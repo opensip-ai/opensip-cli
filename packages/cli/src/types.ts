@@ -158,6 +158,8 @@ export interface FitDoneResult {
     runCount: number;
     success: boolean;
     error?: string;
+    chunksTotal?: number;
+    chunksSucceeded?: number;
   };
   /** Whether the run should cause a non-zero exit code (based on failOnErrors/failOnWarnings config) */
   shouldFail?: boolean;

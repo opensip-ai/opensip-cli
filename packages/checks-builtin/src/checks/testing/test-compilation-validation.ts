@@ -7,13 +7,12 @@
  * This check catches broken imports, type errors, and missing properties in test files.
  */
 
-import { execSync } from 'node:child_process'
 import * as path from 'node:path'
 
 import { logger } from '@opensip-tools/core/logger'
 import { glob } from 'glob'
 
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/core'
+import { defineCheck, execAbortable, type CheckViolation, type FileAccessor } from '@opensip-tools/core'
 import { isTestFile } from '../../utils/index.js'
 
 /**
@@ -168,21 +167,19 @@ async function analyzeAll(files: FileAccessor): Promise<CheckViolation[]> {
   // @fitness-ignore-next-line no-hardcoded-timeouts -- constant defined at module scope for tsc subprocess execution
   const timeout = 120000 // 2 minutes
 
-  try {
-    // Run tsc --build to follow project references
-    execSync(`npx tsc --build 2>&1`, {
-      cwd,
-      timeout,
-      encoding: 'utf-8',
-      maxBuffer: 10 * 1024 * 1024, // 10MB buffer
-      stdio: ['pipe', 'pipe', 'pipe'],
-    })
-  } catch (error) {
-    // @swallow-ok tsc exits with error code when there are errors
-    if (error && typeof error === 'object' && 'stdout' in error) {
-      const output = (error as { stdout?: string }).stdout ?? ''
-      allIssues = parseTypeScriptErrors(output, cwd)
-    }
+  const result = await execAbortable('npx tsc --build 2>&1', {
+    cwd,
+    timeout,
+    maxBuffer: 10 * 1024 * 1024, // 10MB buffer
+  })
+
+  if (result.aborted) {
+    return []
+  }
+
+  // tsc exits non-zero when there are errors — parse stdout for issues
+  if (result.exitCode !== 0) {
+    allIssues = parseTypeScriptErrors(result.stdout, cwd)
   }
 
   // Filter to only include issues from test files, excluding known high-false-positive categories

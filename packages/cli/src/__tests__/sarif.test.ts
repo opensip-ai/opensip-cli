@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildSarifLog } from '../sarif.js';
+import { buildSarifLog, chunkSarifRuns } from '../sarif.js';
 import type { CliOutput } from '../types.js';
 
 function makeSampleOutput(): CliOutput {
@@ -119,5 +119,81 @@ describe('buildSarifLog', () => {
     const sarif = buildSarifLog(cleanOutput);
     const runs = sarif.runs as unknown[];
     expect(runs).toHaveLength(0);
+  });
+});
+
+// ─── chunkSarifRuns ───────────────────────────────────────────────
+
+function makeRun(name: string, findingCount: number) {
+  return {
+    tool: {
+      driver: {
+        name,
+        version: '1.0.0',
+        rules: [{ id: name }],
+      },
+    },
+    results: Array.from({ length: findingCount }, (_, i) => ({
+      ruleId: name,
+      message: { text: `finding ${i}` },
+      level: 'warning',
+    })),
+  };
+}
+
+describe('chunkSarifRuns', () => {
+  it('returns empty array for empty runs', () => {
+    expect(chunkSarifRuns([])).toEqual([]);
+  });
+
+  it('keeps small runs in a single chunk', () => {
+    const runs = [makeRun('a', 100), makeRun('b', 200)];
+    const chunks = chunkSarifRuns(runs, 500);
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0]).toHaveLength(2);
+  });
+
+  it('splits into multiple chunks when findings exceed limit', () => {
+    const runs = [makeRun('a', 300), makeRun('b', 300)];
+    const chunks = chunkSarifRuns(runs, 500);
+    expect(chunks).toHaveLength(2);
+    expect(chunks[0]![0]!.results).toHaveLength(300);
+    expect(chunks[1]![0]!.results).toHaveLength(300);
+  });
+
+  it('splits a single large run across multiple chunks', () => {
+    const runs = [makeRun('big', 1200)];
+    const chunks = chunkSarifRuns(runs, 500);
+    expect(chunks).toHaveLength(3);
+    expect(chunks[0]![0]!.results).toHaveLength(500);
+    expect(chunks[1]![0]!.results).toHaveLength(500);
+    expect(chunks[2]![0]!.results).toHaveLength(200);
+    // Each split chunk preserves the tool driver name
+    for (const chunk of chunks) {
+      expect(chunk[0]!.tool.driver.name).toBe('big');
+    }
+  });
+
+  it('preserves total finding count across all chunks', () => {
+    const runs = [makeRun('a', 450), makeRun('b', 300), makeRun('c', 750)];
+    const chunks = chunkSarifRuns(runs, 500);
+    const total = chunks.reduce(
+      (sum, chunk) => sum + chunk.reduce((s, r) => s + r.results.length, 0),
+      0,
+    );
+    expect(total).toBe(1500);
+  });
+
+  it('packs multiple small runs into one chunk up to the limit', () => {
+    const runs = [makeRun('a', 100), makeRun('b', 100), makeRun('c', 100), makeRun('d', 100), makeRun('e', 100)];
+    const chunks = chunkSarifRuns(runs, 500);
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0]).toHaveLength(5);
+  });
+
+  it('starts a new chunk when next run would exceed limit', () => {
+    const runs = [makeRun('a', 400), makeRun('b', 400)];
+    const chunks = chunkSarifRuns(runs, 500);
+    expect(chunks).toHaveLength(2);
   });
 });

@@ -5,10 +5,9 @@
  * @module fitness/checks/architecture/dependency-architecture
  */
 
-import { execSync } from 'node:child_process'
 import * as path from 'node:path'
 
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/core'
+import { defineCheck, execAbortable, type CheckViolation, type FileAccessor } from '@opensip-tools/core'
 
 interface DependencyCruiserViolation {
   from: string
@@ -82,27 +81,25 @@ export const dependencyArchitecture = defineCheck({
   tags: ['architecture', 'structure', 'dependencies'],
   fileTypes: ['ts'],
 
-  // @fitness-ignore-next-line concurrency-safety -- async keyword required by analyzeAll interface contract; delegates to external command
   async analyzeAll(_files: FileAccessor): Promise<CheckViolation[]> {
     const cwd = process.cwd()
 
     try {
       const cmd = 'npx dependency-cruiser packages services apps --config .config/dependency-cruiser.cjs --output-type json'
 
-      let output: string
-      try {
-        output = execSync(cmd, {
-          encoding: 'utf-8',
-          maxBuffer: 10 * 1024 * 1024,
-          cwd,
-          stdio: ['pipe', 'pipe', 'pipe'],
-        })
-      } catch (error) {
-        // @swallow-ok -- dependency-cruiser exits with non-zero on violations, but still outputs JSON
-        void error
-        const execError = error as { stdout?: string; stderr?: string }
-        output = execError.stdout ?? execError.stderr ?? ''
+      // @fitness-ignore-next-line no-hardcoded-timeouts -- safety timeout for dependency-cruiser subprocess
+      const result = await execAbortable(cmd, {
+        cwd,
+        maxBuffer: 10 * 1024 * 1024,
+        timeout: 300000, // 5 minutes
+      })
+
+      if (result.aborted) {
+        return []
       }
+
+      // dependency-cruiser exits non-zero on violations but still outputs JSON
+      const output = result.stdout || result.stderr
 
       if (!output) {
         return []

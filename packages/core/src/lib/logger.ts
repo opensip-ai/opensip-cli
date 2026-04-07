@@ -85,11 +85,11 @@ function writeToStderr(entry: Record<string, unknown>): void {
 }
 
 function shouldWriteToFile(level: LogLevel): boolean {
-  // In silent mode (framework noise suppressed), only write warn+ to file
-  // In debug mode, write everything to file
-  // Otherwise, respect current log level
-  if (silent && !debugMode) return LEVELS[level] >= LEVELS['warn'];
-  return shouldLog(level);
+  // Always write info+ to the log file regardless of silent mode.
+  // Silent mode suppresses stderr output (for Ink rendering), not file output.
+  // In debug mode, write everything (including debug) to file.
+  if (debugMode) return true;
+  return LEVELS[level] >= LEVELS['info'];
 }
 
 function log(level: LogLevel, msgOrObj: string | Record<string, unknown>, data?: Record<string, unknown>): void {

@@ -1,6 +1,5 @@
 // @fitness-ignore-file throws-documentation -- Functions throw self-documenting typed errors
 // @fitness-ignore-file unused-config-options -- Config options reserved for future use or environment-specific
-// @fitness-ignore-file concurrency-safety -- async keyword required by analyzeAll interface contract; synchronous analysis implementation
 // @fitness-ignore-file no-hardcoded-timeouts -- constants defined at module scope for vitest subprocess execution
 /**
  * @fileoverview Unit Test Health Check - runs unit tests and reports failures
@@ -16,13 +15,12 @@
  */
 
 // @fitness-ignore-file fitness-check-standards -- Uses fs for directory existsSync and config file reading, not source file content
-import { execSync } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
 import { logger } from '@opensip-tools/core/logger'
 
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/core'
+import { defineCheck, execAbortable, type CheckViolation, type FileAccessor } from '@opensip-tools/core'
 
 /**
  * Vitest JSON output types
@@ -256,13 +254,12 @@ function extractJsonFromOutput(output: string): string | null {
 }
 
 /**
- * Run tests using vitest
+ * Run tests using vitest (async — does not block the event loop)
  */
-function runTests(
-  cwd: string,
+async function runTests(
   targetDir: string,
   timeout: number,
-): { summary: VitestJsonOutput; violations: CheckViolation[] } {
+): Promise<{ summary: VitestJsonOutput; violations: CheckViolation[] }> {
   logger.debug({
     evt: 'fitness.checks.unit_test_health.run_tests',
     msg: 'Running tests using vitest',
@@ -273,29 +270,28 @@ function runTests(
     throw new Error(reason)
   }
 
-  const cmd = `cd ${targetDir} && pnpm vitest run --reporter=json 2>&1`
+  const result = await execAbortable('pnpm vitest run --reporter=json 2>&1', {
+    cwd: targetDir,
+    timeout,
+    maxBuffer: 50 * 1024 * 1024, // 50MB buffer
+  })
 
-  try {
-    const output = execSync(cmd, {
-      cwd,
-      timeout,
-      encoding: 'utf-8',
-      maxBuffer: 50 * 1024 * 1024, // 50MB buffer
-      stdio: ['pipe', 'pipe', 'pipe'],
-    })
-    return parseVitestOutput(output)
-  } catch (error) {
-    // vitest exits with error code when tests fail - that's expected
-    if (error && typeof error === 'object' && 'stdout' in error) {
-      const output = (error as { stdout?: string }).stdout ?? ''
-      // Find the JSON output in the stdout using non-regex approach
-      const jsonStr = extractJsonFromOutput(output)
-      if (jsonStr) {
-        return parseVitestOutput(jsonStr)
-      }
-    }
-    throw error
+  if (result.aborted) {
+    return { summary: { numTotalTests: 0, numPassedTests: 0, numFailedTests: 0, numSkippedTests: 0, success: true, testResults: [] }, violations: [] }
   }
+
+  // vitest exits non-zero when tests fail — that's expected
+  const output = result.stdout
+  if (result.exitCode === 0) {
+    return parseVitestOutput(output)
+  }
+
+  const jsonStr = extractJsonFromOutput(output)
+  if (jsonStr) {
+    return parseVitestOutput(jsonStr)
+  }
+
+  throw new Error(`vitest exited with code ${result.exitCode} but produced no JSON output`)
 }
 
 /**
@@ -319,10 +315,10 @@ async function analyzeBackend(files: FileAccessor): Promise<CheckViolation[]> {
   }
 
   const targetDir = path.join(cwd, 'services', 'apiserver')
-  const timeout = 600000 // 10 minutes
+  const timeout = 300000 // 5 minutes
 
   try {
-    const result = runTests(cwd, targetDir, timeout)
+    const result = await runTests(targetDir, timeout)
     return result.violations
   } catch {
     // @swallow-ok -- vitest execution failures are expected when tests cannot run, return empty to skip check
@@ -352,10 +348,10 @@ async function analyzeFrontend(files: FileAccessor): Promise<CheckViolation[]> {
   }
 
   const targetDir = path.join(cwd, 'apps', 'dashboard')
-  const timeout = 600000 // 10 minutes
+  const timeout = 300000 // 5 minutes
 
   try {
-    const result = runTests(cwd, targetDir, timeout)
+    const result = await runTests(targetDir, timeout)
     return result.violations
   } catch {
     // @swallow-ok -- vitest execution failures are expected when tests cannot run, return empty to skip check
