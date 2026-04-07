@@ -69,9 +69,10 @@ export async function openDashboard(): Promise<DashboardResult> {
   let opened = false;
   try {
     const platform = process.platform;
-    if (platform === 'darwin') execFileSync('open', [reportPath]);
-    else if (platform === 'linux') execFileSync('xdg-open', [reportPath]);
-    else if (platform === 'win32') execFileSync('cmd', ['/c', 'start', '', reportPath]);
+    const execOpts = { timeout: 5000 };
+    if (platform === 'darwin') execFileSync('open', [reportPath], execOpts);
+    else if (platform === 'linux') execFileSync('xdg-open', [reportPath], execOpts);
+    else if (platform === 'win32') execFileSync('cmd', ['/c', 'start', '', reportPath], execOpts);
     opened = true;
   } catch {
     // Could not open — user will need to open manually

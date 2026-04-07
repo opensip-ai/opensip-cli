@@ -88,7 +88,7 @@ export async function executeCommand(
       error:
         `Command exited with unexpected code ${result.exitCode}. ` +
         `Expected one of: ${expectedCodes.join(', ')}. ` +
-        `stderr: ${result.stderr.slice(0, 500)}`,
+        `stderr: ${result.stderr.slice(0, 500)}${result.stderr.length > 500 ? ' [truncated]' : ''}`,
     }
   }
 

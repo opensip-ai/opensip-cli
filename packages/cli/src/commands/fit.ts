@@ -165,7 +165,7 @@ export async function executeFit(
   let fitnessResult: FitnessRecipeResult;
   try {
     if (args.tags) {
-      const tagFilters = args.tags.split(',').map(t => t.trim());
+      const tagFilters = args.tags.split(',').map(t => t.trim()).filter(Boolean);
       fitnessResult = await service.start(FitnessRecipeService.createAdHocRecipe({ tagFilters }));
     } else {
       fitnessResult = await service.start(recipeName!);
@@ -212,6 +212,7 @@ export async function executeFit(
         severity: v.severity,
         filePath: v.file,
         line: v.line,
+        column: v.column,
         suggestion: v.suggestion,
       })),
       durationMs: cr.durationMs,

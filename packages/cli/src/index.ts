@@ -352,7 +352,11 @@ sessionsCmd
 sessionsCmd
   .command('purge')
   .description('Delete session data from ~/.opensip-tools/sessions/')
-  .option('--older-than <days>', 'Only delete sessions older than N days', parseInt)
+  .option('--older-than <days>', 'Only delete sessions older than N days', (v: string) => {
+    const n = parseInt(v, 10);
+    if (isNaN(n) || n < 0) throw new Error(`Invalid --older-than value: '${v}'. Must be a non-negative integer.`);
+    return n;
+  })
   .option('-y, --yes', 'Skip confirmation prompt', false)
   .action(async (opts: { olderThan?: number; yes: boolean }) => {
     const { executeClear } = await import('./commands/clear.js');

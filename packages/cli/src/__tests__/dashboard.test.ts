@@ -95,9 +95,9 @@ describe('generateDashboardHtml', () => {
     const scriptStart = html.indexOf('const sessions = ');
     const scriptEnd = html.indexOf(';\nconst fitSessions');
     const jsonSection = html.slice(scriptStart, scriptEnd);
-    // The </ should be escaped as <\/
+    // All < and > should be escaped as \u003c and \u003e in script context
     expect(jsonSection).not.toContain('</script>');
-    expect(jsonSection).toContain('<\\/script>');
+    expect(jsonSection).toContain('\\u003c/script\\u003e');
   });
 
   it('includes CSS with score color classes', () => {

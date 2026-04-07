@@ -32,9 +32,10 @@ export async function withRetry<T>(
     onRetry,
   } = options;
 
+  const effectiveMaxAttempts = Math.max(1, maxAttempts);
   let lastError: Error | undefined;
 
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+  for (let attempt = 1; attempt <= effectiveMaxAttempts; attempt++) {
     try {
       return await fn();
     } catch (e) {

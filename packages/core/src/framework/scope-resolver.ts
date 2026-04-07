@@ -226,7 +226,7 @@ export function resolveFilesForCheck(
       return []
     }
     const names = matchedTargets.map((t) => t.config.name)
-    return maybeApplyExcludes(unionTargetFiles(names, resolvedTargets ?? new Map()))
+    return maybeApplyExcludes(lookupFiles(names))
   }
 
   // 3. No scope, no override — undefined signals "use file cache fallback"

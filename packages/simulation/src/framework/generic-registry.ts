@@ -22,6 +22,17 @@ export class GenericRegistry<T extends Registerable> {
 
   register(item: T): void {
     if (this.byId.has(item.id)) return; // Skip duplicates silently
+
+    // Guard against name collisions: two items with different IDs but same name
+    // would cause inconsistent dual-key state (byId has both, byName only has last)
+    const existingByName = this.byName.get(item.name);
+    if (existingByName && existingByName.id !== item.id) {
+      throw new ValidationError(
+        `${this.moduleName} registry: name collision — '${item.name}' is already registered with id '${existingByName.id}', cannot register id '${item.id}' with the same name`,
+        { code: 'VALIDATION.REGISTRY.NAME_COLLISION' },
+      );
+    }
+
     this.byId.set(item.id, item);
     this.byName.set(item.name, item);
   }

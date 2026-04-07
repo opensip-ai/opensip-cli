@@ -108,7 +108,7 @@ export class FileAccessorImpl implements FileAccessor {
 
     // Try global file cache first (populated by prewarm or previous checks)
     let content = fileCache.getCached(filePath)
-    if (!content) {
+    if (content === undefined) {
       const fileStats = await fs.stat(filePath)
       if (fileStats.size > 10_000_000) {
         // @fitness-ignore-next-line result-pattern-consistency -- infrastructure boundary guard, not domain logic

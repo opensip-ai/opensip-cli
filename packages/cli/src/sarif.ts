@@ -44,13 +44,13 @@ function buildSarifRuns(output: CliOutput): SarifRun[] {
       };
 
       if (f.filePath) {
+        const region: Record<string, number> = {};
+        if (f.line != null) region.startLine = f.line;
+        if (f.column != null) region.startColumn = f.column;
         result.locations = [{
           physicalLocation: {
             artifactLocation: { uri: f.filePath },
-            region: {
-              ...(f.line != null ? { startLine: f.line } : {}),
-              ...(f.column != null ? { startColumn: f.column } : {}),
-            },
+            ...(Object.keys(region).length > 0 ? { region } : {}),
           },
         }];
       }
@@ -180,7 +180,7 @@ export async function reportToCloud(output: CliOutput, url: string, apiKey?: str
               error: error.message,
               delayMs,
               url: sarifUrl,
-              chunk: `${succeeded + 1}/${chunks.length}`,
+              chunk: `${ci + 1}/${chunks.length}`,
             });
           },
         },
@@ -193,7 +193,7 @@ export async function reportToCloud(output: CliOutput, url: string, apiKey?: str
 
         if (!isTransientError(res.status)) {
           // Non-transient (4xx) — no point sending remaining chunks
-          logger.info({ evt: 'cli.report.abort', reason: msg, remaining: chunks.length - succeeded - 1 });
+          logger.info({ evt: 'cli.report.abort', reason: msg, remaining: chunks.length - ci - 1 });
           break;
         }
         continue;

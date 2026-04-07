@@ -103,7 +103,7 @@ export const PERSONAS = {
    * @param count - Number of sellers. Default: 15
    */
   sellerHeavy: (count = 15): readonly PersonaConfig[] =>
-    Object.freeze([persona('seller', count), persona('buyer', count * 2)]),
+    Object.freeze([persona('seller', count), persona('buyer', Math.ceil(count / 4))]),
 
   /**
    * Security testing with adversarial actors.

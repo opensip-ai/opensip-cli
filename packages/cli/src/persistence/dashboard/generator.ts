@@ -21,9 +21,12 @@ export function generateDashboardHtml(
   recipeCatalog: RecipeCatalogEntry[] = [],
 ): string {
   const latest = sessions[0]
-  const safeDataJson = JSON.stringify(sessions).replace(/<\//g, '<\\/')
-  const safeCatalogJson = JSON.stringify(checkCatalog).replace(/<\//g, '<\\/').replace(/</g, '\\u003c')
-  const safeRecipeJson = JSON.stringify(recipeCatalog).replace(/<\//g, '<\\/')
+  // Escape all < and > to prevent script injection in HTML <script> context
+  const escapeForScriptContext = (json: string): string =>
+    json.replace(/</g, '\\u003c').replace(/>/g, '\\u003e')
+  const safeDataJson = escapeForScriptContext(JSON.stringify(sessions))
+  const safeCatalogJson = escapeForScriptContext(JSON.stringify(checkCatalog))
+  const safeRecipeJson = escapeForScriptContext(JSON.stringify(recipeCatalog))
 
   return `<!DOCTYPE html>
 <html lang="en">

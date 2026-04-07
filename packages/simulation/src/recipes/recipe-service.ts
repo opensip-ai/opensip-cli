@@ -64,52 +64,55 @@ export class RecipeService {
       ticketStats: createEmptyTicketStats(),
     }
 
-    logger.info({
-      evt: 'simulation.recipe.start',
-      module: 'simulation:recipe',
-      recipeId: recipe.id,
-      recipeName: recipe.name,
-      scenarioCount: recipe.scenarios.length,
-      mode: recipe.execution.mode,
-    })
+    try {
+      logger.info({
+        evt: 'simulation.recipe.start',
+        module: 'simulation:recipe',
+        recipeId: recipe.id,
+        recipeName: recipe.name,
+        scenarioCount: recipe.scenarios.length,
+        mode: recipe.execution.mode,
+      })
 
-    const results: ScenarioRunResult[] = []
+      const results: ScenarioRunResult[] = []
 
-    if (recipe.execution.mode === 'parallel') {
-      const parallel = await this.executeParallel(recipe)
-      results.push(...parallel)
-    } else {
-      const sequential = await this.executeSequential(recipe)
-      results.push(...sequential)
+      if (recipe.execution.mode === 'parallel') {
+        const parallel = await this.executeParallel(recipe)
+        results.push(...parallel)
+      } else {
+        const sequential = await this.executeSequential(recipe)
+        results.push(...sequential)
+      }
+
+      this.activeSession.scenarioResults = results
+
+      const totals = computeTotals(results)
+      const success = totals.failedScenarios === 0
+
+      const result: RecipeResult = {
+        recipeId: recipe.id,
+        recipeName: recipe.name,
+        success,
+        scenarioResults: results,
+        totals,
+        durationMs: Date.now() - startTime,
+        ticketStats: this.activeSession.ticketStats,
+      }
+
+      logger.info({
+        evt: 'simulation.recipe.complete',
+        module: 'simulation:recipe',
+        recipeId: recipe.id,
+        success,
+        durationMs: result.durationMs,
+        passed: totals.passedScenarios,
+        failed: totals.failedScenarios,
+      })
+
+      return result
+    } finally {
+      this.activeSession = undefined
     }
-
-    this.activeSession.scenarioResults = results
-
-    const totals = computeTotals(results)
-    const success = totals.failedScenarios === 0
-
-    const result: RecipeResult = {
-      recipeId: recipe.id,
-      recipeName: recipe.name,
-      success,
-      scenarioResults: results,
-      totals,
-      durationMs: Date.now() - startTime,
-      ticketStats: this.activeSession.ticketStats,
-    }
-
-    logger.info({
-      evt: 'simulation.recipe.complete',
-      module: 'simulation:recipe',
-      recipeId: recipe.id,
-      success,
-      durationMs: result.durationMs,
-      passed: totals.passedScenarios,
-      failed: totals.failedScenarios,
-    })
-
-    this.activeSession = undefined
-    return result
   }
 
   private async executeSequential(recipe: SimulationRecipe): Promise<ScenarioRunResult[]> {

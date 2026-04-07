@@ -20,7 +20,8 @@ export function generatePrefixedId(prefix: string): string {
 /** Extract the timestamp from a ULID string. Returns null if invalid. */
 export function extractTimestamp(id: string): Date | null {
   // Strip prefix if present (e.g., 'RUN_01HXYZ...' → '01HXYZ...')
-  const ulidPart = id.includes('_') ? id.split('_').pop()! : id;
+  const underscoreIdx = id.indexOf('_');
+  const ulidPart = underscoreIdx >= 0 ? id.slice(underscoreIdx + 1) : id;
   if (ulidPart.length !== 26) return null;
 
   try {
