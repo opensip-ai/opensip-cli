@@ -113,7 +113,7 @@ function extractFunctionBodies(content: string): FunctionBounds[] {
     const name = matchFunctionName(line)
     if (!name) continue
 
-    // Extract function body by tracking brace depth
+    // Extract function body by tracking brace depth (skip braces in strings/comments)
     const body: string[] = []
     let depth = 0
     let started = false
@@ -123,7 +123,16 @@ function extractFunctionBodies(content: string): FunctionBounds[] {
       const bodyLine = lines[j]
       if (!bodyLine) continue
 
+      let inString: string | null = null
+      let escaped = false
       for (const char of bodyLine) {
+        if (escaped) { escaped = false; continue }
+        if (char === '\\') { escaped = true; continue }
+        if (inString) {
+          if (char === inString) inString = null
+          continue
+        }
+        if (char === "'" || char === '"' || char === '`') { inString = char; continue }
         if (char === '{') { depth++; started = true }
         if (char === '}') depth--
       }
