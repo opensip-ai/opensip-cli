@@ -57,9 +57,9 @@ describe('generateDashboardHtml', () => {
     expect(html).toContain('No sessions yet');
   });
 
-  it('includes latest session score in the title', () => {
+  it('includes latest session pass rate in the title', () => {
     const html = generateDashboardHtml([makeSession({ score: 92 })]);
-    expect(html).toContain('Score: 92%');
+    expect(html).toContain('Pass Rate: 92%');
   });
 
   it('includes session data as JSON in a script tag', () => {

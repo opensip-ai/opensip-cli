@@ -33,7 +33,7 @@ export function generateDashboardHtml(
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>OpenSIP Tools${latest ? ` — Score: ${latest.score}%` : ''}</title>
+<title>OpenSIP Tools${latest ? ` — Pass Rate: ${latest.score}%` : ''}</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M4 8h12a4 4 0 0 1 0 8h-1M4 8v8a4 4 0 0 0 4 4h4a4 4 0 0 0 4-4V8M4 8H2M6 4c0 1 .5 2 1 2.5M10 3c0 1.5.5 2.5 1 3M14 4c0 1 .5 2 1 2.5' stroke='%23c4956a' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&display=swap" rel="stylesheet">

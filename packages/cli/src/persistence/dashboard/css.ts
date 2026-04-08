@@ -99,6 +99,7 @@ h3 { font-size: 14px; font-weight: 600; margin-bottom: 8px; color: var(--text-mu
 .badge { font-size: 11px; padding: 2px 8px; border-radius: 3px; font-weight: 500; display: inline-block; }
 .badge-pass { background: var(--success-light); color: var(--success); }
 .badge-fail { background: var(--error-light); color: var(--error); }
+.badge-warn { background: var(--warning-light); color: var(--warning); }
 
 /* Pagination */
 .pagination { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; margin-top: 8px; }

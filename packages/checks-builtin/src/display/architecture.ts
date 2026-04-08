@@ -14,18 +14,13 @@ export const ARCHITECTURE_DISPLAY = Object.freeze<Record<string, CheckDisplayEnt
   'empty-package-detection': ['\uD83D\uDCE6', 'Empty Package Detection'],
   'env-var-validation': ['\uD83D\uDD27', 'Env Var Validation'],
   'interface-implementation-consistency': ['\uD83D\uDCCB', 'Interface Implementation Consistency'],
-  'intermediate-reexport-detection': ['\uD83D\uDD00', 'Intermediate Re-export Detection'],
   'no-custom-event-emitter': ['\uD83D\uDCE8', 'No Custom Event Emitter'],
   'no-duplicate-packages': ['\uD83D\uDCE6', 'No Duplicate Packages'],
   'node-version-consistency': ['\uD83D\uDCE6', 'Node Version Consistency'],
   'phantom-dependency-detection': ['\uD83D\uDCE6', 'Phantom Dependency Detection'],
   'project-readme-existence': ['\uD83D\uDCDD', 'Project README Existence'],
   'typed-inject-scope-mismatch': ['\uD83D\uDC89', 'Typed-Inject Scope Mismatch'],
-  'typescript-build-configuration': ['\uD83D\uDCD8', 'TypeScript Build Configuration'],
   'unused-modules': ['\uD83E\uDDF9', 'Unused Modules'],
-  'dependency-architecture': ['\uD83C\uDFD7\uFE0F', 'Dependency Architecture'],
-  'no-process-exit-in-handlers': ['\uD83D\uDED1', 'No Process Exit In Handlers'],
-  'otel-span-coverage': ['\uD83D\uDCE1', 'OTel Span Coverage'],
 })
 
 /** Documentation check display entries */

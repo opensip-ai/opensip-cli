@@ -9,6 +9,19 @@ export function dashboardSessionsJs(): string {
 // SESSION TABLE (used by fitness/sim tabs)
 // =======================================================
 
+/** Derive 3-state session status: 'fail' | 'warn' | 'pass' */
+function sessionStatus(s) {
+  if (s.summary.failed > 0) return 'fail';
+  if (s.summary.warnings > 0) return 'warn';
+  return 'pass';
+}
+
+function statusBadge(status) {
+  const labels = { fail: 'FAIL', warn: 'WARN', pass: 'PASS' };
+  const classes = { fail: 'badge-fail', warn: 'badge-warn', pass: 'badge-pass' };
+  return el('span', {class:'badge ' + classes[status], text: labels[status]});
+}
+
 function renderSessionTable(panel, toolSessions, accentColor) {
   if (!toolSessions.length) {
     panel.appendChild(el('div', {class:'empty', text:'No sessions yet.'}));
@@ -20,7 +33,7 @@ function renderSessionTable(panel, toolSessions, accentColor) {
   const table = el('table', {class:'data-table sortable'});
   const thead = el('thead');
   const headerRow = el('tr');
-  ['Timestamp', 'Recipe', 'Score', 'Status', 'Passed', 'Failed', 'Findings', 'Duration'].forEach(h => {
+  ['Timestamp', 'Recipe', 'Pass Rate', 'Status', 'Passed', 'Failed', 'Findings', 'Duration'].forEach(h => {
     headerRow.appendChild(el('th', {text: h}));
   });
   thead.appendChild(headerRow);
@@ -40,7 +53,7 @@ function renderSessionTable(panel, toolSessions, accentColor) {
     scoreCell.textContent = s.score + '%';
     row.appendChild(scoreCell);
     const badgeCell = el('td');
-    badgeCell.appendChild(el('span', {class:'badge ' + (s.passed ? 'badge-pass' : 'badge-fail'), text: s.passed ? 'PASS' : 'FAIL'}));
+    badgeCell.appendChild(statusBadge(sessionStatus(s)));
     row.appendChild(badgeCell);
     row.appendChild(el('td', {text: ''+s.summary.passed, style:'color:var(--success)'}));
     row.appendChild(el('td', {text: ''+s.summary.failed, style: s.summary.failed > 0 ? 'color:var(--error)' : 'color:var(--text-dim)'}));
@@ -63,11 +76,27 @@ function renderSessionTable(panel, toolSessions, accentColor) {
     detailContainer.style.display = 'block';
     while (detailContainer.firstChild) detailContainer.removeChild(detailContainer.firstChild);
 
+    // Compute session-level totals from check findings
+    let totalErrors = 0;
+    let totalWarnings = 0;
+    session.checks.forEach(c => {
+      if (c.findings) {
+        c.findings.forEach(f => {
+          if (f.severity === 'error') totalErrors++;
+          else if (f.severity === 'warning') totalWarnings++;
+        });
+      }
+    });
+
     const headerRow = el('div', {style:'display:flex;align-items:center;justify-content:space-between;margin-bottom:16px'});
     const headerLeft = el('div');
     headerLeft.appendChild(el('h3', {text: 'Session Detail \\u2014 ' + new Date(session.timestamp).toLocaleString(), style:'margin-bottom:4px'}));
     const sub = el('div', {style:'color:var(--text-dim);font-size:12px'});
-    sub.textContent = session.cwd + (session.recipe ? ' \\u2014 recipe: ' + session.recipe : '');
+    const countParts = [];
+    if (totalErrors > 0) countParts.push(totalErrors + ' error' + (totalErrors !== 1 ? 's' : ''));
+    if (totalWarnings > 0) countParts.push(totalWarnings + ' warning' + (totalWarnings !== 1 ? 's' : ''));
+    const countsStr = countParts.length > 0 ? ' \\u2014 ' + countParts.join(', ') : '';
+    sub.textContent = session.cwd + (session.recipe ? ' \\u2014 recipe: ' + session.recipe : '') + countsStr;
     headerLeft.appendChild(sub);
     headerRow.appendChild(headerLeft);
 
@@ -83,10 +112,10 @@ function renderSessionTable(panel, toolSessions, accentColor) {
     detailContainer.appendChild(headerRow);
 
     // Check detail table
-    const table = el('table', {class:'data-table'});
+    const table = el('table', {class:'data-table sortable'});
     const thead = el('thead');
     const thRow = el('tr');
-    ['', 'Check', 'Status', 'Findings', 'Duration'].forEach(h => {
+    ['', 'Check', 'Status', 'Errors', 'Warnings', 'Findings', 'Duration'].forEach(h => {
       thRow.appendChild(el('th', {text: h}));
     });
     thead.appendChild(thRow);
@@ -94,15 +123,17 @@ function renderSessionTable(panel, toolSessions, accentColor) {
 
     const tbody = el('tbody');
     session.checks.forEach((check, i) => {
-      const hasFindings = check.findings.length > 0;
-      const vCount = check.violationCount || check.findings.length;
+      const checkErrors = check.findings ? check.findings.filter(f => f.severity === 'error').length : 0;
+      const checkWarnings = check.findings ? check.findings.filter(f => f.severity === 'warning').length : 0;
+      const findingsTotal = checkErrors + checkWarnings;
+      const hasFindings = findingsTotal > 0;
       const expanderId = filterUid + '-exp-' + i;
-      const checkStatus = check.passed ? 'pass' : 'fail';
+      const checkStatusVal = check.passed ? 'pass' : 'fail';
 
       const arrowCell = el('td', {style:'width:24px;text-align:center;color:var(--text-dim);font-size:12px'});
       if (hasFindings) arrowCell.textContent = '\\u25B6';
 
-      const row = el('tr', {class: hasFindings ? 'clickable' : '', 'data-check-status': checkStatus, onclick: hasFindings ? () => {
+      const row = el('tr', {class: hasFindings ? 'clickable' : '', 'data-check-status': checkStatusVal, onclick: hasFindings ? () => {
         const exp = document.getElementById(expanderId);
         if (exp) {
           const isOpen = exp.classList.toggle('open');
@@ -117,13 +148,15 @@ function renderSessionTable(panel, toolSessions, accentColor) {
       const statusCell = el('td');
       statusCell.appendChild(el('span', {class:'badge ' + (check.passed ? 'badge-pass' : 'badge-fail'), text: check.passed ? 'PASS' : 'FAIL'}));
       row.appendChild(statusCell);
-      row.appendChild(el('td', {text: vCount > 0 ? ''+vCount : '\\u2014', style: vCount > 0 ? 'color:var(--text)' : 'color:var(--text-dim)'}));
-      row.appendChild(el('td', {text: check.durationMs > 0 ? check.durationMs + 'ms' : '\\u2014', style:'color:var(--text-dim)'}));
+      row.appendChild(el('td', {text: ''+checkErrors, style: checkErrors > 0 ? 'color:var(--error)' : 'color:var(--text-dim)'}));
+      row.appendChild(el('td', {text: ''+checkWarnings, style: checkWarnings > 0 ? 'color:var(--warning)' : 'color:var(--text-dim)'}));
+      row.appendChild(el('td', {text: ''+findingsTotal, style: findingsTotal > 0 ? 'color:var(--text)' : 'color:var(--text-dim)'}));
+      row.appendChild(el('td', {text: check.durationMs > 0 ? check.durationMs + 'ms' : '0ms', style:'color:var(--text-dim)'}));
       tbody.appendChild(row);
 
       if (hasFindings) {
-        const expRow = el('tr', {id: expanderId, class:'expander-row', 'data-check-status': checkStatus});
-        const expCell = el('td', {colspan:'5', style:'padding:0'});
+        const expRow = el('tr', {id: expanderId, class:'expander-row', 'data-check-status': checkStatusVal});
+        const expCell = el('td', {colspan:'7', style:'padding:0'});
         const expContent = el('div', {class:'expander-content'});
 
         const fTable = el('table', {class:'data-table', style:'margin:0;border:none'});
@@ -156,6 +189,9 @@ function renderSessionTable(panel, toolSessions, accentColor) {
     table.appendChild(tbody);
     const detailPag = el('div', {class:'pagination'});
     detailContainer.appendChild(el('div', {class:'card'}, [table, detailPag]));
+
+    // Enable sorting on the detail table
+    makeSortable(table);
 
     // Apply filter
     applyCheckFilter(select, tbody, detailPag);

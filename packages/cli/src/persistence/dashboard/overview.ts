@@ -16,7 +16,7 @@ function renderOverview() {
   const table = el('table', {class:'data-table sortable'});
   const thead = el('thead');
   const headerRow = el('tr');
-  ['Timestamp', 'Tool', 'Recipe', 'Score', 'Status', 'Checks', 'Findings', 'Duration'].forEach(h => {
+  ['Timestamp', 'Tool', 'Recipe', 'Pass Rate', 'Status', 'Checks', 'Findings', 'Duration'].forEach(h => {
     headerRow.appendChild(el('th', {text: h}));
   });
   thead.appendChild(headerRow);
@@ -48,7 +48,7 @@ function renderOverview() {
     row.appendChild(el('td', {text: s.recipe || 'default', style:'color:var(--text-muted)'}));
     row.appendChild(el('td', {text: s.score+'%', style:'font-weight:600;'+sc2}));
     const statusCell = el('td');
-    statusCell.appendChild(el('span', {class:'badge ' + (s.passed ? 'badge-pass' : 'badge-fail'), text: s.passed ? 'PASS' : 'FAIL'}));
+    statusCell.appendChild(statusBadge(sessionStatus(s)));
     row.appendChild(statusCell);
     row.appendChild(el('td', {text: s.summary.passed+'/'+s.summary.total}));
     row.appendChild(el('td', {text: ''+s.summary.errors}));

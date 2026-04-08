@@ -159,7 +159,7 @@ export async function executeFit(
     checkTargetFiles,
     callbacks,
     disabledChecks,
-    includeViolations: args.findings || args.verbose || !!args.reportTo,
+    includeViolations: true,
   });
 
   let fitnessResult: FitnessRecipeResult;
@@ -194,7 +194,7 @@ export async function executeFit(
     timestamp: new Date().toISOString(),
     recipe: recipeName,
     score,
-    passed: fitnessResult.success,
+    passed: summary.failedChecks === 0,
     summary: {
       total: summary.totalChecks,
       passed: summary.passedChecks,

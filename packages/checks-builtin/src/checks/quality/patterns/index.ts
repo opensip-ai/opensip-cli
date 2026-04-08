@@ -1,7 +1,5 @@
 export * from './async-state-pattern.js'
 export * from './async-waterfall-detection.js'
-export * from './cache-usage-enforcement.js'
-export * from './concurrency-safety.js'
 export * from './dispose-pattern-completeness.js'
 export * from './error-handling-quality.js'
 export * from './lifecycle-cleanup-enforcement.js'
