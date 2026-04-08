@@ -43,7 +43,6 @@ type ViolationType =
   | 'version-check'
   | 'backwards-compat-comment'
   | 'temporary-workaround'
-  | 'migration-code'
   | 'shim-adapter'
 
 /**
@@ -149,17 +148,6 @@ function matchTemporaryWorkaround(line: string): boolean {
 }
 
 /**
- * Matches migration utility declarations.
- * Pattern: (class|function|const|let|var) ...migrate/migration/migrator...
- */
-function matchMigrationCode(line: string): boolean {
-  const lowerLine = line.toLowerCase()
-  if (!lowerLine.includes('migrat')) return false
-  const declarationKeywords = ['class ', 'function ', 'const ', 'let ', 'var ']
-  return declarationKeywords.some((keyword) => lowerLine.includes(keyword))
-}
-
-/**
  * Matches backwards compatibility comments.
  * Excludes: "backward compatible way" (semantic versioning descriptions)
  */
@@ -254,16 +242,6 @@ const COMPATIBILITY_PATTERNS: readonly PatternConfig[] = [
     message: 'Found temporary workaround - implement permanent solution before launch',
     suggestion: 'Replace temporary workaround with a permanent, production-ready solution',
     keywords: ['HACK', 'FIXME', 'temporary', 'workaround'],
-  },
-
-  // Migration utilities
-  {
-    pattern: matchMigrationCode,
-    type: 'migration-code',
-    severity: 'ERROR',
-    message: 'Found migration utility - not needed during pre-launch phase',
-    suggestion: 'Remove migration code and use direct implementation',
-    keywords: ['migrat'],
   },
 
   // Backwards compatibility comments
@@ -388,7 +366,6 @@ export const noLegacyCode = defineCheck({
 - \`@deprecated\` JSDoc tags in production code
 - Declarations containing \`CompatibilityLayer\`, \`LegacyWrapper\`, \`BackwardCompat\`, or \`Shim\` in class/function/variable names
 - Version compatibility checks (\`if (version ...)\` with \`compatibility\`)
-- Migration utilities (declarations containing \`migrat\` keyword)
 - Temporary workaround comments (\`HACK\`/\`FIXME\` with \`before launch\`/\`temporary\`/\`workaround\`)
 - Backwards compatibility comments (\`legacy support\`, \`deprecated but kept\`, \`alias for ... compat\`)
 
