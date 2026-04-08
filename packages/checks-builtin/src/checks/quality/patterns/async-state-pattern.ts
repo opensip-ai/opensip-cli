@@ -1,8 +1,5 @@
 /**
  * @fileoverview Async State Pattern Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/patterns/async-state-pattern
- * @version 2.0.0
  *
  * Enforces that data-driven screens are wrapped in the AsyncState pattern.
  * Screens using TanStack Query should use AsyncState for consistent loading/error handling.

@@ -2,10 +2,6 @@
 // @fitness-ignore-file silent-early-returns -- Guard clauses in analyzeDIFile validate inputs before analysis
 /**
  * @fileoverview DI Static Inject Usage check (v2)
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/architecture/di-static-inject-usage
- * @version 3.0.0
- * @see ADR-054 - Dependency Injection with typed-inject
  */
 
 import * as path from 'node:path'
@@ -444,7 +440,6 @@ function analyzeDIFile(options: AnalyzeDIFileOptions): boolean {
  * - Classes with `static inject` that have constructor params but no DI wiring
  * - Missing `static inject` on classes with injected dependencies
  *
- * @see ADR-054 Dependency Injection with typed-inject
  */
 export const diStaticInjectUsage = defineCheck({
   id: 'e202e61b-f478-4a5f-9395-72e669018729',
@@ -466,7 +461,7 @@ export const diStaticInjectUsage = defineCheck({
 
 **Why it matters:** Mismatched DI wiring causes runtime \`undefined\` injections or silent failures that are difficult to debug in production.
 
-**Scope:** Codebase-specific convention enforcing ADR-054. Cross-file analysis via \`analyzeAll\`.`,
+**Scope:** General best practice for typed-inject codebases. Cross-file analysis via \`analyzeAll\`.`,
   tags: ['architecture', 'structure', 'dependency-injection'],
   fileTypes: ['ts'],
  

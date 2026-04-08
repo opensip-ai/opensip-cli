@@ -1,8 +1,5 @@
 /**
  * @fileoverview Timer lifecycle check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/resilience/timer-lifecycle
- * @version 1.0.0
  */
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/core'

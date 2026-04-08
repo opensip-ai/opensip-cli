@@ -3,9 +3,6 @@
 // @fitness-ignore-file error-handling-quality -- reviewed: false positive; String.prototype.match() at line 141 is regex matching, not Result.match() error handling
 /**
  * @fileoverview Validate JWT handling follows security best practices
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/security/jwt-validation
- * @version 2.1.0
  */
 
 import { logger } from '@opensip-tools/core/logger'

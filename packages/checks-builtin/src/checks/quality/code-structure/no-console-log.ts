@@ -1,9 +1,6 @@
 // @fitness-ignore-file no-console-log -- Check definition file references console patterns in its description
 /**
  * @fileoverview Disallow console.log in production code
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/code-structure/no-console-log
- * @version 2.0.0
  */
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/core'

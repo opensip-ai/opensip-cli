@@ -1,8 +1,5 @@
 /**
  * @fileoverview Image Optimization Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/frontend/image-optimization
- * @version 2.0.0
  *
  * Detects unoptimized image imports and usage patterns in React Native code.
  * Recommends using Expo Image or optimized image loading strategies.

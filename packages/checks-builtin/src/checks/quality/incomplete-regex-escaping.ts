@@ -1,9 +1,6 @@
 // @fitness-ignore-file unused-config-options -- Config options reserved for future use or environment-specific
 /**
  * @fileoverview Incomplete Regex Escaping Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/incomplete-regex-escaping
- * @version 3.0.0
  *
  * Detects incomplete regex character escaping in .replace() calls.
  * This is a security vulnerability that can lead to regex injection attacks.

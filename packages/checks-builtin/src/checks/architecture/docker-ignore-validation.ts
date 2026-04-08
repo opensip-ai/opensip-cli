@@ -6,8 +6,6 @@
  * - Every Dockerfile directory must have a .dockerignore file
  * - .dockerignore must include .git pattern
  * - Node-based Dockerfiles must also include node_modules pattern
- * @module cli/devtools/fitness/src/checks/architecture/docker-ignore-validation
- * @version 1.0.0
  */
 
 import * as fs from 'node:fs'

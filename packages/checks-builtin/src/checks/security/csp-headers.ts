@@ -4,9 +4,6 @@
 // @fitness-ignore-file csp-headers -- Fitness check definition, not production CSP configuration
 /**
  * @fileoverview Validate Content Security Policy headers configuration
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/security/csp-headers
- * @version 2.1.0
  */
 
 import { logger } from '@opensip-tools/core/logger'

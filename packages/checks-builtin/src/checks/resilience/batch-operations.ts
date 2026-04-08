@@ -2,9 +2,6 @@
 // @fitness-ignore-file duplicate-implementation-detection -- similar patterns across diagnostic modules
 /**
  * @fileoverview Batch operations and memory resilience checks
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/resilience/batch-operations
- * @version 2.1.0
  */
 
 import { logger } from '@opensip-tools/core/logger'

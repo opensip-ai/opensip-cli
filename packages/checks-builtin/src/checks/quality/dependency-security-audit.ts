@@ -2,9 +2,6 @@
 // @fitness-ignore-file unused-config-options -- Config options reserved for future use or environment-specific
 /**
  * @fileoverview Dependency Security Audit check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/dependency-security-audit
- * @version 3.0.0
  *
  * Runs npm/pnpm audit to detect known vulnerabilities in dependencies.
  */

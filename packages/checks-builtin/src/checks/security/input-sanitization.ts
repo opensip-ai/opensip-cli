@@ -1,15 +1,12 @@
 // @fitness-ignore-file no-generic-error -- Generic errors appropriate in this context
 /**
  * @fileoverview Detect unsanitized user input usage
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/security/input-sanitization
- * @version 3.0.0
  *
  * Uses AST analysis to detect unsanitized user input in HTML injection,
  * command injection, and path traversal contexts. AST context eliminates
  * false positives from regex definitions, string constants, and comments.
  *
- * @see ADR-048 Centralized Input Sanitization
+ *
  */
 
 import {
@@ -217,7 +214,7 @@ function checkHtmlTemplateInterpolation(
  * Walks the AST to find actual innerHTML assignments, exec/spawn calls,
  * and file operations with user input references.
  *
- * @see ADR-048 Centralized Input Sanitization
+ *
  */
 export const inputSanitization = defineCheck({
   id: '31ef5173-a102-4a37-bc14-3f5bb08f9688',
@@ -236,11 +233,10 @@ export const inputSanitization = defineCheck({
 
 **Why it matters:** Unsanitized user input leads to XSS, command injection, and path traversal vulnerabilities. AST-level detection catches real data flow issues while ignoring string constants and comments.
 
-**Scope:** Codebase-specific convention enforcing ADR-048. Analyzes each file individually using TypeScript AST.`,
-  tags: ['security', 'injection', 'sanitization', 'adr-048'],
+**Scope:** General best practice. Analyzes each file individually using TypeScript AST.`,
+  tags: ['security', 'injection', 'sanitization'],
   fileTypes: ['ts'],
   confidence: 'high',
-  docs: 'docs/adr/security/048-centralized-input-sanitization.md',
 
   analyze(content: string, filePath: string): CheckViolation[] {
     const sourceFile = parseSource(content, filePath)

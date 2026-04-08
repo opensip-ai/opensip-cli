@@ -1,7 +1,6 @@
 // @fitness-ignore-file batch-operation-limits -- reviewed: pattern is architecturally justified or false positive
 /**
  * @fileoverview Semgrep static analysis security scan
- * @module cli/devtools/fitness/src/checks/security/semgrep-scan
  *
  * Runs Semgrep with auto config to detect security vulnerabilities,
  * code injection, and other issues across all supported languages.

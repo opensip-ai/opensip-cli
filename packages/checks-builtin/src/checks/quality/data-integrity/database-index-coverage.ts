@@ -1,9 +1,6 @@
 // @fitness-ignore-file duplicate-implementation-detection -- similar patterns across diagnostic modules
 /**
  * @fileoverview Database Index Coverage check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/data-integrity/database-index-coverage
- * @version 2.0.0
  *
  * Validates that database queries have appropriate indexes.
  * Detects queries that may cause full table scans.

@@ -1,9 +1,6 @@
 // @fitness-ignore-file batch-operation-limits -- Promise.all is bounded to production docker-compose files (typically 1-3)
 /**
  * @fileoverview Verify Hasura production security settings
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/security/hasura-production-config
- * @version 1.0.0
  *
  * Validates that production docker-compose files include required Hasura security settings:
  * - Introspection disabled

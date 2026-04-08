@@ -1,8 +1,5 @@
 /**
  * @fileoverview TOCTOU Race Condition Detection Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/patterns/toctou-race-condition
- * @version 2.0.0
  *
  * Detects Time-of-Check-Time-of-Use race conditions where data is read,
  * then updated without passing version/condition for atomic updates.
@@ -61,11 +58,10 @@ const SAFE_TOCTOU_PATHS = [
   /local-storage/i,
   /local-state/i,
   /state-manager/i,
-  // CLI/DevTools/scripts (single user, non-concurrent)
+  // CLI/scripts (single user, non-concurrent)
   // CLI commands use local Map/Set operations that are not shared-state TOCTOU risks.
   // Server lifecycle TOCTOU issues are better caught by the reentrancy-guard check.
   /\/cli\//,
-  /\/devtools\//,
   /\/scripts\//,
   // Test utilities
   /\/testing\//,
@@ -250,7 +246,7 @@ export const toctouRaceCondition = defineCheck({
   description: 'Detects read-then-update patterns without atomic guarantees',
   longDescription: `**Purpose:** Detects Time-of-Check-Time-of-Use (TOCTOU) race conditions where data is read then updated without atomic guarantees.
 
-**Detects:** Analyzes each file individually using TypeScript AST. Finds functions containing both read operations (\`.get(\`, \`.find(\`, \`.findOne(\`, \`.getById(\`, \`.fetch(\`, \`.load(\`, \`.read(\`) and update operations (\`.update(\`, \`.save(\`, \`.put(\`, \`.set(\`, \`.patch(\`, \`.modify(\`) without any atomic pattern (\`expectedVersion\`, \`ConditionExpression\`, \`transaction\`, \`acquireLock\`, \`mutex\`, \`optimisticLock\`, etc.). Skips safe contexts: in-memory caches, rate limiters, CLI/devtools, config/registry files.
+**Detects:** Analyzes each file individually using TypeScript AST. Finds functions containing both read operations (\`.get(\`, \`.find(\`, \`.findOne(\`, \`.getById(\`, \`.fetch(\`, \`.load(\`, \`.read(\`) and update operations (\`.update(\`, \`.save(\`, \`.put(\`, \`.set(\`, \`.patch(\`, \`.modify(\`) without any atomic pattern (\`expectedVersion\`, \`ConditionExpression\`, \`transaction\`, \`acquireLock\`, \`mutex\`, \`optimisticLock\`, etc.). Skips safe contexts: in-memory caches, rate limiters, CLI/scripts, config/registry files.
 
 **Why it matters:** TOCTOU bugs allow concurrent requests to overwrite each other's changes, causing silent data loss that only manifests under load.
 

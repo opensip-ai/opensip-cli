@@ -1,8 +1,5 @@
 /**
  * @fileoverview Retry configuration validation check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/resilience/retry-config-validation
- * @version 1.1.0
  */
 
 import { logger } from '@opensip-tools/core/logger'

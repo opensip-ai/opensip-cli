@@ -2,9 +2,6 @@
 // @fitness-ignore-file typeorm-n-plus-one -- Check definition contains N+1 pattern strings in suggestions/messages
 /**
  * @fileoverview TypeORM N+1 Query Detection Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/data-integrity/typeorm-n-plus-one
- * @version 2.0.0
  *
  * Detects N+1 query patterns in TypeORM usage:
  * - Loops that call findOne/findBy

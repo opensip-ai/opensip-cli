@@ -1,9 +1,6 @@
 // @fitness-ignore-file unused-config-options -- Config options reserved for future use or environment-specific
 /**
  * @fileoverview Clean Code Naming Quality check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/code-structure/clean-code-naming-quality
- * @version 2.0.0
  *
  * Enforces Clean Code naming conventions for improved readability.
  * Based on Clean Code Ch.2 principles for meaningful names.

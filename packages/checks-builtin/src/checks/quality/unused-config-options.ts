@@ -2,9 +2,6 @@
 // @fitness-ignore-file unused-config-options -- Config options reserved for future use or environment-specific
 /**
  * @fileoverview Unused Configuration Options Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/unused-config-options
- * @version 3.0.0
  *
  * Detects configuration properties that are defined but never accessed.
  */
@@ -52,11 +49,10 @@ const COMMON_PROPERTY_NAMES = new Set([
 ])
 
 /**
- * Paths where this check should not run (CLI, devtools, test utilities)
+ * Paths where this check should not run (CLI, scripts, test utilities)
  */
 const NON_CONFIG_CONSUMER_PATTERNS = [
   /\/cli\//,
-  /\/devtools\//,
   /\/scripts\//,
   /\/bin\//,
   /__tests__\//,

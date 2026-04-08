@@ -1,4 +1,4 @@
-// @fitness-ignore-file correlation-helpers -- uses @opensip/core/logger which provides automatic correlation ID propagation
+// @fitness-ignore-file correlation-helpers -- uses @opensip-tools/core/logger which provides automatic correlation ID propagation
 // @fitness-ignore-file error-handling-suite -- catch blocks delegate errors through established patterns
 // @fitness-ignore-file clean-code-naming-quality -- naming conventions follow domain-specific patterns
 /**

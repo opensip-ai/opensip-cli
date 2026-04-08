@@ -4,9 +4,6 @@
 // @fitness-ignore-file fitness-ignore-validation -- Fitness-ignore directives reference internal check IDs that may not be statically resolvable
 /**
  * @fileoverview Detect secrets exposed through env vars in logs/errors
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/security/env-secret-exposure
- * @version 2.2.0
  */
 
 import { logger } from '@opensip-tools/core/logger'

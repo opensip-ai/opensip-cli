@@ -1,8 +1,6 @@
 // @fitness-ignore-file fitness-check-architecture -- Type definitions for observability-coverage check, not a standalone check
 /**
  * @fileoverview Type definitions for observability coverage analysis
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/observability/observability-coverage/types
  */
 
 /**

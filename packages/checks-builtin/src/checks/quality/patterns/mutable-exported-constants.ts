@@ -1,9 +1,6 @@
 // @fitness-ignore-file unused-config-options -- Config options reserved for future use or environment-specific
 /**
  * @fileoverview Mutable Exported Constants Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/patterns/mutable-exported-constants
- * @version 2.0.0
  *
  * Detects exported const objects/arrays without Object.freeze() or 'as const'.
  * Mutable exported constants can lead to unexpected behavior and bugs.

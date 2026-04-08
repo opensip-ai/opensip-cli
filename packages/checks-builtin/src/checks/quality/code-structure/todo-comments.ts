@@ -2,9 +2,6 @@
 // @fitness-ignore-file toctou-race-condition -- TOCTOU acceptable in this non-concurrent context
 /**
  * @fileoverview Technical Debt Comments Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/code-structure/todo-comments
- * @version 2.0.0
  *
  * Detects technical debt markers in comments for tracking and visibility.
  */

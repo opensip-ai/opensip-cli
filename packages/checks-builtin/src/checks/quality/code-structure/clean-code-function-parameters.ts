@@ -2,9 +2,6 @@
 // @fitness-ignore-file duplicate-utility-functions -- Check-specific helpers (isHandlerFunction, getFunctionName) are typed for this check's node types; extracting would couple independent checks
 /**
  * @fileoverview Clean Code Function Parameter Count check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/code-structure/clean-code-function-parameters
- * @version 2.0.0
  *
  * Enforces Clean Code principles for function parameter counts.
  * Functions with too many parameters indicate design issues and should
@@ -37,8 +34,6 @@ const HANDLER_ERROR = 7
 const RELAXED_PATHS = [
   /\/internal\//,
   /\/cli\//,
-  /\/devtools\//,
-  /\/fitness\//,
   /\/scripts\//,
   /\/utils\//,
   /\/helpers\//,

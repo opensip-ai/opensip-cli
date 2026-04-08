@@ -1,8 +1,5 @@
 /**
  * @fileoverview Validate routes have rate limiting configured
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/security/rate-limit-coverage
- * @version 2.1.0
  */
 
 import { logger } from '@opensip-tools/core/logger'

@@ -100,16 +100,8 @@ function renderSessionTable(panel, toolSessions, accentColor) {
     headerLeft.appendChild(sub);
     headerRow.appendChild(headerLeft);
 
-    // Status filter dropdown
-    const filterUid = 'df-' + tool + '-' + idx + '-' + Math.random().toString(36).slice(2,6);
-    const select = el('select', {id: filterUid, style:'background:var(--bg-surface);color:var(--text);border:1px solid var(--border);border-radius:var(--radius-sm);padding:4px 8px;font-size:12px;cursor:pointer'});
-    [['fail', 'Failed'], ['all', 'All Checks'], ['pass', 'Passed']].forEach(([val, label]) => {
-      const opt = el('option', {value: val, text: label});
-      if (val === 'fail') opt.setAttribute('selected', 'selected');
-      select.appendChild(opt);
-    });
-    headerRow.appendChild(select);
     detailContainer.appendChild(headerRow);
+    const filterUid = 'df-' + tool + '-' + idx + '-' + Math.random().toString(36).slice(2,6);
 
     // Check detail table
     const table = el('table', {class:'data-table sortable'});
@@ -122,7 +114,12 @@ function renderSessionTable(panel, toolSessions, accentColor) {
     table.appendChild(thead);
 
     const tbody = el('tbody');
-    session.checks.forEach((check, i) => {
+    const sortedChecks = [...session.checks].sort((a, b) => {
+      const aErrors = a.findings ? a.findings.filter(f => f.severity === 'error').length : 0;
+      const bErrors = b.findings ? b.findings.filter(f => f.severity === 'error').length : 0;
+      return bErrors - aErrors;
+    });
+    sortedChecks.forEach((check, i) => {
       const checkErrors = check.findings ? check.findings.filter(f => f.severity === 'error').length : 0;
       const checkWarnings = check.findings ? check.findings.filter(f => f.severity === 'warning').length : 0;
       const findingsTotal = checkErrors + checkWarnings;
@@ -193,59 +190,14 @@ function renderSessionTable(panel, toolSessions, accentColor) {
     // Enable sorting on the detail table
     makeSortable(table);
 
-    // Apply filter
-    applyCheckFilter(select, tbody, detailPag);
-    select.addEventListener('change', () => applyCheckFilter(select, tbody, detailPag));
+    // Paginate
+    paginateGroupedRows(tbody, detailPag, 10);
   }
 
   // Auto-show latest
   renderDetail(toolSessions[0], 0);
 }
 
-function applyCheckFilter(select, tbody, pagContainer) {
-  const filter = select.value;
-  const allRows = Array.from(tbody.children);
-  const groups = [];
-  for (let i = 0; i < allRows.length; i++) {
-    const row = allRows[i];
-    if (row.classList.contains('expander-row')) continue;
-    const group = [row];
-    if (i + 1 < allRows.length && allRows[i+1].classList.contains('expander-row')) {
-      group.push(allRows[i+1]);
-    }
-    groups.push(group);
-  }
 
-  const filtered = groups.filter(group => {
-    const status = group[0].getAttribute('data-check-status');
-    if (filter === 'all') return true;
-    return status === filter;
-  });
-
-  groups.forEach(group => group.forEach(row => { row.style.display = 'none'; }));
-
-  let currentPage = 0;
-  const pageSize = 10;
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-
-  function renderPage() {
-    const start = currentPage * pageSize;
-    const end = start + pageSize;
-    filtered.forEach(group => group.forEach(row => { row.style.display = 'none'; }));
-    filtered.slice(start, end).forEach(group => {
-      group[0].style.display = '';
-      if (group[1] && group[1].classList.contains('open')) group[1].style.display = '';
-    });
-
-    while (pagContainer.firstChild) pagContainer.removeChild(pagContainer.firstChild);
-    if (filtered.length <= pageSize) return;
-
-    pagContainer.appendChild(el('div', {class:'pagination-info', text: 'Showing ' + (start+1) + '-' + Math.min(end, filtered.length) + ' of ' + filtered.length + ' checks'}));
-    const btns = el('div', {class:'pagination-btns'});
-    renderPageButtons(btns, currentPage, totalPages, (p) => { currentPage = p; renderPage(); });
-    pagContainer.appendChild(btns);
-  }
-  renderPage();
-}
 `;
 }

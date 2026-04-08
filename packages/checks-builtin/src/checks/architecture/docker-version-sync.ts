@@ -6,8 +6,6 @@
  * - Node major version in FROM directives must match engines.node from root package.json
  * - pnpm version should be derived dynamically from package.json packageManager field
  * - Hardcoded pnpm versions that don't match packageManager are errors
- * @module cli/devtools/fitness/src/checks/architecture/docker-version-sync
- * @version 1.0.0
  */
 
 import * as fs from 'node:fs'

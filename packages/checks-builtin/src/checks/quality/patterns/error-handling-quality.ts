@@ -4,9 +4,6 @@
 // @fitness-ignore-file error-handling-quality -- Fitness check implementation: catch blocks in AST analysis intentionally return empty results to skip unreadable files
 /**
  * @fileoverview Unified Error Handling Quality Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/patterns/error-handling-quality
- * @version 1.0.0
  *
  * Detects silent error handling in both try/catch and Result patterns.
  * Replaces: resilience/no-empty-catch, quality/error-swallowing-boolean
@@ -286,7 +283,6 @@ function checkCatchClauseAsErrorCast(
  * - resilience/no-empty-catch
  * - quality/error-swallowing-boolean
  *
- * NO DEVTOOLS EXCLUSION - same rules apply everywhere
  */
 export const errorHandlingQuality = defineCheck({
   id: '6bae5be9-87f4-499e-a886-ca78a233cfb7',

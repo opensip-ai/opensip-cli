@@ -1,14 +1,9 @@
 // @fitness-ignore-file unused-config-options -- Config options reserved for future use or environment-specific
 /**
- * @fileoverview ADR-034: Pre-Launch Clean Codebase Policy check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/pre-launch-clean-codebase
- * @version 3.0.0
- * @see ADR-034 - Pre-Launch Clean Codebase Policy
+ * @fileoverview No Legacy Code check
  *
- * This check ensures no backwards compatibility code exists during pre-launch phase.
- * The codebase has no external consumers, so we fix things properly without maintaining
- * backwards compatibility.
+ * Detects backwards compatibility code, deprecated patterns, legacy wrappers,
+ * and temporary workarounds that should be cleaned up.
  *
  * Detected patterns:
  * - @deprecated tags
@@ -207,7 +202,7 @@ const COMPATIBILITY_PATTERNS: readonly PatternConfig[] = [
     type: 'deprecated-tag',
     severity: 'ERROR',
     message:
-      'Found @deprecated JSDoc tag - remove this deprecated code and update all callers in the same PR (ADR-034)',
+      'Found @deprecated JSDoc tag - remove this deprecated code and update all callers in the same PR',
     suggestion: 'Remove the deprecated code entirely and update all call sites in the same PR',
     keywords: ['deprecated'],
   },
@@ -217,7 +212,7 @@ const COMPATIBILITY_PATTERNS: readonly PatternConfig[] = [
     pattern: matchCompatibilityLayer,
     type: 'compatibility-layer',
     severity: 'ERROR',
-    message: 'Found compatibility layer class/function - refactor directly instead (ADR-034)',
+    message: 'Found compatibility layer class/function - refactor directly instead',
     suggestion: 'Refactor to use the new implementation directly without a compatibility layer',
     keywords: ['compatibility'],
   },
@@ -225,7 +220,7 @@ const COMPATIBILITY_PATTERNS: readonly PatternConfig[] = [
     pattern: matchLegacyWrapper,
     type: 'legacy-code-path',
     severity: 'ERROR',
-    message: 'Found legacy wrapper class/function - remove and update all dependent code (ADR-034)',
+    message: 'Found legacy wrapper class/function - remove and update all dependent code',
     suggestion:
       'Remove the legacy wrapper and update all dependent code to use the modern implementation',
     keywords: ['legacy'],
@@ -236,7 +231,7 @@ const COMPATIBILITY_PATTERNS: readonly PatternConfig[] = [
     pattern: matchBackwardCompat,
     type: 'migration-utility',
     severity: 'ERROR',
-    message: 'Found backwards compatibility utility - not needed during pre-launch phase (ADR-034)',
+    message: 'Found backwards compatibility utility - not needed during pre-launch phase',
     suggestion: 'Remove backwards compatibility utilities and use direct implementations',
     keywords: ['backward', 'compat'],
   },
@@ -246,7 +241,7 @@ const COMPATIBILITY_PATTERNS: readonly PatternConfig[] = [
     pattern: matchVersionCheck,
     type: 'version-check',
     severity: 'ERROR',
-    message: 'Found version compatibility check - not needed during pre-launch (ADR-034)',
+    message: 'Found version compatibility check - not needed during pre-launch',
     suggestion: 'Remove version checks and use a single implementation',
     keywords: ['version', 'compatibility'],
   },
@@ -256,7 +251,7 @@ const COMPATIBILITY_PATTERNS: readonly PatternConfig[] = [
     pattern: matchTemporaryWorkaround,
     type: 'temporary-workaround',
     severity: 'ERROR',
-    message: 'Found temporary workaround - implement permanent solution before launch (ADR-034)',
+    message: 'Found temporary workaround - implement permanent solution before launch',
     suggestion: 'Replace temporary workaround with a permanent, production-ready solution',
     keywords: ['HACK', 'FIXME', 'temporary', 'workaround'],
   },
@@ -266,7 +261,7 @@ const COMPATIBILITY_PATTERNS: readonly PatternConfig[] = [
     pattern: matchMigrationCode,
     type: 'migration-code',
     severity: 'ERROR',
-    message: 'Found migration utility - not needed during pre-launch phase (ADR-034)',
+    message: 'Found migration utility - not needed during pre-launch phase',
     suggestion: 'Remove migration code and use direct implementation',
     keywords: ['migrat'],
   },
@@ -277,7 +272,7 @@ const COMPATIBILITY_PATTERNS: readonly PatternConfig[] = [
     pattern: matchBackwardsCompatComment,
     type: 'backwards-compat-comment',
     severity: 'WARNING',
-    message: 'Found backwards compatibility comment - remove legacy code paths (ADR-034)',
+    message: 'Found backwards compatibility comment - remove legacy code paths',
     suggestion: 'Remove the backwards compatibility code and associated comments',
     keywords: ['backward', 'compat', 'legacy', 'deprecated'],
   },
@@ -287,7 +282,7 @@ const COMPATIBILITY_PATTERNS: readonly PatternConfig[] = [
     pattern: matchShimAdapter,
     type: 'shim-adapter',
     severity: 'WARNING',
-    message: 'Found shim pattern - verify this is not for backwards compatibility (ADR-034)',
+    message: 'Found shim pattern - verify this is not for backwards compatibility',
     suggestion:
       "If this is for backwards compatibility, remove it. If it's a legitimate design pattern, add a comment explaining why",
     keywords: ['shim'],
@@ -372,23 +367,22 @@ function scanFileForViolations(content: string): ViolationResult[] {
 // =============================================================================
 
 /**
- * Check: quality/pre-launch-clean-codebase
+ * Check: quality/no-legacy-code
  *
  * Ensures no backwards compatibility code exists during pre-launch phase.
  * This is a pre-launch codebase with no external consumers, so we fix things
  * properly without maintaining backwards compatibility.
  *
- * @see ADR-034 Pre-Launch Clean Codebase Policy
  */
-export const preLaunchCleanCodebase = defineCheck({
+export const noLegacyCode = defineCheck({
   id: '3a27c17d-a926-46a8-864d-610de1a385eb',
-  slug: 'pre-launch-clean-codebase',
+  slug: 'no-legacy-code',
   scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
   contentFilter: 'raw',
 
   confidence: 'medium',
-  description: 'Ensures no backwards compatibility code exists during pre-launch phase',
-  longDescription: `**Purpose:** Enforces ADR-034's pre-launch clean codebase policy by detecting backwards compatibility code that is unnecessary before launch.
+  description: 'Detects legacy code, backwards compatibility layers, and temporary workarounds',
+  longDescription: `**Purpose:** Detects backwards compatibility code, deprecated patterns, and legacy workarounds that add unnecessary complexity.
 
 **Detects:**
 - \`@deprecated\` JSDoc tags in production code
@@ -398,13 +392,12 @@ export const preLaunchCleanCodebase = defineCheck({
 - Temporary workaround comments (\`HACK\`/\`FIXME\` with \`before launch\`/\`temporary\`/\`workaround\`)
 - Backwards compatibility comments (\`legacy support\`, \`deprecated but kept\`, \`alias for ... compat\`)
 
-**Why it matters:** Pre-launch codebases have no external consumers, so backwards compatibility code adds unnecessary complexity. Fix things properly instead.
+**Why it matters:** Legacy compatibility code adds complexity, obscures intent, and accumulates tech debt. Removing it keeps the codebase clean and maintainable.
 
-**Scope:** Codebase-specific convention enforcing ADR-034. Analyzes each file individually (\`analyze\`). Targets production files, excluding fitness/test/docs/versioning paths.`,
-  tags: ['code-quality', 'compliance', 'adr-034', 'quality'],
+**Scope:** General best practice. Analyzes each file individually (\`analyze\`). Targets production files, excluding test/docs/versioning paths.`,
+  tags: ['code-quality', 'compliance', 'quality'],
   fileTypes: ['ts', 'tsx'],
   disabled: false,
-  docs: 'docs/adr/034-pre-launch-clean-codebase-policy.md',
 
   analyze(content, filePath): CheckViolation[] {
     const relativePath = filePath

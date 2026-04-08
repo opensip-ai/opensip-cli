@@ -2,9 +2,6 @@
 // @fitness-ignore-file fitness-check-coverage -- check implementation with framework-managed coverage
 /**
  * @fileoverview Detects boolean flag reentrancy guards that should use counters or mutexes
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/resilience/reentrancy-guard
- * @version 1.0.0
  */
 
 import { defineCheck, type CheckViolation, getLineNumber } from '@opensip-tools/core'

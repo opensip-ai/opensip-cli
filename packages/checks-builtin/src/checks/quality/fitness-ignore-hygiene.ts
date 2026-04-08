@@ -1,9 +1,6 @@
 // @fitness-ignore-file fitness-ignore-hygiene -- check references internal slugs that may differ from registered slugs
 /**
  * @fileoverview Fitness ignore hygiene check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/fitness-ignore-hygiene
- * @version 1.0.0
  */
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/core'

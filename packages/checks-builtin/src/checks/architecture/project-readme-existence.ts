@@ -2,9 +2,6 @@
 // @fitness-ignore-file fitness-check-standards -- Uses fs for README existence checking, not source file content
 /**
  * @fileoverview Project README existence check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/architecture/project-readme-existence
- * @version 1.0.0
  *
  * Ensures every package, app, CLI, and service has a README.md file.
  */

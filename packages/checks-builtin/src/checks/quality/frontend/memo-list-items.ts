@@ -1,8 +1,5 @@
 /**
  * @fileoverview Memo List Items Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/frontend/memo-list-items
- * @version 2.0.0
  *
  * Warns when components rendered in .map() calls might benefit from memoization.
  * Detects patterns like: items.map(item => <ComponentName ... />)

@@ -7,8 +7,6 @@
  * - Only checks external npm packages, not workspace packages or relative imports
  * - Distinguishes between dependencies, devDependencies, and peerDependencies
  * - Respects pnpm's strict node_modules isolation
- * @module cli/devtools/fitness/src/checks/architecture/dependencies/phantom-dependency-detection
- * @version 2.0.0
  */
 
 import * as fs from 'node:fs'

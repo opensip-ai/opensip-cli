@@ -2,9 +2,6 @@
 // @fitness-ignore-file clean-code-naming-quality -- Short type aliases (ResponseCoverageIssueType) and helper names follow fitness check conventions
 /**
  * @fileoverview OpenAPI Response Coverage Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/api/openapi-response-coverage
- * @version 3.0.0
  *
  * Validates OpenAPI response schemas coverage:
  * - Routes should have error response schemas (400, 401, 404, 500)

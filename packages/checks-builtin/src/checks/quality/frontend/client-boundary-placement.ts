@@ -1,8 +1,5 @@
 /**
  * @fileoverview Client Boundary Placement Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/frontend/client-boundary-placement
- * @version 1.0.0
  *
  * Warns when 'use client' directive is placed at page/layout level in Next.js app directory.
  * Pages, layouts, and templates should remain Server Components for better performance.

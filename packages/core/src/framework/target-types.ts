@@ -1,6 +1,6 @@
 /**
  * Minimal target types for scope resolution.
- * Standalone version of @opensip/core/targets.
+ * Minimal target types for scope resolution.
  */
 
 export interface Target {

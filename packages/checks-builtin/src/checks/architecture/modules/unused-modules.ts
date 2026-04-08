@@ -1,9 +1,6 @@
 // @fitness-ignore-file unused-config-options -- Config options reserved for future use or environment-specific
 /**
  * @fileoverview Unused Modules check (v2)
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/architecture/modules/unused-modules
- * @version 3.0.0
  */
 
 import * as ts from 'typescript'

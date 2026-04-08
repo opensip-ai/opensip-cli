@@ -1,8 +1,5 @@
 /**
  * @fileoverview Platform Checks
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/frontend/platform-checks
- * @version 2.0.0
  *
  * Validates Platform.OS usage patterns in React Native code.
  */

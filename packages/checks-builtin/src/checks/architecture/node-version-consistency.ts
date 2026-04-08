@@ -7,8 +7,6 @@
  * - @types/node major version must match engines.node
  * - CI workflow node-version must match engines.node
  * - Dockerfiles are NOT checked (covered by docker-version-sync)
- * @module cli/devtools/fitness/src/checks/architecture/node-version-consistency
- * @version 1.0.0
  */
 
 import * as fs from 'node:fs'

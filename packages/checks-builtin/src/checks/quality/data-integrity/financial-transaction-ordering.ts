@@ -1,9 +1,6 @@
 // @fitness-ignore-file file-length-limits -- Complex module with tightly coupled logic; refactoring would risk breaking changes
 /**
  * @fileoverview Financial Transaction Ordering Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/data-integrity/financial-transaction-ordering
- * @version 2.0.0
  *
  * Detects unsafe financial transaction ordering patterns:
  * 1. External charge before database persistence (money lost if DB fails)

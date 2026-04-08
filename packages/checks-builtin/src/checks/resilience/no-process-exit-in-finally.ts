@@ -2,9 +2,6 @@
 // @fitness-ignore-file fitness-check-coverage -- check implementation with framework-managed coverage
 /**
  * @fileoverview Detects process.exit() usage that bypasses finally blocks
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/resilience/no-process-exit-in-finally
- * @version 1.0.0
  */
 
 import { defineCheck, type CheckViolation, getLineNumber } from '@opensip-tools/core'

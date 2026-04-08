@@ -1,13 +1,9 @@
 /**
  * @fileoverview Array Parameter Validation Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/data-integrity/array-validation
- * @version 2.0.0
  *
  * Detects array parameters without proper validation.
  * Ensures arrays are validated for length, type, and content before processing.
  *
- * @see ADR-039 Code Review Methodology
  */
 
 import * as ts from 'typescript'
@@ -38,9 +34,7 @@ const RELAXED_VALIDATION_PATHS = [
   /\/utils\//,
   /\/helpers\//,
   /\/cli\//,
-  /\/devtools\//,
   /\/scripts\//,
-  /\/fitness\//,
 ]
 
 /**
@@ -388,7 +382,6 @@ function analyzeFile(content: string, absolutePath: string): CheckViolation[] {
  * Detects array parameters without proper validation to prevent
  * runtime errors from unvalidated array inputs.
  *
- * @see ADR-039 Code Review Methodology
  */
 export const arrayValidation = defineCheck({
   id: 'a9e0e70c-a4af-42e6-bbd7-4c87a72cb7d4',
@@ -405,12 +398,12 @@ export const arrayValidation = defineCheck({
 - Missing \`Array.isArray()\` checks, \`.length\` bounds checks, Zod \`.parse()\`/\`.safeParse()\` calls, or calls to functions named \`validate\`/\`check\`
 - Uses TypeScript AST node kinds (not text matching) to distinguish true array parameters from object/interface/intersection types that merely contain array-typed properties
 - Skips parameters with complex nested types (\`Record<\`, \`Map<\`, \`Promise<\`, function types)
-- Excludes files under \`/internal/\`, \`/utils/\`, \`/helpers/\`, \`/cli/\`, \`/devtools/\`, \`/scripts/\`, \`/fitness/\`
+- Excludes files under \`/internal/\`, \`/utils/\`, \`/helpers/\`, \`/cli/\`, \`/scripts/\`
 
 **Why it matters:** Unvalidated arrays can cause silent data corruption, out-of-bounds errors, or type mismatches at runtime that TypeScript's type system alone cannot prevent.
 
-**Scope:** General best practice (ADR-039). Analyzes each file individually.`,
-  tags: ['quality', 'validation', 'type-safety', 'arrays', 'adr-039'],
+**Scope:** General best practice. Analyzes each file individually.`,
+  tags: ['quality', 'validation', 'type-safety', 'arrays'],
   fileTypes: ['ts'],
 
   analyze(content: string, filePath: string): CheckViolation[] {

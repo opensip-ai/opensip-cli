@@ -1,9 +1,6 @@
 // @fitness-ignore-file file-length-limits -- Complex module with tightly coupled logic; refactoring would risk breaking changes
 /**
  * @fileoverview DynamoDB Scan Detection check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/data-integrity/dynamodb-scan-detection
- * @version 2.0.0
  *
  * Detects ScanCommand usage in production code that should use GSI queries instead.
  * ScanCommand performs O(N) table scans vs O(1) index queries with QueryCommand.

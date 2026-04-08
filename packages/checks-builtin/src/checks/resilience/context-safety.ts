@@ -4,9 +4,6 @@
 // @fitness-ignore-file silent-early-returns -- Guard clauses in pattern matching function return false for non-matching patterns
 /**
  * @fileoverview Context safety and mutation checks
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/resilience/context-safety
- * @version 2.1.0
  */
 
 import { logger } from '@opensip-tools/core/logger'

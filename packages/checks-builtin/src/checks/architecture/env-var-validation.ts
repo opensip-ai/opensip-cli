@@ -1,9 +1,6 @@
 // @fitness-ignore-file semgrep-scan -- non-literal RegExp patterns use envVarName extracted from process.env.\w+ regex match on source code, not user input; regex operates on bounded, trusted codebase files
 /**
  * @fileoverview Environment Variable Validation check (v2)
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/architecture/env-var-validation
- * @version 3.0.0
  */
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/core'

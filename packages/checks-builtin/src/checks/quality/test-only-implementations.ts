@@ -2,9 +2,6 @@
 // @fitness-ignore-file unused-config-options -- Config options reserved for future use or environment-specific
 /**
  * @fileoverview Test-Only Implementations Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/test-only-implementations
- * @version 3.0.0
  *
  * Detects production code that is only imported by test files, indicating
  * potentially dead code or implementations that should be removed.

@@ -3,9 +3,6 @@
 // @fitness-ignore-file duplicate-utility-functions -- reviewed: route-analysis and validation-detection helpers are check-specific logic, not general-purpose utilities
 /**
  * @fileoverview Fastify Route Validation Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/api/fastify-route-validation
- * @version 3.0.0
  *
  * Ensures all Fastify POST/PATCH/PUT route handlers validate request bodies
  * using Zod schemas.

@@ -1,8 +1,5 @@
 /**
  * @fileoverview Detect unsafe equality comparisons on secret/token values
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/security/unsafe-secret-comparison
- * @version 1.1.0
  *
  * Finds binary equality operators (=== / !==) applied to variables whose names
  * suggest they hold cryptographic secrets (token, secret, signature, password,

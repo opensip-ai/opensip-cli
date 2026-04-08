@@ -1,9 +1,6 @@
 // @fitness-ignore-file no-stub-tests -- longDescription contains backtick-escaped stub test examples for documentation
 /**
  * @fileoverview No stub tests check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/testing/no-stub-tests
- * @version 1.0.0
  */
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/core'

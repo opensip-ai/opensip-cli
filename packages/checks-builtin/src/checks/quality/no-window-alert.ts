@@ -1,9 +1,6 @@
 // @fitness-ignore-file no-window-alert -- Fitness check definition references window.alert/confirm/prompt in string literals and regex patterns, not actual usage
 /**
  * @fileoverview No window.alert/confirm/prompt Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/no-window-alert
- * @version 1.0.0
  *
  * Detects usage of window.alert(), window.confirm(), and window.prompt()
  * in frontend code. These native browser dialogs provide poor UX and

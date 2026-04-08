@@ -12,7 +12,7 @@ import type { TargetConfigInput } from './types.js'
  *
  * @example
  * ```typescript
- * import { defineTargetConfig } from '@opensip/core/targets'
+ * import { defineTargetConfig } from '@opensip-tools/core/targets'
  *
  * export default defineTargetConfig({
  *   targets: {

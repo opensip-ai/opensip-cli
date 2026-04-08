@@ -3,9 +3,6 @@
 // @fitness-ignore-file clean-code-naming-quality -- False positive: check misidentifies 'if' keyword as a short function name
 /**
  * @fileoverview Detects error branches that silently exit with success (exit 0)
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/resilience/exit-code-correctness
- * @version 1.0.0
  */
 
 import { defineCheck, type CheckViolation, getLineNumber } from '@opensip-tools/core'

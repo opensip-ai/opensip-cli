@@ -1,5 +1,4 @@
 export * from './array-validation.js'
-export * from './centralized-input-sanitization.js'
 export * from './database-index-coverage.js'
 export * from './database-schema-validation.js'
 export * from './dynamodb-scan-detection.js'

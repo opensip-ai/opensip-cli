@@ -2,12 +2,9 @@
 // @fitness-ignore-file no-markdown-references -- Check's own JSDoc contains example .md references to document what it detects
 /**
  * @fileoverview Detect markdown file references in code comments
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/no-markdown-references
- * @version 2.0.0
  *
  * File path references to markdown documents become stale when documents are
- * moved, renamed, or deleted. Use stable ADR numbers instead (e.g., ADR-052).
+ * moved, renamed, or deleted. Use stable identifiers instead.
  */
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/core'
@@ -117,9 +114,7 @@ function findMarkdownReferences(
  * Detects markdown file path references in code comments. These references
  * become stale when documents are moved, renamed, or deleted.
  *
- * Use stable identifiers instead:
- *   - BAD:  @see docs/adr/052-adapter-factory.md
- *   - GOOD: @see ADR-052 - Adapter Factory Pattern
+ * Use stable identifiers instead of file paths to avoid stale references.
  */
 export const noMarkdownReferences = defineCheck({
   id: '8be86917-6908-49e5-a185-a6bd18045b31',
@@ -134,9 +129,8 @@ export const noMarkdownReferences = defineCheck({
 **Detects:**
 - References matching \`[./\\w-]+\\.md\` in comment lines (single-line \`//\`, multi-line \`/* */\`, and JSDoc \`/** */\`)
 - Examples: \`docs/adr/052-something.md\`, \`./README.md\`, \`../docs/guide.md\`, \`CHANGELOG.md\`
-- Suggests stable ADR-number format (e.g., \`ADR-052\`) when the reference contains a 3-digit number
 
-**Why it matters:** File path references silently break when documents are reorganized. Stable identifiers like ADR numbers remain valid regardless of file location.
+**Why it matters:** File path references silently break when documents are reorganized. Stable identifiers (e.g., document titles or IDs) remain valid regardless of file location.
 
 **Scope:** General best practice. Analyzes each file individually (\`analyze\`). Targets production files, excluding markdown, test, and changelog files.`,
   tags: ['documentation', 'maintainability', 'quality'],
@@ -152,11 +146,7 @@ export const noMarkdownReferences = defineCheck({
     const references = findMarkdownReferences(content)
 
     for (const { lineNumber, reference } of references) {
-      // Suggest ADR format if it looks like an ADR reference
-      const adrMatch = reference.match(/(\d{3})/)
-      const suggestion = adrMatch
-        ? `Replace '${reference}' with 'ADR-${adrMatch[1]}' or 'ADR-${adrMatch[1]} - Description'. ADR numbers are stable even when files are moved.`
-        : `Remove or replace the markdown file reference '${reference}'. Use stable identifiers like ADR numbers instead of file paths.`
+      const suggestion = `Remove or replace the markdown file reference '${reference}'. Use stable identifiers (e.g., document titles or IDs) instead of file paths that break when documents are moved.`
 
       violations.push({
         line: lineNumber,

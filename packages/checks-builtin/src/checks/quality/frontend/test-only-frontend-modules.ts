@@ -2,9 +2,6 @@
 // @fitness-ignore-file duplicate-implementation-detection -- intentionally co-located for check isolation
 /**
  * @fileoverview Test-Only Frontend Modules Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/frontend/test-only-frontend-modules
- * @version 2.0.0
  *
  * Detects frontend code (hooks, stores, services, utils) that is only
  * imported by test files, indicating potentially dead code.

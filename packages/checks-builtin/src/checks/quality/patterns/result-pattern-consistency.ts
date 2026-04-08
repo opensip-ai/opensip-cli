@@ -1,9 +1,6 @@
 // @fitness-ignore-file canonical-result-usage -- References Result pattern in JSDoc for check documentation, not actual Result usage
 /**
  * @fileoverview Result Pattern Consistency Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/patterns/result-pattern-consistency
- * @version 2.0.0
  *
  * Enforces consistent use of Result<T,E> vs throw based on error type:
  * - Result<T,E> for expected failures (validation, not found, business rules)
@@ -58,7 +55,7 @@ const THROW_ALLOWED_PATHS = [
   /\/plugins?\//,
   /\/bootstrap/,
   /\/providers\//,
-  // Internal services (devtools, platform-admin)
+  // Internal services
   /\/services\/internal\//,
   // Validation utilities
   /\/utils\/validation/,

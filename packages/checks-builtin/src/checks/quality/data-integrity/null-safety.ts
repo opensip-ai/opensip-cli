@@ -1,8 +1,5 @@
 /**
  * @fileoverview Null/Undefined Safety Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/data-integrity/null-safety
- * @version 2.0.0
  *
  * Detects unsafe property and method access without null checks.
  */

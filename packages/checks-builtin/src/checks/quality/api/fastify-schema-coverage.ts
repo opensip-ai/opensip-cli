@@ -3,9 +3,6 @@
 // @fitness-ignore-file fastify-schema-coverage -- Fitness check definition file; references Fastify schema patterns for detection, not actual routes
 /**
  * @fileoverview Fastify Schema Coverage Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/api/fastify-schema-coverage
- * @version 3.0.0
  *
  * Validates Fastify routes have proper schema coverage:
  * - Routes without schema option (unless Zod validation is present)

@@ -1,8 +1,5 @@
 /**
  * @fileoverview Detect potential SQL injection vulnerabilities
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/security/sql-injection
- * @version 3.0.0
  *
  * Uses AST analysis to find SQL injection patterns in template literals and
  * string concatenation. AST context eliminates false positives from suggestion

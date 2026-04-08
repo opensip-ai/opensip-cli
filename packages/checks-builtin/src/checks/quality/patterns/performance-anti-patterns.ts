@@ -1,9 +1,6 @@
 // @fitness-ignore-file no-unbounded-concurrency -- Concurrency bounded by design in this context
 /**
  * @fileoverview Performance Anti-Patterns Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/patterns/performance-anti-patterns
- * @version 2.0.0
  *
  * Detects common performance anti-patterns:
  * - Sequential awaits in loops

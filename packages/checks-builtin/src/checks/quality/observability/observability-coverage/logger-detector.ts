@@ -1,8 +1,6 @@
 // @fitness-ignore-file fitness-check-architecture -- Helper module for observability-coverage check, not a standalone check
 /**
  * @fileoverview Logger call detector for observability coverage analysis
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/observability/observability-coverage/logger-detector
  */
 
 import * as ts from 'typescript'

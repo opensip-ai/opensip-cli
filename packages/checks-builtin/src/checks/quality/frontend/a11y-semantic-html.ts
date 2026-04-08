@@ -1,9 +1,6 @@
 // @fitness-ignore-file file-length-limits -- Complex module with tightly coupled logic; refactoring would risk breaking changes
 /**
  * @fileoverview A11y Semantic HTML Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/frontend/a11y-semantic-html
- * @version 1.0.0
  *
  * Detects div-soup anti-patterns where View components have onPress handlers
  * without proper accessibility role definitions.

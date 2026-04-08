@@ -1,8 +1,5 @@
 /**
  * @fileoverview Dispose Pattern Completeness check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/patterns/dispose-pattern-completeness
- * @version 2.0.0
  *
  * Validates that classes implementing IDisposable properly clean up resources.
  * Ensures all subscriptions, connections, and resources are disposed.

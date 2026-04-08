@@ -6,8 +6,6 @@
  * - Security rules (non-root user, no secrets, production-dependencies) are errors (blocking)
  * - Efficiency rules (layer ordering, multi-stage, no-build-tools-in-runner) are warnings (advisory)
  * - All Dockerfiles in the repository are scanned
- * @module cli/devtools/fitness/src/checks/architecture/docker-best-practices
- * @version 3.0.0
  */
 
 import * as path from 'node:path'

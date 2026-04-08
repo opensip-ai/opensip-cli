@@ -1,5 +1,4 @@
 export * from './logger-event-name-format.js'
-export * from './no-direct-audit-logging.js'
 export * from './no-hardcoded-correlation-id.js'
 export * from './observability-coverage/index.js'
 export * from './pii-exposure-in-logs.js'

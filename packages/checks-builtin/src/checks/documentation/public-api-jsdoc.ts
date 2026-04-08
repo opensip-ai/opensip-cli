@@ -1,9 +1,6 @@
 // @fitness-ignore-file duplicate-implementation-detection -- similar patterns across diagnostic modules
 /**
  * @fileoverview Public API JSDoc check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/documentation/public-api-jsdoc
- * @version 1.0.0
  */
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/core'

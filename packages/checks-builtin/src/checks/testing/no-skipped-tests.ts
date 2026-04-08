@@ -2,9 +2,6 @@
 // @fitness-ignore-file no-test-only-skip -- longDescription contains backtick-escaped .skip( patterns for documentation
 /**
  * @fileoverview Detects .skip in test files that prevent tests from running
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/testing/no-skipped-tests
- * @version 2.0.0
  *
  * Skipped tests should be fixed or removed, not left dormant.
  */

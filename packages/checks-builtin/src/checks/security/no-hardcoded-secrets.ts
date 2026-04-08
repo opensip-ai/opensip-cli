@@ -1,9 +1,6 @@
 // @fitness-ignore-file no-hardcoded-secrets -- Fitness check definition references secret patterns in longDescription as examples, not actual secrets
 /**
  * @fileoverview Detect hardcoded secrets in source code
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/security/no-hardcoded-secrets
- * @version 2.2.0
  */
 
 import { logger } from '@opensip-tools/core/logger'

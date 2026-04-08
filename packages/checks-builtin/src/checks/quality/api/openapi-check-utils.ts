@@ -2,9 +2,6 @@
 // @fitness-ignore-file correlation-id-coverage -- Stateless utility module, not an API handler or service
 /**
  * @fileoverview Shared utilities for OpenAPI freshness checks
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/api/openapi-check-utils
- * @version 1.0.0
  */
 
 import type { CheckViolation } from '@opensip-tools/core'

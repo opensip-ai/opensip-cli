@@ -1,9 +1,6 @@
 // @fitness-ignore-file semgrep-justifications -- This check's own code references nosemgrep patterns for detection purposes
 /**
  * @fileoverview Semgrep Justifications check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/linting/semgrep-justifications
- * @version 2.0.0
  *
  * Validates that all nosemgrep directives have proper justifications.
  * Similar to eslint-justifications, this ensures suppression directives

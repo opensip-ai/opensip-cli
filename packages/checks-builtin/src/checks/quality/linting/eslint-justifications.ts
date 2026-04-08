@@ -1,10 +1,6 @@
 // @fitness-ignore-file file-length-limits -- Complex module with tightly coupled logic; refactoring would risk breaking changes
 /**
- * @fileoverview ADR-010: ESLint Justifications check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/linting/eslint-justifications
- * @version 3.0.0
- * @see ADR-010 - ESLint Rule Violation Documentation Strategy
+ * @fileoverview ESLint Justifications check
  */
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/core'
@@ -347,7 +343,6 @@ function getSeverityForIssueType(issueType: IssueType): 'error' | 'warning' {
  * Ensures all ESLint suppressions have proper justifications.
  * Missing justifications are errors; generic justifications are warnings.
  *
- * @see ADR-010 ESLint Rule Violation Documentation Strategy
  */
 export const eslintJustifications = defineCheck({
   id: '92d8f5de-dc11-40eb-aaf4-e77159975825',
@@ -367,8 +362,8 @@ export const eslintJustifications = defineCheck({
 
 **Why it matters:** Unjustified suppressions hide technical debt and make it impossible to determine whether a suppression is still necessary. Requiring specific reasons ensures suppressions are intentional and reviewable.
 
-**Scope:** Analyzes each file individually. Codebase-specific convention enforcing ADR-010.`,
-  tags: ['compliance', 'documentation', 'adr-010', 'quality'],
+**Scope:** Analyzes each file individually. General best practice.`,
+  tags: ['compliance', 'documentation', 'quality'],
   fileTypes: ['ts', 'tsx'],
   
   analyze: (content: string, filePath: string): CheckViolation[] => {

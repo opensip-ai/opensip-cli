@@ -1,8 +1,5 @@
 /**
  * @fileoverview No Any Types Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/code-structure/no-any-types
- * @version 2.0.0
  *
  * Detects usage of 'any' type in TypeScript code. The 'any' type bypasses
  * type checking and should be replaced with 'unknown' with proper type narrowing.

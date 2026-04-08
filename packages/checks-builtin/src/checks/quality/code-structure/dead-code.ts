@@ -1,9 +1,6 @@
 // @fitness-ignore-file batch-operation-limits -- iterates bounded collections (config entries, registry items, or small analysis results)
 /**
  * @fileoverview Dead code detection using Knip
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/code-structure/dead-code
- * @version 2.0.0
  *
  * Detects unused files, exports, types, and dependencies using Knip.
  */

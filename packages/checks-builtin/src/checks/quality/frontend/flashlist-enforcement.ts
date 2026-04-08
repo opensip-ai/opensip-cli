@@ -1,8 +1,5 @@
 /**
  * @fileoverview FlashList Enforcement Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/frontend/flashlist-enforcement
- * @version 2.0.0
  *
  * Detects FlatList usage in frontend code and recommends FlashList from @shopify/flash-list.
  * FlatList has performance issues with large lists; FlashList is the recommended alternative.

@@ -1,9 +1,6 @@
 // @fitness-ignore-file unused-config-options -- Config options reserved for future use or environment-specific
 /**
  * @fileoverview Security Scanning Suite Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/security-scan-suite
- * @version 3.0.0
  *
  * Consolidates security scanning tools:
  * - npm audit (dependency vulnerabilities)

@@ -1,7 +1,7 @@
 /**
  * @fileoverview Core finding and result types for fitness checks
  *
- * CheckResult carries Signal[] from @opensip/signals. Factory functions
+ * CheckResult carries Signal[]. Factory functions
  * (createResultWithSignals, createErrorResult, createPassingResult) provide
  * the standard way to construct check results.
  */

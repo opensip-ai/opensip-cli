@@ -3,9 +3,6 @@
 // @fitness-ignore-file file-length-limits -- Complex module with tightly coupled logic; refactoring would risk breaking changes
 /**
  * @fileoverview Duplicate Utility Functions check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/code-structure/duplicate-utility-functions
- * @version 2.3.0
  *
  * Detects duplicate utility functions that should be consolidated.
  * Flags TWO types of issues:

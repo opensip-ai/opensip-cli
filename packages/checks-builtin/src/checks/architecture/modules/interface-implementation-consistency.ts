@@ -4,9 +4,6 @@
 // @fitness-ignore-file performance-anti-patterns -- sequential file reading and bounded violation loops; not hot paths
 /**
  * @fileoverview Interface Implementation Consistency check (v2)
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/architecture/modules/interface-implementation-consistency
- * @version 3.0.0
  */
 
 import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/core'

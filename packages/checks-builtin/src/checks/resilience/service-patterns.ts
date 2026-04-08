@@ -1,8 +1,5 @@
 /**
  * @fileoverview Service communication and infrastructure resilience checks
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/resilience/service-patterns
- * @version 2.1.0
  */
 
 import { logger } from '@opensip-tools/core/logger'

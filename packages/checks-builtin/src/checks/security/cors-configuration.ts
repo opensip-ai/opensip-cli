@@ -1,9 +1,6 @@
 // @fitness-ignore-file cors-configuration -- Fitness check definition; regex patterns reference CORS tokens for detection purposes, not actual CORS configuration
 /**
  * @fileoverview Validate CORS configuration follows security best practices
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/security/cors-configuration
- * @version 2.1.0
  */
 
 import { logger } from '@opensip-tools/core/logger'

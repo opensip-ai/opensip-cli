@@ -1,8 +1,5 @@
 /**
  * @fileoverview Validates test file naming conventions
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/testing/test-file-naming
- * @version 2.0.0
  *
  * Test files should follow the pattern *.test.ts or *.spec.ts
  * and be located in __tests__ directories.

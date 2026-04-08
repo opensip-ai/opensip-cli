@@ -1,6 +1,6 @@
 /**
  * Generic dual-key registry with tag-based filtering.
- * Copied from @opensip/core/registry for standalone use.
+ * Copied from @opensip-tools/core registry for standalone use.
  */
 
 import { ValidationError } from '@opensip-tools/core';

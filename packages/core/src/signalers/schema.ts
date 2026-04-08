@@ -8,7 +8,7 @@
 
 import { z } from 'zod'
 
-// Inline defaults (from @opensip/core/config/defaults)
+// Inline defaults
 const DEFAULTS = {
   signals: {
     fitness: { failOnErrors: 1, failOnWarnings: 0, reconcile: true, ticketingAggregationThreshold: 0 },

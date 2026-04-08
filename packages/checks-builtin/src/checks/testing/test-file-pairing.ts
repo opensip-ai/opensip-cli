@@ -1,8 +1,5 @@
 /**
  * @fileoverview Ensures every source file in services has a corresponding test file
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/testing/test-file-pairing
- * @version 2.0.0
  *
  * This check validates that source files have matching test files.
  * Supports @test-pending marker for files awaiting test implementation.
@@ -122,7 +119,7 @@ function hasTestPair(dir: string, filename: string): boolean {
     path.join(dir, '__tests__', `${name}.spec.ts`),
     path.join(dir, '__tests__', `${name}.test.tsx`),
     path.join(dir, '__tests__', `${name}.spec.tsx`),
-    // __tests__/unit directory (ADR-041 structure)
+    // __tests__/unit directory
     path.join(dir, '__tests__', 'unit', `${name}.test.ts`),
     path.join(dir, '__tests__', 'unit', `${name}.spec.ts`),
     path.join(dir, '__tests__', 'unit', `${name}.unit.test.ts`),

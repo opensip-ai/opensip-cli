@@ -1,9 +1,6 @@
 // @fitness-ignore-file file-length-limits -- Complex module with tightly coupled logic; refactoring would risk breaking changes
 /**
  * @fileoverview Detects mock, stub, or fake implementations in production code
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/testing/mock-implementations-in-production
- * @version 2.0.0
  *
  * Mock implementations should only exist in test files, not production code.
  */

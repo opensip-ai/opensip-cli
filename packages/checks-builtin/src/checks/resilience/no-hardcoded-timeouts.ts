@@ -1,8 +1,5 @@
 /**
  * @fileoverview No hardcoded timeouts check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/resilience/no-hardcoded-timeouts
- * @version 1.1.0
  */
 
 import { logger } from '@opensip-tools/core/logger'

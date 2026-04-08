@@ -1,9 +1,6 @@
 // @fitness-ignore-file no-test-only-skip -- longDescription contains backtick-escaped .only( patterns for documentation
 /**
  * @fileoverview Detects .only in test files that would skip other tests
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/testing/no-focused-tests
- * @version 2.0.0
  *
  * Focused tests should not be committed as they prevent other tests from running.
  */

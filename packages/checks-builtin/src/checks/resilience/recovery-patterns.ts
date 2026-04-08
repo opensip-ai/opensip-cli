@@ -1,9 +1,6 @@
 // @fitness-ignore-file recovery-patterns -- Check definition contains custom timeout pattern strings it detects
 /**
  * @fileoverview Enforce use of canonical recovery patterns
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/resilience/recovery-patterns
- * @version 3.0.0
  */
 
 import { logger } from '@opensip-tools/core/logger'

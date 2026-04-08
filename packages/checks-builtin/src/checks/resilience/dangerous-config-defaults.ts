@@ -3,9 +3,6 @@
 // @fitness-ignore-file dangerous-config-defaults -- Fitness check definition references config patterns in longDescription, not actual configuration
 /**
  * @fileoverview Dangerous configuration defaults check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/resilience/dangerous-config-defaults
- * @version 1.1.0
  */
 
 import { logger } from '@opensip-tools/core/logger'

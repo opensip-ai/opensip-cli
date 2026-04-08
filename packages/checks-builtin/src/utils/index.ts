@@ -1,5 +1,5 @@
 /**
- * @fileoverview Utility barrel exports for @opensip/fitness
+ * @fileoverview Utility barrel exports for checks-builtin
  */
 
 export * from './source-analysis.js'

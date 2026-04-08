@@ -3,9 +3,6 @@
 // @fitness-ignore-file fitness-ignore-validation -- Fitness-ignore directives reference internal check IDs that may not be statically resolvable
 /**
  * @fileoverview Detect PII in log statements
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/security/pii-logging
- * @version 2.1.0
  *
  * Enforces privacy-safe logging standards.
  */

@@ -3,7 +3,7 @@
  *
  * Check interface is the return type of defineCheck.
  * CheckConfig represents the internal configuration structure.
- * CheckResult now carries Signal[] from @opensip/signals.
+ * CheckResult carries Signal[].
  */
 
 import type { CheckResult, ItemType } from '../types/findings.js'

@@ -1,8 +1,5 @@
 /**
  * @fileoverview No Custom Event Emitter check (v2)
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/architecture/no-custom-event-emitter
- * @version 3.0.0
  */
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/core'

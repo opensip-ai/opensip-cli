@@ -1,8 +1,5 @@
 /**
  * @fileoverview Missing Input Validation Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/data-integrity/missing-input-validation
- * @version 2.0.0
  *
  * Detects API handlers and functions accepting external input without validation.
  */

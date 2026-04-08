@@ -1,9 +1,6 @@
 // @fitness-ignore-file duplicate-implementation-detection -- similar patterns across diagnostic modules
 /**
  * @fileoverview Validate API key handling supports rotation
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/security/api-key-rotation
- * @version 2.1.0
  */
 
 import { logger } from '@opensip-tools/core/logger'

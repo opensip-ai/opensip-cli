@@ -1,8 +1,5 @@
 /**
  * @fileoverview Lifecycle Cleanup Enforcement check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/patterns/lifecycle-cleanup-enforcement
- * @version 1.0.0
  *
  * Detects resources with lifecycle methods (destroy, close, shutdown, stop, disconnect)
  * that are created but never have their cleanup method called in the same scope.

@@ -1,9 +1,6 @@
 // @fitness-ignore-file file-length-limits -- Complex module with tightly coupled logic; refactoring would risk breaking changes
 /**
  * @fileoverview In-Memory Repository Detection Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/data-integrity/in-memory-repository-detection
- * @version 2.0.0
  *
  * Detects repository classes using Map or in-memory storage in production code.
  * These are often placeholders that should be replaced with DynamoDB implementations.

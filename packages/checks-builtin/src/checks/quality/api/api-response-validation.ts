@@ -4,9 +4,6 @@
 // @fitness-ignore-file no-raw-regex-on-code -- fitness check: regex patterns analyze trusted codebase content, not user input
 /**
  * @fileoverview API Response Validation Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/api/api-response-validation
- * @version 3.0.0
  *
  * Ensures API responses are validated with Zod schemas before being sent to clients.
  * Validates that response types match their Zod schema definitions.
@@ -195,7 +192,6 @@ function analyzeFile(absolutePath: string, content: string): CheckViolation[] {
  *
  * Ensures API responses are validated with Zod schemas.
  *
- * @see ADR-039 Code Review Methodology
  */
 export const apiResponseValidation = defineCheck({
   id: '8822fd30-bcd5-48d5-80d6-2f3abdec7f70',
@@ -217,8 +213,8 @@ export const apiResponseValidation = defineCheck({
 
 **Why it matters:** Without response validation, API endpoints can silently send malformed or extra data to clients, breaking contracts and leaking internal fields.
 
-**Scope:** Codebase-specific convention enforcing ADR-039. Analyzes each file individually using TypeScript AST parsing. Only processes files identified as API files by \`isAPIFile()\`.`,
-  tags: ['quality', 'api', 'validation', 'zod', 'adr-039'],
+**Scope:** General best practice. Analyzes each file individually using TypeScript AST parsing. Only processes files identified as API files by \`isAPIFile()\`.`,
+  tags: ['quality', 'api', 'validation', 'zod'],
   fileTypes: ['ts'],
 
   analyze(content, filePath) {

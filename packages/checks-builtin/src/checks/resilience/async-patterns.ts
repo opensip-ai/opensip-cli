@@ -3,9 +3,6 @@
 // @fitness-ignore-file canonical-result-usage -- References Result pattern in comments and regex patterns for detection, not actual Result usage
 /**
  * @fileoverview Async pattern resilience checks
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/resilience/async-patterns
- * @version 2.2.0
  */
 
 import * as ts from 'typescript'

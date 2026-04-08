@@ -1,8 +1,5 @@
 /**
  * @fileoverview TypeScript Directive Hygiene Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/linting/typescript-directive-hygiene
- * @version 3.0.0
  *
  * Validates TypeScript suppression directives (@ts-expect-error, @ts-ignore) have proper justifications.
  */

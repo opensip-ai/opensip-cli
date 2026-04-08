@@ -1,8 +1,5 @@
 /**
  * @fileoverview Expo Vector Icons Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/frontend/expo-vector-icons
- * @version 2.0.0
  *
  * Ensures consistent icon library usage across the frontend codebase.
  * Recommends using @expo/vector-icons for React Native compatibility.

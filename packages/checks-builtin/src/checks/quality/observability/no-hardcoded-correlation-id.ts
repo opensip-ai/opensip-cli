@@ -1,9 +1,6 @@
 // @fitness-ignore-file project-readme-existence -- internal module, not a package root
 /**
  * @fileoverview Detects hardcoded correlation ID values
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/observability/no-hardcoded-correlation-id
- * @version 1.0.0
  */
 
 import { countUnescapedBackticks } from '@opensip-tools/core/framework/ast-utilities.js'

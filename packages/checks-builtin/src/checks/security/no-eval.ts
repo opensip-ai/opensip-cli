@@ -2,9 +2,6 @@
 // @fitness-ignore-file no-eval -- Fitness check definition references eval/Function/setTimeout/setInterval in string literals and regex patterns, not actual usage
 /**
  * @fileoverview Detect dangerous eval and dynamic code execution
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/security/no-eval
- * @version 2.1.0
  */
 
 import { logger } from '@opensip-tools/core/logger'

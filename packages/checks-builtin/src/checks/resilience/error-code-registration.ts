@@ -1,8 +1,5 @@
 /**
  * @fileoverview Error code registration check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/resilience/error-code-registration
- * @version 1.0.0
  */
 
 import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/core'

@@ -1,9 +1,6 @@
 // @fitness-ignore-file batch-operation-limits -- iterates bounded collections (config entries, registry items, or small analysis results)
 /**
  * @fileoverview Test convention consistency check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/testing/test-convention-consistency
- * @version 1.0.0
  *
  * Detects mixed .test and .spec naming conventions across the codebase.
  * When one convention is dominant (>95%), flags the minority files for renaming.

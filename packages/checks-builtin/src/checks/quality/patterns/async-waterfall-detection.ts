@@ -3,9 +3,6 @@
 // @fitness-ignore-file null-safety -- null checks are intentional guards
 /**
  * @fileoverview Async Waterfall Detection Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/patterns/async-waterfall-detection
- * @version 2.0.0
  *
  * Detects sequential await statements that could potentially be parallelized
  * with Promise.all(). Uses AST-aware heuristics:

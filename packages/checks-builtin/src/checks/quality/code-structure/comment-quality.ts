@@ -2,11 +2,7 @@
 // @fitness-ignore-file duplicate-interface-detection -- similar interfaces across module boundaries
 // @fitness-ignore-file duplicate-implementation-detection -- similar patterns across diagnostic modules
 /**
- * @fileoverview Comment Quality Check (ADR-055)
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/code-structure/comment-quality
- * @version 2.0.0
- * @see ADR-055 - Comment Quality Standards
+ * @fileoverview Comment Quality Check
  *
  * This check detects banned comment patterns:
  * - Debt markers (incomplete task markers, work-in-progress tags)
@@ -103,7 +99,7 @@ const BANNED_PATTERNS: PatternDef[] = [
   { regex: BLOCK_XXX_PATTERN, type: 'DEBT_MARKER_XXX', fix: DEBT_MARKER_FIX },
   { regex: BLOCK_OPTIMIZE_PATTERN, type: 'DEBT_MARKER_OPTIMIZE', fix: DEBT_MARKER_FIX },
 
-  // AI-generation metadata (banned per ADR-055)
+  // AI-generation metadata
   {
     regex: AI_GENERATED_BY_SINGLE_PATTERN,
     type: 'AI_METADATA',
@@ -120,7 +116,7 @@ const BANNED_PATTERNS: PatternDef[] = [
     fix: 'Remove AI-generation metadata; comments must stand on their own merit',
   },
 
-  // Process/planning artifacts (banned per ADR-055)
+  // Process/planning artifacts
   {
     regex: PHASE_PATTERN,
     type: 'PROCESS_ARTIFACT',
@@ -225,7 +221,6 @@ function checkLineForComments(
  * - AI-generation metadata
  * - Process/planning artifacts (Phase X, Sprint X, version stamps)
  *
- * @see ADR-055 Comment Quality Standards
  */
 export const commentQuality = defineCheck({
   id: 'e54e576e-99ea-4beb-9f31-8971e0c852bc',
@@ -235,7 +230,7 @@ export const commentQuality = defineCheck({
 
   confidence: 'medium',
   description: 'Detects banned comment patterns: debt markers, AI-metadata, and process artifacts',
-  longDescription: `**Purpose:** Enforces ADR-055 comment quality standards by detecting banned comment patterns that reduce code quality or leak process metadata into source files.
+  longDescription: `**Purpose:** Enforces comment quality standards by detecting banned comment patterns that reduce code quality or leak process metadata into source files.
 
 **Detects:** Analyzes each file individually via regex matching against each line.
 - Debt markers: \`// TODO\`, \`// FIXME\`, \`// HACK\`, \`// XXX\`, \`// OPTIMIZE\` (single-line and block comments)
@@ -245,11 +240,10 @@ export const commentQuality = defineCheck({
 
 **Why it matters:** Debt markers indicate unfinished work, AI metadata is irrelevant to readers, and process artifacts become stale. All should be resolved or removed.
 
-**Scope:** Codebase-specific convention enforcing ADR-055`,
-  tags: ['maintainability', 'code-quality', 'adr-055', 'quality'],
+**Scope:** General best practice. Analyzes each file individually.`,
+  tags: ['maintainability', 'code-quality', 'quality'],
   fileTypes: ['ts', 'tsx'],
-  disabled: true, // Disabled: ADR-055 is old platform policy, not applicable to opensip
-  docs: 'docs/adr/055-comment-quality-standards.md',
+  disabled: true,
 
   analyze(content: string, filePath: string): CheckViolation[] {
     // Quick filter: skip files without comment markers

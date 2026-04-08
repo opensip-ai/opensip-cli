@@ -1,8 +1,5 @@
 /**
  * @fileoverview Typed-Inject Scope Mismatch check (v2)
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/architecture/typed-inject-scope-mismatch
- * @version 3.0.0
  */
 
 import * as ts from 'typescript'

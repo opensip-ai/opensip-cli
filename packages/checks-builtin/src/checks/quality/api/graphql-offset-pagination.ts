@@ -1,9 +1,6 @@
 // @fitness-ignore-file correlation-id-coverage -- Fitness check analysis function; no network operations requiring correlation
 /**
  * @fileoverview Detect offset-based pagination in GraphQL queries
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/api/graphql-offset-pagination
- * @version 1.0.0
  *
  * Offset pagination produces unstable results when data changes between page
  * fetches (the "shifting page" problem). Cursor-based pagination (keyset via

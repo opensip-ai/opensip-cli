@@ -1,9 +1,6 @@
 // @fitness-ignore-file project-readme-existence -- internal module, not a package root
 /**
  * @fileoverview Validates logger event names follow the 3+ dot-separated segment convention
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/observability/logger-event-name-format
- * @version 1.1.0
  */
 
 import { countUnescapedBackticks } from '@opensip-tools/core/framework/ast-utilities.js'

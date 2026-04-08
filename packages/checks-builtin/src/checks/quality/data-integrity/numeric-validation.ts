@@ -1,9 +1,6 @@
 // @fitness-ignore-file no-generic-error -- Generic errors appropriate in this context
 /**
  * @fileoverview Numeric Parameter Validation Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/data-integrity/numeric-validation
- * @version 2.0.0
  *
  * Detects numeric parameters without NaN/Infinity/range validation.
  */

@@ -4,9 +4,6 @@
 // @fitness-ignore-file fitness-check-standards -- regex patterns are safe; bounded character classes prevent ReDoS
 /**
  * @fileoverview Directive Audit - surfaces suppression directives for periodic review
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/documentation/directive-audit
- * @version 3.0.0
  *
  * Audits all suppression directives in the codebase for periodic review:
  * - TypeScript: @ts-expect-error, @ts-expect-error

@@ -2,9 +2,6 @@
 // @fitness-ignore-file unused-config-options -- Config options reserved for future use or environment-specific
 /**
  * @fileoverview Database Schema Validation check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/data-integrity/database-schema-validation
- * @version 2.0.0
  *
  * Validates database schema definitions for best practices:
  * - Primary key definitions

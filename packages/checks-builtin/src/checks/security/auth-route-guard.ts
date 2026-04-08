@@ -1,8 +1,5 @@
 /**
  * @fileoverview Verify auth group routes are protected
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/security/auth-route-guard
- * @version 2.1.0
  */
 
 import { logger } from '@opensip-tools/core/logger'

@@ -1,9 +1,6 @@
 // @fitness-ignore-file file-length-limits -- Complex module with tightly coupled logic; refactoring would risk breaking changes
 /**
  * @fileoverview Navigation Typing Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/frontend/navigation-typing
- * @version 2.0.0
  *
  * Verifies that navigation params are properly typed for type-safe routing.
  */

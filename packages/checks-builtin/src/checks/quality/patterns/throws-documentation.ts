@@ -3,9 +3,6 @@
 // @fitness-ignore-file no-hardcoded-timeouts -- framework default for fitness check execution timeout
 /**
  * @fileoverview Missing @throws JSDoc Detection Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/patterns/throws-documentation
- * @version 2.0.0
  *
  * Detects functions that contain throw statements but lack @throws JSDoc documentation.
  *

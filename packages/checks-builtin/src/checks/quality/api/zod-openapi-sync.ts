@@ -1,9 +1,6 @@
 // @fitness-ignore-file correlation-id-coverage -- Fitness check implementation, not an API handler
 /**
  * @fileoverview Zod OpenAPI Sync Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/api/zod-openapi-sync
- * @version 3.0.0
  *
  * Enforces that Zod schemas use the `.satisfies z.ZodType<GeneratedType>` pattern
  * to stay in sync with OpenAPI-generated types.

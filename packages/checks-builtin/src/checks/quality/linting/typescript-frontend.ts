@@ -1,8 +1,5 @@
 /**
  * @fileoverview TypeScript Frontend Compiler Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/linting/typescript-frontend
- * @version 3.0.0
  *
  * Validates TypeScript compilation for frontend apps (apps/*).
  */

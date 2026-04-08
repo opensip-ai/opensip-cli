@@ -1,8 +1,5 @@
 /**
  * @fileoverview Detect webhook endpoints without signature verification
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/security/webhook-signature-verification
- * @version 2.1.0
  */
 
 import { logger } from '@opensip-tools/core/logger'

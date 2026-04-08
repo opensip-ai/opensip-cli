@@ -2,9 +2,6 @@
 // @fitness-ignore-file file-length-limits -- Complex module with tightly coupled logic; refactoring would risk breaking changes
 /**
  * @fileoverview Empty Package Detection check (v2)
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/architecture/modules/empty-package-detection
- * @version 3.0.0
  */
 
 import * as fs from 'node:fs'

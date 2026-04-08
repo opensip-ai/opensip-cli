@@ -1,9 +1,6 @@
 // @fitness-ignore-file clean-code-naming-quality -- naming conventions follow domain-specific patterns
 /**
  * @fileoverview No non-null assertions check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/patterns/no-non-null-assertions
- * @version 1.0.0
  */
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/core'

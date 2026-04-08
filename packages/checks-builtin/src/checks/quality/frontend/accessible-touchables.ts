@@ -1,9 +1,6 @@
 // @fitness-ignore-file file-length-limits -- Complex module with tightly coupled logic; refactoring would risk breaking changes
 /**
  * @fileoverview Accessible Touchables Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/frontend/accessible-touchables
- * @version 2.0.0
  *
  * Verifies that touchable/interactive components have accessibilityLabel prop for screen readers.
  * Supports both React Native touchables and Tamagui interactive components.

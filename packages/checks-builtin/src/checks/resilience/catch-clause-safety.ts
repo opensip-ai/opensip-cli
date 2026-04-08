@@ -1,9 +1,6 @@
 // @fitness-ignore-file catch-clause-safety -- check definition contains pattern examples in description strings
 /**
  * @fileoverview Catch clause safety check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/resilience/catch-clause-safety
- * @version 1.0.0
  */
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/core'

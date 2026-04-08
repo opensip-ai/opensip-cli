@@ -1,9 +1,6 @@
 // @fitness-ignore-file lazy-loading -- Self-referential false positive: check code contains 'await' and 'validate' as analysis targets, not actual async/validation patterns
 /**
- * @fileoverview Lazy Loading / Fail Fast Check (ADR-056)
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/frontend/lazy-loading
- * @version 3.0.0
+ * @fileoverview Lazy Loading / Fail Fast Check
  *
  * Detects patterns where expensive operations (await calls) are performed
  * before validation checks that don't depend on those operations.
@@ -309,7 +306,7 @@ function analyzeFile(content: string, filePath: string): CheckViolation[] {
 /**
  * Check: quality/lazy-loading
  *
- * Detects expensive operations performed before unused guard clauses (ADR-056).
+ * Detects expensive operations performed before unused guard clauses.
  */
 export const lazyLoading = defineCheck({
   id: 'a58f74a8-65b0-4ab6-9a1a-385e9f8dcf9a',
@@ -319,7 +316,7 @@ export const lazyLoading = defineCheck({
   contentFilter: 'code-only',
 
   confidence: 'high',
-  description: 'Detect expensive operations performed before unused guard clauses (ADR-056)',
+  description: 'Detect expensive operations performed before unused guard clauses',
   longDescription: `**Purpose:** Enforces the fail-fast principle by detecting validation checks that appear after expensive \`await\` operations when the validation does not depend on the awaited result.
 
 **Detects:** Analyzes each file individually using TypeScript AST traversal of function bodies.
@@ -331,7 +328,7 @@ export const lazyLoading = defineCheck({
 
 **Why it matters:** Performing I/O before guard clauses wastes resources on requests that will fail anyway. Moving validation first avoids unnecessary database/network calls.
 
-**Scope:** Codebase-specific convention enforcing ADR-056`,
+**Scope:** General best practice. Analyzes each file individually.`,
   tags: ['quality', 'code-quality', 'performance'],
   fileTypes: ['ts'],
 

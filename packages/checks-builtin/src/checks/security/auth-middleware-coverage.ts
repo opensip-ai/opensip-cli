@@ -1,9 +1,6 @@
 // @fitness-ignore-file fitness-ignore-validation -- Fitness-ignore directives reference internal check IDs that may not be statically resolvable
 /**
  * @fileoverview Validate routes have authentication middleware
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/security/auth-middleware-coverage
- * @version 2.1.0
  */
 
 import { logger } from '@opensip-tools/core/logger'

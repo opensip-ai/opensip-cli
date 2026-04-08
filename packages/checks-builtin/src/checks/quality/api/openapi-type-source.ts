@@ -1,9 +1,6 @@
 // @fitness-ignore-file correlation-id-coverage -- Fitness check implementation, not an API handler
 /**
  * @fileoverview OpenAPI Type Source Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/api/openapi-type-source
- * @version 3.0.0
  *
  * Enforces that API-related types are sourced from schema.d.ts (generated from OpenAPI).
  */

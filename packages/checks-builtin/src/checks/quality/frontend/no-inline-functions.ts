@@ -1,9 +1,6 @@
 // @fitness-ignore-file file-length-limits -- Complex module with tightly coupled logic; refactoring would risk breaking changes
 /**
  * @fileoverview No Inline Functions Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/frontend/no-inline-functions
- * @version 2.0.0
  *
  * Detects inline function definitions in JSX props which cause unnecessary re-renders.
  * Arrow functions and function expressions created during render should be memoized.

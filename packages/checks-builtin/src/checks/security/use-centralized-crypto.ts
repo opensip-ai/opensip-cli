@@ -1,9 +1,6 @@
 // @fitness-ignore-file batch-operation-limits -- iterates bounded collections (config entries, registry items, or small analysis results)
 /**
  * @fileoverview Enforce use of centralized crypto module
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/security/use-centralized-crypto
- * @version 2.1.0
  */
 
 import { logger } from '@opensip-tools/core/logger'

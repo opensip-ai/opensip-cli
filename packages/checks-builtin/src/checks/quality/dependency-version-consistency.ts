@@ -3,9 +3,6 @@
 // @fitness-ignore-file file-length-limits -- Complex module with tightly coupled logic; refactoring would risk breaking changes
 /**
  * @fileoverview Dependency Version Consistency check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/dependency-version-consistency
- * @version 2.0.0
  *
  * Ensures all packages in the monorepo use consistent dependency versions.
  * This prevents version drift which can cause subtle bugs, inconsistent behavior,

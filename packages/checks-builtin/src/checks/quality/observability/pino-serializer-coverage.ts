@@ -1,8 +1,5 @@
 /**
  * @fileoverview Pino Serializer Coverage Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/observability/pino-serializer-coverage
- * @version 2.0.0
  *
  * Validates that complex objects logged with Pino have serializers:
  * - Objects without registered serializers break structured logging

@@ -2,9 +2,6 @@
 // @fitness-ignore-file stubbed-implementation-detection -- longDescription documents the patterns this check detects, triggering self-detection
 /**
  * @fileoverview Stubbed Implementation Detection Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/stubbed-implementation-detection
- * @version 3.1.0
  *
  * Detects patterns indicating incomplete or placeholder implementations:
  * - Empty object stubs: `({}) as Type`
@@ -466,7 +463,7 @@ export const stubbedImplementationDetection = defineCheck({
       visit(sourceFile)
 
       // Check for placeholder comments (skip test files — placeholder comments
-      // in tests are intentional per ADR-053 test coverage requirements)
+      // in tests are intentional)
       if (!isTestFile(filePath)) {
         const lines = content.split('\n')
         for (let i = 0; i < lines.length; i++) {

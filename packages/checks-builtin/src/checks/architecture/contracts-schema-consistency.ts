@@ -1,8 +1,5 @@
 /**
  * @fileoverview Contracts schema consistency check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/architecture/contracts-schema-consistency
- * @version 1.0.0
  */
 
 import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/core'

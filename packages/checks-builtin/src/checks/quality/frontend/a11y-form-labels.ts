@@ -1,8 +1,5 @@
 /**
  * @fileoverview Form Input Accessibility Labels Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/frontend/a11y-form-labels
- * @version 1.0.0
  *
  * Verifies that form input components have associated labels for accessibility.
  * Supports React Native and Tamagui form components.

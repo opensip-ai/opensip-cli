@@ -1,9 +1,6 @@
 // @fitness-ignore-file no-generic-error -- Generic errors appropriate in this context
 /**
  * @fileoverview Stream Buffer Size Limits Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/patterns/stream-buffer-size-limits
- * @version 2.0.0
  *
  * Detects Buffer.concat() and stream buffering patterns without size limit guards.
  * These patterns can lead to DoS vulnerabilities when processing untrusted input.

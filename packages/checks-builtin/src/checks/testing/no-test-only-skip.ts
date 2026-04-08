@@ -2,9 +2,6 @@
 // @fitness-ignore-file unused-config-options -- Config options reserved for future use or environment-specific
 /**
  * @fileoverview Detects .only and .skip in test files that may have been accidentally committed
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/testing/no-test-only-skip
- * @version 2.0.0
  *
  * Combined check for both .only and .skip patterns.
  * .only is treated as an error (blocks CI), .skip as a warning.

@@ -3,9 +3,6 @@
 // @fitness-ignore-file duplicate-utility-functions -- Check-specific helpers (getFunctionName, isHandlerFunction) use check-local types; extracting would couple independent checks
 /**
  * @fileoverview API Contract Validation Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/api/api-contract-validation
- * @version 3.0.0
  *
  * Ensures API handlers have proper validation, typed responses, and error handling.
  * Validates that request/response contracts are enforced through types and schemas.
@@ -308,7 +305,6 @@ function analyzeFile(absolutePath: string, content: string): CheckViolation[] {
  * Validates that API handlers have proper validation, typed responses,
  * and error handling for type safety and reliability.
  *
- * @see ADR-039 Code Review Methodology
  */
 export const apiContractValidation = defineCheck({
   id: 'ef307717-de39-41d3-8344-0e6f7562367a',
@@ -329,7 +325,7 @@ export const apiContractValidation = defineCheck({
 **Why it matters:** Untyped or unvalidated API handlers allow malformed requests through and produce unpredictable error responses.
 
 **Scope:** General best practice. Analyzes each file individually using TypeScript AST parsing. Only processes files identified as API files by \`isAPIFile()\`.`,
-  tags: ['quality', 'api', 'type-safety', 'validation', 'adr-039'],
+  tags: ['quality', 'api', 'type-safety', 'validation'],
   fileTypes: ['ts'],
 
   analyze(content, filePath) {

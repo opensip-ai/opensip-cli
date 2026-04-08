@@ -2,9 +2,6 @@
 // @fitness-ignore-file unused-config-options -- Config options reserved for future use or environment-specific
 /**
  * @fileoverview Transaction handling resilience checks
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/resilience/transaction-patterns
- * @version 2.1.0
  */
 
 import { logger } from '@opensip-tools/core/logger'

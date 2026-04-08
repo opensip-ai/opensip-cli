@@ -1,9 +1,6 @@
 // @fitness-ignore-file clean-code-function-parameters -- AST visitor helper function requires node, sourceFile, content, file, builder, checkId params for analysis
 /**
  * @fileoverview Silent Early Returns Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/patterns/silent-early-returns
- * @version 1.0.0
  *
  * Detects validation/guard paths that return silently without logging.
  * These patterns make debugging difficult by hiding why code paths weren't executed.

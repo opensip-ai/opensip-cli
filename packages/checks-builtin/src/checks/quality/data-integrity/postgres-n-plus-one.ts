@@ -1,9 +1,6 @@
 // @fitness-ignore-file unused-config-options -- Config options reserved for future use or environment-specific
 /**
  * @fileoverview Postgres N+1 Query Detection Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/data-integrity/postgres-n-plus-one
- * @version 2.0.0
  *
  * Detects N+1 query patterns in postgres.js code by finding SQL queries
  * executed inside loops.

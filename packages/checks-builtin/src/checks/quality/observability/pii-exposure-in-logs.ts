@@ -1,8 +1,5 @@
 /**
  * @fileoverview PII Exposure in Logs Check
- * @invariants standard
- * @module cli/devtools/fitness/src/checks/quality/observability/pii-exposure-in-logs
- * @version 3.0.0
  *
  * Uses AST analysis to detect PII exposure in log statements.
  * Walks call expressions to find logger.info/warn/error/debug/trace/fatal calls,
