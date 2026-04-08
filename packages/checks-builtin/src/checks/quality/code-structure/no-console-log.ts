@@ -49,11 +49,30 @@ const CONSOLE_PATTERNS = [
 ]
 
 /**
+ * Paths where console.* is the correct output mechanism (CLI tools, display modules, scripts).
+ */
+const CLI_OUTPUT_PATTERNS = [
+  /\/commands\//,
+  /\/display\//,
+  /\/output\//,
+  /\/bin\//,
+  /\/scripts\//,
+  /\/cli\/.*\.ts$/,
+]
+
+/**
+ * Check if a file is a CLI output file where console.* is acceptable.
+ */
+function isCliOutputFile(filePath: string): boolean {
+  return CLI_OUTPUT_PATTERNS.some(p => p.test(filePath))
+}
+
+/**
  * Check: quality/no-console-log
  *
  * Ensures production code uses structured logging via a project logger
  * instead of console.log, console.debug, console.info, console.warn, or console.error.
- *
+ * Skips CLI command files, display/output modules, and scripts where console is appropriate.
  */
 export const noConsoleLog = defineCheck({
   id: '86403377-5903-478a-bdf2-e4f2f17df39f',
@@ -70,16 +89,20 @@ export const noConsoleLog = defineCheck({
 - \`console.warn(\` calls
 - \`console.error(\` calls
 - Skips lines that are comments (\`//\`, \`*\`, \`/*\`)
+- Skips CLI output files: \`/commands/\`, \`/display/\`, \`/output/\`, \`/bin/\`, \`/scripts/\` paths
 
-**Why it matters:** Console methods produce unstructured output without correlation IDs (\`corr_id\`) or event types (\`evt\`), making production debugging and log aggregation impossible.
+**Why it matters:** Console methods produce unstructured output without structured fields or log levels, making production debugging and log aggregation difficult.
 
-**Scope:** Codebase-specific convention enforcing structured logging standards`,
+**Scope:** General best practice. Analyzes each file individually.`,
   tags: ['logging', 'quality'],
   fileTypes: ['ts'],
   contentFilter: 'code-only',
   confidence: 'high',
 
   analyze(content, _filePath): CheckViolation[] {
+    // CLI commands, display modules, and scripts use console.* as their output mechanism
+    if (isCliOutputFile(_filePath)) return []
+
     const violations: CheckViolation[] = []
     const lines = content.split('\n')
 

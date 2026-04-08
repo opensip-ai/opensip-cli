@@ -9,7 +9,6 @@
  * - Dockerfiles are NOT checked (covered by docker-version-sync)
  */
 
-import * as fs from 'node:fs'
 import * as path from 'node:path'
 
 import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/core'
@@ -50,18 +49,6 @@ const CI_NODE_VERSION = /node-version:\s*['"]?(\d+)['"]?/
 // =============================================================================
 // HELPERS
 // =============================================================================
-
-/**
- * Read and parse root package.json.
- * @throws {Error} When the file exceeds 10MB
- */
-function readRootPackageJson(cwd: string): RootPackageJson {
-  const pkgPath = path.join(cwd, 'package.json')
-  const stats = fs.statSync(pkgPath)
-  if (stats.size > 10_000_000) throw new Error(`File too large: ${pkgPath}`)
-  const raw = fs.readFileSync(pkgPath, 'utf-8')
-  return JSON.parse(raw) as RootPackageJson
-}
 
 /**
  * Extract major Node version from engines.node constraint.
@@ -240,8 +227,24 @@ export const nodeVersionConsistency = defineCheck({
   async analyzeAll(files: FileAccessor): Promise<CheckViolation[]> {
     const violations: CheckViolation[] = []
 
+    // Find the root package.json from the scanned file set.
+    // The root is the shortest path (shallowest) package.json in the set.
+    const packageJsonPaths = files.paths.filter(p => path.basename(p) === 'package.json')
+    if (packageJsonPaths.length === 0) return violations
+
+    const rootPkgPath = packageJsonPaths.reduce((shortest, p) =>
+      p.length < shortest.length ? p : shortest
+    )
+    const rootDir = path.dirname(rootPkgPath)
+
     // Read root package.json for version truth
-    const rootPkg = readRootPackageJson(process.cwd())
+    const rootContent = await files.read(rootPkgPath)
+    let rootPkg: RootPackageJson
+    try {
+      rootPkg = JSON.parse(rootContent) as RootPackageJson
+    } catch {
+      return violations
+    }
     const rootConstraint = rootPkg.engines?.node
     if (!rootConstraint) return violations
 
@@ -257,8 +260,7 @@ export const nodeVersionConsistency = defineCheck({
         checkNvmrc(content, filePath, expectedMajor, violations)
       } else if (basename === 'package.json') {
         // Skip root package.json (it's the source of truth)
-        const relPath = path.relative(process.cwd(), filePath)
-        if (relPath === 'package.json') continue
+        if (filePath === rootPkgPath) continue
 
         checkWorkspaceEngines(content, filePath, expectedMajor, rootConstraint, violations)
         checkTypesNode(content, filePath, expectedMajor, violations)
