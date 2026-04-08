@@ -92,7 +92,7 @@ export async function executeCommand(
     }
   }
 
-  const violations = config.parseOutput(result.stdout, result.stderr, result.exitCode ?? 0, files)
+  const violations = config.parseOutput(result.stdout, result.stderr, result.exitCode ?? 0, files, cwd)
 
   return { violations, aborted: false, exitCode: result.exitCode }
 }

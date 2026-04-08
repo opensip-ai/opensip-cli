@@ -51,7 +51,7 @@ function renderOverview() {
     statusCell.appendChild(statusBadge(sessionStatus(s)));
     row.appendChild(statusCell);
     row.appendChild(el('td', {text: s.summary.passed+'/'+s.summary.total}));
-    row.appendChild(el('td', {text: ''+s.summary.errors}));
+    row.appendChild(el('td', {text: ''+(s.summary.errors + (s.summary.warnings || 0))}));
     row.appendChild(el('td', {text: (s.durationMs/1000).toFixed(1)+'s', style:'color:var(--text-dim)'}));
     tbody.appendChild(row);
   });

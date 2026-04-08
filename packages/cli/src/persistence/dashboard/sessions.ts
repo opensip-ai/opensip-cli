@@ -43,7 +43,7 @@ function renderSessionTable(panel, toolSessions, accentColor) {
   toolSessions.forEach((s, idx) => {
     const sc = s.score >= 90 ? 'color:var(--success)' : s.score >= 70 ? 'color:var(--warning)' : 'color:var(--error)';
     const row = el('tr', {class:'clickable', id: 'session-row-' + tool + '-' + idx, onclick: () => {
-      document.querySelectorAll('#' + detailContainer.id + ' .data-table tr.selected').forEach(r => r.classList.remove('selected'));
+      tbody.querySelectorAll('tr.selected').forEach(r => r.classList.remove('selected'));
       row.classList.add('selected');
       renderDetail(s, idx);
     }});
@@ -57,7 +57,7 @@ function renderSessionTable(panel, toolSessions, accentColor) {
     row.appendChild(badgeCell);
     row.appendChild(el('td', {text: ''+s.summary.passed, style:'color:var(--success)'}));
     row.appendChild(el('td', {text: ''+s.summary.failed, style: s.summary.failed > 0 ? 'color:var(--error)' : 'color:var(--text-dim)'}));
-    row.appendChild(el('td', {text: ''+s.summary.errors}));
+    row.appendChild(el('td', {text: ''+(s.summary.errors + (s.summary.warnings || 0))}));
     row.appendChild(el('td', {text: (s.durationMs/1000).toFixed(1)+'s', style:'color:var(--text-dim)'}));
     tbody.appendChild(row);
   });
@@ -194,8 +194,10 @@ function renderSessionTable(panel, toolSessions, accentColor) {
     paginateGroupedRows(tbody, detailPag, 10);
   }
 
-  // Auto-show latest
+  // Auto-show latest and highlight first row
   renderDetail(toolSessions[0], 0);
+  const firstRow = tbody.querySelector('tr');
+  if (firstRow) firstRow.classList.add('selected');
 }
 
 

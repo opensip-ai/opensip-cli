@@ -223,8 +223,8 @@ export const deadCode = defineCheck({
       stderr: string,
       _exitCode: number,
       _files: readonly string[],
+      cwd: string,
     ): CheckViolation[] {
-      const cwd = process.cwd()
 
       if (!stdout) {
         // No output - likely a configuration error

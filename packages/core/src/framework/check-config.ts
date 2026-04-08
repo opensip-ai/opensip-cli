@@ -140,6 +140,7 @@ export interface CommandConfig {
     stderr: string,
     exitCode: number,
     files: readonly string[],
+    cwd: string,
   ): CheckViolation[]
   readonly expectedExitCodes?: readonly number[]
 }
