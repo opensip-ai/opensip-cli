@@ -6,6 +6,8 @@
  * code injection, and other issues across all supported languages.
  */
 
+import * as path from 'node:path'
+
 import { defineCheck, type CheckViolation } from '@opensip-tools/core'
 
 // =============================================================================
@@ -54,6 +56,7 @@ function parseSemgrepOutput(
   _stderr: string,
   _exitCode: number,
   _files: readonly string[],
+  cwd: string,
 ): CheckViolation[] {
   if (!stdout.trim()) return []
 
@@ -73,7 +76,7 @@ function parseSemgrepOutput(
     const prefix = cwe ? `[${cwe.split(':')[0]}] ` : ''
 
     violations.push({
-      filePath: result.path,
+      filePath: path.isAbsolute(result.path) ? result.path : path.join(cwd, result.path),
       line: result.start.line,
       column: result.start.col,
       message: `${prefix}${result.extra.message}`,
