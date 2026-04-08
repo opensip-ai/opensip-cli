@@ -193,7 +193,10 @@ export async function filterSignalsByDirectives(
 
 /**
  * Determines whether a single signal should be ignored based on cached directive data.
- * Signals pointing at directive lines are never ignored (recursive loop prevention).
+ *
+ * File-level ignores always apply (the entire file is suppressed).
+ * Line-level ignores apply unless the signal points at a directive line itself
+ * (prevents recursive loops where directive-auditing checks suppress their own findings).
  */
 function isSignalIgnored(
   signal: Signal,
@@ -204,12 +207,13 @@ function isSignalIgnored(
   const filePath = signal.code?.file
   if (!filePath) return false
 
+  // File-level ignores always apply — no anti-recursion needed
+  if (fileIgnoreCache.get(filePath)) return true
+
   const signalLine = signal.code?.line
   const dirLines = directiveLineCache.get(filePath)
-  // Never suppress signals that point at directive lines — prevents recursive loops
+  // For line-level ignores: never suppress signals pointing at directive lines (anti-recursion)
   if (signalLine && dirLines?.has(signalLine)) return false
-
-  if (fileIgnoreCache.get(filePath)) return true
 
   const ignoredLines = lineIgnoreCache.get(filePath)
   if (signalLine && ignoredLines?.has(signalLine)) return true
