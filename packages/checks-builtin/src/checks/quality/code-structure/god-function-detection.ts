@@ -12,7 +12,7 @@
  * - This check: measures complexity and concern spread
  *
  * Thresholds:
- * - Cyclomatic complexity: warning > 10, error > 20
+ * - Cyclomatic complexity: warning >= 18, error >= 20
  * - Concern spread (distinct module refs): warning > 5, error > 8
  */
 
@@ -23,7 +23,7 @@ import { defineCheck, type CheckViolation } from '@opensip-tools/core'
 // =============================================================================
 
 const COMPLEXITY_THRESHOLDS = {
-  warning: 10,
+  warning: 18,
   error: 20,
 } as const
 
@@ -211,7 +211,7 @@ export const godFunctionDetection = defineCheck({
   longDescription: `**Purpose:** Identifies functions that do too many things — high branching complexity or touching too many distinct concerns (database, HTTP, filesystem, etc.).
 
 **Detects:**
-- Cyclomatic complexity > 10 (warning) or > 20 (error): too many branching paths (if/else/switch/ternary/logical operators)
+- Cyclomatic complexity >= 18 (warning) or >= 20 (error): too many branching paths (if/else/switch/ternary/logical operators)
 - Concern spread > 5 (warning) or > 8 (error): function touches too many distinct domains (database + HTTP + filesystem + tracing = 4 concerns)
 
 **Complements:**

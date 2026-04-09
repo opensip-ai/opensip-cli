@@ -170,11 +170,11 @@ function matchBackwardsCompatComment(line: string): boolean {
 }
 
 /**
- * Matches shim declarations.
+ * Matches shim declarations (whole word only to avoid false positives like "kalshiModule").
  */
 function matchShimAdapter(line: string): boolean {
   const lowerLine = line.toLowerCase()
-  if (!lowerLine.includes('shim')) return false
+  if (!/\bshim\b/.test(lowerLine)) return false
   const declarationKeywords = ['class ', 'function ', 'const ', 'let ', 'var ']
   return declarationKeywords.some((keyword) => lowerLine.includes(keyword))
 }
