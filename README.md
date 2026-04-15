@@ -125,11 +125,14 @@ By default, any check error causes exit code 1 (CI fails). Configure thresholds:
 
 ## Plugins
 
-Install community check packs or write your own:
+Plugins live in `~/.opensip-tools/fit/` (checks) and `~/.opensip-tools/sim/` (simulation scenarios). They can be npm packages or single `.mjs` files and can contribute **checks** and **recipes**.
 
 ```bash
-# Install a plugin
+# Install an npm-published plugin
 opensip-tools plugin install @company/checks-custom
+
+# Install a local plugin under development
+opensip-tools plugin install /abs/path/to/my-plugin
 
 # List installed plugins
 opensip-tools plugin list
@@ -138,12 +141,74 @@ opensip-tools plugin list
 opensip-tools plugin remove @company/checks-custom
 ```
 
-### Custom Checks
+`plugin install` runs `npm install` under the hood in `~/.opensip-tools/fit/` and also installs any `peerDependencies` the plugin declares (see below).
 
-Drop a `.js` or `.mjs` file in `~/.opensip-tools/fit/`:
+### Authoring a plugin package
+
+Your plugin is an ordinary npm package that exports a `checks` and/or `recipes` array. Declare `@opensip-tools/core` as a **peer dependency**, not a regular dependency — this lets the host and your plugin share one Check/Signal shape and avoids version drift.
+
+**`package.json`**
+
+```json
+{
+  "name": "@my-org/fitness-checks",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "peerDependencies": {
+    "@opensip-tools/core": "^0.1.0"
+  },
+  "devDependencies": {
+    "@opensip-tools/core": "^0.1.0",
+    "typescript": "^5.7.0"
+  }
+}
+```
+
+**`src/index.ts`**
+
+```typescript
+import { defineCheck, type Check } from '@opensip-tools/core';
+
+const myCheck: Check = defineCheck({
+  id: '3f7a…-uuid',
+  slug: 'my-custom-check',
+  category: 'quality',
+  description: 'What this check enforces',
+  scope: { languages: ['typescript'], concerns: ['backend'] },
+  tags: ['custom'],
+  analyze: (content, filePath) => {
+    const violations = [];
+    // detection logic
+    return violations;
+  },
+});
+
+export const checks: readonly Check[] = [myCheck];
+
+// Optional — ship recipes alongside checks
+export const recipes = [{
+  id: 'URCP_my-org',
+  name: 'my-org',
+  displayName: 'My Org',
+  description: 'All my-org checks',
+  checks: { type: 'tags', include: ['custom'] },
+  execution: { mode: 'parallel', stopOnFirstFailure: false, timeout: 30_000 },
+  reporting: { format: 'table', verbose: false },
+}];
+```
+
+Publish to npm (or install from a local path) and users can `opensip-tools plugin install @my-org/fitness-checks`.
+
+**Why peer dependency?** Plugins return Check objects that the host registers and executes; they don't mutate host singletons. Declaring `@opensip-tools/core` as a peer means one copy lives in the plugin directory alongside all plugins that need it, so peer resolution is clean and version expectations are explicit. This is the same pattern ESLint and Rollup use.
+
+### Single-file plugins
+
+For quick local experiments, drop a `.js` or `.mjs` file directly in `~/.opensip-tools/fit/`:
 
 ```javascript
-// ~/.opensip-tools/fit/my-check.js
+// ~/.opensip-tools/fit/my-check.mjs
 import { defineCheck } from '@opensip-tools/core';
 
 export const checks = [
@@ -153,16 +218,34 @@ export const checks = [
     description: 'My custom check',
     scope: { languages: ['typescript'], concerns: ['backend'] },
     tags: ['custom'],
-    analyze(content, filePath) {
-      const violations = [];
-      // ... your logic
-      return violations;
+    analyze: (content, filePath) => {
+      // your logic
+      return [];
     },
   }),
 ];
 ```
 
-Or publish as an npm package with `export const checks = [...]`.
+Single-file plugins resolve `@opensip-tools/core` from whatever copy is already sitting in `~/.opensip-tools/fit/node_modules/` (installed by any prior `plugin install`). If no package plugins are installed, run `opensip-tools plugin install @opensip-tools/core` once to seed it.
+
+### Recipes in plugins
+
+Recipes are named check bundles — useful when you want to run a specific set of checks across multiple repos:
+
+```javascript
+// ~/.opensip-tools/fit/my-recipes.mjs
+export const recipes = [{
+  id: 'URCP_backend-strict',
+  name: 'backend-strict',
+  displayName: 'Backend Strict',
+  description: 'All my checks plus opensip-tools backend checks',
+  checks: { type: 'all', exclude: [] },
+  execution: { mode: 'parallel', stopOnFirstFailure: false, timeout: 30_000 },
+  reporting: { format: 'table', verbose: false },
+}];
+```
+
+Then: `opensip-tools fit --recipe backend-strict`.
 
 ## Cloud Integration
 

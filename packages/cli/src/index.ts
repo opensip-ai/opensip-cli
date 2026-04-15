@@ -285,7 +285,7 @@ program
 
     // --recipes
     if (args.listRecipes) {
-      const result = listRecipes();
+      const result = await listRecipes();
       if (args.json) { process.stdout.write(JSON.stringify(result, null, 2) + '\n'); return; }
       await renderResult(result);
       return;

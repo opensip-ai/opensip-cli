@@ -2,21 +2,29 @@
  * list-recipes command — list all available fitness recipes
  */
 
-import { builtInRecipesByName } from '@opensip-tools/core';
+import { defaultRecipeRegistry } from '@opensip-tools/core';
 import type { ListRecipesResult } from '../types.js';
+import { ensureChecksLoaded } from './fit.js';
 
 // ---------------------------------------------------------------------------
 // listRecipes
 // ---------------------------------------------------------------------------
 
-export function listRecipes(): ListRecipesResult {
-  const recipes = [...builtInRecipesByName.entries()].map(([name, recipe]) => {
-    const checkCount = recipe.checks.type === 'all'
-      ? 'all checks'
-      : recipe.checks.type === 'explicit'
-        ? `${(recipe.checks as unknown as { checkIds: string[] }).checkIds.length} checks`
-        : 'pattern-based';
-    return { name, description: recipe.description, checkCount };
+export async function listRecipes(): Promise<ListRecipesResult> {
+  // Load plugins so user-defined recipes (e.g. ~/.opensip-tools/fit/*.mjs) appear.
+  await ensureChecksLoaded();
+
+  const recipes = defaultRecipeRegistry.getAllRecipes().map((recipe) => {
+    const selector = recipe.checks;
+    let checkCount: string;
+    if (selector.type === 'all') {
+      checkCount = 'all checks';
+    } else if (selector.type === 'explicit') {
+      checkCount = `${selector.checkIds.length} checks`;
+    } else {
+      checkCount = 'pattern-based';
+    }
+    return { name: recipe.name, description: recipe.description, checkCount };
   });
 
   return {

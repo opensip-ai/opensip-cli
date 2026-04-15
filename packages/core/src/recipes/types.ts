@@ -11,21 +11,6 @@ import os from 'node:os'
 import type { DirectiveEntry } from '../framework/directive-inventory.js'
 
 // =============================================================================
-// TICKET STATS
-// =============================================================================
-
-/** Ticket operation statistics tracked during a recipe run */
-export interface TicketStats {
-  created: number
-  updated: number
-  resolved: number
-  reopened: number
-  deleted: number
-  unchanged: number
-  errors: string[]
-}
-
-// =============================================================================
 // CHECK SELECTOR TYPES
 // =============================================================================
 
@@ -89,21 +74,10 @@ export interface FitnessReportingOptions {
 }
 
 // =============================================================================
-// TICKETING OPTIONS
-// =============================================================================
-
-/** Ticketing configuration controlling automatic ticket creation */
-export interface FitnessTicketingOptions {
-  readonly enabled: boolean
-  /** Override: include specific confidence levels for ticket creation. If set, only checks with matching confidence create tickets. */
-  readonly includeConfidence?: readonly ('high' | 'medium' | 'low')[]
-}
-
-// =============================================================================
 // FITNESS RECIPE
 // =============================================================================
 
-/** Complete recipe definition: checks, execution, reporting, and ticketing */
+/** Complete recipe definition: checks, execution, and reporting */
 export interface FitnessRecipe {
   readonly id: string
   readonly name: string
@@ -112,7 +86,6 @@ export interface FitnessRecipe {
   readonly checks: CheckSelector
   readonly execution: FitnessExecutionOptions
   readonly reporting: FitnessReportingOptions
-  readonly ticketing: FitnessTicketingOptions
   readonly tags?: readonly string[]
   readonly includeDisabled?: readonly string[]
   readonly fileFilter?: string
@@ -121,14 +94,6 @@ export interface FitnessRecipe {
 // =============================================================================
 // RECIPE RUN RESULT
 // =============================================================================
-
-/** Counts of ticket reconciliation operations for a single check */
-export interface ReconciliationCounts {
-  created: number
-  updated: number
-  resolved: number
-  unchanged: number
-}
 
 /** A single violation detail from a fitness check. */
 export interface RecipeViolation {
@@ -156,8 +121,6 @@ export interface RecipeCheckResult {
   readonly skipReason?: string
   readonly error?: string
   readonly timedOut?: boolean
-  reconciliationCounts?: ReconciliationCounts | undefined
-  reconciliationFailed?: boolean | undefined
   appliedDirectives?: readonly import('../framework/directive-inventory.js').DirectiveEntry[] | undefined
   /** Violation details. Populated when includeViolations is true. */
   readonly violations?: readonly RecipeViolation[]
@@ -195,7 +158,6 @@ export interface FitnessRecipeResult {
   readonly durationMs: number
   readonly checkResults: readonly RecipeCheckResult[]
   readonly summary: RecipeRunSummary
-  readonly ticketStats: TicketStats
   readonly ignoreCounts?: IgnoresByType | undefined
   readonly directives?: readonly DirectiveEntry[] | undefined
 }
@@ -212,7 +174,6 @@ export interface FitnessRecipeDefinition {
   readonly checks: CheckSelector
   readonly execution?: Partial<FitnessExecutionOptions>
   readonly reporting?: Partial<FitnessReportingOptions>
-  readonly ticketing?: Partial<FitnessTicketingOptions>
   readonly tags?: readonly string[]
   readonly includeDisabled?: readonly string[]
 }
@@ -239,11 +200,6 @@ export const DEFAULT_REPORTING_OPTIONS: FitnessReportingOptions = {
   verbose: false,
 } as const
 
-/** Default ticketing options applied when not overridden by a recipe */
-export const DEFAULT_TICKETING_OPTIONS: FitnessTicketingOptions = {
-  enabled: false,
-} as const
-
 /** Create a frozen FitnessRecipe from a definition, applying defaults for missing options */
 export function defineRecipe(definition: FitnessRecipeDefinition): FitnessRecipe {
   const id = `RCP_${definition.name}`
@@ -261,10 +217,6 @@ export function defineRecipe(definition: FitnessRecipeDefinition): FitnessRecipe
     reporting: {
       ...DEFAULT_REPORTING_OPTIONS,
       ...definition.reporting,
-    },
-    ticketing: {
-      ...DEFAULT_TICKETING_OPTIONS,
-      ...definition.ticketing,
     },
   }
 

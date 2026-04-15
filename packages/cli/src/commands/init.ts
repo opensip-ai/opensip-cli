@@ -175,11 +175,7 @@ export function generateInitConfig(cwd: string): string {
     'fitness:',
     '  failOnErrors: 1     # fail if total errors >= this (0 = never fail on errors)',
     '  failOnWarnings: 0   # fail if total warnings >= this (0 = warnings are informational)',
-    '  reconcile: false',
     '  disabledChecks: []',
-    '',
-    'simulation:',
-    '  reconcile: false',
     '',
   );
 

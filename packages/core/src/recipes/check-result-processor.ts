@@ -211,11 +211,6 @@ export function processSuccessResult(
 
   updateSessionForSuccess(session, checkResult, tags)
 
-  // Reconcile signals against ticket database when callback is provided.
-  if (callbacks.onReconcile) {
-    void callbacks.onReconcile(checkId, checkSlug, [...result.signals])
-  }
-
   const summary = createCheckSummary(checkId, checkSlug, passed, errorCount, warningCount, durationMs, memoryProfile, ignoredCount, result.metadata.filesScanned ?? 0)
   callbacks.onCheckComplete?.(checkSlug, summary, checkIndex, totalChecks)
 

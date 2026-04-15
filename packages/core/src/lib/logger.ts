@@ -102,7 +102,8 @@ function log(level: LogLevel, msgOrObj: string | Record<string, unknown>, data?:
     writeToFile(entry);
   }
 
-  // Write to stderr only in debug mode (or non-silent for warn/error)
+  // Write to stderr only when debugMode is on. setSilent(true) is called
+  // during preAction so Ink owns stdout; stderr is reserved for --debug.
   if (shouldLog(level)) {
     writeToStderr(entry);
   }

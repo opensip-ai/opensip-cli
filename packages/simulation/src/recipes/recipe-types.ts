@@ -54,18 +54,6 @@ export interface RecipeSession {
   readonly recipeName: string
   readonly startedAt: string
   scenarioResults: ScenarioRunResult[]
-  ticketStats: RecipeTicketStats
-}
-
-/** Ticket operation statistics for a simulation recipe run */
-export interface RecipeTicketStats {
-  created: number
-  updated: number
-  resolved: number
-  reopened: number
-  deleted: number
-  unchanged: number
-  errors: string[]
 }
 
 /** Result of a single scenario execution within a recipe */
@@ -89,7 +77,6 @@ export interface RecipeResult {
   readonly scenarioResults: readonly ScenarioRunResult[]
   readonly totals: RecipeTotals
   readonly durationMs: number
-  readonly ticketStats: RecipeTicketStats
 }
 
 /** Aggregated totals across all scenarios in a recipe run */
@@ -111,5 +98,4 @@ export interface RecipeTotals {
 export interface RecipeCallbacks {
   onScenarioStart?: (scenarioId: string, index: number, total: number) => void
   onScenarioComplete?: (scenarioId: string, result: ScenarioRunResult, index: number, total: number) => void
-  onReconcile?: (scenarioId: string, result: ScenarioRunResult, signals: readonly Signal[]) => void | Promise<void>
 }

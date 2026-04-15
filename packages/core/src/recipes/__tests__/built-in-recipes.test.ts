@@ -31,7 +31,6 @@ describe('built-in recipes', () => {
       expect(recipe.checks).toBeDefined();
       expect(recipe.execution).toBeDefined();
       expect(recipe.reporting).toBeDefined();
-      expect(recipe.ticketing).toBeDefined();
     }
   });
 

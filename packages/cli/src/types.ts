@@ -72,6 +72,7 @@ export interface CliOutput {
 export interface CheckOutput {
   readonly checkSlug: string;
   readonly passed: boolean;
+  readonly violationCount?: number;
   readonly findings: readonly FindingOutput[];
   readonly durationMs: number;
 }

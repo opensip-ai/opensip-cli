@@ -6,7 +6,7 @@ import {
   defaultRegistry,
   FitnessRecipeService, type FitnessRecipeServiceCallbacks, type CheckSummary,
   type FitnessRecipeResult,
-  builtInRecipesByName,
+  defaultRecipeRegistry,
   buildScopeBasedFileMap,
   loadTargetsConfig, loadSignalersConfig,
   logger,
@@ -96,9 +96,12 @@ export async function executeFit(
   await ensureChecksLoaded();
   logger.info({ evt: 'cli.checks.loaded', checkCount: defaultRegistry.listEnabled().length });
 
-  // Determine recipe: --tags creates an ad-hoc recipe, otherwise use named recipe
-  const recipeName = args.tags ? undefined : (args.recipe ?? 'default');
-  if (recipeName && !builtInRecipesByName.has(recipeName)) {
+  // Determine recipe: --check and --tags each create an ad-hoc recipe;
+  // otherwise use a named recipe. --check takes precedence over --recipe
+  // so "opensip-tools fit --check <slug>" runs just that slug.
+  const useAdHoc = args.check != null || args.tags != null;
+  const recipeName = useAdHoc ? undefined : (args.recipe ?? 'default');
+  if (recipeName && !defaultRecipeRegistry.has(recipeName)) {
     return {
       result: {
         type: 'error',
@@ -126,17 +129,25 @@ export async function executeFit(
     if (scopeMap.size > 0) {
       checkTargetFiles = scopeMap;
     }
-  } catch {
-    // No opensip-tools.config.yml — checks will use their built-in file cache fallback
+  } catch (err) {
+    // Distinguish "no config" (fine — use built-in file cache) from "config
+    // present but invalid" (user needs to see this, not silent defaults).
+    const message = err instanceof Error ? err.message : String(err);
+    if (!/No targets config found/.test(message)) {
+      logger.warn({ evt: 'cli.config.targets.invalid', message });
+    }
   }
 
-  // Load signalers config for disabledChecks and CI thresholds
+  // Load signalers config for disabledChecks and CI thresholds. The loader
+  // itself is self-healing (logs warnings, returns defaults), so any error
+  // here is truly exceptional and worth surfacing in logs.
   let signalersConfig: import('@opensip-tools/core').SignalersConfig | undefined;
   try {
     signalersConfig = loadSignalersConfig(args.cwd);
     disabledChecks = signalersConfig.fitness.disabledChecks;
-  } catch {
-    // No signalers config — use defaults
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.warn({ evt: 'cli.config.signalers.load_failed', message });
   }
 
   const label = args.tags ? `tags: ${args.tags}` : `recipe ${recipeName ?? 'default'}`;
@@ -164,7 +175,9 @@ export async function executeFit(
 
   let fitnessResult: FitnessRecipeResult;
   try {
-    if (args.tags) {
+    if (args.check) {
+      fitnessResult = await service.start(FitnessRecipeService.createAdHocRecipe({ check: args.check }));
+    } else if (args.tags) {
       const tagFilters = args.tags.split(',').map(t => t.trim()).filter(Boolean);
       fitnessResult = await service.start(FitnessRecipeService.createAdHocRecipe({ tagFilters }));
     } else {

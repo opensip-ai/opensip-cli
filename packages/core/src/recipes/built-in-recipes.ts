@@ -19,7 +19,6 @@ export const defaultRecipe: FitnessRecipe = defineRecipe({
   checks: { type: 'all' },
   execution: { mode: 'parallel', stopOnFirstFailure: false, timeout: 30_000 },
   reporting: { format: 'table', verbose: false },
-  ticketing: { enabled: false },
   tags: ['comprehensive', 'default'],
 })
 
@@ -39,10 +38,8 @@ export const quickSmokeRecipe: FitnessRecipe = defineRecipe({
       'no-any-types',
       'null-safety',
       'detached-promises',
-      'no-empty-catch',
-      'no-empty-throw',
-      'no-generic-error',
-      'recovery-patterns',
+      'catch-clause-safety',
+      'error-handling-quality',
       'no-hardcoded-secrets',
       'no-eval',
       'sql-injection',
@@ -54,7 +51,6 @@ export const quickSmokeRecipe: FitnessRecipe = defineRecipe({
   },
   execution: { mode: 'parallel', stopOnFirstFailure: false, timeout: 15_000 },
   reporting: { format: 'table', verbose: false },
-  ticketing: { enabled: false },
   tags: ['fast', 'smoke', 'critical'],
 })
 
@@ -93,7 +89,6 @@ export const backendRecipe: FitnessRecipe = defineRecipe({
   },
   execution: { mode: 'parallel', stopOnFirstFailure: false, timeout: 30_000 },
   reporting: { format: 'table', verbose: false },
-  ticketing: { enabled: false },
   tags: ['backend', 'server', 'api'],
 })
 
@@ -128,7 +123,6 @@ export const frontendRecipe: FitnessRecipe = defineRecipe({
   },
   execution: { mode: 'parallel', stopOnFirstFailure: false, timeout: 30_000 },
   reporting: { format: 'table', verbose: false },
-  ticketing: { enabled: false },
   tags: ['frontend', 'react', 'ui'],
 })
 
@@ -157,7 +151,6 @@ export const securityRecipe: FitnessRecipe = defineRecipe({
   },
   execution: { mode: 'sequential', stopOnFirstFailure: false, timeout: 60_000 },
   reporting: { format: 'table', verbose: true },
-  ticketing: { enabled: true },
   tags: ['security', 'audit', 'comprehensive'],
 })
 
@@ -183,7 +176,6 @@ export const preCommitRecipe: FitnessRecipe = defineRecipe({
   },
   execution: { mode: 'parallel', stopOnFirstFailure: true, timeout: 10_000 },
   reporting: { format: 'table', verbose: false },
-  ticketing: { enabled: false },
   tags: ['fast', 'hook', 'pre-commit'],
 })
 
@@ -199,7 +191,6 @@ export const preReleaseRecipe: FitnessRecipe = defineRecipe({
   checks: { type: 'all' },
   execution: { mode: 'sequential', stopOnFirstFailure: false, timeout: 120_000 },
   reporting: { format: 'unified', verbose: true },
-  ticketing: { enabled: true },
   tags: ['comprehensive', 'release', 'thorough'],
 })
 
@@ -220,7 +211,6 @@ export const nightlyFullRecipe: FitnessRecipe = defineRecipe({
     maxParallel: DEFAULT_MAX_PARALLEL,
   },
   reporting: { format: 'unified', verbose: true, outputPath: 'fitness-nightly-report.json' },
-  ticketing: { enabled: true },
   tags: ['nightly', 'comprehensive', 'scheduled'],
 })
 
@@ -236,7 +226,6 @@ export const ciRecipe: FitnessRecipe = defineRecipe({
   checks: { type: 'all', exclude: ['testing/flaky-*', 'performance/*'] },
   execution: { mode: 'parallel', stopOnFirstFailure: false, timeout: 60_000 },
   reporting: { format: 'json', verbose: false },
-  ticketing: { enabled: false },
   tags: ['ci', 'pipeline', 'automated'],
 })
 
@@ -252,7 +241,6 @@ export const architectureRecipe: FitnessRecipe = defineRecipe({
   checks: { type: 'tags', include: ['architecture'] },
   execution: { mode: 'parallel', stopOnFirstFailure: false, timeout: 30_000 },
   reporting: { format: 'table', verbose: true },
-  ticketing: { enabled: false },
   tags: ['architecture', 'structure'],
 })
 

@@ -11,8 +11,7 @@ import { z } from 'zod'
 // Inline defaults
 const DEFAULTS = {
   signals: {
-    fitness: { failOnErrors: 1, failOnWarnings: 0, reconcile: true, ticketingAggregationThreshold: 0 },
-    simulation: { reconcile: true },
+    fitness: { failOnErrors: 1, failOnWarnings: 0 },
   },
 } as const;
 
@@ -50,10 +49,6 @@ export type SignalerScheduleConfig = z.infer<typeof SignalerScheduleSchema>
 // Producer Schemas (copied from config/schema.ts — removed from there in Phase 2)
 // =============================================================================
 
-const FitnessTicketingSchema = z.object({
-  aggregationThreshold: z.number().int().min(0).default(DEFAULTS.signals.fitness.ticketingAggregationThreshold),
-})
-
 /** Schema for fitness check configuration */
 export const FitnessSchema = z.object({
   defaultTarget: z.string().min(1).max(255).optional(),
@@ -61,15 +56,12 @@ export const FitnessSchema = z.object({
   timeout: z.number().int().min(1000).optional(),
   failOnErrors: z.number().int().min(0).default(DEFAULTS.signals.fitness.failOnErrors),
   failOnWarnings: z.number().int().min(0).default(DEFAULTS.signals.fitness.failOnWarnings),
-  reconcile: z.boolean().default(DEFAULTS.signals.fitness.reconcile),
   disabledChecks: z.array(z.string().min(1).max(255)).optional().default([]),
-  ticketing: z.preprocess((v) => v ?? {}, FitnessTicketingSchema).default({}),
   schedules: z.array(SignalerScheduleSchema).default([]),
 })
 
 /** Schema for simulation engine configuration */
 export const SimulationSchema = z.object({
-  reconcile: z.boolean().default(DEFAULTS.signals.simulation.reconcile),
   schedules: z.array(SignalerScheduleSchema).default([]),
 })
 

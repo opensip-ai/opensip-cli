@@ -37,10 +37,12 @@ export function discoverPlugins(
 
   const plugins: DiscoveredPlugin[] = []
 
-  // 1. Discover npm packages in node_modules/
+  // 1. Discover npm packages declared as direct dependencies of the plugin
+  //    dir's package.json. Transitive deps under node_modules/ are skipped
+  //    so unrelated packages (peers, their deps) aren't treated as plugins.
   const nodeModulesDir = join(dir, 'node_modules')
   if (existsSync(nodeModulesDir)) {
-    plugins.push(...discoverNpmPackages(nodeModulesDir))
+    plugins.push(...discoverNpmPackages(nodeModulesDir, dir))
   }
 
   // 2. Discover loose JS/MJS files
@@ -61,41 +63,35 @@ export function discoverPlugins(
 // NPM PACKAGE DISCOVERY
 // =============================================================================
 
-function discoverNpmPackages(nodeModulesDir: string): DiscoveredPlugin[] {
+function discoverNpmPackages(nodeModulesDir: string, pluginDir: string): DiscoveredPlugin[] {
   const plugins: DiscoveredPlugin[] = []
 
-  let entries: string[]
-  try {
-    entries = readdirSync(nodeModulesDir)
-  } catch {
-    return plugins
-  }
+  const declared = readDeclaredDependencies(pluginDir)
+  if (declared.length === 0) return plugins
 
-  for (const entry of entries) {
-    const fullPath = join(nodeModulesDir, entry)
-
-    // Handle scoped packages (@scope/name)
-    if (entry.startsWith('@')) {
-      if (!safeIsDirectory(fullPath)) continue
-      try {
-        const scopedEntries = readdirSync(fullPath)
-        for (const scopedEntry of scopedEntries) {
-          const scopedPath = join(fullPath, scopedEntry)
-          const plugin = tryDiscoverPackage(scopedPath, `${entry}/${scopedEntry}`)
-          if (plugin) plugins.push(plugin)
-        }
-      } catch {
-        // Skip unreadable scope directories
-      }
-      continue
-    }
-
-    // Regular package
-    const plugin = tryDiscoverPackage(fullPath, entry)
+  for (const name of declared) {
+    const packageDir = join(nodeModulesDir, name)
+    const plugin = tryDiscoverPackage(packageDir, name)
     if (plugin) plugins.push(plugin)
   }
 
   return plugins
+}
+
+/**
+ * Read the plugin dir's package.json and return direct-dependency names.
+ * Only these are treated as plugins — transitive deps in node_modules/
+ * (such as peer deps of plugins, or their transitive installs) are ignored.
+ */
+function readDeclaredDependencies(pluginDir: string): string[] {
+  const pkgJsonPath = join(pluginDir, 'package.json')
+  if (!existsSync(pkgJsonPath)) return []
+  try {
+    const pkg = JSON.parse(readFileSync(pkgJsonPath, 'utf-8')) as { dependencies?: Record<string, string> }
+    return Object.keys(pkg.dependencies ?? {})
+  } catch {
+    return []
+  }
 }
 
 function tryDiscoverPackage(packageDir: string, name: string): DiscoveredPlugin | undefined {

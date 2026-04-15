@@ -61,6 +61,9 @@ export const WEAK_REASON_PATTERNS = Object.freeze<readonly RegExp[]>([
 
 /**
  * Parse a file-level or next-line directive from a comment line.
+ * Accepts both `//` and `/*`-style comments for consistency with the
+ * suppression parser in directive-parsing.ts — otherwise block-comment
+ * directives suppress findings but vanish from inventory counts.
  */
 export function parseDirectiveLine(line: string): {
   type: 'file' | 'next-line'
@@ -68,17 +71,17 @@ export function parseDirectiveLine(line: string): {
   reason: string | null
 } | null {
   const trimmed = line.trimStart()
-  if (!trimmed.startsWith('// @fitness-ignore')) return null
+  if (!trimmed.startsWith('// ') && !trimmed.startsWith('/* ')) return null
 
-  const afterSlashes = trimmed.slice(3).trimStart()
+  const afterComment = trimmed.slice(3).trimStart()
 
-  if (afterSlashes.startsWith('@fitness-ignore-file ')) {
-    const rest = afterSlashes.slice('@fitness-ignore-file '.length)
+  if (afterComment.startsWith('@fitness-ignore-file ')) {
+    const rest = afterComment.slice('@fitness-ignore-file '.length)
     return parseDirectiveRest(rest, 'file')
   }
 
-  if (afterSlashes.startsWith('@fitness-ignore-next-line ')) {
-    const rest = afterSlashes.slice('@fitness-ignore-next-line '.length)
+  if (afterComment.startsWith('@fitness-ignore-next-line ')) {
+    const rest = afterComment.slice('@fitness-ignore-next-line '.length)
     return parseDirectiveRest(rest, 'next-line')
   }
 
@@ -89,16 +92,19 @@ function parseDirectiveRest(
   rest: string,
   type: 'file' | 'next-line',
 ): { type: 'file' | 'next-line'; checkId: string; reason: string | null } | null {
-  const separatorIndex = rest.indexOf(' -- ')
+  // Strip trailing `*/` from block-comment directives (e.g. `foo */` → `foo`).
+  const normalized = rest.replace(/\s*\*\/\s*$/, '').trimEnd()
+
+  const separatorIndex = normalized.indexOf(' -- ')
 
   if (separatorIndex === -1) {
-    const checkId = rest.trim()
+    const checkId = normalized.trim()
     if (!checkId || checkId.includes(' ')) return null
     return { type, checkId, reason: null }
   }
 
-  const checkId = rest.slice(0, separatorIndex).trim()
-  const reason = rest.slice(separatorIndex + 4).trim()
+  const checkId = normalized.slice(0, separatorIndex).trim()
+  const reason = normalized.slice(separatorIndex + 4).trim()
 
   if (!checkId || checkId.includes(' ')) return null
   return { type, checkId, reason: reason || null }

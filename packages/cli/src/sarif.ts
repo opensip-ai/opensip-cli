@@ -44,9 +44,12 @@ function buildSarifRuns(output: CliOutput): SarifRun[] {
       };
 
       if (f.filePath) {
+        // SARIF startLine/startColumn are 1-based (per spec § 3.30.6). Values
+        // of 0 are invalid, and fitness signals without a line often carry
+        // line=0 as a sentinel — skip those fields rather than emit invalid SARIF.
         const region: Record<string, number> = {};
-        if (f.line != null) region.startLine = f.line;
-        if (f.column != null) region.startColumn = f.column;
+        if (f.line != null && f.line > 0) region.startLine = f.line;
+        if (f.column != null && f.column > 0) region.startColumn = f.column;
         result.locations = [{
           physicalLocation: {
             artifactLocation: { uri: f.filePath },
@@ -155,7 +158,7 @@ export async function reportToCloud(output: CliOutput, url: string, apiKey?: str
   for (let ci = 0; ci < chunks.length; ci++) {
     const chunk = chunks[ci]!;
     const chunkFindings = chunk.reduce((n, r) => n + r.results.length, 0);
-    // 60s base + 100ms per finding — reconciler does per-finding DB work (dedup, tickets, traces)
+    // 60s base + 100ms per finding — receiver does per-finding work (dedup, persistence, traces)
     const timeoutMs = Math.min(300_000, 60_000 + chunkFindings * 100);
     const sarifLog = wrapSarifLog(chunk);
 

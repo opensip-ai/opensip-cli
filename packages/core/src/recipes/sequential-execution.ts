@@ -31,7 +31,7 @@ export async function executeSequential(ctx: ExecutionServiceContext, opts: Exec
 
   const processorCtx: ProcessorContext = { session, callbacks, recipe, includeViolations: ctx.includeViolations ?? false }
 
-  // @fitness-ignore-next-line file-length-limits -- Sequential check execution loop: orchestrates check lifecycle (start, run, retry, reconcile, complete) callbacks
+  // @fitness-ignore-next-line file-length-limits -- Sequential check execution loop: orchestrates check lifecycle (start, run, retry, complete) callbacks
   for (let i = 0; i < checks.length; i++) {
     if (abortController?.signal.aborted) break
 

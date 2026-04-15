@@ -105,7 +105,6 @@ targets:
 fitness:
   failOnErrors: 1
   failOnWarnings: 0
-  reconcile: false
   disabledChecks:
     # Docker
     - docker-version-sync
@@ -139,6 +138,3 @@ fitness:
     - nextjs-conventions
     - datatable-column-tooltips
     - datatable-pagination
-
-simulation:
-  reconcile: false

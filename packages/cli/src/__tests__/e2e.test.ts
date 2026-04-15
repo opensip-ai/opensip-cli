@@ -115,6 +115,10 @@ describe('CLI e2e', () => {
       const output = JSON.parse(stdout);
       expect(output.tool).toBe('fit');
       expect(output.summary).toBeDefined();
+      // --check must narrow to exactly one check, not the full default recipe.
+      expect(output.summary.total).toBe(1);
+      expect(output.checks).toHaveLength(1);
+      expect(output.checks[0].checkSlug).toBe('no-console-log');
     });
 
     it('--recipe quick-smoke runs without error', () => {

@@ -5,8 +5,6 @@
  * used by FitnessRecipeService and its execution engines.
  */
 
-import type { Signal } from '../types/signal.js'
-
 import type { DirectiveEntry } from '../framework/directive-inventory.js'
 import type { CheckMemoryProfile } from '../framework/memory-profiler.js'
 
@@ -14,13 +12,8 @@ import type {
   FitnessRecipe,
   FitnessRecipeResult,
   RecipeCheckResult,
-  ReconciliationCounts,
-  TicketStats,
   IgnoresByType,
 } from './types.js'
-
-/** Re-exported ticket statistics type */
-export type { TicketStats }
 
 // =============================================================================
 // CHECK SUMMARY (used for callbacks)
@@ -42,28 +35,16 @@ export interface CheckSummary {
 }
 
 // =============================================================================
-// TICKET TYPES
-// =============================================================================
-
-/** Metadata passed to the ticket creation callback */
-export interface TicketCreateMetadata {
-  readonly deduplicationKey: string
-}
-
-// =============================================================================
 // SERVICE CALLBACKS
 // =============================================================================
 
-/** Callbacks invoked during recipe execution for progress, errors, and reconciliation */
+/** Callbacks invoked during recipe execution for progress and errors */
 export interface FitnessRecipeServiceCallbacks {
   onCheckStart?: (checkSlug: string, index: number, total: number) => void
   onCheckComplete?: (checkSlug: string, summary: CheckSummary, index: number, total: number) => void
   onError?: (checkSlug: string, error: Error) => void
-  onTicketCreate?: (ticketId: string, checkId: string, metadata: TicketCreateMetadata) => void
   onMemoryWarning?: (checkId: string, profile: CheckMemoryProfile) => void
   onComplete?: (result: FitnessRecipeResult) => void
-  /** Called after each check to reconcile signals against the ticket database. */
-  onReconcile?: (checkId: string, checkSlug: string, signals: Signal[]) => void | Promise<void>
   /** Called before execution with all registered checks for catalog sync. */
   onCatalogSync?: (entries: Array<{ id: string; slug: string; tags: readonly string[]; description: string }>) => void
 }
@@ -108,9 +89,7 @@ export interface FitnessRecipeSession {
   totalWarnings: number
   totalIgnored: number
   ignoresByTag: Map<string, number>
-  ticketStats: TicketStats
   checkResults: RecipeCheckResult[]
   ignoreCounts?: IgnoresByType | undefined
-  reconciliationCounts: Map<string, ReconciliationCounts>
   directives: DirectiveEntry[]
 }

@@ -196,14 +196,13 @@ export interface BaseCheckConfig {
    */
   readonly contentFilter?: 'raw' | 'code-only'
   /**
-   * Confidence level of this check's findings.
+   * Confidence level of this check's findings. Consumers of opensip-tools
+   * signals (via --report-to) use this to decide how aggressively to act
+   * on findings; this package treats it as pure metadata.
    *
    * - 'high': AST-based or structurally guaranteed no false positives.
-   *   Findings create tickets by default.
-   * - 'medium': Regex with context filtering. Findings create tickets
-   *   but are aggregated more aggressively.
-   * - 'low': Naive regex or heuristic. Findings appear in reports
-   *   but do NOT create tickets unless explicitly opted in.
+   * - 'medium': Regex with context filtering — some false positives expected.
+   * - 'low': Naive regex or heuristic — surfaced in reports but easily noisy.
    *
    * Default: 'medium' (applied at runtime, not in schema).
    */

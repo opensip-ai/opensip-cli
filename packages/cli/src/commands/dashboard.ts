@@ -2,7 +2,7 @@
  * dashboard command — generate HTML report and open in browser
  */
 
-import { defaultRegistry, builtInRecipesByName } from '@opensip-tools/core';
+import { defaultRegistry, defaultRecipeRegistry } from '@opensip-tools/core';
 import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -51,7 +51,7 @@ export async function openDashboard(): Promise<DashboardResult> {
   });
 
   // Collect recipe catalog
-  const recipes: RecipeCatalogEntry[] = [...builtInRecipesByName.values()].map(r => ({
+  const recipes: RecipeCatalogEntry[] = [...defaultRecipeRegistry.getAllRecipes()].map(r => ({
     name: r.name,
     displayName: r.displayName,
     description: r.description,

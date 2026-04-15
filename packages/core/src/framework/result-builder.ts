@@ -145,13 +145,15 @@ export class ResultBuilder {
   }
 
   private buildInfo(errors: number, warnings: number, unit: string): CheckInfo {
-    const total = errors + warnings
-
     if (this._totalItems > 0) {
-      const compliantItems = this._totalItems - this.getUniqueFileCount()
+      // Clamp to 0: analyzeAll-mode checks can surface violations against
+      // files outside the scanned set, which would otherwise produce a
+      // negative "-N/M compliant" label.
+      const compliantItems = Math.max(0, this._totalItems - this.getUniqueFileCount())
       return CheckInfoFactory.compliance(compliantItems, this._totalItems, unit)
     }
 
+    const total = errors + warnings
     return CheckInfoFactory.violations(total, getItemTypeLabel('violations', total))
   }
 

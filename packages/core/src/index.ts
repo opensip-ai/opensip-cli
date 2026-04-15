@@ -37,6 +37,7 @@ export { FitnessRecipeService } from './recipes/service.js';
 export type { FitnessRecipeServiceConfig, FitnessRecipeServiceCallbacks, CheckSummary } from './recipes/service-types.js';
 export type { FitnessRecipeResult, RecipeCheckResult } from './recipes/types.js';
 export { builtInRecipesByName } from './recipes/built-in-recipes.js';
+export { defaultRecipeRegistry, FitnessRecipeRegistry } from './recipes/registry.js';
 
 // Targets and signalers
 export { loadTargetsConfig, resolveTargetFiles } from './targets/index.js';

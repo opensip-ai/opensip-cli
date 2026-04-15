@@ -193,17 +193,7 @@ export class FitnessRecipeService {
       totalWarnings: 0,
       totalIgnored: 0,
       ignoresByTag: new Map(),
-      ticketStats: {
-        created: 0,
-        updated: 0,
-        resolved: 0,
-        reopened: 0,
-        deleted: 0,
-        unchanged: 0,
-        errors: [],
-      },
       checkResults: [],
-      reconciliationCounts: new Map(),
       directives: [],
     }
   }
@@ -287,19 +277,6 @@ export class FitnessRecipeService {
 
     const score = session.totalChecks > 0 ? Math.round((session.passedChecks / session.totalChecks) * 100) : 100
 
-    const checkResultsWithActions = session.checkResults.map((cr) => {
-      const counts = session.reconciliationCounts.get(cr.checkId)
-      if (counts) {
-        const failed = session.ticketStats.errors.some((e) => e.startsWith(`${cr.checkId}:`))
-        return {
-          ...cr,
-          reconciliationCounts: counts,
-          ...(failed ? { reconciliationFailed: true } : {}),
-        }
-      }
-      return cr
-    })
-
     const result: FitnessRecipeResult = {
       recipeId: session.recipe.id,
       recipeName: session.recipe.name,
@@ -308,9 +285,8 @@ export class FitnessRecipeService {
       startedAt: session.startedAt,
       completedAt,
       durationMs: completedAt.getTime() - session.startedAt.getTime(),
-      checkResults: checkResultsWithActions,
+      checkResults: session.checkResults,
       summary,
-      ticketStats: { ...session.ticketStats },
     }
 
     return {
@@ -331,7 +307,6 @@ export class FitnessRecipeService {
     json?: boolean
     unified?: boolean
     verbose?: boolean
-    tickets?: boolean
     retry?: boolean
     maxRetries?: number
     maxParallel?: number
@@ -375,9 +350,6 @@ export class FitnessRecipeService {
           return args.unified ? 'unified' as const : 'json' as const;
         })(),
         verbose: args.verbose ?? false,
-      },
-      ticketing: {
-        enabled: args.tickets ?? false,
       },
       ...(includeDisabled ? { includeDisabled } : {}),
       ...(args.file ? { fileFilter: args.file } : {}),

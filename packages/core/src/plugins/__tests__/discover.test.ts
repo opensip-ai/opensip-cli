@@ -81,14 +81,18 @@ describe('discoverPlugins', () => {
   })
 
   describe('npm packages', () => {
-    it('discovers packages with package.json and main field', () => {
-      const pkgDir = join(testDir, 'fit', 'node_modules', 'my-plugin')
-      mkdirSync(pkgDir, { recursive: true })
-      writeFileSync(join(pkgDir, 'package.json'), JSON.stringify({
+    it('discovers packages declared as dependencies in the plugin dir package.json', () => {
+      const fitDir = join(testDir, 'fit')
+      mkdirSync(join(fitDir, 'node_modules', 'my-plugin'), { recursive: true })
+      writeFileSync(join(fitDir, 'package.json'), JSON.stringify({
+        name: 'plugins-host',
+        dependencies: { 'my-plugin': '*' },
+      }))
+      writeFileSync(join(fitDir, 'node_modules', 'my-plugin', 'package.json'), JSON.stringify({
         name: 'my-plugin',
         main: './index.js',
       }))
-      writeFileSync(join(pkgDir, 'index.js'), 'export const checks = []')
+      writeFileSync(join(fitDir, 'node_modules', 'my-plugin', 'index.js'), 'export const checks = []')
 
       const result = discoverPlugins('fit', testDir)
       expect(result).toHaveLength(1)
@@ -99,9 +103,14 @@ describe('discoverPlugins', () => {
       })
     })
 
-    it('discovers scoped packages', () => {
-      const pkgDir = join(testDir, 'fit', 'node_modules', '@scope', 'checks')
+    it('discovers scoped packages declared as dependencies', () => {
+      const fitDir = join(testDir, 'fit')
+      const pkgDir = join(fitDir, 'node_modules', '@scope', 'checks')
       mkdirSync(pkgDir, { recursive: true })
+      writeFileSync(join(fitDir, 'package.json'), JSON.stringify({
+        name: 'plugins-host',
+        dependencies: { '@scope/checks': '*' },
+      }))
       writeFileSync(join(pkgDir, 'package.json'), JSON.stringify({
         name: '@scope/checks',
         main: './dist/index.js',
@@ -117,9 +126,31 @@ describe('discoverPlugins', () => {
       })
     })
 
+    it('ignores transitive packages not listed as direct dependencies', () => {
+      const fitDir = join(testDir, 'fit')
+      mkdirSync(join(fitDir, 'node_modules', 'transitive'), { recursive: true })
+      writeFileSync(join(fitDir, 'package.json'), JSON.stringify({
+        name: 'plugins-host',
+        dependencies: {},
+      }))
+      writeFileSync(join(fitDir, 'node_modules', 'transitive', 'package.json'), JSON.stringify({
+        name: 'transitive',
+        main: './index.js',
+      }))
+      writeFileSync(join(fitDir, 'node_modules', 'transitive', 'index.js'), '')
+
+      const result = discoverPlugins('fit', testDir)
+      expect(result).toEqual([])
+    })
+
     it('skips packages without entry point', () => {
-      const pkgDir = join(testDir, 'fit', 'node_modules', 'broken')
+      const fitDir = join(testDir, 'fit')
+      const pkgDir = join(fitDir, 'node_modules', 'broken')
       mkdirSync(pkgDir, { recursive: true })
+      writeFileSync(join(fitDir, 'package.json'), JSON.stringify({
+        name: 'plugins-host',
+        dependencies: { broken: '*' },
+      }))
       writeFileSync(join(pkgDir, 'package.json'), JSON.stringify({
         name: 'broken',
         main: './nonexistent.js',
@@ -130,8 +161,13 @@ describe('discoverPlugins', () => {
     })
 
     it('skips directories without package.json', () => {
-      const pkgDir = join(testDir, 'fit', 'node_modules', 'not-a-package')
+      const fitDir = join(testDir, 'fit')
+      const pkgDir = join(fitDir, 'node_modules', 'not-a-package')
       mkdirSync(pkgDir, { recursive: true })
+      writeFileSync(join(fitDir, 'package.json'), JSON.stringify({
+        name: 'plugins-host',
+        dependencies: { 'not-a-package': '*' },
+      }))
       writeFileSync(join(pkgDir, 'index.js'), 'export const checks = []')
 
       const result = discoverPlugins('fit', testDir)
@@ -139,8 +175,13 @@ describe('discoverPlugins', () => {
     })
 
     it('uses exports["."] when available', () => {
-      const pkgDir = join(testDir, 'fit', 'node_modules', 'exports-pkg')
+      const fitDir = join(testDir, 'fit')
+      const pkgDir = join(fitDir, 'node_modules', 'exports-pkg')
       mkdirSync(pkgDir, { recursive: true })
+      writeFileSync(join(fitDir, 'package.json'), JSON.stringify({
+        name: 'plugins-host',
+        dependencies: { 'exports-pkg': '*' },
+      }))
       writeFileSync(join(pkgDir, 'package.json'), JSON.stringify({
         name: 'exports-pkg',
         exports: { '.': './lib/main.js' },
@@ -159,6 +200,10 @@ describe('discoverPlugins', () => {
       const fitDir = join(testDir, 'fit')
       mkdirSync(fitDir, { recursive: true })
       writeFileSync(join(fitDir, 'loose.js'), 'export const checks = []')
+      writeFileSync(join(fitDir, 'package.json'), JSON.stringify({
+        name: 'plugins-host',
+        dependencies: { pkg: '*' },
+      }))
 
       const pkgDir = join(fitDir, 'node_modules', 'pkg')
       mkdirSync(pkgDir, { recursive: true })

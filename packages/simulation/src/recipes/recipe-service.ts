@@ -22,7 +22,6 @@ import type {
   RecipeTotals,
   ScenarioRunResult,
   RecipeCallbacks,
-  RecipeTicketStats,
 } from './recipe-types.js'
 
 // =============================================================================
@@ -61,7 +60,6 @@ export class RecipeService {
       recipeName: recipe.name,
       startedAt: new Date().toISOString(),
       scenarioResults: [],
-      ticketStats: createEmptyTicketStats(),
     }
 
     try {
@@ -96,7 +94,6 @@ export class RecipeService {
         scenarioResults: results,
         totals,
         durationMs: Date.now() - startTime,
-        ticketStats: this.activeSession.ticketStats,
       }
 
       logger.info({
@@ -128,7 +125,6 @@ export class RecipeService {
 
       results.push(result)
       void this.callbacks.onScenarioComplete?.(scenarioRef.scenarioId, result, i, total)
-      void this.callbacks.onReconcile?.(scenarioRef.scenarioId, result, result.signals)
 
       if (recipe.execution.stopOnFirstFailure && result.status === 'failed') {
         // Skip remaining scenarios
@@ -165,7 +161,6 @@ export class RecipeService {
 
         results[idx] = result
         void this.callbacks.onScenarioComplete?.(scenarioRef.scenarioId, result, idx, total)
-        void this.callbacks.onReconcile?.(scenarioRef.scenarioId, result, result.signals)
       })
 
       await Promise.all(promises)
@@ -239,18 +234,6 @@ export class RecipeService {
 // =============================================================================
 // HELPERS
 // =============================================================================
-
-function createEmptyTicketStats(): RecipeTicketStats {
-  return {
-    created: 0,
-    updated: 0,
-    resolved: 0,
-    reopened: 0,
-    deleted: 0,
-    unchanged: 0,
-    errors: [],
-  }
-}
 
 function createSkippedResult(scenarioId: string): ScenarioRunResult {
   return {
