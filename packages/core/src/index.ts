@@ -48,7 +48,16 @@ export { loadSignalersConfig } from './signalers/index.js';
 export type { SignalersConfig } from './signalers/types.js';
 
 // Plugins
-export { discoverPlugins, loadAllPlugins, getPluginDir, getBaseDir } from './plugins/index.js';
+export {
+  discoverPlugins,
+  loadAllPlugins,
+  getPluginDir,
+  getBaseDir,
+  getProjectPluginDir,
+  resolvePluginDir,
+  hasProjectPluginsDeclared,
+  readProjectPluginsList,
+} from './plugins/index.js';
 export type { PluginDomain, DiscoveredPlugin, LoadedPlugin, PluginLoadResult } from './plugins/types.js';
 
 // Lib — errors + Result pattern

@@ -10,9 +10,9 @@ import { ensureChecksLoaded } from './fit.js';
 // listRecipes
 // ---------------------------------------------------------------------------
 
-export async function listRecipes(): Promise<ListRecipesResult> {
+export async function listRecipes(projectDir?: string): Promise<ListRecipesResult> {
   // Load plugins so user-defined recipes (e.g. ~/.opensip-tools/fit/*.mjs) appear.
-  await ensureChecksLoaded();
+  await ensureChecksLoaded(projectDir);
 
   const recipes = defaultRecipeRegistry.getAllRecipes().map((recipe) => {
     const selector = recipe.checks;

@@ -10,8 +10,8 @@ import type { ListChecksResult } from '../types.js';
 // listChecks
 // ---------------------------------------------------------------------------
 
-export async function listChecks(): Promise<ListChecksResult> {
-  await ensureChecksLoaded();
+export async function listChecks(projectDir?: string): Promise<ListChecksResult> {
+  await ensureChecksLoaded(projectDir);
   const checks = defaultRegistry.listEnabled();
 
   const entries = checks.map((check) => ({

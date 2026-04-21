@@ -291,7 +291,7 @@ program
 
     // --list
     if (args.list) {
-      const result = await listChecks();
+      const result = await listChecks(args.cwd);
       if (args.json) { process.stdout.write(JSON.stringify(result, null, 2) + '\n'); return; }
       await renderResult(result);
       return;
@@ -299,7 +299,7 @@ program
 
     // --recipes
     if (args.listRecipes) {
-      const result = await listRecipes();
+      const result = await listRecipes(args.cwd);
       if (args.json) { process.stdout.write(JSON.stringify(result, null, 2) + '\n'); return; }
       await renderResult(result);
       return;
@@ -334,7 +334,7 @@ program
       env: process.env,
     });
     if (openDecision.shouldOpen) {
-      const result = await openDashboard();
+      const result = await openDashboard(args.cwd);
       if (result.type === 'dashboard' && result.path) {
         await launchBrowser(result.path);
       }
@@ -403,7 +403,7 @@ program
   .option('--json', 'Output structured JSON', false)
   .option('--debug', 'Enable debug mode for structured log output', false)
   .action(async (opts: ToolOptions) => {
-    const result = await openDashboard();
+    const result = await openDashboard(opts.cwd);
     if (opts.json) {
       process.stdout.write(JSON.stringify(result, null, 2) + '\n');
       return;
@@ -451,7 +451,7 @@ program
       env: process.env,
     });
     if (openDecision.shouldOpen) {
-      const dash = await openDashboard();
+      const dash = await openDashboard(args.cwd);
       if (dash.type === 'dashboard' && dash.path) {
         await launchBrowser(dash.path);
       }
@@ -488,8 +488,39 @@ pluginCmd
   .command('remove <package>')
   .description('Remove a plugin package')
   .option('--domain <fit|sim>', 'Target domain')
-  .action(async (packageName: string, opts: { domain?: string }) => {
+  .option('--project', 'Remove from project-local .opensip-tools/ instead of ~/.opensip-tools/', false)
+  .action(async (packageName: string, opts: { domain?: string; project?: boolean }) => {
+    if (opts.project) {
+      const { pluginRemoveFromConfig } = await import('./commands/project-plugins.js');
+      const result = await pluginRemoveFromConfig(packageName, process.cwd(), opts.domain);
+      await renderResult(result);
+      return;
+    }
     const result = await pluginRemove(packageName, opts.domain);
+    await renderResult(result);
+  });
+
+// --- project-local plugin commands ---
+
+pluginCmd
+  .command('sync')
+  .description('Install project-local plugins declared in opensip-tools.config.yml')
+  .option('--domain <fit|sim|asm>', 'Sync only one domain')
+  .option('--cwd <path>', 'Project root', process.cwd())
+  .action(async (opts: { domain?: string; cwd?: string }) => {
+    const { pluginSync } = await import('./commands/project-plugins.js');
+    const result = await pluginSync(opts.cwd ?? process.cwd(), opts.domain);
+    await renderResult(result);
+  });
+
+pluginCmd
+  .command('add <package>')
+  .description('Add a plugin to the project config AND install it into .opensip-tools/')
+  .option('--domain <fit|sim|asm>', 'Target domain (default: inferred from package name)')
+  .option('--cwd <path>', 'Project root', process.cwd())
+  .action(async (packageName: string, opts: { domain?: string; cwd?: string }) => {
+    const { pluginAdd } = await import('./commands/project-plugins.js');
+    const result = await pluginAdd(packageName, opts.cwd ?? process.cwd(), opts.domain);
     await renderResult(result);
   });
 

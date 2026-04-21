@@ -47,7 +47,7 @@ export function FitView({ args }: FitViewProps): React.ReactElement {
 
     (async () => {
       // Phase 1: Load checks to get count for header
-      await ensureChecksLoaded();
+      await ensureChecksLoaded(args.cwd);
       const checkCount = getEnabledCheckCount();
 
       if (cancelled) return;

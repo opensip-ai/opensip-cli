@@ -38,6 +38,12 @@ const CheckTargetValueSchema = z.union([
   z.array(z.string()).min(1),
 ])
 
+const PluginsSchema = z.object({
+  fit: z.array(z.string()).optional(),
+  sim: z.array(z.string()).optional(),
+  asm: z.array(z.string()).optional(),
+}).optional()
+
 const TargetsFileSchema = z.object({
   targets: z.record(
     z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'target name must be kebab-case'),
@@ -45,6 +51,7 @@ const TargetsFileSchema = z.object({
   ),
   globalExcludes: z.array(z.string()).optional(),
   checkOverrides: z.record(z.string(), CheckTargetValueSchema).optional(),
+  plugins: PluginsSchema,
 })
 
 // =============================================================================
@@ -58,6 +65,7 @@ function buildFromParsed(
   rawGlobalExcludes: readonly string[] | undefined,
   rawCheckOverrides: Record<string, string | readonly string[]> | undefined,
   sourceLabel: string,
+  rawPlugins?: { fit?: readonly string[]; sim?: readonly string[]; asm?: readonly string[] },
 ): { registry: TargetRegistry; config: TargetsConfig } {
   const registry = new TargetRegistry()
 
@@ -92,9 +100,18 @@ function buildFromParsed(
     }
   }
 
+  const plugins = rawPlugins
+    ? Object.freeze({
+        ...(rawPlugins.fit && { fit: Object.freeze([...rawPlugins.fit]) as readonly string[] }),
+        ...(rawPlugins.sim && { sim: Object.freeze([...rawPlugins.sim]) as readonly string[] }),
+        ...(rawPlugins.asm && { asm: Object.freeze([...rawPlugins.asm]) as readonly string[] }),
+      })
+    : undefined
+
   const config: TargetsConfig = Object.freeze({
     globalExcludes: Object.freeze(rawGlobalExcludes ? [...rawGlobalExcludes] : []) as readonly string[],
     checkOverrides: Object.freeze(checkOverrides) as CheckTargetMap,
+    ...(plugins && { plugins }),
   })
 
   return { registry, config }
@@ -161,6 +178,7 @@ function loadYamlConfig(filePath: string): { registry: TargetRegistry; config: T
     result.data.globalExcludes,
     result.data.checkOverrides,
     YAML_FILENAME,
+    result.data.plugins,
   )
 }
 

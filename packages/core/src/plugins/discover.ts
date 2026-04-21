@@ -13,26 +13,108 @@ import { logger } from '../lib/logger.js'
 import type { DiscoveredPlugin, PluginDomain } from './types.js'
 
 const DEFAULT_BASE_DIR = join(homedir(), '.opensip-tools')
+const CONFIG_FILENAME = 'opensip-tools.config.yml'
 
-/** Get the absolute path to a plugin domain directory. */
+/** Get the absolute path to a user-level plugin domain directory. */
 export function getPluginDir(domain: PluginDomain, baseDir?: string): string {
   return join(baseDir ?? DEFAULT_BASE_DIR, domain)
 }
 
-/** Get the base directory for all plugins. */
+/** Get the user-level base directory for all plugins. */
 export function getBaseDir(baseDir?: string): string {
   return baseDir ?? DEFAULT_BASE_DIR
+}
+
+/** Absolute path to the project-local plugin dir for a given domain. */
+export function getProjectPluginDir(projectDir: string, domain: PluginDomain): string {
+  return join(projectDir, '.opensip-tools', domain)
+}
+
+/**
+ * Resolve the plugin dir to use for a given domain + project.
+ *
+ * Precedence:
+ *   1. Project-local (`<projectDir>/.opensip-tools/<domain>/`) IF the
+ *      project's `opensip-tools.config.yml` declares a non-empty
+ *      `plugins.<domain>` section.
+ *   2. User-level (`~/.opensip-tools/<domain>/`) otherwise.
+ *
+ * Project-local takes precedence when opted in, so a project's plugin
+ * set is reproducible across developers and CI. The user-level dir
+ * remains the default so projects that don't declare plugins keep
+ * the original behavior.
+ *
+ * @param domain      One of `fit` / `sim` / `asm`.
+ * @param projectDir  Absolute path to the project root. When undefined,
+ *                    always returns the user-level dir.
+ * @param baseDir     Override the user-level base (primarily for tests).
+ */
+export function resolvePluginDir(
+  domain: PluginDomain,
+  projectDir?: string,
+  baseDir?: string,
+): { dir: string; source: 'project' | 'user' } {
+  if (projectDir && hasProjectPluginsDeclared(projectDir, domain)) {
+    return { dir: getProjectPluginDir(projectDir, domain), source: 'project' }
+  }
+  return { dir: getPluginDir(domain, baseDir), source: 'user' }
+}
+
+/** True when the project config declares at least one plugin in `plugins.<domain>`. */
+export function hasProjectPluginsDeclared(projectDir: string, domain: PluginDomain): boolean {
+  const list = readProjectPluginsList(projectDir, domain)
+  return list !== undefined && list.length > 0
+}
+
+/**
+ * Read the declared plugin list for a domain from the project config.
+ * Returns undefined when the config is absent, unreadable, or has no
+ * entry for the domain. Does NOT throw on YAML parse errors — returns
+ * undefined so discovery falls back to the user-level dir and the
+ * config-layer schema validation surfaces the parse error on its own
+ * path (avoids double-reporting).
+ */
+export function readProjectPluginsList(
+  projectDir: string,
+  domain: PluginDomain,
+): readonly string[] | undefined {
+  const configPath = join(projectDir, CONFIG_FILENAME)
+  if (!existsSync(configPath)) return undefined
+  try {
+    // Parse YAML inline to avoid a circular dep between plugins/ and targets/.
+    // We only need the `plugins.<domain>` array; anything else is
+    // validated by the targets loader.
+    const raw = readFileSync(configPath, 'utf-8')
+    // Minimal YAML parse — defer to the shared yaml dep.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const yaml = require('js-yaml') as { load: (s: string) => unknown }
+    const doc = yaml.load(raw) as Record<string, unknown> | null
+    if (!doc || typeof doc !== 'object') return undefined
+    const plugins = doc['plugins']
+    if (!plugins || typeof plugins !== 'object') return undefined
+    const list = (plugins as Record<string, unknown>)[domain]
+    if (!Array.isArray(list)) return undefined
+    return list.filter((v): v is string => typeof v === 'string')
+  } catch {
+    return undefined
+  }
 }
 
 /**
  * Discover all plugins in a domain directory.
  * Returns discovered plugins sorted: packages first, then files.
+ *
+ * When `projectDir` is passed AND the project declares plugins in
+ * `opensip-tools.config.yml` under `plugins.<domain>`, scans the
+ * project-local dir (`<projectDir>/.opensip-tools/<domain>/`).
+ * Otherwise falls back to `~/.opensip-tools/<domain>/`.
  */
 export function discoverPlugins(
   domain: PluginDomain,
   baseDir?: string,
+  projectDir?: string,
 ): DiscoveredPlugin[] {
-  const dir = getPluginDir(domain, baseDir)
+  const { dir } = resolvePluginDir(domain, projectDir, baseDir)
   if (!existsSync(dir)) return []
 
   const plugins: DiscoveredPlugin[] = []

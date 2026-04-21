@@ -26,16 +26,89 @@ let getCheckDisplayName: (slug: string) => string = (slug) =>
   slug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 let getCheckIcon: (slug: string) => string = () => '\uD83D\uDD0D';
 
+/**
+ * Install declared project-local plugins when the `.opensip-tools/<domain>/
+ * node_modules/` dir is missing or clearly stale (missing declared deps).
+ *
+ * Runs silently when nothing is needed. Prints a one-line status when
+ * it does work so the user understands the pause before checks start.
+ */
+async function maybeAutoSyncProjectPlugins(projectDir: string): Promise<void> {
+  const { readProjectPluginsList, getProjectPluginDir } = await import('@opensip-tools/core')
+  const { existsSync, readFileSync } = await import('node:fs')
+  const { join } = await import('node:path')
+
+  const domains = ['fit', 'sim', 'asm'] as const
+  const missingDomains: string[] = []
+
+  for (const domain of domains) {
+    const specs = readProjectPluginsList(projectDir, domain)
+    if (!specs || specs.length === 0) continue
+
+    const dir = getProjectPluginDir(projectDir, domain)
+    const pkgJsonPath = join(dir, 'package.json')
+    const nodeModulesPath = join(dir, 'node_modules')
+
+    if (!existsSync(pkgJsonPath) || !existsSync(nodeModulesPath)) {
+      missingDomains.push(domain)
+      continue
+    }
+
+    // Shallow staleness check — count declared deps whose node_modules
+    // entry is present. A truly exhaustive check would compare the
+    // config list against node_modules; this is good enough to catch
+    // the common "first clone" case.
+    try {
+      const pkg = JSON.parse(readFileSync(pkgJsonPath, 'utf-8')) as { dependencies?: Record<string, string> }
+      const installedCount = Object.keys(pkg.dependencies ?? {}).length
+      if (installedCount === 0) missingDomains.push(domain)
+    } catch {
+      missingDomains.push(domain)
+    }
+  }
+
+  if (missingDomains.length === 0) return
+
+  process.stderr.write(
+    `opensip-tools: installing project-local plugins (${missingDomains.join(', ')})...\n`,
+  )
+  const { pluginSync } = await import('./project-plugins.js')
+  for (const domain of missingDomains) {
+    try {
+      await pluginSync(projectDir, domain)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      process.stderr.write(`opensip-tools: plugin sync failed for ${domain}: ${msg}\n`)
+    }
+  }
+}
+
 const BUILTIN_NAMESPACE = '@opensip-tools/checks-builtin';
 
-export async function ensureChecksLoaded(): Promise<void> {
+export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
   if (checksLoaded) return;
 
-  // 1. Load plugins from ~/.opensip-tools/fit/
+  // 0. Auto-sync: if the project declares plugins but the project-local
+  //    dir is empty, transparently install them before loading. Matches
+  //    the onboarding story of `git clone && opensip-tools fit` — no
+  //    explicit setup step. Silent when nothing to sync.
+  if (projectDir) {
+    await maybeAutoSyncProjectPlugins(projectDir)
+  }
+
+  // 1. Load plugins — project-local `<projectDir>/.opensip-tools/fit/`
+  //    when the project config declares `plugins.fit`, otherwise
+  //    `~/.opensip-tools/fit/`. Pass-through baseDir=undefined, so
+  //    resolvePluginDir picks the default.
   const { loadAllPlugins } = await import('@opensip-tools/core');
-  const pluginResult = await loadAllPlugins('fit');
+  const pluginResult = await loadAllPlugins('fit', undefined, projectDir);
   if (pluginResult.errors.length > 0) {
+    // Surface plugin load errors to the user. The logger is silenced in
+    // normal CLI runs, so a structured-log-only failure was invisible
+    // before. Print one line per failure to stderr — short, actionable,
+    // and doesn't clobber stdout (which carries results + --json).
     for (const err of pluginResult.errors) {
+      process.stderr.write(`opensip-tools: plugin failed to load — ${err}\n`);
       logger.warn({ evt: 'cli.plugin.warning', message: err });
     }
   }
@@ -93,7 +166,7 @@ export async function executeFit(
   onProgress?: (completed: number, total: number) => void,
 ): Promise<{ result: FitDoneResult; output: CliOutput } | { result: ErrorResult; output?: undefined }> {
   logger.info({ evt: 'cli.checks.loading' });
-  await ensureChecksLoaded();
+  await ensureChecksLoaded(args.cwd);
   logger.info({ evt: 'cli.checks.loaded', checkCount: defaultRegistry.listEnabled().length });
 
   // Determine recipe: --check and --tags each create an ad-hoc recipe;

@@ -34,6 +34,23 @@ export interface Target {
 export type CheckTargetMap = Readonly<Record<string, string | readonly string[]>>
 
 /**
+ * Project-local plugin declarations — one list per plugin domain.
+ *
+ * When present in the config file, these override the default user-level
+ * plugin directory (`~/.opensip-tools/<domain>/`). Plugins get installed
+ * into `<project-root>/.opensip-tools/<domain>/` and are version-pinned
+ * by the project rather than by each developer's machine.
+ *
+ * Each entry is any npm install spec: `@scope/pkg`, `@scope/pkg@^1.2.3`,
+ * `./local-path`, `/abs/path/to/pkg.tgz`, `git+https://...`, etc.
+ */
+export interface PluginsConfig {
+  readonly fit?: readonly string[]
+  readonly sim?: readonly string[]
+  readonly asm?: readonly string[]
+}
+
+/**
  * Result of loading targets config, including both the target registry
  * and per-check target overrides.
  */
@@ -42,6 +59,14 @@ export interface TargetsConfig {
   readonly globalExcludes: readonly string[]
   /** Per-check target overrides for third-party/marketplace checks. */
   readonly checkOverrides: CheckTargetMap
+  /**
+   * Project-local plugin declarations, keyed by domain. When any domain
+   * has entries here, plugin discovery for that domain reads from
+   * `<project>/.opensip-tools/<domain>/` instead of `~/.opensip-tools/<domain>/`.
+   * Absent (or undefined per-domain) = fall back to the user-level dir
+   * for that domain.
+   */
+  readonly plugins?: PluginsConfig
 }
 
 // =============================================================================

@@ -211,7 +211,7 @@ export interface ExperimentalResult {
 
 export interface PluginResult {
   type: 'plugin';
-  action: 'list' | 'install' | 'remove';
+  action: 'list' | 'install' | 'remove' | 'sync' | 'add';
   [key: string]: unknown;
 }
 

@@ -21,8 +21,8 @@ let getCheckIcon: (slug: string) => string = () => '\uD83D\uDD0D';
 // openDashboard
 // ---------------------------------------------------------------------------
 
-export async function openDashboard(): Promise<DashboardResult> {
-  await ensureChecksLoaded();
+export async function openDashboard(projectDir?: string): Promise<DashboardResult> {
+  await ensureChecksLoaded(projectDir);
 
   // After loading, pull display helpers from checks-builtin
   try {

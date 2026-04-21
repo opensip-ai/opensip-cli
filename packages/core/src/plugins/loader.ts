@@ -148,12 +148,18 @@ export async function loadPlugin(plugin: DiscoveredPlugin): Promise<LoadedPlugin
 /**
  * Discover and load all plugins for a domain.
  * Loads sequentially to ensure deterministic registration order.
+ *
+ * Pass `projectDir` to honor the project's `opensip-tools.config.yml`
+ * `plugins.<domain>` declaration — plugins are then loaded from
+ * `<projectDir>/.opensip-tools/<domain>/`. When absent, falls back to
+ * the user-level dir (`~/.opensip-tools/<domain>/`).
  */
 export async function loadAllPlugins(
   domain: PluginDomain,
   baseDir?: string,
+  projectDir?: string,
 ): Promise<PluginLoadResult> {
-  const discovered = discoverPlugins(domain, baseDir)
+  const discovered = discoverPlugins(domain, baseDir, projectDir)
 
   const plugins: LoadedPlugin[] = []
   const errors: string[] = []

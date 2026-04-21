@@ -7,7 +7,15 @@
  * - getPluginDir() — Get the absolute path to a domain directory
  */
 
-export { discoverPlugins, getPluginDir, getBaseDir } from './discover.js'
+export {
+  discoverPlugins,
+  getPluginDir,
+  getBaseDir,
+  getProjectPluginDir,
+  resolvePluginDir,
+  hasProjectPluginsDeclared,
+  readProjectPluginsList,
+} from './discover.js'
 export { loadPlugin, loadAllPlugins } from './loader.js'
 export type {
   PluginDomain,
