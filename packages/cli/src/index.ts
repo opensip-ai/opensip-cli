@@ -18,8 +18,10 @@ import {
 } from '@opensip-tools/core';
 
 import { EXIT_CODES, getErrorSuggestion } from './exit-codes.js';
+import { printWelcome } from './welcome.js';
 
 export { EXIT_CODES, getErrorSuggestion } from './exit-codes.js';
+export { buildWelcome, printWelcome } from './welcome.js';
 export type { CliOutput, CheckOutput, FindingOutput, TableRow, SummaryOptions, CommandResult, CliArgs, FitOptions, InitOptions, ToolOptions } from './types.js';
 export { buildSarifLog, reportToCloud } from './sarif.js';
 export { resolveApiKey } from './commands/configure.js';
@@ -452,6 +454,14 @@ pluginCmd
 // =============================================================================
 // TOP-LEVEL ERROR HANDLER
 // =============================================================================
+
+// Bare `opensip-tools` with no subcommand → welcome screen.
+// process.argv = [node, script]; anything more means the user passed
+// a subcommand or a flag and commander should handle it.
+if (process.argv.length <= 2) {
+  printWelcome({ version: program.version() ?? 'dev' });
+  process.exit(0);
+}
 
 program.parseAsync().catch(async (err) => {
   const suggestion = getErrorSuggestion(err);

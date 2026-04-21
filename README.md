@@ -4,46 +4,71 @@ Open-source codebase analysis toolkit. Run fitness checks against any TypeScript
 
 ## Installation
 
-### npm (recommended)
-
 ```bash
 npm install -g @opensip-tools/cli
-
-cd your-project
-opensip-tools fit
 ```
 
-### npx (no install)
+Then from any project root:
 
 ```bash
-npx @opensip-tools/cli fit
+opensip-tools fit     # run fitness checks (your first scan)
+opensip-tools sim     # run simulations [experimental]
 ```
 
-### From source
+That's the whole setup. `fit` and `sim` are the two primary subcommands; everything else is options and plumbing.
+
+No global install? Use `npx @opensip-tools/cli fit` for one-offs, or install from source:
 
 ```bash
 git clone https://github.com/opensip-ai/opensip-tools.git
-cd opensip-tools
-pnpm install && pnpm build
+cd opensip-tools && pnpm install && pnpm build
 node packages/cli/dist/index.js fit
 ```
 
-## Commands
+## First run
 
 ```bash
-opensip-tools fit              # Run fitness checks
-opensip-tools fit --verbose    # Show detailed results table
-opensip-tools fit --findings   # Show table + per-check violation details
-opensip-tools fit --json       # Structured JSON output (for CI)
-opensip-tools fit --list       # List all available checks
-opensip-tools fit --recipes    # List available recipes
+cd your-project
+opensip-tools fit                 # runs the default recipe (all enabled checks)
+opensip-tools fit --findings      # + detailed per-violation output
+opensip-tools fit --list          # browse the check catalog
+```
 
-opensip-tools init             # Generate opensip-tools.config.yml
-opensip-tools dashboard        # Generate HTML report and open in browser
-opensip-tools sessions list    # Show stored session history
-opensip-tools sessions purge   # Delete session data (with confirmation)
-opensip-tools plugin list      # List installed plugins
-opensip-tools sim              # Run simulations [experimental]
+If `opensip-tools fit` reports zero checks ran, you likely need a targets file — create one with `opensip-tools init` (see [Configuration](#configuration)).
+
+## Commands
+
+### `fit` — fitness checks
+```bash
+opensip-tools fit                   # run all checks (default recipe)
+opensip-tools fit --recipe <name>   # use a named recipe (e.g. quick-smoke, backend)
+opensip-tools fit --check <slug>    # run a single check
+opensip-tools fit --tags <tags>     # filter by tag (comma-separated)
+opensip-tools fit --findings        # show per-violation detail
+opensip-tools fit --verbose         # full results table
+opensip-tools fit --json            # structured JSON (for CI)
+opensip-tools fit --list            # list available checks
+opensip-tools fit --recipes         # list available recipes
+```
+
+### Project setup & dashboards
+```bash
+opensip-tools init                  # generate opensip-tools.config.yml
+opensip-tools dashboard             # HTML report — opens in browser
+opensip-tools sessions list         # run history
+opensip-tools sessions purge        # delete session data (prompts for confirm)
+```
+
+### Plugins
+```bash
+opensip-tools plugin list           # installed plugins
+opensip-tools plugin install <pkg>  # install a plugin package or local path
+opensip-tools plugin remove  <pkg>  # remove
+```
+
+### `sim` — simulations *(experimental)*
+```bash
+opensip-tools sim                   # run simulations
 ```
 
 ## Fitness Checks
