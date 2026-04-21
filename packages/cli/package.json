@@ -1,6 +1,6 @@
 {
   "name": "@opensip-tools/cli",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "license": "MIT",
   "description": "OpenSIP Tools CLI — codebase analysis from the command line",
   "repository": {
@@ -16,6 +16,10 @@
   "bin": {
     "opensip-tools": "./dist/index.js"
   },
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
