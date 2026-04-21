@@ -54,6 +54,10 @@ export interface CliArgs {
   exclude: string[];
   findings: boolean;
   tags?: string;
+  /** Suppress banner/boxes; show only the pass-fail summary line. */
+  quiet?: boolean;
+  /** Open the HTML dashboard in the default browser after a successful run. */
+  open?: boolean;
 }
 
 /** Structured JSON output format */

@@ -19,9 +19,17 @@ import {
 
 import { EXIT_CODES, getErrorSuggestion } from './exit-codes.js';
 import { printWelcome } from './welcome.js';
+import { printCompletionScript, type Shell } from './commands/completion.js';
+import { executeUninstall } from './commands/uninstall.js';
+import { decideOpen, launchBrowser } from './open-dashboard.js';
+import { maybeNotify } from './update-notifier.js';
 
 export { EXIT_CODES, getErrorSuggestion } from './exit-codes.js';
 export { buildWelcome, printWelcome } from './welcome.js';
+export { buildCompletionScript, printCompletionScript } from './commands/completion.js';
+export { executeUninstall } from './commands/uninstall.js';
+export { decideOpen, launchBrowser } from './open-dashboard.js';
+export { maybeNotify } from './update-notifier.js';
 export type { CliOutput, CheckOutput, FindingOutput, TableRow, SummaryOptions, CommandResult, CliArgs, FitOptions, InitOptions, ToolOptions } from './types.js';
 export { buildSarifLog, reportToCloud } from './sarif.js';
 export { resolveApiKey } from './commands/configure.js';
@@ -144,7 +152,7 @@ function loadConfig(cwd: string): ToolsConfig {
 // =============================================================================
 
 /** Convert FitOptions (Commander) into the CliArgs shape expected by commands. */
-function fitOptsToCliArgs(opts: FitOptions): CliArgs {
+function fitOptsToCliArgs(opts: FitOptions & { quiet?: boolean; open?: boolean }): CliArgs {
   return {
     command: 'fit',
     json: opts.json,
@@ -160,6 +168,8 @@ function fitOptsToCliArgs(opts: FitOptions): CliArgs {
     exclude: opts.exclude,
     findings: opts.findings,
     tags: opts.tags,
+    quiet: opts.quiet === true,
+    open: opts.open === true,
   };
 }
 
@@ -273,8 +283,10 @@ program
   .option('--api-key <key>', 'API key for --report-to authentication')
   .option('--exclude <slug>', 'Exclude check (repeatable)', (val: string, prev: string[]) => [...prev, val], [] as string[])
   .option('--cwd <path>', 'Target directory', process.cwd())
+  .option('-q, --quiet', 'Suppress banner / boxes; print only the pass-fail summary', false)
+  .option('--open', 'Launch the HTML dashboard in your browser after the run completes', false)
   .option('--debug', 'Enable debug mode for structured log output', false)
-  .action(async (opts: FitOptions) => {
+  .action(async (opts: FitOptions & { quiet?: boolean; open?: boolean }) => {
     const args = fitOptsToCliArgs(opts);
 
     // --list
@@ -312,6 +324,21 @@ program
     // Visual mode: render with real-time spinner → results
     const { renderFitView } = await import('./ui/render.js');
     await renderFitView(args);
+
+    // --open: launch dashboard after the run when safe (not in JSON mode,
+    // not in CI, not on a non-TTY stream).
+    const openDecision = decideOpen({
+      openRequested: Boolean(opts.open),
+      jsonOutput: Boolean(args.json),
+      stdoutIsTTY: Boolean(process.stdout.isTTY),
+      env: process.env,
+    });
+    if (openDecision.shouldOpen) {
+      const result = await openDashboard();
+      if (result.type === 'dashboard' && result.path) {
+        await launchBrowser(result.path);
+      }
+    }
   });
 
 // ---------------------------------------------------------------------------
@@ -405,8 +432,10 @@ program
   .description('Run simulation scenarios [experimental]')
   .option('--cwd <path>', 'Target directory', process.cwd())
   .option('--json', 'Output structured JSON', false)
+  .option('-q, --quiet', 'Suppress banner / boxes; print only the pass-fail summary', false)
+  .option('--open', 'Launch the HTML dashboard in your browser after the run completes', false)
   .option('--debug', 'Enable debug mode for structured log output', false)
-  .action(async (opts: ToolOptions) => {
+  .action(async (opts: ToolOptions & { quiet?: boolean; open?: boolean }) => {
     const args = toolOptsToCliArgs('sim', opts);
     const result = executeSim(args);
     if (args.json) {
@@ -414,6 +443,19 @@ program
       return;
     }
     await renderResult(result);
+
+    const openDecision = decideOpen({
+      openRequested: Boolean(opts.open),
+      jsonOutput: Boolean(args.json),
+      stdoutIsTTY: Boolean(process.stdout.isTTY),
+      env: process.env,
+    });
+    if (openDecision.shouldOpen) {
+      const dash = await openDashboard();
+      if (dash.type === 'dashboard' && dash.path) {
+        await launchBrowser(dash.path);
+      }
+    }
   });
 
 // ---------------------------------------------------------------------------
@@ -451,6 +493,38 @@ pluginCmd
     await renderResult(result);
   });
 
+// ---------------------------------------------------------------------------
+// completion subcommand
+// ---------------------------------------------------------------------------
+
+program
+  .command('completion <shell>')
+  .description('Print a shell-completion script (bash | zsh | fish)')
+  .action((shell: string) => {
+    const normalized = shell.toLowerCase();
+    if (normalized !== 'bash' && normalized !== 'zsh' && normalized !== 'fish') {
+      process.stderr.write(`Unsupported shell: ${shell}. Expected one of: bash, zsh, fish.\n`);
+      process.exitCode = EXIT_CODES.CONFIGURATION_ERROR;
+      return;
+    }
+    printCompletionScript(normalized as Shell);
+  });
+
+// ---------------------------------------------------------------------------
+// uninstall subcommand
+// ---------------------------------------------------------------------------
+
+program
+  .command('uninstall')
+  .description('Remove ~/.opensip-tools/ (plugins, sessions, logs) for a clean-slate reset')
+  .option('-y, --yes', 'Skip confirmation prompt', false)
+  .option('--dry-run', 'Print what would be removed; take no action', false)
+  .action(async (opts: { yes?: boolean; dryRun?: boolean }) => {
+    const result = await executeUninstall({ yes: opts.yes, dryRun: opts.dryRun });
+    // Cancelled by user at the confirmation prompt — exit cleanly, not an error.
+    if (result.cancelled) process.exitCode = EXIT_CODES.SUCCESS;
+  });
+
 // =============================================================================
 // TOP-LEVEL ERROR HANDLER
 // =============================================================================
@@ -462,6 +536,11 @@ if (process.argv.length <= 2) {
   printWelcome({ version: program.version() ?? 'dev' });
   process.exit(0);
 }
+
+// Fire an update check (once/day, non-blocking, TTY-gated, opt-out).
+// Runs before parseAsync so the notice is printed first — subsequent
+// command output is unaffected.
+maybeNotify({ name: '@opensip-tools/cli', version: program.version() ?? '0.0.0' });
 
 program.parseAsync().catch(async (err) => {
   const suggestion = getErrorSuggestion(err);

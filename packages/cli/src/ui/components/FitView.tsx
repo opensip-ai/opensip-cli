@@ -91,13 +91,15 @@ export function FitView({ args }: FitViewProps): React.ReactElement {
     case 'loading':
       return (
         <Box flexDirection="column">
-          <Banner />
-          <RunHeader
-            tool="Fitness Checks"
-            description="Scanning your codebase for quality, security, and architecture issues."
-            cwd={args.cwd}
-            metadata={[{ label: 'Recipe', value: recipe }]}
-          />
+          {!args.quiet && <Banner />}
+          {!args.quiet && (
+            <RunHeader
+              tool="Fitness Checks"
+              description="Scanning your codebase for quality, security, and architecture issues."
+              cwd={args.cwd}
+              metadata={[{ label: 'Recipe', value: recipe }]}
+            />
+          )}
           <Box paddingLeft={2}>
             <Spinner total={0} completed={0} label="Loading checks..." />
           </Box>
@@ -107,16 +109,18 @@ export function FitView({ args }: FitViewProps): React.ReactElement {
     case 'running':
       return (
         <Box flexDirection="column">
-          <Banner />
-          <RunHeader
-            tool="Fitness Checks"
-            description="Scanning your codebase for quality, security, and architecture issues."
-            cwd={args.cwd}
-            metadata={[
-              { label: 'Recipe', value: recipe },
-              { label: 'Checks', value: String(state.checkCount) },
-            ]}
-          />
+          {!args.quiet && <Banner />}
+          {!args.quiet && (
+            <RunHeader
+              tool="Fitness Checks"
+              description="Scanning your codebase for quality, security, and architecture issues."
+              cwd={args.cwd}
+              metadata={[
+                { label: 'Recipe', value: recipe },
+                { label: 'Checks', value: String(state.checkCount) },
+              ]}
+            />
+          )}
           <Box paddingLeft={2}>
             <Spinner total={state.total} completed={state.completed} />
           </Box>
@@ -126,32 +130,34 @@ export function FitView({ args }: FitViewProps): React.ReactElement {
     case 'done':
       return (
         <Box flexDirection="column">
-          <Banner />
-          <RunHeader
-            tool="Fitness Checks"
-            description="Scanning your codebase for quality, security, and architecture issues."
-            cwd={args.cwd}
-            metadata={[
-              { label: 'Recipe', value: recipe },
-              { label: 'Checks', value: String(state.checkCount) },
-            ]}
-          />
-          {(args.verbose || args.findings) && (
+          {!args.quiet && <Banner />}
+          {!args.quiet && (
+            <RunHeader
+              tool="Fitness Checks"
+              description="Scanning your codebase for quality, security, and architecture issues."
+              cwd={args.cwd}
+              metadata={[
+                { label: 'Recipe', value: recipe },
+                { label: 'Checks', value: String(state.checkCount) },
+              ]}
+            />
+          )}
+          {!args.quiet && (args.verbose || args.findings) && (
             <Box paddingTop={1} flexDirection="column">
               <ResultsTable rows={state.result.rows} />
             </Box>
           )}
           <Summary {...state.result.summary} />
-          {state.result.findings && <Findings checks={state.result.findings.checks} />}
-          {state.result.reportStatus && <CloudReportStatus {...state.result.reportStatus} />}
-          {!args.verbose && !args.findings && (
+          {!args.quiet && state.result.findings && <Findings checks={state.result.findings.checks} />}
+          {!args.quiet && state.result.reportStatus && <CloudReportStatus {...state.result.reportStatus} />}
+          {!args.quiet && !args.verbose && !args.findings && (
             <Box paddingTop={1} paddingLeft={2}>
               <Text dimColor>
                 Use <Text bold>--verbose</Text> for detailed results | <Text bold>opensip-tools dashboard</Text> for HTML report | <Text bold>--report-to {'<url>'}</Text> to send to OpenSIP
               </Text>
             </Box>
           )}
-          {state.result.configFound === false && (
+          {!args.quiet && state.result.configFound === false && (
             <Box paddingLeft={2}>
               <Text dimColor>
                 No config file found. Run <Text bold>opensip-tools init</Text> to customize targets and settings.
