@@ -35,8 +35,24 @@ export { buildSarifLog, reportToCloud } from './sarif.js';
 export { resolveApiKey } from './commands/configure.js';
 
 import { readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { parse as parseYaml } from 'yaml';
+
+// Read the CLI's own version from its package.json at import time.
+// Avoids a hardcoded string in two places (package.json + Command.version())
+// drifting out of sync — a bump to one without the other silently ships
+// the old number on `--version` (happened once between 0.1.0 and 0.2.0).
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const PKG_VERSION = ((): string => {
+  try {
+    const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf-8')) as { version?: string };
+    return pkg.version ?? '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+})();
 
 // Command imports
 import { executeFit } from './commands/fit.js';
@@ -237,7 +253,7 @@ async function renderResult(result: import('./types.js').CommandResult): Promise
 
 const program = new Command('opensip-tools')
   .description('Codebase analysis toolkit')
-  .version('0.1.0');
+  .version(PKG_VERSION);
 
 // ---------------------------------------------------------------------------
 // preAction hook — runs before every command
