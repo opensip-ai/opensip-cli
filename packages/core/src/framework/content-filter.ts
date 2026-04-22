@@ -156,7 +156,12 @@ function filterContentImpl(content: string): FilteredContent {
   const commentRegions: Region[] = []
   const chars = [...content]
 
-  let inTemplate = false
+  // Depth counter, not a boolean — a `${ `inner` }` construct nests two templates
+  // and each `}` that closes a template-expression must be rescanned. A plain
+  // boolean flipped off by the inner TemplateTail would leave the outer unrescanned
+  // and desync the scanner for the rest of the file (which silently wipes real
+  // code to whitespace). Incremented at TemplateHead, decremented at TemplateTail.
+  let templateDepth = 0
 
   // eslint-disable-next-line no-constant-condition -- scanner loop terminates on EndOfFileToken
   while (true) {
@@ -164,9 +169,9 @@ function filterContentImpl(content: string): FilteredContent {
     // @fitness-ignore-next-line unsafe-secret-comparison -- comparing TypeScript SyntaxKind enum, not a secret
     if (token === ts.SyntaxKind.EndOfFileToken) break
 
-    // After a CloseBraceToken inside a template expression, rescan to get TemplateMiddle/TemplateTail
+    // After a CloseBraceToken inside ANY template expression, rescan to get TemplateMiddle/TemplateTail
     // @fitness-ignore-next-line unsafe-secret-comparison -- comparing TypeScript SyntaxKind enum, not a secret
-    if (token === ts.SyntaxKind.CloseBraceToken && inTemplate) {
+    if (token === ts.SyntaxKind.CloseBraceToken && templateDepth > 0) {
       token = scanner.reScanTemplateToken(false)
     }
 
@@ -183,7 +188,7 @@ function filterContentImpl(content: string): FilteredContent {
 
       case ts.SyntaxKind.TemplateHead: {
         // `text ${ — replace text between ` and ${
-        inTemplate = true
+        templateDepth++
         replaceCharsInRange(chars, start + 1, end - 2, stringRegions)
         break
       }
@@ -196,7 +201,7 @@ function filterContentImpl(content: string): FilteredContent {
 
       case ts.SyntaxKind.TemplateTail: {
         // }text` — replace text between } and `
-        inTemplate = false
+        templateDepth--
         replaceCharsInRange(chars, start + 1, end - 1, stringRegions)
         break
       }
