@@ -7,7 +7,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, rmSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -17,6 +17,15 @@ const __dirname = fileURLToPath(new URL('.', import.meta.url));
 // __dirname = packages/cli/src/__tests__/ → CLI binary is at packages/cli/dist/index.js
 const CLI = join(__dirname, '../../dist/index.js');
 const FIXTURE = join(__dirname, 'fixtures/sample-project');
+
+// Read version from the CLI package's package.json so this test doesn't
+// drift when the version bumps. Source + test now read from the same
+// place — fixes the assertion-vs-source drift that shipped 0.2.0 with
+// the --version test still pinned to '0.1.0'.
+const CLI_PKG_VERSION: string = (() => {
+  const pkg = JSON.parse(readFileSync(join(__dirname, '../../package.json'), 'utf-8')) as { version: string };
+  return pkg.version;
+})();
 
 /** Run the CLI binary with the given arguments and return stdout + exitCode. */
 function run(...args: string[]): { stdout: string; exitCode: number } {
@@ -63,7 +72,7 @@ describe('CLI e2e', () => {
   it('--version shows the version string', () => {
     const { stdout, exitCode } = run('--version');
     expect(exitCode).toBe(0);
-    expect(stdout.trim()).toBe('0.1.0');
+    expect(stdout.trim()).toBe(CLI_PKG_VERSION);
   });
 
   describe('fit', () => {
