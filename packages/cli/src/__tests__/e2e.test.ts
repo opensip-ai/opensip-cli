@@ -7,7 +7,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, rmSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -154,6 +154,64 @@ describe('CLI e2e', () => {
       const output = JSON.parse(stdout);
       expect(output.error).toBeDefined();
       expect(output.error).toContain('nonexistent-recipe');
+    });
+
+    it('fails with exit 2 when no config is found', () => {
+      const tempDir = join(tmpdir(), `opensip-e2e-noconfig-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+      mkdirSync(tempDir, { recursive: true });
+      try {
+        const { stdout, exitCode } = runIn(tempDir, 'fit', '--json');
+        expect(exitCode).toBe(2);
+        const output = JSON.parse(stdout);
+        expect(output.error).toContain('No opensip-tools.config.yml found');
+      } finally {
+        rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it('respects --config flag with an explicit path', () => {
+      const tempDir = join(tmpdir(), `opensip-e2e-explicit-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+      mkdirSync(join(tempDir, 'nested'), { recursive: true });
+      try {
+        // Seed the fixture's config into a non-default location
+        const configSrc = readFileSync(join(FIXTURE, 'opensip-tools.config.yml'), 'utf-8');
+        const configPath = join(tempDir, 'nested', 'custom.yml');
+        writeFileSync(configPath, configSrc);
+        mkdirSync(join(tempDir, 'src'), { recursive: true });
+        writeFileSync(join(tempDir, 'src', 'a.ts'), 'export const x = 1\n');
+
+        const { stdout, exitCode } = runIn(tempDir, 'fit', '--json', '--check', 'no-console-log', '--config', 'nested/custom.yml');
+        expect(exitCode).toBe(0);
+        const output = JSON.parse(stdout);
+        expect(output.tool).toBe('fit');
+      } finally {
+        rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it('respects package.json#opensip-tools.configPath pointer', () => {
+      const tempDir = join(tmpdir(), `opensip-e2e-pkgjson-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+      mkdirSync(join(tempDir, '.config'), { recursive: true });
+      try {
+        const configSrc = readFileSync(join(FIXTURE, 'opensip-tools.config.yml'), 'utf-8');
+        writeFileSync(join(tempDir, '.config', 'opensip-tools.config.yml'), configSrc);
+        writeFileSync(
+          join(tempDir, 'package.json'),
+          JSON.stringify({
+            name: 'pkg-pointer-test',
+            'opensip-tools': { configPath: '.config/opensip-tools.config.yml' },
+          }),
+        );
+        mkdirSync(join(tempDir, 'src'), { recursive: true });
+        writeFileSync(join(tempDir, 'src', 'a.ts'), 'export const x = 1\n');
+
+        const { stdout, exitCode } = runIn(tempDir, 'fit', '--json', '--check', 'no-console-log');
+        expect(exitCode).toBe(0);
+        const output = JSON.parse(stdout);
+        expect(output.tool).toBe('fit');
+      } finally {
+        rmSync(tempDir, { recursive: true, force: true });
+      }
     });
   });
 

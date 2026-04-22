@@ -47,6 +47,8 @@ export { buildScopeBasedFileMap } from './framework/scope-resolver.js';
 export { loadSignalersConfig } from './signalers/index.js';
 export type { SignalersConfig } from './signalers/types.js';
 
+export { PROJECT_CONFIG_FILENAME, resolveProjectConfigPath } from './config-resolution.js';
+
 // Plugins
 export {
   discoverPlugins,

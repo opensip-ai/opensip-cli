@@ -5,7 +5,30 @@
  * Detects unused files, exports, types, and dependencies using Knip.
  */
 
+import * as fs from 'node:fs'
+import * as path from 'node:path'
+
 import { defineCheck, type CheckViolation } from '@opensip-tools/core'
+
+/**
+ * Locations Knip does NOT auto-discover but many repos use for tool configs.
+ * When present, we pass --config explicitly so the check matches how
+ * the repo's own scripts invoke Knip.
+ */
+const NON_DEFAULT_KNIP_CONFIG_PATHS = [
+  '.config/knip.json',
+  '.config/knip.jsonc',
+  '.config/knip.ts',
+  '.config/knip.js',
+]
+
+function findKnipConfig(projectRoot: string): string | null {
+  for (const candidate of NON_DEFAULT_KNIP_CONFIG_PATHS) {
+    const full = path.join(projectRoot, candidate)
+    if (fs.existsSync(full)) return candidate
+  }
+  return null
+}
 
 /**
  * Knip JSON output structure
@@ -215,7 +238,13 @@ export const deadCode = defineCheck({
 
   command: {
     bin: 'npx',
-    args: ['knip', '--reporter', 'json'],
+    // Callable so config discovery runs at check execution time
+    // (when process.cwd() is the project root), not at import time.
+    args: (): readonly string[] => {
+      const base = ['knip', '--reporter', 'json']
+      const configPath = findKnipConfig(process.cwd())
+      return configPath ? [...base, '--config', configPath] : base
+    },
     expectedExitCodes: [0, 1], // 0 = no issues, 1 = issues found
 
     parseOutput(

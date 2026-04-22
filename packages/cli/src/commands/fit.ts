@@ -185,43 +185,39 @@ export async function executeFit(
     };
   }
 
-  // -- Target resolution --
-  let checkTargetFiles: ReadonlyMap<string, readonly string[]> | undefined;
-  let disabledChecks: readonly string[] = [];
-  let configFound = false;
-
+  // -- Config resolution --
+  // Both loaders share the same project config file. A missing file is a
+  // HARD error: file-based checks would silently produce zero findings,
+  // making the scan look green when it actually never ran. The resolver
+  // throws with a message that enumerates every path it attempted.
+  let signalersConfig: import('@opensip-tools/core').SignalersConfig;
+  let targetsResult: ReturnType<typeof loadTargetsConfig>;
   try {
-    const { registry: targetRegistry, config: targetsConfig } = loadTargetsConfig(args.cwd);
-    configFound = true;
-
-    const allChecks = defaultRegistry.listSlugs().map((key) => {
-      const check = defaultRegistry.getBySlug(key);
-      return { slug: check?.config.slug ?? key, scope: check?.config.checkScope };
-    });
-    const scopeMap = buildScopeBasedFileMap(allChecks, targetRegistry, targetsConfig, args.cwd);
-    if (scopeMap.size > 0) {
-      checkTargetFiles = scopeMap;
-    }
-  } catch (err) {
-    // Distinguish "no config" (fine — use built-in file cache) from "config
-    // present but invalid" (user needs to see this, not silent defaults).
-    const message = err instanceof Error ? err.message : String(err);
-    if (!/No targets config found/.test(message)) {
-      logger.warn({ evt: 'cli.config.targets.invalid', message });
-    }
-  }
-
-  // Load signalers config for disabledChecks and CI thresholds. The loader
-  // itself is self-healing (logs warnings, returns defaults), so any error
-  // here is truly exceptional and worth surfacing in logs.
-  let signalersConfig: import('@opensip-tools/core').SignalersConfig | undefined;
-  try {
-    signalersConfig = loadSignalersConfig(args.cwd);
-    disabledChecks = signalersConfig.fitness.disabledChecks;
+    signalersConfig = loadSignalersConfig(args.cwd, args.config);
+    targetsResult = loadTargetsConfig(args.cwd, args.config);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    logger.warn({ evt: 'cli.config.signalers.load_failed', message });
+    logger.warn({ evt: 'cli.config.load_failed', message });
+    return {
+      result: {
+        type: 'error',
+        message,
+        suggestion: "Run 'opensip-tools init' to scaffold a config, or pass --config <path> to point at an existing one.",
+        exitCode: EXIT_CODES.CONFIGURATION_ERROR,
+      },
+    };
   }
+
+  const disabledChecks = signalersConfig.fitness.disabledChecks;
+  const { registry: targetRegistry, config: targetsConfig } = targetsResult;
+  const configFound = true;
+
+  const allChecks = defaultRegistry.listSlugs().map((key) => {
+    const check = defaultRegistry.getBySlug(key);
+    return { slug: check?.config.slug ?? key, scope: check?.config.checkScope };
+  });
+  const scopeMap = buildScopeBasedFileMap(allChecks, targetRegistry, targetsConfig, args.cwd);
+  const checkTargetFiles = scopeMap.size > 0 ? scopeMap : undefined;
 
   const label = args.tags ? `tags: ${args.tags}` : `recipe ${recipeName ?? 'default'}`;
 

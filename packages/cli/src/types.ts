@@ -18,6 +18,8 @@ export interface FitOptions {
   apiKey?: string;
   exclude: string[];
   cwd: string;
+  /** Explicit path to opensip-tools.config.yml (overrides package.json pointer and default location). */
+  config?: string;
   debug: boolean;
 }
 
@@ -58,6 +60,8 @@ export interface CliArgs {
   quiet?: boolean;
   /** Open the HTML dashboard in the default browser after a successful run. */
   open?: boolean;
+  /** Explicit opensip-tools.config.yml path from --config flag. */
+  config?: string;
 }
 
 /** Structured JSON output format */

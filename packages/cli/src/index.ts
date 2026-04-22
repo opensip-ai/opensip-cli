@@ -186,6 +186,7 @@ function fitOptsToCliArgs(opts: FitOptions & { quiet?: boolean; open?: boolean }
     tags: opts.tags,
     quiet: opts.quiet === true,
     open: opts.open === true,
+    config: opts.config,
   };
 }
 
@@ -299,6 +300,7 @@ program
   .option('--api-key <key>', 'API key for --report-to authentication')
   .option('--exclude <slug>', 'Exclude check (repeatable)', (val: string, prev: string[]) => [...prev, val], [] as string[])
   .option('--cwd <path>', 'Target directory', process.cwd())
+  .option('--config <path>', 'Path to opensip-tools.config.yml (overrides package.json pointer and default)')
   .option('-q, --quiet', 'Suppress banner / boxes; print only the pass-fail summary', false)
   .option('--open', 'Launch the HTML dashboard in your browser after the run completes', false)
   .option('--debug', 'Enable debug mode for structured log output', false)

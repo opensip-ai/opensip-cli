@@ -6,9 +6,9 @@
  * Validates with Zod and populates a TargetRegistry.
  */
 
-import { existsSync, readFileSync, statSync } from 'node:fs'
-import { join } from 'node:path'
+import { readFileSync, statSync } from 'node:fs'
 
+import { PROJECT_CONFIG_FILENAME, resolveProjectConfigPath } from '../config-resolution.js'
 import { ValidationError, SystemError } from '../lib/errors.js'
 import yaml from 'js-yaml'
 import { z } from 'zod'
@@ -17,7 +17,7 @@ import { z } from 'zod'
 import { TargetRegistry } from './target-registry.js'
 import type { CheckTargetMap, TargetConfig, TargetsConfig } from './types.js'
 
-const YAML_FILENAME = 'opensip-tools.config.yml'
+const YAML_FILENAME = PROJECT_CONFIG_FILENAME
 const DEFAULT_EXCLUDES: readonly string[] = ['**/node_modules/**', '**/dist/**']
 
 // =============================================================================
@@ -187,30 +187,27 @@ function loadYamlConfig(filePath: string): { registry: TargetRegistry; config: T
 // =============================================================================
 
 /**
- * Load targets from opensip-tools.config.yml in the given root directory.
+ * Load targets from opensip-tools.config.yml. Resolves via the shared
+ * project-config resolver (--config → package.json pointer → default).
  * @throws {ValidationError} When the config file is missing, too large, or contains invalid YAML
  * @throws {ValidationError} When the config file fails schema validation
  */
-export function loadTargets(rootDir: string): TargetRegistry {
-  const yamlPath = join(rootDir, YAML_FILENAME)
+export function loadTargets(rootDir: string, explicitPath?: string): TargetRegistry {
+  const yamlPath = resolveProjectConfigPath(rootDir, explicitPath)
   // @fitness-ignore-next-line null-safety -- loadYamlConfig always returns a valid {registry, config} object or throws
   return loadYamlConfig(yamlPath).registry
 }
 
 /**
  * Load full targets config including per-check target overrides.
+ * Resolves via the shared project-config resolver.
  * @throws {ValidationError} When no targets config file is found or it cannot be loaded
  * @throws {ValidationError} When the config file fails schema validation
  */
 export function loadTargetsConfig(
   rootDir: string,
+  explicitPath?: string,
 ): { registry: TargetRegistry; config: TargetsConfig } {
-  const yamlPath = join(rootDir, YAML_FILENAME)
-  if (!existsSync(yamlPath)) {
-    throw new ValidationError(
-      `No targets config found. Create ${YAML_FILENAME} in ${rootDir}.`,
-      { operation: 'load', loader: 'targets' },
-    )
-  }
+  const yamlPath = resolveProjectConfigPath(rootDir, explicitPath)
   return loadYamlConfig(yamlPath)
 }
