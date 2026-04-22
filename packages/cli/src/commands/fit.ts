@@ -226,14 +226,34 @@ export async function executeFit(
   const label = args.tags ? `tags: ${args.tags}` : `recipe ${recipeName ?? 'default'}`;
 
   // -- Progress callbacks --
+  //
+  // Monotonic completed-count:
+  //
+  // The service fires onCheckStart(slug, displayIndex, total) when a check
+  // STARTS and onCheckComplete(slug, summary, displayIndex, total) when it
+  // FINISHES. Under parallel execution `displayIndex` is the check's
+  // position in the queue (1..total), not "how many have completed" — so
+  // the last started check's index hops above the current completion
+  // tally and then "resets" down when an earlier check finishes. The UI
+  // showed `147/148 → 121/148 → 78/148` because each event fired with a
+  // different in-flight check's queue position.
+  //
+  // The progress bar wants a monotonic counter. Track completed locally,
+  // increment only on onCheckComplete, ignore onCheckStart's index. The
+  // counter is strictly non-decreasing and always reflects "N of M
+  // checks done."
+  let completedCount = 0;
   const callbacks: FitnessRecipeServiceCallbacks = {
     onCheckStart(checkSlug: string, index: number, total: number) {
       logger.debug({ evt: 'cli.check.start', checkSlug, index, total });
-      onProgress?.(index, total);
+      // Emit current completed count so the UI shows activity without
+      // moving the bar backward on start events.
+      onProgress?.(completedCount, total);
     },
     onCheckComplete(checkSlug: string, summary: CheckSummary, index: number, total: number) {
       logger.debug({ evt: 'cli.check.complete', checkSlug, passed: summary.passed, errors: summary.errors, warnings: summary.warnings, durationMs: summary.durationMs });
-      onProgress?.(index + 1, total);
+      completedCount++;
+      onProgress?.(completedCount, total);
     },
   };
 
