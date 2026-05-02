@@ -119,6 +119,17 @@ Use Vitest. Test files: `*.test.ts`. Run with `pnpm test` or `pnpm --filter=@ope
 pnpm typecheck && pnpm test
 ```
 
+## Releasing
+
+Releases are tag-driven: bump the four package versions, commit, tag
+`vX.Y.Z`, push. CI publishes to npm via OIDC trusted publishing.
+
+**Read `RELEASING.md` before touching `.github/workflows/release.yml`.**
+The workflow has two non-obvious steps (npm 11 to a separate prefix;
+`pnpm pack` + `npm publish <tarball>`) that look like they could be
+simplified but cannot — both work around concrete bugs in npm's self-
+replacement and pnpm's lack of OIDC support, respectively.
+
 ## Project Status
 
 Early-stage open-source project. This is a subset of the larger OpenSIP platform, focused on the portable analysis toolkit (fitness, simulation).
