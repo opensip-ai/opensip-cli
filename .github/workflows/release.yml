@@ -28,12 +28,19 @@ jobs:
       - run: pnpm build
       - run: pnpm typecheck
       - run: pnpm test
-      - name: Publish packages
+      - name: Pack workspace packages (resolves workspace:*)
         run: |
-          pnpm --filter @opensip-tools/core publish --no-git-checks --access public --provenance
-          pnpm --filter @opensip-tools/checks-builtin publish --no-git-checks --access public --provenance
-          pnpm --filter @opensip-tools/simulation publish --no-git-checks --access public --provenance
-          pnpm --filter @opensip-tools/cli publish --no-git-checks --access public --provenance
+          mkdir -p /tmp/tarballs
+          pnpm --filter @opensip-tools/core pack --pack-destination /tmp/tarballs
+          pnpm --filter @opensip-tools/checks-builtin pack --pack-destination /tmp/tarballs
+          pnpm --filter @opensip-tools/simulation pack --pack-destination /tmp/tarballs
+          pnpm --filter @opensip-tools/cli pack --pack-destination /tmp/tarballs
+      - name: Publish via npm (OIDC trusted publishing)
+        run: |
+          npm publish /tmp/tarballs/opensip-tools-core-*.tgz --access public --provenance
+          npm publish /tmp/tarballs/opensip-tools-checks-builtin-*.tgz --access public --provenance
+          npm publish /tmp/tarballs/opensip-tools-simulation-*.tgz --access public --provenance
+          npm publish /tmp/tarballs/opensip-tools-cli-*.tgz --access public --provenance
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
