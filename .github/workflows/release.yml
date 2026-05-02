@@ -19,7 +19,11 @@ jobs:
           node-version: 22
           cache: pnpm
           registry-url: https://registry.npmjs.org
-      - run: npm install -g npm@11 --force
+      - name: Install npm 11 to separate prefix (avoids self-replace bug)
+        run: |
+          npm install --prefix "$HOME/.npm-cli" npm@11
+          echo "$HOME/.npm-cli/node_modules/.bin" >> "$GITHUB_PATH"
+      - run: npm --version
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm typecheck
