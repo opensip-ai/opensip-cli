@@ -1,6 +1,6 @@
 {
   "name": "@opensip-tools/core",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "license": "MIT",
   "description": "Core framework for OpenSIP Tools — check definitions, registry, recipes",
   "repository": {
