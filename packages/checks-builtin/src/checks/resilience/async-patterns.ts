@@ -104,6 +104,10 @@ const KNOWN_SYNC_FUNCTIONS = new Set([
   'stop',
   'pause',
   'resume',
+  'kill',                  // Node ChildProcess.kill — synchronous signal dispatch, returns boolean
+  // OpenTelemetry / context propagation helpers (synchronous attach to active span/context)
+  'attachDomainContext',
+  'attachProfileIdToSpan',
   // Timer clearing (synchronous)
   'clearTimeout',
   'clearInterval',
@@ -434,6 +438,11 @@ const KNOWN_SYNC_PREFIXES = [
   // Registration & lifecycle
   'register',
   'unregister',
+  'init',          // initX() / initialize() — DBOS step .init(deps), initConnection, initSipPipelineSteps, etc. are all synchronous wiring helpers
+  // In-memory upsert helpers (upsertProfile and similar mutate sync stores). DB upserts are typically called via
+  // explicit await on a Result-returning method, so the prefix-based whitelist here trades a small precision loss
+  // for ~10× FP reduction on these helper patterns.
+  'upsert',
   // Event system
   'emit',
   'dispatch',
@@ -630,7 +639,47 @@ function isFloatingExpression(node: ts.ExpressionStatement): boolean {
   }
 
   // Must be a call expression
-  return ts.isCallExpression(expr)
+  if (!ts.isCallExpression(expr)) return false
+
+  // Pattern: `(await x.foo()).bar()` and similar paren-wrapped awaits with a chained call.
+  // The outer call is a CallExpression whose callee descends through PropertyAccess/Element
+  // access into a ParenthesizedExpression wrapping an AwaitExpression. The await is the
+  // real promise consumer; the chained sync call after it is not a floating promise.
+  if (containsAwaitedReceiver(expr)) return false
+
+  return true
+}
+
+/**
+ * Walk a call expression's receiver chain and return true if it descends into
+ * a `(await X)` parenthesized await. Handles `(await x.f()).g()` and longer
+ * tails like `(await x.f()).g().h`.
+ */
+function containsAwaitedReceiver(call: ts.CallExpression): boolean {
+  let current: ts.Expression = call.expression
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- AST traversal terminates when current is no longer a chained access
+  while (current) {
+    if (ts.isParenthesizedExpression(current)) {
+      const inner = current.expression
+      if (ts.isAwaitExpression(inner)) return true
+      current = inner
+      continue
+    }
+    if (ts.isPropertyAccessExpression(current) || ts.isElementAccessExpression(current)) {
+      current = current.expression
+      continue
+    }
+    if (ts.isCallExpression(current)) {
+      current = current.expression
+      continue
+    }
+    if (ts.isNonNullExpression(current)) {
+      current = current.expression
+      continue
+    }
+    break
+  }
+  return false
 }
 
 /**
