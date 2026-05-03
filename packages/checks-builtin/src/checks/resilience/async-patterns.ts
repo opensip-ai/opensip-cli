@@ -874,9 +874,19 @@ export const noUnboundedConcurrency = defineCheck({
 
 /**
  * Pattern for detecting raw fetch() calls.
- * Safe regex: uses negative lookbehind for 'this.' prefix, bounded whitespace.
+ *
+ * Safe regex: bounded whitespace + a single negative lookbehind that
+ * rejects any identifier-char or `.` immediately before `fetch`. The
+ * lookbehind excludes both larger identifiers ending in `fetch`
+ * (`prefetch`, `recordReconcilerPrefetch`, `MyClass.fetch`) AND any
+ * dotted call (`this.fetch`, `cacheGit.fetch`, `httpClient.fetch`) in
+ * one rule — there's no need for a separate `this.` exclusion.
+ *
+ * The previous form `(?<!this\.)fetch...` had no word-boundary on the
+ * left, so anything ending in `fetch(` matched (false positives on
+ * `prefetch(`, `recordReconcilerPrefetch(`, etc.).
  */
-const RAW_FETCH_PATTERN = /(?<!this\.)fetch\s{0,10}\(/g
+const RAW_FETCH_PATTERN = /(?<![\w$.])fetch\s{0,10}\(/g
 
 /**
  * Check: resilience/no-raw-fetch
@@ -891,7 +901,7 @@ export const noRawFetch = defineCheck({
   longDescription: `**Purpose:** Enforces use of the platform HTTP client wrapper instead of raw \`fetch()\` calls.
 
 **Detects:**
-- Bare \`fetch(\` calls via regex \`(?<!this\\.)fetch\\s{0,10}\\(\` (excludes \`this.fetch\` method calls)
+- Bare \`fetch(\` calls via regex \`(?<![\\w$.])fetch\\s{0,10}\\(\` (excludes any \`<ident>.fetch\` method call AND any larger identifier ending in \`fetch\`, e.g. \`prefetch\`)
 - Skips comment lines
 
 **Why it matters:** Raw \`fetch()\` lacks built-in retry, timeout, observability, and error normalization that the canonical HttpClient provides.
