@@ -10,13 +10,32 @@ import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-to
 
 // Pre-compiled regex patterns for better performance and to avoid ReDoS
 // Using bounded quantifiers to prevent super-linear runtime
+// Note: the interface header may span multiple lines (a generic-parameter
+// declaration on one line, `extends OtherIface<TParam> {` on the next). The
+// regex matches the first line; the parser scans forward for an `extends`
+// clause until it finds `{`. See `tryStartInterface` / `parseInterfaces`.
+//
+// The `extends` capture uses a greedy character class that includes `<>`
+// so generic type arguments (e.g. `extends IFoo<TParam>`) are captured
+// alongside the bare name. `parseTypeList` / `stripGenerics` handle the
+// downstream normalisation.
 const INTERFACE_PATTERN =
-  /^(?:export\s+)?interface\s+(\w+)(?:<[^>]{1,200}>)?(?:\s+extends\s+([\w,\s]+))?/
+  /^(?:export\s+)?interface\s+(\w+)(?:<[^>]{1,200}>)?(?:\s+extends\s+([\w,\s<>]+))?/
+// Standalone `extends` clause continuation for multi-line interface headers
+// — captures the type list (which may include generics like
+// `IFoo<TParam>, IBar`).
+const INTERFACE_EXTENDS_CONTINUATION = /^\s{0,40}extends\s+([\w,\s<>]+?)\s*\{?\s*$/
 const CLASS_PATTERN =
-  /^(?:export\s+)?class\s+(\w+)(?:\s+extends\s+\w+)?(?:\s+implements\s+([\w,\s]+))?/
+  /^(?:export\s+)?class\s+(\w+)(?:\s+extends\s+\w+(?:<[^>]{1,200}>)?)?(?:\s+implements\s+([\w,\s<>]+))?/
 const METHOD_IN_INTERFACE_PATTERN = /^\s{0,20}(\w+)\??\s{0,5}\(/
 const METHOD_IN_CLASS_PATTERN =
   /^\s{0,20}(?:(?:public|private|protected)\s+)?(?:async\s+)?(?:static\s+)?(\w+)\s{0,5}\(/
+// Detects the `static` modifier on a class method declaration (after any
+// visibility modifier and before the method name). Interfaces cannot declare
+// statics, so `static fromX()` factories must be skipped — comparing them
+// against an interface's instance methods is always a false positive.
+const STATIC_MODIFIER_PATTERN =
+  /^\s{0,20}(?:(?:public|private|protected)\s+)?(?:async\s+)?static\s+\w+\s{0,5}\(/
 
 // Pre-compiled patterns for isMethodDefinition
 const VISIBILITY_MODIFIER_PATTERN = /^(?:public|protected)\s/
@@ -211,6 +230,22 @@ const ALLOWED_EXTRA_METHODS = new Set([
   'toEnvVarName',
 ])
 
+/**
+ * Strips generic type-parameter clauses from a type reference. Handles
+ * nested generics (`Foo<Bar<Baz>>`) by repeatedly removing innermost
+ * `<...>` until idempotent. Used both for resolving interface lookups
+ * (`IFoo<T>` -> `IFoo`) and for the `extends` / `implements` clause text
+ * which may carry generic args.
+ */
+function stripGenerics(typeRef: string): string {
+  let prev = typeRef
+  for (;;) {
+    const next = prev.replace(/<[^<>]*>/g, '')
+    if (next === prev) return next.trim()
+    prev = next
+  }
+}
+
 function countBraces(line: string): { open: number; close: number } {
   let open = 0
   let close = 0
@@ -229,15 +264,42 @@ interface ParseState {
   braces: number
 }
 
+/**
+ * Splits a comma-separated type list at angle-bracket depth 0 only. Naive
+ * `.split(',')` would shred multi-arg generics like
+ * `TypedPipelineStep<Input, Output>` into `TypedPipelineStep<Input` and
+ * `Output>` — both garbage.
+ */
+function splitTopLevel(raw: string): string[] {
+  const segments: string[] = []
+  let depth = 0
+  let buf = ''
+  for (const ch of raw) {
+    if (ch === '<') depth++
+    else if (ch === '>') depth = Math.max(0, depth - 1)
+    if (ch === ',' && depth === 0) {
+      segments.push(buf)
+      buf = ''
+      continue
+    }
+    buf += ch
+  }
+  if (buf.length > 0) segments.push(buf)
+  return segments
+}
+
+function parseTypeList(raw: string): string[] {
+  return splitTopLevel(raw)
+    .map((segment) => stripGenerics(segment.trim()))
+    .filter(Boolean)
+}
+
 function tryStartInterface(line: string, lineIndex: number): ParseState | null {
   const match = INTERFACE_PATTERN.exec(line)
   if (!match?.[1]) return null
   return {
     name: match[1],
-    extends: (match[2] ?? '')
-      .split(',')
-      .map((segment) => segment.trim())
-      .filter(Boolean),
+    extends: parseTypeList(match[2] ?? ''),
     startLine: lineIndex + 1,
     methods: [],
     braces: 0,
@@ -260,8 +322,20 @@ function parseInterfaces(content: string, file: string): InterfaceDefinition[] {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i] ?? ''
 
+    const justStarted = current === null
     current ??= tryStartInterface(line, i)
     if (!current) continue
+
+    // Multi-line interface header: when an `extends` clause appears on a
+    // continuation line before the opening `{`, capture it. The first
+    // line's extends (if any) was parsed by `tryStartInterface`; we only
+    // pick up the continuation when the body has not yet opened.
+    if (!justStarted && current.braces === 0 && current.extends.length === 0) {
+      const continuationMatch = INTERFACE_EXTENDS_CONTINUATION.exec(line)
+      if (continuationMatch?.[1]) {
+        current.extends = parseTypeList(continuationMatch[1])
+      }
+    }
 
     const hadBraces = current.braces > 0
     const { open, close } = countBraces(line)
@@ -315,10 +389,9 @@ function tryStartClass(line: string, lineIndex: number): ClassParseState | null 
   if (!match?.[1]) return null
   return {
     name: match[1],
-    implements: (match[2] ?? '')
-      .split(',')
-      .map((segment) => segment.trim())
-      .filter(Boolean),
+    // `parseTypeList` strips generic args so `implements IFoo<T>` is keyed
+    // by the bare interface name, matching the `allInterfaces` map.
+    implements: parseTypeList(match[2] ?? ''),
     startLine: lineIndex + 1,
     methods: [],
     braces: 0,
@@ -329,6 +402,11 @@ function extractClassMethod(line: string): string | null {
   const trimmed = line.trim()
   if (trimmed.startsWith('private') || trimmed.startsWith('protected')) return null
   if (line.includes('//')) return null
+
+  // Skip static methods. Interfaces cannot declare static members, so
+  // a class's `static fromX()` factory or `static create()` would always
+  // appear to be an "extra" method — that's a false positive.
+  if (STATIC_MODIFIER_PATTERN.test(line)) return null
 
   const methodMatch = METHOD_IN_CLASS_PATTERN.exec(line)
   if (!methodMatch?.[1]) return null
@@ -392,15 +470,18 @@ function resolveInterface(
   allInterfaces: Map<string, InterfaceDefinition>,
   name: string,
 ): InterfaceDefinition | undefined {
-  let iface = allInterfaces.get(name)
+  // Defensive: callers strip generics on parse, but if a generic slips
+  // through here we still want the lookup to succeed.
+  const bare = stripGenerics(name)
+  let iface = allInterfaces.get(bare)
   if (iface) return iface
 
-  if (name.startsWith('I') && name.length > 1 && name[1] === name[1]?.toUpperCase()) {
-    iface = allInterfaces.get(name.slice(1))
+  if (bare.startsWith('I') && bare.length > 1 && bare[1] === bare[1]?.toUpperCase()) {
+    iface = allInterfaces.get(bare.slice(1))
     if (iface) return iface
   }
 
-  return allInterfaces.get('I' + name)
+  return allInterfaces.get('I' + bare)
 }
 
 function createInterfaceMethodsResolver(

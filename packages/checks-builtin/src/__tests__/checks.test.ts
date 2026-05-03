@@ -476,3 +476,79 @@ describe('performance-anti-patterns refinements', () => {
     expect(result.warnings).toBe(0);
   });
 });
+
+describe('interface-implementation-consistency refinements', () => {
+  const check = checks.find((c) => c.config.slug === 'interface-implementation-consistency');
+  let tmpDir: string;
+
+  beforeAll(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'iface-impl-test-'));
+  });
+  afterAll(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('does not flag static factory methods as extra interface methods', async () => {
+    const file = path.join(tmpDir, 'static-factory.ts');
+    fs.writeFileSync(
+      file,
+      [
+        'export interface KekProvider {',
+        '  getKey(id: string): Promise<Buffer>;',
+        '}',
+        'export class EnvVarKekProvider implements KekProvider {',
+        '  async getKey(id: string): Promise<Buffer> { return Buffer.from(id); }',
+        '  static fromEnv(name: string): EnvVarKekProvider { return new EnvVarKekProvider(); }',
+        '  static fromBase64(b64: string): EnvVarKekProvider { return new EnvVarKekProvider(); }',
+        '}',
+      ].join('\n'),
+    );
+    const result = await check!.run(tmpDir, { targetFiles: [file] });
+    expect(result.warnings).toBe(0);
+  });
+
+  it('resolves generic interface inheritance — methods on the base interface are allowed', async () => {
+    const file = path.join(tmpDir, 'generic-inherit.ts');
+    fs.writeFileSync(
+      file,
+      [
+        'export interface IAgentProviderResolver<out TProvider = unknown> {',
+        '  get(id: string): TProvider;',
+        '  has(id: string): boolean;',
+        '  list(): TProvider[];',
+        '}',
+        'export interface IAgentProviderRegistry<TProvider = unknown>',
+        '  extends IAgentProviderResolver<TProvider> {',
+        '  register(provider: TProvider): void;',
+        '}',
+        'export class AgentProviderRegistry implements IAgentProviderRegistry<string> {',
+        '  private readonly providers = new Map<string, string>();',
+        '  get(id: string): string { return this.providers.get(id) ?? ""; }',
+        '  has(id: string): boolean { return this.providers.has(id); }',
+        '  list(): string[] { return [...this.providers.values()]; }',
+        '  register(provider: string): void { this.providers.set(provider, provider); }',
+        '}',
+      ].join('\n'),
+    );
+    const result = await check!.run(tmpDir, { targetFiles: [file] });
+    expect(result.warnings).toBe(0);
+  });
+
+  it('still flags genuinely extra public methods on a class implementing an interface', async () => {
+    const file = path.join(tmpDir, 'extra-method.ts');
+    fs.writeFileSync(
+      file,
+      [
+        'export interface NarrowPort {',
+        '  doThing(): void;',
+        '}',
+        'export class WideAdapter implements NarrowPort {',
+        '  doThing(): void {}',
+        '  undeclaredExtra(): number { return 42; }',
+        '}',
+      ].join('\n'),
+    );
+    const result = await check!.run(tmpDir, { targetFiles: [file] });
+    expect(result.warnings).toBeGreaterThan(0);
+  });
+});
