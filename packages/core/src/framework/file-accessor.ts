@@ -65,8 +65,14 @@ class LRUCache<K, V> {
 export interface FileAccessorOptions {
   readonly cacheCapacity?: number
   readonly signal?: AbortSignal
-  /** When 'code-only', string literals are replaced with spaces before returning content. */
-  readonly contentFilter?: 'raw' | 'code-only'
+  /**
+   * Content filtering applied before returning file content.
+   * - 'code-only': string literals replaced with spaces.
+   * - 'no-strings-no-comments': string literals AND comments replaced
+   *   with spaces. Use for checks that pattern-match identifiers via
+   *   regex and would false-positive on JSDoc / line-comment mentions.
+   */
+  readonly contentFilter?: 'raw' | 'code-only' | 'no-strings-no-comments'
 }
 
 const DEFAULT_CACHE_CAPACITY = 100
@@ -77,7 +83,7 @@ export class FileAccessorImpl implements FileAccessor {
   private readonly cache: LRUCache<string, string>
   private readonly pathSet: Set<string>
   private readonly signal?: AbortSignal
-  private readonly contentFilterMode?: 'raw' | 'code-only'
+  private readonly contentFilterMode?: 'raw' | 'code-only' | 'no-strings-no-comments'
 
   constructor(filePaths: readonly string[], options: FileAccessorOptions = {}) {
     this.paths = filePaths
@@ -121,6 +127,8 @@ export class FileAccessorImpl implements FileAccessor {
     }
     if (this.contentFilterMode === 'code-only') {
       content = filterContent(content).code
+    } else if (this.contentFilterMode === 'no-strings-no-comments') {
+      content = filterContent(content).codeNoComments
     }
     this.cache.set(filePath, content)
     return content

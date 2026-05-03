@@ -76,4 +76,61 @@ describe('filterContent', () => {
       expect(code).toContain('${c}')
     })
   })
+
+  describe('codeNoComments — strings AND comments masked', () => {
+    it('masks line comments while preserving line/column offsets', () => {
+      clearFilterCache()
+      const src = `const x = 1 // calls getDatabase() somewhere\nconst y = 2`
+      const { code, codeNoComments } = filterContent(src)
+      // `code` (strings-only) leaves the line comment intact
+      expect(code).toContain('getDatabase()')
+      // `codeNoComments` masks the comment text but keeps length
+      expect(codeNoComments.length).toBe(src.length)
+      expect(codeNoComments).not.toContain('getDatabase')
+      // Code BEFORE the comment survives
+      expect(codeNoComments).toContain('const x = 1')
+      // Newlines are preserved so line numbers stay accurate
+      expect(codeNoComments.split('\n')).toHaveLength(2)
+      expect(codeNoComments.split('\n')[1]).toBe('const y = 2')
+    })
+
+    it('masks block / JSDoc comments across multiple lines', () => {
+      clearFilterCache()
+      const src = [
+        '/**',
+        ' * Replace getDatabase() with the constructor StoreDeps.',
+        ' * The check guards against process-wide tenant accessors.',
+        ' */',
+        'export class TicketStore {}',
+      ].join('\n')
+      const { codeNoComments } = filterContent(src)
+      expect(codeNoComments).not.toContain('getDatabase')
+      expect(codeNoComments).not.toContain('StoreDeps')
+      expect(codeNoComments).not.toContain('process-wide')
+      // Code AFTER the JSDoc survives
+      expect(codeNoComments).toContain('export class TicketStore')
+      // Line count preserved
+      expect(codeNoComments.split('\n')).toHaveLength(5)
+    })
+
+    it('masks both strings and comments in the same content', () => {
+      clearFilterCache()
+      const src = `const url = 'https://api.example.com' // call openai.messages.create() here`
+      const { codeNoComments } = filterContent(src)
+      expect(codeNoComments).not.toContain('https')
+      expect(codeNoComments).not.toContain('messages.create')
+      expect(codeNoComments).toContain('const url = ')
+    })
+
+    it('does not strip comments when only `code` is requested', () => {
+      // Regression guard: codeNoComments is a sibling field, not a replacement.
+      // `code` must continue to leave comments intact (some checks scan
+      // comments for `@deprecated` / `@fitness-ignore` directives).
+      clearFilterCache()
+      const src = `const x = 1 // @deprecated — use Y instead`
+      const { code, codeNoComments } = filterContent(src)
+      expect(code).toContain('@deprecated')
+      expect(codeNoComments).not.toContain('@deprecated')
+    })
+  })
 })

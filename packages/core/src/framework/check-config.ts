@@ -192,9 +192,18 @@ export interface BaseCheckConfig {
    * - 'code-only': String literals replaced with whitespace, preserving
    *   line/column positions. Use for checks that match code patterns
    *   (function calls, imports, type annotations) and should not match
-   *   inside strings or documentation.
+   *   inside strings — but legitimately want to scan inside comments
+   *   (e.g. checks that look for `@deprecated` directives or rationale
+   *   pragmas).
+   * - 'no-strings-no-comments': String literals AND comments replaced
+   *   with whitespace, preserving line/column positions. Use for checks
+   *   that pattern-match identifiers via regex and would false-positive
+   *   on banned-call references that appear in JSDoc / line / block
+   *   comments documenting the rule itself (e.g. ``"Replace
+   *   getDatabase() with the constructor StoreDeps"`` inside a doc
+   *   string).
    */
-  readonly contentFilter?: 'raw' | 'code-only'
+  readonly contentFilter?: 'raw' | 'code-only' | 'no-strings-no-comments'
   /**
    * Confidence level of this check's findings. Consumers of opensip-tools
    * signals (via --report-to) use this to decide how aggressively to act
@@ -227,7 +236,7 @@ const BaseCheckConfigSchema = z.object({
   fileTypes: z.array(z.string()).optional(),
   provider: z.string().optional(),
   scope: CheckScopeSchema.optional(),
-  contentFilter: z.enum(['raw', 'code-only']).optional(),
+  contentFilter: z.enum(['raw', 'code-only', 'no-strings-no-comments']).optional(),
   confidence: z.enum(['high', 'medium', 'low']).optional(),
 })
 

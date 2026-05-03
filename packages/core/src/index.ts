@@ -20,6 +20,8 @@ export {
 } from './framework/ast-utilities.js';
 export { execAbortable } from './framework/abortable-exec.js';
 export { isInsideStringLiteral } from './framework/strip-literals.js';
+export { filterContent, clearFilterCache } from './framework/content-filter.js';
+export type { FilteredContent } from './framework/content-filter.js';
 // Re-export TypeScript compiler API for AST-based checks
 import * as _ts from 'typescript';
 export { _ts as ts };

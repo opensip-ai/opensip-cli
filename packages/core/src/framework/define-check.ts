@@ -103,9 +103,14 @@ async function executeAnalyzeMode(
 
     try {
       const rawContent = await ctx.readFile(filePath)
-      const content = config.contentFilter === 'code-only'
-        ? filterContent(rawContent).code
-        : rawContent
+      let content: string
+      if (config.contentFilter === 'code-only') {
+        content = filterContent(rawContent).code
+      } else if (config.contentFilter === 'no-strings-no-comments') {
+        content = filterContent(rawContent).codeNoComments
+      } else {
+        content = rawContent
+      }
       const violations = config.analyze(content, filePath)
 
       for (const violation of violations) {

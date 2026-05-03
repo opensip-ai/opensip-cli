@@ -19,6 +19,15 @@ import ts from 'typescript'
 export interface FilteredContent {
   /** Content with string literals replaced by whitespace of equal length */
   readonly code: string
+  /**
+   * Content with both string literals AND comments replaced by whitespace
+   * of equal length. Use when a check pattern-matches identifiers via regex
+   * and would otherwise false-positive on banned-call references that
+   * appear in JSDoc / line / block comments documenting the rule
+   * (e.g. ``"Replace getDatabase() with the constructor StoreDeps"`` inside
+   * a doc string).
+   */
+  readonly codeNoComments: string
   /** Original content (unchanged) */
   readonly raw: string
   /** Set of line numbers (1-based) that are entirely inside comments */
@@ -139,6 +148,7 @@ export function filterContent(content: string): FilteredContent {
     logger.debug('Content filter fell back to raw content', { evt: 'fitness.content_filter.fallback', module: 'fitness:framework' })
     const fallback: FilteredContent = {
       code: content,
+      codeNoComments: content,
       raw: content,
       commentLines: new Set(),
       isInString: () => false,
@@ -222,8 +232,27 @@ function filterContentImpl(content: string): FilteredContent {
   const code = chars.join('')
   const commentLines = linesToSet(content, commentRegions)
 
+  // Compute `codeNoComments` by additionally replacing comment regions
+  // with whitespace. Done as a second pass on a fresh array so `code`
+  // (strings-stripped only) and `codeNoComments` (strings + comments
+  // stripped) remain available — most checks want one or the other,
+  // not both.
+  const charsNoComments = [...content]
+  for (const region of stringRegions) {
+    for (let i = region.start; i < region.end; i++) {
+      if (charsNoComments[i] !== '\n') charsNoComments[i] = ' '
+    }
+  }
+  for (const region of commentRegions) {
+    for (let i = region.start; i < region.end; i++) {
+      if (charsNoComments[i] !== '\n') charsNoComments[i] = ' '
+    }
+  }
+  const codeNoComments = charsNoComments.join('')
+
   return {
     code,
+    codeNoComments,
     raw: content,
     commentLines,
     isInString: (line, column) => isInRegions(content, stringRegions, line, column),
