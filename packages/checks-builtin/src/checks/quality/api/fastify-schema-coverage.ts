@@ -97,6 +97,16 @@ function checkMissingSchema(
   )
 }
 
+function handlerReadsBody(routeText: string): boolean {
+  // The route's text passed in here covers the full call expression,
+  // including the handler body. If neither `request.body` nor `req.body`
+  // appears, the handler doesn't consume a request body — POST/PUT/PATCH
+  // routes triggered purely by URL params (state-transition actions like
+  // `/dispatch`, `/replay`, `/dismiss`) legitimately have no body schema
+  // because there is no body. Flagging those is a false positive.
+  return routeText.includes('request.body') || routeText.includes('req.body')
+}
+
 function checkMissingBodySchema(
   options: CheckRouteSchemaOptions,
   zodResult: ZodValidationResult,
@@ -108,6 +118,9 @@ function checkMissingBodySchema(
     return null
   }
   if (zodResult.hasBody) {
+    return null
+  }
+  if (!handlerReadsBody(options.routeText)) {
     return null
   }
   return createSchemaViolation(
@@ -328,7 +341,7 @@ export const fastifySchemaCoverage = defineCheck({
 
 **Detects:**
 - Routes (both object-literal \`{ method: 'POST', url: '...' }\` and shorthand \`fastify.post(...)\` styles) missing the \`schema\` option entirely
-- POST/PUT/PATCH routes missing a \`body:\` schema property
+- POST/PUT/PATCH routes missing a \`body:\` schema property when the handler reads \`request.body\` (state-transition routes triggered by URL params with no body access are not flagged)
 - Routes missing a \`response:\` schema property
 - Routes with path parameters (containing \`:\`) missing a \`params:\` schema property
 - Routes accessing \`request.query\`/\`req.query\` missing a \`querystring:\` schema property

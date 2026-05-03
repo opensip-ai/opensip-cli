@@ -552,3 +552,64 @@ describe('interface-implementation-consistency refinements', () => {
     expect(result.warnings).toBeGreaterThan(0);
   });
 });
+
+describe('fastify-schema-coverage refinements', () => {
+  const check = checks.find((c) => c.config.slug === 'fastify-schema-coverage');
+  let tmpDir: string;
+
+  beforeAll(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fastify-schema-test-'));
+  });
+  afterAll(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('does not flag a POST route with no body schema if the handler does not read request.body', async () => {
+    const file = path.join(tmpDir, 'bodyless.routes.ts');
+    fs.writeFileSync(
+      file,
+      [
+        "import { z } from 'zod';",
+        'export const routes = async (fastify: any) => {',
+        "  fastify.post('/tickets/:id/dispatch', {",
+        '    schema: {',
+        '      params: z.object({ id: z.string() }),',
+        '      response: { 200: z.object({ success: z.boolean() }) },',
+        '    },',
+        '  }, async (request: any, reply: any) => {',
+        '    const { id } = request.params;',
+        "    return reply.send({ success: true, dispatched: id });",
+        '  });',
+        '};',
+      ].join('\n'),
+    );
+    const result = await check!.run(tmpDir, { targetFiles: [file] });
+    const findings = (result as unknown as { signals?: { metadata?: { type?: string } }[] }).signals ?? [];
+    const bodySchemaFindings = findings.filter((f) => f.metadata?.type === 'missing-body-schema');
+    expect(bodySchemaFindings.length).toBe(0);
+  });
+
+  it('still flags a POST route with no body schema when the handler reads request.body', async () => {
+    const file = path.join(tmpDir, 'body-reader.routes.ts');
+    fs.writeFileSync(
+      file,
+      [
+        "import { z } from 'zod';",
+        'export const routes = async (fastify: any) => {',
+        "  fastify.post('/items', {",
+        '    schema: {',
+        '      response: { 200: z.object({ ok: z.boolean() }) },',
+        '    },',
+        '  }, async (request: any, reply: any) => {',
+        '    const body = request.body as { name: string };',
+        "    return reply.send({ ok: true, name: body.name });",
+        '  });',
+        '};',
+      ].join('\n'),
+    );
+    const result = await check!.run(tmpDir, { targetFiles: [file] });
+    const findings = (result as unknown as { signals?: { metadata?: { type?: string } }[] }).signals ?? [];
+    const bodySchemaFindings = findings.filter((f) => f.metadata?.type === 'missing-body-schema');
+    expect(bodySchemaFindings.length).toBeGreaterThan(0);
+  });
+});
