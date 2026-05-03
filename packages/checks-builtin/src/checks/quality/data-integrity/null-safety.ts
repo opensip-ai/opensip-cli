@@ -369,6 +369,13 @@ const SAFE_FLUENT_METHODS = new Set([
   'unwrapErr',
   '_unsafeUnwrap',
   '_unsafeUnwrapErr',
+  // typed-inject Injector chain — every .provide* call returns a new Injector<T>, never null
+  'provideValue',
+  'provideClass',
+  'provideFactory',
+  'provide',
+  // Drizzle column builder — column.$type<T>() always returns the same column reference
+  '$type',
 ])
 
 /**
@@ -527,6 +534,30 @@ function isFluentChain(node: ts.PropertyAccessExpression): boolean {
 }
 
 /**
+ * Path patterns where null-safety findings are dominated by safe-by-construction
+ * builders that the AST analyzer cannot fully resolve:
+ *
+ * - `**\/di/fragment.ts`, `**\/di/fragments/*.ts` — typed-inject Injector chains
+ *   (`.provideValue/.provideClass/...` always return Injector<T>); the chain
+ *   is split across many lines so the AST chain-depth heuristic does not always
+ *   apply. The whole-file safe-list captures the convention.
+ * - `**\/schema/*.ts`, `**\/*-schema.ts`, `**\/dbos/schema*.ts` — Drizzle/Zod
+ *   schema declarations are pure column/shape builders. No runtime null-access
+ *   surface to protect.
+ */
+const SAFE_NULL_PATHS: RegExp[] = [
+  /\/di\/fragment\.ts$/,
+  /\/di\/fragments\//,
+  /\/schema\//,
+  /-schema\.ts$/,
+  /\/dbos\/schema/,
+]
+
+function isSafeNullPath(filePath: string): boolean {
+  return SAFE_NULL_PATHS.some((p) => p.test(filePath))
+}
+
+/**
  * @param {*} content
  * @param {*} filePath
  * @returns {*}
@@ -534,6 +565,9 @@ function isFluentChain(node: ts.PropertyAccessExpression): boolean {
  */
 function analyzeFile(content: string, filePath: string): CheckViolation[] {
   const violations: CheckViolation[] = []
+
+  // Skip safe-by-construction path families (DI fragments + schema declarations)
+  if (isSafeNullPath(filePath)) return violations
 
   try {
     const sourceFile = getSharedSourceFile(filePath, content)
