@@ -203,6 +203,11 @@ const SELF_DOCUMENTING_ERRORS = new Set([
 /**
  * Suffixes that indicate a self-documenting error type.
  * These typed error classes are descriptive enough that @throws JSDoc adds little value.
+ *
+ * The list is intentionally broad: any class name ending in a recognizable error
+ * suffix counts as self-documenting because it carries its semantic meaning in the
+ * type name itself (callers can read and handle the typed error directly without
+ * needing prose).
  */
 const SELF_DOCUMENTING_SUFFIXES = [
   'ValidationError',
@@ -219,6 +224,39 @@ const SELF_DOCUMENTING_SUFFIXES = [
   'ApplicationError',
   'OperationError',
   'ErrorBuilder', // Builder pattern for typed errors
+  // Additional project-defined error families (verified in opensip codebase):
+  // CompositionError, CompositeError, NetworkError, CanonicalizationError,
+  // TransformError, VersioningError, BudgetExceededError, IdSystemError,
+  // IdValidationError, AssessmentExecutionError, DiffCaptureError,
+  // IllegalRunTransitionError, PluginLoadError, TicketNotFoundError,
+  // HmacVerifyError, ValidationApiError, BestEffortSyncStateError,
+  // IntelligentError, DefaultError, SimpleError
+  'CompositionError',
+  'CompositeError',
+  'NetworkError',
+  'CanonicalizationError',
+  'TransformError',
+  'VersioningError',
+  'ExecutionError',
+  'TransitionError',
+  'LoadError',
+  'VerifyError',
+  'ApiError',
+  'ParseError',
+  'EncodingError',
+  'DecodingError',
+  'StateError',
+  'SyncError',
+  'CaptureError',
+  'IntegrationError',
+  'PermissionError',
+  'AccessError',
+  'AuthenticationError',
+  'ResourceNotFoundError',
+  'DuplicateResourceError',
+  'DataIntegrityError',
+  'BusinessRuleError',
+  'InputValidationError',
 ]
 
 function isSelfDocumentingError(errorType: string): boolean {
@@ -326,15 +364,120 @@ function allThrowsSelfDocumenting(
 }
 
 /**
- * Check if a throw statement is a re-throw (throw error; or throw err;)
+ * Common error-field name patterns on `this` that indicate a stored-error rethrow.
+ * Used to recognise patterns like `throw this.error` (Result-pattern Failure rethrow).
+ */
+const ERROR_FIELD_NAME_PATTERN = /^(error|err|cause|innerError|originalError)$/i
+
+/**
+ * Generic error-variable name patterns (caught-error identifiers).
+ * Used as a fallback when we cannot statically determine the enclosing catch clause
+ * (e.g. when isRethrow is called without a function context).
+ */
+const ERROR_VAR_NAME_PATTERN = /^(error|err|e|ex|exception)$/i
+
+/**
+ * Collect identifier names introduced by `catch (X)` clauses anywhere inside the
+ * given function-like node (excluding nested function bodies). These names are the
+ * caught-error variables that a subsequent `throw <name>` or `throw <name>.<...>`
+ * is treated as a re-throw of.
+ *
+ * @param fnNode - The enclosing function-like node
+ * @returns Set of caught-error variable names
+ */
+function collectCaughtErrorNames(fnNode: ts.Node): Set<string> {
+  const names = new Set<string>()
+  const visit = (n: ts.Node): void => {
+    // Don't descend into nested function bodies — their catch variables are
+    // out of scope at the throw site we care about.
+    if (isFunctionLikeNode(n) && n !== fnNode) {
+      return
+    }
+    if (ts.isCatchClause(n) && n.variableDeclaration) {
+      const decl = n.variableDeclaration
+      if (ts.isIdentifier(decl.name)) {
+        names.add(decl.name.text)
+      }
+    }
+    ts.forEachChild(n, visit)
+  }
+  visit(fnNode)
+  return names
+}
+
+/**
+ * Check if a throw statement is a re-throw of a caught error.
+ *
+ * Recognised re-throw shapes:
+ *  - `throw err`                     — bare caught-error identifier
+ *  - `throw err.unwrapErr()`         — typed Result rethrow
+ *  - `throw this.error`              — Result-pattern Failure stored-error rethrow
+ *  - `throw sanitizedError(err)`     — single-arg helper wrapping a caught error
+ *
  * @param throwStmt - The throw statement to check
  * @param sourceFile - The source file containing the throw statement
- * @returns True if this is a re-throw statement
+ * @param caughtNames - Names of caught-error variables in the enclosing function
+ * @returns True if this throw statement re-throws (rather than freshly creates) an error
  */
-function isRethrow(throwStmt: ts.ThrowStatement, sourceFile: ts.SourceFile): boolean {
-  const text = throwStmt.expression.getText(sourceFile).trim()
-  // Re-throws are just variable names (error, err, e) without 'new'
-  return !text.includes('new ') && /^(error|err|e|ex|exception)$/i.test(text)
+function isRethrow(
+  throwStmt: ts.ThrowStatement,
+  sourceFile: ts.SourceFile,
+  caughtNames?: Set<string>,
+): boolean {
+  const expr = throwStmt.expression
+  const text = expr.getText(sourceFile).trim()
+
+  // `new X(...)` is never a re-throw.
+  if (ts.isNewExpression(expr)) return false
+
+  // `throw err` — bare identifier
+  if (ts.isIdentifier(expr)) {
+    if (caughtNames?.has(expr.text)) return true
+    // Fallback: name matches a generic caught-error pattern (used when no context).
+    return ERROR_VAR_NAME_PATTERN.test(expr.text)
+  }
+
+  // `throw this.error` / `throw this.cause` — stored-error field rethrow
+  if (ts.isPropertyAccessExpression(expr)) {
+    if (
+      expr.expression.kind === ts.SyntaxKind.ThisKeyword &&
+      ts.isIdentifier(expr.name) &&
+      ERROR_FIELD_NAME_PATTERN.test(expr.name.text)
+    ) {
+      return true
+    }
+  }
+
+  // Result-pattern rethrows: `throw X.unwrapErr()` / `throw X.unwrap()` —
+  // the throw extracts an already-typed error from a Result and propagates it.
+  // We treat this as a rethrow regardless of whether X is in scope as a caught
+  // variable, because the wrapped error is itself a typed error from elsewhere.
+  if (ts.isCallExpression(expr) && ts.isPropertyAccessExpression(expr.expression)) {
+    const methodName = ts.isIdentifier(expr.expression.name) ? expr.expression.name.text : ''
+    if (methodName === 'unwrapErr' || methodName === 'unwrap') {
+      return true
+    }
+    // Method invocation on a caught-error variable — also a rethrow.
+    const root = expr.expression.expression
+    if (ts.isIdentifier(root) && caughtNames?.has(root.text)) {
+      return true
+    }
+  }
+
+  // `throw sanitizedError(err)` — single-arg call wrapping a caught-error variable.
+  // Heuristic: the call has exactly one argument and that argument is an identifier
+  // matching a caught-error name (preferred) or the generic err/error pattern.
+  if (ts.isCallExpression(expr) && expr.arguments.length === 1) {
+    const arg = expr.arguments[0]
+    if (arg && ts.isIdentifier(arg)) {
+      if (caughtNames?.has(arg.text)) return true
+      if (!caughtNames && ERROR_VAR_NAME_PATTERN.test(arg.text)) return true
+    }
+  }
+
+  // Legacy fallback: bare-identifier-shaped text without 'new'. Kept for backward
+  // compatibility with call sites that don't pass the AST node.
+  return !text.includes('new ') && ERROR_VAR_NAME_PATTERN.test(text)
 }
 
 /**
@@ -369,8 +512,12 @@ function analyzeFunctionNode(
     return null
   }
 
-  // Skip if all throws are re-throws (error propagation)
-  if (throwStatements.every((stmt) => isRethrow(stmt, ctx.sourceFile))) {
+  // Skip if all throws are re-throws (error propagation). We pass the set of
+  // caught-error variable names declared in any `catch (X)` clause inside the
+  // function so that `throw err`, `throw err.unwrapErr()`, and
+  // `throw sanitizedError(err)` are recognised as rethrows.
+  const caughtNames = collectCaughtErrorNames(node)
+  if (throwStatements.every((stmt) => isRethrow(stmt, ctx.sourceFile, caughtNames))) {
     return null
   }
 

@@ -303,3 +303,108 @@ describe('null-safety refinements', () => {
     expect(result.warnings).toBeGreaterThan(0);
   });
 });
+
+describe('throws-documentation refinements', () => {
+  const check = checks.find((c) => c.config.slug === 'throws-documentation');
+  let tmpDir: string;
+
+  beforeAll(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'throws-doc-test-'));
+  });
+  afterAll(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('does not flag `throw sanitizedError(err)` rethrow helper', async () => {
+    const file = path.join(tmpDir, 'sanitized.ts');
+    fs.writeFileSync(
+      file,
+      `declare function sanitizedError(e: unknown): Error;
+       export async function callApi() {
+         try {
+           return await fetch('x');
+         } catch (err) {
+           throw sanitizedError(err);
+         }
+       }`,
+    );
+    const result = await check!.run(tmpDir, { targetFiles: [file] });
+    expect(result.warnings).toBe(0);
+  });
+
+  it('does not flag `throw this.error` Result-pattern Failure rethrow', async () => {
+    const file = path.join(tmpDir, 'failure.ts');
+    fs.writeFileSync(
+      file,
+      `export class Failure<E> {
+         constructor(public readonly error: E) {}
+         unwrap(): never {
+           throw this.error;
+         }
+       }`,
+    );
+    const result = await check!.run(tmpDir, { targetFiles: [file] });
+    expect(result.warnings).toBe(0);
+  });
+
+  it('does not flag `throw err.unwrapErr()` typed Result rethrow', async () => {
+    const file = path.join(tmpDir, 'unwrap.ts');
+    fs.writeFileSync(
+      file,
+      `declare function compute(): { unwrapErr(): Error };
+       export function run() {
+         try {
+           return compute();
+         } catch (err) {
+           throw (err as { unwrapErr(): Error }).unwrapErr();
+         }
+       }`,
+    );
+    const result = await check!.run(tmpDir, { targetFiles: [file] });
+    expect(result.warnings).toBe(0);
+  });
+
+  it('does not flag throws of project-defined typed errors with extended suffixes', async () => {
+    const file = path.join(tmpDir, 'typed.ts');
+    fs.writeFileSync(
+      file,
+      `class CanonicalizationError extends Error {}
+       class ValidationApiError extends Error {}
+       class CompositionError extends Error {}
+       export function a() { throw new CanonicalizationError(); }
+       export function b() { throw new ValidationApiError(); }
+       export function c() { throw new CompositionError(); }`,
+    );
+    const result = await check!.run(tmpDir, { targetFiles: [file] });
+    expect(result.warnings).toBe(0);
+  });
+
+  it('still flags genuinely undocumented `throw new Error(...)`', async () => {
+    const file = path.join(tmpDir, 'generic.ts');
+    fs.writeFileSync(
+      file,
+      `export function notDocumented() {
+         throw new Error('boom');
+       }`,
+    );
+    const result = await check!.run(tmpDir, { targetFiles: [file] });
+    expect(result.warnings).toBeGreaterThan(0);
+  });
+
+  it('does not flag function whose throws are all rethrows of the caught variable', async () => {
+    const file = path.join(tmpDir, 'mixed-rethrow.ts');
+    fs.writeFileSync(
+      file,
+      `export async function run() {
+         try {
+           await Promise.resolve();
+         } catch (caught) {
+           if (caught instanceof Error) throw caught;
+           throw caught;
+         }
+       }`,
+    );
+    const result = await check!.run(tmpDir, { targetFiles: [file] });
+    expect(result.warnings).toBe(0);
+  });
+});
