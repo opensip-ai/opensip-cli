@@ -60,8 +60,13 @@ const PATTERNS: PatternConfig[] = [
     severity: 'warning',
   },
   {
-    // Bounded to prevent super-linear runtime
-    pattern: /for\s{0,5}\([^)]{0,200}\)\s{0,5}\{[^}]{0,500}\.\.\./,
+    // Bounded to prevent super-linear runtime.
+    // We match `[...` or `(...` or `, ...` so that destructuring rest
+    // (`{ a, ...rest } = obj` and `const [a, ...rest] = arr`) does NOT trigger:
+    // those forms appear after `{`/`[` that immediately follow `const`/`let`/`var`
+    // — the `(...|[...|, ...` shapes here cover spread-in-array-literal,
+    // spread-in-call-args, and spread-in-arg-list-after-comma respectively.
+    pattern: /for\s{0,5}\([^)]{0,200}\)\s{0,5}\{[^}]{0,500}[([,]\s{0,5}\.\.\./,
     type: ANTI_PATTERN_TYPES.SPREAD_IN_LOOP,
     message: 'Spread operator in loop - pre-allocate array instead',
     severity: 'warning',
@@ -99,7 +104,7 @@ function checkLineForPerformancePatterns(
       const isSequentialAwait =
         patternConfig.type === ANTI_PATTERN_TYPES.SEQUENTIAL_AWAIT && line.includes('await')
       const isSpreadInLoop =
-        patternConfig.type === ANTI_PATTERN_TYPES.SPREAD_IN_LOOP && line.includes('...')
+        patternConfig.type === ANTI_PATTERN_TYPES.SPREAD_IN_LOOP && isSpreadInCallOrArray(line)
       const isStringConcatInLoop =
         patternConfig.type === ANTI_PATTERN_TYPES.STRING_CONCAT_IN_LOOP &&
         /\+=\s{0,5}['"`]/.test(line)
@@ -123,6 +128,26 @@ function checkLineForPerformancePatterns(
   }
 
   return null
+}
+
+/**
+ * Distinguish spread-in-call / spread-in-array (a real anti-pattern in loops)
+ * from rest-destructuring (`{ a, ...rest } = obj`, `const [a, ...rest] = arr`),
+ * which is not.
+ *
+ * Heuristic: a true spread is preceded by `(`, `[`, or `,` (after optional
+ * whitespace) — those positions correspond to call args, array literals, and
+ * subsequent args. A destructuring rest, while syntactically also `, ...rest`
+ * inside `{}`, is always followed by an `=` on the same line (the destructuring
+ * assignment), so we exclude lines containing `} =` or `] =`.
+ */
+function isSpreadInCallOrArray(line: string): boolean {
+  if (!line.includes('...')) return false
+  // Exclude rest-destructuring: `{ ..., ...rest } = expr` or `[..., ...rest] = expr`
+  // Bounded quantifier prevents catastrophic backtracking.
+  if (/[\]}]\s{0,5}=/.test(line)) return false
+  // Must be `(...`, `[...`, or `, ...` — bounded quantifier keeps this linear.
+  return /[([,]\s{0,5}\.\.\./.test(line)
 }
 
 function getPerformanceSuggestion(type: AntiPatternType, defaultMessage: string): string {

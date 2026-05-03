@@ -408,3 +408,71 @@ describe('throws-documentation refinements', () => {
     expect(result.warnings).toBe(0);
   });
 });
+
+describe('performance-anti-patterns refinements', () => {
+  const check = checks.find((c) => c.config.slug === 'performance-anti-patterns');
+  let tmpDir: string;
+
+  beforeAll(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'perf-anti-test-'));
+  });
+  afterAll(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('does not flag rest destructuring inside for loop as spread-in-loop', async () => {
+    const file = path.join(tmpDir, 'destructure.ts');
+    fs.writeFileSync(
+      file,
+      `interface Row { id: number; name: string; extra: string }
+       export function transform(rows: Row[]) {
+         const out: { id: number; rest: { name: string; extra: string } }[] = [];
+         for (const r of rows) {
+           const { id, ...rest } = r;
+           out.push({ id, rest });
+         }
+         return out;
+       }`,
+    );
+    const result = await check!.run(tmpDir, { targetFiles: [file] });
+    // No spread-in-loop warning should fire for destructuring rest.
+    const spreadFindings = (result as unknown as { findings?: { message: string }[] }).findings ?? [];
+    const spreadOnly = spreadFindings.filter((f) => f.message.includes('Spread operator'));
+    expect(spreadOnly.length).toBe(0);
+  });
+
+  it('still flags actual spread-in-call inside for loop', async () => {
+    const file = path.join(tmpDir, 'spread-call.ts');
+    fs.writeFileSync(
+      file,
+      `export function build(items: number[][]) {
+         let acc: number[] = [];
+         for (const arr of items) {
+           acc = [...acc, ...arr];
+         }
+         return acc;
+       }`,
+    );
+    const result = await check!.run(tmpDir, { targetFiles: [file] });
+    expect(result.warnings).toBeGreaterThan(0);
+  });
+
+  it('honours @sequential-ok pragma for legitimate sequential loops', async () => {
+    const file = path.join(tmpDir, 'sequential-ok.ts');
+    fs.writeFileSync(
+      file,
+      `// @sequential-ok: pagination drain — each iteration depends on prior offset
+       declare function fetchPage(offset: number): Promise<unknown[]>;
+       export async function drain() {
+         let offset = 0;
+         while (true) {
+           const rows = await fetchPage(offset);
+           if (rows.length === 0) break;
+           offset += rows.length;
+         }
+       }`,
+    );
+    const result = await check!.run(tmpDir, { targetFiles: [file] });
+    expect(result.warnings).toBe(0);
+  });
+});
