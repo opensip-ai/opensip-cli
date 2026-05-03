@@ -93,6 +93,7 @@ const KNOWN_SYNC_FUNCTIONS = new Set([
   'wrapError',
   // Lifecycle/cleanup methods (synchronous)
   'release',
+  'releaseLock',           // Web Streams ReadableStreamReader.releaseLock — sync, returns void
   'reset',
   'reject',
   'resolve',
@@ -104,10 +105,22 @@ const KNOWN_SYNC_FUNCTIONS = new Set([
   'stop',
   'pause',
   'resume',
+  'cleanup',               // Common sync lifecycle — process-host CrashGuards.cleanup, etc.
+  'unref',                 // Node Timer/Immediate/Socket.unref — sync, returns the handle
   'kill',                  // Node ChildProcess.kill — synchronous signal dispatch, returns boolean
   // OpenTelemetry / context propagation helpers (synchronous attach to active span/context)
   'attachDomainContext',
   'attachProfileIdToSpan',
+  'inject',                // OTel TextMapPropagator.inject — sync header injection
+  'observe',               // OTel ObservableResult.observe (gauge callback) — sync record
+  // HTTP error helpers (synchronous reply.send wrappers)
+  'sendError',
+  // Span error finalization (rethrows; synchronous in practice)
+  'finalizeError',
+  // Pyroscope per-profiler starters — sync, returns void (Pyroscope.default.startWallProfiling/startHeapProfiling)
+  'startWallProfiling',
+  'startHeapProfiling',
+  'startCpuProfiling',
   // Timer clearing (synchronous)
   'clearTimeout',
   'clearInterval',
@@ -370,6 +383,10 @@ const KNOWN_SYNC_RECEIVERS = new Set([
   // Metrics/observability (synchronous counters)
   'metrics',
   'stats',
+  // OTel context propagation API — propagation.inject/extract are synchronous
+  'propagation',
+  // Pyroscope profiling SDK — Pyroscope.start/.default.startWallProfiling/.startHeapProfiling are all sync (returns void)
+  'Pyroscope',
   // HTTP response objects (synchronous — framework handles promise)
   'res',
   'reply',
@@ -477,6 +494,12 @@ const KNOWN_SYNC_PREFIXES = [
   'invalidate',
   'deliver',
   'notify',
+  // Metric counter increments — incrementXxx is universally synchronous
+  'increment',
+  // Validation/floor enforcement — enforceXxx throws on violation, sync
+  'enforce',
+  // DI wiring helpers — wireXxx wires composition, sync
+  'wire',
 ]
 
 /**
@@ -553,6 +576,17 @@ function isKnownSyncMethodCall(expr: ts.PropertyAccessExpression): boolean {
   if (ts.isPropertyAccessExpression(receiverExpr)) {
     const nestedName = receiverExpr.name.text
     if (KNOWN_SYNC_RECEIVERS.has(nestedName)) {
+      return true
+    }
+    // Also walk to the root identifier of the chain. e.g. Pyroscope.default.start()
+    // — the call's receiver is `Pyroscope.default` (PropertyAccess); the rightmost
+    // segment is `default`, but the SDK identity is `Pyroscope`. Walk left to find it.
+    let cursor: ts.Node = receiverExpr.expression
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- AST walk
+    while (cursor && ts.isPropertyAccessExpression(cursor)) {
+      cursor = cursor.expression
+    }
+    if (ts.isIdentifier(cursor) && KNOWN_SYNC_RECEIVERS.has(cursor.text)) {
       return true
     }
   }
