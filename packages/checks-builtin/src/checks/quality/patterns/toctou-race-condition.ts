@@ -55,6 +55,12 @@ const SAFE_TOCTOU_PATHS = [
   /memory-cache/i,
   /memory-store/i,
   /in-memory/i,
+  // Filename conventions — `*-cache.ts` and `*-prefetcher.ts` are
+  // single-threaded coalescing structures by convention (Node event-loop
+  // semantics make the .get-then-.set pattern safe). The path-segment
+  // /cache/ skip above misses files at top of a package's src/ tree.
+  /-cache\.tsx?$/i,
+  /-prefetcher\.tsx?$/i,
   // Rate limiting (bounded operations)
   /rate-limit/i,
   /rate_limit/i,
