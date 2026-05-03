@@ -922,6 +922,21 @@ export const noRawFetch = defineCheck({
       return violations
     }
 
+    // Skip test files — tests legitimately invoke `fetch(` directly to
+    // exercise the wrapper, mock the global, or hit a localhost test
+    // server. Routing those through the wrapper would defeat the test.
+    if (
+      filePath.endsWith('.test.ts') ||
+      filePath.endsWith('.test.tsx') ||
+      filePath.endsWith('.test.js') ||
+      filePath.endsWith('.test.jsx') ||
+      filePath.endsWith('.spec.ts') ||
+      filePath.endsWith('.spec.tsx') ||
+      filePath.includes('/__tests__/')
+    ) {
+      return violations
+    }
+
     // Skip fitness check definitions that reference fetch in string/regex patterns
     if (filePath.includes('/fitness/src/checks/')) {
       return violations
