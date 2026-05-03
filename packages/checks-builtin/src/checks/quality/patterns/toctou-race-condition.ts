@@ -37,6 +37,10 @@ const ATOMIC_PATTERNS = [
   /single-threaded/i,
   /in-memory/i,
   /atomic in.*Node/i,
+  // Documented coalescing/event-loop safety patterns commonly used in Node single-threaded code
+  /single-threaded coalesce/i, // explicit coalescing-cache documentation
+  /Node single-threaded/i,     // explicit Node single-threaded documentation
+  /event-loop semantics/i,     // explicit event-loop atomicity documentation
 ]
 
 /**
@@ -71,6 +75,14 @@ const SAFE_TOCTOU_PATHS = [
   /\/registry\//,
   /\/di-registration\//,
   /\/factories\//,
+  // Route handlers — request-scoped Map/Set ops are not shared-state TOCTOU; route handlers are dominated by Zod.pick/parse and per-request local maps that the regex misreads as TOCTOU.
+  /\/routes\//,
+  // DI composition — fragment graphs construct a per-startup map of providers; not concurrent shared state.
+  /\/di\//,
+  // Schema declarations — Drizzle/Zod schema files are pure declarative builders, no runtime read/update race surface.
+  /\/schema\//,
+  // Audit chain walkers — topological/depth algorithms operate on freshly-allocated function-local Map/Set; not shared mutable state.
+  /\/chain-walker\//,
 ]
 
 /**
