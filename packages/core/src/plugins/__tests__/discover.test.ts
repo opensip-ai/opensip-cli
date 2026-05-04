@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { mkdirSync, writeFileSync, rmSync, symlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { tmpdir, platform } from 'node:os'
 
 import { discoverPlugins, getPluginDir } from '../discover.js'
 
@@ -192,6 +192,97 @@ describe('discoverPlugins', () => {
       const result = discoverPlugins('fit', testDir)
       expect(result).toHaveLength(1)
       expect(result[0]!.entryPoint).toContain('lib/main.js')
+    })
+  })
+
+  describe('security: path traversal and symlink containment', () => {
+    it('rejects dependency names containing .. (would traverse out of node_modules)', () => {
+      // Layout: testDir/fit/package.json declares "../escapee" as a dependency.
+      // testDir/escapee/ is a real plugin sitting OUTSIDE testDir/fit/.
+      // Without the containment check, join(node_modules, "../escapee") would
+      // resolve to testDir/fit/node_modules/../escapee = testDir/fit/escapee,
+      // and the loader would happily import code from there.
+      const fitDir = join(testDir, 'fit')
+      mkdirSync(fitDir, { recursive: true })
+      writeFileSync(join(fitDir, 'package.json'), JSON.stringify({
+        name: 'plugins-host',
+        dependencies: { '../escapee': '*' },
+      }))
+      // Set up the would-be victim location so the realpath check would
+      // succeed if our string-level check failed — proving the test
+      // exercises the rejection path, not just a missing file.
+      const escapee = join(fitDir, 'node_modules', '..', 'escapee')
+      mkdirSync(escapee, { recursive: true })
+      writeFileSync(join(escapee, 'package.json'), JSON.stringify({ name: 'escapee', main: './index.js' }))
+      writeFileSync(join(escapee, 'index.js'), 'export const checks = []')
+
+      const result = discoverPlugins('fit', testDir)
+      expect(result).toHaveLength(0)
+    })
+
+    it('rejects absolute-path dependency names', () => {
+      const fitDir = join(testDir, 'fit')
+      mkdirSync(fitDir, { recursive: true })
+      writeFileSync(join(fitDir, 'package.json'), JSON.stringify({
+        name: 'plugins-host',
+        dependencies: { '/etc/passwd': '*' },
+      }))
+
+      const result = discoverPlugins('fit', testDir)
+      expect(result).toHaveLength(0)
+    })
+
+    it('rejects dependency names containing NUL bytes', () => {
+      const fitDir = join(testDir, 'fit')
+      mkdirSync(fitDir, { recursive: true })
+      writeFileSync(join(fitDir, 'package.json'), JSON.stringify({
+        name: 'plugins-host',
+        dependencies: { 'pkg evil': '*' },
+      }))
+
+      const result = discoverPlugins('fit', testDir)
+      expect(result).toHaveLength(0)
+    })
+
+    it('rejects loose-file plugins that are symlinks pointing outside the plugin dir', () => {
+      // Skip on Windows where symlink creation requires elevated privileges
+      // in CI and isn't part of the threat model we're testing here.
+      if (platform() === 'win32') return
+
+      const fitDir = join(testDir, 'fit')
+      mkdirSync(fitDir, { recursive: true })
+
+      // Set up a target file outside the plugin dir — this stands in for
+      // /etc/passwd or any other attacker-readable file.
+      const outsideTarget = join(testDir, 'evil-target.mjs')
+      writeFileSync(outsideTarget, 'export const checks = []')
+
+      // Plant a symlink inside the plugin dir that points to it.
+      const symlinkPath = join(fitDir, 'looks-legit.mjs')
+      symlinkSync(outsideTarget, symlinkPath)
+
+      const result = discoverPlugins('fit', testDir)
+      expect(result).toHaveLength(0)
+    })
+
+    it('accepts symlinks that resolve INSIDE the plugin dir (pnpm-style layout)', () => {
+      // pnpm uses symlinks within node_modules pointing to .pnpm/<pkg>@<ver>/...
+      // — those must keep working. Verify a same-dir-tree symlink is allowed.
+      if (platform() === 'win32') return
+
+      const fitDir = join(testDir, 'fit')
+      mkdirSync(fitDir, { recursive: true })
+
+      const realFile = join(fitDir, 'real-plugin.mjs')
+      writeFileSync(realFile, 'export const checks = []')
+
+      const symlinkPath = join(fitDir, 'aliased.mjs')
+      symlinkSync(realFile, symlinkPath)
+
+      const result = discoverPlugins('fit', testDir)
+      // Both the real file and the symlink should be discovered.
+      expect(result.length).toBeGreaterThanOrEqual(1)
+      expect(result.every(p => p.type === 'file')).toBe(true)
     })
   })
 

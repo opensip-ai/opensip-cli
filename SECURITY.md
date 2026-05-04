@@ -46,3 +46,22 @@ This policy covers:
 | Latest  | Yes       |
 
 We recommend always running the latest version.
+
+## Past advisories
+
+### 0.2.5 (2026-05-04) — Plugin discovery path traversal & symlink escape
+
+Affected: `@opensip-tools/core` and `@opensip-tools/cli` versions `< 0.2.5`.
+
+A user-controlled `.opensip-tools/fit/package.json` or a symlink planted in
+the plugin directory could cause the toolkit to dynamically import code
+from arbitrary paths outside the plugin sandbox. Additionally, plugin load
+failures did not fail the run, allowing a broken or malicious plugin to
+silently suppress checks while CI reported success.
+
+Fix: containment checks via `realpathSync` on all attacker-influenced paths
+in plugin discovery, plus rejection of dependency names containing `..`,
+leading `/`, or NUL bytes. Plugin load failures now propagate to a non-zero
+exit code.
+
+Upgrade to `0.2.5` or later. See `CHANGELOG.md` for full details.

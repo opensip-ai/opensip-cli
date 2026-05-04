@@ -4,6 +4,39 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.2.5] — 2026-05-04
+
+### Security
+
+Users on 0.2.4 and earlier should upgrade. Three issues in plugin discovery
+allowed code outside the plugin directory to be loaded and executed:
+
+- **Path traversal in plugin discovery** (`@opensip-tools/core`). A malicious
+  `.opensip-tools/fit/package.json` (or `~/.opensip-tools/fit/package.json`)
+  with a dependency key like `"../../etc/passwd"` would resolve outside the
+  plugins' `node_modules/` and the matching file could be dynamically
+  imported. Now: dependency names containing `..`, leading `/`, or NUL bytes
+  are rejected before any filesystem access, and resolved package paths are
+  containment-checked against `node_modules/` via `realpathSync`.
+- **Symlink follow in loose-file plugin discovery** (`@opensip-tools/core`).
+  A symlink in `~/.opensip-tools/fit/` (or a project-local plugin dir)
+  pointing to an arbitrary file outside the plugin dir would be loaded as a
+  plugin and dynamically imported. Now: loose-file plugin paths are
+  containment-checked against the plugin dir; pnpm-style symlinks that
+  resolve inside the plugin dir continue to work.
+- **Silent plugin load failure** (`@opensip-tools/cli`). When a plugin failed
+  to import, errors were printed to stderr but the run still exited 0 with
+  `passed: true` if no checks failed. A malicious or broken plugin could
+  therefore suppress its own checks (including compliance-required checks)
+  while CI reported success. Now: any plugin load error sets `passed: false`
+  and produces a non-zero exit code.
+
+### Tests
+
+- Added 5 regression tests in `core/src/plugins/__tests__/discover.test.ts`
+  covering `..` traversal, absolute-path names, NUL-byte names, escaping
+  symlinks, and pnpm-legitimate symlinks.
+
 ## [Unreleased]
 
 ### Added

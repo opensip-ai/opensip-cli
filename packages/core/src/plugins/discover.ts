@@ -4,8 +4,8 @@
  * Scans for npm packages in node_modules/ and loose .js/.mjs files.
  */
 
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
-import { join, basename, extname } from 'node:path'
+import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs'
+import { join, basename, extname, sep } from 'node:path'
 import { homedir } from 'node:os'
 
 import { logger } from '../lib/logger.js'
@@ -152,7 +152,33 @@ function discoverNpmPackages(nodeModulesDir: string, pluginDir: string): Discove
   if (declared.length === 0) return plugins
 
   for (const name of declared) {
+    // Reject names that could traverse before they ever touch the filesystem.
+    // The plugin dir's package.json is user-controlled (and edited directly
+    // by `plugin add` / hand edits), so dependency keys are an attacker-
+    // influenced input flowing into a path join.
+    if (name.length === 0 || name.includes('..') || name.startsWith('/') || name.includes('\0')) {
+      logger.warn({
+        evt: 'plugin.loader.discover.reject',
+        module: 'core:plugins',
+        reason: 'invalid dependency name',
+        name,
+      })
+      continue
+    }
     const packageDir = join(nodeModulesDir, name)
+    // Containment check: resolved path (after any symlinks) must stay inside
+    // node_modules. This catches both string-level traversal that survives
+    // path.join (none currently, but defense-in-depth) and symlink-based
+    // escapes if an attacker can plant a symlink in node_modules itself.
+    if (!isPathInside(packageDir, nodeModulesDir)) {
+      logger.warn({
+        evt: 'plugin.loader.discover.reject',
+        module: 'core:plugins',
+        reason: 'package path resolves outside node_modules',
+        name,
+      })
+      continue
+    }
     const plugin = tryDiscoverPackage(packageDir, name)
     if (plugin) plugins.push(plugin)
   }
@@ -259,6 +285,21 @@ function discoverLooseFiles(dir: string): DiscoveredPlugin[] {
     const fullPath = join(dir, entry)
     if (!safeIsFile(fullPath)) continue
 
+    // Containment check: a symlink in the plugin dir pointing outside it
+    // would otherwise be dynamically imported, executing arbitrary code from
+    // wherever the symlink leads. statSync follows symlinks (intentionally —
+    // pnpm uses symlinks inside node_modules for legitimate reasons), so we
+    // verify the real path stays inside the plugin dir.
+    if (!isPathInside(fullPath, dir)) {
+      logger.warn({
+        evt: 'plugin.loader.discover.reject',
+        module: 'core:plugins',
+        reason: 'loose file resolves outside plugin dir',
+        entry,
+      })
+      continue
+    }
+
     const name = basename(entry, ext)
 
     plugins.push({
@@ -290,4 +331,29 @@ function safeIsFile(path: string): boolean {
   } catch {
     return false
   }
+}
+
+/**
+ * Returns true iff `child`, after resolving symlinks, is the same path as
+ * `parent` or located inside it. Used as a security boundary check against
+ * attacker-influenced paths in plugin discovery: a malicious package.json
+ * dependency key (`"../../etc/passwd"`) or a symlink planted in the plugin
+ * dir would pass `existsSync` / `statSync` but fail this check.
+ *
+ * Both paths are resolved with `realpathSync`, so the comparison reflects
+ * the real filesystem location regardless of intermediate symlinks. If
+ * either path can't be resolved (doesn't exist, permission denied), we
+ * fail closed and return false.
+ */
+function isPathInside(child: string, parent: string): boolean {
+  let realChild: string
+  let realParent: string
+  try {
+    realChild = realpathSync(child)
+    realParent = realpathSync(parent)
+  } catch {
+    return false
+  }
+  if (realChild === realParent) return true
+  return realChild.startsWith(realParent + sep)
 }

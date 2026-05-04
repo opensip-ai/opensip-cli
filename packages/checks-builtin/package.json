@@ -1,6 +1,6 @@
 {
   "name": "@opensip-tools/checks-builtin",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "license": "MIT",
   "description": "Built-in fitness checks for opensip-tools",
   "repository": {

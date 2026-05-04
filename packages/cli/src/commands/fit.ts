@@ -22,9 +22,20 @@ import type { CliArgs } from '../types.js';
 // ---------------------------------------------------------------------------
 
 let checksLoaded = false;
+let pluginLoadErrors: readonly string[] = [];
 let getCheckDisplayName: (slug: string) => string = (slug) =>
   slug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 let getCheckIcon: (slug: string) => string = () => '\uD83D\uDD0D';
+
+/**
+ * Plugin load errors recorded during the most recent ensureChecksLoaded() call.
+ * Read by runFit to fail the run if any plugin failed to import \u2014 otherwise a
+ * malicious or broken plugin could silently suppress its own checks while the
+ * CLI exits 0, masking a compliance failure or a supply-chain compromise.
+ */
+export function getPluginLoadErrors(): readonly string[] {
+  return pluginLoadErrors;
+}
 
 /**
  * Install declared project-local plugins when the `.opensip-tools/<domain>/
@@ -102,6 +113,7 @@ export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
   //    resolvePluginDir picks the default.
   const { loadAllPlugins } = await import('@opensip-tools/core');
   const pluginResult = await loadAllPlugins('fit', undefined, projectDir);
+  pluginLoadErrors = pluginResult.errors;
   if (pluginResult.errors.length > 0) {
     // Surface plugin load errors to the user. The logger is silenced in
     // normal CLI runs, so a structured-log-only failure was invisible
@@ -296,7 +308,7 @@ export async function executeFit(
     timestamp: new Date().toISOString(),
     recipe: recipeName,
     score,
-    passed: summary.failedChecks === 0,
+    passed: summary.failedChecks === 0 && pluginLoadErrors.length === 0,
     summary: {
       total: summary.totalChecks,
       passed: summary.passedChecks,
@@ -368,6 +380,7 @@ export async function executeFit(
   const failOnErrors = signalersConfig?.fitness.failOnErrors ?? 1;
   const failOnWarnings = signalersConfig?.fitness.failOnWarnings ?? 0;
   const shouldFail =
+    pluginLoadErrors.length > 0 ||
     (failOnErrors > 0 && summary.totalErrors >= failOnErrors) ||
     (failOnWarnings > 0 && summary.totalWarnings >= failOnWarnings);
 
