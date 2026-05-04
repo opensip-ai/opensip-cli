@@ -77,4 +77,23 @@ describe('withRetry', () => {
       withRetry(fn, { maxAttempts: 1 }),
     ).rejects.toThrow('string error');
   });
+
+  it('runs at least once when maxAttempts is 0', async () => {
+    const fn = vi.fn().mockResolvedValue('ok');
+    const result = await withRetry(fn, { maxAttempts: 0 });
+    expect(result).toBe('ok');
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it('throws the underlying error (not undefined) when maxAttempts is NaN', async () => {
+    // Math.max(1, NaN) returns NaN, so without the Number.isFinite guard the
+    // for-loop never ran and `throw lastError!` propagated `undefined`.
+    const fn = vi.fn().mockRejectedValue(new Error('boom'));
+
+    await expect(
+      withRetry(fn, { maxAttempts: NaN, initialDelayMs: 10 }),
+    ).rejects.toThrow('boom');
+
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
 });

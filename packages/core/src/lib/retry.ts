@@ -32,7 +32,14 @@ export async function withRetry<T>(
     onRetry,
   } = options;
 
-  const effectiveMaxAttempts = Math.max(1, maxAttempts);
+  // Floor defensively against zero/negative/NaN/non-integer values. Math.max(1, NaN)
+  // returns NaN per spec, so an unguarded `Math.max(1, maxAttempts)` would let
+  // NaN reach the loop condition (attempt <= NaN is false) and throw
+  // `undefined` for `lastError!`. Compare against effectiveMaxAttempts everywhere
+  // so the original maxAttempts can never re-enter the comparison.
+  const effectiveMaxAttempts = Number.isFinite(maxAttempts)
+    ? Math.max(1, Math.floor(maxAttempts))
+    : 1;
   let lastError: Error | undefined;
 
   for (let attempt = 1; attempt <= effectiveMaxAttempts; attempt++) {
@@ -41,7 +48,7 @@ export async function withRetry<T>(
     } catch (e) {
       lastError = e instanceof Error ? e : new Error(String(e));
 
-      if (attempt >= maxAttempts) break;
+      if (attempt >= effectiveMaxAttempts) break;
 
       // Exponential backoff with jitter
       const baseDelay = initialDelayMs * Math.pow(backoffMultiplier, attempt - 1);
