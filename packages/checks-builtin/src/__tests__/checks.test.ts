@@ -434,19 +434,61 @@ describe('throws-documentation refinements', () => {
     expect(result.warnings).toBe(0);
   });
 
-  it('does not flag throws of project-defined typed errors with extended suffixes', async () => {
-    const file = path.join(tmpDir, 'typed.ts');
+  it('does not flag throws of generic typed errors covered by built-in suffixes', async () => {
+    // ValidationApiError ends with `ApiError`, NetworkError matches NetworkError —
+    // both are kept as built-in defaults because they are generic enough that any
+    // project may use them.
+    const file = path.join(tmpDir, 'typed-generic.ts');
     fs.writeFileSync(
       file,
-      `class CanonicalizationError extends Error {}
-       class ValidationApiError extends Error {}
-       class CompositionError extends Error {}
-       export function a() { throw new CanonicalizationError(); }
-       export function b() { throw new ValidationApiError(); }
-       export function c() { throw new CompositionError(); }`,
+      `class ValidationApiError extends Error {}
+       class GitNetworkError extends Error {}
+       export function a() { throw new ValidationApiError(); }
+       export function b() { throw new GitNetworkError(); }`,
     );
     const result = await check!.run(tmpDir, { targetFiles: [file] });
     expect(result.warnings).toBe(0);
+  });
+
+  it('flags project-specific suffixes (CompositionError) by default — moved to recipe config', async () => {
+    // CompositionError / CanonicalizationError are opensip-specific suffixes;
+    // they are no longer built-in defaults. Without recipe config they are
+    // treated as undocumented throws.
+    const file = path.join(tmpDir, 'typed-project.ts');
+    fs.writeFileSync(
+      file,
+      `class CanonicalizationError extends Error {}
+       class CompositionError extends Error {}
+       export function a() { throw new CanonicalizationError(); }
+       export function b() { throw new CompositionError(); }`,
+    );
+    const result = await check!.run(tmpDir, { targetFiles: [file] });
+    expect(result.warnings).toBeGreaterThan(0);
+  });
+
+  it('does not flag project-specific suffixes when augmented via recipe config', async () => {
+    const { setCurrentRecipeCheckConfig, clearCurrentRecipeCheckConfig } = await import(
+      '@opensip-tools/core'
+    );
+    setCurrentRecipeCheckConfig({
+      'throws-documentation': {
+        additionalSelfDocumentingSuffixes: ['CompositionError', 'CanonicalizationError'],
+      },
+    });
+    try {
+      const file = path.join(tmpDir, 'typed-project-augmented.ts');
+      fs.writeFileSync(
+        file,
+        `class CanonicalizationError extends Error {}
+         class CompositionError extends Error {}
+         export function a() { throw new CanonicalizationError(); }
+         export function b() { throw new CompositionError(); }`,
+      );
+      const result = await check!.run(tmpDir, { targetFiles: [file] });
+      expect(result.warnings).toBe(0);
+    } finally {
+      clearCurrentRecipeCheckConfig();
+    }
   });
 
   it('still flags genuinely undocumented `throw new Error(...)`', async () => {

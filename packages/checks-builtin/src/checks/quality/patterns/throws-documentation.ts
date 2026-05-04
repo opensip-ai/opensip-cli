@@ -10,8 +10,21 @@
 
 import * as ts from 'typescript'
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/core'
+import { defineCheck, getCheckConfig, type CheckViolation } from '@opensip-tools/core'
 import { getSharedSourceFile } from '@opensip-tools/core/framework/parse-cache.js'
+
+/**
+ * Recipe-config shape for throws-documentation. Project-specific typed-error
+ * suffixes (e.g. opensip's `CompositionError`, `CanonicalizationError`)
+ * belong in a recipe's `checks.config['throws-documentation']` block, not
+ * in built-in defaults.
+ */
+export interface ThrowsDocConfig extends Record<string, unknown> {
+  /** Class-name suffixes that mark a thrown error as self-documenting. */
+  additionalSelfDocumentingSuffixes?: readonly string[]
+}
+
+const THROWS_DOC_SLUG = 'throws-documentation'
 
 // =============================================================================
 // TYPES
@@ -25,6 +38,8 @@ interface FileAnalysisContext {
   sourceFile: ts.SourceFile
   content: string
   filePath: string
+  /** Effective self-documenting suffix list (built-in + recipe config). */
+  selfDocumentingSuffixes: readonly string[]
 }
 
 // =============================================================================
@@ -224,21 +239,9 @@ const SELF_DOCUMENTING_SUFFIXES = [
   'ApplicationError',
   'OperationError',
   'ErrorBuilder', // Builder pattern for typed errors
-  // Additional project-defined error families (verified in opensip codebase):
-  // CompositionError, CompositeError, NetworkError, CanonicalizationError,
-  // TransformError, VersioningError, BudgetExceededError, IdSystemError,
-  // IdValidationError, AssessmentExecutionError, DiffCaptureError,
-  // IllegalRunTransitionError, PluginLoadError, TicketNotFoundError,
-  // HmacVerifyError, ValidationApiError, BestEffortSyncStateError,
-  // IntelligentError, DefaultError, SimpleError
-  'CompositionError',
-  'CompositeError',
+  // Generic-sounding suffixes any project may use:
   'NetworkError',
-  'CanonicalizationError',
-  'TransformError',
-  'VersioningError',
   'ExecutionError',
-  'TransitionError',
   'LoadError',
   'VerifyError',
   'ApiError',
@@ -257,15 +260,28 @@ const SELF_DOCUMENTING_SUFFIXES = [
   'DataIntegrityError',
   'BusinessRuleError',
   'InputValidationError',
+  // NOTE: opensip-specific suffixes — `CompositionError`, `CompositeError`,
+  // `CanonicalizationError`, `TransformError`, `VersioningError`,
+  // `TransitionError` — are NOT defaults. They live in opensip's recipe
+  // under `checks.config['throws-documentation'].additionalSelfDocumentingSuffixes`.
 ]
 
-function isSelfDocumentingError(errorType: string): boolean {
+/**
+ * Build the effective self-documenting suffix list by merging built-in
+ * defaults with the recipe config slice. Called per-file from the analyze entry.
+ */
+function buildEffectiveSuffixes(): readonly string[] {
+  const cfg = getCheckConfig<ThrowsDocConfig>(THROWS_DOC_SLUG)
+  return [...SELF_DOCUMENTING_SUFFIXES, ...(cfg.additionalSelfDocumentingSuffixes ?? [])]
+}
+
+function isSelfDocumentingError(errorType: string, suffixes: readonly string[]): boolean {
   // Check exact match
   if (SELF_DOCUMENTING_ERRORS.has(errorType)) {
     return true
   }
   // Check if it ends with known self-documenting patterns
-  return SELF_DOCUMENTING_SUFFIXES.some((suffix) => errorType.endsWith(suffix))
+  return suffixes.some((suffix) => errorType.endsWith(suffix))
 }
 
 /**
@@ -353,13 +369,14 @@ function shouldAnalyzeFunction(node: FunctionLikeNode, funcName: string): boolea
 function allThrowsSelfDocumenting(
   throwStatements: ts.ThrowStatement[],
   sourceFile: ts.SourceFile,
+  suffixes: readonly string[],
 ): boolean {
   if (!Array.isArray(throwStatements) || throwStatements.length === 0) {
     return false
   }
   return throwStatements.every((stmt) => {
     const errorType = extractThrownType(stmt, sourceFile)
-    return isSelfDocumentingError(errorType)
+    return isSelfDocumentingError(errorType, suffixes)
   })
 }
 
@@ -508,7 +525,7 @@ function analyzeFunctionNode(
   }
 
   // Skip if all throws are self-documenting typed errors
-  if (allThrowsSelfDocumenting(throwStatements, ctx.sourceFile)) {
+  if (allThrowsSelfDocumenting(throwStatements, ctx.sourceFile, ctx.selfDocumentingSuffixes)) {
     return null
   }
 
@@ -591,6 +608,7 @@ export const throwsDocumentation = defineCheck({
       sourceFile,
       content,
       filePath,
+      selfDocumentingSuffixes: buildEffectiveSuffixes(),
     })
   },
 })
