@@ -372,6 +372,42 @@ describe('null-safety refinements', () => {
     const result = await check!.run(tmpDir, { targetFiles: [file] });
     expect(result.warnings).toBeGreaterThan(0);
   });
+
+  it('flags project-specific paths (/dbos/schema) by default — moved to recipe config', async () => {
+    const file = path.join(tmpDir, 'pkg', 'dbos', 'schema-tables.ts');
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(
+      file,
+      `declare function lookup(): { value: number } | null;
+       export const v = lookup().value;`,
+    );
+    const result = await check!.run(tmpDir, { targetFiles: [file] });
+    expect(result.warnings).toBeGreaterThan(0);
+  });
+
+  it('skips project-specific paths when augmented via recipe config', async () => {
+    const { setCurrentRecipeCheckConfig, clearCurrentRecipeCheckConfig } = await import(
+      '@opensip-tools/core'
+    );
+    setCurrentRecipeCheckConfig({
+      'null-safety': {
+        additionalSafeNullPaths: ['/dbos/schema'],
+      },
+    });
+    try {
+      const file = path.join(tmpDir, 'pkg', 'dbos', 'schema-tables-augmented.ts');
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(
+        file,
+        `declare function lookup(): { value: number } | null;
+         export const v = lookup().value;`,
+      );
+      const result = await check!.run(tmpDir, { targetFiles: [file] });
+      expect(result.warnings).toBe(0);
+    } finally {
+      clearCurrentRecipeCheckConfig();
+    }
+  });
 });
 
 describe('throws-documentation refinements', () => {

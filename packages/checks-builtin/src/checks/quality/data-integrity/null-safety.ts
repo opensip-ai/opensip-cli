@@ -6,9 +6,24 @@
 
 import * as ts from 'typescript'
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/core'
+import { defineCheck, getCheckConfig, type CheckViolation } from '@opensip-tools/core'
 import { getSharedSourceFile } from '@opensip-tools/core/framework/parse-cache.js'
 import { isTestFile } from '../../../utils/index.js'
+
+/**
+ * Recipe-config shape for null-safety. Project-specific safe-by-construction
+ * paths (e.g. opensip's `/dbos/schema`) belong in a recipe's
+ * `checks.config['null-safety']` block, not in built-in defaults.
+ */
+export interface NullSafetyConfig extends Record<string, unknown> {
+  /**
+   * Additional path patterns whose files are skipped entirely. Each entry
+   * is compiled to a case-insensitive RegExp via `new RegExp(entry, 'i')`.
+   */
+  additionalSafeNullPaths?: readonly string[]
+}
+
+const NULL_SAFETY_SLUG = 'null-safety'
 
 /**
  * Patterns that indicate the access is already protected
@@ -545,16 +560,26 @@ function isFluentChain(node: ts.PropertyAccessExpression): boolean {
  *   schema declarations are pure column/shape builders. No runtime null-access
  *   surface to protect.
  */
-const SAFE_NULL_PATHS: RegExp[] = [
+const SAFE_NULL_PATHS: readonly RegExp[] = [
   /\/di\/fragment\.ts$/,
   /\/di\/fragments\//,
   /\/schema\//,
   /-schema\.ts$/,
-  /\/dbos\/schema/,
+  // NOTE: opensip's `/dbos/schema` path is NOT a default. DBOS is a
+  // published library, but the path layout is opensip's convention. It
+  // lives in opensip's recipe under
+  // `checks.config['null-safety'].additionalSafeNullPaths`.
 ]
 
-function isSafeNullPath(filePath: string): boolean {
-  return SAFE_NULL_PATHS.some((p) => p.test(filePath))
+/** Merge built-in defaults with the recipe-config slice. */
+function buildEffectiveSafePaths(): readonly RegExp[] {
+  const cfg = getCheckConfig<NullSafetyConfig>(NULL_SAFETY_SLUG)
+  const extras = (cfg.additionalSafeNullPaths ?? []).map((src) => new RegExp(src, 'i'))
+  return [...SAFE_NULL_PATHS, ...extras]
+}
+
+function isSafeNullPath(filePath: string, paths: readonly RegExp[]): boolean {
+  return paths.some((p) => p.test(filePath))
 }
 
 /**
@@ -566,8 +591,10 @@ function isSafeNullPath(filePath: string): boolean {
 function analyzeFile(content: string, filePath: string): CheckViolation[] {
   const violations: CheckViolation[] = []
 
-  // Skip safe-by-construction path families (DI fragments + schema declarations)
-  if (isSafeNullPath(filePath)) return violations
+  // Skip safe-by-construction path families (DI fragments + schema declarations).
+  // Built-in defaults are merged with the recipe-config slice once per file.
+  const safePaths = buildEffectiveSafePaths()
+  if (isSafeNullPath(filePath, safePaths)) return violations
 
   try {
     const sourceFile = getSharedSourceFile(filePath, content)
