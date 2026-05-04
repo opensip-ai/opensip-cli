@@ -102,6 +102,7 @@ export function saveBaseline(output: CliOutput, baselinePath: string): void {
   const findingCount = output.checks.reduce((n, c) => n + c.findings.length, 0);
   logger.info({
     evt: 'cli.gate.save.complete',
+    module: 'cli:gate',
     baselinePath,
     findingCount,
     checkCount: output.checks.length,
@@ -166,6 +167,7 @@ export function compareToBaseline(output: CliOutput, baselinePath: string): Gate
 
   logger.info({
     evt: 'cli.gate.compare.complete',
+    module: 'cli:gate',
     baselinePath,
     addedCount: added.length,
     resolvedCount: resolved.length,

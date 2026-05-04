@@ -181,7 +181,6 @@ function analyzeFile(content: string, filePath: string): CheckViolation[] {
     }
 
     const visit = (node: ts.Node): void => {
-      logger.debug('Visiting AST node')
       if (ts.isClassDeclaration(node) && node.name) {
         checkClassForMock(node)
       }

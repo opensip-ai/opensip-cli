@@ -324,6 +324,12 @@ program
     // --gate-save / --gate-compare — architecture gate (always headless; output to stdout, exit code is the gate decision).
     if (args.gateSave === true || args.gateCompare === true) {
       if (args.gateSave === true && args.gateCompare === true) {
+        logger.warn({
+          evt: 'cli.gate.config_error',
+          module: 'cli:gate',
+          reason: 'mutually-exclusive flags',
+          msg: '--gate-save and --gate-compare specified together',
+        });
         process.exitCode = EXIT_CODES.CONFIGURATION_ERROR;
         process.stderr.write('Error: --gate-save and --gate-compare are mutually exclusive.\n');
         return;
@@ -331,6 +337,13 @@ program
       const baselinePath = args.baseline ?? DEFAULT_BASELINE_PATH;
       const fitResult = await executeFit(args);
       if (fitResult.result.type !== 'fit-done') {
+        logger.warn({
+          evt: 'cli.gate.fit_failed',
+          module: 'cli:gate',
+          mode: args.gateSave === true ? 'save' : 'compare',
+          baselinePath,
+          reason: fitResult.result.message,
+        });
         process.exitCode = fitResult.result.exitCode;
         process.stderr.write(`Error: ${fitResult.result.message}\n`);
         return;
@@ -353,6 +366,14 @@ program
         return;
       } catch (err) {
         if (err instanceof GateBaselineMissingError || err instanceof GateBaselineInvalidError) {
+          logger.warn({
+            evt: 'cli.gate.baseline_error',
+            module: 'cli:gate',
+            mode: args.gateSave === true ? 'save' : 'compare',
+            baselinePath,
+            errorType: err.name,
+            reason: err.message,
+          });
           process.exitCode = EXIT_CODES.CONFIGURATION_ERROR;
           process.stderr.write(`Error: ${err.message}\n`);
           return;
