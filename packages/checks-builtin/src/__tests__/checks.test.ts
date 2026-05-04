@@ -613,3 +613,162 @@ describe('fastify-schema-coverage refinements', () => {
     expect(bodySchemaFindings.length).toBeGreaterThan(0);
   });
 });
+
+describe('context-leakage AST refinements', () => {
+  const check = checks.find((c) => c.config.slug === 'context-leakage');
+  let tmpDir: string;
+
+  beforeAll(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'context-leakage-test-'));
+  });
+  afterAll(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('flags module-level `let activeContext: RequestContext | null = null`', async () => {
+    const file = path.join(tmpDir, 'leak-module.ts');
+    fs.writeFileSync(
+      file,
+      [
+        'interface RequestContext { tenantId: string }',
+        'let activeContext: RequestContext | null = null;',
+        'export function setCtx(c: RequestContext) { activeContext = c; }',
+      ].join('\n'),
+    );
+    const result = await check!.run(tmpDir, { targetFiles: [file] });
+    expect(result.warnings).toBeGreaterThan(0);
+  });
+
+  it('flags class field `private context: RequestContext` on a request-scoped class', async () => {
+    const file = path.join(tmpDir, 'leak-class.ts');
+    fs.writeFileSync(
+      file,
+      [
+        'interface RequestContext { foo: string }',
+        'export class RequestHandler {',
+        '  private context!: RequestContext;',
+        '  async handle(tenantId: string): Promise<void> {',
+        '    void tenantId; void this.context;',
+        '  }',
+        '}',
+      ].join('\n'),
+    );
+    const result = await check!.run(tmpDir, { targetFiles: [file] });
+    expect(result.warnings).toBeGreaterThan(0);
+  });
+
+  it('does NOT flag module-level `let counter: Counter | null = null` (OTel lazy init)', async () => {
+    const file = path.join(tmpDir, 'metric.ts');
+    fs.writeFileSync(
+      file,
+      [
+        'declare type Counter = unknown;',
+        'declare type Histogram = unknown;',
+        'let agentContextChars: Histogram | null = null;',
+        'let agentContextWindowed: Counter | null = null;',
+        'export function ensure() { agentContextChars = {} as Histogram; void agentContextWindowed; }',
+      ].join('\n'),
+    );
+    const result = await check!.run(tmpDir, { targetFiles: [file] });
+    expect(result.warnings).toBe(0);
+  });
+
+  it('does NOT flag class field whose type is `SyncStrategy<InitialSyncContext>` (type-only generic arg)', async () => {
+    const file = path.join(tmpDir, 'sync-strategy.ts');
+    fs.writeFileSync(
+      file,
+      [
+        'declare type SyncStrategy<T> = { apply(): T };',
+        'declare type InitialSyncContext = { kind: "initial" };',
+        'export class BoundInitialStrategy {',
+        '  private inner!: SyncStrategy<InitialSyncContext>;',
+        '  // Class is request-scoped enough to fail naive class-field detection.',
+        '  async handle(tenantId: string): Promise<void> { void tenantId; void this.inner; }',
+        '}',
+      ].join('\n'),
+    );
+    const result = await check!.run(tmpDir, { targetFiles: [file] });
+    expect(result.warnings).toBe(0);
+  });
+
+  it('does NOT flag method-parameter type `(ctx: SomeContext) => …`', async () => {
+    const file = path.join(tmpDir, 'method-param.ts');
+    fs.writeFileSync(
+      file,
+      [
+        'interface SomeContext { foo: string }',
+        'export class Strategy {',
+        '  async handle(tenantId: string, ctx: SomeContext): Promise<void> { void tenantId; void ctx; }',
+        '}',
+      ].join('\n'),
+    );
+    const result = await check!.run(tmpDir, { targetFiles: [file] });
+    expect(result.warnings).toBe(0);
+  });
+
+  it('does NOT flag function-local `let ctx = …`', async () => {
+    const file = path.join(tmpDir, 'local-let.ts');
+    fs.writeFileSync(
+      file,
+      [
+        'export function run() {',
+        '  let ctx: { x: number } | null = null;',
+        '  ctx = { x: 1 };',
+        '  return ctx;',
+        '}',
+      ].join('\n'),
+    );
+    const result = await check!.run(tmpDir, { targetFiles: [file] });
+    expect(result.warnings).toBe(0);
+  });
+
+  it('does NOT flag DBOS step `static ctx: SharedPipelineContext` (skip-by-path)', async () => {
+    const file = path.join(tmpDir, 'pkg', 'sip', 'src', 'dbos', 'steps', 'review.ts');
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(
+      file,
+      [
+        'interface SharedPipelineContext { foo: string }',
+        'export class ReviewSteps {',
+        '  static ctx!: SharedPipelineContext;',
+        '  static init(ctx: SharedPipelineContext) { ReviewSteps.ctx = ctx; }',
+        '}',
+      ].join('\n'),
+    );
+    const result = await check!.run(tmpDir, { targetFiles: [file] });
+    expect(result.warnings).toBe(0);
+  });
+
+  it('does NOT flag DBOS step host (decorator-based detection, outside skip path)', async () => {
+    const file = path.join(tmpDir, 'step-decorated.ts');
+    fs.writeFileSync(
+      file,
+      [
+        'declare const DBOS: { step: () => MethodDecorator };',
+        'interface SharedPipelineContext { foo: string }',
+        'export class FixSteps {',
+        '  static ctx!: SharedPipelineContext;',
+        '  @DBOS.step()',
+        '  static async run(tenantId: string): Promise<void> { void tenantId; }',
+        '}',
+      ].join('\n'),
+    );
+    const result = await check!.run(tmpDir, { targetFiles: [file] });
+    expect(result.warnings).toBe(0);
+  });
+
+  it('does NOT flag AsyncLocalStorage-typed declarations', async () => {
+    const file = path.join(tmpDir, 'als.ts');
+    fs.writeFileSync(
+      file,
+      [
+        'declare class AsyncLocalStorage<T> { run(s: T, fn: () => void): void }',
+        'interface RequestContext { id: string }',
+        'export const requestContextStore = new AsyncLocalStorage<RequestContext>();',
+        'export let backupStore: AsyncLocalStorage<RequestContext> | null = null;',
+      ].join('\n'),
+    );
+    const result = await check!.run(tmpDir, { targetFiles: [file] });
+    expect(result.warnings).toBe(0);
+  });
+});
