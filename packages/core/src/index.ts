@@ -19,6 +19,8 @@ export {
   isLiteral, isPropertyAccess,
 } from './framework/ast-utilities.js';
 export { execAbortable } from './framework/abortable-exec.js';
+export { buildImportGraph, findStronglyConnectedComponents } from './framework/import-graph.js';
+export type { ImportGraph } from './framework/import-graph.js';
 export { isInsideStringLiteral } from './framework/strip-literals.js';
 export { filterContent, clearFilterCache } from './framework/content-filter.js';
 export type { FilteredContent } from './framework/content-filter.js';

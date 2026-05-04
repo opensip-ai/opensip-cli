@@ -920,3 +920,115 @@ describe('context-leakage AST refinements', () => {
     expect(result.warnings).toBe(0);
   });
 });
+
+// =============================================================================
+// circular-import-detection — Phase 3 of architecture-gate-capability plan
+// =============================================================================
+
+describe('circular-import-detection', () => {
+  const check = checks.find((c) => c.config.slug === 'circular-import-detection');
+  let tmpDir: string;
+
+  beforeAll(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'circular-import-test-'));
+  });
+  afterAll(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('exists', () => {
+    expect(check).toBeDefined();
+  });
+
+  it('passes a project with no cycles', async () => {
+    const a = path.join(tmpDir, 'no-cycle-a.ts');
+    const b = path.join(tmpDir, 'no-cycle-b.ts');
+    fs.writeFileSync(a, `import {} from './no-cycle-b'`);
+    fs.writeFileSync(b, `export const x = 1`);
+    const result = await check!.run(tmpDir, { targetFiles: [a, b] });
+    expect(result.errors).toBe(0);
+    expect(result.passed).toBe(true);
+  });
+
+  it('detects a 2-file cycle', async () => {
+    const a = path.join(tmpDir, 'cycle-a.ts');
+    const b = path.join(tmpDir, 'cycle-b.ts');
+    fs.writeFileSync(a, `import type {} from './cycle-b'`);
+    fs.writeFileSync(b, `import type {} from './cycle-a'`);
+    const result = await check!.run(tmpDir, { targetFiles: [a, b] });
+    expect(result.errors).toBeGreaterThan(0);
+    expect(result.passed).toBe(false);
+  });
+
+  it('detects a 3-file cycle', async () => {
+    const a = path.join(tmpDir, 'tri-a.ts');
+    const b = path.join(tmpDir, 'tri-b.ts');
+    const c = path.join(tmpDir, 'tri-c.ts');
+    fs.writeFileSync(a, `import type {} from './tri-b'`);
+    fs.writeFileSync(b, `import type {} from './tri-c'`);
+    fs.writeFileSync(c, `import type {} from './tri-a'`);
+    const result = await check!.run(tmpDir, { targetFiles: [a, b, c] });
+    expect(result.errors).toBe(1); // one cycle, one violation
+  });
+});
+
+// =============================================================================
+// module-coupling-fan-out — Phase 4 of architecture-gate-capability plan
+// =============================================================================
+
+describe('module-coupling-fan-out', () => {
+  const check = checks.find((c) => c.config.slug === 'module-coupling-fan-out');
+  let tmpDir: string;
+
+  beforeAll(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fan-out-test-'));
+  });
+  afterAll(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('exists', () => {
+    expect(check).toBeDefined();
+  });
+
+  it('passes files with low fan-out (≤ 15)', async () => {
+    // 5 leaf files + 1 importer that imports 5 of them — well under threshold.
+    const leaves = Array.from({ length: 5 }, (_, i) => path.join(tmpDir, `leaf-low-${i}.ts`));
+    leaves.forEach((p, i) => fs.writeFileSync(p, `export const x${i} = ${i}`));
+    const importer = path.join(tmpDir, 'low-fan.ts');
+    fs.writeFileSync(
+      importer,
+      leaves.map((p) => `import {} from './${path.basename(p, '.ts')}'`).join('\n'),
+    );
+    const result = await check!.run(tmpDir, { targetFiles: [importer, ...leaves] });
+    expect(result.errors).toBe(0);
+    expect(result.warnings).toBe(0);
+  });
+
+  it('warns at fan-out > 15 (warning threshold)', async () => {
+    // 20 leaves → 20-edge fan-out → warning
+    const leaves = Array.from({ length: 20 }, (_, i) => path.join(tmpDir, `leaf-warn-${i}.ts`));
+    leaves.forEach((p, i) => fs.writeFileSync(p, `export const x${i} = ${i}`));
+    const importer = path.join(tmpDir, 'warn-fan.ts');
+    fs.writeFileSync(
+      importer,
+      leaves.map((p) => `import {} from './${path.basename(p, '.ts')}'`).join('\n'),
+    );
+    const result = await check!.run(tmpDir, { targetFiles: [importer, ...leaves] });
+    expect(result.warnings).toBeGreaterThan(0);
+    expect(result.errors).toBe(0);
+  });
+
+  it('errors at fan-out > 30 (error threshold)', async () => {
+    // 35 leaves → 35-edge fan-out → error
+    const leaves = Array.from({ length: 35 }, (_, i) => path.join(tmpDir, `leaf-err-${i}.ts`));
+    leaves.forEach((p, i) => fs.writeFileSync(p, `export const x${i} = ${i}`));
+    const importer = path.join(tmpDir, 'err-fan.ts');
+    fs.writeFileSync(
+      importer,
+      leaves.map((p) => `import {} from './${path.basename(p, '.ts')}'`).join('\n'),
+    );
+    const result = await check!.run(tmpDir, { targetFiles: [importer, ...leaves] });
+    expect(result.errors).toBeGreaterThan(0);
+  });
+});
