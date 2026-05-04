@@ -8,6 +8,7 @@
 import * as ts from 'typescript'
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/core'
+import { getSharedSourceFile } from '@opensip-tools/core/framework/parse-cache.js'
 
 /**
  * Patterns that suggest an API-related type
@@ -20,13 +21,8 @@ const API_TYPE_PATTERNS = [/Request$/, /Response$/, /Payload$/, /DTO$/, /ApiErro
 function analyzeFile(content: string, filePath: string): CheckViolation[] {
   const violations: CheckViolation[] = []
 
-  const sourceFile = ts.createSourceFile(
-    filePath,
-    content,
-    ts.ScriptTarget.Latest,
-    true,
-    filePath.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
-  )
+  const sourceFile = getSharedSourceFile(filePath, content)
+  if (!sourceFile) return violations
 
   const visitNode = (node: ts.Node): void => {
     ts.forEachChild(node, visitNode)

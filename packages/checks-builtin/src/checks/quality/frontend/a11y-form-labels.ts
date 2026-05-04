@@ -8,6 +8,7 @@
 import * as ts from 'typescript'
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/core'
+import { getSharedSourceFile } from '@opensip-tools/core/framework/parse-cache.js'
 
 /**
  * Form input components that should have accessibility labels.
@@ -40,13 +41,8 @@ function analyzeFile(content: string, filePath: string): CheckViolation[] {
 
   const violations: CheckViolation[] = []
 
-  const sourceFile = ts.createSourceFile(
-    filePath,
-    content,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TSX,
-  )
+  const sourceFile = getSharedSourceFile(filePath, content)
+  if (!sourceFile) return violations
 
   const visit = (node: ts.Node): void => {
     if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {

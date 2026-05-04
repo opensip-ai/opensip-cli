@@ -13,6 +13,7 @@
  */
 
 import * as ts from 'typescript'
+import { getSharedSourceFile } from '@opensip-tools/core/framework/parse-cache.js'
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/core'
 
@@ -320,13 +321,8 @@ function analyzeFile(content: string, filePath: string): CheckViolation[] {
   }
 
   try {
-    const sourceFile = ts.createSourceFile(
-      filePath,
-      content,
-      ts.ScriptTarget.Latest,
-      true,
-      ts.ScriptKind.TSX,
-    )
+    const sourceFile = getSharedSourceFile(filePath, content)
+    if (!sourceFile) return []
 
     // Collect all components wrapped in React.memo within this file
     const memoizedNames = collectMemoizedComponents(sourceFile)

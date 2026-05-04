@@ -5,6 +5,8 @@
 
 import * as ts from 'typescript'
 
+import { getSharedSourceFile } from '@opensip-tools/core/framework/parse-cache.js'
+
 import type { LoggerCall } from './types.js'
 
 /** Logger method names we recognize as logging calls */
@@ -29,19 +31,18 @@ export function detectLoggerCalls(
   startLine: number,
   endLine: number,
 ): LoggerCall[] {
-  const sourceFile = ts.createSourceFile(
-    filePath,
-    content,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TS,
-  )
+  const sourceFile = getSharedSourceFile(filePath, content)
+  if (!sourceFile) return []
+  // Local non-nullable alias so the nested `visit` function declaration —
+  // which TypeScript treats as hoisted and therefore non-narrowing — can
+  // still see a non-null SourceFile.
+  const sf = sourceFile
 
   const calls: LoggerCall[] = []
 
   function visit(node: ts.Node): void {
     if (ts.isCallExpression(node)) {
-      const call = extractLoggerCall(node, sourceFile, startLine, endLine)
+      const call = extractLoggerCall(node, sf, startLine, endLine)
       if (call) {
         calls.push(call)
       }
@@ -50,7 +51,7 @@ export function detectLoggerCalls(
     ts.forEachChild(node, visit)
   }
 
-  ts.forEachChild(sourceFile, visit)
+  ts.forEachChild(sf, visit)
 
   return calls
 }

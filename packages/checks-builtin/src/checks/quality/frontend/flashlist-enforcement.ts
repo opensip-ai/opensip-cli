@@ -8,6 +8,7 @@
 import * as ts from 'typescript'
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/core'
+import { getSharedSourceFile } from '@opensip-tools/core/framework/parse-cache.js'
 
 /**
  * Options for checking FlatList usage
@@ -99,13 +100,8 @@ function analyzeFile(content: string, filePath: string): CheckViolation[] {
   }
 
   try {
-    const sourceFile = ts.createSourceFile(
-      filePath,
-      content,
-      ts.ScriptTarget.Latest,
-      true,
-      filePath.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
-    )
+    const sourceFile = getSharedSourceFile(filePath, content)
+    if (!sourceFile) return violations
 
     const visitNode = (node: ts.Node): void => {
       checkFlatListImport({ node, sourceFile, filePath, violations })

@@ -6,6 +6,7 @@
  */
 
 import * as ts from 'typescript'
+import { getSharedSourceFile } from '@opensip-tools/core/framework/parse-cache.js'
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/core'
 
@@ -39,13 +40,8 @@ function analyzeFile(content: string, filePath: string): CheckViolation[] {
   const disabledLines = findDisabledLines(content)
 
   try {
-    const sourceFile = ts.createSourceFile(
-      filePath,
-      content,
-      ts.ScriptTarget.Latest,
-      true,
-      filePath.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
-    )
+    const sourceFile = getSharedSourceFile(filePath, content)
+    if (!sourceFile) return violations
 
     const visit = (node: ts.Node): void => {
       if (node.kind === ts.SyntaxKind.AnyKeyword) {

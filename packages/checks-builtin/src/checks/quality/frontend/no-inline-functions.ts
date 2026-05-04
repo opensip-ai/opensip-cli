@@ -9,6 +9,7 @@
 import * as ts from 'typescript'
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/core'
+import { getSharedSourceFile } from '@opensip-tools/core/framework/parse-cache.js'
 
 /**
  * High-impact callback props that definitely should not have inline functions
@@ -82,13 +83,8 @@ function analyzeFile(content: string, filePath: string): CheckViolation[] {
   const violations: CheckViolation[] = []
 
   try {
-    const sourceFile = ts.createSourceFile(
-      filePath,
-      content,
-      ts.ScriptTarget.Latest,
-      true,
-      ts.ScriptKind.TSX,
-    )
+    const sourceFile = getSharedSourceFile(filePath, content)
+    if (!sourceFile) return violations
 
     const visit = (node: ts.Node): void => {
       if (!ts.isJsxAttribute(node)) {

@@ -7,6 +7,7 @@
 import * as ts from 'typescript'
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/core'
+import { getSharedSourceFile } from '@opensip-tools/core/framework/parse-cache.js'
 
 /**
  * Checks if a node is an import declaration from 'react-native'
@@ -75,13 +76,8 @@ function analyzeFile(content: string, filePath: string): CheckViolation[] {
 
   const violations: CheckViolation[] = []
 
-  const sourceFile = ts.createSourceFile(
-    filePath,
-    content,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TSX,
-  )
+  const sourceFile = getSharedSourceFile(filePath, content)
+  if (!sourceFile) return violations
 
   // Use state object to track findings across callback invocations
   // (TypeScript can't track primitive mutations in callbacks)
