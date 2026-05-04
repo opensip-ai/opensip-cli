@@ -21,6 +21,12 @@ export interface FitOptions {
   /** Explicit path to opensip-tools.config.yml (overrides package.json pointer and default location). */
   config?: string;
   debug: boolean;
+  /** Architecture-gate: save the current run's findings as a baseline. Mutually exclusive with --gate-compare. */
+  gateSave?: boolean;
+  /** Architecture-gate: compare current findings against a saved baseline; exit 1 if regressions found. Mutually exclusive with --gate-save. */
+  gateCompare?: boolean;
+  /** Path to the baseline file used by --gate-save / --gate-compare. Default: .opensip-tools/baseline.sarif */
+  baseline?: string;
 }
 
 /** Options for the `init` subcommand. */
@@ -62,6 +68,10 @@ export interface CliArgs {
   open?: boolean;
   /** Explicit opensip-tools.config.yml path from --config flag. */
   config?: string;
+  /** Architecture-gate flags — see FitOptions for details. */
+  gateSave?: boolean;
+  gateCompare?: boolean;
+  baseline?: string;
 }
 
 /** Structured JSON output format */

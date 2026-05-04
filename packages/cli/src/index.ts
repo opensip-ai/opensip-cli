@@ -64,6 +64,14 @@ import { executeSim } from './commands/sim.js';
 import { pluginList, pluginInstall, pluginRemove } from './commands/plugin.js';
 import { executeConfigure, resolveApiKey } from './commands/configure.js';
 import { reportToCloud } from './sarif.js';
+import {
+  saveBaseline,
+  compareToBaseline,
+  renderGateCompareOutput,
+  GateBaselineMissingError,
+  GateBaselineInvalidError,
+  DEFAULT_BASELINE_PATH,
+} from './gate.js';
 
 import type { CliArgs, FitOptions, InitOptions, ToolOptions } from './types.js';
 
@@ -187,6 +195,9 @@ function fitOptsToCliArgs(opts: FitOptions & { quiet?: boolean; open?: boolean }
     quiet: opts.quiet === true,
     open: opts.open === true,
     config: opts.config,
+    gateSave: opts.gateSave === true,
+    gateCompare: opts.gateCompare === true,
+    baseline: opts.baseline,
   };
 }
 
@@ -304,8 +315,51 @@ program
   .option('-q, --quiet', 'Suppress banner / boxes; print only the pass-fail summary', false)
   .option('--open', 'Launch the HTML dashboard in your browser after the run completes', false)
   .option('--debug', 'Enable debug mode for structured log output', false)
+  .option('--gate-save', 'Architecture-gate: save current findings as baseline (mutually exclusive with --gate-compare)', false)
+  .option('--gate-compare', 'Architecture-gate: compare current findings against baseline; exit 1 on regression', false)
+  .option('--baseline <path>', 'Path to baseline file for --gate-save / --gate-compare (default: .opensip-tools/baseline.sarif)')
   .action(async (opts: FitOptions & { quiet?: boolean; open?: boolean }) => {
     const args = fitOptsToCliArgs(opts);
+
+    // --gate-save / --gate-compare — architecture gate (always headless; output to stdout, exit code is the gate decision).
+    if (args.gateSave === true || args.gateCompare === true) {
+      if (args.gateSave === true && args.gateCompare === true) {
+        process.exitCode = EXIT_CODES.CONFIGURATION_ERROR;
+        process.stderr.write('Error: --gate-save and --gate-compare are mutually exclusive.\n');
+        return;
+      }
+      const baselinePath = args.baseline ?? DEFAULT_BASELINE_PATH;
+      const fitResult = await executeFit(args);
+      if (fitResult.result.type !== 'fit-done') {
+        process.exitCode = fitResult.result.exitCode;
+        process.stderr.write(`Error: ${fitResult.result.message}\n`);
+        return;
+      }
+      // Narrow: fit-done branch always has output defined per executeFit's signature,
+      // but TS doesn't narrow through the nested discriminant `result.type`.
+      const output = fitResult.output!;
+      try {
+        if (args.gateSave === true) {
+          saveBaseline(output, baselinePath);
+          const findingCount = output.checks.reduce((n, c) => n + c.findings.length, 0);
+          process.stdout.write(`Baseline saved to ${baselinePath}\n`);
+          process.stdout.write(`  ${output.checks.length} check(s), ${findingCount} finding(s)\n`);
+          return;
+        }
+        // --gate-compare
+        const result = compareToBaseline(output, baselinePath);
+        process.stdout.write(renderGateCompareOutput(result) + '\n');
+        process.exitCode = result.degraded ? 1 : 0;
+        return;
+      } catch (err) {
+        if (err instanceof GateBaselineMissingError || err instanceof GateBaselineInvalidError) {
+          process.exitCode = EXIT_CODES.CONFIGURATION_ERROR;
+          process.stderr.write(`Error: ${err.message}\n`);
+          return;
+        }
+        throw err;
+      }
+    }
 
     // --list
     if (args.list) {
