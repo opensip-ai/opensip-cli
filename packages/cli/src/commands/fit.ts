@@ -121,7 +121,7 @@ export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
     // and doesn't clobber stdout (which carries results + --json).
     for (const err of pluginResult.errors) {
       process.stderr.write(`opensip-tools: plugin failed to load — ${err}\n`);
-      logger.warn({ evt: 'cli.plugin.warning', message: err });
+      logger.warn({ evt: 'cli.plugin.warning', module: 'cli:fit', message: err });
     }
   }
 
@@ -177,9 +177,9 @@ export async function executeFit(
   args: CliArgs,
   onProgress?: (completed: number, total: number) => void,
 ): Promise<{ result: FitDoneResult; output: CliOutput } | { result: ErrorResult; output?: undefined }> {
-  logger.info({ evt: 'cli.checks.loading' });
+  logger.info({ evt: 'cli.checks.loading', module: 'cli:fit' });
   await ensureChecksLoaded(args.cwd);
-  logger.info({ evt: 'cli.checks.loaded', checkCount: defaultRegistry.listEnabled().length });
+  logger.info({ evt: 'cli.checks.loaded', module: 'cli:fit', checkCount: defaultRegistry.listEnabled().length });
 
   // Determine recipe: --check and --tags each create an ad-hoc recipe;
   // otherwise use a named recipe. --check takes precedence over --recipe
@@ -209,7 +209,7 @@ export async function executeFit(
     targetsResult = loadTargetsConfig(args.cwd, args.config);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    logger.warn({ evt: 'cli.config.load_failed', message });
+    logger.warn({ evt: 'cli.config.load_failed', module: 'cli:fit', message });
     return {
       result: {
         type: 'error',
@@ -253,13 +253,13 @@ export async function executeFit(
   let completedCount = 0;
   const callbacks: FitnessRecipeServiceCallbacks = {
     onCheckStart(checkSlug: string, index: number, total: number) {
-      logger.debug({ evt: 'cli.check.start', checkSlug, index, total });
+      logger.debug({ evt: 'cli.check.start', module: 'cli:fit', checkSlug, index, total });
       // Emit current completed count so the UI shows activity without
       // moving the bar backward on start events.
       onProgress?.(completedCount, total);
     },
     onCheckComplete(checkSlug: string, summary: CheckSummary, index: number, total: number) {
-      logger.debug({ evt: 'cli.check.complete', checkSlug, passed: summary.passed, errors: summary.errors, warnings: summary.warnings, durationMs: summary.durationMs });
+      logger.debug({ evt: 'cli.check.complete', module: 'cli:fit', checkSlug, passed: summary.passed, errors: summary.errors, warnings: summary.warnings, durationMs: summary.durationMs });
       completedCount++;
       onProgress?.(completedCount, total);
     },
@@ -417,7 +417,7 @@ export async function executeFit(
     configFound,
   };
 
-  logger.info({ evt: 'cli.fit.complete', score, passed: fitnessResult.success, totalChecks: summary.totalChecks, durationMs });
+  logger.info({ evt: 'cli.fit.complete', module: 'cli:fit', score, passed: fitnessResult.success, totalChecks: summary.totalChecks, durationMs });
 
   return { result, output };
 }

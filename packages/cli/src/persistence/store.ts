@@ -156,7 +156,7 @@ export function loadSessions(limit?: number): StoredSession[] {
       sessions.push(JSON.parse(raw) as StoredSession);
     } catch {
       // Warn about corrupted files — don't crash
-      logger.warn({ evt: 'cli.session.corrupted', msg: `Skipping corrupted session file: ${file}`, file });
+      logger.warn({ evt: 'cli.session.corrupted', module: 'cli:persistence', msg: `Skipping corrupted session file: ${file}`, file });
     }
   }
   return sessions;

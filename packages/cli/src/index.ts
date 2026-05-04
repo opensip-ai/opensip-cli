@@ -289,7 +289,7 @@ program.hook('preAction', (_thisCommand, actionCommand) => {
   const config = loadConfig(cwd);
   mergeConfigDefaults(opts, config);
 
-  logger.info({ evt: 'cli.start', runId, command: actionCommand.name(), cwd });
+  logger.info({ evt: 'cli.start', module: 'cli:bootstrap', runId, command: actionCommand.name(), cwd });
 });
 
 // ---------------------------------------------------------------------------
