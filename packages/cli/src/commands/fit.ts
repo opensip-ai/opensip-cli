@@ -80,6 +80,12 @@ async function maybeAutoSyncProjectPlugins(projectDir: string): Promise<void> {
 
   if (missingDomains.length === 0) return
 
+  logger.info({
+    evt: 'cli.plugin.autosync.start',
+    module: 'cli:fit',
+    domains: missingDomains,
+    msg: `installing project-local plugins (${missingDomains.join(', ')})`,
+  })
   process.stderr.write(
     `opensip-tools: installing project-local plugins (${missingDomains.join(', ')})...\n`,
   )
@@ -89,6 +95,12 @@ async function maybeAutoSyncProjectPlugins(projectDir: string): Promise<void> {
       await pluginSync(projectDir, domain)
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
+      logger.warn({
+        evt: 'cli.plugin.autosync.failed',
+        module: 'cli:fit',
+        domain,
+        error: msg,
+      })
       process.stderr.write(`opensip-tools: plugin sync failed for ${domain}: ${msg}\n`)
     }
   }
