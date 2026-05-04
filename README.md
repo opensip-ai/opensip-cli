@@ -1,6 +1,6 @@
 # OpenSIP Tools
 
-Open-source codebase analysis toolkit. Run fitness checks against any TypeScript/JavaScript codebase — standalone in the CLI, in CI pipelines, or integrated with [OpenSIP Cloud](https://opensip.ai) for centralized reporting.
+Open-source codebase analysis toolkit for TypeScript/JavaScript codebases. Run fitness checks standalone, in CI, or as a regression detector around AI-agent coding sessions. Integrates with [OpenSIP Cloud](https://opensip.ai) for centralized reporting.
 
 ## Installation
 
@@ -49,11 +49,14 @@ opensip-tools fit --verbose         # full results table
 opensip-tools fit --json            # structured JSON (for CI)
 opensip-tools fit --list            # list available checks
 opensip-tools fit --recipes         # list available recipes
+opensip-tools fit --gate-save       # save current findings as architecture baseline
+opensip-tools fit --gate-compare    # compare against baseline; exit 1 on regression
 ```
 
 ### Project setup & dashboards
 ```bash
 opensip-tools init                  # generate opensip-tools.config.yml
+opensip-tools configure             # set up OpenSIP Cloud API key (interactive)
 opensip-tools dashboard             # HTML report — opens in browser
 opensip-tools sessions list         # run history
 opensip-tools sessions purge        # delete session data (prompts for confirm)
@@ -111,7 +114,7 @@ Pre-defined check sets for common scenarios:
 
 ### Check Tags
 
-Checks are organized by tags: `security`, `quality`, `architecture`, `testing`, `resilience`, `observability`, `accessibility`, and more. Use `--tags` to filter or `--list` to browse all checks.
+Checks are organized by tags: `security`, `quality`, `architecture`, `modularity`, `testing`, `resilience`, `observability`, `accessibility`, and more. Use `--tags` to filter or `--list` to browse all checks.
 
 ## Configuration
 
@@ -147,6 +150,54 @@ By default, any check error causes exit code 1 (CI fails). Configure thresholds:
 - `failOnErrors: 1` — fail if total errors >= 1 (default)
 - `failOnErrors: 0` — report-only mode, never fail on errors
 - `failOnWarnings: 1` — strict mode, warnings also cause failure
+
+## Architecture Gate
+
+Catch architectural regressions during code reviews, AI-agent coding sessions, or pre-commit hooks. The gate is a baseline-and-compare workflow: snapshot your current state, then compare future runs against that snapshot.
+
+```bash
+# Before making changes — save a baseline
+opensip-tools fit --gate-save
+
+# After making changes — compare
+opensip-tools fit --gate-compare
+```
+
+Output of `--gate-compare`:
+
+```
+opensip-tools gate compare
+
+Added (2):
+  ✗ fit:circular-import      packages/foo/x.ts → y.ts
+  ✗ fit:complex-function     packages/foo/z.ts:88 (cc=28, was 22)
+
+Resolved (1):
+  ✓ fit:dead-code            packages/foo/y.ts:10
+
+✗ DEGRADED — 2 new violations introduced
+```
+
+**Exit codes:**
+- `0` — no new violations (baseline preserved or improved)
+- `1` — regression detected (at least one new violation)
+- `2` — config error (missing baseline, malformed SARIF)
+
+**Default baseline location** is `<cwd>/.opensip-tools/baseline.sarif`. Use `--baseline <path>` to override. Add `.opensip-tools/` to `.gitignore` — baselines are repo-state snapshots, not source.
+
+**How diffs are matched:** by `(filePath, ruleId, message)` tuple. Line numbers are intentionally **not** in the matching key — unrelated edits that shift lines won't register as false-positive added/resolved entries.
+
+### Use case: AI-agent fix pipelines
+
+Before letting an AI agent modify your code, save a baseline:
+
+```bash
+opensip-tools fit --gate-save
+# … agent makes changes …
+opensip-tools fit --gate-compare || echo "Architecture degraded — review changes"
+```
+
+Combined with `--report-to` and the dashboard, you get a continuous record of every agent session's architectural impact.
 
 ## Plugins
 
@@ -277,10 +328,19 @@ Then: `opensip-tools fit --recipe backend-strict`.
 Send findings to OpenSIP Cloud as SARIF:
 
 ```bash
+# One-time setup (interactive prompt for your API key)
+opensip-tools configure
+
+# Then send findings
+opensip-tools fit --report-to https://your-opensip-instance/api/ingest
+
+# Or pass the key per-invocation
 opensip-tools fit --report-to https://your-opensip-instance/api/ingest --api-key sk-...
 ```
 
 Findings are posted in SARIF 2.1.0 format with automatic retry on network failures.
+
+API key resolution: `--api-key` flag > `OPENSIP_API_KEY` env var > `~/.opensip-tools/config.yml`.
 
 ## CI Integration
 
