@@ -19,9 +19,12 @@ export function generatePrefixedId(prefix: string): string {
 
 /** Extract the timestamp from a ULID string. Returns null if invalid. */
 export function extractTimestamp(id: string): Date | null {
-  // Strip prefix if present (e.g., 'RUN_01HXYZ...' → '01HXYZ...')
-  const underscoreIdx = id.indexOf('_');
-  const ulidPart = underscoreIdx >= 0 ? id.slice(underscoreIdx + 1) : id;
+  // ULIDs are exactly 26 Crockford Base32 chars; the prefix (if any) may
+  // contain underscores itself — e.g. `generatePrefixedId('my_tool')`
+  // produces `MY_TOOL_<ulid>`. Splitting on the first '_' would slice off
+  // only `MY` and leave `TOOL_<ulid>`, failing the length check. Take the
+  // trailing 26 chars instead, since ULIDs never contain underscores.
+  const ulidPart = id.length >= 26 ? id.slice(-26) : id;
   if (ulidPart.length !== 26) return null;
 
   try {

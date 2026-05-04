@@ -66,6 +66,19 @@ describe('extractTimestamp', () => {
     expect(ts!.getTime()).toBeLessThanOrEqual(after);
   });
 
+  it('extracts timestamp from a multi-underscore prefixed ID', () => {
+    // generatePrefixedId('my_tool') produces 'MY_TOOL_<ulid>' — earlier
+    // implementations split on the first '_' and failed the length check.
+    const before = Date.now();
+    const id = generatePrefixedId('my_tool');
+    const after = Date.now();
+
+    const ts = extractTimestamp(id);
+    expect(ts).toBeInstanceOf(Date);
+    expect(ts!.getTime()).toBeGreaterThanOrEqual(before);
+    expect(ts!.getTime()).toBeLessThanOrEqual(after);
+  });
+
   it('returns null for invalid input', () => {
     expect(extractTimestamp('not-a-ulid')).toBeNull();
     expect(extractTimestamp('')).toBeNull();

@@ -127,21 +127,44 @@ function replaceCharsInRange(chars: string[], start: number, end: number, string
  * line/column positions. Comments are tracked but not removed (directives
  * live in comments and must be preserved).
  */
-// Module-level cache to avoid re-running the TS scanner on the same content
+// Module-level cache to avoid re-running the TS scanner on the same content.
+// Bounded by an idle timer (10 min, matching parse-cache.ts) so long-lived
+// embedders don't accumulate cached filter results across runs forever. The
+// timer resets each time filterContent runs, so an active session never
+// loses its cache.
+const FILTER_CACHE_IDLE_TIMEOUT_MS = 10 * 60 * 1000
 const filterCache = new Map<string, FilteredContent>()
+let filterCacheIdleTimer: ReturnType<typeof setTimeout> | null = null
+
+function scheduleFilterCacheClear(): void {
+  if (filterCacheIdleTimer) clearTimeout(filterCacheIdleTimer)
+  filterCacheIdleTimer = setTimeout(() => {
+    filterCache.clear()
+    filterCacheIdleTimer = null
+  }, FILTER_CACHE_IDLE_TIMEOUT_MS)
+  filterCacheIdleTimer.unref()
+}
 
 /** Clear the filter cache (call between runs or on memory pressure) */
 export function clearFilterCache(): void {
   filterCache.clear()
+  if (filterCacheIdleTimer) {
+    clearTimeout(filterCacheIdleTimer)
+    filterCacheIdleTimer = null
+  }
 }
 
 export function filterContent(content: string): FilteredContent {
   const cached = filterCache.get(content)
-  if (cached) return cached
+  if (cached) {
+    scheduleFilterCacheClear()
+    return cached
+  }
 
   try {
     const result = filterContentImpl(content)
     filterCache.set(content, result)
+    scheduleFilterCacheClear()
     return result
   } catch {
     // Graceful degradation — return raw content if scanner fails
