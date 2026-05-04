@@ -40,7 +40,7 @@ export type { FitnessRecipeServiceConfig, FitnessRecipeServiceCallbacks, CheckSu
 export type { FitnessRecipeResult, RecipeCheckResult, RecipeCheckConfigMap } from './recipes/types.js';
 export { builtInRecipesByName } from './recipes/built-in-recipes.js';
 export { defaultRecipeRegistry, FitnessRecipeRegistry } from './recipes/registry.js';
-export { getCheckConfig } from './recipes/check-config.js';
+export { getCheckConfig, setCurrentRecipeCheckConfig, clearCurrentRecipeCheckConfig } from './recipes/check-config.js';
 
 // Targets and signalers
 export { loadTargetsConfig, resolveTargetFiles } from './targets/index.js';

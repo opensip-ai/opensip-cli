@@ -7,9 +7,26 @@
 
 import * as ts from 'typescript'
 
-import { defineCheck, type CheckViolation, getLineNumber } from '@opensip-tools/core'
+import { defineCheck, getCheckConfig, type CheckViolation, getLineNumber } from '@opensip-tools/core'
 import { getSharedSourceFile } from '@opensip-tools/core/framework/parse-cache.js'
 import { isCommentLine, isTestFile } from '../../utils/index.js'
+
+/**
+ * Recipe-config shape for the detached-promises check. Each field augments the
+ * built-in defaults; nothing here is required. Project-specific helper names
+ * (e.g. opensip's `attachDomainContext`, `sendError`) belong in a recipe's
+ * `checks.config['detached-promises']` block, not in built-in defaults.
+ */
+export interface DetachedPromisesConfig extends Record<string, unknown> {
+  /** Method/function names that are synchronous (no await needed). */
+  additionalSyncFunctions?: readonly string[]
+  /** Receiver identifiers (the part before the dot) that are synchronous. */
+  additionalSyncReceivers?: readonly string[]
+  /** Method-name prefixes that mark a call as synchronous (e.g. `'wire'`). */
+  additionalSyncPrefixes?: readonly string[]
+}
+
+const DETACHED_PROMISES_SLUG = 'detached-promises'
 
 // =============================================================================
 // DETACHED PROMISES (AST-based)
@@ -108,15 +125,13 @@ const KNOWN_SYNC_FUNCTIONS = new Set([
   'cleanup',               // Common sync lifecycle — process-host CrashGuards.cleanup, etc.
   'unref',                 // Node Timer/Immediate/Socket.unref — sync, returns the handle
   'kill',                  // Node ChildProcess.kill — synchronous signal dispatch, returns boolean
-  // OpenTelemetry / context propagation helpers (synchronous attach to active span/context)
-  'attachDomainContext',
-  'attachProfileIdToSpan',
+  // OpenTelemetry / context propagation helpers (generic OTel surface)
   'inject',                // OTel TextMapPropagator.inject — sync header injection
   'observe',               // OTel ObservableResult.observe (gauge callback) — sync record
-  // HTTP error helpers (synchronous reply.send wrappers)
-  'sendError',
-  // Span error finalization (rethrows; synchronous in practice)
-  'finalizeError',
+  // NOTE: opensip-specific OTel/error helpers — `attachDomainContext`,
+  // `attachProfileIdToSpan`, `sendError`, `finalizeError` — are NOT defaults.
+  // They live in opensip's recipe under `checks.config['detached-promises']
+  // .additionalSyncFunctions`. See packages/core/src/recipes/check-config.ts.
   // Pyroscope per-profiler starters — sync, returns void (Pyroscope.default.startWallProfiling/startHeapProfiling)
   'startWallProfiling',
   'startHeapProfiling',
@@ -523,6 +538,30 @@ const FIRE_AND_FORGET_PATTERNS = new Set([
 ])
 
 /**
+ * Built-in defaults merged with the recipe's `detached-promises` config slice.
+ * Built once per `analyze` invocation and threaded through helpers.
+ */
+interface EffectiveSyncSets {
+  syncFunctions: ReadonlySet<string>
+  syncReceivers: ReadonlySet<string>
+  syncPrefixes: readonly string[]
+}
+
+/**
+ * Build effective sync-call lookup sets by merging built-in defaults with the
+ * recipe-provided augmentation for `detached-promises`.
+ */
+function buildEffectiveSyncSets(): EffectiveSyncSets {
+  const cfg = getCheckConfig<DetachedPromisesConfig>(DETACHED_PROMISES_SLUG)
+  const fns = new Set(KNOWN_SYNC_FUNCTIONS)
+  for (const name of cfg.additionalSyncFunctions ?? []) fns.add(name)
+  const recvs = new Set(KNOWN_SYNC_RECEIVERS)
+  for (const name of cfg.additionalSyncReceivers ?? []) recvs.add(name)
+  const prefixes = [...KNOWN_SYNC_PREFIXES, ...(cfg.additionalSyncPrefixes ?? [])]
+  return { syncFunctions: fns, syncReceivers: recvs, syncPrefixes: prefixes }
+}
+
+/**
  * Check if a node is inside an async function or method
  */
 function isInAsyncContext(node: ts.Node): boolean {
@@ -547,15 +586,15 @@ function isInAsyncContext(node: ts.Node): boolean {
 /**
  * Check if a method call expression is to a known synchronous receiver or method.
  */
-function isKnownSyncMethodCall(expr: ts.PropertyAccessExpression): boolean {
+function isKnownSyncMethodCall(expr: ts.PropertyAccessExpression, sets: EffectiveSyncSets): boolean {
   const methodName = expr.name.text
   const receiverExpr = expr.expression
 
   // Check if method is known sync, fire-and-forget, or matches sync prefix
   if (
-    KNOWN_SYNC_FUNCTIONS.has(methodName) ||
+    sets.syncFunctions.has(methodName) ||
     FIRE_AND_FORGET_PATTERNS.has(methodName) ||
-    matchesSyncNamePattern(methodName)
+    matchesSyncNamePattern(methodName, sets)
   ) {
     return true
   }
@@ -563,7 +602,7 @@ function isKnownSyncMethodCall(expr: ts.PropertyAccessExpression): boolean {
   // Check if receiver is known sync object: logger.info(), path.join(), etc.
   if (ts.isIdentifier(receiverExpr)) {
     const receiverName = receiverExpr.text
-    if (KNOWN_SYNC_RECEIVERS.has(receiverName)) {
+    if (sets.syncReceivers.has(receiverName)) {
       return true
     }
     // Handle this.logger.info() via logger at end
@@ -575,7 +614,7 @@ function isKnownSyncMethodCall(expr: ts.PropertyAccessExpression): boolean {
   // Handle nested: this.logger.info(), this.config.get(), this.callbacks.onUpdate()
   if (ts.isPropertyAccessExpression(receiverExpr)) {
     const nestedName = receiverExpr.name.text
-    if (KNOWN_SYNC_RECEIVERS.has(nestedName)) {
+    if (sets.syncReceivers.has(nestedName)) {
       return true
     }
     // Also walk to the root identifier of the chain. e.g. Pyroscope.default.start()
@@ -586,7 +625,7 @@ function isKnownSyncMethodCall(expr: ts.PropertyAccessExpression): boolean {
     while (cursor && ts.isPropertyAccessExpression(cursor)) {
       cursor = cursor.expression
     }
-    if (ts.isIdentifier(cursor) && KNOWN_SYNC_RECEIVERS.has(cursor.text)) {
+    if (ts.isIdentifier(cursor) && sets.syncReceivers.has(cursor.text)) {
       return true
     }
   }
@@ -605,8 +644,8 @@ function isKnownSyncMethodCall(expr: ts.PropertyAccessExpression): boolean {
 /**
  * Check if a function/method name matches a known synchronous prefix or suffix.
  */
-function matchesSyncNamePattern(name: string): boolean {
-  if (KNOWN_SYNC_PREFIXES.some((prefix) => name.startsWith(prefix))) return true
+function matchesSyncNamePattern(name: string, sets: EffectiveSyncSets): boolean {
+  if (sets.syncPrefixes.some((prefix) => name.startsWith(prefix))) return true
   if (KNOWN_SYNC_SUFFIXES.some((suffix) => name.endsWith(suffix))) return true
   return false
 }
@@ -614,7 +653,7 @@ function matchesSyncNamePattern(name: string): boolean {
 /**
  * Check if a call expression is to a known synchronous function
  */
-function isKnownSyncCall(node: ts.CallExpression): boolean {
+function isKnownSyncCall(node: ts.CallExpression, sets: EffectiveSyncSets): boolean {
   const expr = node.expression
 
   // super() calls — constructor delegation, always synchronous
@@ -626,9 +665,9 @@ function isKnownSyncCall(node: ts.CallExpression): boolean {
   if (ts.isIdentifier(expr)) {
     const name = expr.text
     if (
-      KNOWN_SYNC_FUNCTIONS.has(name) ||
+      sets.syncFunctions.has(name) ||
       FIRE_AND_FORGET_PATTERNS.has(name) ||
-      matchesSyncNamePattern(name)
+      matchesSyncNamePattern(name, sets)
     ) {
       return true
     }
@@ -636,7 +675,7 @@ function isKnownSyncCall(node: ts.CallExpression): boolean {
 
   // Method call: receiver.method()
   if (ts.isPropertyAccessExpression(expr)) {
-    return isKnownSyncMethodCall(expr)
+    return isKnownSyncMethodCall(expr, sets)
   }
 
   return false
@@ -764,6 +803,9 @@ function analyzeFileForDetachedPromises(content: string, filePath: string): Chec
     return violations
   }
 
+  // Build the effective sync-call sets once per file from defaults + recipe config.
+  const sets = buildEffectiveSyncSets()
+
   try {
     // @lazy-ok -- 'await' appears in string literals, not actual await expression
     const sourceFile = getSharedSourceFile(filePath, content)
@@ -789,7 +831,7 @@ function analyzeFileForDetachedPromises(content: string, filePath: string): Chec
       if (!isInAsyncContext(node)) return
 
       // Skip known synchronous calls
-      if (isKnownSyncCall(expr)) return
+      if (isKnownSyncCall(expr, sets)) return
 
       // Skip this.method() calls where method is defined as sync in the same class
       if (isDefinedAsSyncInSameFile(expr)) return

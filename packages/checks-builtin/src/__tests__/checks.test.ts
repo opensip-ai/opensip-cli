@@ -154,7 +154,11 @@ describe('detached-promises refinements', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it('skips attachDomainContext (sync OTel helper)', async () => {
+  it('flags project-specific helpers like attachDomainContext by default (no recipe config)', async () => {
+    // attachDomainContext is opensip-specific — it is NOT a built-in default.
+    // Without recipe config augmentation, it is treated as a potentially
+    // unawaited call. opensip's recipe adds it via
+    // `checks.config['detached-promises'].additionalSyncFunctions`.
     const file = path.join(tmpDir, 'a.ts');
     fs.writeFileSync(
       file,
@@ -163,7 +167,31 @@ describe('detached-promises refinements', () => {
        }`,
     );
     const result = await check!.run(tmpDir, { targetFiles: [file] });
-    expect(result.warnings).toBe(0);
+    expect(result.warnings).toBeGreaterThan(0);
+  });
+
+  it('skips project-specific helpers when augmented via recipe config', async () => {
+    const { setCurrentRecipeCheckConfig, clearCurrentRecipeCheckConfig } = await import(
+      '@opensip-tools/core'
+    );
+    setCurrentRecipeCheckConfig({
+      'detached-promises': {
+        additionalSyncFunctions: ['attachDomainContext'],
+      },
+    });
+    try {
+      const file = path.join(tmpDir, 'a-augmented.ts');
+      fs.writeFileSync(
+        file,
+        `async function handle() {
+           attachDomainContext({ tenantId: 'a' });
+         }`,
+      );
+      const result = await check!.run(tmpDir, { targetFiles: [file] });
+      expect(result.warnings).toBe(0);
+    } finally {
+      clearCurrentRecipeCheckConfig();
+    }
   });
 
   it('skips child.kill() (sync ChildProcess method)', async () => {
