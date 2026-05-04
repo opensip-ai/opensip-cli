@@ -127,6 +127,48 @@ describe('toctou-race-condition refinements', () => {
     expect(result.warnings).toBe(0);
   });
 
+  it('flags project-specific paths (chain-walker) by default — moved to recipe config', async () => {
+    // /chain-walker/ is opensip-specific; it is no longer a built-in default.
+    // Without recipe augmentation, code there is analyzed normally.
+    const file = path.join(tmpDir, 'chain-walker', 'walk.ts');
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(
+      file,
+      `export function walk(map: Map<string, string>) {
+         const v = map.get('a');
+         map.set('a', (v ?? '') + 'x');
+       }`,
+    );
+    const result = await check!.run(tmpDir, { targetFiles: [file] });
+    expect(result.warnings).toBeGreaterThan(0);
+  });
+
+  it('skips project-specific paths when augmented via recipe config', async () => {
+    const { setCurrentRecipeCheckConfig, clearCurrentRecipeCheckConfig } = await import(
+      '@opensip-tools/core'
+    );
+    setCurrentRecipeCheckConfig({
+      'toctou-race-condition': {
+        additionalSafeTOCTOUPaths: ['/chain-walker/'],
+      },
+    });
+    try {
+      const file = path.join(tmpDir, 'chain-walker', 'walk-augmented.ts');
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(
+        file,
+        `export function walk(map: Map<string, string>) {
+           const v = map.get('a');
+           map.set('a', (v ?? '') + 'x');
+         }`,
+      );
+      const result = await check!.run(tmpDir, { targetFiles: [file] });
+      expect(result.warnings).toBe(0);
+    } finally {
+      clearCurrentRecipeCheckConfig();
+    }
+  });
+
   it('honors documented "single-threaded coalesce" comment as atomic', async () => {
     const file = path.join(tmpDir, 'cache.ts');
     fs.writeFileSync(

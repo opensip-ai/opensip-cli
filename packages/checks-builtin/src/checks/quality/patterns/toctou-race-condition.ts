@@ -7,9 +7,24 @@
 
 import * as ts from 'typescript'
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/core'
+import { defineCheck, getCheckConfig, type CheckViolation } from '@opensip-tools/core'
 import { getSharedSourceFile } from '@opensip-tools/core/framework/parse-cache.js'
 import { isTestFile } from '../../../utils/index.js'
+
+/**
+ * Recipe-config shape for toctou-race-condition. Project-specific safe-paths
+ * (e.g. opensip's `/chain-walker/`) belong in a recipe's
+ * `checks.config['toctou-race-condition']` block, not in built-in defaults.
+ */
+export interface TocTouConfig extends Record<string, unknown> {
+  /**
+   * Additional path patterns where TOCTOU is not a concern. Each entry is
+   * compiled to a case-insensitive RegExp via `new RegExp(entry, 'i')`.
+   */
+  additionalSafeTOCTOUPaths?: readonly string[]
+}
+
+const TOCTOU_SLUG = 'toctou-race-condition'
 
 /** Patterns that indicate proper atomic update handling */
 const ATOMIC_PATTERNS = [
@@ -87,15 +102,26 @@ const SAFE_TOCTOU_PATHS = [
   /\/di\//,
   // Schema declarations — Drizzle/Zod schema files are pure declarative builders, no runtime read/update race surface.
   /\/schema\//,
-  // Audit chain walkers — topological/depth algorithms operate on freshly-allocated function-local Map/Set; not shared mutable state.
-  /\/chain-walker\//,
+  // NOTE: opensip-specific paths (e.g. `/chain-walker/` for audit-chain
+  // walkers) are NOT defaults. They live in opensip's recipe under
+  // `checks.config['toctou-race-condition'].additionalSafeTOCTOUPaths`.
 ]
 
 /**
- * Check if a file path is in a safe TOCTOU context
+ * Compile recipe-provided string entries to case-insensitive RegExp values.
  */
-function isSafeToctouPath(filePath: string): boolean {
-  return SAFE_TOCTOU_PATHS.some((pattern) => pattern.test(filePath))
+function buildEffectiveSafePaths(): readonly RegExp[] {
+  const cfg = getCheckConfig<TocTouConfig>(TOCTOU_SLUG)
+  const extras = (cfg.additionalSafeTOCTOUPaths ?? []).map((src) => new RegExp(src, 'i'))
+  return [...SAFE_TOCTOU_PATHS, ...extras]
+}
+
+/**
+ * Check if a file path is in a safe TOCTOU context. Combines built-in
+ * defaults with the recipe-config augmentation.
+ */
+function isSafeToctouPath(filePath: string, safePaths: readonly RegExp[]): boolean {
+  return safePaths.some((pattern) => pattern.test(filePath))
 }
 
 /** Read operation patterns */
@@ -217,8 +243,10 @@ function checkFunctionForToctou(options: CheckFunctionForToctouOptions): CheckVi
 function analyzeFileForToctou(filePath: string, content: string): CheckViolation[] {
   const violations: CheckViolation[] = []
 
-  // Skip files in safe TOCTOU paths (caches, rate limiters, CLI, etc.)
-  if (isSafeToctouPath(filePath)) {
+  // Skip files in safe TOCTOU paths (caches, rate limiters, CLI, etc.).
+  // Merge built-in defaults with recipe config once per file.
+  const safePaths = buildEffectiveSafePaths()
+  if (isSafeToctouPath(filePath, safePaths)) {
     return violations
   }
 
