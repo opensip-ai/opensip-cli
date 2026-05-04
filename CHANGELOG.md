@@ -39,6 +39,19 @@ allowed code outside the plugin directory to be loaded and executed:
 
 ## [Unreleased]
 
+### Security
+
+- **Plugin install no longer runs npm lifecycle scripts.** All three
+  `npm install` invocations (project-local sync, user-level `plugin install`,
+  and peer-dep auto-install) now pass `--ignore-scripts`. Without this,
+  `opensip-tools fit` running in a freshly cloned repo with declared
+  plugins would auto-install them and execute their `postinstall` /
+  `preinstall` / `prepare` scripts before the user had any chance to
+  inspect what was being installed. Plugins are loaded via dynamic
+  `import()` at fit time, so legitimate plugin code paths are unaffected;
+  only install-time side-effects are blocked.
+
+
 ### Added
 - Ink-based CLI rendering with themed components (React for terminals)
 - Commander.js for argument parsing with auto-generated `--help`

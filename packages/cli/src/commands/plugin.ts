@@ -120,7 +120,11 @@ export async function pluginInstall(packageName: string | undefined, domainOverr
   const depsBefore = readHostDependencies(dir);
 
   try {
-    execFileSync('npm', ['install', packageName], { cwd: dir, stdio: 'inherit' });
+    // --ignore-scripts: refuse to execute plugin postinstall/preinstall hooks.
+    // Plugins are loaded via dynamic import() at fit time; they don't legitimately
+    // need install-time code execution. This blocks supply-chain attacks where a
+    // malicious plugin runs arbitrary code during `npm install` itself.
+    execFileSync('npm', ['install', '--ignore-scripts', packageName], { cwd: dir, stdio: 'inherit' });
 
     // npm does not reliably auto-install peerDependencies for packages
     // installed via file: specs (local paths) or workspaces. Read the
@@ -169,7 +173,7 @@ function installMissingPeers(dir: string, requestedSpec: string, depsBefore: Set
     try {
       // --no-save: peers land in node_modules but are not recorded as
       // host-level dependencies, so discovery doesn't list them as plugins.
-      execFileSync('npm', ['install', '--no-save', `${name}@${range}`], { cwd: dir, stdio: 'inherit' });
+      execFileSync('npm', ['install', '--ignore-scripts', '--no-save', `${name}@${range}`], { cwd: dir, stdio: 'inherit' });
     } catch {
       // Swallow — loader will report if the peer is ultimately unreachable.
     }

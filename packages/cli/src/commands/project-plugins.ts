@@ -147,7 +147,12 @@ function saveConfigDoc(path: string, doc: ReturnType<typeof parseDocument>): voi
  * `peerDependencies` (notably `@opensip-tools/core`) resolve cleanly.
  */
 function npmInstall(spec: string, dir: string): void {
-  execFileSync('npm', ['install', spec], { cwd: dir, stdio: 'inherit' })
+  // --ignore-scripts: refuse to execute plugin postinstall/preinstall hooks.
+  // Auto-sync runs npm install for every spec declared in the project's
+  // opensip-tools.config.yml the first time `fit` runs in a fresh clone.
+  // Without this flag, a malicious project config could cause arbitrary code
+  // execution at install time, before the user has any chance to inspect.
+  execFileSync('npm', ['install', '--ignore-scripts', spec], { cwd: dir, stdio: 'inherit' })
 }
 
 function npmUninstall(pkgName: string, dir: string): void {
