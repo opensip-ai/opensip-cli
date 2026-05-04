@@ -14,10 +14,21 @@ import type { DirectiveEntry } from '../framework/directive-inventory.js'
 // CHECK SELECTOR TYPES
 // =============================================================================
 
+/**
+ * Per-check configuration map.
+ *
+ * Keys are check slugs; values are check-specific config objects whose shape
+ * is declared by the consuming check. The recipe service projects this map
+ * into module-level state before execution so each check can read its slice
+ * via `getCheckConfig<T>(slug)`. See `check-config.ts`.
+ */
+export type RecipeCheckConfigMap = Readonly<Record<string, Readonly<Record<string, unknown>>>>
+
 /** Selector that specifies checks by explicit slug list */
 export interface ExplicitCheckSelector {
   readonly type: 'explicit'
   readonly checkIds: readonly string[]
+  readonly config?: RecipeCheckConfigMap
 }
 
 /** Selector that matches checks via glob patterns */
@@ -25,6 +36,7 @@ export interface PatternCheckSelector {
   readonly type: 'pattern'
   readonly include: readonly string[]
   readonly exclude?: readonly string[]
+  readonly config?: RecipeCheckConfigMap
 }
 
 /** Selector that includes all checks with specified tags */
@@ -32,12 +44,14 @@ export interface TagsCheckSelector {
   readonly type: 'tags'
   readonly include: readonly string[]
   readonly exclude?: readonly string[]
+  readonly config?: RecipeCheckConfigMap
 }
 
 /** Selector that includes all checks with optional exclusions */
 export interface AllCheckSelector {
   readonly type: 'all'
   readonly exclude?: readonly string[]
+  readonly config?: RecipeCheckConfigMap
 }
 
 /** Union of all check selector types used by recipes */

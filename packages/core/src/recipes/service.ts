@@ -16,6 +16,7 @@ import { defaultRegistry, type Check, type CheckRegistry } from '../framework/re
 import { initParseCache, clearParseCache } from '../framework/parse-cache.js'
 
 import { resolveChecks, validateCheckReferences } from './check-resolution.js'
+import { setCurrentRecipeCheckConfig, clearCurrentRecipeCheckConfig } from './check-config.js'
 import { executeParallel, type ExecutionOptions, type ExecutionServiceContext } from './parallel-execution.js'
 import { defaultRecipeRegistry, type FitnessRecipeRegistry } from './registry.js'
 import { executeSequential } from './sequential-execution.js'
@@ -115,6 +116,11 @@ export class FitnessRecipeService {
 
     logger.info('Starting recipe session', { evt: 'fitness.recipe.session.start', module: MODULE_FITNESS_RECIPES, sessionId, recipeName: recipe.name })
 
+    // Project the recipe's per-check config into module-level state so that
+    // individual checks can read their slice via getCheckConfig<T>(slug).
+    // Cleared in the `finally` below.
+    setCurrentRecipeCheckConfig(recipe.checks.config)
+
     try {
       const cwd = this.config.cwd ?? process.cwd()
       const checks = this.resolveAndFilterChecks(recipe)
@@ -157,6 +163,7 @@ export class FitnessRecipeService {
       }
       throw error
     } finally {
+      clearCurrentRecipeCheckConfig()
       void clearParseCache()
       fileCache.clear()
       this.abortController?.abort()

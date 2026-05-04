@@ -37,9 +37,10 @@ export { createSignal } from './types/signal.js';
 // Recipe service
 export { FitnessRecipeService } from './recipes/service.js';
 export type { FitnessRecipeServiceConfig, FitnessRecipeServiceCallbacks, CheckSummary } from './recipes/service-types.js';
-export type { FitnessRecipeResult, RecipeCheckResult } from './recipes/types.js';
+export type { FitnessRecipeResult, RecipeCheckResult, RecipeCheckConfigMap } from './recipes/types.js';
 export { builtInRecipesByName } from './recipes/built-in-recipes.js';
 export { defaultRecipeRegistry, FitnessRecipeRegistry } from './recipes/registry.js';
+export { getCheckConfig } from './recipes/check-config.js';
 
 // Targets and signalers
 export { loadTargetsConfig, resolveTargetFiles } from './targets/index.js';
