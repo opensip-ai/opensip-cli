@@ -200,23 +200,11 @@ export interface BaseCheckConfig {
    *   false-positive on the same banned phrase appearing in JSDoc /
    *   line / block comments documenting the rule itself.
    *
-   * The legacy names `'code-only'` and `'no-strings-no-comments'` are
-   * retained as deprecated aliases for back-compat. New checks should
-   * use the strip-* names — they read more accurately at the call site,
-   * and `code-only` was misleading enough that it produced a real bug
-   * (audit-sink-direct-use false-positiving on its own JSDoc).
-   *
-   * @deprecated `code-only` — use `strip-strings` instead (same behaviour).
-   * @deprecated `no-strings-no-comments` — use `strip-strings-and-comments` instead (same behaviour).
+   * The legacy `'code-only'` / `'no-strings-no-comments'` aliases were
+   * retained through 0.4.x for backwards-compat and removed in 0.5.0.
+   * Migrate any remaining call sites to the strip-* names.
    */
-  readonly contentFilter?:
-    | 'raw'
-    | 'strip-strings'
-    | 'strip-strings-and-comments'
-    /** @deprecated use `strip-strings` */
-    | 'code-only'
-    /** @deprecated use `strip-strings-and-comments` */
-    | 'no-strings-no-comments'
+  readonly contentFilter?: 'raw' | 'strip-strings' | 'strip-strings-and-comments'
   /**
    * Confidence level of this check's findings. Consumers of opensip-tools
    * signals (via --report-to) use this to decide how aggressively to act
@@ -249,15 +237,7 @@ const BaseCheckConfigSchema = z.object({
   fileTypes: z.array(z.string()).optional(),
   provider: z.string().optional(),
   scope: CheckScopeSchema.optional(),
-  contentFilter: z.enum([
-    'raw',
-    'strip-strings',
-    'strip-strings-and-comments',
-    // Deprecated aliases — kept for back-compat. New checks should use
-    // the `strip-*` names. See BaseCheckConfig.contentFilter docs.
-    'code-only',
-    'no-strings-no-comments',
-  ]).optional(),
+  contentFilter: z.enum(['raw', 'strip-strings', 'strip-strings-and-comments']).optional(),
   confidence: z.enum(['high', 'medium', 'low']).optional(),
 })
 

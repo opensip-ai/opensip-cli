@@ -68,18 +68,8 @@ export interface FileAccessorOptions {
   /**
    * Content filtering applied before returning file content. See
    * BaseCheckConfig.contentFilter for the canonical doc.
-   *
-   * Legacy names `code-only` and `no-strings-no-comments` are kept
-   * as deprecated aliases.
    */
-  readonly contentFilter?:
-    | 'raw'
-    | 'strip-strings'
-    | 'strip-strings-and-comments'
-    /** @deprecated use `strip-strings` */
-    | 'code-only'
-    /** @deprecated use `strip-strings-and-comments` */
-    | 'no-strings-no-comments'
+  readonly contentFilter?: 'raw' | 'strip-strings' | 'strip-strings-and-comments'
 }
 
 const DEFAULT_CACHE_CAPACITY = 100
@@ -133,13 +123,10 @@ export class FileAccessorImpl implements FileAccessor {
       content = await fs.readFile(filePath, 'utf-8')
     }
     // Two distinct modes — see BaseCheckConfig.contentFilter docs in
-    // check-config.ts. Legacy aliases map to the same dispatch.
-    if (this.contentFilterMode === 'strip-strings' || this.contentFilterMode === 'code-only') {
+    // check-config.ts.
+    if (this.contentFilterMode === 'strip-strings') {
       content = filterContent(content).code
-    } else if (
-      this.contentFilterMode === 'strip-strings-and-comments' ||
-      this.contentFilterMode === 'no-strings-no-comments'
-    ) {
+    } else if (this.contentFilterMode === 'strip-strings-and-comments') {
       content = filterContent(content).codeNoComments
     }
     this.cache.set(filePath, content)

@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.5.0] — 2026-05-05
+
+### Removed (`@opensip-tools/core`) — BREAKING
+
+- The deprecated `contentFilter: 'code-only'` and
+  `contentFilter: 'no-strings-no-comments'` aliases are removed.
+  Migrate to the canonical names introduced in 0.4.0:
+  - `'code-only'`              → `'strip-strings'`
+  - `'no-strings-no-comments'` → `'strip-strings-and-comments'`
+  Mapping is mechanical — same dispatch, same behaviour, just the
+  spelling changes.
+
+  Consumers of `@opensip-tools/core` who passed either old name to
+  `defineCheck({ contentFilter, ... })` or to `createFileAccessor(...,
+  { contentFilter })` will see a TypeScript narrowing error and a Zod
+  validation rejection at runtime.
+
+  Why now: `code-only` described intent, not behaviour, and the
+  resulting confusion produced a real false-positive bug
+  (`audit-sink-direct-use` firing on its own JSDoc) before the rename.
+  Keeping the alias indefinitely would invite the same confusion to
+  recur. The 0.4.0 release shipped both forms so consumers had a clean
+  migration window; that window closes here.
+
 ## [0.4.0] — 2026-05-05
 
 ### Added (`@opensip-tools/core`)

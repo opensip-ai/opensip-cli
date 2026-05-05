@@ -105,15 +105,10 @@ async function executeAnalyzeMode(
       const rawContent = await ctx.readFile(filePath)
       let content: string
       // Two distinct filter modes — see BaseCheckConfig.contentFilter
-      // docs for when to pick each. Legacy aliases `code-only` and
-      // `no-strings-no-comments` map to the same dispatch as their
-      // canonical strip-* counterparts.
-      if (config.contentFilter === 'strip-strings' || config.contentFilter === 'code-only') {
+      // docs for when to pick each.
+      if (config.contentFilter === 'strip-strings') {
         content = filterContent(rawContent).code
-      } else if (
-        config.contentFilter === 'strip-strings-and-comments' ||
-        config.contentFilter === 'no-strings-no-comments'
-      ) {
+      } else if (config.contentFilter === 'strip-strings-and-comments') {
         content = filterContent(rawContent).codeNoComments
       } else {
         content = rawContent
