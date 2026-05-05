@@ -12,9 +12,15 @@ import { defineCheck, type CheckViolation, getLineNumber } from '@opensip-tools/
 const PROCESS_EXIT_PATTERN = /process\.exit\s*\(/g
 
 /**
- * Pattern for detecting try/finally blocks
+ * Pattern for detecting an actual try/finally clause: a closing brace
+ * (of the try or catch block) immediately followed by `finally {`.
+ *
+ * Critical: must NOT match `Promise.finally(...)` (a method call),
+ * which is `.finally(` — preceded by a dot, followed by `(`. The
+ * `}\s*finally\s*\{` shape excludes both cases by requiring brace
+ * adjacency on both sides.
  */
-const TRY_FINALLY_PATTERN = /\btry\s*\{/g
+const TRY_FINALLY_PATTERN = /\}\s*finally\s*\{/
 
 /**
  * Check: resilience/no-process-exit-in-finally
@@ -50,17 +56,15 @@ export const noProcessExitInFinally = defineCheck({
       return violations
     }
 
-    // Quick check: must have both process.exit and try
+    // Quick check: must have both process.exit and finally
     if (!content.includes('process.exit') || !content.includes('finally')) {
       return violations
     }
 
-    // Verify the file actually has try/finally blocks
-    TRY_FINALLY_PATTERN.lastIndex = 0
-    const hasTryBlock = TRY_FINALLY_PATTERN.test(content)
-    const hasFinally = content.includes('finally')
-
-    if (!hasTryBlock || !hasFinally) {
+    // Verify the file has a real try/finally clause (not Promise.finally).
+    // The pattern `}\s*finally\s*\{` requires brace adjacency on both sides,
+    // which method-style `.finally(...)` cannot match.
+    if (!TRY_FINALLY_PATTERN.test(content)) {
       return violations
     }
 
