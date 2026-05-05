@@ -78,7 +78,7 @@ export const noWindowAlert = defineCheck({
   id: '170b156b-a45d-4f1a-af7a-a40ed507afe0',
   slug: 'no-window-alert',
   scope: { languages: ['typescript', 'tsx'], concerns: ['frontend', 'ui'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'medium',
   description:

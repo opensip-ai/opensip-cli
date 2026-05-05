@@ -118,7 +118,7 @@ export const clientBoundaryPlacement = defineCheck({
   slug: 'frontend-client-boundary-placement',
   disabled: true,
   scope: { languages: ['typescript', 'tsx'], concerns: ['frontend', 'ui'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'medium',
   description:

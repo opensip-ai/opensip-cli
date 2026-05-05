@@ -45,7 +45,7 @@ describe('filterContent', () => {
     // token after the inner template to be misinterpreted as part of a string).
     // The symptom was that real code — `loadConfig(process.cwd())`, type
     // annotations, anything — below the nested template got wiped to whitespace
-    // silently, producing false negatives in every `contentFilter: 'code-only'`
+    // silently, producing false negatives in every `contentFilter: 'strip-strings'`
     // check that scanned the affected file. Fix replaced the boolean with a
     // depth counter; this test keeps it fixed.
     it('handles nested templates inside ${} expressions — code below is preserved', () => {

@@ -116,7 +116,7 @@ export const batchOperationLimits = defineCheck({
   id: 'c4d9b853-147e-4c29-9702-f392b1f51056',
   slug: 'batch-operation-limits',
   scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'medium',
   description: 'Detect batch operations that may process unbounded data',

@@ -112,7 +112,7 @@ export const eventArchitecture = defineCheck({
   slug: 'event-architecture',
   disabled: true,
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'medium',
   description: 'Validate event handling follows architectural patterns',

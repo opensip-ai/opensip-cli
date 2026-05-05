@@ -29,7 +29,57 @@ async function writeTempFile(content: string): Promise<string> {
 }
 
 describe('FileAccessor contentFilter dispatch', () => {
-  describe('code-only mode (strings blanked, comments preserved)', () => {
+  describe('strip-strings (canonical) and code-only (deprecated alias) — strings blanked, comments preserved', () => {
+    it('strip-strings preserves comments', async () => {
+      const filePath = await writeTempFile(`const a = 1\n// @swallow-ok\nconst b = 2`)
+      const accessor = createFileAccessor([filePath], { contentFilter: 'strip-strings' })
+      const content = await accessor.read(filePath)
+      expect(content).toContain('@swallow-ok')
+      expect(content).toContain('const a = 1')
+    })
+
+    it('strip-strings blanks string literals', async () => {
+      const filePath = await writeTempFile(`const url = 'leak_me'`)
+      const accessor = createFileAccessor([filePath], { contentFilter: 'strip-strings' })
+      const content = await accessor.read(filePath)
+      expect(content).not.toContain('leak_me')
+    })
+
+    it('code-only is an alias for strip-strings', async () => {
+      const src = `const a = 1\n// @swallow-ok marker\nconst url = 'leak_me'`
+      const filePath = await writeTempFile(src)
+      const newAcc = createFileAccessor([filePath], { contentFilter: 'strip-strings' })
+      const oldAcc = createFileAccessor([filePath], { contentFilter: 'code-only' })
+      expect(await newAcc.read(filePath)).toEqual(await oldAcc.read(filePath))
+    })
+  })
+
+  describe('strip-strings-and-comments (canonical) and no-strings-no-comments (deprecated alias) — both blanked', () => {
+    it('strip-strings-and-comments blanks comments', async () => {
+      const filePath = await writeTempFile(`const a = 1\n// forbidden_phrase\nconst b = 2`)
+      const accessor = createFileAccessor([filePath], { contentFilter: 'strip-strings-and-comments' })
+      const content = await accessor.read(filePath)
+      expect(content).not.toContain('forbidden_phrase')
+      expect(content).toContain('const a = 1')
+    })
+
+    it('strip-strings-and-comments blanks string literals too', async () => {
+      const filePath = await writeTempFile(`const url = 'leak' // also leak`)
+      const accessor = createFileAccessor([filePath], { contentFilter: 'strip-strings-and-comments' })
+      const content = await accessor.read(filePath)
+      expect(content).not.toContain('leak')
+    })
+
+    it('no-strings-no-comments is an alias for strip-strings-and-comments', async () => {
+      const src = `const url = 'leak' // also leak`
+      const filePath = await writeTempFile(src)
+      const newAcc = createFileAccessor([filePath], { contentFilter: 'strip-strings-and-comments' })
+      const oldAcc = createFileAccessor([filePath], { contentFilter: 'no-strings-no-comments' })
+      expect(await newAcc.read(filePath)).toEqual(await oldAcc.read(filePath))
+    })
+  })
+
+  describe('legacy code-only mode (kept for back-compat — strings blanked, comments preserved)', () => {
     it('preserves line-comment text so rules can scan markers', async () => {
       const filePath = await writeTempFile(
         `const a = 1\n// @swallow-ok intentional fallthrough\nconst b = 2`,

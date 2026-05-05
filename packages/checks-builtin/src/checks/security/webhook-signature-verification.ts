@@ -190,7 +190,7 @@ export const webhookSignatureVerification = defineCheck({
   disabled: true,
   tags: ['security'],
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'medium',
   description: 'Detect webhook endpoints without signature verification',

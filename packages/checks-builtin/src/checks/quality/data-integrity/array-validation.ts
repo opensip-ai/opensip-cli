@@ -387,7 +387,7 @@ export const arrayValidation = defineCheck({
   id: 'a9e0e70c-a4af-42e6-bbd7-4c87a72cb7d4',
   slug: 'array-validation',
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'high',
   description: 'Detect array parameters without proper validation',

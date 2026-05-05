@@ -45,7 +45,7 @@ export const exitCodeCorrectness = defineCheck({
   id: 'c5007f87-9c72-49be-861a-a419cac1006f',
   slug: 'exit-code-correctness',
   scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'medium',
   description: 'Detect error branches that mask failures with silent success exit',

@@ -313,7 +313,7 @@ export const lazyLoading = defineCheck({
   slug: 'lazy-loading',
   disabled: true,
   scope: { languages: ['typescript', 'tsx'], concerns: ['frontend', 'ui'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'high',
   description: 'Detect expensive operations performed before unused guard clauses',

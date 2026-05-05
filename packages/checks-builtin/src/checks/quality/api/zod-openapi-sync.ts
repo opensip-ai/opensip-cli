@@ -81,7 +81,7 @@ export const zodOpenapiSync = defineCheck({
   slug: 'zod-openapi-sync',
   disabled: true,
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'medium',
   description: 'Ensures Zod schemas use .satisfies z.ZodType<> pattern',

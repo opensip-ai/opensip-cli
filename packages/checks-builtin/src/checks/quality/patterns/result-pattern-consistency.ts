@@ -309,7 +309,7 @@ export const resultPatternConsistency = defineCheck({
   id: '137e8d24-8b06-4d1f-b5f0-e7542d932679',
   slug: 'result-pattern-consistency',
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'high',
   description:

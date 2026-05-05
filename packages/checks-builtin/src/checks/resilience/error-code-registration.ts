@@ -15,7 +15,7 @@ export const errorCodeRegistration = defineCheck({
   slug: 'error-code-registration',
   disabled: true,
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'medium',
   description: 'Validates that error codes used in code are registered in an error registry file',

@@ -31,7 +31,7 @@ export const asyncStatePattern = defineCheck({
   slug: 'async-state-pattern',
   disabled: true,
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'medium',
   description: 'Ensure data-driven screens use AsyncState pattern',

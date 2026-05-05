@@ -172,7 +172,7 @@ export const performanceAntiPatterns = defineCheck({
   id: '7631876c-1688-4f36-b6c9-0b987202d9f9',
   slug: 'performance-anti-patterns',
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'medium',
   description: 'Detects common performance anti-patterns (sequential await, spread in loops)',

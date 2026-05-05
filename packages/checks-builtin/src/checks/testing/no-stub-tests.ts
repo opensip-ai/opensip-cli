@@ -94,7 +94,7 @@ export const noStubTests = defineCheck({
   id: 'fc8032e4-9fcf-4a1f-bc00-e080e58ae1c5',
   slug: 'no-stub-tests',
   scope: { languages: ['typescript', 'tsx'], concerns: ['testing'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'medium',
   description:

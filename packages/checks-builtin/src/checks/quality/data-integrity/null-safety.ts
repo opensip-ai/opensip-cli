@@ -671,7 +671,7 @@ export const nullSafety = defineCheck({
   id: '011c993e-829b-4423-8032-0b7c9baa22bf',
   slug: 'null-safety',
   scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'high',
   description: 'Detect unsafe property and method access without null checks',

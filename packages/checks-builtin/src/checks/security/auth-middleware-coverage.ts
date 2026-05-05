@@ -171,7 +171,7 @@ export const authMiddlewareCoverage = defineCheck({
   id: 'eb8b97f1-3125-4391-be4d-020c74413817',
   slug: 'auth-middleware-coverage',
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'medium',
   description: 'Validate routes have authentication middleware',

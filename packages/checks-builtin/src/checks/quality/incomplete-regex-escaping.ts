@@ -168,7 +168,7 @@ export const incompleteRegexEscaping = defineCheck({
   id: '62395bfb-8ece-4c82-a6e2-4150b827ac1f',
   slug: 'incomplete-regex-escaping',
   scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'high',
   description:

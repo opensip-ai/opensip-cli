@@ -80,7 +80,7 @@ export const unsafeSecretComparison = defineCheck({
   id: '0249cfc8-5342-480a-a9d0-fbf7ad89a6cf',
   slug: 'unsafe-secret-comparison',
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
   confidence: 'high',
   description: 'Detect timing-unsafe equality comparisons on secret/token values',
   longDescription: `**Purpose:** Detects \`===\` or \`!==\` comparisons on variables whose names suggest they hold cryptographic secrets, which are vulnerable to timing side-channel attacks.

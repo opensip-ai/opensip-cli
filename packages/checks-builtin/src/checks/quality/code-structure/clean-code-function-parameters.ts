@@ -235,7 +235,7 @@ export const cleanCodeFunctionParameters = defineCheck({
   id: 'fccfbaff-d492-492e-ad09-21b7abb2b8b6',
   slug: 'clean-code-function-parameters',
   scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
   confidence: 'high',
   description: 'Ensure functions have minimal parameters (0-2 ideal, 3+ warning, 5+ error)',
   longDescription: `**Purpose:** Enforces Clean Code principles for function parameter counts, requiring functions to use options objects or builder patterns instead of long parameter lists.

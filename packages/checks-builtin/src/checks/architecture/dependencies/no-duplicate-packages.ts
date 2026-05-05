@@ -153,7 +153,7 @@ export const noDuplicatePackages = defineCheck({
   slug: 'no-duplicate-packages',
   tags: ['architecture'],
   scope: { languages: ['json', 'typescript', 'yaml'], concerns: ['config'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'medium',
   description: 'Detects packages that serve the same purpose',

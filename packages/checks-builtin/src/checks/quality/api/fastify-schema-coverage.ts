@@ -333,7 +333,7 @@ export const fastifySchemaCoverage = defineCheck({
   id: '16f14276-7a70-43bb-8097-181dd277371c',
   slug: 'fastify-schema-coverage',
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'high',
   description: 'Validate that Fastify routes have proper request/response schema validation',

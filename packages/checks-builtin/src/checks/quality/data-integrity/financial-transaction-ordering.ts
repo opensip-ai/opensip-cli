@@ -297,7 +297,7 @@ export const financialTransactionOrdering = defineCheck({
   slug: 'financial-transaction-ordering',
   disabled: true,
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'high',
   description:

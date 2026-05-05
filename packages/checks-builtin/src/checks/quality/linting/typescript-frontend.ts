@@ -147,7 +147,7 @@ export const typescriptFrontend = defineCheck({
   id: 'a32ab706-f817-404c-835f-da79f64505c7',
   slug: 'typescript-frontend',
   scope: { languages: ['typescript', 'tsx'], concerns: ['frontend', 'ui'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'medium',
   description: 'Validates TypeScript compilation for frontend apps',

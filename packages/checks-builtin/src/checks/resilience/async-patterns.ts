@@ -879,7 +879,7 @@ export const detachedPromises = defineCheck({
   id: 'fda3b4f5-bb4f-4b77-9d0d-9103f958febb',
   slug: 'detached-promises',
   scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'high',
   description: 'Detect promises that may not be awaited (potential silent failures)',

@@ -170,7 +170,7 @@ export const inMemoryRepositoryDetection = defineCheck({
   id: 'e44c8f1a-c63f-4583-8f64-a652d240865a',
   slug: 'in-memory-repository-detection',
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'high',
   description:

@@ -68,7 +68,7 @@ export const noEval = defineCheck({
   id: '9f6d299f-8155-4719-b605-897e9dcb1fdb',
   slug: 'no-eval',
   scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
   confidence: 'medium',
   description: 'Detect dangerous eval and dynamic code execution',
   longDescription: `**Purpose:** Detects usage of \`eval()\`, \`new Function()\`, and other dynamic code execution patterns that can lead to code injection vulnerabilities.

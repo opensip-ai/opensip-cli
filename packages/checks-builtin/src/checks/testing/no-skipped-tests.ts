@@ -107,7 +107,7 @@ export const noSkippedTests = defineCheck({
 **Scope:** General best practice. Analyzes each file individually, targeting test files only.`,
   tags: ['testing'],
   fileTypes: ['ts', 'tsx'],
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
   confidence: 'high',
 
   analyze: analyzeFile,

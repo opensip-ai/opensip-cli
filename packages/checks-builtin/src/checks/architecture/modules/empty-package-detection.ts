@@ -287,7 +287,7 @@ export const emptyPackageDetection = defineCheck({
   slug: 'empty-package-detection',
   itemType: 'packages',
   scope: { languages: ['json', 'typescript', 'yaml'], concerns: ['config'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'medium',
   description: 'Detects packages with empty or commented-out exports',

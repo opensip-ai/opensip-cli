@@ -232,7 +232,7 @@ export const mutableExportedConstants = defineCheck({
   id: 'd9d43de6-8f2a-4da7-9d24-bc1b30f4e611',
   slug: 'mutable-exported-constants',
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'high',
   description: 'Detect exported const objects/arrays without Object.freeze() or as const',

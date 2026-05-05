@@ -112,7 +112,7 @@ export const noFocusedTests = defineCheck({
 **Scope:** General best practice. Analyzes each file individually, targeting test files only.`,
   tags: ['testing', 'ci-blocking'],
   fileTypes: ['ts', 'tsx'],
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
   confidence: 'high',
 
   analyze: analyzeFile,

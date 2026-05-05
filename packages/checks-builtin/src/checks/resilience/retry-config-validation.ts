@@ -154,7 +154,7 @@ export const retryConfigValidation = defineCheck({
   id: '174659f8-56b5-4e8d-a495-3c3188fddaf8',
   slug: 'retry-config-validation',
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'medium',
   description:

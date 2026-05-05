@@ -457,7 +457,7 @@ export const asyncWaterfallDetection = defineCheck({
   id: 'cf169aa8-906c-4e74-bd48-8c9f59ae3eb7',
   slug: 'async-waterfall-detection',
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'high',
   description: 'Detect sequential await statements that could be parallelized',

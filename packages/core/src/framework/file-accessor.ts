@@ -66,13 +66,20 @@ export interface FileAccessorOptions {
   readonly cacheCapacity?: number
   readonly signal?: AbortSignal
   /**
-   * Content filtering applied before returning file content.
-   * - 'code-only': string literals replaced with spaces.
-   * - 'no-strings-no-comments': string literals AND comments replaced
-   *   with spaces. Use for checks that pattern-match identifiers via
-   *   regex and would false-positive on JSDoc / line-comment mentions.
+   * Content filtering applied before returning file content. See
+   * BaseCheckConfig.contentFilter for the canonical doc.
+   *
+   * Legacy names `code-only` and `no-strings-no-comments` are kept
+   * as deprecated aliases.
    */
-  readonly contentFilter?: 'raw' | 'code-only' | 'no-strings-no-comments'
+  readonly contentFilter?:
+    | 'raw'
+    | 'strip-strings'
+    | 'strip-strings-and-comments'
+    /** @deprecated use `strip-strings` */
+    | 'code-only'
+    /** @deprecated use `strip-strings-and-comments` */
+    | 'no-strings-no-comments'
 }
 
 const DEFAULT_CACHE_CAPACITY = 100
@@ -83,7 +90,7 @@ export class FileAccessorImpl implements FileAccessor {
   private readonly cache: LRUCache<string, string>
   private readonly pathSet: Set<string>
   private readonly signal?: AbortSignal
-  private readonly contentFilterMode?: 'raw' | 'code-only' | 'no-strings-no-comments'
+  private readonly contentFilterMode?: FileAccessorOptions['contentFilter']
 
   constructor(filePaths: readonly string[], options: FileAccessorOptions = {}) {
     this.paths = filePaths
@@ -125,10 +132,14 @@ export class FileAccessorImpl implements FileAccessor {
       }
       content = await fs.readFile(filePath, 'utf-8')
     }
-    // Two distinct modes — see define-check.ts for the semantic note.
-    if (this.contentFilterMode === 'code-only') {
+    // Two distinct modes — see BaseCheckConfig.contentFilter docs in
+    // check-config.ts. Legacy aliases map to the same dispatch.
+    if (this.contentFilterMode === 'strip-strings' || this.contentFilterMode === 'code-only') {
       content = filterContent(content).code
-    } else if (this.contentFilterMode === 'no-strings-no-comments') {
+    } else if (
+      this.contentFilterMode === 'strip-strings-and-comments' ||
+      this.contentFilterMode === 'no-strings-no-comments'
+    ) {
       content = filterContent(content).codeNoComments
     }
     this.cache.set(filePath, content)

@@ -114,7 +114,7 @@ export const dynamodbScanDetection = defineCheck({
   slug: 'dynamodb-scan-detection',
   disabled: true,
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'high',
   description: 'Detect DynamoDB ScanCommand usage that should use QueryCommand',

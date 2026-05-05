@@ -106,7 +106,7 @@ export const noCustomEventEmitter = defineCheck({
   slug: 'no-custom-event-emitter',
   disabled: true,
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'medium',
   description: 'Detects direct EventEmitter usage that should use infrastructure/events',

@@ -147,7 +147,7 @@ export const gracefulShutdown = defineCheck({
   id: '3e98b441-1ec9-4963-bb97-6f5b0bce0fbe',
   slug: 'graceful-shutdown',
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'medium',
   description: 'Validate services implement graceful shutdown handling',

@@ -111,7 +111,7 @@ export const catchClauseSafety = defineCheck({
 **Scope:** Production code. Analyzes each file individually via regex-based line scanning.`,
   tags: ['errors', 'resilience', 'type-safety'],
   fileTypes: ['ts', 'tsx'],
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
   confidence: 'medium',
   analyze: analyzeCatchSafety,
 })

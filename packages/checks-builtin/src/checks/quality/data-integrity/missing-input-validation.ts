@@ -181,7 +181,7 @@ export const missingInputValidation = defineCheck({
   id: '25f2a9b6-be96-42a4-aa0d-3b00839784e3',
   slug: 'missing-input-validation',
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'high',
   description: 'Detect API handlers accepting external input without validation (Zod, Joi, etc.)',

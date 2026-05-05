@@ -37,7 +37,7 @@ export const readlineCleanup = defineCheck({
   id: 'd0e76036-c138-4132-99be-d2cddf9aeac1',
   slug: 'readline-cleanup',
   scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'medium',
   description: 'Detect readline usage without proper cleanup (close/finally)',

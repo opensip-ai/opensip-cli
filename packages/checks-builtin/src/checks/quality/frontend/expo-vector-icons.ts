@@ -69,7 +69,7 @@ export const expoVectorIcons = defineCheck({
   slug: 'expo-vector-icons',
   disabled: true,
   scope: { languages: ['typescript', 'tsx'], concerns: ['frontend', 'ui'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'medium',
   description: 'Ensure consistent icon library usage with @expo/vector-icons',

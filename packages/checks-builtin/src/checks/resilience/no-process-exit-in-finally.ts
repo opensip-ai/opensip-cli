@@ -32,7 +32,7 @@ export const noProcessExitInFinally = defineCheck({
   id: '58c0aaf6-f965-4336-983f-ee1033269e54',
   slug: 'no-process-exit-in-finally',
   scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'medium',
   description: 'Detect process.exit() that bypasses finally cleanup',

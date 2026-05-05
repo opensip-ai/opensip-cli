@@ -546,7 +546,7 @@ export const interfaceImplementationConsistency = defineCheck({
   id: 'c9549378-95bf-4b5f-923c-c342134c3068',
   slug: 'interface-implementation-consistency',
   scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'medium',
   description: 'Verifies interfaces match their implementations',

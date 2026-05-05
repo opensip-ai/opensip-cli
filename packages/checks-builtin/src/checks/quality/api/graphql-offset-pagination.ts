@@ -16,7 +16,7 @@ export const graphqlOffsetPagination = defineCheck({
   slug: 'graphql-offset-pagination',
   disabled: true,
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'medium',
   description: 'Detect $offset variables in GraphQL queries that indicate offset-based pagination',

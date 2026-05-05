@@ -65,7 +65,7 @@ export const navigationTyping = defineCheck({
   slug: 'navigation-typing',
   disabled: true,
   scope: { languages: ['typescript', 'tsx'], concerns: ['frontend', 'ui'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'medium',
   description: 'Verify navigation params are properly typed for type-safe routing',

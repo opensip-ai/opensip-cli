@@ -132,7 +132,7 @@ export const streamBufferSizeLimits = defineCheck({
   id: 'a3206507-aa7f-4210-ae8c-06ed1025abfd',
   slug: 'stream-buffer-size-limits',
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'high',
   description: 'Detects Buffer.concat() and stream buffering without size limit guards',

@@ -310,7 +310,7 @@ export const apiContractValidation = defineCheck({
   id: 'ef307717-de39-41d3-8344-0e6f7562367a',
   slug: 'api-contract-validation',
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'high',
   description: 'Validate API handlers have proper validation, typed responses, and error handling',

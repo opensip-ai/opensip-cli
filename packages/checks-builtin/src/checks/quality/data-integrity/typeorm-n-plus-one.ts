@@ -238,7 +238,7 @@ export const typeormNPlusOne = defineCheck({
   slug: 'typeorm-n-plus-one',
   disabled: true,
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'high',
   description: 'Detects N+1 query patterns in TypeORM usage',

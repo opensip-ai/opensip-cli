@@ -139,7 +139,7 @@ export const testOnlyFrontendModules = defineCheck({
   id: '78a085b3-55c4-42d3-a74c-8dfaad8123f1',
   slug: 'test-only-frontend-modules',
   scope: { languages: ['typescript', 'tsx'], concerns: ['frontend', 'ui'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
   confidence: 'medium',
   description: 'Detects frontend code only imported by test files',
   tags: ['quality', 'code-quality', 'maintainability'],

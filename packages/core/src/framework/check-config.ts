@@ -185,25 +185,38 @@ export interface BaseCheckConfig {
   /** Portable scope declaration for marketplace-ready target matching. */
   readonly scope?: CheckScope
   /**
-   * Content filtering mode for the analyze() function.
+   * Content filtering mode for the analyze() function. Names describe
+   * what the filter strips so rule authors don't have to guess at intent.
    *
    * - 'raw' (default): Full file content, unchanged. Use for checks that
    *   need to analyze string content (e.g., hardcoded secrets, PII detection).
-   * - 'code-only': String literals replaced with whitespace, preserving
-   *   line/column positions. Use for checks that match code patterns
-   *   (function calls, imports, type annotations) and should not match
-   *   inside strings — but legitimately want to scan inside comments
-   *   (e.g. checks that look for `@deprecated` directives or rationale
-   *   pragmas).
-   * - 'no-strings-no-comments': String literals AND comments replaced
-   *   with whitespace, preserving line/column positions. Use for checks
-   *   that pattern-match identifiers via regex and would false-positive
-   *   on banned-call references that appear in JSDoc / line / block
-   *   comments documenting the rule itself (e.g. ``"Replace
-   *   getDatabase() with the constructor StoreDeps"`` inside a doc
-   *   string).
+   * - 'strip-strings': String literals replaced with whitespace,
+   *   preserving line/column positions. COMMENTS PRESERVED — use when
+   *   the check reads comment-based directives like `// @deprecated`,
+   *   `// @swallow-ok`, or `// @fitness-ignore-...`.
+   * - 'strip-strings-and-comments': BOTH string literals and comments
+   *   replaced with whitespace, preserving line/column positions. Use
+   *   for checks that pattern-match identifiers via regex and would
+   *   false-positive on the same banned phrase appearing in JSDoc /
+   *   line / block comments documenting the rule itself.
+   *
+   * The legacy names `'code-only'` and `'no-strings-no-comments'` are
+   * retained as deprecated aliases for back-compat. New checks should
+   * use the strip-* names — they read more accurately at the call site,
+   * and `code-only` was misleading enough that it produced a real bug
+   * (audit-sink-direct-use false-positiving on its own JSDoc).
+   *
+   * @deprecated `code-only` — use `strip-strings` instead (same behaviour).
+   * @deprecated `no-strings-no-comments` — use `strip-strings-and-comments` instead (same behaviour).
    */
-  readonly contentFilter?: 'raw' | 'code-only' | 'no-strings-no-comments'
+  readonly contentFilter?:
+    | 'raw'
+    | 'strip-strings'
+    | 'strip-strings-and-comments'
+    /** @deprecated use `strip-strings` */
+    | 'code-only'
+    /** @deprecated use `strip-strings-and-comments` */
+    | 'no-strings-no-comments'
   /**
    * Confidence level of this check's findings. Consumers of opensip-tools
    * signals (via --report-to) use this to decide how aggressively to act
@@ -236,7 +249,15 @@ const BaseCheckConfigSchema = z.object({
   fileTypes: z.array(z.string()).optional(),
   provider: z.string().optional(),
   scope: CheckScopeSchema.optional(),
-  contentFilter: z.enum(['raw', 'code-only', 'no-strings-no-comments']).optional(),
+  contentFilter: z.enum([
+    'raw',
+    'strip-strings',
+    'strip-strings-and-comments',
+    // Deprecated aliases — kept for back-compat. New checks should use
+    // the `strip-*` names. See BaseCheckConfig.contentFilter docs.
+    'code-only',
+    'no-strings-no-comments',
+  ]).optional(),
   confidence: z.enum(['high', 'medium', 'low']).optional(),
 })
 

@@ -458,7 +458,7 @@ export const phantomDependencyDetection = defineCheck({
   id: '67284374-69b8-4711-9c66-33d2ad44ef79',
   slug: 'phantom-dependency-detection',
   scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'medium',
   description: 'Detect phantom dependencies (used but not declared in package.json)',

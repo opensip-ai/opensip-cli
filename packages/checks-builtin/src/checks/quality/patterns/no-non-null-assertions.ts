@@ -85,7 +85,7 @@ export const noNonNullAssertions = defineCheck({
   id: 'd1e51952-5758-40f3-999b-b83f57db9a42',
   slug: 'no-non-null-assertions',
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'medium',
   description:

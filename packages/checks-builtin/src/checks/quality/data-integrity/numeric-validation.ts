@@ -413,7 +413,7 @@ export const numericValidation = defineCheck({
   id: '7e6e4703-670d-45cd-a0cd-e14595e6fffc',
   slug: 'numeric-validation',
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'high',
   description: 'Detect numeric parameters without NaN/Infinity/range validation',

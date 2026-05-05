@@ -265,7 +265,7 @@ export const testFilePairing = defineCheck({
   id: '6f807024-f5c3-4364-a1f3-ccd39d439df2',
   slug: 'test-file-pairing',
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
   confidence: 'high',
   description: 'Ensures every source file has a corresponding test file',
   longDescription: `**Purpose:** Ensures every TypeScript source file in \`packages/\`, \`apps/\`, and \`services/\` has a corresponding test file, enforcing test coverage completeness.

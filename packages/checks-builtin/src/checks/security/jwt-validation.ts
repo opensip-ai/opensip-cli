@@ -300,7 +300,7 @@ export const jwtValidation = defineCheck({
   slug: 'jwt-validation',
   disabled: true,
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'medium',
   description: 'Validate JWT handling follows security best practices',

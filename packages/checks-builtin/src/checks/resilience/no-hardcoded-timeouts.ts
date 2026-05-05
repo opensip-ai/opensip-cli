@@ -269,7 +269,7 @@ export const noHardcodedTimeouts = defineCheck({
   id: '5c183a31-ff6e-4120-a7a5-39a32dbbcfa5',
   slug: 'no-hardcoded-timeouts',
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'medium',
   description: 'Detect hardcoded timeout values that should be configurable',

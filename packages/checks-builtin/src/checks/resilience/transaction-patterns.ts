@@ -161,7 +161,7 @@ export const transactionBoundaryValidation = defineCheck({
   id: '77c69adc-7ccd-4f83-98d1-fb9599d3e16f',
   slug: 'transaction-boundary-validation',
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'medium',
   description: 'Validate transaction boundaries are properly managed',

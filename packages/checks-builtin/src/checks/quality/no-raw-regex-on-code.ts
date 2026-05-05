@@ -2,7 +2,7 @@
  * @fileoverview Advisory meta-check for content filter usage
  *
  * Detects fitness checks that use regex pattern matching on file content
- * without declaring contentFilter: 'code-only', which may lead to
+ * without declaring contentFilter: 'strip-strings', which may lead to
  * false positives from string literal and comment content.
  */
 
@@ -19,13 +19,13 @@ export const noRawRegexOnCode = defineCheck({
 
   confidence: 'medium',
   description: 'Detect regex checks that should use contentFilter: code-only',
-  longDescription: `**Purpose:** Advisory meta-check that identifies fitness checks using regex pattern matching without declaring \`contentFilter: 'code-only'\`. Such checks may produce false positives when patterns match inside string literals or comments.
+  longDescription: `**Purpose:** Advisory meta-check that identifies fitness checks using regex pattern matching without declaring \`contentFilter: 'strip-strings'\`. Such checks may produce false positives when patterns match inside string literals or comments.
 
 **Detects:**
 - Check files that call \`.test()\`, \`.match()\`, \`.exec()\`, or \`.search()\` on content
-- That do NOT declare \`contentFilter: 'code-only'\` or \`contentFilter: 'raw'\`
+- That do NOT declare \`contentFilter: 'strip-strings'\` or \`contentFilter: 'raw'\`
 
-**Why it matters:** Regex checks without content filtering match patterns inside string literals and documentation, producing false positives. Adding \`contentFilter: 'code-only'\` to the check config eliminates this class of false positives.
+**Why it matters:** Regex checks without content filtering match patterns inside string literals and documentation, producing false positives. Adding \`contentFilter: 'strip-strings'\` to the check config eliminates this class of false positives.
 
 **Scope:** Fitness check files only.`,
   tags: ['quality', 'internal', 'meta', 'content-filter'],
@@ -54,7 +54,7 @@ export const noRawRegexOnCode = defineCheck({
           message: 'Check uses regex pattern matching without contentFilter declaration',
           severity: 'warning',
           type: 'missing-content-filter',
-          suggestion: "Add contentFilter: 'code-only' to skip string literals, or contentFilter: 'raw' to explicitly opt out (e.g., for secret detection checks).",
+          suggestion: "Add contentFilter: 'strip-strings' to skip string literals, or contentFilter: 'raw' to explicitly opt out (e.g., for secret detection checks).",
         }]
       }
     }

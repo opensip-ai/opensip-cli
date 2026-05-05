@@ -220,7 +220,7 @@ export const inputSanitization = defineCheck({
   id: '31ef5173-a102-4a37-bc14-3f5bb08f9688',
   slug: 'input-sanitization',
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
   description: 'Detect unsanitized user input usage',
   longDescription: `**Purpose:** Detects user input from request objects (req.body, req.params, req.query) flowing unsanitized into dangerous sinks, using AST analysis to avoid false positives.
 

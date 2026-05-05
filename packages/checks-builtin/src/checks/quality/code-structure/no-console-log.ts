@@ -96,7 +96,7 @@ export const noConsoleLog = defineCheck({
 **Scope:** General best practice. Analyzes each file individually.`,
   tags: ['logging', 'quality'],
   fileTypes: ['ts'],
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
   confidence: 'high',
 
   analyze(content, _filePath): CheckViolation[] {

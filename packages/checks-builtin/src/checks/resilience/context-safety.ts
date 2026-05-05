@@ -296,7 +296,7 @@ export const contextMutationCheck = defineCheck({
   id: 'abed5b29-960b-486f-bb0d-5b9e1744241d',
   slug: 'context-mutation-check',
   scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'medium',
   description: 'Detect unsafe mutations of request/execution context',

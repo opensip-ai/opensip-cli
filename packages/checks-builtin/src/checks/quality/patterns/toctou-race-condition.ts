@@ -286,7 +286,7 @@ export const toctouRaceCondition = defineCheck({
   id: 'eb67d6f3-c984-485d-b077-1ebabea0d894',
   slug: 'toctou-race-condition',
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'high',
   description: 'Detects read-then-update patterns without atomic guarantees',

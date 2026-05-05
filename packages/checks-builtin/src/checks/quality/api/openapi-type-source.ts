@@ -63,7 +63,7 @@ export const openapiTypeSource = defineCheck({
   slug: 'openapi-type-source',
   disabled: true,
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'high',
   description: 'Ensures API types are sourced from generated schema.d.ts',

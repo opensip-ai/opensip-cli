@@ -326,7 +326,7 @@ export const fastifyRouteValidation = defineCheck({
   id: '0de8bce9-e6fd-45c2-83ea-013bedfd3346',
   slug: 'fastify-route-validation',
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'high',
   description: 'Ensure all Fastify POST/PATCH/PUT routes validate request bodies with Zod schemas',

@@ -227,7 +227,7 @@ export const unusedModules = defineCheck({
   id: '8c826451-c3d8-43d2-a2e6-b85d9e685d8c',
   slug: 'unused-modules',
   scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'high',
   description: 'Detects modules with no exports or that are never imported anywhere',

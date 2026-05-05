@@ -197,7 +197,7 @@ export const testFileNaming = defineCheck({
   id: '7c26c9ae-2944-46e1-a49b-817b81aba0e6',
   slug: 'test-file-naming',
   scope: { languages: ['typescript', 'tsx'], concerns: ['testing'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'medium',
   description: 'Validates test file naming conventions follow *.test.ts or *.spec.ts patterns',

@@ -173,7 +173,7 @@ export const noTestOnlySkip = defineCheck({
   id: '11f39e35-8518-49a7-b0f0-44c2fab0634d',
   slug: 'no-test-only-skip',
   scope: { languages: ['typescript', 'tsx'], concerns: ['testing'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'medium',
   description: 'Detects .only and .skip in test files that should not be committed',

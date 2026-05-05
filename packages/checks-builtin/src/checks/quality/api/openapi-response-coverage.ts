@@ -259,7 +259,7 @@ export const openapiResponseCoverage = defineCheck({
   slug: 'openapi-response-coverage',
   disabled: true,
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'high',
   description: 'Validates that API routes have proper error response schemas in OpenAPI spec',

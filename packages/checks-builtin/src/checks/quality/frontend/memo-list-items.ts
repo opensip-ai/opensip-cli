@@ -351,7 +351,7 @@ export const memoListItems = defineCheck({
   slug: 'memo-list-items',
   disabled: true,
   scope: { languages: ['typescript', 'tsx'], concerns: ['frontend', 'ui'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'high',
   description: 'Warn when components rendered in .map() calls might benefit from memoization',

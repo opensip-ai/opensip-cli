@@ -103,7 +103,7 @@ export const rateLimitCoverage = defineCheck({
   slug: 'rate-limit-coverage',
   disabled: true,
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'medium',
   description: 'Validate routes have rate limiting configured',

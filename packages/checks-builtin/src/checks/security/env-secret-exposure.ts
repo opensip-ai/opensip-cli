@@ -103,7 +103,7 @@ export const envSecretExposure = defineCheck({
 **Scope:** General best practice. Analyzes each file individually.`,
   tags: ['security', 'secrets', 'logging', 'errors'],
   fileTypes: ['ts'],
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
   confidence: 'medium',
 
   analyze(content: string, filePath: string): CheckViolation[] {

@@ -31,7 +31,7 @@ export const reentrancyGuard = defineCheck({
   id: 'd7f35c3b-af42-435f-b953-ee167060fecb',
   slug: 'reentrancy-guard',
   scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'medium',
   description: 'Detect boolean reentrancy guards that need counter/mutex semantics',

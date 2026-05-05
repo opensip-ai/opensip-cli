@@ -209,7 +209,7 @@ export const mockImplementationsInProduction = defineCheck({
   id: 'f7507280-993b-4dde-9270-52b30478cca8',
   slug: 'mock-implementations-in-production',
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'high',
   description: 'Detects mock, stub, or fake implementations in production code',

@@ -183,7 +183,7 @@ export const useCentralizedCrypto = defineCheck({
   slug: 'use-centralized-crypto',
   disabled: true,
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'medium',
   description: 'Enforce use of centralized crypto module instead of direct crypto operations',

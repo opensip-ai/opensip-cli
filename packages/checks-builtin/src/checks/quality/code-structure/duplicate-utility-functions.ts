@@ -569,7 +569,7 @@ export const duplicateUtilityFunctions = defineCheck({
   id: 'aa303a1e-f3f8-4a11-ade2-9e29af89c299',
   slug: 'duplicate-utility-functions',
   scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'high',
   description: 'Detect duplicate and similar utility functions',

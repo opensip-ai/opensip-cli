@@ -78,7 +78,7 @@ export const timerLifecycle = defineCheck({
 **Scope:** Backend code. Analyzes each file individually via regex.`,
   tags: ['resilience', 'memory', 'lifecycle'],
   fileTypes: ['ts'],
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
   confidence: 'medium',
   analyze: analyzeTimerLifecycle,
 })

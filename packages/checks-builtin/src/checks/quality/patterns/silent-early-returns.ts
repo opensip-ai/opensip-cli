@@ -280,7 +280,7 @@ export const silentEarlyReturns = defineCheck({
   id: '9585ae15-45ea-404c-91b5-91baad7b4de0',
   slug: 'silent-early-returns',
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
   description: 'Detect single-line early returns without logging',
   longDescription: `**Purpose:** Detects validation/guard paths that return sentinel values (\`null\` or \`false\`) without logging, making debugging difficult.
 

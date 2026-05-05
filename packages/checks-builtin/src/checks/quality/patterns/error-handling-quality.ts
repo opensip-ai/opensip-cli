@@ -288,7 +288,7 @@ export const errorHandlingQuality = defineCheck({
   id: '6bae5be9-87f4-499e-a886-ca78a233cfb7',
   slug: 'error-handling-quality',
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
   confidence: 'high',
   description: 'Detect silent error handling in try/catch and Result patterns',
   longDescription: `**Purpose:** Detects silent error handling in both try/catch blocks and Result pattern usage, ensuring errors are always logged or propagated.

@@ -152,7 +152,7 @@ export const apiKeyRotation = defineCheck({
   id: '32f69a85-7a07-4f60-88dd-cc4a0982c1b4',
   slug: 'api-key-rotation',
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'medium',
   description: 'Validate API key handling supports rotation',

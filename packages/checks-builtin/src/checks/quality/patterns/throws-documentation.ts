@@ -580,7 +580,7 @@ export const throwsDocumentation = defineCheck({
   id: 'f4fb7ff5-5927-4b0b-a9cf-d919cd37c931',
   slug: 'throws-documentation',
   scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
-  contentFilter: 'code-only',
+  contentFilter: 'strip-strings',
 
   confidence: 'high',
   description: 'Detects functions with throw statements but no @throws JSDoc',
