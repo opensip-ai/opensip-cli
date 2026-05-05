@@ -125,6 +125,7 @@ export class FileAccessorImpl implements FileAccessor {
       }
       content = await fs.readFile(filePath, 'utf-8')
     }
+    // Two distinct modes — see define-check.ts for the semantic note.
     if (this.contentFilterMode === 'code-only') {
       content = filterContent(content).code
     } else if (this.contentFilterMode === 'no-strings-no-comments') {

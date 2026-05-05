@@ -104,6 +104,16 @@ async function executeAnalyzeMode(
     try {
       const rawContent = await ctx.readFile(filePath)
       let content: string
+      // Two distinct filter modes — pick based on what the rule scans:
+      //   `code-only`            → string literals blanked, COMMENTS PRESERVED.
+      //                            Use when the rule reads comment-based
+      //                            directives (e.g. `// @swallow-ok`,
+      //                            `// @fitness-ignore-next-line`) or other
+      //                            JSDoc/prose markers.
+      //   `no-strings-no-comments` → both blanked. Use when the rule's
+      //                            pattern would false-fire on the same
+      //                            phrase appearing in a comment.
+      // Don't conflate the two — rule authors choose deliberately.
       if (config.contentFilter === 'code-only') {
         content = filterContent(rawContent).code
       } else if (config.contentFilter === 'no-strings-no-comments') {
