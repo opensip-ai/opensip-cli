@@ -37,7 +37,7 @@ allowed code outside the plugin directory to be loaded and executed:
   covering `..` traversal, absolute-path names, NUL-byte names, escaping
   symlinks, and pnpm-legitimate symlinks.
 
-## [Unreleased]
+## [0.3.0] — 2026-05-04
 
 ### Security
 
@@ -50,6 +50,48 @@ allowed code outside the plugin directory to be loaded and executed:
   inspect what was being installed. Plugins are loaded via dynamic
   `import()` at fit time, so legitimate plugin code paths are unaffected;
   only install-time side-effects are blocked.
+
+### Performance
+
+- **Shared AST parse cache for checks-builtin.** 10 AST-based checks
+  (`circular-imports`, `deep-inheritance`, `export-complexity`,
+  `fan-out-complexity`, `import-graph`, `interface-bloat`, `logger-detector`,
+  `method-complexity`, `missing-error-handling`, `type-assertion-overuse`)
+  now call `getSharedSourceFile()` instead of `ts.createSourceFile()`.
+  Files parsed by multiple checks in the same run are parsed once and
+  reused from an LRU cache, reducing CPU and memory overhead proportional
+  to the number of co-running AST checks.
+
+### Fixed
+
+- **`withRetry` tolerates NaN / non-finite `maxAttempts`.** Passing
+  `maxAttempts: NaN` (or `Infinity`, `-1`) previously caused an infinite
+  retry loop. Now clamped to `max(1, floor(n))` with a `Number.isFinite`
+  guard; non-finite inputs default to a single attempt.
+- **ULID `extractTimestamp` handles multi-underscore ID prefixes.** The
+  old implementation split on the first `_`, so IDs like
+  `fitness_check_01JPHK...` returned a garbage substring. Now uses
+  `id.slice(-26)` to always extract the last 26 characters (the canonical
+  ULID component), regardless of prefix length or underscore count.
+- **`filterCache` idle timer bounds memory growth.** The content-filter
+  cache had no eviction path: after a large scan the filtered-content map
+  would stay in memory for the process lifetime. A 10-minute idle timer
+  (matching the parse-cache pattern) now clears the map when no new files
+  are being scanned, returning memory between runs without affecting
+  correctness.
+
+### Observability
+
+- Structured log events for all fitness check lifecycle stages now carry a
+  `module: 'fitness:execution'` field, making it straightforward to filter
+  check-level traces in log aggregators.
+- All CLI-level logger calls in `cli:fit`, `cli:gate`, `cli:report`,
+  `cli:persistence`, and `cli:bootstrap` now include a `module:` field,
+  enabling per-component log filtering.
+- `cli.plugin.autosync.start` and `cli.plugin.autosync.failed` events
+  are now emitted when the CLI transparently installs project-local
+  plugins, surfacing install activity and per-domain failures in
+  structured logs.
 
 
 ### Added
