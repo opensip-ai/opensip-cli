@@ -4,6 +4,54 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.0] — 2026-05-05
+
+### Added (`@opensip-tools/core`)
+
+- New `contentFilter` mode names that describe what the filter strips:
+  - `'strip-strings'` — string literals blanked, comments preserved
+    (use when a check reads comment-based directives like `// @swallow-ok`,
+    `// @fitness-ignore-...`, or `@deprecated` JSDoc tags).
+  - `'strip-strings-and-comments'` — both strings and comments blanked
+    (use when a check pattern-matches identifiers that would false-fire
+    if the same phrase appears in JSDoc / inline comments documenting
+    the rule itself).
+
+  The previous names (`'code-only'`, `'no-strings-no-comments'`)
+  described intent rather than behaviour and were misleading enough to
+  cause real false positives — `code-only` strips strings but PRESERVES
+  comments, which most rule authors didn't expect from the name.
+
+### Changed (`@opensip-tools/checks-builtin`)
+
+- 82 built-in checks migrated to the new `strip-strings` /
+  `strip-strings-and-comments` names.
+
+### Deprecated (`@opensip-tools/core`)
+
+- `contentFilter: 'code-only'` — use `'strip-strings'` instead (same
+  dispatch, no behaviour change).
+- `contentFilter: 'no-strings-no-comments'` — use
+  `'strip-strings-and-comments'` instead (same dispatch).
+
+  Both old names continue to work as aliases. Plan to remove in 0.5.0.
+
+### Fixed (`@opensip-tools/checks-builtin`)
+
+- `resilience/no-process-exit-in-finally` no longer false-fires on
+  files that use `Promise.prototype.finally(...)` without a try/finally
+  clause. The detection regex now requires `} finally {` brace
+  adjacency rather than matching the bare word `finally`.
+- `architecture/module-coupling-fan-out` no longer flags pure barrel
+  files (only `export ... from` re-exports) or type-declaration files
+  (`.d.ts`, `.test-d.ts`). Both are exempt by design — barrels fan out
+  on purpose; type imports compile to nothing.
+
+## [0.3.0] — earlier
+
+(Release notes were not captured at the time. Includes various
+infrastructure improvements over 0.2.5; see git log for details.)
+
 ## [0.2.5] — 2026-05-04
 
 ### Security
