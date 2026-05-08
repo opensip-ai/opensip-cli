@@ -112,8 +112,28 @@ function checkCatchClause(node: ts.CatchClause, sourceFile: ts.SourceFile): Chec
 
   const trimmed = catchText.replace(/\{|\}/g, '').trim()
 
+  // Strip leading single-line comments (`// ...` lines, including
+  // multi-line stacks) and block comments before testing for empty.
+  // The original regex `/^\/[/*]/` only checked the first character,
+  // which falsely flags `} catch { // comment\n actualHandler() }`
+  // patterns as empty even though real code follows the comment.
+  let codeOnly = trimmed
+  while (true) {
+    if (codeOnly.startsWith('//')) {
+      const eol = codeOnly.indexOf('\n')
+      codeOnly = (eol === -1 ? '' : codeOnly.slice(eol + 1)).trim()
+      continue
+    }
+    if (codeOnly.startsWith('/*')) {
+      const close = codeOnly.indexOf('*/')
+      codeOnly = (close === -1 ? '' : codeOnly.slice(close + 2)).trim()
+      continue
+    }
+    break
+  }
+
   // Empty catch - SEVERITY: ERROR
-  if (trimmed === '' || /^\/[/*]/.test(trimmed)) {
+  if (trimmed === '' || codeOnly === '') {
     const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
     violations.push({
       line: line + 1,
