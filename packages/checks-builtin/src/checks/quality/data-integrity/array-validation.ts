@@ -159,8 +159,11 @@ function isValidationFunctionCall(node: ts.Node): boolean {
 }
 
 /**
- * Check if node is an iteration over the parameter (for...of, forEach, map, filter)
- * Iteration implies validation because it handles empty arrays gracefully
+ * Check if node is an iteration over the parameter (for...of, forEach, map, filter,
+ * slice, includes, join, indexOf, concat, flat, etc.)
+ *
+ * Iteration implies validation because it handles empty arrays gracefully and
+ * cannot blow up the runtime — the worst case is no work done.
  */
 function isIterationOverParam(
   node: ts.Node,
@@ -175,7 +178,9 @@ function isIterationOverParam(
     }
   }
 
-  // .forEach(), .map(), .filter(), .some(), .every(), .find(), .reduce() calls
+  // Array prototype methods that internally iterate (and therefore handle empty
+  // arrays gracefully) or otherwise produce a bounded view. These are
+  // validation-equivalent because they don't crash on empty/short input.
   if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
     const objText = node.expression.expression.getText(sourceFile)
     const methodName = node.expression.name.getText(sourceFile)
@@ -186,8 +191,27 @@ function isIterationOverParam(
       'some',
       'every',
       'find',
+      'findIndex',
+      'findLast',
+      'findLastIndex',
       'reduce',
+      'reduceRight',
       'flatMap',
+      'flat',
+      'slice',
+      'includes',
+      'indexOf',
+      'lastIndexOf',
+      'join',
+      'concat',
+      'entries',
+      'values',
+      'keys',
+      'at',
+      'toSorted',
+      'toReversed',
+      'toSpliced',
+      'with',
     ]
     if (objText === paramName && iterationMethods.includes(methodName)) {
       return true
@@ -195,6 +219,115 @@ function isIterationOverParam(
   }
 
   return false
+}
+
+/**
+ * Check if node is a write-only sink usage of the parameter.
+ *
+ * Out-array sinks (`bucket.push(...)`, `bucket.unshift(...)`) flag the param
+ * as a producer target — the function isn't *consuming* the array, it's
+ * writing into it. Validation belongs at the consumer, not the producer.
+ */
+function isOutSinkUsage(
+  node: ts.Node,
+  paramName: string,
+  sourceFile: ts.SourceFile,
+): boolean {
+  if (!ts.isCallExpression(node)) return false
+  if (!ts.isPropertyAccessExpression(node.expression)) return false
+  const objText = node.expression.expression.getText(sourceFile)
+  if (objText !== paramName) return false
+  const methodName = node.expression.name.getText(sourceFile)
+  // Mutating sink methods — caller is producing into the array.
+  return methodName === 'push' || methodName === 'unshift' || methodName === 'splice'
+}
+
+/**
+ * Check if node is indexed access on the parameter (`param[i]`).
+ *
+ * Indexed access on a typed array yields `T | undefined` under
+ * `noUncheckedIndexedAccess`; under any reasonable consumer it implies
+ * defensive use and cannot crash on empty/short input the way an
+ * unconditional `.length`-less iteration would. Practically: if the body
+ * does `param[i]`, the author has already structured the access around
+ * length (or expects undefined).
+ */
+function isIndexedAccess(
+  node: ts.Node,
+  paramName: string,
+  sourceFile: ts.SourceFile,
+): boolean {
+  if (!ts.isElementAccessExpression(node)) return false
+  return node.expression.getText(sourceFile) === paramName
+}
+
+/**
+ * Check if node is a spread of the parameter (`...param`) inside a call
+ * argument list, array literal, or object literal.
+ *
+ * Spread iterates the array — equivalent to `for...of`.
+ */
+function isSpreadOfParam(
+  node: ts.Node,
+  paramName: string,
+  sourceFile: ts.SourceFile,
+): boolean {
+  if (ts.isSpreadElement(node) || ts.isSpreadAssignment(node)) {
+    return node.expression.getText(sourceFile) === paramName
+  }
+  return false
+}
+
+/**
+ * Check if node passes the parameter through to another function call.
+ *
+ * A pure pass-through forwarder (`return otherFn(..., param, ...)`) defers
+ * validation to the destination function — flagging the forwarder is a false
+ * positive, since the wrapper has nothing to validate against. The destination
+ * function (which actually consumes the array) is the meaningful validation
+ * site.
+ *
+ * Restricted to call-argument position (not the callee position) so we don't
+ * match the param being treated as a function.
+ */
+function isForwardedToCall(
+  node: ts.Node,
+  paramName: string,
+  sourceFile: ts.SourceFile,
+): boolean {
+  if (!ts.isCallExpression(node) && !ts.isNewExpression(node)) return false
+  const args = node.arguments
+  if (!args) return false
+  for (const arg of args) {
+    if (ts.isIdentifier(arg) && arg.text === paramName) {
+      return true
+    }
+    // `Array.from(param)`, `[...param]`, etc. handled by isSpreadOfParam.
+    // Type-cast forwards: `someFn(param as Foo)` or `someFn(param satisfies Foo)`.
+    if (ts.isAsExpression(arg) || ts.isSatisfiesExpression(arg)) {
+      const inner = arg.expression
+      if (ts.isIdentifier(inner) && inner.text === paramName) {
+        return true
+      }
+    }
+  }
+  return false
+}
+
+/**
+ * Check if node is a property-shorthand reference to the parameter inside
+ * an object literal (`return { param }`).
+ *
+ * The param value is being copied by reference into a result object — no
+ * iteration, no boundary crossing, the consumer of the returned object is
+ * the meaningful validation site (same logic as `isForwardedToCall`).
+ */
+function isShorthandPropertyReference(
+  node: ts.Node,
+  paramName: string,
+): boolean {
+  if (!ts.isShorthandPropertyAssignment(node)) return false
+  return node.name.text === paramName
 }
 
 /**
@@ -236,6 +369,11 @@ function checkForArrayValidation(
   const paramName = ts.isIdentifier(param.name) ? param.name.text : null
   if (!paramName) return true // Destructured params are harder to track, assume validated
 
+  // Underscore-prefixed params are an established TS convention for
+  // "intentionally unused" — the body does not consume them, so demanding
+  // validation is meaningless.
+  if (paramName.startsWith('_')) return true
+
   let hasValidation = false
 
   const visit = (n: ts.Node) => {
@@ -257,6 +395,28 @@ function checkForArrayValidation(
     }
     // Optional chaining/nullish coalescing implies null safety
     if (isOptionalHandling(n, paramName, sourceFile)) {
+      hasValidation = true
+    }
+    // Out-array sinks (param.push(...)) — param is a producer target, not a
+    // consumer input. Validation belongs at the consumer.
+    if (isOutSinkUsage(n, paramName, sourceFile)) {
+      hasValidation = true
+    }
+    // Indexed access (param[i]) — defensive, bounded by author intent.
+    if (isIndexedAccess(n, paramName, sourceFile)) {
+      hasValidation = true
+    }
+    // Spread (...param) — iterates the array, equivalent to for...of.
+    if (isSpreadOfParam(n, paramName, sourceFile)) {
+      hasValidation = true
+    }
+    // Forwarded to another call — destination owns validation.
+    if (isForwardedToCall(n, paramName, sourceFile)) {
+      hasValidation = true
+    }
+    // Property-shorthand reference ({ param }) — pass-through into a result
+    // object; consumer of the result owns validation.
+    if (isShorthandPropertyReference(n, paramName)) {
       hasValidation = true
     }
 

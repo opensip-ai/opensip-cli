@@ -66,6 +66,25 @@ const ALLOWED_SHORT_NAMES = new Set([
   'req',
   'res',
   'ctx', // Callback/request patterns
+  'on',
+  'to',
+  'at',
+  'in',
+  'as',
+  'is',
+  'do',
+  'go',
+  'up',
+  'of', // Idiomatic short method/function names (e.g. EventEmitter.on, Array.of, Date.in)
+  'Tx',
+  'Rx',
+  'Fn',
+  'IO',
+  'OS',
+  'UI', // PascalCase short type/class names — Tx (transaction), Rx (reactive), Fn (function),
+  // IO (input/output), OS (operating system), UI (user interface). Canonical structural-type and
+  // domain abbreviations; requiring 3+ chars here just produces verbose synonyms (TransactionLike,
+  // OsContext) without improving clarity.
   'T',
   'K',
   'V',
