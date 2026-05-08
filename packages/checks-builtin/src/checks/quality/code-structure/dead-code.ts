@@ -109,7 +109,7 @@ function processExportsAndTypes(
 function processDependencies(
   issue: NonNullable<KnipOutput['issues']>[number],
   filePath: string,
-  cwd: string,
+  _cwd: string,
 ): CheckViolation[] {
   const violations: CheckViolation[] = []
 
@@ -122,7 +122,10 @@ function processDependencies(
       type: 'unused-dependency',
       suggestion: `Remove '${depName}' from package.json dependencies with 'pnpm remove ${depName}'`,
       match: depName,
-      filePath: `${cwd}/package.json`,
+      // Use the actual package.json path from Knip's issue, not the project root.
+      // In a monorepo, each workspace has its own package.json — pointing to the
+      // root masked which sub-package owned the unused dep.
+      filePath,
     })
   }
 
