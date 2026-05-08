@@ -132,11 +132,13 @@ describe('toctou-race-condition refinements', () => {
     // Without recipe augmentation, code there is analyzed normally.
     const file = path.join(tmpDir, 'chain-walker', 'walk.ts');
     fs.mkdirSync(path.dirname(file), { recursive: true });
+    // Repository-style read-then-update on a *shared* receiver (not a
+    // local Map). This is a real TOCTOU shape and must flag.
     fs.writeFileSync(
       file,
-      `export function walk(map: Map<string, string>) {
-         const v = map.get('a');
-         map.set('a', (v ?? '') + 'x');
+      `export async function walk(repo: { findOne(id: string): Promise<unknown>; save(v: unknown): Promise<void> }) {
+         const v = await repo.findOne('a');
+         await repo.save(v);
        }`,
     );
     const result = await check!.run(tmpDir, { targetFiles: [file] });
@@ -157,9 +159,9 @@ describe('toctou-race-condition refinements', () => {
       fs.mkdirSync(path.dirname(file), { recursive: true });
       fs.writeFileSync(
         file,
-        `export function walk(map: Map<string, string>) {
-           const v = map.get('a');
-           map.set('a', (v ?? '') + 'x');
+        `export async function walk(repo: { findOne(id: string): Promise<unknown>; save(v: unknown): Promise<void> }) {
+           const v = await repo.findOne('a');
+           await repo.save(v);
          }`,
       );
       const result = await check!.run(tmpDir, { targetFiles: [file] });
@@ -167,6 +169,89 @@ describe('toctou-race-condition refinements', () => {
     } finally {
       clearCurrentRecipeCheckConfig();
     }
+  });
+
+  it('skips local Map.get/set accumulator pattern', async () => {
+    const file = path.join(tmpDir, 'accum.ts');
+    fs.writeFileSync(
+      file,
+      `export function accum(name: string, counts: Map<string, number>) {
+         counts.set(name, (counts.get(name) ?? 0) + 1);
+       }`,
+    );
+    const result = await check!.run(tmpDir, { targetFiles: [file] });
+    expect(result.warnings).toBe(0);
+  });
+
+  it('skips local new Map() with grouping pattern', async () => {
+    const file = path.join(tmpDir, 'group.ts');
+    fs.writeFileSync(
+      file,
+      `export async function group(rows: ReadonlyArray<{ k: string; v: number }>) {
+         const byKey = new Map<string, number[]>();
+         for (const row of rows) {
+           if (!byKey.has(row.k)) byKey.set(row.k, []);
+           const bucket = byKey.get(row.k);
+           if (bucket) bucket.push(row.v);
+         }
+         return byKey;
+       }`,
+    );
+    const result = await check!.run(tmpDir, { targetFiles: [file] });
+    expect(result.warnings).toBe(0);
+  });
+
+  it('skips this.#cache get/set on a class field initialized as new Map()', async () => {
+    const file = path.join(tmpDir, 'with-class-cache.ts');
+    fs.writeFileSync(
+      file,
+      `export class Foo {
+         readonly #cache = new Map<string, string>();
+         async get(id: string): Promise<string> {
+           const cached = this.#cache.get(id);
+           if (cached) return cached;
+           const fresh = await Promise.resolve('x');
+           this.#cache.set(id, fresh);
+           return fresh;
+         }
+       }`,
+    );
+    const result = await check!.run(tmpDir, { targetFiles: [file] });
+    expect(result.warnings).toBe(0);
+  });
+
+  it('skips read-only DB function building local Maps', async () => {
+    const file = path.join(tmpDir, 'reader.ts');
+    fs.writeFileSync(
+      file,
+      `export async function readOnly(db: { select(): { from(): Promise<Array<{ k: string; v: number }>> } }) {
+         const rows = await db.select().from();
+         const byKey = new Map<string, number[]>();
+         for (const row of rows) {
+           if (!byKey.has(row.k)) byKey.set(row.k, []);
+           byKey.get(row.k)!.push(row.v);
+         }
+         return byKey;
+       }`,
+    );
+    const result = await check!.run(tmpDir, { targetFiles: [file] });
+    expect(result.warnings).toBe(0);
+  });
+
+  it('skips single-statement atomic SQL UPDATE in tx.execute(sql`...`)', async () => {
+    const file = path.join(tmpDir, 'atomic-sql.ts');
+    fs.writeFileSync(
+      file,
+      `declare const sql: any;
+       export async function bulkUpdate(tx: any, ticketIds: string[]) {
+         const rows = await tx.select({ id: 'tickets.id' }).from('tickets');
+         const byTicket = new Map<string, unknown>();
+         for (const row of rows) byTicket.set((row as any).id, row);
+         await tx.execute(sql\`UPDATE tickets SET v = 1 WHERE id = ANY($1)\`);
+       }`,
+    );
+    const result = await check!.run(tmpDir, { targetFiles: [file] });
+    expect(result.warnings).toBe(0);
   });
 
   it('honors documented "single-threaded coalesce" comment as atomic', async () => {
@@ -621,6 +706,27 @@ describe('performance-anti-patterns refinements', () => {
        }`,
     );
     const result = await check!.run(tmpDir, { targetFiles: [file] });
+    expect(result.warnings).toBe(0);
+  });
+
+  it('does not flag retry/backoff loops with await delay()', async () => {
+    const file = path.join(tmpDir, 'retry-loop.ts');
+    fs.writeFileSync(
+      file,
+      `declare function attempt(): Promise<{ ok: boolean }>;
+       declare function delay(ms: number): Promise<void>;
+       export async function withRetries() {
+         for (let i = 0; i < 3; i++) {
+           const r = await attempt();
+           if (r.ok) return r;
+           await delay(100 * (i + 1));
+         }
+         throw new Error('exhausted');
+       }`,
+    );
+    const result = await check!.run(tmpDir, { targetFiles: [file] });
+    // Retry-with-backoff loops are intentionally sequential — running
+    // attempts in parallel would defeat the retry semantics.
     expect(result.warnings).toBe(0);
   });
 });

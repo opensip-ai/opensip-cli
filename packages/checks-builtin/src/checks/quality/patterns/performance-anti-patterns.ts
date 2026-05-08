@@ -85,6 +85,18 @@ interface CheckLineForPerformancePatternsOptions {
   index: number
 }
 
+/**
+ * Recognize retry/backoff loops, where sequential `await` is the entire
+ * point — running attempts in parallel would defeat retry semantics. The
+ * giveaway is an `await delay(`, `await sleep(`, `await setTimeout`, or
+ * `await wait(` inside the same loop body. These loops are bounded by
+ * their retry counter, not by data volume, so the sequential-await
+ * suggestion is a false positive.
+ *
+ * Bounded quantifiers prevent ReDoS — context is at most 8 lines.
+ */
+const RETRY_LOOP_BODY = /await\s{1,5}(delay|sleep|wait|setTimeout|backoff|pause)\s{0,5}\(/
+
 function checkLineForPerformancePatterns(
   options: CheckLineForPerformancePatternsOptions,
 ): CheckViolation | null {
@@ -97,8 +109,27 @@ function checkLineForPerformancePatterns(
   const contextEnd = Math.min(lines.length, index + 5)
   const context = lines.slice(contextStart, contextEnd).join('\n')
 
+  // Wider window for retry-loop detection — the `await delay()` that
+  // marks an intentional retry/backoff loop often sits past the small
+  // 8-line context window that the anti-pattern regexes themselves use.
+  // 30 lines forward covers nearly all real retry helpers without
+  // crossing function boundaries in normal code.
+  const retryContextEnd = Math.min(lines.length, index + 30)
+  const retryContext = lines.slice(contextStart, retryContextEnd).join('\n')
+
   for (const patternConfig of PATTERNS) {
     if (patternConfig.pattern.test(context)) {
+      // Skip retry/backoff loops — sequential awaits with intentional
+      // pacing between attempts. Only applies to the sequential-await
+      // pattern (a spread or string-concat in a retry loop is still a
+      // real bug).
+      if (
+        patternConfig.type === ANTI_PATTERN_TYPES.SEQUENTIAL_AWAIT &&
+        RETRY_LOOP_BODY.test(retryContext)
+      ) {
+        continue
+      }
+
       // Check if this line contains the key indicator
       // Using bounded quantifiers to prevent ReDoS
       const isSequentialAwait =
