@@ -238,6 +238,40 @@ describe('toctou-race-condition refinements', () => {
     expect(result.warnings).toBe(0);
   });
 
+  it('skips parameters typed as a *Cache class (in-process cache convention)', async () => {
+    const file = path.join(tmpDir, 'cache-typed.ts');
+    fs.writeFileSync(
+      file,
+      `interface SecretsCache {
+         get(name: string): unknown;
+         set(name: string, v: unknown): void;
+       }
+       export async function fetchUncached(cache: SecretsCache, names: string[]) {
+         const fetched = new Map<string, unknown>();
+         for (const name of names) {
+           const data = fetched.get(name);
+           if (data) cache.set(name, data);
+         }
+       }`,
+    );
+    const result = await check!.run(tmpDir, { targetFiles: [file] });
+    expect(result.warnings).toBe(0);
+  });
+
+  it('does not pair read on receiver A with update on receiver B', async () => {
+    // foo.find then bar.save is not a TOCTOU — they're different objects.
+    const file = path.join(tmpDir, 'cross-receiver.ts');
+    fs.writeFileSync(
+      file,
+      `export async function f(foo: { find(id: string): Promise<unknown> }, bar: { save(v: unknown): Promise<void> }) {
+         const v = await foo.find('a');
+         await bar.save(v);
+       }`,
+    );
+    const result = await check!.run(tmpDir, { targetFiles: [file] });
+    expect(result.warnings).toBe(0);
+  });
+
   it('skips single-statement atomic SQL UPDATE in tx.execute(sql`...`)', async () => {
     const file = path.join(tmpDir, 'atomic-sql.ts');
     fs.writeFileSync(

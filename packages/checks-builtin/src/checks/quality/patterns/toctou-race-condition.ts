@@ -3,6 +3,23 @@
  *
  * Detects Time-of-Check-Time-of-Use race conditions where data is read,
  * then updated without passing version/condition for atomic updates.
+ *
+ * Refinement notes (Wave E lane E6-redo):
+ * The original implementation was a regex-only test for the presence of
+ * `.get/.find/...` and `.update/.set/...` strings inside the same function
+ * body. That broad pattern produced false positives on:
+ *   - Local `Map.get` / `Map.set` accumulator idioms (count++ via map).
+ *   - In-process cache fields (`this.#cache.get` then `this.#cache.set`)
+ *     used as single-threaded coalescing structures.
+ *   - Read-only DB functions that build local Maps for grouping
+ *     (`db.select(...)` → `new Map().set(...)`).
+ *   - Single-statement atomic SQL writes (`tx.execute(sql`UPDATE...`)`).
+ *
+ * Refinement strategy: classify each `.get/.set/.update/...` call by its
+ * receiver. A function only flags as TOCTOU if there is at least one
+ * read+update pair on a *non-local* receiver (i.e. not a local Map/Set,
+ * not a "Cache"-named field, and not a tx/db where writes are atomic
+ * SQL). All-local-receiver patterns are excluded.
  */
 
 import * as ts from 'typescript'
@@ -124,28 +141,11 @@ function isSafeToctouPath(filePath: string, safePaths: readonly RegExp[]): boole
   return safePaths.some((pattern) => pattern.test(filePath))
 }
 
-/** Read operation patterns */
-const READ_PATTERNS = [
-  /\.get\(/,
-  /\.find\(/,
-  /\.findOne\(/,
-  /\.getById\(/,
-  /\.fetch\(/,
-  /\.load\(/,
-  /\.read\(/,
-]
+/** Read operation method names */
+const READ_METHODS = new Set(['get', 'find', 'findOne', 'findFirst', 'findMany', 'getById', 'fetch', 'load', 'read'])
 
-/** Update operation patterns */
-const UPDATE_PATTERNS = [/\.update\(/, /\.save\(/, /\.put\(/, /\.set\(/, /\.patch\(/, /\.modify\(/]
-
-/**
- * Check if content has required read/update patterns
- */
-function hasRequiredPatterns(content: string): boolean {
-  const hasRead = READ_PATTERNS.some((p) => p.test(content))
-  const hasUpdate = UPDATE_PATTERNS.some((p) => p.test(content))
-  return hasRead && hasUpdate
-}
+/** Update operation method names */
+const UPDATE_METHODS = new Set(['update', 'save', 'put', 'set', 'patch', 'modify'])
 
 /**
  * Check if content has atomic patterns
@@ -180,16 +180,6 @@ function getFunctionNameFromNode(node: FunctionLikeNode, sourceFile: ts.SourceFi
 }
 
 /**
- * Check if a function has TOCTOU pattern
- */
-function hasToctouPattern(funcText: string): boolean {
-  const funcHasRead = READ_PATTERNS.some((p) => p.test(funcText))
-  const funcHasUpdate = UPDATE_PATTERNS.some((p) => p.test(funcText))
-  const funcHasAtomic = ATOMIC_PATTERNS.some((p) => p.test(funcText))
-  return funcHasRead && funcHasUpdate && !funcHasAtomic
-}
-
-/**
  * Check if node is a function-like node
  */
 function isFunctionLikeNode(node: ts.Node): node is FunctionLikeNode {
@@ -202,6 +192,297 @@ function isFunctionLikeNode(node: ts.Node): node is FunctionLikeNode {
 }
 
 /**
+ * Identify TypeNodes that name an in-memory keyed collection — these are
+ * not shared persistent state and read+set on them is not a TOCTOU risk.
+ */
+const IN_MEMORY_COLLECTION_TYPE_NAMES = new Set([
+  'Map',
+  'WeakMap',
+  'ReadonlyMap',
+  'Set',
+  'WeakSet',
+  'ReadonlySet',
+])
+
+function isInMemoryCollectionTypeNode(typeNode: ts.TypeNode | undefined): boolean {
+  if (!typeNode) return false
+  if (ts.isTypeReferenceNode(typeNode)) {
+    const name = typeNode.typeName
+    if (ts.isIdentifier(name)) {
+      if (IN_MEMORY_COLLECTION_TYPE_NAMES.has(name.text)) return true
+      // Type names ending in `Cache` (e.g. `SecretsCache`) are an
+      // OpenSIP-wide convention for in-process keyed coalescing
+      // structures. Treating them as local-collection eliminates the
+      // FP class where a service-level `cache: XCache` parameter is
+      // read+written within a function body.
+      if (/Cache$/.test(name.text)) return true
+    }
+  }
+  return false
+}
+
+/**
+ * Identify variable initializers that construct an in-memory collection,
+ * e.g. `const counts = new Map()`, `new Set<string>()`.
+ */
+function isInMemoryCollectionInitializer(init: ts.Expression | undefined): boolean {
+  if (!init) return false
+  if (ts.isNewExpression(init) && ts.isIdentifier(init.expression)) {
+    return IN_MEMORY_COLLECTION_TYPE_NAMES.has(init.expression.text)
+  }
+  return false
+}
+
+/**
+ * Heuristic: a property access like `this.#cache`, `this.headerCache`,
+ * `this._cache` is treated as an in-process cache field. The `*Cache`
+ * suffix and `_cache` / `#cache` conventions are strong signals that the
+ * field is a coalescing in-memory structure (single-threaded Node).
+ *
+ * This is intentionally narrow: only matches `this.<name>` shapes whose
+ * `<name>` has the `Cache` suffix or is exactly `cache`.
+ */
+function isInMemoryCacheReceiverText(text: string): boolean {
+  // strip a leading `#` (private field) and `_` (convention)
+  const normalized = text.replace(/^[#_]/, '')
+  if (normalized === 'cache') return true
+  if (/Cache$/.test(normalized)) return true
+  return false
+}
+
+/**
+ * Collect names of local variables/parameters within a function that
+ * refer to in-memory keyed collections (`Map`, `Set`, etc.). Names are
+ * matched against the simple receiver of `<name>.get/set/...` calls.
+ */
+function collectLocalCollectionNames(node: FunctionLikeNode): Set<string> {
+  const names = new Set<string>()
+
+  // Parameters typed as Map/Set
+  for (const param of node.parameters) {
+    if (ts.isIdentifier(param.name) && isInMemoryCollectionTypeNode(param.type)) {
+      names.add(param.name.text)
+    }
+  }
+
+  // Local `const x = new Map()` / `new Set()` declarations anywhere in body.
+  const visit = (n: ts.Node): void => {
+    // Don't descend into nested functions — their locals belong to a
+    // different scope.
+    if (n !== node && isFunctionLikeNode(n)) return
+    if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name)) {
+      if (isInMemoryCollectionInitializer(n.initializer) || isInMemoryCollectionTypeNode(n.type)) {
+        names.add(n.name.text)
+      }
+    }
+    ts.forEachChild(n, visit)
+  }
+  if (node.body) visit(node.body)
+  return names
+}
+
+/**
+ * Collect class-level field names that are initialized to an in-memory
+ * collection (`new Map()` / `new Set()`). Used so that `this.#cache`-style
+ * access in a method does not look like shared persistent state.
+ *
+ * Walks up to the containing ClassDeclaration / ClassExpression. Returns
+ * the simple field name (no `#` prefix) for matching against
+ * `this.<name>.get/set` receivers.
+ */
+function collectClassInMemoryFieldNames(node: FunctionLikeNode): Set<string> {
+  const names = new Set<string>()
+  let cls: ts.Node | undefined = node.parent
+  while (cls && !ts.isClassDeclaration(cls) && !ts.isClassExpression(cls)) {
+    cls = cls.parent
+  }
+  if (!cls) return names
+  const classNode = cls as ts.ClassDeclaration | ts.ClassExpression
+  for (const member of classNode.members) {
+    if (ts.isPropertyDeclaration(member)) {
+      const memberName = member.name
+      const fieldName = ts.isIdentifier(memberName)
+        ? memberName.text
+        : ts.isPrivateIdentifier(memberName)
+          ? memberName.text.replace(/^#/, '')
+          : undefined
+      if (!fieldName) continue
+      if (
+        isInMemoryCollectionInitializer(member.initializer) ||
+        isInMemoryCollectionTypeNode(member.type)
+      ) {
+        names.add(fieldName)
+      }
+    }
+  }
+  return names
+}
+
+/**
+ * Classification of a `<receiver>.<method>(...)` call site.
+ */
+type CallKind =
+  | { kind: 'read-shared' }
+  | { kind: 'update-shared' }
+  | { kind: 'read-local' }
+  | { kind: 'update-local' }
+  | { kind: 'atomic-sql-write' }
+  | { kind: 'unrelated' }
+
+/**
+ * Return true if a call expression is `<tx-or-db>.execute(sql\`...\`)`
+ * with a single SQL statement — those writes are atomic at the DB layer
+ * (single statement, no separate read-then-update window).
+ */
+function isAtomicSqlExecute(call: ts.CallExpression): boolean {
+  if (!ts.isPropertyAccessExpression(call.expression)) return false
+  if (call.expression.name.text !== 'execute') return false
+  const arg = call.arguments[0]
+  if (!arg) return false
+  if (ts.isTaggedTemplateExpression(arg)) {
+    // `sql\`...\``
+    if (ts.isIdentifier(arg.tag) && arg.tag.text === 'sql') return true
+  }
+  return false
+}
+
+/**
+ * Drizzle-style ORM writes. `db.update(table)`, `db.insert(table)`,
+ * `db.delete(table)` each produce a single atomic SQL statement when
+ * awaited — they are not separate-read-then-update sequences.
+ *
+ * We treat these as `atomic-sql-write` so the function is not flagged
+ * unless there is an *actual* read-then-update on a shared receiver
+ * elsewhere.
+ */
+const DRIZZLE_ATOMIC_WRITE_METHODS = new Set(['update', 'insert', 'delete'])
+
+function isDrizzleAtomicWrite(call: ts.CallExpression): boolean {
+  if (!ts.isPropertyAccessExpression(call.expression)) return false
+  const methodName = call.expression.name.text
+  if (!DRIZZLE_ATOMIC_WRITE_METHODS.has(methodName)) return false
+  // Heuristic: receiver looks like a db/tx (named `db`, `tx`, ends in `Db`/`Tx`).
+  const receiver = call.expression.expression
+  if (ts.isIdentifier(receiver)) {
+    const r = receiver.text
+    if (r === 'db' || r === 'tx' || /Db$|Tx$/.test(r)) return true
+  }
+  return false
+}
+
+/**
+ * Get the simple receiver name from a call expression like
+ * `<receiver>.method(...)`. For `this.<name>.method(...)` returns
+ * `this.<name>` collapsed; for `<id>.method(...)` returns `<id>`.
+ * Returns null if the receiver isn't a simple identifier or this-property.
+ */
+function getReceiverName(call: ts.CallExpression): { name: string; isThisField: boolean } | null {
+  if (!ts.isPropertyAccessExpression(call.expression)) return null
+  const receiver = call.expression.expression
+  if (ts.isIdentifier(receiver)) {
+    return { name: receiver.text, isThisField: false }
+  }
+  if (ts.isPropertyAccessExpression(receiver) && receiver.expression.kind === ts.SyntaxKind.ThisKeyword) {
+    return { name: receiver.name.text, isThisField: true }
+  }
+  return null
+}
+
+/**
+ * Classify a single call expression for TOCTOU purposes.
+ */
+function classifyCall(
+  call: ts.CallExpression,
+  ctx: { localCollections: Set<string>; classCacheFields: Set<string> },
+): CallKind {
+  // First, atomic SQL writes anywhere short-circuit.
+  if (isAtomicSqlExecute(call)) return { kind: 'atomic-sql-write' }
+  if (isDrizzleAtomicWrite(call)) return { kind: 'atomic-sql-write' }
+
+  if (!ts.isPropertyAccessExpression(call.expression)) return { kind: 'unrelated' }
+  const methodName = call.expression.name.text
+  const isRead = READ_METHODS.has(methodName)
+  const isUpdate = UPDATE_METHODS.has(methodName)
+  if (!isRead && !isUpdate) return { kind: 'unrelated' }
+
+  const receiver = getReceiverName(call)
+  if (!receiver) {
+    // chained / non-simple receiver — treat as shared
+    return { kind: isRead ? 'read-shared' : 'update-shared' }
+  }
+
+  const isLocal =
+    (!receiver.isThisField && ctx.localCollections.has(receiver.name)) ||
+    (receiver.isThisField &&
+      (ctx.classCacheFields.has(receiver.name) || isInMemoryCacheReceiverText(receiver.name))) ||
+    // bare `this.cache` / `this.<X>Cache` even when class field decl wasn't
+    // statically detected as `new Map()` — the naming convention is enough.
+    (!receiver.isThisField && isInMemoryCacheReceiverText(receiver.name))
+
+  if (isLocal) {
+    return { kind: isRead ? 'read-local' : 'update-local' }
+  }
+  return { kind: isRead ? 'read-shared' : 'update-shared' }
+}
+
+/**
+ * Walk a function body and classify every call expression.
+ *
+ * Tracks reads and updates *per receiver* — TOCTOU is fundamentally
+ * read-X-then-update-X on the same shared object. A function with a
+ * read on receiver A and an update on receiver B is not a TOCTOU.
+ */
+function classifyFunctionCalls(
+  node: FunctionLikeNode,
+  localCollections: Set<string>,
+  classCacheFields: Set<string>,
+): { hasSharedReadAndUpdateOnSameReceiver: boolean } {
+  const ctx = { localCollections, classCacheFields }
+  // receiver-key → { read, update }. Receiver-key is `<name>` for plain
+  // identifiers and `this.<name>` for this-field accesses.
+  const perReceiver = new Map<string, { read: boolean; update: boolean }>()
+  let hasReadOnUnknownReceiver = false
+  let hasUpdateOnUnknownReceiver = false
+
+  const visit = (n: ts.Node): void => {
+    if (n !== node && isFunctionLikeNode(n)) return
+    if (ts.isCallExpression(n)) {
+      const cls = classifyCall(n, ctx)
+      if (cls.kind === 'read-shared' || cls.kind === 'update-shared') {
+        const recv = getReceiverName(n)
+        if (!recv) {
+          if (cls.kind === 'read-shared') hasReadOnUnknownReceiver = true
+          else hasUpdateOnUnknownReceiver = true
+        } else {
+          const key = recv.isThisField ? `this.${recv.name}` : recv.name
+          let entry = perReceiver.get(key)
+          if (!entry) {
+            entry = { read: false, update: false }
+            perReceiver.set(key, entry)
+          }
+          if (cls.kind === 'read-shared') entry.read = true
+          else entry.update = true
+        }
+      }
+    }
+    ts.forEachChild(n, visit)
+  }
+  if (node.body) visit(node.body)
+
+  for (const entry of perReceiver.values()) {
+    if (entry.read && entry.update) {
+      return { hasSharedReadAndUpdateOnSameReceiver: true }
+    }
+  }
+  // Conservative fallback: if we have unknown-receiver reads paired with
+  // unknown-receiver updates, treat as shared (chained / dynamic call).
+  if (hasReadOnUnknownReceiver && hasUpdateOnUnknownReceiver) {
+    return { hasSharedReadAndUpdateOnSameReceiver: true }
+  }
+  return { hasSharedReadAndUpdateOnSameReceiver: false }
+}
+
+/**
  * Options for checking a function for TOCTOU patterns
  */
 interface CheckFunctionForToctouOptions {
@@ -211,16 +492,26 @@ interface CheckFunctionForToctouOptions {
 
 /**
  * Check a function for TOCTOU patterns
- * @param options - The options for the check
- * @returns CheckViolation if found, null otherwise
  */
 function checkFunctionForToctou(options: CheckFunctionForToctouOptions): CheckViolation | null {
   const { node, sourceFile } = options
-  const funcText = node.getText(sourceFile)
+  if (!node.body) return null
 
-  if (!hasToctouPattern(funcText)) {
-    return null
-  }
+  // Atomic-comment escape hatch retained from the regex implementation —
+  // a function (or its surrounding scope) that documents single-threaded
+  // / coalescing semantics is treated as safe.
+  const funcText = node.getText(sourceFile)
+  if (hasAtomicPatterns(funcText)) return null
+
+  const localCollections = collectLocalCollectionNames(node)
+  const classCacheFields = collectClassInMemoryFieldNames(node)
+  const { hasSharedReadAndUpdateOnSameReceiver } = classifyFunctionCalls(
+    node,
+    localCollections,
+    classCacheFields,
+  )
+
+  if (!hasSharedReadAndUpdateOnSameReceiver) return null
 
   const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
   const lineNum = line + 1
@@ -250,18 +541,13 @@ function analyzeFileForToctou(filePath: string, content: string): CheckViolation
     return violations
   }
 
-  // Quick filter: must have both read and update patterns
-  if (!hasRequiredPatterns(content)) {
-    return violations
-  }
-
-  // Skip if file has atomic patterns
+  // Skip if the whole file documents atomic / single-threaded semantics.
   if (hasAtomicPatterns(content)) {
     return violations
   }
 
   const sourceFile = getSharedSourceFile(filePath, content)
-    if (!sourceFile) return []
+  if (!sourceFile) return []
 
   const visit = (node: ts.Node): void => {
     if (isFunctionLikeNode(node)) {
@@ -292,7 +578,7 @@ export const toctouRaceCondition = defineCheck({
   description: 'Detects read-then-update patterns without atomic guarantees',
   longDescription: `**Purpose:** Detects Time-of-Check-Time-of-Use (TOCTOU) race conditions where data is read then updated without atomic guarantees.
 
-**Detects:** Analyzes each file individually using TypeScript AST. Finds functions containing both read operations (\`.get(\`, \`.find(\`, \`.findOne(\`, \`.getById(\`, \`.fetch(\`, \`.load(\`, \`.read(\`) and update operations (\`.update(\`, \`.save(\`, \`.put(\`, \`.set(\`, \`.patch(\`, \`.modify(\`) without any atomic pattern (\`expectedVersion\`, \`ConditionExpression\`, \`transaction\`, \`acquireLock\`, \`mutex\`, \`optimisticLock\`, etc.). Skips safe contexts: in-memory caches, rate limiters, CLI/scripts, config/registry files.
+**Detects:** Walks the TypeScript AST per-function. Flags a function only when both (a) at least one read call (\`.get(\`, \`.find(\`, \`.findOne(\`, \`.findFirst(\`, \`.findMany(\`, \`.getById(\`, \`.fetch(\`, \`.load(\`, \`.read(\`) and (b) at least one update call (\`.update(\`, \`.save(\`, \`.put(\`, \`.set(\`, \`.patch(\`, \`.modify(\`) target a *shared* receiver — i.e. neither a local \`Map\`/\`Set\` declared in the function nor a parameter typed \`Map<...>\`/\`Set<...>\`, nor a class field initialized to \`new Map()\`/\`new Set()\`, nor a cache-named field (\`this.cache\`, \`this.#cache\`, \`this.<X>Cache\`). Single-statement atomic SQL writes (\`tx.execute(sql\`UPDATE...\`)\`, \`tx.update(table)\`, \`tx.insert(table)\`, \`tx.delete(table)\`) are not counted as the "update" side. Skips safe contexts: in-memory caches, rate limiters, CLI/scripts, config/registry files, and functions whose body documents atomic / single-threaded semantics (\`single-threaded coalesce\`, \`Node single-threaded\`, \`event-loop semantics\`).
 
 **Why it matters:** TOCTOU bugs allow concurrent requests to overwrite each other's changes, causing silent data loss that only manifests under load.
 
