@@ -389,12 +389,19 @@ export const unboundedMemory = defineCheck({
     // below" or `@module readFile` JSDoc previously yielded false positives
     // because the regex hit the comment text. Use the position-preserving
     // variant so match indexes map back to the original source line.
+    //
+    // Eviction-keyword and file-size-check detection intentionally run on
+    // the ORIGINAL content so author-supplied hints in comments
+    // ("// bounded by upstream cap", "// max-size enforced upstream")
+    // continue to mark the file as bounded. Stripping them there would
+    // surface previously-passing files as new positives every time we
+    // tighten the regex.
     const codeOnly = stripStringsAndCommentsPreservingPositions(content)
 
     const collectionDeclarations = findCollectionDeclarations(codeOnly)
     for (const declaration of collectionDeclarations) {
-      const hasEviction = hasEvictionKeyword(codeOnly)
-      const hasGrowth = hasGrowthMethod(codeOnly)
+      const hasEviction = hasEvictionKeyword(content)
+      const hasGrowth = hasGrowthMethod(content)
 
       if (hasGrowth && !hasEviction) {
         const lineNumber = getLineNumber(content, declaration.index)
@@ -419,9 +426,9 @@ export const unboundedMemory = defineCheck({
       // Real-world bundle/file readers interleave stat → branch → recover
       // → readFile, easily putting the guard >500 chars upstream.
       const start = Math.max(0, readCall.index - 1500)
-      const context = codeOnly.substring(start, readCall.index)
+      const context = content.substring(start, readCall.index)
 
-      if (isReadingKnownSmallFile(codeOnly, readCall.index)) {
+      if (isReadingKnownSmallFile(content, readCall.index)) {
         continue
       }
 

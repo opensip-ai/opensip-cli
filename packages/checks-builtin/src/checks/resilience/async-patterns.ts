@@ -1008,19 +1008,28 @@ export const noUnboundedConcurrency = defineCheck({
       return violations
     }
 
-    // Strip strings and comments before scanning so doc-block prose
-    // describing the pattern (e.g. JSDoc that says
-    // "`Promise.all(arr.map(asyncFn))` fans out one promise per element")
-    // doesn't produce a false positive that's impossible to suppress
-    // without a pragma in user code. Use the position-preserving variant
-    // so match indexes still map onto the original source line numbers.
+    // Strip strings and comments before pattern-match scanning so
+    // doc-block prose describing the pattern (e.g. JSDoc that says
+    // "`Promise.all(arr.map(asyncFn))` fans out one promise per
+    // element") doesn't produce a false positive that's impossible to
+    // suppress without a pragma in user code. Use the position-
+    // preserving variant so match indexes still map onto the original
+    // source line numbers.
+    //
+    // Bounded-pattern detection (`hasBoundedConcurrencyPattern`)
+    // intentionally runs on the ORIGINAL content — comments often carry
+    // intent ("// Batch failed", "// chunked at 4 in flight") that
+    // operators expect to suppress the warning. Stripping them there
+    // would surface previously-passing files as new positives every
+    // time we tighten the regex, so keep the file-level escape hatch
+    // generous and only narrow the per-match scan.
     const codeOnly = stripStringsAndCommentsPreservingPositions(content)
     if (!codeOnly.includes('Promise.all')) {
       return violations
     }
 
-    // Check if file has bounded concurrency patterns
-    if (hasBoundedConcurrencyPattern(codeOnly)) {
+    // Check if file has bounded concurrency patterns (uses original content)
+    if (hasBoundedConcurrencyPattern(content)) {
       return violations
     }
 
@@ -1028,10 +1037,14 @@ export const noUnboundedConcurrency = defineCheck({
     let match
     while ((match = UNBOUNDED_PROMISE_ALL_PATTERN.exec(codeOnly)) !== null) {
       // @lazy-ok -- 'await' appears in suggestion string literal, not actual await
-      // Check context around match for bounded patterns
+      // Check context around match for bounded patterns. Use the
+      // ORIGINAL content here — adjacent comments like
+      // `// chunked, batch=N` or `// see batchWithConcurrency above`
+      // are deliberate hints that operators expect to suppress the
+      // warning. Same rationale as the file-level bounded check.
       const start = Math.max(0, match.index - 200)
-      const end = Math.min(codeOnly.length, match.index + 200)
-      const context = codeOnly.substring(start, end)
+      const end = Math.min(content.length, match.index + 200)
+      const context = content.substring(start, end)
 
       if (!hasBoundedConcurrencyPattern(context)) {
         const lineNumber = getLineNumber(content, match.index)
