@@ -32,6 +32,14 @@ const VALIDATION_METHOD_NAMES = new Set([
 const HANDLER_NAME_PATTERNS = [/handler$/i, /^handle[A-Z]/, /^process[A-Z]/]
 
 /**
+ * Names that match HANDLER_NAME_PATTERNS but are themselves error
+ * translators / classifiers — they're called from inside a catch block,
+ * so requiring try-catch around their body is error-handling-inception.
+ * Match: handleXxxError, handleStoreError, processError.
+ */
+const ERROR_HANDLER_NAME_PATTERNS = [/^handle[A-Z].*Error$/, /^process[A-Z].*Error$/]
+
+/**
  * Function-like node types that can be API handlers
  */
 type FunctionLikeNode = ts.FunctionDeclaration | ts.ArrowFunction | ts.MethodDeclaration
@@ -254,7 +262,10 @@ function checkFunctionContract(options: CheckFunctionContractOptions): CheckViol
   }
 
   // Check 4: Has try-catch for error handling
-  if (!hasTryCatchBlock(node)) {
+  // Skip functions that ARE error handlers (handleXxxError) — wrapping
+  // them in another try-catch is error-handling-inception.
+  const isErrorHandler = ERROR_HANDLER_NAME_PATTERNS.some((p) => p.test(functionName))
+  if (!isErrorHandler && !hasTryCatchBlock(node)) {
     violations.push({
       line,
       column: character + 1,

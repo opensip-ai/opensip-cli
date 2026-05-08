@@ -502,6 +502,16 @@ function createInterfaceMethodsResolver(
   }
 }
 
+/**
+ * Test fakes (`class Fake<X> implements I<X>`) intentionally extend the
+ * production interface with helper methods that drive the fake's state
+ * (`queueError`, `setEvents`, `reset`, etc.). Flagging these as
+ * "extra methods" produces noise without surfacing real interface drift.
+ * Detected by class-name prefix rather than file path so the rule fires
+ * uniformly regardless of where fakes live.
+ */
+const TEST_DOUBLE_CLASS_NAME_PATTERN = /^(Fake|Mock|Stub|Spy)[A-Z]/
+
 function checkConsistencyForClass(
   cls: ClassImplementation,
   getInterfaceMethods: (name: string) => string[],
@@ -509,6 +519,7 @@ function checkConsistencyForClass(
 ): void {
   if (!Array.isArray(issues)) return
   if (cls.implements.length === 0) return
+  if (TEST_DOUBLE_CLASS_NAME_PATTERN.test(cls.name)) return
 
   const allowedMethods = new Set<string>()
   for (const ifaceName of cls.implements) {
