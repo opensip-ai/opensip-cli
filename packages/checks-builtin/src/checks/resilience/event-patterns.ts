@@ -34,13 +34,20 @@ const PROPER_EVENT_PATTERNS = [
 ]
 
 /**
- * Patterns indicating idempotency handling
+ * Patterns indicating idempotency handling.
+ *
+ * Includes domain-specific delivery-id keys used by upstream dispatchers
+ * (GitHub webhooks: `deliveryId`; AWS SQS: `messageId`; Stripe: `eventId`)
+ * — when a handler references one of these, the upstream framework is
+ * deduplicating on it before invoking the handler.
  */
 const IDEMPOTENCY_PATTERNS = [
   /idempotency/i,
   /dedup/i,
   /idempotentId/i,
   /messageId/i,
+  /deliveryId/i,
+  /eventId/i,
   /processedEvents/i,
   /alreadyProcessed/i,
 ]
