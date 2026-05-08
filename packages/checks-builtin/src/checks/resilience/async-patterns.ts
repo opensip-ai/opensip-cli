@@ -720,7 +720,49 @@ function isFloatingExpression(node: ts.ExpressionStatement): boolean {
   // real promise consumer; the chained sync call after it is not a floating promise.
   if (containsAwaitedReceiver(expr)) return false
 
+  // Pattern: `unwrap(await x.foo())`, `assertOk(await fn())`, `expectSuccess(await ...)`.
+  // The outer call wraps an awaited promise — a sync helper that consumes a Result/value.
+  // The await is the real promise consumer; the floating outer call only operates on the
+  // already-resolved value. Marking the statement as floating produces false positives at
+  // every boundary that uses a sync result-unwrap helper.
+  if (hasAwaitedArgument(expr)) return false
+
   return true
+}
+
+/**
+ * Return true if any direct argument of the call is an `await` expression
+ * (or an `await` wrapped in parentheses / a non-null assertion). A floating
+ * `outer(await inner())` statement has the await as its real promise
+ * consumer; the outer sync wrapper is not a detached promise.
+ */
+function hasAwaitedArgument(call: ts.CallExpression): boolean {
+  for (const arg of call.arguments) {
+    if (isAwaitedExpression(arg)) return true
+  }
+  return false
+}
+
+/**
+ * Walk through paren-wrap / non-null-assertion noise to determine whether
+ * the underlying expression is an `await`.
+ */
+function isAwaitedExpression(node: ts.Expression): boolean {
+  let current: ts.Expression = node
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- AST traversal; loop body reassigns current
+  while (current) {
+    if (ts.isAwaitExpression(current)) return true
+    if (ts.isParenthesizedExpression(current)) {
+      current = current.expression
+      continue
+    }
+    if (ts.isNonNullExpression(current)) {
+      current = current.expression
+      continue
+    }
+    break
+  }
+  return false
 }
 
 /**

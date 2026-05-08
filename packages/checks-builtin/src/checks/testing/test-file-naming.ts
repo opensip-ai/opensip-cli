@@ -29,11 +29,15 @@ const VALID_TEST_PATTERNS = [
 const IGNORED_PATTERNS = [
   /^setup\.[jt]sx?$/, // Test setup files
   /^test-setup\.[jt]sx?$/, // Test setup files
+  /-test-setup\.[jt]sx?$/, // Test setup files with module prefix (e.g. git-worktree-test-setup.ts)
   /^test-context\.[jt]sx?$/, // Test context files
   /\.setup\.[jt]sx?$/, // Setup files with prefix
   /^mock[-_]/, // Mock files
+  /^_mocks?\.[jt]sx?$/, // Underscore-prefix mock files (e.g. _mocks.ts)
   /-mock\.[jt]sx?$/, // Mock files with suffix
+  /-mocks\.[jt]sx?$/, // Mock files with plural suffix
   /[-_]helpers?\.[jt]sx?$/, // Helper files
+  /\.test\.helpers?\.[jt]sx?$/, // Test-only helper files (e.g. service.test.helpers.ts)
   /[-_]fixtures?\.[jt]sx?$/, // Fixture files
   /[-_]utils?\.[jt]sx?$/, // Utility files
   /^services\.[jt]sx?$/, // Service mocks

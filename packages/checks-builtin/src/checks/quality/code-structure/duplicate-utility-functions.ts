@@ -208,6 +208,75 @@ const DOMAIN_SPECIFIC_FUNCTIONS = new Set([
 
   // Dependency checking - domain-specific dependency analysis
   'isDeclaredDependency',
+
+  // CLI-local timestamp formatters — each subcommand renders timestamps
+  // for a different input shape (Date / ISO string / number-of-ms /
+  // unknown) and uses subcommand-local color helpers. They share a name
+  // because "format the timestamp for display" is the user-facing intent;
+  // collapsing them into one function would force every caller to
+  // pre-coerce its input and would need a CLI-color injection scheme.
+  'formatTimestamp',
+
+  // Severity-color mapping is consumer-specific — log severity level
+  // (numeric) vs. autonomy-mode (string) vs. ticket-status. Each maps a
+  // bounded enum to a color helper from createColorScheme.
+  'getLevelColor',
+
+  // Duration formatters operate on different units depending on the
+  // domain: foundation's canonical formatDuration takes ms, while
+  // CLI helpers like pipeline-stalled take minutes. They are not
+  // interchangeable; ms-input formatters are exported from
+  // @opensip/foundation/utils.
+  'formatDuration',
+
+  // Per-domain payload validators — audit corrections, SIP stream
+  // events, billing webhook deliveries each validate a different shape
+  // against a different schema with a different error type. The name
+  // is descriptive of the action ("validate the payload"); the schema
+  // and error type are domain-bound.
+  'validatePayload',
+
+  // getLogLevel is called by both the logger config schema (returns a
+  // ConfigLogLevel from env / config defaults) and the request-
+  // observability plugin (maps an HTTP status code to a pino level).
+  // Different inputs, different outputs.
+  'getLogLevel',
+
+  // Each prompt-injection sanitizer scopes to its package's prompt
+  // surface — assistant chat prompts truncate at 500 chars and strip
+  // markdown directives; observatory caps at MAX_NOTE_CONTENT_CHARS;
+  // enrichment + worker-runtime guard angle brackets at 10_000 chars.
+  // Different defaults + different escape sets per LLM context.
+  'sanitizeForPrompt',
+
+  // Foundation hosts two correlation-ID providers — request-context
+  // exposes the AsyncLocalStorage-backed accessor; error-factory
+  // exposes the singleton-CorrelationIdProvider accessor. Each backs
+  // a different layer (request-scoped vs. shared error factory
+  // composition) and reads from a different storage instance.
+  'getCurrentCorrelationId',
+
+  // sanitizeObject in foundation/serialization is a sync replacer-
+  // based recursion used by safe-stringify; sanitizeObject in
+  // input-sanitization/middleware is the async sanitization pipeline
+  // entry point that recurses into nested objects calling per-field
+  // sanitizers. Same name, completely different I/O contracts.
+  'sanitizeObject',
+
+  // getRemoteUrl in @opensip/github is a thin git CLI wrapper that
+  // returns Promise<string> (origin URL only); getRemoteUrl in
+  // @opensip/worker-runtime/git-worktree is the Result-wrapped
+  // operation-tracked variant that accepts an arbitrary remote name
+  // and timeout. Different signatures by design — the worker-runtime
+  // version is the safer one for pipeline use.
+  'getRemoteUrl',
+
+  // sanitizeField in @opensip/input-sanitization is the per-field
+  // step of the async sanitization middleware (takes a sanitizer +
+  // key + options bundle); sanitizeField in apiserver/routes/ingest
+  // is the signal-route-specific text helper (takes raw text + max-
+  // length + modifications array). Different parameter shapes.
+  'sanitizeField',
 ])
 
 interface FunctionInfo {
