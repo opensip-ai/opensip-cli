@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.6.1] — 2026-05-07
+
+### Fixed (`@opensip-tools/checks-builtin`)
+
+- **`async-patterns` and `batch-operations`** — split the strip-comments
+  preprocessing between per-match scanning and bounded-pattern
+  detection. The 0.6.0 narrowings ran the full strip (including
+  comments) for both, which caused new false positives on files where
+  the bounded indicator was a comment (e.g.
+  `assessment-runner/heartbeat-manager.ts`). Per-match scanning still
+  strips comments to avoid JSDoc FPs; bounded-pattern detection now
+  runs on original content to preserve operator hints.
+
 ## [0.6.0] — 2026-05-07
 
 ### Removed (`@opensip-tools/checks-builtin`) — BREAKING

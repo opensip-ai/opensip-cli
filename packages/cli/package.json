@@ -1,6 +1,6 @@
 {
   "name": "@opensip-tools/cli",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "license": "MIT",
   "description": "OpenSIP Tools CLI — codebase analysis from the command line",
   "repository": {
