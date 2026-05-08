@@ -19,9 +19,22 @@ import { getSharedSourceFile } from '@opensip-tools/core/framework/parse-cache.j
 /**
  * Check if a file contains Fastify route-level response schema definitions.
  * Routes using `schema: { response: ... }` already validate responses at the framework level.
+ *
+ * The previous regex `\{[^}]*response\s*:` failed on real route schemas
+ * because real schemas contain nested object literals — once the regex
+ * hits the first `}` (e.g. closing a `querystring` block) it gives up
+ * before reaching `response:`. The lazy `.*?` form scans across nested
+ * braces correctly. We also accept the related forms a Zod-typed Fastify
+ * route uses: bare `response: {` blocks, response-status-keyed objects,
+ * and ResponseSchema imports paired with .send.
  */
 function hasRouteResponseSchema(content: string): boolean {
-  return /schema\s*:\s*\{[^}]*response\s*:/s.test(content)
+  // schema: { ... response: ... } — handles nested braces via lazy match.
+  if (/schema\s*:\s*\{.*?\bresponse\s*:/s.test(content)) return true
+  // Direct `response: { 200: ... }` block — Fastify also accepts this
+  // shape outside an enclosing `schema:` wrapper inside `RouteOptions`.
+  if (/\bresponse\s*:\s*\{\s*[12345]\d{2}\s*:/s.test(content)) return true
+  return false
 }
 
 /**

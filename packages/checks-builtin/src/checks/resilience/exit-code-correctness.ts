@@ -1,6 +1,5 @@
 // @fitness-ignore-file project-readme-existence -- internal module, not a package root
 // @fitness-ignore-file fitness-check-coverage -- check implementation with framework-managed coverage
-// @fitness-ignore-file clean-code-naming-quality -- False positive: check misidentifies 'if' keyword as a short function name
 /**
  * @fileoverview Detects error branches that silently exit with success (exit 0)
  */

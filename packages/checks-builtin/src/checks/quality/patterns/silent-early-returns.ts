@@ -1,4 +1,3 @@
-// @fitness-ignore-file clean-code-function-parameters -- AST visitor helper function requires node, sourceFile, content, file, builder, checkId params for analysis
 /**
  * @fileoverview Silent Early Returns Check
  *

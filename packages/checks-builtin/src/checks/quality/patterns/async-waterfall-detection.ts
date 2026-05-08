@@ -1,4 +1,3 @@
-// @fitness-ignore-file clean-code-function-parameters -- AST analysis helpers need sourceFile + node context parameters
 // @fitness-ignore-file file-length-limits -- Complex module with tightly coupled logic; splitting would fragment cohesive functionality
 // @fitness-ignore-file null-safety -- null checks are intentional guards
 /**

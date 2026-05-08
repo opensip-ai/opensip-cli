@@ -1,5 +1,4 @@
 // @fitness-ignore-file canonical-result-usage -- References Result pattern in comments/JSDoc for pattern detection documentation, not actual Result usage
-// @fitness-ignore-file clean-code-function-parameters -- AST visitor helper functions require node, sourceFile, file, filePath, builder, checkId params for TypeScript analysis
 // @fitness-ignore-file logging-standards -- String literals in suggestion text reference logger calls, not actual logger usage
 // @fitness-ignore-file error-handling-quality -- Fitness check implementation: catch blocks in AST analysis intentionally return empty results to skip unreadable files
 /**

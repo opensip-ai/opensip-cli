@@ -4,6 +4,95 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.6.0] — 2026-05-07
+
+### Removed (`@opensip-tools/checks-builtin`) — BREAKING
+
+Four checks have been removed from the default recipe because their
+false-positive rate on idiomatic TypeScript codebases consistently
+exceeded the bar for a built-in. Each was either opinion-based
+("naming should be 3+ characters"), enforced an arbitrary numeric
+cutoff ("functions should have ≤5 parameters"), or guarded a class of
+bugs that doesn't meaningfully occur in practice ("exported objects
+should be frozen"). Customers running `opensip-tools fit` against a
+typical TypeScript repo would see a wall of false positives on day 1
+— a poor first-impression experience that trains users to ignore
+warnings rather than act on them.
+
+- **`clean-code-naming-quality`** — flagged `EventEmitter.on`,
+  `Drizzle.Tx`, `IO`, `OS`, `UI`, and any other short identifier as a
+  violation of "min 3 characters". The allowlist needed to match the
+  canonical short names of every TypeScript codebase. Naming is too
+  team-specific to enforce by default.
+- **`clean-code-function-parameters`** — flagged any function with >5
+  parameters. Real APIs (DI constructors, Fastify handlers, LLM tool
+  definitions) legitimately have wider signatures. The 5-param cutoff
+  is a Robert C. Martin opinion, not a precision rule.
+- **`mutable-exported-constants`** — defensive theater. Mutation of
+  an exported object literal is rare in practice, and TypeScript's
+  `Readonly<T>` + `as const` already provide compile-time protection
+  for the real risk. The check fired on every codebase using
+  `Object.freeze` (the canonical immutability primitive) until it
+  was patched, then continued to flag legitimate frozen objects.
+- **`god-function-detection`** — used arbitrary cyclomatic-complexity
+  cutoffs (warning ≥18, error ≥20) that don't correlate with real
+  bugs. Long functions are sometimes correct; complexity scores
+  measure the wrong thing.
+
+If a team wants any of these patterns enforced, they can re-add the
+check as a workspace plugin under their own recipe — but they
+shouldn't be defaults.
+
+### Improved (`@opensip-tools/checks-builtin`) — Precision narrowings
+
+A round of false-positive narrowings landed alongside the removals.
+Every change shipped with at least one regression test asserting the
+check does NOT fire on the previously-misidentified pattern.
+
+- **`error-handling-quality`** — empty-catch detection iteratively
+  strips leading single-line and block comments before testing for
+  empty body. Previously, a catch with `// @fitness-ignore` followed
+  by a real handler call was flagged as silently swallowing because
+  the regex only checked the first character.
+- **`api-contract-validation`** — skip "missing try-catch" warning
+  for `handle*Error` and `process*Error` functions. These are
+  themselves error translators called from inside a catch block;
+  requiring another try-catch around them is error-handling
+  inception.
+- **`interface-implementation-consistency`** — skip "extra method"
+  warning for classes named `Fake*`, `Mock*`, `Stub*`, `Spy*`. Test
+  doubles intentionally extend the production interface with helper
+  methods (`queueError`, `setEvents`, `reset`).
+- **`async-patterns` (detached-promises)** — recognize `outer(await inner())`
+  as a sync wrapper around an awaited promise. Previously flagged
+  every `unwrap(await x)` pattern as detached.
+- **`performance-anti-patterns`** — sequential-await detection skips
+  retry/backoff loops where any of `await delay|sleep|wait|setTimeout|backoff|pause`
+  appears in a 30-line forward window. Spread and string-concat
+  detectors are unchanged.
+- **`toctou-race-condition`** — full AST rewrite. Previously a
+  regex-only check that paired any `.get(...)` with any `.set(...)`
+  regardless of receiver. New detection classifies calls by receiver
+  identity, recognizes local in-memory `Map`/`Set` collections,
+  in-process cache fields (`this.cache`, `this.#cache`,
+  `this.<X>Cache`), parameters typed `*Cache`, and atomic SQL
+  writes (`tx.update`, `tx.execute(sql\`UPDATE ...\`)`).
+- **`dead-code`** — Knip's per-issue path is now propagated to the
+  violation record's `filePath`, so dead-dep warnings in a monorepo
+  surface against the sub-package's `package.json` instead of
+  collapsing onto root.
+- **`duplicate-utility-functions`** — recognizes intentional
+  variation (different generic constraints, side-effect profiles).
+- **`test-file-naming`** — accepts `*-helper.ts` and `*-helpers.ts`
+  suffix conventions alongside the canonical `*-test-setup.ts`.
+
+### Migration
+
+Customers on `0.5.x` who relied on any removed check should add the
+check back as a workspace-local plugin or pin to `0.5.x`. No code
+changes are required for the precision narrowings — they only
+reduce noise.
+
 ## [0.5.0] — 2026-05-05
 
 ### Removed (`@opensip-tools/core`) — BREAKING

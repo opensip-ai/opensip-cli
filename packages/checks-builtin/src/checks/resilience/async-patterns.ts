@@ -9,6 +9,7 @@ import * as ts from 'typescript'
 
 import { defineCheck, getCheckConfig, type CheckViolation, getLineNumber } from '@opensip-tools/core'
 import { getSharedSourceFile } from '@opensip-tools/core/framework/parse-cache.js'
+import { stripStringsAndCommentsPreservingPositions } from '@opensip-tools/core/framework/strip-literals.js'
 import { isCommentLine, isTestFile } from '../../utils/index.js'
 
 /**
@@ -996,24 +997,41 @@ export const noUnboundedConcurrency = defineCheck({
   analyze(content: string, filePath: string): CheckViolation[] {
     const violations: CheckViolation[] = []
 
+    // Skip test files — bounded by fixture data, not external load. A
+    // partial mock of bounded-concurrency helpers that fans out via
+    // Promise.all is a deliberate test seam; the production callers it
+    // replaces ARE bounded.
+    if (isTestFile(filePath)) return violations
+
     // Skip files that don't use Promise.all
     if (!content.includes('Promise.all')) {
       return violations
     }
 
+    // Strip strings and comments before scanning so doc-block prose
+    // describing the pattern (e.g. JSDoc that says
+    // "`Promise.all(arr.map(asyncFn))` fans out one promise per element")
+    // doesn't produce a false positive that's impossible to suppress
+    // without a pragma in user code. Use the position-preserving variant
+    // so match indexes still map onto the original source line numbers.
+    const codeOnly = stripStringsAndCommentsPreservingPositions(content)
+    if (!codeOnly.includes('Promise.all')) {
+      return violations
+    }
+
     // Check if file has bounded concurrency patterns
-    if (hasBoundedConcurrencyPattern(content)) {
+    if (hasBoundedConcurrencyPattern(codeOnly)) {
       return violations
     }
 
     UNBOUNDED_PROMISE_ALL_PATTERN.lastIndex = 0
     let match
-    while ((match = UNBOUNDED_PROMISE_ALL_PATTERN.exec(content)) !== null) {
+    while ((match = UNBOUNDED_PROMISE_ALL_PATTERN.exec(codeOnly)) !== null) {
       // @lazy-ok -- 'await' appears in suggestion string literal, not actual await
       // Check context around match for bounded patterns
       const start = Math.max(0, match.index - 200)
-      const end = Math.min(content.length, match.index + 200)
-      const context = content.substring(start, end)
+      const end = Math.min(codeOnly.length, match.index + 200)
+      const context = codeOnly.substring(start, end)
 
       if (!hasBoundedConcurrencyPattern(context)) {
         const lineNumber = getLineNumber(content, match.index)

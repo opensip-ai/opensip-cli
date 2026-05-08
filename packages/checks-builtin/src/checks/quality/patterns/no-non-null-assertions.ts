@@ -1,4 +1,3 @@
-// @fitness-ignore-file clean-code-naming-quality -- naming conventions follow domain-specific patterns
 /**
  * @fileoverview No non-null assertions check
  */

@@ -24,6 +24,15 @@ const BOUNDED_PATTERNS = [
   /totalSize\s*[<>]/,
   /cipher\.final\(\)/,
   /decipher\.final\(\)/,
+  // Bounded chunk-loop pattern: `for (let X = 0; X < ARR.length; X += CONSTANT)`.
+  // The classic array-chunking idiom — pushes happen at most
+  // `ceil(ARR.length / CONSTANT)` times, fully bounded by the input array.
+  // `MAX_ROWS_PER_INSERT`, `BATCH_SIZE`, `CHUNK_SIZE` etc. are the typical
+  // names; a literal numeric step also counts. Without this, every
+  // batch-insert helper in the codebase needs an explicit pragma.
+  /for\s*\([^)]{0,200}<\s*[A-Za-z_$][\w$.]{0,80}\.length\s*;[^)]{0,80}\+=\s*(?:[A-Z][A-Z0-9_]{1,80}|\d{1,8})/,
+  // Named chunk-size constants are themselves a strong bounded signal.
+  /\b(?:MAX_ROWS_PER_\w+|BATCH_SIZE|CHUNK_SIZE|PAGE_SIZE|MAX_BATCH|MAX_CHUNK|MAX_PAGE)\b/,
 ]
 
 /** Quick filter keywords */

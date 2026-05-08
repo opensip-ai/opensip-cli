@@ -7,6 +7,7 @@
 import { logger } from '@opensip-tools/core/logger'
 
 import { defineCheck, type CheckViolation, getLineNumber } from '@opensip-tools/core'
+import { stripStringsAndCommentsPreservingPositions } from '@opensip-tools/core/framework/strip-literals.js'
 import { isTestFile } from '../../utils/index.js'
 
 interface UnboundedBatchPattern {
@@ -383,10 +384,17 @@ export const unboundedMemory = defineCheck({
     })
     const violations: CheckViolation[] = []
 
-    const collectionDeclarations = findCollectionDeclarations(content)
+    // Strip string literals + block / single-line comments BEFORE scanning
+    // for `readFile(` matches. Doc prose like "// followed by readFile()
+    // below" or `@module readFile` JSDoc previously yielded false positives
+    // because the regex hit the comment text. Use the position-preserving
+    // variant so match indexes map back to the original source line.
+    const codeOnly = stripStringsAndCommentsPreservingPositions(content)
+
+    const collectionDeclarations = findCollectionDeclarations(codeOnly)
     for (const declaration of collectionDeclarations) {
-      const hasEviction = hasEvictionKeyword(content)
-      const hasGrowth = hasGrowthMethod(content)
+      const hasEviction = hasEvictionKeyword(codeOnly)
+      const hasGrowth = hasGrowthMethod(codeOnly)
 
       if (hasGrowth && !hasEviction) {
         const lineNumber = getLineNumber(content, declaration.index)
@@ -404,12 +412,16 @@ export const unboundedMemory = defineCheck({
       }
     }
 
-    const fileReadCalls = findFileReadCalls(content)
+    const fileReadCalls = findFileReadCalls(codeOnly)
     for (const readCall of fileReadCalls) {
-      const start = Math.max(0, readCall.index - 500)
-      const context = content.substring(start, readCall.index)
+      // Widen the look-back window to 1500 chars so a stat() guard placed
+      // up to ~30 lines earlier in the same function still counts.
+      // Real-world bundle/file readers interleave stat → branch → recover
+      // → readFile, easily putting the guard >500 chars upstream.
+      const start = Math.max(0, readCall.index - 1500)
+      const context = codeOnly.substring(start, readCall.index)
 
-      if (isReadingKnownSmallFile(content, readCall.index)) {
+      if (isReadingKnownSmallFile(codeOnly, readCall.index)) {
         continue
       }
 

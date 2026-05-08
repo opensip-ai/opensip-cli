@@ -1,5 +1,4 @@
 // @fitness-ignore-file correlation-id-coverage -- Fitness check implementation, not an API handler
-// @fitness-ignore-file clean-code-naming-quality -- Short type aliases (ResponseCoverageIssueType) and helper names follow fitness check conventions
 /**
  * @fileoverview OpenAPI Response Coverage Check
  *
