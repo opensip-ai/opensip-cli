@@ -11,8 +11,9 @@
 import { logger } from '@opensip-tools/core'
 import { generateId } from '@opensip-tools/core'
 
-import { getScenario } from '../framework/define-scenario.js'
+import { getScenario } from '../framework/registry.js'
 import { createEmptyMetrics } from '../framework/result-builder.js'
+import { renderScenarioResultView } from '../framework/result-renderers.js'
 
 import { getRecipe } from './recipe-registry.js'
 import type {
@@ -204,15 +205,16 @@ export class RecipeService {
     try {
       const abortController = new AbortController()
       const executorResult = await registeredScenario.run(abortController.signal)
+      const view = renderScenarioResultView(executorResult)
 
       return {
         scenarioId,
         scenarioName: registeredScenario.name,
-        status: executorResult.passed ? 'passed' : 'failed',
-        metrics: executorResult.metrics,
+        status: view.passed ? 'passed' : 'failed',
+        metrics: view.metrics,
         signals: executorResult.signals,
-        assertionsPassed: executorResult.assertions.passed.length,
-        assertionsFailed: executorResult.assertions.failed.length,
+        assertionsPassed: view.assertionsPassed,
+        assertionsFailed: view.assertionsFailed,
         durationMs: Date.now() - startTime,
       }
     } catch (err) {

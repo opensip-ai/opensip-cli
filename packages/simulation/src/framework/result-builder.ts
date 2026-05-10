@@ -10,7 +10,11 @@ import { ValidationError } from '@opensip-tools/core'
 import type { Signal } from '@opensip-tools/core'
 
 import type { SimulationMetrics } from '../types/base-types.js'
-import type { ScenarioAssertion, FailedAssertion, ScenarioExecutorResult } from '../types/framework-types.js'
+import type {
+  ScenarioAssertion,
+  FailedAssertion,
+  LegacyLoadResultPayload,
+} from '../types/framework-types.js'
 
 import { evaluateAssertion } from './assertions.js'
 
@@ -153,9 +157,9 @@ export class ScenarioResultBuilder {
   // BUILD
   // ===========================================================================
 
-  /** Build the final result. Throws if metrics are not set. */
-  // @fitness-ignore-next-line result-pattern-consistency -- return type is ScenarioExecutorResult (not canonical Result); throw is a builder precondition
-  build(): ScenarioExecutorResult {
+  /** Build the final load-shaped payload. Throws if metrics are not set. */
+  // @fitness-ignore-next-line result-pattern-consistency -- return type is LegacyLoadResultPayload (not canonical Result); throw is a builder precondition
+  build(): LegacyLoadResultPayload {
     if (!this._metrics) {
       // @fitness-ignore-next-line result-pattern-consistency -- builder precondition, throw is appropriate
       throw new ValidationError('Metrics are required. Call withMetrics() before build().', {

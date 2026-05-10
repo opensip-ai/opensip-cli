@@ -1,17 +1,22 @@
 /**
- * @fileoverview Simulation Framework
+ * @fileoverview Simulation Framework — shared infrastructure.
  *
- * Two execution models:
- * 1. **Declarative** (`defineScenario`) — Config-driven scenario definition with auto-registration,
- *    built-in validation, and standard execution. Use this for most scenarios.
- * 2. **Imperative** (`createScenario`/`createStandardExecutor`) — Low-level API for custom
- *    execution logic, manual lifecycle control, and framework-level integration.
+ * Per Plan 01 Phase 0b.5 / DEC-338, scenario authoring goes through one of the
+ * four kind-specific entry points exported from the package root:
  *
- * Both models produce runnable scenario objects that can be executed via `run(abortSignal)`.
+ *   - `defineLoadScenario`           ← personas + ramp + assertions (existing)
+ *   - `defineChaosScenario`          ← base load + failure injection
+ *   - `defineInvariantScenario`      ← seed → act → assert
+ *   - `defineFixEvaluationScenario`  ← run agent against signal → score predicate
+ *
+ * The framework module exports the cross-kind shared infrastructure: the
+ * registry, the runnable contract, the discriminated result union, helpers
+ * shared between load + chaos kinds (personas, assertions, result-builder),
+ * and the abort/log/correlation execution engine.
  */
 
 // =============================================================================
-// TYPES (from types/)
+// LEGACY TYPES (load-shaped, retained for back-compat with `defineScenario`)
 // =============================================================================
 
 export type {
@@ -26,17 +31,16 @@ export type {
   // Executor types
   ScenarioExecutionContext,
   ScenarioLogger,
+  /** @deprecated Alias for {@link LegacyLoadResultPayload}. The discriminated result type is exported from the package root. */
   ScenarioExecutorResult,
+  LegacyLoadResultPayload,
   CustomExecuteFn,
   ActionExecutorFn,
 
   // Config types
   ScenarioExecutionOptions,
+  /** @deprecated Use the kind-specific `LoadScenarioConfig` / `ChaosScenarioConfig` / etc. */
   ScenarioConfig,
-
-  // Runnable scenario
-  RunnableScenario,
-  ScenarioRegistryEntry,
 
   // Re-exports from base-types
   PersonaType,
@@ -46,7 +50,37 @@ export type {
 } from '../types/framework-types.js'
 
 // =============================================================================
-// ASSERTIONS
+// KIND DISCRIMINATOR
+// =============================================================================
+
+export type { ScenarioKind } from '../types/kind-types.js'
+export { SCENARIO_KINDS } from '../types/kind-types.js'
+
+// =============================================================================
+// SHARED RUNTIME CONTRACT
+// =============================================================================
+
+export type { RunnableScenario, ScenarioRegistryEntry } from './runnable-scenario.js'
+export type {
+  ScenarioExecutorResult as KindAwareScenarioExecutorResult,
+  LoadScenarioExecutorResult,
+} from './scenario-executor-result.js'
+
+// =============================================================================
+// REGISTRY
+// =============================================================================
+
+export {
+  scenarioRegistry,
+  getRegisteredScenarios,
+  getScenario,
+  getScenariosByTag,
+  getScenariosByKind,
+  clearScenarioRegistry,
+} from './registry.js'
+
+// =============================================================================
+// ASSERTIONS (load + chaos shared)
 // =============================================================================
 
 export {
@@ -58,7 +92,7 @@ export {
 } from './assertions.js'
 
 // =============================================================================
-// PERSONAS
+// PERSONAS (load + chaos shared)
 // =============================================================================
 
 export {
@@ -72,28 +106,27 @@ export {
 } from './personas.js'
 
 // =============================================================================
-// RESULT BUILDER
+// RESULT BUILDER (load + chaos shared)
 // =============================================================================
 
 export { ScenarioResultBuilder, createEmptyMetrics, mergeMetrics } from './result-builder.js'
 
 // =============================================================================
-// REGISTRY
+// GENERIC REGISTRY PRIMITIVE
 // =============================================================================
 
 export { GenericRegistry, type Registerable } from './generic-registry.js'
 
 // =============================================================================
-// DEFINE SCENARIO
+// LEGACY DEFINE-SCENARIO ALIAS
 // =============================================================================
 
 export {
+  /** @deprecated Use `defineLoadScenario` from '@opensip-tools/simulation'. */
   defineScenario,
+  /** @deprecated Use `defineLoadScenarioWithoutRegistration` from '@opensip-tools/simulation'. */
   defineScenarioWithoutRegistration,
-  getRegisteredScenarios,
-  getScenario,
-  getScenariosByTag,
-  clearScenarioRegistry,
+  /** @deprecated Use `validateLoadScenarioConfig` from '@opensip-tools/simulation/kinds/load'. */
   validateScenarioConfig,
   type ValidationError,
 } from './define-scenario.js'
@@ -111,7 +144,7 @@ export {
 } from './validation/scenario-validator.js'
 
 // =============================================================================
-// EXECUTION ENGINE
+// EXECUTION ENGINE (shared abort / log / correlation infra)
 // =============================================================================
 
 export {

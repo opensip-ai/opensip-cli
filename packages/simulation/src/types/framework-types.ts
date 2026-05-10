@@ -1,8 +1,16 @@
 /**
- * @fileoverview Type definitions for the Simulation Framework
+ * @fileoverview Legacy type definitions for the Simulation Framework.
  *
- * ScenarioConfig is the primary interface for scenario authors.
- * All optional fields have sensible defaults. Readonly types ensure immutability.
+ * Per Plan 01 Phase 0b.5, the framework now exposes four kind-specific entry
+ * points (`defineLoadScenario`, `defineChaosScenario`, `defineInvariantScenario`,
+ * `defineFixEvaluationScenario`). The discriminated union over kinds lives in
+ * `framework/scenario-executor-result.ts`; the cross-kind `RunnableScenario`
+ * lives in `framework/runnable-scenario.ts`.
+ *
+ * The exports below preserve the legacy shapes so callers using `defineScenario`
+ * (the deprecated alias for `defineLoadScenario`) continue to compile.
+ *
+ * @deprecated Prefer the new kind-specific types from `kinds/<kind>/define.ts`.
  */
 
 import type { Signal } from '@opensip-tools/core'
@@ -73,9 +81,16 @@ export interface ScenarioLogger {
 }
 
 /**
- * Result of executing a scenario.
+ * Legacy load-shaped scenario result payload, produced by `ScenarioResultBuilder`.
+ *
+ * The new public `ScenarioExecutorResult` (discriminated union over kinds)
+ * lives in `framework/scenario-executor-result.ts`. Each kind's runner wraps
+ * a payload of this shape into its kind-specific envelope.
+ *
+ * @deprecated Prefer the discriminated `ScenarioExecutorResult` from
+ * `framework/scenario-executor-result.ts`.
  */
-export interface ScenarioExecutorResult {
+export interface LegacyLoadResultPayload {
   readonly passed: boolean
   readonly metrics: SimulationMetrics
   readonly assertions: {
@@ -85,10 +100,16 @@ export interface ScenarioExecutorResult {
   readonly signals: readonly Signal[]
 }
 
+/** @deprecated Alias for {@link LegacyLoadResultPayload}; the public discriminated union now lives in `framework/scenario-executor-result.ts`. */
+export type ScenarioExecutorResult = LegacyLoadResultPayload
+
 /**
- * Custom execute function signature.
+ * Custom execute function signature for load scenarios.
+ *
+ * Custom execute functions return the legacy load result payload; the
+ * load runner wraps the payload into a `LoadScenarioExecutorResult`.
  */
-export type CustomExecuteFn = (context: ScenarioExecutionContext) => Promise<ScenarioExecutorResult>
+export type CustomExecuteFn = (context: ScenarioExecutionContext) => Promise<LegacyLoadResultPayload>
 
 /**
  * Action executor function signature.
@@ -141,41 +162,12 @@ export interface ScenarioConfig {
 // RUNNABLE SCENARIO
 // =============================================================================
 
-/**
- * A validated, runnable scenario.
- * Created by defineScenario() after validation.
- */
-export interface RunnableScenario {
-  readonly id: string
-  readonly name: string
-  readonly description: string
-  readonly type: ScenarioType
-  readonly tags: readonly string[]
-
-  /**
-   * Run the scenario with the given abort signal.
-   */
-  run(abortSignal: AbortSignal): Promise<ScenarioExecutorResult>
-
-  /**
-   * Get the raw configuration.
-   */
-  getConfig(): Readonly<ScenarioConfig>
-}
-
-// =============================================================================
-// REGISTRY TYPES
-// =============================================================================
-
-/**
- * Scenario registry entry.
- */
-export interface ScenarioRegistryEntry {
-  readonly id: string
-  readonly name: string
-  readonly scenario: RunnableScenario
-  readonly tags: readonly string[]
-}
+// `RunnableScenario` is now defined in `framework/runnable-scenario.ts` and
+// carries a `kind` discriminator. The legacy load-only interface that lived
+// here (with `type: ScenarioType` + `getConfig()`) was retired by Plan 01
+// Phase 0b.5 — there were no external consumers of `getConfig()`, and `type`
+// was redundant with the new `kind` discriminator.
+export type { RunnableScenario, ScenarioRegistryEntry } from '../framework/runnable-scenario.js'
 
 // =============================================================================
 // RE-EXPORTS
