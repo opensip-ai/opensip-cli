@@ -66,6 +66,7 @@ export type {
   LoadScenarioExecutorResult,
   ChaosScenarioExecutorResult,
   InvariantScenarioExecutorResult,
+  FixEvaluationScenarioExecutorResult,
 } from './scenario-executor-result.js'
 
 // =============================================================================

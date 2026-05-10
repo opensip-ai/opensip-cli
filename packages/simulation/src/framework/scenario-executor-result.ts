@@ -18,6 +18,7 @@ import type { Signal } from '@opensip-tools/core'
 import type { LoadOutcome } from '../kinds/load/result.js'
 import type { ChaosOutcome } from '../kinds/chaos/result.js'
 import type { InvariantOutcome } from '../kinds/invariant/result.js'
+import type { FixEvaluationOutcome } from '../kinds/fix-evaluation/result.js'
 
 /** Common envelope fields for every kind's result. */
 interface BaseScenarioExecutorResult {
@@ -49,14 +50,20 @@ export interface InvariantScenarioExecutorResult extends BaseScenarioExecutorRes
   readonly outcome: InvariantOutcome
 }
 
+/** Fix-evaluation-kind result envelope. */
+export interface FixEvaluationScenarioExecutorResult extends BaseScenarioExecutorResult {
+  readonly kind: 'fix-evaluation'
+  readonly outcome: FixEvaluationOutcome
+}
+
 /**
  * Discriminated union over scenario executor results.
  *
  * Use exhaustive `switch (result.kind)` to dispatch — TypeScript's narrowing
- * makes per-kind `outcome` access compile-time safe. Subsequent commits extend
- * this union with the fix-evaluation variant.
+ * makes per-kind `outcome` access compile-time safe.
  */
 export type ScenarioExecutorResult =
   | LoadScenarioExecutorResult
   | ChaosScenarioExecutorResult
   | InvariantScenarioExecutorResult
+  | FixEvaluationScenarioExecutorResult

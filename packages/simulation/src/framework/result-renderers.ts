@@ -82,6 +82,20 @@ export function renderScenarioResultView(
       }
     }
 
+    case 'fix-evaluation':
+      return {
+        kind: 'fix-evaluation',
+        scenarioId: result.scenarioId,
+        passed: result.passed,
+        durationMs: result.durationMs,
+        metrics: createEmptyMetrics(),
+        assertionsPassed: result.outcome.predicateMatched ? 1 : 0,
+        assertionsFailed: result.outcome.predicateMatched ? 0 : 1,
+        outcomeLabel: result.outcome.predicateMatched
+          ? 'predicate matched'
+          : `predicate did not match (matchedExpectedOutcome=${result.outcome.matchedExpectedOutcome})`,
+      }
+
     default: {
       // Exhaustiveness guard — adding a new variant to the discriminated union
       // turns this assignment into a compile-time error, forcing every dispatch

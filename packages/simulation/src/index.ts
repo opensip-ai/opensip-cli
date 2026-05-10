@@ -1,13 +1,13 @@
 /**
  * @opensip-tools/simulation — Simulation scenarios for codebase analysis.
  *
- * Per Plan 01 Phase 0b.5 / DEC-338, the package will expose four kind-specific
+ * Per Plan 01 Phase 0b.5 / DEC-338, the package exposes four kind-specific
  * scenario authoring entry points sharing one runtime contract:
  *
  *   - `defineLoadScenario`           ← personas + ramp + sustain + assert SLO
  *   - `defineChaosScenario`          ← base load + failure injection + recovery
  *   - `defineInvariantScenario`      ← seed → act → assert state
- *   - `defineFixEvaluationScenario`  (added in a follow-up commit)
+ *   - `defineFixEvaluationScenario`  ← run agent against signal → score predicate
  *
  * The legacy `defineScenario` is preserved as a one-release deprecation alias
  * that routes to `defineLoadScenario`.
@@ -30,6 +30,7 @@ export type {
   LoadScenarioExecutorResult,
   ChaosScenarioExecutorResult,
   InvariantScenarioExecutorResult,
+  FixEvaluationScenarioExecutorResult,
 } from './framework/scenario-executor-result.js'
 
 // =============================================================================
@@ -94,6 +95,39 @@ export type {
   InvariantPhaseStatus,
   InvariantAssertion,
 } from './kinds/invariant/result.js'
+
+// =============================================================================
+// FIX-EVALUATION KIND
+// =============================================================================
+
+export {
+  defineFixEvaluationScenario,
+  defineFixEvaluationScenarioWithoutRegistration,
+  validateFixEvaluationScenarioConfig,
+  type FixEvaluationScenarioConfig,
+  type FixEvaluationValidationError,
+  type PredicateComposition,
+  type PredicateLeaf,
+  type SignalPayload,
+} from './kinds/fix-evaluation/define.js'
+export type {
+  FixEvaluationOutcome,
+  PredicateLeafVerdict,
+  PredicateCompositeVerdict,
+  PredicateVerdict,
+  AgentRunSummary,
+} from './kinds/fix-evaluation/result.js'
+export {
+  predicateRegistry,
+  registerPredicate,
+  getPredicate,
+  listPredicateIds,
+  resetPredicateRegistryToBaseline,
+  type PredicateEvaluator,
+  type PredicateEvaluationContext,
+  type PredicateEvaluationResult,
+  type PredicateArgs,
+} from './kinds/fix-evaluation/predicates/index.js'
 
 // =============================================================================
 // LEGACY ALIAS (DEPRECATED — one release notice)

@@ -226,6 +226,7 @@ function toolOptsToCliArgs(command: string, opts: ToolOptions): CliArgs {
     verbose: false,
     exclude: [],
     findings: false,
+    ...(opts.kind ? { kind: opts.kind } : {}),
   };
 }
 
@@ -527,8 +528,12 @@ program
   .option('--json', 'Output structured JSON', false)
   .option('-q, --quiet', 'Suppress banner / boxes; print only the pass-fail summary', false)
   .option('--open', 'Launch the HTML dashboard in your browser after the run completes', false)
+  .option(
+    '--kind <kind>',
+    'Filter scenarios by kind (load | chaos | invariant | fix-evaluation)',
+  )
   .option('--debug', 'Enable debug mode for structured log output', false)
-  .action(async (opts: ToolOptions & { quiet?: boolean; open?: boolean }) => {
+  .action(async (opts: ToolOptions & { quiet?: boolean; open?: boolean; kind?: string }) => {
     const args = toolOptsToCliArgs('sim', opts);
     const result = executeSim(args);
     if (args.json) {

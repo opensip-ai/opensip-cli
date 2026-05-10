@@ -41,6 +41,8 @@ export interface ToolOptions {
   cwd: string;
   json: boolean;
   debug: boolean;
+  /** Filter by scenario kind (load / chaos / invariant / fix-evaluation). */
+  kind?: string;
 }
 
 /**
@@ -72,6 +74,11 @@ export interface CliArgs {
   gateSave?: boolean;
   gateCompare?: boolean;
   baseline?: string;
+  /**
+   * Sim-only: filter scenarios by kind.
+   * One of 'load' | 'chaos' | 'invariant' | 'fix-evaluation', or undefined for all.
+   */
+  kind?: string;
 }
 
 /** Structured JSON output format */
@@ -221,6 +228,8 @@ export interface ExperimentalResult {
   type: 'experimental';
   tool: 'sim';
   cwd: string;
+  /** Optional `--kind` filter (load / chaos / invariant / fix-evaluation). */
+  kind?: string;
 }
 
 export interface PluginResult {
