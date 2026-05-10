@@ -2,13 +2,11 @@
  * @opensip-tools/simulation — Simulation scenarios for codebase analysis.
  *
  * Per Plan 01 Phase 0b.5 / DEC-338, the package will expose four kind-specific
- * scenario authoring entry points sharing one runtime contract. This commit
- * lands the foundation + the load kind; subsequent commits add the chaos,
- * invariant, and fix-evaluation kinds.
+ * scenario authoring entry points sharing one runtime contract:
  *
  *   - `defineLoadScenario`           ← personas + ramp + sustain + assert SLO
+ *   - `defineInvariantScenario`      ← seed → act → assert state
  *   - `defineChaosScenario`          (added in a follow-up commit)
- *   - `defineInvariantScenario`      (added in a follow-up commit)
  *   - `defineFixEvaluationScenario`  (added in a follow-up commit)
  *
  * The legacy `defineScenario` is preserved as a one-release deprecation alias
@@ -30,6 +28,7 @@ export type { RunnableScenario, ScenarioRegistryEntry } from './framework/runnab
 export type {
   ScenarioExecutorResult,
   LoadScenarioExecutorResult,
+  InvariantScenarioExecutorResult,
 } from './framework/scenario-executor-result.js'
 
 // =============================================================================
@@ -59,6 +58,28 @@ export {
   type LoadValidationError,
 } from './kinds/load/define.js'
 export type { LoadOutcome } from './kinds/load/result.js'
+
+// =============================================================================
+// INVARIANT KIND
+// =============================================================================
+
+export {
+  defineInvariantScenario,
+  defineInvariantScenarioWithoutRegistration,
+  validateInvariantScenarioConfig,
+  type InvariantScenarioConfig,
+  type InvariantValidationError,
+} from './kinds/invariant/define.js'
+export type {
+  InvariantContext,
+  InvariantContextDeps,
+} from './kinds/invariant/context.js'
+export type {
+  InvariantOutcome,
+  InvariantPhaseResult,
+  InvariantPhaseStatus,
+  InvariantAssertion,
+} from './kinds/invariant/result.js'
 
 // =============================================================================
 // LEGACY ALIAS (DEPRECATED — one release notice)

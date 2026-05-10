@@ -64,6 +64,7 @@ export type { RunnableScenario, ScenarioRegistryEntry } from './runnable-scenari
 export type {
   ScenarioExecutorResult as KindAwareScenarioExecutorResult,
   LoadScenarioExecutorResult,
+  InvariantScenarioExecutorResult,
 } from './scenario-executor-result.js'
 
 // =============================================================================

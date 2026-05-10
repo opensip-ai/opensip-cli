@@ -15,6 +15,7 @@
 
 import type { SimulationMetrics } from '../types/base-types.js'
 
+import { createEmptyMetrics } from './result-builder.js'
 import type { ScenarioExecutorResult } from './scenario-executor-result.js'
 
 /** View-friendly summary common to every kind. */
@@ -47,13 +48,26 @@ export function renderScenarioResultView(
         outcomeLabel: `${result.outcome.metrics.totalRequests} req, ${result.outcome.assertions.failed.length} failed`,
       }
 
+    case 'invariant': {
+      const heldCount = result.outcome.assertions.filter((a) => a.held).length
+      const failedCount = result.outcome.assertions.length - heldCount
+      return {
+        kind: 'invariant',
+        scenarioId: result.scenarioId,
+        passed: result.passed,
+        durationMs: result.durationMs,
+        metrics: createEmptyMetrics(),
+        assertionsPassed: heldCount,
+        assertionsFailed: failedCount,
+        outcomeLabel: `${result.outcome.assertions.length} invariants checked, ${failedCount} failed`,
+      }
+    }
+
     default: {
       // Exhaustiveness guard — adding a new variant to the discriminated union
       // turns this assignment into a compile-time error, forcing every dispatch
       // site (including this one) to add the missing branch.
-      // Cast through `unknown` so a single-variant union doesn't trip the check
-      // before the chaos / invariant / fix-evaluation variants land.
-      const _exhaustive: never = result as unknown as never
+      const _exhaustive: never = result
       // @fitness-ignore-next-line result-pattern-consistency -- exhaustiveness probe; runtime should never hit this
       throw new Error(
         `Unreachable: ScenarioExecutorResult kind exhaustiveness violation (${String(_exhaustive)})`,
