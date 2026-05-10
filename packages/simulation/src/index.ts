@@ -5,8 +5,8 @@
  * scenario authoring entry points sharing one runtime contract:
  *
  *   - `defineLoadScenario`           ← personas + ramp + sustain + assert SLO
+ *   - `defineChaosScenario`          ← base load + failure injection + recovery
  *   - `defineInvariantScenario`      ← seed → act → assert state
- *   - `defineChaosScenario`          (added in a follow-up commit)
  *   - `defineFixEvaluationScenario`  (added in a follow-up commit)
  *
  * The legacy `defineScenario` is preserved as a one-release deprecation alias
@@ -28,6 +28,7 @@ export type { RunnableScenario, ScenarioRegistryEntry } from './framework/runnab
 export type {
   ScenarioExecutorResult,
   LoadScenarioExecutorResult,
+  ChaosScenarioExecutorResult,
   InvariantScenarioExecutorResult,
 } from './framework/scenario-executor-result.js'
 
@@ -58,6 +59,19 @@ export {
   type LoadValidationError,
 } from './kinds/load/define.js'
 export type { LoadOutcome } from './kinds/load/result.js'
+
+// =============================================================================
+// CHAOS KIND
+// =============================================================================
+
+export {
+  defineChaosScenario,
+  defineChaosScenarioWithoutRegistration,
+  validateChaosScenarioConfig,
+  type ChaosScenarioConfig,
+  type ChaosValidationError,
+} from './kinds/chaos/define.js'
+export type { ChaosOutcome, ChaosEvent, ChaosAssertionVerdict } from './kinds/chaos/result.js'
 
 // =============================================================================
 // INVARIANT KIND

@@ -48,6 +48,25 @@ export function renderScenarioResultView(
         outcomeLabel: `${result.outcome.metrics.totalRequests} req, ${result.outcome.assertions.failed.length} failed`,
       }
 
+    case 'chaos': {
+      const passedCount =
+        result.outcome.steadyStateAssertions.passed.length +
+        result.outcome.recoveryAssertions.passed.length
+      const failedCount =
+        result.outcome.steadyStateAssertions.failed.length +
+        result.outcome.recoveryAssertions.failed.length
+      return {
+        kind: 'chaos',
+        scenarioId: result.scenarioId,
+        passed: result.passed,
+        durationMs: result.durationMs,
+        metrics: result.outcome.steadyStateMetrics,
+        assertionsPassed: passedCount,
+        assertionsFailed: failedCount,
+        outcomeLabel: `${result.outcome.chaosEvents.length} chaos events, ${failedCount} failed`,
+      }
+    }
+
     case 'invariant': {
       const heldCount = result.outcome.assertions.filter((a) => a.held).length
       const failedCount = result.outcome.assertions.length - heldCount
