@@ -75,6 +75,28 @@ const CheckTargetValueSchema = z.union([
 ])
 
 // =============================================================================
+// CLI Defaults
+// =============================================================================
+
+/**
+ * Defaults applied to every `opensip-tools` CLI invocation in the project.
+ * Equivalent to flags on the command line (`--recipe`, `--exclude`, …) but
+ * declared once in the project config so every contributor and CI run agrees.
+ *
+ * Lives alongside targets so a project can ship a single config file.
+ */
+export const CliDefaultsSchema = z.object({
+  recipe:    z.string().min(1).max(128).optional(),
+  exclude:   z.array(z.string()).optional(),
+  verbose:   z.boolean().optional(),
+  json:      z.boolean().optional(),
+  reportTo:  z.string().url().optional(),
+  apiKey:    z.string().min(1).optional(),
+  fileTypes: z.array(z.string()).optional(),
+  ignore:    z.array(z.string()).optional(),
+})
+
+// =============================================================================
 // Root Schema
 // =============================================================================
 
@@ -91,6 +113,7 @@ export const SignalersConfigSchema = z.object({
     TargetDefinitionSchema,
   ).default({}),
   checkOverrides: z.record(z.string(), CheckTargetValueSchema).optional(),
-  fitness: section(FitnessSchema),
+  fitness:    section(FitnessSchema),
   simulation: section(SimulationSchema),
+  cli:        section(CliDefaultsSchema),
 })

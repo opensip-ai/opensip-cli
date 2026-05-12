@@ -8,11 +8,11 @@
  */
 
 // Schema
-export { SignalersConfigSchema, FitnessSchema, SimulationSchema, SignalerScheduleSchema } from './schema.js'
+export { SignalersConfigSchema, FitnessSchema, SimulationSchema, SignalerScheduleSchema, CliDefaultsSchema } from './schema.js'
 export type { SignalerScheduleConfig } from './schema.js'
 
 // Types
-export type { SignalersConfig, SignalersFitnessConfig, SignalersSimulationConfig } from './types.js'
+export type { SignalersConfig, SignalersFitnessConfig, SignalersSimulationConfig, SignalersCliDefaultsConfig } from './types.js'
 
 // Loader
 export { loadSignalersConfig, resetSignalersConfigCache } from './loader.js'

@@ -56,8 +56,8 @@ describe('error handling', () => {
       expect(suggestion!.exitCode).toBe(EXIT_CODES.CONFIGURATION_ERROR);
     });
 
-    it('detects config file errors (.opensip-tools.yml)', () => {
-      const err = new Error('Invalid .opensip-tools.yml');
+    it('detects config file errors (opensip-tools.config.yml)', () => {
+      const err = new Error('Invalid opensip-tools.config.yml');
       const suggestion = getErrorSuggestion(err);
       expect(suggestion).not.toBeNull();
       expect(suggestion!.message).toContain('Configuration error');
@@ -156,7 +156,7 @@ describe('error handling', () => {
       const testCases = [
         new Error('Check not found: x'),
         new Error('Unknown recipe'),
-        new Error('.opensip-tools.yml invalid'),
+        new Error('opensip-tools.config.yml invalid'),
         new Error('EACCES denied'),
         new Error('No checks registered'),
         new Error('fetch error'),

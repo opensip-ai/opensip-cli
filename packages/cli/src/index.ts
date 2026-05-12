@@ -15,7 +15,9 @@ import { Command } from 'commander';
 import {
   setSilent, setDebugMode,
   generatePrefixedId, setRunId, initLogFile, logger,
+  loadSignalersConfig,
 } from '@opensip-tools/core';
+import type { SignalersConfig } from '@opensip-tools/core';
 
 import { EXIT_CODES, getErrorSuggestion } from './exit-codes.js';
 import { printWelcome } from './welcome.js';
@@ -34,10 +36,9 @@ export type { CliOutput, CheckOutput, FindingOutput, TableRow, SummaryOptions, C
 export { buildSarifLog, reportToCloud } from './sarif.js';
 export { resolveApiKey } from './commands/configure.js';
 
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parse as parseYaml } from 'yaml';
 
 // Read the CLI's own version from its package.json at import time.
 // Avoids a hardcoded string in two places (package.json + Command.version())
@@ -76,99 +77,36 @@ import {
 import type { CliArgs, FitOptions, InitOptions, ToolOptions } from './types.js';
 
 // =============================================================================
-// CONFIG FILE (.opensip-tools.yml)
+// CLI DEFAULTS (read from `cli:` block in opensip-tools.config.yml)
 // =============================================================================
 
-interface ToolsConfig {
-  recipe?: string;
-  exclude?: string[];
-  verbose?: boolean;
-  json?: boolean;
-  reportTo?: string;
-  apiKey?: string;
-  fileTypes?: string[];
-  ignore?: string[];
-}
+/** Subset of opensip-tools.config.yml#cli — defaults applied to every CLI run. */
+type CliDefaults = SignalersConfig['cli'];
 
-const CONFIG_FILENAMES = ['.opensip-tools.yml', '.opensip-tools.yaml', 'opensip-tools.yml'];
-
-function loadConfig(cwd: string): ToolsConfig {
-  for (const filename of CONFIG_FILENAMES) {
-    const filePath = join(cwd, filename);
-    if (existsSync(filePath)) {
-      let raw: string;
-      try {
-        raw = readFileSync(filePath, 'utf-8');
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        logger.warn({
-          evt: 'cli.config.read_error',
-          module: 'cli',
-          file: filePath,
-          error: message,
-          msg: `Failed to read ${filename}: ${message}. Falling back to defaults.`,
-        });
-        return {};
-      }
-
-      let parsed: ToolsConfig | null;
-      try {
-        parsed = parseYaml(raw) as ToolsConfig | null;
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        logger.warn({
-          evt: 'cli.config.yaml_error',
-          module: 'cli',
-          file: filePath,
-          error: message,
-          msg: `${filename} contains invalid YAML: ${message}. Falling back to defaults.`,
-        });
-        return {};
-      }
-
-      const config = parsed ?? {};
-
-      // Validate expected field types
-      const warnings: string[] = [];
-      if (config.recipe !== undefined && typeof config.recipe !== 'string') {
-        warnings.push('recipe: expected string');
-        delete config.recipe;
-      }
-      if (config.verbose !== undefined && typeof config.verbose !== 'boolean') {
-        warnings.push('verbose: expected boolean');
-        delete config.verbose;
-      }
-      if (config.json !== undefined && typeof config.json !== 'boolean') {
-        warnings.push('json: expected boolean');
-        delete config.json;
-      }
-      if (config.exclude !== undefined && !Array.isArray(config.exclude)) {
-        warnings.push('exclude: expected array');
-        delete config.exclude;
-      }
-      if (config.reportTo !== undefined && typeof config.reportTo !== 'string') {
-        warnings.push('reportTo: expected string');
-        delete config.reportTo;
-      }
-      if (config.apiKey !== undefined && typeof config.apiKey !== 'string') {
-        warnings.push('apiKey: expected string');
-        delete config.apiKey;
-      }
-
-      if (warnings.length > 0) {
-        logger.warn({
-          evt: 'cli.config.validation_warning',
-          module: 'cli',
-          file: filePath,
-          issues: warnings,
-          msg: `${filename} has invalid fields (ignored): ${warnings.join(', ')}`,
-        });
-      }
-
-      return config;
-    }
+/**
+ * Load the `cli:` defaults block from the project's opensip-tools.config.yml.
+ *
+ * Path resolution is delegated to loadSignalersConfig (explicit --config,
+ * then package.json#opensip-tools.configPath, then <cwd>/opensip-tools.config.yml).
+ *
+ * If the targets config is missing or invalid, return empty defaults and
+ * defer the real error to the command (executeFit / executeSim / etc.),
+ * which produces the user-facing "config not found" message. This keeps
+ * commands like `--help` and `--version` working without a project config.
+ */
+function loadCliDefaults(cwd: string, explicitConfigPath?: string): CliDefaults {
+  try {
+    return loadSignalersConfig(cwd, explicitConfigPath).cli;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.debug({
+      evt: 'cli.config.unavailable',
+      module: 'cli',
+      cwd,
+      error: message,
+    });
+    return {} as CliDefaults;
   }
-  return {};
 }
 
 // =============================================================================
@@ -231,7 +169,7 @@ function toolOptsToCliArgs(command: string, opts: ToolOptions): CliArgs {
 }
 
 /** Merge config-file defaults into Commander options (config is lower priority). */
-function mergeConfigDefaults(opts: Record<string, unknown>, config: ToolsConfig): void {
+function mergeConfigDefaults(opts: Record<string, unknown>, config: CliDefaults): void {
   // Only apply config defaults when the CLI didn't explicitly set a value
   if (config.recipe && opts.recipe === undefined) opts.recipe = config.recipe;
   if (config.verbose && opts.verbose === false) opts.verbose = config.verbose;
@@ -285,9 +223,9 @@ program.hook('preAction', (_thisCommand, actionCommand) => {
     setDebugMode(true);
   }
 
-  // Load config from --cwd and merge defaults
+  // Load CLI defaults from the project's opensip-tools.config.yml#cli block
   const cwd = (opts.cwd as string) ?? process.cwd();
-  const config = loadConfig(cwd);
+  const config = loadCliDefaults(cwd, opts.config as string | undefined);
   mergeConfigDefaults(opts, config);
 
   logger.info({ evt: 'cli.start', module: 'cli:bootstrap', runId, command: actionCommand.name(), cwd });

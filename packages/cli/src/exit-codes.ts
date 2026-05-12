@@ -35,10 +35,10 @@ export function getErrorSuggestion(err: unknown): ErrorSuggestion | null {
   }
 
   // Config file error
-  if (message.includes('.opensip-tools.yml') || message.includes('YAML') || message.includes('config')) {
+  if (message.includes('opensip-tools.config.yml') || message.includes('YAML') || message.includes('config')) {
     return {
       message: 'Configuration error.',
-      action: 'Check .opensip-tools.yml for syntax errors.',
+      action: 'Check opensip-tools.config.yml for syntax errors.',
       exitCode: EXIT_CODES.CONFIGURATION_ERROR,
     };
   }
