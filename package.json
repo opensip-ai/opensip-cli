@@ -16,7 +16,8 @@
     "build": "turbo run build",
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",
-    "lint": "turbo run lint",
+    "lint": "eslint 'packages/**/src/**/*.{ts,tsx}'",
+    "lint:fix": "eslint --fix 'packages/**/src/**/*.{ts,tsx}'",
     "clean": "turbo run clean",
     "cli": "node packages/cli/dist/index.js",
     "fit": "node packages/cli/dist/index.js fit",
@@ -24,9 +25,17 @@
     "sessions": "node packages/cli/dist/index.js sessions"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.4",
     "@vitest/coverage-v8": "^2.1.9",
+    "eslint": "^9.39.4",
+    "eslint-import-resolver-typescript": "^4.4.4",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-sonarjs": "^4.0.3",
+    "eslint-plugin-unicorn": "^64.0.0",
+    "globals": "^17.6.0",
     "turbo": "^2.5.0",
-    "typescript": "~5.7.0"
+    "typescript": "~5.7.0",
+    "typescript-eslint": "^8.59.3"
   },
   "packageManager": "pnpm@10.12.1",
   "engines": {
