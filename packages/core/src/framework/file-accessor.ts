@@ -9,8 +9,9 @@ import * as fs from 'node:fs/promises'
 
 import { ValidationError } from '../lib/errors.js'
 
+import { applyContentFilter } from '../languages/content-filter-dispatch.js'
+
 import type { FileAccessor } from './check-config.js'
-import { filterContent } from './content-filter.js'
 import { fileCache } from './file-cache.js'
 
 // =============================================================================
@@ -122,13 +123,9 @@ export class FileAccessorImpl implements FileAccessor {
       }
       content = await fs.readFile(filePath, 'utf-8')
     }
-    // Two distinct modes — see BaseCheckConfig.contentFilter docs in
-    // check-config.ts.
-    if (this.contentFilterMode === 'strip-strings') {
-      content = filterContent(content).code
-    } else if (this.contentFilterMode === 'strip-strings-and-comments') {
-      content = filterContent(content).codeNoComments
-    }
+    // Dispatch through the LanguageAdapter for the file's extension.
+    // See languages/content-filter-dispatch.ts.
+    content = applyContentFilter(filePath, content, this.contentFilterMode ?? 'none')
     this.cache.set(filePath, content)
     return content
   }

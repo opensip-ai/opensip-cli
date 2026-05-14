@@ -7,3 +7,4 @@ export {
   getParseTree,
   getParseTreeForFile,
 } from './parse-cache.js'
+export { applyContentFilter, type ContentFilterMode } from './content-filter-dispatch.js'

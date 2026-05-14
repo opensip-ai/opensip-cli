@@ -34,8 +34,9 @@ import {
   validateCheckConfig,
 } from './check-config.js'
 import type { Check } from './check-types.js'
+import { applyContentFilter } from '../languages/content-filter-dispatch.js'
+
 import { executeCommand } from './command-executor.js'
-import { filterContent } from './content-filter.js'
 import type { ExecutionContext, RunOptions } from './execution-context.js'
 import { CheckAbortedError, createExecutionContext } from './execution-context.js'
 import { createFileAccessor } from './file-accessor.js'
@@ -103,16 +104,10 @@ async function executeAnalyzeMode(
 
     try {
       const rawContent = await ctx.readFile(filePath)
-      let content: string
-      // Two distinct filter modes — see BaseCheckConfig.contentFilter
-      // docs for when to pick each.
-      if (config.contentFilter === 'strip-strings') {
-        content = filterContent(rawContent).code
-      } else if (config.contentFilter === 'strip-strings-and-comments') {
-        content = filterContent(rawContent).codeNoComments
-      } else {
-        content = rawContent
-      }
+      // Dispatch the content filter through the LanguageAdapter for the
+      // file's extension. Falls back to raw content when no adapter is
+      // registered. See languages/content-filter-dispatch.ts.
+      const content = applyContentFilter(filePath, rawContent, config.contentFilter ?? 'none')
       const violations = config.analyze(content, filePath)
 
       for (const violation of violations) {

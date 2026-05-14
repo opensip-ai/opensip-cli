@@ -21,9 +21,34 @@ import { mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+import type { LanguageAdapter } from '../../languages/adapter.js'
+import { defaultLanguageRegistry } from '../../languages/registry.js'
+import { filterContent } from '../content-filter.js'
 import { createFileAccessor } from '../file-accessor.js'
+
+// FileAccessor.read dispatches strip via the registered LanguageAdapter
+// for the file's extension. Register a minimal TS adapter for the test
+// scope so the dispatch resolves and the existing core filterContent
+// implementation produces the expected output. Lang packages live in
+// their own workspaces and core can't depend on @opensip-tools/lang-typescript
+// directly without creating a cycle.
+const inProcessTypescriptAdapter: LanguageAdapter = {
+  id: 'typescript-test-shim',
+  fileExtensions: ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'],
+  parse: () => null,
+  stripStrings: (s) => filterContent(s).code,
+  stripComments: (s) => filterContent(s).codeNoComments,
+}
+
+beforeAll(() => {
+  defaultLanguageRegistry.register(inProcessTypescriptAdapter)
+})
+
+afterAll(() => {
+  defaultLanguageRegistry.clear()
+})
 
 async function writeTempFile(content: string): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'cf-dispatch-'))

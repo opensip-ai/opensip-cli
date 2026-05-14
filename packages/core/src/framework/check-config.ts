@@ -219,9 +219,19 @@ export interface BaseCheckConfig {
   readonly confidence?: 'high' | 'medium' | 'low'
 }
 
-/** Zod schema for validating check scope declarations. */
+/**
+ * Zod schema for validating check scope declarations.
+ *
+ * Empty `languages` and empty `concerns` are both valid and mean
+ * "matches any". This is how cross-language ("universal") checks
+ * declare themselves — see @opensip-tools/checks-universal.
+ *
+ * findByScope() in TargetRegistry treats empty arrays as match-any
+ * already; the schema mirrors that behavior so callers can author
+ * universal checks without inventing a wildcard sentinel.
+ */
 export const CheckScopeSchema = z.object({
-  languages: z.array(z.string()).min(1, 'At least one language is required'),
+  languages: z.array(z.string()),
   concerns: z.array(z.string()),
 })
 
