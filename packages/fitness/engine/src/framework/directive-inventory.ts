@@ -1,17 +1,7 @@
-// @fitness-ignore-file concurrency-safety -- single-threaded access pattern
-// @fitness-ignore-file duplicate-implementation-detection -- similar patterns across diagnostic modules
 /**
- * @fileoverview Directive Inventory - shared parsing logic and codebase scanner
- *
- * Provides shared parsing constants/functions for fitness-ignore directives,
- * and a codebase scanner that inventories all directives.
+ * @fileoverview Directive Inventory - shared parsing logic for
+ * fitness-ignore directives.
  */
-
-import * as fs from 'node:fs'
-import * as path from 'node:path'
-
-import { DEFAULT_EXCLUSION_PATTERNS } from './constants.js'
-import { PathMatcher } from './path-matcher.js'
 
 // =============================================================================
 // Types
@@ -28,21 +18,12 @@ export interface DirectiveEntry {
   weakReason: boolean
 }
 
-/** Aggregate inventory of all fitness-ignore directives in a codebase. */
-export interface DirectiveInventory {
-  totalDirectives: number
-  byType: { file: number; nextLine: number }
-  byGroup: Record<string, number>
-  weakReasonCount: number
-  directives: DirectiveEntry[]
-}
-
 // =============================================================================
 // Shared Constants
 // =============================================================================
 
 /** Patterns that indicate a weak or generic ignore reason. */
-export const WEAK_REASON_PATTERNS = Object.freeze<readonly RegExp[]>([
+const WEAK_REASON_PATTERNS = Object.freeze<readonly RegExp[]>([
   /^ignore$/i,
   /^skip$/i,
   /^todo$/i,
@@ -127,97 +108,3 @@ export function extractGroup(checkId: string): string {
   return slashIndex > 0 ? checkId.slice(0, slashIndex) : 'other'
 }
 
-// =============================================================================
-// Scanner
-// =============================================================================
-
-/** Default exclusion patterns for scanning (without tsbuildinfo since we scan source). */
-const DEFAULT_SCAN_EXCLUDES = [...DEFAULT_EXCLUSION_PATTERNS].filter(p => p !== '**/*.tsbuildinfo')
-
-/**
- * Internal: scan files for directives using a reader function.
- */
-async function scanWithReader(
-  cwd: string,
-  readFn: (absolutePath: string) => Promise<string>,
-): Promise<DirectiveInventory> {
-  const matcher = PathMatcher.create({
-    cwd,
-    include: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx'],
-    exclude: DEFAULT_SCAN_EXCLUDES,
-  })
-  const files = await matcher.files()
-
-  const directives: DirectiveEntry[] = []
-  for (const absolutePath of files) {
-    const relativePath = path.relative(cwd, absolutePath)
-    // @fitness-ignore-next-line performance-anti-patterns -- sequential reads to limit memory: avoids loading all files concurrently
-    const content = await readFn(absolutePath)
-
-    if (!content.includes('@fitness-ignore')) continue
-
-    const lines = content.split('\n')
-    for (const [i, line] of lines.entries()) {
-      const parsed = parseDirectiveLine(line ?? '')
-      if (parsed) {
-        directives.push({
-          filePath: relativePath,
-          lineNumber: i + 1,
-          type: parsed.type,
-          checkId: parsed.checkId,
-          group: extractGroup(parsed.checkId),
-          reason: parsed.reason,
-          weakReason: isWeakReason(parsed.reason),
-        })
-      }
-    }
-  }
-
-  return buildInventory(directives)
-}
-
-/**
- * Scan the codebase and return all @fitness-ignore directives with metadata.
- */
-export async function scanDirectiveInventory(cwd: string): Promise<DirectiveInventory> {
-  return scanWithReader(cwd, async (p) => {
-    const fileStats = await fs.promises.stat(p)
-    if (fileStats.size > 10_000_000) return ''
-    return fs.promises.readFile(p, 'utf8')
-  })
-}
-
-/**
- * Scan for directives using a provided file cache.
- */
-export async function scanDirectiveInventoryFromCache(
-  cwd: string,
-  cache: { get(path: string): Promise<string>; stats: { prewarmed: boolean } },
-): Promise<DirectiveInventory> {
-  if (!cache.stats.prewarmed) {
-    return scanDirectiveInventory(cwd)
-  }
-  return scanWithReader(cwd, (p) => cache.get(p))
-}
-
-function buildInventory(directives: DirectiveEntry[]): DirectiveInventory {
-  const byGroup: Record<string, number> = {}
-  let fileCount = 0
-  let nextLineCount = 0
-  let weakReasonCount = 0
-
-  for (const dir of directives) {
-    byGroup[dir.group] = (byGroup[dir.group] ?? 0) + 1
-    if (dir.type === 'file') fileCount++
-    else nextLineCount++
-    if (dir.weakReason) weakReasonCount++
-  }
-
-  return {
-    totalDirectives: directives.length,
-    byType: { file: fileCount, nextLine: nextLineCount },
-    byGroup,
-    weakReasonCount,
-    directives,
-  }
-}

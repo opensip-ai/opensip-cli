@@ -6,7 +6,7 @@
  */
 
 /** Point-in-time snapshot of Node.js memory usage */
-export interface MemorySnapshot {
+interface MemorySnapshot {
   readonly heapUsed: number
   readonly heapTotal: number
   readonly external: number
@@ -25,7 +25,7 @@ export interface CheckMemoryProfile {
 }
 
 /** Aggregated memory profiling summary across all check executions */
-export interface MemoryProfileSummary {
+interface MemoryProfileSummary {
   readonly prewarmMemoryMB: number
   readonly peakMemoryMB: number
   readonly checksExceedingThreshold: number
@@ -36,7 +36,7 @@ export interface MemoryProfileSummary {
 const DEFAULT_MEMORY_WARNING_THRESHOLD_MB = 200
 
 /** Low-overhead memory profiler that tracks per-check heap usage during fitness runs */
-export class MemoryProfiler {
+class MemoryProfiler {
   private readonly profiles: CheckMemoryProfile[] = []
   private prewarmMemoryMB = 0
   private peakMemoryMB = 0

@@ -35,7 +35,7 @@ export interface ExecResult {
 /**
  * Error thrown when command execution fails
  */
-export class ExecError extends SystemError {
+class ExecError extends SystemError {
   constructor(
     message: string,
     public readonly stdout: string,
@@ -175,29 +175,3 @@ function killProcess(child: ChildProcess): void {
   }
 }
 
-/**
- * Execute a command and throw if it fails or is aborted.
- * @throws {ExecError} When the command is aborted or exits with a non-zero code
- */
-export async function execAbortableOrThrow(
-  command: string | readonly string[],
-  options: AbortableExecOptions = {},
-): Promise<string> {
-  const result = await execAbortable(command, options)
-
-  if (result.aborted) {
-    throw new ExecError('Command was aborted', result.stdout, result.stderr, result.exitCode, true)
-  }
-
-  if (result.exitCode !== 0) {
-    throw new ExecError(
-      `Command failed with exit code ${result.exitCode}`,
-      result.stdout,
-      result.stderr,
-      result.exitCode,
-      false,
-    )
-  }
-
-  return result.stdout
-}

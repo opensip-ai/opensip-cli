@@ -19,8 +19,6 @@ import { logger , ValidationError as CoreValidationError } from '@opensip-tools/
 import {
   defineLoadScenario,
   defineLoadScenarioWithoutRegistration,
-  validateLoadScenarioConfig,
-  type LoadValidationError,
  type LoadScenarioConfig } from '../kinds/load/define.js'
 
 
@@ -28,9 +26,6 @@ import type { RunnableScenario } from './runnable-scenario.js'
 import type { ScenarioConfig } from '../types/framework-types.js'
 
 
-
-/** Validation error with field name and message (legacy alias). */
-export type ValidationError = LoadValidationError
 
 let deprecationWarned = false
 
@@ -63,18 +58,6 @@ function projectLegacyToLoadConfig(config: ScenarioConfig): LoadScenarioConfig {
     ...(config.execute ? { execute: config.execute } : {}),
     ...(config.options ? { options: config.options } : {}),
   }
-}
-
-/**
- * Validate a (legacy) scenario configuration.
- *
- * @deprecated Use `validateLoadScenarioConfig` from
- * '@opensip-tools/simulation/kinds/load' (or rely on `defineLoadScenario`'s
- * built-in validation).
- * @throws {ValidationError} When the scenario configuration is invalid
- */
-export function validateScenarioConfig(config: ScenarioConfig): void {
-  validateLoadScenarioConfig(projectLegacyToLoadConfig(config))
 }
 
 /**
@@ -112,4 +95,3 @@ export function defineScenarioWithoutRegistration(config: ScenarioConfig): Runna
   return defineLoadScenarioWithoutRegistration(projectLegacyToLoadConfig(config))
 }
 
-export {scenarioRegistry, getRegisteredScenarios, getScenario, getScenariosByTag, clearScenarioRegistry} from './registry.js'

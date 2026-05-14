@@ -89,8 +89,8 @@ export {
 } from './cli/fit.js';
 export type { PreLoadHook } from './cli/fit.js';
 export { openDashboard } from './cli/dashboard.js';
-export { listChecks, executeListChecks } from './cli/list-checks.js';
-export { listRecipes, executeListRecipes } from './cli/list-recipes.js';
+export { listChecks } from './cli/list-checks.js';
+export { listRecipes } from './cli/list-recipes.js';
 
 // Architecture-gate primitives (baseline save / compare) and SARIF
 // upload — both operate on fitness's CliOutput. Wired into the `fit`

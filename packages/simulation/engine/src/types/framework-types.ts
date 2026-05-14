@@ -100,10 +100,6 @@ export interface LegacyLoadResultPayload {
   readonly signals: readonly Signal[]
 }
 
-/** @deprecated Alias for {@link LegacyLoadResultPayload}; the public discriminated union now lives in `framework/scenario-executor-result.ts`. */
-// eslint-disable-next-line sonarjs/deprecation -- this alias is itself the deprecation back-compat layer
-export type ScenarioExecutorResult = LegacyLoadResultPayload
-
 /**
  * Custom execute function signature for load scenarios.
  *
@@ -169,7 +165,6 @@ export interface ScenarioConfig {
 // here (with `type: ScenarioType` + `getConfig()`) was retired by Plan 01
 // Phase 0b.5 — there were no external consumers of `getConfig()`, and `type`
 // was redundant with the new `kind` discriminator.
-export type { RunnableScenario, ScenarioRegistryEntry } from '../framework/runnable-scenario.js'
 
 // =============================================================================
 // RE-EXPORTS

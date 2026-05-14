@@ -13,15 +13,8 @@
  */
 
 
-import { getParseTree , defaultLanguageRegistry } from '@opensip-tools/core'
+import { getParseTree, defaultLanguageRegistry } from '@opensip-tools/core'
 import ts from 'typescript'
-
-export {
-  initParseCache,
-  clearParseCache,
-  getParseTree,
-  getParseTreeForFile,
-} from '@opensip-tools/core'
 
 /**
  * Get a TypeScript SourceFile via the language-aware cache when the TS

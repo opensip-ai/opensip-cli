@@ -45,7 +45,7 @@ export interface IsTestFileOptions {
 /**
  * Standard test file patterns used across the codebase
  */
-export const TEST_FILE_PATTERNS = {
+const TEST_FILE_PATTERNS = {
   /** Files ending with .test.ts or .test.tsx */
   testExtension: /\.test\.tsx?$/,
 

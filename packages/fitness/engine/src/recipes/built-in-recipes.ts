@@ -12,7 +12,7 @@ import { DEFAULT_MAX_PARALLEL, defineRecipe, type FitnessRecipe } from './types.
 // =============================================================================
 
 /** Default recipe: runs all enabled checks in parallel */
-export const defaultRecipe: FitnessRecipe = defineRecipe({
+const defaultRecipe: FitnessRecipe = defineRecipe({
   name: 'default',
   displayName: 'Default',
   description: 'Run all enabled checks in parallel',
@@ -27,7 +27,7 @@ export const defaultRecipe: FitnessRecipe = defineRecipe({
 // =============================================================================
 
 /** Quick smoke recipe: fast critical checks for rapid validation */
-export const quickSmokeRecipe: FitnessRecipe = defineRecipe({
+const quickSmokeRecipe: FitnessRecipe = defineRecipe({
   name: 'quick-smoke',
   displayName: 'Quick Smoke',
   description: 'Fast critical checks for rapid validation',
@@ -59,7 +59,7 @@ export const quickSmokeRecipe: FitnessRecipe = defineRecipe({
 // =============================================================================
 
 /** Backend recipe: architecture, resilience, and quality checks for server code */
-export const backendRecipe: FitnessRecipe = defineRecipe({
+const backendRecipe: FitnessRecipe = defineRecipe({
   name: 'backend',
   displayName: 'Backend',
   description: 'Backend-focused checks (architecture, resilience, quality)',
@@ -97,7 +97,7 @@ export const backendRecipe: FitnessRecipe = defineRecipe({
 // =============================================================================
 
 /** Frontend recipe: React and accessibility checks for UI code */
-export const frontendRecipe: FitnessRecipe = defineRecipe({
+const frontendRecipe: FitnessRecipe = defineRecipe({
   name: 'frontend',
   displayName: 'Frontend',
   description: 'Frontend-focused checks (React, accessibility)',
@@ -131,7 +131,7 @@ export const frontendRecipe: FitnessRecipe = defineRecipe({
 // =============================================================================
 
 /** Security recipe: comprehensive security audit checks */
-export const securityRecipe: FitnessRecipe = defineRecipe({
+const securityRecipe: FitnessRecipe = defineRecipe({
   name: 'security',
   displayName: 'Security Audit',
   description: 'Comprehensive security analysis',
@@ -159,7 +159,7 @@ export const securityRecipe: FitnessRecipe = defineRecipe({
 // =============================================================================
 
 /** Pre-commit recipe: fast checks suitable for git pre-commit hooks */
-export const preCommitRecipe: FitnessRecipe = defineRecipe({
+const preCommitRecipe: FitnessRecipe = defineRecipe({
   name: 'pre-commit',
   displayName: 'Pre-Commit',
   description: 'Fast checks for git pre-commit hooks',
@@ -184,7 +184,7 @@ export const preCommitRecipe: FitnessRecipe = defineRecipe({
 // =============================================================================
 
 /** Pre-release recipe: comprehensive checks run before a release */
-export const preReleaseRecipe: FitnessRecipe = defineRecipe({
+const preReleaseRecipe: FitnessRecipe = defineRecipe({
   name: 'pre-release',
   displayName: 'Pre-Release',
   description: 'Comprehensive checks before release',
@@ -199,7 +199,7 @@ export const preReleaseRecipe: FitnessRecipe = defineRecipe({
 // =============================================================================
 
 /** Nightly full recipe: complete check suite for scheduled nightly runs */
-export const nightlyFullRecipe: FitnessRecipe = defineRecipe({
+const nightlyFullRecipe: FitnessRecipe = defineRecipe({
   name: 'nightly-full',
   displayName: 'Nightly Full',
   description: 'Complete suite for nightly scheduled runs',
@@ -219,7 +219,7 @@ export const nightlyFullRecipe: FitnessRecipe = defineRecipe({
 // =============================================================================
 
 /** CI recipe: optimized for CI pipelines with JSON output */
-export const ciRecipe: FitnessRecipe = defineRecipe({
+const ciRecipe: FitnessRecipe = defineRecipe({
   name: 'ci',
   displayName: 'CI',
   description: 'Optimized for CI pipelines with JSON output',
@@ -234,7 +234,7 @@ export const ciRecipe: FitnessRecipe = defineRecipe({
 // =============================================================================
 
 /** Architecture recipe: architecture validation and compliance checks */
-export const architectureRecipe: FitnessRecipe = defineRecipe({
+const architectureRecipe: FitnessRecipe = defineRecipe({
   name: 'architecture',
   displayName: 'Architecture Review',
   description: 'Architecture validation and compliance',

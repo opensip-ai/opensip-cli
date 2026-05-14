@@ -8,7 +8,7 @@ import React, { useState, useEffect, createContext, useContext } from 'react';
 
 const TICK_INTERVAL_MS = 80;
 
-export const ClockContext = createContext<number>(0);
+const ClockContext = createContext<number>(0);
 
 export interface ClockProviderProps {
   readonly intervalMs?: number;

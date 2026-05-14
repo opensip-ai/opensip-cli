@@ -98,10 +98,3 @@ export async function executeCommand(
   return { violations, aborted: false, exitCode: result.exitCode }
 }
 
-/**
- * Quote a file path for shell execution.
- */
-export function quoteForShell(filePath: string): string {
-  const escaped = filePath.replaceAll('\'', String.raw`'\''`)
-  return `'${escaped}'`
-}

@@ -167,19 +167,3 @@ export function validateCheckReferences(
   return { valid, missing }
 }
 
-/** Match check IDs against glob patterns with optional exclusions */
-export function matchCheckIds(
-  patterns: readonly string[],
-  checkIds: readonly string[],
-  excludePatterns?: readonly string[],
-  registry?: CheckRegistry,
-): readonly string[] {
-  if (
-    !Array.isArray(patterns) ||
-    !Array.isArray(checkIds) ||
-    (excludePatterns !== undefined && !Array.isArray(excludePatterns))
-  ) {
-    return []
-  }
-  return resolvePatternSelector(patterns, excludePatterns ?? [], checkIds, registry)
-}

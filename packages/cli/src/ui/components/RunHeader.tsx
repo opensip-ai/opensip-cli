@@ -8,7 +8,7 @@ import React from 'react';
 
 import { useTheme } from '../theme.js';
 
-export interface RunHeaderMeta {
+interface RunHeaderMeta {
   readonly label: string;
   readonly value: string;
 }

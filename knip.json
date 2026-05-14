@@ -1,0 +1,32 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "workspaces": {
+    "packages/cli": {
+      "entry": ["src/__tests__/fixtures/**/*.ts"],
+      "ignoreDependencies": [
+        "@opensip-tools/checks-typescript",
+        "@opensip-tools/checks-universal"
+      ]
+    },
+    "packages/core": {
+      "ignoreDependencies": [
+        "js-yaml"
+      ]
+    },
+    "packages/fitness/engine": {
+      "entry": [
+        "src/tool.ts",
+        "src/cli/{fit,dashboard,list-checks,list-recipes}.ts"
+      ]
+    },
+    "packages/simulation/engine": {
+      "entry": [
+        "src/tool.ts",
+        "src/cli/sim.ts"
+      ]
+    }
+  },
+  "ignoreBinaries": [
+    "dot"
+  ]
+}

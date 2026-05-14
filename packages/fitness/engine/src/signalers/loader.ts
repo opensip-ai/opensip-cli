@@ -139,14 +139,3 @@ export function loadSignalersConfig(
   return frozen
 }
 
-/**
- * Clear the cached signalers config. Useful for testing.
- */
-export function resetSignalersConfigCache(): void {
-  cache.clear()
-}
-
-/** Re-export so tests and the init command can reference the canonical filename. */
-
-
-export {PROJECT_CONFIG_FILENAME} from '@opensip-tools/core'

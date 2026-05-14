@@ -38,14 +38,36 @@ import {
   setRunId,
   initLogFile,
   logger,
+  defaultLanguageRegistry,
   defaultToolRegistry,
   discoverToolPackages,
   type Tool,
   type ToolCliContext,
 } from '@opensip-tools/core';
 import { loadSignalersConfig, fitnessTool, openDashboard } from '@opensip-tools/fitness';
+import { cppAdapter } from '@opensip-tools/lang-cpp';
+import { goAdapter } from '@opensip-tools/lang-go';
+import { javaAdapter } from '@opensip-tools/lang-java';
+import { pythonAdapter } from '@opensip-tools/lang-python';
+import { rustAdapter } from '@opensip-tools/lang-rust';
+import { typescriptAdapter } from '@opensip-tools/lang-typescript';
 import { simulationTool } from '@opensip-tools/simulation';
 import { Command } from 'commander';
+
+// Register the bundled language adapters at module load time, BEFORE the
+// fitness tool's initialize() runs. Empty adapter registry would let
+// scope-empty checks scan everything as plain text and produce zero
+// findings — the exact silent-success failure mode v2.0.0 was designed
+// to avoid. Side-effect registrations are imported here (not in
+// fitness/engine) so fitness doesn't take a hard dep on every lang
+// pack: the layered architecture has CLI as the one component that
+// wires concrete adapters into the kernel registries.
+defaultLanguageRegistry.register(typescriptAdapter);
+defaultLanguageRegistry.register(rustAdapter);
+defaultLanguageRegistry.register(pythonAdapter);
+defaultLanguageRegistry.register(javaAdapter);
+defaultLanguageRegistry.register(goAdapter);
+defaultLanguageRegistry.register(cppAdapter);
 
 import { printCompletionScript } from './commands/completion.js';
 import { executeConfigure, resolveApiKey } from './commands/configure.js';

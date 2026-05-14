@@ -25,9 +25,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@opensip-tools/core": "workspace:*",
-    "@opensip-tools/fitness": "workspace:*",
-    "@opensip-tools/lang-cpp": "workspace:*"
+    "@opensip-tools/fitness": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

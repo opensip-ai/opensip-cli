@@ -11,10 +11,10 @@ import type { CliArgs , InitResult } from '@opensip-tools/cli-shared';
 // Init config generation
 // ---------------------------------------------------------------------------
 
-export const INIT_FILENAME = 'opensip-tools.config.yml';
+const INIT_FILENAME = 'opensip-tools.config.yml';
 
 // eslint-disable-next-line sonarjs/cognitive-complexity -- config generator emits multiple project shapes (packages/src/apps/Next.js); flattening would scatter related output
-export function generateInitConfig(cwd: string): string {
+function generateInitConfig(cwd: string): string {
   // Detect project shape by looking for common patterns
   const hasPackagesDir = existsSync(join(cwd, 'packages'));
   const hasSrcDir = existsSync(join(cwd, 'src'));

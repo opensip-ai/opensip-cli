@@ -36,5 +36,3 @@ export async function listRecipes(projectDir?: string): Promise<ListRecipesResul
   };
 }
 
-/** Alias matching the Tool-command naming convention (executeXxx). */
-export const executeListRecipes = listRecipes;

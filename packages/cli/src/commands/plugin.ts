@@ -15,7 +15,7 @@ import type { PluginDomain } from '@opensip-tools/core';
 
 const VALID_DOMAINS: ReadonlySet<PluginDomain> = new Set(['fit', 'sim', 'asm']);
 
-export function inferDomain(packageName: string): PluginDomain {
+function inferDomain(packageName: string): PluginDomain {
   if (/\bsim\b/.test(packageName)) return 'sim';
   return 'fit';
 }

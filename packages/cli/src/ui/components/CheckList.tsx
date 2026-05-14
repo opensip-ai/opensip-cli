@@ -7,7 +7,7 @@ import React from 'react';
 
 import { useTheme } from '../theme.js';
 
-export interface CheckEntry {
+interface CheckEntry {
   readonly slug: string;
   readonly description: string;
   readonly tags: readonly string[];

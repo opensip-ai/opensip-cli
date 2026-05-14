@@ -33,15 +33,11 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "glob": "^11.0.0",
     "js-yaml": "^4.1.0",
-    "minimatch": "^10.0.0",
     "typescript": "~5.7.0",
-    "ulid": "^2.4.0",
-    "zod": "^3.24.0"
+    "ulid": "^2.4.0"
   },
   "devDependencies": {
-    "@types/js-yaml": "^4.0.0",
     "@types/node": "^22.0.0",
     "vitest": "^2.1.0"
   }

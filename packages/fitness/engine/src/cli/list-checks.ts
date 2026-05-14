@@ -30,5 +30,3 @@ export async function listChecks(projectDir?: string): Promise<ListChecksResult>
   };
 }
 
-/** Alias matching the Tool-command naming convention (executeXxx). */
-export const executeListChecks = listChecks;

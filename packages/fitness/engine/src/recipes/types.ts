@@ -25,14 +25,14 @@ import type { DirectiveEntry } from '../framework/directive-inventory.js'
 export type RecipeCheckConfigMap = Readonly<Record<string, Readonly<Record<string, unknown>>>>
 
 /** Selector that specifies checks by explicit slug list */
-export interface ExplicitCheckSelector {
+interface ExplicitCheckSelector {
   readonly type: 'explicit'
   readonly checkIds: readonly string[]
   readonly config?: RecipeCheckConfigMap
 }
 
 /** Selector that matches checks via glob patterns */
-export interface PatternCheckSelector {
+interface PatternCheckSelector {
   readonly type: 'pattern'
   readonly include: readonly string[]
   readonly exclude?: readonly string[]
@@ -40,7 +40,7 @@ export interface PatternCheckSelector {
 }
 
 /** Selector that includes all checks with specified tags */
-export interface TagsCheckSelector {
+interface TagsCheckSelector {
   readonly type: 'tags'
   readonly include: readonly string[]
   readonly exclude?: readonly string[]
@@ -48,7 +48,7 @@ export interface TagsCheckSelector {
 }
 
 /** Selector that includes all checks with optional exclusions */
-export interface AllCheckSelector {
+interface AllCheckSelector {
   readonly type: 'all'
   readonly exclude?: readonly string[]
   readonly config?: RecipeCheckConfigMap
@@ -66,7 +66,7 @@ export type CheckSelector =
 // =============================================================================
 
 /** Execution configuration for a fitness recipe */
-export interface FitnessExecutionOptions {
+interface FitnessExecutionOptions {
   readonly mode: 'parallel' | 'sequential'
   readonly stopOnFirstFailure: boolean
   readonly timeout?: number
@@ -81,7 +81,7 @@ export interface FitnessExecutionOptions {
 // =============================================================================
 
 /** Reporting output configuration for a fitness recipe */
-export interface FitnessReportingOptions {
+interface FitnessReportingOptions {
   readonly format: 'table' | 'json' | 'unified'
   readonly verbose: boolean
   readonly outputPath?: string
@@ -110,7 +110,7 @@ export interface FitnessRecipe {
 // =============================================================================
 
 /** A single violation detail from a fitness check. */
-export interface RecipeViolation {
+interface RecipeViolation {
   readonly file: string
   readonly line: number
   readonly column?: number
@@ -196,7 +196,7 @@ export interface FitnessRecipeDefinition {
 export const DEFAULT_MAX_PARALLEL = os.availableParallelism?.() ?? os.cpus().length
 
 /** Default execution options applied when not overridden by a recipe */
-export const DEFAULT_EXECUTION_OPTIONS: FitnessExecutionOptions = {
+const DEFAULT_EXECUTION_OPTIONS: FitnessExecutionOptions = {
   mode: 'parallel',
   stopOnFirstFailure: false,
   timeout: 30_000,
@@ -209,7 +209,7 @@ export function getEffectiveMaxParallel(recipe: FitnessRecipe): number {
 }
 
 /** Default reporting options applied when not overridden by a recipe */
-export const DEFAULT_REPORTING_OPTIONS: FitnessReportingOptions = {
+const DEFAULT_REPORTING_OPTIONS: FitnessReportingOptions = {
   format: 'table',
   verbose: false,
 } as const

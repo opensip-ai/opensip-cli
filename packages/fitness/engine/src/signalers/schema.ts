@@ -32,7 +32,7 @@ const TargetDefinitionSchema = z.object({
 // Signaler Schedule Schema
 // =============================================================================
 
-export const SignalerScheduleSchema = z.object({
+const SignalerScheduleSchema = z.object({
   name: z.string().min(1).max(128),
   recipe: z.string().min(1).max(128).optional(),
   scenario: z.string().min(1).max(128).optional(),
@@ -43,14 +43,12 @@ export const SignalerScheduleSchema = z.object({
   message: 'Weekly schedules must specify a day',
 })
 
-export type SignalerScheduleConfig = z.infer<typeof SignalerScheduleSchema>
-
 // =============================================================================
 // Producer Schemas (copied from config/schema.ts — removed from there in Phase 2)
 // =============================================================================
 
 /** Schema for fitness check configuration */
-export const FitnessSchema = z.object({
+const FitnessSchema = z.object({
   defaultTarget: z.string().min(1).max(255).optional(),
   maxParallel: z.number().int().min(1).optional(),
   timeout: z.number().int().min(1000).optional(),
@@ -61,7 +59,7 @@ export const FitnessSchema = z.object({
 })
 
 /** Schema for simulation engine configuration */
-export const SimulationSchema = z.object({
+const SimulationSchema = z.object({
   schedules: z.array(SignalerScheduleSchema).default([]),
 })
 
@@ -85,7 +83,7 @@ const CheckTargetValueSchema = z.union([
  *
  * Lives alongside targets so a project can ship a single config file.
  */
-export const CliDefaultsSchema = z.object({
+const CliDefaultsSchema = z.object({
   recipe:    z.string().min(1).max(128).optional(),
   exclude:   z.array(z.string()).optional(),
   verbose:   z.boolean().optional(),

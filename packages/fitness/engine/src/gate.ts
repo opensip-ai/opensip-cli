@@ -30,7 +30,7 @@ import type { CliOutput } from '@opensip-tools/cli-shared';
 // ---------------------------------------------------------------------------
 
 /** A single violation as it appears in the gate diff. */
-export interface GateViolation {
+interface GateViolation {
   /** sha256(filePath + '\n' + ruleId + '\n' + message) — opaque identity */
   readonly hash: string;
   readonly ruleId: string;

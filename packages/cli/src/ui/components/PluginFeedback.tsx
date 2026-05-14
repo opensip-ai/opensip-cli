@@ -12,7 +12,7 @@ export type PluginAction =
   | { readonly type: 'install'; readonly packageName: string; readonly success: boolean; readonly error?: string }
   | { readonly type: 'remove'; readonly packageName: string; readonly success: boolean; readonly error?: string };
 
-export interface PluginInfo {
+interface PluginInfo {
   readonly domain: string;
   readonly namespace: string;
   readonly pluginType: 'package' | 'file';

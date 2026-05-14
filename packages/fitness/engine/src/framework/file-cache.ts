@@ -15,7 +15,7 @@ import { glob } from 'glob'
 /**
  * Prewarm statistics.
  */
-export interface PrewarmStats {
+interface PrewarmStats {
   /** Number of files loaded */
   readonly filesLoaded: number
   /** Duration in milliseconds */
@@ -34,7 +34,7 @@ export interface PrewarmStats {
  */
 const PREWARM_BATCH_SIZE = 100
 
-export class FileCache {
+class FileCache {
   private readonly cache = new Map<string, string>()
   private _prewarmed = false
   private _cleared = false

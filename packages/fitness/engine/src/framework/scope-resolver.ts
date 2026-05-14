@@ -182,7 +182,7 @@ function applyGlobalExcludes(
  * When called without pre-resolved targets (single-check fallback), globalExcludes
  * are applied after direct globbing.
  */
-export function resolveFilesForCheck(
+function resolveFilesForCheck(
   slug: string,
   scope: CheckScope | undefined,
   registry: TargetRegistry,

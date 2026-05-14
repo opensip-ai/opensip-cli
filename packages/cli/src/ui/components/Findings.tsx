@@ -23,7 +23,7 @@ import { useTheme } from '../theme.js';
  */
 const DEFAULT_VIOLATIONS_PER_CHECK = 25;
 
-export interface FindingViolation {
+interface FindingViolation {
   readonly severity: 'error' | 'warning';
   readonly message: string;
   readonly file?: string;

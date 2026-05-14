@@ -7,7 +7,7 @@ import React from 'react';
 
 import { useTheme } from '../theme.js';
 
-export interface RecipeEntry {
+interface RecipeEntry {
   readonly name: string;
   readonly description: string;
   readonly checkCount: string;

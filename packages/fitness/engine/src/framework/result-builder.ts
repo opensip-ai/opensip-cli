@@ -12,13 +12,12 @@ import {
   createErrorResult,
   getItemTypeLabel,
 } from '../types/findings.js'
-import { countErrors, countWarnings, isErrorSeverity, isWarningSeverity } from '../types/severity.js'
+import { countErrors, countWarnings } from '../types/severity.js'
 
 import type {
   CheckResult,
   CheckInfo,
   ItemType,
-  FindingSeverity,
 } from '../types/findings.js'
 import type { Signal } from '@opensip-tools/core'
 
@@ -185,107 +184,6 @@ export class ResultBuilder {
 }
 
 // =============================================================================
-// HELPER FUNCTIONS
-// =============================================================================
-
-/**
- * Aggregate multiple check results into one.
- */
-export function aggregateResults(
-  results: readonly CheckResult[],
-  options: { checkId: string; itemType: ItemType },
-): CheckResult {
-  if (results.length === 0) {
-    return ResultBuilder.create(options).build()
-  }
-
-  const builder = ResultBuilder.create(options)
-
-  let totalItems = 0
-  let totalIgnored = 0
-  let totalDuration = 0
-
-  for (const result of results) {
-    totalItems += result.metadata.totalItems
-    totalIgnored += result.ignoredCount ?? 0
-    if (result.metadata.durationMs) {
-      totalDuration += result.metadata.durationMs
-    }
-    builder.addSignals(result.signals)
-  }
-
-  builder.totalItems(totalItems).ignoredCount(totalIgnored)
-
-  if (totalDuration > 0) {
-    builder.duration(totalDuration)
-  }
-
-  return builder.build()
-}
-
-/**
- * Create a passing result quickly.
- */
-export function passResult(
-  options: ResultBuilderOptions,
-  totalItems: number,
-  durationMs?: number,
-): CheckResult {
-  const builder = ResultBuilder.create(options).totalItems(totalItems)
-
-  if (durationMs !== undefined) {
-    builder.duration(durationMs)
-  }
-
-  return builder.build()
-}
-
-/**
- * Filter signals by severity.
- */
-export function filterSignals(
-  signals: readonly Signal[],
-  severity: FindingSeverity,
-): Signal[] {
-  return signals.filter((s) =>
-    severity === 'error' ? isErrorSeverity(s.severity) : isWarningSeverity(s.severity),
-  )
-}
-
-/**
- * Group signals by file.
- */
-export function groupByFile(signals: readonly Signal[]): Map<string, Signal[]> {
-  // in-memory: single-threaded Node.js access pattern
-  const groups = new Map<string, Signal[]>()
-
-  for (const signal of signals) {
-    const file = signal.code?.file ?? ''
-    const existing = groups.get(file)
-    if (existing) {
-      existing.push(signal)
-    } else {
-      groups.set(file, [signal])
-    }
-  }
-
-  return groups
-}
-
-/**
- * Sort signals by file, then line.
- */
-export function sortSignals(signals: readonly Signal[]): Signal[] {
-  return [...signals].sort((a, b) => {
-    const fileA = a.code?.file ?? ''
-    const fileB = b.code?.file ?? ''
-    const fileCompare = fileA.localeCompare(fileB)
-    if (fileCompare !== 0) return fileCompare
-    return (a.code?.line ?? 0) - (b.code?.line ?? 0)
-  })
-}
-
-// =============================================================================
 // SNIPPET UTILITIES
 // =============================================================================
 
@@ -315,7 +213,7 @@ export function getLineNumber(content: string, index: number): number {
 /**
  * Default patterns for identifying API-related files.
  */
-export const DEFAULT_API_FILE_PATTERNS = ['/api/', '/routes/', '-handler.ts', '.handler.ts'] as const
+const DEFAULT_API_FILE_PATTERNS = ['/api/', '/routes/', '-handler.ts', '.handler.ts'] as const
 
 /**
  * Check if a file path matches API file patterns.

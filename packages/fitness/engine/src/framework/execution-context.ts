@@ -25,7 +25,7 @@ import type { ResolvedScope } from './check-config.js'
  * Check identifier (UUID format).
  */
 // eslint-disable-next-line sonarjs/redundant-type-aliases -- semantic alias for UUID-shaped check identifier
-export type CheckId = string
+type CheckId = string
 
 /**
  * Error thrown when a check is aborted via AbortSignal.
@@ -44,7 +44,7 @@ export class CheckAbortedError extends SystemError {
 /**
  * Result of extracting a code snippet.
  */
-export interface ExtractSnippetResult {
+interface ExtractSnippetResult {
   readonly snippet: string
   readonly contextLines: number
 }

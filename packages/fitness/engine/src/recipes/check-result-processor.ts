@@ -63,7 +63,7 @@ export interface ProcessResultOutput {
 // =============================================================================
 
 /** Build a CheckSummary from a successful check execution */
-export function createCheckSummary(
+function createCheckSummary(
   checkId: string,
   checkSlug: string,
   passed: boolean,
@@ -88,7 +88,7 @@ export function createCheckSummary(
 }
 
 /** Build a CheckSummary from a failed or errored check execution */
-export function createErrorSummary(
+function createErrorSummary(
   checkId: string,
   checkSlug: string,
   durationMs: number,

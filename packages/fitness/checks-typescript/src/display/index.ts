@@ -43,7 +43,3 @@ export function getCheckDisplayName(checkSlug: string): string {
 }
 
 export {type CheckDisplayEntry} from './types.js'
-export {ARCHITECTURE_DISPLAY, DOCUMENTATION_DISPLAY} from './architecture.js'
-export {QUALITY_DISPLAY} from './quality.js'
-export {RESILIENCE_DISPLAY} from './resilience.js'
-export {SECURITY_DISPLAY, TESTING_DISPLAY} from './security-testing.js'

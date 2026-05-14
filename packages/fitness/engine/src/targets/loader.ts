@@ -200,18 +200,6 @@ function loadYamlConfig(filePath: string): { registry: TargetRegistry; config: T
 // =============================================================================
 
 /**
- * Load targets from opensip-tools.config.yml. Resolves via the shared
- * project-config resolver (--config → package.json pointer → default).
- * @throws {ValidationError} When the config file is missing, too large, or contains invalid YAML
- * @throws {ValidationError} When the config file fails schema validation
- */
-export function loadTargets(rootDir: string, explicitPath?: string): TargetRegistry {
-  const yamlPath = resolveProjectConfigPath(rootDir, explicitPath)
-  // @fitness-ignore-next-line null-safety -- loadYamlConfig always returns a valid {registry, config} object or throws
-  return loadYamlConfig(yamlPath).registry
-}
-
-/**
  * Load full targets config including per-check target overrides.
  * Resolves via the shared project-config resolver.
  * @throws {ValidationError} When no targets config file is found or it cannot be loaded

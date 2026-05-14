@@ -109,5 +109,3 @@ export class TargetRegistry {
   }
 }
 
-/** Singleton target registry instance. */
-export const defaultTargetRegistry = new TargetRegistry()

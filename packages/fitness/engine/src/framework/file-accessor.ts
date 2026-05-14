@@ -76,7 +76,7 @@ export interface FileAccessorOptions {
 const DEFAULT_CACHE_CAPACITY = 100
 
 /** FileAccessor implementation with LRU caching and abort signal support. */
-export class FileAccessorImpl implements FileAccessor {
+class FileAccessorImpl implements FileAccessor {
   readonly paths: readonly string[]
   private readonly cache: LRUCache<string, string>
   private readonly pathSet: Set<string>

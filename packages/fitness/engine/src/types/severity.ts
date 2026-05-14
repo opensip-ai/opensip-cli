@@ -11,12 +11,12 @@
 import type { SignalSeverity } from '@opensip-tools/core'
 
 /** Returns true for 'high' or 'critical' severity signals (error-level) */
-export function isErrorSeverity(severity: SignalSeverity): boolean {
+function isErrorSeverity(severity: SignalSeverity): boolean {
   return severity === 'high' || severity === 'critical'
 }
 
 /** Returns true for 'medium' severity signals (warning-level) */
-export function isWarningSeverity(severity: SignalSeverity): boolean {
+function isWarningSeverity(severity: SignalSeverity): boolean {
   return severity === 'medium'
 }
 

@@ -35,7 +35,7 @@ export interface SimulationActionResult {
 /**
  * Result of chaos application
  */
-export interface ChaosResult {
+interface ChaosResult {
   applied: boolean
   type?: 'latency' | 'error' | 'timeout'
   additionalLatency?: number
@@ -85,7 +85,7 @@ function emitLoopSignal(signal: Signal, loopContext: SimulationLoopContext): voi
 /**
  * Apply chaos injection based on configuration.
  */
-export function applyChaos(chaosConfig: ChaosConfig | undefined): ChaosResult {
+function applyChaos(chaosConfig: ChaosConfig | undefined): ChaosResult {
   if (!chaosConfig?.enabled) {
     return { applied: false }
   }
@@ -124,7 +124,7 @@ export function applyChaos(chaosConfig: ChaosConfig | undefined): ChaosResult {
 // =============================================================================
 
 /** Process a chaos injection result, updating metrics and emitting signals for errors/timeouts */
-export function handleChaosInjection(
+function handleChaosInjection(
   chaosResult: ChaosResult,
   loopContext: SimulationLoopContext,
 ): boolean {
@@ -196,7 +196,7 @@ export function handleChaosInjection(
 // =============================================================================
 
 /** Record a completed action result, updating metrics and emitting a signal on failure */
-export function handleActionSuccess(
+function handleActionSuccess(
   result: SimulationActionResult,
   persona: Persona,
   loopContext: SimulationLoopContext,
@@ -236,7 +236,7 @@ export function handleActionSuccess(
 }
 
 /** Record an action exception, updating metrics and emitting an error signal */
-export function handleActionError(
+function handleActionError(
   error: unknown,
   persona: Persona,
   loopContext: SimulationLoopContext,

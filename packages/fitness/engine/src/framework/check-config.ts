@@ -23,7 +23,7 @@ const CheckSlugSchema = z
   .regex(/^[a-z][a-z0-9-]*(?:-[a-z0-9]+)*$/, 'Check slug must be kebab-case (e.g., no-console-log)')
 
 /** Zod schema for validating UUID-format check IDs. */
-export const CheckIdSchema = z
+const CheckIdSchema = z
   .string()
   .regex(
     /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/,
@@ -153,7 +153,7 @@ export interface CommandConfig {
 const CommandArgsSchema = z.union([z.array(z.string()), z.function()])
 
 /** Zod schema for validating command configurations. */
-export const CommandConfigSchema = z.object({
+const CommandConfigSchema = z.object({
   bin: z.string().min(1),
   args: CommandArgsSchema,
   parseOutput: z.function(),
@@ -173,7 +173,7 @@ const CommandModeSchema = z.object({ command: CommandConfigSchema })
 // =============================================================================
 
 /** Common configuration fields shared by all check types. */
-export interface BaseCheckConfig {
+interface BaseCheckConfig {
   readonly id: string
   readonly slug: CheckSlug
   readonly description: string
@@ -237,7 +237,7 @@ export interface BaseCheckConfig {
  * already; the schema mirrors that behavior so callers can author
  * universal checks without inventing a wildcard sentinel.
  */
-export const CheckScopeSchema = z.object({
+const CheckScopeSchema = z.object({
   languages: z.array(z.string()),
   concerns: z.array(z.string()),
 })
@@ -285,7 +285,7 @@ export type UnifiedCheckConfig = AnalyzeCheckConfig | AnalyzeAllCheckConfig | Co
 // =============================================================================
 
 /** Zod schema for validating unified check configurations (exactly one analysis mode required). */
-export const UnifiedCheckConfigSchema = z
+const UnifiedCheckConfigSchema = z
   .object({})
   .passthrough()
   .superRefine((config, ctx) => {

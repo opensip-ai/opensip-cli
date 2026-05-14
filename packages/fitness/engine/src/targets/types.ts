@@ -31,7 +31,7 @@ export interface Target {
  * Per-check target overrides.
  * Maps check slug → target name(s) to restrict which files a check runs against.
  */
-export type CheckTargetMap = Readonly<Record<string, string | readonly string[]>>
+type CheckTargetMap = Readonly<Record<string, string | readonly string[]>>
 
 /**
  * Project-local plugin declarations — one list per plugin domain.
@@ -44,7 +44,7 @@ export type CheckTargetMap = Readonly<Record<string, string | readonly string[]>
  * Each entry is any npm install spec: `@scope/pkg`, `@scope/pkg@^1.2.3`,
  * `./local-path`, `/abs/path/to/pkg.tgz`, `git+https://...`, etc.
  */
-export interface PluginsConfig {
+interface PluginsConfig {
   readonly fit?: readonly string[]
   readonly sim?: readonly string[]
   readonly asm?: readonly string[]
@@ -87,29 +87,3 @@ export interface TargetsConfig {
   readonly plugins?: PluginsConfig
 }
 
-// =============================================================================
-// defineTargetConfig() input types
-// =============================================================================
-
-/**
- * Target entry in the config file (without the name field — name comes from the key).
- */
-export interface TargetEntry {
-  readonly description: string
-  readonly include: readonly string[]
-  readonly exclude?: readonly string[]
-  readonly tags?: readonly string[]
-  /** Languages this target contains (e.g. 'typescript', 'tsx', 'json') */
-  readonly languages?: readonly string[]
-  /** Semantic concerns this target represents (e.g. 'backend', 'server', 'api') */
-  readonly concerns?: readonly string[]
-}
-
-/**
- * Input shape for defineTargetConfig().
- */
-export interface TargetConfigInput {
-  readonly targets: Readonly<Record<string, TargetEntry>>
-  readonly globalExcludes?: readonly string[]
-  readonly checkOverrides?: Readonly<Record<string, string | readonly string[]>>
-}

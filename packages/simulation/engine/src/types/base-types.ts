@@ -16,7 +16,7 @@ import type { Signal } from '@opensip-tools/core'
 export type PersonaType = string
 
 /** Behavioral mode for a simulation persona */
-export type PersonaBehavior = 'normal' | 'aggressive' | 'cautious' | 'erratic'
+type PersonaBehavior = 'normal' | 'aggressive' | 'cautious' | 'erratic'
 
 /** A simulation persona with behavioral attributes and action probabilities */
 export interface Persona {
@@ -29,7 +29,7 @@ export interface Persona {
 }
 
 /** Configurable attributes defining a persona's behavioral profile */
-export interface PersonaAttributes {
+interface PersonaAttributes {
   trustScore: number // 0-100
   activityLevel: 'low' | 'medium' | 'high'
   preferredCategories: string[]
@@ -38,7 +38,7 @@ export interface PersonaAttributes {
 }
 
 /** Map of action names to their probability weights */
-export type ActionProbabilities = Record<string, number>;
+type ActionProbabilities = Record<string, number>;
 
 // =============================================================================
 // SCENARIO TYPES
@@ -56,21 +56,6 @@ export type ScenarioType =
   | 'load'
   | 'load-test'
   | 'chaos'
-
-/** Full scenario definition including personas, timing, chaos, and assertions */
-export interface SimulationScenario {
-  id: string
-  name: string
-  description: string
-  type: ScenarioType
-  personas: PersonaConfig[]
-  duration: number // seconds
-  rampUp: number // seconds
-  targetRps: number // requests per second
-  chaosConfig?: ChaosConfig
-  assertions: ScenarioAssertion[]
-  tags: string[]
-}
 
 /** Configuration for a persona within a scenario */
 export interface PersonaConfig {
@@ -103,7 +88,7 @@ export interface ScenarioAssertion {
 // =============================================================================
 
 /** Types of chaos that can be injected during simulation */
-export type ChaosType =
+type ChaosType =
   | 'latency'
   | 'error'
   | 'timeout'
@@ -119,7 +104,7 @@ export interface ChaosConfig {
 }
 
 /** A single chaos injection rule targeting a service or endpoint */
-export interface ChaosInjection {
+interface ChaosInjection {
   type: ChaosType
   target: string // service or endpoint pattern
   probability: number // 0-1
@@ -127,7 +112,7 @@ export interface ChaosInjection {
 }
 
 /** Union of all chaos-type-specific configuration objects */
-export type ChaosTypeConfig =
+type ChaosTypeConfig =
   | LatencyChaosConfig
   | ErrorChaosConfig
   | TimeoutChaosConfig
@@ -136,40 +121,40 @@ export type ChaosTypeConfig =
   | DataCorruptionChaosConfig
 
 /** Configuration for injecting artificial latency */
-export interface LatencyChaosConfig {
+interface LatencyChaosConfig {
   type: 'latency'
   minMs: number
   maxMs: number
 }
 
 /** Configuration for injecting error responses */
-export interface ErrorChaosConfig {
+interface ErrorChaosConfig {
   type: 'error'
   statusCode: number
   message: string
 }
 
 /** Configuration for injecting request timeouts */
-export interface TimeoutChaosConfig {
+interface TimeoutChaosConfig {
   type: 'timeout'
   afterMs: number
 }
 
 /** Configuration for injecting rate limiting */
-export interface RateLimitChaosConfig {
+interface RateLimitChaosConfig {
   type: 'rate-limit'
   limit: number
   windowMs: number
 }
 
 /** Configuration for injecting connection drops */
-export interface ConnectionDropChaosConfig {
+interface ConnectionDropChaosConfig {
   type: 'connection-drop'
   afterBytes?: number
 }
 
 /** Configuration for injecting data corruption */
-export interface DataCorruptionChaosConfig {
+interface DataCorruptionChaosConfig {
   type: 'data-corruption'
   fields: string[]
   corruptionType: 'truncate' | 'randomize' | 'null'
@@ -180,7 +165,7 @@ export interface DataCorruptionChaosConfig {
 // =============================================================================
 
 /** Environment in which a simulation executes */
-export type ExecutionMode = 'local' | 'docker' | 'ephemeral-aws' | 'staging'
+type ExecutionMode = 'local' | 'docker' | 'ephemeral-aws' | 'staging'
 
 /** Run is waiting or actively executing */
 type ActiveRunStatus = 'pending' | 'running'
@@ -188,7 +173,7 @@ type ActiveRunStatus = 'pending' | 'running'
 type TerminalRunStatus = 'completed' | 'failed' | 'cancelled'
 /** All simulation run statuses */
 /** All simulation run statuses */
-export type SimulationRunStatus = ActiveRunStatus | TerminalRunStatus
+type SimulationRunStatus = ActiveRunStatus | TerminalRunStatus
 
 /** A single simulation execution with its metrics and signals */
 export interface SimulationRun {
@@ -218,33 +203,3 @@ export interface SimulationMetrics {
   findingsGenerated: number
 }
 
-// =============================================================================
-// SERVICE CONTRACTS
-// =============================================================================
-
-/** Options for filtering and paginating simulation run listings */
-export interface ListRunsOptions {
-  status?: SimulationRun['status']
-  limit?: number
-  offset?: number
-}
-
-/**
- * Simulation service contract - defines the API for running simulations
- */
-export interface ISimulationService {
-  start(
-    scenarioId: string,
-    options?: { durationOverride?: number; recipeId?: string },
-  ): Promise<SimulationRun>
-
-  stop(runId: string): Promise<SimulationRun>
-
-  getStatus(runId: string): Promise<SimulationRun | null>
-
-  listRuns(options?: ListRunsOptions): Promise<SimulationRun[]>
-
-  listScenarios(): SimulationScenario[] | Promise<SimulationScenario[]>
-
-  listPersonas(): Persona[] | Promise<Persona[]>
-}
