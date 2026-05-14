@@ -16,7 +16,7 @@ import { basename, dirname } from 'node:path'
 import * as ts from 'typescript'
 
 import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/core'
-import { getSharedSourceFile } from '@opensip-tools/core/framework/parse-cache.js'
+import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
 
 /**
  * Common utility function name patterns

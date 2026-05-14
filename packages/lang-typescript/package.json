@@ -1,12 +1,12 @@
 {
-  "name": "@opensip-tools/checks-builtin",
+  "name": "@opensip-tools/lang-typescript",
   "version": "0.6.1",
   "license": "MIT",
-  "description": "Built-in fitness checks for opensip-tools",
+  "description": "TypeScript/JavaScript language adapter for opensip-tools",
   "repository": {
     "type": "git",
     "url": "https://github.com/opensip-ai/opensip-tools.git",
-    "directory": "packages/checks-builtin"
+    "directory": "packages/lang-typescript"
   },
   "homepage": "https://github.com/opensip-ai/opensip-tools",
   "bugs": {
@@ -16,7 +16,12 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./dist/index.js"
+    ".": "./dist/index.js",
+    "./adapter": "./dist/adapter.js",
+    "./parse": "./dist/parse.js",
+    "./query": "./dist/query.js",
+    "./strip": "./dist/strip.js",
+    "./ast-utilities": "./dist/ast-utilities.js"
   },
   "scripts": {
     "build": "tsc",
@@ -26,8 +31,6 @@
   },
   "dependencies": {
     "@opensip-tools/core": "workspace:*",
-    "@opensip-tools/lang-typescript": "workspace:*",
-    "glob": "^11.0.0",
     "typescript": "~5.7.0"
   },
   "devDependencies": {

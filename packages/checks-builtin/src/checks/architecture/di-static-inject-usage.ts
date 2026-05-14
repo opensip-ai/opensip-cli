@@ -9,7 +9,7 @@ import * as path from 'node:path'
 import * as ts from 'typescript'
 
 import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/core'
-import { getSharedSourceFile } from '@opensip-tools/core/framework/parse-cache.js'
+import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
 
 /** Issue types for DI static inject checks */
 enum IssueType {

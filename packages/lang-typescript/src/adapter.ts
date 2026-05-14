@@ -1,0 +1,20 @@
+import type ts from 'typescript'
+
+import type { LanguageAdapter } from '@opensip-tools/core/languages/adapter.js'
+
+import { parseSource } from './parse.js'
+import { typescriptQuery } from './query.js'
+import { stripComments, stripStrings } from './strip.js'
+
+export const typescriptAdapter: LanguageAdapter<ts.SourceFile, ts.Node> = {
+  id: 'typescript',
+  fileExtensions: ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'],
+  aliases: ['javascript', 'tsx', 'jsx', 'js'],
+  parse: parseSource,
+  stripStrings,
+  stripComments,
+  query: typescriptQuery,
+}
+
+/** Plugin contract — exported as the lang plugin's `adapters` array. */
+export const adapters = [typescriptAdapter] as const

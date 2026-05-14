@@ -11,7 +11,7 @@
 import * as ts from 'typescript'
 
 import { defineCheck, getCheckConfig, type CheckViolation } from '@opensip-tools/core'
-import { getSharedSourceFile } from '@opensip-tools/core/framework/parse-cache.js'
+import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
 
 /**
  * Recipe-config shape for throws-documentation. Project-specific typed-error

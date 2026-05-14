@@ -119,11 +119,23 @@ export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
     await maybeAutoSyncProjectPlugins(projectDir)
   }
 
-  // 1. Load plugins — project-local `<projectDir>/.opensip-tools/fit/`
+  // 1. Register the bundled TypeScript language adapter, then discover
+  //    additional language packs via the `lang` plugin domain.
+  const { loadAllPlugins, defaultLanguageRegistry } = await import('@opensip-tools/core');
+  const { typescriptAdapter } = await import('@opensip-tools/lang-typescript');
+  defaultLanguageRegistry.register(typescriptAdapter);
+  const langPluginResult = await loadAllPlugins('lang', undefined, projectDir);
+  if (langPluginResult.errors.length > 0) {
+    for (const err of langPluginResult.errors) {
+      process.stderr.write(`opensip-tools: lang plugin failed to load — ${err}\n`);
+      logger.warn({ evt: 'cli.lang_plugin.warning', module: 'cli:fit', message: err });
+    }
+  }
+
+  // 2. Load fit plugins — project-local `<projectDir>/.opensip-tools/fit/`
   //    when the project config declares `plugins.fit`, otherwise
   //    `~/.opensip-tools/fit/`. Pass-through baseDir=undefined, so
   //    resolvePluginDir picks the default.
-  const { loadAllPlugins } = await import('@opensip-tools/core');
   const pluginResult = await loadAllPlugins('fit', undefined, projectDir);
   pluginLoadErrors = pluginResult.errors;
   if (pluginResult.errors.length > 0) {

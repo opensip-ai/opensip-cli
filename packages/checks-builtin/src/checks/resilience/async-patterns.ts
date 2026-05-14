@@ -8,7 +8,7 @@
 import * as ts from 'typescript'
 
 import { defineCheck, getCheckConfig, type CheckViolation, getLineNumber } from '@opensip-tools/core'
-import { getSharedSourceFile } from '@opensip-tools/core/framework/parse-cache.js'
+import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
 import { stripStringsAndCommentsPreservingPositions } from '@opensip-tools/core/framework/strip-literals.js'
 import { isCommentLine, isTestFile } from '../../utils/index.js'
 

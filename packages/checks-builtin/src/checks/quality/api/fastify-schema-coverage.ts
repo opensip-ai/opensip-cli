@@ -14,7 +14,7 @@
 import * as ts from 'typescript'
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/core'
-import { getSharedSourceFile } from '@opensip-tools/core/framework/parse-cache.js'
+import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
 
 const BODY_METHODS = ['POST', 'PUT', 'PATCH']
 

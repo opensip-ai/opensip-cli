@@ -10,7 +10,7 @@
 import * as ts from 'typescript'
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/core'
-import { getSharedSourceFile } from '@opensip-tools/core/framework/parse-cache.js'
+import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
 
 /**
  * Describes a known type that has lifecycle methods requiring cleanup.

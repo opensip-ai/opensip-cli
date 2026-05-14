@@ -6,7 +6,7 @@
  */
 
 import * as ts from 'typescript'
-import { getSharedSourceFile } from '@opensip-tools/core/framework/parse-cache.js'
+import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/core'
 

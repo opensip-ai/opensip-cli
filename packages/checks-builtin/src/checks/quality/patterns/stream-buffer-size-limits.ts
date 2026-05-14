@@ -9,7 +9,7 @@
 import * as ts from 'typescript'
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/core'
-import { getSharedSourceFile } from '@opensip-tools/core/framework/parse-cache.js'
+import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
 import { stripStringsAndComments } from '@opensip-tools/core/framework/strip-literals.js'
 
 /** Patterns that indicate bounded buffer usage */

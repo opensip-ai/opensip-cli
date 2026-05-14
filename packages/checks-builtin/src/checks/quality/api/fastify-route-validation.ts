@@ -11,7 +11,7 @@
 import * as ts from 'typescript'
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/core'
-import { getSharedSourceFile } from '@opensip-tools/core/framework/parse-cache.js'
+import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
 
 /**
  * Quick filter regex to check if file might contain Fastify routes

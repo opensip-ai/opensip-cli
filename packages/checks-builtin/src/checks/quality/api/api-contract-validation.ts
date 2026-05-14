@@ -11,7 +11,7 @@
 import * as ts from 'typescript'
 
 import { defineCheck, type CheckViolation, isAPIFile } from '@opensip-tools/core'
-import { getSharedSourceFile } from '@opensip-tools/core/framework/parse-cache.js'
+import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
 
 /**
  * Validation detection patterns

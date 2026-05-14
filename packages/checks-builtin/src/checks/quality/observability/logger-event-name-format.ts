@@ -3,7 +3,7 @@
  * @fileoverview Validates logger event names follow the 3+ dot-separated segment convention
  */
 
-import { countUnescapedBackticks } from '@opensip-tools/core/framework/ast-utilities.js'
+import { countUnescapedBackticks } from '@opensip-tools/lang-typescript'
 import { defineCheck, isInsideStringLiteral, type CheckViolation } from '@opensip-tools/core'
 
 /**

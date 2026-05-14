@@ -3,7 +3,7 @@
  * @fileoverview Detects hardcoded correlation ID values
  */
 
-import { countUnescapedBackticks } from '@opensip-tools/core/framework/ast-utilities.js'
+import { countUnescapedBackticks } from '@opensip-tools/lang-typescript'
 import { defineCheck, type CheckViolation } from '@opensip-tools/core'
 
 /**
