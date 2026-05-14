@@ -1,0 +1,37 @@
+{
+  "name": "@opensip-tools/simulation",
+  "version": "2.0.0",
+  "license": "MIT",
+  "description": "Simulation scenarios for OpenSIP Tools",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opensip-ai/opensip-tools.git",
+    "directory": "packages/simulation/engine"
+  },
+  "homepage": "https://github.com/opensip-ai/opensip-tools",
+  "bugs": {
+    "url": "https://github.com/opensip-ai/opensip-tools/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "opensipTools": {
+    "kind": "tool"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@opensip-tools/cli-shared": "workspace:*",
+    "@opensip-tools/core": "workspace:*",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "~5.7.0",
+    "vitest": "^2.1.0"
+  }
+}

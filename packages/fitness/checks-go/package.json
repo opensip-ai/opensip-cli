@@ -1,0 +1,36 @@
+{
+  "name": "@opensip-tools/checks-go",
+  "version": "2.0.0",
+  "license": "MIT",
+  "description": "Go fitness checks for opensip-tools",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opensip-ai/opensip-tools.git",
+    "directory": "packages/fitness/checks-go"
+  },
+  "homepage": "https://github.com/opensip-ai/opensip-tools",
+  "bugs": {
+    "url": "https://github.com/opensip-ai/opensip-tools/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@opensip-tools/core": "workspace:*",
+    "@opensip-tools/fitness": "workspace:*",
+    "@opensip-tools/lang-go": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "vitest": "^2.1.0"
+  }
+}

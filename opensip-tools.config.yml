@@ -73,7 +73,7 @@ targets:
     languages: [typescript]
     concerns: [fitness]
     include:
-      - "packages/fitness/src/checks/**/*.ts"
+      - "packages/fitness/checks-*/src/checks/**/*.ts"
     exclude:
       - "**/*.test.ts"
       - "**/__tests__/**"

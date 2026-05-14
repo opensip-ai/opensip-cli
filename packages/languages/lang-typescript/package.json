@@ -1,0 +1,41 @@
+{
+  "name": "@opensip-tools/lang-typescript",
+  "version": "2.0.0",
+  "license": "MIT",
+  "description": "TypeScript/JavaScript language adapter for opensip-tools",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opensip-ai/opensip-tools.git",
+    "directory": "packages/languages/lang-typescript"
+  },
+  "homepage": "https://github.com/opensip-ai/opensip-tools",
+  "bugs": {
+    "url": "https://github.com/opensip-ai/opensip-tools/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./adapter": "./dist/adapter.js",
+    "./parse": "./dist/parse.js",
+    "./query": "./dist/query.js",
+    "./strip": "./dist/strip.js",
+    "./ast-utilities": "./dist/ast-utilities.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@opensip-tools/core": "workspace:*",
+    "@opensip-tools/fitness": "workspace:*",
+    "typescript": "~5.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "vitest": "^2.1.0"
+  }
+}

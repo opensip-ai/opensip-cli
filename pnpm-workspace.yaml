@@ -1,2 +1,7 @@
 packages:
+  # Top-level packages: cli, cli-shared, core
   - "packages/*"
+  # Tool-grouped subdirectories: each tool's engine + sub-packages
+  - "packages/fitness/*"
+  - "packages/simulation/*"
+  - "packages/languages/*"

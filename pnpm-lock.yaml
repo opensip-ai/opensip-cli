@@ -18,131 +18,14 @@ importers:
         specifier: ~5.7.0
         version: 5.7.3
 
-  packages/checks-cpp:
-    dependencies:
-      '@opensip-tools/core':
-        specifier: workspace:*
-        version: link:../core
-      '@opensip-tools/fitness':
-        specifier: workspace:*
-        version: link:../fitness
-      '@opensip-tools/lang-cpp':
-        specifier: workspace:*
-        version: link:../lang-cpp
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.19.15
-      vitest:
-        specifier: ^2.1.0
-        version: 2.1.9(@types/node@22.19.15)
-
-  packages/checks-go:
-    dependencies:
-      '@opensip-tools/core':
-        specifier: workspace:*
-        version: link:../core
-      '@opensip-tools/fitness':
-        specifier: workspace:*
-        version: link:../fitness
-      '@opensip-tools/lang-go':
-        specifier: workspace:*
-        version: link:../lang-go
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.19.15
-      vitest:
-        specifier: ^2.1.0
-        version: 2.1.9(@types/node@22.19.15)
-
-  packages/checks-java:
-    dependencies:
-      '@opensip-tools/core':
-        specifier: workspace:*
-        version: link:../core
-      '@opensip-tools/fitness':
-        specifier: workspace:*
-        version: link:../fitness
-      '@opensip-tools/lang-java':
-        specifier: workspace:*
-        version: link:../lang-java
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.19.15
-      vitest:
-        specifier: ^2.1.0
-        version: 2.1.9(@types/node@22.19.15)
-
-  packages/checks-python:
-    dependencies:
-      '@opensip-tools/core':
-        specifier: workspace:*
-        version: link:../core
-      '@opensip-tools/fitness':
-        specifier: workspace:*
-        version: link:../fitness
-      '@opensip-tools/lang-python':
-        specifier: workspace:*
-        version: link:../lang-python
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.19.15
-      vitest:
-        specifier: ^2.1.0
-        version: 2.1.9(@types/node@22.19.15)
-
-  packages/checks-typescript:
-    dependencies:
-      '@opensip-tools/core':
-        specifier: workspace:*
-        version: link:../core
-      '@opensip-tools/fitness':
-        specifier: workspace:*
-        version: link:../fitness
-      '@opensip-tools/lang-typescript':
-        specifier: workspace:*
-        version: link:../lang-typescript
-      glob:
-        specifier: ^11.0.0
-        version: 11.1.0
-      typescript:
-        specifier: ~5.7.0
-        version: 5.7.3
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.19.15
-      vitest:
-        specifier: ^2.1.0
-        version: 2.1.9(@types/node@22.19.15)
-
-  packages/checks-universal:
-    dependencies:
-      '@opensip-tools/core':
-        specifier: workspace:*
-        version: link:../core
-      '@opensip-tools/fitness':
-        specifier: workspace:*
-        version: link:../fitness
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.19.15
-      vitest:
-        specifier: ^2.1.0
-        version: 2.1.9(@types/node@22.19.15)
-
   packages/cli:
     dependencies:
       '@opensip-tools/checks-typescript':
         specifier: workspace:*
-        version: link:../checks-typescript
+        version: link:../fitness/checks-typescript
       '@opensip-tools/checks-universal':
         specifier: workspace:*
-        version: link:../checks-universal
+        version: link:../fitness/checks-universal
       '@opensip-tools/cli-shared':
         specifier: workspace:*
         version: link:../cli-shared
@@ -151,28 +34,28 @@ importers:
         version: link:../core
       '@opensip-tools/fitness':
         specifier: workspace:*
-        version: link:../fitness
+        version: link:../fitness/engine
       '@opensip-tools/lang-cpp':
         specifier: workspace:*
-        version: link:../lang-cpp
+        version: link:../languages/lang-cpp
       '@opensip-tools/lang-go':
         specifier: workspace:*
-        version: link:../lang-go
+        version: link:../languages/lang-go
       '@opensip-tools/lang-java':
         specifier: workspace:*
-        version: link:../lang-java
+        version: link:../languages/lang-java
       '@opensip-tools/lang-python':
         specifier: workspace:*
-        version: link:../lang-python
+        version: link:../languages/lang-python
       '@opensip-tools/lang-rust':
         specifier: workspace:*
-        version: link:../lang-rust
+        version: link:../languages/lang-rust
       '@opensip-tools/lang-typescript':
         specifier: workspace:*
-        version: link:../lang-typescript
+        version: link:../languages/lang-typescript
       '@opensip-tools/simulation':
         specifier: workspace:*
-        version: link:../simulation
+        version: link:../simulation/engine
       commander:
         specifier: ^13.1.0
         version: 13.1.0
@@ -261,14 +144,131 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.19.15)
 
-  packages/fitness:
+  packages/fitness/checks-cpp:
+    dependencies:
+      '@opensip-tools/core':
+        specifier: workspace:*
+        version: link:../../core
+      '@opensip-tools/fitness':
+        specifier: workspace:*
+        version: link:../engine
+      '@opensip-tools/lang-cpp':
+        specifier: workspace:*
+        version: link:../../languages/lang-cpp
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.15
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.15)
+
+  packages/fitness/checks-go:
+    dependencies:
+      '@opensip-tools/core':
+        specifier: workspace:*
+        version: link:../../core
+      '@opensip-tools/fitness':
+        specifier: workspace:*
+        version: link:../engine
+      '@opensip-tools/lang-go':
+        specifier: workspace:*
+        version: link:../../languages/lang-go
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.15
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.15)
+
+  packages/fitness/checks-java:
+    dependencies:
+      '@opensip-tools/core':
+        specifier: workspace:*
+        version: link:../../core
+      '@opensip-tools/fitness':
+        specifier: workspace:*
+        version: link:../engine
+      '@opensip-tools/lang-java':
+        specifier: workspace:*
+        version: link:../../languages/lang-java
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.15
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.15)
+
+  packages/fitness/checks-python:
+    dependencies:
+      '@opensip-tools/core':
+        specifier: workspace:*
+        version: link:../../core
+      '@opensip-tools/fitness':
+        specifier: workspace:*
+        version: link:../engine
+      '@opensip-tools/lang-python':
+        specifier: workspace:*
+        version: link:../../languages/lang-python
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.15
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.15)
+
+  packages/fitness/checks-typescript:
+    dependencies:
+      '@opensip-tools/core':
+        specifier: workspace:*
+        version: link:../../core
+      '@opensip-tools/fitness':
+        specifier: workspace:*
+        version: link:../engine
+      '@opensip-tools/lang-typescript':
+        specifier: workspace:*
+        version: link:../../languages/lang-typescript
+      glob:
+        specifier: ^11.0.0
+        version: 11.1.0
+      typescript:
+        specifier: ~5.7.0
+        version: 5.7.3
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.15
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.15)
+
+  packages/fitness/checks-universal:
+    dependencies:
+      '@opensip-tools/core':
+        specifier: workspace:*
+        version: link:../../core
+      '@opensip-tools/fitness':
+        specifier: workspace:*
+        version: link:../engine
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.15
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.15)
+
+  packages/fitness/engine:
     dependencies:
       '@opensip-tools/cli-shared':
         specifier: workspace:*
-        version: link:../cli-shared
+        version: link:../../cli-shared
       '@opensip-tools/core':
         specifier: workspace:*
-        version: link:../core
+        version: link:../../core
       glob:
         specifier: ^11.0.0
         version: 11.1.0
@@ -295,11 +295,11 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.19.15)
 
-  packages/lang-cpp:
+  packages/languages/lang-cpp:
     dependencies:
       '@opensip-tools/core':
         specifier: workspace:*
-        version: link:../core
+        version: link:../../core
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -308,11 +308,11 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.19.15)
 
-  packages/lang-go:
+  packages/languages/lang-go:
     dependencies:
       '@opensip-tools/core':
         specifier: workspace:*
-        version: link:../core
+        version: link:../../core
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -321,11 +321,11 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.19.15)
 
-  packages/lang-java:
+  packages/languages/lang-java:
     dependencies:
       '@opensip-tools/core':
         specifier: workspace:*
-        version: link:../core
+        version: link:../../core
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -334,11 +334,11 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.19.15)
 
-  packages/lang-python:
+  packages/languages/lang-python:
     dependencies:
       '@opensip-tools/core':
         specifier: workspace:*
-        version: link:../core
+        version: link:../../core
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -347,11 +347,11 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.19.15)
 
-  packages/lang-rust:
+  packages/languages/lang-rust:
     dependencies:
       '@opensip-tools/core':
         specifier: workspace:*
-        version: link:../core
+        version: link:../../core
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -360,14 +360,14 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.19.15)
 
-  packages/lang-typescript:
+  packages/languages/lang-typescript:
     dependencies:
       '@opensip-tools/core':
         specifier: workspace:*
-        version: link:../core
+        version: link:../../core
       '@opensip-tools/fitness':
         specifier: workspace:*
-        version: link:../fitness
+        version: link:../../fitness/engine
       typescript:
         specifier: ~5.7.0
         version: 5.7.3
@@ -379,14 +379,14 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.19.15)
 
-  packages/simulation:
+  packages/simulation/engine:
     dependencies:
       '@opensip-tools/cli-shared':
         specifier: workspace:*
-        version: link:../cli-shared
+        version: link:../../cli-shared
       '@opensip-tools/core':
         specifier: workspace:*
-        version: link:../core
+        version: link:../../core
       zod:
         specifier: ^3.24.0
         version: 3.25.76
