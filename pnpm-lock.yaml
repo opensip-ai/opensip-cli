@@ -40,6 +40,70 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.19.15)
 
+  packages/checks-cpp:
+    dependencies:
+      '@opensip-tools/core':
+        specifier: workspace:*
+        version: link:../core
+      '@opensip-tools/lang-cpp':
+        specifier: workspace:*
+        version: link:../lang-cpp
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.15
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.15)
+
+  packages/checks-go:
+    dependencies:
+      '@opensip-tools/core':
+        specifier: workspace:*
+        version: link:../core
+      '@opensip-tools/lang-go':
+        specifier: workspace:*
+        version: link:../lang-go
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.15
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.15)
+
+  packages/checks-java:
+    dependencies:
+      '@opensip-tools/core':
+        specifier: workspace:*
+        version: link:../core
+      '@opensip-tools/lang-java':
+        specifier: workspace:*
+        version: link:../lang-java
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.15
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.15)
+
+  packages/checks-python:
+    dependencies:
+      '@opensip-tools/core':
+        specifier: workspace:*
+        version: link:../core
+      '@opensip-tools/lang-python':
+        specifier: workspace:*
+        version: link:../lang-python
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.15
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.15)
+
   packages/checks-universal:
     dependencies:
       '@opensip-tools/core':
@@ -135,6 +199,58 @@ importers:
       '@types/js-yaml':
         specifier: ^4.0.0
         version: 4.0.9
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.15
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.15)
+
+  packages/lang-cpp:
+    dependencies:
+      '@opensip-tools/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.15
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.15)
+
+  packages/lang-go:
+    dependencies:
+      '@opensip-tools/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.15
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.15)
+
+  packages/lang-java:
+    dependencies:
+      '@opensip-tools/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.15
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.15)
+
+  packages/lang-python:
+    dependencies:
+      '@opensip-tools/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.15
