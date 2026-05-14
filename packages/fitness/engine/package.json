@@ -30,6 +30,7 @@
   "dependencies": {
     "@opensip-tools/cli-shared": "workspace:*",
     "@opensip-tools/core": "workspace:*",
+    "commander": "^13.1.0",
     "glob": "^11.0.0",
     "js-yaml": "^4.1.0",
     "minimatch": "^10.0.0",

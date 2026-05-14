@@ -34,14 +34,16 @@ export type {
   ToolPackageMetadata,
 } from './plugins/index.js';
 
-// Tools — kernel-level Tool plugin contract
+// Tools — kernel-level Tool plugin contract.
+// (discoverToolPackages and friends live under plugins/ and are
+// re-exported above; the Tool / Registry types are tool-shape, not
+// plugin-discovery-shape, hence the separate barrel.)
 export { ToolRegistry, defaultToolRegistry } from './tools/index.js';
 export type {
   Tool,
   ToolMetadata,
-  ToolCommand,
-  ToolRunContext,
-  ToolRunResult,
+  ToolCommandDescriptor,
+  ToolCliContext,
   ToolPluginExports,
 } from './tools/index.js';
 

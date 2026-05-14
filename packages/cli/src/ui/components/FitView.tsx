@@ -10,7 +10,7 @@ import { useApp, Box, Text } from 'ink';
 import type { CliArgs } from '@opensip-tools/cli-shared';
 import type { FitDoneResult, ErrorResult, CliOutput } from '@opensip-tools/cli-shared';
 import { ensureChecksLoaded, getEnabledCheckCount, executeFit } from '@opensip-tools/fitness';
-import { reportToCloud } from '../../sarif.js';
+import { reportToCloud } from '@opensip-tools/fitness';
 
 import { Banner } from './Banner.js';
 import { RunHeader } from './RunHeader.js';

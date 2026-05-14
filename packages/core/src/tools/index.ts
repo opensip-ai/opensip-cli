@@ -8,9 +8,8 @@
 export type {
   Tool,
   ToolMetadata,
-  ToolCommand,
-  ToolRunContext,
-  ToolRunResult,
+  ToolCommandDescriptor,
+  ToolCliContext,
   ToolPluginExports,
 } from './types.js';
 export { ToolRegistry, defaultToolRegistry } from './registry.js';

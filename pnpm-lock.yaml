@@ -269,6 +269,9 @@ importers:
       '@opensip-tools/core':
         specifier: workspace:*
         version: link:../../core
+      commander:
+        specifier: ^13.1.0
+        version: 13.1.0
       glob:
         specifier: ^11.0.0
         version: 11.1.0
@@ -387,6 +390,9 @@ importers:
       '@opensip-tools/core':
         specifier: workspace:*
         version: link:../../core
+      commander:
+        specifier: ^13.1.0
+        version: 13.1.0
       zod:
         specifier: ^3.24.0
         version: 3.25.76

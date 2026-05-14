@@ -27,6 +27,7 @@
   "dependencies": {
     "@opensip-tools/cli-shared": "workspace:*",
     "@opensip-tools/core": "workspace:*",
+    "commander": "^13.1.0",
     "zod": "^3.24.0"
   },
   "devDependencies": {
