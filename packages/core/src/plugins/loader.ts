@@ -43,66 +43,136 @@ export async function loadPlugin(
     let recipesRegistered = 0
     let adaptersRegistered = 0
 
-    // Lang domain: register language adapters
-    if (domain === 'lang' && mod.adapters !== undefined) {
-      if (!Array.isArray(mod.adapters)) {
-        logger.warn({
-          evt: 'plugin.loader.invalid_adapters_export',
+    // Lang domain: register language adapters from `adapters` array,
+    // named exports, and default export. Adapters are deduplicated by id.
+    if (domain === 'lang') {
+      const registeredAdapterIds = new Set<string>()
+
+      const tryRegisterAdapter = (value: unknown, sourceLabel: string): void => {
+        if (!looksLikeLanguageAdapter(value)) return
+        const id = (value as { id: string }).id
+        if (registeredAdapterIds.has(id)) return
+        defaultLanguageRegistry.register(value as Parameters<typeof defaultLanguageRegistry.register>[0])
+        registeredAdapterIds.add(id)
+        adaptersRegistered++
+        logger.debug({
+          evt: 'plugin.loader.adapter.registered',
           module: 'core:plugins',
           namespace: plugin.namespace,
-          source: plugin.source,
-          msg: `Plugin "${plugin.namespace}" exports "adapters" but it is not an array — skipping adapter registration.`,
+          source: sourceLabel,
+          id,
         })
-      } else {
-        for (const [index, adapter] of mod.adapters.entries()) {
-          if (
-            adapter &&
-            typeof adapter === 'object' &&
-            'id' in adapter &&
-            'fileExtensions' in adapter &&
-            'parse' in adapter
-          ) {
-            defaultLanguageRegistry.register(adapter)
-            adaptersRegistered++
-          } else {
-            logger.warn({
-              evt: 'plugin.loader.invalid_adapter_item',
-              module: 'core:plugins',
-              namespace: plugin.namespace,
-              source: plugin.source,
-              index,
-              msg: `Plugin "${plugin.namespace}" adapters[${index}] is not a valid LanguageAdapter — skipping.`,
-            })
+      }
+
+      if (mod.adapters !== undefined) {
+        if (!Array.isArray(mod.adapters)) {
+          logger.warn({
+            evt: 'plugin.loader.invalid_adapters_export',
+            module: 'core:plugins',
+            namespace: plugin.namespace,
+            source: plugin.source,
+            msg: `Plugin "${plugin.namespace}" exports "adapters" but it is not an array — skipping adapter registration.`,
+          })
+        } else {
+          for (const [index, adapter] of mod.adapters.entries()) {
+            if (looksLikeLanguageAdapter(adapter)) {
+              tryRegisterAdapter(adapter, `adapters[${index}]`)
+            } else {
+              logger.warn({
+                evt: 'plugin.loader.invalid_adapter_item',
+                module: 'core:plugins',
+                namespace: plugin.namespace,
+                source: plugin.source,
+                index,
+                msg: `Plugin "${plugin.namespace}" adapters[${index}] is not a valid LanguageAdapter — skipping.`,
+              })
+            }
           }
         }
       }
+
+      // Named exports that look like LanguageAdapter
+      for (const [exportName, value] of Object.entries(mod)) {
+        if (
+          exportName === 'default' ||
+          exportName === 'adapters' ||
+          exportName === 'checks' ||
+          exportName === 'recipes' ||
+          exportName === 'metadata'
+        ) continue
+        tryRegisterAdapter(value, `named:${exportName}`)
+      }
+
+      // Default export: a single LanguageAdapter
+      const defaultExport = (mod as { default?: unknown }).default
+      tryRegisterAdapter(defaultExport, 'default')
     }
 
-    // Register checks with namespace (skipped for lang domain)
-    if (domain !== 'lang' && mod.checks !== undefined) {
-      if (!Array.isArray(mod.checks)) {
-        logger.warn({
-          evt: 'plugin.loader.invalid_checks_export',
-          module: 'core:plugins',
-          namespace: plugin.namespace,
-          source: plugin.source,
-          msg: `Plugin "${plugin.namespace}" exports "checks" but it is not an array — skipping checks registration.`,
-        })
-      } else {
-        for (const [index, check] of mod.checks.entries()) {
-          if (isCheck(check)) {
-            defaultRegistry.register(check, plugin.namespace)
-            checksRegistered++
-          } else {
-            logger.warn({
-              evt: 'plugin.loader.invalid_check_item',
-              module: 'core:plugins',
-              namespace: plugin.namespace,
-              source: plugin.source,
-              index,
-              msg: `Plugin "${plugin.namespace}" checks[${index}] is not a valid Check object — skipping.`,
-            })
+    // Register checks with namespace (skipped for lang domain).
+    //
+    // Two authorship styles are supported:
+    //   1. `export const checks = [...]`  — array of Check instances
+    //   2. `export const myCheck = defineCheck({...})` — Check as a named export
+    //
+    // Style 2 enables single-file plugins that drop into ~/.opensip-tools/fit/
+    // to author one check per file without a redundant array wrapper.
+    // Both styles can coexist in the same module; checks are deduplicated by
+    // their stable id so a check appearing in both an array and a named
+    // export is registered exactly once.
+    if (domain !== 'lang') {
+      const registeredIds = new Set<string>()
+
+      // Style 1: explicit `checks` array
+      if (mod.checks !== undefined) {
+        if (!Array.isArray(mod.checks)) {
+          logger.warn({
+            evt: 'plugin.loader.invalid_checks_export',
+            module: 'core:plugins',
+            namespace: plugin.namespace,
+            source: plugin.source,
+            msg: `Plugin "${plugin.namespace}" exports "checks" but it is not an array — skipping checks registration.`,
+          })
+        } else {
+          for (const [index, check] of mod.checks.entries()) {
+            if (isCheck(check)) {
+              if (!registeredIds.has(check.config.id)) {
+                defaultRegistry.register(check, plugin.namespace)
+                registeredIds.add(check.config.id)
+                checksRegistered++
+              }
+            } else {
+              logger.warn({
+                evt: 'plugin.loader.invalid_check_item',
+                module: 'core:plugins',
+                namespace: plugin.namespace,
+                source: plugin.source,
+                index,
+                msg: `Plugin "${plugin.namespace}" checks[${index}] is not a valid Check object — skipping.`,
+              })
+            }
           }
+        }
+      }
+
+      // Style 2: any named export that is a Check instance
+      for (const [exportName, value] of Object.entries(mod)) {
+        if (exportName === 'default' || exportName === 'checks' || exportName === 'recipes' || exportName === 'metadata') continue
+        if (isCheck(value)) {
+          if (!registeredIds.has(value.config.id)) {
+            defaultRegistry.register(value, plugin.namespace)
+            registeredIds.add(value.config.id)
+            checksRegistered++
+          }
+        }
+      }
+
+      // Default export: a single Check instance
+      const defaultExport = (mod as { default?: unknown }).default
+      if (isCheck(defaultExport)) {
+        if (!registeredIds.has(defaultExport.config.id)) {
+          defaultRegistry.register(defaultExport, plugin.namespace)
+          registeredIds.add(defaultExport.config.id)
+          checksRegistered++
         }
       }
     }
@@ -140,10 +210,13 @@ export async function loadPlugin(
       }
     }
 
+    // Warn only when nothing was registered. With named-export discovery,
+    // counting actual registrations is more accurate than checking which
+    // declared exports were present.
     const nothingRegistered =
       domain === 'lang'
-        ? mod.adapters === undefined
-        : mod.checks === undefined && mod.recipes === undefined
+        ? adaptersRegistered === 0
+        : checksRegistered === 0 && recipesRegistered === 0
 
     if (nothingRegistered) {
       logger.warn({
@@ -154,8 +227,8 @@ export async function loadPlugin(
         domain,
         msg:
           domain === 'lang'
-            ? `Plugin "${plugin.namespace}" exports no "adapters" — nothing to register.`
-            : `Plugin "${plugin.namespace}" exports neither "checks" nor "recipes" — nothing to register.`,
+            ? `Plugin "${plugin.namespace}" registered no language adapters — nothing to use.`
+            : `Plugin "${plugin.namespace}" registered no checks or recipes — nothing to run.`,
       })
     }
 
@@ -201,6 +274,25 @@ export async function loadPlugin(
       error: errorMsg,
     }
   }
+}
+
+/**
+ * Structural check for LanguageAdapter — used by the lang plugin domain
+ * to identify adapter values among arbitrary named exports. We don't
+ * have a runtime type guard equivalent to isCheck() for adapters, so
+ * we duck-type the required surface (`id`, `fileExtensions`, `parse`,
+ * `stripStrings`, `stripComments`).
+ */
+function looksLikeLanguageAdapter(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false
+  const v = value as Record<string, unknown>
+  return (
+    typeof v.id === 'string' &&
+    Array.isArray(v.fileExtensions) &&
+    typeof v.parse === 'function' &&
+    typeof v.stripStrings === 'function' &&
+    typeof v.stripComments === 'function'
+  )
 }
 
 /**

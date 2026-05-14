@@ -96,6 +96,102 @@ describe('loadPlugin', () => {
     expect(result.checksRegistered).toBe(0)
     expect(result.error).toBeUndefined()
   })
+
+  it('registers Check instances exported as named exports (no array wrapper)', async () => {
+    const pluginFile = join(testDir, 'named-export-checks.mjs')
+    writeFileSync(pluginFile, `
+      import { defineCheck } from '@opensip-tools/core';
+
+      export const myFirstCheck = defineCheck({
+        id: '11111111-1111-1111-1111-111111111111',
+        slug: 'my-first',
+        description: 'First check via named export',
+        scope: { languages: ['rust'], concerns: [] },
+        tags: ['quality'],
+        analyze: () => [],
+      });
+
+      export const mySecondCheck = defineCheck({
+        id: '22222222-2222-2222-2222-222222222222',
+        slug: 'my-second',
+        description: 'Second check via named export',
+        scope: { languages: ['rust'], concerns: [] },
+        tags: ['quality'],
+        analyze: () => [],
+      });
+
+      // Non-check named exports are ignored
+      export const helper = (s) => s;
+      export const VERSION = '1.0.0';
+    `)
+
+    const plugin: DiscoveredPlugin = {
+      type: 'file',
+      entryPoint: pluginFile,
+      namespace: 'named-export-checks',
+      source: 'named-export-checks.mjs',
+    }
+
+    const result = await loadPlugin(plugin)
+    expect(result.error).toBeUndefined()
+    expect(result.checksRegistered).toBe(2)
+  })
+
+  it('registers a Check from default export', async () => {
+    const pluginFile = join(testDir, 'default-export-check.mjs')
+    writeFileSync(pluginFile, `
+      import { defineCheck } from '@opensip-tools/core';
+
+      export default defineCheck({
+        id: '33333333-3333-3333-3333-333333333333',
+        slug: 'default-check',
+        description: 'Single check via default export',
+        scope: { languages: ['rust'], concerns: [] },
+        tags: ['quality'],
+        analyze: () => [],
+      });
+    `)
+
+    const plugin: DiscoveredPlugin = {
+      type: 'file',
+      entryPoint: pluginFile,
+      namespace: 'default-export-check',
+      source: 'default-export-check.mjs',
+    }
+
+    const result = await loadPlugin(plugin)
+    expect(result.error).toBeUndefined()
+    expect(result.checksRegistered).toBe(1)
+  })
+
+  it('deduplicates checks appearing in both array and named exports', async () => {
+    const pluginFile = join(testDir, 'dedup-checks.mjs')
+    writeFileSync(pluginFile, `
+      import { defineCheck } from '@opensip-tools/core';
+
+      export const sameCheck = defineCheck({
+        id: '44444444-4444-4444-4444-444444444444',
+        slug: 'same',
+        description: 'Same check exported two ways',
+        scope: { languages: ['rust'], concerns: [] },
+        tags: ['quality'],
+        analyze: () => [],
+      });
+
+      export const checks = [sameCheck];
+    `)
+
+    const plugin: DiscoveredPlugin = {
+      type: 'file',
+      entryPoint: pluginFile,
+      namespace: 'dedup-checks',
+      source: 'dedup-checks.mjs',
+    }
+
+    const result = await loadPlugin(plugin)
+    expect(result.error).toBeUndefined()
+    expect(result.checksRegistered).toBe(1)
+  })
 })
 
 describe('loadAllPlugins', () => {

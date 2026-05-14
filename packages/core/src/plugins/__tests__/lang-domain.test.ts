@@ -103,6 +103,81 @@ describe('lang plugin domain', () => {
     expect(defaultLanguageRegistry.get('good')).toBeDefined()
   })
 
+  it('registers adapters exported as named exports (no array wrapper)', async () => {
+    const pluginFile = join(testDir, 'lang-named-export.mjs')
+    writeFileSync(pluginFile, `
+      export const myLang = {
+        id: 'fake-lang-named',
+        fileExtensions: ['.fln'],
+        parse: () => ({ ok: true }),
+        stripStrings: (s) => s,
+        stripComments: (s) => s,
+      };
+    `)
+
+    const plugin: DiscoveredPlugin = {
+      type: 'file',
+      entryPoint: pluginFile,
+      namespace: 'lang-named-export',
+      source: 'lang-named-export.mjs',
+    }
+
+    const result = await loadPlugin(plugin, 'lang')
+    expect(result.error).toBeUndefined()
+    expect(result.adaptersRegistered).toBe(1)
+    expect(defaultLanguageRegistry.get('fake-lang-named')).toBeDefined()
+  })
+
+  it('registers an adapter from default export', async () => {
+    const pluginFile = join(testDir, 'lang-default.mjs')
+    writeFileSync(pluginFile, `
+      export default {
+        id: 'fake-lang-default',
+        fileExtensions: ['.fld'],
+        parse: () => ({ ok: true }),
+        stripStrings: (s) => s,
+        stripComments: (s) => s,
+      };
+    `)
+
+    const plugin: DiscoveredPlugin = {
+      type: 'file',
+      entryPoint: pluginFile,
+      namespace: 'lang-default',
+      source: 'lang-default.mjs',
+    }
+
+    const result = await loadPlugin(plugin, 'lang')
+    expect(result.error).toBeUndefined()
+    expect(result.adaptersRegistered).toBe(1)
+    expect(defaultLanguageRegistry.get('fake-lang-default')).toBeDefined()
+  })
+
+  it('deduplicates adapters appearing in both array and named export', async () => {
+    const pluginFile = join(testDir, 'lang-dedup.mjs')
+    writeFileSync(pluginFile, `
+      export const myLang = {
+        id: 'fake-lang-dedup',
+        fileExtensions: ['.fdd'],
+        parse: () => ({ ok: true }),
+        stripStrings: (s) => s,
+        stripComments: (s) => s,
+      };
+      export const adapters = [myLang];
+    `)
+
+    const plugin: DiscoveredPlugin = {
+      type: 'file',
+      entryPoint: pluginFile,
+      namespace: 'lang-dedup',
+      source: 'lang-dedup.mjs',
+    }
+
+    const result = await loadPlugin(plugin, 'lang')
+    expect(result.error).toBeUndefined()
+    expect(result.adaptersRegistered).toBe(1)
+  })
+
   it('loadAllPlugins with lang domain aggregates totalAdapters', async () => {
     const baseDir = mkdtempSync(join(tmpdir(), 'opensip-lang-base-'))
     const langDir = join(baseDir, 'lang')
