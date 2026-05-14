@@ -26,7 +26,7 @@ A "hello world" Rust check ships as part of this plan as proof-of-design — it 
 
 ## Design Principles
 
-**Strangler migration over big-bang.** The adapter API is added alongside the existing TS-direct surface. Both work in parallel. Existing checks are not rewritten in this plan. The `typescript` dep stays in `core` for the duration of this plan; removing it is a follow-up.
+**Hard cutover, not strangler migration.** The adapter API replaces the existing TS-direct surface in one pass. No shims, no dual caches, no "temporary" compatibility layers. The 48 TS-direct checks are updated to import from `@opensip-tools/lang-typescript` in the same phase that extracts the adapter. This is safe because the codebase has no external consumers depending on import paths — the entire repo is updated atomically.
 
 **Config-driven adapter loading.** Adapters load only for languages declared in the project's targets. A project that ships no Rust target never loads `tree-sitter-rust`. Cold start scales with declared languages, not installed packages.
 
@@ -34,36 +34,34 @@ A "hello world" Rust check ships as part of this plan as proof-of-design — it 
 
 **Parser choice per language, hidden behind the adapter.** TS keeps the `typescript` compiler (no regression on 47 existing AST checks). New syntactic languages use tree-sitter via `web-tree-sitter`. C++ shells out to `clang-tidy`. Replacing any of these later only touches one adapter file.
 
-**No backwards compatibility for check authors writing NEW checks.** New TS/JS checks must use the adapter API. Existing TS checks keep their direct `typescript` imports indefinitely (Phase 7 sets up the migration path; the actual long-tail migration is a separate plan).
+**All checks migrate in Phase 2.** Existing TS checks are updated to import from `@opensip-tools/lang-typescript` rather than directly importing `typescript`. This happens in the same phase that creates the adapter package — no deferred migration, no Phase 7 bridge.
 
 ## Phases
 
 | Phase | Name | Description | Depends On |
 |-------|------|-------------|------------|
 | 0 | Languages module scaffold | Create `packages/core/src/languages/` with empty interfaces, types, and a registry skeleton. No callers yet. | — |
-| 1 | Registry & language-aware parse cache | Implement `LanguageRegistry`, refactor `parse-cache.ts` to be language-aware, wire `'lang'` plugin domain. | 0 |
-| 2 | Extract `@opensip-tools/lang-typescript` | New package re-exports `parseSource`, `getSharedSourceFile`, AST utilities; registers the TS adapter; existing checks keep using current import paths via compat shim. | 1 |
+| 1 | Registry & language-aware parse cache | Implement `LanguageRegistry`, replace `parse-cache.ts` with language-aware version (hard cutover, no shim), wire `'lang'` plugin domain. | 0 |
+| 2 | Extract `@opensip-tools/lang-typescript` | New package owns the TS adapter, parse, query, strip, and AST utilities. All 48 checks updated to import from `@opensip-tools/lang-typescript`. `framework/parse-cache.ts` and `framework/ast-utilities.ts` replaced with re-exports. `typescript` dependency removed from core. | 1 |
 | 3 | `@opensip-tools/lang-rust` + proof check | Tree-sitter Rust adapter, lazy WASM grammar, one "hello world" check that triggers on `unwrap()` in a fixture. End-to-end proof of design. | 2 |
-| 4 | Adapter-driven content filter + first universal checks | Move `stripStrings` / `stripComments` to adapter; port two regex-based built-in checks into a new `@opensip-tools/checks-universal` package. | 3 |
+| 4 | Adapter-driven content filter + first universal checks | Move `stripStrings` / `stripComments` dispatch to adapter in `define-check.ts`; port two regex-based built-in checks into a new `@opensip-tools/checks-universal` package. | 3 |
 | 5 | `lang-python`, `lang-java`, `lang-go` | Three more language packs in parallel using the Phase 3 template. One "hello world" check per language. | 3 |
 | 6 | `lang-cpp` via clang-tidy `CommandConfig` | C++ adapter wraps `clang-tidy`; the `parse()` method returns `null` and the adapter declares itself as command-only. One demo check. | 1, 2 |
-| 7 | TS-migration bridge | Document the migration shape for the 48 TS-direct checks. Migrate exactly two checks as worked examples. Long-tail migration deferred to a follow-up plan. | 2, 4 |
-| 8 | Tests | Unit + integration tests for the registry, parse cache, content-filter dispatch, plugin domain, Rust end-to-end fixture run. | 0-7 |
+| 8 | Tests | Unit + integration tests for the registry, parse cache, content-filter dispatch, plugin domain, Rust end-to-end fixture run. | 0-6 |
 | 9 | Validation | CLI smoke runs against a multi-language fixture repo. Verify per-language dispatch, error messages on missing adapters, fail-loud on unknown languages declared in targets. | All |
 
 ## Dependency Graph
 
 ```
 Phase 0 (Languages module scaffold)
-└── Phase 1 (Registry & parse cache)
-      ├── Phase 2 (lang-typescript)
+└── Phase 1 (Registry & parse cache — hard cutover)
+      ├── Phase 2 (lang-typescript — extract + migrate all 48 checks)
       │     ├── Phase 3 (lang-rust + proof)
       │     │     ├── Phase 4 (content filter + universal)
       │     │     └── Phase 5 (python, java, go)        ← parallel with Phase 4
       │     └── Phase 6 (lang-cpp)                       ← parallel with Phase 3
-      │           └── Phase 7 (TS migration bridge)      ← also depends on Phase 4
-      │                 └── Phase 8 (Tests)
-      │                       └── Phase 9 (Validation)
+      │           └── Phase 8 (Tests)
+      │                 └── Phase 9 (Validation)
       └── Phase 6 (lang-cpp)
 ```
 
@@ -72,18 +70,19 @@ Parallelization opportunities:
 - Phase 4 and Phase 5 are independent once Phase 3 ships.
 - Phase 5's three language packs are independent of each other.
 
+Note: Phase 7 (TS migration bridge) is eliminated — all 48 TS checks are migrated in Phase 2 as part of the hard cutover.
+
 ## File Change Summary
 
 | Phase | New Files | Modified Files |
 |-------|-----------|----------------|
 | 0 | `packages/core/src/languages/adapter.ts`, `registry.ts`, `generic-types.ts`, `index.ts`, `__tests__/registry.test.ts` | `packages/core/src/index.ts` (export `./languages`) |
-| 1 | `packages/core/src/languages/parse-cache.ts` | `packages/core/src/framework/parse-cache.ts` (re-export from new location), `packages/core/src/recipes/service.ts:16,167,266` (init/clear calls), `packages/core/src/plugins/types.ts` (add `'lang'` to `PluginDomain`), `packages/core/src/plugins/discover.ts`, `packages/core/src/plugins/loader.ts` |
-| 2 | `packages/lang-typescript/package.json`, `tsconfig.json`, `src/index.ts`, `src/adapter.ts`, `src/parse.ts`, `src/query.ts`, `src/strip.ts`, `src/__tests__/adapter.test.ts` | `packages/core/src/framework/parse-cache.ts` (becomes thin re-export shim from `@opensip-tools/lang-typescript`), `packages/core/src/framework/ast-utilities.ts` (becomes thin re-export shim), `pnpm-workspace.yaml` (no change — `packages/*` already covers it), root `package.json` if needed |
+| 1 | `packages/core/src/languages/parse-cache.ts` | `packages/core/src/framework/parse-cache.ts` (replaced with re-export from languages/parse-cache), `packages/core/src/recipes/service.ts:16,167,266` (init/clear calls point to new cache), `packages/core/src/plugins/types.ts` (add `'lang'` to `PluginDomain`), `packages/core/src/plugins/discover.ts`, `packages/core/src/plugins/loader.ts` |
+| 2 | `packages/lang-typescript/package.json`, `tsconfig.json`, `src/index.ts`, `src/adapter.ts`, `src/parse.ts`, `src/query.ts`, `src/strip.ts`, `src/ast-utilities.ts`, `src/__tests__/adapter.test.ts` | `packages/core/src/framework/parse-cache.ts` (re-export from lang-typescript), `packages/core/src/framework/ast-utilities.ts` (re-export from lang-typescript), `packages/core/package.json` (remove `typescript` dep, add `@opensip-tools/lang-typescript`), `packages/cli/src/index.ts` (register TS adapter at bootstrap), **all 48 checks** in `packages/checks-builtin/src/checks/` (update imports from `@opensip-tools/core/framework/parse-cache.js` → `@opensip-tools/lang-typescript`, and `import ts from 'typescript'` → `import ts from 'typescript'` via lang-typescript re-export) |
 | 3 | `packages/lang-rust/package.json`, `tsconfig.json`, `src/index.ts`, `src/adapter.ts`, `src/parse.ts`, `src/query.ts`, `src/strip.ts`, `src/grammar-loader.ts`, `src/__tests__/adapter.test.ts`; `packages/checks-rust/package.json`, `tsconfig.json`, `src/index.ts`, `src/checks/no-unwrap.ts`, `src/__tests__/no-unwrap.test.ts`; `packages/cli/__fixtures__/multi-lang/sample.rs` | — |
-| 4 | `packages/checks-universal/package.json`, `tsconfig.json`, `src/index.ts`, `src/checks/no-todo-comments.ts`, `src/checks/file-length-limit.ts`, `src/__tests__/*.test.ts` | `packages/core/src/languages/adapter.ts` (add `stripStrings`/`stripComments` already in Phase 0 — Phase 4 wires call sites), `packages/core/src/framework/define-check.ts:107-115` (dispatch to adapter), `packages/core/src/framework/content-filter.ts` (becomes adapter-backed for TS; new public API stays the same) |
+| 4 | `packages/checks-universal/package.json`, `tsconfig.json`, `src/index.ts`, `src/checks/no-todo-comments.ts`, `src/checks/file-length-limit.ts`, `src/__tests__/*.test.ts` | `packages/core/src/framework/define-check.ts:107-115` (dispatch content-filter to adapter), `packages/core/src/framework/content-filter.ts` (becomes adapter-backed dispatch) |
 | 5 | `packages/lang-python/**`, `packages/lang-java/**`, `packages/lang-go/**`, three minimal `checks-<lang>` packages (each: `package.json`, `tsconfig.json`, `src/index.ts`, one hello-world check, one fixture file) | — |
 | 6 | `packages/lang-cpp/package.json`, `tsconfig.json`, `src/index.ts`, `src/adapter.ts`, `src/clang-tidy.ts`; `packages/checks-cpp/package.json`, `tsconfig.json`, `src/index.ts`, `src/checks/clang-tidy-passthrough.ts` | — |
-| 7 | `docs/plans/multi-language-support/migration-guide.md` (worked-example migration of two TS checks) | Two TS check files migrated from `import ts from 'typescript'` + `getSharedSourceFile` to `ctx.lang.parse(content, filePath)` |
 | 8 | `packages/core/src/languages/__tests__/registry.test.ts` (already in Phase 0), `packages/core/src/languages/__tests__/parse-cache.test.ts`, `packages/core/src/plugins/__tests__/lang-domain.test.ts`, fixture-driven integration test in `packages/cli/src/__tests__/multi-lang.test.ts` | — |
 | 9 | `packages/cli/__fixtures__/multi-lang/` (sample.rs, sample.py, sample.java, sample.go, sample.cpp, sample.ts, `opensip-tools.config.yml`) | — |
 
