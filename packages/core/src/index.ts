@@ -44,6 +44,9 @@ export { builtInRecipesByName } from './recipes/built-in-recipes.js';
 export { defaultRecipeRegistry, FitnessRecipeRegistry } from './recipes/registry.js';
 export { getCheckConfig, setCurrentRecipeCheckConfig, clearCurrentRecipeCheckConfig } from './recipes/check-config.js';
 
+// Languages — cross-language adapter API
+export * from './languages/index.js';
+
 // Targets and signalers
 export { loadTargetsConfig, resolveTargetFiles } from './targets/index.js';
 export type { TargetsConfig } from './targets/types.js';

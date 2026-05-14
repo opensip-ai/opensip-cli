@@ -28,7 +28,9 @@
     "./signalers": "./dist/signalers/index.js",
     "./signalers/*": "./dist/signalers/*",
     "./plugins": "./dist/plugins/index.js",
-    "./plugins/*": "./dist/plugins/*"
+    "./plugins/*": "./dist/plugins/*",
+    "./languages": "./dist/languages/index.js",
+    "./languages/*": "./dist/languages/*"
   },
   "scripts": {
     "build": "tsc",
