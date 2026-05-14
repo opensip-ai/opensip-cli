@@ -20,7 +20,10 @@ const SIM: ToolCommandDescriptor = {
   description: 'Run simulation scenarios [experimental]',
 };
 
-function toolOptsToCliArgs(command: string, opts: ToolOptions & { kind?: string }): CliArgs {
+function toolOptsToCliArgs(
+  command: string,
+  opts: ToolOptions & { recipe?: string; kind?: string },
+): CliArgs {
   return {
     command,
     json: opts.json,
@@ -31,6 +34,7 @@ function toolOptsToCliArgs(command: string, opts: ToolOptions & { kind?: string 
     verbose: false,
     exclude: [],
     findings: false,
+    ...(opts.recipe ? { recipe: opts.recipe } : {}),
     ...(opts.kind ? { kind: opts.kind } : {}),
   };
 }
@@ -41,34 +45,47 @@ function register(cli: ToolCliContext): void {
   program
     .command(SIM.name)
     .description(SIM.description)
+    .option('--recipe <name>', 'Run a named sim recipe (default: built-in `default`)')
     .option('--cwd <path>', 'Target directory', process.cwd())
     .option('--json', 'Output structured JSON', false)
     .option('-q, --quiet', 'Suppress banner / boxes; print only the pass-fail summary', false)
     .option('--open', 'Launch the HTML dashboard in your browser after the run completes', false)
     .option('--kind <kind>', 'Filter scenarios by kind (load | chaos | invariant | fix-evaluation)')
     .option('--debug', 'Enable debug mode for structured log output', false)
-    .action(async (opts: ToolOptions & { quiet?: boolean; open?: boolean; kind?: string }) => {
-      const args = toolOptsToCliArgs('sim', opts);
-      const result = executeSim(args);
-      if (args.json) {
-        process.stdout.write(JSON.stringify(result, null, 2) + '\n');
-        // executeSim is sync today and returns a stub result — no exit
-        // code shaping needed here. When sim grows real outcomes, this
-        // is where pass/fail mapping goes.
-        return;
-      }
-      await cli.render(result);
+    .action(
+      async (
+        opts: ToolOptions & { recipe?: string; quiet?: boolean; open?: boolean; kind?: string },
+      ) => {
+        const args = toolOptsToCliArgs('sim', opts);
+        const { result } = await executeSim(args);
 
-      await cli.maybeOpenDashboard({
-        openRequested: Boolean(opts.open),
-        jsonOutput: Boolean(args.json),
-        cwd: args.cwd,
-      });
-    });
+        if (args.json) {
+          if (result.type === 'error') {
+            cli.setExitCode(result.exitCode);
+            process.stdout.write(JSON.stringify({ error: result.message }, null, 2) + '\n');
+          } else {
+            if (result.shouldFail === true) cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
+            process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+          }
+          return;
+        }
 
-  // Reference EXIT_CODES so the import isn't dropped — sim doesn't
-  // currently set non-zero exit codes but will when scenarios fail.
-  void EXIT_CODES;
+        if (result.type === 'error') {
+          cli.setExitCode(result.exitCode);
+          await cli.render(result);
+          return;
+        }
+
+        if (result.shouldFail === true) cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
+        await cli.render(result);
+
+        await cli.maybeOpenDashboard({
+          openRequested: Boolean(opts.open),
+          jsonOutput: Boolean(args.json),
+          cwd: args.cwd,
+        });
+      },
+    );
 }
 
 export const simulationTool: Tool = {

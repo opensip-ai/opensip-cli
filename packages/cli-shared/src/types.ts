@@ -41,6 +41,8 @@ export interface ToolOptions {
   cwd: string;
   json: boolean;
   debug: boolean;
+  /** Recipe name to run. Defaults to the built-in `default` if omitted. */
+  recipe?: string;
   /** Filter by scenario kind (load / chaos / invariant / fix-evaluation). */
   kind?: string;
 }
@@ -139,6 +141,7 @@ export interface SummaryOptions {
 /** Union type for all command results — App.tsx dispatches on result.type */
 export type CommandResult =
   | FitDoneResult
+  | SimDoneResult
   | ListChecksResult
   | ListRecipesResult
   | HistoryResult
@@ -230,6 +233,27 @@ export interface ExperimentalResult {
   cwd: string;
   /** Optional `--kind` filter (load / chaos / invariant / fix-evaluation). */
   kind?: string;
+}
+
+/** Outcome of a `sim --recipe <name>` run. */
+export interface SimDoneResult {
+  type: 'sim-done';
+  recipeName: string;
+  cwd: string;
+  totalScenarios: number;
+  passedScenarios: number;
+  failedScenarios: number;
+  scenarios: {
+    scenarioId: string;
+    scenarioName: string;
+    kind: 'load' | 'chaos' | 'invariant' | 'fix-evaluation';
+    passed: boolean;
+    durationMs: number;
+    error?: string;
+  }[];
+  durationMs: number;
+  /** Whether the run should cause a non-zero exit code (any scenario failed). */
+  shouldFail?: boolean;
 }
 
 export interface PluginResult {

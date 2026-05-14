@@ -202,6 +202,40 @@ export {
 } from './framework/execution/execution-engine.js'
 
 // =============================================================================
+// RECIPES — sim recipes mirror the fitness recipe shape
+// =============================================================================
+
+export { defineSimulationRecipe } from './recipes/define-recipe.js'
+export {
+  SimulationRecipeRegistry,
+  defaultSimulationRecipeRegistry,
+} from './recipes/registry.js'
+export type { SimulationRecipeDisplayInfo } from './recipes/registry.js'
+export {
+  builtInSimulationRecipes,
+  builtInSimulationRecipesByName,
+  isBuiltInSimulationRecipe,
+} from './recipes/built-in-recipes.js'
+export {
+  SimulationRecipeService,
+} from './recipes/service.js'
+export type {
+  SimulationRecipeServiceConfig,
+  SimulationScenarioResult,
+  SimulationRecipeResult,
+} from './recipes/service.js'
+export type {
+  SimulationRecipe,
+  SimulationRecipeConfig,
+  SimulationExecutionOptions,
+  ScenarioSelector,
+  ExplicitScenarioSelector,
+  AllScenarioSelector,
+  TagsScenarioSelector,
+  KindScenarioSelector,
+} from './recipes/types.js'
+
+// =============================================================================
 // LEGACY TYPES (load-shaped, retained for `defineScenario`)
 // =============================================================================
 

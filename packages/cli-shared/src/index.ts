@@ -30,6 +30,7 @@ export type {
   CommandResult,
   ClearDoneResult,
   FitDoneResult,
+  SimDoneResult,
   ListChecksResult,
   ListRecipesResult,
   HistoryResult,

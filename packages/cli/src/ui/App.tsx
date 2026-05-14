@@ -22,7 +22,7 @@ import { RunHeader } from './components/RunHeader.js';
 import { Summary } from './components/Summary.js';
 import { useTheme } from './theme.js';
 
-import type { CommandResult } from '@opensip-tools/cli-shared';
+import type { CommandResult, SimDoneResult } from '@opensip-tools/cli-shared';
 
 export interface AppProps {
   readonly result: CommandResult;
@@ -83,6 +83,10 @@ export function App({ result }: AppProps): React.ReactElement {
       );
     }
 
+    case 'sim-done': {
+      return <SimDoneSummary result={result} />;
+    }
+
     case 'plugin': {
       return <PluginFeedback action={toPluginAction(result)} />;
     }
@@ -117,6 +121,69 @@ export function App({ result }: AppProps): React.ReactElement {
       return <ErrorMessage message="Unknown command result" />;
     }
   }
+}
+
+/**
+ * Inline summary for `sim --recipe <name>` runs.
+ *
+ * Mirrors the fit-done compact summary: one line per scenario, then a
+ * pass/fail tally + duration. Detailed per-scenario error messages
+ * surface inline when a scenario failed.
+ */
+function SimDoneSummary({
+  result,
+}: Readonly<{ result: SimDoneResult }>): React.ReactElement {
+  const theme = useTheme();
+  const ms = result.durationMs;
+  const dur = ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
+
+  return (
+    <Box flexDirection="column">
+      <Banner />
+      <RunHeader
+        tool="Simulation"
+        description={`Recipe: ${result.recipeName}`}
+        cwd={result.cwd}
+      />
+      <Box flexDirection="column" paddingLeft={2} paddingTop={1}>
+        {result.scenarios.length === 0 ? (
+          <Text dimColor>
+            No scenarios matched recipe '{result.recipeName}'. Add one to opensip-tools/sim/scenarios/.
+          </Text>
+        ) : (
+          result.scenarios.map((s) => (
+            <Box key={s.scenarioId} flexDirection="column">
+              <Text>
+                <Text color={s.passed ? theme.success : theme.error}>
+                  {s.passed ? '✓' : '✗'}
+                </Text>
+                {' '}
+                <Text bold>{s.scenarioName}</Text>
+                {' '}
+                <Text dimColor>({s.kind}, {s.durationMs}ms)</Text>
+              </Text>
+              {s.error && (
+                <Box paddingLeft={4}>
+                  <Text color={theme.error}>{s.error}</Text>
+                </Box>
+              )}
+            </Box>
+          ))
+        )}
+      </Box>
+      <Box paddingLeft={2} paddingTop={1}>
+        <Text>
+          <Text bold>{result.passedScenarios}</Text> passed,{' '}
+          <Text bold color={result.failedScenarios > 0 ? theme.error : undefined}>
+            {result.failedScenarios}
+          </Text>{' '}
+          failed
+          {' '}
+          <Text dimColor>| Duration {dur}</Text>
+        </Text>
+      </Box>
+    </Box>
+  );
 }
 
 /** Inline dashboard feedback component */

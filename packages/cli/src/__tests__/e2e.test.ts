@@ -217,11 +217,18 @@ describe('CLI e2e', () => {
   });
 
   describe('sim', () => {
-    it('shows development notice', () => {
+    it('runs the built-in default recipe with no scenarios registered', () => {
+      // No user-authored scenarios in the e2e env, so the default
+      // recipe matches zero scenarios and exits cleanly. The output
+      // surface (Ink summary) mentions the recipe name.
       const { stdout, exitCode } = run('sim');
       expect(exitCode).toBe(0);
-      // The ExperimentalNotice contains "Under active development"
-      expect(stdout).toContain('development');
+      expect(stdout.toLowerCase()).toContain('recipe');
+    });
+
+    it('exits 2 when given an unknown recipe name', () => {
+      const { exitCode } = run('sim', '--recipe', 'nonexistent');
+      expect(exitCode).toBe(2);
     });
   });
 
