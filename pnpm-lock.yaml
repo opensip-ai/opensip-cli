@@ -125,6 +125,18 @@ importers:
       '@opensip-tools/core':
         specifier: workspace:*
         version: link:../core
+      '@opensip-tools/lang-cpp':
+        specifier: workspace:*
+        version: link:../lang-cpp
+      '@opensip-tools/lang-go':
+        specifier: workspace:*
+        version: link:../lang-go
+      '@opensip-tools/lang-java':
+        specifier: workspace:*
+        version: link:../lang-java
+      '@opensip-tools/lang-python':
+        specifier: workspace:*
+        version: link:../lang-python
       '@opensip-tools/lang-rust':
         specifier: workspace:*
         version: link:../lang-rust

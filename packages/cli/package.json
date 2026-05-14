@@ -29,6 +29,10 @@
   "dependencies": {
     "@opensip-tools/checks-builtin": "workspace:*",
     "@opensip-tools/core": "workspace:*",
+    "@opensip-tools/lang-cpp": "workspace:*",
+    "@opensip-tools/lang-go": "workspace:*",
+    "@opensip-tools/lang-java": "workspace:*",
+    "@opensip-tools/lang-python": "workspace:*",
     "@opensip-tools/lang-rust": "workspace:*",
     "@opensip-tools/lang-typescript": "workspace:*",
     "@opensip-tools/simulation": "workspace:*",

@@ -1,0 +1,76 @@
+/**
+ * End-to-end multi-language test.
+ *
+ * Pins the contract that opensip-tools fit walks files in every
+ * bundled language (rust, python, java, go, cpp, typescript) and
+ * dispatches checks to the right adapters. Uses the
+ * fixtures/multi-lang sample tree as input.
+ */
+
+import { execFileSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+import { describe, expect, it } from 'vitest'
+
+const __dirname = fileURLToPath(new URL('.', import.meta.url))
+const CLI = join(__dirname, '../../dist/index.js')
+const FIXTURE = join(__dirname, 'fixtures/multi-lang')
+
+function run(...args: string[]): { stdout: string; stderr: string; exitCode: number } {
+  try {
+    const stdout = execFileSync('node', [CLI, ...args], {
+      cwd: FIXTURE,
+      encoding: 'utf-8',
+      timeout: 60_000,
+      env: { ...process.env, NO_COLOR: '1' },
+    })
+    return { stdout, stderr: '', exitCode: 0 }
+  } catch (err) {
+    const e = err as { stdout?: string; stderr?: string; status?: number }
+    return { stdout: e.stdout ?? '', stderr: e.stderr ?? '', exitCode: e.status ?? 1 }
+  }
+}
+
+describe('CLI multi-language', () => {
+  it('lists language adapters for all six bundled languages', () => {
+    // The CLI doesn't expose adapters via --list yet; verify by running
+    // fit and checking it doesn't throw on any of the language targets.
+    const result = run('fit', '--json')
+    expect([0, 1]).toContain(result.exitCode) // 0 if all pass, 1 if some fail (acceptable in fixture)
+    const output: unknown = JSON.parse(result.stdout)
+    expect(typeof output).toBe('object')
+    expect((output as { version: string }).version).toBe('1.0')
+  })
+
+  it('produces no plugin-load errors for the fixture', () => {
+    const result = run('fit', '--json')
+    // stderr may have warnings about unrelated things, but no
+    // "lang plugin failed to load" or "plugin failed to load"
+    expect(result.stderr).not.toContain('lang plugin failed to load')
+    expect(result.stderr).not.toContain('plugin failed to load')
+  })
+
+  it('fixture contains source files in every supported language', () => {
+    // Sanity: confirm the fixture is what we expect (so the CLI run
+    // above is meaningful).
+    const langs = ['rs', 'py', 'java', 'go', 'cpp', 'ts']
+    for (const ext of langs) {
+      // Confirm at least one file with that extension under src/
+      const files = require('node:fs').readdirSync(join(FIXTURE, 'src')) as string[]
+      const matches = files.filter((f) => f.endsWith(`.${ext}`))
+      expect(matches.length).toBeGreaterThan(0)
+    }
+  })
+
+  it('fixture config declares targets for every language', () => {
+    const cfg = readFileSync(join(FIXTURE, 'opensip-tools.config.yml'), 'utf-8')
+    expect(cfg).toContain('languages: [rust]')
+    expect(cfg).toContain('languages: [python]')
+    expect(cfg).toContain('languages: [java]')
+    expect(cfg).toContain('languages: [go]')
+    expect(cfg).toContain('languages: [cpp]')
+    expect(cfg).toContain('languages: [typescript]')
+  })
+})

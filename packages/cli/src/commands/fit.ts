@@ -124,8 +124,16 @@ export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
   const { loadAllPlugins, defaultLanguageRegistry } = await import('@opensip-tools/core');
   const { typescriptAdapter } = await import('@opensip-tools/lang-typescript');
   const { rustAdapter } = await import('@opensip-tools/lang-rust');
+  const { pythonAdapter } = await import('@opensip-tools/lang-python');
+  const { javaAdapter } = await import('@opensip-tools/lang-java');
+  const { goAdapter } = await import('@opensip-tools/lang-go');
+  const { cppAdapter } = await import('@opensip-tools/lang-cpp');
   defaultLanguageRegistry.register(typescriptAdapter);
   defaultLanguageRegistry.register(rustAdapter);
+  defaultLanguageRegistry.register(pythonAdapter);
+  defaultLanguageRegistry.register(javaAdapter);
+  defaultLanguageRegistry.register(goAdapter);
+  defaultLanguageRegistry.register(cppAdapter);
   const langPluginResult = await loadAllPlugins('lang', undefined, projectDir);
   if (langPluginResult.errors.length > 0) {
     for (const err of langPluginResult.errors) {
