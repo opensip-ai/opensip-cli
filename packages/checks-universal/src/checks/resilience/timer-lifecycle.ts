@@ -2,7 +2,7 @@
  * @fileoverview Timer lifecycle check
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
 /**
  * Analyze a file for setInterval without corresponding clearInterval

@@ -10,7 +10,7 @@
 
 import * as ts from 'typescript'
 
-import { defineCheck, type CheckViolation, isAPIFile } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation, isAPIFile } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
 
 /**

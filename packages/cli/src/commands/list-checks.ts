@@ -2,7 +2,7 @@
  * list-checks command — list all available fitness checks
  */
 
-import { defaultRegistry } from '@opensip-tools/core';
+import { defaultRegistry } from '@opensip-tools/fitness';
 import { ensureChecksLoaded } from './fit.js';
 import type { ListChecksResult } from '../types.js';
 

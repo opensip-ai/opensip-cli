@@ -2,7 +2,7 @@
  * @fileoverview Error code registration check
  */
 
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
 
 /**
  * Check: resilience/error-code-registration

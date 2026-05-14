@@ -6,7 +6,7 @@
  * preserve byte length so line/column positions remain stable.
  */
 
-import { filterContent } from '@opensip-tools/core/framework/content-filter.js'
+import { filterContent } from '@opensip-tools/fitness'
 
 /**
  * Replace string literal content with whitespace of equal length.
@@ -26,5 +26,5 @@ export function stripComments(content: string): string {
 // Re-export filterContent and the FilteredContent type for richer
 // position-aware needs. The clearFilterCache helper is also re-exported
 // for compatibility with any callers that managed it directly.
-export { filterContent, clearFilterCache } from '@opensip-tools/core/framework/content-filter.js'
-export type { FilteredContent } from '@opensip-tools/core/framework/content-filter.js'
+export { filterContent, clearFilterCache } from '@opensip-tools/fitness'
+export type { FilteredContent } from '@opensip-tools/fitness'

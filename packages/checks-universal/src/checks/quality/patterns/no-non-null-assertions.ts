@@ -2,7 +2,7 @@
  * @fileoverview No non-null assertions check
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 import { isTestFile } from '../../../utils/index.js'
 
 /**

@@ -3,7 +3,7 @@
  * @module checks-builtin/checks/resilience/sentry/sentry-dsn-configured
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
 import { hasSentryInit, extractSentryInitBlock } from './sentry-helpers.js'
 

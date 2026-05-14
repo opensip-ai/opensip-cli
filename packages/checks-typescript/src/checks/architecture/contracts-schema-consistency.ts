@@ -2,7 +2,7 @@
  * @fileoverview Contracts schema consistency check
  */
 
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
 
 /**
  * Check: architecture/contracts-schema-consistency

@@ -4,7 +4,7 @@
  * @module checks-builtin/checks/resilience/sentry/sentry-pii-scrubbing
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
 import { hasSentryInit, extractSentryInitBlock } from './sentry-helpers.js'
 

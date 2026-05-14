@@ -3,7 +3,7 @@
  * @fileoverview No stub tests check
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
 /**
  * Patterns for empty test bodies on a single line

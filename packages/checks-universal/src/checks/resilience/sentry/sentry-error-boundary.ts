@@ -3,7 +3,7 @@
  * @module checks-builtin/checks/resilience/sentry/sentry-error-boundary
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
 import { hasSentryUsage } from './sentry-helpers.js'
 

@@ -1,2 +1,2 @@
-export type { Finding, Severity, FindingSeverity, CheckResult, CheckInfo, CheckResultMetadata, ToolOutput, ItemType } from './findings.js';
-export { CheckInfoFactory, createResultWithSignals, createErrorResult, createPassingResult, getItemTypeLabel } from './findings.js';
+export type { Signal, SignalSeverity, SignalCategory, CreateSignalInput, FixHint } from './signal.js';
+export { createSignal } from './signal.js';

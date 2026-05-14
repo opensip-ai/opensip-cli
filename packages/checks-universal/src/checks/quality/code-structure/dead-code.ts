@@ -8,7 +8,7 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
 /**
  * Locations Knip does NOT auto-discover but many repos use for tool configs.

@@ -3,7 +3,7 @@
  * @fileoverview Fitness ignore hygiene check
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
 /** Regex to match @fitness-ignore directives */
 const FITNESS_IGNORE_REGEX = /@fitness-ignore(?:-file|-next-line)?\s+(\S+)/g

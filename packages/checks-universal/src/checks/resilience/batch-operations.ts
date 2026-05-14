@@ -6,8 +6,8 @@
 
 import { logger } from '@opensip-tools/core/logger'
 
-import { defineCheck, type CheckViolation, getLineNumber } from '@opensip-tools/core'
-import { stripStringsAndCommentsPreservingPositions } from '@opensip-tools/core/framework/strip-literals.js'
+import { defineCheck, type CheckViolation, getLineNumber } from '@opensip-tools/fitness'
+import { stripStringsAndCommentsPreservingPositions } from '@opensip-tools/fitness'
 import { isTestFile } from '../../utils/index.js'
 
 interface UnboundedBatchPattern {

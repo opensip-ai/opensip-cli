@@ -8,7 +8,7 @@
  * - Excessive named imports from a single module (>15 items)
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
 interface HeavyLibrary {
   pattern: RegExp

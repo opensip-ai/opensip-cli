@@ -17,12 +17,7 @@
  * separate concern (warrants a "barrel-bloat" check, not this one).
  */
 
-import {
-  defineCheck,
-  type CheckViolation,
-  type FileAccessor,
-  buildImportGraph,
-} from '@opensip-tools/core'
+import { defineCheck, type CheckViolation, type FileAccessor, buildImportGraph } from '@opensip-tools/fitness'
 
 const WARNING_THRESHOLD = 15
 const ERROR_THRESHOLD = 30

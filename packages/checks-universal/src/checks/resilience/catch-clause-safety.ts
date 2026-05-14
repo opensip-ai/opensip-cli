@@ -3,7 +3,7 @@
  * @fileoverview Catch clause safety check
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
 /**
  * Analyze catch clauses for unsafe patterns

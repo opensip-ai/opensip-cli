@@ -7,7 +7,7 @@
 // @fitness-ignore-next-line no-markdown-references -- rule provenance reference for developer context
 // Rule source: .augment/rules/ui-patterns.md
 
-import { defineCheck, type CheckViolation, extractSnippet } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation, extractSnippet } from '@opensip-tools/fitness'
 
 /**
  * Paths to exclude from checking

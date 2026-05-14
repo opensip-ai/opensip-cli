@@ -1,10 +1,9 @@
 /**
  * @fileoverview Plugin system barrel export
  *
- * Public API for plugin discovery and loading:
- * - discoverPlugins() — Scan ~/.opensip-tools/{fit,sim,asm}/ for plugins
- * - loadAllPlugins() — Discover + load + register all plugins for a domain
- * - getPluginDir() — Get the absolute path to a domain directory
+ * Public API for plugin discovery and the kernel-level plugin types.
+ * Tool-specific loaders (e.g. fitness's loadAllPlugins) live with the
+ * tool that owns them.
  */
 
 export {
@@ -16,7 +15,6 @@ export {
   hasProjectPluginsDeclared,
   readProjectPluginsList,
 } from './discover.js'
-export { loadPlugin, loadAllPlugins } from './loader.js'
 export {
   discoverCheckPackages,
   readCheckPackageMetadata,
@@ -32,7 +30,6 @@ export type {
   DiscoveredPlugin,
   LoadedPlugin,
   PluginLoadResult,
-  FitPluginExports,
   LangPluginExports,
   PluginExports,
   PluginMetadata,

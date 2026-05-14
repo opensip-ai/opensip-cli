@@ -6,8 +6,6 @@ export default defineConfig({
       include: [
         'src/lib/**',
         'src/types/signal.ts',
-        'src/types/findings.ts',
-        'src/framework/registry.ts',
         'src/index.ts',
       ],
       exclude: ['src/**/*.test.ts', 'src/**/__tests__/**'],

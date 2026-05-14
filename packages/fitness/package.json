@@ -1,0 +1,40 @@
+{
+  "name": "@opensip-tools/fitness",
+  "version": "2.0.0",
+  "license": "MIT",
+  "description": "Fitness checks engine for OpenSIP Tools",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opensip-ai/opensip-tools.git",
+    "directory": "packages/fitness"
+  },
+  "homepage": "https://github.com/opensip-ai/opensip-tools",
+  "bugs": {
+    "url": "https://github.com/opensip-ai/opensip-tools/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@opensip-tools/core": "workspace:*",
+    "glob": "^11.0.0",
+    "js-yaml": "^4.1.0",
+    "minimatch": "^10.0.0",
+    "typescript": "~5.7.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.0",
+    "@types/node": "^22.0.0",
+    "vitest": "^2.1.0"
+  }
+}

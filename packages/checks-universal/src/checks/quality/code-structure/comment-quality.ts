@@ -12,7 +12,7 @@
  * All detected patterns are errors, not warnings. This supersedes quality/no-todos.
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
 // =============================================================================
 // TYPES

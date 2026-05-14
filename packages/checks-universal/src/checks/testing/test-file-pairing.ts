@@ -11,7 +11,7 @@ import * as path from 'node:path'
 
 import { logger } from '@opensip-tools/core/logger'
 
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
 
 /**
  * Directories to skip during scanning

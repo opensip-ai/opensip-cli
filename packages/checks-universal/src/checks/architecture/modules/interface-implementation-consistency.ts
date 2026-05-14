@@ -6,7 +6,7 @@
  * @fileoverview Interface Implementation Consistency check (v2)
  */
 
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
 
 // Pre-compiled regex patterns for better performance and to avoid ReDoS
 // Using bounded quantifiers to prevent super-linear runtime

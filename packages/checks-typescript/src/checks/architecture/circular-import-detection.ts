@@ -11,13 +11,7 @@
  * iterative agent-driven development.
  */
 
-import {
-  defineCheck,
-  type CheckViolation,
-  type FileAccessor,
-  buildImportGraph,
-  findStronglyConnectedComponents,
-} from '@opensip-tools/core'
+import { defineCheck, type CheckViolation, type FileAccessor, buildImportGraph, findStronglyConnectedComponents } from '@opensip-tools/fitness'
 
 export const circularImportDetection = defineCheck({
   id: '7b3a9e1c-8d2f-4a5b-9c6d-0e1f2a3b4c5d',

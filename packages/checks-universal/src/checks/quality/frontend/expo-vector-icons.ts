@@ -5,7 +5,7 @@
  * Recommends using @expo/vector-icons for React Native compatibility.
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
 const PREFERRED_ICON_LIBRARY = '@expo/vector-icons'
 const DISCOURAGED_LIBRARIES = [

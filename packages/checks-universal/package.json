@@ -1,6 +1,6 @@
 {
   "name": "@opensip-tools/checks-universal",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "license": "MIT",
   "description": "Cross-language fitness checks for opensip-tools",
   "repository": {
@@ -25,7 +25,8 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@opensip-tools/core": "workspace:*"
+    "@opensip-tools/core": "workspace:*",
+    "@opensip-tools/fitness": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

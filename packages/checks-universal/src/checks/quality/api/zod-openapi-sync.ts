@@ -6,7 +6,7 @@
  * to stay in sync with OpenAPI-generated types.
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
 /** Zod schema match result */
 interface ZodSchemaMatch {

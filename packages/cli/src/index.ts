@@ -12,12 +12,9 @@
 
 import { Command } from 'commander';
 
-import {
-  setSilent, setDebugMode,
-  generatePrefixedId, setRunId, initLogFile, logger,
-  loadSignalersConfig,
-} from '@opensip-tools/core';
-import type { SignalersConfig } from '@opensip-tools/core';
+import { setSilent, setDebugMode, generatePrefixedId, setRunId, initLogFile, logger } from '@opensip-tools/core';
+import { loadSignalersConfig } from '@opensip-tools/fitness';
+import type { SignalersConfig } from '@opensip-tools/fitness';
 
 import { EXIT_CODES, getErrorSuggestion } from './exit-codes.js';
 import { printWelcome } from './welcome.js';

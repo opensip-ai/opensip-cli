@@ -1,6 +1,6 @@
 {
   "name": "@opensip-tools/lang-typescript",
-  "version": "0.6.1",
+  "version": "2.0.0",
   "license": "MIT",
   "description": "TypeScript/JavaScript language adapter for opensip-tools",
   "repository": {
@@ -31,6 +31,7 @@
   },
   "dependencies": {
     "@opensip-tools/core": "workspace:*",
+    "@opensip-tools/fitness": "workspace:*",
     "typescript": "~5.7.0"
   },
   "devDependencies": {

@@ -12,7 +12,7 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
 
 /**
  * Packages that are always available (Node.js built-ins)

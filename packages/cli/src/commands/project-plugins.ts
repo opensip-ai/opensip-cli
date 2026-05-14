@@ -23,11 +23,7 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import {
-  getProjectPluginDir,
-  readProjectPluginsList,
-  type PluginDomain,
-} from '@opensip-tools/core'
+import { getProjectPluginDir, readProjectPluginsList, type PluginDomain } from '@opensip-tools/core'
 import { parseDocument, YAMLSeq, type Scalar } from 'yaml'
 
 import type { PluginResult } from '../types.js'

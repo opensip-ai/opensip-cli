@@ -3,7 +3,7 @@
  * @fileoverview Public API JSDoc check
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
 /**
  * Patterns for exported declarations that should have JSDoc

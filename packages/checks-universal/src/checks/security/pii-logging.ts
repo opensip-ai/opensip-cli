@@ -9,7 +9,7 @@
 
 import { logger } from '@opensip-tools/core/logger'
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
 // PII field names to detect in log statements
 const PII_FIELDS = [

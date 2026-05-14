@@ -8,12 +8,7 @@
 import { existsSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
-import {
-  defineCheck,
-  execAbortable,
-  type CheckViolation,
-  type FileAccessor,
-} from '@opensip-tools/core'
+import { defineCheck, execAbortable, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
 
 /**
  * TypeScript error line pattern.

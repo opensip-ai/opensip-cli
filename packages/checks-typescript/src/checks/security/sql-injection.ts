@@ -6,14 +6,7 @@
  * text, error messages, and comments.
  */
 
-import {
-  defineCheck,
-  type CheckViolation,
-  parseSource,
-  walkNodes,
-  getASTLineNumber,
-  ts,
-} from '@opensip-tools/core'
+import { defineCheck, type CheckViolation, parseSource, walkNodes, getASTLineNumber, ts } from '@opensip-tools/fitness'
 
 /**
  * SQL structural patterns indicating actual SQL statements (not casual English).

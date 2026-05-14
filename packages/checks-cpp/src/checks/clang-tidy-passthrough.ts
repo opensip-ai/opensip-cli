@@ -6,7 +6,7 @@
  * config (if present) controls which lints fire — we don't override
  * it. Use `--checks=...` in the args if you want a fixed lint set.
  */
-import { defineCheck, type CheckViolation } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
 const CLANG_TIDY_LINE = /^(.+?):(\d+):(\d+):\s+(warning|error|note):\s+(.+?)(?:\s+\[([\w\-,.]+)\])?$/
 

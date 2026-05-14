@@ -7,7 +7,7 @@
  * - semgrep (static analysis)
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
 // =============================================================================
 // CHECK DEFINITION

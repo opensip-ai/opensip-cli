@@ -13,7 +13,7 @@
  * The check uses `strip-strings` content filtering so a literal like
  * `"except:"` inside a docstring or string doesn't false-fire.
  */
-import { defineCheck, type CheckViolation } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
 const BARE_EXCEPT_PATTERN = /^\s*except\s*:/gm
 

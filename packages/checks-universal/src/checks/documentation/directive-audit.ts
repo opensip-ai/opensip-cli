@@ -15,7 +15,7 @@
  * Each directive can be reviewed to determine if it's still needed.
  */
 
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
 
 // =============================================================================
 // TYPES

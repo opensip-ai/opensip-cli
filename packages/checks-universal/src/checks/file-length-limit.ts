@@ -6,7 +6,7 @@
  * files don't slip through and trivial generated boilerplate isn't
  * over-counted (configurable later if needed).
  */
-import { defineCheck, type CheckViolation } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
 const SOFT_LIMIT = 400
 const HARD_LIMIT = 800

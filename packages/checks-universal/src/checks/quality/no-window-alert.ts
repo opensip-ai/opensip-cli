@@ -7,7 +7,7 @@
  * should be replaced with modal components or toast notifications.
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
 // =============================================================================
 // DETECTION

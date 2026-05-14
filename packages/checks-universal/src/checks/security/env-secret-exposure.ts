@@ -8,7 +8,7 @@
 
 import { logger } from '@opensip-tools/core/logger'
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
 /**
  * Creates a pre-compiled RegExp for pattern matching.

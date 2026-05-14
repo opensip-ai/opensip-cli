@@ -2,7 +2,7 @@
  * dashboard command — generate HTML report and open in browser
  */
 
-import { defaultRegistry, defaultRecipeRegistry } from '@opensip-tools/core';
+import { defaultRegistry, defaultRecipeRegistry } from '@opensip-tools/fitness';
 import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';

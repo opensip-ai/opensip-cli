@@ -8,7 +8,7 @@
 import * as ts from 'typescript'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
 /**
  * Quick filter keywords for 'any' type patterns

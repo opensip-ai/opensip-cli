@@ -10,7 +10,7 @@
  * the literal string `"fmt.Println("` inside a doc-string or comment
  * doesn't false-fire.
  */
-import { defineCheck, type CheckViolation } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
 const FMT_PRINT_PATTERN = /\bfmt\.(Print|Println|Printf)\s*\(/g
 

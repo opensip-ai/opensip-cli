@@ -5,7 +5,7 @@
  * Recommends using Expo Image or optimized image loading strategies.
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
 /**
  * Check if content contains a react-native Image import.

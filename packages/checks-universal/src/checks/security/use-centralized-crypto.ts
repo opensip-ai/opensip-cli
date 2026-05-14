@@ -5,7 +5,7 @@
 
 import { logger } from '@opensip-tools/core/logger'
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 import { createPathMatcher, isCommentLine } from '../../utils/index.js'
 
 /**

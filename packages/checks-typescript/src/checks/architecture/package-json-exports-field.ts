@@ -7,7 +7,7 @@
  * inside the package, creating fragile coupling to internal structure.
  */
 
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
 
 export const packageJsonExportsField = defineCheck({
   id: 'e1f2a3b4-c5d6-7e8f-9a0b-1c2d3e4f5a6b',

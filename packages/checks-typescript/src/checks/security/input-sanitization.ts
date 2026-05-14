@@ -9,14 +9,7 @@
  *
  */
 
-import {
-  defineCheck,
-  type CheckViolation,
-  parseSource,
-  walkNodes,
-  getASTLineNumber,
-  ts,
-} from '@opensip-tools/core'
+import { defineCheck, type CheckViolation, parseSource, walkNodes, getASTLineNumber, ts } from '@opensip-tools/fitness'
 
 /** Names of user input sources on request objects */
 const USER_INPUT_PROPERTIES = new Set(['body', 'params', 'query'])

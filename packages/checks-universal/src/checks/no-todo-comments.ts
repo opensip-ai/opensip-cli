@@ -6,7 +6,7 @@
  * dispatches through the registered LanguageAdapter, so this check
  * works for any language whose adapter implements stripStrings.
  */
-import { defineCheck, type CheckViolation } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
 const TODO_PATTERN = /\b(TODO|FIXME|XXX|HACK)\b/g
 

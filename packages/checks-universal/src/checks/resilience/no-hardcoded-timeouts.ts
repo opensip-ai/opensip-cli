@@ -4,8 +4,8 @@
 
 import { logger } from '@opensip-tools/core/logger'
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/core'
-import { stripStringLiterals, stripStringsAndComments } from '@opensip-tools/core/framework/strip-literals.js'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { stripStringLiterals, stripStringsAndComments } from '@opensip-tools/fitness'
 import { isTestFile } from '../../utils/index.js'
 
 import {

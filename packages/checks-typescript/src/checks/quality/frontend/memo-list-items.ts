@@ -15,7 +15,7 @@
 import * as ts from 'typescript'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
 /**
  * Built-in React Native components that don't need memoization warnings

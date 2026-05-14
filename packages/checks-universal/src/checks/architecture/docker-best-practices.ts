@@ -10,7 +10,7 @@
 
 import * as path from 'node:path'
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
 // =============================================================================
 // TYPES

@@ -10,8 +10,9 @@
  * They could apply to any codebase regardless of language.
  */
 
-import { isCheck } from '@opensip-tools/core'
-import type { Check, CheckDisplayEntry } from '@opensip-tools/core'
+import { isCheck } from '@opensip-tools/fitness'
+import type { CheckDisplayEntry } from '@opensip-tools/core'
+import type { Check } from '@opensip-tools/fitness'
 import * as allChecks from './checks/index.js'
 import { CHECK_DISPLAY } from './display/index.js'
 

@@ -1,8 +1,8 @@
 {
   "name": "@opensip-tools/core",
-  "version": "0.6.1",
+  "version": "2.0.0",
   "license": "MIT",
-  "description": "Core framework for OpenSIP Tools — check definitions, registry, recipes",
+  "description": "Core kernel for OpenSIP Tools — language adapters, plugin loader, errors, logger, IDs, retry, project config",
   "repository": {
     "type": "git",
     "url": "https://github.com/opensip-ai/opensip-tools.git",
@@ -21,12 +21,6 @@
     "./logger": "./dist/lib/logger.js",
     "./types": "./dist/types/index.js",
     "./signal": "./dist/types/signal.js",
-    "./framework/*": "./dist/framework/*",
-    "./recipes/*": "./dist/recipes/*",
-    "./targets": "./dist/targets/index.js",
-    "./targets/*": "./dist/targets/*",
-    "./signalers": "./dist/signalers/index.js",
-    "./signalers/*": "./dist/signalers/*",
     "./plugins": "./dist/plugins/index.js",
     "./plugins/*": "./dist/plugins/*",
     "./languages": "./dist/languages/index.js",

@@ -8,9 +8,9 @@
 
 import * as ts from 'typescript'
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
-import { stripStringsAndComments } from '@opensip-tools/core/framework/strip-literals.js'
+import { stripStringsAndComments } from '@opensip-tools/fitness'
 
 /** Patterns that indicate bounded buffer usage */
 const BOUNDED_PATTERNS = [

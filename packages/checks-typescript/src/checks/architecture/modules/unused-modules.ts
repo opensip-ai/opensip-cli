@@ -5,7 +5,7 @@
 
 import * as ts from 'typescript'
 
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
 
 interface UnusedModuleIssue {

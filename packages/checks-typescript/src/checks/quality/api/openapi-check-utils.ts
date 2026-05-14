@@ -4,7 +4,7 @@
  * @fileoverview Shared utilities for OpenAPI freshness checks
  */
 
-import type { CheckViolation } from '@opensip-tools/core'
+import type { CheckViolation } from '@opensip-tools/fitness'
 
 /**
  * Creates a parseOutput function for OpenAPI freshness checks.

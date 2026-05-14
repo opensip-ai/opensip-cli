@@ -7,9 +7,9 @@
 
 import * as ts from 'typescript'
 
-import { defineCheck, getCheckConfig, type CheckViolation, getLineNumber } from '@opensip-tools/core'
+import { defineCheck, getCheckConfig, type CheckViolation, getLineNumber } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
-import { stripStringsAndCommentsPreservingPositions } from '@opensip-tools/core/framework/strip-literals.js'
+import { stripStringsAndCommentsPreservingPositions } from '@opensip-tools/fitness'
 import { isCommentLine, isTestFile } from '../../utils/index.js'
 
 /**

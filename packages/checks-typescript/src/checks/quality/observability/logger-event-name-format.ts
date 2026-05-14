@@ -4,7 +4,7 @@
  */
 
 import { countUnescapedBackticks } from '@opensip-tools/lang-typescript'
-import { defineCheck, isInsideStringLiteral, type CheckViolation } from '@opensip-tools/core'
+import { defineCheck, isInsideStringLiteral, type CheckViolation } from '@opensip-tools/fitness'
 
 /**
  * Validates evt format: domain.component.action (3+ segments in lowercase with underscores)

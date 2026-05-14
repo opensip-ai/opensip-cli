@@ -9,7 +9,7 @@
  * - Nested O(n^2) loops
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 import { isTestFile } from '../../../utils/index.js'
 
 /**

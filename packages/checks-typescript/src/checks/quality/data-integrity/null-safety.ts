@@ -6,7 +6,7 @@
 
 import * as ts from 'typescript'
 
-import { defineCheck, getCheckConfig, type CheckViolation } from '@opensip-tools/core'
+import { defineCheck, getCheckConfig, type CheckViolation } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
 import { isTestFile } from '../../../utils/index.js'
 

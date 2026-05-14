@@ -5,16 +5,8 @@
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname } from 'node:path';
 
-import {
-  defaultRegistry,
-  FitnessRecipeService, type FitnessRecipeServiceCallbacks, type CheckSummary,
-  type FitnessRecipeResult,
-  defaultRecipeRegistry,
-  buildScopeBasedFileMap,
-  loadTargetsConfig, loadSignalersConfig,
-  logger,
-  type CheckDisplayEntry,
-} from '@opensip-tools/core';
+import { logger, type CheckDisplayEntry } from '@opensip-tools/core';
+import { defaultRegistry, FitnessRecipeService, type FitnessRecipeServiceCallbacks, type CheckSummary, type FitnessRecipeResult, defaultRecipeRegistry, buildScopeBasedFileMap, loadTargetsConfig, loadSignalersConfig } from '@opensip-tools/fitness';
 
 import type { CliOutput, TableRow, SummaryOptions, FitDoneResult, ErrorResult } from '../types.js';
 import { EXIT_CODES } from '../exit-codes.js';
@@ -148,7 +140,8 @@ export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
 
   // 1. Register the bundled language adapters, then discover additional
   //    language packs via the `lang` plugin domain.
-  const { loadAllPlugins, defaultLanguageRegistry } = await import('@opensip-tools/core');
+  const { defaultLanguageRegistry } = await import('@opensip-tools/core');
+  const { loadAllPlugins } = await import('@opensip-tools/fitness');
   const { typescriptAdapter } = await import('@opensip-tools/lang-typescript');
   const { rustAdapter } = await import('@opensip-tools/lang-rust');
   const { pythonAdapter } = await import('@opensip-tools/lang-python');
@@ -257,8 +250,8 @@ async function loadDiscoveredCheckPackages(projectDir: string): Promise<number> 
     discoverCheckPackages,
     readCheckPackageMetadata,
     readCheckPackagePreferences,
-    isCheck,
   } = await import('@opensip-tools/core');
+  const { isCheck } = await import('@opensip-tools/fitness');
   const prefs = readCheckPackagePreferences(projectDir);
   const discovered = discoverCheckPackages({
     projectDir,
@@ -411,7 +404,7 @@ export async function executeFit(
   // HARD error: file-based checks would silently produce zero findings,
   // making the scan look green when it actually never ran. The resolver
   // throws with a message that enumerates every path it attempted.
-  let signalersConfig: import('@opensip-tools/core').SignalersConfig;
+  let signalersConfig: import('@opensip-tools/fitness').SignalersConfig;
   let targetsResult: ReturnType<typeof loadTargetsConfig>;
   try {
     signalersConfig = loadSignalersConfig(args.cwd, args.config);

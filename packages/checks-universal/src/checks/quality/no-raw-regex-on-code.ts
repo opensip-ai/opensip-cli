@@ -6,7 +6,7 @@
  * false positives from string literal and comment content.
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
 const REGEX_USAGE_PATTERN = /\.(test|match|exec|search)\s*\(/
 const CONTENT_FILTER_PATTERN = /contentFilter\s*:\s*['"](raw|code-only)['"]/

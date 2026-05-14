@@ -6,7 +6,7 @@
  * Detects technical debt markers in comments for tracking and visibility.
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
 // =============================================================================
 // TYPES

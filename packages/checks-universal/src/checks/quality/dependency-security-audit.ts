@@ -6,7 +6,7 @@
  * Runs npm/pnpm audit to detect known vulnerabilities in dependencies.
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
 /**
  * Check: quality/dependency-security-audit

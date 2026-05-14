@@ -6,7 +6,7 @@
 
 import { logger } from '@opensip-tools/core/logger'
 
-import { defineCheck, type CheckViolation, getLineNumber } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation, getLineNumber } from '@opensip-tools/fitness'
 
 // =============================================================================
 // TRANSACTION BOUNDARY VALIDATION

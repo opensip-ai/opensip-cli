@@ -4,7 +4,7 @@
  * @fileoverview Detects error branches that silently exit with success (exit 0)
  */
 
-import { defineCheck, type CheckViolation, getLineNumber } from '@opensip-tools/core'
+import { defineCheck, type CheckViolation, getLineNumber } from '@opensip-tools/fitness'
 import { isCommentLine } from '../../utils/index.js'
 
 /**

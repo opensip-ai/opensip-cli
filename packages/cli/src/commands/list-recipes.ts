@@ -2,7 +2,7 @@
  * list-recipes command — list all available fitness recipes
  */
 
-import { defaultRecipeRegistry } from '@opensip-tools/core';
+import { defaultRecipeRegistry } from '@opensip-tools/fitness';
 import type { ListRecipesResult } from '../types.js';
 import { ensureChecksLoaded } from './fit.js';
 

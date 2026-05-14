@@ -2,12 +2,14 @@
  * @fileoverview Plugin contract types for opensip-tools
  *
  * Plugins can be npm packages or loose JS/MJS files.
- * Both export the same shape: arrays of checks and/or recipes.
+ *
+ * Tool-specific plugin export shapes (e.g. fitness's `FitPluginExports`,
+ * which references Check / FitnessRecipe types) live with the tool that
+ * owns them. This file holds the kernel-level types that any tool
+ * loader can use without dragging in tool-specific symbols.
  */
 
-import type { Check } from '../framework/check-types.js'
 import type { LanguageAdapter } from '../languages/adapter.js'
-import type { FitnessRecipe } from '../recipes/types.js'
 
 // =============================================================================
 // PLUGIN EXPORTS CONTRACT
@@ -23,27 +25,18 @@ import type { FitnessRecipe } from '../recipes/types.js'
  */
 export type CheckDisplayEntry = readonly [icon: string, displayName: string]
 
-/** What a fitness plugin package/file exports */
-export interface FitPluginExports {
-  readonly checks?: readonly Check[]
-  readonly recipes?: readonly FitnessRecipe[]
-  readonly metadata?: PluginMetadata
-  /**
-   * Optional display map: check slug → [icon, displayName].
-   * The CLI merges these from every loaded check package and uses
-   * the merged map when rendering tables and dashboard catalog entries.
-   */
-  readonly checkDisplay?: Readonly<Record<string, CheckDisplayEntry>>
-}
-
 /** What a language plugin package/file exports */
 export interface LangPluginExports {
   readonly adapters?: readonly LanguageAdapter[]
   readonly metadata?: PluginMetadata
 }
 
-/** Union of all plugin export shapes. */
-export type PluginExports = FitPluginExports | LangPluginExports
+/**
+ * Union of all plugin export shapes — kept open so tool-specific exports
+ * (e.g. fitness's FitPluginExports) can be assigned through structural
+ * compatibility. Each tool owns its own export-shape interface.
+ */
+export type PluginExports = LangPluginExports | Record<string, unknown>
 
 /** Optional plugin metadata */
 export interface PluginMetadata {
