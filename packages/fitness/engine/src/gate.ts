@@ -82,8 +82,12 @@ export class GateBaselineInvalidError extends Error {
 // Default baseline path
 // ---------------------------------------------------------------------------
 
-/** Default location for the baseline file when --baseline is not specified. */
-export const DEFAULT_BASELINE_PATH = '.opensip-tools/baseline.sarif';
+/**
+ * Default location for the baseline file when --baseline is not
+ * specified. v3.0.0: lives under the per-project gitignored runtime
+ * dir, not the v2 visible `.opensip-tools/`.
+ */
+export const DEFAULT_BASELINE_PATH = 'opensip-tools/.runtime/baseline.sarif';
 
 // ---------------------------------------------------------------------------
 // saveBaseline

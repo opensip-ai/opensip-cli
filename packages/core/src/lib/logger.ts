@@ -141,13 +141,19 @@ export function getRunId(): string | undefined {
 
 /**
  * Initialize the log file for this session.
- * Creates ~/.opensip-tools/logs/ if it doesn't exist.
- * Opens a JSONL file for today's date.
- * Prunes log files older than 7 days.
+ *
+ * v3.0.0: writes to `<project>/opensip-tools/.runtime/logs/` when the
+ * caller passes a `dir` (the CLI bootstrap supplies it from
+ * `resolveProjectPaths(cwd).logsDir`). Without an explicit dir, falls
+ * back to `~/.opensip-tools/logs/` so callers that haven't migrated
+ * still get logs.
+ *
+ * Opens a JSONL file for today's date. Prunes log files older than
+ * 7 days inside the chosen directory.
  */
-export function initLogFile(): void {
+export function initLogFile(dir?: string): void {
   try {
-    logDir = join(homedir(), '.opensip-tools', 'logs');
+    logDir = dir ?? join(homedir(), '.opensip-tools', 'logs');
     mkdirSync(logDir, { recursive: true });
 
     const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD

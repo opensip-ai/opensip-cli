@@ -114,7 +114,7 @@ function register(cli: ToolCliContext): void {
     .option('--debug', 'Enable debug mode for structured log output', false)
     .option('--gate-save', 'Architecture-gate: save current findings as baseline (mutually exclusive with --gate-compare)', false)
     .option('--gate-compare', 'Architecture-gate: compare current findings against baseline; exit 1 on regression', false)
-    .option('--baseline <path>', 'Path to baseline file for --gate-save / --gate-compare (default: .opensip-tools/baseline.sarif)')
+    .option('--baseline <path>', 'Path to baseline file for --gate-save / --gate-compare (default: opensip-tools/.runtime/baseline.sarif)')
     .action(async (opts: FitOptions & { quiet?: boolean; open?: boolean }) => {
       const args = fitOptsToCliArgs(opts);
 

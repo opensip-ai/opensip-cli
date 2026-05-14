@@ -1,8 +1,16 @@
 /**
  * JSON file persistence for opensip-tools results.
  *
- * Stores session results in ~/.opensip-tools/sessions/ as individual JSON files.
- * Each run creates one file: {timestamp}-{tool}-{recipe}.json
+ * v3.0.0 layout: stores session results in
+ * `<project>/opensip-tools/.runtime/sessions/` per project.
+ * Each run creates one file: {timestamp}-{tool}-{recipe}.json.
+ *
+ * The CLI bootstrap calls `configurePersistencePaths(projectPaths)`
+ * once on startup with paths from `resolveProjectPaths(cwd)`. Until
+ * that call, the module falls back to the v2 user-global location
+ * (~/.opensip-tools/) so any caller who imports persistence helpers
+ * before the CLI's preAction hook still gets a valid path. The
+ * fallback is also exercised by tests that don't bootstrap a CLI.
  */
 
 import { randomUUID } from 'node:crypto';
@@ -11,6 +19,8 @@ import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
 
 import { logger } from '@opensip-tools/core';
+
+import type { ProjectPaths } from '@opensip-tools/core';
 
 export interface StoredSession {
   readonly id: string;
@@ -69,11 +79,28 @@ export interface RecipeCatalogEntry {
   readonly timeout: number;
 }
 
-/** Root directory for all opensip-tools data */
+/**
+ * v2 fallback: user-global ~/.opensip-tools/ used by tests and any
+ * code path that imports persistence helpers before the CLI has
+ * called `configurePersistencePaths`. New code should not rely on
+ * this fallback.
+ */
 export const TOOLS_HOME = join(homedir(), '.opensip-tools');
-const STORE_DIR = join(TOOLS_HOME, 'sessions');
-const REPORTS_DIR = join(TOOLS_HOME, 'reports');
+
+/** Mutable per-process state — set by `configurePersistencePaths`. */
+let storeDir: string = join(TOOLS_HOME, 'sessions');
+let reportsDir: string = join(TOOLS_HOME, 'reports');
 const MAX_SESSIONS = 100;
+
+/**
+ * Configure where this module writes sessions and reports. Called
+ * once by the CLI bootstrap with the v3 project paths. Idempotent
+ * and safe to call repeatedly (e.g. tests that switch project dirs).
+ */
+export function configurePersistencePaths(paths: Pick<ProjectPaths, 'sessionsDir' | 'reportsDir'>): void {
+  storeDir = paths.sessionsDir;
+  reportsDir = paths.reportsDir;
+}
 
 /** Ensure directory exists — mkdirSync with recursive is idempotent */
 function ensureDir(dir: string): void {
@@ -87,11 +114,11 @@ export function sanitizeForFilename(s: string): string {
 
 /** Save a session result to disk */
 export function saveSession(session: StoredSession): string {
-  ensureDir(STORE_DIR);
+  ensureDir(storeDir);
   const safeRecipe = session.recipe ? `-${sanitizeForFilename(session.recipe)}` : '';
   const filename = `${session.timestamp.replaceAll(/[:.]/g, '-')}-${session.tool}${safeRecipe}.json`;
   // Ensure filename stays within the sessions directory
-  const filepath = join(STORE_DIR, basename(filename));
+  const filepath = join(storeDir, basename(filename));
   writeFileSync(filepath, JSON.stringify(session, null, 2), 'utf8');
 
   pruneOldSessions();
@@ -100,30 +127,30 @@ export function saveSession(session: StoredSession): string {
 
 /** Count session files in the store directory */
 export function countSessions(): number {
-  ensureDir(STORE_DIR);
-  return readdirSync(STORE_DIR).filter(f => f.endsWith('.json')).length;
+  ensureDir(storeDir);
+  return readdirSync(storeDir).filter(f => f.endsWith('.json')).length;
 }
 
 /** Delete all sessions. Returns the number of files deleted. */
 export function clearAllSessions(): number {
-  ensureDir(STORE_DIR);
-  const files = readdirSync(STORE_DIR).filter(f => f.endsWith('.json'));
+  ensureDir(storeDir);
+  const files = readdirSync(storeDir).filter(f => f.endsWith('.json'));
   for (const file of files) {
-    unlinkSync(join(STORE_DIR, file));
+    unlinkSync(join(storeDir, file));
   }
   return files.length;
 }
 
 /** Delete sessions older than the given number of days. Returns the number of files deleted. */
 export function clearSessionsOlderThan(days: number): number {
-  ensureDir(STORE_DIR);
+  ensureDir(storeDir);
   const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
-  const files = readdirSync(STORE_DIR).filter(f => f.endsWith('.json'));
+  const files = readdirSync(storeDir).filter(f => f.endsWith('.json'));
   let deleted = 0;
 
   for (const file of files) {
     try {
-      const filepath = join(STORE_DIR, file);
+      const filepath = join(storeDir, file);
       const raw = readFileSync(filepath, 'utf8');
       const session = JSON.parse(raw) as { timestamp?: string };
       if (session.timestamp) {
@@ -143,8 +170,8 @@ export function clearSessionsOlderThan(days: number): number {
 
 /** Load all sessions, newest first. Optional limit to avoid reading everything. */
 export function loadSessions(limit?: number): StoredSession[] {
-  ensureDir(STORE_DIR);
-  const files = readdirSync(STORE_DIR)
+  ensureDir(storeDir);
+  const files = readdirSync(storeDir)
     .filter(f => f.endsWith('.json'))
     .sort()
     // eslint-disable-next-line unicorn/no-array-reverse -- target ES2022; Array#toReversed is ES2023 and not in the lib
@@ -154,7 +181,7 @@ export function loadSessions(limit?: number): StoredSession[] {
   const sessions: StoredSession[] = [];
   for (const file of toRead) {
     try {
-      const raw = readFileSync(join(STORE_DIR, file), 'utf8');
+      const raw = readFileSync(join(storeDir, file), 'utf8');
       sessions.push(JSON.parse(raw) as StoredSession);
     } catch {
       // Warn about corrupted files — don't crash
@@ -172,7 +199,7 @@ export function loadLatestSession(): StoredSession | null {
 
 /** Prune sessions beyond the max count */
 function pruneOldSessions(): void {
-  const files = readdirSync(STORE_DIR)
+  const files = readdirSync(storeDir)
     .filter(f => f.endsWith('.json'))
     .sort()
     // eslint-disable-next-line unicorn/no-array-reverse -- target ES2022; Array#toReversed is ES2023 and not in the lib
@@ -182,7 +209,7 @@ function pruneOldSessions(): void {
 
   for (const file of files.slice(MAX_SESSIONS)) {
     try {
-      unlinkSync(join(STORE_DIR, file));
+      unlinkSync(join(storeDir, file));
     } catch {
       // Best effort
     }
@@ -191,13 +218,13 @@ function pruneOldSessions(): void {
 
 /** Get the store directory path */
 export function getStoreDir(): string {
-  return STORE_DIR;
+  return storeDir;
 }
 
 /** Get the reports directory path, creating it if needed */
 export function getReportsDir(): string {
-  ensureDir(REPORTS_DIR);
-  return REPORTS_DIR;
+  ensureDir(reportsDir);
+  return reportsDir;
 }
 
 /** Generate a unique session ID */

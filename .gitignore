@@ -30,8 +30,14 @@ coverage/
 # Logs
 *.log
 
-# Generated reports (now in ~/.opensip-tools/reports/)
+# Generated reports (legacy ~/.opensip-tools/reports/)
 opensip-tools-report.html
 
 # Packed tarballs (from `pnpm pack` / `npm pack`)
 *.tgz
+
+# v3 per-project runtime state — sessions, logs, dashboard reports,
+# baselines, AST cache, plugin installs. Test fixtures, the
+# opensip-tools repo itself, and any consumer all generate this.
+opensip-tools/.runtime/
+**/opensip-tools/.runtime/

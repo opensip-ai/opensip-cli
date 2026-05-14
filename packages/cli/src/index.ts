@@ -26,6 +26,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   EXIT_CODES,
+  configurePersistencePaths,
   getErrorSuggestion,
   type CliArgs,
   type CommandResult,
@@ -41,6 +42,7 @@ import {
   defaultLanguageRegistry,
   defaultToolRegistry,
   discoverToolPackages,
+  resolveProjectPaths,
   type Tool,
   type ToolCliContext,
 } from '@opensip-tools/core';
@@ -209,7 +211,6 @@ const program = new Command('opensip-tools')
 program.hook('preAction', (_thisCommand, actionCommand) => {
   const runId = generatePrefixedId('run');
   setRunId(runId);
-  initLogFile();
   setSilent(true);
 
   const opts = actionCommand.opts();
@@ -218,6 +219,17 @@ program.hook('preAction', (_thisCommand, actionCommand) => {
   const cwd = (opts.cwd as string) ?? process.cwd();
   const config = loadCliDefaults(cwd, opts.config as string | undefined);
   mergeConfigDefaults(opts, config);
+
+  // Configure project-local persistence and logging paths from the
+  // v3 path resolver. Logger writes JSONL to
+  // <cwd>/opensip-tools/.runtime/logs/<YYYY-MM-DD>.jsonl; sessions and
+  // dashboard reports land alongside it. Both functions are
+  // idempotent + best-effort, so a non-init'd project (no
+  // opensip-tools/ dir yet) still gets a logger that fails silently
+  // and a session store that creates the dir on first write.
+  const projectPaths = resolveProjectPaths(cwd);
+  initLogFile(projectPaths.logsDir);
+  configurePersistencePaths(projectPaths);
 
   logger.info({ evt: 'cli.start', module: 'cli:bootstrap', runId, command: actionCommand.name(), cwd });
 });
