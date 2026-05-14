@@ -1,6 +1,11 @@
 # OpenSIP Tools
 
-Open-source codebase analysis toolkit for TypeScript/JavaScript codebases. Run fitness checks standalone, in CI, or as a regression detector around AI-agent coding sessions. Integrates with [OpenSIP Cloud](https://opensip.ai) for centralized reporting.
+Open-source codebase analysis toolkit. Run fitness checks against TypeScript, Rust, Python, Java, Go, or C/C++ codebases standalone, in CI, or as a regression detector around AI-agent coding sessions. Integrates with [OpenSIP Cloud](https://opensip.ai) for centralized reporting.
+
+opensip-tools is a **collection of tools**, not a single tool. Today it ships
+with two: `fit` (fitness checks) and `sim` (simulation scenarios, experimental).
+Adding a new tool is a plugin operation — install a package that implements the
+[Tool contract](#tool-plugin-architecture) and the CLI picks it up automatically.
 
 ## Installation
 
@@ -72,6 +77,16 @@ opensip-tools plugin remove  <pkg>  # remove
 ### `sim` — simulations *(experimental)*
 ```bash
 opensip-tools sim                   # run simulations
+```
+
+### Standalone listing commands
+
+These mirror the `fit --list` / `fit --recipes` flags but work as
+top-level commands too:
+
+```bash
+opensip-tools fit-list              # alias: list-checks
+opensip-tools fit-recipes           # alias: list-recipes
 ```
 
 ## Fitness Checks
@@ -219,9 +234,18 @@ opensip-tools plugin remove @company/checks-custom
 
 `plugin install` runs `npm install` under the hood in `~/.opensip-tools/fit/` and also installs any `peerDependencies` the plugin declares (see below).
 
-### Authoring a plugin package
+### Authoring a check package
 
-Your plugin is an ordinary npm package that exports a `checks` and/or `recipes` array. Declare `@opensip-tools/core` as a **peer dependency**, not a regular dependency — this lets the host and your plugin share one Check/Signal shape and avoids version drift.
+Your check pack is an ordinary npm package that exports a `checks` and/or
+`recipes` array. Declare `@opensip-tools/fitness` as a **peer dependency** —
+this lets the host and your pack share one Check / Signal shape and avoids
+version drift.
+
+`fitness` (not `core`) is the right peer because `defineCheck`, `Check`,
+`CheckViolation`, and the recipe types all live in the fitness engine
+package. `core` is the kernel (errors, logger, language adapters, plugin
+loader) — packs that import only those can peer-depend on `core`, but most
+won't need to.
 
 **`package.json`**
 
@@ -233,10 +257,10 @@ Your plugin is an ordinary npm package that exports a `checks` and/or `recipes` 
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "peerDependencies": {
-    "@opensip-tools/core": "^0.1.0"
+    "@opensip-tools/fitness": "^2.0.0"
   },
   "devDependencies": {
-    "@opensip-tools/core": "^0.1.0",
+    "@opensip-tools/fitness": "^2.0.0",
     "typescript": "^5.7.0"
   }
 }
@@ -245,12 +269,11 @@ Your plugin is an ordinary npm package that exports a `checks` and/or `recipes` 
 **`src/index.ts`**
 
 ```typescript
-import { defineCheck, type Check } from '@opensip-tools/core';
+import { defineCheck, type Check, type CheckDisplayEntry } from '@opensip-tools/fitness';
 
 const myCheck: Check = defineCheck({
   id: '3f7a…-uuid',
   slug: 'my-custom-check',
-  category: 'quality',
   description: 'What this check enforces',
   scope: { languages: ['typescript'], concerns: ['backend'] },
   tags: ['custom'],
@@ -262,6 +285,12 @@ const myCheck: Check = defineCheck({
 });
 
 export const checks: readonly Check[] = [myCheck];
+
+// Optional — contribute display names that the CLI's table / dashboard
+// renders for your slugs (icon + human-readable label).
+export const checkDisplay: Readonly<Record<string, CheckDisplayEntry>> = {
+  'my-custom-check': ['🔍', 'My Custom Check'],
+};
 
 // Optional — ship recipes alongside checks
 export const recipes = [{
@@ -275,9 +304,31 @@ export const recipes = [{
 }];
 ```
 
-Publish to npm (or install from a local path) and users can `opensip-tools plugin install @my-org/fitness-checks`.
+#### Auto-discovery
 
-**Why peer dependency?** Plugins return Check objects that the host registers and executes; they don't mutate host singletons. Declaring `@opensip-tools/core` as a peer means one copy lives in the plugin directory alongside all plugins that need it, so peer resolution is clean and version expectations are explicit. This is the same pattern ESLint and Rollup use.
+Any installed npm package whose name matches `@opensip-tools/checks-*` is
+auto-discovered by the CLI — no `plugin install` step needed. Run
+`pnpm add @my-org/fitness-checks` (or `npm install`) in your project, name
+the package's bin or use the explicit list option, and the CLI loads it on
+the next `fit` run.
+
+For non-`@opensip-tools/checks-*` names, declare them in your project's
+`opensip-tools.config.yml`:
+
+```yaml
+plugins:
+  checkPackages:
+    - "@my-org/fitness-checks"
+```
+
+This explicit list disables auto-discovery for the run, so you get a
+deterministic set of check packs.
+
+**Why peer dependency?** Check packs return Check objects that the host
+registers and executes; they don't mutate host singletons. Declaring
+`@opensip-tools/fitness` as a peer means one copy of the fitness engine
+serves every loaded pack, so peer resolution is clean and version
+expectations are explicit. This mirrors the ESLint / Rollup plugin model.
 
 ### Single-file plugins
 
@@ -285,7 +336,7 @@ For quick local experiments, drop a `.js` or `.mjs` file directly in `~/.opensip
 
 ```javascript
 // ~/.opensip-tools/fit/my-check.mjs
-import { defineCheck } from '@opensip-tools/core';
+import { defineCheck } from '@opensip-tools/fitness';
 
 export const checks = [
   defineCheck({
@@ -302,7 +353,7 @@ export const checks = [
 ];
 ```
 
-Single-file plugins resolve `@opensip-tools/core` from whatever copy is already sitting in `~/.opensip-tools/fit/node_modules/` (installed by any prior `plugin install`). If no package plugins are installed, run `opensip-tools plugin install @opensip-tools/core` once to seed it.
+Single-file plugins resolve `@opensip-tools/fitness` from whatever copy is already sitting in `~/.opensip-tools/fit/node_modules/` (installed by any prior `plugin install`). If no package plugins are installed, run `opensip-tools plugin install @opensip-tools/fitness` once to seed it.
 
 ### Recipes in plugins
 
@@ -426,15 +477,64 @@ Log files rotate daily, keeping the last 7 days.
 
 ## Architecture
 
-Turborepo + pnpm monorepo:
+Turborepo + pnpm monorepo. Layered: lower numbers depend only on
+higher numbers, never the other direction. Architecture rules are
+enforced in CI by [dependency-cruiser](https://github.com/sverweij/dependency-cruiser).
 
 ```
 packages/
-  cli/             # @opensip-tools/cli — CLI binary (Ink/React)
-  core/            # @opensip-tools/core — Framework, registry, recipes
-  checks-builtin/  # @opensip-tools/checks-builtin — Built-in fitness checks
-  simulation/      # @opensip-tools/simulation — Simulation engine [experimental]
+  core/                    # @opensip-tools/core — kernel: errors, logger, IDs,
+                           #   language adapters, plugin loader, Tool contract
+  cli-shared/              # @opensip-tools/cli-shared — CLI types, exit codes,
+                           #   session persistence, dashboard HTML generator
+  cli/                     # @opensip-tools/cli — generic tool dispatcher (Ink/React)
+
+  fitness/                 # @opensip-tools/fitness namespace
+    engine/                # @opensip-tools/fitness — fit/dashboard/list-checks
+                           #   commands, recipe service, gate, SARIF reporting
+    checks-typescript/     # @opensip-tools/checks-typescript — TS-AST checks
+    checks-universal/      # @opensip-tools/checks-universal — text/regex/glob checks
+    checks-python/         # @opensip-tools/checks-python — Python (no-bare-except)
+    checks-go/             # @opensip-tools/checks-go — Go (no-fmt-print)
+    checks-java/           # @opensip-tools/checks-java — Java (no-printstacktrace)
+    checks-cpp/            # @opensip-tools/checks-cpp — C/C++ (clang-tidy)
+
+  simulation/              # @opensip-tools/simulation namespace
+    engine/                # @opensip-tools/simulation — sim command + scenarios
+
+  languages/               # language adapters (@opensip-tools/lang-*)
+    lang-typescript/       # TypeScript / TSX adapter
+    lang-rust/             # Rust adapter (hand-written lexer)
+    lang-python/           # Python adapter
+    lang-go/               # Go adapter
+    lang-java/             # Java adapter
+    lang-cpp/              # C/C++ adapter (command-mode via clang-tidy)
 ```
+
+### Tool plugin architecture
+
+The CLI is a generic dispatcher that walks `defaultToolRegistry` and asks
+each registered Tool to mount its own subcommands. fitness and simulation
+are first-party tools; third-party tools are discovered automatically when
+their `package.json` declares:
+
+```json
+{
+  "opensipTools": { "kind": "tool" }
+}
+```
+
+The `Tool` contract (`@opensip-tools/core/tools`) carries the tool's
+metadata, command descriptors (for `--help` listings), and a `register(cli)`
+method that mounts Commander commands. Tools call back into shared CLI
+infrastructure (Ink rendering, dashboard auto-open, structured logging) via
+the `ToolCliContext` they receive — they never depend on the CLI package
+directly. This keeps the dependency graph acyclic and lets a third-party
+tool ship without touching CLI source.
+
+To author a new tool, see the source of `packages/fitness/engine/src/tool.ts`
+or `packages/simulation/engine/src/tool.ts`. The shape is small enough to
+keep the contract honest.
 
 ## License
 

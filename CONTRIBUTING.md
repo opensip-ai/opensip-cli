@@ -21,20 +21,40 @@ pnpm fit          # Run fitness checks against this repo
 
 ## Project Structure
 
+Layered monorepo with three top-level groupings: top-level packages
+(core, cli-shared, cli), per-tool namespaces (`packages/fitness/`,
+`packages/simulation/`), and the language-adapter group (`packages/languages/`).
+
 ```
 packages/
-  cli/              # CLI binary (Ink/React for terminal UI)
-  core/             # Framework: defineCheck, registry, recipes, plugins
-  checks-builtin/   # Built-in fitness checks
-  simulation/       # Simulation engine [experimental]
+  core/                    # @opensip-tools/core — kernel
+  cli-shared/              # @opensip-tools/cli-shared — shared CLI types/persistence
+  cli/                     # @opensip-tools/cli — generic tool dispatcher
+
+  fitness/
+    engine/                # @opensip-tools/fitness — fitness engine + commands
+    checks-typescript/     # TS-AST checks
+    checks-universal/      # text/regex/glob checks
+    checks-{python,go,java,cpp}/  # per-language packs
+
+  simulation/
+    engine/                # @opensip-tools/simulation
+
+  languages/
+    lang-{typescript,rust,python,go,java,cpp}/  # language adapters
 ```
+
+See [CLAUDE.md](CLAUDE.md) for the full architecture overview, including
+the layer rules enforced by dependency-cruiser.
 
 ## Writing a Fitness Check
 
-Checks are defined with `defineCheck()` from `@opensip-tools/core`:
+Checks are defined with `defineCheck()` from `@opensip-tools/fitness`
+(the fitness engine). Note: NOT `@opensip-tools/core` — core is the
+kernel and doesn't carry fitness-domain symbols.
 
 ```typescript
-import { defineCheck, type CheckViolation } from '@opensip-tools/core';
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
 
 export const myCheck = defineCheck({
   id: 'unique-uuid-here',       // Generate with: node -e "console.log(crypto.randomUUID())"
@@ -90,7 +110,18 @@ export const myCheck = defineCheck({
 
 ### Where to put checks
 
-Built-in checks go in `packages/checks-builtin/src/checks/` organized by category:
+Pick the right pack based on what your check does:
+
+| Check shape | Pack |
+|-------------|------|
+| Imports the TypeScript compiler API or parses TS/TSX AST | `packages/fitness/checks-typescript/` |
+| Uses raw text / regex / file globs (language-agnostic) | `packages/fitness/checks-universal/` |
+| Specific to Python source | `packages/fitness/checks-python/` |
+| Specific to Go source | `packages/fitness/checks-go/` |
+| Specific to Java source | `packages/fitness/checks-java/` |
+| Specific to C/C++ source | `packages/fitness/checks-cpp/` |
+
+Within a pack, checks live under `src/checks/<category>/`:
 - `architecture/` — structural patterns
 - `quality/` — code quality and style
 - `resilience/` — error handling and robustness
@@ -100,7 +131,9 @@ Built-in checks go in `packages/checks-builtin/src/checks/` organized by categor
 
 After creating a check file:
 1. Export the check from the category's `index.ts` barrel file
-2. Add a display entry in `packages/checks-builtin/src/display/`
+2. Add a display entry in the pack's `src/display/` (icon + human-readable name)
+3. Run `pnpm test` to verify the pack still loads and the new check
+   passes the contract test (slug uniqueness, ID format, etc.)
 
 ### Custom checks (plugin)
 
@@ -145,6 +178,7 @@ it('renders correctly', () => {
 pnpm build       # Must pass
 pnpm typecheck   # Must pass
 pnpm test        # Must pass
+pnpm lint        # ESLint + dependency-cruiser; both must be 0-error
 ```
 
 ## Code Style
@@ -155,6 +189,11 @@ pnpm test        # Must pass
 - No hardcoded colors in UI — use `useTheme()` from `ui/theme.ts`
 - Commands return data objects — rendering is the UI layer's job
 - Structured logging via `logger` from `@opensip-tools/core`
+- Imports follow ESLint's `import/order` (enforced): builtin → external →
+  internal → parent → sibling → index, with newlines between groups
+- Architecture-layer rules are enforced by dependency-cruiser. See
+  [CLAUDE.md](CLAUDE.md) for the layer order. Adding a new edge that
+  violates the rules will fail CI; refactor or surface for discussion.
 
 ## Reporting Issues
 

@@ -28,11 +28,18 @@ If you discover a security vulnerability in opensip-tools, please report it resp
 
 ### Scope
 
-This policy covers:
+This policy covers all 17 first-party `@opensip-tools/*` packages:
+
 - `@opensip-tools/cli` — the CLI binary
-- `@opensip-tools/core` — the framework
-- `@opensip-tools/checks-builtin` — built-in fitness checks
+- `@opensip-tools/cli-shared` — shared CLI infrastructure
+- `@opensip-tools/core` — kernel (errors, logger, language adapters,
+  plugin loader, Tool contract)
+- `@opensip-tools/fitness` — fitness engine
 - `@opensip-tools/simulation` — simulation engine
+- `@opensip-tools/checks-{typescript,universal,python,go,java,cpp}` —
+  fitness check packs
+- `@opensip-tools/lang-{typescript,rust,python,go,java,cpp}` —
+  language adapters
 
 ### Out of scope
 

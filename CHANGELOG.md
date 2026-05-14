@@ -4,6 +4,159 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.0.0] — 2026-05-14
+
+Architecture refactor. opensip-tools is now a true tool-plugin platform —
+a kernel + a Tool contract + first-party fitness and simulation tools.
+Adding a third tool is "write a Tool, install the package."
+
+### Added
+
+- **`@opensip-tools/fitness`** (new package, v2.0.0) — extracted from
+  `@opensip-tools/core`. Holds the fitness engine (defineCheck, recipes,
+  framework, signalers, targets, types/findings, gate, SARIF reporting,
+  fit/dashboard/list-checks/list-recipes commands). 188 tests.
+- **`@opensip-tools/cli-shared`** (new package) — CLI types, exit codes,
+  session persistence, dashboard HTML generator. Tools depend on this
+  for shared CLI infrastructure without taking a hard dep on the CLI
+  entry point.
+- **Tool plugin contract** in `@opensip-tools/core/tools` —
+  `Tool { metadata, commands, register(cli), initialize? }`. Tools mount
+  their own Commander subcommands via `register(cli)`; the CLI walks
+  `defaultToolRegistry` and never imports tool-specific code directly.
+- **Auto-discovery for tool packages** — any npm package whose
+  `package.json` declares `opensipTools.kind === 'tool'` is loaded by
+  the CLI on startup. Walks ancestor `node_modules/` directories,
+  matching Node's resolution algorithm.
+- **dependency-cruiser** with architecture rules encoding the layer
+  order (core → cli-shared → fitness/simulation/lang-* → checks-* →
+  cli). Forbidden edges fail CI.
+- **ESLint flat config** with `typescript-eslint:recommendedTypeChecked`,
+  `eslint-plugin-sonarjs`, `eslint-plugin-unicorn`, `eslint-plugin-import`.
+  Workspace runs at 0 errors.
+- **knip** for orphan / dead-export detection. Workspace runs at 0
+  findings.
+- **Multi-language fitness checks** — Rust, Python, Java, Go, C/C++
+  language packs with hand-written lexers (or clang-tidy command mode
+  for C/C++). 158 checks total across the typescript / universal /
+  per-language packs.
+- **Scope-resolver fix**: scope-empty checks (e.g. `file-length-limit`)
+  now honor the project config's `globalExcludes`. Previously the
+  fileCache fallback path returned every prewarmed file regardless of
+  exclusion config — causing findings inside `docs/`, `tests/fixtures/`,
+  etc. (D14 in the multi-language decisions log.)
+- **No-checks-loaded warning** — silent zero-checks runs are now
+  impossible. The CLI prints to stderr if no check packages registered.
+
+### Changed — BREAKING
+
+- **`@opensip-tools/core` is now a strict kernel.** Every fitness symbol
+  (`defineCheck`, `Check`, `CheckRegistry`, `defaultRegistry`,
+  `FitnessRecipeService`, `FitnessRecipeResult`, `Finding`, `Severity`,
+  `loadTargetsConfig`, `loadSignalersConfig`, `buildScopeBasedFileMap`,
+  `parseSource`, `walkNodes`, `getLineNumber`, etc.) moved to
+  `@opensip-tools/fitness`. Plugin authors must update imports:
+  ```ts
+  // before
+  import { defineCheck } from '@opensip-tools/core';
+  // after
+  import { defineCheck } from '@opensip-tools/fitness';
+  ```
+- **CLI no longer hardcodes any check pack import.** What was
+  `@opensip-tools/checks-builtin` (deleted) is now split into
+  `@opensip-tools/checks-typescript` (66 TS-AST checks) and
+  `@opensip-tools/checks-universal` (92 cross-language checks). Both
+  are auto-discovered.
+- **`FitPluginExports` interface moved to `@opensip-tools/fitness`.**
+  Tool-package-discovery is in core; check-package-discovery is in
+  fitness (it's fitness-specific).
+- **Workspace layout reorganized** to `packages/<tool>/<pkg>/`:
+  ```
+  packages/lang-*               → packages/languages/lang-*
+  packages/fitness              → packages/fitness/engine
+  packages/checks-*             → packages/fitness/checks-*
+  packages/simulation           → packages/simulation/engine
+  ```
+  npm package names are unchanged — pure DX cleanup. The new check
+  packs (`checks-python/go/java/cpp`) live alongside `checks-typescript`
+  and `checks-universal` under `packages/fitness/`.
+- **`@opensip-tools/cli` shrinks from 627 to ~430 lines.** All
+  fitness-specific command implementations (fit, dashboard, list-checks,
+  list-recipes) and the gate / SARIF code moved to
+  `@opensip-tools/fitness`. The CLI is now a tool dispatcher with
+  argv setup, the rendering layer, and cross-tool housekeeping
+  commands (init, plugin, sessions, configure, completion, uninstall).
+
+### Removed — BREAKING
+
+- **`@opensip-tools/checks-builtin`** (was the v1.0.0 package) —
+  replaced by `@opensip-tools/checks-typescript` (TS-AST checks) and
+  `@opensip-tools/checks-universal` (text/regex/glob checks). No
+  deprecation alias; consumers update their `package.json` directly:
+  ```json
+  // before
+  "dependencies": { "@opensip-tools/checks-builtin": "^1.0.0" }
+  // after
+  "dependencies": {
+    "@opensip-tools/checks-typescript": "^2.0.0",
+    "@opensip-tools/checks-universal": "^2.0.0"
+  }
+  ```
+
+### Fixed
+
+- **`globalExcludes` now flows into scope-empty checks.** Fixes a
+  regression introduced when scope-empty checks (file-length-limit)
+  were first added — they bypassed the project config's exclude list
+  by reading directly from the prewarmed file cache. (D14.)
+- **Cleaned up ~700 ESLint violations and ~12 truly-dead source files.**
+  Build/test/parity all green; check pack behavior unchanged.
+
+### Migration from 1.0.0
+
+1. In any package depending on `@opensip-tools/core` for fitness
+   symbols, add `@opensip-tools/fitness` and switch the imports:
+   ```ts
+   import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
+   ```
+2. If you depended on `@opensip-tools/checks-builtin`, replace it
+   with `@opensip-tools/checks-typescript` + `@opensip-tools/checks-universal`.
+3. If you implement a Tool plugin, the contract is in
+   `@opensip-tools/core/tools`. See `packages/fitness/engine/src/tool.ts`
+   for a worked example.
+
+## [1.0.0] — 2026-05-14
+
+### Changed — BREAKING
+
+- **`@opensip-tools/checks-builtin` deleted; split into two packages:**
+  - **`@opensip-tools/checks-typescript`** (new, 66 checks) — checks
+    that import the TypeScript compiler API or are conceptually only
+    meaningful in a TS/Node ecosystem (drizzle-orm, typed-inject, react,
+    package.json#exports, tsconfig).
+  - **`@opensip-tools/checks-universal`** (existing, re-versioned) — 92
+    checks that operate on raw text, regex, file globs, or
+    language-agnostic config (Docker, .env, Sentry, generic structure).
+- **CLI decoupled from any privileged check pack.** The hardcoded
+  `await import('@opensip-tools/checks-builtin')` is gone. Every check
+  package goes through the same `discoverCheckPackages()` path. The
+  plugin contract gained `FitPluginExports.checkDisplay` so packages
+  contribute their own display names; the CLI merges from every
+  loaded pack.
+- **Auto-discovery of `@opensip-tools/checks-*` packages.** The CLI
+  scans `node_modules/` and ancestor `node_modules/` for any package
+  in the `@opensip-tools/checks-*` namespace and loads them. Override
+  via `plugins.checkPackages: [...]` in the project config or opt
+  out via `plugins.autoDiscoverChecks: false`.
+- **No-checks-loaded warning.** Silent zero-checks runs are now
+  impossible — the CLI prints to stderr if no check packages
+  registered.
+
+### Migration
+
+Replace `@opensip-tools/checks-builtin` in your `package.json` with
+`@opensip-tools/checks-typescript` + `@opensip-tools/checks-universal`.
+
 ## [0.6.1] — 2026-05-07
 
 ### Fixed (`@opensip-tools/checks-builtin`)
