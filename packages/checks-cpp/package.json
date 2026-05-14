@@ -1,0 +1,35 @@
+{
+  "name": "@opensip-tools/checks-cpp",
+  "version": "0.6.1",
+  "license": "MIT",
+  "description": "C/C++ fitness checks (clang-tidy backed)",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opensip-ai/opensip-tools.git",
+    "directory": "packages/checks-cpp"
+  },
+  "homepage": "https://github.com/opensip-ai/opensip-tools",
+  "bugs": {
+    "url": "https://github.com/opensip-ai/opensip-tools/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@opensip-tools/core": "workspace:*",
+    "@opensip-tools/lang-cpp": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "vitest": "^2.1.0"
+  }
+}
