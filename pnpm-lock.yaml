@@ -48,6 +48,9 @@ importers:
       '@opensip-tools/core':
         specifier: workspace:*
         version: link:../core
+      '@opensip-tools/lang-rust':
+        specifier: workspace:*
+        version: link:../lang-rust
       '@opensip-tools/lang-typescript':
         specifier: workspace:*
         version: link:../lang-typescript
@@ -119,6 +122,19 @@ importers:
       '@types/js-yaml':
         specifier: ^4.0.0
         version: 4.0.9
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.15
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.15)
+
+  packages/lang-rust:
+    dependencies:
+      '@opensip-tools/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.15

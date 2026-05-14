@@ -119,11 +119,13 @@ export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
     await maybeAutoSyncProjectPlugins(projectDir)
   }
 
-  // 1. Register the bundled TypeScript language adapter, then discover
-  //    additional language packs via the `lang` plugin domain.
+  // 1. Register the bundled language adapters, then discover additional
+  //    language packs via the `lang` plugin domain.
   const { loadAllPlugins, defaultLanguageRegistry } = await import('@opensip-tools/core');
   const { typescriptAdapter } = await import('@opensip-tools/lang-typescript');
+  const { rustAdapter } = await import('@opensip-tools/lang-rust');
   defaultLanguageRegistry.register(typescriptAdapter);
+  defaultLanguageRegistry.register(rustAdapter);
   const langPluginResult = await loadAllPlugins('lang', undefined, projectDir);
   if (langPluginResult.errors.length > 0) {
     for (const err of langPluginResult.errors) {
