@@ -136,3 +136,35 @@
 **Trade-off:** Universal checks that need a parse tree (none today) won't work for C/C++ files. We accept this — universal checks operate on text, and language-specific C/C++ checks all go through clang-tidy.
 
 **Reversible:** Yes — adding tree-sitter-cpp later only changes `parse()` and a new `query` impl.
+
+---
+
+## D10 — Post-publish smoke test: auto-discovery for `@opensip-tools/checks-*` packages
+
+**Decision:** The CLI auto-discovers any `@opensip-tools/checks-*` package installed in the project's `node_modules` (or any ancestor's `node_modules`, matching Node's resolution). Two override paths in `opensip-tools.config.yml`:
+- `plugins.checkPackages: [...]` — explicit list; auto-discovery is bypassed
+- `plugins.autoDiscoverChecks: false` — opt out entirely
+
+**Why:**
+- Smoke-testing tarball installs revealed that publishing 5 new check packages (`checks-universal`, `checks-python`, `checks-java`, `checks-go`, `checks-cpp`) was useless without a load mechanism. Only `checks-builtin` was hardcoded into the CLI's import list.
+- The choice between auto-discovery and explicit declaration is a real trade-off (zero-config vs control). Default to auto-discovery so projects that just `npm install @opensip-tools/checks-python` see their checks fire — matches user expectations from comparable tools (eslint plugins, prettier plugins).
+- Provide both override paths so deterministic environments (CI, security-conscious orgs) can pin their check set.
+
+**Trade-off:** Discovery walks ancestor `node_modules` directories — could pick up an unwanted check package in a monorepo workspace root. Mitigated by the explicit-list opt-in for users who care about determinism.
+
+**Reversible:** Yes — `loadDiscoveredCheckPackages` is an isolated function in fit.ts; the discovery module is self-contained in `core/src/plugins/check-package-discovery.ts`.
+
+---
+
+## D11 — Drive-by fix: `require('js-yaml')` in ESM context
+
+**Decision:** Replaced bare `require('js-yaml')` with `createRequire(import.meta.url)('js-yaml')` in two places: my new `readCheckPackagePreferences()` and the pre-existing `readProjectPluginsList()` in `discover.ts`.
+
+**Why:**
+- Pre-existing bug: `readProjectPluginsList()` used `require('js-yaml')` literally. In ESM (which Node16 modules emit), there is no global `require`, and TypeScript's `module: Node16` setting passes the `require` call through unchanged. The function silently failed (the catch-all returned undefined) — meaning `plugins.fit/sim/asm` declarations in projects' configs were never honored.
+- Same bug would have hit my new function for the same reason. Fixed both atomically.
+- `createRequire(import.meta.url)` is the documented Node API for bridging ESM ↔ CJS. Resolves modules from this package's directory, which is where `js-yaml` is declared as a dep.
+
+**Trade-off:** None. This is a pure correctness fix with no behavior change for callers — the function now actually works.
+
+**Reversible:** Yes, but you wouldn't want to.

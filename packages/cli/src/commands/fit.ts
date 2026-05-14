@@ -2,6 +2,8 @@
  * fit command — run fitness checks
  */
 
+import { pathToFileURL } from 'node:url';
+
 import {
   defaultRegistry,
   FitnessRecipeService, type FitnessRecipeServiceCallbacks, type CheckSummary,
@@ -167,7 +169,74 @@ export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
   getCheckDisplayName = builtin.getCheckDisplayName;
   getCheckIcon = builtin.getCheckIcon;
 
+  // 3. Discover and load additional check packages from node_modules.
+  //    Default: scan for any @opensip-tools/checks-* package. Users can
+  //    set plugins.checkPackages in opensip-tools.config.yml to use an
+  //    explicit list, or plugins.autoDiscoverChecks: false to opt out.
+  if (projectDir) {
+    await loadDiscoveredCheckPackages(projectDir);
+  }
+
   checksLoaded = true;
+}
+
+/**
+ * Load every check package returned by discoverCheckPackages(). Each
+ * package's main entry should re-export a `checks` array (FitPluginExports
+ * shape). Errors loading any one package don't fail the others — they
+ * surface to stderr the same way fit-domain plugin failures do.
+ */
+async function loadDiscoveredCheckPackages(projectDir: string): Promise<void> {
+  const {
+    discoverCheckPackages,
+    readCheckPackageMetadata,
+    readCheckPackagePreferences,
+    isCheck,
+  } = await import('@opensip-tools/core');
+  const prefs = readCheckPackagePreferences(projectDir);
+  const discovered = discoverCheckPackages({
+    projectDir,
+    explicitPackages: prefs.checkPackages,
+    autoDiscover: prefs.autoDiscoverChecks,
+  });
+  for (const pkg of discovered) {
+    const meta = readCheckPackageMetadata(pkg.packageDir);
+    if (!meta) {
+      process.stderr.write(`opensip-tools: check package ${pkg.name} has no readable package.json — skipping\n`);
+      continue;
+    }
+    try {
+      const moduleUrl = pathToFileURL(meta.mainEntry).href;
+      const mod = (await import(moduleUrl)) as { checks?: unknown };
+      const checks = mod.checks;
+      if (!Array.isArray(checks)) {
+        process.stderr.write(`opensip-tools: check package ${pkg.name} does not export a "checks" array — skipping\n`);
+        continue;
+      }
+      let registered = 0;
+      for (const check of checks) {
+        if (isCheck(check)) {
+          defaultRegistry.register(check, pkg.name);
+          registered++;
+        }
+      }
+      logger.info({
+        evt: 'cli.check_package.loaded',
+        module: 'cli:fit',
+        name: pkg.name,
+        checksRegistered: registered,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      process.stderr.write(`opensip-tools: failed to load check package ${pkg.name}: ${msg}\n`);
+      logger.warn({
+        evt: 'cli.check_package.load_failed',
+        module: 'cli:fit',
+        name: pkg.name,
+        error: msg,
+      });
+    }
+  }
 }
 
 /** Get display name for a check slug (available after ensureChecksLoaded) */

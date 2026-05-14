@@ -5,6 +5,7 @@
  */
 
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { join, basename, extname, sep } from 'node:path'
 import { homedir } from 'node:os'
 
@@ -14,6 +15,10 @@ import type { DiscoveredPlugin, PluginDomain } from './types.js'
 
 const DEFAULT_BASE_DIR = join(homedir(), '.opensip-tools')
 const CONFIG_FILENAME = 'opensip-tools.config.yml'
+
+// Bridge ESM ↔ CJS to load js-yaml from this package's deps without
+// relying on a (nonexistent) global `require` in ESM context.
+const requireFromHere = createRequire(import.meta.url)
 
 /** Get the absolute path to a user-level plugin domain directory. */
 export function getPluginDir(domain: PluginDomain, baseDir?: string): string {
@@ -86,8 +91,7 @@ export function readProjectPluginsList(
     // validated by the targets loader.
     const raw = readFileSync(configPath, 'utf-8')
     // Minimal YAML parse — defer to the shared yaml dep.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const yaml = require('js-yaml') as { load: (s: string) => unknown }
+    const yaml = requireFromHere('js-yaml') as { load: (s: string) => unknown }
     const doc = yaml.load(raw) as Record<string, unknown> | null
     if (!doc || typeof doc !== 'object') return undefined
     const plugins = doc['plugins']

@@ -42,6 +42,9 @@ const PluginsSchema = z.object({
   fit: z.array(z.string()).optional(),
   sim: z.array(z.string()).optional(),
   asm: z.array(z.string()).optional(),
+  lang: z.array(z.string()).optional(),
+  checkPackages: z.array(z.string()).optional(),
+  autoDiscoverChecks: z.boolean().optional(),
 }).optional()
 
 const TargetsFileSchema = z.object({
@@ -65,7 +68,14 @@ function buildFromParsed(
   rawGlobalExcludes: readonly string[] | undefined,
   rawCheckOverrides: Record<string, string | readonly string[]> | undefined,
   sourceLabel: string,
-  rawPlugins?: { fit?: readonly string[]; sim?: readonly string[]; asm?: readonly string[] },
+  rawPlugins?: {
+    fit?: readonly string[]
+    sim?: readonly string[]
+    asm?: readonly string[]
+    lang?: readonly string[]
+    checkPackages?: readonly string[]
+    autoDiscoverChecks?: boolean
+  },
 ): { registry: TargetRegistry; config: TargetsConfig } {
   const registry = new TargetRegistry()
 
@@ -105,6 +115,9 @@ function buildFromParsed(
         ...(rawPlugins.fit && { fit: Object.freeze([...rawPlugins.fit]) as readonly string[] }),
         ...(rawPlugins.sim && { sim: Object.freeze([...rawPlugins.sim]) as readonly string[] }),
         ...(rawPlugins.asm && { asm: Object.freeze([...rawPlugins.asm]) as readonly string[] }),
+        ...(rawPlugins.lang && { lang: Object.freeze([...rawPlugins.lang]) as readonly string[] }),
+        ...(rawPlugins.checkPackages && { checkPackages: Object.freeze([...rawPlugins.checkPackages]) as readonly string[] }),
+        ...(rawPlugins.autoDiscoverChecks !== undefined && { autoDiscoverChecks: rawPlugins.autoDiscoverChecks }),
       })
     : undefined
 

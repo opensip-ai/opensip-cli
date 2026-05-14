@@ -17,6 +17,16 @@ export {
   readProjectPluginsList,
 } from './discover.js'
 export { loadPlugin, loadAllPlugins } from './loader.js'
+export {
+  discoverCheckPackages,
+  readCheckPackageMetadata,
+  readCheckPackagePreferences,
+} from './check-package-discovery.js'
+export type {
+  CheckPackageDiscoveryOptions,
+  DiscoveredCheckPackage,
+  CheckPackageMetadata,
+} from './check-package-discovery.js'
 export type {
   PluginDomain,
   DiscoveredPlugin,

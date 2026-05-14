@@ -48,6 +48,23 @@ export interface PluginsConfig {
   readonly fit?: readonly string[]
   readonly sim?: readonly string[]
   readonly asm?: readonly string[]
+  readonly lang?: readonly string[]
+  /**
+   * Explicit list of npm package names to load as check providers
+   * (e.g. ['@opensip-tools/checks-python', '@my-org/checks-internal']).
+   *
+   * When present, the CLI loads only these packages plus the bundled
+   * checks-builtin. Auto-discovery is disabled for this run.
+   * @opensip-tools/checks-builtin in this list is silently ignored
+   * (it's always loaded directly by the CLI).
+   */
+  readonly checkPackages?: readonly string[]
+  /**
+   * When false, the CLI does NOT scan node_modules for
+   * @opensip-tools/checks-* packages. Default: true.
+   * Ignored when `checkPackages` is set (explicit list always wins).
+   */
+  readonly autoDiscoverChecks?: boolean
 }
 
 /**
