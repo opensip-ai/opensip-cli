@@ -2,8 +2,7 @@
  * sim command — run simulation scenarios
  */
 
-import type { CliArgs } from '../types.js';
-import type { ExperimentalResult } from '../types.js';
+import type { CliArgs, ExperimentalResult } from '@opensip-tools/cli-shared';
 
 const VALID_KINDS = new Set(['load', 'chaos', 'invariant', 'fix-evaluation']);
 

@@ -2,8 +2,8 @@
  * history command — show run history
  */
 
-import { loadSessions } from '../persistence/store.js';
-import type { HistoryResult } from '../types.js';
+import { loadSessions } from '@opensip-tools/cli-shared';
+import type { HistoryResult } from '@opensip-tools/cli-shared';
 
 // ---------------------------------------------------------------------------
 // showHistory

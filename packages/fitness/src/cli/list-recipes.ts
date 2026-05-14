@@ -2,8 +2,9 @@
  * list-recipes command — list all available fitness recipes
  */
 
-import { defaultRecipeRegistry } from '@opensip-tools/fitness';
-import type { ListRecipesResult } from '../types.js';
+import type { ListRecipesResult } from '@opensip-tools/cli-shared';
+
+import { defaultRecipeRegistry } from '../recipes/registry.js';
 import { ensureChecksLoaded } from './fit.js';
 
 // ---------------------------------------------------------------------------
@@ -32,3 +33,6 @@ export async function listRecipes(projectDir?: string): Promise<ListRecipesResul
     recipes,
   };
 }
+
+/** Alias matching the Tool-command naming convention (executeXxx). */
+export const executeListRecipes = listRecipes;

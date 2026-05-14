@@ -17,9 +17,8 @@ export {
   resolvePluginDir,
   hasProjectPluginsDeclared,
   readProjectPluginsList,
-  discoverCheckPackages,
-  readCheckPackageMetadata,
-  readCheckPackagePreferences,
+  discoverToolPackages,
+  readToolPackageMetadata,
 } from './plugins/index.js';
 export type {
   PluginDomain,
@@ -30,10 +29,21 @@ export type {
   PluginExports,
   PluginMetadata,
   CheckDisplayEntry,
-  CheckPackageDiscoveryOptions,
-  DiscoveredCheckPackage,
-  CheckPackageMetadata,
+  ToolPackageDiscoveryOptions,
+  DiscoveredToolPackage,
+  ToolPackageMetadata,
 } from './plugins/index.js';
+
+// Tools — kernel-level Tool plugin contract
+export { ToolRegistry, defaultToolRegistry } from './tools/index.js';
+export type {
+  Tool,
+  ToolMetadata,
+  ToolCommand,
+  ToolRunContext,
+  ToolRunResult,
+  ToolPluginExports,
+} from './tools/index.js';
 
 // Lib — errors + Result pattern
 export { ToolError, ValidationError, NotFoundError, SystemError, TimeoutError, NetworkError, ConfigurationError } from './lib/errors.js';

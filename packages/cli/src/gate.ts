@@ -22,7 +22,7 @@ import { dirname } from 'node:path';
 import { logger } from '@opensip-tools/core';
 
 import { buildSarifLog } from './sarif.js';
-import type { CliOutput } from './types.js';
+import type { CliOutput } from '@opensip-tools/cli-shared';
 
 // ---------------------------------------------------------------------------
 // Types

@@ -52,3 +52,37 @@ export type { SignalersConfig } from './signalers/types.js';
 // it because lang adapter loading currently shares the same orchestration).
 export { loadPlugin, loadAllPlugins } from './plugins/loader.js';
 export type { FitPluginExports } from './plugins/types.js';
+
+// Check-package discovery (fitness-specific — scans @opensip-tools/checks-* packages).
+export {
+  discoverCheckPackages,
+  readCheckPackageMetadata,
+  readCheckPackagePreferences,
+} from './plugins/check-package-discovery.js';
+export type {
+  CheckPackageDiscoveryOptions,
+  DiscoveredCheckPackage,
+  CheckPackageMetadata,
+} from './plugins/check-package-discovery.js';
+
+// Tool plugin export — fitness as a Tool.
+export { fitnessTool } from './tool.js';
+
+// CLI command implementations — re-exported for the Phase 2 CLI which
+// still drives commands directly. Phase 4 will collapse these behind
+// the Tool contract.
+export {
+  executeFit,
+  ensureChecksLoaded,
+  getDisplayName,
+  getEnabledCheckCount,
+  getIcon,
+  getPluginLoadErrors,
+  setPreLoadHook,
+  formatDuration,
+  formatValidatedColumn,
+} from './cli/fit.js';
+export type { PreLoadHook } from './cli/fit.js';
+export { openDashboard } from './cli/dashboard.js';
+export { listChecks, executeListChecks } from './cli/list-checks.js';
+export { listRecipes, executeListRecipes } from './cli/list-recipes.js';

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildSarifLog, chunkSarifRuns } from '../sarif.js';
-import type { CliOutput } from '../types.js';
+import type { CliOutput } from '@opensip-tools/cli-shared';
 
 function makeSampleOutput(): CliOutput {
   return {

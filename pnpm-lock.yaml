@@ -143,6 +143,9 @@ importers:
       '@opensip-tools/checks-universal':
         specifier: workspace:*
         version: link:../checks-universal
+      '@opensip-tools/cli-shared':
+        specifier: workspace:*
+        version: link:../cli-shared
       '@opensip-tools/core':
         specifier: workspace:*
         version: link:../core
@@ -211,6 +214,22 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.19.15)
 
+  packages/cli-shared:
+    dependencies:
+      '@opensip-tools/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.15
+      typescript:
+        specifier: ~5.7.0
+        version: 5.7.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.15)
+
   packages/core:
     dependencies:
       glob:
@@ -244,6 +263,9 @@ importers:
 
   packages/fitness:
     dependencies:
+      '@opensip-tools/cli-shared':
+        specifier: workspace:*
+        version: link:../cli-shared
       '@opensip-tools/core':
         specifier: workspace:*
         version: link:../core
@@ -359,6 +381,9 @@ importers:
 
   packages/simulation:
     dependencies:
+      '@opensip-tools/cli-shared':
+        specifier: workspace:*
+        version: link:../cli-shared
       '@opensip-tools/core':
         specifier: workspace:*
         version: link:../core

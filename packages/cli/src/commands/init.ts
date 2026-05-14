@@ -5,8 +5,8 @@
 import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import type { CliArgs } from '../types.js';
-import type { InitResult } from '../types.js';
+import type { CliArgs } from '@opensip-tools/cli-shared';
+import type { InitResult } from '@opensip-tools/cli-shared';
 
 // ---------------------------------------------------------------------------
 // Init config generation

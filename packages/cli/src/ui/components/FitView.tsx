@@ -7,9 +7,9 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useApp, Box, Text } from 'ink';
-import type { CliArgs } from '../../types.js';
-import type { FitDoneResult, ErrorResult, CliOutput } from '../../types.js';
-import { ensureChecksLoaded, getEnabledCheckCount, executeFit } from '../../commands/fit.js';
+import type { CliArgs } from '@opensip-tools/cli-shared';
+import type { FitDoneResult, ErrorResult, CliOutput } from '@opensip-tools/cli-shared';
+import { ensureChecksLoaded, getEnabledCheckCount, executeFit } from '@opensip-tools/fitness';
 import { reportToCloud } from '../../sarif.js';
 
 import { Banner } from './Banner.js';

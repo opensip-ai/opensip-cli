@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { generateDashboardHtml } from '../persistence/dashboard/index.js';
-import type { StoredSession } from '../persistence/store.js';
+import { generateDashboardHtml } from '@opensip-tools/cli-shared';
+import type { StoredSession } from '@opensip-tools/cli-shared';
 
 function makeSession(overrides: Partial<StoredSession> = {}): StoredSession {
   return {

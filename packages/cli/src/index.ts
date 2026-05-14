@@ -16,20 +16,20 @@ import { setSilent, setDebugMode, generatePrefixedId, setRunId, initLogFile, log
 import { loadSignalersConfig } from '@opensip-tools/fitness';
 import type { SignalersConfig } from '@opensip-tools/fitness';
 
-import { EXIT_CODES, getErrorSuggestion } from './exit-codes.js';
+import { EXIT_CODES, getErrorSuggestion } from '@opensip-tools/cli-shared';
 import { printWelcome } from './welcome.js';
 import { printCompletionScript, type Shell } from './commands/completion.js';
 import { executeUninstall } from './commands/uninstall.js';
 import { decideOpen, launchBrowser } from './open-dashboard.js';
 import { maybeNotify } from './update-notifier.js';
 
-export { EXIT_CODES, getErrorSuggestion } from './exit-codes.js';
+export { EXIT_CODES, getErrorSuggestion } from '@opensip-tools/cli-shared';
 export { buildWelcome, printWelcome } from './welcome.js';
 export { buildCompletionScript, printCompletionScript } from './commands/completion.js';
 export { executeUninstall } from './commands/uninstall.js';
 export { decideOpen, launchBrowser } from './open-dashboard.js';
 export { maybeNotify } from './update-notifier.js';
-export type { CliOutput, CheckOutput, FindingOutput, TableRow, SummaryOptions, CommandResult, CliArgs, FitOptions, InitOptions, ToolOptions } from './types.js';
+export type { CliOutput, CheckOutput, FindingOutput, TableRow, SummaryOptions, CommandResult, CliArgs, FitOptions, InitOptions, ToolOptions } from '@opensip-tools/cli-shared';
 export { buildSarifLog, reportToCloud } from './sarif.js';
 export { resolveApiKey } from './commands/configure.js';
 
@@ -52,13 +52,11 @@ const PKG_VERSION = ((): string => {
   }
 })();
 
-// Command imports
-import { executeFit } from './commands/fit.js';
-import { listChecks } from './commands/list-checks.js';
-import { listRecipes } from './commands/list-recipes.js';
-import { openDashboard } from './commands/dashboard.js';
+// Command imports — fitness/simulation commands live in their tool packages.
+// Phase 4 will replace these direct imports with a Tool registry walk.
+import { executeFit, listChecks, listRecipes, openDashboard } from '@opensip-tools/fitness';
+import { executeSim } from '@opensip-tools/simulation';
 import { executeInit } from './commands/init.js';
-import { executeSim } from './commands/sim.js';
 import { pluginList, pluginInstall, pluginRemove } from './commands/plugin.js';
 import { executeConfigure, resolveApiKey } from './commands/configure.js';
 import { reportToCloud } from './sarif.js';
@@ -71,7 +69,7 @@ import {
   DEFAULT_BASELINE_PATH,
 } from './gate.js';
 
-import type { CliArgs, FitOptions, InitOptions, ToolOptions } from './types.js';
+import type { CliArgs, FitOptions, InitOptions, ToolOptions } from '@opensip-tools/cli-shared';
 
 // =============================================================================
 // CLI DEFAULTS (read from `cli:` block in opensip-tools.config.yml)
@@ -190,7 +188,7 @@ function mergeConfigDefaults(opts: Record<string, unknown>, config: CliDefaults)
 // INK RENDER HELPER
 // =============================================================================
 
-async function renderResult(result: import('./types.js').CommandResult): Promise<void> {
+async function renderResult(result: import('@opensip-tools/cli-shared').CommandResult): Promise<void> {
   const { renderApp } = await import('./ui/render.js');
   await renderApp(result);
 }

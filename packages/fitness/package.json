@@ -18,6 +18,9 @@
   "exports": {
     ".": "./dist/index.js"
   },
+  "opensipTools": {
+    "kind": "tool"
+  },
   "scripts": {
     "build": "tsc",
     "test": "vitest run --passWithNoTests",
@@ -25,6 +28,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@opensip-tools/cli-shared": "workspace:*",
     "@opensip-tools/core": "workspace:*",
     "glob": "^11.0.0",
     "js-yaml": "^4.1.0",

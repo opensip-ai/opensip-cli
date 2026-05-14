@@ -2,15 +2,22 @@
  * dashboard command — generate HTML report and open in browser
  */
 
-import { defaultRegistry, defaultRecipeRegistry } from '@opensip-tools/fitness';
 import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { loadSessions, getReportsDir, type CheckCatalogEntry, type RecipeCatalogEntry } from '../persistence/store.js';
-import { generateDashboardHtml } from '../persistence/dashboard/index.js';
+import {
+  loadSessions,
+  getReportsDir,
+  generateDashboardHtml,
+  type CheckCatalogEntry,
+  type RecipeCatalogEntry,
+  type DashboardResult,
+} from '@opensip-tools/cli-shared';
+
+import { defaultRegistry } from '../framework/registry.js';
+import { defaultRecipeRegistry } from '../recipes/registry.js';
 import { ensureChecksLoaded, getDisplayName, getIcon } from './fit.js';
-import type { DashboardResult } from '../types.js';
 
 // ---------------------------------------------------------------------------
 // openDashboard

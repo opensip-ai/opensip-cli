@@ -32,7 +32,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 
-import { logger } from '../lib/logger.js'
+import { logger } from '@opensip-tools/core'
 
 const CONFIG_FILENAME = 'opensip-tools.config.yml'
 

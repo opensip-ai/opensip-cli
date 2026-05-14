@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getErrorSuggestion, EXIT_CODES } from '../exit-codes.js';
+import { getErrorSuggestion, EXIT_CODES } from '@opensip-tools/cli-shared';
 
 describe('error handling', () => {
 

@@ -7,8 +7,8 @@
  */
 
 import React from 'react';
-import type { CommandResult } from '../types.js';
-import type { CliArgs } from '../types.js';
+import type { CommandResult } from '@opensip-tools/cli-shared';
+import type { CliArgs } from '@opensip-tools/cli-shared';
 import { ThemeProvider } from './theme.js';
 import { ClockProvider } from './hooks/useClock.js';
 import { App } from './App.js';

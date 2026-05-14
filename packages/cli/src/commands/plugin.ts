@@ -7,7 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-import type { PluginResult } from '../types.js';
+import type { PluginResult } from '@opensip-tools/cli-shared';
 
 // ---------------------------------------------------------------------------
 // Plugin helpers

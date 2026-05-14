@@ -1,12 +1,12 @@
 {
-  "name": "@opensip-tools/simulation",
+  "name": "@opensip-tools/cli-shared",
   "version": "2.0.0",
   "license": "MIT",
-  "description": "Simulation scenarios for OpenSIP Tools",
+  "description": "Shared CLI infrastructure for OpenSIP Tools — types, exit codes, session persistence",
   "repository": {
     "type": "git",
     "url": "https://github.com/opensip-ai/opensip-tools.git",
-    "directory": "packages/simulation"
+    "directory": "packages/cli-shared"
   },
   "homepage": "https://github.com/opensip-ai/opensip-tools",
   "bugs": {
@@ -15,19 +15,17 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "opensipTools": {
-    "kind": "tool"
+  "exports": {
+    ".": "./dist/index.js"
   },
   "scripts": {
     "build": "tsc",
-    "test": "vitest run",
+    "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@opensip-tools/cli-shared": "workspace:*",
-    "@opensip-tools/core": "workspace:*",
-    "zod": "^3.24.0"
+    "@opensip-tools/core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

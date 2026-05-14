@@ -6,7 +6,7 @@
  */
 
 import { createInterface } from 'node:readline';
-import { countSessions, clearAllSessions, clearSessionsOlderThan } from '../persistence/store.js';
+import { countSessions, clearAllSessions, clearSessionsOlderThan } from '@opensip-tools/cli-shared';
 
 export interface ClearOptions {
   olderThan?: number;

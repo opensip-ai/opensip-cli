@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { render } from 'ink-testing-library';
 import { ThemeProvider } from '../../../ui/theme.js';
 import { ResultsTable } from '../../../ui/components/ResultsTable.js';
-import type { TableRow } from '../../../types.js';
+import type { TableRow } from '@opensip-tools/cli-shared';
 
 const sampleRows: TableRow[] = [
   {

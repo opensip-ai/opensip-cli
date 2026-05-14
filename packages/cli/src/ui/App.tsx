@@ -4,7 +4,7 @@
 
 import React from 'react';
 import { Text, Box } from 'ink';
-import type { CommandResult } from '../types.js';
+import type { CommandResult } from '@opensip-tools/cli-shared';
 
 import { Banner } from './components/Banner.js';
 import { ResultsTable } from './components/ResultsTable.js';

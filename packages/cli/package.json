@@ -29,6 +29,7 @@
   "dependencies": {
     "@opensip-tools/checks-typescript": "workspace:*",
     "@opensip-tools/checks-universal": "workspace:*",
+    "@opensip-tools/cli-shared": "workspace:*",
     "@opensip-tools/core": "workspace:*",
     "@opensip-tools/fitness": "workspace:*",
     "@opensip-tools/lang-cpp": "workspace:*",

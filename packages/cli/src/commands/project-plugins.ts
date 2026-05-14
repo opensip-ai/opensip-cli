@@ -26,7 +26,7 @@ import { join } from 'node:path'
 import { getProjectPluginDir, readProjectPluginsList, type PluginDomain } from '@opensip-tools/core'
 import { parseDocument, YAMLSeq, type Scalar } from 'yaml'
 
-import type { PluginResult } from '../types.js'
+import type { PluginResult } from '@opensip-tools/cli-shared'
 
 const CONFIG_FILENAME = 'opensip-tools.config.yml'
 const VALID_DOMAINS: ReadonlySet<PluginDomain> = new Set(['fit', 'sim', 'asm'])

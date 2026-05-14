@@ -141,6 +141,13 @@ export {
 } from './framework/define-scenario.js'
 
 // =============================================================================
+// TOOL PLUGIN — simulation as a Tool implementation
+// =============================================================================
+
+export { simulationTool } from './tool.js'
+export { executeSim } from './cli/sim.js'
+
+// =============================================================================
 // SHARED INFRASTRUCTURE (assertions, personas, result-builder, exec engine)
 // =============================================================================
 

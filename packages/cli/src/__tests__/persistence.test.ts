@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-import type { StoredSession } from '../persistence/store.js';
+import type { StoredSession } from '@opensip-tools/cli-shared';
 
 // Module-level variable that the hoisted mock can close over
 let _mockHome = '';
@@ -35,13 +35,13 @@ function makeSession(overrides: Partial<StoredSession> = {}): StoredSession {
 }
 
 describe('persistence/store', () => {
-  let storeModule: typeof import('../persistence/store.js');
+  let storeModule: typeof import('@opensip-tools/cli-shared');
 
   beforeEach(async () => {
     _mockHome = makeTempDir();
     // Force fresh import so TOOLS_HOME picks up the new mock value
     vi.resetModules();
-    storeModule = await import('../persistence/store.js');
+    storeModule = await import('@opensip-tools/cli-shared');
   });
 
   afterEach(() => {

@@ -25,7 +25,7 @@ import {
   DEFAULT_BASELINE_PATH,
   type GateCompareResult,
 } from '../gate.js';
-import type { CliOutput, FindingOutput } from '../types.js';
+import type { CliOutput, FindingOutput } from '@opensip-tools/cli-shared';
 
 // ---------------------------------------------------------------------------
 // Helpers

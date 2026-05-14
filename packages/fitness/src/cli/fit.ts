@@ -6,12 +6,34 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname } from 'node:path';
 
 import { logger, type CheckDisplayEntry } from '@opensip-tools/core';
-import { defaultRegistry, FitnessRecipeService, type FitnessRecipeServiceCallbacks, type CheckSummary, type FitnessRecipeResult, defaultRecipeRegistry, buildScopeBasedFileMap, loadTargetsConfig, loadSignalersConfig } from '@opensip-tools/fitness';
+import {
+  EXIT_CODES,
+  saveSession,
+  generateSessionId,
+  type CliArgs,
+  type CliOutput,
+  type TableRow,
+  type SummaryOptions,
+  type FitDoneResult,
+  type ErrorResult,
+} from '@opensip-tools/cli-shared';
 
-import type { CliOutput, TableRow, SummaryOptions, FitDoneResult, ErrorResult } from '../types.js';
-import { EXIT_CODES } from '../exit-codes.js';
-import { saveSession, generateSessionId } from '../persistence/store.js';
-import type { CliArgs } from '../types.js';
+import { defaultRegistry } from '../framework/registry.js';
+import { isCheck } from '../framework/check-types.js';
+import { FitnessRecipeService } from '../recipes/service.js';
+import type { FitnessRecipeServiceCallbacks, CheckSummary } from '../recipes/service-types.js';
+import type { FitnessRecipeResult } from '../recipes/types.js';
+import { defaultRecipeRegistry } from '../recipes/registry.js';
+import { buildScopeBasedFileMap } from '../framework/scope-resolver.js';
+import { loadTargetsConfig } from '../targets/index.js';
+import { loadSignalersConfig } from '../signalers/index.js';
+import type { SignalersConfig } from '../signalers/types.js';
+import { loadAllPlugins } from '../plugins/loader.js';
+import {
+  discoverCheckPackages,
+  readCheckPackageMetadata,
+  readCheckPackagePreferences,
+} from '../plugins/check-package-discovery.js';
 
 // ---------------------------------------------------------------------------
 // Lazy-load fitness checks
@@ -59,101 +81,34 @@ export function getPluginLoadErrors(): readonly string[] {
 }
 
 /**
- * Install declared project-local plugins when the `.opensip-tools/<domain>/
- * node_modules/` dir is missing or clearly stale (missing declared deps).
- *
- * Runs silently when nothing is needed. Prints a one-line status when
- * it does work so the user understands the pause before checks start.
+ * Pre-load hook the CLI registers via setPreLoadHook(). Lets the CLI
+ * inject CLI-only behavior (e.g. project-plugin auto-sync) without
+ * fitness needing to import CLI internals. Called once before the
+ * first ensureChecksLoaded() in this process.
  */
-async function maybeAutoSyncProjectPlugins(projectDir: string): Promise<void> {
-  const { readProjectPluginsList, getProjectPluginDir } = await import('@opensip-tools/core')
-  const { existsSync, readFileSync } = await import('node:fs')
-  const { join } = await import('node:path')
+export type PreLoadHook = (projectDir: string) => Promise<void>;
 
-  const domains = ['fit', 'sim', 'asm'] as const
-  const missingDomains: string[] = []
+let preLoadHook: PreLoadHook | undefined;
 
-  for (const domain of domains) {
-    const specs = readProjectPluginsList(projectDir, domain)
-    if (!specs || specs.length === 0) continue
-
-    const dir = getProjectPluginDir(projectDir, domain)
-    const pkgJsonPath = join(dir, 'package.json')
-    const nodeModulesPath = join(dir, 'node_modules')
-
-    if (!existsSync(pkgJsonPath) || !existsSync(nodeModulesPath)) {
-      missingDomains.push(domain)
-      continue
-    }
-
-    // Shallow staleness check — count declared deps whose node_modules
-    // entry is present. A truly exhaustive check would compare the
-    // config list against node_modules; this is good enough to catch
-    // the common "first clone" case.
-    try {
-      const pkg = JSON.parse(readFileSync(pkgJsonPath, 'utf-8')) as { dependencies?: Record<string, string> }
-      const installedCount = Object.keys(pkg.dependencies ?? {}).length
-      if (installedCount === 0) missingDomains.push(domain)
-    } catch {
-      missingDomains.push(domain)
-    }
-  }
-
-  if (missingDomains.length === 0) return
-
-  logger.info({
-    evt: 'cli.plugin.autosync.start',
-    module: 'cli:fit',
-    domains: missingDomains,
-    msg: `installing project-local plugins (${missingDomains.join(', ')})`,
-  })
-  process.stderr.write(
-    `opensip-tools: installing project-local plugins (${missingDomains.join(', ')})...\n`,
-  )
-  const { pluginSync } = await import('./project-plugins.js')
-  for (const domain of missingDomains) {
-    try {
-      await pluginSync(projectDir, domain)
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      logger.warn({
-        evt: 'cli.plugin.autosync.failed',
-        module: 'cli:fit',
-        domain,
-        error: msg,
-      })
-      process.stderr.write(`opensip-tools: plugin sync failed for ${domain}: ${msg}\n`)
-    }
-  }
+/** Register a hook the CLI runs before fitness loads checks. */
+export function setPreLoadHook(hook: PreLoadHook | undefined): void {
+  preLoadHook = hook;
 }
 
 export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
   if (checksLoaded) return;
 
-  // 0. Auto-sync: if the project declares plugins but the project-local
-  //    dir is empty, transparently install them before loading. Matches
-  //    the onboarding story of `git clone && opensip-tools fit` — no
-  //    explicit setup step. Silent when nothing to sync.
-  if (projectDir) {
-    await maybeAutoSyncProjectPlugins(projectDir)
+  // 0. CLI-injected pre-load hook (auto-sync project plugins, etc).
+  //    Skipped when no hook is registered (e.g. running fitness via the
+  //    Tool API outside the CLI).
+  if (projectDir && preLoadHook) {
+    await preLoadHook(projectDir);
   }
 
-  // 1. Register the bundled language adapters, then discover additional
-  //    language packs via the `lang` plugin domain.
-  const { defaultLanguageRegistry } = await import('@opensip-tools/core');
-  const { loadAllPlugins } = await import('@opensip-tools/fitness');
-  const { typescriptAdapter } = await import('@opensip-tools/lang-typescript');
-  const { rustAdapter } = await import('@opensip-tools/lang-rust');
-  const { pythonAdapter } = await import('@opensip-tools/lang-python');
-  const { javaAdapter } = await import('@opensip-tools/lang-java');
-  const { goAdapter } = await import('@opensip-tools/lang-go');
-  const { cppAdapter } = await import('@opensip-tools/lang-cpp');
-  defaultLanguageRegistry.register(typescriptAdapter);
-  defaultLanguageRegistry.register(rustAdapter);
-  defaultLanguageRegistry.register(pythonAdapter);
-  defaultLanguageRegistry.register(javaAdapter);
-  defaultLanguageRegistry.register(goAdapter);
-  defaultLanguageRegistry.register(cppAdapter);
+  // 1. Discover additional language packs via the `lang` plugin domain.
+  //    The bundled language adapters are registered by the CLI before
+  //    the first command runs — fitness doesn't take a direct dep on
+  //    @opensip-tools/lang-* packages.
   const langPluginResult = await loadAllPlugins('lang', undefined, projectDir);
   if (langPluginResult.errors.length > 0) {
     for (const err of langPluginResult.errors) {
@@ -246,12 +201,6 @@ function cliInstallDir(): string {
  * we want to make impossible).
  */
 async function loadDiscoveredCheckPackages(projectDir: string): Promise<number> {
-  const {
-    discoverCheckPackages,
-    readCheckPackageMetadata,
-    readCheckPackagePreferences,
-  } = await import('@opensip-tools/core');
-  const { isCheck } = await import('@opensip-tools/fitness');
   const prefs = readCheckPackagePreferences(projectDir);
   const discovered = discoverCheckPackages({
     projectDir,
@@ -404,7 +353,7 @@ export async function executeFit(
   // HARD error: file-based checks would silently produce zero findings,
   // making the scan look green when it actually never ran. The resolver
   // throws with a message that enumerates every path it attempted.
-  let signalersConfig: import('@opensip-tools/fitness').SignalersConfig;
+  let signalersConfig: SignalersConfig;
   let targetsResult: ReturnType<typeof loadTargetsConfig>;
   try {
     signalersConfig = loadSignalersConfig(args.cwd, args.config);
@@ -432,7 +381,7 @@ export async function executeFit(
   // users ship configs that scan files but produce wrong results.
   {
     const { defaultLanguageRegistry: langRegistry } = await import('@opensip-tools/core');
-    const knownLanguages = new Set<string>(langRegistry.list().flatMap((a) => [a.id, ...(a.aliases ?? [])]))
+    const knownLanguages = new Set<string>(langRegistry.list().flatMap((a) => [a.id, ...(a.aliases ?? [])]));
     const unknownLanguages = new Set<string>()
     for (const target of targetRegistry.getAll()) {
       const langs = target.config.languages ?? []

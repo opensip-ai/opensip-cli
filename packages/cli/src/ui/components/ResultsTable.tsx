@@ -5,7 +5,7 @@
 import React from 'react';
 import { Text, Box } from 'ink';
 import { useTheme, type Theme } from '../theme.js';
-import type { TableRow } from '../../types.js';
+import type { TableRow } from '@opensip-tools/cli-shared';
 
 export interface ResultsTableProps {
   readonly rows: TableRow[];

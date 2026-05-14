@@ -2,8 +2,8 @@
  * @fileoverview Plugin system barrel export
  *
  * Public API for plugin discovery and the kernel-level plugin types.
- * Tool-specific loaders (e.g. fitness's loadAllPlugins) live with the
- * tool that owns them.
+ * Tool-specific loaders (e.g. fitness's loadAllPlugins, fitness's
+ * check-package-discovery) live with the tool that owns them.
  */
 
 export {
@@ -16,15 +16,14 @@ export {
   readProjectPluginsList,
 } from './discover.js'
 export {
-  discoverCheckPackages,
-  readCheckPackageMetadata,
-  readCheckPackagePreferences,
-} from './check-package-discovery.js'
+  discoverToolPackages,
+  readToolPackageMetadata,
+} from './tool-package-discovery.js'
 export type {
-  CheckPackageDiscoveryOptions,
-  DiscoveredCheckPackage,
-  CheckPackageMetadata,
-} from './check-package-discovery.js'
+  ToolPackageDiscoveryOptions,
+  DiscoveredToolPackage,
+  ToolPackageMetadata,
+} from './tool-package-discovery.js'
 export type {
   PluginDomain,
   DiscoveredPlugin,
