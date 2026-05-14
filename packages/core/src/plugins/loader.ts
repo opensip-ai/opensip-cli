@@ -10,12 +10,14 @@ import { pathToFileURL } from 'node:url'
 import { logger } from '../lib/logger.js'
 import { isCheck } from '../framework/check-types.js'
 import { defaultRegistry } from '../framework/registry.js'
+import { defaultLanguageRegistry } from '../languages/registry.js'
 import { defaultRecipeRegistry } from '../recipes/registry.js'
 
 import { discoverPlugins } from './discover.js'
 import type {
   DiscoveredPlugin,
   FitPluginExports,
+  LangPluginExports,
   LoadedPlugin,
   PluginDomain,
   PluginLoadResult,
@@ -23,18 +25,61 @@ import type {
 
 /**
  * Load a single discovered plugin.
- * Imports the module, validates exports, registers checks and recipes.
+ *
+ * For `domain === 'lang'`, the module is expected to export an `adapters`
+ * array of LanguageAdapter; each is registered with defaultLanguageRegistry.
+ * For other domains, registers checks and recipes with defaultRegistry and
+ * defaultRecipeRegistry respectively.
  */
-export async function loadPlugin(plugin: DiscoveredPlugin): Promise<LoadedPlugin> {
+export async function loadPlugin(
+  plugin: DiscoveredPlugin,
+  domain: PluginDomain = 'fit',
+): Promise<LoadedPlugin> {
   try {
     const moduleUrl = pathToFileURL(plugin.entryPoint).href
-    const mod = await import(moduleUrl) as FitPluginExports
+    const mod = await import(moduleUrl) as FitPluginExports & LangPluginExports
 
     let checksRegistered = 0
     let recipesRegistered = 0
+    let adaptersRegistered = 0
 
-    // Register checks with namespace
-    if (mod.checks !== undefined) {
+    // Lang domain: register language adapters
+    if (domain === 'lang' && mod.adapters !== undefined) {
+      if (!Array.isArray(mod.adapters)) {
+        logger.warn({
+          evt: 'plugin.loader.invalid_adapters_export',
+          module: 'core:plugins',
+          namespace: plugin.namespace,
+          source: plugin.source,
+          msg: `Plugin "${plugin.namespace}" exports "adapters" but it is not an array — skipping adapter registration.`,
+        })
+      } else {
+        for (const [index, adapter] of mod.adapters.entries()) {
+          if (
+            adapter &&
+            typeof adapter === 'object' &&
+            'id' in adapter &&
+            'fileExtensions' in adapter &&
+            'parse' in adapter
+          ) {
+            defaultLanguageRegistry.register(adapter)
+            adaptersRegistered++
+          } else {
+            logger.warn({
+              evt: 'plugin.loader.invalid_adapter_item',
+              module: 'core:plugins',
+              namespace: plugin.namespace,
+              source: plugin.source,
+              index,
+              msg: `Plugin "${plugin.namespace}" adapters[${index}] is not a valid LanguageAdapter — skipping.`,
+            })
+          }
+        }
+      }
+    }
+
+    // Register checks with namespace (skipped for lang domain)
+    if (domain !== 'lang' && mod.checks !== undefined) {
       if (!Array.isArray(mod.checks)) {
         logger.warn({
           evt: 'plugin.loader.invalid_checks_export',
@@ -62,8 +107,8 @@ export async function loadPlugin(plugin: DiscoveredPlugin): Promise<LoadedPlugin
       }
     }
 
-    // Register recipes
-    if (mod.recipes !== undefined) {
+    // Register recipes (skipped for lang domain)
+    if (domain !== 'lang' && mod.recipes !== undefined) {
       if (!Array.isArray(mod.recipes)) {
         logger.warn({
           evt: 'plugin.loader.invalid_recipes_export',
@@ -95,13 +140,22 @@ export async function loadPlugin(plugin: DiscoveredPlugin): Promise<LoadedPlugin
       }
     }
 
-    if (mod.checks === undefined && mod.recipes === undefined) {
+    const nothingRegistered =
+      domain === 'lang'
+        ? mod.adapters === undefined
+        : mod.checks === undefined && mod.recipes === undefined
+
+    if (nothingRegistered) {
       logger.warn({
         evt: 'plugin.loader.no_exports',
         module: 'core:plugins',
         namespace: plugin.namespace,
         source: plugin.source,
-        msg: `Plugin "${plugin.namespace}" exports neither "checks" nor "recipes" — nothing to register.`,
+        domain,
+        msg:
+          domain === 'lang'
+            ? `Plugin "${plugin.namespace}" exports no "adapters" — nothing to register.`
+            : `Plugin "${plugin.namespace}" exports neither "checks" nor "recipes" — nothing to register.`,
       })
     }
 
@@ -110,8 +164,10 @@ export async function loadPlugin(plugin: DiscoveredPlugin): Promise<LoadedPlugin
       module: 'core:plugins',
       namespace: plugin.namespace,
       source: plugin.source,
+      domain,
       checksRegistered,
       recipesRegistered,
+      adaptersRegistered,
     })
 
     return {
@@ -120,6 +176,7 @@ export async function loadPlugin(plugin: DiscoveredPlugin): Promise<LoadedPlugin
       type: plugin.type,
       checksRegistered,
       recipesRegistered,
+      adaptersRegistered,
     }
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err)
@@ -140,6 +197,7 @@ export async function loadPlugin(plugin: DiscoveredPlugin): Promise<LoadedPlugin
       type: plugin.type,
       checksRegistered: 0,
       recipesRegistered: 0,
+      adaptersRegistered: 0,
       error: errorMsg,
     }
   }
@@ -165,7 +223,7 @@ export async function loadAllPlugins(
   const errors: string[] = []
 
   for (const plugin of discovered) {
-    const result = await loadPlugin(plugin)
+    const result = await loadPlugin(plugin, domain)
     plugins.push(result)
     if (result.error) {
       errors.push(`${result.source}: ${result.error}`)
@@ -176,6 +234,7 @@ export async function loadAllPlugins(
     plugins,
     totalChecks: plugins.reduce((sum, p) => sum + p.checksRegistered, 0),
     totalRecipes: plugins.reduce((sum, p) => sum + p.recipesRegistered, 0),
+    totalAdapters: plugins.reduce((sum, p) => sum + (p.adaptersRegistered ?? 0), 0),
     errors,
   }
 }

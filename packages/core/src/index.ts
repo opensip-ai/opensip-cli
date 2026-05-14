@@ -68,7 +68,7 @@ export {
   hasProjectPluginsDeclared,
   readProjectPluginsList,
 } from './plugins/index.js';
-export type { PluginDomain, DiscoveredPlugin, LoadedPlugin, PluginLoadResult } from './plugins/types.js';
+export type { PluginDomain, DiscoveredPlugin, LoadedPlugin, PluginLoadResult, FitPluginExports, LangPluginExports, PluginExports, PluginMetadata } from './plugins/types.js';
 
 // Lib — errors + Result pattern
 export { ToolError, ValidationError, NotFoundError, SystemError, TimeoutError, NetworkError, ConfigurationError } from './lib/errors.js';

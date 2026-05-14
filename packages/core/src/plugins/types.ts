@@ -6,6 +6,7 @@
  */
 
 import type { Check } from '../framework/check-types.js'
+import type { LanguageAdapter } from '../languages/adapter.js'
 import type { FitnessRecipe } from '../recipes/types.js'
 
 // =============================================================================
@@ -18,6 +19,15 @@ export interface FitPluginExports {
   readonly recipes?: readonly FitnessRecipe[]
   readonly metadata?: PluginMetadata
 }
+
+/** What a language plugin package/file exports */
+export interface LangPluginExports {
+  readonly adapters?: readonly LanguageAdapter[]
+  readonly metadata?: PluginMetadata
+}
+
+/** Union of all plugin export shapes. */
+export type PluginExports = FitPluginExports | LangPluginExports
 
 /** Optional plugin metadata */
 export interface PluginMetadata {
@@ -54,6 +64,8 @@ export interface LoadedPlugin {
   readonly type: 'package' | 'file'
   readonly checksRegistered: number
   readonly recipesRegistered: number
+  /** Number of language adapters registered (only for 'lang' domain). */
+  readonly adaptersRegistered?: number
   readonly error?: string
 }
 
@@ -62,8 +74,9 @@ export interface PluginLoadResult {
   readonly plugins: readonly LoadedPlugin[]
   readonly totalChecks: number
   readonly totalRecipes: number
+  readonly totalAdapters: number
   readonly errors: readonly string[]
 }
 
-/** The three plugin domains */
-export type PluginDomain = 'fit' | 'sim' | 'asm'
+/** Plugin domains. `lang` packs register language adapters; the others register checks/recipes. */
+export type PluginDomain = 'fit' | 'sim' | 'asm' | 'lang'

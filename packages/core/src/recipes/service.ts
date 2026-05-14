@@ -13,7 +13,7 @@ import { generateId } from '../lib/ids.js'
 
 import { fileCache, DEFAULT_PREWARM_PATTERNS } from '../framework/file-cache.js'
 import { defaultRegistry, type Check, type CheckRegistry } from '../framework/registry.js'
-import { initParseCache, clearParseCache } from '../framework/parse-cache.js'
+import { initParseCache, clearParseCache } from '../languages/parse-cache.js'
 
 import { resolveChecks, validateCheckReferences } from './check-resolution.js'
 import { setCurrentRecipeCheckConfig, clearCurrentRecipeCheckConfig } from './check-config.js'

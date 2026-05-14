@@ -23,5 +23,7 @@ export type {
   LoadedPlugin,
   PluginLoadResult,
   FitPluginExports,
+  LangPluginExports,
+  PluginExports,
   PluginMetadata,
 } from './types.js'
