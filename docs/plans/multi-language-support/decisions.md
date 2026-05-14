@@ -93,3 +93,46 @@
 - Other tests that need full TS adapter behavior (CLI integration tests) register the real adapter at bootstrap.
 
 **Reversible:** Yes — the shim is local to the test file.
+
+---
+
+## D7 — Phase 9: warn (don't fail) on unknown languages in target config
+
+**Decision:** When `opensip-tools.config.yml` declares a target with `languages: [...]` containing a language with no registered adapter, the CLI prints a stderr warning naming the unknown language(s) and the known ones, then continues. It does NOT fail the run.
+
+**Why:**
+- Failing hard would break projects that pin to one CLI version while expecting older configs to keep working when a new language is added later.
+- Silent acceptance was the previous behavior — files in unknown languages would scan but `applyContentFilter` would return raw content, producing wrong results.
+- Loud warning + continue is the right balance: visible to the user, doesn't block CI, gives them time to install the lang pack or fix the typo.
+
+**Trade-off:** A typo in `languages` (e.g. `pyhton` instead of `python`) becomes a warning rather than an error. This is intentional — error-on-unknown is too strict for a multi-language project where some adapters may be optional plugins. A future strict mode flag (`--strict-languages`) could elevate this to an error for projects that want it.
+
+**Reversible:** Yes — the validation block in fit.ts is bounded to one section.
+
+---
+
+## D8 — Phase 5/6: pure `analyzeXxx` functions extracted for testability
+
+**Decision:** Every check in checks-universal/checks-python/checks-java/checks-go/checks-cpp exports two things: a pure analysis function (e.g. `analyzeTodoComments(content)`) AND the `defineCheck`-wrapped Check (`noTodoComments`). Tests target the pure function.
+
+**Why:**
+- `defineCheck` wraps the user's `analyze` callback inside an `execute(ctx)` closure that requires an `ExecutionContext`. Direct unit testing of the wrapped Check would require standing up a full file-accessor + file-cache + signal infrastructure.
+- The pure function is the actual logic; the Check is the framework-integrated wrapper. Testing the pure function exercises the algorithm; an end-to-end CLI test exercises the framework wiring.
+- Pattern is consistent across all proof checks. Documented in `checks-universal/src/checks/no-todo-comments.ts`.
+
+**Reversible:** Yes — if the framework adds a `Check.run(content, filePath)` convenience method later, tests can shift to call that.
+
+---
+
+## D9 — Phase 6: lang-cpp parse() returns null intentionally; CommandConfig is the analysis path
+
+**Decision:** `cppAdapter.parse()` returns null. C/C++ analysis goes through `CommandConfig` (clang-tidy) rather than a JS-side parser.
+
+**Why:**
+- Writing a real C/C++ parser in TypeScript is intractable for the scope. Tree-sitter's C++ grammar exists but pulling it in for one language is heavy when clang-tidy is the de-facto standard tool everyone already has.
+- `LanguageAdapter` already supports `parse: () => null` for command-only languages. The contract holds: stripStrings/stripComments still work for regex-based universal checks; AST-based checks rely on clang-tidy.
+- Establishes the pattern for any future command-mode language (shellcheck, phpcs, etc.).
+
+**Trade-off:** Universal checks that need a parse tree (none today) won't work for C/C++ files. We accept this — universal checks operate on text, and language-specific C/C++ checks all go through clang-tidy.
+
+**Reversible:** Yes — adding tree-sitter-cpp later only changes `parse()` and a new `query` impl.

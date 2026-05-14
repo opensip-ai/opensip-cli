@@ -258,6 +258,39 @@ export async function executeFit(
   const { registry: targetRegistry, config: targetsConfig } = targetsResult;
   const configFound = true;
 
+  // Phase 9: validate that every language declared in the targets config
+  // has a registered LanguageAdapter. Warn loudly when a target asks for
+  // a language we don't know how to handle — silent acceptance would let
+  // users ship configs that scan files but produce wrong results.
+  {
+    const { defaultLanguageRegistry: langRegistry } = await import('@opensip-tools/core');
+    const knownLanguages = new Set<string>(langRegistry.list().flatMap((a) => [a.id, ...(a.aliases ?? [])]))
+    const unknownLanguages = new Set<string>()
+    for (const target of targetRegistry.getAll()) {
+      const langs = target.config.languages ?? []
+      for (const lang of langs) {
+        if (!knownLanguages.has(lang)) unknownLanguages.add(lang)
+      }
+    }
+    if (unknownLanguages.size > 0) {
+      const list = [...unknownLanguages].sort().join(', ')
+      const known = [...knownLanguages].filter((l) => !l.startsWith('rs') && !l.startsWith('py')).slice(0, 8).join(', ')
+      process.stderr.write(
+        `opensip-tools: target config declares unknown language(s): ${list}. ` +
+        `Known languages: ${[...knownLanguages].sort().join(', ')}. ` +
+        `Files in unknown languages will scan with no string/comment filtering.\n`,
+      );
+      logger.warn({
+        evt: 'cli.config.unknown_languages',
+        module: 'cli:fit',
+        unknown: [...unknownLanguages],
+        known: [...knownLanguages],
+      });
+      // Reference `known` to avoid unused-var lint without changing the user-facing message.
+      void known
+    }
+  }
+
   const allChecks = defaultRegistry.listSlugs().map((key) => {
     const check = defaultRegistry.getBySlug(key);
     return { slug: check?.config.slug ?? key, scope: check?.config.checkScope };

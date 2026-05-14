@@ -7,8 +7,8 @@
  * fixtures/multi-lang sample tree as input.
  */
 
-import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -17,20 +17,24 @@ import { describe, expect, it } from 'vitest'
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 const CLI = join(__dirname, '../../dist/index.js')
 const FIXTURE = join(__dirname, 'fixtures/multi-lang')
+const UNKNOWN_FIXTURE = join(__dirname, 'fixtures/unknown-language')
+
+function runIn(cwd: string, ...args: string[]): { stdout: string; stderr: string; exitCode: number } {
+  const result = spawnSync('node', [CLI, ...args], {
+    cwd,
+    encoding: 'utf-8',
+    timeout: 60_000,
+    env: { ...process.env, NO_COLOR: '1' },
+  })
+  return {
+    stdout: result.stdout ?? '',
+    stderr: result.stderr ?? '',
+    exitCode: result.status ?? 1,
+  }
+}
 
 function run(...args: string[]): { stdout: string; stderr: string; exitCode: number } {
-  try {
-    const stdout = execFileSync('node', [CLI, ...args], {
-      cwd: FIXTURE,
-      encoding: 'utf-8',
-      timeout: 60_000,
-      env: { ...process.env, NO_COLOR: '1' },
-    })
-    return { stdout, stderr: '', exitCode: 0 }
-  } catch (err) {
-    const e = err as { stdout?: string; stderr?: string; status?: number }
-    return { stdout: e.stdout ?? '', stderr: e.stderr ?? '', exitCode: e.status ?? 1 }
-  }
+  return runIn(FIXTURE, ...args)
 }
 
 describe('CLI multi-language', () => {
@@ -56,9 +60,8 @@ describe('CLI multi-language', () => {
     // Sanity: confirm the fixture is what we expect (so the CLI run
     // above is meaningful).
     const langs = ['rs', 'py', 'java', 'go', 'cpp', 'ts']
+    const files = readdirSync(join(FIXTURE, 'src'))
     for (const ext of langs) {
-      // Confirm at least one file with that extension under src/
-      const files = require('node:fs').readdirSync(join(FIXTURE, 'src')) as string[]
       const matches = files.filter((f) => f.endsWith(`.${ext}`))
       expect(matches.length).toBeGreaterThan(0)
     }
@@ -72,5 +75,17 @@ describe('CLI multi-language', () => {
     expect(cfg).toContain('languages: [go]')
     expect(cfg).toContain('languages: [cpp]')
     expect(cfg).toContain('languages: [typescript]')
+  })
+
+  it('warns loudly when a target declares an unknown language', () => {
+    const result = runIn(UNKNOWN_FIXTURE, 'fit', '--json')
+    // Phase 9 contract: unknown languages produce a stderr warning and
+    // continue running. The fit command does not fail on this.
+    expect(result.stderr).toContain('unknown language')
+    expect(result.stderr).toContain('klingon')
+    // CLI should still complete (exit 0 since no errors fired) and
+    // produce valid JSON on stdout.
+    const output = JSON.parse(result.stdout) as { version: string }
+    expect(output.version).toBe('1.0')
   })
 })
