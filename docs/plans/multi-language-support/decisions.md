@@ -168,3 +168,59 @@
 **Trade-off:** None. This is a pure correctness fix with no behavior change for callers — the function now actually works.
 
 **Reversible:** Yes, but you wouldn't want to.
+
+---
+
+## D12 — Decouple CLI from `@opensip-tools/checks-builtin`
+
+**Decision:** Removed the hardcoded `await import('@opensip-tools/checks-builtin')` from the CLI's `fit.ts` and `dashboard.ts`. Every check package is now discovered through the same `discoverCheckPackages()` path — no package is privileged. `checks-builtin` becomes an ordinary npm dependency declared in `cli/package.json` like any other check pack.
+
+**Why:**
+- The hardcoding created three concrete problems: (a) CLI ↔ checks-builtin version coupling forced lockstep releases; (b) `check-package-discovery.ts` carried a `if (name === BUILTIN_NAME) continue` carve-out that future contributors had to remember; (c) users couldn't substitute, slim down, or remove checks-builtin without forking the CLI.
+- Discovery + auto-load is already battle-tested by D10. Routing checks-builtin through it eliminates the special case at zero new design risk.
+- The plugin contract gained `FitPluginExports.checkDisplay` so packages contribute their own display names. The CLI merges these from every loaded package; on collision, last-loaded wins. No package owns the global display registry.
+- A no-checks-loaded warning was added to the CLI: silent zero-checks would let a misconfig produce a green run scanning nothing, the exact failure mode the tool exists to prevent.
+
+**Trade-off:** "Built-in vs community" labelling in the dashboard catalog now keys on the `@opensip-tools/` scope rather than a single magic name — a slightly looser definition, but it survives the checks-builtin split (D13) without changes.
+
+**Reversible:** Yes — re-introducing the hardcoded import is a one-line change. But the entire reason for D13 was to never need to.
+
+---
+
+## D13 — Hard cutover: split `checks-builtin` into `checks-typescript` + `checks-universal`
+
+**Decision:** Deleted `@opensip-tools/checks-builtin` (158 checks, mixed languages) and split it into:
+- `@opensip-tools/checks-typescript` (new, v1.0.0) — 66 checks that import the TS compiler API or are conceptually only meaningful in a TS/Node ecosystem (drizzle, typed-inject, react, package.json#exports, tsconfig).
+- `@opensip-tools/checks-universal` (existing, re-versioned to v1.0.0) — 92 checks that operate on raw text, regex, file globs, or language-agnostic config (Docker, .env, Sentry config, generic structure).
+
+No deprecation shim. The CLI's `package.json` directly depends on both new packages.
+
+**Why:**
+- "checks-builtin" named its *implementation status* (it's hardcoded), not its *contents* — a code smell once D12 removed the hardcoding.
+- Real composition: roughly 40% of the old pack was TS-specific. Bundling it on a Rust-first repo (DART) imposed mostly-irrelevant checks. Splitting lets non-TS projects pull only `checks-universal`.
+- Classification rule: "language API used" (does the check import `typescript` / parse .ts AST?). Mechanical, easy to verify, and forces dual-purpose checks into TS_AST conservatively. Full table at `docs/plans/checks-builtin-split-classification.md`. Per-helper / per-test placement notes at `docs/plans/checks-builtin-split-summary.md`.
+- Hard cutover (no compat package) avoids carrying a deprecated alias across versions. We're pre-1.0 for the CLI and there is exactly one external consumer (DART), so the migration cost is bounded and visible.
+
+**Trade-off:**
+- Anyone currently depending on `@opensip-tools/checks-builtin` must replace the dep with `checks-typescript + checks-universal`. Documented as a v0.7.0 breaking change in the next CLI release.
+- The split surfaced a latent scope-resolver bug — fixed in D14.
+
+**Reversible:** Yes mechanically, but the labeled packages are public API now. Reversal would be another breaking change.
+
+---
+
+## D14 — Fix: thread `globalExcludes` into matchFiles fallback
+
+**Decision:** Plumbed `globalExcludes` from `FitnessRecipeServiceConfig` through `ExecutionOptions` → `RunOptions` → `createExecutionContext()` → `createMatchFilesFunction()`. The fileCache fallback now filters `fileCache.paths()` against the run's globalExcludes (compiled once into Minimatch matchers) before returning. CLI passes the project config's `globalExcludes` into the service.
+
+**Why:**
+- Surfaced by D13's split — DART suddenly loaded `file-length-limit` (which lives in `checks-universal`) and got hard errors against files in directories it had explicitly listed in `globalExcludes`.
+- Root cause was pre-existing: `createMatchFilesFunction()` returned `fileCache.paths()` verbatim for scope-empty checks. The cache doesn't honor exclusion config — that filtering belongs at matchFiles.
+- Custom `patterns` and per-check `targetFiles` paths are intentionally untouched: the former is caller-controlled, the latter is already filtered upstream by `preResolveAllTargets()`. Only the fallback needed the filter.
+- Compiled Minimatch is reused across calls (closure over `compiledGlobalExcludes`) so we don't pay regex compilation per file.
+
+**Trade-off:** None observed. Empty-scope checks now match the same exclusion semantics as scope-typed checks, which is the expected mental model.
+
+**Reversible:** Yes — revert by removing the new `globalExcludes` field from `RunOptions` and the four sites that thread it. But the prior behavior was buggy; you wouldn't want to.
+
+**Regression test:** `packages/core/src/framework/__tests__/execution-context.test.ts` — four cases covering no-excludes, dir patterns, extension patterns, and empty-array.

@@ -56,7 +56,7 @@ export function getErrorSuggestion(err: unknown): ErrorSuggestion | null {
   if (message.includes('No checks registered') || message.includes('No checks to run')) {
     return {
       message: 'No checks available to run.',
-      action: 'Ensure @opensip-tools/checks-builtin is installed.',
+      action: 'Install at least one @opensip-tools/checks-* package, or declare plugins.checkPackages in opensip-tools.config.yml.',
       exitCode: EXIT_CODES.RUNTIME_ERROR,
     };
   }

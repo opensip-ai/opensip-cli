@@ -53,10 +53,11 @@ export interface PluginsConfig {
    * Explicit list of npm package names to load as check providers
    * (e.g. ['@opensip-tools/checks-python', '@my-org/checks-internal']).
    *
-   * When present, the CLI loads only these packages plus the bundled
-   * checks-builtin. Auto-discovery is disabled for this run.
-   * @opensip-tools/checks-builtin in this list is silently ignored
-   * (it's always loaded directly by the CLI).
+   * When present, ONLY these packages are loaded. Auto-discovery is
+   * disabled for the run. No package is privileged: if you want the
+   * default check pack you must list `@opensip-tools/checks-builtin`
+   * (or its successors) here explicitly. An empty list disables all
+   * check loading and triggers a no-checks-loaded warning.
    */
   readonly checkPackages?: readonly string[]
   /**

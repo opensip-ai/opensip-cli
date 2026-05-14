@@ -36,4 +36,5 @@ export type {
   LangPluginExports,
   PluginExports,
   PluginMetadata,
+  CheckDisplayEntry,
 } from './types.js'

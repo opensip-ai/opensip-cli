@@ -134,7 +134,13 @@ export class FitnessRecipeService {
       await this.prepareExecution(checks, cwd)
 
       // Execute
-      const execOpts: ExecutionOptions = { checks, cwd, recipe, checkTargetFiles: this.config.checkTargetFiles }
+      const execOpts: ExecutionOptions = {
+        checks,
+        cwd,
+        recipe,
+        checkTargetFiles: this.config.checkTargetFiles,
+        ...(this.config.globalExcludes ? { globalExcludes: this.config.globalExcludes } : {}),
+      }
       const execCtx: ExecutionServiceContext = {
         session: this.activeSession,
         callbacks: this.callbacks,

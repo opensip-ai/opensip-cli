@@ -2,7 +2,8 @@
  * fit command — run fitness checks
  */
 
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { dirname } from 'node:path';
 
 import {
   defaultRegistry,
@@ -12,6 +13,7 @@ import {
   buildScopeBasedFileMap,
   loadTargetsConfig, loadSignalersConfig,
   logger,
+  type CheckDisplayEntry,
 } from '@opensip-tools/core';
 
 import type { CliOutput, TableRow, SummaryOptions, FitDoneResult, ErrorResult } from '../types.js';
@@ -25,9 +27,34 @@ import type { CliArgs } from '../types.js';
 
 let checksLoaded = false;
 let pluginLoadErrors: readonly string[] = [];
-let getCheckDisplayName: (slug: string) => string = (slug) =>
-  slug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+
+/**
+ * Merged display map contributed by every loaded check package via the
+ * FitPluginExports.checkDisplay field. Each package owns the slugs it
+ * registers; on collision the last package loaded wins (no package is
+ * privileged). Slugs without an entry fall back to kebab-to-title-case.
+ */
+const mergedCheckDisplay = new Map<string, CheckDisplayEntry>();
+let getCheckDisplayName: (slug: string) => string = defaultDisplayName;
 let getCheckIcon: (slug: string) => string = () => '\uD83D\uDD0D';
+
+function defaultDisplayName(slug: string): string {
+  return slug
+    .split('-')
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
+function rebuildDisplayLookups(): void {
+  getCheckDisplayName = (slug) => {
+    const entry = mergedCheckDisplay.get(slug);
+    return entry ? entry[1] : defaultDisplayName(slug);
+  };
+  getCheckIcon = (slug) => {
+    const entry = mergedCheckDisplay.get(slug);
+    return entry ? entry[0] : '\uD83D\uDD0D';
+  };
+}
 
 /**
  * Plugin load errors recorded during the most recent ensureChecksLoaded() call.
@@ -108,8 +135,6 @@ async function maybeAutoSyncProjectPlugins(projectDir: string): Promise<void> {
   }
 }
 
-const BUILTIN_NAMESPACE = '@opensip-tools/checks-builtin';
-
 export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
   if (checksLoaded) return;
 
@@ -161,32 +186,73 @@ export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
     }
   }
 
-  // 2. Load built-in checks directly from checks-builtin
-  const builtin = await import('@opensip-tools/checks-builtin');
-  for (const check of builtin.checks) {
-    defaultRegistry.register(check, BUILTIN_NAMESPACE);
-  }
-  getCheckDisplayName = builtin.getCheckDisplayName;
-  getCheckIcon = builtin.getCheckIcon;
+  // 3. Discover and load every @opensip-tools/checks-* package installed
+  //    in node_modules. No package is privileged — what used to be a
+  //    hardcoded `import('@opensip-tools/checks-builtin')` is now an
+  //    ordinary npm dependency declared by @opensip-tools/cli and
+  //    discovered via discoverCheckPackages() like every other pack.
+  //    Project config can override (plugins.checkPackages: [...]) or
+  //    opt out (plugins.autoDiscoverChecks: false).
+  //
+  //    `projectDir` is the discovery anchor — discoverCheckPackages
+  //    walks up to ancestor node_modules from there. When called
+  //    without one (e.g. ad-hoc `opensip-tools fit` in an unconfigured
+  //    dir) we fall back to the CLI's own install dir so the bundled
+  //    deps still resolve.
+  const discoveryAnchor = projectDir ?? cliInstallDir();
+  const checksRegistered = await loadDiscoveredCheckPackages(discoveryAnchor);
 
-  // 3. Discover and load additional check packages from node_modules.
-  //    Default: scan for any @opensip-tools/checks-* package. Users can
-  //    set plugins.checkPackages in opensip-tools.config.yml to use an
-  //    explicit list, or plugins.autoDiscoverChecks: false to opt out.
-  if (projectDir) {
-    await loadDiscoveredCheckPackages(projectDir);
+  // 4. No-checks-loaded guard. Silent zero-checks would let a misconfig
+  //    or missing dep produce a green run that scanned nothing — the
+  //    exact failure mode the CLI exists to prevent. Warn loudly.
+  if (checksRegistered === 0) {
+    const msg =
+      'opensip-tools: no check packages were loaded. ' +
+      'Install at least one @opensip-tools/checks-* package, ' +
+      'or declare plugins.checkPackages in opensip-tools.config.yml.\n';
+    process.stderr.write(msg);
+    logger.warn({
+      evt: 'cli.check_packages.empty',
+      module: 'cli:fit',
+      msg: 'no check packages loaded',
+    });
   }
 
+  rebuildDisplayLookups();
   checksLoaded = true;
 }
 
 /**
- * Load every check package returned by discoverCheckPackages(). Each
- * package's main entry should re-export a `checks` array (FitPluginExports
- * shape). Errors loading any one package don't fail the others — they
- * surface to stderr the same way fit-domain plugin failures do.
+ * Resolve the directory the CLI was installed into, used as a discovery
+ * fallback when no projectDir is supplied. Walks up from this module's
+ * URL to the @opensip-tools/cli package root so node_modules lookup
+ * sees the CLI's own dependency tree (which now contains checks-builtin
+ * and any other check packages declared in cli/package.json).
  */
-async function loadDiscoveredCheckPackages(projectDir: string): Promise<void> {
+function cliInstallDir(): string {
+  // import.meta.url points at this file inside the CLI's dist/. The CLI
+  // package root is two levels up from dist/commands/. Resolve via the
+  // Node URL → path bridge to keep this OS-agnostic.
+  const thisFile = fileURLToPath(import.meta.url);
+  return dirname(dirname(dirname(thisFile)));
+}
+
+/**
+ * Load every check package returned by discoverCheckPackages(). Each
+ * package's main entry should follow the FitPluginExports contract:
+ *
+ *   - `checks`: readonly Check[]                (required)
+ *   - `checkDisplay`: { [slug]: [icon, name] }  (optional)
+ *
+ * Errors loading any one package don't fail the others — they surface
+ * to stderr the same way fit-domain plugin failures do.
+ *
+ * Returns the total number of checks registered across all loaded
+ * packages, so the caller can warn when zero packages contributed
+ * anything (a silent green run scanning nothing is the failure mode
+ * we want to make impossible).
+ */
+async function loadDiscoveredCheckPackages(projectDir: string): Promise<number> {
   const {
     discoverCheckPackages,
     readCheckPackageMetadata,
@@ -199,6 +265,7 @@ async function loadDiscoveredCheckPackages(projectDir: string): Promise<void> {
     explicitPackages: prefs.checkPackages,
     autoDiscover: prefs.autoDiscoverChecks,
   });
+  let totalRegistered = 0;
   for (const pkg of discovered) {
     const meta = readCheckPackageMetadata(pkg.packageDir);
     if (!meta) {
@@ -207,7 +274,10 @@ async function loadDiscoveredCheckPackages(projectDir: string): Promise<void> {
     }
     try {
       const moduleUrl = pathToFileURL(meta.mainEntry).href;
-      const mod = (await import(moduleUrl)) as { checks?: unknown };
+      const mod = (await import(moduleUrl)) as {
+        checks?: unknown;
+        checkDisplay?: unknown;
+      };
       const checks = mod.checks;
       if (!Array.isArray(checks)) {
         process.stderr.write(`opensip-tools: check package ${pkg.name} does not export a "checks" array — skipping\n`);
@@ -220,6 +290,8 @@ async function loadDiscoveredCheckPackages(projectDir: string): Promise<void> {
           registered++;
         }
       }
+      totalRegistered += registered;
+      mergeCheckDisplay(pkg.name, mod.checkDisplay);
       logger.info({
         evt: 'cli.check_package.loaded',
         module: 'cli:fit',
@@ -234,6 +306,40 @@ async function loadDiscoveredCheckPackages(projectDir: string): Promise<void> {
         module: 'cli:fit',
         name: pkg.name,
         error: msg,
+      });
+    }
+  }
+  return totalRegistered;
+}
+
+/**
+ * Merge a check package's display map into the CLI-wide registry.
+ *
+ * Validates each entry is a `[icon, name]` tuple before accepting it —
+ * a malformed `checkDisplay` export from a third-party package shouldn't
+ * crash the run. Bad entries are dropped silently with a debug log so
+ * the user still gets a (worse-formatted) result rather than a hang.
+ *
+ * On collision, last package loaded wins. That's intentional: it lets
+ * a downstream package override a base package's display name without
+ * having to touch the original.
+ */
+function mergeCheckDisplay(packageName: string, raw: unknown): void {
+  if (!raw || typeof raw !== 'object') return;
+  for (const [slug, entry] of Object.entries(raw as Record<string, unknown>)) {
+    if (
+      Array.isArray(entry) &&
+      entry.length === 2 &&
+      typeof entry[0] === 'string' &&
+      typeof entry[1] === 'string'
+    ) {
+      mergedCheckDisplay.set(slug, [entry[0], entry[1]] as const);
+    } else {
+      logger.debug({
+        evt: 'cli.check_package.bad_display_entry',
+        module: 'cli:fit',
+        packageName,
+        slug,
       });
     }
   }
@@ -402,12 +508,17 @@ export async function executeFit(
   };
 
   // -- Execute via FitnessRecipeService --
+  // Forward globalExcludes from the project config so the matchFiles()
+  // fileCache fallback honors them. Without this, scope-empty checks
+  // (e.g. file-length-limit) scan every prewarmed file regardless of
+  // whether the project config told us to exclude it.
   const service = new FitnessRecipeService({
     cwd: args.cwd,
     checkTargetFiles,
     callbacks,
     disabledChecks,
     includeViolations: true,
+    globalExcludes: targetsConfig.globalExcludes,
   });
 
   let fitnessResult: FitnessRecipeResult;

@@ -80,6 +80,7 @@ export type {
   LangPluginExports,
   PluginExports,
   PluginMetadata,
+  CheckDisplayEntry,
   CheckPackageDiscoveryOptions,
   DiscoveredCheckPackage,
   CheckPackageMetadata,

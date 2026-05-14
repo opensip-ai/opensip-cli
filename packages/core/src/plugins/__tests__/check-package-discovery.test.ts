@@ -45,11 +45,17 @@ describe('discoverCheckPackages — auto-discovery (default)', () => {
     ])
   })
 
-  it('skips checks-builtin (always loaded directly by the CLI)', () => {
-    makeNodeModulesPackage(testDir, '@opensip-tools/checks-builtin')
+  it('returns every @opensip-tools/checks-* package without privileging any one', () => {
+    // No package is hardcoded into the CLI any more; the discovery layer
+    // treats them all the same. The only reason a check package would be
+    // excluded is if the package.json is missing or unreadable.
+    makeNodeModulesPackage(testDir, '@opensip-tools/checks-typescript')
     makeNodeModulesPackage(testDir, '@opensip-tools/checks-python')
     const result = discoverCheckPackages({ projectDir: testDir })
-    expect(result.map((p) => p.name)).toEqual(['@opensip-tools/checks-python'])
+    expect(result.map((p) => p.name).sort()).toEqual([
+      '@opensip-tools/checks-python',
+      '@opensip-tools/checks-typescript',
+    ])
   })
 
   it('ignores @opensip-tools packages that are not check packs', () => {
@@ -109,14 +115,20 @@ describe('discoverCheckPackages — explicit packages', () => {
     expect(result).toEqual([])
   })
 
-  it('silently strips checks-builtin from the explicit list', () => {
-    makeNodeModulesPackage(testDir, '@opensip-tools/checks-builtin')
+  it('honors every entry in the explicit list — no package is privileged', () => {
+    // After the decoupling there is no hardcoded "builtin" package; the
+    // explicit list passes through verbatim. This guards against
+    // re-introducing a magic name skip.
+    makeNodeModulesPackage(testDir, '@opensip-tools/checks-typescript')
     makeNodeModulesPackage(testDir, '@opensip-tools/checks-python')
     const result = discoverCheckPackages({
       projectDir: testDir,
-      explicitPackages: ['@opensip-tools/checks-builtin', '@opensip-tools/checks-python'],
+      explicitPackages: ['@opensip-tools/checks-typescript', '@opensip-tools/checks-python'],
     })
-    expect(result.map((p) => p.name)).toEqual(['@opensip-tools/checks-python'])
+    expect(result.map((p) => p.name).sort()).toEqual([
+      '@opensip-tools/checks-python',
+      '@opensip-tools/checks-typescript',
+    ])
   })
 })
 

@@ -29,6 +29,12 @@ export interface ExecutionOptions {
   recipe: FitnessRecipe
   /** Per-check pre-resolved file paths from target overrides */
   checkTargetFiles?: ReadonlyMap<string, readonly string[]>
+  /**
+   * Run-wide globalExcludes from project config. Forwarded into each
+   * check's RunOptions so scope-empty checks honor exclusions instead
+   * of scanning every file in the prewarmed cache.
+   */
+  globalExcludes?: readonly string[]
 }
 
 /** Service context providing session state, callbacks, and abort control */
@@ -46,7 +52,7 @@ export interface ExecutionServiceContext {
 /** Execute fitness checks concurrently with configurable parallelism and per-check timeouts */
 export async function executeParallel(ctx: ExecutionServiceContext, opts: ExecutionOptions): Promise<void> {
   // in-memory: single-threaded Node.js access pattern
-  const { checks, cwd, recipe, checkTargetFiles } = opts
+  const { checks, cwd, recipe, checkTargetFiles, globalExcludes } = opts
   const { session, callbacks, abortController } = ctx
   const recipeTimeout = recipe.execution.timeout ?? 30_000
   const maxParallel = getEffectiveMaxParallel(recipe)
@@ -141,7 +147,11 @@ export async function executeParallel(ctx: ExecutionServiceContext, opts: Execut
       const timeoutId = setTimeout(() => checkAbortController.abort(), checkTimeout)
 
       const targetFiles = checkTargetFiles?.get(check.config.slug)
-      void executeWithRetry(() => check.run(cwd, { signal: checkAbortController.signal, ...(targetFiles ? { targetFiles } : {}) }), {
+      void executeWithRetry(() => check.run(cwd, {
+        signal: checkAbortController.signal,
+        ...(targetFiles ? { targetFiles } : {}),
+        ...(globalExcludes ? { globalExcludes } : {}),
+      }), {
         enabled: recipe.execution.retryOnFailure ?? false,
         maxRetries: recipe.execution.maxRetries ?? 2,
         checkId,

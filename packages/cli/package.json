@@ -27,7 +27,8 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@opensip-tools/checks-builtin": "workspace:*",
+    "@opensip-tools/checks-typescript": "workspace:*",
+    "@opensip-tools/checks-universal": "workspace:*",
     "@opensip-tools/core": "workspace:*",
     "@opensip-tools/lang-cpp": "workspace:*",
     "@opensip-tools/lang-go": "workspace:*",

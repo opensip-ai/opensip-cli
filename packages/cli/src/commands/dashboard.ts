@@ -9,44 +9,43 @@ import { join } from 'node:path';
 
 import { loadSessions, getReportsDir, type CheckCatalogEntry, type RecipeCatalogEntry } from '../persistence/store.js';
 import { generateDashboardHtml } from '../persistence/dashboard/index.js';
-import { ensureChecksLoaded } from './fit.js';
+import { ensureChecksLoaded, getDisplayName, getIcon } from './fit.js';
 import type { DashboardResult } from '../types.js';
-
-// We need access to getCheckDisplayName and getCheckIcon after loading
-let getCheckDisplayName: (slug: string) => string = (slug) =>
-  slug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-let getCheckIcon: (slug: string) => string = () => '\uD83D\uDD0D';
 
 // ---------------------------------------------------------------------------
 // openDashboard
 // ---------------------------------------------------------------------------
 
+/**
+ * "built-in" vs "community" classification for the dashboard catalog.
+ * Anything registered under the @opensip-tools/ scope is first-party;
+ * anything else (loose plugin file, third-party npm package) is
+ * community. We no longer match a single magic package name — the
+ * scope rule keeps working when checks-builtin is split into multiple
+ * first-party packages (checks-typescript, checks-universal, etc).
+ */
+const FIRST_PARTY_SCOPE = '@opensip-tools/';
+
+function classifyCheckSource(namespace: string | undefined): 'built-in' | 'community' {
+  return namespace?.startsWith(FIRST_PARTY_SCOPE) ? 'built-in' : 'community';
+}
+
 export async function openDashboard(projectDir?: string): Promise<DashboardResult> {
   await ensureChecksLoaded(projectDir);
 
-  // After loading, pull display helpers from checks-builtin
-  try {
-    const builtin = await import('@opensip-tools/checks-builtin');
-    getCheckDisplayName = builtin.getCheckDisplayName;
-    getCheckIcon = builtin.getCheckIcon;
-  } catch { /* use defaults */ }
-
   const sessions = loadSessions(20);
 
-  // Collect check catalog from registry — determine source from namespace
-  const BUILTIN_NAMESPACE = '@opensip-tools/checks-builtin';
   const catalog: CheckCatalogEntry[] = defaultRegistry.list().map(check => {
     const namespace = defaultRegistry.getNamespace(check.config.slug);
-    const source = (namespace === BUILTIN_NAMESPACE ? 'built-in' : 'community') as 'built-in' | 'community';
     return {
       slug: check.config.slug,
-      name: getCheckDisplayName(check.config.slug),
-      icon: getCheckIcon(check.config.slug),
+      name: getDisplayName(check.config.slug),
+      icon: getIcon(check.config.slug),
       description: check.config.description,
       longDescription: check.config.longDescription,
       tags: [...(check.config.tags ?? [])],
       confidence: check.config.confidence ?? 'medium',
-      source,
+      source: classifyCheckSource(namespace),
     };
   });
 

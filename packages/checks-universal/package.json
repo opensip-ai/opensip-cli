@@ -1,8 +1,8 @@
 {
   "name": "@opensip-tools/checks-universal",
-  "version": "0.6.1",
+  "version": "1.0.0",
   "license": "MIT",
-  "description": "Cross-language fitness checks (TODO comments, file length, etc.)",
+  "description": "Cross-language fitness checks for opensip-tools",
   "repository": {
     "type": "git",
     "url": "https://github.com/opensip-ai/opensip-tools.git",

@@ -24,7 +24,7 @@ import { executeWithRetry } from './retry.js'
 /** Execute fitness checks sequentially with per-check timeouts and retry support */
 // eslint-disable-next-line sonarjs/cognitive-complexity -- Inherent complexity: sequential check execution with per-check timeouts, abort signal handling, file matching, error recovery, and progress callbacks
 export async function executeSequential(ctx: ExecutionServiceContext, opts: ExecutionOptions): Promise<void> {
-  const { checks, cwd, recipe, checkTargetFiles } = opts
+  const { checks, cwd, recipe, checkTargetFiles, globalExcludes } = opts
   const { session, callbacks, abortController } = ctx
   const recipeTimeout = recipe.execution.timeout ?? 30_000
   const totalChecks = checks.length
@@ -58,7 +58,11 @@ export async function executeSequential(ctx: ExecutionServiceContext, opts: Exec
       const retryResult = await executeWithRetry(
         () => {
           const targetFiles = checkTargetFiles?.get(check.config.slug)
-          return check.run(cwd, { signal: checkAbortController.signal, ...(targetFiles ? { targetFiles } : {}) })
+          return check.run(cwd, {
+            signal: checkAbortController.signal,
+            ...(targetFiles ? { targetFiles } : {}),
+            ...(globalExcludes ? { globalExcludes } : {}),
+          })
         },
         {
           enabled: recipe.execution.retryOnFailure ?? false,

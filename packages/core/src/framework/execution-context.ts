@@ -8,6 +8,9 @@
  */
 
 import * as fs from 'node:fs/promises'
+import { relative } from 'node:path'
+
+import { Minimatch } from 'minimatch'
 
 import { SystemError } from '../lib/errors.js'
 
@@ -91,6 +94,16 @@ export interface RunOptions {
   readonly signal?: AbortSignal
   /** Pre-resolved file paths from per-check target overrides. When set, matchFiles() returns these instead of cache paths. */
   readonly targetFiles?: readonly string[]
+  /**
+   * Run-wide file exclusion patterns from the project config's
+   * `globalExcludes`. Applied to the fileCache fallback path used by
+   * scope-empty checks (e.g. `file-length-limit`). Without this filter,
+   * a check that declares `scope: { languages: [], concerns: [] }`
+   * would scan every prewarmed file regardless of whether the project
+   * told us to exclude it — surfacing findings inside `docs/`,
+   * `tests/fixtures/`, etc., contrary to user intent.
+   */
+  readonly globalExcludes?: readonly string[]
 }
 
 /**
@@ -105,15 +118,36 @@ export interface ExecutionContextConfig {
 
 /**
  * Creates the matchFiles function for the execution context.
+ *
+ * `globalExcludes` come from the project config's top-level
+ * `globalExcludes` array. They are applied ONLY to the fileCache
+ * fallback path — the path taken by scope-empty checks. Custom
+ * `patterns` arguments are honored as-is (the caller knows what they
+ * want), and `targetFiles` from per-check overrides are pre-filtered
+ * by `preResolveAllTargets`. Pre-compiled to Minimatch matchers so
+ * we don't pay regex compilation per filter call.
  */
 function createMatchFilesFunction(
   cwd: string,
   matcher: PathMatcher,
   targetFiles?: readonly string[],
+  globalExcludes?: readonly string[],
 ): (
   patterns?: readonly string[],
   options?: { ignore?: readonly string[] },
 ) => Promise<readonly string[]> {
+  const compiledGlobalExcludes = globalExcludes && globalExcludes.length > 0
+    ? globalExcludes.map((pattern) => new Minimatch(pattern, { dot: true }))
+    : undefined
+
+  const applyGlobalExcludes = (files: readonly string[]): readonly string[] => {
+    if (!compiledGlobalExcludes) return files
+    return files.filter((filePath) => {
+      const rel = relative(cwd, filePath)
+      return !compiledGlobalExcludes.some((m) => m.match(rel))
+    })
+  }
+
   return async (
     patterns?: readonly string[],
     options?: { ignore?: readonly string[] },
@@ -127,15 +161,20 @@ function createMatchFilesFunction(
       return customMatcher.files()
     }
 
-    // Per-check target files take priority over cache
+    // Per-check target files take priority over cache.
+    // These are already filtered by globalExcludes during target
+    // pre-resolution (scope-resolver.ts), so don't re-filter.
     if (targetFiles) {
       return targetFiles
     }
 
     // When the matcher has no include patterns (checks without targets),
-    // fall back to the prewarmed file cache paths
+    // fall back to the prewarmed file cache paths. The cache itself
+    // honors no exclusion config — that's the layer where globalExcludes
+    // must be applied, otherwise scope-empty checks scan every prewarmed
+    // file regardless of project intent.
     if (matcher.includePatterns.length === 0) {
-      return fileCache.paths()
+      return applyGlobalExcludes(fileCache.paths())
     }
 
     return matcher.files()
@@ -171,7 +210,7 @@ export function createExecutionContext(
       return fileCache.exists(filePath)
     },
 
-    matchFiles: createMatchFilesFunction(cwd, matcher, options?.targetFiles),
+    matchFiles: createMatchFilesFunction(cwd, matcher, options?.targetFiles, options?.globalExcludes),
 
     getMatcher(): PathMatcher {
       return matcher
