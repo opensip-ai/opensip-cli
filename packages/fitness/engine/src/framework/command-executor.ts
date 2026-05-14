@@ -6,6 +6,7 @@
  */
 
 import { execAbortable, type AbortableExecOptions } from './abortable-exec.js'
+
 import type { CheckViolation, CommandConfig } from './check-config.js'
 
 // =============================================================================
@@ -51,9 +52,9 @@ export async function executeCommand(
   let result: Awaited<ReturnType<typeof execAbortable>>
   try {
     result = await execAbortable(command, execOptions)
-  } catch (err) {
+  } catch (error) {
     // ENOENT = tool not installed (spawn fails before the process starts)
-    const message = err instanceof Error ? err.message : String(err)
+    const message = error instanceof Error ? error.message : String(error)
     if (message.includes('ENOENT') || message.includes('not found')) {
       return {
         violations: [],
@@ -62,7 +63,7 @@ export async function executeCommand(
         error: `${config.bin} is not installed. Install it to enable this check.`,
       }
     }
-    throw err
+    throw error
   }
 
   if (result.aborted) {
@@ -101,5 +102,6 @@ export async function executeCommand(
  * Quote a file path for shell execution.
  */
 export function quoteForShell(filePath: string): string {
-  return `'${filePath.replace(/'/g, "'\\''")}'`
+  const escaped = filePath.replaceAll('\'', String.raw`'\''`)
+  return `'${escaped}'`
 }

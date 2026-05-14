@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+
 import { detectTerminalCapabilities, ThemeContext } from '../../ui/theme.js';
 
 describe('theme', () => {
@@ -8,20 +9,20 @@ describe('theme', () => {
 
     beforeEach(() => {
       origIsTTY = process.stdout.isTTY;
-      origNoColor = process.env['NO_COLOR'];
+      origNoColor = process.env.NO_COLOR;
     });
 
     afterEach(() => {
-      process.stdout.isTTY = origIsTTY as boolean;
+      process.stdout.isTTY = origIsTTY!;
       if (origNoColor === undefined) {
-        delete process.env['NO_COLOR'];
+        delete process.env.NO_COLOR;
       } else {
-        process.env['NO_COLOR'] = origNoColor;
+        process.env.NO_COLOR = origNoColor;
       }
     });
 
     it('returns colorsEnabled=false when NO_COLOR=1', () => {
-      process.env['NO_COLOR'] = '1';
+      process.env.NO_COLOR = '1';
       const caps = detectTerminalCapabilities();
       expect(caps.supportsColor).toBe(false);
       expect(caps.supports256Color).toBe(false);
@@ -29,8 +30,8 @@ describe('theme', () => {
     });
 
     it('returns isTTY=false when stdout is not a TTY', () => {
-      process.stdout.isTTY = false as unknown as boolean;
-      delete process.env['NO_COLOR'];
+      process.stdout.isTTY = false;
+      delete process.env.NO_COLOR;
       const caps = detectTerminalCapabilities();
       expect(caps.isTTY).toBe(false);
       // supportsColor requires isTTY
@@ -39,7 +40,7 @@ describe('theme', () => {
 
     it('returns isTTY=true when stdout is a TTY', () => {
       process.stdout.isTTY = true;
-      delete process.env['NO_COLOR'];
+      delete process.env.NO_COLOR;
       const caps = detectTerminalCapabilities();
       expect(caps.isTTY).toBe(true);
     });

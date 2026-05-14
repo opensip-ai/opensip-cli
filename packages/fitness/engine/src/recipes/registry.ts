@@ -10,6 +10,7 @@
 import { ValidationError } from '@opensip-tools/core'
 
 import { builtInRecipes, isBuiltInRecipe } from './built-in-recipes.js'
+
 import type { FitnessRecipe } from './types.js'
 
 /** Stub for user recipe loading (not ported to opensip-tools) */
@@ -88,7 +89,7 @@ export class FitnessRecipeRegistry {
 
   /** Return the names of all built-in recipes overridden by user recipes */
   getOverriddenBuiltIns(): readonly string[] {
-    return Array.from(this._overriddenBuiltIns)
+    return [...this._overriddenBuiltIns]
   }
 
   /** Look up a recipe by name or ID */
@@ -144,7 +145,6 @@ export class FitnessRecipeRegistry {
 
   /** Register multiple recipes at once */
   registerAll(recipes: readonly FitnessRecipe[], options?: { allowOverwrite?: boolean }): void {
-    if (!Array.isArray(recipes)) return
     for (const recipe of recipes) {
       this.register(recipe, options)
     }

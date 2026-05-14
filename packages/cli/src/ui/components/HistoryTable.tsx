@@ -2,9 +2,11 @@
  * HistoryTable component — renders run history sessions.
  */
 
-import React from 'react';
 import { Text, Box } from 'ink';
+import React from 'react';
+
 import { useTheme } from '../theme.js';
+
 import type { StoredSession } from '@opensip-tools/cli-shared';
 
 export interface HistoryTableProps {

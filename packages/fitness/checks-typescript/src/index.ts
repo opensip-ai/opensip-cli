@@ -11,10 +11,12 @@
  */
 
 import { isCheck } from '@opensip-tools/fitness'
-import type { CheckDisplayEntry } from '@opensip-tools/core'
-import type { Check } from '@opensip-tools/fitness'
+
 import * as allChecks from './checks/index.js'
 import { CHECK_DISPLAY } from './display/index.js'
+
+import type { CheckDisplayEntry } from '@opensip-tools/core'
+import type { Check } from '@opensip-tools/fitness'
 
 // Collect all Check objects from the barrel exports, deduplicated by ID
 function collectChecks(obj: Record<string, unknown>, seen = new Set<string>()): Check[] {
@@ -33,7 +35,7 @@ function collectChecks(obj: Record<string, unknown>, seen = new Set<string>()): 
 }
 
 /** All TypeScript-only checks, exported as a flat array per plugin contract */
-export const checks: readonly Check[] = collectChecks(allChecks as unknown as Record<string, unknown>)
+export const checks: readonly Check[] = collectChecks(allChecks)
 
 /**
  * Display map for this package's checks, contributed to the CLI's merged

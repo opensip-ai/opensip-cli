@@ -40,7 +40,7 @@ export const circularImportDetection = defineCheck({
       // The anchor file gets the violation. Sort the cycle for deterministic
       // output regardless of graph iteration order.
       const cycle = [...scc].sort()
-      const anchor = cycle[0]!
+      const anchor = cycle[0]
       const chain = cycle.join(' → ') + ' → ' + anchor
 
       violations.push({

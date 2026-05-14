@@ -14,8 +14,9 @@ import {
   processErrorResult,
   type ProcessorContext,
 } from './check-result-processor.js'
-import type { ExecutionOptions, ExecutionServiceContext } from './parallel-execution.js'
 import { executeWithRetry } from './retry.js'
+
+import type { ExecutionOptions, ExecutionServiceContext } from './parallel-execution.js'
 
 // =============================================================================
 // SEQUENTIAL EXECUTION
@@ -32,10 +33,9 @@ export async function executeSequential(ctx: ExecutionServiceContext, opts: Exec
   const processorCtx: ProcessorContext = { session, callbacks, recipe, includeViolations: ctx.includeViolations ?? false }
 
   // @fitness-ignore-next-line file-length-limits -- Sequential check execution loop: orchestrates check lifecycle (start, run, retry, complete) callbacks
-  for (let i = 0; i < checks.length; i++) {
+  for (const [i, check] of checks.entries()) {
     if (abortController?.signal.aborted) break
 
-    const check = checks[i]
     if (!check) continue
 
     const checkId = check.config.id

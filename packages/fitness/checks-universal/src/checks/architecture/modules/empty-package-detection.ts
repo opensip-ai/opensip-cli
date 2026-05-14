@@ -66,8 +66,8 @@ function resolveSubpathExports(
   exports: Record<string, unknown>,
   packageDir: string,
 ): string | null {
-  const exportEntries = Object.keys(exports).filter((k) => k !== '.')
-  const firstKey = exportEntries[0]
+  const exportEntry = Object.keys(exports).find((k) => k !== '.')
+  const firstKey = exportEntry
   if (firstKey === undefined) {
     return null
   }
@@ -85,7 +85,7 @@ function resolveSubpathExports(
 
 function getMainEntryFile(packageJsonPath: string): string | null {
   try {
-    const content = fs.readFileSync(packageJsonPath, 'utf-8')
+    const content = fs.readFileSync(packageJsonPath, 'utf8')
     const pkg = JSON.parse(content) as Record<string, unknown>
     const packageDir = path.dirname(packageJsonPath)
 
@@ -124,7 +124,7 @@ function analyzeBarrelFile(filePath: string): {
   }
 
   try {
-    const content = fs.readFileSync(filePath, 'utf-8')
+    const content = fs.readFileSync(filePath, 'utf8')
     const lines = content.split('\n')
 
     let exportCount = 0
@@ -173,8 +173,8 @@ function determinePackageReason(
 
 function analyzePackage(packageJsonPath: string, projectRoot: string): PackageInfo | null {
   try {
-    const content = fs.readFileSync(packageJsonPath, 'utf-8')
-    const pkg = JSON.parse(content)
+    const content = fs.readFileSync(packageJsonPath, 'utf8')
+    const pkg = JSON.parse(content) as { name?: string; bin?: unknown }
     const packageDir = path.dirname(packageJsonPath)
     const relativePath = path.relative(projectRoot, packageDir)
 
@@ -196,7 +196,7 @@ function analyzePackage(packageJsonPath: string, projectRoot: string): PackageIn
         return null
       }
       return {
-        name: pkg.name || path.basename(packageDir),
+        name: pkg.name ?? path.basename(packageDir),
         packagePath: relativePath,
         mainEntry: 'not found',
         exportCount: 0,
@@ -224,7 +224,7 @@ function analyzePackage(packageJsonPath: string, projectRoot: string): PackageIn
     )
 
     return {
-      name: pkg.name || path.basename(packageDir),
+      name: pkg.name ?? path.basename(packageDir),
       packagePath: relativePath,
       mainEntry: relativeMainEntry,
       exportCount,
@@ -268,7 +268,7 @@ function createPackageViolation(pkg: PackageInfo, cwd: string): CheckViolation {
   return {
     filePath: entryPath,
     line: 1,
-    message: `Package '${pkg.name}' appears empty or has mostly commented exports. ${pkg.reason || ''}`,
+    message: `Package '${pkg.name}' appears empty or has mostly commented exports. ${pkg.reason ?? ''}`,
     severity: pkg.exportCount === 0 ? 'error' : 'warning',
     suggestion,
     match: pkg.name,
@@ -305,6 +305,7 @@ export const emptyPackageDetection = defineCheck({
   fileTypes: ['json'],
 
   // @fitness-ignore-next-line concurrency-safety -- async keyword required by analyzeAll interface contract; synchronous analysis implementation
+  // eslint-disable-next-line @typescript-eslint/require-await -- AnalyzeAllCheckConfig requires Promise<CheckViolation[]>; this implementation is synchronous
   async analyzeAll(files: FileAccessor): Promise<CheckViolation[]> {
     const cwd = process.cwd()
 

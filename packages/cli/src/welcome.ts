@@ -18,15 +18,15 @@ export interface WelcomeOptions {
   readonly write?: (s: string) => void
 }
 
-const ANSI_BOLD = '\x1b[1m'
-const ANSI_DIM = '\x1b[2m'
-const ANSI_CYAN = '\x1b[36m'
-const ANSI_RESET = '\x1b[0m'
+const ANSI_BOLD = '\u001B[1m'
+const ANSI_DIM = '\u001B[2m'
+const ANSI_CYAN = '\u001B[36m'
+const ANSI_RESET = '\u001B[0m'
 
 /** True when stdout is a terminal and colors are safe to emit. */
 function colorsEnabled(): boolean {
-  if (process.env['NO_COLOR']) return false
-  if (process.env['FORCE_COLOR']) return true
+  if (process.env.NO_COLOR) return false
+  if (process.env.FORCE_COLOR) return true
   return Boolean(process.stdout.isTTY)
 }
 

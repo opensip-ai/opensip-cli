@@ -22,15 +22,15 @@ function analyzeCatchSafety(content: string, _filePath: string): CheckViolation[
   let catchHasInstanceofCheck = false
   let catchVarName = ''
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i] ?? ''
+  for (const [i, line_] of lines.entries()) {
+    const line = line_ ?? ''
     const trimmed = line.trim()
 
     // Skip comments
     if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue
 
     // Detect catch clause entry
-    const catchMatch = line.match(/\bcatch\s*\(\s*(\w+)(?:\s*:\s*(\w+))?\s*\)/)
+    const catchMatch = /\bcatch\s*\(\s*(\w+)(?:\s*:\s*(\w+))?\s*\)/.exec(line)
     if (catchMatch) {
       inCatchBlock = true
       catchBlockStart = i

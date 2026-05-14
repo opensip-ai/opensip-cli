@@ -4,7 +4,6 @@
  */
 
 import { logger } from '@opensip-tools/core/logger'
-
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
 /**
@@ -80,7 +79,7 @@ const SECRET_PATTERNS = [
   },
   // Private keys (PEM format start) - fixed pattern, no variable repetition
   {
-    regex: createPattern('-----BEGIN\\s+(?:RSA\\s+)?PRIVATE\\s+KEY-----', 'g'),
+    regex: createPattern(String.raw`-----BEGIN\s+(?:RSA\s+)?PRIVATE\s+KEY-----`, 'g'),
     message: 'Hardcoded private key detected',
     suggestion:
       'Move private key to a secure file outside the repository or use a secrets manager. Never commit private keys to source control. If exposed, rotate immediately.',
@@ -134,8 +133,8 @@ export const noHardcodedSecrets = defineCheck({
     const violations: CheckViolation[] = []
     const lines = content.split('\n')
 
-    for (let lineNum = 0; lineNum < lines.length; lineNum++) {
-      const line = lines[lineNum] ?? ''
+    for (const [lineNum, line_] of lines.entries()) {
+      const line = line_ ?? ''
 
       // Skip comments
       const trimmed = line.trim()

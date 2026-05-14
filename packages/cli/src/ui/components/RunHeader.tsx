@@ -3,8 +3,9 @@
  * Displays tool name, metadata key-value pairs, description, and separator.
  */
 
-import React from 'react';
 import { Text, Box } from 'ink';
+import React from 'react';
+
 import { useTheme } from '../theme.js';
 
 export interface RunHeaderMeta {

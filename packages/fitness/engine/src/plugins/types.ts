@@ -6,10 +6,10 @@
  * the kernel doesn't know about.
  */
 
-import type { CheckDisplayEntry, PluginMetadata } from '@opensip-tools/core'
 
 import type { Check } from '../framework/check-types.js'
 import type { FitnessRecipe } from '../recipes/types.js'
+import type { CheckDisplayEntry, PluginMetadata } from '@opensip-tools/core'
 
 /** What a fitness plugin package/file exports */
 export interface FitPluginExports {

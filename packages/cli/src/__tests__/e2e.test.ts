@@ -7,10 +7,11 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, rmSync, readdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
 import { describe, it, expect, afterEach } from 'vitest';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
@@ -23,7 +24,7 @@ const FIXTURE = join(__dirname, 'fixtures/sample-project');
 // place — fixes the assertion-vs-source drift that shipped 0.2.0 with
 // the --version test still pinned to '0.1.0'.
 const CLI_PKG_VERSION: string = (() => {
-  const pkg = JSON.parse(readFileSync(join(__dirname, '../../package.json'), 'utf-8')) as { version: string };
+  const pkg = JSON.parse(readFileSync(join(__dirname, '../../package.json'), 'utf8')) as { version: string };
   return pkg.version;
 })();
 
@@ -32,13 +33,13 @@ function run(...args: string[]): { stdout: string; exitCode: number } {
   try {
     const stdout = execFileSync('node', [CLI, ...args], {
       cwd: FIXTURE,
-      encoding: 'utf-8',
+      encoding: 'utf8',
       timeout: 60_000,
       env: { ...process.env, NO_COLOR: '1' },
     });
     return { stdout, exitCode: 0 };
-  } catch (err: any) {
-    return { stdout: err.stdout ?? '', exitCode: err.status ?? 1 };
+  } catch (error: any) {
+    return { stdout: error.stdout ?? '', exitCode: error.status ?? 1 };
   }
 }
 
@@ -47,13 +48,13 @@ function runIn(cwd: string, ...args: string[]): { stdout: string; exitCode: numb
   try {
     const stdout = execFileSync('node', [CLI, ...args], {
       cwd,
-      encoding: 'utf-8',
+      encoding: 'utf8',
       timeout: 60_000,
       env: { ...process.env, NO_COLOR: '1' },
     });
     return { stdout, exitCode: 0 };
-  } catch (err: any) {
-    return { stdout: err.stdout ?? '', exitCode: err.status ?? 1 };
+  } catch (error: any) {
+    return { stdout: error.stdout ?? '', exitCode: error.status ?? 1 };
   }
 }
 
@@ -174,7 +175,7 @@ describe('CLI e2e', () => {
       mkdirSync(join(tempDir, 'nested'), { recursive: true });
       try {
         // Seed the fixture's config into a non-default location
-        const configSrc = readFileSync(join(FIXTURE, 'opensip-tools.config.yml'), 'utf-8');
+        const configSrc = readFileSync(join(FIXTURE, 'opensip-tools.config.yml'), 'utf8');
         const configPath = join(tempDir, 'nested', 'custom.yml');
         writeFileSync(configPath, configSrc);
         mkdirSync(join(tempDir, 'src'), { recursive: true });
@@ -193,7 +194,7 @@ describe('CLI e2e', () => {
       const tempDir = join(tmpdir(), `opensip-e2e-pkgjson-${Date.now()}-${Math.random().toString(36).slice(2)}`);
       mkdirSync(join(tempDir, '.config'), { recursive: true });
       try {
-        const configSrc = readFileSync(join(FIXTURE, 'opensip-tools.config.yml'), 'utf-8');
+        const configSrc = readFileSync(join(FIXTURE, 'opensip-tools.config.yml'), 'utf8');
         writeFileSync(join(tempDir, '.config', 'opensip-tools.config.yml'), configSrc);
         writeFileSync(
           join(tempDir, 'package.json'),
@@ -278,15 +279,15 @@ describe('CLI e2e', () => {
     it('NO_COLOR=1 disables ANSI escape sequences', () => {
       const { stdout } = run('--help');
       // ANSI escape sequences start with ESC (0x1b)
-      // eslint-disable-next-line no-control-regex
-      const hasAnsi = /\x1b\[/.test(stdout);
+       
+      const hasAnsi = stdout.includes('[');
       expect(hasAnsi).toBe(false);
     });
 
     it('--list output has no ANSI escape sequences', () => {
       const { stdout } = run('fit', '--list');
-      // eslint-disable-next-line no-control-regex
-      const hasAnsi = /\x1b\[/.test(stdout);
+       
+      const hasAnsi = stdout.includes('[');
       expect(hasAnsi).toBe(false);
     });
   });

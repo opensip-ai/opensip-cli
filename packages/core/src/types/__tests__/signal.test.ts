@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
+
 import { createSignal } from '../../types/signal.js';
+
 import type { CreateSignalInput } from '../../types/signal.js';
 
 describe('createSignal', () => {

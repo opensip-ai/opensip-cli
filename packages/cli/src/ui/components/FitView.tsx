@@ -5,21 +5,20 @@
  * 3. Transitions to ResultsTable + Summary when complete
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import { ensureChecksLoaded, getEnabledCheckCount, executeFit , reportToCloud } from '@opensip-tools/fitness';
 import { useApp, Box, Text } from 'ink';
-import type { CliArgs } from '@opensip-tools/cli-shared';
-import type { FitDoneResult, ErrorResult, CliOutput } from '@opensip-tools/cli-shared';
-import { ensureChecksLoaded, getEnabledCheckCount, executeFit } from '@opensip-tools/fitness';
-import { reportToCloud } from '@opensip-tools/fitness';
+import React, { useState, useEffect, useCallback } from 'react';
 
 import { Banner } from './Banner.js';
-import { RunHeader } from './RunHeader.js';
-import { Spinner } from './Spinner.js';
-import { ResultsTable } from './ResultsTable.js';
-import { Summary } from './Summary.js';
-import { Findings } from './Findings.js';
 import { CloudReportStatus } from './CloudReportStatus.js';
 import { ErrorMessage } from './ErrorMessage.js';
+import { Findings } from './Findings.js';
+import { ResultsTable } from './ResultsTable.js';
+import { RunHeader } from './RunHeader.js';
+import { Spinner } from './Spinner.js';
+import { Summary } from './Summary.js';
+
+import type { FitDoneResult, ErrorResult, CliOutput , CliArgs } from '@opensip-tools/cli-shared';
 
 type FitState =
   | { phase: 'loading' }
@@ -45,7 +44,7 @@ export function FitView({ args }: FitViewProps): React.ReactElement {
   useEffect(() => {
     let cancelled = false;
 
-    (async () => {
+    void (async () => {
       // Phase 1: Load checks to get count for header
       await ensureChecksLoaded(args.cwd);
       const checkCount = getEnabledCheckCount();
@@ -83,12 +82,12 @@ export function FitView({ args }: FitViewProps): React.ReactElement {
     })();
 
     return () => { cancelled = true; };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   const recipe = args.tags ? `tags: ${args.tags}` : (args.recipe ?? 'default');
 
   switch (state.phase) {
-    case 'loading':
+    case 'loading': {
       return (
         <Box flexDirection="column">
           {!args.quiet && <Banner />}
@@ -105,8 +104,9 @@ export function FitView({ args }: FitViewProps): React.ReactElement {
           </Box>
         </Box>
       );
+    }
 
-    case 'running':
+    case 'running': {
       return (
         <Box flexDirection="column">
           {!args.quiet && <Banner />}
@@ -126,8 +126,9 @@ export function FitView({ args }: FitViewProps): React.ReactElement {
           </Box>
         </Box>
       );
+    }
 
-    case 'done':
+    case 'done': {
       return (
         <Box flexDirection="column">
           {!args.quiet && <Banner />}
@@ -166,8 +167,10 @@ export function FitView({ args }: FitViewProps): React.ReactElement {
           )}
         </Box>
       );
+    }
 
-    case 'error':
+    case 'error': {
       return <ErrorMessage message={state.result.message} suggestion={state.result.suggestion} />;
+    }
   }
 }

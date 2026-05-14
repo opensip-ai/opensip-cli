@@ -6,9 +6,11 @@
  * the standard way to construct check results.
  */
 
+import { countErrors, countWarnings } from './severity.js'
+
+import type { DirectiveEntry } from '../framework/directive-inventory.js'
 import type { Signal } from '@opensip-tools/core'
 
-import { countErrors, countWarnings } from './severity.js'
 
 // =============================================================================
 // SEVERITY
@@ -22,6 +24,7 @@ export type FindingSeverity = 'error' | 'warning'
 /**
  * Alias for FindingSeverity — used by simplified check.ts types.
  */
+// eslint-disable-next-line sonarjs/redundant-type-aliases -- public re-export under a shorter name for ergonomics
 export type Severity = FindingSeverity
 
 /**
@@ -96,7 +99,7 @@ export interface CheckResult {
   /** Count of violations ignored via directives */
   readonly ignoredCount?: number
   /** Directives that actually suppressed signals during this check's execution */
-  readonly appliedDirectives?: readonly import('../framework/directive-inventory.js').DirectiveEntry[]
+  readonly appliedDirectives?: readonly DirectiveEntry[]
 }
 
 // =============================================================================

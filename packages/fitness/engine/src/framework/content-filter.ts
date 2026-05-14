@@ -51,6 +51,7 @@ interface Region {
 /** Build an array of byte offsets where each line starts. */
 function buildLineStarts(content: string): number[] {
   const lineStarts: number[] = [0]
+  // eslint-disable-next-line unicorn/no-for-loop -- offset-bearing scan: stores UTF-16 indexes
   for (let i = 0; i < content.length; i++) {
     if (content[i] === '\n') lineStarts.push(i + 1)
   }
@@ -89,6 +90,7 @@ function isInRegions(content: string, regions: readonly Region[], line: number, 
   // Convert line/column to byte offset
   let currentLine = 1
   let lineStart = 0
+  // eslint-disable-next-line unicorn/no-for-loop -- offset-bearing scan: captures UTF-16 line start
   for (let i = 0; i < content.length; i++) {
     if (currentLine === line) {
       lineStart = i
@@ -182,6 +184,7 @@ export function filterContent(content: string): FilteredContent {
   }
 }
 
+// eslint-disable-next-line sonarjs/cognitive-complexity -- TS scanner driver: token-by-token loop with per-kind handling; flatter shape would scatter token classification
 function filterContentImpl(content: string): FilteredContent {
   const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, ts.LanguageVariant.Standard, content)
 
@@ -196,7 +199,7 @@ function filterContentImpl(content: string): FilteredContent {
   // code to whitespace). Incremented at TemplateHead, decremented at TemplateTail.
   let templateDepth = 0
 
-  // eslint-disable-next-line no-constant-condition -- scanner loop terminates on EndOfFileToken
+   
   while (true) {
     let token = scanner.scan()
     // @fitness-ignore-next-line unsafe-secret-comparison -- comparing TypeScript SyntaxKind enum, not a secret
@@ -247,8 +250,9 @@ function filterContentImpl(content: string): FilteredContent {
       }
 
       // RegularExpressionLiteral — leave unchanged, regex is code
-      default:
+      default: {
         break
+      }
     }
   }
 

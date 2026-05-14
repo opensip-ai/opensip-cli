@@ -13,6 +13,9 @@
 import { ValidationError as CoreValidationError } from '@opensip-tools/core'
 
 import { scenarioRegistry } from '../../framework/registry.js'
+
+import { createChaosScenarioRunner } from './executor.js'
+
 import type { RunnableScenario } from '../../framework/runnable-scenario.js'
 import type { ChaosConfig } from '../../types/base-types.js'
 import type {
@@ -22,7 +25,6 @@ import type {
   ScenarioExecutionOptions,
 } from '../../types/framework-types.js'
 
-import { createChaosScenarioRunner } from './executor.js'
 
 /**
  * Author-facing configuration for a chaos scenario.

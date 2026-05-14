@@ -6,11 +6,11 @@
  * These patterns can lead to DoS vulnerabilities when processing untrusted input.
  */
 
-import * as ts from 'typescript'
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
-import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
 import { stripStringsAndComments } from '@opensip-tools/fitness'
+import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import * as ts from 'typescript'
 
 /** Patterns that indicate bounded buffer usage */
 const BOUNDED_PATTERNS = [
@@ -157,7 +157,7 @@ export const streamBufferSizeLimits = defineCheck({
   tags: ['quality', 'security', 'best-practices'],
   fileTypes: ['ts'],
   // @fitness-ignore-next-line no-hardcoded-timeouts -- framework default for fitness check execution
-  timeout: 180000, // 3 minutes - scans buffer usage patterns
+  timeout: 180_000, // 3 minutes - scans buffer usage patterns
 
   analyze(content, filePath) {
     // Quick filter

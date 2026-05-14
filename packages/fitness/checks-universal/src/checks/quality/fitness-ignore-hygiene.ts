@@ -20,8 +20,8 @@ function analyzeIgnoreHygiene(content: string, _filePath: string): CheckViolatio
 
   let totalIgnoreDirectives = 0
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i] ?? ''
+  for (const [i, line_] of lines.entries()) {
+    const line = line_ ?? ''
 
     // Only check actual comment lines — skip string literals, code, and template literals
     // that happen to contain ignore-directive text (e.g., regex patterns, suggestion strings)

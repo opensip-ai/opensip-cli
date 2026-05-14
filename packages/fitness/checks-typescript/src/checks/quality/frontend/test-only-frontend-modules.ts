@@ -10,6 +10,7 @@
 import * as path from 'node:path'
 
 import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
+
 import { isTestFile } from '../../../utils/index.js'
 
 

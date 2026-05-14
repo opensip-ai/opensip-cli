@@ -3,7 +3,6 @@
  */
 
 import { logger } from '@opensip-tools/core/logger'
-
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 import { stripStringLiterals, stripStringsAndComments } from '@opensip-tools/fitness'
 
@@ -30,10 +29,10 @@ const SENSITIVE_ENDPOINT_REGEX = new RegExp(
   'gi',
 )
 const GLOBAL_RATE_LIMIT_REGISTER_REGEX = new RegExp(
-  'register\\s*\\(\\s*(?:rateLimit|rateLimiter)',
+  String.raw`register\s*\(\s*(?:rateLimit|rateLimiter)`,
   'i',
 )
-const GLOBAL_RATE_LIMIT_USE_REGEX = new RegExp('use\\s*\\(\\s*(?:rateLimit|rateLimiter)', 'i')
+const GLOBAL_RATE_LIMIT_USE_REGEX = new RegExp(String.raw`use\s*\(\s*(?:rateLimit|rateLimiter)`, 'i')
 const FRAMEWORK_DETECT_REGEX = /(?:fastify|app|router)\.(get|post|put|patch|delete)\s*\(/i
 
 /**

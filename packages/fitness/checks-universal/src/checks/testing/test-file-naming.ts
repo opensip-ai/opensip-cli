@@ -10,7 +10,6 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 
 import { logger } from '@opensip-tools/core/logger'
-
 import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
 
 /**
@@ -47,7 +46,7 @@ const IGNORED_PATTERNS = [
 /**
  * Directories to skip (build artifacts, etc.)
  */
-const SKIP_DIRECTORIES = ['node_modules', 'dist', 'build', 'coverage', '.turbo']
+const SKIP_DIRECTORIES = new Set(['node_modules', 'dist', 'build', 'coverage', '.turbo'])
 
 /**
  * Directories to scan for tests
@@ -104,7 +103,7 @@ function checkTestsDirectory(testsDir: string, cwd: string): CheckViolation[] {
         }
       } else if (stat.isDirectory()) {
         // Skip build artifact directories
-        if (SKIP_DIRECTORIES.includes(entry)) continue
+        if (SKIP_DIRECTORIES.has(entry)) continue
 
         // Recurse into subdirectories (like unit/, integration/, fixtures/, helpers/)
         const subViolations = checkTestsDirectory(fullPath, cwd)
@@ -133,7 +132,7 @@ function scanDirectory(dirPath: string, cwd: string): CheckViolation[] {
 
     for (const entry of entries) {
       // Skip ignored directories (node_modules, dist, build, etc.)
-      if (SKIP_DIRECTORIES.includes(entry) || entry.startsWith('.')) continue
+      if (SKIP_DIRECTORIES.has(entry) || entry.startsWith('.')) continue
 
       const fullPath = path.join(dirPath, entry)
       const stat = fs.statSync(fullPath)
@@ -161,6 +160,7 @@ function scanDirectory(dirPath: string, cwd: string): CheckViolation[] {
  * Analyze all files for test naming violations
  */
 // @fitness-ignore-next-line concurrency-safety -- async keyword required by analyzeAll interface contract; synchronous analysis implementation
+// eslint-disable-next-line @typescript-eslint/require-await -- AnalyzeAllCheckConfig requires Promise<CheckViolation[]>; this implementation is synchronous
 async function analyzeAll(files: FileAccessor): Promise<CheckViolation[]> {
   logger.debug({
     evt: 'fitness.checks.test_file_naming.analyze_all',

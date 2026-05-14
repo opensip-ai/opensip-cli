@@ -24,11 +24,10 @@ const PRINT_STACK_TRACE_PATTERN = /\.printStackTrace\s*\(\s*\)/g
 export function analyzePrintStackTrace(content: string): CheckViolation[] {
   const violations: CheckViolation[] = []
   const lines = content.split('\n')
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]!
-    let match: RegExpExecArray | null
+  for (const [i, line_] of lines.entries()) {
+    const line = line_
     PRINT_STACK_TRACE_PATTERN.lastIndex = 0
-    while ((match = PRINT_STACK_TRACE_PATTERN.exec(line)) !== null) {
+    while (PRINT_STACK_TRACE_PATTERN.exec(line) !== null) {
       violations.push({
         message:
           'e.printStackTrace() bypasses the logging framework — use a logger instead',

@@ -33,16 +33,16 @@ const ONE_CHAR_PREFIXES = new Set(['r', 'b', 'u', 'f'])
 
 function isAsciiLetter(ch: string | undefined): boolean {
   if (!ch) return false
-  const code = ch.charCodeAt(0)
-  return (code >= 0x41 && code <= 0x5a) || (code >= 0x61 && code <= 0x7a)
+  const code = ch.codePointAt(0) ?? 0
+  return (code >= 0x41 && code <= 0x5A) || (code >= 0x61 && code <= 0x7A)
 }
 
 function isIdentChar(ch: string | undefined): boolean {
   if (!ch) return false
-  const code = ch.charCodeAt(0)
+  const code = ch.codePointAt(0) ?? 0
   return (
-    (code >= 0x41 && code <= 0x5a) ||
-    (code >= 0x61 && code <= 0x7a) ||
+    (code >= 0x41 && code <= 0x5A) ||
+    (code >= 0x61 && code <= 0x7A) ||
     (code >= 0x30 && code <= 0x39) ||
     ch === '_'
   )
@@ -109,7 +109,6 @@ function scanTripleString(
   isRaw: boolean,
 ): StringScanResult {
   const len = src.length
-  const closer = quote + quote + quote
   let i = contentStart
   while (i < len) {
     const ch = src[i]
@@ -181,7 +180,7 @@ function scan(src: string): Scan {
     const stringStart = matchStringStart(src, i)
     if (stringStart) {
       const { quoteIndex, isRaw } = stringStart
-      const quote = src[quoteIndex]!
+      const quote = src[quoteIndex]
       // Triple-quoted?
       if (src[quoteIndex + 1] === quote && src[quoteIndex + 2] === quote) {
         const contentStart = quoteIndex + 3
@@ -205,6 +204,7 @@ function scan(src: string): Scan {
 
 function applyRegions(src: string, regions: readonly Region[]): string {
   if (regions.length === 0) return src
+  // eslint-disable-next-line unicorn/prefer-spread -- split('') keeps UTF-16 unit indexing; spread/Array.from use code points and break offsets
   const buf = src.split('')
   for (const r of regions) {
     for (let i = r.start; i < r.end; i++) {

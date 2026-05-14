@@ -3,7 +3,6 @@
  */
 
 import { logger } from '@opensip-tools/core/logger'
-
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 import { stripStringLiterals, stripStringsAndComments } from '@opensip-tools/fitness'
 
@@ -29,7 +28,7 @@ function parseConfigValueFromLine(
   const idx = lowerLine.indexOf(lowerKey)
   if (idx === -1) return null
 
-  const afterKey = line.substring(idx + configKey.length)
+  const afterKey = line.slice(Math.max(0, idx + configKey.length))
   let i = 0
 
   // Skip whitespace
@@ -59,10 +58,10 @@ function parseConfigValueFromLine(
   }
 
   // @fitness-ignore-next-line numeric-validation -- substring is guaranteed digit-only by isDigit loop above
-  const value = parseInt(afterKey.substring(digitStart, i), 10)
+  const value = Number.parseInt(afterKey.slice(digitStart, i), 10)
   return {
     value,
-    matchText: `${configKey}${afterKey.substring(0, i)}`,
+    matchText: `${configKey}${afterKey.slice(0, Math.max(0, i))}`,
   }
 }
 
@@ -181,8 +180,7 @@ export const retryConfigValidation = defineCheck({
     }
 
     const lines = content.split('\n')
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i]
+    for (const [i, line] of lines.entries()) {
       if (!line) continue
 
       const strippedLine = stripStringLiterals(line)

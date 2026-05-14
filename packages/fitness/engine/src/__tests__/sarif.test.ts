@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
+
 import { buildSarifLog, chunkSarifRuns } from '../sarif.js';
+
 import type { CliOutput } from '@opensip-tools/cli-shared';
 
 function makeSampleOutput(): CliOutput {
@@ -56,7 +58,7 @@ describe('buildSarifLog', () => {
 
   it('creates one run per check with findings', () => {
     const sarif = buildSarifLog(makeSampleOutput());
-    const runs = sarif.runs as Array<Record<string, unknown>>;
+    const runs = sarif.runs as Record<string, unknown>[];
 
     // Only 1 check has findings (no-console-log); require-error-handling has 0
     expect(runs).toHaveLength(1);
@@ -64,47 +66,47 @@ describe('buildSarifLog', () => {
 
   it('uses check slug as tool driver name', () => {
     const sarif = buildSarifLog(makeSampleOutput());
-    const runs = sarif.runs as Array<{ tool: { driver: { name: string } } }>;
+    const runs = sarif.runs as { tool: { driver: { name: string } } }[];
 
-    expect(runs[0]!.tool.driver.name).toBe('no-console-log');
+    expect(runs[0].tool.driver.name).toBe('no-console-log');
   });
 
   it('includes file locations in results', () => {
     const sarif = buildSarifLog(makeSampleOutput());
-    const runs = sarif.runs as Array<{ results: Array<Record<string, unknown>> }>;
-    const results = runs[0]!.results;
+    const runs = sarif.runs as { results: Record<string, unknown>[] }[];
+    const results = runs[0].results;
 
     expect(results).toHaveLength(2);
 
     // First result has full location
-    const first = results[0] as { locations: Array<{ physicalLocation: { artifactLocation: { uri: string }; region: { startLine?: number; startColumn?: number } } }> };
-    expect(first.locations[0]!.physicalLocation.artifactLocation.uri).toBe('src/index.ts');
-    expect(first.locations[0]!.physicalLocation.region.startLine).toBe(42);
-    expect(first.locations[0]!.physicalLocation.region.startColumn).toBe(5);
+    const first = results[0] as { locations: { physicalLocation: { artifactLocation: { uri: string }; region: { startLine?: number; startColumn?: number } } }[] };
+    expect(first.locations[0].physicalLocation.artifactLocation.uri).toBe('src/index.ts');
+    expect(first.locations[0].physicalLocation.region.startLine).toBe(42);
+    expect(first.locations[0].physicalLocation.region.startColumn).toBe(5);
   });
 
   it('maps severity to SARIF levels', () => {
     const sarif = buildSarifLog(makeSampleOutput());
-    const runs = sarif.runs as Array<{ results: Array<{ level: string }> }>;
-    const results = runs[0]!.results;
+    const runs = sarif.runs as { results: { level: string }[] }[];
+    const results = runs[0].results;
 
-    expect(results[0]!.level).toBe('error');
-    expect(results[1]!.level).toBe('warning');
+    expect(results[0].level).toBe('error');
+    expect(results[1].level).toBe('warning');
   });
 
   it('includes suggestions as fixes', () => {
     const sarif = buildSarifLog(makeSampleOutput());
-    const runs = sarif.runs as Array<{ results: Array<Record<string, unknown>> }>;
-    const second = runs[0]!.results[1] as { fixes: Array<{ description: { text: string } }> };
+    const runs = sarif.runs as { results: Record<string, unknown>[] }[];
+    const second = runs[0].results[1] as { fixes: { description: { text: string } }[] };
 
-    expect(second.fixes[0]!.description.text).toBe('Use a logger');
+    expect(second.fixes[0].description.text).toBe('Use a logger');
   });
 
   it('includes rule IDs in driver rules', () => {
     const sarif = buildSarifLog(makeSampleOutput());
-    const runs = sarif.runs as Array<{ tool: { driver: { rules: Array<{ id: string }> } } }>;
+    const runs = sarif.runs as { tool: { driver: { rules: { id: string }[] } } }[];
 
-    const ruleIds = runs[0]!.tool.driver.rules.map((r) => r.id);
+    const ruleIds = runs[0].tool.driver.rules.map((r) => r.id);
     expect(ruleIds).toContain('no-console-log');
   });
 
@@ -157,20 +159,20 @@ describe('chunkSarifRuns', () => {
     const runs = [makeRun('a', 300), makeRun('b', 300)];
     const chunks = chunkSarifRuns(runs, 500);
     expect(chunks).toHaveLength(2);
-    expect(chunks[0]![0]!.results).toHaveLength(300);
-    expect(chunks[1]![0]!.results).toHaveLength(300);
+    expect(chunks[0][0].results).toHaveLength(300);
+    expect(chunks[1][0].results).toHaveLength(300);
   });
 
   it('splits a single large run across multiple chunks', () => {
     const runs = [makeRun('big', 1200)];
     const chunks = chunkSarifRuns(runs, 500);
     expect(chunks).toHaveLength(3);
-    expect(chunks[0]![0]!.results).toHaveLength(500);
-    expect(chunks[1]![0]!.results).toHaveLength(500);
-    expect(chunks[2]![0]!.results).toHaveLength(200);
+    expect(chunks[0][0].results).toHaveLength(500);
+    expect(chunks[1][0].results).toHaveLength(500);
+    expect(chunks[2][0].results).toHaveLength(200);
     // Each split chunk preserves the tool driver name
     for (const chunk of chunks) {
-      expect(chunk[0]!.tool.driver.name).toBe('big');
+      expect(chunk[0].tool.driver.name).toBe('big');
     }
   });
 

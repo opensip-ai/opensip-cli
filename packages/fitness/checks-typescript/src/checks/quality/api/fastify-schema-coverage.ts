@@ -11,12 +11,12 @@
  * - Recognizes Zod .parse()/.safeParse() on request properties as equivalent coverage
  */
 
-import * as ts from 'typescript'
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import * as ts from 'typescript'
 
-const BODY_METHODS = ['POST', 'PUT', 'PATCH']
+const BODY_METHODS = new Set(['POST', 'PUT', 'PATCH'])
 
 interface CheckRouteSchemaOptions {
   routeText: string
@@ -111,7 +111,7 @@ function checkMissingBodySchema(
   options: CheckRouteSchemaOptions,
   zodResult: ZodValidationResult,
 ): CheckViolation | null {
-  if (!BODY_METHODS.includes(options.method)) {
+  if (!BODY_METHODS.has(options.method)) {
     return null
   }
   if (hasProperty(options.routeText, 'body')) {

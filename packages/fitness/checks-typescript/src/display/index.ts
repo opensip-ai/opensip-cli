@@ -9,9 +9,10 @@ import { ARCHITECTURE_DISPLAY, DOCUMENTATION_DISPLAY } from './architecture.js'
 import { QUALITY_DISPLAY } from './quality.js'
 import { RESILIENCE_DISPLAY } from './resilience.js'
 import { SECURITY_DISPLAY, TESTING_DISPLAY } from './security-testing.js'
+
 import type { CheckDisplayEntry } from './types.js'
 
-export type { CheckDisplayEntry }
+
 
 /** Combined check display configuration */
 export const CHECK_DISPLAY = Object.freeze<Record<string, CheckDisplayEntry>>({
@@ -23,14 +24,7 @@ export const CHECK_DISPLAY = Object.freeze<Record<string, CheckDisplayEntry>>({
   ...TESTING_DISPLAY,
 })
 
-export {
-  ARCHITECTURE_DISPLAY,
-  DOCUMENTATION_DISPLAY,
-  QUALITY_DISPLAY,
-  RESILIENCE_DISPLAY,
-  SECURITY_DISPLAY,
-  TESTING_DISPLAY,
-}
+
 
 /** Get the icon for a check by slug. Falls back to magnifying glass. */
 export function getCheckIcon(checkSlug: string): string {
@@ -47,3 +41,9 @@ export function getCheckDisplayName(checkSlug: string): string {
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ')
 }
+
+export {type CheckDisplayEntry} from './types.js'
+export {ARCHITECTURE_DISPLAY, DOCUMENTATION_DISPLAY} from './architecture.js'
+export {QUALITY_DISPLAY} from './quality.js'
+export {RESILIENCE_DISPLAY} from './resilience.js'
+export {SECURITY_DISPLAY, TESTING_DISPLAY} from './security-testing.js'

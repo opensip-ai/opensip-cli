@@ -22,10 +22,11 @@
  * SQL). All-local-receiver patterns are excluded.
  */
 
-import * as ts from 'typescript'
 
 import { defineCheck, getCheckConfig, type CheckViolation } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import * as ts from 'typescript'
+
 import { isTestFile } from '../../../utils/index.js'
 
 /**
@@ -215,7 +216,7 @@ function isInMemoryCollectionTypeNode(typeNode: ts.TypeNode | undefined): boolea
       // structures. Treating them as local-collection eliminates the
       // FP class where a service-level `cache: XCache` parameter is
       // read+written within a function body.
-      if (/Cache$/.test(name.text)) return true
+      if (name.text.endsWith('Cache')) return true
     }
   }
   return false
@@ -246,7 +247,7 @@ function isInMemoryCacheReceiverText(text: string): boolean {
   // strip a leading `#` (private field) and `_` (convention)
   const normalized = text.replace(/^[#_]/, '')
   if (normalized === 'cache') return true
-  if (/Cache$/.test(normalized)) return true
+  if (normalized.endsWith('Cache')) return true
   return false
 }
 
@@ -270,11 +271,9 @@ function collectLocalCollectionNames(node: FunctionLikeNode): Set<string> {
     // Don't descend into nested functions — their locals belong to a
     // different scope.
     if (n !== node && isFunctionLikeNode(n)) return
-    if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name)) {
-      if (isInMemoryCollectionInitializer(n.initializer) || isInMemoryCollectionTypeNode(n.type)) {
+    if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && (isInMemoryCollectionInitializer(n.initializer) || isInMemoryCollectionTypeNode(n.type))) {
         names.add(n.name.text)
       }
-    }
     ts.forEachChild(n, visit)
   }
   if (node.body) visit(node.body)
@@ -290,6 +289,7 @@ function collectLocalCollectionNames(node: FunctionLikeNode): Set<string> {
  * the simple field name (no `#` prefix) for matching against
  * `this.<name>.get/set` receivers.
  */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- AST walk over class members: nested type checks reflect the TypeScript AST shape
 function collectClassInMemoryFieldNames(node: FunctionLikeNode): Set<string> {
   const names = new Set<string>()
   let cls: ts.Node | undefined = node.parent
@@ -297,15 +297,16 @@ function collectClassInMemoryFieldNames(node: FunctionLikeNode): Set<string> {
     cls = cls.parent
   }
   if (!cls) return names
-  const classNode = cls as ts.ClassDeclaration | ts.ClassExpression
+  const classNode = cls
   for (const member of classNode.members) {
     if (ts.isPropertyDeclaration(member)) {
       const memberName = member.name
-      const fieldName = ts.isIdentifier(memberName)
-        ? memberName.text
-        : ts.isPrivateIdentifier(memberName)
-          ? memberName.text.replace(/^#/, '')
-          : undefined
+      let fieldName: string | undefined
+      if (ts.isIdentifier(memberName)) {
+        fieldName = memberName.text
+      } else if (ts.isPrivateIdentifier(memberName)) {
+        fieldName = memberName.text.replace(/^#/, '')
+      }
       if (!fieldName) continue
       if (
         isInMemoryCollectionInitializer(member.initializer) ||
@@ -339,10 +340,8 @@ function isAtomicSqlExecute(call: ts.CallExpression): boolean {
   if (call.expression.name.text !== 'execute') return false
   const arg = call.arguments[0]
   if (!arg) return false
-  if (ts.isTaggedTemplateExpression(arg)) {
-    // `sql\`...\``
-    if (ts.isIdentifier(arg.tag) && arg.tag.text === 'sql') return true
-  }
+  if (ts.isTaggedTemplateExpression(arg) && // `sql\`...\``
+    ts.isIdentifier(arg.tag) && arg.tag.text === 'sql') return true
   return false
 }
 
@@ -432,6 +431,7 @@ function classifyCall(
  * read-X-then-update-X on the same shared object. A function with a
  * read on receiver A and an update on receiver B is not a TOCTOU.
  */
+/* eslint-disable sonarjs/cognitive-complexity -- TOCTOU classifier and its inner AST visitor: branches reflect AST node taxonomy; flatter shape would hide the read/update pairing logic */
 function classifyFunctionCalls(
   node: FunctionLikeNode,
   localCollections: Set<string>,
@@ -450,10 +450,7 @@ function classifyFunctionCalls(
       const cls = classifyCall(n, ctx)
       if (cls.kind === 'read-shared' || cls.kind === 'update-shared') {
         const recv = getReceiverName(n)
-        if (!recv) {
-          if (cls.kind === 'read-shared') hasReadOnUnknownReceiver = true
-          else hasUpdateOnUnknownReceiver = true
-        } else {
+        if (recv) {
           const key = recv.isThisField ? `this.${recv.name}` : recv.name
           let entry = perReceiver.get(key)
           if (!entry) {
@@ -462,6 +459,9 @@ function classifyFunctionCalls(
           }
           if (cls.kind === 'read-shared') entry.read = true
           else entry.update = true
+        } else {
+          if (cls.kind === 'read-shared') hasReadOnUnknownReceiver = true
+          else hasUpdateOnUnknownReceiver = true
         }
       }
     }
@@ -481,6 +481,7 @@ function classifyFunctionCalls(
   }
   return { hasSharedReadAndUpdateOnSameReceiver: false }
 }
+/* eslint-enable sonarjs/cognitive-complexity */
 
 /**
  * Options for checking a function for TOCTOU patterns
@@ -586,7 +587,7 @@ export const toctouRaceCondition = defineCheck({
   tags: ['quality', 'performance', 'best-practices'],
   fileTypes: ['ts'],
   // @fitness-ignore-next-line no-hardcoded-timeouts -- framework default for fitness check execution
-  timeout: 180000, // 3 minutes - analyzes read-then-update patterns
+  timeout: 180_000, // 3 minutes - analyzes read-then-update patterns
 
   analyze(content, filePath) {
     // Skip test files — TOCTOU patterns in tests are low-risk

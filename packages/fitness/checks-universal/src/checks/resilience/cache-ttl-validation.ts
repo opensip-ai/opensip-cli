@@ -5,7 +5,6 @@
  */
 
 import { logger } from '@opensip-tools/core/logger'
-
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
 import { isDigit } from './config-validation-helpers.js'
@@ -15,7 +14,7 @@ import { isDigit } from './config-validation-helpers.js'
 // =============================================================================
 
 const MIN_TTL_SECONDS = 5 // Minimum 5 seconds to avoid thundering herd
-const MAX_TTL_SECONDS = 86400 // Maximum 24 hours for general data
+const MAX_TTL_SECONDS = 86_400 // Maximum 24 hours for general data
 const MAX_FINANCIAL_TTL_SECONDS = 60 // Maximum 1 minute for financial data
 
 // =============================================================================
@@ -84,7 +83,7 @@ function parseTtlFromLine(line: string): { ttl: number; matchText: string } | nu
   const ttlIndex = lowerLine.indexOf('ttl')
   if (ttlIndex === -1) return null
 
-  const afterTtl = line.substring(ttlIndex + 3)
+  const afterTtl = line.slice(Math.max(0, ttlIndex + 3))
   let i = 0
 
   // Skip whitespace
@@ -114,10 +113,10 @@ function parseTtlFromLine(line: string): { ttl: number; matchText: string } | nu
   }
 
   // @fitness-ignore-next-line numeric-validation -- substring is guaranteed digit-only by isDigit loop above
-  const ttlValue = parseInt(afterTtl.substring(digitStart, i), 10)
+  const ttlValue = Number.parseInt(afterTtl.slice(digitStart, i), 10)
   return {
     ttl: ttlValue,
-    matchText: `ttl${afterTtl.substring(0, i)}`,
+    matchText: `ttl${afterTtl.slice(0, Math.max(0, i))}`,
   }
 }
 
@@ -235,8 +234,7 @@ export const cacheTtlValidation = defineCheck({
     }
 
     const lines = content.split('\n')
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i]
+    for (const [i, line] of lines.entries()) {
       if (!line || isNonCachePattern(line)) {
         continue
       }

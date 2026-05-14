@@ -97,7 +97,7 @@ function extractPackageName(spec: string): string {
 function readConfigDoc(projectDir: string): { path: string; doc: ReturnType<typeof parseDocument> } | null {
   const path = join(projectDir, CONFIG_FILENAME)
   if (!existsSync(path)) return null
-  const raw = readFileSync(path, 'utf-8')
+  const raw = readFileSync(path, 'utf8')
   const doc = parseDocument(raw)
   return { path, doc }
 }
@@ -110,10 +110,8 @@ function ensurePluginsMap(doc: ReturnType<typeof parseDocument>): {
   get: (domain: PluginDomain) => YAMLSeq | undefined
   ensure: (domain: PluginDomain) => YAMLSeq
 } {
-  let pluginsNode = doc.get('plugins')
-  if (pluginsNode == null) {
+  if (doc.get('plugins') == null) {
     doc.set('plugins', doc.createNode({}))
-    pluginsNode = doc.get('plugins')
   }
 
   return {
@@ -134,7 +132,7 @@ function ensurePluginsMap(doc: ReturnType<typeof parseDocument>): {
 }
 
 function saveConfigDoc(path: string, doc: ReturnType<typeof parseDocument>): void {
-  writeFileSync(path, doc.toString(), 'utf-8')
+  writeFileSync(path, doc.toString(), 'utf8')
 }
 
 /**
@@ -167,6 +165,7 @@ function npmUninstall(pkgName: string, dir: string): void {
  * When `domainFilter` is provided, only that domain is synced; else
  * all three (fit / sim / asm) are synced.
  */
+// eslint-disable-next-line @typescript-eslint/require-await, sonarjs/cognitive-complexity -- public async API; orchestrates domain filtering + spec install per-domain
 export async function pluginSync(
   projectDir: string,
   domainFilter?: string,
@@ -224,6 +223,7 @@ export async function pluginSync(
  * Append a spec to `plugins.<domain>` in config AND install it into
  * the project-local dir. Idempotent — duplicate adds are coalesced.
  */
+// eslint-disable-next-line @typescript-eslint/require-await -- public async API: callers `await` and the body wraps synchronous fs/npm calls
 export async function pluginAdd(
   spec: string,
   projectDir: string,
@@ -272,6 +272,7 @@ export async function pluginAdd(
  * from the project-local dir. Matches by extracted package name so
  * the caller can pass either `@scope/pkg` or `@scope/pkg@^1.2.3`.
  */
+// eslint-disable-next-line @typescript-eslint/require-await -- public async API: callers `await` and the body wraps synchronous fs/npm calls
 export async function pluginRemoveFromConfig(
   spec: string,
   projectDir: string,

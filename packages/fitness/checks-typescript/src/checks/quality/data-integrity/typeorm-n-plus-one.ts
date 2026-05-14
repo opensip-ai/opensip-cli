@@ -9,10 +9,10 @@
  * - Missing relations option in queries
  */
 
-import * as ts from 'typescript'
 
 import { defineCheck, type CheckViolation, extractSnippet } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import * as ts from 'typescript'
 
 /** TypeORM query methods */
 const QUERY_METHODS = [
@@ -33,7 +33,7 @@ const QUERY_METHODS = [
 function findQueryMethodInLoop(bodyText: string): string | null {
   for (const method of QUERY_METHODS) {
     const repositoryPattern = new RegExp(
-      `(repository|Repository|this\\.[a-z]\\w*)\\.${method}\\s*\\(`,
+      String.raw`(repository|Repository|this\.[a-z]\w*)\.${method}\s*\(`,
       'gi',
     )
 
@@ -255,7 +255,7 @@ export const typeormNPlusOne = defineCheck({
   tags: ['quality', 'performance', 'code-quality', 'best-practices'],
   fileTypes: ['ts'],
   // @fitness-ignore-next-line no-hardcoded-timeouts -- framework default for fitness check execution
-  timeout: 180000, // 3 minutes - analyzes TypeORM query patterns
+  timeout: 180_000, // 3 minutes - analyzes TypeORM query patterns
 
   analyze: analyzeFile,
 })

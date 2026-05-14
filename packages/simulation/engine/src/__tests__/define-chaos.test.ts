@@ -4,10 +4,11 @@
 
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { defineChaosScenario, validateChaosScenarioConfig } from '../kinds/chaos/define.js'
-import { clearScenarioRegistry } from '../framework/registry.js'
 import { ASSERTIONS } from '../framework/assertions.js'
 import { persona } from '../framework/personas.js'
+import { clearScenarioRegistry } from '../framework/registry.js'
+import { defineChaosScenario, validateChaosScenarioConfig } from '../kinds/chaos/define.js'
+
 import type { ChaosConfig } from '../types/base-types.js'
 
 const baseChaos: ChaosConfig = {

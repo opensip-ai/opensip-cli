@@ -6,10 +6,10 @@
  * Arrow functions and function expressions created during render should be memoized.
  */
 
-import * as ts from 'typescript'
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import * as ts from 'typescript'
 
 /**
  * High-impact callback props that definitely should not have inline functions

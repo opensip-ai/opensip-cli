@@ -46,7 +46,7 @@ describe('go stripStrings', () => {
   })
 
   it('strips entire content of regular string with escape', () => {
-    const src = 's := "tab\\there"'
+    const src = String.raw`s := "tab\there"`
     const out = stripStrings(src)
     expect(out.length).toBe(src.length)
     expect(out).not.toContain('tab')

@@ -22,7 +22,7 @@ function analyzeFile(content: string, filePath: string): CheckViolation[] {
   const untypedParamsRegex = /useLocalSearchParams\s*\(\s*\)/g
   let match
   while ((match = untypedParamsRegex.exec(content)) !== null) {
-    const line = content.substring(0, match.index).split('\n').length
+    const line = content.slice(0, Math.max(0, match.index)).split('\n').length
     violations.push({
       filePath,
       line,
@@ -39,7 +39,7 @@ function analyzeFile(content: string, filePath: string): CheckViolation[] {
   // Check for untyped router.push with params
   const untypedPushRegex = /router\.push\(\s*['"`][^'"`]+['"`]\s*,\s*\{/g
   while ((match = untypedPushRegex.exec(content)) !== null) {
-    const line = content.substring(0, match.index).split('\n').length
+    const line = content.slice(0, Math.max(0, match.index)).split('\n').length
     violations.push({
       filePath,
       line,

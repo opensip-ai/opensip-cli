@@ -24,14 +24,15 @@ export function hasSentryInit(content: string): boolean {
  * Returns the line range (start/end indices) and the content of the init block.
  * Handles multi-line init calls by tracking brace depth.
  */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- multi-line bracket scanner: handles nested braces, string literals, and the open-paren/close-paren state in Sentry.init({...})
 export function extractSentryInitBlock(
   content: string,
 ): { startLine: number; endLine: number; block: string } | null {
   const lines = content.split('\n')
 
   let initLineIdx = -1
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i] ?? ''
+  for (const [i, line_] of lines.entries()) {
+    const line = line_ ?? ''
     if (line.includes('Sentry.init(') || line.includes('Sentry.init (')) {
       initLineIdx = i
       break

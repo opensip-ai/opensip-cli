@@ -9,10 +9,10 @@
  * @see CLAUDE.md Error Handling Policy
  */
 
-import * as ts from 'typescript'
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import * as ts from 'typescript'
 
 /**
  * Expected error types that should use Result pattern
@@ -112,7 +112,7 @@ function isValidationHelper(funcName: string): boolean {
  */
 function isInCatchBlock(node: ts.Node): boolean {
   let current: ts.Node | undefined = node.parent
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- AST traversal: parent is undefined at SourceFile root despite Node type
+   
   while (current) {
     if (ts.isCatchClause(current)) {
       return true
@@ -127,13 +127,13 @@ function isInCatchBlock(node: ts.Node): boolean {
  */
 function getContainingFunctionName(node: ts.Node, sourceFile: ts.SourceFile): string | undefined {
   let current: ts.Node | undefined = node.parent
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- AST traversal: parent is undefined at SourceFile root despite Node type
+   
   while (current) {
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- AST node name property may be undefined for anonymous declarations
+     
     if (ts.isFunctionDeclaration(current) && current.name) {
       return current.name.getText(sourceFile)
     }
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- AST node name property check for consistency with FunctionDeclaration pattern
+     
     if (ts.isMethodDeclaration(current) && current.name) {
       return current.name.getText(sourceFile)
     }
@@ -153,7 +153,7 @@ function getContainingFunctionName(node: ts.Node, sourceFile: ts.SourceFile): st
  */
 function isInConstructor(node: ts.Node): boolean {
   let current: ts.Node | undefined = node.parent
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- AST traversal: parent is undefined at SourceFile root despite Node type
+   
   while (current) {
     if (ts.isConstructorDeclaration(current)) {
       return true
@@ -168,7 +168,7 @@ function isInConstructor(node: ts.Node): boolean {
  */
 function isInPrivateMethod(node: ts.Node): boolean {
   let current: ts.Node | undefined = node.parent
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- AST traversal: parent is undefined at SourceFile root despite Node type
+   
   while (current) {
     if (ts.isMethodDeclaration(current)) {
       const modifiers = ts.getModifiers(current)

@@ -48,7 +48,7 @@ function analyzeJsdoc(content: string, _filePath: string): CheckViolation[] {
 
     // Check if this line is an export declaration
     for (const pattern of EXPORT_PATTERNS) {
-      const match = trimmed.match(pattern)
+      const match = pattern.exec(trimmed)
       if (!match?.[1]) continue
 
       const exportName = match[1]

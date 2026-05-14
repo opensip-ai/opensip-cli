@@ -46,8 +46,7 @@ function hasExpoImageImport(content: string): boolean {
  */
 function findReactNativeImageLine(content: string): { line: number; snippet: string } | null {
   const lines = content.split('\n')
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
+  for (const [i, line] of lines.entries()) {
     if (line === undefined) {
       continue
     }
@@ -69,8 +68,8 @@ function findReactNativeImageLine(content: string): { line: number; snippet: str
  * @param content - File content to search
  * @returns Array of violations with line numbers
  */
-function findImagesWithoutPlaceholder(content: string): Array<{ line: number; snippet: string }> {
-  const results: Array<{ line: number; snippet: string }> = []
+function findImagesWithoutPlaceholder(content: string): { line: number; snippet: string }[] {
+  const results: { line: number; snippet: string }[] = []
   const lines = content.split('\n')
 
   for (let i = 0; i < lines.length; i++) {

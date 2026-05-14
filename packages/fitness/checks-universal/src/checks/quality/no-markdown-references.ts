@@ -73,12 +73,11 @@ function shouldExcludeFile(filePath: string): boolean {
  */
 function findMarkdownReferences(
   content: string,
-): Array<{ lineNumber: number; line: string; reference: string }> {
-  const references: Array<{ lineNumber: number; line: string; reference: string }> = []
+): { lineNumber: number; line: string; reference: string }[] {
+  const references: { lineNumber: number; line: string; reference: string }[] = []
   const lines = content.split('\n')
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
+  for (const [i, line] of lines.entries()) {
     if (line === undefined) continue
 
     // Only check comment lines

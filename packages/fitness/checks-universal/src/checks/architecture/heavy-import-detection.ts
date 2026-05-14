@@ -54,14 +54,14 @@ export const heavyImportDetection = defineCheck({
   tags: ['architecture', 'performance', 'bundle-size'],
   fileTypes: ['ts', 'tsx', 'js', 'jsx'],
 
+  // eslint-disable-next-line sonarjs/cognitive-complexity -- bundler-aware heuristic: each branch detects a distinct heavy-import pattern (deprecated, namespace, deep-path, named-import-explosion)
   analyze(content: string, filePath: string): CheckViolation[] {
     if (filePath.includes('.test.') || filePath.includes('__tests__')) return []
 
     const violations: CheckViolation[] = []
     const lines = content.split('\n')
 
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i]
+    for (const [i, line] of lines.entries()) {
       if (!line) continue
 
       const trimmed = line.trim()

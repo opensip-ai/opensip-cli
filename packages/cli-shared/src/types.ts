@@ -164,19 +164,19 @@ export interface FitDoneResult {
   label: string;
   cwd: string;
   findings?: {
-    checks: Array<{
+    checks: {
       checkSlug: string;
       errorCount: number;
       warningCount: number;
       error?: string;
-      violations?: Array<{
+      violations?: {
         severity: 'error' | 'warning';
         message: string;
         file?: string;
         line?: number;
         suggestion?: string;
-      }>;
-    }>;
+      }[];
+    }[];
   };
   reportStatus?: {
     url: string;
@@ -195,13 +195,13 @@ export interface FitDoneResult {
 
 export interface ListChecksResult {
   type: 'list-checks';
-  checks: Array<{ slug: string; description: string; tags: string[] }>;
+  checks: { slug: string; description: string; tags: string[] }[];
   totalCount: number;
 }
 
 export interface ListRecipesResult {
   type: 'list-recipes';
-  recipes: Array<{ name: string; description: string; checkCount: string }>;
+  recipes: { name: string; description: string; checkCount: string }[];
 }
 
 export interface HistoryResult {

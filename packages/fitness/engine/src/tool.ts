@@ -12,14 +12,12 @@
  * subcommand to fitness is a local change; no CLI edit required.
  */
 
-import { Command } from 'commander';
 
-import type { Tool, ToolCliContext, ToolCommandDescriptor } from '@opensip-tools/core';
-import type { CliArgs, CliOutput, FitOptions, ToolOptions } from '@opensip-tools/cli-shared';
 import { EXIT_CODES } from '@opensip-tools/cli-shared';
+import { type Command } from 'commander';
 
-import { executeFit, ensureChecksLoaded } from './cli/fit.js';
 import { openDashboard } from './cli/dashboard.js';
+import { executeFit } from './cli/fit.js';
 import { listChecks } from './cli/list-checks.js';
 import { listRecipes } from './cli/list-recipes.js';
 import {
@@ -30,6 +28,9 @@ import {
   GateBaselineInvalidError,
   DEFAULT_BASELINE_PATH,
 } from './gate.js';
+
+import type { CliArgs, FitOptions, ToolOptions } from '@opensip-tools/cli-shared';
+import type { Tool, ToolCliContext, ToolCommandDescriptor } from '@opensip-tools/core';
 
 // =============================================================================
 // COMMAND DESCRIPTORS — used by --help listings and conflict detection.
@@ -243,7 +244,7 @@ async function runGateMode(args: CliArgs, cli: ToolCliContext): Promise<void> {
     process.stderr.write(`Error: ${fitResult.result.message}\n`);
     return;
   }
-  const output = fitResult.output as CliOutput;
+  const output = fitResult.output!;
   try {
     if (args.gateSave === true) {
       saveBaseline(output, baselinePath);
@@ -256,21 +257,21 @@ async function runGateMode(args: CliArgs, cli: ToolCliContext): Promise<void> {
     process.stdout.write(renderGateCompareOutput(result) + '\n');
     cli.setExitCode(result.degraded ? 1 : 0);
     return;
-  } catch (err) {
-    if (err instanceof GateBaselineMissingError || err instanceof GateBaselineInvalidError) {
+  } catch (error) {
+    if (error instanceof GateBaselineMissingError || error instanceof GateBaselineInvalidError) {
       cli.logger.warn({
         evt: 'cli.gate.baseline_error',
         module: 'cli:gate',
         mode: args.gateSave === true ? 'save' : 'compare',
         baselinePath,
-        errorType: err.name,
-        reason: err.message,
+        errorType: error.name,
+        reason: error.message,
       });
       cli.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
-      process.stderr.write(`Error: ${err.message}\n`);
+      process.stderr.write(`Error: ${error.message}\n`);
       return;
     }
-    throw err;
+    throw error;
   }
 }
 

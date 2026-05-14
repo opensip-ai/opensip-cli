@@ -5,10 +5,11 @@
  * Each run creates one file: {timestamp}-{tool}-{recipe}.json
  */
 
-import { mkdirSync, readFileSync, readdirSync, writeFileSync, unlinkSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
-import { basename, join } from 'node:path';
+import { mkdirSync, readFileSync, readdirSync, writeFileSync, unlinkSync } from 'node:fs';
 import { homedir } from 'node:os';
+import { basename, join } from 'node:path';
+
 import { logger } from '@opensip-tools/core';
 
 export interface StoredSession {
@@ -81,17 +82,17 @@ function ensureDir(dir: string): void {
 
 /** Sanitize a string for use in a filename — strip path separators and special chars */
 export function sanitizeForFilename(s: string): string {
-  return s.replace(/\.\./g, '-').replace(/[/\\:*?"<>|.]/g, '-');
+  return s.replaceAll('..', '-').replaceAll(/[/\\:*?"<>|.]/g, '-');
 }
 
 /** Save a session result to disk */
 export function saveSession(session: StoredSession): string {
   ensureDir(STORE_DIR);
   const safeRecipe = session.recipe ? `-${sanitizeForFilename(session.recipe)}` : '';
-  const filename = `${session.timestamp.replace(/[:.]/g, '-')}-${session.tool}${safeRecipe}.json`;
+  const filename = `${session.timestamp.replaceAll(/[:.]/g, '-')}-${session.tool}${safeRecipe}.json`;
   // Ensure filename stays within the sessions directory
   const filepath = join(STORE_DIR, basename(filename));
-  writeFileSync(filepath, JSON.stringify(session, null, 2), 'utf-8');
+  writeFileSync(filepath, JSON.stringify(session, null, 2), 'utf8');
 
   pruneOldSessions();
   return filepath;
@@ -123,11 +124,11 @@ export function clearSessionsOlderThan(days: number): number {
   for (const file of files) {
     try {
       const filepath = join(STORE_DIR, file);
-      const raw = readFileSync(filepath, 'utf-8');
+      const raw = readFileSync(filepath, 'utf8');
       const session = JSON.parse(raw) as { timestamp?: string };
       if (session.timestamp) {
         const sessionTime = new Date(session.timestamp).getTime();
-        if (!isNaN(sessionTime) && sessionTime < cutoff) {
+        if (!Number.isNaN(sessionTime) && sessionTime < cutoff) {
           unlinkSync(filepath);
           deleted++;
         }
@@ -146,13 +147,14 @@ export function loadSessions(limit?: number): StoredSession[] {
   const files = readdirSync(STORE_DIR)
     .filter(f => f.endsWith('.json'))
     .sort()
+    // eslint-disable-next-line unicorn/no-array-reverse -- target ES2022; Array#toReversed is ES2023 and not in the lib
     .reverse();
 
   const toRead = limit ? files.slice(0, limit) : files;
   const sessions: StoredSession[] = [];
   for (const file of toRead) {
     try {
-      const raw = readFileSync(join(STORE_DIR, file), 'utf-8');
+      const raw = readFileSync(join(STORE_DIR, file), 'utf8');
       sessions.push(JSON.parse(raw) as StoredSession);
     } catch {
       // Warn about corrupted files — don't crash
@@ -173,6 +175,7 @@ function pruneOldSessions(): void {
   const files = readdirSync(STORE_DIR)
     .filter(f => f.endsWith('.json'))
     .sort()
+    // eslint-disable-next-line unicorn/no-array-reverse -- target ES2022; Array#toReversed is ES2023 and not in the lib
     .reverse();
 
   if (files.length <= MAX_SESSIONS) return;

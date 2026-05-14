@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/require-await -- driver stubs match contract `() => Promise<T>`; bodies throw synchronously until Phase 7 wires real drivers */
 /**
  * @fileoverview Invariant-kind executor.
  *
@@ -12,8 +13,7 @@
  */
 
 import { ScenarioAbortedError } from '../../framework/execution/execution-engine.js'
-import type { RunnableScenario } from '../../framework/runnable-scenario.js'
-import type { InvariantScenarioExecutorResult } from '../../framework/scenario-executor-result.js'
+
 
 import type {
   InvariantContext,
@@ -29,6 +29,8 @@ import type {
 } from './context.js'
 import type { InvariantScenarioConfig } from './define.js'
 import type { InvariantAssertion, InvariantPhaseResult } from './result.js'
+import type { RunnableScenario } from '../../framework/runnable-scenario.js'
+import type { InvariantScenarioExecutorResult } from '../../framework/scenario-executor-result.js'
 
 // =============================================================================
 // DEFAULT DRIVER STUBS
@@ -83,9 +85,9 @@ function buildContext(
     held: boolean,
     details?: Record<string, unknown>,
   ): void {
-    const entry: InvariantAssertion = details !== undefined
-      ? { description, held, details }
-      : { description, held }
+    const entry: InvariantAssertion = details === undefined
+      ? { description, held }
+      : { description, held, details }
     state.assertions.push(entry)
   }
 
@@ -185,7 +187,7 @@ async function runPhase(
 export function createInvariantScenarioRunner(
   config: InvariantScenarioConfig,
 ): RunnableScenario {
-  const deps: InvariantContextDeps = { ...defaultDeps, ...(config.deps ?? {}) }
+  const deps: InvariantContextDeps = { ...defaultDeps, ...config.deps }
 
   return Object.freeze({
     kind: 'invariant' as const,
@@ -210,25 +212,14 @@ export function createInvariantScenarioRunner(
         const setup = await runPhase('setup', config.setup, ctx, abortSignal)
         phases.push(setup)
 
-        let act: InvariantPhaseResult
-        if (setup.status === 'failed') {
-          act = { phase: 'act', status: 'failed', durationMs: 0, error: 'setup failed' }
-        } else {
-          act = await runPhase('act', config.act, ctx, abortSignal)
-        }
+        const act: InvariantPhaseResult = setup.status === 'failed'
+          ? { phase: 'act', status: 'failed', durationMs: 0, error: 'setup failed' }
+          : await runPhase('act', config.act, ctx, abortSignal);
         phases.push(act)
 
-        let assert: InvariantPhaseResult
-        if (act.status === 'failed') {
-          assert = {
-            phase: 'assert',
-            status: 'failed',
-            durationMs: 0,
-            error: 'act failed',
-          }
-        } else {
-          assert = await runPhase('assert', config.assert, ctx, abortSignal)
-        }
+        const assert: InvariantPhaseResult = act.status === 'failed'
+          ? { phase: 'assert', status: 'failed', durationMs: 0, error: 'act failed' }
+          : await runPhase('assert', config.assert, ctx, abortSignal);
         phases.push(assert)
 
         const allAssertionsHeld = state.assertions.every((a) => a.held)

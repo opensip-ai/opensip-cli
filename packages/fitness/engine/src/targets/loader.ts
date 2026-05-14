@@ -8,14 +8,14 @@
 
 import { readFileSync, statSync } from 'node:fs'
 
-import { PROJECT_CONFIG_FILENAME, resolveProjectConfigPath } from '@opensip-tools/core'
-import { ValidationError, SystemError } from '@opensip-tools/core'
+import { PROJECT_CONFIG_FILENAME, resolveProjectConfigPath , ValidationError, SystemError } from '@opensip-tools/core'
 import yaml from 'js-yaml'
 import { z } from 'zod'
 
 
 import { TargetRegistry } from './target-registry.js'
-import type { CheckTargetMap, TargetConfig, TargetsConfig } from './types.js'
+
+import type { TargetConfig, TargetsConfig } from './types.js'
 
 const YAML_FILENAME = PROJECT_CONFIG_FILENAME
 const DEFAULT_EXCLUDES: readonly string[] = ['**/node_modules/**', '**/dist/**']
@@ -95,7 +95,7 @@ function buildFromParsed(
   const checkOverrides: Record<string, string | readonly string[]> = {}
   if (rawCheckOverrides) {
     for (const [checkSlug, targetRef] of Object.entries(rawCheckOverrides)) {
-      const targetNames = Array.isArray(targetRef) ? targetRef : [targetRef]
+      const targetNames = typeof targetRef === 'string' ? [targetRef] : targetRef
       for (const name of targetNames) {
         if (!registry.has(name)) {
           // @fitness-ignore-next-line result-pattern-consistency -- infrastructure boundary, throw is appropriate
@@ -106,24 +106,24 @@ function buildFromParsed(
           )
         }
       }
-      checkOverrides[checkSlug] = Array.isArray(targetRef) ? Object.freeze([...targetRef]) : targetRef
+      checkOverrides[checkSlug] = typeof targetRef === 'string' ? targetRef : Object.freeze([...targetRef])
     }
   }
 
   const plugins = rawPlugins
     ? Object.freeze({
-        ...(rawPlugins.fit && { fit: Object.freeze([...rawPlugins.fit]) as readonly string[] }),
-        ...(rawPlugins.sim && { sim: Object.freeze([...rawPlugins.sim]) as readonly string[] }),
-        ...(rawPlugins.asm && { asm: Object.freeze([...rawPlugins.asm]) as readonly string[] }),
-        ...(rawPlugins.lang && { lang: Object.freeze([...rawPlugins.lang]) as readonly string[] }),
-        ...(rawPlugins.checkPackages && { checkPackages: Object.freeze([...rawPlugins.checkPackages]) as readonly string[] }),
+        ...(rawPlugins.fit && { fit: Object.freeze([...rawPlugins.fit]) }),
+        ...(rawPlugins.sim && { sim: Object.freeze([...rawPlugins.sim]) }),
+        ...(rawPlugins.asm && { asm: Object.freeze([...rawPlugins.asm]) }),
+        ...(rawPlugins.lang && { lang: Object.freeze([...rawPlugins.lang]) }),
+        ...(rawPlugins.checkPackages && { checkPackages: Object.freeze([...rawPlugins.checkPackages]) }),
         ...(rawPlugins.autoDiscoverChecks !== undefined && { autoDiscoverChecks: rawPlugins.autoDiscoverChecks }),
       })
     : undefined
 
   const config: TargetsConfig = Object.freeze({
-    globalExcludes: Object.freeze(rawGlobalExcludes ? [...rawGlobalExcludes] : []) as readonly string[],
-    checkOverrides: Object.freeze(checkOverrides) as CheckTargetMap,
+    globalExcludes: Object.freeze(rawGlobalExcludes ? [...rawGlobalExcludes] : []),
+    checkOverrides: Object.freeze(checkOverrides),
     ...(plugins && { plugins }),
   })
 
@@ -143,9 +143,9 @@ function readYamlFile(filePath: string): string {
     if (stats.size > MAX_FILE_SIZE) {
       throw new SystemError(`File too large (${stats.size} bytes, max ${MAX_FILE_SIZE}): ${filePath}`, { code: 'SYSTEM.FILE.TOO_LARGE' })
     }
-    return readFileSync(filePath, 'utf-8')
-  } catch (err) {
-    if (err instanceof ValidationError || err instanceof SystemError) throw err
+    return readFileSync(filePath, 'utf8')
+  } catch (error) {
+    if (error instanceof ValidationError || error instanceof SystemError) throw error
     throw new ValidationError(
       `${YAML_FILENAME} not found at ${filePath}. Create one to define your targets.`,
       { operation: 'load', loader: 'targets' },
@@ -157,12 +157,12 @@ function readYamlFile(filePath: string): string {
 function parseYamlContent(raw: string): unknown {
   try {
     return yaml.load(raw)
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
     throw new ValidationError(`${YAML_FILENAME} contains invalid YAML: ${message}`, {
       operation: 'load',
       loader: 'targets',
-      cause: err instanceof Error ? err : undefined,
+      cause: error instanceof Error ? error : undefined,
     })
   }
 }

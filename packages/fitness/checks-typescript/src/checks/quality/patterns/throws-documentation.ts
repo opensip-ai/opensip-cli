@@ -8,10 +8,10 @@
  *
  */
 
-import * as ts from 'typescript'
 
 import { defineCheck, getCheckConfig, type CheckViolation } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import * as ts from 'typescript'
 
 /**
  * Recipe-config shape for throws-documentation. Project-specific typed-error
@@ -97,7 +97,7 @@ function hasThrowsJSDoc(node: ts.Node, sourceFile: ts.SourceFile): boolean {
   if (!comments) return false
 
   for (const comment of comments) {
-    const commentText = fullText.substring(comment.pos, comment.end)
+    const commentText = fullText.slice(comment.pos, comment.end)
     if (commentText.includes('@throws')) {
       return true
     }
@@ -293,7 +293,7 @@ function isSelfDocumentingError(errorType: string, suffixes: readonly string[]):
 function extractThrownType(throwStmt: ts.ThrowStatement, sourceFile: ts.SourceFile): string {
   const text = throwStmt.expression.getText(sourceFile)
   // @fitness-ignore-next-line sonarjs-backend -- Safe regex with fixed tokens for extracting error class name
-  const typeMatch = text.match(/new\s+(\w+)/)
+  const typeMatch = /new\s+(\w+)/.exec(text)
   return typeMatch?.[1] ?? 'Error'
 }
 
@@ -330,7 +330,7 @@ function createMissingThrowsViolation(
   ctx: FileAnalysisContext,
 ): CheckViolation {
   if (!Array.isArray(throwStatements)) {
-    throw new Error('throwStatements must be an array')
+    throw new TypeError('throwStatements must be an array')
   }
   const { line, character } = ctx.sourceFile.getLineAndCharacterOfPosition(node.getStart())
   const lineNum = line + 1
@@ -436,6 +436,7 @@ function collectCaughtErrorNames(fnNode: ts.Node): Set<string> {
  * @param caughtNames - Names of caught-error variables in the enclosing function
  * @returns True if this throw statement re-throws (rather than freshly creates) an error
  */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- rethrow heuristic: enumerates the AST shapes that count as rethrowing (caught var, wrapping cause, scoped helpers); flatter shape would obscure the matching logic
 function isRethrow(
   throwStmt: ts.ThrowStatement,
   sourceFile: ts.SourceFile,
@@ -455,15 +456,13 @@ function isRethrow(
   }
 
   // `throw this.error` / `throw this.cause` — stored-error field rethrow
-  if (ts.isPropertyAccessExpression(expr)) {
-    if (
+  if (ts.isPropertyAccessExpression(expr) && 
       expr.expression.kind === ts.SyntaxKind.ThisKeyword &&
       ts.isIdentifier(expr.name) &&
       ERROR_FIELD_NAME_PATTERN.test(expr.name.text)
     ) {
       return true
     }
-  }
 
   // Result-pattern rethrows: `throw X.unwrapErr()` / `throw X.unwrap()` —
   // the throw extracts an already-typed error from a Result and propagates it.
@@ -593,7 +592,7 @@ export const throwsDocumentation = defineCheck({
 **Scope:** Codebase-specific convention enforcing error handling standards`,
   tags: ['quality', 'documentation', 'best-practices'],
   fileTypes: ['ts'],
-  timeout: 180000, // 3 minutes - parses TypeScript AST for all backend files
+  timeout: 180_000, // 3 minutes - parses TypeScript AST for all backend files
 
   analyze(content, filePath) {
     // Quick filter

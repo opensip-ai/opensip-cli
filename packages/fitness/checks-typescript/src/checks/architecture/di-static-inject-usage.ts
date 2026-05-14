@@ -6,10 +6,10 @@
 
 import * as path from 'node:path'
 
-import * as ts from 'typescript'
 
 import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import * as ts from 'typescript'
 
 /** Issue types for DI static inject checks */
 enum IssueType {
@@ -79,7 +79,7 @@ function extractStaticInjectInfo(
     return { hasStaticInject: true, injectTokens: [] }
   }
 
-  const injectTokens = arrayExpr.elements.map((e) => e.getText(sourceFile).replace(/['"]/g, ''))
+  const injectTokens = arrayExpr.elements.map((e) => e.getText(sourceFile).replaceAll(/['"]/g, ''))
   return { hasStaticInject: true, injectTokens }
 }
 

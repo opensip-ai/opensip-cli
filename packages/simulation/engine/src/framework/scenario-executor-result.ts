@@ -13,12 +13,12 @@
  * with chaos, invariant, and fix-evaluation variants.
  */
 
-import type { Signal } from '@opensip-tools/core'
 
-import type { LoadOutcome } from '../kinds/load/result.js'
 import type { ChaosOutcome } from '../kinds/chaos/result.js'
-import type { InvariantOutcome } from '../kinds/invariant/result.js'
 import type { FixEvaluationOutcome } from '../kinds/fix-evaluation/result.js'
+import type { InvariantOutcome } from '../kinds/invariant/result.js'
+import type { LoadOutcome } from '../kinds/load/result.js'
+import type { Signal } from '@opensip-tools/core'
 
 /** Common envelope fields for every kind's result. */
 interface BaseScenarioExecutorResult {

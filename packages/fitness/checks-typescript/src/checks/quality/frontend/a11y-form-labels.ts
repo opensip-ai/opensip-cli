@@ -5,27 +5,27 @@
  * Supports React Native and Tamagui form components.
  */
 
-import * as ts from 'typescript'
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import * as ts from 'typescript'
 
 /**
  * Form input components that should have accessibility labels.
  * Includes React Native and common UI library form components.
  */
-const FORM_INPUT_COMPONENTS = ['TextInput', 'Input', 'Select', 'Picker']
+const FORM_INPUT_COMPONENTS = new Set(['TextInput', 'Input', 'Select', 'Picker'])
 
 /**
  * Props that satisfy the accessibility label requirement.
  * Any one of these props being present is sufficient.
  */
-const ACCESSIBILITY_LABEL_PROPS = [
+const ACCESSIBILITY_LABEL_PROPS = new Set([
   'accessibilityLabel',
   'accessibilityLabelledBy',
   'aria-label',
   'aria-labelledby',
-]
+])
 
 /**
  * Analyze a TSX file for form accessibility issues
@@ -48,10 +48,10 @@ function analyzeFile(content: string, filePath: string): CheckViolation[] {
     if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
       const tagName = ts.isIdentifier(node.tagName) ? node.tagName.text : ''
 
-      if (FORM_INPUT_COMPONENTS.includes(tagName)) {
+      if (FORM_INPUT_COMPONENTS.has(tagName)) {
         const hasA11yLabel = node.attributes.properties.some(
           (attr) =>
-            ts.isJsxAttribute(attr) && ACCESSIBILITY_LABEL_PROPS.includes(attr.name.getText()),
+            ts.isJsxAttribute(attr) && ACCESSIBILITY_LABEL_PROPS.has(attr.name.getText()),
         )
 
         if (!hasA11yLabel) {

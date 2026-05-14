@@ -4,8 +4,8 @@
  */
 
 import { logger } from '@opensip-tools/core/logger'
-
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+
 import { createPathMatcher, isCommentLine } from '../../utils/index.js'
 
 /**
@@ -41,71 +41,71 @@ function createCryptoPattern(
 const DIRECT_CRYPTO_PATTERNS: CryptoPattern[] = [
   // Node.js crypto module - symmetric/hashing
   createCryptoPattern(
-    'crypto\\.createHash\\s*\\(',
+    String.raw`crypto\.createHash\s*\(`,
     'Direct crypto.createHash usage - use hashingService.sha256() from crypto module',
     'Use a centralized crypto utility instead of direct crypto.createHash calls.',
     'error',
   ),
   createCryptoPattern(
-    'crypto\\.createHmac\\s*\\(',
+    String.raw`crypto\.createHmac\s*\(`,
     'Direct crypto.createHmac usage - use hashingService.hmac() from crypto module',
     'Use a centralized crypto utility instead of direct crypto.createHmac calls.',
     'error',
   ),
   createCryptoPattern(
-    'crypto\\.createCipheriv\\s*\\(',
+    String.raw`crypto\.createCipheriv\s*\(`,
     'Direct crypto.createCipheriv usage - use encryptionService.encrypt() from crypto module',
     'Use a centralized crypto utility for encryption instead of direct crypto.createCipheriv calls.',
     'error',
   ),
   createCryptoPattern(
-    'crypto\\.createDecipheriv\\s*\\(',
+    String.raw`crypto\.createDecipheriv\s*\(`,
     'Direct crypto.createDecipheriv usage - use encryptionService.decrypt() from crypto module',
     'Use a centralized crypto utility for decryption instead of direct crypto.createDecipheriv calls.',
     'error',
   ),
   createCryptoPattern(
-    'crypto\\.pbkdf2(?:Sync)?\\s*\\(',
+    String.raw`crypto\.pbkdf2(?:Sync)?\s*\(`,
     'Direct crypto.pbkdf2 usage - use deriveKeyPbkdf2() from crypto module',
     'Use a centralized crypto utility for key derivation instead of direct crypto.pbkdf2 calls.',
     'error',
   ),
   createCryptoPattern(
-    'crypto\\.scrypt(?:Sync)?\\s*\\(',
+    String.raw`crypto\.scrypt(?:Sync)?\s*\(`,
     'Direct crypto.scrypt usage - use deriveKeyScrypt() from crypto module',
     'Use a centralized crypto utility for key derivation instead of direct crypto.scrypt calls.',
     'error',
   ),
   // Node.js crypto module - asymmetric signing
   createCryptoPattern(
-    'crypto\\.createSign\\s*\\(',
+    String.raw`crypto\.createSign\s*\(`,
     'Direct crypto.createSign usage - use signingService.sign() from crypto module',
     'Use a centralized crypto utility for signing instead of direct crypto.createSign calls.',
     'error',
   ),
   // @fitness-ignore-next-line jwt-validation -- Fitness check definition, not production code; .verify() in suggestion text
   createCryptoPattern(
-    'crypto\\.createVerify\\s*\\(',
+    String.raw`crypto\.createVerify\s*\(`,
     'Direct crypto.createVerify usage - use signingService.verify() from crypto module',
     'Use a centralized crypto utility for signature verification instead of direct crypto.createVerify calls.',
     'error',
   ),
   createCryptoPattern(
-    'crypto\\.sign\\s*\\(',
+    String.raw`crypto\.sign\s*\(`,
     'Direct crypto.sign usage - use signingService.sign() from crypto module',
     'Use a centralized crypto utility for signing instead of direct crypto.sign calls.',
     'error',
   ),
   // @fitness-ignore-next-line jwt-validation -- Fitness check definition, not production code; .verify() in suggestion text
   createCryptoPattern(
-    'crypto\\.verify\\s*\\(',
+    String.raw`crypto\.verify\s*\(`,
     'Direct crypto.verify usage - use signingService.verify() from crypto module',
     'Use a centralized crypto utility for signature verification instead of direct crypto.verify calls.',
     'error',
   ),
   // Direct createHmac import usage
   createCryptoPattern(
-    '\\bcreateHmac\\s*\\(\\s*[\'"]sha256[\'"]',
+    String.raw`\bcreateHmac\s*\(\s*['"]sha256['"]`,
     'Direct createHmac usage - use hashingService.hmac() from crypto module',
     'Use a centralized crypto utility instead of direct createHmac calls.',
     'error',
@@ -118,7 +118,7 @@ const DIRECT_CRYPTO_PATTERNS: CryptoPattern[] = [
     'error',
   ),
   createCryptoPattern(
-    'new KMSClient\\s*\\(',
+    String.raw`new KMSClient\s*\(`,
     'Direct KMSClient usage - use a centralized crypto utility with KMS provider',
     'Use a centralized crypto utility that handles KMS integration for key management.',
     'error',
@@ -144,7 +144,7 @@ const DIRECT_CRYPTO_PATTERNS: CryptoPattern[] = [
     'warning',
   ),
   createCryptoPattern(
-    'import\\s+\\*\\s+as\\s+jose\\s+from',
+    String.raw`import\s+\*\s+as\s+jose\s+from`,
     'Direct jose import - use ISigningService from crypto module',
     'Use a centralized crypto utility for JWT operations instead of direct jose imports.',
     'warning',
@@ -214,8 +214,8 @@ export const useCentralizedCrypto = defineCheck({
     const violations: CheckViolation[] = []
     const lines = content.split('\n')
 
-    for (let lineNum = 0; lineNum < lines.length; lineNum++) {
-      const line = lines[lineNum] ?? ''
+    for (const [lineNum, line_] of lines.entries()) {
+      const line = line_ ?? ''
 
       if (isCommentLine(line)) {
         continue

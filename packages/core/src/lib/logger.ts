@@ -17,8 +17,8 @@
  */
 
 import { appendFileSync, mkdirSync, readdirSync, unlinkSync } from 'node:fs';
-import { join } from 'node:path';
 import { homedir } from 'node:os';
+import { join } from 'node:path';
 
 export interface Logger {
   debug(msgOrObj: string | Record<string, unknown>, data?: Record<string, unknown>): void;
@@ -89,7 +89,7 @@ function shouldWriteToFile(level: LogLevel): boolean {
   // Silent mode suppresses stderr output (for Ink rendering), not file output.
   // In debug mode, write everything (including debug) to file.
   if (debugMode) return true;
-  return LEVELS[level] >= LEVELS['info'];
+  return LEVELS[level] >= LEVELS.info;
 }
 
 function log(level: LogLevel, msgOrObj: string | Record<string, unknown>, data?: Record<string, unknown>): void {
@@ -171,7 +171,7 @@ function pruneOldLogs(dir: string): void {
       // Extract date from filename: YYYY-MM-DD.jsonl
       const dateStr = file.replace('.jsonl', '');
       const fileDate = new Date(dateStr).getTime();
-      if (!isNaN(fileDate) && fileDate < cutoff) {
+      if (!Number.isNaN(fileDate) && fileDate < cutoff) {
         try {
           unlinkSync(join(dir, file));
         } catch {

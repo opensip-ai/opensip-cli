@@ -8,9 +8,9 @@
  * isolated to the language pack.
  */
 
+import { getParseTree } from '@opensip-tools/core/languages/parse-cache.js'
 import * as ts from 'typescript'
 
-import { getParseTree } from '@opensip-tools/core/languages/parse-cache.js'
 
 import { typescriptAdapter } from './adapter.js'
 
@@ -234,4 +234,5 @@ export function countUnescapedBackticks(line: string): number {
 }
 
 /** Re-export TypeScript namespace for check authors */
+// eslint-disable-next-line unicorn/prefer-export-from -- `export * as from 'typescript'` is invalid (typescript uses `export =`); the namespace import + named export form is the only working shape
 export { ts }

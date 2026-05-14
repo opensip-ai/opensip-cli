@@ -1,19 +1,17 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdirSync, writeFileSync, rmSync } from 'node:fs'
-import { join } from 'node:path'
-import { mkdtempSync } from 'node:fs'
+import { mkdirSync, writeFileSync, rmSync , mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 
 import { loadPlugin, loadAllPlugins } from '../loader.js'
-import { defaultRegistry } from '../../framework/registry.js'
+
 import type { DiscoveredPlugin } from '@opensip-tools/core'
 
 let testDir: string
-let initialRegistrySize: number
 
 beforeEach(() => {
   testDir = mkdtempSync(join(tmpdir(), 'opensip-loader-test-'))
-  initialRegistrySize = defaultRegistry.size
 })
 
 afterEach(() => {

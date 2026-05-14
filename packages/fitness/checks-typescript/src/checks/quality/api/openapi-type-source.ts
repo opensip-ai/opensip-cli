@@ -5,10 +5,10 @@
  * Enforces that API-related types are sourced from schema.d.ts (generated from OpenAPI).
  */
 
-import * as ts from 'typescript'
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import * as ts from 'typescript'
 
 /**
  * Patterns that suggest an API-related type

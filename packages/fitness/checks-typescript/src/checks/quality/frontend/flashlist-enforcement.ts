@@ -5,10 +5,10 @@
  * FlatList has performance issues with large lists; FlashList is the recommended alternative.
  */
 
-import * as ts from 'typescript'
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import * as ts from 'typescript'
 
 /**
  * Options for checking FlatList usage

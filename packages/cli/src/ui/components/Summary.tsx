@@ -3,8 +3,9 @@
  * Example: 120 Passed, 10 Failed (423 Errors, 227 Warnings) | Duration 8.1s
  */
 
-import React from 'react';
 import { Text, Box } from 'ink';
+import React from 'react';
+
 import { useTheme } from '../theme.js';
 
 export interface SummaryProps {

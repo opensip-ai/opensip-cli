@@ -10,12 +10,12 @@
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 
-import type { Signal } from '@opensip-tools/core'
 import { createSignal } from '@opensip-tools/core'
 
-import type { FindingSeverity } from '../types/findings.js'
-
 import { mapFindingSeverity, mapTagsToSignalCategory } from './severity-mapping.js'
+
+import type { FindingSeverity } from '../types/findings.js'
+import type { Signal } from '@opensip-tools/core'
 
 // =============================================================================
 // PATTERN DEFINITION
@@ -165,6 +165,7 @@ export class PatternDetector {
   /** Pre-compute the start offset of each line for O(1) position lookups via binary search. */
   private computeLineOffsets(content: string): number[] {
     const offsets = [0]
+    // eslint-disable-next-line unicorn/no-for-loop -- offset-bearing scan: captures UTF-16 line starts
     for (let i = 0; i < content.length; i++) {
       if (content[i] === '\n') {
         offsets.push(i + 1)
@@ -180,15 +181,15 @@ export class PatternDetector {
     let hi = offsets.length - 1
     while (lo < hi) {
       const mid = (lo + hi + 1) >>> 1
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- mid is always within bounds of the offsets array
-      if (offsets[mid]! <= index) {
+       
+      if (offsets[mid] <= index) {
         lo = mid
       } else {
         hi = mid - 1
       }
     }
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- lo is always within bounds after binary search
-    return { line: lo + 1, column: index - offsets[lo]! + 1 }
+     
+    return { line: lo + 1, column: index - offsets[lo] + 1 }
   }
 
   private isInComment(lineContent: string, column: number): boolean {
@@ -244,8 +245,6 @@ export async function detectInFiles(
   readFile: (path: string) => Promise<string>,
   options: DetectorOptions,
 ): Promise<readonly FileDetectionResult[]> {
-  if (!Array.isArray(files)) return []
-
   // @fitness-ignore-next-line no-unbounded-concurrency -- file count bounded by caller; individual reads are lightweight
   const results = await Promise.all(
     files.map(async (filePath) => {

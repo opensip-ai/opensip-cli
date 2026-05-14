@@ -6,10 +6,10 @@
  * These are often placeholders that should be replaced with DynamoDB implementations.
  */
 
-import * as ts from 'typescript'
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import * as ts from 'typescript'
 
 /**
  * Patterns that indicate intentional in-memory usage

@@ -45,7 +45,7 @@ const WORKSPACE_PREFIXES: string[] = []
 /**
  * Directories to exclude from package discovery
  */
-const TRAVERSAL_SKIP_DIRS = ['node_modules', 'dist', '.turbo', '.git']
+const TRAVERSAL_SKIP_DIRS = new Set(['node_modules', 'dist', '.turbo', '.git'])
 
 interface PackageJson {
   name?: string | undefined
@@ -73,13 +73,13 @@ interface VersionAnalysis {
 function findPackageJsonFiles(projectRoot: string): string[] {
   const files: string[] = []
 
-  function searchDir(dir: string, depth: number = 0): void {
+  function searchDir(dir: string, depth = 0): void {
     if (depth > 5) return
 
     try {
       const entries = fs.readdirSync(dir, { withFileTypes: true })
       for (const entry of entries) {
-        if (TRAVERSAL_SKIP_DIRS.includes(entry.name)) continue
+        if (TRAVERSAL_SKIP_DIRS.has(entry.name)) continue
 
         const fullPath = path.join(dir, entry.name)
         if (entry.isDirectory()) {
@@ -108,7 +108,7 @@ function parsePackageJson(filePath: string): PackageJson | null {
   try {
     const stats = fs.statSync(filePath)
     if (stats.size > 10_000_000) return null
-    const content = fs.readFileSync(filePath, 'utf-8')
+    const content = fs.readFileSync(filePath, 'utf8')
     return JSON.parse(content) as PackageJson
   } catch {
     // @swallow-ok graceful degradation - return sentinel on failure
@@ -168,7 +168,7 @@ function analyzeDependencyVersions(
     const pkgName = pkg.name ?? path.basename(path.dirname(pkgPath))
 
     // Check both dependencies and devDependencies
-    const depSources: Array<{ deps: Record<string, string> | undefined; isDev: boolean }> = [
+    const depSources: { deps: Record<string, string> | undefined; isDev: boolean }[] = [
       { deps: pkg.dependencies, isDev: false },
       { deps: pkg.devDependencies, isDev: true },
     ]
@@ -215,8 +215,8 @@ function analyzeDependencyVersions(
 function findNonWorkspaceProtocolDeps(
   packageJsonFiles: string[],
   projectRoot: string,
-): Array<{ pkgName: string; pkgPath: string; dep: string; version: string }> {
-  const violations: Array<{ pkgName: string; pkgPath: string; dep: string; version: string }> = []
+): { pkgName: string; pkgPath: string; dep: string; version: string }[] {
+  const violations: { pkgName: string; pkgPath: string; dep: string; version: string }[] = []
 
   for (const pkgPath of packageJsonFiles) {
     const pkg = parsePackageJson(pkgPath)
@@ -226,6 +226,7 @@ function findNonWorkspaceProtocolDeps(
     const allDeps = { ...pkg.dependencies, ...pkg.devDependencies }
 
     for (const [dep, version] of Object.entries(allDeps)) {
+      // eslint-disable-next-line sonarjs/no-empty-collection -- WORKSPACE_PREFIXES is intentionally empty by default; consumers populate it via project config
       const isWorkspaceDep = WORKSPACE_PREFIXES.some((prefix) => dep.startsWith(prefix))
       if (isWorkspaceDep && !version.startsWith('workspace:')) {
         violations.push({
@@ -288,6 +289,7 @@ export const dependencyVersionConsistency = defineCheck({
   tags: ['quality', 'dependencies', 'monorepo'],
 
   // @fitness-ignore-next-line concurrency-safety -- async keyword required by analyzeAll interface contract; synchronous analysis implementation
+  // eslint-disable-next-line @typescript-eslint/require-await -- AnalyzeAllCheckConfig requires Promise<CheckViolation[]>; this implementation is synchronous
   async analyzeAll(_files: FileAccessor): Promise<CheckViolation[]> {
     const violations: CheckViolation[] = []
 
@@ -302,17 +304,17 @@ export const dependencyVersionConsistency = defineCheck({
     for (const [dep, depAnalysis] of analysis) {
       if (depAnalysis.hasInconsistency && depAnalysis.versions.size > 0) {
         const canonical = suggestCanonicalVersion(depAnalysis)
-        const affectedPackages = Array.from(depAnalysis.versions.values())
+        const affectedPackages = [...depAnalysis.versions.values()]
           .flatMap((u) => u.packages)
           .filter((pkg) => {
-            const pkgVersion = Array.from(depAnalysis.versions.entries()).find(([, u]) =>
+            const pkgVersion = [...depAnalysis.versions.entries()].find(([, u]) =>
               u.packages.includes(pkg),
             )?.[0]
             return pkgVersion !== canonical
           })
 
         for (const pkgName of affectedPackages) {
-          const pkgVersion = Array.from(depAnalysis.versions.entries()).find(([, u]) =>
+          const pkgVersion = [...depAnalysis.versions.entries()].find(([, u]) =>
             u.packages.includes(pkgName),
           )?.[0]
 

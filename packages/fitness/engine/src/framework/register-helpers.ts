@@ -2,8 +2,9 @@
  * @fileoverview Helper for registering checks with a namespace
  */
 
-import type { Check } from './check-types.js';
 import { defaultRegistry } from './registry.js';
+
+import type { Check } from './check-types.js';
 
 /**
  * Register an array of checks with a namespace into the default registry.

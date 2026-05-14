@@ -58,15 +58,14 @@ export const errorCodeRegistration = defineCheck({
     // @fitness-ignore-next-line no-unbounded-concurrency -- bounded by files matching target; read is lightweight (FileAccessor caches)
     const nonRegistryContents = await Promise.all(nonRegistryPaths.map((fp) => files.read(fp)))
 
-    for (let fileIdx = 0; fileIdx < nonRegistryPaths.length; fileIdx++) {
-      const filePath = nonRegistryPaths[fileIdx]
+    for (const [fileIdx, filePath] of nonRegistryPaths.entries()) {
       if (!filePath) continue
       const content = nonRegistryContents[fileIdx]
       if (!content) continue
       const lines = content.split('\n')
 
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i] ?? ''
+      for (const [i, line_] of lines.entries()) {
+        const line = line_ ?? ''
         const trimmed = line.trim()
 
         // Skip comments

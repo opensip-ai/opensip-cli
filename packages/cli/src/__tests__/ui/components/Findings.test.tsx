@@ -1,8 +1,10 @@
+/* eslint-disable unicorn/filename-case -- React component test files mirror PascalCase component filenames */
+import { render } from 'ink-testing-library';
 import React from 'react';
 import { describe, it, expect } from 'vitest';
-import { render } from 'ink-testing-library';
-import { ThemeProvider } from '../../../ui/theme.js';
+
 import { Findings, type FindingCheck } from '../../../ui/components/Findings.js';
+import { ThemeProvider } from '../../../ui/theme.js';
 
 const sampleChecks: FindingCheck[] = [
   {

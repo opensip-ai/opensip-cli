@@ -30,21 +30,21 @@ function createPattern(pattern: string, flags?: string): RegExp {
 const EVENT_EMITTER_PATTERNS = [
   {
     // Fixed pattern - no backtracking issues
-    pattern: createPattern('new\\s+EventEmitter\\s*\\(', 'g'),
+    pattern: createPattern(String.raw`new\s+EventEmitter\s*\(`, 'g'),
     type: 'new-event-emitter',
     suggestion: 'Use a centralized event bus instead of direct EventEmitter instantiation',
     severity: 'error' as const,
   },
   {
     // Fixed pattern - word boundary prevents issues
-    pattern: createPattern('extends\\s+EventEmitter\\b', 'g'),
+    pattern: createPattern(String.raw`extends\s+EventEmitter\b`, 'g'),
     type: 'extends-event-emitter',
     suggestion: 'Implement event handling via a centralized event bus instead of extending EventEmitter',
     severity: 'error' as const,
   },
   {
     // Use [^}]* (bounded by curly brace) instead of .* to prevent catastrophic backtracking
-    pattern: createPattern('import\\s+[^}]*\\bEventEmitter\\b[^}]*from\\s+[\'"]events[\'"]', 'g'),
+    pattern: createPattern(String.raw`import\s+[^}]*\bEventEmitter\b[^}]*from\s+['"]events['"]`, 'g'),
     type: 'import-event-emitter',
     suggestion: 'Use a centralized event bus instead of importing EventEmitter directly',
     severity: 'error' as const,
@@ -52,7 +52,7 @@ const EVENT_EMITTER_PATTERNS = [
   {
     // Use [^}]* (bounded by curly brace) instead of .* to prevent catastrophic backtracking
     pattern: createPattern(
-      'import\\s+[^}]*\\bEventEmitter\\b[^}]*from\\s+[\'"]node:events[\'"]',
+      String.raw`import\s+[^}]*\bEventEmitter\b[^}]*from\s+['"]node:events['"]`,
       'g',
     ),
     type: 'import-event-emitter',
@@ -72,8 +72,7 @@ function analyzeFile(filePath: string, content: string): EventEmitterIssue[] {
 
   const lines = content.split('\n')
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
+  for (const [i, line] of lines.entries()) {
     if (!line) continue
 
     for (const { pattern, type, suggestion, severity } of EVENT_EMITTER_PATTERNS) {

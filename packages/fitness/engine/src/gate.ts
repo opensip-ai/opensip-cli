@@ -22,6 +22,7 @@ import { dirname } from 'node:path';
 import { logger } from '@opensip-tools/core';
 
 import { buildSarifLog } from './sarif.js';
+
 import type { CliOutput } from '@opensip-tools/cli-shared';
 
 // ---------------------------------------------------------------------------
@@ -44,11 +45,11 @@ export interface GateViolation {
 export interface GateCompareResult {
   readonly baselinePath: string;
   /** Violations present now but not in baseline. */
-  readonly added: ReadonlyArray<GateViolation>;
+  readonly added: readonly GateViolation[];
   /** Violations present in baseline but not now. */
-  readonly resolved: ReadonlyArray<GateViolation>;
+  readonly resolved: readonly GateViolation[];
   /** Violations present in both. */
-  readonly unchanged: ReadonlyArray<GateViolation>;
+  readonly unchanged: readonly GateViolation[];
   /** True iff `added` is non-empty — the gate decision. */
   readonly degraded: boolean;
 }
@@ -97,7 +98,7 @@ export function saveBaseline(output: CliOutput, baselinePath: string): void {
   const dir = dirname(baselinePath);
   // mkdirSync with recursive: true is idempotent — no need to check existsSync first.
   mkdirSync(dir, { recursive: true });
-  writeFileSync(baselinePath, JSON.stringify(sarif, null, 2), 'utf-8');
+  writeFileSync(baselinePath, JSON.stringify(sarif, null, 2), 'utf8');
 
   const findingCount = output.checks.reduce((n, c) => n + c.findings.length, 0);
   logger.info({
@@ -125,12 +126,12 @@ export function compareToBaseline(output: CliOutput, baselinePath: string): Gate
     throw new GateBaselineMissingError(baselinePath);
   }
 
-  const baselineRaw = readFileSync(baselinePath, 'utf-8');
+  const baselineRaw = readFileSync(baselinePath, 'utf8');
   let baselineDoc: unknown;
   try {
     baselineDoc = JSON.parse(baselineRaw);
-  } catch (err) {
-    const reason = err instanceof Error ? err.message : String(err);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
     throw new GateBaselineInvalidError(baselinePath, `not valid JSON (${reason})`);
   }
 
@@ -185,10 +186,9 @@ export function compareToBaseline(output: CliOutput, baselinePath: string): Gate
 /**
  * Pretty-print a gate compare result for stdout. Caller sets the exit code.
  */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- multi-section diff renderer: added/removed/changed sections each shape output; flatter form would scatter formatting
 export function renderGateCompareOutput(result: GateCompareResult): string {
-  const lines: string[] = [];
-  lines.push('opensip-tools gate compare');
-  lines.push('');
+  const lines: string[] = [ 'opensip-tools gate compare', ''];
 
   if (result.added.length > 0) {
     lines.push(`Added (${result.added.length}):`);
@@ -263,22 +263,22 @@ interface SarifResult {
   ruleId?: string;
   level?: string;
   message?: { text?: string };
-  locations?: ReadonlyArray<{
+  locations?: readonly {
     physicalLocation?: {
       artifactLocation?: { uri?: string };
       region?: { startLine?: number };
     };
-  }>;
+  }[];
 }
 
 interface SarifRun {
   tool?: { driver?: { name?: string } };
-  results?: ReadonlyArray<SarifResult>;
+  results?: readonly SarifResult[];
 }
 
 interface SarifDoc {
   version?: string;
-  runs?: ReadonlyArray<SarifRun>;
+  runs?: readonly SarifRun[];
 }
 
 function extractViolationsFromSarif(doc: unknown, baselinePath: string): GateViolation[] {
@@ -286,14 +286,16 @@ function extractViolationsFromSarif(doc: unknown, baselinePath: string): GateVio
     throw new GateBaselineInvalidError(baselinePath, 'top-level value is not an object');
   }
   const sarif = doc as SarifDoc;
-  if (!Array.isArray(sarif.runs)) {
+  if (sarif.runs === undefined || !Array.isArray(sarif.runs)) {
     throw new GateBaselineInvalidError(baselinePath, 'missing or non-array `runs`');
   }
 
+  const runs: readonly SarifRun[] = sarif.runs;
   const violations: GateViolation[] = [];
-  for (const run of sarif.runs) {
-    if (!Array.isArray(run.results)) continue;
-    for (const result of run.results) {
+  for (const run of runs) {
+    const results: readonly SarifResult[] | undefined = run.results;
+    if (results === undefined) continue;
+    for (const result of results) {
       const ruleId = result.ruleId ?? '';
       const message = result.message?.text ?? '';
       const loc = result.locations?.[0]?.physicalLocation;
@@ -315,10 +317,10 @@ function extractViolationsFromSarif(doc: unknown, baselinePath: string): GateVio
 
 function formatLocation(v: GateViolation): string {
   if (!v.filePath) return '(no location)';
-  return v.line != null ? `${v.filePath}:${v.line}` : v.filePath;
+  return v.line == null ? v.filePath : `${v.filePath}:${v.line}`;
 }
 
-function sortViolations(vs: ReadonlyArray<GateViolation>): GateViolation[] {
+function sortViolations(vs: readonly GateViolation[]): GateViolation[] {
   return [...vs].sort((a, b) => {
     if (a.ruleId !== b.ruleId) return a.ruleId.localeCompare(b.ruleId);
     if (a.filePath !== b.filePath) return a.filePath.localeCompare(b.filePath);

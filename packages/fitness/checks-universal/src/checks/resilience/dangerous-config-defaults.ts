@@ -6,7 +6,6 @@
  */
 
 import { logger } from '@opensip-tools/core/logger'
-
 import { defineCheck, type CheckViolation, getLineNumber } from '@opensip-tools/fitness'
 
 import { isDigit, isAlphanumericChar } from './config-validation-helpers.js'
@@ -20,7 +19,7 @@ import { isDigit, isAlphanumericChar } from './config-validation-helpers.js'
  * Avoids regex patterns that trigger SonarJS warnings.
  */
 interface ConfigPatternChecker {
-  check: (content: string) => Array<{ index: number; match: string }>
+  check: (content: string) => { index: number; match: string }[]
   message: string
   suggestion: string
   severity: 'error' | 'warning'
@@ -63,11 +62,11 @@ function extractAssignment(afterKey: string, expectedValue: string): string | nu
     i++
   }
 
-  const remaining = afterKey.substring(i)
+  const remaining = afterKey.slice(Math.max(0, i))
   if (remaining.toLowerCase().startsWith(expectedValue.toLowerCase())) {
     const nextChar = remaining[expectedValue.length]
     if (!nextChar || !isAlphanumericChar(nextChar)) {
-      return afterKey.substring(0, i + expectedValue.length)
+      return afterKey.slice(0, Math.max(0, i + expectedValue.length))
     }
   }
 
@@ -81,12 +80,12 @@ function extractAssignment(afterKey: string, expectedValue: string): string | nu
 function createConfigChecker(options: CreateConfigCheckerOptions): ConfigPatternChecker {
   const { configKey, expectedValue, message, suggestion, severity } = options
   return {
-    check(content: string): Array<{ index: number; match: string }> {
+    check(content: string): { index: number; match: string }[] {
       logger.debug({
         evt: 'fitness.checks.dangerous_config_defaults.config_checker_check',
         msg: 'Checking content for dangerous config pattern matches',
       })
-      const results: Array<{ index: number; match: string }> = []
+      const results: { index: number; match: string }[] = []
       const lowerContent = content.toLowerCase()
       const lowerKey = configKey.toLowerCase()
       let searchStart = 0
@@ -95,11 +94,11 @@ function createConfigChecker(options: CreateConfigCheckerOptions): ConfigPattern
         const keyIndex = lowerContent.indexOf(lowerKey, searchStart)
         if (keyIndex === -1) break
 
-        const afterKey = content.substring(keyIndex + configKey.length)
+        const afterKey = content.slice(Math.max(0, keyIndex + configKey.length))
         const assignMatch = extractAssignment(afterKey, expectedValue)
 
         if (assignMatch) {
-          const fullMatch = content.substring(
+          const fullMatch = content.slice(
             keyIndex,
             keyIndex + configKey.length + assignMatch.length,
           )
@@ -151,7 +150,7 @@ function extractTlsAssignment(afterKey: string): string | null {
     i++
   }
 
-  return afterKey.substring(0, i)
+  return afterKey.slice(0, Math.max(0, i))
 }
 
 /**
@@ -160,12 +159,12 @@ function extractTlsAssignment(afterKey: string): string | null {
 // @fitness-ignore-next-line dangerous-config-defaults -- This is the fitness check definition itself; the string literal 'node_tls_reject_unauthorized' is the pattern being detected, not actual TLS configuration
 function createTlsRejectChecker(): ConfigPatternChecker {
   return {
-    check(content: string): Array<{ index: number; match: string }> {
+    check(content: string): { index: number; match: string }[] {
       logger.debug({
         evt: 'fitness.checks.dangerous_config_defaults.tls_reject_checker_check',
         msg: 'Checking content for TLS reject unauthorized patterns',
       })
-      const results: Array<{ index: number; match: string }> = []
+      const results: { index: number; match: string }[] = []
       const lowerContent = content.toLowerCase()
       const key = 'node_tls_reject_unauthorized'
       let searchStart = 0
@@ -174,11 +173,11 @@ function createTlsRejectChecker(): ConfigPatternChecker {
         const keyIndex = lowerContent.indexOf(key, searchStart)
         if (keyIndex === -1) break
 
-        const afterKey = content.substring(keyIndex + key.length)
+        const afterKey = content.slice(Math.max(0, keyIndex + key.length))
         const assignMatch = extractTlsAssignment(afterKey)
 
         if (assignMatch) {
-          const fullMatch = content.substring(keyIndex, keyIndex + key.length + assignMatch.length)
+          const fullMatch = content.slice(keyIndex, keyIndex + key.length + assignMatch.length)
           results.push({ index: keyIndex, match: fullMatch })
         }
 
@@ -199,12 +198,12 @@ function createTlsRejectChecker(): ConfigPatternChecker {
 // @fitness-ignore-next-line dangerous-config-defaults -- This is the fitness check definition itself; the string literal 'poolsize' is the pattern being detected, not actual pool configuration
 function createPoolSizeChecker(): ConfigPatternChecker {
   return {
-    check(content: string): Array<{ index: number; match: string }> {
+    check(content: string): { index: number; match: string }[] {
       logger.debug({
         evt: 'fitness.checks.dangerous_config_defaults.pool_size_checker_check',
         msg: 'Checking content for small connection pool size patterns',
       })
-      const results: Array<{ index: number; match: string }> = []
+      const results: { index: number; match: string }[] = []
       const lowerContent = content.toLowerCase()
       let searchStart = 0
 
@@ -212,11 +211,11 @@ function createPoolSizeChecker(): ConfigPatternChecker {
         const keyIndex = lowerContent.indexOf('poolsize', searchStart)
         if (keyIndex === -1) break
 
-        const afterKey = content.substring(keyIndex + 8)
+        const afterKey = content.slice(Math.max(0, keyIndex + 8))
         const assignMatch = extractPoolSizeAssignment(afterKey)
 
         if (assignMatch) {
-          const fullMatch = content.substring(keyIndex, keyIndex + 8 + assignMatch.length)
+          const fullMatch = content.slice(keyIndex, keyIndex + 8 + assignMatch.length)
           results.push({ index: keyIndex, match: fullMatch })
         }
 
@@ -253,7 +252,7 @@ function extractPoolSizeAssignment(afterKey: string): string | null {
   if (afterKey[i] === '1' || afterKey[i] === '2') {
     const nextChar = afterKey[i + 1]
     if (!nextChar || !isDigit(nextChar)) {
-      return afterKey.substring(0, i + 1)
+      return afterKey.slice(0, Math.max(0, i + 1))
     }
   }
 

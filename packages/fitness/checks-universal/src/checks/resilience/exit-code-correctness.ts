@@ -5,6 +5,7 @@
  */
 
 import { defineCheck, type CheckViolation, getLineNumber } from '@opensip-tools/fitness'
+
 import { isCommentLine } from '../../utils/index.js'
 
 /**
@@ -102,7 +103,7 @@ export const exitCodeCorrectness = defineCheck({
         severity: 'warning',
         suggestion:
           'Re-throw the error, call process.exit(1), or return a Result.err() to ensure the failure is visible to callers and CI pipelines.',
-        match: match[0].substring(0, 60),
+        match: match[0].slice(0, 60),
         type: 'silent-failure-exit',
         filePath,
       })

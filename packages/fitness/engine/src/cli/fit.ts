@@ -2,10 +2,9 @@
  * fit command — run fitness checks
  */
 
-import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { logger, type CheckDisplayEntry } from '@opensip-tools/core';
 import {
   EXIT_CODES,
   saveSession,
@@ -17,23 +16,26 @@ import {
   type FitDoneResult,
   type ErrorResult,
 } from '@opensip-tools/cli-shared';
+import { logger, type CheckDisplayEntry } from '@opensip-tools/core';
 
-import { defaultRegistry } from '../framework/registry.js';
 import { isCheck } from '../framework/check-types.js';
-import { FitnessRecipeService } from '../recipes/service.js';
-import type { FitnessRecipeServiceCallbacks, CheckSummary } from '../recipes/service-types.js';
-import type { FitnessRecipeResult } from '../recipes/types.js';
-import { defaultRecipeRegistry } from '../recipes/registry.js';
+import { defaultRegistry } from '../framework/registry.js';
 import { buildScopeBasedFileMap } from '../framework/scope-resolver.js';
-import { loadTargetsConfig } from '../targets/index.js';
-import { loadSignalersConfig } from '../signalers/index.js';
-import type { SignalersConfig } from '../signalers/types.js';
-import { loadAllPlugins } from '../plugins/loader.js';
 import {
   discoverCheckPackages,
   readCheckPackageMetadata,
   readCheckPackagePreferences,
 } from '../plugins/check-package-discovery.js';
+import { loadAllPlugins } from '../plugins/loader.js';
+import { defaultRecipeRegistry } from '../recipes/registry.js';
+import { FitnessRecipeService } from '../recipes/service.js';
+import { loadSignalersConfig } from '../signalers/index.js';
+import { loadTargetsConfig } from '../targets/index.js';
+
+import type { FitnessRecipeServiceCallbacks, CheckSummary } from '../recipes/service-types.js';
+import type { FitnessRecipeResult } from '../recipes/types.js';
+import type { SignalersConfig } from '../signalers/types.js';
+
 
 // ---------------------------------------------------------------------------
 // Lazy-load fitness checks
@@ -50,13 +52,18 @@ let pluginLoadErrors: readonly string[] = [];
  */
 const mergedCheckDisplay = new Map<string, CheckDisplayEntry>();
 let getCheckDisplayName: (slug: string) => string = defaultDisplayName;
-let getCheckIcon: (slug: string) => string = () => '\uD83D\uDD0D';
+let getCheckIcon: (slug: string) => string = (_slug: string) => '\uD83D\uDD0D';
 
 function defaultDisplayName(slug: string): string {
   return slug
     .split('-')
     .map(w => w.charAt(0).toUpperCase() + w.slice(1))
     .join(' ');
+}
+
+function rowStatus(cr: { timedOut?: boolean; passed: boolean }): 'TIMEOUT' | 'PASS' | 'FAIL' {
+  if (cr.timedOut) return 'TIMEOUT';
+  return cr.passed ? 'PASS' : 'FAIL';
 }
 
 function rebuildDisplayLookups(): void {
@@ -240,8 +247,8 @@ async function loadDiscoveredCheckPackages(projectDir: string): Promise<number> 
         name: pkg.name,
         checksRegistered: registered,
       });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
       process.stderr.write(`opensip-tools: failed to load check package ${pkg.name}: ${msg}\n`);
       logger.warn({
         evt: 'cli.check_package.load_failed',
@@ -311,19 +318,19 @@ export function formatDuration(ms: number): string {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
-export function formatValidatedColumn(totalItems: number | undefined, itemType: string | undefined): string {
+export function formatValidatedColumn(totalItems: number | undefined, itemType = 'items'): string {
   // No meaningful count: external tool checks, errored checks, or checks with no file scanning
   if (!totalItems) return '—';
   // Use singular for count of 1, plural otherwise (e.g., "1 file", "450 files", "13 packages")
-  const label = itemType ?? 'items';
-  const singular = label.endsWith('s') ? label.slice(0, -1) : label;
-  return totalItems === 1 ? `${totalItems} ${singular}` : `${totalItems} ${label}`;
+  const singular = itemType.endsWith('s') ? itemType.slice(0, -1) : itemType;
+  return totalItems === 1 ? `${totalItems} ${singular}` : `${totalItems} ${itemType}`;
 }
 
 // ---------------------------------------------------------------------------
 // executeFit — main fit command (returns data, no console output)
 // ---------------------------------------------------------------------------
 
+// eslint-disable-next-line sonarjs/cognitive-complexity -- top-level CLI command flow: validates args, resolves config, runs recipes, persists results — distinct phases that read better inline
 export async function executeFit(
   args: CliArgs,
   onProgress?: (completed: number, total: number) => void,
@@ -358,8 +365,8 @@ export async function executeFit(
   try {
     signalersConfig = loadSignalersConfig(args.cwd, args.config);
     targetsResult = loadTargetsConfig(args.cwd, args.config);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     logger.warn({ evt: 'cli.config.load_failed', module: 'cli:fit', message });
     return {
       result: {
@@ -473,8 +480,8 @@ export async function executeFit(
     } else {
       fitnessResult = await service.start(recipeName!);
     }
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
     return {
       result: {
         type: 'error',
@@ -544,7 +551,7 @@ export async function executeFit(
   // Build table rows
   const tableRows: TableRow[] = checkResults.map(cr => ({
     check: getCheckDisplayName(cr.checkSlug),
-    status: cr.timedOut ? 'TIMEOUT' as const : cr.passed ? 'PASS' as const : 'FAIL' as const,
+    status: rowStatus(cr),
     errors: cr.errorCount,
     warnings: cr.warningCount,
     validated: formatValidatedColumn(cr.totalItems, cr.itemType),

@@ -10,6 +10,7 @@
  */
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+
 import { isTestFile } from '../../../utils/index.js'
 
 /**
@@ -183,14 +184,18 @@ function isSpreadInCallOrArray(line: string): boolean {
 
 function getPerformanceSuggestion(type: AntiPatternType, defaultMessage: string): string {
   switch (type) {
-    case 'sequential-await':
+    case 'sequential-await': {
       return 'Collect promises in an array and use Promise.all() to execute them in parallel, e.g.: const results = await Promise.all(items.map(item => fetchItem(item)));'
-    case 'spread-in-loop':
+    }
+    case 'spread-in-loop': {
       return 'Pre-allocate the result array with the known size, then use indexed assignment or push() without spread to avoid O(n^2) complexity'
-    case 'string-concat-in-loop':
+    }
+    case 'string-concat-in-loop': {
       return 'Collect strings in an array and call .join("") after the loop completes to avoid O(n^2) string allocation'
-    default:
+    }
+    default: {
       return defaultMessage
+    }
   }
 }
 
@@ -220,7 +225,7 @@ export const performanceAntiPatterns = defineCheck({
   tags: ['performance', 'quality'],
   fileTypes: ['ts', 'tsx'],
   // @fitness-ignore-next-line no-hardcoded-timeouts -- framework default for fitness check execution
-  timeout: 180000, // 3 minutes - parses AST for all production files
+  timeout: 180_000, // 3 minutes - parses AST for all production files
 
   analyze(content, filePath) {
     // Skip test files — performance anti-patterns in tests are low-risk

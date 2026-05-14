@@ -3,6 +3,7 @@
  */
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+
 import { isTestFile } from '../../../utils/index.js'
 
 /**
@@ -16,7 +17,7 @@ const NON_NULL_ASSERTION_REGEX = /([\w.[\]]+)!\s*[.[;,)]/g
 /**
  * Analyze a file for non-null assertion operator usage
  */
-// eslint-disable-next-line sonarjs/cognitive-complexity, sonarjs/cyclomatic-complexity -- Inherent complexity: template literal tracking + regex matching + multiple skip conditions
+// eslint-disable-next-line sonarjs/cognitive-complexity -- Inherent complexity: template literal tracking + regex matching + multiple skip conditions
 function analyzeNonNullAssertions(content: string, _filePath: string): CheckViolation[] {
   const violations: CheckViolation[] = []
   const lines = content.split('\n')
@@ -24,8 +25,8 @@ function analyzeNonNullAssertions(content: string, _filePath: string): CheckViol
   // Track template literal nesting to skip lines inside multi-line template literals
   let inTemplateLiteral = false
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i] ?? ''
+  for (const [i, line_] of lines.entries()) {
+    const line = line_ ?? ''
     const trimmed = line.trim()
 
     // Track template literal boundaries (count unescaped backticks)

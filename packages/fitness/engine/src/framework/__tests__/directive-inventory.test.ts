@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+
 import { parseDirectiveLine } from '../directive-inventory.js'
 
 describe('parseDirectiveLine', () => {

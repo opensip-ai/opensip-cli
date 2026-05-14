@@ -5,18 +5,19 @@
  * per-check timeouts, abort support, and retry logic.
  */
 
-import { TimeoutError } from '@opensip-tools/core'
-import { logger } from '@opensip-tools/core'
+import { TimeoutError , logger } from '@opensip-tools/core'
 
-import type { Check } from '../framework/check-types.js'
 import { memoryProfiler } from '../framework/memory-profiler.js'
-import type { CheckResult } from '../types/findings.js'
+
 
 import { processSuccessResult, processErrorResult, type ProcessorContext } from './check-result-processor.js'
 import { executeWithRetry } from './retry.js'
+import { getEffectiveMaxParallel } from './types.js'
+
 import type { FitnessRecipeServiceCallbacks, FitnessRecipeSession } from './service-types.js'
 import type { FitnessRecipe } from './types.js'
-import { getEffectiveMaxParallel } from './types.js'
+import type { Check } from '../framework/check-types.js'
+import type { CheckResult } from '../types/findings.js'
 
 // =============================================================================
 // TYPES
@@ -66,6 +67,7 @@ export async function executeParallel(ctx: ExecutionServiceContext, opts: Execut
   const processorCtx: ProcessorContext = { session, callbacks, recipe, includeViolations: ctx.includeViolations ?? false }
 
   // @fitness-ignore-next-line concurrency-safety -- async arrow provides Promise<void> return type for consistency; single-threaded Node.js access pattern
+  /* eslint-disable @typescript-eslint/require-await -- callers `await` this; preserving async signature in case future processors become async */
   const processCheckResult = async (
     checkIndex: number,
     checkId: string,
@@ -88,6 +90,7 @@ export async function executeParallel(ctx: ExecutionServiceContext, opts: Execut
     })
     if (output.shouldStop) shouldStopExecution = true
   }
+  /* eslint-enable @typescript-eslint/require-await */
 
   const processCheckError = (
     checkIndex: number,
@@ -95,7 +98,7 @@ export async function executeParallel(ctx: ExecutionServiceContext, opts: Execut
     checkSlug: string,
     error: unknown,
     durationMs: number,
-    timedOut: boolean = false,
+    timedOut = false,
     timeoutMs?: number,
   ): void => {
     const memoryBeforeMB = memoryBeforeMap.get(checkId) ?? 0
@@ -108,7 +111,7 @@ export async function executeParallel(ctx: ExecutionServiceContext, opts: Execut
       durationMs,
       memoryBeforeMB,
       timedOut,
-      ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+      ...(timeoutMs === undefined ? {} : { timeoutMs }),
     }
     const output = processErrorResult(processorCtx, errorInput)
     if (output.shouldStop) shouldStopExecution = true

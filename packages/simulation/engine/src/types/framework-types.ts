@@ -13,22 +13,22 @@
  * @deprecated Prefer the new kind-specific types from `kinds/<kind>/define.ts`.
  */
 
-import type { Signal } from '@opensip-tools/core'
-
 import type {
-  AssertionOperator,
+  
   ScenarioType,
   ChaosConfig,
   SimulationMetrics,
-  PersonaType,
+  
   ScenarioAssertion as MutableScenarioAssertion,
 } from './base-types.js'
+import type { Signal } from '@opensip-tools/core'
+
 
 // =============================================================================
 // ASSERTION TYPES
 // =============================================================================
 
-export type { AssertionOperator }
+
 
 /**
  * A scenario assertion definition (readonly variant for framework use).
@@ -101,6 +101,7 @@ export interface LegacyLoadResultPayload {
 }
 
 /** @deprecated Alias for {@link LegacyLoadResultPayload}; the public discriminated union now lives in `framework/scenario-executor-result.ts`. */
+// eslint-disable-next-line sonarjs/deprecation -- this alias is itself the deprecation back-compat layer
 export type ScenarioExecutorResult = LegacyLoadResultPayload
 
 /**
@@ -109,6 +110,7 @@ export type ScenarioExecutorResult = LegacyLoadResultPayload
  * Custom execute functions return the legacy load result payload; the
  * load runner wraps the payload into a `LoadScenarioExecutorResult`.
  */
+// eslint-disable-next-line sonarjs/deprecation -- the legacy custom-execute hook returns the legacy payload by design
 export type CustomExecuteFn = (context: ScenarioExecutionContext) => Promise<LegacyLoadResultPayload>
 
 /**
@@ -173,4 +175,6 @@ export type { RunnableScenario, ScenarioRegistryEntry } from '../framework/runna
 // RE-EXPORTS
 // =============================================================================
 
-export type { PersonaType, ScenarioType, ChaosConfig, SimulationMetrics }
+
+
+export {type ScenarioType, type AssertionOperator, type PersonaType, type ChaosConfig, type SimulationMetrics} from './base-types.js'

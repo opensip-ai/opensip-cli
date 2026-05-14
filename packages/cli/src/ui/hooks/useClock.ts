@@ -1,3 +1,4 @@
+/* eslint-disable unicorn/filename-case -- React `useXxx` hook convention; renaming to kebab-case obscures the hook role */
 /**
  * Clock context — provides a tick counter that increments at a fixed interval.
  * Used by useSpinner and any other animation that needs a frame counter.

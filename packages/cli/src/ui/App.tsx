@@ -2,25 +2,27 @@
  * App — top-level Ink component that dispatches on CommandResult.type.
  */
 
-import React from 'react';
 import { Text, Box } from 'ink';
-import type { CommandResult } from '@opensip-tools/cli-shared';
+import React from 'react';
+
 
 import { Banner } from './components/Banner.js';
-import { ResultsTable } from './components/ResultsTable.js';
-import { Summary } from './components/Summary.js';
-import { Findings } from './components/Findings.js';
-import { CloudReportStatus } from './components/CloudReportStatus.js';
 import { CheckList } from './components/CheckList.js';
-import { RecipeList } from './components/RecipeList.js';
+import { CloudReportStatus } from './components/CloudReportStatus.js';
+import { ErrorMessage } from './components/ErrorMessage.js';
+import { ExperimentalNotice } from './components/ExperimentalNotice.js';
+import { Findings } from './components/Findings.js';
+import { HelpText } from './components/HelpText.js';
 import { HistoryTable } from './components/HistoryTable.js';
 import { InitFeedback } from './components/InitFeedback.js';
 import { PluginFeedback, type PluginAction } from './components/PluginFeedback.js';
-import { ExperimentalNotice } from './components/ExperimentalNotice.js';
+import { RecipeList } from './components/RecipeList.js';
+import { ResultsTable } from './components/ResultsTable.js';
 import { RunHeader } from './components/RunHeader.js';
-import { ErrorMessage } from './components/ErrorMessage.js';
-import { HelpText } from './components/HelpText.js';
+import { Summary } from './components/Summary.js';
 import { useTheme } from './theme.js';
+
+import type { CommandResult } from '@opensip-tools/cli-shared';
 
 export interface AppProps {
   readonly result: CommandResult;
@@ -28,7 +30,7 @@ export interface AppProps {
 
 export function App({ result }: AppProps): React.ReactElement {
   switch (result.type) {
-    case 'fit-done':
+    case 'fit-done': {
       return (
         <Box flexDirection="column">
           <Banner />
@@ -38,26 +40,32 @@ export function App({ result }: AppProps): React.ReactElement {
           {result.reportStatus && <CloudReportStatus {...result.reportStatus} />}
         </Box>
       );
+    }
 
-    case 'list-checks':
+    case 'list-checks': {
       return <CheckList checks={result.checks} totalCount={result.totalCount} />;
+    }
 
-    case 'list-recipes':
+    case 'list-recipes': {
       return <RecipeList recipes={result.recipes} />;
+    }
 
-    case 'history':
+    case 'history': {
       return <HistoryTable sessions={result.sessions} />;
+    }
 
-    case 'dashboard':
+    case 'dashboard': {
       return <DashboardFeedback path={result.path} opened={result.opened} />;
+    }
 
-    case 'init':
+    case 'init': {
       return (
         <Box flexDirection="column">
           {result.created && <Banner />}
           <InitFeedback {...result} />
         </Box>
       );
+    }
 
     case 'experimental': {
       const toolName = 'Simulation';
@@ -75,10 +83,11 @@ export function App({ result }: AppProps): React.ReactElement {
       );
     }
 
-    case 'plugin':
+    case 'plugin': {
       return <PluginFeedback action={toPluginAction(result)} />;
+    }
 
-    case 'clear-done':
+    case 'clear-done': {
       return (
         <Box flexDirection="column">
           <Banner />
@@ -94,20 +103,24 @@ export function App({ result }: AppProps): React.ReactElement {
           </Box>
         </Box>
       );
+    }
 
-    case 'help':
+    case 'help': {
       return <HelpText />;
+    }
 
-    case 'error':
+    case 'error': {
       return <ErrorMessage message={result.message} suggestion={result.suggestion} />;
+    }
 
-    default:
+    default: {
       return <ErrorMessage message="Unknown command result" />;
+    }
   }
 }
 
 /** Inline dashboard feedback component */
-function DashboardFeedback({ path, opened }: { path: string; opened: boolean }): React.ReactElement {
+function DashboardFeedback({ path, opened }: Readonly<{ path: string; opened: boolean }>): React.ReactElement {
   const theme = useTheme();
   return (
     <Box flexDirection="column" paddingLeft={2}>
@@ -128,7 +141,7 @@ function toPluginAction(result: CommandResult & { type: 'plugin' }): PluginActio
   if (result.action === 'list') {
     return {
       type: 'list',
-      plugins: (result.plugins as Array<{ domain: string; namespace: string; pluginType: 'package' | 'file' }>) ?? [],
+      plugins: (result.plugins as { domain: string; namespace: string; pluginType: 'package' | 'file' }[]) ?? [],
       totalCount: (result.totalCount as number) ?? 0,
     };
   }

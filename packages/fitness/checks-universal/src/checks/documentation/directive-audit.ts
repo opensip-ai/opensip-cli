@@ -98,8 +98,7 @@ function parseTypeScriptDirectives(
   const directives: DirectiveInfo[] = []
   const lines = content.split('\n')
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
+  for (const [i, line] of lines.entries()) {
     if (line === undefined) {
       // Skip undefined lines
       continue
@@ -303,8 +302,7 @@ function parseESLintDirectives(content: string, filePath: string, file: string):
   const directives: DirectiveInfo[] = []
   const lines = content.split('\n')
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
+  for (const [i, line] of lines.entries()) {
     if (line === undefined) {
       continue
     }
@@ -362,11 +360,11 @@ function extractFitnessDirective(
   if (fileIdx !== -1) {
     scopeType = 'file'
     markerEnd = fileIdx + fileMarker.length
-  } else if (nextLineIdx !== -1) {
+  } else if (nextLineIdx === -1) {
+    return null
+  } else {
     scopeType = 'next-line'
     markerEnd = nextLineIdx + nextLineMarker.length
-  } else {
-    return null
   }
 
   // Extract check ID and reason
@@ -403,8 +401,7 @@ function parseFitnessDirectives(content: string, filePath: string, file: string)
   const directives: DirectiveInfo[] = []
   const lines = content.split('\n')
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
+  for (const [i, line] of lines.entries()) {
     if (line === undefined) {
       continue
     }
@@ -455,11 +452,11 @@ function extractSemgrepDirective(
 
     // Check for -- separator (reason follows)
     const reasonSeparator = afterColon.indexOf('--')
-    if (reasonSeparator !== -1) {
+    if (reasonSeparator === -1) {
+      ruleId = afterColon.trim() || '*'
+    } else {
       ruleId = afterColon.slice(0, reasonSeparator).trim() || '*'
       reason = afterColon.slice(reasonSeparator + 2).trim()
-    } else {
-      ruleId = afterColon.trim() || '*'
     }
   } else if (afterMarker.trim().startsWith('--')) {
     // Just a reason, no rule ID
@@ -482,8 +479,7 @@ function parseSemgrepDirectives(content: string, filePath: string, file: string)
   const directives: DirectiveInfo[] = []
   const lines = content.split('\n')
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
+  for (const [i, line] of lines.entries()) {
     if (line === undefined) {
       continue
     }
@@ -502,12 +498,12 @@ function hasDirectiveMarkers(content: string): boolean {
 }
 
 function collectFileDirectives(content: string, filePath: string, file: string): DirectiveInfo[] {
-  const directives: DirectiveInfo[] = []
-
-  directives.push(...parseTypeScriptDirectives(content, filePath, file))
-  directives.push(...parseESLintDirectives(content, filePath, file))
-  directives.push(...parseFitnessDirectives(content, filePath, file))
-  directives.push(...parseSemgrepDirectives(content, filePath, file))
+  const directives: DirectiveInfo[] = [
+    ...parseTypeScriptDirectives(content, filePath, file),
+    ...parseESLintDirectives(content, filePath, file),
+    ...parseFitnessDirectives(content, filePath, file),
+    ...parseSemgrepDirectives(content, filePath, file),
+  ]
 
   // Sort by line number
   directives.sort((a, b) => a.line - b.line)
@@ -524,7 +520,7 @@ function isTypeScriptFile(filePath: string): boolean {
  */
 function getFileName(filePath: string): string {
   const lastSlash = filePath.lastIndexOf('/')
-  return lastSlash >= 0 ? filePath.slice(lastSlash + 1) : filePath
+  return lastSlash === -1 ? filePath : filePath.slice(lastSlash + 1)
 }
 
 /**

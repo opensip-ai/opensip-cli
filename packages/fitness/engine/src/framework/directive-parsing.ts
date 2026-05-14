@@ -48,7 +48,7 @@ function isKnownDirectiveLine(line: string): boolean {
 }
 
 function isCheckIdChar(char: string): boolean {
-  const code = char.charCodeAt(0)
+  const code = char.codePointAt(0) ?? 0
   const isLowerCase = code >= 97 && code <= 122
   const isUpperCase = code >= 65 && code <= 90
   const isDigit = code >= 48 && code <= 57
@@ -57,12 +57,12 @@ function isCheckIdChar(char: string): boolean {
 }
 
 function extractCheckIdFromDirective(line: string, directiveKeyword: string): string | null {
+  // Both `//` and `/*` are 2-char prefixes; sliceLen is fixed.
+  const sliceLen = 2
   let commentIndex = line.indexOf('//')
-  let sliceLen = 2
   if (commentIndex === -1) {
     commentIndex = line.indexOf('/*')
     if (commentIndex === -1) return null
-    sliceLen = 2
   }
 
   const afterComment = line.slice(commentIndex + sliceLen).trimStart()
@@ -206,8 +206,8 @@ export function parseLinterIgnoreDirectives(
   const counts = { eslint: 0, typescript: 0, semgrep: 0 }
   const lines = content.split('\n')
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i] ?? ''
+  for (const [i, line_] of lines.entries()) {
+    const line = line_ ?? ''
 
     if (options.eslint && isEslintIgnoreLine(line)) {
       counts.eslint++

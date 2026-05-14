@@ -7,10 +7,10 @@
  * this check analyzes call-sites for proper resource cleanup.
  */
 
-import * as ts from 'typescript'
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import * as ts from 'typescript'
 
 /**
  * Describes a known type that has lifecycle methods requiring cleanup.
@@ -69,7 +69,7 @@ function findEnclosingScope(node: ts.Node): ts.Node {
   let current: ts.Node | undefined = node.parent
   while (current) {
     if (
-      // eslint-disable-next-line sonarjs/expression-complexity -- All six TypeScript AST node type checks are required to identify function-like scope boundaries
+       
       ts.isFunctionDeclaration(current) ||
       ts.isFunctionExpression(current) ||
       ts.isArrowFunction(current) ||
@@ -79,7 +79,7 @@ function findEnclosingScope(node: ts.Node): ts.Node {
     ) {
       return current
     }
-    current = current.parent as ts.Node | undefined
+    current = current.parent
   }
   return node.getSourceFile()
 }

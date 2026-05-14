@@ -135,7 +135,7 @@ export interface RecipeCheckResult {
   readonly skipReason?: string
   readonly error?: string
   readonly timedOut?: boolean
-  appliedDirectives?: readonly import('../framework/directive-inventory.js').DirectiveEntry[] | undefined
+  appliedDirectives?: readonly DirectiveEntry[] | undefined
   /** Violation details. Populated when includeViolations is true. */
   readonly violations?: readonly RecipeViolation[]
 }

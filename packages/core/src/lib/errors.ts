@@ -90,8 +90,8 @@ export function err<E>(error: E): Result<never, E> {
 export async function tryCatchAsync<T>(fn: () => Promise<T>): Promise<Result<T, Error>> {
   try {
     return ok(await fn());
-  } catch (e) {
-    return err(e instanceof Error ? e : new Error(String(e)));
+  } catch (error) {
+    return err(error instanceof Error ? error : new Error(String(error)));
   }
 }
 
@@ -99,7 +99,7 @@ export async function tryCatchAsync<T>(fn: () => Promise<T>): Promise<Result<T, 
 export function tryCatch<T>(fn: () => T): Result<T, Error> {
   try {
     return ok(fn());
-  } catch (e) {
-    return err(e instanceof Error ? e : new Error(String(e)));
+  } catch (error) {
+    return err(error instanceof Error ? error : new Error(String(error)));
   }
 }

@@ -74,7 +74,8 @@ async function confirm(
   prompt: (question: string) => Promise<string>,
   message: string,
 ): Promise<boolean> {
-  const answer = (await prompt(message)).trim().toLowerCase()
+  const raw = await prompt(message)
+  const answer = raw.trim().toLowerCase()
   return answer === 'y' || answer === 'yes'
 }
 

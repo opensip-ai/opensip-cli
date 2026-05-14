@@ -4,6 +4,7 @@
  */
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+
 import { isCommentLine } from '../../../utils/index.js'
 
 /**
@@ -106,8 +107,8 @@ export const noConsoleLog = defineCheck({
     const violations: CheckViolation[] = []
     const lines = content.split('\n')
 
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i] ?? ''
+    for (const [i, line_] of lines.entries()) {
+      const line = line_ ?? ''
       const lineNum = i + 1
 
       // Skip comments

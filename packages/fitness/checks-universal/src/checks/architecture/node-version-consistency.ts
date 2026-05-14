@@ -58,7 +58,7 @@ function extractNodeMajor(constraint: string): number | null {
   const match = ENGINES_NODE_MAJOR.exec(constraint)
   const digit = match?.[1]
   // @fitness-ignore-next-line numeric-validation -- regex guarantees digit-only string; null guard above
-  return digit ? parseInt(digit, 10) : null
+  return digit ? Number.parseInt(digit, 10) : null
 }
 
 // =============================================================================
@@ -72,8 +72,8 @@ function checkNvmrc(
   violations: CheckViolation[],
 ): void {
   const trimmed = content.trim()
-  const nvmrcMajor = parseInt(trimmed, 10)
-  if (isNaN(nvmrcMajor)) return
+  const nvmrcMajor = Number.parseInt(trimmed, 10)
+  if (Number.isNaN(nvmrcMajor)) return
 
   if (nvmrcMajor !== expectedMajor) {
     violations.push({
@@ -143,7 +143,7 @@ function checkTypesNode(
   if (!typesMajor) return
 
   // @fitness-ignore-next-line numeric-validation -- regex ^\d+ guarantees digit-only string
-  const typesMajorNum = parseInt(typesMajor, 10)
+  const typesMajorNum = Number.parseInt(typesMajor, 10)
   if (typesMajorNum !== expectedMajor) {
     const relPath = path.relative(process.cwd(), filePath)
     violations.push({
@@ -164,8 +164,7 @@ function checkCiWorkflow(
   violations: CheckViolation[],
 ): void {
   const lines = content.split('\n')
-  for (let i = 0; i < lines.length; i++) {
-    const rawLine = lines[i]
+  for (const [i, rawLine] of lines.entries()) {
     if (!rawLine) continue
     const line = rawLine.trim()
 
@@ -174,7 +173,7 @@ function checkCiWorkflow(
     if (!ciVersion) continue
 
     // @fitness-ignore-next-line numeric-validation -- regex (\d+) guarantees digit-only string
-    const ciMajor = parseInt(ciVersion, 10)
+    const ciMajor = Number.parseInt(ciVersion, 10)
     if (ciMajor !== expectedMajor) {
       violations.push({
         line: i + 1,
@@ -232,11 +231,10 @@ export const nodeVersionConsistency = defineCheck({
     const packageJsonPaths = files.paths.filter(p => path.basename(p) === 'package.json')
     if (packageJsonPaths.length === 0) return violations
 
-    const rootPkgPath = packageJsonPaths.reduce((shortest, p) =>
-      p.length < shortest.length ? p : shortest
+    const rootPkgPath = packageJsonPaths.reduce(
+      (shortest, p) => (p.length < shortest.length ? p : shortest),
+      packageJsonPaths[0],
     )
-    const rootDir = path.dirname(rootPkgPath)
-
     // Read root package.json for version truth
     const rootContent = await files.read(rootPkgPath)
     let rootPkg: RootPackageJson

@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
 import { generateDashboardHtml } from '@opensip-tools/cli-shared';
+import { describe, it, expect } from 'vitest';
+
 import type { StoredSession } from '@opensip-tools/cli-shared';
 
 function makeSession(overrides: Partial<StoredSession> = {}): StoredSession {
@@ -7,6 +8,7 @@ function makeSession(overrides: Partial<StoredSession> = {}): StoredSession {
     id: overrides.id ?? 'test-session-1',
     tool: overrides.tool ?? 'fit',
     timestamp: overrides.timestamp ?? '2025-06-15T10:30:00.000Z',
+    // eslint-disable-next-line sonarjs/publicly-writable-directories -- test fixture cwd; not a runtime filesystem operation
     cwd: overrides.cwd ?? '/tmp/my-project',
     recipe: overrides.recipe,
     score: overrides.score ?? 85,
@@ -97,7 +99,7 @@ describe('generateDashboardHtml', () => {
     const jsonSection = html.slice(scriptStart, scriptEnd);
     // All < and > should be escaped as \u003c and \u003e in script context
     expect(jsonSection).not.toContain('</script>');
-    expect(jsonSection).toContain('\\u003c/script\\u003e');
+    expect(jsonSection).toContain(String.raw`\u003c/script\u003e`);
   });
 
   it('includes CSS with score color classes', () => {

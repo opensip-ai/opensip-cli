@@ -7,12 +7,13 @@
  */
 
 import React from 'react';
-import type { CommandResult } from '@opensip-tools/cli-shared';
-import type { CliArgs } from '@opensip-tools/cli-shared';
-import { ThemeProvider } from './theme.js';
-import { ClockProvider } from './hooks/useClock.js';
+
 import { App } from './App.js';
 import { FitView } from './components/FitView.js';
+import { ClockProvider } from './hooks/useClock.js';
+import { ThemeProvider } from './theme.js';
+
+import type { CommandResult , CliArgs } from '@opensip-tools/cli-shared';
 
 /** Render a static command result (non-fit commands) */
 export async function renderApp(result: CommandResult): Promise<void> {

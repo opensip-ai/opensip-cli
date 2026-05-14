@@ -120,7 +120,7 @@ const FROM_STAGE_PATTERN = /\bAS\s{1,10}(\w{1,100})/i
 const USER_PATTERN = /USER\s{1,10}(\S{1,100})/i
 const NODE_ENV_PROD_PATTERN = /NODE_ENV\s{0,10}=\s{0,10}production/i
 
-const RUNNER_STAGE_NAMES = ['runner', 'production', 'prod', 'final', 'runtime']
+const RUNNER_STAGE_NAMES = new Set(['runner', 'production', 'prod', 'final', 'runtime'])
 
 // =============================================================================
 // ANALYSIS FUNCTIONS
@@ -273,7 +273,7 @@ function processFromLine(line: string, lineNum: number, state: AnalysisState): v
 
   // Determine if this is the runner stage
   if (stageName) {
-    state.isInRunnerStage = RUNNER_STAGE_NAMES.includes(stageName)
+    state.isInRunnerStage = RUNNER_STAGE_NAMES.has(stageName)
   } else if (state.fromCount > 1) {
     state.isInRunnerStage = true
   }
@@ -326,7 +326,7 @@ function addMissingBestPracticeViolations(
       message: 'Dockerfile does not specify a non-root user',
       severity: 'error',
       suggestion:
-        'Add USER directive with a non-root user: RUN addgroup --system app && adduser --system --ingroup app app\\nUSER app',
+        String.raw`Add USER directive with a non-root user: RUN addgroup --system app && adduser --system --ingroup app app\nUSER app`,
     })
   }
 

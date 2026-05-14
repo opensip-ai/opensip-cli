@@ -8,10 +8,10 @@
  * - Ensures consistent error response formats
  */
 
-import * as ts from 'typescript'
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import * as ts from 'typescript'
 
 /**
  * Issue types for OpenAPI response coverage
@@ -70,7 +70,7 @@ function extractDefinedStatusCodes(text: string): Set<number> {
   for (const match of codeMatches) {
     const codeStr = match[0].replace(':', '').trim()
     // @fitness-ignore-next-line numeric-validation -- regex [1-5]\d{2} guarantees valid 3-digit status code; range check follows
-    const code = parseInt(codeStr, 10)
+    const code = Number.parseInt(codeStr, 10)
     if (code >= 100 && code <= 599) {
       definedCodes.add(code)
     }
@@ -93,7 +93,7 @@ function checkResponseCoverage(
   // Check if response block exists using pre-compiled pattern
   if (!RESPONSE_BLOCK_PATTERN.test(schemaText)) {
     return requiredCodes.map((code) => ({
-      type: 'missing-error-responses' as ResponseCoverageIssueType,
+      type: 'missing-error-responses',
       code,
       severity: 'warning' as const,
     }))
@@ -166,7 +166,7 @@ function analyzeObjectLiteral(
   issues: RouteIssue[],
 ): boolean {
   const nodeText = node.getText(sourceFile)
-  const methodMatch = nodeText.match(METHOD_PATTERN)
+  const methodMatch = METHOD_PATTERN.exec(nodeText)
   const schemaMatch = SCHEMA_PATTERN.test(nodeText)
 
   // @fitness-ignore-next-line silent-early-returns -- Guard clause: node without method or schema is not a Fastify route
@@ -176,7 +176,7 @@ function analyzeObjectLiteral(
 
   const method = methodMatch[1]?.toUpperCase() ?? 'GET'
   const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
-  const pathMatch = nodeText.match(URL_PATTERN)
+  const pathMatch = URL_PATTERN.exec(nodeText)
   const routePath = pathMatch?.[1]
   const coverageIssues = checkResponseCoverage(nodeText, method)
   processRouteIssues({ coverageIssues, method, routePath, line: line + 1, issues })
@@ -196,7 +196,7 @@ function analyzeCallExpression(
   issues: RouteIssue[],
 ): boolean {
   const callText = node.getText(sourceFile)
-  const methodMatch = callText.match(FASTIFY_METHOD_PATTERN)
+  const methodMatch = FASTIFY_METHOD_PATTERN.exec(callText)
 
   if (!methodMatch || !callText.includes('schema')) {
     return false
@@ -204,7 +204,7 @@ function analyzeCallExpression(
 
   const method = methodMatch[1]?.toUpperCase() ?? 'GET'
   const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
-  const pathMatch = callText.match(FASTIFY_PATH_PATTERN)
+  const pathMatch = FASTIFY_PATH_PATTERN.exec(callText)
   const routePath = pathMatch?.[1]
   const coverageIssues = checkResponseCoverage(callText, method)
   processRouteIssues({ coverageIssues, method, routePath, line: line + 1, issues })
@@ -275,7 +275,7 @@ export const openapiResponseCoverage = defineCheck({
   tags: ['openapi', 'api', 'quality'],
   fileTypes: ['ts'],
   // @fitness-ignore-next-line no-hardcoded-timeouts -- framework default for fitness check execution
-  timeout: 180000, // 3 minutes - scans route files and OpenAPI specs
+  timeout: 180_000, // 3 minutes - scans route files and OpenAPI specs
 
   analyze(content, filePath) {
     // Focus on route files
@@ -290,7 +290,7 @@ export const openapiResponseCoverage = defineCheck({
 
     try {
       const sourceFile = getSharedSourceFile(filePath, content)
-    if (!sourceFile) return []
+      if (!sourceFile) return []
 
       const { issues } = analyzeSourceFile(sourceFile)
       const violations: CheckViolation[] = []

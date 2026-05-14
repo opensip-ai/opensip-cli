@@ -38,6 +38,7 @@ const PII_FIELD_NAMES = [
   'api_key',
 ]
 
+// eslint-disable-next-line sonarjs/cognitive-complexity -- tiered detector: 3 tiers (init-level, capture-level, key-name) all need a single pass for clear precedence
 function analyze(content: string, filePath: string): CheckViolation[] {
   const violations: CheckViolation[] = []
 
@@ -68,8 +69,8 @@ function analyze(content: string, filePath: string): CheckViolation[] {
   // --- Tier 2: PII field names in Sentry context calls (medium confidence) ---
 
   const lines = content.split('\n')
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i] ?? ''
+  for (const [i, line_] of lines.entries()) {
+    const line = line_ ?? ''
     const trimmed = line.trim()
 
     // Skip comments

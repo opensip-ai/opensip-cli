@@ -1,11 +1,12 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+
+import { createExecutionContext } from '../execution-context.js'
 import { fileCache } from '../file-cache.js'
 import { PathMatcher } from '../path-matcher.js'
-import { createExecutionContext } from '../execution-context.js'
 
 let testDir: string
 
@@ -25,6 +26,7 @@ describe('createExecutionContext > matchFiles fileCache fallback', () => {
   // explicitly listed in `globalExcludes`. The fix threads the run's
   // globalExcludes through RunOptions into the matchFiles fallback.
 
+  // eslint-disable-next-line unicorn/consistent-function-scoping -- closes over describe-scoped `testDir`
   function setupCachedFiles(): void {
     mkdirSync(join(testDir, 'src'), { recursive: true })
     mkdirSync(join(testDir, 'docs'), { recursive: true })

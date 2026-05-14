@@ -7,10 +7,9 @@
  */
 
 import { logger } from '@opensip-tools/core/logger'
-import * as ts from 'typescript'
-
 import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import * as ts from 'typescript'
 
 interface ConfigProperty {
   name: string

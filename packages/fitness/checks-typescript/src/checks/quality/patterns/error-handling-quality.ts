@@ -8,10 +8,11 @@
  * Replaces: resilience/no-empty-catch, quality/error-swallowing-boolean
  */
 
-import * as ts from 'typescript'
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import * as ts from 'typescript'
+
 import { isTestFile } from '../../../utils/index.js'
 
 // =============================================================================
@@ -60,7 +61,7 @@ const RETHROW_PATTERN = /\bthrow\b/
 /**
  * Sentinel return values that indicate silent error handling
  */
-const SENTINEL_VALUES = ['false', 'null', 'undefined', '[]', '{}']
+const SENTINEL_VALUES = new Set(['false', 'null', 'undefined', '[]', '{}'])
 
 // =============================================================================
 // HELPER FUNCTIONS
@@ -109,7 +110,7 @@ function checkCatchClause(node: ts.CatchClause, sourceFile: ts.SourceFile): Chec
   // Skip if has acceptable pattern
   if (hasAcceptablePattern(catchText)) return violations
 
-  const trimmed = catchText.replace(/\{|\}/g, '').trim()
+  const trimmed = catchText.replaceAll(/[{}]/g, '').trim()
 
   // Strip leading single-line comments (`// ...` lines, including
   // multi-line stacks) and block comments before testing for empty.
@@ -151,7 +152,7 @@ function checkCatchClause(node: ts.CatchClause, sourceFile: ts.SourceFile): Chec
   const visitReturn = (n: ts.Node): void => {
     if (ts.isReturnStatement(n)) {
       const val = getReturnValue(n.expression, sourceFile)
-      if (val && SENTINEL_VALUES.includes(val)) {
+      if (val && SENTINEL_VALUES.has(val)) {
         const { line } = sourceFile.getLineAndCharacterOfPosition(n.getStart())
         violations.push({
           line: line + 1,
@@ -187,7 +188,7 @@ function checkResultIsErr(node: ts.IfStatement, sourceFile: ts.SourceFile): Chec
   const visitReturn = (n: ts.Node): void => {
     if (ts.isReturnStatement(n)) {
       const val = getReturnValue(n.expression, sourceFile)
-      if (val && SENTINEL_VALUES.includes(val)) {
+      if (val && SENTINEL_VALUES.has(val)) {
         const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
         violations.push({
           line: line + 1,
@@ -341,8 +342,10 @@ export const errorHandlingQuality = defineCheck({
 
     const visit = (node: ts.Node): void => {
       if (ts.isCatchClause(node)) {
-        violations.push(...checkCatchClause(node, sourceFile))
-        violations.push(...checkCatchClauseAsErrorCast(node, sourceFile))
+        violations.push(
+          ...checkCatchClause(node, sourceFile),
+          ...checkCatchClauseAsErrorCast(node, sourceFile),
+        )
       }
       if (ts.isIfStatement(node)) {
         violations.push(...checkResultIsErr(node, sourceFile))

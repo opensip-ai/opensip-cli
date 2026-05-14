@@ -121,8 +121,8 @@ export const PERSONAS = {
    */
   loadTest: (users = 100): readonly PersonaConfig[] =>
     Object.freeze([
-      persona('buyer', Math.floor(users * 0.6), { spawnRate: 2.0 }),
-      persona('seller', Math.floor(users * 0.3), { spawnRate: 1.0 }),
+      persona('buyer', Math.floor(users * 0.6), { spawnRate: 2 }),
+      persona('seller', Math.floor(users * 0.3), { spawnRate: 1 }),
       persona('power-user', Math.floor(users * 0.1), { spawnRate: 1.5 }),
     ]),
 
@@ -132,8 +132,8 @@ export const PERSONAS = {
    */
   spikeTest: (baseUsers = 50): readonly PersonaConfig[] =>
     Object.freeze([
-      persona('buyer', baseUsers, { spawnRate: 5.0 }),
-      persona('seller', Math.ceil(baseUsers / 3), { spawnRate: 3.0 }),
+      persona('buyer', baseUsers, { spawnRate: 5 }),
+      persona('seller', Math.ceil(baseUsers / 3), { spawnRate: 3 }),
     ]),
 
   /**
@@ -165,9 +165,6 @@ export type PersonaPresets = typeof PERSONAS
  * Calculate total persona count from configs.
  */
 export function getTotalPersonaCount(personas: readonly PersonaConfig[]): number {
-  if (!Array.isArray(personas)) {
-    return 0
-  }
   return personas.reduce((sum, p) => sum + p.count, 0)
 }
 
@@ -175,9 +172,6 @@ export function getTotalPersonaCount(personas: readonly PersonaConfig[]): number
  * Calculate estimated requests per second based on personas.
  */
 export function getEstimatedRps(personas: readonly PersonaConfig[]): number {
-  if (!Array.isArray(personas)) {
-    return 0
-  }
   return personas.reduce((sum, p) => sum + p.count * p.spawnRate, 0)
 }
 
@@ -185,9 +179,6 @@ export function getEstimatedRps(personas: readonly PersonaConfig[]): number {
  * Get unique persona types from configs.
  */
 export function getPersonaTypes(personas: readonly PersonaConfig[]): readonly string[] {
-  if (!Array.isArray(personas)) {
-    return []
-  }
   const types = new Set(
     personas
       .map((p) => p.personaId.split('-')[0])

@@ -13,10 +13,10 @@
 import { createHash } from 'node:crypto'
 import { basename, dirname } from 'node:path'
 
-import * as ts from 'typescript'
 
 import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import * as ts from 'typescript'
 
 /**
  * Common utility function name patterns
@@ -386,7 +386,7 @@ function removeSingleLineComments(code: string): string {
     .split('\n')
     .map((line) => {
       const commentIndex = line.indexOf('//')
-      return commentIndex >= 0 ? line.slice(0, commentIndex) : line
+      return commentIndex === -1 ? line : line.slice(0, commentIndex)
     })
     .join('\n')
 }
@@ -421,7 +421,7 @@ function normalizeBody(body: string): string {
   let normalized = body
   normalized = removeSingleLineComments(normalized)
   normalized = removeMultiLineComments(normalized)
-  normalized = normalized.replace(/\s+/g, ' ')
+  normalized = normalized.replaceAll(/\s+/g, ' ')
   normalized = normalized.trim()
   return normalized
 }
@@ -615,8 +615,7 @@ function processFunctionGroup(
     return []
   }
 
-  const violations: CheckViolation[] = []
-  violations.push(...findIdenticalViolations(name, hashGroups))
+  const violations: CheckViolation[] = [...findIdenticalViolations(name, hashGroups)]
 
   const similarViolation = findSimilarViolation(name, hashGroups)
   if (similarViolation) {

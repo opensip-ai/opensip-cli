@@ -12,12 +12,25 @@
  * CheckViolation into a universal Signal via createSignal().
  */
 
-import { logger } from '@opensip-tools/core'
-import { SystemError } from '@opensip-tools/core'
-import type { Signal } from '@opensip-tools/core'
-import { createSignal } from '@opensip-tools/core'
+import { logger , SystemError , createSignal , applyContentFilter } from '@opensip-tools/core'
 
-import type { CheckResult } from '../types/findings.js'
+
+
+import {
+  getAnalysisMode,
+  isAnalyzeConfig,
+  isAnalyzeAllConfig,
+  isCommandConfig,
+  validateCheckConfig,
+} from './check-config.js'
+import { executeCommand } from './command-executor.js'
+import { CheckAbortedError, createExecutionContext } from './execution-context.js'
+import { createFileAccessor } from './file-accessor.js'
+import { filterFilesByType } from './file-type-filter.js'
+import { filterSignalsByDirectives, buildFilteredResult } from './ignore-processing.js'
+import { PathMatcher } from './path-matcher.js'
+import { ResultBuilder } from './result-builder.js'
+import { mapFindingSeverity, mapTagsToSignalCategory } from './severity-mapping.js'
 
 import type {
   UnifiedCheckConfig,
@@ -26,25 +39,10 @@ import type {
   AnalyzeAllCheckConfig,
   CommandCheckConfig,
 } from './check-config.js'
-import {
-  getAnalysisMode,
-  isAnalyzeConfig,
-  isAnalyzeAllConfig,
-  isCommandConfig,
-  validateCheckConfig,
-} from './check-config.js'
 import type { Check } from './check-types.js'
-import { applyContentFilter } from '@opensip-tools/core'
-
-import { executeCommand } from './command-executor.js'
 import type { ExecutionContext, RunOptions } from './execution-context.js'
-import { CheckAbortedError, createExecutionContext } from './execution-context.js'
-import { createFileAccessor } from './file-accessor.js'
-import { filterFilesByType } from './file-type-filter.js'
-import { filterSignalsByDirectives, buildFilteredResult } from './ignore-processing.js'
-import { PathMatcher } from './path-matcher.js'
-import { ResultBuilder } from './result-builder.js'
-import { mapFindingSeverity, mapTagsToSignalCategory } from './severity-mapping.js'
+import type { CheckResult } from '../types/findings.js'
+import type { Signal } from '@opensip-tools/core'
 
 // =============================================================================
 // VIOLATION → SIGNAL CONVERSION
@@ -55,7 +53,7 @@ function toSignal(
   checkSlug: string,
   checkTags: readonly string[],
   defaultFilePath?: string,
-  provider: string = 'opensip',
+  provider = 'opensip',
 ): Signal {
   const filePath = violation.filePath ?? defaultFilePath ?? ''
   return createSignal({
@@ -113,8 +111,8 @@ async function executeAnalyzeMode(
       for (const violation of violations) {
         void builder.addSignal(toSignal(violation, config.slug, config.tags ?? [], filePath, config.provider))
       }
-    } catch (err) {
-      if (err instanceof CheckAbortedError) throw err
+    } catch (error) {
+      if (error instanceof CheckAbortedError) throw error
       logger.debug('Skipping unreadable file', { evt: 'fitness.check.file.skip', module: 'fitness:framework', filePath, checkSlug: config.slug })
     }
   }
@@ -268,7 +266,7 @@ export function defineCheck(config: UnifiedCheckConfig): Check {
         tags: config.tags ? [...config.tags] : [],
         description: config.description,
         scope: { include: [] as readonly string[], exclude: [] as readonly string[], description: '' },
-        itemType: (config.itemType ?? 'files') as import('../types/findings.js').ItemType,
+        itemType: (config.itemType ?? 'files'),
         docs: config.docs,
         disabled: config.disabled,
         timeout: config.timeout,

@@ -45,8 +45,8 @@ export async function withRetry<T>(
   for (let attempt = 1; attempt <= effectiveMaxAttempts; attempt++) {
     try {
       return await fn();
-    } catch (e) {
-      lastError = e instanceof Error ? e : new Error(String(e));
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
 
       if (attempt >= effectiveMaxAttempts) break;
 

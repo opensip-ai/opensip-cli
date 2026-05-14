@@ -24,8 +24,10 @@ const INTERFACE_PATTERN =
 // Standalone `extends` clause continuation for multi-line interface headers
 // — captures the type list (which may include generics like
 // `IFoo<TParam>, IBar`).
+// eslint-disable-next-line sonarjs/slow-regex -- anchored line match with bounded prefix; `[\w,\s<>]+?` is followed by `\s*\{?\s*$` and exhausts on bounded input
 const INTERFACE_EXTENDS_CONTINUATION = /^\s{0,40}extends\s+([\w,\s<>]+?)\s*\{?\s*$/
 const CLASS_PATTERN =
+  // eslint-disable-next-line sonarjs/regex-complexity -- single regex captures class name + optional extends + optional implements; splitting requires multiple anchored matches
   /^(?:export\s+)?class\s+(\w+)(?:\s+extends\s+\w+(?:<[^>]{1,200}>)?)?(?:\s+implements\s+([\w,\s<>]+))?/
 const METHOD_IN_INTERFACE_PATTERN = /^\s{0,20}(\w+)\??\s{0,5}\(/
 const METHOD_IN_CLASS_PATTERN =
@@ -240,7 +242,7 @@ const ALLOWED_EXTRA_METHODS = new Set([
 function stripGenerics(typeRef: string): string {
   let prev = typeRef
   for (;;) {
-    const next = prev.replace(/<[^<>]*>/g, '')
+    const next = prev.replaceAll(/<[^<>]*>/g, '')
     if (next === prev) return next.trim()
     prev = next
   }
@@ -319,8 +321,8 @@ function parseInterfaces(content: string, file: string): InterfaceDefinition[] {
   const lines = content.split('\n')
   let current: ParseState | null = null
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i] ?? ''
+  for (const [i, line_] of lines.entries()) {
+    const line = line_ ?? ''
 
     const justStarted = current === null
     current ??= tryStartInterface(line, i)
@@ -422,8 +424,8 @@ function parseClasses(content: string, file: string): ClassImplementation[] {
   const lines = content.split('\n')
   let current: ClassParseState | null = null
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i] ?? ''
+  for (const [i, line_] of lines.entries()) {
+    const line = line_ ?? ''
 
     current ??= tryStartClass(line, i)
     if (!current) continue
@@ -463,7 +465,7 @@ function mergeInterface(
   }
   const methodSet = new Set(existing.methods)
   for (const method of iface.methods) methodSet.add(method)
-  allInterfaces.set(iface.name, { ...existing, methods: Array.from(methodSet) })
+  allInterfaces.set(iface.name, { ...existing, methods: [...methodSet] })
 }
 
 function resolveInterface(

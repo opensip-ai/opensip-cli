@@ -17,6 +17,7 @@ import {
 
 import { defaultRegistry } from '../framework/registry.js';
 import { defaultRecipeRegistry } from '../recipes/registry.js';
+
 import { ensureChecksLoaded, getDisplayName, getIcon } from './fit.js';
 
 // ---------------------------------------------------------------------------
@@ -69,7 +70,7 @@ export async function openDashboard(projectDir?: string): Promise<DashboardResul
 
   const html = generateDashboardHtml(sessions, catalog, recipes);
   const reportPath = join(getReportsDir(), 'latest.html');
-  writeFileSync(reportPath, html, 'utf-8');
+  writeFileSync(reportPath, html, 'utf8');
 
   // Try to open in browser
   let opened = false;

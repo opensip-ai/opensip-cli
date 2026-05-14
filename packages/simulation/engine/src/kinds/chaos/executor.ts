@@ -12,12 +12,15 @@
  */
 
 import { logger } from '@opensip-tools/core'
-import type { Signal } from '@opensip-tools/core'
+
 
 import { ScenarioAbortedError } from '../../framework/execution/execution-engine.js'
 import { LatencyTracker } from '../../framework/execution/latency-tracker.js'
 import { getEstimatedRps } from '../../framework/personas.js'
 import { ScenarioResultBuilder, createEmptyMetrics } from '../../framework/result-builder.js'
+
+import type { ChaosScenarioConfig } from './define.js'
+import type { ChaosAssertionVerdict, ChaosEvent } from './result.js'
 import type { RunnableScenario } from '../../framework/runnable-scenario.js'
 import type { ChaosScenarioExecutorResult } from '../../framework/scenario-executor-result.js'
 import type { SimulationMetrics } from '../../types/base-types.js'
@@ -25,9 +28,7 @@ import type {
   ScenarioExecutionContext,
   ScenarioLogger,
 } from '../../types/framework-types.js'
-
-import type { ChaosScenarioConfig } from './define.js'
-import type { ChaosAssertionVerdict, ChaosEvent } from './result.js'
+import type { Signal } from '@opensip-tools/core'
 
 function createScenarioLogger(scenarioId: string): ScenarioLogger {
   return {
@@ -40,7 +41,7 @@ function createScenarioLogger(scenarioId: string): ScenarioLogger {
     error: (message, data) => {
       logger.error({
         evt: 'simulation.scenario.error',
-        err: data?.['err'] instanceof Error ? data['err'] : undefined,
+        err: data?.err instanceof Error ? data.err : undefined,
         scenarioId,
         msg: message,
         ...data,
@@ -57,6 +58,7 @@ function createScenarioLogger(scenarioId: string): ScenarioLogger {
  * Used twice by the chaos executor — once during the chaos-active window,
  * once during the recovery window.
  */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- chaos load window driver: tracks request lifecycle (spawn/await/abort) and aggregates metrics inline
 async function runWindow(
   config: ChaosScenarioConfig,
   context: ScenarioExecutionContext,

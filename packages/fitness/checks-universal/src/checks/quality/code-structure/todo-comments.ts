@@ -62,18 +62,24 @@ const PATTERNS: PatternEntry[] = [
 
 function getSuggestionForType(type: TodoType): string {
   switch (type) {
-    case TodoType.TODO:
+    case TodoType.TODO: {
       return 'Create a ticket to track this work and add the ticket ID to the comment, or complete the work now'
-    case TodoType.FIXME:
+    }
+    case TodoType.FIXME: {
       return 'Fix the issue described in this comment. If it requires significant work, create a ticket'
-    case TodoType.HACK:
+    }
+    case TodoType.HACK: {
       return 'Replace this hack with a proper implementation. Document why the hack exists if it must remain'
-    case TodoType.OPTIMIZE:
+    }
+    case TodoType.OPTIMIZE: {
       return 'Profile the code to verify optimization is needed, then implement the optimization'
-    case TodoType.XXX:
+    }
+    case TodoType.XXX: {
       return 'Address the technical debt described in this comment'
-    default:
+    }
+    default: {
       return 'Review and address this comment'
+    }
   }
 }
 
@@ -138,14 +144,14 @@ export const todoComments = defineCheck({
   tags: ['quality', 'maintainability', 'code-quality'],
   fileTypes: ['ts'],
   // @fitness-ignore-next-line no-hardcoded-timeouts -- framework default for fitness check execution
-  timeout: 180000, // 3 minutes - scans all production files
+  timeout: 180_000, // 3 minutes - scans all production files
 
   analyze(content: string, filePath: string): CheckViolation[] {
     const violations: CheckViolation[] = []
     const lines = content.split('\n')
 
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i] ?? ''
+    for (const [i, line_] of lines.entries()) {
+      const line = line_ ?? ''
       const matchResult = matchLineForPatterns(line)
 
       if (matchResult) {

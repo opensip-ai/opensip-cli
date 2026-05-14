@@ -222,4 +222,5 @@ export function countUnescapedBackticks(line: string): number {
 }
 
 /** Re-export TypeScript namespace for check authors */
+// eslint-disable-next-line unicorn/prefer-export-from -- `export * as from 'typescript'` is invalid (typescript uses `export =`); the namespace import + named export form is the only working shape
 export { ts }

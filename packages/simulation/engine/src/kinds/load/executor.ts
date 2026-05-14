@@ -10,12 +10,14 @@
  */
 
 import { logger } from '@opensip-tools/core'
-import type { Signal } from '@opensip-tools/core'
+
 
 import { ScenarioAbortedError } from '../../framework/execution/execution-engine.js'
 import { LatencyTracker } from '../../framework/execution/latency-tracker.js'
 import { getEstimatedRps } from '../../framework/personas.js'
 import { ScenarioResultBuilder, createEmptyMetrics } from '../../framework/result-builder.js'
+
+import type { LoadScenarioConfig } from './define.js'
 import type { RunnableScenario } from '../../framework/runnable-scenario.js'
 import type {
   LoadScenarioExecutorResult,
@@ -25,8 +27,7 @@ import type {
   ScenarioExecutionContext,
   ScenarioLogger,
 } from '../../types/framework-types.js'
-
-import type { LoadScenarioConfig } from './define.js'
+import type { Signal } from '@opensip-tools/core'
 
 // =============================================================================
 // LOGGER
@@ -43,7 +44,7 @@ function createScenarioLogger(scenarioId: string): ScenarioLogger {
     error: (message, data) => {
       logger.error({
         evt: 'simulation.scenario.error',
-        err: data?.['err'] instanceof Error ? data['err'] : undefined,
+        err: data?.err instanceof Error ? data.err : undefined,
         scenarioId,
         msg: message,
         ...data,

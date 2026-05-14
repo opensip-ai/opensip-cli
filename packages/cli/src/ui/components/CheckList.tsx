@@ -2,8 +2,9 @@
  * CheckList component — renders available fitness checks grouped by tag.
  */
 
-import React from 'react';
 import { Text, Box } from 'ink';
+import React from 'react';
+
 import { useTheme } from '../theme.js';
 
 export interface CheckEntry {

@@ -12,20 +12,20 @@ import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 /**
  * Files in app/ directory that should remain Server Components
  */
-const SERVER_COMPONENT_FILES = ['page.tsx', 'layout.tsx', 'template.tsx']
+const SERVER_COMPONENT_FILES = new Set(['page.tsx', 'layout.tsx', 'template.tsx'])
 
 /**
  * Pattern to match 'use client' directive at the start of a file
  * Allows for leading comments (single-line or multi-line) before the directive
  */
-// eslint-disable-next-line sonarjs/slow-regex -- matches leading comments before 'use client' directive; bounded by file start
+// eslint-disable-next-line sonarjs/slow-regex, sonarjs/regex-complexity -- matches leading comments before 'use client' directive; bounded by file start
 const USE_CLIENT_PATTERN = /^(?:\s*\/\/[^\n]*\n|\s*\/\*[\s\S]*?\*\/\s*\n)*\s*['"]use client['"]/
 
 /**
  * Check if a file is in an app/ directory (Next.js app router)
  */
 function isAppDirectoryFile(filePath: string): boolean {
-  const normalizedPath = filePath.replace(/\\/g, '/')
+  const normalizedPath = filePath.replaceAll('\\', '/')
   return normalizedPath.includes('/app/')
 }
 
@@ -34,7 +34,7 @@ function isAppDirectoryFile(filePath: string): boolean {
  */
 function isServerComponentFile(filePath: string): boolean {
   const fileName = path.basename(filePath)
-  return SERVER_COMPONENT_FILES.includes(fileName)
+  return SERVER_COMPONENT_FILES.has(fileName)
 }
 
 /**
@@ -49,8 +49,7 @@ function hasUseClientDirective(content: string): boolean {
  */
 function getUseClientLine(content: string): number {
   const lines = content.split('\n')
-  for (let i = 0; i < lines.length; i++) {
-    const lineContent = lines[i]
+  for (const [i, lineContent] of lines.entries()) {
     if (lineContent === undefined) {
       continue
     }

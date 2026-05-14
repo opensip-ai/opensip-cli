@@ -3,9 +3,9 @@
  * @fileoverview AST function extractor for observability coverage analysis
  */
 
+import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
 import * as ts from 'typescript'
 
-import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
 
 import type { FunctionInfo } from './types.js'
 

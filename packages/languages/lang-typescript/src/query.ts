@@ -50,11 +50,9 @@ export const typescriptQuery: LanguageQueryAPI<ts.SourceFile, ts.Node> = {
     walk(tree, (n) => {
       if (ts.isCallExpression(n)) {
         const expr = n.expression
-        const target = ts.isIdentifier(expr)
-          ? expr.text
-          : ts.isPropertyAccessExpression(expr)
-            ? expr.name.text
-            : ''
+        let target = ''
+        if (ts.isIdentifier(expr)) target = expr.text
+        else if (ts.isPropertyAccessExpression(expr)) target = expr.name.text
         if (target === name) out.push(n)
       }
     })

@@ -8,6 +8,7 @@
  */
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
+// eslint-disable-next-line sonarjs/slow-regex -- input is one bounded line of clang-tidy output; no real ReDoS exposure
 const CLANG_TIDY_LINE = /^(.+?):(\d+):(\d+):\s+(warning|error|note):\s+(.+?)(?:\s+\[([\w\-,.]+)\])?$/
 
 /**
@@ -29,12 +30,15 @@ export function parseClangTidyOutput(
   for (const line of lines) {
     const match = CLANG_TIDY_LINE.exec(line)
     if (!match) continue
-    const [, _filePath, lineStr, _colStr, severity, message, lintName] = match
+    const lineStr = match[2]
+    const severity = match[4]
+    const message = match[5]
+    const lintName = match[6]
     if (severity === 'note') continue
     violations.push({
       message: lintName ? `[${lintName}] ${message}` : message ?? 'clang-tidy diagnostic',
       severity: severity === 'error' ? 'error' : 'warning',
-      line: lineStr ? parseInt(lineStr, 10) : 1,
+      line: lineStr ? Number.parseInt(lineStr, 10) : 1,
       suggestion: 'See clang-tidy docs for the named lint',
     })
   }

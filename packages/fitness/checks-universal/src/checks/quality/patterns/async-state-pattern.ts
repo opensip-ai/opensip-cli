@@ -71,7 +71,7 @@ export const asyncStatePattern = defineCheck({
     const hasAsyncState = /AsyncState|<AsyncState/.test(content)
     if (!hasAsyncState) {
       // Find the useQuery line for better context
-      const queryMatch = content.match(/use(Query|Mutation|InfiniteQuery)\s*\(/)
+      const queryMatch = /use(Query|Mutation|InfiniteQuery)\s*\(/.exec(content)
       const queryLine = queryMatch ? content.slice(0, queryMatch.index).split('\n').length : 1
       extractSnippet(content, queryLine, 3)
       const matchText = queryMatch?.[0] ?? 'useQuery'

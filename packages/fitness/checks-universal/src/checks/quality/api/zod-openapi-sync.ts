@@ -25,7 +25,7 @@ function checkZodSchema(
 ): { lineNumber: number; schemaName: string } | null {
   const { schemaName, startIndex } = match
   const afterMatch = content.slice(startIndex)
-  const endMatch = afterMatch.match(/;\s*$/m)
+  const endMatch = /;\s*$/m.exec(afterMatch)
 
   if (!endMatch) return null
 

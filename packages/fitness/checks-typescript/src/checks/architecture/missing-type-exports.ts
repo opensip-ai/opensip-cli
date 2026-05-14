@@ -20,7 +20,7 @@ const IMPORT_PATTERN = /import\s+(?:type\s+)?\{([^}]+)\}\s+from\s+['"]([^'"]+)['
 const NAMED_EXPORT_BLOCK = /export\s+(?:type\s+)?\{([^}]+)\}/g
 const NAMED_EXPORT_DECL = /export\s+(?:type\s+)?(?:interface|type|class|enum|function|const)\s+(\w+)/g
 
-const TRAVERSAL_SKIP_DIRS = ['node_modules', 'dist', '.turbo', '.git', 'coverage', 'build', '.worktrees']
+const TRAVERSAL_SKIP_DIRS = new Set(['node_modules', 'dist', '.turbo', '.git', 'coverage', 'build', '.worktrees'])
 
 interface PackageExportsInfo {
   /** Exact subpath strings declared in the exports map, e.g. "." or "./errors". */
@@ -32,17 +32,17 @@ interface PackageExportsInfo {
 function extractNames(block: string): string[] {
   return block.split(',').map(n => {
     const trimmed = n.trim()
-    const asMatch = trimmed.match(/^(\w+)\s+as\s+/)
+    const asMatch = /^(\w+)\s+as\s+/.exec(trimmed)
     return asMatch ? asMatch[1] : trimmed
   }).filter(n => n.length > 0 && /^\w+$/.test(n))
 }
 
-function findPackageJsonFiles(root: string, depth: number = 0): string[] {
+function findPackageJsonFiles(root: string, depth = 0): string[] {
   if (depth > 5) return []
   const results: string[] = []
   try {
     for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
-      if (TRAVERSAL_SKIP_DIRS.includes(entry.name)) continue
+      if (TRAVERSAL_SKIP_DIRS.has(entry.name)) continue
       const full = path.join(root, entry.name)
       if (entry.isDirectory()) {
         results.push(...findPackageJsonFiles(full, depth + 1))
@@ -130,6 +130,7 @@ export const missingTypeExports = defineCheck({
   description: 'Detects types imported via deep internal paths not declared in the package exports map or barrel',
   tags: ['architecture', 'api-surface', 'monorepo'],
 
+  // eslint-disable-next-line sonarjs/cognitive-complexity -- cross-file analyzer: discovers packages, parses imports, and cross-references declared exports against deep-path usage
   async analyzeAll(files: FileAccessor): Promise<CheckViolation[]> {
     const violations: CheckViolation[] = []
 
@@ -146,7 +147,7 @@ export const missingTypeExports = defineCheck({
       try {
         const stats = fs.statSync(pkgJsonPath)
         if (stats.size > 1_000_000) continue
-        parsed = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf-8')) as {
+        parsed = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf8')) as {
           name?: string
           exports?: unknown
         }
@@ -154,7 +155,7 @@ export const missingTypeExports = defineCheck({
         continue
       }
       const name = parsed.name
-      if (!name || !name.startsWith('@')) continue
+      if (!name?.startsWith('@')) continue
       if (parsed.exports !== undefined) {
         exportsByPackage.set(name, collectExportSubpaths(parsed.exports))
       }

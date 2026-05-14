@@ -10,7 +10,6 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 
 import { logger } from '@opensip-tools/core/logger'
-
 import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
 
 /**
@@ -83,7 +82,7 @@ function isSourceFile(filename: string, relativePath?: string): boolean {
   if (filename === 'types.ts' || filename === 'types.tsx') return false
   // Skip pure data/schema/constants files
   const dataOnlyPatterns = ['schema.ts', 'constants.ts', 'profiles.ts', 'error-messages.ts']
-  if (dataOnlyPatterns.some((pattern) => filename === pattern)) return false
+  if (dataOnlyPatterns.includes(filename)) return false
   // Skip files in types/ or interfaces/ directories
   if (relativePath && (relativePath.includes('/types/') || relativePath.includes('/interfaces/')))
     return false

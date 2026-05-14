@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
 import { logger, setLogLevel, setSilent, setDebugMode, setRunId } from '../../lib/logger.js';
 
 describe('logger', () => {
@@ -14,7 +15,7 @@ describe('logger', () => {
     vi.spyOn(process.stderr, 'write').mockImplementation(((chunk: unknown) => {
       stderrCalls.push(String(chunk));
       return true;
-    }) as typeof process.stderr.write);
+    }));
   });
 
   afterEach(() => {

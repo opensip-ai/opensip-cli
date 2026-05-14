@@ -46,8 +46,8 @@ export const noRawRegexOnCode = defineCheck({
 
     // Find the line with defineCheck to report the violation
     const lines = content.split('\n')
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i] && DEFINE_CHECK_PATTERN.test(lines[i])) {
+    for (const [i, line] of lines.entries()) {
+      if (line && DEFINE_CHECK_PATTERN.test(line)) {
         return [{
           line: i + 1,
           column: 0,

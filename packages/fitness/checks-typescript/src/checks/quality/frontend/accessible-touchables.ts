@@ -6,16 +6,16 @@
  * Supports both React Native touchables and Tamagui interactive components.
  */
 
-import * as ts from 'typescript'
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import * as ts from 'typescript'
 
 /**
  * Interactive components that should have accessibility labels.
  * Includes React Native touchables and Tamagui interactive components.
  */
-const TOUCHABLE_COMPONENTS = [
+const TOUCHABLE_COMPONENTS = new Set([
   // React Native touchables
   'TouchableOpacity',
   'TouchableHighlight',
@@ -24,7 +24,7 @@ const TOUCHABLE_COMPONENTS = [
   'Pressable',
   // Tamagui interactive components (from UI library)
   'Button',
-]
+])
 
 /**
  * Analyze a TSX file for accessibility issues
@@ -47,7 +47,7 @@ function analyzeFile(content: string, filePath: string): CheckViolation[] {
     if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
       const tagName = ts.isIdentifier(node.tagName) ? node.tagName.text : ''
 
-      if (TOUCHABLE_COMPONENTS.includes(tagName)) {
+      if (TOUCHABLE_COMPONENTS.has(tagName)) {
         const hasA11yLabel = node.attributes.properties.some(
           (attr) =>
             ts.isJsxAttribute(attr) &&

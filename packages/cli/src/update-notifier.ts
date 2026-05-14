@@ -28,8 +28,8 @@ export interface NotifyOptions {
 }
 
 function shouldSkip(): boolean {
-  if (process.env['OPENSIP_NO_UPDATE']) return true
-  if (process.env['NO_UPDATE_NOTIFIER']) return true
+  if (process.env.OPENSIP_NO_UPDATE) return true
+  if (process.env.NO_UPDATE_NOTIFIER) return true
   // The update-notifier package already suppresses in CI and non-TTY,
   // but we short-circuit so we don't even construct the notifier —
   // keeps the startup path minimal.

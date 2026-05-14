@@ -10,19 +10,21 @@
 import * as fs from 'node:fs/promises'
 import { relative } from 'node:path'
 
-import { Minimatch } from 'minimatch'
 
 import { SystemError } from '@opensip-tools/core'
+import { Minimatch } from 'minimatch'
 
-import type { ResolvedScope } from './check-config.js'
 import { DEFAULT_EXCLUSION_PATTERNS } from './constants.js'
 import { fileCache } from './file-cache.js'
 import { PathMatcher } from './path-matcher.js'
 import { extractSnippet } from './result-builder.js'
 
+import type { ResolvedScope } from './check-config.js'
+
 /**
  * Check identifier (UUID format).
  */
+// eslint-disable-next-line sonarjs/redundant-type-aliases -- semantic alias for UUID-shaped check identifier
 export type CheckId = string
 
 /**
@@ -220,7 +222,7 @@ export function createExecutionContext(
       if (options?.verbose) {
         // @fitness-ignore-next-line no-console-log -- Verbose check-level debug output bypasses structured logger for immediate CLI feedback
         // @fitness-ignore-next-line logging-standards -- Verbose check-level debug output bypasses structured logger for immediate CLI feedback
-        // eslint-disable-next-line no-console -- Verbose check-level debug output bypasses structured logger for immediate CLI feedback
+         
         console.log(`[${config.slug}] ${message}`)
       }
     },
@@ -228,7 +230,7 @@ export function createExecutionContext(
     extractSnippet(
       content: string,
       line: number,
-      contextLines: number = 2,
+      contextLines = 2,
     ): ExtractSnippetResult {
       return extractSnippet(content, line, contextLines)
     },

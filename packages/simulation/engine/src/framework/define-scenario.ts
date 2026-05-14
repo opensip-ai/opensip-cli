@@ -14,35 +14,20 @@
  * @deprecated Use `defineLoadScenario` from '@opensip-tools/simulation'.
  */
 
-import { logger } from '@opensip-tools/core'
-import { ValidationError as CoreValidationError } from '@opensip-tools/core'
+import { logger , ValidationError as CoreValidationError } from '@opensip-tools/core'
 
-import type { LoadScenarioConfig } from '../kinds/load/define.js'
 import {
   defineLoadScenario,
   defineLoadScenarioWithoutRegistration,
   validateLoadScenarioConfig,
   type LoadValidationError,
-} from '../kinds/load/define.js'
+ type LoadScenarioConfig } from '../kinds/load/define.js'
 
-import {
-  scenarioRegistry,
-  getRegisteredScenarios,
-  getScenario,
-  getScenariosByTag,
-  clearScenarioRegistry,
-} from './registry.js'
+
 import type { RunnableScenario } from './runnable-scenario.js'
-
 import type { ScenarioConfig } from '../types/framework-types.js'
 
-export {
-  scenarioRegistry,
-  getRegisteredScenarios,
-  getScenario,
-  getScenariosByTag,
-  clearScenarioRegistry,
-}
+
 
 /** Validation error with field name and message (legacy alias). */
 export type ValidationError = LoadValidationError
@@ -72,8 +57,8 @@ function projectLegacyToLoadConfig(config: ScenarioConfig): LoadScenarioConfig {
     tags: config.tags,
     personas: config.personas,
     duration: config.duration,
-    ...(config.rampUp !== undefined ? { rampUp: config.rampUp } : {}),
-    ...(config.targetRps !== undefined ? { targetRps: config.targetRps } : {}),
+    ...(config.rampUp === undefined ? {} : { rampUp: config.rampUp }),
+    ...(config.targetRps === undefined ? {} : { targetRps: config.targetRps }),
     assertions: config.assertions,
     ...(config.execute ? { execute: config.execute } : {}),
     ...(config.options ? { options: config.options } : {}),
@@ -126,3 +111,5 @@ export function defineScenarioWithoutRegistration(config: ScenarioConfig): Runna
   warnOnceLegacyDefineScenario()
   return defineLoadScenarioWithoutRegistration(projectLegacyToLoadConfig(config))
 }
+
+export {scenarioRegistry, getRegisteredScenarios, getScenario, getScenariosByTag, clearScenarioRegistry} from './registry.js'

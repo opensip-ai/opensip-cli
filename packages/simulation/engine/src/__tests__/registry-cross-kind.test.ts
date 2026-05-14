@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-empty-function -- scenario phase hooks must match `() => Promise<void>` shape; cross-kind registry tests use no-op stubs */
 /**
  * @fileoverview Tests for cross-kind registry behavior — tag filtering,
  * kind filtering, and discriminated-union exhaustiveness.
@@ -5,11 +6,8 @@
 
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { defineLoadScenario } from '../kinds/load/define.js'
-import { defineChaosScenario } from '../kinds/chaos/define.js'
-import { defineInvariantScenario } from '../kinds/invariant/define.js'
-import { defineFixEvaluationScenario } from '../kinds/fix-evaluation/define.js'
-import { resetPredicateRegistryToBaseline } from '../kinds/fix-evaluation/predicates/index.js'
+import { ASSERTIONS } from '../framework/assertions.js'
+import { persona } from '../framework/personas.js'
 import {
   clearScenarioRegistry,
   getRegisteredScenarios,
@@ -17,10 +15,14 @@ import {
   getScenariosByTag,
 } from '../framework/registry.js'
 import { renderScenarioResultView } from '../framework/result-renderers.js'
-import type { ScenarioExecutorResult } from '../framework/scenario-executor-result.js'
-import { ASSERTIONS } from '../framework/assertions.js'
-import { persona } from '../framework/personas.js'
+import { defineChaosScenario } from '../kinds/chaos/define.js'
+import { defineFixEvaluationScenario } from '../kinds/fix-evaluation/define.js'
+import { resetPredicateRegistryToBaseline } from '../kinds/fix-evaluation/predicates/index.js'
+import { defineInvariantScenario } from '../kinds/invariant/define.js'
+import { defineLoadScenario } from '../kinds/load/define.js'
 import { SCENARIO_KINDS } from '../types/kind-types.js'
+
+import type { ScenarioExecutorResult } from '../framework/scenario-executor-result.js'
 
 afterEach(() => {
   clearScenarioRegistry()

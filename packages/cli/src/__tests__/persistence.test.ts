@@ -1,15 +1,19 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdirSync, writeFileSync, readdirSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
-import type { StoredSession } from '@opensip-tools/cli-shared';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+
+import type * as cliShared from '@opensip-tools/cli-shared';
+import type * as nodeOs from 'node:os';
+
+type StoredSession = cliShared.StoredSession;
 
 // Module-level variable that the hoisted mock can close over
 let _mockHome = '';
 
 vi.mock('node:os', async (importOriginal) => {
-  const orig = await importOriginal<typeof import('node:os')>();
+  const orig = await importOriginal<typeof nodeOs>();
   return { ...orig, homedir: () => _mockHome };
 });
 
@@ -24,6 +28,7 @@ function makeSession(overrides: Partial<StoredSession> = {}): StoredSession {
     id: overrides.id ?? 'test-id',
     tool: overrides.tool ?? 'fit',
     timestamp: overrides.timestamp ?? new Date().toISOString(),
+    // eslint-disable-next-line sonarjs/publicly-writable-directories -- test fixture cwd; not a runtime filesystem operation
     cwd: overrides.cwd ?? '/tmp/project',
     recipe: overrides.recipe,
     score: overrides.score ?? 85,
@@ -35,7 +40,7 @@ function makeSession(overrides: Partial<StoredSession> = {}): StoredSession {
 }
 
 describe('persistence/store', () => {
-  let storeModule: typeof import('@opensip-tools/cli-shared');
+  let storeModule: typeof cliShared;
 
   beforeEach(async () => {
     _mockHome = makeTempDir();
@@ -50,7 +55,7 @@ describe('persistence/store', () => {
 
   describe('sanitizeForFilename', () => {
     it('strips path separators', () => {
-      expect(storeModule.sanitizeForFilename('foo/bar\\baz')).toBe('foo-bar-baz');
+      expect(storeModule.sanitizeForFilename(String.raw`foo/bar\baz`)).toBe('foo-bar-baz');
     });
 
     it('strips special characters', () => {
@@ -152,10 +157,12 @@ describe('persistence/store', () => {
 
       // Write a corrupted file directly
       const storeDir = storeModule.getStoreDir();
-      writeFileSync(join(storeDir, '2025-01-01T00-00-00-000Z-fit.json'), 'NOT VALID JSON{{{', 'utf-8');
+      writeFileSync(join(storeDir, '2025-01-01T00-00-00-000Z-fit.json'), 'NOT VALID JSON{{{', 'utf8');
 
       const { logger } = await import('@opensip-tools/core');
-      const loggerSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+      const loggerSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {
+        /* swallow logged warning during test */
+      });
       const loaded = storeModule.loadSessions();
       // Should have loaded only the valid session
       expect(loaded).toHaveLength(1);

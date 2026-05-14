@@ -6,11 +6,11 @@
  * with a warning logged on ambiguity.
  */
 
-import type { Check } from './check-types.js';
-import { NotFoundError } from '@opensip-tools/core';
-import { logger } from '@opensip-tools/core';
+import { NotFoundError , logger } from '@opensip-tools/core';
 
-export type { Check };
+import type { Check } from './check-types.js';
+
+
 
 export class CheckRegistry {
   /** Primary store: key is `namespace:slug` or bare `slug` */
@@ -57,7 +57,7 @@ export class CheckRegistry {
     if (!keys || keys.length === 0) return undefined;
     const key = keys[0];
     const colonIdx = key.indexOf(':');
-    return colonIdx >= 0 ? key.slice(0, colonIdx) : undefined;
+    return colonIdx === -1 ? undefined : key.slice(0, colonIdx);
   }
 
   listEnabled(): Check[] {
@@ -115,9 +115,11 @@ export class CheckRegistry {
       });
     }
 
-    return this.checks.get(candidates[0]!);
+    return this.checks.get(candidates[0]);
   }
 }
 
 /** Default global registry — checks auto-register here on import */
 export const defaultRegistry = new CheckRegistry();
+
+export {type Check} from './check-types.js';

@@ -6,15 +6,15 @@
  * without proper accessibility role definitions.
  */
 
-import * as ts from 'typescript'
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import * as ts from 'typescript'
 
 /**
  * Press handler props that indicate interactive behavior on View components.
  */
-const PRESS_HANDLER_PROPS = ['onPress', 'onPressIn', 'onPressOut', 'onLongPress']
+const PRESS_HANDLER_PROPS = new Set(['onPress', 'onPressIn', 'onPressOut', 'onLongPress'])
 
 /**
  * Analyze a TSX file for View components with press handlers missing accessibilityRole
@@ -42,7 +42,7 @@ function analyzeFile(content: string, filePath: string): CheckViolation[] {
 
         // Check if View has any press handler props
         const hasPressHandler = attributes.some(
-          (attr) => ts.isJsxAttribute(attr) && PRESS_HANDLER_PROPS.includes(attr.name.getText()),
+          (attr) => ts.isJsxAttribute(attr) && PRESS_HANDLER_PROPS.has(attr.name.getText()),
         )
 
         if (hasPressHandler) {

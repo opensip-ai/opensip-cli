@@ -14,9 +14,9 @@ import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
  * These patterns are intentional and safe for static code analysis.
  * They detect object references in log statements, not user input.
  */
-const REQUEST_PATTERN = new RegExp('\\breq\\s*[,}]')
-const QUERY_RUNNER_PATTERN = new RegExp('queryRunner\\s*[,}]', 'i')
-const ENTITY_PATTERN = new RegExp('\\bentity\\s*[,}]', 'i')
+const REQUEST_PATTERN = new RegExp(String.raw`\breq\s*[,}]`)
+const QUERY_RUNNER_PATTERN = new RegExp(String.raw`queryRunner\s*[,}]`, 'i')
+const ENTITY_PATTERN = new RegExp(String.raw`\bentity\s*[,}]`, 'i')
 
 /**
  * Known complex objects that need serializers
@@ -250,7 +250,7 @@ export const pinoSerializerCoverage = defineCheck({
   tags: ['logging', 'quality'],
   fileTypes: ['ts'],
   // @fitness-ignore-next-line no-hardcoded-timeouts -- framework default for fitness check execution
-  timeout: 180000, // 3 minutes - scans log statements across codebase
+  timeout: 180_000, // 3 minutes - scans log statements across codebase
 
   analyze: analyzeFile,
 })

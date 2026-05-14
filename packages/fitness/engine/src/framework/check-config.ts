@@ -11,6 +11,8 @@
 
 import { z } from 'zod'
 
+import type { ItemType } from '../types/findings.js'
+
 // =============================================================================
 // CHECK SLUGS AND IDS
 // =============================================================================
@@ -29,6 +31,7 @@ export const CheckIdSchema = z
   )
 
 /** Type alias for a kebab-case check slug string. */
+// eslint-disable-next-line sonarjs/redundant-type-aliases -- semantic alias documents intent ("a slug" vs raw string)
 type CheckSlug = string
 
 // =============================================================================
@@ -54,6 +57,7 @@ export interface ResolvedScope {
  * Used for automatic target matching: a check with `concerns: ['backend']`
  * matches any target that declares `concerns: ['backend', ...]`.
  */
+// eslint-disable-next-line sonarjs/redundant-type-aliases -- semantic alias documents the marketplace concern dimension
 export type CheckConcern = string
 
 /**
@@ -61,6 +65,7 @@ export type CheckConcern = string
  * a check with `languages: ['typescript']` matches any target with
  * `languages: ['typescript', ...]`.
  */
+// eslint-disable-next-line sonarjs/redundant-type-aliases -- semantic alias documents the marketplace language dimension
 export type CheckLanguage = string
 
 /**
@@ -181,7 +186,7 @@ export interface BaseCheckConfig {
   /** Signal provider name for external tool checks (default: 'opensip') */
   readonly provider?: string
   /** The type of items this check validates (default: 'files'). Used for display in results table. */
-  readonly itemType?: import('../types/findings.js').ItemType
+  readonly itemType?: ItemType
   /** Portable scope declaration for marketplace-ready target matching. */
   readonly scope?: CheckScope
   /**
@@ -192,8 +197,10 @@ export interface BaseCheckConfig {
    *   need to analyze string content (e.g., hardcoded secrets, PII detection).
    * - 'strip-strings': String literals replaced with whitespace,
    *   preserving line/column positions. COMMENTS PRESERVED — use when
-   *   the check reads comment-based directives like `// @deprecated`,
-   *   `// @swallow-ok`, or `// @fitness-ignore-...`.
+   *   the check reads comment-based directives like the deprecation
+   *   marker, the swallow-ok marker, or `// @fitness-ignore-...` (we
+   *   don't reference those tag names verbatim in this JSDoc to avoid
+   *   confusing static analyzers).
    * - 'strip-strings-and-comments': BOTH string literals and comments
    *   replaced with whitespace, preserving line/column positions. Use
    *   for checks that pattern-match identifiers via regex and would

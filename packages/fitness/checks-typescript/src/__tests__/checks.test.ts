@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+
 import { checks } from '../index.js'
 
 describe('checks-typescript', () => {

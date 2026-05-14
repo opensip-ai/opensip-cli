@@ -13,13 +13,16 @@
  */
 
 import { ValidationError as CoreValidationError } from '@opensip-tools/core'
-import type { CreateSignalInput } from '@opensip-tools/core'
+
 
 import { scenarioRegistry } from '../../framework/registry.js'
-import type { RunnableScenario } from '../../framework/runnable-scenario.js'
+
 
 import { createFixEvaluationScenarioRunner } from './executor.js'
 import { getPredicate } from './predicates/index.js'
+
+import type { RunnableScenario } from '../../framework/runnable-scenario.js'
+import type { CreateSignalInput } from '@opensip-tools/core'
 
 // =============================================================================
 // PREDICATE COMPOSITION TYPES
@@ -166,8 +169,9 @@ function validatePredicateTree(
         message: 'predicate node may declare either all_of or any_of, not both',
       })
     }
-    const children = hasAllOf ? composition.all_of : composition.any_of
-    if (Array.isArray(children)) {
+    const children: readonly (PredicateComposition | PredicateLeaf)[] | undefined =
+      hasAllOf ? composition.all_of : composition.any_of
+    if (children) {
       children.forEach((child, idx) => {
         const branch = hasAllOf ? 'all_of' : 'any_of'
         validatePredicateTree(child, `${pathTrace}.${branch}[${idx}]`, errors)
@@ -201,11 +205,8 @@ function validateGamingDefense(
   let found = false
   const visit = (node: PredicateComposition | PredicateLeaf): void => {
     const composition = node as PredicateComposition
-    const children = Array.isArray(composition.all_of)
-      ? composition.all_of
-      : Array.isArray(composition.any_of)
-        ? composition.any_of
-        : null
+    const children: readonly (PredicateComposition | PredicateLeaf)[] | undefined =
+      composition.all_of ?? composition.any_of
     if (children) {
       for (const child of children) {
         if (found) return

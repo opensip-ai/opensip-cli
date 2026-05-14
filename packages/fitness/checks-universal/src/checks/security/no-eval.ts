@@ -5,8 +5,8 @@
  */
 
 import { logger } from '@opensip-tools/core/logger'
-
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+
 import { isCommentLine } from '../../utils/index.js'
 
 // Patterns that indicate dangerous dynamic code execution
@@ -93,8 +93,8 @@ export const noEval = defineCheck({
     const violations: CheckViolation[] = []
     const lines = content.split('\n')
 
-    for (let lineNum = 0; lineNum < lines.length; lineNum++) {
-      const line = lines[lineNum] ?? ''
+    for (const [lineNum, line_] of lines.entries()) {
+      const line = line_ ?? ''
 
       // Skip comments and find eval patterns in non-comment lines
       if (!isCommentLine(line)) {

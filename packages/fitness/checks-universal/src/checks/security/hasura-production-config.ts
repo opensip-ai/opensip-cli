@@ -10,7 +10,6 @@
  */
 
 import { logger } from '@opensip-tools/core/logger'
-
 import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
 
 interface RequiredSetting {
@@ -44,8 +43,8 @@ const REQUIRED_SETTINGS: RequiredSetting[] = [
 
 function findHasuraEnvLine(content: string): number {
   const lines = content.split('\n')
-  for (let i = 0; i < lines.length; i++) {
-    if ((lines[i] ?? '').includes('HASURA_GRAPHQL_')) {
+  for (const [i, line] of lines.entries()) {
+    if ((line ?? '').includes('HASURA_GRAPHQL_')) {
       return i + 1
     }
   }
@@ -57,9 +56,10 @@ function checkMissingSettings(filePath: string, content: string): CheckViolation
 
   const violations: CheckViolation[] = []
   for (const setting of REQUIRED_SETTINGS) {
-    const presencePattern = new RegExp(`${setting.envVar}\\s*:`)
+    const presencePattern = new RegExp(String.raw`${setting.envVar}\s*:`)
+    const escapedValue = setting.expectedValue.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)
     const correctValuePattern = new RegExp(
-      `${setting.envVar}\\s*:\\s*${setting.expectedValue.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`
+      String.raw`${setting.envVar}\s*:\s*${escapedValue}`
     )
 
     if (!presencePattern.test(content)) {
@@ -75,7 +75,7 @@ function checkMissingSettings(filePath: string, content: string): CheckViolation
       const settingLine = lines.findIndex(l => presencePattern.test(l))
       violations.push({
         filePath,
-        line: settingLine >= 0 ? settingLine + 1 : findHasuraEnvLine(content),
+        line: settingLine === -1 ? findHasuraEnvLine(content) : settingLine + 1,
         severity: 'warning',
         message: `${setting.envVar} has incorrect value. Expected: ${setting.expectedValue}. ${setting.description}.`,
         suggestion: `Change to \`${setting.envVar}: ${setting.expectedValue}\`.`,

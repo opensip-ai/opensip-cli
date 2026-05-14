@@ -5,7 +5,6 @@
  */
 
 import { logger } from '@opensip-tools/core/logger'
-
 import { defineCheck, type CheckViolation, getLineNumber } from '@opensip-tools/fitness'
 
 // =============================================================================
@@ -125,7 +124,7 @@ function findAsyncInTransactionViolations(content: string, filePath: string): Ch
     pattern.lastIndex = 0
     let match
     while ((match = pattern.exec(content)) !== null) {
-      const beforeMatch = content.substring(0, match.index)
+      const beforeMatch = content.slice(0, Math.max(0, match.index))
       const hasOpenTransaction = TRANSACTION_PATTERNS.some((p) => p.test(beforeMatch.slice(-500)))
 
       if (!hasOpenTransaction) {

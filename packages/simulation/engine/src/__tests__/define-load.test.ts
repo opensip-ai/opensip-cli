@@ -4,14 +4,14 @@
 
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { ASSERTIONS } from '../framework/assertions.js'
+import { persona } from '../framework/personas.js'
+import { clearScenarioRegistry, getScenario } from '../framework/registry.js'
 import {
   defineLoadScenario,
   defineLoadScenarioWithoutRegistration,
   validateLoadScenarioConfig,
 } from '../kinds/load/define.js'
-import { clearScenarioRegistry, getScenario } from '../framework/registry.js'
-import { ASSERTIONS } from '../framework/assertions.js'
-import { persona } from '../framework/personas.js'
 
 afterEach(() => {
   clearScenarioRegistry()

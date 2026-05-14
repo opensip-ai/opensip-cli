@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
+
 import { CheckRegistry } from '../../framework/registry.js'
 import { resolveChecks } from '../check-resolution.js'
+
 import type { Check } from '../../framework/check-types.js'
 import type { CheckSelector } from '../types.js'
 
@@ -15,8 +17,10 @@ function makeCheck(slug: string, tags: string[] = ['quality'], opts?: { disabled
       scope: { include: [], exclude: [], description: '' },
       itemType: 'files',
       disabled: opts?.disabled,
+      // eslint-disable-next-line @typescript-eslint/require-await -- mock matches expected `() => Promise<CheckResult>` shape
       execute: async () => ({ findings: [], passed: true }),
     },
+    // eslint-disable-next-line @typescript-eslint/require-await -- mock matches expected `() => Promise<CheckResult>` shape
     run: async () => ({ findings: [], passed: true }),
     getScope: () => ({ include: [], exclude: [], description: '' }),
     getMatcher: () => ({ matches: () => true }),

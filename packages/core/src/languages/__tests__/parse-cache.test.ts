@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import type { LanguageAdapter } from '../adapter.js'
 import {
   clearParseCache,
   getParseTree,
@@ -8,6 +7,8 @@ import {
   initParseCache,
 } from '../parse-cache.js'
 import { defaultLanguageRegistry } from '../registry.js'
+
+import type { LanguageAdapter } from '../adapter.js'
 
 interface FakeTree {
   readonly id: number

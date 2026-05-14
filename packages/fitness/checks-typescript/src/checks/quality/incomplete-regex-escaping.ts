@@ -6,10 +6,10 @@
  * This is a security vulnerability that can lead to regex injection attacks.
  */
 
-import * as ts from 'typescript'
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import * as ts from 'typescript'
 
 /**
  * All special regex characters that should be escaped
@@ -40,7 +40,7 @@ function stripRegexDelimiters(regexText: string): string {
     pattern = pattern.slice(1)
   }
   if (pattern.includes('/')) {
-    pattern = pattern.substring(0, pattern.lastIndexOf('/'))
+    pattern = pattern.slice(0, Math.max(0, pattern.lastIndexOf('/')))
   }
   return pattern
 }
@@ -74,12 +74,12 @@ function extractCharacterClass(pattern: string): string | null {
  */
 function isCharInClass(char: string, charClass: string): boolean {
   if (char === '\\') return charClass.includes('\\\\')
-  if (char === ']') return charClass.includes('\\]')
+  if (char === ']') return charClass.includes(String.raw`\]`)
   if (char === '^') {
-    return charClass.includes('\\^') || (charClass.includes('^') && charClass.indexOf('^') > 0)
+    return charClass.includes(String.raw`\^`) || (charClass.includes('^') && charClass.indexOf('^') > 0)
   }
   if (char === '-') {
-    return charClass.includes('\\-') || charClass.startsWith('-') || charClass.endsWith('-')
+    return charClass.includes(String.raw`\-`) || charClass.startsWith('-') || charClass.endsWith('-')
   }
   return charClass.includes(char) || charClass.includes(`\\${char}`)
 }
@@ -91,12 +91,12 @@ function findMissingChars(regexText: string): string[] {
   const pattern = stripRegexDelimiters(regexText)
 
   if (!pattern.startsWith('[')) {
-    return Array.from(REQUIRED_SPECIAL_CHARS)
+    return [...REQUIRED_SPECIAL_CHARS]
   }
 
   const charClass = extractCharacterClass(pattern)
   if (charClass === null) {
-    return Array.from(REQUIRED_SPECIAL_CHARS)
+    return [...REQUIRED_SPECIAL_CHARS]
   }
 
   const missingChars: string[] = []
@@ -126,14 +126,14 @@ function checkReplaceCall(
 
   const secondArg = node.arguments[1]
   if (!secondArg || !ts.isStringLiteral(secondArg)) return null
-  if (secondArg.text !== '\\$&') return null
+  if (secondArg.text !== String.raw`\$&`) return null
 
   // Check context for intentional partial escaping
   const fullText = sourceFile.getFullText()
   const nodeStart = node.getFullStart()
   const nodeEnd = node.getEnd()
   const contextStart = Math.max(0, nodeStart - 500)
-  const contextText = fullText.substring(contextStart, nodeEnd)
+  const contextText = fullText.slice(contextStart, nodeEnd)
 
   if (/character class|lucene|search|opensearch|elasticsearch|query/i.test(contextText)) {
     return null
@@ -154,7 +154,7 @@ function checkReplaceCall(
     severity: 'error',
     type: 'incomplete-escaping',
     suggestion:
-      'Include all regex special characters in the escape pattern: \\\\ ^ $ . * + ? ( ) [ ] { } |. Use a library like escape-string-regexp for safety.',
+      String.raw`Include all regex special characters in the escape pattern: \\ ^ $ . * + ? ( ) [ ] { } |. Use a library like escape-string-regexp for safety.`,
     match: regexText,
   }
 }
@@ -196,7 +196,7 @@ export const incompleteRegexEscaping = defineCheck({
 
     try {
       const sourceFile = getSharedSourceFile(filePath, content)
-    if (!sourceFile) return []
+      if (!sourceFile) return []
 
       const visit = (node: ts.Node) => {
         if (ts.isCallExpression(node)) {

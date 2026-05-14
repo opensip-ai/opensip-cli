@@ -26,7 +26,7 @@ export interface RetryResult<T> {
 }
 
 function backoff(attempt: number): Promise<void> {
-  const delay = BACKOFF_DELAYS_MS[attempt] ?? BACKOFF_DELAYS_MS[BACKOFF_DELAYS_MS.length - 1] ?? 2000
+  const delay = BACKOFF_DELAYS_MS[attempt] ?? BACKOFF_DELAYS_MS.at(-1) ?? 2000
   return new Promise((resolve) => setTimeout(resolve, delay))
 }
 

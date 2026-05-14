@@ -6,12 +6,12 @@
  * @fileoverview Context safety and mutation checks
  */
 
-import * as ts from 'typescript'
 
 import { logger } from '@opensip-tools/core/logger'
-
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import * as ts from 'typescript'
+
 import { isCommentLine, isTestFile } from '../../utils/index.js'
 
 // =============================================================================
@@ -62,6 +62,7 @@ function findWordEndIndex(str: string): number {
     msg: 'Finding end index of word characters in string',
   })
   let wordEnd = 0
+  // eslint-disable-next-line unicorn/no-for-loop -- offset-bearing scan: returns the UTF-16 index after the last word char
   for (let i = 0; i < str.length; i++) {
     const char = str[i]
     if (char === undefined || !/\w/.test(char)) {
@@ -89,11 +90,11 @@ function createAssignmentDetector(prefix: string): MutationDetector {
       const idx = line.indexOf(prefix)
       if (idx === -1) return false
       // Find next non-word character after prefix
-      const afterPrefix = line.substring(idx + prefix.length)
+      const afterPrefix = line.slice(Math.max(0, idx + prefix.length))
       // Must have at least one word character
       const wordEnd = findWordEndIndex(afterPrefix)
       if (wordEnd === 0) return false
-      const afterWord = afterPrefix.substring(wordEnd).trimStart()
+      const afterWord = afterPrefix.slice(Math.max(0, wordEnd)).trimStart()
       // Check for assignment (but NOT comparison operators)
       if (!afterWord.startsWith('=')) return false
       // Exclude === and == (comparison) and !=, !==
@@ -456,6 +457,13 @@ function isSkippedPath(filePath: string): boolean {
  * type *as the outer / value-shape* (not as an inner generic argument of a
  * process-scoped wrapper like `Injector<AuditContext>`).
  */
+/** Get the simple name of a type reference's `typeName` (handles qualified names). */
+function getTypeRefName(typeName: ts.EntityName): string {
+  if (ts.isIdentifier(typeName)) return typeName.text
+  if (ts.isQualifiedName(typeName)) return typeName.right.text
+  return ''
+}
+
 function typeLooksLikeRequestContext(type: ts.TypeNode | undefined): boolean {
   if (!type) return false
 
@@ -465,11 +473,7 @@ function typeLooksLikeRequestContext(type: ts.TypeNode | undefined): boolean {
   }
 
   if (ts.isTypeReferenceNode(type)) {
-    const name = ts.isIdentifier(type.typeName)
-      ? type.typeName.text
-      : ts.isQualifiedName(type.typeName)
-        ? type.typeName.right.text
-        : ''
+    const name = getTypeRefName(type.typeName)
     if (PROCESS_SCOPED_WRAPPER_TYPES.has(name)) {
       // The outer wrapper is process-scoped; ignore its generic arguments.
       return false
@@ -505,12 +509,7 @@ function isMetricLazyInit(decl: ts.VariableDeclaration): boolean {
 
   return candidates.some((c) => {
     if (!ts.isTypeReferenceNode(c)) return false
-    const name = ts.isIdentifier(c.typeName)
-      ? c.typeName.text
-      : ts.isQualifiedName(c.typeName)
-        ? c.typeName.right.text
-        : ''
-    return METRIC_INSTRUMENT_TYPES.has(name)
+    return METRIC_INSTRUMENT_TYPES.has(getTypeRefName(c.typeName))
   })
 }
 
@@ -521,12 +520,7 @@ function isMetricLazyInit(decl: ts.VariableDeclaration): boolean {
 function isAsyncLocalStorageType(type: ts.TypeNode | undefined): boolean {
   if (!type) return false
   if (ts.isTypeReferenceNode(type)) {
-    const name = ts.isIdentifier(type.typeName)
-      ? type.typeName.text
-      : ts.isQualifiedName(type.typeName)
-        ? type.typeName.right.text
-        : ''
-    return name === 'AsyncLocalStorage'
+    return getTypeRefName(type.typeName) === 'AsyncLocalStorage'
   }
   if (ts.isUnionTypeNode(type)) {
     return type.types.some(isAsyncLocalStorageType)
@@ -574,11 +568,11 @@ function classIsDbosStepHost(cls: ts.ClassDeclaration): boolean {
     }
     return false
   }
-  if (checkDecorators(ts.getModifiers(cls) as readonly ts.ModifierLike[] | undefined)) return true
+  if (checkDecorators(ts.getModifiers(cls))) return true
   for (const member of cls.members) {
     if (
       ts.canHaveDecorators(member) &&
-      checkDecorators(ts.getDecorators(member) as readonly ts.ModifierLike[] | undefined)
+      checkDecorators(ts.getDecorators(member))
     ) {
       return true
     }
@@ -596,6 +590,7 @@ interface ContextLeakageFinding {
  * Walk top-level statements and class declarations of a SourceFile and collect
  * findings for genuine module-level / request-scoped class-level leakage.
  */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- module/class-level walk; branches map to AST node kinds and are easier to read inline than as a fragmented dispatcher
 function collectContextLeakage(sourceFile: ts.SourceFile): ContextLeakageFinding[] {
   const findings: ContextLeakageFinding[] = []
 
@@ -657,7 +652,7 @@ function collectContextLeakage(sourceFile: ts.SourceFile): ContextLeakageFinding
       if (!ts.isPropertyDeclaration(member)) continue
       if (!ts.isIdentifier(member.name)) continue
 
-      const mods = ts.getModifiers(member) as readonly ts.Modifier[] | undefined
+      const mods = ts.getModifiers(member)
       const isReadonly = mods?.some((m) => m.kind === ts.SyntaxKind.ReadonlyKeyword) ?? false
       const isStatic = mods?.some((m) => m.kind === ts.SyntaxKind.StaticKeyword) ?? false
       if (isReadonly || isStatic) continue

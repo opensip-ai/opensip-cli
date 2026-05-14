@@ -5,7 +5,6 @@
  */
 
 import { logger } from '@opensip-tools/core/logger'
-
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
 /**
@@ -40,7 +39,7 @@ function checkJwtVerifyWithoutAlgorithm(line: string): {
   if (idx === -1) return { matched: false, matchIndex: -1, matchText: '' }
 
   // Find the end of the verify call
-  const afterVerify = line.substring(idx)
+  const afterVerify = line.slice(Math.max(0, idx))
   const parenStart = afterVerify.indexOf('(')
   if (parenStart === -1) return { matched: false, matchIndex: -1, matchText: '' }
 
@@ -64,7 +63,7 @@ function checkJwtVerifyWithoutAlgorithm(line: string): {
 
   if (parenEnd === -1) return { matched: false, matchIndex: -1, matchText: '' }
 
-  const callContent = afterVerify.substring(parenStart, parenEnd + 1)
+  const callContent = afterVerify.slice(parenStart, parenEnd + 1)
 
   // Check if there are 2 args (no options) - simple comma count for basic calls
   const commaCount = (callContent.match(/,/g) ?? []).length
@@ -131,10 +130,10 @@ function checkWeakJwtSecret(line: string): {
     if (idx === -1) continue
 
     // Look for assignment after keyword - simple check for short strings
-    const afterKeyword = line.substring(idx + keyword.length)
+    const afterKeyword = line.slice(Math.max(0, idx + keyword.length))
     // Match patterns like: = 'short' or : "short"
     // @fitness-ignore-next-line sonarjs-regular-expr -- Simple pattern with bounded quantifier {0,20} and negated class [^'"`]; no backtracking risk
-    const assignMatch = afterKeyword.match(/^\s*[:=]\s*['"`]([^'"`]{0,20})['"`]/)
+    const assignMatch = /^\s*[:=]\s*['"`]([^'"`]{0,20})['"`]/.exec(afterKeyword)
 
     if (assignMatch?.[1] !== undefined && assignMatch[1].length <= 20) {
       return { matched: true, matchIndex: idx, matchText: keyword + assignMatch[0] }
@@ -167,7 +166,7 @@ function checkAlgorithmNone(line: string): {
     const idx = lowerLine.indexOf(pattern)
     if (idx === -1) continue
 
-    const afterPattern = lowerLine.substring(idx)
+    const afterPattern = lowerLine.slice(Math.max(0, idx))
     // Check for assignment to array containing 'none'
     const hasNone =
       afterPattern.includes('[') &&
@@ -176,8 +175,8 @@ function checkAlgorithmNone(line: string): {
         afterPattern.includes('`none`'))
 
     if (hasNone) {
-      const matchEnd = line.substring(idx).indexOf(']') + 1
-      return { matched: true, matchIndex: idx, matchText: line.substring(idx, idx + matchEnd) }
+      const matchEnd = line.slice(Math.max(0, idx)).indexOf(']') + 1
+      return { matched: true, matchIndex: idx, matchText: line.slice(idx, idx + matchEnd) }
     }
   }
 
@@ -206,7 +205,7 @@ function checkMissingIssuerAudience(line: string): {
   if (idx === -1) return { matched: false, matchIndex: -1, matchText: '' }
 
   // Check if there's an options object
-  const afterVerify = line.substring(idx)
+  const afterVerify = line.slice(Math.max(0, idx))
   if (!afterVerify.includes('{')) return { matched: false, matchIndex: -1, matchText: '' }
 
   // Check if issuer/audience/iss/aud is present
@@ -331,8 +330,8 @@ export const jwtValidation = defineCheck({
     const violations: CheckViolation[] = []
     const lines = content.split('\n')
 
-    for (let lineNum = 0; lineNum < lines.length; lineNum++) {
-      const line = lines[lineNum] ?? ''
+    for (const [lineNum, line_] of lines.entries()) {
+      const line = line_ ?? ''
 
       // Skip comments
       const trimmed = line.trim()

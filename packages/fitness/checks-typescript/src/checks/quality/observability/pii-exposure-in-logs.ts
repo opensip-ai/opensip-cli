@@ -169,7 +169,7 @@ export const piiExposureInLogs = defineCheck({
   tags: ['security', 'compliance', 'quality'],
   fileTypes: ['ts'],
   // @fitness-ignore-next-line no-hardcoded-timeouts -- framework default for fitness check execution
-  timeout: 180000, // 3 minutes - scans all log statements
+  timeout: 180_000, // 3 minutes - scans all log statements
 
   analyze(content: string, filePath: string): CheckViolation[] {
     // Quick filter: skip files without logger patterns

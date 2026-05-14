@@ -29,7 +29,7 @@ describe('rust stripStrings', () => {
   })
 
   it('handles raw strings r"..."', () => {
-    const src = 'let p = r"C:\\path\\to\\file";'
+    const src = String.raw`let p = r"C:\path\to\file";`
     const out = stripStrings(src)
     expect(out.length).toBe(src.length)
     expect(out).not.toContain('C:')

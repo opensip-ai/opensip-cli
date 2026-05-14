@@ -6,10 +6,10 @@
  * executed inside loops.
  */
 
-import * as ts from 'typescript'
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import * as ts from 'typescript'
 
 interface LoopInfo {
   isLoop: boolean
@@ -46,7 +46,7 @@ function checkWhileLoop(node: ts.Node): LoopInfo | null {
 /**
  * Array methods that iterate over elements
  */
-const ARRAY_LOOP_METHODS = [
+const ARRAY_LOOP_METHODS = new Set([
   'forEach',
   'map',
   'filter',
@@ -55,7 +55,7 @@ const ARRAY_LOOP_METHODS = [
   'every',
   'find',
   'findIndex',
-]
+])
 
 /**
  * Check if node is an array method call that loops
@@ -67,7 +67,7 @@ function checkArrayLoopMethod(node: ts.Node): LoopInfo | null {
   if (!ts.isPropertyAccessExpression(node.expression)) return null
 
   const methodName = node.expression.name.text
-  if (ARRAY_LOOP_METHODS.includes(methodName)) {
+  if (ARRAY_LOOP_METHODS.has(methodName)) {
     return { isLoop: true, loopType: methodName }
   }
   return null
@@ -273,7 +273,7 @@ function analyzeFile(content: string, filePath: string): CheckViolation[] {
               column: 0,
               message: `SQL query inside ${loopType} loop may cause N+1 query performance issue`,
               severity: 'error',
-              suggestion: `Batch the queries: collect IDs first, then execute a single query with WHERE id IN (...) or use sql\`...WHERE id = ANY($\{ids})\` outside the loop`,
+              suggestion: `Batch the queries: collect IDs first, then execute a single query with WHERE id IN (...) or use sql\`...WHERE id = ANY(\${ids})\` outside the loop`,
               match: matchText,
             })
           }
@@ -318,7 +318,7 @@ export const postgresNPlusOne = defineCheck({
   tags: ['performance', 'database', 'quality'],
   fileTypes: ['ts'],
   // @fitness-ignore-next-line no-hardcoded-timeouts -- framework default for fitness check execution
-  timeout: 180000, // 3 minutes - analyzes query patterns
+  timeout: 180_000, // 3 minutes - analyzes query patterns
 
   analyze: analyzeFile,
 })

@@ -1,7 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import {
   discoverCheckPackages,
@@ -13,7 +14,7 @@ let testDir: string
 
 function makeNodeModulesPackage(testDir: string, scopedName: string, fields: Record<string, unknown> = {}): string {
   const [scope, name] = scopedName.startsWith('@')
-    ? [scopedName.split('/')[0]!, scopedName.split('/').slice(1).join('/')]
+    ? [scopedName.split('/')[0], scopedName.split('/').slice(1).join('/')]
     : ['', scopedName]
   const dir = scope ? join(testDir, 'node_modules', scope, name) : join(testDir, 'node_modules', name)
   mkdirSync(dir, { recursive: true })

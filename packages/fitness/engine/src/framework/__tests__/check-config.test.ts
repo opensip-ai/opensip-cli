@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+
 import { validateCheckConfig } from '../check-config.js'
 
 const BASE_CONFIG = {
@@ -37,9 +38,11 @@ describe('validateCheckConfig', () => {
     })).not.toThrow()
 
     // analyzeAll mode
+    // eslint-disable-next-line sonarjs/no-unused-vars -- destructure-omit pattern: drop `analyze` from spread copy
     const { analyze: _, ...noAnalyze } = BASE_CONFIG
     expect(() => validateCheckConfig({
       ...noAnalyze,
+      // eslint-disable-next-line @typescript-eslint/require-await -- arrow must match `(files: FileAccessor) => Promise<CheckViolation[]>`
       analyzeAll: async () => [],
     })).not.toThrow()
 
@@ -55,6 +58,7 @@ describe('validateCheckConfig', () => {
   })
 
   it('rejects config without any analysis mode', () => {
+    // eslint-disable-next-line sonarjs/no-unused-vars -- destructure-omit pattern: drop `analyze` from spread copy
     const { analyze: _, ...noMode } = BASE_CONFIG
     expect(() => validateCheckConfig(noMode)).toThrow()
   })

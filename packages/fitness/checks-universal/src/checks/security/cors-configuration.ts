@@ -4,7 +4,6 @@
  */
 
 import { logger } from '@opensip-tools/core/logger'
-
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
 /**
@@ -112,8 +111,8 @@ export const corsConfiguration = defineCheck({
     const violations: CheckViolation[] = []
     const lines = content.split('\n')
 
-    for (let lineNum = 0; lineNum < lines.length; lineNum++) {
-      const line = lines[lineNum] ?? ''
+    for (const [lineNum, line_] of lines.entries()) {
+      const line = line_ ?? ''
 
       // Skip comments
       if (line.trim().startsWith('//') || line.trim().startsWith('*')) {

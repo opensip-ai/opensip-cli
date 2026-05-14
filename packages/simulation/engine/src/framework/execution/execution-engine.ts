@@ -9,10 +9,17 @@
 
 import { randomBytes } from 'node:crypto'
 
-import { logger as coreLogger } from '@opensip-tools/core'
-import type { Signal, SignalSeverity, SignalCategory, FixHint } from '@opensip-tools/core'
-import { createSignal } from '@opensip-tools/core'
+import { logger as coreLogger , createSignal } from '@opensip-tools/core'
 
+
+import { evaluateOperator } from '../assertions.js'
+import { createEmptyMetrics } from '../result-builder.js'
+
+import { executeTickRequests } from './action-handlers.js'
+import { LatencyTracker } from './latency-tracker.js'
+import { ScenarioAbortedError } from './scenario-aborted-error.js'
+
+import type { SimulationActionResult, SimulationLoopContext } from './action-handlers.js'
 import type {
   SimulationRun,
   SimulationMetrics,
@@ -22,15 +29,9 @@ import type {
   ScenarioType,
   ChaosConfig,
 } from '../../types/base-types.js'
-import { evaluateOperator } from '../assertions.js'
-import { createEmptyMetrics } from '../result-builder.js'
+import type { Signal, SignalSeverity, SignalCategory, FixHint } from '@opensip-tools/core'
 
-import type { SimulationActionResult, SimulationLoopContext } from './action-handlers.js'
-import { executeTickRequests } from './action-handlers.js'
-import { LatencyTracker } from './latency-tracker.js'
-import { ScenarioAbortedError } from './scenario-aborted-error.js'
 
-export { ScenarioAbortedError }
 
 // =============================================================================
 // EXECUTOR TYPES
@@ -89,7 +90,7 @@ export interface ExecutorResult {
   metrics: SimulationMetrics
   signals: Signal[]
   assertionsPassed: boolean
-  failedAssertions?: Array<{ assertion: ScenarioAssertion; actual: number }>
+  failedAssertions?: { assertion: ScenarioAssertion; actual: number }[]
 }
 
 /**
@@ -140,12 +141,12 @@ export interface ExecutorRunnableScenario {
 export function validateAssertions(
   metrics: SimulationMetrics,
   assertions: ScenarioAssertion[],
-): { passed: boolean; failed: Array<{ assertion: ScenarioAssertion; actual: number }> } {
+): { passed: boolean; failed: { assertion: ScenarioAssertion; actual: number }[] } {
   if (!Array.isArray(assertions)) {
     return { passed: false, failed: [] }
   }
 
-  const failed: Array<{ assertion: ScenarioAssertion; actual: number }> = []
+  const failed: { assertion: ScenarioAssertion; actual: number }[] = []
 
   for (const assertion of assertions) {
     const actual = getMetricValue(metrics, assertion.metric)
@@ -164,32 +165,43 @@ export function validateAssertions(
  */
 export function getMetricValue(metrics: SimulationMetrics, metric: string): number {
   switch (metric) {
-    case 'error_rate':
+    case 'error_rate': {
       return metrics.totalRequests > 0 ? metrics.failedRequests / metrics.totalRequests : 0
-    case 'success_rate':
+    }
+    case 'success_rate': {
       return metrics.totalRequests > 0 ? metrics.successfulRequests / metrics.totalRequests : 1
-    case 'recovery_rate':
+    }
+    case 'recovery_rate': {
       return metrics.errorsGenerated > 0 ? 1 - metrics.failedRequests / metrics.errorsGenerated : 1
+    }
     case 'p50_latency':
-    case 'p50_latency_ms':
+    case 'p50_latency_ms': {
       return metrics.p50LatencyMs
+    }
     case 'p95_latency':
-    case 'p95_latency_ms':
+    case 'p95_latency_ms': {
       return metrics.p95LatencyMs
+    }
     case 'p99_latency':
-    case 'p99_latency_ms':
+    case 'p99_latency_ms': {
       return metrics.p99LatencyMs
+    }
     case 'avg_latency':
-    case 'avg_latency_ms':
+    case 'avg_latency_ms': {
       return metrics.avgLatencyMs
-    case 'total_requests':
+    }
+    case 'total_requests': {
       return metrics.totalRequests
-    case 'failed_requests':
+    }
+    case 'failed_requests': {
       return metrics.failedRequests
-    case 'findings_generated':
+    }
+    case 'findings_generated': {
       return metrics.findingsGenerated
-    default:
+    }
+    default: {
       return 0
+    }
   }
 }
 
@@ -309,8 +321,8 @@ export async function runSimulationLoop(
     signals: [],
     scenarioId: ctx.scenarioId,
     correlationId: ctx.correlationId,
-    ...(onSignal !== undefined ? { onSignal } : {}),
-    ...(signalFilter !== undefined ? { signalFilter } : {}),
+    ...(onSignal === undefined ? {} : { onSignal }),
+    ...(signalFilter === undefined ? {} : { signalFilter }),
   }
 
   const latencyTracker = new LatencyTracker()
@@ -321,11 +333,7 @@ export async function runSimulationLoop(
   const trackLatency = (metrics: SimulationMetrics, latency: number): void => {
     latencyTracker.record(latency)
     const n = metrics.totalRequests
-    if (n === 0) {
-      metrics.avgLatencyMs = latency
-    } else {
-      metrics.avgLatencyMs = (metrics.avgLatencyMs * (n - 1) + latency) / n
-    }
+    metrics.avgLatencyMs = n === 0 ? latency : (metrics.avgLatencyMs * (n - 1) + latency) / n;
   }
 
   for (;;) {
@@ -631,7 +639,7 @@ export interface StandardExecutorConfig {
  * should use this helper to avoid code duplication.
  */
 export function createStandardExecutor(config: StandardExecutorConfig): ScenarioExecutor {
-  const eventPrefix = `scenario.${config.id.replace(/-/g, '_')}`
+  const eventPrefix = `scenario.${config.id.replaceAll('-', '_')}`
 
   return {
     metadata: {
@@ -692,3 +700,5 @@ export function createStandardExecutor(config: StandardExecutorConfig): Scenario
     },
   }
 }
+
+export {ScenarioAbortedError} from './scenario-aborted-error.js'

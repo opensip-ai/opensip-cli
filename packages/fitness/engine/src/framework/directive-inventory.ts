@@ -93,6 +93,7 @@ function parseDirectiveRest(
   type: 'file' | 'next-line',
 ): { type: 'file' | 'next-line'; checkId: string; reason: string | null } | null {
   // Strip trailing `*/` from block-comment directives (e.g. `foo */` → `foo`).
+  // eslint-disable-next-line sonarjs/slow-regex -- anchored at end-of-string, bounded \s* runs; no ReDoS exposure
   const normalized = rest.replace(/\s*\*\/\s*$/, '').trimEnd()
 
   const separatorIndex = normalized.indexOf(' -- ')
@@ -156,8 +157,8 @@ async function scanWithReader(
     if (!content.includes('@fitness-ignore')) continue
 
     const lines = content.split('\n')
-    for (let i = 0; i < lines.length; i++) {
-      const parsed = parseDirectiveLine(lines[i] ?? '')
+    for (const [i, line] of lines.entries()) {
+      const parsed = parseDirectiveLine(line ?? '')
       if (parsed) {
         directives.push({
           filePath: relativePath,
@@ -182,7 +183,7 @@ export async function scanDirectiveInventory(cwd: string): Promise<DirectiveInve
   return scanWithReader(cwd, async (p) => {
     const fileStats = await fs.promises.stat(p)
     if (fileStats.size > 10_000_000) return ''
-    return fs.promises.readFile(p, 'utf-8')
+    return fs.promises.readFile(p, 'utf8')
   })
 }
 

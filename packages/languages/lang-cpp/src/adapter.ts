@@ -1,6 +1,7 @@
+import { stripComments, stripStrings } from './strip.js'
+
 import type { LanguageAdapter } from '@opensip-tools/core/languages/adapter.js'
 
-import { stripComments, stripStrings } from './strip.js'
 
 /**
  * C/C++ adapter. parse() returns null intentionally — for C/C++ we

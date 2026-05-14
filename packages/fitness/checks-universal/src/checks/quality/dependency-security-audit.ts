@@ -94,7 +94,7 @@ interface AuditVulnerability {
   severity: AuditSeverity
   title: string
   url?: string
-  via?: Array<{ name?: string; title?: string }>
+  via?: { name?: string; title?: string }[]
   fixAvailable?: boolean | { name: string; version: string }
 }
 
@@ -112,10 +112,12 @@ interface ParsedViolation {
 function mapSeverity(severity: string): 'error' | 'warning' {
   switch (severity.toLowerCase()) {
     case 'critical':
-    case 'high':
+    case 'high': {
       return 'error'
-    default:
+    }
+    default: {
       return 'warning'
+    }
   }
 }
 
@@ -165,7 +167,7 @@ function extractVulnCount(line: string): number {
   const match = VULN_COUNT_PATTERN.exec(line)
   if (match?.[1]) {
     // @fitness-ignore-next-line numeric-validation -- regex (\d+) guarantees digit-only string; parseInt always returns valid integer
-    return parseInt(match[1], 10)
+    return Number.parseInt(match[1], 10)
   }
 
   return 0

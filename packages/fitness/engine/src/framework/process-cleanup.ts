@@ -23,9 +23,10 @@ export function findOrphanedProcesses(): string[] {
 
   for (const processName of ORPHAN_CANDIDATE_PROCESSES) {
     try {
+      // eslint-disable-next-line sonarjs/os-command -- processName is from a hardcoded allowlist (ORPHAN_CANDIDATE_PROCESSES); no user input
       execSync(`pgrep -x "${processName}"`, {
         stdio: ['pipe', 'pipe', 'pipe'],
-        encoding: 'utf-8',
+        encoding: 'utf8',
       })
       found.push(processName)
     } catch {
@@ -44,10 +45,12 @@ export function cleanupOrphanedProcesses(): number {
 
   for (const processName of ORPHAN_CANDIDATE_PROCESSES) {
     try {
+      // eslint-disable-next-line sonarjs/os-command -- processName is from a hardcoded allowlist (ORPHAN_CANDIDATE_PROCESSES); no user input
       execSync(`pgrep -x "${processName}"`, {
         stdio: ['pipe', 'pipe', 'pipe'],
-        encoding: 'utf-8',
+        encoding: 'utf8',
       })
+      // eslint-disable-next-line sonarjs/os-command -- processName is from a hardcoded allowlist (ORPHAN_CANDIDATE_PROCESSES); no user input
       execSync(`pkill -9 -x "${processName}"`, {
         stdio: ['pipe', 'pipe', 'pipe'],
       })

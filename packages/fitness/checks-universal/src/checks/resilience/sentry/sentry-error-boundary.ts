@@ -34,8 +34,8 @@ function analyze(content: string, filePath: string): CheckViolation[] {
   // Find the Sentry import line for the violation location
   const lines = content.split('\n')
   let sentryImportLine = 1
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i] ?? ''
+  for (const [i, line_] of lines.entries()) {
+    const line = line_ ?? ''
     if (line.includes('@sentry/') || line.includes('Sentry')) {
       sentryImportLine = i + 1
       break

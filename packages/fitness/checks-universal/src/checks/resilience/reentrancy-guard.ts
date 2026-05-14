@@ -17,7 +17,7 @@ const BOOLEAN_FLAG_PATTERN = /^(?:let|var)\s+(\w+(?:Running|Started|Active|Initi
  */
 function createFlagCheckPattern(flagName: string): RegExp {
   // @fitness-ignore-next-line semgrep-scan -- non-literal RegExp is intentional; flagName is extracted from regex match on source code identifiers (\w+), not user input
-  return new RegExp(`if\\s*\\(\\s*${flagName}\\s*\\)\\s*(?:return|\\{)`)
+  return new RegExp(String.raw`if\s*\(\s*${flagName}\s*\)\s*(?:return|\{)`)
 }
 
 /**

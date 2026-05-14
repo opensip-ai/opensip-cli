@@ -7,24 +7,16 @@
  * coordinates parallel/sequential execution, and builds results.
  */
 
-import { logger } from '@opensip-tools/core'
-import { NotFoundError, SystemError } from '@opensip-tools/core'
-import { generateId } from '@opensip-tools/core'
+import { logger , NotFoundError, SystemError , generateId , initParseCache, clearParseCache } from '@opensip-tools/core'
 
 import { fileCache, DEFAULT_PREWARM_PATTERNS } from '../framework/file-cache.js'
 import { defaultRegistry, type Check, type CheckRegistry } from '../framework/registry.js'
-import { initParseCache, clearParseCache } from '@opensip-tools/core'
 
-import { resolveChecks, validateCheckReferences } from './check-resolution.js'
 import { setCurrentRecipeCheckConfig, clearCurrentRecipeCheckConfig } from './check-config.js'
+import { resolveChecks, validateCheckReferences } from './check-resolution.js'
 import { executeParallel, type ExecutionOptions, type ExecutionServiceContext } from './parallel-execution.js'
 import { defaultRecipeRegistry, type FitnessRecipeRegistry } from './registry.js'
 import { executeSequential } from './sequential-execution.js'
-import type {
-  FitnessRecipeServiceCallbacks,
-  FitnessRecipeServiceConfig,
-  FitnessRecipeSession,
-} from './service-types.js'
 import {
   DEFAULT_MAX_PARALLEL,
   type CheckSelector,
@@ -32,6 +24,13 @@ import {
   type FitnessRecipeResult,
   type RecipeRunSummary,
 } from './types.js'
+
+import type {
+  FitnessRecipeServiceCallbacks,
+  FitnessRecipeServiceConfig,
+  FitnessRecipeSession,
+} from './service-types.js'
+import type { DirectiveEntry } from '../framework/directive-inventory.js'
 
 const MODULE_FITNESS_RECIPES = 'fitness:recipes'
 
@@ -101,8 +100,9 @@ export class FitnessRecipeService {
     const recipe = typeof recipeOrName === 'string' ? this.getRecipe(recipeOrName) : recipeOrName
 
     if (!recipe) {
+      const identifier = typeof recipeOrName === 'string' ? recipeOrName : recipeOrName.name
       // @fitness-ignore-next-line result-pattern-consistency -- internal method, exceptions propagate to CLI boundary
-      throw new NotFoundError(`Recipe not found: ${String(recipeOrName)}`, { code: 'RESOURCE.NOT_FOUND.RECIPE', metadata: { entity: 'recipe', identifier: String(recipeOrName) } })
+      throw new NotFoundError(`Recipe not found: ${identifier}`, { code: 'RESOURCE.NOT_FOUND.RECIPE', metadata: { entity: 'recipe', identifier } })
     }
 
     return this.executeRecipe(recipe)
@@ -148,11 +148,7 @@ export class FitnessRecipeService {
         includeViolations: this.config.includeViolations ?? false,
       }
 
-      if (recipe.execution.mode === 'parallel') {
-        await executeParallel(execCtx, execOpts)
-      } else {
-        await executeSequential(execCtx, execOpts)
-      }
+      await (recipe.execution.mode === 'parallel' ? executeParallel(execCtx, execOpts) : executeSequential(execCtx, execOpts));
 
       this.activeSession.directives = this.collectAppliedDirectives()
 
@@ -178,8 +174,8 @@ export class FitnessRecipeService {
     }
   }
 
-  private collectAppliedDirectives(): import('../framework/directive-inventory.js').DirectiveEntry[] {
-    const result: import('../framework/directive-inventory.js').DirectiveEntry[] = []
+  private collectAppliedDirectives(): DirectiveEntry[] {
+    const result: DirectiveEntry[] = []
     const session = this.activeSession
     if (!session) return result
     for (const cr of session.checkResults) {
@@ -223,8 +219,8 @@ export class FitnessRecipeService {
       }
     }
 
-    const configDisabled = new Set(this.config.disabledChecks ?? [])
-    const includeDisabledSet = new Set(recipe.includeDisabled ?? [])
+    const configDisabled = new Set(this.config.disabledChecks)
+    const includeDisabledSet = new Set(recipe.includeDisabled)
     const checks: Check[] = []
 
     // Warn about unknown slugs in disabledChecks config
@@ -240,7 +236,7 @@ export class FitnessRecipeService {
       const check = this.checkRegistry.getBySlug(slug)
       if (!check) continue
       const bareSlug = slug.includes(':') ? slug.split(':').pop()! : slug
-      const isDisabled = check.config.disabled || configDisabled.has(slug) || configDisabled.has(bareSlug)
+      const isDisabled = (check.config.disabled ?? false) || configDisabled.has(slug) || configDisabled.has(bareSlug)
       const isForceIncluded = includeDisabledSet.has(slug) || includeDisabledSet.has(bareSlug)
       if (!isDisabled || isForceIncluded) {
         checks.push(check)
@@ -349,7 +345,7 @@ export class FitnessRecipeService {
       description: 'Dynamically created recipe from CLI arguments',
       checks,
       execution: {
-        mode: args.parallel !== false ? 'parallel' : 'sequential',
+        mode: args.parallel === false ? 'sequential' : 'parallel',
         stopOnFirstFailure: false,
         timeout: args.timeout ?? 30_000,
         maxParallel: args.maxParallel ?? DEFAULT_MAX_PARALLEL,

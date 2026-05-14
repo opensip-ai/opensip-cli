@@ -115,11 +115,11 @@ function parseNosemgrepLine(line: string): {
 
     // Check for -- separator (reason follows)
     const reasonSeparator = afterColon.indexOf('--')
-    if (reasonSeparator !== -1) {
+    if (reasonSeparator === -1) {
+      ruleId = afterColon.trim() || null
+    } else {
       ruleId = afterColon.slice(0, reasonSeparator).trim() || null
       reason = afterColon.slice(reasonSeparator + 2).trim() || null
-    } else {
-      ruleId = afterColon.trim() || null
     }
   } else if (afterMarker.trim().startsWith('--')) {
     // Just a reason, no rule ID: // nosemgrep -- reason
@@ -185,8 +185,7 @@ function validateNosemgrepSuppressions(content: string): SemgrepSuppressionIssue
   const issues: SemgrepSuppressionIssue[] = []
   const lines = content.split('\n')
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
+  for (const [i, line] of lines.entries()) {
     if (!line) continue
 
     const issue = checkNosemgrepLine(line, i + 1)
@@ -204,14 +203,18 @@ function validateNosemgrepSuppressions(content: string): SemgrepSuppressionIssue
 
 function getSuggestionForIssueType(issueType: IssueType): string {
   switch (issueType) {
-    case ISSUE_TYPE_MISSING_JUSTIFICATION:
+    case ISSUE_TYPE_MISSING_JUSTIFICATION: {
       return 'Add a justification after -- explaining why this suppression is safe'
-    case ISSUE_TYPE_GENERIC_JUSTIFICATION:
+    }
+    case ISSUE_TYPE_GENERIC_JUSTIFICATION: {
       return 'Replace generic justification with a specific explanation of why this code is safe'
-    case ISSUE_TYPE_MISSING_RULE:
+    }
+    case ISSUE_TYPE_MISSING_RULE: {
       return 'Specify the rule ID being suppressed: // nosemgrep: rule.id -- reason'
-    default:
+    }
+    default: {
       return 'Fix the nosemgrep directive format: // nosemgrep: rule.id -- reason'
+    }
   }
 }
 

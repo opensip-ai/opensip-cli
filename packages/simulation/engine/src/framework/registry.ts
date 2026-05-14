@@ -7,6 +7,7 @@
  */
 
 import { GenericRegistry } from './generic-registry.js'
+
 import type { RunnableScenario } from './runnable-scenario.js'
 import type { ScenarioKind } from '../types/kind-types.js'
 

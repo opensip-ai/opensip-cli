@@ -3,9 +3,9 @@
  */
 
 import { logger } from '@opensip-tools/core/logger'
-
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 import { stripStringLiterals, stripStringsAndComments } from '@opensip-tools/fitness'
+
 import { isTestFile } from '../../utils/index.js'
 
 import {
@@ -67,7 +67,7 @@ function extractSetTimeoutValue(line: string): { timeout: number; matchText: str
   const idx = line.indexOf('setTimeout')
   if (idx === -1) return null
 
-  const afterSetTimeout = line.substring(idx + 10)
+  const afterSetTimeout = line.slice(Math.max(0, idx + 10))
   let i = skipWhitespace(afterSetTimeout, 0)
 
   // Expect (
@@ -94,7 +94,7 @@ function extractSetTimeoutValue(line: string): { timeout: number; matchText: str
 
   return {
     timeout,
-    matchText: `setTimeout${afterSetTimeout.substring(0, i)}`,
+    matchText: `setTimeout${afterSetTimeout.slice(0, Math.max(0, i))}`,
   }
 }
 
@@ -111,9 +111,9 @@ function extractTimeoutAssignment(line: string): { timeout: number; matchText: s
   if (idx === -1) return null
 
   // Skip if this is setTimeout (handled separately)
-  if (idx >= 3 && lowerLine.substring(idx - 3, idx) === 'set') return null
+  if (idx >= 3 && lowerLine.slice(idx - 3, idx) === 'set') return null
 
-  const afterTimeout = line.substring(idx + 7)
+  const afterTimeout = line.slice(Math.max(0, idx + 7))
   let i = 0
 
   // Skip whitespace
@@ -147,10 +147,10 @@ function extractTimeoutAssignment(line: string): { timeout: number; matchText: s
   }
 
   // @fitness-ignore-next-line numeric-validation -- substring is guaranteed digit-only by isDigit loop above
-  const timeout = parseInt(afterTimeout.substring(digitStart, i), 10)
+  const timeout = Number.parseInt(afterTimeout.slice(digitStart, i), 10)
   return {
     timeout,
-    matchText: `timeout${afterTimeout.substring(0, i)}`,
+    matchText: `timeout${afterTimeout.slice(0, Math.max(0, i))}`,
   }
 }
 
@@ -165,7 +165,7 @@ function extractDotTimeout(line: string): { timeout: number; matchText: string }
   const idx = line.indexOf('.timeout')
   if (idx === -1) return null
 
-  const afterDotTimeout = line.substring(idx + 8)
+  const afterDotTimeout = line.slice(Math.max(0, idx + 8))
   let i = 0
 
   // Skip whitespace
@@ -198,7 +198,7 @@ function extractDotTimeout(line: string): { timeout: number; matchText: string }
   if (digitCount < 4) return null
 
   // @fitness-ignore-next-line numeric-validation -- substring is guaranteed digit-only by isDigit loop above
-  const timeout = parseInt(afterDotTimeout.substring(digitStart, i), 10)
+  const timeout = Number.parseInt(afterDotTimeout.slice(digitStart, i), 10)
 
   // Skip whitespace and expect )
   while (
@@ -212,7 +212,7 @@ function extractDotTimeout(line: string): { timeout: number; matchText: string }
 
   return {
     timeout,
-    matchText: `.timeout${afterDotTimeout.substring(0, i)}`,
+    matchText: `.timeout${afterDotTimeout.slice(0, Math.max(0, i))}`,
   }
 }
 
@@ -304,8 +304,7 @@ export const noHardcodedTimeouts = defineCheck({
     }
 
     const lines = content.split('\n')
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i]
+    for (const [i, line] of lines.entries()) {
       if (!line || shouldSkipTimeoutLine(line)) {
         continue
       }

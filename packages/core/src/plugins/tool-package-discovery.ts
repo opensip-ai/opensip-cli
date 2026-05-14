@@ -71,6 +71,7 @@ export function discoverToolPackages(
   return out;
 }
 
+// eslint-disable-next-line sonarjs/cognitive-complexity -- node_modules walker: handles both flat and @scope/* layouts and skips invalid entries inline
 function collectFromNodeModules(
   nodeModulesDir: string,
   seen: Set<string>,
@@ -105,12 +106,12 @@ function isToolPackage(packageDir: string): boolean {
   const pkgJsonPath = join(packageDir, 'package.json');
   if (!existsSync(pkgJsonPath)) return false;
   try {
-    const pkg = JSON.parse(readFileSync(pkgJsonPath, 'utf-8')) as {
+    const pkg = JSON.parse(readFileSync(pkgJsonPath, 'utf8')) as {
       opensipTools?: { kind?: string };
     };
     return pkg.opensipTools?.kind === TOOL_KIND;
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
     logger.debug({
       evt: 'core.tool_discovery.read_failed',
       module: 'core:plugins',
@@ -140,11 +141,12 @@ export interface ToolPackageMetadata {
   readonly mainEntry: string;
 }
 
+// eslint-disable-next-line sonarjs/cognitive-complexity -- mirrors the npm exports-map resolution for the main entry; each branch corresponds to a documented npm shape
 export function readToolPackageMetadata(packageDir: string): ToolPackageMetadata | undefined {
   const pkgPath = join(packageDir, 'package.json');
   if (!existsSync(pkgPath)) return undefined;
   try {
-    const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8')) as {
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as {
       name?: string;
       main?: string;
       exports?: Record<string, unknown> | string;
@@ -167,9 +169,7 @@ export function readToolPackageMetadata(packageDir: string): ToolPackageMetadata
     if (!mainEntry && typeof pkg.main === 'string') {
       mainEntry = pkg.main;
     }
-    if (!mainEntry) {
-      mainEntry = './index.js';
-    }
+    mainEntry ??= './index.js';
     return { name: pkg.name, mainEntry: join(packageDir, mainEntry) };
   } catch {
     return undefined;

@@ -6,10 +6,10 @@
  * before validation checks that don't depend on those operations.
  */
 
-import * as ts from 'typescript'
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import * as ts from 'typescript'
 
 /**
  * Options for analyzing a function body for fail-fast violations
@@ -44,14 +44,14 @@ function extractAwaitAssignedVariables(codeText: string): string[] {
   const vars: string[] = []
 
   // Simple assignment: const/let/var foo = await ...
-  const simpleMatch = codeText.match(/(?:const|let|var)\s+(\w+)\s*=\s*await\b/)
+  const simpleMatch = /(?:const|let|var)\s+(\w+)\s*=\s*await\b/.exec(codeText)
   if (simpleMatch?.[1]) {
     vars.push(simpleMatch[1])
     return vars
   }
 
   // Object destructuring: const { a, b } = await ...
-  const objectDestructureMatch = codeText.match(/(?:const|let|var)\s*\{([^}]+)\}\s*=\s*await\b/)
+  const objectDestructureMatch = /(?:const|let|var)\s*\{([^}]+)\}\s*=\s*await\b/.exec(codeText)
   if (objectDestructureMatch?.[1]) {
     const inner = objectDestructureMatch[1]
     const identifiers = inner.match(/\w+/g)
@@ -64,7 +64,7 @@ function extractAwaitAssignedVariables(codeText: string): string[] {
   }
 
   // Array destructuring: const [a, b] = await ...
-  const arrayDestructureMatch = codeText.match(/(?:const|let|var)\s*\[([^\]]+)\]\s*=\s*await\b/)
+  const arrayDestructureMatch = /(?:const|let|var)\s*\[([^\]]+)\]\s*=\s*await\b/.exec(codeText)
   if (arrayDestructureMatch?.[1]) {
     const inner = arrayDestructureMatch[1]
     const identifiers = inner.match(/\w+/g)

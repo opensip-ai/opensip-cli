@@ -10,10 +10,10 @@
  * - Index definitions
  */
 
-import * as ts from 'typescript'
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import * as ts from 'typescript'
 
 // =============================================================================
 // Helper Types and Interfaces

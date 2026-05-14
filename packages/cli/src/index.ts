@@ -23,8 +23,14 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { Command } from 'commander';
 
+import {
+  EXIT_CODES,
+  getErrorSuggestion,
+  type CliArgs,
+  type CommandResult,
+  type InitOptions,
+} from '@opensip-tools/cli-shared';
 import {
   setSilent,
   setDebugMode,
@@ -38,24 +44,19 @@ import {
   type ToolCliContext,
 } from '@opensip-tools/core';
 import { loadSignalersConfig, fitnessTool, openDashboard } from '@opensip-tools/fitness';
-import type { SignalersConfig } from '@opensip-tools/fitness';
 import { simulationTool } from '@opensip-tools/simulation';
-import {
-  EXIT_CODES,
-  getErrorSuggestion,
-  type CliArgs,
-  type CommandResult,
-  type InitOptions,
-} from '@opensip-tools/cli-shared';
+import { Command } from 'commander';
 
-import { printWelcome } from './welcome.js';
-import { printCompletionScript, type Shell } from './commands/completion.js';
+import { printCompletionScript } from './commands/completion.js';
+import { executeConfigure, resolveApiKey } from './commands/configure.js';
+import { executeInit } from './commands/init.js';
+import { pluginList, pluginInstall, pluginRemove } from './commands/plugin.js';
 import { executeUninstall } from './commands/uninstall.js';
 import { decideOpen, launchBrowser } from './open-dashboard.js';
 import { maybeNotify } from './update-notifier.js';
-import { executeInit } from './commands/init.js';
-import { pluginList, pluginInstall, pluginRemove } from './commands/plugin.js';
-import { executeConfigure, resolveApiKey } from './commands/configure.js';
+import { printWelcome } from './welcome.js';
+
+import type { SignalersConfig } from '@opensip-tools/fitness';
 
 // =============================================================================
 // PUBLIC RE-EXPORTS — the CLI's own programmatic API surface.
@@ -89,7 +90,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const PKG_VERSION = ((): string => {
   try {
-    const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf-8')) as { version?: string };
+    const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8')) as { version?: string };
     return pkg.version ?? '0.0.0';
   } catch {
     return '0.0.0';
@@ -105,15 +106,15 @@ type CliDefaults = SignalersConfig['cli'];
 function loadCliDefaults(cwd: string, explicitConfigPath?: string): CliDefaults {
   try {
     return loadSignalersConfig(cwd, explicitConfigPath).cli;
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     logger.debug({
       evt: 'cli.config.unavailable',
       module: 'cli',
       cwd,
       error: message,
     });
-    return {} as CliDefaults;
+    return {};
   }
 }
 
@@ -126,11 +127,7 @@ function mergeConfigDefaults(opts: Record<string, unknown>, config: CliDefaults)
     (opts.exclude as string[]).push(...config.exclude);
   }
   if (opts.apiKey === undefined) {
-    if (config.apiKey) {
-      opts.apiKey = config.apiKey;
-    } else {
-      opts.apiKey = resolveApiKey();
-    }
+    opts.apiKey = config.apiKey ?? resolveApiKey();
   }
 }
 
@@ -249,8 +246,8 @@ async function loadDiscoveredTools(): Promise<void> {
       if (mod.tool && mod.tool.metadata.id !== fitnessTool.metadata.id && mod.tool.metadata.id !== simulationTool.metadata.id) {
         defaultToolRegistry.register(mod.tool);
       }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
       process.stderr.write(`opensip-tools: failed to load tool ${pkg.name}: ${msg}\n`);
       logger.warn({
         evt: 'cli.tool.load_failed',
@@ -269,8 +266,8 @@ function registerAllTools(): void {
   for (const tool of defaultToolRegistry.list()) {
     try {
       tool.register(cliContext);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
       process.stderr.write(`opensip-tools: tool ${tool.metadata.id} failed to register: ${msg}\n`);
       logger.warn({
         evt: 'cli.tool.register_failed',
@@ -333,8 +330,8 @@ function registerCliCommands(): void {
     .command('purge')
     .description('Delete session data from ~/.opensip-tools/sessions/')
     .option('--older-than <days>', 'Only delete sessions older than N days', (v: string) => {
-      const n = parseInt(v, 10);
-      if (isNaN(n) || n < 0) throw new Error(`Invalid --older-than value: '${v}'. Must be a non-negative integer.`);
+      const n = Number.parseInt(v, 10);
+      if (Number.isNaN(n) || n < 0) throw new Error(`Invalid --older-than value: '${v}'. Must be a non-negative integer.`);
       return n;
     })
     .option('-y, --yes', 'Skip confirmation prompt', false)
@@ -424,7 +421,7 @@ function registerCliCommands(): void {
         process.exitCode = EXIT_CODES.CONFIGURATION_ERROR;
         return;
       }
-      printCompletionScript(normalized as Shell);
+      printCompletionScript(normalized);
     });
 
   // -- uninstall ---------------------------------------------------------
@@ -457,8 +454,8 @@ async function main(): Promise<void> {
   // Fire an update check (once/day, non-blocking, TTY-gated, opt-out).
   maybeNotify({ name: '@opensip-tools/cli', version: program.version() ?? '0.0.0' });
 
-  await program.parseAsync().catch(async (err) => {
-    const suggestion = getErrorSuggestion(err);
+  await program.parseAsync().catch(async (error) => {
+    const suggestion = getErrorSuggestion(error);
     if (suggestion) {
       await renderResult({
         type: 'error',
@@ -468,7 +465,7 @@ async function main(): Promise<void> {
       });
       process.exitCode = suggestion.exitCode;
     } else {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = error instanceof Error ? error.message : String(error);
       await renderResult({
         type: 'error',
         message,
@@ -479,8 +476,10 @@ async function main(): Promise<void> {
   });
 }
 
-main().catch((err) => {
-  const message = err instanceof Error ? err.message : String(err);
+try {
+  await main();
+} catch (error) {
+  const message = error instanceof Error ? error.message : String(error);
   process.stderr.write(`opensip-tools: fatal error: ${message}\n`);
   process.exit(EXIT_CODES.RUNTIME_ERROR);
-});
+}

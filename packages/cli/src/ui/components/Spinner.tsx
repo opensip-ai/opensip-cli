@@ -3,10 +3,11 @@
  * Shows: ⠋ Running checks... Check Name  12/130 (9%)
  */
 
-import React from 'react';
 import { Text } from 'ink';
-import { useTheme } from '../theme.js';
+import React from 'react';
+
 import { useSpinner } from '../hooks/useSpinner.js';
+import { useTheme } from '../theme.js';
 
 export interface SpinnerProps {
   readonly total: number;

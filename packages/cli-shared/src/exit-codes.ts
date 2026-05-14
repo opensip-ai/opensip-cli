@@ -17,7 +17,7 @@ export function getErrorSuggestion(err: unknown): ErrorSuggestion | null {
 
   // Check not found
   if (message.includes('Check not found:') || message.includes('not found')) {
-    const slug = message.match(/Check not found: (.+)/)?.[1] ?? message.match(/not found: (.+)/)?.[1];
+    const slug = (/Check not found: (.+)/.exec(message))?.[1] ?? (/not found: (.+)/.exec(message))?.[1];
     return {
       message: `Check '${slug ?? 'unknown'}' not found.`,
       action: 'Run opensip-tools fit --list to see available checks.',

@@ -2,8 +2,9 @@
  * Banner component — renders the OpenSIP Tools ASCII art banner.
  */
 
-import React from 'react';
 import { Text, Box } from 'ink';
+import React from 'react';
+
 import { useTheme } from '../theme.js';
 
 // Each entry: [cup, openPart, sipPart]

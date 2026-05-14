@@ -36,8 +36,9 @@ function isBarrelFile(content: string): boolean {
   // Strip block comments and line comments first so prose can't fool the
   // top-level statement scan.
   const stripped = content
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/\/\/.*$/gm, '')
+    .replaceAll(/\/\*[\s\S]*?\*\//g, '')
+    // eslint-disable-next-line sonarjs/slow-regex -- anchored line scan with bounded `.*`; no ReDoS exposure
+    .replaceAll(/\/\/.*$/gm, '')
 
   // Collapse multi-line `export { a, b, c } from '...'` blocks onto one
   // logical line by joining lines that don't terminate a statement. Any
@@ -59,7 +60,7 @@ function isBarrelFile(content: string): boolean {
 
   // Every logical line must be a re-export. Anything else (import,
   // declaration, side-effect call) disqualifies.
-  const reExportRe = /^export\s+(?:type\s+)?(?:\*|\{)/
+  const reExportRe = /^export\s+(?:type\s+)?[*{]/
   return logicalLines.every((line) => reExportRe.test(line))
 }
 

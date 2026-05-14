@@ -6,8 +6,8 @@
 
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { join, basename, extname, sep } from 'node:path'
 import { homedir } from 'node:os'
+import { join, basename, extname, sep } from 'node:path'
 
 import { logger } from '../lib/logger.js'
 
@@ -89,12 +89,12 @@ export function readProjectPluginsList(
     // Parse YAML inline to avoid a circular dep between plugins/ and targets/.
     // We only need the `plugins.<domain>` array; anything else is
     // validated by the targets loader.
-    const raw = readFileSync(configPath, 'utf-8')
+    const raw = readFileSync(configPath, 'utf8')
     // Minimal YAML parse — defer to the shared yaml dep.
     const yaml = requireFromHere('js-yaml') as { load: (s: string) => unknown }
     const doc = yaml.load(raw) as Record<string, unknown> | null
     if (!doc || typeof doc !== 'object') return undefined
-    const plugins = doc['plugins']
+    const plugins = doc.plugins
     if (!plugins || typeof plugins !== 'object') return undefined
     const list = (plugins as Record<string, unknown>)[domain]
     if (!Array.isArray(list)) return undefined
@@ -199,13 +199,14 @@ function readDeclaredDependencies(pluginDir: string): string[] {
   const pkgJsonPath = join(pluginDir, 'package.json')
   if (!existsSync(pkgJsonPath)) return []
   try {
-    const pkg = JSON.parse(readFileSync(pkgJsonPath, 'utf-8')) as { dependencies?: Record<string, string> }
+    const pkg = JSON.parse(readFileSync(pkgJsonPath, 'utf8')) as { dependencies?: Record<string, string> }
     return Object.keys(pkg.dependencies ?? {})
   } catch {
     return []
   }
 }
 
+// eslint-disable-next-line sonarjs/cognitive-complexity -- entry point resolution: walks exports map (string vs object vs nested condition) + main + default; each branch documents a real npm shape
 function tryDiscoverPackage(packageDir: string, name: string): DiscoveredPlugin | undefined {
   if (!safeIsDirectory(packageDir)) return undefined
 
@@ -213,7 +214,7 @@ function tryDiscoverPackage(packageDir: string, name: string): DiscoveredPlugin 
   if (!existsSync(pkgJsonPath)) return undefined
 
   try {
-    const pkgJson = JSON.parse(readFileSync(pkgJsonPath, 'utf-8')) as Record<string, unknown>
+    const pkgJson = JSON.parse(readFileSync(pkgJsonPath, 'utf8')) as Record<string, unknown>
     const packageName = (pkgJson.name as string) ?? name
 
     // Determine entry point: exports['.'] > main > index.js
@@ -234,9 +235,7 @@ function tryDiscoverPackage(packageDir: string, name: string): DiscoveredPlugin 
     if (!entryPoint && typeof pkgJson.main === 'string') {
       entryPoint = join(packageDir, pkgJson.main)
     }
-    if (!entryPoint) {
-      entryPoint = join(packageDir, 'index.js')
-    }
+    entryPoint ??= join(packageDir, 'index.js')
 
     if (!existsSync(entryPoint)) {
       logger.debug({

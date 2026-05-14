@@ -1,4 +1,5 @@
 import { withRetry, logger } from '@opensip-tools/core';
+
 import type { CliOutput } from '@opensip-tools/cli-shared';
 
 const SARIF_SCHEMA = 'https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json';
@@ -16,8 +17,8 @@ export interface ReportResult {
 }
 
 interface SarifRun {
-  tool: { driver: { name: string; version: string; rules: Array<{ id: string }> } };
-  results: Array<Record<string, unknown>>;
+  tool: { driver: { name: string; version: string; rules: { id: string }[] } };
+  results: Record<string, unknown>[];
 }
 
 /** Build a SARIF 2.1.0 log from CLI output — one run per check slug */
@@ -25,6 +26,7 @@ export function buildSarifLog(output: CliOutput): Record<string, unknown> {
   return wrapSarifLog(buildSarifRuns(output));
 }
 
+// eslint-disable-next-line sonarjs/cognitive-complexity -- SARIF builder: assembles rules + results per check; flatter shape would scatter the per-check loop
 function buildSarifRuns(output: CliOutput): SarifRun[] {
   const runs: SarifRun[] = [];
 
@@ -32,7 +34,7 @@ function buildSarifRuns(output: CliOutput): SarifRun[] {
     if (ch.findings.length === 0) continue;
 
     const ruleIds = new Set<string>();
-    const results: Array<Record<string, unknown>> = [];
+    const results: Record<string, unknown>[] = [];
 
     for (const f of ch.findings) {
       ruleIds.add(f.ruleId);
@@ -89,6 +91,7 @@ function wrapSarifLog(runs: SarifRun[]): Record<string, unknown> {
  * Keeps whole runs together when possible; splits a single run across
  * chunks only when it exceeds the limit on its own.
  */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- chunk packer: flush-current vs split-large branches reflect the two shapes the loop must handle
 export function chunkSarifRuns(runs: SarifRun[], maxFindings = MAX_FINDINGS_PER_CHUNK): SarifRun[][] {
   if (runs.length === 0) return [];
 
@@ -137,6 +140,7 @@ function isTransientError(status: number): boolean {
   return status >= 500 || status === 429;
 }
 
+// eslint-disable-next-line sonarjs/cognitive-complexity -- network reporter: chunked uploads with per-chunk retries and aggregated error summary; phases read better inline
 export async function reportToCloud(output: CliOutput, url: string, apiKey?: string): Promise<ReportResult> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (apiKey) headers['X-API-Key'] = apiKey;
@@ -156,7 +160,7 @@ export async function reportToCloud(output: CliOutput, url: string, apiKey?: str
   let succeeded = 0;
 
   for (let ci = 0; ci < chunks.length; ci++) {
-    const chunk = chunks[ci]!;
+    const chunk = chunks[ci];
     const chunkFindings = chunk.reduce((n, r) => n + r.results.length, 0);
     // 60s base + 100ms per finding — receiver does per-finding work (dedup, persistence, traces)
     const timeoutMs = Math.min(300_000, 60_000 + chunkFindings * 100);
@@ -205,9 +209,9 @@ export async function reportToCloud(output: CliOutput, url: string, apiKey?: str
 
       succeeded++;
       logger.info({ evt: 'cli.report.chunk.done', module: 'cli:report', chunk: `${ci + 1}/${chunks.length}`, findings: chunkFindings });
-    } catch (err) {
+    } catch (error) {
       // Network errors and timeouts are transient — continue with next chunk
-      const errMsg = err instanceof Error ? err.message : String(err);
+      const errMsg = error instanceof Error ? error.message : String(error);
       errors.push(errMsg);
       logger.info({ evt: 'cli.report.chunk.error', module: 'cli:report', chunk: `${ci + 1}/${chunks.length}`, error: errMsg });
     }

@@ -214,20 +214,27 @@ export function evaluateOperator(
   expected: number,
 ): boolean {
   switch (operator) {
-    case 'lt':
+    case 'lt': {
       return actual < expected
-    case 'lte':
+    }
+    case 'lte': {
       return actual <= expected
-    case 'gt':
+    }
+    case 'gt': {
       return actual > expected
-    case 'gte':
+    }
+    case 'gte': {
       return actual >= expected
-    case 'eq':
+    }
+    case 'eq': {
       return actual === expected
-    case 'neq':
+    }
+    case 'neq': {
       return actual !== expected
-    default:
+    }
+    default: {
       return false
+    }
   }
 }
 
@@ -236,20 +243,27 @@ export function evaluateOperator(
  */
 export function evaluateAssertion(assertion: ScenarioAssertion, actual: number): boolean {
   switch (assertion.operator) {
-    case 'lt':
+    case 'lt': {
       return actual < assertion.value
-    case 'lte':
+    }
+    case 'lte': {
       return actual <= assertion.value
-    case 'gt':
+    }
+    case 'gt': {
       return actual > assertion.value
-    case 'gte':
+    }
+    case 'gte': {
       return actual >= assertion.value
-    case 'eq':
+    }
+    case 'eq': {
       return actual === assertion.value
-    case 'neq':
+    }
+    case 'neq': {
       return actual !== assertion.value
-    default:
+    }
+    default: {
       return false
+    }
   }
 }
 
@@ -258,19 +272,26 @@ export function evaluateAssertion(assertion: ScenarioAssertion, actual: number):
  */
 export function getOperatorDescription(operator: AssertionOperator): string {
   switch (operator) {
-    case 'lt':
+    case 'lt': {
       return 'less than'
-    case 'lte':
+    }
+    case 'lte': {
       return 'at most'
-    case 'gt':
+    }
+    case 'gt': {
       return 'greater than'
-    case 'gte':
+    }
+    case 'gte': {
       return 'at least'
-    case 'eq':
+    }
+    case 'eq': {
       return 'equal to'
-    case 'neq':
+    }
+    case 'neq': {
       return 'not equal to'
-    default:
+    }
+    default: {
       return operator
+    }
   }
 }

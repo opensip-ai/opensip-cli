@@ -19,10 +19,12 @@
 import { ValidationError as CoreValidationError } from '@opensip-tools/core'
 
 import { scenarioRegistry } from '../../framework/registry.js'
-import type { RunnableScenario } from '../../framework/runnable-scenario.js'
+
+import { createInvariantScenarioRunner } from './executor.js'
 
 import type { InvariantContext, InvariantContextDeps } from './context.js'
-import { createInvariantScenarioRunner } from './executor.js'
+import type { RunnableScenario } from '../../framework/runnable-scenario.js'
+
 
 /** Author-facing configuration for an invariant scenario. */
 export interface InvariantScenarioConfig {

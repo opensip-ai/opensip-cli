@@ -1,10 +1,11 @@
-import type ts from 'typescript'
 
-import type { LanguageAdapter } from '@opensip-tools/core/languages/adapter.js'
 
 import { parseSource } from './parse.js'
 import { typescriptQuery } from './query.js'
 import { stripComments, stripStrings } from './strip.js'
+
+import type { LanguageAdapter } from '@opensip-tools/core/languages/adapter.js'
+import type ts from 'typescript'
 
 export const typescriptAdapter: LanguageAdapter<ts.SourceFile, ts.Node> = {
   id: 'typescript',

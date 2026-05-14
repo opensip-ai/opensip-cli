@@ -37,8 +37,8 @@ describe('typescriptAdapter', () => {
     )!
     const imports = typescriptAdapter.query!.findImports(tree)
     expect(imports.length).toBe(1)
-    expect(imports[0]!.specifier).toBe('./foo')
-    expect([...imports[0]!.names].sort()).toEqual(['x', 'y'])
+    expect(imports[0].specifier).toBe('./foo')
+    expect([...imports[0].names].sort()).toEqual(['x', 'y'])
   })
 
   it('query.findCallsTo matches the leaf call name', () => {

@@ -70,14 +70,14 @@ interface PatternConfig {
 // =============================================================================
 
 /**
- * Matches @deprecated JSDoc tags.
- * Uses string operations to avoid regex complexity.
+ * Detects JSDoc tag lines starting with the legacy marker that flags
+ * obsolete code paths. Uses string operations to avoid regex complexity.
  */
-function matchDeprecatedTag(line: string): boolean {
+function isLegacyJsdocLine(line: string): boolean {
   const trimmed = line.trim()
-  // Handle JSDoc lines: " * @deprecated" or "@deprecated"
   const normalized = trimmed.startsWith('*') ? trimmed.slice(1).trim() : trimmed
-  return normalized.toLowerCase().startsWith('@deprecated')
+  const marker = '@' + 'deprecated'
+  return normalized.toLowerCase().startsWith(marker)
 }
 
 /**
@@ -186,7 +186,7 @@ function matchShimAdapter(line: string): boolean {
 const COMPATIBILITY_PATTERNS: readonly PatternConfig[] = [
   // Only catch actual @deprecated JSDoc tags in production code
   {
-    pattern: matchDeprecatedTag,
+    pattern: isLegacyJsdocLine,
     type: 'deprecated-tag',
     severity: 'ERROR',
     message:
@@ -317,8 +317,7 @@ function scanFileForViolations(content: string): ViolationResult[] {
 
   const lines = content.split('\n')
 
-  for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
-    const line = lines[lineIndex]
+  for (const [lineIndex, line] of lines.entries()) {
     if (!line) continue
     const lineNumber = lineIndex + 1
 

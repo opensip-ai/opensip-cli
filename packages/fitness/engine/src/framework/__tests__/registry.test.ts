@@ -1,6 +1,8 @@
-import { describe, it, expect } from 'vitest';
-import { CheckRegistry } from '../../framework/registry.js';
 import { NotFoundError } from '@opensip-tools/core';
+import { describe, it, expect } from 'vitest';
+
+import { CheckRegistry } from '../../framework/registry.js';
+
 import type { Check } from '../../framework/check-types.js';
 
 /** Create a minimal Check stub for testing the registry. */
@@ -20,8 +22,10 @@ function makeCheck(overrides: {
       scope: { include: [], exclude: [] },
       itemType: 'file' as any,
       disabled: overrides.disabled,
+      // eslint-disable-next-line @typescript-eslint/require-await -- mock matches expected `() => Promise<CheckResult>` shape
       execute: async () => ({ findings: [], passed: true }),
     },
+    // eslint-disable-next-line @typescript-eslint/require-await -- mock matches expected `() => Promise<CheckResult>` shape
     run: async () => ({ findings: [], passed: true }),
     getScope: () => ({ include: [], exclude: [] }),
     getMatcher: () => ({ matches: () => true }),

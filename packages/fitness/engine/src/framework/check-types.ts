@@ -6,13 +6,13 @@
  * CheckResult carries Signal[].
  */
 
-import type { CheckResult, ItemType } from '../types/findings.js'
 
 import type { CheckScope, ResolvedScope } from './check-config.js'
 import type { ExecutionContext, RunOptions } from './execution-context.js'
 import type { PathMatcher } from './path-matcher.js'
+import type { CheckResult, ItemType } from '../types/findings.js'
 
-export type { ResolvedScope }
+
 
 /**
  * Check configuration options.
@@ -73,3 +73,5 @@ export function isCheck(value: unknown): value is Check {
 
   return true
 }
+
+export {type ResolvedScope} from './check-config.js'

@@ -15,6 +15,7 @@ const EMPTY_BODY_PATTERNS = [
   /(?:it|test)\s*\(\s*['"`].*['"`]\s*,\s*(?:async\s*)?function\s*\(\)\s*\{\s*\}\s*\)/,
 ]
 
+/* eslint-disable sonarjs/fixme-tag -- this file detects TODO/FIXME markers; the words appear in JSDoc and regex literals by design */
 /**
  * Pattern for TODO/FIXME comments inside test bodies on same line
  */
@@ -33,8 +34,8 @@ function analyzeTestFile(content: string, _filePath: string): CheckViolation[] {
   const violations: CheckViolation[] = []
   const lines = content.split('\n')
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i] ?? ''
+  for (const [i, line_] of lines.entries()) {
+    const line = line_ ?? ''
     const trimmed = line.trim()
 
     // Skip actual comments (not inside test bodies)

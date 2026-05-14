@@ -2,12 +2,12 @@
  * plugin command — manage installed plugins
  */
 
-import type { PluginDomain } from '@opensip-tools/core';
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import type { PluginResult } from '@opensip-tools/cli-shared';
+import type { PluginDomain } from '@opensip-tools/core';
 
 // ---------------------------------------------------------------------------
 // Plugin helpers
@@ -47,7 +47,7 @@ export async function pluginList(): Promise<PluginResult> {
   const { discoverPlugins } = await import('@opensip-tools/core');
   const domains: PluginDomain[] = ['fit', 'sim'];
 
-  const plugins: Array<{ domain: string; namespace: string; pluginType: 'package' | 'file' }> = [];
+  const plugins: { domain: string; namespace: string; pluginType: 'package' | 'file' }[] = [];
 
   for (const domain of domains) {
     const found = discoverPlugins(domain);
@@ -138,13 +138,13 @@ export async function pluginInstall(packageName: string | undefined, domainOverr
       packageName,
       success: true,
     };
-  } catch (err) {
+  } catch (error) {
     return {
       type: 'plugin',
       action: 'install',
       packageName,
       success: false,
-      error: `Failed to install ${packageName}: ${err instanceof Error ? err.message : String(err)}`,
+      error: `Failed to install ${packageName}: ${error instanceof Error ? error.message : String(error)}`,
     };
   }
 }
@@ -218,14 +218,14 @@ function extractNameFromSpec(spec: string): string | undefined {
     // @scope/name or @scope/name@version
     const withoutScope = spec.slice(1);
     const slashIdx = withoutScope.indexOf('/');
-    if (slashIdx < 0) return undefined;
+    if (slashIdx === -1) return undefined;
     const rest = withoutScope.slice(slashIdx + 1);
     const atIdx = rest.indexOf('@');
-    const name = atIdx < 0 ? rest : rest.slice(0, atIdx);
+    const name = atIdx === -1 ? rest : rest.slice(0, atIdx);
     return `@${withoutScope.slice(0, slashIdx)}/${name}`;
   }
   const atIdx = spec.indexOf('@');
-  return atIdx < 0 ? spec : spec.slice(0, atIdx);
+  return atIdx === -1 ? spec : spec.slice(0, atIdx);
 }
 
 function readPackageJson(
@@ -233,7 +233,7 @@ function readPackageJson(
 ): { name: string; dependencies?: Record<string, string>; peerDependencies?: Record<string, string> } | undefined {
   if (!existsSync(path)) return undefined;
   try {
-    return JSON.parse(readFileSync(path, 'utf-8')) as { name: string; dependencies?: Record<string, string>; peerDependencies?: Record<string, string> };
+    return JSON.parse(readFileSync(path, 'utf8')) as { name: string; dependencies?: Record<string, string>; peerDependencies?: Record<string, string> };
   } catch {
     return undefined;
   }

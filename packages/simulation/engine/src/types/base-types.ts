@@ -12,6 +12,7 @@ import type { Signal } from '@opensip-tools/core'
 // =============================================================================
 
 /** Identifier for a persona type category */
+// eslint-disable-next-line sonarjs/redundant-type-aliases -- semantic alias documents the persona-id dimension
 export type PersonaType = string
 
 /** Behavioral mode for a simulation persona */
@@ -37,9 +38,7 @@ export interface PersonaAttributes {
 }
 
 /** Map of action names to their probability weights */
-export interface ActionProbabilities {
-  [action: string]: number
-}
+export type ActionProbabilities = Record<string, number>;
 
 // =============================================================================
 // SCENARIO TYPES

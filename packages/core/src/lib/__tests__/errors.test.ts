@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+
 import {
   ToolError,
   ValidationError,
@@ -12,6 +13,7 @@ import {
   tryCatch,
   tryCatchAsync,
 } from '../../lib/errors.js';
+
 import type { Result } from '../../lib/errors.js';
 
 describe('ToolError', () => {
@@ -214,19 +216,23 @@ describe('Result pattern', () => {
   });
 
   it('tryCatchAsync returns ok on success', async () => {
+    // eslint-disable-next-line @typescript-eslint/require-await -- arrow signature must be `() => Promise<T>` to match tryCatchAsync
     const result = await tryCatchAsync(async () => 'hello');
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value).toBe('hello');
   });
 
   it('tryCatchAsync returns err on rejection', async () => {
+    // eslint-disable-next-line @typescript-eslint/require-await -- arrow signature must be `() => Promise<T>` to match tryCatchAsync
     const result = await tryCatchAsync(async () => { throw new Error('async boom'); });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.message).toBe('async boom');
   });
 
   it('tryCatchAsync wraps non-Error throws', async () => {
+    /* eslint-disable @typescript-eslint/require-await, @typescript-eslint/only-throw-error -- arrow must match `() => Promise<T>`; intentionally throwing a non-Error to verify wrapping */
     const result = await tryCatchAsync(async () => { throw 'string error'; });
+    /* eslint-enable @typescript-eslint/require-await, @typescript-eslint/only-throw-error */
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.message).toBe('string error');
   });

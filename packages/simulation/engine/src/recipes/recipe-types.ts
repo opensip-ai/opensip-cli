@@ -5,9 +5,9 @@
  * with execution options, callbacks, and result aggregation.
  */
 
+import type { SimulationMetrics } from '../types/base-types.js'
 import type { Signal } from '@opensip-tools/core'
 
-import type { SimulationMetrics } from '../types/base-types.js'
 
 // =============================================================================
 // RECIPE DEFINITION

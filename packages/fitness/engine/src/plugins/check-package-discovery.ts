@@ -111,6 +111,7 @@ export function discoverCheckPackages(
  * (any ancestor node_modules counts), which handles pnpm hoisting and
  * monorepo layouts where the scope may live in the workspace root.
  */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- ancestor-walk discovery: walks node_modules trees up the directory tree until the filesystem root
 function autoDiscoverChecks(projectDir: string): DiscoveredCheckPackage[] {
   const seen = new Set<string>()
   const out: DiscoveredCheckPackage[] = []
@@ -185,11 +186,11 @@ export function readCheckPackagePreferences(projectDir: string): {
   const configPath = join(projectDir, CONFIG_FILENAME)
   if (!existsSync(configPath)) return {}
   try {
-    const raw = readFileSync(configPath, 'utf-8')
+    const raw = readFileSync(configPath, 'utf8')
     const yaml = requireFromHere('js-yaml') as { load: (s: string) => unknown }
     const doc = yaml.load(raw) as Record<string, unknown> | null
     if (!doc || typeof doc !== 'object') return {}
-    const plugins = doc['plugins']
+    const plugins = doc.plugins
     if (!plugins || typeof plugins !== 'object') return {}
     const p = plugins as Record<string, unknown>
     const result: { checkPackages?: readonly string[]; autoDiscoverChecks?: boolean } = {}
@@ -205,11 +206,12 @@ export function readCheckPackagePreferences(projectDir: string): {
   }
 }
 
+// eslint-disable-next-line sonarjs/cognitive-complexity -- exports-map resolution: each branch corresponds to a documented npm exports shape (string, object with import/default/require)
 export function readCheckPackageMetadata(packageDir: string): CheckPackageMetadata | undefined {
   const pkgPath = join(packageDir, 'package.json')
   if (!existsSync(pkgPath)) return undefined
   try {
-    const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8')) as {
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as {
       name?: string
       main?: string
       exports?: Record<string, unknown> | string
@@ -232,9 +234,7 @@ export function readCheckPackageMetadata(packageDir: string): CheckPackageMetada
     if (!mainEntry && typeof pkg.main === 'string') {
       mainEntry = pkg.main
     }
-    if (!mainEntry) {
-      mainEntry = './index.js'
-    }
+    mainEntry ??= './index.js'
     return { name: pkg.name, mainEntry: join(packageDir, mainEntry) }
   } catch {
     return undefined

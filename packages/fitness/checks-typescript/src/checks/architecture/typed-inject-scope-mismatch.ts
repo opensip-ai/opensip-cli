@@ -2,10 +2,10 @@
  * @fileoverview Typed-Inject Scope Mismatch check (v2)
  */
 
-import * as ts from 'typescript'
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import * as ts from 'typescript'
 
 interface ScopeMismatchIssue {
   file: string

@@ -19,7 +19,7 @@ const DISCOURAGED_LIBRARIES = [
  */
 function escapeRegExp(str: string): string {
   // @fitness-ignore-next-line fitness-check-standards -- Character class regex is safe from ReDoS, no backtracking
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return str.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)
 }
 
 /**
@@ -38,11 +38,11 @@ function analyzeFile(content: string, filePath: string): CheckViolation[] {
 
   for (const lib of DISCOURAGED_LIBRARIES) {
     const escapedLib = escapeRegExp(lib)
-    const pattern = `import\\s+.*\\s+from\\s+['"]${escapedLib}['"]`
+    const pattern = String.raw`import\s+.*\s+from\s+['"]${escapedLib}['"]`
     const regex = new RegExp(pattern, 'g')
     let match
     while ((match = regex.exec(content)) !== null) {
-      const line = content.substring(0, match.index).split('\n').length
+      const line = content.slice(0, Math.max(0, match.index)).split('\n').length
       violations.push({
         filePath,
         line,

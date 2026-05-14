@@ -47,10 +47,6 @@ export class FileCache {
    * @returns Prewarm statistics
    */
   async prewarm(cwd: string, patterns: readonly string[]): Promise<PrewarmStats> {
-    if (!Array.isArray(patterns)) {
-      return { filesLoaded: 0, totalBytes: 0, durationMs: 0 }
-    }
-
     const start = Date.now()
     let totalBytes = 0
 
@@ -70,7 +66,7 @@ export class FileCache {
     }
 
     // Load file contents in parallel batches
-    const files = Array.from(allFiles)
+    const files = [...allFiles]
 
     for (let i = 0; i < files.length; i += PREWARM_BATCH_SIZE) {
       const batch = files.slice(i, i + PREWARM_BATCH_SIZE)
@@ -81,7 +77,7 @@ export class FileCache {
           if (stats.isDirectory()) {
             return null
           }
-          const content = await fs.readFile(filePath, 'utf-8')
+          const content = await fs.readFile(filePath, 'utf8')
           return { filePath, content }
         }),
       )
@@ -129,7 +125,7 @@ export class FileCache {
       // @fitness-ignore-next-line result-pattern-consistency -- internal method, exceptions propagate to public Result boundary
       throw new ValidationError(`Cannot read directory as file: ${absolutePath}`, { code: 'VALIDATION.FITNESS.DIRECTORY_AS_FILE' })
     }
-    const content = await fs.readFile(absolutePath, 'utf-8')
+    const content = await fs.readFile(absolutePath, 'utf8')
 
     this.cache.set(absolutePath, content)
 

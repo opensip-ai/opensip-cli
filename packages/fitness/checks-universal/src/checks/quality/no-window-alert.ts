@@ -38,8 +38,8 @@ function analyzeFile(content: string, _filePath: string): CheckViolation[] {
   const violations: CheckViolation[] = []
   const lines = content.split('\n')
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i] ?? ''
+  for (const [i, line_] of lines.entries()) {
+    const line = line_ ?? ''
     const trimmed = line.trim()
 
     // Skip comments and imports

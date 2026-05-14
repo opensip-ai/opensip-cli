@@ -15,18 +15,18 @@ function analyzeTimerLifecycle(content: string, _filePath: string): CheckViolati
   // Quick check: skip files without setInterval
   if (!content.includes('setInterval')) return violations
 
-  const intervalCreations: Array<{ line: number; varName: string | null }> = []
+  const intervalCreations: { line: number; varName: string | null }[] = []
   let hasClearInterval = false
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i] ?? ''
+  for (const [i, line_] of lines.entries()) {
+    const line = line_ ?? ''
     const trimmed = line.trim()
 
     // Skip comments
     if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue
 
     // Detect setInterval with variable capture
-    const intervalMatch = line.match(/(?:const|let|var)\s+(\w+)\s*=\s*setInterval\s*\(/)
+    const intervalMatch = /(?:const|let|var)\s+(\w+)\s*=\s*setInterval\s*\(/.exec(line)
     if (intervalMatch) {
       intervalCreations.push({ line: i + 1, varName: intervalMatch[1] ?? null })
     } else if (/\bsetInterval\s*\(/.test(line) && !line.includes('clearInterval')) {

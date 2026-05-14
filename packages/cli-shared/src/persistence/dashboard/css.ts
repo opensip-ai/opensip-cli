@@ -4,7 +4,7 @@
  */
 
 export function dashboardCss(): string {
-  return `
+  return String.raw`
 :root {
   --bg: #1a1210; --bg-surface: #231a16; --bg-card: #231a16;
   --bg-hover: #3a2e27; --text: #f4ede5; --text-secondary: #e6ddd2;
@@ -64,8 +64,8 @@ h3 { font-size: 14px; font-weight: 600; margin-bottom: 8px; color: var(--text-mu
 .data-table td, .data-table th { white-space: nowrap; }
 .data-table th { text-align: left; padding: 8px 12px; font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--border); font-weight: 600; cursor: pointer; }
 .data-table th:hover { color: var(--text-muted); }
-.data-table th[data-sort="asc"]::after { content: ' \\25B2'; font-size: 10px; }
-.data-table th[data-sort="desc"]::after { content: ' \\25BC'; font-size: 10px; }
+.data-table th[data-sort="asc"]::after { content: ' \25B2'; font-size: 10px; }
+.data-table th[data-sort="desc"]::after { content: ' \25BC'; font-size: 10px; }
 .data-table td { padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 13px; }
 .data-table tr:hover { background: var(--bg-hover); }
 .data-table tr.clickable { cursor: pointer; }

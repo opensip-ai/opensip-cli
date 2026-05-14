@@ -119,10 +119,11 @@ function validateScenarioType(type: unknown): ScenarioValidationError[] {
     return [{ field: 'type', message: 'Scenario type is required', severity: 'error' }]
   }
   if (!VALID_SCENARIO_TYPES.has(type as string)) {
+    const typeStr = typeof type === 'string' ? type : JSON.stringify(type)
     return [
       {
         field: 'type',
-        message: `Unknown scenario type "${type}". Valid types: ${Array.from(VALID_SCENARIO_TYPES).join(', ')}`,
+        message: `Unknown scenario type "${typeStr}". Valid types: ${[...VALID_SCENARIO_TYPES].join(', ')}`,
         severity: 'warning',
       },
     ]
@@ -247,7 +248,7 @@ function validateAssertion(assertion: ScenarioAssertion, index: number): Scenari
   } else if (!VALID_METRICS.has(assertion.metric)) {
     errors.push({
       field: `${prefix}.metric`,
-      message: `Unknown metric "${assertion.metric}". Valid metrics: ${Array.from(VALID_METRICS).join(', ')}`,
+      message: `Unknown metric "${assertion.metric}". Valid metrics: ${[...VALID_METRICS].join(', ')}`,
       severity: 'warning',
     })
   }
@@ -255,7 +256,7 @@ function validateAssertion(assertion: ScenarioAssertion, index: number): Scenari
   if (!VALID_OPERATORS.has(assertion.operator)) {
     errors.push({
       field: `${prefix}.operator`,
-      message: `Invalid operator "${assertion.operator}". Valid operators: ${Array.from(VALID_OPERATORS).join(', ')}`,
+      message: `Invalid operator "${assertion.operator}". Valid operators: ${[...VALID_OPERATORS].join(', ')}`,
       severity: 'error',
     })
   }
@@ -320,18 +321,12 @@ function validateChaosConfig(config: ChaosConfig): ScenarioValidationError[] {
     })
   }
 
-  if (!Array.isArray(config.types)) {
-    errors.push({
-      field: `${prefix}.types`,
-      message: 'Chaos types must be an array',
-      severity: 'error',
-    })
-  } else {
+  if (Array.isArray(config.types)) {
     config.types.forEach((injection, index) => {
       if (!VALID_CHAOS_TYPES.has(injection.type)) {
         errors.push({
           field: `${prefix}.types[${index}].type`,
-          message: `Unknown chaos type "${injection.type}". Valid types: ${Array.from(VALID_CHAOS_TYPES).join(', ')}`,
+          message: `Unknown chaos type "${injection.type}". Valid types: ${[...VALID_CHAOS_TYPES].join(', ')}`,
           severity: 'error',
         })
       }
@@ -355,6 +350,12 @@ function validateChaosConfig(config: ChaosConfig): ScenarioValidationError[] {
           severity: 'error',
         })
       }
+    })
+  } else {
+    errors.push({
+      field: `${prefix}.types`,
+      message: 'Chaos types must be an array',
+      severity: 'error',
     })
   }
 

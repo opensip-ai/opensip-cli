@@ -1,3 +1,4 @@
+/* eslint-disable unicorn/filename-case -- React `useXxx` hook convention; renaming to kebab-case obscures the hook role */
 /**
  * useSpinner hook — returns the current spinner frame character.
  * Consumes the ClockContext to cycle through braille animation frames.
@@ -13,5 +14,5 @@ export const SPINNER_FRAMES = [
 
 export function useSpinner(): string {
   const tick = useClock();
-  return SPINNER_FRAMES[tick % SPINNER_FRAMES.length]!;
+  return SPINNER_FRAMES[tick % SPINNER_FRAMES.length];
 }

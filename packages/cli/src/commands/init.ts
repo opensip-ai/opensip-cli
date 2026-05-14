@@ -5,8 +5,7 @@
 import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import type { CliArgs } from '@opensip-tools/cli-shared';
-import type { InitResult } from '@opensip-tools/cli-shared';
+import type { CliArgs , InitResult } from '@opensip-tools/cli-shared';
 
 // ---------------------------------------------------------------------------
 // Init config generation
@@ -14,6 +13,7 @@ import type { InitResult } from '@opensip-tools/cli-shared';
 
 export const INIT_FILENAME = 'opensip-tools.config.yml';
 
+// eslint-disable-next-line sonarjs/cognitive-complexity -- config generator emits multiple project shapes (packages/src/apps/Next.js); flattening would scatter related output
 export function generateInitConfig(cwd: string): string {
   // Detect project shape by looking for common patterns
   const hasPackagesDir = existsSync(join(cwd, 'packages'));
@@ -27,7 +27,10 @@ export function generateInitConfig(cwd: string): string {
   let hasNext = false;
   if (existsSync(pkgJsonPath)) {
     try {
-      const pkg = JSON.parse(readFileSync(pkgJsonPath, 'utf-8'));
+      const pkg = JSON.parse(readFileSync(pkgJsonPath, 'utf8')) as {
+        dependencies?: Record<string, string>;
+        devDependencies?: Record<string, string>;
+      };
       const allDeps = { ...pkg.dependencies, ...pkg.devDependencies };
       hasReact = 'react' in allDeps;
       hasNext = 'next' in allDeps;
@@ -52,17 +55,12 @@ export function generateInitConfig(cwd: string): string {
   ];
 
   // Determine source pattern
-  const srcPattern = hasPackagesDir
-    ? 'packages/*/src/**/*.ts'
-    : hasSrcDir
-      ? 'src/**/*.ts'
-      : '**/*.ts';
+  let srcPattern: string;
+  if (hasPackagesDir) srcPattern = 'packages/*/src/**/*.ts';
+  else if (hasSrcDir) srcPattern = 'src/**/*.ts';
+  else srcPattern = '**/*.ts';
 
-  const srcInclude = hasPackagesDir
-    ? ['packages/*/src/**/*.ts']
-    : hasSrcDir
-      ? ['src/**/*.ts']
-      : ['**/*.ts'];
+  const srcInclude: string[] = [srcPattern];
 
   if (hasAppsDir) {
     srcInclude.push('apps/*/src/**/*.ts');
@@ -89,13 +87,18 @@ export function generateInitConfig(cwd: string): string {
 
   // Frontend target (only if React detected)
   if (hasReact) {
-    const frontendInclude = hasNext
-      ? hasAppDir ? ['app/**/*.tsx', 'app/**/*.ts'] : ['pages/**/*.tsx', 'src/**/*.tsx']
-      : hasAppsDir
-        ? ['apps/*/src/**/*.tsx', 'apps/*/src/**/*.ts']
-        : hasSrcDir
-          ? ['src/**/*.tsx', 'src/**/*.ts']
-          : ['**/*.tsx'];
+    let frontendInclude: string[];
+    if (hasNext) {
+      frontendInclude = hasAppDir
+        ? ['app/**/*.tsx', 'app/**/*.ts']
+        : ['pages/**/*.tsx', 'src/**/*.tsx'];
+    } else if (hasAppsDir) {
+      frontendInclude = ['apps/*/src/**/*.tsx', 'apps/*/src/**/*.ts'];
+    } else if (hasSrcDir) {
+      frontendInclude = ['src/**/*.tsx', 'src/**/*.ts'];
+    } else {
+      frontendInclude = ['**/*.tsx'];
+    }
 
     lines.push(
       '  frontend:',
@@ -132,11 +135,7 @@ export function generateInitConfig(cwd: string): string {
     '    tags:',
     '      - testing',
     '      - typescript',
-    '',
-  );
-
-  // All-ts catch-all
-  lines.push(
+    '', 
     '  all-ts:',
     '    description: All TypeScript files',
     '    languages: [typescript]',
@@ -147,11 +146,7 @@ export function generateInitConfig(cwd: string): string {
     '      - "**/dist/**"',
     '    tags:',
     '      - typescript',
-    '',
-  );
-
-  // Configs target
-  lines.push(
+    '', 
     '  configs:',
     '    description: Configuration files',
     '    languages: [json, typescript, yaml]',
@@ -163,11 +158,7 @@ export function generateInitConfig(cwd: string): string {
     '      - "**/node_modules/**"',
     '    tags:',
     '      - config',
-    '',
-  );
-
-  // Fitness config
-  lines.push(
+    '', 
     '# =============================================================================',
     '# Fitness Configuration',
     '# =============================================================================',
@@ -177,6 +168,9 @@ export function generateInitConfig(cwd: string): string {
     '  failOnWarnings: 0   # fail if total warnings >= this (0 = warnings are informational)',
     '  disabledChecks: []',
     '',
+  
+  
+  
   );
 
   return lines.join('\n');
@@ -212,7 +206,7 @@ export function executeInit(args: CliArgs): InitResult {
   }
 
   const content = generateInitConfig(args.cwd);
-  writeFileSync(targetPath, content, 'utf-8');
+  writeFileSync(targetPath, content, 'utf8');
 
   return {
     type: 'init',

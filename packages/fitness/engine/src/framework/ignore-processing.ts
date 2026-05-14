@@ -10,15 +10,17 @@
  */
 
 import { logger } from '@opensip-tools/core'
-import type { Signal } from '@opensip-tools/core'
 
-import type { CheckResult } from '../types/findings.js'
+
 import { countErrors, countWarnings } from '../types/severity.js'
 
-import type { DirectiveEntry } from './directive-inventory.js'
 import { extractGroup, isWeakReason, parseDirectiveLine } from './directive-inventory.js'
 import { parseFileIgnoreDirective, parseIgnoreDirectives } from './directive-parsing.js'
 import { fileCache } from './file-cache.js'
+
+import type { DirectiveEntry } from './directive-inventory.js'
+import type { CheckResult } from '../types/findings.js'
+import type { Signal } from '@opensip-tools/core'
 
 // =============================================================================
 // DIRECTIVE LINE DETECTION
@@ -32,8 +34,8 @@ import { fileCache } from './file-cache.js'
 function findDirectiveLines(content: string): Set<number> {
   const directiveLines = new Set<number>()
   const lines = content.split('\n')
-  for (let i = 0; i < lines.length; i++) {
-    const trimmed = (lines[i] ?? '').trimStart()
+  for (const [i, line] of lines.entries()) {
+    const trimmed = (line ?? '').trimStart()
     if (
       (trimmed.startsWith('//') || trimmed.startsWith('/*')) &&
       trimmed.includes('@fitness-ignore')
@@ -92,8 +94,8 @@ async function processFileIgnoreStatus(
     }
 
     return { fileIgnored: isIgnored, ignoredLines, directiveLines: dirLines }
-  } catch (err) {
-    logger.warn('fitness.ignore.file_read.failed', { evt: 'fitness.ignore.file_read.failed', module: 'fitness:ignore-processing', filePath, err });
+  } catch (error) {
+    logger.warn('fitness.ignore.file_read.failed', { evt: 'fitness.ignore.file_read.failed', module: 'fitness:ignore-processing', filePath, err: error });
     fileIgnoreCache.set(filePath, false)
     return { fileIgnored: false, ignoredLines: null, directiveLines: new Set() }
   }
@@ -163,10 +165,6 @@ export async function filterSignalsByDirectives(
   checkId: string,
   initialIgnoredCount: number,
 ): Promise<{ filteredSignals: Signal[]; ignoredCount: number; appliedDirectives: DirectiveEntry[] }> {
-  if (!Array.isArray(signals)) {
-    return { filteredSignals: [], ignoredCount: initialIgnoredCount, appliedDirectives: [] }
-  }
-
   const fileIgnoreCache = new Map<string, boolean>()
   const lineIgnoreCache = new Map<string, Set<number>>()
   const directiveLineCache = new Map<string, Set<number>>()
@@ -252,12 +250,12 @@ async function collectFileIgnoreDirectives(
         const lines = content.split('\n')
         for (let i = 0; i < Math.min(lines.length, 50); i++) {
           const parsed = parseDirectiveLine(lines[i] ?? '')
-          if (parsed && parsed.type === 'file' && parsed.checkId === checkId) {
+          if (parsed?.type === 'file' && parsed.checkId === checkId) {
             return toDirectiveEntry(filePath, i + 1, parsed)
           }
         }
-      } catch (err) {
-        logger.warn('fitness.ignore.directive_read.failed', { evt: 'fitness.ignore.directive_read.failed', module: 'fitness:ignore-processing', err });
+      } catch (error) {
+        logger.warn('fitness.ignore.directive_read.failed', { evt: 'fitness.ignore.directive_read.failed', module: 'fitness:ignore-processing', err: error });
       }
       return null
     }),
@@ -277,7 +275,7 @@ async function collectLineIgnoreDirectives(
         const lines = content.split('\n')
         for (let i = 0; i < lines.length; i++) {
           const parsed = parseDirectiveLine(lines[i] ?? '')
-          if (!parsed || parsed.type !== 'next-line' || parsed.checkId !== checkId) continue
+          if (parsed?.type !== 'next-line' || parsed.checkId !== checkId) continue
           let targetLine = i + 1
           while (targetLine < lines.length && (lines[targetLine] ?? '').trimStart().startsWith('//')) {
             targetLine++
@@ -286,8 +284,8 @@ async function collectLineIgnoreDirectives(
             found.push(toDirectiveEntry(filePath, i + 1, parsed))
           }
         }
-      } catch (err) {
-        logger.warn('fitness.ignore.directive_read.failed', { evt: 'fitness.ignore.directive_read.failed', module: 'fitness:ignore-processing', err });
+      } catch (error) {
+        logger.warn('fitness.ignore.directive_read.failed', { evt: 'fitness.ignore.directive_read.failed', module: 'fitness:ignore-processing', err: error });
       }
       return found
     }),

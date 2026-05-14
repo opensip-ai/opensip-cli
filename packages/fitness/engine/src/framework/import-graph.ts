@@ -90,7 +90,7 @@ export function buildImportGraph(files: ReadonlyMap<string, string>): ImportGrap
  */
 export function findStronglyConnectedComponents(
   graph: ImportGraph,
-): ReadonlyArray<ReadonlyArray<string>> {
+): readonly (readonly string[])[] {
   const indexOf = new Map<string, number>()
   const lowlinkOf = new Map<string, number>()
   const onStack = new Set<string>()
@@ -100,12 +100,13 @@ export function findStronglyConnectedComponents(
 
   // Iterative Tarjan's — recursive form blows the stack on large graphs.
   // State machine: we replay each node's adjacency from where we left off.
-  type Frame = {
+  interface Frame {
     node: string
     neighbors: string[]
     next: number
   }
 
+  // eslint-disable-next-line sonarjs/cognitive-complexity -- iterative Tarjan SCC: explicit stack to avoid recursion; the algorithm is canonical and reads cleanest as a single function
   function strongConnect(start: string): void {
     const callStack: Frame[] = []
 
@@ -121,10 +122,10 @@ export function findStronglyConnectedComponents(
     })
 
     while (callStack.length > 0) {
-      const frame = callStack[callStack.length - 1]!
+      const frame = callStack.at(-1)!
 
       if (frame.next < frame.neighbors.length) {
-        const w = frame.neighbors[frame.next]!
+        const w = frame.neighbors[frame.next]
         frame.next++
 
         if (!indexOf.has(w)) {
@@ -172,7 +173,7 @@ export function findStronglyConnectedComponents(
 
       // Propagate lowlink up to the parent frame.
       if (callStack.length > 0) {
-        const parent = callStack[callStack.length - 1]!
+        const parent = callStack.at(-1)!
         const parentLow = lowlinkOf.get(parent.node)!
         if (vLow < parentLow) lowlinkOf.set(parent.node, vLow)
       }
@@ -244,15 +245,13 @@ function resolveRelativeSpecifier(
 
   // Try the candidate paths in priority order. The first one that exists in
   // the project's file set wins.
-  const candidates: string[] = []
+  const candidates: string[] = [ base]
 
   // 1. Literal path (specifier already includes extension).
-  candidates.push(base)
 
   // 2. ESM extension swap: `.js` → `.ts` / `.tsx` (TypeScript ESM convention).
   if (base.endsWith('.js')) {
-    candidates.push(base.slice(0, -3) + '.ts')
-    candidates.push(base.slice(0, -3) + '.tsx')
+    candidates.push(base.slice(0, -3) + '.ts', base.slice(0, -3) + '.tsx')
   }
   if (base.endsWith('.jsx')) {
     candidates.push(base.slice(0, -4) + '.tsx')
@@ -261,15 +260,17 @@ function resolveRelativeSpecifier(
   // 3. Append common extensions if the specifier was extension-less.
   const hasExt = path.extname(base) !== ''
   if (!hasExt) {
-    candidates.push(base + '.ts')
-    candidates.push(base + '.tsx')
-    candidates.push(base + '.js')
-    candidates.push(base + '.jsx')
-    // 4. Index resolution.
-    candidates.push(path.join(base, 'index.ts'))
-    candidates.push(path.join(base, 'index.tsx'))
-    candidates.push(path.join(base, 'index.js'))
-    candidates.push(path.join(base, 'index.jsx'))
+    // Direct extensions and index resolution.
+    candidates.push(
+      base + '.ts',
+      base + '.tsx',
+      base + '.js',
+      base + '.jsx',
+      path.join(base, 'index.ts'),
+      path.join(base, 'index.tsx'),
+      path.join(base, 'index.js'),
+      path.join(base, 'index.jsx'),
+    )
   }
 
   for (const candidate of candidates) {

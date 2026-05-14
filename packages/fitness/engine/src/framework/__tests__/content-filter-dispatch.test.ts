@@ -21,12 +21,14 @@ import { mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+
+import { defaultLanguageRegistry } from '@opensip-tools/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import type { LanguageAdapter } from '@opensip-tools/core'
-import { defaultLanguageRegistry } from '@opensip-tools/core'
 import { filterContent } from '../content-filter.js'
 import { createFileAccessor } from '../file-accessor.js'
+
+import type { LanguageAdapter } from '@opensip-tools/core'
 
 // FileAccessor.read dispatches strip via the registered LanguageAdapter
 // for the file's extension. Register a minimal TS adapter for the test
@@ -53,7 +55,7 @@ afterAll(() => {
 async function writeTempFile(content: string): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'cf-dispatch-'))
   const filePath = join(dir, 'sample.ts')
-  await writeFile(filePath, content, 'utf-8')
+  await writeFile(filePath, content, 'utf8')
   return filePath
 }
 

@@ -5,15 +5,21 @@
  * Each tool tab (Fitness, Simulation) has subtabs: Overview, Catalog, Recipes.
  */
 
+
+import { dashboardChecksJs } from './checks.js'
+import { dashboardCss } from './css.js'
+import { dashboardOverviewJs } from './overview.js'
+import { dashboardRecipesJs } from './recipes.js'
+import { dashboardSessionsJs } from './sessions.js'
+import { dashboardSharedJs } from './shared.js'
+import { dashboardToolTabsJs } from './tool-tabs.js'
+
 import type { StoredSession, CheckCatalogEntry, RecipeCatalogEntry } from '../store.js'
 
-import { dashboardCss } from './css.js'
-import { dashboardSharedJs } from './shared.js'
-import { dashboardOverviewJs } from './overview.js'
-import { dashboardSessionsJs } from './sessions.js'
-import { dashboardChecksJs } from './checks.js'
-import { dashboardRecipesJs } from './recipes.js'
-import { dashboardToolTabsJs } from './tool-tabs.js'
+// Escape all < and > to prevent script injection in HTML <script> context
+function escapeForScriptContext(json: string): string {
+  return json.replaceAll('<', String.raw`\u003c`).replaceAll('>', String.raw`\u003e`)
+}
 
 export function generateDashboardHtml(
   sessions: StoredSession[],
@@ -21,9 +27,6 @@ export function generateDashboardHtml(
   recipeCatalog: RecipeCatalogEntry[] = [],
 ): string {
   const latest = sessions[0]
-  // Escape all < and > to prevent script injection in HTML <script> context
-  const escapeForScriptContext = (json: string): string =>
-    json.replace(/</g, '\\u003c').replace(/>/g, '\\u003e')
   const safeDataJson = escapeForScriptContext(JSON.stringify(sessions))
   const safeCatalogJson = escapeForScriptContext(JSON.stringify(checkCatalog))
   const safeRecipeJson = escapeForScriptContext(JSON.stringify(recipeCatalog))

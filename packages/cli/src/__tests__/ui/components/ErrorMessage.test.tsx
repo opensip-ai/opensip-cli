@@ -1,8 +1,10 @@
+/* eslint-disable unicorn/filename-case -- React component test files mirror PascalCase component filenames */
+import { render } from 'ink-testing-library';
 import React from 'react';
 import { describe, it, expect } from 'vitest';
-import { render } from 'ink-testing-library';
-import { ThemeProvider } from '../../../ui/theme.js';
+
 import { ErrorMessage } from '../../../ui/components/ErrorMessage.js';
+import { ThemeProvider } from '../../../ui/theme.js';
 
 describe('ErrorMessage', () => {
   it('renders the error message', () => {

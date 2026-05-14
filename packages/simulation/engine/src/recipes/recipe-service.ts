@@ -8,14 +8,14 @@
  * progress callbacks, and result aggregation.
  */
 
-import { logger } from '@opensip-tools/core'
-import { generateId } from '@opensip-tools/core'
+import { logger , generateId } from '@opensip-tools/core'
 
 import { getScenario } from '../framework/registry.js'
 import { createEmptyMetrics } from '../framework/result-builder.js'
 import { renderScenarioResultView } from '../framework/result-renderers.js'
 
 import { getRecipe } from './recipe-registry.js'
+
 import type {
   SimulationRecipe,
   RecipeSession,
@@ -217,7 +217,7 @@ export class RecipeService {
         assertionsFailed: view.assertionsFailed,
         durationMs: Date.now() - startTime,
       }
-    } catch (err) {
+    } catch (error) {
       return {
         scenarioId,
         scenarioName: registeredScenario.name,
@@ -227,7 +227,7 @@ export class RecipeService {
         assertionsPassed: 0,
         assertionsFailed: 0,
         durationMs: Date.now() - startTime,
-        error: err instanceof Error ? err.message : String(err),
+        error: error instanceof Error ? error.message : String(error),
       }
     }
   }
@@ -260,16 +260,19 @@ function computeTotals(results: ScenarioRunResult[]): RecipeTotals {
 
   for (const r of results) {
     switch (r.status) {
-      case 'passed':
+      case 'passed': {
         passedScenarios++
         break
+      }
       case 'failed':
-      case 'error':
+      case 'error': {
         failedScenarios++
         break
-      case 'skipped':
+      }
+      case 'skipped': {
         skippedScenarios++
         break
+      }
     }
     totalSignals += r.signals.length
     totalAssertionsPassed += r.assertionsPassed

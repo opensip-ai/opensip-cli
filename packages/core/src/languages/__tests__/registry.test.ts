@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
+
 import { LanguageRegistry } from '../registry.js'
+
 import type { LanguageAdapter } from '../adapter.js'
 
 const fakeRust: LanguageAdapter = {

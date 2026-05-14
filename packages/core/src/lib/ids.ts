@@ -3,8 +3,9 @@
  * Uses ULID for time-sortable, unique identifiers.
  */
 
-import { ulid } from 'ulid';
 import { randomUUID } from 'node:crypto';
+
+import { ulid } from 'ulid';
 
 /** Generate a ULID (time-sortable, 26 lowercase crockford base32 chars) */
 export function generateId(prefix?: string): string {

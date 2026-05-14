@@ -10,12 +10,12 @@
 
 import { relative, resolve } from 'node:path'
 
-import type { Target, TargetsConfig } from '../targets/types.js'
-import type { TargetRegistry } from '../targets/target-registry.js'
 import { globSync } from 'glob'
 import { minimatch, Minimatch } from 'minimatch'
 
 import type { CheckScope } from './check-config.js'
+import type { TargetRegistry } from '../targets/target-registry.js'
+import type { Target, TargetsConfig } from '../targets/types.js'
 
 // =============================================================================
 // Pre-resolved target file cache
@@ -39,7 +39,7 @@ function assembleTargetFiles(
   if (targetConfig.exclude.length > 0 || compiledGlobalExcludes.length > 0) {
     const compiledTargetExcludes = targetConfig.exclude.map((ex) => new Minimatch(ex, { dot: true }))
     const allExcludes = [...compiledTargetExcludes, ...compiledGlobalExcludes]
-    for (const filePath of [...files]) {
+    for (const filePath of files) {
       const rel = relative(rootDir, filePath)
       if (allExcludes.some((m) => m.match(rel))) {
         files.delete(filePath)
@@ -198,7 +198,7 @@ export function resolveFilesForCheck(
 
   // Use pre-resolved cache when available, otherwise fall back to direct glob
   const lookupFiles = (targetRef: string | readonly string[]): string[] => {
-    const names = Array.isArray(targetRef) ? targetRef : [targetRef]
+    const names = typeof targetRef === 'string' ? [targetRef] : targetRef
     if (resolvedTargets) {
       return unionTargetFiles(names, resolvedTargets)
     }
@@ -240,7 +240,7 @@ export function resolveFilesForCheck(
  * in-memory lookup against the pre-resolved file lists.
  */
 export function buildScopeBasedFileMap(
-  checks: ReadonlyArray<{ slug: string; scope?: CheckScope }>,
+  checks: readonly { slug: string; scope?: CheckScope }[],
   registry: TargetRegistry,
   config: TargetsConfig,
   rootDir: string,

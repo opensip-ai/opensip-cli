@@ -10,8 +10,8 @@
 import * as path from 'node:path'
 
 import { ValidationError } from '@opensip-tools/core/errors'
-
 import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
+
 import { isTestFile } from '../../utils/index.js'
 
 /**
@@ -135,7 +135,7 @@ export const testOnlyImplementations = defineCheck({
   fileTypes: ['ts'],
   disabled: true, // Disabled: references old /implementations/, /adapters/, /repositories/, /providers/ structure not present in opensip
   // @fitness-ignore-next-line no-hardcoded-timeouts -- framework default for fitness check execution
-  timeout: 180000, // 3 minutes - analyzes import graphs
+  timeout: 180_000, // 3 minutes - analyzes import graphs
 
   async analyzeAll(files: FileAccessor): Promise<CheckViolation[]> {
     const violations: CheckViolation[] = []

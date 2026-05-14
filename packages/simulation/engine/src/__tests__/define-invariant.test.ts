@@ -1,14 +1,15 @@
+/* eslint-disable @typescript-eslint/require-await, @typescript-eslint/no-empty-function -- scenario phase hooks must match `() => Promise<void>` shape; many test scenarios are intentionally no-op stubs */
 /**
  * @fileoverview Tests for `defineInvariantScenario` — invariant-kind entry point.
  */
 
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { clearScenarioRegistry } from '../framework/registry.js'
 import {
   defineInvariantScenario,
   validateInvariantScenarioConfig,
 } from '../kinds/invariant/define.js'
-import { clearScenarioRegistry } from '../framework/registry.js'
 
 afterEach(() => {
   clearScenarioRegistry()

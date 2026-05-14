@@ -24,9 +24,14 @@ export type { ImportGraph } from './framework/import-graph.js';
 export { isInsideStringLiteral, stripStringLiterals, stripStringsAndComments, stripStringsAndCommentsPreservingPositions } from './framework/strip-literals.js';
 export { filterContent, clearFilterCache } from './framework/content-filter.js';
 export type { FilteredContent } from './framework/content-filter.js';
-// Re-export TypeScript compiler API for AST-based checks
+// Re-export TypeScript compiler API for AST-based checks. The typescript module
+// uses `export =`, so `export * as ts from 'typescript'` is invalid; the
+// import-then-rename-export form works under esModuleInterop.
+/* eslint-disable unicorn/prefer-export-from -- `export * as ts from 'typescript'` is invalid (the module uses `export =`); the namespace import + named export is the only working shape */
 import * as _ts from 'typescript';
 export { _ts as ts };
+/* eslint-enable unicorn/prefer-export-from */
+
 
 // Types — findings output
 export type { Finding, Severity, FindingSeverity, ToolOutput, CheckResult, CheckInfo, CheckResultMetadata, ItemType } from './types/findings.js';

@@ -75,10 +75,10 @@ export interface TerminalCapabilities {
 
 export function detectTerminalCapabilities(): TerminalCapabilities {
   const isTTY = !!process.stdout.isTTY;
-  const noColor = !!process.env['NO_COLOR'];
-  const colorTerm = process.env['COLORTERM'] ?? '';
-  const termProgram = process.env['TERM_PROGRAM'] ?? '';
-  const term = process.env['TERM'] ?? '';
+  const noColor = !!process.env.NO_COLOR;
+  const colorTerm = process.env.COLORTERM ?? '';
+  const termProgram = process.env.TERM_PROGRAM ?? '';
+  const term = process.env.TERM ?? '';
 
   if (noColor) {
     return { isTTY, supportsColor: false, supports256Color: false, supportsTrueColor: false };

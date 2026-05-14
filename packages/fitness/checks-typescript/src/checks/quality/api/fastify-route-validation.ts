@@ -8,10 +8,10 @@
  * using Zod schemas.
  */
 
-import * as ts from 'typescript'
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import * as ts from 'typescript'
 
 /**
  * Quick filter regex to check if file might contain Fastify routes
@@ -128,10 +128,6 @@ function extractRouteInfo(node: ts.CallExpression, sourceFile: ts.SourceFile): R
  * @returns true if any pattern matches
  */
 function matchesAnyPattern(text: string, patterns: readonly RegExp[]): boolean {
-  // Validate array parameter
-  if (!Array.isArray(patterns)) {
-    return false
-  }
   return patterns.some((pattern) => pattern.test(text))
 }
 

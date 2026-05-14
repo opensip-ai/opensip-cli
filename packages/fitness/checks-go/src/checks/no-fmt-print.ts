@@ -23,8 +23,8 @@ const FMT_PRINT_PATTERN = /\bfmt\.(Print|Println|Printf)\s*\(/g
 export function analyzeFmtPrint(content: string): CheckViolation[] {
   const violations: CheckViolation[] = []
   const lines = content.split('\n')
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]!
+  for (const [i, line_] of lines.entries()) {
+    const line = line_
     let match: RegExpExecArray | null
     FMT_PRINT_PATTERN.lastIndex = 0
     while ((match = FMT_PRINT_PATTERN.exec(line)) !== null) {

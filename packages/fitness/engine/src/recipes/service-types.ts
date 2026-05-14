@@ -5,15 +5,17 @@
  * used by FitnessRecipeService and its execution engines.
  */
 
-import type { DirectiveEntry } from '../framework/directive-inventory.js'
-import type { CheckMemoryProfile } from '../framework/memory-profiler.js'
-
+import type { FitnessRecipeRegistry } from './registry.js'
 import type {
   FitnessRecipe,
   FitnessRecipeResult,
   RecipeCheckResult,
   IgnoresByType,
 } from './types.js'
+import type { DirectiveEntry } from '../framework/directive-inventory.js'
+import type { CheckMemoryProfile } from '../framework/memory-profiler.js'
+import type { CheckRegistry } from '../framework/registry.js'
+
 
 // =============================================================================
 // CHECK SUMMARY (used for callbacks)
@@ -46,7 +48,7 @@ export interface FitnessRecipeServiceCallbacks {
   onMemoryWarning?: (checkId: string, profile: CheckMemoryProfile) => void
   onComplete?: (result: FitnessRecipeResult) => void
   /** Called before execution with all registered checks for catalog sync. */
-  onCatalogSync?: (entries: Array<{ id: string; slug: string; tags: readonly string[]; description: string }>) => void
+  onCatalogSync?: (entries: { id: string; slug: string; tags: readonly string[]; description: string }[]) => void
 }
 
 // =============================================================================
@@ -62,9 +64,9 @@ export interface FitnessRecipeServiceConfig {
   /** Per-check pre-resolved file paths from target overrides. Map of check slug → absolute file paths. */
   checkTargetFiles?: ReadonlyMap<string, readonly string[]>
   /** Optional check registry (defaults to defaultRegistry). */
-  checkRegistry?: import('../framework/registry.js').CheckRegistry
+  checkRegistry?: CheckRegistry
   /** Optional recipe registry (defaults to defaultRecipeRegistry). */
-  recipeRegistry?: import('./registry.js').FitnessRecipeRegistry
+  recipeRegistry?: FitnessRecipeRegistry
   /** Check slugs disabled via opensip.config.yml — these checks are skipped unless force-included by a recipe. */
   disabledChecks?: readonly string[]
   /** When true, carry violation details on RecipeCheckResult. */

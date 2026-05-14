@@ -87,7 +87,7 @@ export function isTestFile(filePath: string, options: IsTestFileOptions = {}): b
   } = options
 
   // Normalize path separators for cross-platform compatibility
-  const normalized = filePath.replace(/\\/g, '/')
+  const normalized = filePath.replaceAll('\\', '/')
 
   // Exclude declaration files first
   if (excludeDeclarationFiles && normalized.endsWith('.d.ts')) {

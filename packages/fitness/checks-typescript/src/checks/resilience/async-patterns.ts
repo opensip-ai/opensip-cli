@@ -5,11 +5,12 @@
  * @fileoverview Async pattern resilience checks
  */
 
-import * as ts from 'typescript'
 
 import { defineCheck, getCheckConfig, type CheckViolation, getLineNumber } from '@opensip-tools/fitness'
-import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
 import { stripStringsAndCommentsPreservingPositions } from '@opensip-tools/fitness'
+import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import * as ts from 'typescript'
+
 import { isCommentLine, isTestFile } from '../../utils/index.js'
 
 /**
@@ -567,7 +568,7 @@ function buildEffectiveSyncSets(): EffectiveSyncSets {
  */
 function isInAsyncContext(node: ts.Node): boolean {
   let current: ts.Node | undefined = node.parent
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- AST traversal: parent is undefined at SourceFile root despite Node type
+   
   while (current) {
     if (
       ts.isFunctionDeclaration(current) ||
@@ -587,6 +588,7 @@ function isInAsyncContext(node: ts.Node): boolean {
 /**
  * Check if a method call expression is to a known synchronous receiver or method.
  */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- multi-pattern dispatcher: distinguishes receivers, methods, and aliased members across N known sync APIs
 function isKnownSyncMethodCall(expr: ts.PropertyAccessExpression, sets: EffectiveSyncSets): boolean {
   const methodName = expr.name.text
   const receiverExpr = expr.expression
@@ -622,7 +624,7 @@ function isKnownSyncMethodCall(expr: ts.PropertyAccessExpression, sets: Effectiv
     // — the call's receiver is `Pyroscope.default` (PropertyAccess); the rightmost
     // segment is `default`, but the SDK identity is `Pyroscope`. Walk left to find it.
     let cursor: ts.Node = receiverExpr.expression
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- AST walk
+     
     while (cursor && ts.isPropertyAccessExpression(cursor)) {
       cursor = cursor.expression
     }
@@ -707,7 +709,7 @@ function isFloatingExpression(node: ts.ExpressionStatement): boolean {
   const expr = node.expression
 
   // Check for void prefix: void doSomething()
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Runtime guard: VoidExpression wrapping is not reflected in static ts.Expression union
+   
   if (expr.kind === ts.SyntaxKind.VoidExpression) {
     return false // Explicitly voided
   }
@@ -750,7 +752,7 @@ function hasAwaitedArgument(call: ts.CallExpression): boolean {
  */
 function isAwaitedExpression(node: ts.Expression): boolean {
   let current: ts.Expression = node
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- AST traversal; loop body reassigns current
+   
   while (current) {
     if (ts.isAwaitExpression(current)) return true
     if (ts.isParenthesizedExpression(current)) {
@@ -773,7 +775,7 @@ function isAwaitedExpression(node: ts.Expression): boolean {
  */
 function containsAwaitedReceiver(call: ts.CallExpression): boolean {
   let current: ts.Expression = call.expression
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- AST traversal terminates when current is no longer a chained access
+   
   while (current) {
     if (ts.isParenthesizedExpression(current)) {
       const inner = current.expression
@@ -814,11 +816,11 @@ function isDefinedAsSyncInSameFile(expr: ts.CallExpression): boolean {
 
   // Walk up to the enclosing class
   let current: ts.Node | undefined = expr.parent
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- current is reassigned in loop body; TypeScript cannot statically prove it remains truthy
+   
   while (current && !ts.isClassDeclaration(current) && !ts.isClassExpression(current)) {
     current = current.parent
   }
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- loop may exit with undefined current
+   
   if (!current) return false
 
   // Look for a method with the same name in the class
@@ -1044,7 +1046,7 @@ export const noUnboundedConcurrency = defineCheck({
       // warning. Same rationale as the file-level bounded check.
       const start = Math.max(0, match.index - 200)
       const end = Math.min(content.length, match.index + 200)
-      const context = content.substring(start, end)
+      const context = content.slice(start, end)
 
       if (!hasBoundedConcurrencyPattern(context)) {
         const lineNumber = getLineNumber(content, match.index)
@@ -1157,8 +1159,8 @@ export const noRawFetch = defineCheck({
 
     const lines = content.split('\n')
 
-    for (let lineNum = 0; lineNum < lines.length; lineNum++) {
-      const line = lines[lineNum] ?? ''
+    for (const [lineNum, line_] of lines.entries()) {
+      const line = line_ ?? ''
 
       // Skip comment lines
       if (isCommentLine(line)) {
@@ -1242,7 +1244,7 @@ export const awaitResultUnwrap = defineCheck({
     // @fitness-ignore-next-line performance-anti-patterns -- 'await' appears in comments and string literals within this loop, not actual await expressions
     for (const { line, index: i } of candidateLines) {
       // Check if the line has an async call before unwrap
-      const asyncMatch = line.match(ASYNC_CALL_UNWRAP_PATTERN)
+      const asyncMatch = ASYNC_CALL_UNWRAP_PATTERN.exec(line)
       if (!asyncMatch) {
         continue
       }

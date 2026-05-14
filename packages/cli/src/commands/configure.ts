@@ -3,9 +3,10 @@
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';
-import { join } from 'node:path';
 import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { createInterface } from 'node:readline';
+
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 
 // ---------------------------------------------------------------------------
@@ -27,7 +28,7 @@ interface GlobalConfig {
 function readGlobalConfig(): GlobalConfig {
   if (!existsSync(CONFIG_PATH)) return {};
   try {
-    const raw = readFileSync(CONFIG_PATH, 'utf-8');
+    const raw = readFileSync(CONFIG_PATH, 'utf8');
     return (parseYaml(raw) as GlobalConfig) ?? {};
   } catch {
     return {};
@@ -38,7 +39,7 @@ function writeGlobalConfig(config: GlobalConfig): void {
   if (!existsSync(OPENSIP_DIR)) {
     mkdirSync(OPENSIP_DIR, { recursive: true });
   }
-  writeFileSync(CONFIG_PATH, stringifyYaml(config), 'utf-8');
+  writeFileSync(CONFIG_PATH, stringifyYaml(config), 'utf8');
   chmodSync(CONFIG_PATH, 0o600);
 }
 

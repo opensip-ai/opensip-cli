@@ -7,7 +7,6 @@
  */
 
 import { logger } from '@opensip-tools/core/logger'
-
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
 /**
@@ -30,7 +29,7 @@ const EXPOSURE_PATTERNS = [
   // Logging all env vars - uses [^)]* which is bounded by closing paren
   {
     regex: createPattern(
-      '(?:logger|console|log)\\.\\w+\\s*\\([^)]*process\\.env(?!\\.\\w+)[^)]*\\)',
+      String.raw`(?:logger|console|log)\.\w+\s*\([^)]*process\.env(?!\.\w+)[^)]*\)`,
       'g',
     ),
     message: 'Logging entire process.env exposes all secrets',
@@ -41,7 +40,7 @@ const EXPOSURE_PATTERNS = [
   // Env vars in error messages with interpolation - uses [^;]* which is bounded by semicolon
   {
     regex: createPattern(
-      '(?:Error|throw)[^;]*process\\.env\\.\\w*(?:SECRET|KEY|PASSWORD|TOKEN|CREDENTIAL)',
+      String.raw`(?:Error|throw)[^;]*process\.env\.\w*(?:SECRET|KEY|PASSWORD|TOKEN|CREDENTIAL)`,
       'gi',
     ),
     message: 'Sensitive environment variable in error message may expose secrets',
@@ -51,7 +50,7 @@ const EXPOSURE_PATTERNS = [
   },
   // Stringifying env vars (JSON.stringify(process.env)) - fixed pattern, no variable repetition
   {
-    regex: createPattern('JSON\\.stringify\\s*\\(\\s*process\\.env\\s*\\)', 'g'),
+    regex: createPattern(String.raw`JSON\.stringify\s*\(\s*process\.env\s*\)`, 'g'),
     message: 'JSON.stringify(process.env) exposes all secrets',
     suggestion:
       'Select specific non-sensitive env vars to stringify: JSON.stringify({ NODE_ENV: process.env.NODE_ENV, PORT: process.env.PORT }).',
@@ -59,7 +58,7 @@ const EXPOSURE_PATTERNS = [
   },
   // Spreading env into object that might be logged - fixed pattern
   {
-    regex: createPattern('\\{\\s*\\.\\.\\.process\\.env', 'g'),
+    regex: createPattern(String.raw`\{\s*\.\.\.process\.env`, 'g'),
     message: 'Spreading process.env may expose secrets if object is logged',
     suggestion:
       'Explicitly pick non-sensitive values instead of spreading: { NODE_ENV: process.env.NODE_ENV, PORT: process.env.PORT }.',
@@ -114,8 +113,8 @@ export const envSecretExposure = defineCheck({
     const violations: CheckViolation[] = []
     const lines = content.split('\n')
 
-    for (let lineNum = 0; lineNum < lines.length; lineNum++) {
-      const line = lines[lineNum] ?? ''
+    for (const [lineNum, line_] of lines.entries()) {
+      const line = line_ ?? ''
 
       // Skip comments
       const trimmed = line.trim()

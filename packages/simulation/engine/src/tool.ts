@@ -6,13 +6,14 @@
  * surface, JSON/Ink dispatch, and dashboard auto-open hook.
  */
 
-import { Command } from 'commander';
-
-import type { Tool, ToolCliContext, ToolCommandDescriptor } from '@opensip-tools/core';
-import type { CliArgs, ToolOptions } from '@opensip-tools/cli-shared';
 import { EXIT_CODES } from '@opensip-tools/cli-shared';
+import { type Command } from 'commander';
 
 import { executeSim } from './cli/sim.js';
+
+import type { CliArgs, ToolOptions } from '@opensip-tools/cli-shared';
+import type { Tool, ToolCliContext, ToolCommandDescriptor } from '@opensip-tools/core';
+
 
 const SIM: ToolCommandDescriptor = {
   name: 'sim',

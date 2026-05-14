@@ -119,13 +119,44 @@ export default tseslint.config(
       // The codebase intentionally uses `for...of`/`forEach` interchangeably.
       'unicorn/no-array-for-each': 'off',
       'unicorn/no-array-reduce': 'off',
+      // import-style is a stylistic preference; the codebase intentionally
+      // mixes `import { x } from 'node:path'` and `import * as path` for
+      // good reasons (ESM/CJS bridges, namespace usage).
+      'unicorn/import-style': 'off',
+      // toSorted() requires Node 20+. We're on 22, but the rule's
+      // auto-fix ignores some call sites (sort + spread, sort in-place
+      // intent), producing churn for marginal gain. Off for now.
+      'unicorn/no-array-sort': 'off',
 
       // -- sonarjs opinions we soften -------------------------------------
-      // Cognitive complexity stays at 15; opt-out files use the file-level disable.
-      // 'sonarjs/cognitive-complexity': ['warn', 15],
+      // Cognitive complexity stays at 15; opt-out files use a per-file
+      // disable comment with rationale.
       // The check-pack files often have repeated string literals (slugs,
       // event names) that don't belong in constants.
       'sonarjs/no-duplicate-string': ['warn', { threshold: 5 }],
+      // TODO/FIXME tags are tracked by fitness's own `todo-comments`
+      // check (in @opensip-tools/checks-universal). Avoid double-flagging.
+      'sonarjs/todo-tag': 'off',
+      // Math.random is fine for non-security uses (jitter, sample IDs,
+      // demo data). Crypto code uses node:crypto explicitly.
+      'sonarjs/pseudo-random': 'off',
+      // CLI tooling intentionally invokes PATH-resolved binaries
+      // (`open`, `xdg-open`, etc.). The risk pattern this rule guards
+      // against is server-side command injection, not CLI helpers.
+      'sonarjs/no-os-command-from-path': 'off',
+      // Locale-aware sort is fine; an explicit comparator is required
+      // only when sorting non-strings, which the type checker enforces.
+      'sonarjs/no-alphabetical-sort': 'off',
+      // `field?: T | undefined` is a deliberate readability choice.
+      // Cosmetic; not worth churn.
+      'sonarjs/no-redundant-optional': 'off',
+      // void on a fire-and-forget promise expression is the documented
+      // pattern. The `no-floating-promises` rule already enforces it.
+      'sonarjs/void-use': 'off',
+      // Comparing a value to `undefined` after `typeof` checks is a
+      // type-narrowing idiom; the type checker validates it. Disabled
+      // to avoid flagging the pattern.
+      'sonarjs/different-types-comparison': 'off',
 
       // -- import hygiene -------------------------------------------------
       'import/no-cycle': ['error', { maxDepth: 10 }],

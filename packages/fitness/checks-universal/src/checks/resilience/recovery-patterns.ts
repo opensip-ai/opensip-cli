@@ -4,8 +4,8 @@
  */
 
 import { logger } from '@opensip-tools/core/logger'
-
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+
 import { isCommentLine } from '../../utils/index.js'
 
 // =============================================================================
@@ -115,7 +115,7 @@ function matchesExclusionPattern(filePath: string, patterns: readonly string[]):
   })
   for (const pattern of patterns) {
     // Convert glob pattern to simple substring match for common cases
-    const normalizedPattern = pattern.replace(/\*\*/g, '').replace(/\*/g, '')
+    const normalizedPattern = pattern.replaceAll('**', '').replaceAll('*', '')
     if (normalizedPattern && filePath.includes(normalizedPattern)) {
       return true
     }
@@ -166,8 +166,7 @@ function detectSingleLinePattern(lines: string[], pattern: PatternDefinition): C
   })
   const violations: CheckViolation[] = []
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
+  for (const [i, line] of lines.entries()) {
     if (line === undefined) continue
     if (pattern.skipInComments && isCommentLine(line)) continue
 

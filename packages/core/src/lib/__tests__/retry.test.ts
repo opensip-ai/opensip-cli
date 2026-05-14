@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+
 import { withRetry } from '../../lib/retry.js';
 
 describe('withRetry', () => {
@@ -91,7 +92,7 @@ describe('withRetry', () => {
     const fn = vi.fn().mockRejectedValue(new Error('boom'));
 
     await expect(
-      withRetry(fn, { maxAttempts: NaN, initialDelayMs: 10 }),
+      withRetry(fn, { maxAttempts: Number.NaN, initialDelayMs: 10 }),
     ).rejects.toThrow('boom');
 
     expect(fn).toHaveBeenCalledTimes(1);

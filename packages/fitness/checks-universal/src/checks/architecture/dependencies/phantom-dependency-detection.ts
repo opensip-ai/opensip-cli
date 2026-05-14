@@ -181,7 +181,7 @@ function findNearestPackageJson(filePath: string): string | null {
  */
 function readPackageJson(pkgPath: string): PackageJson | null {
   try {
-    const content = fs.readFileSync(pkgPath, 'utf-8')
+    const content = fs.readFileSync(pkgPath, 'utf8')
     return JSON.parse(content) as PackageJson
   } catch {
     // @swallow-ok graceful degradation - return sentinel on failure
@@ -382,8 +382,8 @@ function stripCommentsAndStrings(content: string): string {
  */
 function extractImports(
   content: string,
-): Array<{ specifier: string; lineNum: number; lineContent: string }> {
-  const imports: Array<{ specifier: string; lineNum: number; lineContent: string }> = []
+): { specifier: string; lineNum: number; lineContent: string }[] {
+  const imports: { specifier: string; lineNum: number; lineContent: string }[] = []
   const originalLines = content.split('\n')
 
   // Strip comments and string literals from content before extracting imports

@@ -12,9 +12,9 @@
  */
 export function stripStringLiterals(line: string): string {
   return line
-    .replace(/'(?:[^'\\]|\\.)*'/g, "''")
-    .replace(/"(?:[^"\\]|\\.)*"/g, '""')
-    .replace(/`(?:[^`\\]|\\.)*`/gs, '``')
+    .replaceAll(/'(?:[^'\\]|\\.)*'/g, "''")
+    .replaceAll(/"(?:[^"\\]|\\.)*"/g, '""')
+    .replaceAll(/`(?:[^`\\]|\\.)*`/gs, '``')
 }
 
 /** Shared regex patterns for string literal replacement */
@@ -67,12 +67,12 @@ export function isInsideStringLiteral(line: string, matchIndex: number): boolean
 export function stripStringsAndComments(content: string): string {
   // Strip string literals first
   let result = content
-    .replace(SINGLE_QUOTE_RE, "''")
-    .replace(DOUBLE_QUOTE_RE, '""')
-    .replace(BACKTICK_RE, '``')
+    .replaceAll(SINGLE_QUOTE_RE, "''")
+    .replaceAll(DOUBLE_QUOTE_RE, '""')
+    .replaceAll(BACKTICK_RE, '``')
   // Strip single-line comments (after string stripping to avoid matching // inside strings)
   // eslint-disable-next-line sonarjs/slow-regex -- .*$ anchored to line end; linear scan
-  result = result.replace(/\/\/.*$/gm, '')
+  result = result.replaceAll(/\/\/.*$/gm, '')
   return result
 }
 
@@ -93,6 +93,7 @@ export function stripStringsAndComments(content: string): string {
  * Preserves: newlines, total character count, character positions of
  * code OUTSIDE these regions.
  */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- token-state-machine: single-pass tokenizer, branches reflect quote/comment state
 export function stripStringsAndCommentsPreservingPositions(content: string): string {
   const out: string[] = []
   let i = 0
@@ -104,7 +105,7 @@ export function stripStringsAndCommentsPreservingPositions(content: string): str
   let escaped = false
 
   while (i < content.length) {
-    const ch = content[i] as string
+    const ch = content[i]
     const next = content[i + 1]
 
     // Inside any string: blank out chars (preserve newlines) until terminator.

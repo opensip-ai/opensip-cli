@@ -5,9 +5,9 @@
  */
 
 import { logger } from '@opensip-tools/core/logger'
-
 import { defineCheck, type CheckViolation, getLineNumber } from '@opensip-tools/fitness'
 import { stripStringsAndCommentsPreservingPositions } from '@opensip-tools/fitness'
+
 import { isTestFile } from '../../utils/index.js'
 
 interface UnboundedBatchPattern {
@@ -34,17 +34,17 @@ function findUnboundedBatchMatch(
   if (idx === -1) return null
 
   if (patternDef.type === 'async') {
-    const afterPattern = content.substring(
+    const afterPattern = content.slice(
       idx + patternDef.pattern.length,
       idx + patternDef.pattern.length + 20,
     )
-    const asyncMatch = afterPattern.match(/^\s*\(\s*async/)
+    const asyncMatch = /^\s*\(\s*async/.exec(afterPattern)
     if (asyncMatch) {
       return { index: idx, match: patternDef.pattern + asyncMatch[0] }
     }
   } else {
-    const afterFor = content.substring(idx, idx + 50)
-    const forOfMatch = afterFor.match(/^for\s*\(\s*const\s+\w+\s+of/)
+    const afterFor = content.slice(idx, idx + 50)
+    const forOfMatch = /^for\s*\(\s*const\s+\w+\s+of/.exec(afterFor)
     if (forOfMatch) {
       return { index: idx, match: forOfMatch[0] }
     }
@@ -71,12 +71,12 @@ function hasBoundedKeyword(content: string): boolean {
 
 function findUnboundedQueryCalls(
   content: string,
-): Array<{ index: number; methodName: string; match: string }> {
+): { index: number; methodName: string; match: string }[] {
   logger.debug({
     evt: 'fitness.checks.batch_operations.find_unbounded_query_calls',
     msg: 'Finding unbounded query calls like findAll, getAll, findMany with empty args',
   })
-  const results: Array<{ index: number; methodName: string; match: string }> = []
+  const results: { index: number; methodName: string; match: string }[] = []
   const methods = ['findAll', 'getAll', 'findMany']
 
   for (const method of methods) {
@@ -87,8 +87,8 @@ function findUnboundedQueryCalls(
       const idx = content.indexOf(pattern, searchStart)
       if (idx === -1) break
 
-      const afterMethod = content.substring(idx + pattern.length, idx + pattern.length + 10)
-      const emptyArgsMatch = afterMethod.match(/^\s*\(\s*\)/)
+      const afterMethod = content.slice(idx + pattern.length, idx + pattern.length + 10)
+      const emptyArgsMatch = /^\s*\(\s*\)/.exec(afterMethod)
 
       if (emptyArgsMatch) {
         results.push({
@@ -169,9 +169,9 @@ export const batchOperationLimits = defineCheck({
         const matchResult = findUnboundedBatchMatch(content, patternDef, searchStart)
         if (!matchResult) break
 
-          const start = Math.max(0, matchResult.index - 300)
+        const start = Math.max(0, matchResult.index - 300)
         const end = Math.min(content.length, matchResult.index + 300)
-        const context = content.substring(start, end)
+        const context = content.slice(start, end)
 
         if (!hasBoundedKeyword(context)) {
           const lineNumber = getLineNumber(content, matchResult.index)
@@ -221,12 +221,12 @@ function isBoundedDeclaration(line: string): boolean {
   return BOUNDED_DECLARATION_PATTERNS.some((pattern) => trimmed.includes(pattern))
 }
 
-function findCollectionDeclarations(content: string): Array<{ index: number; match: string }> {
+function findCollectionDeclarations(content: string): { index: number; match: string }[] {
   logger.debug({
     evt: 'fitness.checks.batch_operations.find_collection_declarations',
     msg: 'Finding private collection declarations that may grow without bounds',
   })
-  const results: Array<{ index: number; match: string }> = []
+  const results: { index: number; match: string }[] = []
   const lines = content.split('\n')
   let charIndex = 0
 
@@ -249,7 +249,7 @@ function findCollectionDeclarations(content: string): Array<{ index: number; mat
       const lineEnd = line.includes(';') ? line.indexOf(';') + 1 : line.length
       results.push({
         index: currentCharIndex + matchStart,
-        match: line.substring(matchStart, lineEnd).trim(),
+        match: line.slice(matchStart, lineEnd).trim(),
       })
     }
   }
@@ -319,16 +319,16 @@ const KNOWN_SMALL_FILE_PATTERNS = [
 function isReadingKnownSmallFile(content: string, readIndex: number): boolean {
   const start = Math.max(0, readIndex - 100)
   const end = Math.min(content.length, readIndex + 150)
-  const context = content.substring(start, end).toLowerCase()
+  const context = content.slice(start, end).toLowerCase()
   return KNOWN_SMALL_FILE_PATTERNS.some((pattern) => context.includes(pattern))
 }
 
-function findFileReadCalls(content: string): Array<{ index: number; match: string }> {
+function findFileReadCalls(content: string): { index: number; match: string }[] {
   logger.debug({
     evt: 'fitness.checks.batch_operations.find_file_read_calls',
     msg: 'Finding file read calls that may cause OOM without size validation',
   })
-  const results: Array<{ index: number; match: string }> = []
+  const results: { index: number; match: string }[] = []
 
   for (const method of FILE_READ_METHODS) {
     let searchStart = 0
@@ -426,7 +426,7 @@ export const unboundedMemory = defineCheck({
       // Real-world bundle/file readers interleave stat → branch → recover
       // → readFile, easily putting the guard >500 chars upstream.
       const start = Math.max(0, readCall.index - 1500)
-      const context = content.substring(start, readCall.index)
+      const context = content.slice(start, readCall.index)
 
       if (isReadingKnownSmallFile(content, readCall.index)) {
         continue

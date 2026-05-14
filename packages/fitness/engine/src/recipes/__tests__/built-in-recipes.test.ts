@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+
 import { builtInRecipes, builtInRecipesByName, isBuiltInRecipe } from '../built-in-recipes.js';
 
 describe('built-in recipes', () => {

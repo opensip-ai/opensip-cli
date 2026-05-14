@@ -4,7 +4,7 @@
  */
 
 export function dashboardSessionsJs(): string {
-  return `
+  return String.raw`
 // =======================================================
 // SESSION TABLE (used by fitness/sim tabs)
 // =======================================================
@@ -90,13 +90,13 @@ function renderSessionTable(panel, toolSessions, accentColor) {
 
     const headerRow = el('div', {style:'display:flex;align-items:center;justify-content:space-between;margin-bottom:16px'});
     const headerLeft = el('div');
-    headerLeft.appendChild(el('h3', {text: 'Session Detail \\u2014 ' + new Date(session.timestamp).toLocaleString(), style:'margin-bottom:4px'}));
+    headerLeft.appendChild(el('h3', {text: 'Session Detail \u2014 ' + new Date(session.timestamp).toLocaleString(), style:'margin-bottom:4px'}));
     const sub = el('div', {style:'color:var(--text-dim);font-size:12px'});
     const countParts = [];
     if (totalErrors > 0) countParts.push(totalErrors + ' error' + (totalErrors !== 1 ? 's' : ''));
     if (totalWarnings > 0) countParts.push(totalWarnings + ' warning' + (totalWarnings !== 1 ? 's' : ''));
-    const countsStr = countParts.length > 0 ? ' \\u2014 ' + countParts.join(', ') : '';
-    sub.textContent = session.cwd + (session.recipe ? ' \\u2014 recipe: ' + session.recipe : '') + countsStr;
+    const countsStr = countParts.length > 0 ? ' \u2014 ' + countParts.join(', ') : '';
+    sub.textContent = session.cwd + (session.recipe ? ' \u2014 recipe: ' + session.recipe : '') + countsStr;
     headerLeft.appendChild(sub);
     headerRow.appendChild(headerLeft);
 
@@ -128,14 +128,14 @@ function renderSessionTable(panel, toolSessions, accentColor) {
       const checkStatusVal = check.passed ? 'pass' : 'fail';
 
       const arrowCell = el('td', {style:'width:24px;text-align:center;color:var(--text-dim);font-size:12px'});
-      if (hasFindings) arrowCell.textContent = '\\u25B6';
+      if (hasFindings) arrowCell.textContent = '\u25B6';
 
       const row = el('tr', {class: hasFindings ? 'clickable' : '', 'data-check-status': checkStatusVal, onclick: hasFindings ? () => {
         const exp = document.getElementById(expanderId);
         if (exp) {
           const isOpen = exp.classList.toggle('open');
           exp.style.display = isOpen ? 'table-row' : 'none';
-          arrowCell.textContent = isOpen ? '\\u25BC' : '\\u25B6';
+          arrowCell.textContent = isOpen ? '\u25BC' : '\u25B6';
         }
         row.classList.toggle('expanded');
       } : undefined});
@@ -172,8 +172,8 @@ function renderSessionTable(panel, toolSessions, accentColor) {
           sevCell.appendChild(el('span', {class:'finding-sev ' + f.severity, text: f.severity}));
           fRow.appendChild(sevCell);
           fRow.appendChild(el('td', {text: f.message, style:'padding:6px 12px;font-size:13px'}));
-          fRow.appendChild(el('td', {text: f.filePath ? f.filePath + (f.line ? ':' + f.line : '') : '\\u2014', style:'padding:6px 12px;color:var(--text-dim);font-size:12px'}));
-          fRow.appendChild(el('td', {text: f.suggestion || '\\u2014', style:'padding:6px 12px;color:var(--accent);font-size:12px'}));
+          fRow.appendChild(el('td', {text: f.filePath ? f.filePath + (f.line ? ':' + f.line : '') : '\u2014', style:'padding:6px 12px;color:var(--text-dim);font-size:12px'}));
+          fRow.appendChild(el('td', {text: f.suggestion || '\u2014', style:'padding:6px 12px;color:var(--accent);font-size:12px'}));
           fBody.appendChild(fRow);
         });
         fTable.appendChild(fBody);

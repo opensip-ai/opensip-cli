@@ -6,10 +6,9 @@
  */
 
 import { logger } from '@opensip-tools/core/logger'
-import * as ts from 'typescript'
-
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import * as ts from 'typescript'
 
 /**
  * Pre-compiled regex patterns for detecting mock implementations.

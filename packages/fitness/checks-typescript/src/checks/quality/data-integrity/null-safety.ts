@@ -4,10 +4,11 @@
  * Detects unsafe property and method access without null checks.
  */
 
-import * as ts from 'typescript'
 
 import { defineCheck, getCheckConfig, type CheckViolation } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import * as ts from 'typescript'
+
 import { isTestFile } from '../../../utils/index.js'
 
 /**
@@ -482,7 +483,7 @@ function isZodBuilderChain(node: ts.PropertyAccessExpression, sourceFile: ts.Sou
   // Handles arbitrary depth: z.string().regex().optional().superRefine().pipe()
   let current: ts.Expression = node.expression
 
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- AST traversal: expression chain terminates despite always-truthy type
+   
   while (current) {
     if (ts.isCallExpression(current)) {
       const result = checkZodCallExpression(current, sourceFile)

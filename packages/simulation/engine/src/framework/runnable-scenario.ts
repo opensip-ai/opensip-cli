@@ -6,9 +6,9 @@
  * persistence, dashboard) dispatch on `kind` to handle per-kind result variants.
  */
 
+import type { ScenarioExecutorResult } from './scenario-executor-result.js'
 import type { ScenarioKind } from '../types/kind-types.js'
 
-import type { ScenarioExecutorResult } from './scenario-executor-result.js'
 
 /**
  * A validated, runnable scenario.

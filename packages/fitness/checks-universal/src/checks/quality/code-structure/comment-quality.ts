@@ -168,8 +168,7 @@ function analyzeFileContent(content: string): CommentViolation[] {
   const violations: CommentViolation[] = []
   const lines = content.split('\n')
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
+  for (const [i, line] of lines.entries()) {
     if (!line) continue
 
     checkLineForComments(line, i + 1, violations)

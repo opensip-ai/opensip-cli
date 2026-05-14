@@ -2,8 +2,9 @@
  * ErrorMessage component — displays an error with an optional suggestion.
  */
 
-import React from 'react';
 import { Text, Box } from 'ink';
+import React from 'react';
+
 import { useTheme } from '../theme.js';
 
 export interface ErrorMessageProps {

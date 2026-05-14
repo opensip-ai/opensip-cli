@@ -5,10 +5,10 @@
  * Detects numeric parameters without NaN/Infinity/range validation.
  */
 
-import * as ts from 'typescript'
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import * as ts from 'typescript'
 
 /**
  * Quick filter keywords for numeric validation patterns

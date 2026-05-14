@@ -3,10 +3,10 @@
  * @fileoverview Unused Modules check (v2)
  */
 
-import * as ts from 'typescript'
 
 import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import * as ts from 'typescript'
 
 interface UnusedModuleIssue {
   modulePath: string
@@ -158,7 +158,7 @@ interface ModulePathInfo {
 function getModulePathInfo(modulePath: string): ModulePathInfo {
   const normalizedPath = modulePath.replace(FILE_EXTENSION_PATTERN, '')
   const fileName = normalizedPath.split('/').pop() ?? ''
-  const dir = normalizedPath.substring(0, normalizedPath.lastIndexOf('/'))
+  const dir = normalizedPath.slice(0, Math.max(0, normalizedPath.lastIndexOf('/')))
   return { normalizedPath, fileName, dir }
 }
 
@@ -184,7 +184,7 @@ function checkImportsForModule(
   importerDir: string,
   moduleInfo: ModulePathInfo,
 ): boolean {
-  const relevantImports = Array.from(imports).filter(isLocalOrAliasedImport)
+  const relevantImports = [...imports].filter(isLocalOrAliasedImport)
 
   for (const importPath of relevantImports) {
     const resolvedImport = resolveImportPath(importPath, importerDir)
@@ -199,7 +199,7 @@ function isModuleImported(modulePath: string, importMap: Map<string, Set<string>
   const moduleInfo = getModulePathInfo(modulePath)
 
   for (const [importerFile, imports] of importMap) {
-    const importerDir = importerFile.substring(0, importerFile.lastIndexOf('/'))
+    const importerDir = importerFile.slice(0, Math.max(0, importerFile.lastIndexOf('/')))
     if (checkImportsForModule(imports, importerDir, moduleInfo)) {
       return true
     }

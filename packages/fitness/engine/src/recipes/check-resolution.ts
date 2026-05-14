@@ -9,9 +9,9 @@
 import { SystemError } from '@opensip-tools/core'
 import { minimatch } from 'minimatch'
 
+import type { CheckSelector } from './types.js'
 import type { CheckRegistry } from '../framework/registry.js'
 
-import type { CheckSelector } from './types.js'
 
 /**
  * Resolve a CheckSelector to a list of check slugs from the registry.
@@ -20,14 +20,18 @@ export function resolveChecks(selector: CheckSelector, registry: CheckRegistry):
   const allCheckSlugs = registry.listSlugs()
 
   switch (selector.type) {
-    case 'explicit':
+    case 'explicit': {
       return resolveExplicitSelector(selector.checkIds, allCheckSlugs, registry)
-    case 'pattern':
+    }
+    case 'pattern': {
       return resolvePatternSelector(selector.include, selector.exclude ?? [], allCheckSlugs, registry)
-    case 'tags':
+    }
+    case 'tags': {
       return resolveTagsSelector(selector.include, selector.exclude ?? [], registry)
-    case 'all':
+    }
+    case 'all': {
       return resolveAllSelector(selector.exclude ?? [], allCheckSlugs, registry)
+    }
     default: {
       const _exhaustive: never = selector
       throw new SystemError(`Unknown selector type: ${JSON.stringify(_exhaustive)}`, { code: 'SYSTEM.FITNESS.UNKNOWN_SELECTOR' })
@@ -40,7 +44,6 @@ function resolveExplicitSelector(
   allCheckSlugs: readonly string[],
   registry?: CheckRegistry,
 ): readonly string[] {
-  if (!Array.isArray(checkIds) || !Array.isArray(allCheckSlugs)) return []
   const existingIds = new Set(allCheckSlugs)
   const result: string[] = []
 
@@ -86,10 +89,6 @@ function resolvePatternSelector(
   allCheckSlugs: readonly string[],
   registry?: CheckRegistry,
 ): readonly string[] {
-  if (!Array.isArray(includePatterns) || !Array.isArray(excludePatterns) || !Array.isArray(allCheckSlugs)) {
-    return []
-  }
-
   return allCheckSlugs.filter((slug) => {
     const matchTargets = buildMatchTargets(slug, registry)
 
@@ -110,8 +109,6 @@ function resolveTagsSelector(
   excludeTags: readonly string[],
   registry: CheckRegistry,
 ): readonly string[] {
-  if (!Array.isArray(includeTags)) return []
-
   const includeSet = new Set(includeTags)
   const excludeSet = new Set(excludeTags)
   const allSlugs = registry.listSlugs()
@@ -132,7 +129,6 @@ function resolveAllSelector(
   allCheckSlugs: readonly string[],
   registry?: CheckRegistry,
 ): readonly string[] {
-  if (!Array.isArray(excludePatterns) || !Array.isArray(allCheckSlugs)) return []
   if (excludePatterns.length === 0) return allCheckSlugs
 
   return allCheckSlugs.filter((slug) => {

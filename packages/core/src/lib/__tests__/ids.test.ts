@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+
 import { generateId, generatePrefixedId, extractTimestamp, generateUUID } from '../../lib/ids.js';
 
 const ULID_REGEX = /^[0-9A-HJKMNP-TV-Z]{26}$/i;
@@ -26,6 +27,7 @@ describe('generateId', () => {
   });
 
   it('returns plain ULID with undefined prefix', () => {
+    // eslint-disable-next-line sonarjs/no-undefined-argument -- explicitly testing the undefined-argument behavior
     const id = generateId(undefined);
     expect(id).toMatch(ULID_REGEX);
   });

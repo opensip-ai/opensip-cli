@@ -3,7 +3,6 @@
  */
 
 import { logger } from '@opensip-tools/core/logger'
-
 import { defineCheck, type CheckViolation, getLineNumber } from '@opensip-tools/fitness'
 
 // =============================================================================
@@ -240,8 +239,7 @@ export const rateLimitingCoverage = defineCheck({
     const hasRateLimitingInFile = matchesRateLimitingPatterns(content)
     const lines = content.split('\n')
 
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i]
+    for (const [i, line] of lines.entries()) {
       if (!line) continue
 
       const isEndpoint = isApiEndpoint(line)

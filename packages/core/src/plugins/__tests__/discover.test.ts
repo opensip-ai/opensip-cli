@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdirSync, writeFileSync, rmSync, symlinkSync } from 'node:fs'
-import { join } from 'node:path'
-import { mkdtempSync } from 'node:fs'
+import { mkdirSync, writeFileSync, rmSync, symlinkSync , mkdtempSync } from 'node:fs'
 import { tmpdir, platform } from 'node:os'
+import { join } from 'node:path'
+
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 
 import { discoverPlugins, getPluginDir } from '../discover.js'
 
@@ -58,7 +58,7 @@ describe('discoverPlugins', () => {
 
       const result = discoverPlugins('fit', testDir)
       expect(result).toHaveLength(1)
-      expect(result[0]!.source).toBe('plugin.mjs')
+      expect(result[0].source).toBe('plugin.mjs')
     })
 
     it('ignores non-js files', () => {
@@ -191,7 +191,7 @@ describe('discoverPlugins', () => {
 
       const result = discoverPlugins('fit', testDir)
       expect(result).toHaveLength(1)
-      expect(result[0]!.entryPoint).toContain('lib/main.js')
+      expect(result[0].entryPoint).toContain('lib/main.js')
     })
   })
 

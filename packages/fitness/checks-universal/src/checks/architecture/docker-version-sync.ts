@@ -49,7 +49,7 @@ function readRootPackageJson(cwd: string): RootPackageJson {
   const pkgPath = path.join(cwd, 'package.json')
   const stats = fs.statSync(pkgPath)
   if (stats.size > 10_000_000) throw new Error(`File too large: ${pkgPath}`)
-  const raw = fs.readFileSync(pkgPath, 'utf-8')
+  const raw = fs.readFileSync(pkgPath, 'utf8')
   return JSON.parse(raw) as RootPackageJson
 }
 
@@ -61,7 +61,7 @@ function extractNodeMajor(constraint: string): number | null {
   const match = /(\d+)/.exec(constraint)
   const digit = match?.[1]
   // @fitness-ignore-next-line numeric-validation -- regex (\d+) guarantees digit-only string
-  return digit ? parseInt(digit, 10) : null
+  return digit ? Number.parseInt(digit, 10) : null
 }
 
 /**
@@ -79,7 +79,7 @@ function extractPnpmVersion(packageManager: string): string | null {
  */
 function extractMajor(version: string): number {
   const major = version.split('.')[0] ?? '0'
-  const parsed = parseInt(major, 10)
+  const parsed = Number.parseInt(major, 10)
   return Number.isFinite(parsed) ? parsed : 0
 }
 
@@ -99,7 +99,7 @@ function checkNodeVersion(
   if (!nodeVersion) return
 
   // @fitness-ignore-next-line numeric-validation -- regex (\d+) guarantees digit-only string
-  const dockerNodeMajor = parseInt(nodeVersion, 10)
+  const dockerNodeMajor = Number.parseInt(nodeVersion, 10)
   if (dockerNodeMajor !== expectedNodeMajor) {
     violations.push({
       line: lineNum,
@@ -165,8 +165,7 @@ function analyzeDockerfileLines(
   expectedPnpmVersion: string | null,
   violations: CheckViolation[],
 ): void {
-  for (let i = 0; i < lines.length; i++) {
-    const rawLine = lines[i]
+  for (const [i, rawLine] of lines.entries()) {
     if (!rawLine) continue
     const line = rawLine.trim()
     const lineNum = i + 1

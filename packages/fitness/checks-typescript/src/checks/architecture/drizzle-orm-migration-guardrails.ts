@@ -62,6 +62,7 @@ export const drizzleOrmMigrationGuardrails = defineCheck({
   tags: ['architecture', 'database', 'safety', 'drizzle'],
   fileTypes: ['ts'],
 
+  // eslint-disable-next-line sonarjs/cognitive-complexity -- multi-pattern guardrail: each branch detects a distinct dangerous Drizzle migration pattern
   analyze(content: string, filePath: string): CheckViolation[] {
     // Only check migration files and schema files
     if (!filePath.includes('/migrations/') && !filePath.includes('/schema')) return []

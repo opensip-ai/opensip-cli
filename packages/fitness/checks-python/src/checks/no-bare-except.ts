@@ -15,6 +15,7 @@
  */
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
+// eslint-disable-next-line sonarjs/slow-regex -- anchored, bounded line scan; \s* on bounded leading whitespace is safe
 const BARE_EXCEPT_PATTERN = /^\s*except\s*:/gm
 
 /**

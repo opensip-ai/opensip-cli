@@ -2,9 +2,11 @@
  * ResultsTable component — renders the fitness check results table.
  */
 
-import React from 'react';
 import { Text, Box } from 'ink';
+import React from 'react';
+
 import { useTheme, type Theme } from '../theme.js';
+
 import type { TableRow } from '@opensip-tools/cli-shared';
 
 export interface ResultsTableProps {
@@ -36,8 +38,8 @@ function warningColor(count: number, theme: Theme): string {
 /** Parse the numeric count from a validated string like "450 files". Returns 0 for "—" or unparseable. */
 function parseValidatedCount(validated: string): number {
   if (validated === '—') return 0;
-  const match = validated.match(/^(\d+)/);
-  return match ? parseInt(match[1], 10) : 0;
+  const match = /^(\d+)/.exec(validated);
+  return match ? Number.parseInt(match[1], 10) : 0;
 }
 
 function ignoredColor(ignored: number, validated: string, theme: Theme): string {

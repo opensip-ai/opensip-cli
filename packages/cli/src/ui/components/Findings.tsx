@@ -10,8 +10,9 @@
  * readable) or `opensip-tools dashboard` (HTML).
  */
 
-import React from 'react';
 import { Text, Box } from 'ink';
+import React from 'react';
+
 import { useTheme } from '../theme.js';
 
 /**
@@ -91,9 +92,8 @@ export function Findings({ checks, maxViolationsPerCheck = DEFAULT_VIOLATIONS_PE
             )}
 
             {visible.map((v, i) => {
-              const loc = v.file
-                ? `${v.file}${v.line ? `:${v.line}` : ''}`
-                : '';
+              const lineSuffix = v.line ? `:${v.line}` : '';
+              const loc = v.file ? `${v.file}${lineSuffix}` : '';
               return (
                 <Box key={i} flexDirection="column">
                   <Text>

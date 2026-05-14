@@ -31,7 +31,7 @@ function readConfigPathFromPackageJson(rootDir: string): string | null {
 
   let parsed: unknown
   try {
-    parsed = JSON.parse(readFileSync(pkgPath, 'utf-8'))
+    parsed = JSON.parse(readFileSync(pkgPath, 'utf8'))
   } catch {
     // Malformed package.json is the user's problem to fix — don't
     // silently mask it with a config-resolution error. The subsequent

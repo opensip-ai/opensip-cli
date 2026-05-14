@@ -11,6 +11,9 @@
 import { ValidationError as CoreValidationError } from '@opensip-tools/core'
 
 import { scenarioRegistry } from '../../framework/registry.js'
+
+import { createLoadScenarioRunner } from './executor.js'
+
 import type { RunnableScenario } from '../../framework/runnable-scenario.js'
 import type {
   CustomExecuteFn,
@@ -19,7 +22,6 @@ import type {
   ScenarioExecutionOptions,
 } from '../../types/framework-types.js'
 
-import { createLoadScenarioRunner } from './executor.js'
 
 /**
  * Author-facing configuration for a load scenario.

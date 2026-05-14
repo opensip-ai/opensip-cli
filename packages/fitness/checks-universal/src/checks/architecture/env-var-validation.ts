@@ -4,6 +4,7 @@
  */
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+
 import { createPathMatcher } from '../../utils/index.js'
 
 
@@ -96,8 +97,8 @@ function getMatchContext(line: string, matchIndex: number, matchLength: number):
  * Check for type coercion issues using dynamic patterns
  */
 function hasTypeCoercionIssue(context: string, envVarName: string): boolean {
-  const numericOpPattern = new RegExp(`process\\.env\\.${envVarName}\\s*[+\\-*/<>]=?\\s*\\d`)
-  const reverseOpPattern = new RegExp(`\\d\\s*[+\\-*/<>]=?\\s*process\\.env\\.${envVarName}`)
+  const numericOpPattern = new RegExp(String.raw`process\.env\.${envVarName}\s*[+\-*/<>]=?\s*\d`)
+  const reverseOpPattern = new RegExp(String.raw`\d\s*[+\-*/<>]=?\s*process\.env\.${envVarName}`)
   const portPattern = `port`
   const timeoutPattern = `timeout`
   const envAccess = `process.env.${envVarName}`
@@ -148,7 +149,7 @@ function createIssue(
   envVarName: string,
 ): EnvVarIssue {
   switch (type) {
-    case 'direct-access-outside-config':
+    case 'direct-access-outside-config': {
       return {
         file: filePath,
         line: lineNumber,
@@ -158,7 +159,8 @@ function createIssue(
         severity: 'warning',
         envVarName,
       }
-    case 'type-coercion':
+    }
+    case 'type-coercion': {
       return {
         file: filePath,
         line: lineNumber,
@@ -168,7 +170,8 @@ function createIssue(
         severity: 'warning',
         envVarName,
       }
-    case 'unvalidated-access':
+    }
+    case 'unvalidated-access': {
       return {
         file: filePath,
         line: lineNumber,
@@ -178,7 +181,8 @@ function createIssue(
         severity: 'warning',
         envVarName,
       }
-    default:
+    }
+    default: {
       return {
         file: filePath,
         line: lineNumber,
@@ -188,6 +192,7 @@ function createIssue(
         severity: 'warning',
         envVarName,
       }
+    }
   }
 }
 
@@ -258,8 +263,7 @@ function analyzeFile(filePath: string, content: string): EnvVarIssue[] {
   const isConfigFile = filePath.includes('config')
   const issues: EnvVarIssue[] = []
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
+  for (const [i, line] of lines.entries()) {
     if (!line) {
       continue
     }

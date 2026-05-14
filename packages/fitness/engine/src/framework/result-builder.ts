@@ -5,14 +5,7 @@
  * metadata, and display information.
  */
 
-import type { Signal } from '@opensip-tools/core'
 
-import type {
-  CheckResult,
-  CheckInfo,
-  ItemType,
-  FindingSeverity,
-} from '../types/findings.js'
 import {
   CheckInfoFactory,
   createResultWithSignals,
@@ -20,6 +13,14 @@ import {
   getItemTypeLabel,
 } from '../types/findings.js'
 import { countErrors, countWarnings, isErrorSeverity, isWarningSeverity } from '../types/severity.js'
+
+import type {
+  CheckResult,
+  CheckInfo,
+  ItemType,
+  FindingSeverity,
+} from '../types/findings.js'
+import type { Signal } from '@opensip-tools/core'
 
 /**
  * Options for building results.
@@ -45,9 +46,9 @@ export interface ResultBuilderOptions {
  * ```
  */
 export class ResultBuilder {
-  private _totalItems: number = 0
+  private _totalItems = 0
   private readonly _signals: Signal[] = []
-  private _ignoredCount: number = 0
+  private _ignoredCount = 0
   private _durationMs?: number
   private _filesScanned?: number
   private _extra?: Record<string, unknown>
@@ -76,7 +77,7 @@ export class ResultBuilder {
   }
 
   addSignals(signals: readonly Signal[]): this {
-    if (!Array.isArray(signals) || signals.length === 0) {
+    if (signals.length === 0) {
       return this
     }
     this._signals.push(...signals)
@@ -88,7 +89,7 @@ export class ResultBuilder {
     return this
   }
 
-  incrementIgnored(by: number = 1): this {
+  incrementIgnored(by = 1): this {
     this._ignoredCount += by
     return this
   }
@@ -246,9 +247,6 @@ export function filterSignals(
   signals: readonly Signal[],
   severity: FindingSeverity,
 ): Signal[] {
-  if (!Array.isArray(signals)) {
-    return []
-  }
   return signals.filter((s) =>
     severity === 'error' ? isErrorSeverity(s.severity) : isWarningSeverity(s.severity),
   )
@@ -259,10 +257,6 @@ export function filterSignals(
  */
 export function groupByFile(signals: readonly Signal[]): Map<string, Signal[]> {
   // in-memory: single-threaded Node.js access pattern
-  if (!Array.isArray(signals)) {
-    return new Map()
-  }
-
   const groups = new Map<string, Signal[]>()
 
   for (const signal of signals) {
@@ -282,9 +276,6 @@ export function groupByFile(signals: readonly Signal[]): Map<string, Signal[]> {
  * Sort signals by file, then line.
  */
 export function sortSignals(signals: readonly Signal[]): Signal[] {
-  if (!Array.isArray(signals)) {
-    return []
-  }
   return [...signals].sort((a, b) => {
     const fileA = a.code?.file ?? ''
     const fileB = b.code?.file ?? ''
@@ -304,7 +295,7 @@ export function sortSignals(signals: readonly Signal[]): Signal[] {
 export function extractSnippet(
   content: string,
   line: number,
-  contextLines: number = 2,
+  contextLines = 2,
 ): { snippet: string; contextLines: number } {
   const lines = content.split('\n')
   const startLine = Math.max(0, line - 1 - contextLines)
@@ -318,7 +309,7 @@ export function extractSnippet(
  * Get line number from content string and character index.
  */
 export function getLineNumber(content: string, index: number): number {
-  return content.substring(0, index).split('\n').length
+  return content.slice(0, Math.max(0, index)).split('\n').length
 }
 
 /**

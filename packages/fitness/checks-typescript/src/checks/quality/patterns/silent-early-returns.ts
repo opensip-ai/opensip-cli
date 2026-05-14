@@ -6,14 +6,16 @@
  */
 
 import { logger } from '@opensip-tools/core/logger'
-import * as ts from 'typescript'
-
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import * as ts from 'typescript'
 
 // =============================================================================
 // DETECTION PATTERNS
 // =============================================================================
+
+/** Function-like AST nodes this check operates on. */
+type FunctionLikeNode = ts.FunctionDeclaration | ts.MethodDeclaration | ts.ArrowFunction
 
 /**
  * Patterns that indicate logging is present
@@ -39,9 +41,9 @@ const SENTINEL_KINDS = new Set([ts.SyntaxKind.NullKeyword, ts.SyntaxKind.FalseKe
  */
 function findFunction(
   node: ts.Node,
-): ts.FunctionDeclaration | ts.MethodDeclaration | ts.ArrowFunction | null {
+): FunctionLikeNode | null {
   let current = node.parent
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- defensive: ts.Node.parent is undefined at root despite TS typing
+   
   while (current) {
     if (
       ts.isFunctionDeclaration(current) ||
@@ -61,7 +63,7 @@ function findFunction(
  * - Predicate functions: isXxx, hasXxx, canXxx, shouldXxx
  */
 function isTypeGuard(
-  fn: ts.FunctionDeclaration | ts.MethodDeclaration | ts.ArrowFunction,
+  fn: FunctionLikeNode,
   sourceFile: ts.SourceFile,
 ): boolean {
   // Check return type predicate
@@ -86,7 +88,7 @@ function isTypeGuard(
  * These functions legitimately return null/false for invalid input.
  */
 function isValidationOrParserFunction(
-  fn: ts.FunctionDeclaration | ts.MethodDeclaration | ts.ArrowFunction,
+  fn: FunctionLikeNode,
   sourceFile: ts.SourceFile,
 ): boolean {
   // Get function name if available
@@ -94,6 +96,7 @@ function isValidationOrParserFunction(
     const name = fn.name.getText(sourceFile)
     // Validation/parsing function patterns: validate*, verify*, parse*, check*, extract*, get*OrNull, etc.
     if (
+      // eslint-disable-next-line sonarjs/regex-complexity -- exhaustive list of known validator/parser prefixes; readable as written
       /^(validate|verify|parse|check|extract|try|attempt|find|get\w*OrNull|get|lookup|resolve|match|unregister|acquire|release|test|compare|supports)[A-Z]?/.test(
         name,
       )
@@ -119,7 +122,7 @@ function isValidationOrParserFunction(
  */
 function isEarlyGuardClause(
   returnNode: ts.IfStatement,
-  fn: ts.FunctionDeclaration | ts.MethodDeclaration | ts.ArrowFunction,
+  fn: FunctionLikeNode,
 ): boolean {
   const body = fn.body
   if (!body || !ts.isBlock(body)) return false
@@ -153,7 +156,7 @@ const PREDICATE_METHODS = new Set([
  * Example: arr.filter(x => { if (!x) return false; ... })
  */
 function isPredicateCallback(
-  fn: ts.FunctionDeclaration | ts.MethodDeclaration | ts.ArrowFunction,
+  fn: FunctionLikeNode,
 ): boolean {
   // Only arrow functions can be predicate callbacks
   if (!ts.isArrowFunction(fn)) return false

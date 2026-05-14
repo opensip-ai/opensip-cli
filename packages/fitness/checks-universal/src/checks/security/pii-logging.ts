@@ -8,7 +8,6 @@
  */
 
 import { logger } from '@opensip-tools/core/logger'
-
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
 // PII field names to detect in log statements
@@ -81,7 +80,7 @@ function hasUserObjectReference(line: string): boolean {
   if (userIdx === -1) return false
 
   // Check if followed by safe patterns (Id, _id, .id)
-  const afterUser = lowerLine.substring(userIdx + 4)
+  const afterUser = lowerLine.slice(Math.max(0, userIdx + 4))
   if (afterUser.startsWith('id') || afterUser.startsWith('_id') || afterUser.startsWith('.id')) {
     return false
   }
@@ -110,16 +109,16 @@ function findUserLoggingMatch(line: string): { match: string; index: number } | 
     .filter(({ idx }) => idx !== -1)
     .map(({ idx: prefixIdx }) => {
       const parenStart = line.indexOf('(', prefixIdx)
-      const parenEnd = parenStart !== -1 ? line.indexOf(')', parenStart) : -1
+      const parenEnd = parenStart === -1 ? -1 : line.indexOf(')', parenStart)
       return { prefixIdx, parenStart, parenEnd }
     })
     .filter(({ parenStart, parenEnd }) => parenStart !== -1 && parenEnd !== -1)
 
   for (const { prefixIdx, parenStart, parenEnd } of presentPrefixes) {
-    const callContent = line.substring(parenStart, parenEnd + 1)
+    const callContent = line.slice(parenStart, parenEnd + 1)
     if (callContent.toLowerCase().includes('user')) {
       return {
-        match: line.substring(prefixIdx, parenEnd + 1),
+        match: line.slice(prefixIdx, parenEnd + 1),
         index: prefixIdx,
       }
     }
@@ -165,10 +164,10 @@ export const piiLogging = defineCheck({
 
     // Build regex for PII fields (case-insensitive for object properties)
 
-    const piiFieldsRegex = new RegExp(`(?:${PII_FIELDS.join('|')})\\s*[:=]`, 'gi')
+    const piiFieldsRegex = new RegExp(String.raw`(?:${PII_FIELDS.join('|')})\s*[:=]`, 'gi')
 
-    for (let lineNum = 0; lineNum < lines.length; lineNum++) {
-      const line = lines[lineNum] ?? ''
+    for (const [lineNum, line_] of lines.entries()) {
+      const line = line_ ?? ''
 
       // Skip comments
       const trimmed = line.trim()

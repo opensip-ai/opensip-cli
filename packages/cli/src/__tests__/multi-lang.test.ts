@@ -22,7 +22,7 @@ const UNKNOWN_FIXTURE = join(__dirname, 'fixtures/unknown-language')
 function runIn(cwd: string, ...args: string[]): { stdout: string; stderr: string; exitCode: number } {
   const result = spawnSync('node', [CLI, ...args], {
     cwd,
-    encoding: 'utf-8',
+    encoding: 'utf8',
     timeout: 60_000,
     env: { ...process.env, NO_COLOR: '1' },
   })
@@ -68,7 +68,7 @@ describe('CLI multi-language', () => {
   })
 
   it('fixture config declares targets for every language', () => {
-    const cfg = readFileSync(join(FIXTURE, 'opensip-tools.config.yml'), 'utf-8')
+    const cfg = readFileSync(join(FIXTURE, 'opensip-tools.config.yml'), 'utf8')
     expect(cfg).toContain('languages: [rust]')
     expect(cfg).toContain('languages: [python]')
     expect(cfg).toContain('languages: [java]')

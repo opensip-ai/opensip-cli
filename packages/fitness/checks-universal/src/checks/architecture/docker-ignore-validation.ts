@@ -99,7 +99,7 @@ export const dockerIgnoreValidation = defineCheck({
       // Read .dockerignore and validate required patterns
       const dockerignoreStats = fs.statSync(dockerignorePath)
       if (dockerignoreStats.size > 10_000_000) throw new Error(`File too large: ${dockerignorePath}`)
-      const dockerignoreContent = fs.readFileSync(dockerignorePath, 'utf-8')
+      const dockerignoreContent = fs.readFileSync(dockerignorePath, 'utf8')
       const content = await files.read(filePath)
 
       // .git is always required

@@ -13,6 +13,7 @@ import { defineCheck, type CheckViolation, parseSource, walkNodes, getASTLineNum
  * Requires SQL keyword + structural follow-up: SELECT...FROM, INSERT INTO, etc.
  */
 const SQL_STRUCTURE_PATTERN =
+  // eslint-disable-next-line sonarjs/regex-complexity -- enumerates SQL DML/DDL shapes in a single bounded alternation; splitting fragments the rule's intent
   /\b(?:SELECT\s+[\w.*]+\s+FROM|INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM|DROP\s+(?:TABLE|INDEX|DATABASE|VIEW)|ALTER\s+TABLE|CREATE\s+(?:TABLE|INDEX|DATABASE|VIEW)|TRUNCATE\s+(?:TABLE)?)\b/i
 
 /** Simpler pattern for SQL keywords at start of string concatenation */

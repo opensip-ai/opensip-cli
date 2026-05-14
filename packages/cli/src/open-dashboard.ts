@@ -39,9 +39,9 @@ export function decideOpen(ctx: OpenDashboardContext): OpenDashboardDecision {
   if (!ctx.openRequested) return { shouldOpen: false, reason: 'not-requested' }
   if (ctx.jsonOutput) return { shouldOpen: false, reason: 'json-mode' }
   if (!ctx.stdoutIsTTY) return { shouldOpen: false, reason: 'non-tty' }
-  if (ctx.env['CI']) return { shouldOpen: false, reason: 'ci-env' }
-  const ssh = ctx.env['SSH_CONNECTION'] ?? ctx.env['SSH_CLIENT']
-  const display = ctx.env['DISPLAY'] ?? ctx.env['WAYLAND_DISPLAY']
+  if (ctx.env.CI) return { shouldOpen: false, reason: 'ci-env' }
+  const ssh = ctx.env.SSH_CONNECTION ?? ctx.env.SSH_CLIENT
+  const display = ctx.env.DISPLAY ?? ctx.env.WAYLAND_DISPLAY
   if (ssh && !display) return { shouldOpen: false, reason: 'ssh-no-display' }
   return { shouldOpen: true, reason: 'ok' }
 }

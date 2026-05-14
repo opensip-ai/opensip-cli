@@ -14,8 +14,6 @@
  */
 
 import { ScenarioAbortedError } from '../../framework/execution/execution-engine.js'
-import type { RunnableScenario } from '../../framework/runnable-scenario.js'
-import type { FixEvaluationScenarioExecutorResult } from '../../framework/scenario-executor-result.js'
 
 import type {
   FixEvaluationScenarioConfig,
@@ -23,11 +21,15 @@ import type {
   PredicateLeaf,
 } from './define.js'
 import type { PredicateVerdict } from './result.js'
+import type { RunnableScenario } from '../../framework/runnable-scenario.js'
+import type { FixEvaluationScenarioExecutorResult } from '../../framework/scenario-executor-result.js'
+
 
 const HARNESS_NOT_WIRED_REASON =
   'fix-evaluation harness not yet wired (Phase 7.5 — autoresearch corpus migration)'
 
 /** Build a placeholder verdict tree mirroring the input predicate's structure. */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- recursive verdict builder: composition vs leaf branches read better as a single function
 function placeholderVerdict(
   node: PredicateComposition | PredicateLeaf | undefined,
 ): PredicateVerdict | undefined {
@@ -37,9 +39,10 @@ function placeholderVerdict(
   const hasAnyOf = Array.isArray(composition.any_of)
   if (hasAllOf || hasAnyOf) {
     const combinator: 'all_of' | 'any_of' = hasAllOf ? 'all_of' : 'any_of'
-    const childrenSrc = hasAllOf ? composition.all_of : composition.any_of
+    const childrenSrc: readonly (PredicateComposition | PredicateLeaf)[] | undefined =
+      hasAllOf ? composition.all_of : composition.any_of
     const children: PredicateVerdict[] = []
-    if (Array.isArray(childrenSrc)) {
+    if (childrenSrc) {
       for (const child of childrenSrc) {
         const verdict = placeholderVerdict(child)
         if (verdict) children.push(verdict)
@@ -72,6 +75,7 @@ export function createFixEvaluationScenarioRunner(
     description: config.description,
     tags: Object.freeze([...config.tags]),
 
+    /* eslint-disable-next-line @typescript-eslint/require-await -- run() must match `(signal) => Promise<...>`; placeholder body is currently synchronous */
     run:
       /** @throws {ScenarioAbortedError} When the scenario is aborted via AbortSignal */
       async (abortSignal: AbortSignal): Promise<FixEvaluationScenarioExecutorResult> => {

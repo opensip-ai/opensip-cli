@@ -6,19 +6,22 @@
  * to SignalCategory. Used by defineCheck and PatternDetector.
  */
 
+import type { FindingSeverity } from '../types/findings.js'
 import type { SignalSeverity, SignalCategory } from '@opensip-tools/core'
 
-import type { FindingSeverity } from '../types/findings.js'
 
 /** Map FindingSeverity to SignalSeverity */
 export function mapFindingSeverity(severity: FindingSeverity): SignalSeverity {
   switch (severity) {
-    case 'error':
+    case 'error': {
       return 'high'
-    case 'warning':
+    }
+    case 'warning': {
       return 'medium'
-    default:
+    }
+    default: {
       return 'medium'
+    }
   }
 }
 
@@ -26,20 +29,27 @@ export function mapFindingSeverity(severity: FindingSeverity): SignalSeverity {
 export function mapTagsToSignalCategory(tags: readonly string[]): SignalCategory {
   for (const tag of tags) {
     switch (tag) {
-      case 'security':
+      case 'security': {
         return 'security'
-      case 'performance':
+      }
+      case 'performance': {
         return 'performance'
-      case 'architecture':
+      }
+      case 'architecture': {
         return 'architecture'
-      case 'quality':
+      }
+      case 'quality': {
         return 'warning'
-      case 'resilience':
+      }
+      case 'resilience': {
         return 'resilience'
-      case 'testing':
+      }
+      case 'testing': {
         return 'testing'
-      case 'documentation':
+      }
+      case 'documentation': {
         return 'documentation'
+      }
     }
   }
   return 'warning'

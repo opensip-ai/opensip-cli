@@ -3,8 +3,8 @@
  * @fileoverview Detects hardcoded correlation ID values
  */
 
-import { countUnescapedBackticks } from '@opensip-tools/lang-typescript'
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { countUnescapedBackticks } from '@opensip-tools/lang-typescript'
 
 /**
  * Pattern for detecting hardcoded correlationId string literal assignments.
@@ -19,8 +19,7 @@ function findHardcodedCorrelationIds(content: string, filePath: string): CheckVi
   const lines = content.split('\n')
   let inTemplateLiteral = false
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
+  for (const [i, line] of lines.entries()) {
     if (!line) continue
 
     const backtickCount = countUnescapedBackticks(line)

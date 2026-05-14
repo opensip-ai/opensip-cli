@@ -1,10 +1,12 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { defaultLanguageRegistry } from '@opensip-tools/core'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+
 import { loadAllPlugins, loadPlugin } from '../loader.js'
+
 import type { DiscoveredPlugin } from '@opensip-tools/core'
 
 let testDir: string

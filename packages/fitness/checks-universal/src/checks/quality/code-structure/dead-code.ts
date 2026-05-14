@@ -35,17 +35,17 @@ function findKnipConfig(projectRoot: string): string | null {
  */
 interface KnipOutput {
   files?: string[]
-  issues?: Array<{
+  issues?: {
     file: string
-    exports?: Array<{ name?: string; symbol?: string; line?: number }>
-    types?: Array<{ name?: string; symbol?: string; line?: number }>
-    dependencies?: Array<{ name?: string; line?: number }>
-    devDependencies?: Array<{ name?: string; line?: number }>
-    unlisted?: Array<{ name?: string; line?: number }>
-    enumMembers?: Record<string, Array<{ name?: string; line?: number }>>
-    classMembers?: Record<string, Array<{ name?: string; line?: number }>>
+    exports?: { name?: string; symbol?: string; line?: number }[]
+    types?: { name?: string; symbol?: string; line?: number }[]
+    dependencies?: { name?: string; line?: number }[]
+    devDependencies?: { name?: string; line?: number }[]
+    unlisted?: { name?: string; line?: number }[]
+    enumMembers?: Record<string, { name?: string; line?: number }[]>
+    classMembers?: Record<string, { name?: string; line?: number }[]>
     duplicates?: string[]
-  }>
+  }[]
 }
 
 /**
@@ -192,7 +192,7 @@ function processMembers(
  */
 function parseKnipOutput(output: string, cwd: string): CheckViolation[] {
   const violations: CheckViolation[] = []
-  const data: KnipOutput = JSON.parse(output)
+  const data = JSON.parse(output) as KnipOutput
 
   // Process unused files
   for (const file of data.files ?? []) {
@@ -203,9 +203,11 @@ function parseKnipOutput(output: string, cwd: string): CheckViolation[] {
   for (const issue of data.issues ?? []) {
     const filePath = issue.file.startsWith('/') ? issue.file : `${cwd}/${issue.file}`
 
-    violations.push(...processExportsAndTypes(issue, filePath))
-    violations.push(...processDependencies(issue, filePath, cwd))
-    violations.push(...processMembers(issue, filePath))
+    violations.push(
+      ...processExportsAndTypes(issue, filePath),
+      ...processDependencies(issue, filePath, cwd),
+      ...processMembers(issue, filePath),
+    )
   }
 
   return violations

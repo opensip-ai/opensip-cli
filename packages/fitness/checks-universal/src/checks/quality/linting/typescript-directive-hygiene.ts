@@ -108,8 +108,8 @@ export const typescriptDirectiveHygiene = defineCheck({
 
     const lines = content.split('\n')
 
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i] ?? ''
+    for (const [i, line_] of lines.entries()) {
+      const line = line_ ?? ''
       const match = TS_DIRECTIVE_REGEX.exec(line)
       if (!match) continue
 

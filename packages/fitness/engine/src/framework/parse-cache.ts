@@ -12,10 +12,9 @@
  * core framework/import-graph.ts internal use case.
  */
 
-import ts from 'typescript'
 
-import { getParseTree } from '@opensip-tools/core'
-import { defaultLanguageRegistry } from '@opensip-tools/core'
+import { getParseTree , defaultLanguageRegistry } from '@opensip-tools/core'
+import ts from 'typescript'
 
 export {
   initParseCache,

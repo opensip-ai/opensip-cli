@@ -7,16 +7,19 @@
  */
 
 import { ValidationError } from '@opensip-tools/core'
-import type { Signal } from '@opensip-tools/core'
+
+import { evaluateAssertion } from './assertions.js'
 
 import type { SimulationMetrics } from '../types/base-types.js'
 import type {
   ScenarioAssertion,
   FailedAssertion,
+  // eslint-disable-next-line sonarjs/deprecation -- this builder IS the legacy load-result implementation; the deprecated type is its return shape by design
   LegacyLoadResultPayload,
 } from '../types/framework-types.js'
+import type { Signal } from '@opensip-tools/core'
 
-import { evaluateAssertion } from './assertions.js'
+
 
 // =============================================================================
 // METRIC MAPPING
@@ -110,10 +113,6 @@ export class ScenarioResultBuilder {
 
   /** Evaluate all assertions against the current metrics. */
   evaluateAssertions(assertions: readonly ScenarioAssertion[]): this {
-    if (!Array.isArray(assertions)) {
-      return this
-    }
-
     if (!this._metrics) {
       // @fitness-ignore-next-line result-pattern-consistency -- builder precondition, throw is appropriate
       throw new ValidationError(
@@ -146,9 +145,6 @@ export class ScenarioResultBuilder {
 
   /** Add multiple signals. */
   addSignals(signals: readonly Signal[]): this {
-    if (!Array.isArray(signals)) {
-      return this
-    }
     this._signals.push(...signals)
     return this
   }
@@ -159,6 +155,7 @@ export class ScenarioResultBuilder {
 
   /** Build the final load-shaped payload. Throws if metrics are not set. */
   // @fitness-ignore-next-line result-pattern-consistency -- return type is LegacyLoadResultPayload (not canonical Result); throw is a builder precondition
+  // eslint-disable-next-line sonarjs/deprecation -- legacy builder return type, kept for back-compat
   build(): LegacyLoadResultPayload {
     if (!this._metrics) {
       // @fitness-ignore-next-line result-pattern-consistency -- builder precondition, throw is appropriate
@@ -193,24 +190,28 @@ export class ScenarioResultBuilder {
     }
 
     switch (metric) {
-      case 'error_rate':
+      case 'error_rate': {
         return this._metrics.totalRequests > 0
           ? this._metrics.failedRequests / this._metrics.totalRequests
           : 0
+      }
 
-      case 'success_rate':
+      case 'success_rate': {
         return this._metrics.totalRequests > 0
           ? this._metrics.successfulRequests / this._metrics.totalRequests
           : 0
+      }
 
-      case 'requests_per_second':
+      case 'requests_per_second': {
         if (!this._duration || this._duration <= 0) {
           return 0
         }
         return this._metrics.totalRequests / this._duration
+      }
 
-      default:
+      default: {
         return 0
+      }
     }
   }
 }

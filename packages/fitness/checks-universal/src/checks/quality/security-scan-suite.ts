@@ -50,7 +50,11 @@ export const securityScanSuite = defineCheck({
 
       // Parse npm audit results
       try {
-        const auditResult = JSON.parse(stdout)
+        // npm/pnpm/yarn audit JSON shape — stable across the three CLIs.
+        interface AuditOutput {
+          metadata?: { vulnerabilities?: { critical?: number; high?: number; moderate?: number; low?: number } }
+        }
+        const auditResult = JSON.parse(stdout) as AuditOutput
         const meta = auditResult.metadata?.vulnerabilities ?? {}
         const count = (meta.critical ?? 0) + (meta.high ?? 0) + (meta.moderate ?? 0)
 

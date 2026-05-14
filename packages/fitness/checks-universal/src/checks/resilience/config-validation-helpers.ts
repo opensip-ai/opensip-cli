@@ -15,7 +15,7 @@ import { logger } from '@opensip-tools/core/logger'
  */
 export function isDigit(char: string | undefined): boolean {
   if (!char) return false
-  const code = char.charCodeAt(0)
+  const code = char.codePointAt(0) ?? 0
   return code >= 48 && code <= 57
 }
 
@@ -24,7 +24,7 @@ export function isDigit(char: string | undefined): boolean {
  */
 export function isAlphanumericChar(char: string | undefined): boolean {
   if (!char) return false
-  const code = char.charCodeAt(0)
+  const code = char.codePointAt(0) ?? 0
   const isDigitChar = code >= 48 && code <= 57 // 0-9
   const isUpperCase = code >= 65 && code <= 90 // A-Z
   const isLowerCase = code >= 97 && code <= 122 // a-z
@@ -62,6 +62,6 @@ export function parseDigits(
   }
   const digitCount = i - startPos
   // @fitness-ignore-next-line numeric-validation -- substring is guaranteed digit-only by isDigit loop above
-  const value = digitCount > 0 ? parseInt(str.substring(startPos, i), 10) : 0
+  const value = digitCount > 0 ? Number.parseInt(str.slice(startPos, i), 10) : 0
   return { endPos: i, value, digitCount }
 }

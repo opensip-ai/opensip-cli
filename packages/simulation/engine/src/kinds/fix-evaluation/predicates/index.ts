@@ -96,6 +96,7 @@ export const predicateRegistry: ReadonlyMap<string, PredicateEvaluator> = regist
  * replaces these via `registerPredicate` at composition time.
  */
 function makeStubEvaluator(id: string): PredicateEvaluator {
+  // eslint-disable-next-line @typescript-eslint/require-await -- PredicateEvaluator returns a Promise; this stub throws synchronously
   return async () => {
     // @fitness-ignore-next-line result-pattern-consistency -- intentional stub; harness wires real evaluator
     throw new Error(

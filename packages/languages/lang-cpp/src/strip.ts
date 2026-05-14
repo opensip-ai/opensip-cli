@@ -16,6 +16,7 @@ interface Scan {
   readonly commentRegions: Region[]
 }
 
+// eslint-disable-next-line sonarjs/cognitive-complexity -- token-state-machine: cyclomatic complexity is inherent to lexer-style scanners; splitting hurts readability
 function scan(src: string): Scan {
   const stringRegions: Region[] = []
   const commentRegions: Region[] = []
@@ -69,13 +70,13 @@ function scan(src: string): Scan {
             // content starts at j+1, ends at start of closingPattern
             const contentStart = j + 1
             const closeIdx = src.indexOf(closingPattern, contentStart)
-            if (closeIdx >= 0) {
-              stringRegions.push({ start: contentStart, end: closeIdx })
-              i = closeIdx + closingPattern.length
-            } else {
+            if (closeIdx === -1) {
               // Unterminated raw string — record what we have
               stringRegions.push({ start: contentStart, end: len })
               i = len
+            } else {
+              stringRegions.push({ start: contentStart, end: closeIdx })
+              i = closeIdx + closingPattern.length
             }
             continue
           }
@@ -167,6 +168,7 @@ function scanRegularString(src: string, openQuotePos: number): RegStrResult {
 
 function applyRegions(src: string, regions: readonly Region[]): string {
   if (regions.length === 0) return src
+  // eslint-disable-next-line unicorn/prefer-spread -- split('') keeps UTF-16 unit indexing; spread/Array.from use code points and break offsets
   const buf = src.split('')
   for (const r of regions) {
     for (let i = r.start; i < r.end; i++) {

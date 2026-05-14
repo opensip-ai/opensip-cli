@@ -36,7 +36,7 @@ interface SemgrepResult {
 
 interface SemgrepOutput {
   results: SemgrepResult[]
-  errors: Array<{ message: string }>
+  errors: { message: string }[]
 }
 
 // =============================================================================

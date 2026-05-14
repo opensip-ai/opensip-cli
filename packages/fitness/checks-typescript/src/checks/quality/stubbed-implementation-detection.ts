@@ -18,10 +18,11 @@
  *   - ({}) as T used as Proxy target is skipped
  */
 
-import * as ts from 'typescript'
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import * as ts from 'typescript'
+
 import { isTestFile } from '../../utils/index.js'
 
 /** The check ID constant to avoid duplication */
@@ -289,7 +290,7 @@ function checkEmptyObjectStub(options: CheckNodeOptions): CheckViolation | null 
   if (!ts.isAsExpression(node) && !ts.isTypeAssertionExpression(node)) return null
 
   const expression = node.expression
-  if (!ts.isObjectLiteralExpression(expression) || expression.properties.length !== 0) return null
+  if (!ts.isObjectLiteralExpression(expression) || expression.properties.length > 0) return null
 
   const typeText = node.type.getText(sourceFile)
   // Skip primitives and Record types
@@ -443,7 +444,7 @@ export const stubbedImplementationDetection = defineCheck({
 
     try {
       const sourceFile = getSharedSourceFile(filePath, content)
-    if (!sourceFile) return []
+      if (!sourceFile) return []
 
       const visit = (node: ts.Node): void => {
         const nodeOptions = { node, sourceFile }
@@ -466,8 +467,8 @@ export const stubbedImplementationDetection = defineCheck({
       // in tests are intentional)
       if (!isTestFile(filePath)) {
         const lines = content.split('\n')
-        for (let i = 0; i < lines.length; i++) {
-          const placeholder = checkLineForPlaceholder(lines[i] ?? '', i + 1)
+        for (const [i, line] of lines.entries()) {
+          const placeholder = checkLineForPlaceholder(line ?? '', i + 1)
           if (placeholder) violations.push(placeholder)
         }
       }

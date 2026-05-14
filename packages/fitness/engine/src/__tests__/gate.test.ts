@@ -10,7 +10,7 @@
  *   - DEFAULT_BASELINE_PATH constant is what we documented
  */
 
-import { mkdtempSync, readFileSync, writeFileSync, existsSync, rmSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -25,6 +25,7 @@ import {
   DEFAULT_BASELINE_PATH,
   type GateCompareResult,
 } from '../gate.js';
+
 import type { CliOutput, FindingOutput } from '@opensip-tools/cli-shared';
 
 // ---------------------------------------------------------------------------
@@ -92,7 +93,7 @@ describe('saveBaseline', () => {
     saveBaseline(makeOutput(), path);
 
     expect(existsSync(path)).toBe(true);
-    const doc = JSON.parse(readFileSync(path, 'utf-8'));
+    const doc = JSON.parse(readFileSync(path, 'utf8'));
     expect(doc.version).toBe('2.1.0');
     expect(Array.isArray(doc.runs)).toBe(true);
     expect(doc.runs[0].results.length).toBe(1);
@@ -109,7 +110,7 @@ describe('saveBaseline', () => {
     saveBaseline(makeOutput([makeFinding({ message: 'first' })]), path);
     saveBaseline(makeOutput([makeFinding({ message: 'second' })]), path);
 
-    const doc = JSON.parse(readFileSync(path, 'utf-8'));
+    const doc = JSON.parse(readFileSync(path, 'utf8'));
     expect(doc.runs[0].results[0].message.text).toBe('second');
   });
 
@@ -118,7 +119,7 @@ describe('saveBaseline', () => {
     const empty: CliOutput = { ...makeOutput(), checks: [] };
     saveBaseline(empty, path);
 
-    const doc = JSON.parse(readFileSync(path, 'utf-8'));
+    const doc = JSON.parse(readFileSync(path, 'utf8'));
     expect(doc.runs).toEqual([]);
   });
 });
@@ -128,6 +129,7 @@ describe('saveBaseline', () => {
 // ---------------------------------------------------------------------------
 
 describe('compareToBaseline — classification', () => {
+  // eslint-disable-next-line unicorn/consistent-function-scoping -- closes over describe-scoped `tmpDir`
   function setupBaseline(findings: FindingOutput[]): string {
     const path = join(tmpDir, 'baseline.sarif');
     saveBaseline(makeOutput(findings), path);
@@ -156,8 +158,8 @@ describe('compareToBaseline — classification', () => {
     );
 
     expect(result.added.length).toBe(1);
-    expect(result.added[0]!.filePath).toBe('b.ts');
-    expect(result.added[0]!.message).toBe('new');
+    expect(result.added[0].filePath).toBe('b.ts');
+    expect(result.added[0].message).toBe('new');
     expect(result.unchanged.length).toBe(1);
     expect(result.resolved).toEqual([]);
     expect(result.degraded).toBe(true);
@@ -175,7 +177,7 @@ describe('compareToBaseline — classification', () => {
 
     expect(result.added).toEqual([]);
     expect(result.resolved.length).toBe(1);
-    expect(result.resolved[0]!.filePath).toBe('b.ts');
+    expect(result.resolved[0].filePath).toBe('b.ts');
     expect(result.unchanged.length).toBe(1);
     expect(result.degraded).toBe(false);
   });
@@ -194,9 +196,9 @@ describe('compareToBaseline — classification', () => {
     );
 
     expect(result.added.length).toBe(1);
-    expect(result.added[0]!.filePath).toBe('new.ts');
+    expect(result.added[0].filePath).toBe('new.ts');
     expect(result.resolved.length).toBe(1);
-    expect(result.resolved[0]!.filePath).toBe('gone.ts');
+    expect(result.resolved[0].filePath).toBe('gone.ts');
     expect(result.unchanged.length).toBe(1);
     expect(result.degraded).toBe(true);
   });
@@ -249,9 +251,9 @@ describe('compareToBaseline — line-number invariance (D3)', () => {
     );
 
     expect(result.added.length).toBe(1);
-    expect(result.added[0]!.message).toBe('cc=28');
+    expect(result.added[0].message).toBe('cc=28');
     expect(result.resolved.length).toBe(1);
-    expect(result.resolved[0]!.message).toBe('cc=22');
+    expect(result.resolved[0].message).toBe('cc=22');
     expect(result.degraded).toBe(true);
   });
 });
@@ -267,10 +269,10 @@ describe('compareToBaseline — errors', () => {
 
     try {
       compareToBaseline(makeOutput(), path);
-    } catch (err) {
-      expect(err).toBeInstanceOf(GateBaselineMissingError);
-      expect((err as GateBaselineMissingError).baselinePath).toBe(path);
-      expect((err as Error).message).toContain('--gate-save');
+    } catch (error) {
+      expect(error).toBeInstanceOf(GateBaselineMissingError);
+      expect((error as GateBaselineMissingError).baselinePath).toBe(path);
+      expect((error as Error).message).toContain('--gate-save');
     }
   });
 
@@ -302,8 +304,8 @@ describe('compareToBaseline — errors', () => {
     const path = join(tmpDir, 'no-such.sarif');
     try {
       compareToBaseline(makeOutput(), path);
-    } catch (err) {
-      expect((err as Error).message).toContain(path);
+    } catch (error) {
+      expect((error as Error).message).toContain(path);
     }
   });
 });
@@ -378,8 +380,10 @@ describe('compareToBaseline — partial SARIF tolerance', () => {
 // ---------------------------------------------------------------------------
 
 describe('renderGateCompareOutput', () => {
+  // eslint-disable-next-line unicorn/consistent-function-scoping -- describe-scoped factory; could move out but reads better adjacent to its tests
   function makeResult(overrides: Partial<GateCompareResult> = {}): GateCompareResult {
     return {
+      // eslint-disable-next-line sonarjs/publicly-writable-directories -- test fixture path; not a runtime filesystem operation
       baselinePath: '/tmp/baseline.sarif',
       added: [],
       resolved: [],
@@ -528,6 +532,6 @@ describe('integration — save then compare round-trip', () => {
     );
     expect(result.unchanged.length).toBe(1);
     expect(result.added.length).toBe(1);
-    expect(result.added[0]!.filePath).toBe('b.ts');
+    expect(result.added[0].filePath).toBe('b.ts');
   });
 });

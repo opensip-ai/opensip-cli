@@ -16,14 +16,13 @@ function analyze(content: string, filePath: string): CheckViolation[] {
   const violations: CheckViolation[] = []
 
   // Check for tracesSampleRate: 1.0 (or 1) — expensive in production
-  const rateMatch = initBlock.block.match(/tracesSampleRate\s*:\s*([\d.]+)/)
+  const rateMatch = /tracesSampleRate\s*:\s*([\d.]+)/.exec(initBlock.block)
   if (rateMatch) {
-    const rate = parseFloat(rateMatch[1] ?? '0')
-    if (rate === 1 || rate === 1.0) {
-      const rateIndex = initBlock.block.indexOf('tracesSampleRate')
+    const rate = Number.parseFloat(rateMatch[1] ?? '0')
+    if (rate === 1) {
       const absoluteIndex = content.indexOf('tracesSampleRate', content.indexOf('Sentry.init'))
       violations.push({
-        line: absoluteIndex !== -1 ? getLineNumber(content, absoluteIndex) : initBlock.startLine + 1,
+        line: absoluteIndex === -1 ? initBlock.startLine + 1 : getLineNumber(content, absoluteIndex),
         message:
           'tracesSampleRate is 1.0 — every transaction is traced, which is expensive at scale',
         severity: 'warning',

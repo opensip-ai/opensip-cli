@@ -4,6 +4,7 @@
 
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { clearScenarioRegistry } from '../framework/registry.js'
 import {
   defineFixEvaluationScenario,
   validateFixEvaluationScenarioConfig,
@@ -14,7 +15,6 @@ import {
   registerPredicate,
   resetPredicateRegistryToBaseline,
 } from '../kinds/fix-evaluation/predicates/index.js'
-import { clearScenarioRegistry } from '../framework/registry.js'
 
 const baseConfig: Omit<FixEvaluationScenarioConfig, 'id' | 'name' | 'predicate'> = {
   description: 'sql injection fix predicate test',
@@ -66,7 +66,7 @@ describe('defineFixEvaluationScenario', () => {
       predicate: {
         all_of: [
           { id: 'tests-pass' },
-          { id: 'regex-in-file', path: 'src/db.ts', pattern: '\\$\\d+' },
+          { id: 'regex-in-file', path: 'src/db.ts', pattern: String.raw`\$\d+` },
           { id: 'no-files-outside-target', targets: ['src/db.ts'] },
         ],
       },
@@ -125,6 +125,7 @@ describe('defineFixEvaluationScenario', () => {
   })
 
   it('accepts a custom predicate registered at composition time', () => {
+    // eslint-disable-next-line @typescript-eslint/require-await -- predicate signature requires `() => Promise<PredicateResult>`
     registerPredicate('my-custom-predicate', async () => ({ passed: true }))
     expect(listPredicateIds()).toContain('my-custom-predicate')
 
@@ -159,6 +160,7 @@ describe('predicate registry baseline', () => {
   })
 
   it('resetPredicateRegistryToBaseline reinstates the baseline ids', () => {
+    // eslint-disable-next-line @typescript-eslint/require-await -- predicate signature requires `() => Promise<PredicateResult>`
     registerPredicate('temporary', async () => ({ passed: true }))
     expect(listPredicateIds()).toContain('temporary')
 

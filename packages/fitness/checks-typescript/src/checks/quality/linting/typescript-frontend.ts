@@ -25,18 +25,18 @@ const TS_ERROR_PATTERN = /^([^(]+)\((\d+),(\d+)\):\s*(error|warning)\s+(TS\d+):\
 /**
  * Parse TypeScript error output
  */
-function parseErrors(output: string): Array<{
+function parseErrors(output: string): {
   file: string
   line: number
   code: string
   message: string
-}> {
-  const errors: Array<{
+}[] {
+  const errors: {
     file: string
     line: number
     code: string
     message: string
-  }> = []
+  }[] = []
 
   TS_ERROR_PATTERN.lastIndex = 0
   let match
@@ -45,7 +45,7 @@ function parseErrors(output: string): Array<{
     errors.push({
       file: match[1] ?? '',
       // @fitness-ignore-next-line numeric-validation -- regex (\d+) guarantees digits only; parseInt always returns a valid integer
-      line: parseInt(match[2] ?? '0', 10),
+      line: Number.parseInt(match[2] ?? '0', 10),
       code: match[5] ?? '',
       message: match[6] ?? '',
     })
@@ -97,7 +97,7 @@ function createGenericFailure(appPath: string, app: string): CheckViolation {
  */
 function errorsToViolations(
   appPath: string,
-  errors: Array<{ file: string; line: number; code: string; message: string }>,
+  errors: { file: string; line: number; code: string; message: string }[],
 ): CheckViolation[] {
   return errors.slice(0, 10).map((err) => ({
     filePath: join(appPath, err.file),
@@ -181,7 +181,7 @@ export const typescriptFrontend = defineCheck({
       const result = await execAbortable('npx tsc --noEmit 2>&1', {
         cwd: appPath,
         // @fitness-ignore-next-line no-hardcoded-timeouts -- framework default for tsc subprocess execution
-        timeout: 60000,
+        timeout: 60_000,
         maxBuffer: 10 * 1024 * 1024,
       })
 

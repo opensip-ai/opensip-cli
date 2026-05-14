@@ -45,17 +45,17 @@ export const contractsSchemaConsistency = defineCheck({
       const schemaNames = new Set<string>()
       // @fitness-ignore-next-line batch-operation-limits -- iterating over lines of a single file, bounded by file-length-limits check
       for (const line of lines) {
-        const schemaMatch = line.match(/export\s+const\s+(\w+Schema)\s*=\s*z\./)
+        const schemaMatch = /export\s+const\s+(\w+Schema)\s*=\s*z\./.exec(line)
         if (schemaMatch?.[1]) {
           schemaNames.add(schemaMatch[1])
         }
       }
 
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i] ?? ''
+      for (const [i, line_] of lines.entries()) {
+        const line = line_ ?? ''
 
         // Check for manually defined types that have a corresponding schema
-        const typeMatch = line.match(/export\s+type\s+(\w+)\s*=\s*(?!z\.infer)/)
+        const typeMatch = /export\s+type\s+(\w+)\s*=\s*(?!z\.infer)/.exec(line)
         if (typeMatch?.[1]) {
           const typeName = typeMatch[1]
           const expectedSchema = `${typeName}Schema`

@@ -5,8 +5,9 @@
  * lightweight placeholder that can be extended later if needed.
  */
 
-import React from 'react';
 import { Text, Box } from 'ink';
+import React from 'react';
+
 import { useTheme } from '../theme.js';
 
 export function HelpText(): React.ReactElement {

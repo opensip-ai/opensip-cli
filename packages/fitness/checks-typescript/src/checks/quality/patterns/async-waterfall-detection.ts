@@ -13,10 +13,11 @@
  * - Skips sleep/delay in polling loops
  */
 
-import * as ts from 'typescript'
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import * as ts from 'typescript'
+
 import { isTestFile } from '../../../utils/index.js'
 
 /**
@@ -284,8 +285,8 @@ function isDynamicImportExpression(awaitNode: ts.AwaitExpression): boolean {
 function isSleepOrDelay(expressionText: string): boolean {
   const afterAwait = expressionText.replace(/^await\s+/, '')
   // Extract the function name from patterns like: sleep(100), this.sleep(100), delay(ms)
-  // eslint-disable-next-line sonarjs/slow-regex -- [\w]+ bounded by '(' delimiter; optional 'this.' prefix is fixed
-  const match = afterAwait.match(/(?:this\.)?([\w]+)\s*\(/)
+  // eslint-disable-next-line sonarjs/slow-regex -- `\w+` bounded by `(`; optional `this.` prefix is fixed
+  const match = /(?:this\.)?(\w+)\s*\(/.exec(afterAwait)
 
   if (match?.[1] !== undefined) {
     return SLEEP_DELAY_NAMES.has(match[1])
@@ -299,8 +300,8 @@ function isSleepOrDelay(expressionText: string): boolean {
 function isLockAcquire(expressionText: string): boolean {
   const afterAwait = expressionText.replace(/^await\s+/, '')
   // Extract the function name from patterns like: this.acquire(), acquire(timeout)
-  // eslint-disable-next-line sonarjs/slow-regex -- [\w]+ bounded by '(' delimiter; optional 'this.' prefix is fixed
-  const match = afterAwait.match(/(?:this\.)?([\w]+)\s*\(/)
+  // eslint-disable-next-line sonarjs/slow-regex -- `\w+` bounded by `(`; optional `this.` prefix is fixed
+  const match = /(?:this\.)?(\w+)\s*\(/.exec(afterAwait)
 
   if (match?.[1] !== undefined) {
     return LOCK_ACQUIRE_NAMES.has(match[1])

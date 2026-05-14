@@ -4,7 +4,7 @@
  */
 
 export function dashboardSharedJs(): string {
-  return `
+  return String.raw`
 // Tab switching
 document.getElementById('tab-bar').addEventListener('click', e => {
   const tab = e.target.closest('.tab');
@@ -32,7 +32,7 @@ function el(tag, attrs, children) {
 // =======================================================
 
 function renderPageButtons(container, currentPage, totalPages, goToPage) {
-  container.appendChild(el('button', {class:'pagination-btn' + (currentPage === 0 ? ' disabled' : ''), text:'\\u2190 Prev', onclick: () => { if (currentPage > 0) goToPage(currentPage - 1); }}));
+  container.appendChild(el('button', {class:'pagination-btn' + (currentPage === 0 ? ' disabled' : ''), text:'\u2190 Prev', onclick: () => { if (currentPage > 0) goToPage(currentPage - 1); }}));
 
   const pages = [];
   for (let p = 0; p < totalPages; p++) {
@@ -45,13 +45,13 @@ function renderPageButtons(container, currentPage, totalPages, goToPage) {
 
   pages.forEach(p => {
     if (p === -1) {
-      container.appendChild(el('span', {style:'color:var(--text-dim);padding:4px 4px;font-size:12px', text:'\\u2026'}));
+      container.appendChild(el('span', {style:'color:var(--text-dim);padding:4px 4px;font-size:12px', text:'\u2026'}));
     } else {
       container.appendChild(el('button', {class:'pagination-btn' + (p === currentPage ? ' active' : ''), text: ''+(p+1), onclick: () => goToPage(p)}));
     }
   });
 
-  container.appendChild(el('button', {class:'pagination-btn' + (currentPage >= totalPages-1 ? ' disabled' : ''), text:'Next \\u2192', onclick: () => { if (currentPage < totalPages-1) goToPage(currentPage + 1); }}));
+  container.appendChild(el('button', {class:'pagination-btn' + (currentPage >= totalPages-1 ? ' disabled' : ''), text:'Next \u2192', onclick: () => { if (currentPage < totalPages-1) goToPage(currentPage + 1); }}));
 }
 
 function paginateTable(tbody, paginationContainer, pageSize) {

@@ -2,8 +2,9 @@
  * InitFeedback component — renders feedback for the init command.
  */
 
-import React from 'react';
 import { Text, Box } from 'ink';
+import React from 'react';
+
 import { useTheme } from '../theme.js';
 
 export interface InitFeedbackProps {

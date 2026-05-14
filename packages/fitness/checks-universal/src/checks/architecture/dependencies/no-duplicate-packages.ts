@@ -71,8 +71,8 @@ const EXCLUDED_PACKAGES = [/__fixtures__/, /__mocks__/, /examples?$/, /-test$/, 
 
 function getPackageInfo(packageJsonPath: string, projectRoot: string): PackageInfo | null {
   try {
-    const content = fs.readFileSync(packageJsonPath, 'utf-8')
-    const pkg = JSON.parse(content)
+    const content = fs.readFileSync(packageJsonPath, 'utf8')
+    const pkg = JSON.parse(content) as { name?: string; keywords?: string[] }
     const packageDir = path.dirname(packageJsonPath)
     const relativePath = path.relative(projectRoot, packageDir)
 
@@ -81,7 +81,7 @@ function getPackageInfo(packageJsonPath: string, projectRoot: string): PackageIn
     }
 
     return {
-      name: pkg.name || path.basename(packageDir),
+      name: pkg.name ?? path.basename(packageDir),
       path: relativePath,
       keywords: pkg.keywords,
     }
@@ -97,7 +97,7 @@ function matchesPattern(pkg: PackageInfo, patterns: RegExp[]): boolean {
     return false
   }
 
-  const namePart = pkg.name.split('/').pop() || pkg.name
+  const namePart = pkg.name.split('/').pop() ?? pkg.name
   if (patterns.some((p) => p.test(namePart))) return true
   if (pkg.keywords) {
     for (const keyword of pkg.keywords) {
@@ -111,7 +111,7 @@ function matchesPattern(pkg: PackageInfo, patterns: RegExp[]): boolean {
 function deduplicateByNamePart(packages: PackageInfo[]): PackageInfo[] {
   const seen = new Map<string, PackageInfo>()
   for (const pkg of packages) {
-    const namePart = pkg.name.split('/').pop() || pkg.name
+    const namePart = pkg.name.split('/').pop() ?? pkg.name
     if (!seen.has(namePart)) {
       seen.set(namePart, pkg)
     }
@@ -169,6 +169,7 @@ export const noDuplicatePackages = defineCheck({
   fileTypes: ['json'],
 
   // @fitness-ignore-next-line concurrency-safety -- async keyword required by analyzeAll interface contract; synchronous analysis implementation
+  // eslint-disable-next-line @typescript-eslint/require-await -- AnalyzeAllCheckConfig requires Promise<CheckViolation[]>; this implementation is synchronous
   async analyzeAll(files: FileAccessor): Promise<CheckViolation[]> {
     // Get the cwd from the first file path
     const firstFile = files.paths[0]

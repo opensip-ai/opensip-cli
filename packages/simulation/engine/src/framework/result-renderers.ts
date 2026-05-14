@@ -13,10 +13,11 @@
  * omission as a compile-time error.
  */
 
-import type { SimulationMetrics } from '../types/base-types.js'
 
 import { createEmptyMetrics } from './result-builder.js'
+
 import type { ScenarioExecutorResult } from './scenario-executor-result.js'
+import type { SimulationMetrics } from '../types/base-types.js'
 
 /** View-friendly summary common to every kind. */
 export interface ScenarioResultView {
@@ -36,7 +37,7 @@ export function renderScenarioResultView(
   result: ScenarioExecutorResult,
 ): ScenarioResultView {
   switch (result.kind) {
-    case 'load':
+    case 'load': {
       return {
         kind: 'load',
         scenarioId: result.scenarioId,
@@ -47,6 +48,7 @@ export function renderScenarioResultView(
         assertionsFailed: result.outcome.assertions.failed.length,
         outcomeLabel: `${result.outcome.metrics.totalRequests} req, ${result.outcome.assertions.failed.length} failed`,
       }
+    }
 
     case 'chaos': {
       const passedCount =
@@ -82,7 +84,7 @@ export function renderScenarioResultView(
       }
     }
 
-    case 'fix-evaluation':
+    case 'fix-evaluation': {
       return {
         kind: 'fix-evaluation',
         scenarioId: result.scenarioId,
@@ -95,6 +97,7 @@ export function renderScenarioResultView(
           ? 'predicate matched'
           : `predicate did not match (matchedExpectedOutcome=${result.outcome.matchedExpectedOutcome})`,
       }
+    }
 
     default: {
       // Exhaustiveness guard — adding a new variant to the discriminated union

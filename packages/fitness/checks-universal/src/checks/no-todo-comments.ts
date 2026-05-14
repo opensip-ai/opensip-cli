@@ -1,3 +1,4 @@
+/* eslint-disable sonarjs/fixme-tag -- this file's job is to detect TODO/FIXME markers; the words appear in identifiers and JSDoc by necessity */
 /**
  * @fileoverview Cross-language TODO/FIXME comment detection.
  *
@@ -19,8 +20,8 @@ const TODO_PATTERN = /\b(TODO|FIXME|XXX|HACK)\b/g
 export function analyzeTodoComments(content: string): CheckViolation[] {
   const violations: CheckViolation[] = []
   const lines = content.split('\n')
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]!
+  for (const [i, line_] of lines.entries()) {
+    const line = line_
     let match: RegExpExecArray | null
     TODO_PATTERN.lastIndex = 0
     while ((match = TODO_PATTERN.exec(line)) !== null) {

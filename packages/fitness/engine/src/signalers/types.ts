@@ -2,9 +2,9 @@
  * @fileoverview Signalers configuration types — derived from Zod schemas
  */
 
+import type { CliDefaultsSchema, FitnessSchema, SignalersConfigSchema, SimulationSchema } from './schema.js'
 import type { z } from 'zod'
 
-import type { CliDefaultsSchema, FitnessSchema, SignalersConfigSchema, SimulationSchema } from './schema.js'
 
 /** Recursively marks all properties as readonly. */
 type DeepReadonly<T> = {

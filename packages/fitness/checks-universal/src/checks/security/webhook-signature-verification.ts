@@ -3,8 +3,8 @@
  */
 
 import { logger } from '@opensip-tools/core/logger'
-
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+
 import { isCommentLine } from '../../utils/index.js'
 
 /**
@@ -89,7 +89,7 @@ function hasVerifierImport(content: string): boolean {
 const SECURITY_ISSUE_PATTERNS: SecurityPattern[] = [
   // Hardcoded webhook secrets - simplified non-backtracking pattern
   createSecurityPattern({
-    pattern: '(?:webhook)?secret\\s*[:=]\\s*[\'"][^\'"]{10,}[\'"]',
+    pattern: String.raw`(?:webhook)?secret\s*[:=]\s*['"][^'"]{10,}['"]`,
     flags: 'gi',
     message: 'Hardcoded webhook secret detected - use environment variables',
     suggestion:
@@ -109,7 +109,7 @@ const SECURITY_ISSUE_PATTERNS: SecurityPattern[] = [
   // Direct string comparison for signatures (not timing-safe)
   // Simplified pattern without lookahead to avoid slow-regex/backtracking
   createSecurityPattern({
-    pattern: 'signature\\s*(?:===|!==|==|!=)\\s*[^;]+',
+    pattern: String.raw`signature\s*(?:===|!==|==|!=)\s*[^;]+`,
     flags: 'gi',
     message:
       'Direct signature comparison detected - use timing-safe comparison to prevent timing attacks',
@@ -123,7 +123,7 @@ const SECURITY_ISSUE_PATTERNS: SecurityPattern[] = [
 // Patterns indicating JSON parsing without verification - simplified
 const UNSAFE_JSON_PATTERNS: SecurityPattern[] = [
   createSecurityPattern({
-    pattern: 'JSON\\.parse\\s*\\([^)]*(?:req\\.body|request\\.body|rawBody)',
+    pattern: String.raw`JSON\.parse\s*\([^)]*(?:req\.body|request\.body|rawBody)`,
     flags: 'gi',
     message:
       'JSON.parse on webhook body without signature verification - use a shared webhook verification utility',
@@ -219,8 +219,8 @@ export const webhookSignatureVerification = defineCheck({
     const fileHasVerifierImport = hasVerifierImport(content)
     const lines = content.split('\n')
 
-    for (let lineNum = 0; lineNum < lines.length; lineNum++) {
-      const line = lines[lineNum] ?? ''
+    for (const [lineNum, line_] of lines.entries()) {
+      const line = line_ ?? ''
 
       if (isCommentLine(line)) {
         continue

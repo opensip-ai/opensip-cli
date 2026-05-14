@@ -5,15 +5,14 @@
  * builds check summaries, and determines whether execution should stop.
  */
 
-import { logger } from '@opensip-tools/core'
-import { SystemError } from '@opensip-tools/core'
+import { logger , SystemError } from '@opensip-tools/core'
 
 import { memoryProfiler, type CheckMemoryProfile } from '../framework/memory-profiler.js'
-import type { CheckResult } from '../types/findings.js'
 import { countErrors, countWarnings } from '../types/severity.js'
 
 import type { CheckSummary, FitnessRecipeServiceCallbacks, FitnessRecipeSession } from './service-types.js'
 import type { FitnessRecipe, RecipeCheckResult } from './types.js'
+import type { CheckResult } from '../types/findings.js'
 
 // =============================================================================
 // TYPES
@@ -72,8 +71,8 @@ export function createCheckSummary(
   warningCount: number,
   durationMs: number,
   memoryProfile: CheckMemoryProfile,
-  ignoredCount: number = 0,
-  filesScanned: number = 0,
+  ignoredCount = 0,
+  filesScanned = 0,
 ): CheckSummary {
   return {
     checkId,

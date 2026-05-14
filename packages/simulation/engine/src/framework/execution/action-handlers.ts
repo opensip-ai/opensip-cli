@@ -6,8 +6,9 @@
  * Metrics must be updated atomically.
  */
 
-import type { Signal } from '@opensip-tools/core'
 import { createSignal } from '@opensip-tools/core'
+
+import { ScenarioAbortedError } from './scenario-aborted-error.js'
 
 import type {
   ChaosConfig,
@@ -15,8 +16,7 @@ import type {
   PersonaConfig,
   SimulationMetrics,
 } from '../../types/base-types.js'
-
-import { ScenarioAbortedError } from './scenario-aborted-error.js'
+import type { Signal } from '@opensip-tools/core'
 
 // =============================================================================
 // TYPES
@@ -93,7 +93,7 @@ export function applyChaos(chaosConfig: ChaosConfig | undefined): ChaosResult {
   for (const injection of chaosConfig.types) {
     if (Math.random() < injection.probability) {
       switch (injection.config.type) {
-        case 'latency':
+        case 'latency': {
           return {
             applied: true,
             type: 'latency',
@@ -101,14 +101,17 @@ export function applyChaos(chaosConfig: ChaosConfig | undefined): ChaosResult {
               injection.config.minMs +
               Math.random() * (injection.config.maxMs - injection.config.minMs),
           }
-        case 'error':
+        }
+        case 'error': {
           return {
             applied: true,
             type: 'error',
             message: injection.config.message,
           }
-        case 'timeout':
+        }
+        case 'timeout': {
           return { applied: true, type: 'timeout' }
+        }
       }
     }
   }

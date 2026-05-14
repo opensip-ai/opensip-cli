@@ -5,7 +5,6 @@
  */
 
 import { logger } from '@opensip-tools/core/logger'
-
 import { defineCheck, type CheckViolation, getLineNumber } from '@opensip-tools/fitness'
 
 // =============================================================================
@@ -156,8 +155,7 @@ export const eventArchitecture = defineCheck({
 
     // Check each line for direct EventEmitter usage
     const lines = content.split('\n')
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i]
+    for (const [i, line] of lines.entries()) {
       if (!line || !hasDirectEventEmitterPattern(line)) {
         continue
       }

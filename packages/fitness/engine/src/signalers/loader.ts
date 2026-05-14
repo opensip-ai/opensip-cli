@@ -9,14 +9,13 @@
 
 import { readFileSync, statSync } from 'node:fs'
 
-import { PROJECT_CONFIG_FILENAME, resolveProjectConfigPath } from '@opensip-tools/core'
-import { ValidationError, SystemError } from '@opensip-tools/core'
+import {  resolveProjectConfigPath , ValidationError, SystemError , logger } from '@opensip-tools/core'
 import yaml from 'js-yaml'
 
-const deepFreeze = <T>(obj: T): T => JSON.parse(JSON.stringify(obj)) as T
-import { logger } from '@opensip-tools/core'
+const deepFreeze = <T>(obj: T): T => structuredClone(obj)
 
 import { SignalersConfigSchema } from './schema.js'
+
 import type { SignalersConfig } from './types.js'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB
@@ -49,17 +48,17 @@ function readConfigFile(filePath: string): string {
         { code: 'SYSTEM.FILE.TOO_LARGE' },
       )
     }
-    return readFileSync(filePath, 'utf-8')
-  } catch (err) {
-    if (err instanceof ValidationError || err instanceof SystemError) throw err
-    const message = err instanceof Error ? err.message : String(err)
+    return readFileSync(filePath, 'utf8')
+  } catch (error) {
+    if (error instanceof ValidationError || error instanceof SystemError) throw error
+    const message = error instanceof Error ? error.message : String(error)
     throw new ValidationError(
       `Failed to read config file ${filePath}: ${message}`,
       {
         operation: 'load',
         loader: 'signalers',
         filePath,
-        cause: err instanceof Error ? err : undefined,
+        cause: error instanceof Error ? error : undefined,
       },
     )
   }
@@ -69,12 +68,12 @@ function readConfigFile(filePath: string): string {
 function parseYaml(raw: string, filePath: string): unknown {
   try {
     return yaml.load(raw) ?? {}
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
     throw new ValidationError(`${filePath} contains invalid YAML: ${message}`, {
       operation: 'load',
       loader: 'signalers',
-      cause: err instanceof Error ? err : undefined,
+      cause: error instanceof Error ? error : undefined,
     })
   }
 }
@@ -148,4 +147,6 @@ export function resetSignalersConfigCache(): void {
 }
 
 /** Re-export so tests and the init command can reference the canonical filename. */
-export { PROJECT_CONFIG_FILENAME }
+
+
+export {PROJECT_CONFIG_FILENAME} from '@opensip-tools/core'

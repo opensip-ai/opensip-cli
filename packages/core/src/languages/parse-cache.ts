@@ -9,8 +9,9 @@
 
 import { logger } from '../lib/logger.js'
 
-import type { LanguageAdapter } from './adapter.js'
 import { defaultLanguageRegistry } from './registry.js'
+
+import type { LanguageAdapter } from './adapter.js'
 
 const AUTO_CLEAR_MS = 10 * 60 * 1000 // matches previous behavior
 
@@ -26,7 +27,7 @@ class LanguageParseCache {
     // content and code-only filtered content. content.length alone is insufficient
     // because filterContent preserves length (replaces chars with same-length spaces).
     // Using the first 64 chars + length provides practical uniqueness.
-    const fingerprint = content.slice(0, 64).replace(/\s/g, '') + ':' + content.length
+    const fingerprint = content.slice(0, 64).replaceAll(/\s/g, '') + ':' + content.length
     const key = `${adapter.id}:${filePath}:${fingerprint}`
     const cached = this.cache.get(key) as TTree | undefined
     if (cached !== undefined) return cached
@@ -95,7 +96,7 @@ export function getParseTree<TTree>(
  * Convenience: resolve the adapter for the file via the global registry,
  * then parse. Returns null when no adapter is registered for the extension.
  */
-export function getParseTreeForFile(filePath: string, content: string): unknown | null {
+export function getParseTreeForFile(filePath: string, content: string): unknown {
   const adapter = defaultLanguageRegistry.forFile(filePath)
   if (!adapter) {
     logger.debug({

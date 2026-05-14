@@ -294,8 +294,7 @@ function validateESLintSuppressions(content: string): ESLintSuppressionIssue[] {
     blockRules: null,
   }
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
+  for (const [i, line] of lines.entries()) {
     if (!line) continue
 
     processLineForSuppressions(line, i + 1, state, issues)
@@ -320,12 +319,15 @@ function validateESLintSuppressions(content: string): ESLintSuppressionIssue[] {
 
 function getSuggestionForIssueType(issueType: IssueType): string {
   switch (issueType) {
-    case ISSUE_TYPE_MISSING_JUSTIFICATION:
+    case ISSUE_TYPE_MISSING_JUSTIFICATION: {
       return 'Add a justification after -- explaining why this rule is suppressed'
-    case ISSUE_TYPE_GENERIC_JUSTIFICATION:
+    }
+    case ISSUE_TYPE_GENERIC_JUSTIFICATION: {
       return 'Replace generic justification with a specific explanation of why this rule does not apply here'
-    default:
+    }
+    default: {
       return 'Fix the malformed eslint directive format: // eslint-disable-next-line rule-name -- reason'
+    }
   }
 }
 

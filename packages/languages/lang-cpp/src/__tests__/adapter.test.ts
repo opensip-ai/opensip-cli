@@ -26,7 +26,7 @@ describe('cpp stripStrings', () => {
   })
 
   it('handles backslash escapes inside strings', () => {
-    const src = 'X = "needle\\"middle"; Y'
+    const src = String.raw`X = "needle\"middle"; Y`
     const out = stripStrings(src)
     expect(out.length).toBe(src.length)
     expect(out).not.toContain('needle')

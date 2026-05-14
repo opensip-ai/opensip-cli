@@ -49,7 +49,7 @@ describe('java stripStrings', () => {
   })
 
   it('preserves char literals with escapes', () => {
-    const src = "char c = '\\n';"
+    const src = String.raw`char c = '\n';`
     const out = stripStrings(src)
     expect(out).toBe(src)
   })
@@ -62,10 +62,10 @@ describe('java stripStrings', () => {
   })
 
   it('handles escapes inside regular strings', () => {
-    const src = 'String s = "a\\"b";'
+    const src = String.raw`String s = "a\"b";`
     const out = stripStrings(src)
     expect(out.length).toBe(src.length)
-    expect(out).not.toContain('a\\"b')
+    expect(out).not.toContain(String.raw`a\"b`)
   })
 })
 

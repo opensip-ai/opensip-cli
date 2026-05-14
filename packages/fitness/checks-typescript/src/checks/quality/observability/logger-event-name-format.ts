@@ -3,8 +3,8 @@
  * @fileoverview Validates logger event names follow the 3+ dot-separated segment convention
  */
 
-import { countUnescapedBackticks } from '@opensip-tools/lang-typescript'
 import { defineCheck, isInsideStringLiteral, type CheckViolation } from '@opensip-tools/fitness'
+import { countUnescapedBackticks } from '@opensip-tools/lang-typescript'
 
 /**
  * Validates evt format: domain.component.action (3+ segments in lowercase with underscores)
@@ -39,7 +39,7 @@ function shouldSkipLine(line: string, inTemplateLiteral: boolean, backtickCount:
 }
 
 function isEvtPropertyContext(line: string, matchIndex: number): boolean {
-  const beforeEvt = line.substring(0, matchIndex).trim()
+  const beforeEvt = line.slice(0, Math.max(0, matchIndex)).trim()
   return beforeEvt.length === 0 || /^[{,]$/.test(beforeEvt)
 }
 
@@ -62,8 +62,7 @@ function analyzeEvtNames(content: string, filePath: string): CheckViolation[] {
   const lines = content.split('\n')
   let inTemplateLiteral = false
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
+  for (const [i, line] of lines.entries()) {
     if (!line) continue
 
     const backtickCount = countUnescapedBackticks(line)

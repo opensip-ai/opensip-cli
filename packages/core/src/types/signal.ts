@@ -11,6 +11,7 @@ export interface Signal {
   readonly source: string
   readonly provider: string
   readonly severity: SignalSeverity
+  // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents -- documents the canonical set while leaving the field open for plugin-defined categories
   readonly category: SignalCategory | string
   readonly ruleId: string
   readonly message: string
@@ -31,6 +32,7 @@ export interface CreateSignalInput {
   source: string
   provider?: string
   severity: SignalSeverity
+  // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents -- documents the canonical set while leaving the field open for plugin-defined categories
   category?: SignalCategory | string
   ruleId: string
   message: string

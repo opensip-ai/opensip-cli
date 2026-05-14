@@ -7,12 +7,12 @@
 
 import * as fs from 'node:fs/promises'
 
-import { ValidationError } from '@opensip-tools/core'
+import { ValidationError , applyContentFilter } from '@opensip-tools/core'
 
-import { applyContentFilter } from '@opensip-tools/core'
+
+import { fileCache } from './file-cache.js'
 
 import type { FileAccessor } from './check-config.js'
-import { fileCache } from './file-cache.js'
 
 // =============================================================================
 // LRU CACHE
@@ -121,7 +121,7 @@ export class FileAccessorImpl implements FileAccessor {
           { code: 'VALIDATION.FITNESS.FILE_TOO_LARGE' },
         )
       }
-      content = await fs.readFile(filePath, 'utf-8')
+      content = await fs.readFile(filePath, 'utf8')
     }
     // Dispatch through the LanguageAdapter for the file's extension.
     // See languages/content-filter-dispatch.ts.

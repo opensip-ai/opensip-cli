@@ -12,10 +12,10 @@
  * - JSX inside a React.useMemo callback (already optimized)
  */
 
-import * as ts from 'typescript'
-import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
-
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import * as ts from 'typescript'
+
 
 /**
  * Built-in React Native components that don't need memoization warnings
@@ -121,7 +121,7 @@ function collectMemoizedComponents(sourceFile: ts.SourceFile): Set<string> {
         ts.isIdentifier(callExpr.expression.expression) &&
         callExpr.expression.expression.text === 'Object' &&
         callExpr.expression.name.text === 'assign' &&
-        callExpr.arguments.length >= 1
+        callExpr.arguments.length > 0
       ) {
         const firstArg = callExpr.arguments[0]
         if (firstArg && ts.isIdentifier(firstArg) && memoized.has(firstArg.text)) {
@@ -180,7 +180,7 @@ function getMemoInnerFunctionName(node: ts.Node): string | null {
  */
 function findEnclosingMapCall(node: ts.Node): ts.CallExpression | null {
   let parent = node.parent
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- defensive: ts.Node.parent is undefined at root despite TS typing
+   
   while (parent) {
     if (ts.isCallExpression(parent)) {
       const expression = parent.expression
@@ -227,7 +227,7 @@ function isStaticArrayMap(mapCall: ts.CallExpression): boolean {
  */
 function isInsideUseMemo(node: ts.Node): boolean {
   let parent = node.parent
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- defensive: ts.Node.parent is undefined at root despite TS typing
+   
   while (parent) {
     if (ts.isCallExpression(parent)) {
       const expr = parent.expression

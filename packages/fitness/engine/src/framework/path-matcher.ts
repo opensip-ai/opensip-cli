@@ -136,9 +136,6 @@ export class PathMatcher {
    * Create a new PathMatcher with additional exclusions.
    */
   withExcludes(additionalExcludes: readonly string[]): PathMatcher {
-    if (!Array.isArray(additionalExcludes)) {
-      return this
-    }
     return new PathMatcher({
       ...this.options,
       additionalExcludes: [...(this.options.additionalExcludes ?? []), ...additionalExcludes],

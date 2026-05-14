@@ -11,10 +11,10 @@
 
 import { basename } from 'node:path'
 
-import * as ts from 'typescript'
 
 import { defineCheck, type CheckViolation, isAPIFile } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import * as ts from 'typescript'
 
 /**
  * Check if a file contains Fastify route-level response schema definitions.

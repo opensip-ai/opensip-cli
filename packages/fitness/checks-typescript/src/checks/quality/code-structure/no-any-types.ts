@@ -5,10 +5,10 @@
  * type checking and should be replaced with 'unknown' with proper type narrowing.
  */
 
-import * as ts from 'typescript'
-import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
-
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import * as ts from 'typescript'
+
 
 /**
  * Quick filter keywords for 'any' type patterns
@@ -22,8 +22,7 @@ function findDisabledLines(content: string): Set<number> {
   const disabledLines = new Set<number>()
   const lines = content.split('\n')
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
+  for (const [i, line] of lines.entries()) {
     if (line?.includes('eslint-disable-next-line')) {
       disabledLines.add(i + 1)
     }

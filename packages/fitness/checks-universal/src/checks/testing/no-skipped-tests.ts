@@ -7,8 +7,8 @@
  */
 
 import { logger } from '@opensip-tools/core/logger'
-
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+
 import { isCommentLine, isTestFile } from '../../utils/index.js'
 
 /**
@@ -53,8 +53,7 @@ function analyzeFile(content: string, filePath: string): CheckViolation[] {
 
   const lines = content.split('\n')
 
-  for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
-    const line = lines[lineIndex]
+  for (const [lineIndex, line] of lines.entries()) {
     if (line === undefined || isCommentLine(line)) {
       continue
     }

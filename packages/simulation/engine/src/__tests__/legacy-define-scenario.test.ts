@@ -1,3 +1,4 @@
+/* eslint-disable sonarjs/deprecation -- this file is the test suite that exercises the deprecated `defineScenario` back-compat path */
 /**
  * @fileoverview Tests for the deprecated `defineScenario` alias.
  *
@@ -9,10 +10,10 @@
 
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { defineScenario } from '../framework/define-scenario.js'
-import { clearScenarioRegistry } from '../framework/registry.js'
 import { ASSERTIONS } from '../framework/assertions.js'
+import { defineScenario } from '../framework/define-scenario.js'
 import { persona } from '../framework/personas.js'
+import { clearScenarioRegistry } from '../framework/registry.js'
 
 afterEach(() => {
   clearScenarioRegistry()

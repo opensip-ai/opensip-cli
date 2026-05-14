@@ -8,10 +8,10 @@
  * Validates that request/response contracts are enforced through types and schemas.
  */
 
-import * as ts from 'typescript'
 
 import { defineCheck, type CheckViolation, isAPIFile } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import * as ts from 'typescript'
 
 /**
  * Validation detection patterns
@@ -79,15 +79,16 @@ function getFunctionName(node: FunctionLikeNode): string {
  * Check if function has Express handler signature
  * @returns {boolean} True if the function has Express handler signature (req, res)
  */
+function getParamIdentifierName(p: ts.ParameterDeclaration | undefined): string {
+  return p && ts.isIdentifier(p.name) ? p.name.text : ''
+}
+
 function hasExpressHandlerSignature(node: FunctionLikeNode): boolean {
   const params = node.parameters
   if (params.length < 2) return false
 
-  const getParamName = (p: ts.ParameterDeclaration | undefined) =>
-    p && ts.isIdentifier(p.name) ? p.name.text : ''
-
-  const param1 = getParamName(params[0])
-  const param2 = getParamName(params[1])
+  const param1 = getParamIdentifierName(params[0])
+  const param2 = getParamIdentifierName(params[1])
 
   return (param1 === 'req' || param1 === 'request') && (param2 === 'res' || param2 === 'response')
 }

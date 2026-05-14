@@ -20,7 +20,7 @@ import { buildImportGraph, findStronglyConnectedComponents, type ImportGraph } f
 // Helpers — synthetic file maps
 // ---------------------------------------------------------------------------
 
-function map(...entries: ReadonlyArray<readonly [string, string]>): ReadonlyMap<string, string> {
+function map(...entries: readonly (readonly [string, string])[]): ReadonlyMap<string, string> {
   return new Map(entries)
 }
 
@@ -201,7 +201,7 @@ describe('findStronglyConnectedComponents', () => {
     const sccs = findStronglyConnectedComponents(g)
     const cycles = sccs.filter((s) => s.length > 1)
     expect(cycles.length).toBe(1)
-    expect(cycles[0]!.length).toBe(4)
+    expect(cycles[0].length).toBe(4)
   })
 
   it('detects two disjoint cycles', () => {
@@ -248,7 +248,7 @@ describe('findStronglyConnectedComponents', () => {
     // 1000-node linear chain: a0 → a1 → ... → a999. Iterative Tarjan's
     // should handle this without stack overflow (recursive form would die
     // around ~10k depending on the runtime).
-    const entries: Array<[string, string]> = []
+    const entries: [string, string][] = []
     const N = 1000
     for (let i = 0; i < N; i++) {
       const next = i + 1 < N ? `import {} from './a${i + 1}'` : ''

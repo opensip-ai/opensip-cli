@@ -180,9 +180,12 @@ function fishScript(): string {
 
 export function buildCompletionScript(shell: Shell): string {
   switch (shell) {
-    case 'bash': return bashScript()
-    case 'zsh':  return zshScript()
-    case 'fish': return fishScript()
+    case 'bash': { return bashScript()
+    }
+    case 'zsh': {  return zshScript()
+    }
+    case 'fish': { return fishScript()
+    }
   }
 }
 
