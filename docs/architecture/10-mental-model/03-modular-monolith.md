@@ -63,7 +63,7 @@ This document is the conceptual map. For the lookup-shaped catalog of every pack
 
 **Layer 1 — `@opensip-tools/core`.** The kernel. Ships types, errors, IDs, the logger, the path resolver, the language-adapter contract, the plugin discovery mechanics, and the Tool registry. No knowledge of fitness, simulation, or any other tool. No dependency on Commander, Ink, or any UI library.
 
-**Layer 2 — `@opensip-tools/contracts`.** Shared CLI types and infrastructure: the `CliOutput`/`CheckOutput`/`FindingOutput` shape every tool produces, the exit codes, the persistence helpers (session writers, log file initializers). Depends on `core` only. Does not import any tool.
+**Layer 2 — `@opensip-tools/contracts`.** The shared contract layer between Tools and the runner: the `CliOutput`/`CheckOutput`/`FindingOutput` shape every tool produces, the `CommandResult` discriminated union the renderer dispatches on, the exit-code constants, and the session persistence helpers (session writer, dashboard HTML generator). Depends on `core` only. Does not import any tool.
 
 **Layer 3 — `@opensip-tools/fitness`, `@opensip-tools/simulation`, `@opensip-tools/lang-*`.** Peer packages, all depending on `contracts` and `core`. Each tool engine (`fitness`, `simulation`) implements the `Tool` contract. Each language adapter (`lang-typescript`, `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp`) implements the `LanguageAdapter` contract.
 

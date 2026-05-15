@@ -585,8 +585,9 @@ enforced in CI by [dependency-cruiser](https://github.com/sverweij/dependency-cr
 packages/
   core/                    # @opensip-tools/core — kernel: errors, logger, IDs,
                            #   language adapters, plugin loader, Tool contract
-  contracts/              # @opensip-tools/contracts — CLI types, exit codes,
-                           #   session persistence, dashboard HTML generator
+  contracts/               # @opensip-tools/contracts — contract types between
+                           #   Tools and the runner: CliOutput/CommandResult
+                           #   shapes, exit codes, session persistence
   cli/                     # @opensip-tools/cli — generic tool dispatcher (Ink/React)
 
   fitness/                 # @opensip-tools/fitness namespace

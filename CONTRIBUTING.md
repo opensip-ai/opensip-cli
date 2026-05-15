@@ -28,7 +28,7 @@ Layered monorepo with three top-level groupings: top-level packages
 ```
 packages/
   core/                    # @opensip-tools/core — kernel
-  contracts/              # @opensip-tools/contracts — shared CLI types/persistence
+  contracts/               # @opensip-tools/contracts — Tool↔runner contract types
   cli/                     # @opensip-tools/cli — generic tool dispatcher
 
   fitness/

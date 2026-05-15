@@ -22,8 +22,10 @@ opensip-tools/
 │   ├── core/                    # @opensip-tools/core — kernel: errors, logger,
 │   │                            #   IDs, language adapters, plugin loader,
 │   │                            #   Tool contract
-│   ├── contracts/              # @opensip-tools/contracts — CLI types, exit
-│   │                            #   codes, session persistence, dashboard HTML
+│   ├── contracts/               # @opensip-tools/contracts — contract types
+│   │                            #   between Tools and the runner: CliOutput,
+│   │                            #   CommandResult, exit codes, session
+│   │                            #   persistence, dashboard HTML generator
 │   ├── cli/                     # @opensip-tools/cli — generic tool dispatcher
 │   │
 │   ├── fitness/                 # fitness namespace
@@ -214,7 +216,7 @@ or `pnpm --filter=@opensip-tools/<pkg> test`.
 ```
 core (kernel)
   ↑
-contracts (shared CLI infra)
+contracts (Tool↔runner contract types)
   ↑
 lang-* / fitness / simulation (peer layer)
   ↑
