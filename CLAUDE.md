@@ -22,7 +22,7 @@ opensip-tools/
 │   ├── core/                    # @opensip-tools/core — kernel: errors, logger,
 │   │                            #   IDs, language adapters, plugin loader,
 │   │                            #   Tool contract
-│   ├── cli-shared/              # @opensip-tools/cli-shared — CLI types, exit
+│   ├── contracts/              # @opensip-tools/contracts — CLI types, exit
 │   │                            #   codes, session persistence, dashboard HTML
 │   ├── cli/                     # @opensip-tools/cli — generic tool dispatcher
 │   │
@@ -214,7 +214,7 @@ or `pnpm --filter=@opensip-tools/<pkg> test`.
 ```
 core (kernel)
   ↑
-cli-shared (shared CLI infra)
+contracts (shared CLI infra)
   ↑
 lang-* / fitness / simulation (peer layer)
   ↑
@@ -223,11 +223,11 @@ checks-* (depend on fitness)
 cli (entry point — depends on every tool)
 ```
 
-- core must NOT import from cli-shared, cli, fitness, simulation, lang-*, or checks-*.
-- cli-shared must NOT import from cli, fitness, simulation, lang-*, or checks-*.
+- core must NOT import from contracts, cli, fitness, simulation, lang-*, or checks-*.
+- contracts must NOT import from cli, fitness, simulation, lang-*, or checks-*.
 - fitness / simulation must NOT import from cli (would create a cycle).
-- check packs must NOT import from cli or cli-shared.
-- lang-* packs must NOT import from cli, cli-shared, or each other.
+- check packs must NOT import from cli or contracts.
+- lang-* packs must NOT import from cli, contracts, or each other.
   - DOCUMENTED EXCEPTION: lang-typescript imports `filterContent` from
     fitness for legacy compatibility (D14).
 

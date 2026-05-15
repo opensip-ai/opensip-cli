@@ -5,7 +5,7 @@ title: "Output, gate, SARIF"
 audience: [contributors, ci-integrators]
 purpose: "What happens to the violations a check produces — render layer, JSON output, SARIF, the gate, cloud reporting."
 source-files:
-  - packages/cli-shared/src/types.ts
+  - packages/contracts/src/types.ts
   - packages/fitness/engine/src/sarif.ts
   - packages/fitness/engine/src/gate.ts
   - packages/fitness/engine/src/cli/fit.ts
@@ -52,7 +52,7 @@ The paths are mutually exclusive in their effect on stdout, but composable in th
 
 ## The `CliOutput` envelope
 
-Every output path starts from the same shape — a `CliOutput` produced after the recipe runs. Defined at [`packages/cli-shared/src/types.ts:100`](../../../packages/cli-shared/src/types.ts):
+Every output path starts from the same shape — a `CliOutput` produced after the recipe runs. Defined at [`packages/contracts/src/types.ts:100`](../../../packages/contracts/src/types.ts):
 
 ```ts
 interface CliOutput {

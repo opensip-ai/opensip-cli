@@ -15,7 +15,7 @@ import {
   type SummaryOptions,
   type FitDoneResult,
   type ErrorResult,
-} from '@opensip-tools/cli-shared';
+} from '@opensip-tools/contracts';
 import { logger, type CheckDisplayEntry } from '@opensip-tools/core';
 
 import { isCheck } from '../framework/check-types.js';

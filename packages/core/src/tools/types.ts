@@ -63,7 +63,7 @@ export interface ToolCliContext {
    * to mount their subcommands.
    */
   readonly program: unknown;
-  /** Render an Ink result (CommandResult shape from cli-shared). */
+  /** Render an Ink result (CommandResult shape from @opensip-tools/contracts). */
   readonly render: (result: unknown) => Promise<void>;
   /**
    * Render a live, stateful Ink view (spinner → results transition).

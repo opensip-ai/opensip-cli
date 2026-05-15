@@ -93,7 +93,7 @@ This is not a hypothetical: it's why `fit` and `sim` ship in separate packages, 
 
 ### Layered, not modular
 
-The 17 packages are organized as a strict dependency layer cake: `core` at the bottom, `cli-shared` above it, then `fitness/simulation/lang-*` as peers, then `checks-*` packs (which depend on the language packs), then `cli` at the top. The layer policy is enforced by [dependency-cruiser](../../../.dependency-cruiser.cjs) at lint time — the build fails if a `core` module imports from `fitness`, or if `lang-typescript` imports from `cli`.
+The 17 packages are organized as a strict dependency layer cake: `core` at the bottom, `contracts` above it, then `fitness/simulation/lang-*` as peers, then `checks-*` packs (which depend on the language packs), then `cli` at the top. The layer policy is enforced by [dependency-cruiser](../../../.dependency-cruiser.cjs) at lint time — the build fails if a `core` module imports from `fitness`, or if `lang-typescript` imports from `cli`.
 
 This shape is what makes the tool-plugin model possible: the kernel doesn't know what tools exist (`core` defines `Tool` and `ToolRegistry` but never imports a Tool implementation), and tools don't know what other tools exist. New tools slot in *between* layers without touching anyone else.
 
@@ -109,7 +109,7 @@ The kernel ships zero adapters. The CLI binds the six bundled adapters at startu
 
 The kernel exports types, errors, IDs, the logger, the path resolver, and the registries. It does not export anything that knows about Commander, Ink, the dashboard browser-launcher, or the user's TTY. Those are CLI concerns, and they live in [`packages/cli/`](../../../packages/cli/) — a single package that takes the dependency on every visual concern.
 
-This means tests can run the kernel headlessly. It means a future GUI front-end could share everything below `packages/cli/`. It means the JSON output (which is structured by `cli-shared`) is portable: any consumer that can parse a `CliOutput` can integrate, without depending on the CLI itself.
+This means tests can run the kernel headlessly. It means a future GUI front-end could share everything below `packages/cli/`. It means the JSON output (which is structured by `contracts`) is portable: any consumer that can parse a `CliOutput` can integrate, without depending on the CLI itself.
 
 ### Determinism over flexibility
 

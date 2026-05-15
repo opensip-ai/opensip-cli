@@ -22,7 +22,7 @@ import { RunHeader } from './components/RunHeader.js';
 import { Summary } from './components/Summary.js';
 import { useTheme } from './theme.js';
 
-import type { CommandResult, SimDoneResult } from '@opensip-tools/cli-shared';
+import type { CommandResult, SimDoneResult } from '@opensip-tools/contracts';
 
 export interface AppProps {
   readonly result: CommandResult;

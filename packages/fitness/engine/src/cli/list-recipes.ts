@@ -7,7 +7,7 @@ import { defaultRecipeRegistry } from '../recipes/registry.js';
 
 import { ensureChecksLoaded } from './fit.js';
 
-import type { ListRecipesResult } from '@opensip-tools/cli-shared';
+import type { ListRecipesResult } from '@opensip-tools/contracts';
 
 // ---------------------------------------------------------------------------
 // listRecipes

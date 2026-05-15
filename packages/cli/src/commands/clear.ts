@@ -8,7 +8,7 @@
 
 import { createInterface } from 'node:readline';
 
-import { countSessions, clearAllSessions, clearSessionsOlderThan } from '@opensip-tools/cli-shared';
+import { countSessions, clearAllSessions, clearSessionsOlderThan } from '@opensip-tools/contracts';
 
 export interface ClearOptions {
   olderThan?: number;

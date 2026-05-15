@@ -7,7 +7,7 @@ import { defaultRegistry } from '../framework/registry.js';
 
 import { ensureChecksLoaded } from './fit.js';
 
-import type { ListChecksResult } from '@opensip-tools/cli-shared';
+import type { ListChecksResult } from '@opensip-tools/contracts';
 
 // ---------------------------------------------------------------------------
 // listChecks

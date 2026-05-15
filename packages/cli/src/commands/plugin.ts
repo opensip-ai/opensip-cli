@@ -43,7 +43,7 @@ import {
   type PluginDomain,
 } from '@opensip-tools/core';
 
-import type { PluginResult } from '@opensip-tools/cli-shared';
+import type { PluginResult } from '@opensip-tools/contracts';
 
 // =============================================================================
 // VALIDATION HELPERS

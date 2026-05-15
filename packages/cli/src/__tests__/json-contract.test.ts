@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 
 // Import the CliOutput type
-import type { CliOutput } from '@opensip-tools/cli-shared';
+import type { CliOutput } from '@opensip-tools/contracts';
 
 describe('JSON output contract', () => {
   it('CliOutput has required fields', () => {

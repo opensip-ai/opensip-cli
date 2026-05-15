@@ -7,8 +7,8 @@ purpose: "What gets written to disk during and after a run. The runtime dir layo
 source-files:
   - packages/core/src/lib/paths.ts
   - packages/core/src/lib/logger.ts
-  - packages/cli-shared/src/persistence/store.ts
-  - packages/cli-shared/src/persistence/dashboard/
+  - packages/contracts/src/persistence/store.ts
+  - packages/contracts/src/persistence/dashboard/
   - packages/fitness/engine/src/framework/parse-cache.ts
   - packages/fitness/engine/src/framework/file-cache.ts
 related-docs:
@@ -59,7 +59,7 @@ A session is one record per `fit` or `sim` run. Stored at `<project>/opensip-too
 
 ### Schema
 
-The shape lives in [`packages/cli-shared/src/persistence/store.ts`](../../../packages/cli-shared/src/persistence/store.ts):
+The shape lives in [`packages/contracts/src/persistence/store.ts`](../../../packages/contracts/src/persistence/store.ts):
 
 ```ts
 interface StoredSession {
@@ -135,7 +135,7 @@ The `evt` field is the primary axis for filtering. Every event has a stable `evt
 
 The HTML dashboard writes to `<project>/opensip-tools/.runtime/reports/<run-id>/index.html` plus its asset bundle. The dashboard is a static site — no server, no templating — generated from the session record.
 
-Dashboard assets are bundled by the build into [`packages/cli-shared/src/persistence/dashboard/`](../../../packages/cli-shared/src/persistence/dashboard/) and copied into the report directory at write time. The HTML reads the session JSON via `<script type="application/json">` injection so the report is fully self-contained — you can email the directory to a teammate and they can open it locally without opensip-tools installed.
+Dashboard assets are bundled by the build into [`packages/contracts/src/persistence/dashboard/`](../../../packages/contracts/src/persistence/dashboard/) and copied into the report directory at write time. The HTML reads the session JSON via `<script type="application/json">` injection so the report is fully self-contained — you can email the directory to a teammate and they can open it locally without opensip-tools installed.
 
 Reports stick around per-run. The `dashboard` command opens the most recent run's report; a run-id flag would show an older one. `sessions purge` doesn't delete reports today; manual cleanup of `.runtime/reports/` is the answer if it grows large.
 

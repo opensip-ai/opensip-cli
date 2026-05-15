@@ -50,7 +50,7 @@ This document is the conceptual map. For the lookup-shaped catalog of every pack
 │           └──────────┴────────────┴──────────────────────────┘    │
 │                                  ▲                                 │
 │  Layer 2  ┌──────────────────────┴───────────────────────────┐    │
-│           │            @opensip-tools/cli-shared             │    │
+│           │            @opensip-tools/contracts             │    │
 │           └──────────────────────────────────────────────────┘    │
 │                                  ▲                                 │
 │  Layer 1  ┌──────────────────────┴───────────────────────────┐    │
@@ -63,11 +63,11 @@ This document is the conceptual map. For the lookup-shaped catalog of every pack
 
 **Layer 1 — `@opensip-tools/core`.** The kernel. Ships types, errors, IDs, the logger, the path resolver, the language-adapter contract, the plugin discovery mechanics, and the Tool registry. No knowledge of fitness, simulation, or any other tool. No dependency on Commander, Ink, or any UI library.
 
-**Layer 2 — `@opensip-tools/cli-shared`.** Shared CLI types and infrastructure: the `CliOutput`/`CheckOutput`/`FindingOutput` shape every tool produces, the exit codes, the persistence helpers (session writers, log file initializers). Depends on `core` only. Does not import any tool.
+**Layer 2 — `@opensip-tools/contracts`.** Shared CLI types and infrastructure: the `CliOutput`/`CheckOutput`/`FindingOutput` shape every tool produces, the exit codes, the persistence helpers (session writers, log file initializers). Depends on `core` only. Does not import any tool.
 
-**Layer 3 — `@opensip-tools/fitness`, `@opensip-tools/simulation`, `@opensip-tools/lang-*`.** Peer packages, all depending on `cli-shared` and `core`. Each tool engine (`fitness`, `simulation`) implements the `Tool` contract. Each language adapter (`lang-typescript`, `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp`) implements the `LanguageAdapter` contract.
+**Layer 3 — `@opensip-tools/fitness`, `@opensip-tools/simulation`, `@opensip-tools/lang-*`.** Peer packages, all depending on `contracts` and `core`. Each tool engine (`fitness`, `simulation`) implements the `Tool` contract. Each language adapter (`lang-typescript`, `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp`) implements the `LanguageAdapter` contract.
 
-**Layer 4 — `@opensip-tools/checks-*`.** Six check packs: `checks-universal`, `checks-typescript`, `checks-python`, `checks-go`, `checks-java`, `checks-cpp`. Each pack depends on `fitness` (for `defineCheck`) and `core` (for `Signal`, errors, the language adapter type). Check packs do **not** depend on `cli` or `cli-shared` — they're the marketplace shape, designed to be installable from npm without dragging the CLI in.
+**Layer 4 — `@opensip-tools/checks-*`.** Six check packs: `checks-universal`, `checks-typescript`, `checks-python`, `checks-go`, `checks-java`, `checks-cpp`. Each pack depends on `fitness` (for `defineCheck`) and `core` (for `Signal`, errors, the language adapter type). Check packs do **not** depend on `cli` or `contracts` — they're the marketplace shape, designed to be installable from npm without dragging the CLI in.
 
 **Layer 5 — `@opensip-tools/cli`.** The composition root. Imports every first-party tool and language adapter, registers them, builds the Commander tree, runs the dispatcher. The only package that knows everything below it.
 
@@ -83,22 +83,22 @@ The layer rule — "dependencies flow up only" — is enforced by [dependency-cr
 // core imports nothing else from the workspace.
 { name: 'core-imports-nothing-workspace',
   from: { path: '^packages/core/src/' },
-  to:   { path: ['^@opensip-tools/cli-shared', '^@opensip-tools/cli($|/)',
+  to:   { path: ['^@opensip-tools/contracts', '^@opensip-tools/cli($|/)',
                  '^@opensip-tools/fitness',    '^@opensip-tools/simulation',
                  '^@opensip-tools/lang-',      '^@opensip-tools/checks-'] },
 }
 
-// cli-shared imports only core.
-{ name: 'cli-shared-imports-core-only', /* ... */ }
+// contracts imports only core.
+{ name: 'contracts-imports-core-only', /* ... */ }
 
 // fitness / simulation cannot import cli (would create a cycle).
 { name: 'fitness-no-cli',     from: { path: '^packages/fitness/' },    to: { path: '^@opensip-tools/cli($|/)' } }
 { name: 'simulation-no-cli',  from: { path: '^packages/simulation/' }, to: { path: '^@opensip-tools/cli($|/)' } }
 
-// checks-* cannot reach into cli or cli-shared.
+// checks-* cannot reach into cli or contracts.
 { name: 'check-pack-no-cli', /* ... */ }
 
-// lang-* cannot reach into cli, cli-shared, or checks-*.
+// lang-* cannot reach into cli, contracts, or checks-*.
 { name: 'lang-no-cli-or-shared', /* ... */ }
 ```
 

@@ -1,6 +1,6 @@
 {
   "name": "@opensip-tools/fitness",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "license": "MIT",
   "description": "Fitness checks engine for OpenSIP Tools",
   "repository": {
@@ -28,7 +28,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@opensip-tools/cli-shared": "workspace:*",
+    "@opensip-tools/contracts": "workspace:*",
     "@opensip-tools/core": "workspace:*",
     "commander": "^13.1.0",
     "glob": "^11.0.0",

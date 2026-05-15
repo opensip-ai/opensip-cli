@@ -1,6 +1,6 @@
 {
   "name": "@opensip-tools/cli",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "license": "MIT",
   "description": "OpenSIP Tools CLI — codebase analysis from the command line",
   "repository": {
@@ -29,7 +29,7 @@
   "dependencies": {
     "@opensip-tools/checks-typescript": "workspace:*",
     "@opensip-tools/checks-universal": "workspace:*",
-    "@opensip-tools/cli-shared": "workspace:*",
+    "@opensip-tools/contracts": "workspace:*",
     "@opensip-tools/core": "workspace:*",
     "@opensip-tools/fitness": "workspace:*",
     "@opensip-tools/lang-cpp": "workspace:*",

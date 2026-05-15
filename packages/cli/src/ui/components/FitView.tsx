@@ -18,7 +18,7 @@ import { RunHeader } from './RunHeader.js';
 import { Spinner } from './Spinner.js';
 import { Summary } from './Summary.js';
 
-import type { FitDoneResult, ErrorResult, CliOutput , CliArgs } from '@opensip-tools/cli-shared';
+import type { FitDoneResult, ErrorResult, CliOutput , CliArgs } from '@opensip-tools/contracts';
 
 type FitState =
   | { phase: 'loading' }

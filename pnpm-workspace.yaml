@@ -1,5 +1,5 @@
 packages:
-  # Top-level packages: cli, cli-shared, core
+  # Top-level packages: cli, contracts, core
   - "packages/*"
   # Tool-grouped subdirectories: each tool's engine + sub-packages
   - "packages/fitness/*"

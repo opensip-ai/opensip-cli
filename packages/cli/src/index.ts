@@ -31,7 +31,7 @@ import {
   type CliArgs,
   type CommandResult,
   type InitOptions,
-} from '@opensip-tools/cli-shared';
+} from '@opensip-tools/contracts';
 import {
   setSilent,
   setDebugMode,
@@ -86,7 +86,7 @@ import type { SignalersConfig } from '@opensip-tools/fitness';
 // PUBLIC RE-EXPORTS — the CLI's own programmatic API surface.
 // =============================================================================
 
-export { EXIT_CODES, getErrorSuggestion } from '@opensip-tools/cli-shared';
+export { EXIT_CODES, getErrorSuggestion } from '@opensip-tools/contracts';
 export { buildWelcome, printWelcome } from './welcome.js';
 export { buildCompletionScript, printCompletionScript } from './commands/completion.js';
 export { executeUninstall } from './commands/uninstall.js';
@@ -103,7 +103,7 @@ export type {
   FitOptions,
   InitOptions,
   ToolOptions,
-} from '@opensip-tools/cli-shared';
+} from '@opensip-tools/contracts';
 export { resolveApiKey } from './commands/configure.js';
 
 // =============================================================================

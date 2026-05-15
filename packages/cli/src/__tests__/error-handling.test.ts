@@ -1,4 +1,4 @@
-import { getErrorSuggestion, EXIT_CODES } from '@opensip-tools/cli-shared';
+import { getErrorSuggestion, EXIT_CODES } from '@opensip-tools/contracts';
 import { describe, it, expect } from 'vitest';
 
 describe('error handling', () => {

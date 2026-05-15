@@ -585,7 +585,7 @@ enforced in CI by [dependency-cruiser](https://github.com/sverweij/dependency-cr
 packages/
   core/                    # @opensip-tools/core — kernel: errors, logger, IDs,
                            #   language adapters, plugin loader, Tool contract
-  cli-shared/              # @opensip-tools/cli-shared — CLI types, exit codes,
+  contracts/              # @opensip-tools/contracts — CLI types, exit codes,
                            #   session persistence, dashboard HTML generator
   cli/                     # @opensip-tools/cli — generic tool dispatcher (Ink/React)
 

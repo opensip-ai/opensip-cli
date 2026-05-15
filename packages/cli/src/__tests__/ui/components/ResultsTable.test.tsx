@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest';
 import { ResultsTable } from '../../../ui/components/ResultsTable.js';
 import { ThemeProvider } from '../../../ui/theme.js';
 
-import type { TableRow } from '@opensip-tools/cli-shared';
+import type { TableRow } from '@opensip-tools/contracts';
 
 const sampleRows: TableRow[] = [
   {

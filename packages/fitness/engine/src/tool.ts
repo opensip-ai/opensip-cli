@@ -13,7 +13,7 @@
  */
 
 
-import { EXIT_CODES } from '@opensip-tools/cli-shared';
+import { EXIT_CODES } from '@opensip-tools/contracts';
 import { type Command } from 'commander';
 
 import { openDashboard } from './cli/dashboard.js';
@@ -29,7 +29,7 @@ import {
   DEFAULT_BASELINE_PATH,
 } from './gate.js';
 
-import type { CliArgs, FitOptions, ToolOptions } from '@opensip-tools/cli-shared';
+import type { CliArgs, FitOptions, ToolOptions } from '@opensip-tools/contracts';
 import type { Tool, ToolCliContext, ToolCommandDescriptor } from '@opensip-tools/core';
 
 // =============================================================================

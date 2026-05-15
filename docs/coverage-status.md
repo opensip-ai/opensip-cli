@@ -6,7 +6,7 @@ Snapshot taken 2026-05-15 against v1.0.0.
 
 | Package | Stmts | Branch | Funcs | Lines | Status |
 |---|---:|---:|---:|---:|---|
-| `@opensip-tools/cli-shared` | 99.5 | 98.6 | 100 | 99.5 | ✅ |
+| `@opensip-tools/contracts` | 99.5 | 98.6 | 100 | 99.5 | ✅ |
 | `@opensip-tools/core` | 94.7 | 89.4 | 98.7 | 94.7 | ✅ |
 | `@opensip-tools/lang-typescript` | 92.7 | 89.8 | 86.2 | 92.7 | ✅ |
 | `@opensip-tools/lang-rust` | 83.3 | 85.7 | 87.5 | 83.3 | close |
@@ -133,7 +133,7 @@ without per-check test maintenance.
 pnpm --filter=@opensip-tools/<name> exec vitest run --coverage
 
 # All packages
-for p in cli-shared core fitness simulation checks-typescript \
+for p in contracts core fitness simulation checks-typescript \
          checks-universal checks-go checks-python checks-java \
          checks-cpp lang-typescript lang-rust lang-go lang-python \
          lang-java lang-cpp; do

@@ -22,13 +22,13 @@ pnpm fit          # Run fitness checks against this repo
 ## Project Structure
 
 Layered monorepo with three top-level groupings: top-level packages
-(core, cli-shared, cli), per-tool namespaces (`packages/fitness/`,
+(core, contracts, cli), per-tool namespaces (`packages/fitness/`,
 `packages/simulation/`), and the language-adapter group (`packages/languages/`).
 
 ```
 packages/
   core/                    # @opensip-tools/core — kernel
-  cli-shared/              # @opensip-tools/cli-shared — shared CLI types/persistence
+  contracts/              # @opensip-tools/contracts — shared CLI types/persistence
   cli/                     # @opensip-tools/cli — generic tool dispatcher
 
   fitness/

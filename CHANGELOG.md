@@ -24,7 +24,7 @@ releases listed further down are the actual public history.
   by the CLI on startup; the walker matches Node's nearest-ancestor
   resolution.
 - **Layered architecture enforced by dependency-cruiser.** core →
-  cli-shared → fitness / simulation / lang-* (peers) → checks-* → cli.
+  contracts → fitness / simulation / lang-* (peers) → checks-* → cli.
   Forbidden edges fail CI.
 
 ### Packages (17)
@@ -32,7 +32,7 @@ releases listed further down are the actual public history.
 - **`@opensip-tools/cli`** — generic tool dispatcher (Ink/React UI).
 - **`@opensip-tools/core`** — kernel: errors, logger, IDs, language
   adapters, plugin loader, Tool contract, path resolution.
-- **`@opensip-tools/cli-shared`** — CLI types, exit codes, session
+- **`@opensip-tools/contracts`** — CLI types, exit codes, session
   persistence, dashboard HTML generator.
 - **`@opensip-tools/fitness`** — fitness engine + commands
   (`fit`, `dashboard`, `fit-list`, `fit-recipes`), recipe service,

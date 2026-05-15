@@ -40,7 +40,7 @@ function makeSession(overrides: Partial<StoredSession> = {}): StoredSession {
 
 beforeEach(() => {
    
-  testDir = mkdtempSync(join(tmpdir(), 'cli-shared-store-'));
+  testDir = mkdtempSync(join(tmpdir(), 'contracts-store-'));
   sessionsDir = join(testDir, 'sessions');
   reportsDir = join(testDir, 'reports');
   configurePersistencePaths({ sessionsDir, reportsDir });

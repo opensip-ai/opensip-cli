@@ -26,7 +26,7 @@ import {
   type GateCompareResult,
 } from '../gate.js';
 
-import type { CliOutput, FindingOutput } from '@opensip-tools/cli-shared';
+import type { CliOutput, FindingOutput } from '@opensip-tools/contracts';
 
 // ---------------------------------------------------------------------------
 // Helpers

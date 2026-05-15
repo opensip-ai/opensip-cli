@@ -1,5 +1,5 @@
 /**
- * @opensip-tools/cli-shared — shared CLI infrastructure.
+ * @opensip-tools/contracts — shared contract types.
  *
  * Tool packages (fitness, simulation) and the CLI entry-point both
  * depend on this package for:
@@ -7,8 +7,8 @@
  *   - Exit code constants and error suggestions
  *   - Session persistence (saveSession, loadSessions, dashboard generator)
  *
- * cli-shared depends only on @opensip-tools/core. Tools depend on
- * cli-shared. The CLI entry-point depends on cli-shared and on every
+ * contracts depends only on @opensip-tools/core. Tools depend on
+ * contracts. The CLI entry-point depends on contracts and on every
  * tool package — the dependency graph stays acyclic.
  */
 

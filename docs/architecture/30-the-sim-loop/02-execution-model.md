@@ -135,7 +135,7 @@ The `--kind` CLI filter (`opensip-tools sim --kind invariant`) is a post-selecto
 
 ## The aggregated result
 
-After every scenario runs, the recipe service produces a `SimDoneResult` ([`packages/cli-shared/src/types.ts:271`](../../../packages/cli-shared/src/types.ts)):
+After every scenario runs, the recipe service produces a `SimDoneResult` ([`packages/contracts/src/types.ts:271`](../../../packages/contracts/src/types.ts)):
 
 ```ts
 interface SimDoneResult {

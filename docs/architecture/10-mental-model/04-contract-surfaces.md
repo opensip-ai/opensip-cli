@@ -5,8 +5,8 @@ title: "Contract surfaces"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "The system's public edges. Every contract opensip-tools makes with the outside world, and what changing each one would cost."
 source-files:
-  - packages/cli-shared/src/types.ts
-  - packages/cli-shared/src/exit-codes.ts
+  - packages/contracts/src/types.ts
+  - packages/contracts/src/exit-codes.ts
   - packages/core/src/tools/types.ts
   - packages/core/src/plugins/types.ts
   - packages/core/src/languages/adapter.ts
@@ -33,8 +33,8 @@ A contract is a promise to a consumer outside your control. Break it, and the co
 | # | Surface | Consumers | Stability tier | Shape lives in |
 |---|---|---|---|---|
 | 1 | CLI argv (commands and flags) | humans, CI, shells | **stable** (semver-major) | `packages/*/src/*tool.ts` |
-| 2 | Exit codes | CI, scripts | **stable** (semver-major) | `packages/cli-shared/src/exit-codes.ts` |
-| 3 | JSON output (`CliOutput`) | CI, dashboards, the gate, OpenSIP Cloud | **stable** (semver-major) | `packages/cli-shared/src/types.ts` |
+| 2 | Exit codes | CI, scripts | **stable** (semver-major) | `packages/contracts/src/exit-codes.ts` |
+| 3 | JSON output (`CliOutput`) | CI, dashboards, the gate, OpenSIP Cloud | **stable** (semver-major) | `packages/contracts/src/types.ts` |
 | 4 | SARIF output | GitHub Code Scanning, IDEs | **stable** (versioned by SARIF spec) | `packages/fitness/engine/src/sarif.ts` |
 | 5 | Tool plugin contract (`Tool`) | third-party tools | **stable** (semver-major) | `packages/core/src/tools/types.ts` |
 | 6 | Plugin discovery (Tool marker + check-pack name prefix) | third-party tools, check packs | **stable** (semver-major) | `packages/core/src/plugins/tool-package-discovery.ts`, `packages/fitness/engine/src/plugins/check-package-discovery.ts` |
@@ -85,7 +85,7 @@ Each command's flag list is owned by the Tool that registers it. `fit` flags liv
 
 ## 2. Exit codes
 
-The integer the binary returns when it ends. Defined exactly once in [`packages/cli-shared/src/exit-codes.ts`](../../../packages/cli-shared/src/exit-codes.ts):
+The integer the binary returns when it ends. Defined exactly once in [`packages/contracts/src/exit-codes.ts`](../../../packages/contracts/src/exit-codes.ts):
 
 | Code | Constant | Meaning |
 |---|---|---|
@@ -101,7 +101,7 @@ CI integrations are the primary consumer. `opensip-tools fit && deploy` is an id
 
 ## 3. JSON output (`CliOutput`)
 
-The structured stdout when `--json` is set. Shape lives at [`packages/cli-shared/src/types.ts`](../../../packages/cli-shared/src/types.ts):
+The structured stdout when `--json` is set. Shape lives at [`packages/contracts/src/types.ts`](../../../packages/contracts/src/types.ts):
 
 ```ts
 interface CliOutput {

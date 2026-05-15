@@ -9,7 +9,7 @@ source-files:
   - tsconfig.json
   - packages/core/src/lib/errors.ts
   - packages/core/src/lib/logger.ts
-  - packages/cli-shared/src/exit-codes.ts
+  - packages/contracts/src/exit-codes.ts
   - knip.json
 related-docs:
   - ./02-layer-policy.md
@@ -107,7 +107,7 @@ Plus the `Result<T, E>` pattern with `ok(value)` / `err(error)` / `tryCatchAsync
 
 Code format: `DOMAIN.SUBDOMAIN.SPECIFIC` — e.g. `'CONFIG.MISSING'`, `'GATE.BASELINE.NOT_FOUND'`, `'PLUGIN.LOADER.IMPORT_FAILED'`. The dot-separated shape is greppable and the prefix is meaningful for filter rules.
 
-Codes are mapped to user-facing suggestions in [`packages/cli-shared/src/exit-codes.ts`](../../../packages/cli-shared/src/exit-codes.ts):
+Codes are mapped to user-facing suggestions in [`packages/contracts/src/exit-codes.ts`](../../../packages/contracts/src/exit-codes.ts):
 
 ```ts
 export function getErrorSuggestion(code: string): string | undefined {
@@ -125,7 +125,7 @@ The CLI calls `getErrorSuggestion(error.code)` and threads the result into the `
 
 ## Exit codes
 
-Defined exactly once in [`packages/cli-shared/src/exit-codes.ts`](../../../packages/cli-shared/src/exit-codes.ts):
+Defined exactly once in [`packages/contracts/src/exit-codes.ts`](../../../packages/contracts/src/exit-codes.ts):
 
 ```ts
 export const EXIT_CODES = {
@@ -202,7 +202,7 @@ import { z } from 'zod';
 
 // 3. Internal workspace deps (alphabetical by package)
 import { logger, ToolError } from '@opensip-tools/core';
-import { EXIT_CODES } from '@opensip-tools/cli-shared';
+import { EXIT_CODES } from '@opensip-tools/contracts';
 
 // 4. Local relative imports
 import { sarifBuilder } from './sarif.js';

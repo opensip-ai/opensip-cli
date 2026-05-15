@@ -1,12 +1,12 @@
 {
-  "name": "@opensip-tools/cli-shared",
-  "version": "1.0.1",
+  "name": "@opensip-tools/contracts",
+  "version": "1.0.2",
   "license": "MIT",
-  "description": "Shared CLI infrastructure for OpenSIP Tools — types, exit codes, session persistence",
+  "description": "Shared contract types for OpenSIP Tools — CliOutput / CommandResult shapes, exit codes, session persistence",
   "repository": {
     "type": "git",
     "url": "https://github.com/opensip-ai/opensip-tools.git",
-    "directory": "packages/cli-shared"
+    "directory": "packages/contracts"
   },
   "homepage": "https://github.com/opensip-ai/opensip-tools",
   "bugs": {

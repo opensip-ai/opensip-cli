@@ -1,7 +1,7 @@
-import { generateDashboardHtml } from '@opensip-tools/cli-shared';
+import { generateDashboardHtml } from '@opensip-tools/contracts';
 import { describe, it, expect } from 'vitest';
 
-import type { StoredSession } from '@opensip-tools/cli-shared';
+import type { StoredSession } from '@opensip-tools/contracts';
 
 function makeSession(overrides: Partial<StoredSession> = {}): StoredSession {
   return {

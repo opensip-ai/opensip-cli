@@ -48,7 +48,7 @@ jobs:
           # Layer 1 — kernel
           pnpm --filter @opensip-tools/core             pack --pack-destination /tmp/tarballs
           # Layer 2 — shared CLI infra
-          pnpm --filter @opensip-tools/cli-shared       pack --pack-destination /tmp/tarballs
+          pnpm --filter @opensip-tools/contracts       pack --pack-destination /tmp/tarballs
           # Layer 3 — language adapters
           pnpm --filter @opensip-tools/lang-typescript  pack --pack-destination /tmp/tarballs
           pnpm --filter @opensip-tools/lang-rust        pack --pack-destination /tmp/tarballs
@@ -84,7 +84,7 @@ jobs:
           # Layer 1 — kernel
           npm publish /tmp/tarballs/opensip-tools-core-*.tgz             --access public --provenance
           # Layer 2 — shared CLI infra
-          npm publish /tmp/tarballs/opensip-tools-cli-shared-*.tgz       --access public --provenance
+          npm publish /tmp/tarballs/opensip-tools-contracts-*.tgz        --access public --provenance
           # Layer 3 — language adapters (lang-typescript first; downstream check packs depend on it)
           npm publish /tmp/tarballs/opensip-tools-lang-typescript-*.tgz  --access public --provenance
           npm publish /tmp/tarballs/opensip-tools-lang-rust-*.tgz        --access public --provenance
@@ -92,7 +92,7 @@ jobs:
           npm publish /tmp/tarballs/opensip-tools-lang-go-*.tgz          --access public --provenance
           npm publish /tmp/tarballs/opensip-tools-lang-java-*.tgz        --access public --provenance
           npm publish /tmp/tarballs/opensip-tools-lang-cpp-*.tgz         --access public --provenance
-          # Layer 3 — tools (depend on core, cli-shared, lang-typescript)
+          # Layer 3 — tools (depend on core, contracts, lang-typescript)
           npm publish /tmp/tarballs/opensip-tools-fitness-*.tgz          --access public --provenance
           npm publish /tmp/tarballs/opensip-tools-simulation-*.tgz       --access public --provenance
           # Layer 4 — check packs (depend on fitness)

@@ -7,7 +7,7 @@ import { defineLoadScenario } from '../../kinds/load/define.js';
 import { defaultSimulationRecipeRegistry } from '../../recipes/registry.js';
 import { executeSim } from '../sim.js';
 
-import type { CliArgs } from '@opensip-tools/cli-shared';
+import type { CliArgs } from '@opensip-tools/contracts';
 
 const args = (overrides: Partial<CliArgs> = {}): CliArgs => ({
   command: 'sim',

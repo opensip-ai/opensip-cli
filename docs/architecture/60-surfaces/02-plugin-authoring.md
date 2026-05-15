@@ -301,7 +301,7 @@ A Tool contributes its own subcommand. Use this when you want something fundamen
   "type": "module",
   "opensipTools": { "kind": "tool" },
   "peerDependencies": {
-    "@opensip-tools/cli-shared": "^1.0.0",
+    "@opensip-tools/contracts": "^1.0.0",
     "@opensip-tools/core": "^1.0.0"
   }
 }

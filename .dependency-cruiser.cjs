@@ -1,11 +1,11 @@
 // @ts-check
 /**
- * dependency-cruiser config — enforces the v2.0.0 layered architecture.
+ * dependency-cruiser config — enforces the v1.0 layered architecture.
  *
  * Layer order (lower depends on higher only):
  *
  *   1. @opensip-tools/core           — kernel
- *   2. @opensip-tools/cli-shared     — shared CLI infra (types, exit codes, persistence)
+ *   2. @opensip-tools/contracts      — shared contract types (CliOutput, exit codes, persistence)
  *   3. @opensip-tools/lang-*         — language adapters (depend on core)
  *   3. @opensip-tools/fitness        — fitness engine + cli/* commands
  *   3. @opensip-tools/simulation     — simulation engine + cli/* commands
@@ -80,12 +80,12 @@ module.exports = {
       name: 'core-imports-nothing-workspace',
       severity: 'error',
       comment:
-        'core is the kernel. It must not depend on cli-shared, cli, fitness, ' +
+        'core is the kernel. It must not depend on contracts, cli, fitness, ' +
         'simulation, lang-*, or checks-*. Anything else inverts the layering.',
       from: { path: '^packages/core/src/' },
       to: {
         path: [
-          '^@opensip-tools/cli-shared',
+          '^@opensip-tools/contracts',
           '^@opensip-tools/cli($|/)',
           '^@opensip-tools/fitness',
           '^@opensip-tools/simulation',
@@ -96,16 +96,16 @@ module.exports = {
     },
 
     // -------------------------------------------------------------------
-    // Layer enforcement — cli-shared depends only on core
+    // Layer enforcement — contracts depends only on core
     // -------------------------------------------------------------------
     {
-      name: 'cli-shared-imports-core-only',
+      name: 'contracts-imports-core-only',
       severity: 'error',
       comment:
-        'cli-shared holds the CLI types / exit codes / persistence used by ' +
-        'tools. It must not import from any tool, the cli entry point, or ' +
-        'language packs.',
-      from: { path: '^packages/cli-shared/src/' },
+        'contracts holds the CliOutput / exit codes / persistence types used ' +
+        'by every tool. It must not import from any tool, the cli entry ' +
+        'point, or language packs.',
+      from: { path: '^packages/contracts/src/' },
       to: {
         path: [
           '^@opensip-tools/cli($|/)',
@@ -142,7 +142,7 @@ module.exports = {
     },
 
     // -------------------------------------------------------------------
-    // Layer enforcement — checks-* must not depend on cli/cli-shared
+    // Layer enforcement — checks-* must not depend on cli/contracts
     // -------------------------------------------------------------------
     {
       name: 'check-pack-no-cli',
@@ -150,18 +150,18 @@ module.exports = {
       comment:
         'Check packs are self-contained units of fitness-domain logic. They ' +
         'depend on fitness (for defineCheck etc.) and core (for languages, ' +
-        'errors). They must not depend on the CLI or cli-shared.',
+        'errors). They must not depend on the CLI or contracts.',
       from: { path: '^packages/fitness/checks-' },
       to: {
         path: [
           '^@opensip-tools/cli($|/)',
-          '^@opensip-tools/cli-shared',
+          '^@opensip-tools/contracts',
         ],
       },
     },
 
     // -------------------------------------------------------------------
-    // Layer enforcement — lang-* must not depend on cli/cli-shared/checks-*
+    // Layer enforcement — lang-* must not depend on cli/contracts/checks-*
     //
     // Documented exception: lang-typescript depends on fitness for
     // filterContent (the content-filter API moved out of core during P1).
@@ -169,16 +169,16 @@ module.exports = {
     // fitness.
     // -------------------------------------------------------------------
     {
-      name: 'lang-no-cli-or-shared',
+      name: 'lang-no-cli-or-contracts',
       severity: 'error',
       comment:
         'Language adapter packages depend only on core (for the LanguageAdapter ' +
-        'contract). They must not reach into the CLI, cli-shared, or check packs.',
+        'contract). They must not reach into the CLI, contracts, or check packs.',
       from: { path: '^packages/languages/lang-' },
       to: {
         path: [
           '^@opensip-tools/cli($|/)',
-          '^@opensip-tools/cli-shared',
+          '^@opensip-tools/contracts',
           '^@opensip-tools/checks-',
         ],
       },

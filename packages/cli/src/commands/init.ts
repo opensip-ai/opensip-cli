@@ -28,7 +28,7 @@ import { join } from 'node:path';
 
 import { resolveProjectPaths } from '@opensip-tools/core';
 
-import type { CliArgs, InitResult } from '@opensip-tools/cli-shared';
+import type { CliArgs, InitResult } from '@opensip-tools/contracts';
 
 // =============================================================================
 // LANGUAGE DETECTION

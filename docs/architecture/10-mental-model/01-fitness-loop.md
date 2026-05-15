@@ -46,7 +46,7 @@ We trace one specific scenario: a single TypeScript check named `no-console-log`
                             ▼
                 ┌──────────────────────────────────────────────────┐
                 │  2. Config + paths     core/lib/paths.ts         │
-                │                        cli-shared/persistence    │
+                │                        contracts/persistence    │
                 └──────────────────────────────────────────────────┘
                             │
                             ▼
@@ -77,7 +77,7 @@ We trace one specific scenario: a single TypeScript check named `no-console-log`
                             ▼
                 ┌──────────────────────────────────────────────────┐
                 │  7. Signal aggregation core/types/signal.ts      │
-                │                        cli-shared/types          │
+                │                        contracts/types          │
                 └──────────────────────────────────────────────────┘
                             │
                             ▼
@@ -210,11 +210,11 @@ A timeout per check kicks in if `execution.timeout` is set. A timed-out check re
 
 ## Stage 7 — Signal aggregation
 
-Source: [`packages/core/src/types/signal.ts`](../../../packages/core/src/types/signal.ts), [`packages/cli-shared/src/types.ts`](../../../packages/cli-shared/src/types.ts), [`packages/fitness/engine/src/framework/result-builder.ts`](../../../packages/fitness/engine/src/framework/result-builder.ts).
+Source: [`packages/core/src/types/signal.ts`](../../../packages/core/src/types/signal.ts), [`packages/contracts/src/types.ts`](../../../packages/contracts/src/types.ts), [`packages/fitness/engine/src/framework/result-builder.ts`](../../../packages/fitness/engine/src/framework/result-builder.ts).
 
 Every check returns a `CheckResult` carrying `Signal[]`. The recipe service aggregates results into the run-level `RecipeRunSummary` (totals, pass/fail counts, ignored counts), then hands the whole shape to the rendering layer.
 
-The `CliOutput` type ([`packages/cli-shared/src/types.ts`](../../../packages/cli-shared/src/types.ts)) is the canonical envelope: version, tool, timestamp, score, passed flag, summary, durationMs, and a `checks[]` array each with its own findings. Anything that consumes the JSON output (CI, dashboard, the gate) reads `CliOutput`.
+The `CliOutput` type ([`packages/contracts/src/types.ts`](../../../packages/contracts/src/types.ts)) is the canonical envelope: version, tool, timestamp, score, passed flag, summary, durationMs, and a `checks[]` array each with its own findings. Anything that consumes the JSON output (CI, dashboard, the gate) reads `CliOutput`.
 
 The aggregation pass is also where the score is computed — currently a deterministic function of pass/fail and severity weights. The score is informational; the exit code is the gate.
 

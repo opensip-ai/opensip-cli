@@ -7,7 +7,7 @@ import React from 'react';
 
 import { useTheme } from '../theme.js';
 
-import type { StoredSession } from '@opensip-tools/cli-shared';
+import type { StoredSession } from '@opensip-tools/contracts';
 
 export interface HistoryTableProps {
   readonly sessions: readonly StoredSession[];

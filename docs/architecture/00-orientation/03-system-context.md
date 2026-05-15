@@ -9,7 +9,7 @@ source-files:
   - packages/cli/src/index.ts
   - packages/cli/src/commands/init.ts
   - packages/cli/src/commands/configure.ts
-  - packages/cli-shared/src/exit-codes.ts
+  - packages/contracts/src/exit-codes.ts
 related-docs:
   - ./01-what-is-opensip-tools.md
   - ./02-vocabulary.md
@@ -135,7 +135,7 @@ The user-level dir is intentionally small. Anything project-specific (checks, re
 
 ## Exit codes
 
-opensip-tools follows the conventional Unix exit-code shape, defined in [`packages/cli-shared/src/exit-codes.ts`](../../../packages/cli-shared/src/exit-codes.ts):
+opensip-tools follows the conventional Unix exit-code shape, defined in [`packages/contracts/src/exit-codes.ts`](../../../packages/contracts/src/exit-codes.ts):
 
 | Code | Meaning |
 |---|---|

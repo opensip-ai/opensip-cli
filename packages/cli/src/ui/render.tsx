@@ -13,7 +13,7 @@ import { FitView } from './components/FitView.js';
 import { ClockProvider } from './hooks/useClock.js';
 import { ThemeProvider } from './theme.js';
 
-import type { CommandResult , CliArgs } from '@opensip-tools/cli-shared';
+import type { CommandResult , CliArgs } from '@opensip-tools/contracts';
 
 /** Render a static command result (non-fit commands) */
 export async function renderApp(result: CommandResult): Promise<void> {

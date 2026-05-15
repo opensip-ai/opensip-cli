@@ -13,7 +13,7 @@ import {
   type CheckCatalogEntry,
   type RecipeCatalogEntry,
   type DashboardResult,
-} from '@opensip-tools/cli-shared';
+} from '@opensip-tools/contracts';
 
 import { defaultRegistry } from '../framework/registry.js';
 import { defaultRecipeRegistry } from '../recipes/registry.js';

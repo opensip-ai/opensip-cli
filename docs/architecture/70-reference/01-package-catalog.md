@@ -34,7 +34,7 @@ Types, exit codes, persistence helpers consumed by every tool. Imports `core` on
 
 | Package | Path | Role | Key exports |
 |---|---|---|---|
-| `@opensip-tools/cli-shared` | `packages/cli-shared/` | Shared CLI types, exit codes, session persistence | `CliOutput`, `CheckOutput`, `FindingOutput`, `CommandResult`, `EXIT_CODES`, `getErrorSuggestion`, `configurePersistencePaths`, `StoredSession` |
+| `@opensip-tools/contracts` | `packages/contracts/` | Shared CLI types, exit codes, session persistence | `CliOutput`, `CheckOutput`, `FindingOutput`, `CommandResult`, `EXIT_CODES`, `getErrorSuggestion`, `configurePersistencePaths`, `StoredSession` |
 
 ## Layer 3 — tools and language adapters
 
@@ -81,7 +81,7 @@ Imports every layer below. The published binary.
 
 ## Adding a new package
 
-1. **Decide the layer.** Apply the rules in [`../10-mental-model/03-modular-monolith.md`](../10-mental-model/03-modular-monolith.md): kernel = zero tool knowledge; cli-shared = used by every tool; tools = own a Tool contract; language adapters = implement `LanguageAdapter`; check packs = ship `Check[]`; cli = composition root only.
+1. **Decide the layer.** Apply the rules in [`../10-mental-model/03-modular-monolith.md`](../10-mental-model/03-modular-monolith.md): kernel = zero tool knowledge; contracts = used by every tool; tools = own a Tool contract; language adapters = implement `LanguageAdapter`; check packs = ship `Check[]`; cli = composition root only.
 2. **Add the dep-cruiser carve-out** if needed. The default layer rules forbid most cross-layer edges; if your package needs an exception, add it to [`.dependency-cruiser.cjs`](../../../.dependency-cruiser.cjs) and document it in [`../80-conventions/02-layer-policy.md`](../80-conventions/02-layer-policy.md).
 3. **Add a row** in the right table above with the canonical npm name, path, one-line role (concrete, not "fitness concerns"), and 1–3 key exports a reader would grep for.
 4. **Update the layer narrative** in `10-mental-model/03-modular-monolith.md` if the new package changes what the layer *means*. Pure additions to an existing pattern don't need a narrative edit — just the row here.
@@ -92,6 +92,6 @@ Imports every layer below. The published binary.
 
 Last verified at v1.0.0 against:
 
-- `packages/` directory listing (17 packages — 1 kernel + 1 cli-shared + 6 lang + 1 fitness + 1 simulation + 6 check packs + 1 cli).
+- `packages/` directory listing (17 packages — 1 kernel + 1 contracts + 6 lang + 1 fitness + 1 simulation + 6 check packs + 1 cli).
 - Each package's `package.json` `description` and `name` field, read directly.
 - The dep-cruiser config for layer rules.

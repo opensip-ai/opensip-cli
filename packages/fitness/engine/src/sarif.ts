@@ -1,6 +1,6 @@
 import { withRetry, logger } from '@opensip-tools/core';
 
-import type { CliOutput } from '@opensip-tools/cli-shared';
+import type { CliOutput } from '@opensip-tools/contracts';
 
 const SARIF_SCHEMA = 'https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json';
 const MAX_FINDINGS_PER_CHUNK = 500;

@@ -31,7 +31,7 @@ If you discover a security vulnerability in opensip-tools, please report it resp
 This policy covers all 17 first-party `@opensip-tools/*` packages:
 
 - `@opensip-tools/cli` — the CLI binary
-- `@opensip-tools/cli-shared` — shared CLI infrastructure
+- `@opensip-tools/contracts` — shared CLI infrastructure
 - `@opensip-tools/core` — kernel (errors, logger, language adapters,
   plugin loader, Tool contract)
 - `@opensip-tools/fitness` — fitness engine

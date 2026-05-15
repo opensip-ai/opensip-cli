@@ -9,13 +9,13 @@
  * callers (CLI / Tool layer) render or JSON-serialize as appropriate.
  */
 
-import { EXIT_CODES } from '@opensip-tools/cli-shared';
+import { EXIT_CODES } from '@opensip-tools/contracts';
 import { logger } from '@opensip-tools/core';
 
 import { defaultSimulationRecipeRegistry } from '../recipes/registry.js';
 import { SimulationRecipeService } from '../recipes/service.js';
 
-import type { CliArgs, ErrorResult, SimDoneResult } from '@opensip-tools/cli-shared';
+import type { CliArgs, ErrorResult, SimDoneResult } from '@opensip-tools/contracts';
 
 const VALID_KINDS = new Set(['load', 'chaos', 'invariant', 'fix-evaluation']);
 

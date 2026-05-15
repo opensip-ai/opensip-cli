@@ -16,7 +16,7 @@ import {
   type SupportedLanguage,
 } from '../commands/init.js';
 
-import type { CliArgs } from '@opensip-tools/cli-shared';
+import type { CliArgs } from '@opensip-tools/contracts';
 
 let testDir: string;
 

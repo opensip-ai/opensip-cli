@@ -10,7 +10,7 @@ publishing — no `NPM_TOKEN` required.
 | Layer | Package | Path |
 |-------|---------|------|
 | Kernel | `@opensip-tools/core` | `packages/core` |
-| Shared CLI | `@opensip-tools/cli-shared` | `packages/cli-shared` |
+| Shared CLI | `@opensip-tools/contracts` | `packages/contracts` |
 | Languages | `@opensip-tools/lang-typescript` | `packages/languages/lang-typescript` |
 | Languages | `@opensip-tools/lang-rust` | `packages/languages/lang-rust` |
 | Languages | `@opensip-tools/lang-python` | `packages/languages/lang-python` |
@@ -60,7 +60,7 @@ their `dependencies`.
 
 5. Verify on npm:
    ```bash
-   for p in core cli-shared cli fitness simulation \
+   for p in core contracts cli fitness simulation \
             lang-typescript lang-rust lang-python lang-go lang-java lang-cpp \
             checks-typescript checks-universal checks-python checks-go checks-java checks-cpp; do
      printf '%-40s %s\n' "@opensip-tools/$p" "$(npm view "@opensip-tools/$p" version 2>/dev/null || echo MISSING)"
@@ -77,20 +77,20 @@ when downstream's `dependencies` field is resolved.
 Order:
 
 1. **`@opensip-tools/core`** — depends on nothing else workspace-internal.
-2. **`@opensip-tools/cli-shared`** — depends on core.
+2. **`@opensip-tools/contracts`** — depends on core.
 3. **Language adapters** (lang-typescript first, then any order):
    `lang-typescript` → others. lang-typescript is published before the
    rest because it has more downstream consumers (every TS-AST check
    pack peer-depends on it transitively).
-4. **`@opensip-tools/fitness`** — depends on core, cli-shared, and
+4. **`@opensip-tools/fitness`** — depends on core, contracts, and
    lang-typescript.
-5. **`@opensip-tools/simulation`** — depends on core, cli-shared.
+5. **`@opensip-tools/simulation`** — depends on core, contracts.
 6. **Check packs** (any order within this group):
    `checks-typescript`, `checks-universal`, `checks-python`,
    `checks-go`, `checks-java`, `checks-cpp` — all peer-depend on
    fitness.
 7. **`@opensip-tools/cli`** — depends on every tool, every check pack
-   the CLI loads by default, every language adapter, and cli-shared.
+   the CLI loads by default, every language adapter, and contracts.
    Always published last.
 
 ## Prerequisites (one-time setup)

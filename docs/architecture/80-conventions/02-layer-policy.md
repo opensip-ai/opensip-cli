@@ -14,7 +14,7 @@ related-docs:
 ---
 # Layer policy
 
-The five-layer architecture (kernel → cli-shared → tools/lang/ → checks → cli) is enforced by [dependency-cruiser](https://github.com/sverweij/dependency-cruiser). Build fails on any forbidden edge. This doc walks every rule and the reasoning.
+The five-layer architecture (kernel → contracts → tools/lang/ → checks → cli) is enforced by [dependency-cruiser](https://github.com/sverweij/dependency-cruiser). Build fails on any forbidden edge. This doc walks every rule and the reasoning.
 
 For the conceptual layer narrative, see [`../10-mental-model/03-modular-monolith.md`](../10-mental-model/03-modular-monolith.md).
 
@@ -77,7 +77,7 @@ The five rules that pin the layer cake.
   from: { path: '^packages/core/src/' },
   to: {
     path: [
-      '^@opensip-tools/cli-shared',
+      '^@opensip-tools/contracts',
       '^@opensip-tools/cli($|/)',
       '^@opensip-tools/fitness',
       '^@opensip-tools/simulation',
@@ -94,11 +94,11 @@ This is the load-bearing rule. The kernel is what every Tool depends on; if the 
 
 The rule's path-list is exhaustive — every package outside `packages/core/` is forbidden. Adding a new package below `core` would require updating this rule (it doesn't, today — the kernel is the bottom).
 
-### `cli-shared-imports-core-only`
+### `contracts-imports-core-only`
 
 ```js
 {
-  from: { path: '^packages/cli-shared/src/' },
+  from: { path: '^packages/contracts/src/' },
   to: {
     path: [
       '^@opensip-tools/cli($|/)',
@@ -111,9 +111,9 @@ The rule's path-list is exhaustive — every package outside `packages/core/` is
 }
 ```
 
-`cli-shared` depends only on `core`. It can't reach up to a tool, the CLI, or check packs.
+`contracts` depends only on `core`. It can't reach up to a tool, the CLI, or check packs.
 
-The reasoning: cli-shared exists to define the contract surface (`CliOutput`, `CommandResult`, `EXIT_CODES`) that *every* Tool consumes. If it took a dep on one Tool, it'd be coupled to that Tool's lifecycle.
+The reasoning: contracts exists to define the contract surface (`CliOutput`, `CommandResult`, `EXIT_CODES`) that *every* Tool consumes. If it took a dep on one Tool, it'd be coupled to that Tool's lifecycle.
 
 ### `fitness-no-cli` and `simulation-no-cli`
 
@@ -130,12 +130,12 @@ Tools cannot import the CLI. This would create a cycle (cli depends on every too
 {
   from: { path: '^packages/fitness/checks-' },
   to: {
-    path: ['^@opensip-tools/cli($|/)', '^@opensip-tools/cli-shared'],
+    path: ['^@opensip-tools/cli($|/)', '^@opensip-tools/contracts'],
   },
 }
 ```
 
-Check packs are self-contained units of fitness-domain logic. They depend on `fitness` (for `defineCheck`) and `core` (for `Signal`, errors). They don't depend on the CLI or cli-shared — they're the marketplace shape, designed to be installable from npm without dragging the CLI in.
+Check packs are self-contained units of fitness-domain logic. They depend on `fitness` (for `defineCheck`) and `core` (for `Signal`, errors). They don't depend on the CLI or contracts — they're the marketplace shape, designed to be installable from npm without dragging the CLI in.
 
 A consumer using `@opensip-tools/checks-typescript` from inside their own custom Tool gets the checks without the CLI's transitive deps.
 
@@ -145,12 +145,12 @@ A consumer using `@opensip-tools/checks-typescript` from inside their own custom
 {
   from: { path: '^packages/languages/lang-' },
   to: {
-    path: ['^@opensip-tools/cli($|/)', '^@opensip-tools/cli-shared', '^@opensip-tools/checks-'],
+    path: ['^@opensip-tools/cli($|/)', '^@opensip-tools/contracts', '^@opensip-tools/checks-'],
   },
 }
 ```
 
-Language adapter packages depend only on `core` (for the `LanguageAdapter` contract). They don't reach into the CLI, cli-shared, or check packs.
+Language adapter packages depend only on `core` (for the `LanguageAdapter` contract). They don't reach into the CLI, contracts, or check packs.
 
 The lang layer is below check packs in the implicit ordering, even though both sit at "Layer 3" in the conceptual model — a check pack imports `lang-typescript` (transitively, through the framework's adapter dispatch), but a lang pack never imports a check pack.
 
@@ -177,7 +177,7 @@ Concrete examples of edges that fail the build:
 - **`packages/fitness/engine/src/foo.ts` imports from `@opensip-tools/cli`** — `fitness-no-cli` fails. Use `ToolCliContext` instead.
 - **`packages/fitness/checks-typescript/src/foo.ts` imports from `@opensip-tools/cli`** — `check-pack-no-cli` fails. Check packs only depend on fitness + core.
 - **`packages/languages/lang-rust/src/foo.ts` imports from `@opensip-tools/fitness`** — `lang-no-fitness-except-typescript` fails. Only the typescript adapter is exempt.
-- **`packages/cli-shared/src/foo.ts` imports from `@opensip-tools/simulation`** — `cli-shared-imports-core-only` fails. cli-shared talks to core only.
+- **`packages/contracts/src/foo.ts` imports from `@opensip-tools/simulation`** — `contracts-imports-core-only` fails. contracts talks to core only.
 - **A circular import inside any package** — `no-circular` fails. Refactor.
 
 All of these surface during `pnpm depcruise` (run as part of `pnpm lint`). Each violation prints the offending file, the import line, and the rule name.

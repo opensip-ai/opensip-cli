@@ -5,11 +5,11 @@ title: "Dashboard"
 audience: [users, contributors]
 purpose: "The HTML report — what it shows, when it opens, how it's generated, and where it lives."
 source-files:
-  - packages/cli-shared/src/persistence/dashboard/generator.ts
-  - packages/cli-shared/src/persistence/dashboard/index.ts
-  - packages/cli-shared/src/persistence/dashboard/overview.ts
-  - packages/cli-shared/src/persistence/dashboard/checks.ts
-  - packages/cli-shared/src/persistence/dashboard/sessions.ts
+  - packages/contracts/src/persistence/dashboard/generator.ts
+  - packages/contracts/src/persistence/dashboard/index.ts
+  - packages/contracts/src/persistence/dashboard/overview.ts
+  - packages/contracts/src/persistence/dashboard/checks.ts
+  - packages/contracts/src/persistence/dashboard/sessions.ts
   - packages/cli/src/open-dashboard.ts
   - packages/fitness/engine/src/cli/dashboard.ts
 related-docs:
@@ -48,7 +48,7 @@ If any check fails, the dashboard doesn't open. The HTML file is still written; 
 
 ## What it shows
 
-Four primary panels, each with its own JS module under [`packages/cli-shared/src/persistence/dashboard/`](../../../packages/cli-shared/src/persistence/dashboard/).
+Four primary panels, each with its own JS module under [`packages/contracts/src/persistence/dashboard/`](../../../packages/contracts/src/persistence/dashboard/).
 
 ### Overview
 
@@ -59,7 +59,7 @@ The default landing panel. Shows:
 - The breakdown by category (security, quality, architecture, etc.).
 - Quick links into the other panels.
 
-Source: [`packages/cli-shared/src/persistence/dashboard/overview.ts`](../../../packages/cli-shared/src/persistence/dashboard/overview.ts).
+Source: [`packages/contracts/src/persistence/dashboard/overview.ts`](../../../packages/contracts/src/persistence/dashboard/overview.ts).
 
 ### Sessions
 
@@ -67,7 +67,7 @@ A list of every past run, sorted reverse-chronological. Click into one to see it
 
 Per-run detail expands into a tree: check → file → finding. Each finding shows the rule id, severity, line, and (when present) the suggestion text.
 
-Source: [`packages/cli-shared/src/persistence/dashboard/sessions.ts`](../../../packages/cli-shared/src/persistence/dashboard/sessions.ts).
+Source: [`packages/contracts/src/persistence/dashboard/sessions.ts`](../../../packages/contracts/src/persistence/dashboard/sessions.ts).
 
 ### Checks catalog
 
@@ -79,13 +79,13 @@ Every check that was registered for the current project, with per-check stats:
 
 Filterable by tag, by source pack, by pass-rate. Useful for spotting the noisiest checks (high failure rate) and the dormant ones (haven't run in weeks — maybe a recipe drift).
 
-Source: [`packages/cli-shared/src/persistence/dashboard/checks.ts`](../../../packages/cli-shared/src/persistence/dashboard/checks.ts).
+Source: [`packages/contracts/src/persistence/dashboard/checks.ts`](../../../packages/contracts/src/persistence/dashboard/checks.ts).
 
 ### Recipes
 
 The configured recipes, with per-recipe stats. Same shape as the checks catalog but a level up: how often each recipe has run, its pass rate, its average duration.
 
-Source: [`packages/cli-shared/src/persistence/dashboard/recipes.ts`](../../../packages/cli-shared/src/persistence/dashboard/recipes.ts).
+Source: [`packages/contracts/src/persistence/dashboard/recipes.ts`](../../../packages/contracts/src/persistence/dashboard/recipes.ts).
 
 ### Tool tabs
 
@@ -95,10 +95,10 @@ The dashboard supports both fit and sim runs. The top-of-page tab switcher (fit 
 
 ## How it's generated
 
-Static HTML. The generator ([`packages/cli-shared/src/persistence/dashboard/generator.ts`](../../../packages/cli-shared/src/persistence/dashboard/generator.ts)) assembles:
+Static HTML. The generator ([`packages/contracts/src/persistence/dashboard/generator.ts`](../../../packages/contracts/src/persistence/dashboard/generator.ts)) assembles:
 
 1. The base HTML scaffold (head, body shell, the four panel containers).
-2. The CSS, inlined via `<style>` (from [`css.ts`](../../../packages/cli-shared/src/persistence/dashboard/css.ts)).
+2. The CSS, inlined via `<style>` (from [`css.ts`](../../../packages/contracts/src/persistence/dashboard/css.ts)).
 3. The session data, embedded via `<script type="application/json" id="sessions-data">…</script>`.
 4. The catalog data (checks, recipes), embedded the same way.
 5. The JS panels, inlined via `<script type="module">…</script>` (from each panel's `dashboard*Js()` function).

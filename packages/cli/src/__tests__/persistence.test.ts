@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
-import type * as cliShared from '@opensip-tools/cli-shared';
+import type * as cliShared from '@opensip-tools/contracts';
 import type * as nodeOs from 'node:os';
 
 type StoredSession = cliShared.StoredSession;
@@ -46,7 +46,7 @@ describe('persistence/store', () => {
     _mockHome = makeTempDir();
     // Force fresh import so TOOLS_HOME picks up the new mock value
     vi.resetModules();
-    storeModule = await import('@opensip-tools/cli-shared');
+    storeModule = await import('@opensip-tools/contracts');
   });
 
   afterEach(() => {

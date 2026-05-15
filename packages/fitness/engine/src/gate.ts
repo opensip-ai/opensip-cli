@@ -23,7 +23,7 @@ import { logger } from '@opensip-tools/core';
 
 import { buildSarifLog } from './sarif.js';
 
-import type { CliOutput } from '@opensip-tools/cli-shared';
+import type { CliOutput } from '@opensip-tools/contracts';
 
 // ---------------------------------------------------------------------------
 // Types

@@ -11,7 +11,7 @@ source-files:
   - packages/cli/src/commands/plugin.ts
   - packages/cli/src/commands/uninstall.ts
   - packages/cli/src/welcome.ts
-  - packages/cli-shared/src/exit-codes.ts
+  - packages/contracts/src/exit-codes.ts
 related-docs:
   - ../10-mental-model/02-tool-plugin-model.md
   - ./02-plugin-loader.md
@@ -104,7 +104,7 @@ The banner does not appear when a command is invoked. It's strictly a no-argv af
 Some errors produced inside a Tool carry a `code` (e.g. `'CONFIG.MISSING'`). The CLI maps these codes to human-readable suggestions before rendering the error result:
 
 ```ts
-import { getErrorSuggestion } from '@opensip-tools/cli-shared';
+import { getErrorSuggestion } from '@opensip-tools/contracts';
 
 // inside the action handler:
 catch (error) {
@@ -114,7 +114,7 @@ catch (error) {
 }
 ```
 
-The suggestion is a one-line hint — "Run `opensip-tools init` first" or "Check that `opensip-tools.config.yml` is valid YAML." The Tool author throws an error with a code; the CLI handles the rendering. The mapping is centralized in [`packages/cli-shared/src/exit-codes.ts`](../../../packages/cli-shared/src/exit-codes.ts) so the same code surfaces the same suggestion regardless of which Tool threw it.
+The suggestion is a one-line hint — "Run `opensip-tools init` first" or "Check that `opensip-tools.config.yml` is valid YAML." The Tool author throws an error with a code; the CLI handles the rendering. The mapping is centralized in [`packages/contracts/src/exit-codes.ts`](../../../packages/contracts/src/exit-codes.ts) so the same code surfaces the same suggestion regardless of which Tool threw it.
 
 This is the polite way the CLI extends Tool errors. The Tool doesn't have to know about the suggestion; it just throws with a code. The CLI doesn't have to know about the Tool; it just looks up the code.
 
