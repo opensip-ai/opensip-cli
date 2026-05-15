@@ -20,8 +20,8 @@ Snapshot taken 2026-05-15 against v3.0.0.
 | `@opensip-tools/checks-cpp` | 100 | 84.6 | 50 | 100 | ✅ |
 | `@opensip-tools/fitness` | 83.2 | 81.9 | 88.8 | 83.2 | close |
 | `@opensip-tools/simulation` | 69.8 | 82.0 | 77.1 | 69.8 | gap |
-| `@opensip-tools/checks-typescript` | 62.3 | 66.4 | 69.9 | 62.3 | gap |
-| `@opensip-tools/checks-universal` | 71.8 | 67.9 | 77.6 | 71.8 | gap |
+| `@opensip-tools/checks-typescript` | 70.4 | 69.4 | 79.9 | 70.4 | close |
+| `@opensip-tools/checks-universal` | 73.6 | 68.8 | 80.2 | 73.6 | close |
 | `@opensip-tools/cli` | 0 | 0 | 0 | 0 | not measured |
 
 Workspace test count: **1410** passing across 17 packages.

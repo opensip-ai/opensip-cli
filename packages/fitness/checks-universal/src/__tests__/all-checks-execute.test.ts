@@ -392,6 +392,88 @@ beforeAll(async () => {
       'export const NEVER_REFERENCED = 0;',
       'export interface NeverUsed { v: number }',
     ].join('\n')),
+
+    // --- NO-CUSTOM-EVENT-EMITTER ---
+    fixture('src/events/custom-emitter.ts', [
+      'import { EventEmitter } from "node:events";',
+      'export class MyEmitter extends EventEmitter {}',
+      'export function makeOne() { return new EventEmitter(); }',
+    ].join('\n')),
+
+    // --- PINO serializer coverage (request/queryRunner/entity logged) ---
+    fixture('src/log/pino-handlers.ts', [
+      'declare const logger: { info(o: unknown): void; error(o: unknown): void };',
+      'export function logRequest(req: unknown) {',
+      '  logger.info({ msg: "incoming", req });',
+      '}',
+      'export function logSafe(user: { id: string }) {',
+      '  logger.info({ id: user.id });',
+      '}',
+      'export function logEntity(entity: unknown) {',
+      '  logger.error({ msg: "entity error", entity });',
+      '}',
+    ].join('\n')),
+
+    // --- IMAGE OPTIMIZATION (react-native Image vs expo-image) ---
+    fixture('src/components/Avatar.tsx', [
+      'import { Image } from "react-native";',
+      'export function Avatar({ uri }: { uri: string }) {',
+      '  return <Image source={{ uri }} />;',
+      '}',
+    ].join('\n')),
+    fixture('src/components/Logo.tsx', [
+      'import { Image } from "expo-image";',
+      'export function Logo({ uri }: { uri: string }) {',
+      '  return <Image source={{ uri }} />;',
+      '}',
+    ].join('\n')),
+
+    // --- EXPO VECTOR ICONS pattern ---
+    fixture('src/components/Icon.tsx', [
+      'import { Ionicons } from "@expo/vector-icons";',
+      'export function Icon() {',
+      '  return <Ionicons name="home" size={24} />;',
+      '}',
+    ].join('\n')),
+
+    // --- DEPENDENCY-VERSION-CONSISTENCY (pkg manifest with mismatched deps) ---
+    fixture('packages/inner-c/package.json', JSON.stringify({
+      name: 'inner-c',
+      dependencies: { 'lodash': '^4.0.0' },
+      devDependencies: { 'lodash': '^3.0.0' },
+    }, null, 2)),
+
+    // --- DOCKER VERSION SYNC (mismatched node version in Dockerfile vs nvmrc) ---
+    fixture('Dockerfile.api', [
+      'FROM node:20',
+      'COPY . .',
+      'RUN npm install',
+    ].join('\n')),
+    fixture('Dockerfile.web', [
+      'FROM node:18',
+      'COPY . .',
+    ].join('\n')),
+
+    // --- HEAVY-IMPORT detection (e.g. importing all of moment / lodash) ---
+    fixture('src/util/heavy-import.ts', [
+      'import * as moment from "moment";',
+      'import _ from "lodash";',
+      'export function fmt(d: Date) { return moment(d).format(); }',
+      'export function pick(o: Record<string, unknown>) { return _.pick(o, ["a"]); }',
+    ].join('\n')),
+
+    // --- SECURITY-SCAN-SUITE: dangerous patterns ---
+    fixture('src/security/scan-targets.ts', [
+      'export function dangerous(input: string) {',
+      '  return require("node:child_process").exec(`echo ${input}`);',
+      '}',
+      'export const cookieSec = "Set-Cookie: token=abc; HttpOnly; Secure";',
+      'export const cookieInsecure = "Set-Cookie: token=abc";',
+    ].join('\n')),
+
+    // --- TEST CONVENTION CONSISTENCY (mixed file naming) ---
+    fixture('src/components/__tests__/button-spec.ts', 'import { it } from "vitest"; it("x", () => undefined);'),
+    fixture('src/components/__tests__/Button.test.tsx', 'import { it } from "vitest"; it("x", () => undefined);'),
   ];
 
   // Prewarm so the file cache contains every fixture for any check
