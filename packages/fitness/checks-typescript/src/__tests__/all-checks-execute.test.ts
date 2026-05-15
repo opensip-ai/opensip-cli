@@ -137,6 +137,184 @@ beforeAll(async () => {
     ].join('\n')),
     fixture('src/circular/a.ts', 'import { b } from "./b.js"; export const a = b;'),
     fixture('src/circular/b.ts', 'import { a } from "./a.js"; export const b = a;'),
+
+    // --- DRIZZLE ORM patterns ---
+    fixture('src/db/users.ts', [
+      'import { pgTable, serial, text, varchar, timestamp, integer, boolean } from "drizzle-orm/pg-core";',
+      'import { relations } from "drizzle-orm";',
+      'export const users = pgTable("users", {',
+      '  id: serial("id").primaryKey(),',
+      '  email: varchar("email", { length: 255 }).notNull().unique(),',
+      '  createdAt: timestamp("created_at").defaultNow().notNull(),',
+      '  isActive: boolean("is_active").default(true),',
+      '  // missing index on a frequently-queried column',
+      '});',
+      'export const posts = pgTable("posts", {',
+      '  id: serial("id").primaryKey(),',
+      '  userId: integer("user_id").references(() => users.id),',
+      '  title: text("title").notNull(),',
+      '});',
+      'export const usersRelations = relations(users, ({ many }) => ({',
+      '  posts: many(posts),',
+      '}));',
+    ].join('\n')),
+    fixture('src/db/migrations/001_create_users.ts', [
+      'import { sql } from "drizzle-orm";',
+      'export const up = sql`CREATE TABLE users (id SERIAL PRIMARY KEY)`;',
+      'export const down = sql`DROP TABLE users`;',
+    ].join('\n')),
+
+    // --- TYPED-INJECT patterns ---
+    fixture('src/di/container.ts', [
+      'import { createInjector } from "typed-inject";',
+      'class UserService {',
+      '  static inject = ["db"] as const;',
+      '  constructor(private db: any) {}',
+      '}',
+      'export const container = createInjector()',
+      '  .provideValue("db", { query: async () => [] })',
+      '  .provideClass("userService", UserService);',
+    ].join('\n')),
+
+    // --- COMPLEX EXPRESS routes (security checks) ---
+    fixture('src/routes/admin.ts', [
+      'import express from "express";',
+      'const router = express.Router();',
+      'router.get("/users", async (req, res) => {',
+      '  // Missing auth guard — should flag',
+      '  const all = await fetch("/api/users");',
+      '  return res.json(await all.json());',
+      '});',
+      'router.post("/raw-html", (req, res) => {',
+      '  // XSS-prone',
+      '  res.send(`<div>${req.body.html}</div>`);',
+      '});',
+      'export default router;',
+    ].join('\n')),
+
+    // --- FORM HANDLER without label ---
+    fixture('src/components/LoginForm.tsx', [
+      'import React from "react";',
+      'export function LoginForm() {',
+      '  return (',
+      '    <form>',
+      '      <input type="text" />',
+      '      <input type="password" />',
+      '      <div onClick={() => undefined}>tap me</div>',
+      '      <span style={{ cursor: "pointer" }}>also clickable</span>',
+      '      <button>Submit</button>',
+      '    </form>',
+      '  );',
+      '}',
+    ].join('\n')),
+
+    // --- N+1 candidate ---
+    fixture('src/db/n-plus-one.ts', [
+      'export async function listWithDetails(items: { id: number }[]) {',
+      '  const out = [];',
+      '  for (const item of items) {',
+      '    out.push(await fetchDetail(item.id));',
+      '  }',
+      '  return out;',
+      '}',
+      'async function fetchDetail(id: number) { return { id }; }',
+    ].join('\n')),
+
+    // --- DANGEROUS REGEX ---
+    fixture('src/regex/dangerous.ts', [
+      'export const RE = /(a+)+b/;',
+      'export const RE2 = new RegExp("(.*)*x");',
+      'export function match(s: string) {',
+      '  return RE.test(s);',
+      '}',
+    ].join('\n')),
+
+    // --- COMPLEX CYCLOMATIC functions ---
+    fixture('src/util/branch-heavy.ts', [
+      'export function classify(value: number, mode: string): string {',
+      '  if (mode === "a") {',
+      '    if (value < 0) return "neg-a";',
+      '    if (value === 0) return "zero-a";',
+      '    if (value < 10) return "small-a";',
+      '    if (value < 100) return "med-a";',
+      '    return "big-a";',
+      '  }',
+      '  if (mode === "b") {',
+      '    if (value < 0) return "neg-b";',
+      '    if (value > 100) return "big-b";',
+      '  }',
+      '  if (mode === "c") return value > 50 ? "high-c" : "low-c";',
+      '  return "unknown";',
+      '}',
+    ].join('\n')),
+
+    // --- TYPED-INJECT misuse: missing inject decorator ---
+    fixture('src/di/bad.ts', [
+      'export class BadService {',
+      '  // No static inject — should flag',
+      '  constructor(private dep: { query(): Promise<unknown> }) {}',
+      '  async run() { return this.dep.query(); }',
+      '}',
+    ].join('\n')),
+
+    // --- SUSPICIOUS comparison + secret usage ---
+    fixture('src/secrets/compare.ts', [
+      'import { createHmac } from "node:crypto";',
+      'export function checkSig(provided: string, expected: string) {',
+      '  // Should use timingSafeEqual',
+      '  return provided == expected;',
+      '}',
+      'export function badHmac(secret: string, body: string) {',
+      '  const got = createHmac("sha256", secret).update(body).digest("hex");',
+      '  return got === "expected-here";',
+      '}',
+    ].join('\n')),
+
+    // --- API CONTRACT mismatch placeholder ---
+    fixture('src/api/contract.ts', [
+      'export interface UserDto {',
+      '  id: string;',
+      '  email: string;',
+      '  createdAt: string;',
+      '}',
+      'export async function fetchUser(id: string): Promise<UserDto> {',
+      '  return fetch(`/api/users/${id}`).then(r => r.json());',
+      '}',
+    ].join('\n')),
+
+    // --- THROWS without docs ---
+    fixture('src/errors/maybe-throws.ts', [
+      'export function maybeThrow(arg: string) {',
+      '  if (arg === "") throw new Error("empty");',
+      '  if (arg.length > 100) throw new TypeError("too long");',
+      '  return arg.toUpperCase();',
+      '}',
+    ].join('\n')),
+
+    // --- MUTABLE STATE in module ---
+    fixture('src/state/global.ts', [
+      'export let counter = 0;',
+      'export const state: { items: string[] } = { items: [] };',
+      'export function increment() { counter++; }',
+    ].join('\n')),
+
+    // --- ASYNC PATTERNS (waterfall + missing await) ---
+    fixture('src/async/waterfall.ts', [
+      'export async function loadAll() {',
+      '  const a = await loadA();',
+      '  const b = await loadB();',
+      '  const c = await loadC();',
+      '  return { a, b, c };',
+      '}',
+      'async function loadA() { return 1; }',
+      'async function loadB() { return 2; }',
+      'async function loadC() { return 3; }',
+    ].join('\n')),
+
+    // --- LARGE FILE (file-size-limits) ---
+    fixture('src/big/manyfns.ts', Array.from({ length: 60 }, (_, i) =>
+      `export function fn${i}(x: number): number { return x + ${i}; }`,
+    ).join('\n')),
   ];
 
   await fileCache.prewarm(cwd, ['**/*']);

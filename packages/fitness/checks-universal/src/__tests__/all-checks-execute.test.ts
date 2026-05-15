@@ -145,6 +145,208 @@ beforeAll(async () => {
       'export class AppError extends Error {}',
       'export const ERROR_CODES = { NOT_FOUND: "E001", UNAUTHORIZED: "E002" };',
     ].join('\n')),
+
+    // --- DIRECTIVE-AUDIT FIXTURES (TS / ESLint / fitness / semgrep) ---
+    fixture('src/directives/ts-suppressions.ts', [
+      '// @ts-expect-error reason: testing suppression detection',
+      'const x: number = "not a number" as any;',
+      '// @ts-ignore — legacy shim',
+      'const y: string = 42 as any;',
+      '// eslint-disable-next-line no-console',
+      'console.log("disabled inline");',
+      '/* eslint-disable @typescript-eslint/no-explicit-any */',
+      'export function takesAny(a: any) { return a; }',
+      '/* eslint-enable */',
+      'const stmt = 1; // eslint-disable-line no-magic-numbers',
+      '// @fitness-ignore-file no-console-log -- reason',
+      '// @fitness-ignore-next-line no-todo-comments -- intentional',
+      '// nosemgrep: javascript.lang.security',
+      'eval("nosemgrep here");',
+    ].join('\n')),
+
+    // --- DEPENDENCY-SECURITY-AUDIT (lockfile + outdated deps) ---
+    fixture('package-lock.json', JSON.stringify({
+      lockfileVersion: 3,
+      packages: { '': { dependencies: { lodash: '^4.0.0' } } },
+    }, null, 2)),
+    fixture('pnpm-lock.yaml', 'lockfileVersion: \'9.0\'\nimporters:\n  .:\n    dependencies:\n      lodash:\n        specifier: ^4.0.0\n        version: 4.17.21\n'),
+
+    // --- PII / LOGGING SMELLS ---
+    fixture('src/log/sensitive.ts', [
+      'export function logUser(user: { email: string; ssn: string }) {',
+      '  console.log("user email", user.email, "ssn", user.ssn);',
+      '  console.error("creditCard:", "4111-1111-1111-1111");',
+      '  console.warn("password=hunter2");',
+      '}',
+    ].join('\n')),
+
+    // --- WEBHOOK / API-KEY ROTATION patterns ---
+    fixture('src/webhooks/stripe.ts', [
+      'import express from "express";',
+      'export const handler = (req: express.Request) => {',
+      '  // unverified webhook — should be flagged',
+      '  return req.body;',
+      '};',
+    ].join('\n')),
+
+    // --- OPENAPI sync target ---
+    fixture('openapi.yaml', [
+      'openapi: 3.0.0',
+      'info:',
+      '  title: Demo',
+      '  version: 1.0.0',
+      'paths:',
+      '  /users/{id}:',
+      '    get:',
+      '      operationId: getUser',
+      '      responses:',
+      '        "200":',
+      '          description: ok',
+    ].join('\n')),
+
+    // --- SENTRY / OBSERVABILITY patterns ---
+    fixture('src/observability/sentry.ts', [
+      'import * as Sentry from "@sentry/node";',
+      'Sentry.init({ dsn: "" });',
+      'export function reportError(e: Error) {',
+      '  Sentry.captureException(e);',
+      '}',
+    ].join('\n')),
+    fixture('src/observability/correlation.ts', [
+      'export function makeRequestId() {',
+      '  return Math.random().toString(36).slice(2);',
+      '}',
+    ].join('\n')),
+
+    // --- FRONTEND smells ---
+    fixture('src/ui/Form.tsx', [
+      'export function Form() {',
+      '  return (',
+      '    <form>',
+      '      <input type="text" />',
+      '      <input type="email" />',
+      '      <button>Submit</button>',
+      '    </form>',
+      '  );',
+      '}',
+    ].join('\n')),
+    fixture('src/ui/InlineStyles.tsx', [
+      'export function Box() {',
+      '  return <div style={{ color: "red", margin: 8 }}>x</div>;',
+      '}',
+    ].join('\n')),
+
+    // --- CIRCULAR + N+1 query patterns ---
+    fixture('src/db/userRepo.ts', [
+      'import { db } from "./connection.js";',
+      'export async function listUsers() {',
+      '  const users = await db.users.findMany();',
+      '  for (const u of users) {',
+      '    u.posts = await db.posts.findMany({ where: { userId: u.id } });',
+      '  }',
+      '  return users;',
+      '}',
+    ].join('\n')),
+    fixture('src/db/connection.ts', 'export const db = { users: { findMany: async () => [] } as any, posts: { findMany: async () => [] } as any };'),
+
+    // --- RECOVERY / RETRY / TIMEOUT patterns ---
+    fixture('src/retry/policy.ts', [
+      'export async function withRetry<T>(fn: () => Promise<T>, n = 3): Promise<T> {',
+      '  let last: unknown;',
+      '  for (let i = 0; i < n; i++) {',
+      '    try { return await fn(); } catch (e) { last = e; }',
+      '  }',
+      '  throw last;',
+      '}',
+    ].join('\n')),
+
+    // --- PROCESS.EXIT in finally + reentrancy ---
+    fixture('src/cleanup/shutdown.ts', [
+      'export function shutdown() {',
+      '  try {',
+      '    cleanUp();',
+      '  } finally {',
+      '    process.exit(0);',
+      '  }',
+      '}',
+      'function cleanUp() { /* noop */ }',
+    ].join('\n')),
+
+    // --- LEGACY CODE markers ---
+    fixture('src/legacy/old.ts', [
+      '// @deprecated since v1, removed in v3',
+      'export function legacyApi() { return null; }',
+      '// LEGACY: kept for back-compat',
+      'export const VERSION = "1";',
+    ].join('\n')),
+
+    // --- READLINE cleanup pattern ---
+    fixture('src/cli/prompt.ts', [
+      'import { createInterface } from "node:readline";',
+      'export async function ask(q: string): Promise<string> {',
+      '  const rl = createInterface({ input: process.stdin, output: process.stdout });',
+      '  return new Promise(resolve => rl.question(q, ans => { rl.close(); resolve(ans); }));',
+      '}',
+    ].join('\n')),
+
+    // --- BATCH + transaction patterns ---
+    fixture('src/batch/processor.ts', [
+      'export async function processBatch(items: number[]) {',
+      '  for (const item of items) {',
+      '    await new Promise(r => setTimeout(r, 10));',
+      '    item;',
+      '  }',
+      '}',
+    ].join('\n')),
+
+    // --- MULTI-FILE no-duplicate-package fixtures ---
+    fixture('packages/inner-a/package.json', JSON.stringify({ name: 'inner-a', version: '1.0.0' }, null, 2)),
+    fixture('packages/inner-b/package.json', JSON.stringify({ name: 'inner-b', version: '1.0.0' }, null, 2)),
+    fixture('packages/inner-a/src/index.ts', 'export const a = 1;'),
+    fixture('packages/inner-b/src/index.ts', 'export const b = 2;'),
+
+    // --- HASURA / CSP / CORS / RATE-LIMIT placeholders ---
+    fixture('hasura/config.yaml', 'version: 3\nendpoint: https://example.com/v1/graphql\nadmin_secret: "should-be-env-only"\n'),
+    fixture('src/security/csp.ts', [
+      'export const csp = {',
+      '  "default-src": "*",',
+      '  "script-src": "* unsafe-inline",',
+      '};',
+    ].join('\n')),
+    fixture('src/security/cors.ts', [
+      'import express from "express";',
+      'const app = express();',
+      'app.use((req, res, next) => {',
+      '  res.header("Access-Control-Allow-Origin", "*");',
+      '  next();',
+      '});',
+    ].join('\n')),
+
+    // --- TEST CONVENTION ---
+    fixture('src/__tests__/skipped-suite.test.ts', [
+      'import { describe, it } from "vitest";',
+      'describe.skip("disabled suite", () => {',
+      '  it("a", () => undefined);',
+      '});',
+    ].join('\n')),
+    fixture('src/__tests__/focused-suite.test.ts', [
+      'import { describe, it } from "vitest";',
+      'describe.only("focused suite", () => {',
+      '  it.only("a", () => undefined);',
+      '});',
+    ].join('\n')),
+
+    // --- ENV VAR ACCESS PATTERNS ---
+    fixture('src/config/env-direct.ts', [
+      'export function getPort() {',
+      '  // Direct, unvalidated access — should be flagged',
+      '  return process.env.PORT ?? "3000";',
+      '}',
+      'export function badAccess() {',
+      '  // No validation, no fallback, type coercion',
+      '  return Number(process.env.MAX_REQUESTS);',
+      '}',
+    ].join('\n')),
   ];
 
   // Prewarm so the file cache contains every fixture for any check
