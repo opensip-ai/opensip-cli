@@ -322,12 +322,14 @@ function registerCliCommands(): void {
   // -- init --------------------------------------------------------------
   program
     .command('init')
-    .description('Generate opensip-tools.config.yml config for your project')
+    .description('Scaffold opensip-tools.config.yml + example checks/scenarios for your project')
     .option('--cwd <path>', 'Target directory', process.cwd())
+    .option('--language <list>', 'Comma-separated language list (typescript|rust|python|go|java|cpp). Default: detect from filesystem markers.')
+    .option('--force', 'Overwrite an existing config + example files', false)
     .option('--json', 'Output structured JSON', false)
     .option('--debug', 'Enable debug mode for structured log output', false)
     .action(async (opts: InitOptions) => {
-      const args: CliArgs = {
+      const args = {
         command: 'init',
         json: opts.json,
         cwd: opts.cwd,
@@ -337,8 +339,22 @@ function registerCliCommands(): void {
         verbose: false,
         exclude: [],
         findings: false,
+        language: opts.language,
+        force: opts.force,
       };
       const result = executeInit(args);
+
+      // Detection ambiguity — exit 2 with the prompt message.
+      if (result.ambiguousLanguageError) {
+        cliContext.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
+        if (args.json) {
+          process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+          return;
+        }
+        await renderResult(result);
+        return;
+      }
+
       if (args.json) {
         process.stdout.write(JSON.stringify(result, null, 2) + '\n');
         return;

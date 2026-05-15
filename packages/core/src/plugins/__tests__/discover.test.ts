@@ -9,7 +9,7 @@ import { discoverPlugins } from '../discover.js'
 let testDir: string
 
 beforeEach(() => {
-  // eslint-disable-next-line sonarjs/publicly-writable-directories -- mkdtempSync creates a private 700 dir under tmpdir; safe for test fixtures
+   
   testDir = mkdtempSync(join(tmpdir(), 'opensip-plugins-test-'))
 })
 

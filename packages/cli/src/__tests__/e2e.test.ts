@@ -256,29 +256,42 @@ describe('CLI e2e', () => {
       }
     });
 
-    it('creates config file in a fresh directory', () => {
+    it('creates config + example files for an explicit --language', () => {
       tempDir = join(tmpdir(), `opensip-e2e-init-${Date.now()}-${Math.random().toString(36).slice(2)}`);
       mkdirSync(tempDir, { recursive: true });
 
-      const { exitCode } = runIn(tempDir, 'init');
+      const { exitCode } = runIn(tempDir, 'init', '--language', 'typescript');
       expect(exitCode).toBe(0);
 
-      const configPath = join(tempDir, 'opensip-tools.config.yml');
-      expect(existsSync(configPath)).toBe(true);
+      expect(existsSync(join(tempDir, 'opensip-tools.config.yml'))).toBe(true);
+      expect(existsSync(join(tempDir, 'opensip-tools', 'fit', 'checks', 'example-check.mjs'))).toBe(true);
+      expect(existsSync(join(tempDir, 'opensip-tools', 'fit', 'recipes', 'example-recipe.mjs'))).toBe(true);
+      expect(existsSync(join(tempDir, 'opensip-tools', 'sim', 'scenarios', 'example-scenario.mjs'))).toBe(true);
+      expect(existsSync(join(tempDir, '.gitignore'))).toBe(true);
     });
 
     it('reports already exists on second run', () => {
       tempDir = join(tmpdir(), `opensip-e2e-init2-${Date.now()}-${Math.random().toString(36).slice(2)}`);
       mkdirSync(tempDir, { recursive: true });
 
-      // First run creates the file
-      runIn(tempDir, 'init');
-      // Second run should indicate it already exists
-      const { stdout, exitCode } = runIn(tempDir, 'init', '--json');
+      // First run creates the layout
+      runIn(tempDir, 'init', '--language', 'typescript');
+      // Second run should refuse to overwrite (exit 0, alreadyExists in JSON)
+      const { stdout, exitCode } = runIn(tempDir, 'init', '--language', 'typescript', '--json');
       expect(exitCode).toBe(0);
       const output = JSON.parse(stdout);
       expect(output.alreadyExists).toBe(true);
       expect(output.created).toBe(false);
+    });
+
+    it('exits 2 with a prompt when language is ambiguous and --language not passed', () => {
+      tempDir = join(tmpdir(), `opensip-e2e-init3-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+      mkdirSync(tempDir, { recursive: true });
+
+      const { exitCode } = runIn(tempDir, 'init', '--json');
+      expect(exitCode).toBe(2);
+      // Nothing should have been written.
+      expect(existsSync(join(tempDir, 'opensip-tools.config.yml'))).toBe(false);
     });
   });
 

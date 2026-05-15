@@ -34,6 +34,19 @@ export interface InitOptions {
   cwd: string;
   json: boolean;
   debug: boolean;
+  /**
+   * Comma-separated language list. When omitted, init detects the
+   * project's primary language(s) by inspecting filesystem markers
+   * (Cargo.toml, pyproject.toml, etc.) and exits 2 with a prompt if
+   * the result is ambiguous.
+   */
+  language?: string;
+  /**
+   * Overwrite an existing opensip-tools.config.yml or example files
+   * without prompting. Default false — the safe behavior is to refuse
+   * overwriting.
+   */
+  force: boolean;
 }
 
 /** Options for `sim` subcommand. */
@@ -225,6 +238,25 @@ export interface InitResult {
   alreadyExists: boolean;
   cwd: string;
   configFilename: string;
+  /** Languages selected for this scaffold (post-detection or from --language). */
+  languages?: readonly ('typescript' | 'rust' | 'python' | 'go' | 'java' | 'cpp')[];
+  /**
+   * Every file v3 init created, in display order. Includes the
+   * config file plus example check / recipe / scenario scaffolds.
+   * Empty when alreadyExists is true (nothing was written).
+   */
+  createdFiles?: readonly string[];
+  /** True when init appended `opensip-tools/.runtime/` to .gitignore. */
+  gitignoreUpdated?: boolean;
+  /**
+   * When detection is ambiguous and --language wasn't passed, init
+   * exits without writing anything and surfaces this error so the
+   * user can re-invoke with --language <list>.
+   */
+  ambiguousLanguageError?: {
+    detected: readonly string[];
+    message: string;
+  };
 }
 
 export interface ExperimentalResult {
