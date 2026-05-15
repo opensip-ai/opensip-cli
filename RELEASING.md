@@ -149,6 +149,5 @@ cutting a real release if you want to validate the tarball contents:
 
 ```bash
 # Start Verdaccio, pack everything, publish to localhost, install in a
-# fresh consumer project, run the CLI. Procedure documented in
-# docs/plans/smoke-test-v1.0.0.md (still applicable for v2.0.0+).
+# fresh consumer project, run the CLI. Full procedure: docs/release-smoke-test.md.
 ```
