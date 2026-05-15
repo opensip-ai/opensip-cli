@@ -102,9 +102,50 @@ Order:
   - Repository: `opensip-tools`
   - Workflow: `release.yml`
 
-  When adding a new package to the workspace, configure trusted
-  publishing BEFORE the next release tag, or that package will fail
-  to publish.
+  npm has **no "pending trusted publisher" feature** — the package
+  must already exist on the registry before its trusted publisher can
+  be configured. See "Bootstrapping a brand-new package" below for the
+  one-time path to create a package on npm so its trusted publisher
+  becomes configurable.
+
+## Bootstrapping a brand-new package
+
+When the workspace gains a new `@opensip-tools/*` package (or an
+existing package gets renamed — `cli-shared` → `contracts` was the
+first instance), the next release workflow will fail at the publish
+step for that package with `404 PUT`. Cause: OIDC publishing routes
+auth through the trusted publisher entry; with no entry registered for
+the package name, npm responds 404. The release workflow's preflight
+step warns about this case before publishing starts.
+
+To unblock:
+
+1. Generate a short-lived granular access token on npmjs.com (scope
+   `@opensip-tools/*`, publish permission, 1-day expiry).
+
+2. Run the bootstrap script with the token in the environment:
+   ```bash
+   NPM_TOKEN=npm_xxx ./tools/bootstrap-publish.sh
+   ```
+
+   The script is **idempotent**. It iterates the 17 packages in
+   dependency order, skips any whose current source version is already
+   on npm, packs and publishes the rest using the token, and at the
+   end prints a list of newly-created packages with direct links to
+   their npmjs.com settings pages.
+
+3. Visit each link the script printed and add the trusted publisher
+   entry (org/repo/workflow as above).
+
+4. Delete the npm token.
+
+5. Subsequent releases follow the normal tag-driven flow — OIDC takes
+   over once the trusted publisher entries exist.
+
+Tarballs created by the bootstrap script are published **without
+provenance** (provenance requires OIDC, which the script doesn't have).
+This is a one-time visible artifact in the npm UI; all subsequent
+versions published by the release workflow include provenance.
 
 ## Why the workflow looks the way it does
 
@@ -131,15 +172,25 @@ understanding why they exist:
 
 ## If a release fails
 
-The published versions are **immutable**. If the workflow fails after
-some packages have published, **do not retry the same version** — bump
-to the next patch and re-tag. npm only allows unpublish within 72 hours
-and only if no dependents exist; treat every successful publish as
-permanent.
+The published versions are **immutable** — npm only allows unpublish
+within 72 hours and only if no dependents exist; treat every
+successful publish as permanent.
 
-If the workflow failed before any package published, retrying the same
-tag is safe — but verify with `npm view <pkg> version` first to be
-sure none made it through.
+The release workflow's publish step is **idempotent**: each package is
+publish-only-if-the-exact-version-isn't-already-on-npm. So:
+
+- **Network blip / npm flake mid-publish**: re-run the workflow on
+  the same tag. Already-published packages will be skipped; the loop
+  resumes from the failed one.
+- **Trusted publisher missing for a new package**: the publish step
+  will fail with `404 PUT`. Fix it via the bootstrap path above
+  (publish manually with a token, configure trusted publisher), then
+  re-run the workflow on the same tag.
+- **Some other failure that produced a partial release at version
+  X.Y.Z**: bump to X.Y.(Z+1) and re-tag. The orphaned partial release
+  is harmless — no consumers will have referenced it via lockfiles
+  yet, and you can `npm deprecate` the orphan versions if you want
+  them invisible.
 
 ## Smoke testing a release locally (Verdaccio)
 

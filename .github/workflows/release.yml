@@ -38,6 +38,37 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
 
+      # Probe the registry for every package we are about to publish. A
+      # package whose name is not yet on npm needs trusted publishing
+      # configured on npmjs.com (org opensip-ai → package settings →
+      # Publishing access) before the publish step will succeed — see
+      # RELEASING.md "Prerequisites". We only warn here; the publish step
+      # is the authoritative gate. The warning gives a named, predictable
+      # failure point so a later 404 from `npm publish` is easy to map
+      # back to "trusted publisher missing" rather than "registry flake".
+      - name: Preflight — detect packages not yet on npm
+        run: |
+          set -u
+          new_count=0
+          for pkg in \
+            core \
+            contracts \
+            lang-typescript lang-rust lang-python lang-go lang-java lang-cpp \
+            fitness simulation \
+            checks-universal checks-typescript checks-python checks-go checks-java checks-cpp \
+            cli ; do
+            name="@opensip-tools/$pkg"
+            if npm view "$name" version >/dev/null 2>&1 ; then
+              echo "  ok  $name"
+            else
+              echo "::warning title=New package detected::$name is not yet on npm. Publish will fail unless trusted publisher is registered on npmjs.com (org opensip-ai → package settings → Publishing access)."
+              new_count=$((new_count + 1))
+            fi
+          done
+          if [ "$new_count" -gt 0 ] ; then
+            echo "::notice::$new_count new package(s) detected. Continuing — publish step will fail loudly for any unregistered trusted publisher."
+          fi
+
       # Pack every workspace package into a tarball. `pnpm pack` resolves
       # workspace:* deps into concrete versions, which `npm publish` then
       # uploads. We pack all 17 up front so the publish step can run
@@ -78,32 +109,49 @@ jobs:
       #
       # `npm publish <tarball>` performs the OIDC handshake (unlike
       # `pnpm publish`, which uses its own HTTP client and skips OIDC).
+      #
+      # Idempotent — already-published versions are skipped, so re-running
+      # the workflow on the same tag is safe (e.g. after a network blip
+      # halfway through the publish loop).
       - name: Publish via npm (OIDC trusted publishing)
         run: |
           set -e
+          VERSION=$(node -p "require('./packages/core/package.json').version")
+          echo "Publishing version: $VERSION"
+
+          publish_if_new() {
+            local pkg="$1"
+            local name="@opensip-tools/$pkg"
+            if npm view "${name}@${VERSION}" version >/dev/null 2>&1; then
+              echo "::notice::skip ${name}@${VERSION} (already on npm)"
+              return 0
+            fi
+            npm publish /tmp/tarballs/opensip-tools-${pkg}-*.tgz --access public --provenance
+          }
+
           # Layer 1 — kernel
-          npm publish /tmp/tarballs/opensip-tools-core-*.tgz             --access public --provenance
+          publish_if_new core
           # Layer 2 — shared CLI infra
-          npm publish /tmp/tarballs/opensip-tools-contracts-*.tgz        --access public --provenance
+          publish_if_new contracts
           # Layer 3 — language adapters (lang-typescript first; downstream check packs depend on it)
-          npm publish /tmp/tarballs/opensip-tools-lang-typescript-*.tgz  --access public --provenance
-          npm publish /tmp/tarballs/opensip-tools-lang-rust-*.tgz        --access public --provenance
-          npm publish /tmp/tarballs/opensip-tools-lang-python-*.tgz      --access public --provenance
-          npm publish /tmp/tarballs/opensip-tools-lang-go-*.tgz          --access public --provenance
-          npm publish /tmp/tarballs/opensip-tools-lang-java-*.tgz        --access public --provenance
-          npm publish /tmp/tarballs/opensip-tools-lang-cpp-*.tgz         --access public --provenance
+          publish_if_new lang-typescript
+          publish_if_new lang-rust
+          publish_if_new lang-python
+          publish_if_new lang-go
+          publish_if_new lang-java
+          publish_if_new lang-cpp
           # Layer 3 — tools (depend on core, contracts, lang-typescript)
-          npm publish /tmp/tarballs/opensip-tools-fitness-*.tgz          --access public --provenance
-          npm publish /tmp/tarballs/opensip-tools-simulation-*.tgz       --access public --provenance
+          publish_if_new fitness
+          publish_if_new simulation
           # Layer 4 — check packs (depend on fitness)
-          npm publish /tmp/tarballs/opensip-tools-checks-universal-*.tgz  --access public --provenance
-          npm publish /tmp/tarballs/opensip-tools-checks-typescript-*.tgz --access public --provenance
-          npm publish /tmp/tarballs/opensip-tools-checks-python-*.tgz     --access public --provenance
-          npm publish /tmp/tarballs/opensip-tools-checks-go-*.tgz         --access public --provenance
-          npm publish /tmp/tarballs/opensip-tools-checks-java-*.tgz       --access public --provenance
-          npm publish /tmp/tarballs/opensip-tools-checks-cpp-*.tgz        --access public --provenance
+          publish_if_new checks-universal
+          publish_if_new checks-typescript
+          publish_if_new checks-python
+          publish_if_new checks-go
+          publish_if_new checks-java
+          publish_if_new checks-cpp
           # Layer 5 — CLI (depends on every tool, every check pack, every adapter)
-          npm publish /tmp/tarballs/opensip-tools-cli-*.tgz              --access public --provenance
+          publish_if_new cli
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
