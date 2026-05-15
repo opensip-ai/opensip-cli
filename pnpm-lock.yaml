@@ -56,9 +56,9 @@ importers:
       '@opensip-tools/checks-universal':
         specifier: workspace:*
         version: link:../fitness/checks-universal
-      '@opensip-tools/cli-shared':
+      '@opensip-tools/contracts':
         specifier: workspace:*
-        version: link:../cli-shared
+        version: link:../contracts
       '@opensip-tools/core':
         specifier: workspace:*
         version: link:../core
@@ -124,7 +124,7 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.19.15)
 
-  packages/cli-shared:
+  packages/contracts:
     dependencies:
       '@opensip-tools/core':
         specifier: workspace:*
@@ -254,9 +254,9 @@ importers:
 
   packages/fitness/engine:
     dependencies:
-      '@opensip-tools/cli-shared':
+      '@opensip-tools/contracts':
         specifier: workspace:*
-        version: link:../../cli-shared
+        version: link:../../contracts
       '@opensip-tools/core':
         specifier: workspace:*
         version: link:../../core
@@ -375,9 +375,9 @@ importers:
 
   packages/simulation/engine:
     dependencies:
-      '@opensip-tools/cli-shared':
+      '@opensip-tools/contracts':
         specifier: workspace:*
-        version: link:../../cli-shared
+        version: link:../../contracts
       '@opensip-tools/core':
         specifier: workspace:*
         version: link:../../core
