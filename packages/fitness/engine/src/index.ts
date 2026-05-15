@@ -19,6 +19,8 @@ export {
   isLiteral, isPropertyAccess,
 } from './framework/ast-utilities.js';
 export { execAbortable } from './framework/abortable-exec.js';
+// File cache (used by checks for content access; tests may seed/clear).
+export { fileCache, DEFAULT_PREWARM_PATTERNS } from './framework/file-cache.js';
 export { buildImportGraph, findStronglyConnectedComponents } from './framework/import-graph.js';
 export type { ImportGraph } from './framework/import-graph.js';
 export { isInsideStringLiteral, stripStringLiterals, stripStringsAndComments, stripStringsAndCommentsPreservingPositions } from './framework/strip-literals.js';

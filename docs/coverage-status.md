@@ -18,10 +18,10 @@ Snapshot taken 2026-05-14 against v3.0.0.
 | `@opensip-tools/checks-python` | 100 | 100 | 50 | 100 | ✅ |
 | `@opensip-tools/checks-java` | 100 | 100 | 50 | 100 | ✅ |
 | `@opensip-tools/checks-cpp` | 100 | 84.6 | 50 | 100 | ✅ |
-| `@opensip-tools/fitness` | 54.7 | 88.9 | 77.4 | 54.7 | gap |
+| `@opensip-tools/fitness` | 83.1 | 81.9 | 88.8 | 83.1 | close |
 | `@opensip-tools/simulation` | 51.0 | 69.8 | 57.1 | 51.0 | gap |
-| `@opensip-tools/checks-typescript` | 25.2 | 78.6 | 1.1 | 25.2 | gap |
-| `@opensip-tools/checks-universal` | 33.0 | 88.5 | 3.3 | 33.0 | gap |
+| `@opensip-tools/checks-typescript` | 44.6 | 58.7 | 43.9 | 44.6 | gap |
+| `@opensip-tools/checks-universal` | 60.5 | 65.7 | 62.6 | 60.5 | gap |
 | `@opensip-tools/cli` | 0 | 0 | 0 | 0 | not measured |
 
 ## What 50% function coverage means for `checks-*`
@@ -34,39 +34,47 @@ but the `Check` object built by `defineCheck()` carries closures
 framework during a real `fit` run — never in unit tests. Those closures
 are exercised end-to-end by the CLI's e2e suite.
 
-## Fitness gaps
+## Fitness — substantially covered (83%)
 
-The fitness engine sits at 54.7% because the orchestration layer is
-extensively tested via the e2e suite (which the per-package coverage
-report cannot see). Specifically not unit-tested:
+Direct unit tests now drive the orchestrator:
 
-- `recipes/service.ts` (recipe execution orchestrator)
-- `recipes/parallel-execution.ts` / `sequential-execution.ts`
-- `recipes/callback-processor.ts`
-- `framework/command-executor.ts` (shells out)
-- `framework/cacheable-exec.ts` (caches command results)
-- `framework/ignore-processing.ts` (directive filtering)
-- `framework/severity-resolver.ts` (per-check severity overrides)
-- `definitions/dump-literals.ts` (dump-format diagnostics)
-- `framework/ast-utilities.ts` (legacy framework AST helpers)
+- **`recipes/service.ts`** (89%) — `service.test.ts` exercises start /
+  abort / disabledChecks / includeViolations / onCheckStart-Complete-
+  Catalog callbacks / explicit + tags + all selectors / sequential
+  execution / error containment / `createAdHocRecipe`. Covers parallel
+  and sequential paths.
+- **`framework/file-cache.ts`** (94%) — file-cache.test.ts
+- **`framework/file-accessor.ts`** (99%) — file-accessor.test.ts
+- **`framework/path-matcher.ts`** (96%) — path-matcher.test.ts
+- **`framework/define-check.ts`** (65%) — analyze + analyzeAll +
+  command modes via define-check.test.ts
+- **`framework/result-builder.ts`** (100%)
+- **`framework/severity-mapping.ts`** (100%)
+- **`framework/strip-literals.ts`** (90%) — strip-literals.test.ts
+- **`framework/ast-utilities.ts`** (100%)
+- **`framework/scope-resolver.ts`** (79%) — scope-resolver.test.ts
+- **`framework/command-executor.ts`** (79%) — command-executor.test.ts
+  (skips the bin-not-found and unexpected-exit-code paths via real shell)
+- **`framework/register-helpers.ts`** (100%)
+- **`recipes/registry.ts`** (100%)
+- **`recipes/built-in-recipes.ts`** (100%)
+- **`recipes/check-resolution.ts`** (96%)
+- **`recipes/retry.ts`** (100%)
+- **`signalers/loader.ts`** (100%)
+- **`targets/loader.ts`** (94%)
+- **`targets/resolver.ts`** (100%)
+- **`targets/target-registry.ts`** (100%)
+- **`gate.ts`** (99%), **`sarif.ts`** (53% — render path tested via e2e)
 
-These are exercised by `packages/cli/src/__tests__/e2e.test.ts` (23
-tests) and the DART parity scan (121 fitness checks against a real
-codebase). Adding direct unit tests for the orchestrator would
-substantially duplicate the e2e suite without catching new bugs.
-
-What **is** unit-tested in fitness:
-
-- `framework/define-check.ts` (factory)
-- `framework/file-cache.ts`, `framework/file-accessor.ts`
-- `framework/path-matcher.ts`, `framework/result-builder.ts`
-- `framework/severity-mapping.ts`
-- `framework/registry.ts`, `recipes/registry.ts`
-- `recipes/check-resolution.ts`, `recipes/check-config.ts`
-- `recipes/built-in-recipes.ts`, `recipes/retry.ts`
-- `signalers/loader.ts`, `targets/loader.ts`
-- `targets/resolver.ts`, `targets/target-registry.ts`
-- `gate.ts`, `sarif.ts`
+What's left in fitness (the remaining 17%):
+- `framework/cacheable-exec.ts` — caches external command output;
+  exercised end-to-end by the e2e suite when a command-mode check runs
+- `framework/ignore-processing.ts` — `@fitness-ignore-*` directive
+  application; exercised via the directive-inventory tests + e2e
+- `framework/directive-parsing.ts` — the parser is partially covered
+- `recipes/parallel-execution.ts` / `sequential-execution.ts` /
+  `callback-processor.ts` — exercised through the FitnessRecipeService
+  tests but with all callback variants the coverage isn't 100%
 
 ## Simulation gaps
 
@@ -81,24 +89,25 @@ production scenario.
 
 ## Check pack gaps
 
-`checks-typescript` (66 checks) and `checks-universal` (88 checks)
-each have a single smoke test verifying metadata (id/slug/tags
-uniqueness, analysisMode validity). Adding per-check `analyze()`
-detection tests would lift each pack's coverage to 90%+ but represents
-~150 individual tests.
+`checks-typescript` (66 checks) and `checks-universal` (88 checks) now
+have parametric coverage tests (`all-checks-execute.test.ts`) that drive
+every check's `run()` method against a curated fixture corpus. This
+exercises the analyze paths each check declares, lifting coverage from
+25%/33% to 44%/60%.
 
-The checks **are** exercised end-to-end:
+The remaining gap is content-specific: each check has detection branches
+that fire only on very specific code patterns (e.g. drizzle-orm table
+definitions with `.primaryKey()`, React effect hooks with stale-deps,
+etc.). To reach 90% per pack, each check needs a dedicated fixture.
+The follow-on work is incremental — every new check should ship with
+a per-check fixture file.
+
+The checks are also exercised end-to-end:
 - The DART parity scan runs 121 of these checks against real source
-  on every commit. Detection regressions would surface there.
+  on every commit. Detection regressions surface there.
 - `e2e.test.ts` runs `fit --recipe quick-smoke` and `fit --check
   no-console-log`, which load and execute checks through the full
   framework path.
-
-Adding per-check unit tests is the next coverage investment. They
-should follow the shape of the language-pack smoke tests
-(`packages/fitness/checks-{go,python,java,cpp}/src/__tests__/`):
-exercise `analyze()` directly with a small fixture and assert the
-violation count + severity.
 
 ## How to run coverage
 
