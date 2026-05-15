@@ -7,22 +7,31 @@ with two: `fit` (fitness checks) and `sim` (simulation scenarios, experimental).
 Adding a new tool is a plugin operation — install a package that implements the
 [Tool contract](#tool-plugin-architecture) and the CLI picks it up automatically.
 
-## Installation
+## Quick start
+
+Four commands from zero to a passing fitness run:
 
 ```bash
+# 1. Install the CLI globally from npm
 npm install -g @opensip-tools/cli
+
+# 2. Change into your project's repo
+cd your-project
+
+# 3. Scaffold the project layout (detects language, writes config + examples)
+opensip-tools init
+
+# 4. Smoke-test the install — runs the example check, then the example scenario
+opensip-tools fit --recipe example
+opensip-tools sim --recipe example
 ```
 
-Then from any project root:
+Both example commands should pass. From there, edit (or delete) the example
+files under `opensip-tools/{fit,sim}/`, write your own checks and scenarios,
+and run `opensip-tools fit` (no recipe flag) to use the default recipe.
 
-```bash
-opensip-tools fit     # run fitness checks (your first scan)
-opensip-tools sim     # run simulations [experimental]
-```
-
-That's the whole setup. `fit` and `sim` are the two primary subcommands; everything else is options and plumbing.
-
-No global install? Use `npx @opensip-tools/cli fit` for one-offs, or install from source:
+**No global install?** `npx @opensip-tools/cli fit` works for one-offs.
+**Install from source?**
 
 ```bash
 git clone https://github.com/opensip-ai/opensip-tools.git
@@ -30,19 +39,10 @@ cd opensip-tools && pnpm install && pnpm build
 node packages/cli/dist/index.js fit
 ```
 
-## Quick start
+## What `init` writes
 
-A fresh project goes from zero to a working pipeline in three commands:
-
-```bash
-$ cd your-project
-$ opensip-tools init                     # detects language, scaffolds the layout
-$ opensip-tools fit --recipe example     # smoke test — runs the example check
-$ opensip-tools sim --recipe example     # smoke test — runs the example scenario
-```
-
-`init` detects your project's primary language(s) from filesystem
-markers (`Cargo.toml`, `pyproject.toml`, `go.mod`, `pom.xml`,
+`opensip-tools init` detects your project's primary language(s) from
+filesystem markers (`Cargo.toml`, `pyproject.toml`, `go.mod`, `pom.xml`,
 `build.gradle`, `CMakeLists.txt`, `tsconfig.json`, `package.json`) and
 scaffolds:
 
@@ -171,9 +171,11 @@ Pre-defined check sets for common scenarios:
 | `backend` | Backend-focused (architecture, resilience) |
 | `frontend` | Frontend-focused (React, accessibility) |
 | `security` | Comprehensive security analysis |
-| `pre-commit` | Fast checks for git hooks |
-| `ci` | Optimized for CI pipelines |
-| `architecture` | Architecture validation |
+| `pre-commit` | Fast checks for git pre-commit hooks |
+| `pre-release` | Comprehensive checks before release |
+| `nightly-full` | Complete suite for nightly scheduled runs |
+| `ci` | Optimized for CI pipelines with JSON output |
+| `architecture` | Architecture validation and compliance |
 
 ### Check Tags
 
@@ -555,19 +557,25 @@ opensip-tools sessions purge --yes           # Skip confirmation
 
 ## Observability
 
-Every CLI invocation generates a `runId` (ULID) for log correlation.
-Structured JSON logs are written to
-`<project>/opensip-tools/.runtime/logs/` (gitignored). Sessions and
-HTML reports live alongside in `.runtime/sessions/` and
+Every CLI invocation generates a `runId` (prefixed ULID — `RUN_<26char>`)
+for log correlation. Structured JSON logs are written to
+`<project>/opensip-tools/.runtime/logs/<YYYY-MM-DD>.jsonl` (gitignored).
+Sessions and HTML reports live alongside in `.runtime/sessions/` and
 `.runtime/reports/`.
 
 ```bash
 opensip-tools fit --debug    # Show structured log events on stderr
 ```
 
-Log files rotate daily, keeping the last 7 days.
+Logs are written to a daily JSONL file; files older than 7 days are
+pruned automatically on the next run.
 
 ## Architecture
+
+For the full educational walkthrough — the fitness loop end-to-end, the
+tool-plugin model, the layer cake, the pipeline subsystems, and a
+lookup-shaped package catalog — see [`docs/architecture/README.md`](./docs/architecture/README.md).
+What follows here is a one-page overview.
 
 Turborepo + pnpm monorepo. Layered: lower numbers depend only on
 higher numbers, never the other direction. Architecture rules are
