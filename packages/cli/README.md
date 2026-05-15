@@ -12,9 +12,10 @@ npm install -g @opensip-tools/cli
 
 ```bash
 cd your-project
-opensip-tools             # welcome screen
-opensip-tools init        # create a targets config
-opensip-tools fit         # run fitness checks
+opensip-tools                            # welcome screen
+opensip-tools init                       # detect language, scaffold layout
+opensip-tools fit --recipe example       # smoke-test the example check
+opensip-tools sim --recipe example       # smoke-test the example scenario
 ```
 
 ## What's in the box
@@ -23,14 +24,18 @@ opensip-tools fit         # run fitness checks
 - **`fit-list`** (alias `list-checks`) — list available checks.
 - **`fit-recipes`** (alias `list-recipes`) — list available recipes.
 - **`dashboard`** — open an HTML report in your browser.
-- **`sim`** — run simulation scenarios (experimental).
-- **`init`** — generate a starter `opensip-tools.config.yml` targets file.
+- **`sim`** — run simulation recipes.
+- **`init`** — detect language and scaffold `opensip-tools.config.yml`
+  plus example checks/recipes/scenarios under `opensip-tools/`.
 - **`sessions list|purge`** — manage stored session data.
 - **`configure`** — set up an OpenSIP Cloud API key for `--report-to`.
-- **`plugin list|install|remove|sync|add`** — manage plugin packages
-  that contribute additional checks and recipes.
+- **`plugin list|add|remove|sync`** — manage npm-installed plugin
+  packages declared in `plugins.<domain>:` (project-local).
 - **`completion`** — print a shell-completion script for bash / zsh / fish.
-- **`uninstall`** — remove `~/.opensip-tools/` (plugins, sessions, logs) for a clean-slate reset.
+- **`uninstall`** — remove `~/.opensip-tools/` (legacy v2 user-level
+  state) for a clean-slate reset. Project-local
+  `opensip-tools/.runtime/` is gitignored — delete it manually if
+  needed.
 
 The CLI is a generic [tool dispatcher](https://github.com/opensip-ai/opensip-tools#tool-plugin-architecture):
 fitness and simulation are first-party tools, but the underlying CLI

@@ -43,7 +43,7 @@ This policy covers all 17 first-party `@opensip-tools/*` packages:
 
 ### Out of scope
 
-- Community plugins installed via `opensip-tools plugin install`
+- Community plugins installed via `opensip-tools plugin add`
 - Issues in upstream dependencies (report those to the respective projects)
 
 ## Supported Versions

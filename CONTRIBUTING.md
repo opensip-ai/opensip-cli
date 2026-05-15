@@ -137,13 +137,35 @@ After creating a check file:
 
 ### Custom checks (plugin)
 
-For checks that aren't suitable for the built-in set, create a plugin:
+For checks that aren't suitable for the built-in set, you have two
+project-local options under v3:
 
-```bash
-mkdir -p ~/.opensip-tools/fit/
+**Source files (auto-loaded)** — drop a `.mjs` file in your project's
+`opensip-tools/fit/checks/` (or `recipes/`) directory. The plugin
+loader auto-discovers it on the next `opensip-tools fit` run; no
+config opt-in required:
+
+```javascript
+// opensip-tools/fit/checks/my-check.mjs
+import { defineCheck } from '@opensip-tools/fitness';
+
+export const checks = [
+  defineCheck({
+    id: 'unique-uuid-here',
+    slug: 'my-check',
+    description: 'What this check does',
+    scope: { languages: ['typescript'], concerns: ['backend'] },
+    tags: ['custom'],
+    analyze: (content, filePath) => [],
+  }),
+];
 ```
 
-Drop a `.js` file there with `export const checks = [...]`, or publish as an npm package and install with `opensip-tools plugin install <package>`.
+**npm packages (explicitly pinned)** — install via `opensip-tools
+plugin add <package>`. The CLI runs `npm install` under
+`opensip-tools/.runtime/plugins/fit/node_modules/` and adds the
+package name to `plugins.fit:` in `opensip-tools.config.yml`. Only
+packages listed there are loaded.
 
 ## Writing Tests
 

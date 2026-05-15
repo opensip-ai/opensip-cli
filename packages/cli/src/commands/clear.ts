@@ -1,5 +1,6 @@
 /**
- * clear command — clear session data from ~/.opensip-tools/sessions/
+ * clear command — clear session data from
+ * <project>/opensip-tools/.runtime/sessions/.
  *
  * Uses Node readline for interactive confirmation (not Ink),
  * since Ink's useInput requires raw mode which isn't always available.
@@ -57,8 +58,8 @@ export async function executeClear(opts: ClearOptions): Promise<ClearResult> {
   // Describe what will happen
   const dayWord = opts.olderThan === 1 ? 'day' : 'days';
   const description = opts.olderThan
-    ? `This will delete session data older than ${opts.olderThan} ${dayWord} from ~/.opensip-tools/sessions/.`
-    : 'This will delete ALL session data from ~/.opensip-tools/sessions/.';
+    ? `This will delete session data older than ${opts.olderThan} ${dayWord} from opensip-tools/.runtime/sessions/.`
+    : 'This will delete ALL session data from opensip-tools/.runtime/sessions/.';
 
   // Prompt for confirmation unless --yes
   if (!opts.yes) {

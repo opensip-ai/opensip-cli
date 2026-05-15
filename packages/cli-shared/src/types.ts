@@ -25,7 +25,7 @@ export interface FitOptions {
   gateSave?: boolean;
   /** Architecture-gate: compare current findings against a saved baseline; exit 1 if regressions found. Mutually exclusive with --gate-save. */
   gateCompare?: boolean;
-  /** Path to the baseline file used by --gate-save / --gate-compare. Default: .opensip-tools/baseline.sarif */
+  /** Path to the baseline file used by --gate-save / --gate-compare. Default: opensip-tools/.runtime/baseline.sarif */
   baseline?: string;
 }
 

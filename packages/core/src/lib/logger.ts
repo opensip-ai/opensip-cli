@@ -10,7 +10,9 @@
  * - ...data: additional structured fields
  *
  * Destinations:
- * - File: ~/.opensip-tools/logs/{YYYY-MM-DD}.jsonl (always, even when silent)
+ * - File: <project>/opensip-tools/.runtime/logs/{YYYY-MM-DD}.jsonl
+ *   (always, even when silent — when the CLI bootstrap supplies a path
+ *   via initLogFile(); falls back to ~/.opensip-tools/logs/ otherwise)
  * - stderr: when debug mode is enabled (Ink renders to stdout, logs to stderr)
  *
  * The setSilent(true) flag only suppresses stderr output, NOT file output.

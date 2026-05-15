@@ -381,7 +381,7 @@ function registerCliCommands(): void {
 
   sessionsCmd
     .command('purge')
-    .description('Delete session data from ~/.opensip-tools/sessions/')
+    .description('Delete session data from opensip-tools/.runtime/sessions/')
     .option('--older-than <days>', 'Only delete sessions older than N days', (v: string) => {
       const n = Number.parseInt(v, 10);
       if (Number.isNaN(n) || n < 0) throw new Error(`Invalid --older-than value: '${v}'. Must be a non-negative integer.`);
