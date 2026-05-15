@@ -134,7 +134,7 @@ prompt — no partial scaffolding.
   sonarjs + unicorn + import) — workspace at 0 errors / 0 warnings.
 - dependency-cruiser layer rules — 0 violations across 465 modules.
 - knip — 0 unused exports / files.
-- Vitest — 1410 tests passing across 17 packages.
+- Vitest — 1308 tests passing across 17 packages.
 
 ### Migration from 0.x
 

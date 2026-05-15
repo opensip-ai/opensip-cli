@@ -24,7 +24,7 @@ Snapshot taken 2026-05-15 against v1.0.0.
 | `@opensip-tools/checks-universal` | 73.6 | 68.8 | 80.2 | 73.6 | close |
 | `@opensip-tools/cli` | 0 | 0 | 0 | 0 | not measured |
 
-Workspace test count: **1410** passing across 17 packages.
+Workspace test count: **1308** passing across 17 packages.
 
 ## What 50% function coverage means for `checks-*`
 
