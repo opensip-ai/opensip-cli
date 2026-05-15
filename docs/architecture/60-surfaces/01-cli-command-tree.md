@@ -1,0 +1,325 @@
+---
+status: current
+last_verified: 2026-05-15
+title: "CLI command tree"
+audience: [users, ci-integrators, contributors]
+purpose: "Lookup-shaped reference for every CLI command, its flags, and when to use each."
+source-files:
+  - packages/cli/src/index.ts
+  - packages/cli/src/commands/init.ts
+  - packages/cli/src/commands/configure.ts
+  - packages/cli/src/commands/plugin.ts
+  - packages/cli/src/commands/uninstall.ts
+  - packages/cli/src/commands/completion.ts
+  - packages/fitness/engine/src/tool.ts
+  - packages/simulation/engine/src/tool.ts
+related-docs:
+  - ../40-runtime/01-cli-dispatch.md
+  - ../70-reference/02-configuration.md
+---
+# CLI command tree
+
+Every command, alphabetized by command name. Use this when you need to look up a flag, not when you're learning what a command is for. For "why", read the relevant subsystem doc.
+
+The grouping mirrors the source split: tool-owned commands (`fit`, `sim`, `dashboard`, `fit-list`, `fit-recipes`) come from each Tool's `register()` call. CLI-owned commands (everything else) live under [`packages/cli/src/commands/`](../../../packages/cli/src/commands/).
+
+---
+
+## Top-level
+
+```
+opensip-tools                           # show welcome banner + next steps
+opensip-tools --version                  # print version, exit
+opensip-tools --help                     # print full help, exit
+opensip-tools <command> --help           # per-command help
+```
+
+Global flags applicable to most commands:
+
+| Flag | Effect |
+|---|---|
+| `--debug` | Enable debug-level logging (events of `debug` level appear in stderr and the run log file). |
+| `--quiet` | Suppress banner / boxes; print only the pass/fail summary line. |
+| `--cwd <path>` | Override the project root (default: `process.cwd()`). |
+| `--json` | Emit structured JSON on stdout instead of the table renderer. |
+| `--config <path>` | Override `opensip-tools.config.yml` location. |
+
+---
+
+## `fit` — run fitness checks
+
+Tool-owned: [`packages/fitness/engine/src/tool.ts`](../../../packages/fitness/engine/src/tool.ts).
+
+```
+opensip-tools fit
+opensip-tools fit --recipe <name>
+opensip-tools fit --check <slug>
+opensip-tools fit --tags <list>
+opensip-tools fit --gate-save
+opensip-tools fit --gate-compare
+```
+
+| Flag | Type | Default | Effect |
+|---|---|---|---|
+| `--recipe <name>` | string | `default` | Use a named recipe. Built-in `default` runs every enabled check. |
+| `--check <slug>` | string | — | Run a single check by slug. Mutually informative with `--recipe`. |
+| `--tags <list>` | comma-list | — | Filter checks by tag (intersected with the recipe's selector). |
+| `--exclude <slug>` | repeatable | `[]` | Exclude check by slug. Can be passed multiple times. |
+| `--list` | bool | `false` | List available checks instead of running. |
+| `--recipes` | bool | `false` | List available recipes instead of running. |
+| `--findings` | bool | `false` | Append a per-check finding listing after the table. |
+| `-v, --verbose` | bool | `false` | Inline finding details + findings summary. |
+| `--report-to <url>` | URL | — | POST findings to a URL (OpenSIP Cloud or compatible). |
+| `--api-key <key>` | string | — | API key for `--report-to`. |
+| `--gate-save` | bool | `false` | Save current findings as architecture baseline. |
+| `--gate-compare` | bool | `false` | Compare current findings against baseline; exit 1 on regression. |
+| `--baseline <path>` | path | `opensip-tools/.runtime/baseline.sarif` | Baseline file location for `--gate-save`/`--gate-compare`. |
+| `-q, --quiet` | bool | `false` | Suppress banner. |
+| `--open` | bool | `false` | Launch dashboard after run. |
+
+**Mutual exclusion:** `--gate-save` and `--gate-compare` cannot be combined.
+
+**Exit codes:** 0 (passed), 1 (violations or regression), 2 (config/runtime error).
+
+**See also:** [`20-the-fit-loop/04-output-gate-sarif.md`](../20-the-fit-loop/04-output-gate-sarif.md), [`50-subsystems/03-architecture-gate.md`](../50-subsystems/03-architecture-gate.md).
+
+---
+
+## `sim` — run simulation scenarios
+
+Tool-owned: [`packages/simulation/engine/src/tool.ts`](../../../packages/simulation/engine/src/tool.ts). Marked **experimental** in `--help`.
+
+```
+opensip-tools sim
+opensip-tools sim --recipe <name>
+opensip-tools sim --kind <kind>
+```
+
+| Flag | Type | Default | Effect |
+|---|---|---|---|
+| `--recipe <name>` | string | built-in `default` | Run a named sim recipe. |
+| `--kind <kind>` | string | — | Filter scenarios by kind. One of `load`, `chaos`, `invariant`, `fix-evaluation`. |
+| `-q, --quiet` | bool | `false` | Suppress banner. |
+| `--open` | bool | `false` | Launch dashboard after run. |
+
+**Exit codes:** 0 (all scenarios passed), 1 (any scenario failed), 2 (config/runtime error).
+
+**See also:** [`30-the-sim-loop/`](../30-the-sim-loop/).
+
+---
+
+## `dashboard` — open the HTML report
+
+Tool-owned (fitness Tool registers it). Renders the most recent run as HTML and opens it in the user's default browser.
+
+```
+opensip-tools dashboard
+opensip-tools dashboard --cwd <path>
+```
+
+The dashboard is a static site at `<project>/opensip-tools/.runtime/reports/<run-id>/index.html`. The command launches the browser and exits; the file is fully self-contained — you can email or commit the directory and the report works elsewhere.
+
+**See also:** [`60-surfaces/03-dashboard.md`](./03-dashboard.md), [`40-runtime/03-session-and-persistence.md`](../40-runtime/03-session-and-persistence.md).
+
+---
+
+## `fit-list` (alias: `list-checks`) — catalog checks
+
+Tool-owned. Prints the loaded check inventory: slug, description, tags.
+
+```
+opensip-tools fit-list
+opensip-tools fit-list --json
+opensip-tools list-checks                # alias
+```
+
+JSON shape:
+
+```json
+{
+  "type": "list-checks",
+  "checks": [{ "slug": "...", "description": "...", "tags": ["..."] }],
+  "totalCount": 80
+}
+```
+
+Useful for scripting (`opensip-tools fit-list --json | jq '.checks[].slug'`) and for verifying that a `plugin add` actually registered the new pack's checks.
+
+---
+
+## `fit-recipes` (alias: `list-recipes`) — catalog recipes
+
+Tool-owned. Prints the loaded recipe inventory.
+
+```
+opensip-tools fit-recipes
+opensip-tools fit-recipes --json
+opensip-tools list-recipes               # alias
+```
+
+JSON shape:
+
+```json
+{
+  "type": "list-recipes",
+  "recipes": [{ "name": "default", "description": "...", "checkCount": "80" }]
+}
+```
+
+---
+
+## `init` — scaffold the project layout
+
+CLI-owned: [`packages/cli/src/commands/init.ts`](../../../packages/cli/src/commands/init.ts).
+
+```
+opensip-tools init
+opensip-tools init --language <list>
+opensip-tools init --force
+```
+
+Detects the project's primary language(s) from filesystem markers and writes:
+
+```
+<cwd>/opensip-tools.config.yml                              # TRACKED
+<cwd>/opensip-tools/fit/checks/example-check.mjs            # TRACKED
+<cwd>/opensip-tools/fit/recipes/example-recipe.mjs          # TRACKED
+<cwd>/opensip-tools/sim/scenarios/example-scenario.mjs      # TRACKED
+<cwd>/opensip-tools/sim/recipes/example-recipe.mjs          # TRACKED
+```
+
+Plus appends `opensip-tools/.runtime/` to `<cwd>/.gitignore`.
+
+| Flag | Effect |
+|---|---|
+| `--language <list>` | Comma-separated language list (`typescript,rust`). Overrides detection. |
+| `--force` | Overwrite existing `opensip-tools.config.yml` and example files. |
+
+Detection markers:
+
+| Marker | Language |
+|---|---|
+| `Cargo.toml` | `rust` |
+| `pyproject.toml`, `setup.py` | `python` |
+| `go.mod` | `go` |
+| `pom.xml`, `build.gradle` | `java` |
+| `CMakeLists.txt` | `cpp` |
+| `tsconfig.json` (or `package.json` alone with no other marker) | `typescript` |
+
+Ambiguous detection (multiple markers, no `--language`) exits 2 with a prompt to specify `--language`.
+
+**Exit codes:** 0 (created), 0 (already exists, with notice), 2 (ambiguous detection / parse error).
+
+---
+
+## `configure` — manage user-level settings
+
+CLI-owned: [`packages/cli/src/commands/configure.ts`](../../../packages/cli/src/commands/configure.ts). Interactive — sets up the OpenSIP Cloud API key in `~/.opensip-tools/config.yml`.
+
+```
+opensip-tools configure
+```
+
+Prompts:
+1. Have an API key already?
+2. If yes, paste it.
+3. If no, walk through `https://opensip.ai` signup.
+4. Test the key against the cloud's auth endpoint.
+5. Write `~/.opensip-tools/config.yml` with the key.
+
+The user-level config is shared across every project on the machine. `opensip-tools fit --report-to <url>` uses the configured key by default unless `--api-key` overrides it.
+
+---
+
+## `dashboard` (CLI-owned variant)
+
+The `dashboard` command is also reachable as a top-level CLI command in addition to the Tool's registration. The Tool variant is the active one; the CLI's mention exists in the welcome banner under common next steps.
+
+---
+
+## `sessions list` and `sessions purge` — manage session records
+
+CLI-owned. Walks `<project>/opensip-tools/.runtime/sessions/`.
+
+```
+opensip-tools sessions list
+opensip-tools sessions list --tool fit
+opensip-tools sessions list --limit 50
+opensip-tools sessions purge
+opensip-tools sessions purge --keep 10
+```
+
+| Flag | Effect |
+|---|---|
+| `--tool <fit\|sim>` | Filter list by tool. |
+| `--limit <n>` | List only the most recent N. |
+| `--keep <n>` | (purge) Keep only the most recent N; delete the rest. |
+
+**See also:** [`40-runtime/03-session-and-persistence.md`](../40-runtime/03-session-and-persistence.md).
+
+---
+
+## `plugin add/remove/list/sync` — manage project-pinned plugins
+
+CLI-owned: [`packages/cli/src/commands/plugin.ts`](../../../packages/cli/src/commands/plugin.ts).
+
+```
+opensip-tools plugin list
+opensip-tools plugin add <pkg>
+opensip-tools plugin add <pkg> --domain <fit|sim>
+opensip-tools plugin remove <pkg>
+opensip-tools plugin sync
+```
+
+| Flag | Effect |
+|---|---|
+| `--domain <fit\|sim>` | (add) Override the inferred domain. Default: `sim` if name contains `/sim/`, else `fit`. |
+| `--json` | Structured output (for any plugin subcommand). |
+
+**`add`** writes to `.runtime/plugins/<domain>/node_modules/<pkg>/` and appends to `plugins.<domain>:` in `opensip-tools.config.yml`. **`remove`** is the inverse. **`list`** intersects installed and config-listed packages. **`sync`** installs everything declared in the config — the post-clone bootstrap.
+
+**See also:** [`40-runtime/02-plugin-loader.md`](../40-runtime/02-plugin-loader.md).
+
+---
+
+## `completion` — print shell completion script
+
+CLI-owned: [`packages/cli/src/commands/completion.ts`](../../../packages/cli/src/commands/completion.ts).
+
+```
+opensip-tools completion             # zsh by default
+opensip-tools completion bash
+opensip-tools completion fish
+```
+
+Pipe to your shell's completion config:
+
+```bash
+opensip-tools completion zsh > ~/.opensip-tools-completion.zsh
+echo "source ~/.opensip-tools-completion.zsh" >> ~/.zshrc
+```
+
+The completion catalog is sourced from `defaultToolRegistry.list()`, so installed third-party tools' commands complete automatically once the script is regenerated.
+
+---
+
+## `uninstall` — remove user-level dotdir
+
+CLI-owned: [`packages/cli/src/commands/uninstall.ts`](../../../packages/cli/src/commands/uninstall.ts). Deletes `~/.opensip-tools/`.
+
+```
+opensip-tools uninstall
+opensip-tools uninstall --force      # skip confirmation prompt
+```
+
+Does **not** remove the binary itself or any project-level state. To fully remove opensip-tools: `opensip-tools uninstall && npm uninstall -g @opensip-tools/cli`.
+
+The interactive flow shows what will be deleted (paths + sizes) and prompts for confirmation. `--force` skips the prompt.
+
+---
+
+## What's next
+
+- **[`02-plugin-authoring.md`](./02-plugin-authoring.md)** — write a check, recipe, scenario, or full Tool plugin.
+- **[`03-dashboard.md`](./03-dashboard.md)** — the HTML report's structure and lifecycle.
+- **[`../70-reference/02-configuration.md`](../70-reference/02-configuration.md)** — every field of `opensip-tools.config.yml`.
