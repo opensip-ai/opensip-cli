@@ -48,7 +48,7 @@ opensip-tools ships two first-party tools today, both invoked through the same C
 The primary loop. One run of `opensip-tools fit` does this:
 
 1. **Resolve config.** Read `opensip-tools.config.yml` from the project root. Detect the project's languages from filesystem markers (`package.json`, `Cargo.toml`, `pyproject.toml`, `go.mod`, `pom.xml`, `CMakeLists.txt`).
-2. **Load checks.** Walk `opensip-tools/fit/checks/*.mjs` for project-local checks. Walk `node_modules` for any package whose `package.json` declares `opensipTools.kind === 'fit-checks'`. Register each check it finds.
+2. **Load checks.** Walk `opensip-tools/fit/checks/*.mjs` for project-local checks. Walk `node_modules` for any package whose name matches `@opensip-tools/checks-*` (or any package listed in `plugins.checkPackages:`). Register each check it finds.
 3. **Pick a recipe.** A recipe is a named selection of checks plus execution options. The default recipe runs every enabled check; named recipes (`--recipe quick-smoke`) narrow that.
 4. **Run the recipe.** Execute checks in parallel by default (configurable per recipe). Each check returns a list of `Signal` objects — one per violation.
 5. **Render and exit.** Print a results table (or JSON, or SARIF). Exit 0 if every check passed, 1 if any check failed, 2 for unrecoverable errors.

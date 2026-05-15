@@ -37,7 +37,7 @@ A contract is a promise to a consumer outside your control. Break it, and the co
 | 3 | JSON output (`CliOutput`) | CI, dashboards, the gate, OpenSIP Cloud | **stable** (semver-major) | `packages/cli-shared/src/types.ts` |
 | 4 | SARIF output | GitHub Code Scanning, IDEs | **stable** (versioned by SARIF spec) | `packages/fitness/engine/src/sarif.ts` |
 | 5 | Tool plugin contract (`Tool`) | third-party tools | **stable** (semver-major) | `packages/core/src/tools/types.ts` |
-| 6 | Plugin manifest (`opensipTools` block) | third-party tools, check packs | **stable** (semver-major) | `packages/core/src/plugins/types.ts` |
+| 6 | Plugin discovery (Tool marker + check-pack name prefix) | third-party tools, check packs | **stable** (semver-major) | `packages/core/src/plugins/tool-package-discovery.ts`, `packages/fitness/engine/src/plugins/check-package-discovery.ts` |
 
 Anything else — internal types, framework helpers, the recipe registry shape, the language-adapter content-filter API — is **internal**. It can move between minors. Don't depend on it from outside the workspace; if you do, you're on your own when it shifts.
 
@@ -174,30 +174,54 @@ Why this surface is so narrow: every byte of it is a constraint on every Tool au
 
 ---
 
-## 6. Plugin manifest
+## 6. Plugin discovery
 
-The `package.json` block that marks an npm package as opensip-tools-discoverable. Lives in [`packages/core/src/plugins/types.ts`](../../../packages/core/src/plugins/types.ts).
+opensip-tools discovers third-party packages two different ways depending on what you're shipping:
+
+### Tools — explicit marker in `package.json`
 
 ```json
 {
-  "name": "@yourorg/your-thing",
+  "name": "@yourorg/your-tool",
   "main": "dist/index.js",
-  "opensipTools": {
-    "kind": "tool" | "fit-checks" | "sim-scenarios" | "lang"
-  }
+  "opensipTools": { "kind": "tool" }
 }
 ```
 
-Each `kind` value pins a different export shape:
+The kernel's [`discoverToolPackages`](../../../packages/core/src/plugins/tool-package-discovery.ts) walks `node_modules` looking for the `opensipTools.kind === 'tool'` marker. The package's main entry must export a `tool: Tool` symbol.
 
-- **`tool`** — main entry must export `tool: Tool`.
-- **`fit-checks`** — main entry must export `checks: Check[]`, optionally `recipes: FitnessRecipe[]`, optionally `checkDisplay: Record<string, [icon, name]>`.
-- **`sim-scenarios`** — main entry must export `scenarios: Scenario[]`, optionally `recipes: SimulationRecipe[]`.
-- **`lang`** — main entry must export `adapters: LanguageAdapter[]`.
+### Check packs — name-prefix discovery
 
-**Stability rule.** Adding a new `kind` is a minor change (existing packs don't break). Changing what an existing `kind` requires is a major change. The four-`kind` taxonomy is itself a contract: a fifth would be a major statement that the platform's plugin shape evolved.
+```json
+{
+  "name": "@opensip-tools/checks-mything",
+  "main": "dist/index.js"
+}
+```
 
-The `PluginDomain` type ([`packages/core/src/plugins/types.ts:91`](../../../packages/core/src/plugins/types.ts)) lists `'fit' | 'sim' | 'asm' | 'lang'` — `asm` is reserved for a future tool. No package ships with `kind: 'asm'` today.
+The fitness engine's [`discoverCheckPackages`](../../../packages/fitness/engine/src/plugins/check-package-discovery.ts) walks `node_modules` looking for any package whose name matches `@opensip-tools/checks-*`. **No `opensipTools.kind` marker is required** — the name prefix is the contract. The package's main entry must export `checks: Check[]`, optionally `recipes: FitnessRecipe[]`, and optionally `checkDisplay: Record<string, [icon, name]>`.
+
+For names outside the `@opensip-tools/checks-*` prefix (e.g. an internal scope), declare the package explicitly in the project config:
+
+```yaml
+plugins:
+  checkPackages:
+    - '@my-org/fitness-checks'      # explicit pin disables auto-discovery
+```
+
+When `plugins.checkPackages:` is set, **only** those packages load — the `@opensip-tools/checks-*` auto-discovery is disabled for the run.
+
+### Sim scenario packs
+
+Currently use the same project-pinned shape as fit (declare the package in `plugins.sim:` in the project config and `plugin add` it). There is no name-prefix auto-discovery for sim today.
+
+### Stability rules
+
+- **Adding a new auto-discovery shape is a minor change.** Existing packs don't break.
+- **Changing what an existing shape requires is a major change.** A pack at `@opensip-tools/checks-*` that exports `checks: Check[]` should keep working across minors.
+- **The Tool marker (`opensipTools.kind: 'tool'`) is a stable surface.** A future fifth kind would be a deliberate addition, not an accident.
+
+The `PluginDomain` type ([`packages/core/src/plugins/types.ts:91`](../../../packages/core/src/plugins/types.ts)) lists `'fit' | 'sim' | 'asm' | 'lang'` — these are domain identifiers used for path resolution (`<project>/opensip-tools/.runtime/plugins/<domain>/`), not `package.json` `kind` values. `asm` is reserved for a future tool.
 
 ---
 

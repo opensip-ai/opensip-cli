@@ -24,7 +24,7 @@ You can extend opensip-tools five ways, listed in increasing order of effort and
 1. **Add a project-local check** — drop a `.mjs` file under `<project>/opensip-tools/fit/checks/`.
 2. **Add a project-local recipe** — drop a `.mjs` file under `<project>/opensip-tools/fit/recipes/`.
 3. **Add a project-local sim scenario** — under `<project>/opensip-tools/sim/scenarios/`.
-4. **Ship a check pack** — npm package with `opensipTools.kind === 'fit-checks'`.
+4. **Ship a check pack** — npm package whose name starts with `@opensip-tools/checks-*` (auto-discovered) or is pinned in `plugins.checkPackages:`.
 5. **Ship a full Tool** — npm package with `opensipTools.kind === 'tool'`.
 
 This doc walks each shape with full code.
@@ -176,7 +176,6 @@ A check pack is a check directory promoted to its own npm package. Use this when
   "version": "0.1.0",
   "main": "dist/index.js",
   "type": "module",
-  "opensipTools": { "kind": "fit-checks" },
   "peerDependencies": {
     "@opensip-tools/fitness": "^1.0.0",
     "@opensip-tools/core": "^1.0.0"
@@ -188,7 +187,12 @@ A check pack is a check directory promoted to its own npm package. Use this when
 }
 ```
 
-The `opensipTools.kind: 'fit-checks'` marker is what discovery looks for. Peer-depend on `@opensip-tools/fitness` and `@opensip-tools/core` — the consumer brings their own version.
+**No `opensipTools.kind` marker for check packs** — discovery is name-based. Two paths:
+
+- **Publish into `@opensip-tools/checks-*`** — auto-discovered by name prefix when installed in `node_modules`.
+- **Use any other scope** (e.g. `@my-co/checks-internal`) — the consumer must list it in `plugins.checkPackages:` (or `plugins.fit:`). `opensip-tools plugin add @my-co/checks-internal` does this in one step.
+
+Peer-depend on `@opensip-tools/fitness` and `@opensip-tools/core` — the consumer brings their own version.
 
 ### `src/index.ts`
 
@@ -362,7 +366,7 @@ A Tool that's structurally different (a benchmark runner, a custom report genera
 - **Test every check with the same content filter the framework will use.** The strip behavior is per-language; a check that works on raw content might break on filtered content. Use the language adapter's `stripComments` directly in tests if needed.
 - **Use `--debug` aggressively while authoring.** Your check's log lines (`ctx.log(...)`) appear in stderr; the run log file under `<project>/opensip-tools/.runtime/logs/<run-id>.jsonl` archives them.
 - **Pin your peer-deps to majors, not minors.** Minor opensip-tools releases are non-breaking; pinning to a minor unnecessarily blocks consumers who are already on a newer minor.
-- **Keep `opensipTools.kind` accurate.** A package marked `tool` but exporting a check pack's `checks` array won't load — the discovery walker looks for the right shape per kind.
+- **Use the right discovery shape for the right export.** A package marked `opensipTools.kind: 'tool'` is treated as a Tool by the discovery walker — it must export `tool: Tool`. A check pack uses no marker and is discovered by name prefix or pinning. Mismatching the two leads to a load failure that's logged but not fatal.
 
 ---
 

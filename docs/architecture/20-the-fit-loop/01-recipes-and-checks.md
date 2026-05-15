@@ -313,7 +313,7 @@ Three sources, loaded in order:
 
 1. **Built-in.** [`packages/fitness/engine/src/recipes/built-in-recipes.ts`](../../../packages/fitness/engine/src/recipes/built-in-recipes.ts) defines `default` (every enabled check, parallel, table output) and a small handful of canonical recipes. These ship with `@opensip-tools/fitness` and are always available.
 2. **Project-local.** Files matching `<project>/opensip-tools/fit/recipes/*.mjs` are loaded by the plugin discoverer. Each module exports a default recipe (or a named one). This is where most teams put their `quick-smoke`, `pre-merge`, and `nightly` recipes.
-3. **npm-package.** Check packs (`opensipTools.kind: 'fit-checks'`) can export recipes alongside checks, by declaring `recipes:` in their entry. A pack-shipped recipe is registered the same way a project-local one is.
+3. **npm-package.** Check packs (any package matching `@opensip-tools/checks-*` or listed in `plugins.checkPackages:`) can export recipes alongside checks, by declaring `recipes:` in their entry. A pack-shipped recipe is registered the same way a project-local one is.
 
 The recipe registry is last-writer-wins. A project-local `default` recipe overrides the built-in one; a pack-shipped recipe with a name conflict overrides whichever was registered first.
 

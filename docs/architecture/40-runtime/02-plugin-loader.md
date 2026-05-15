@@ -18,24 +18,24 @@ related-docs:
 ---
 # Plugin loader
 
-opensip-tools discovers four kinds of plugins. Each has its own discovery shape, but they share a small, explicit policy: nothing loads silently, nothing loads transitively without opt-in, and the project owns its plugin set.
+opensip-tools loads four kinds of plugins. Each has its own discovery shape, but they share a small, explicit policy: nothing loads silently, nothing loads transitively without opt-in, and the project owns its plugin set.
 
 > **What you'll understand after this:**
-> - The four discovery shapes (Tool, fit-checks, sim-scenarios, lang).
-> - Why source-file plugins auto-load but npm-package plugins require explicit listing.
+> - The four discovery shapes (Tool marker, check-pack name prefix, project-pinned, direct import).
+> - Why source-file plugins auto-load but project-pinned npm packages require explicit listing.
 > - The on-disk layout the `plugin add/remove/list/sync` commands operate on.
 > - What `plugin sync` does and when CI should run it.
 
 ---
 
-## The four plugin kinds
+## The four discovery shapes
 
-| `opensipTools.kind` | Discovery shape | Where loaded |
+| Plugin kind | Discovery shape | Where loaded |
 |---|---|---|
-| `tool` | `node_modules` walk for the `opensipTools` marker | At CLI startup, by `discoverToolPackages()` |
-| `fit-checks` | Project-local files + project-pinned npm packages | Inside fitness's `ensureChecksLoaded()` |
-| `sim-scenarios` | Project-local files + project-pinned npm packages | Inside simulation's `ensureScenariosLoaded()` |
-| `lang` | Direct CLI imports (no discovery walk) | At CLI module load, before any Tool runs |
+| **Tools** | `node_modules` walk for `opensipTools.kind === 'tool'` marker | At CLI startup, by `discoverToolPackages()` |
+| **Check packs** | `node_modules` walk for `@opensip-tools/checks-*` name prefix, OR explicit `plugins.checkPackages:` list | Inside fitness's `ensureChecksLoaded()` |
+| **Sim scenario packs** | Project-local source files + project-pinned via `plugins.sim:` list | Inside simulation's `ensureScenariosLoaded()` |
+| **Language adapters** | Direct CLI imports (no discovery walk) | At CLI module load, before any Tool runs |
 
 Different kinds, different lifetimes. Tools are global to the binary — once registered, they're available regardless of cwd. Check packs and scenario packs are project-scoped — they load when the relevant Tool actually runs. Language adapters are bundled — they're a CLI dep, not a discoverable plugin, because the framework can't usefully run without them.
 
@@ -87,7 +87,7 @@ The loader is forgiving — it loads what it finds and logs (but doesn't throw) 
 
 These files are **always loaded**. There's no opt-in required because they're already part of the project — you wrote them, you committed them, they're inside `<project>/opensip-tools/`. The auto-loading is the affordance.
 
-### 2. Npm-package plugins (explicit pinning required)
+### 2. Project-pinned npm-package plugins
 
 ```
 <project>/opensip-tools/.runtime/plugins/fit/node_modules/<pkg>/
@@ -99,21 +99,41 @@ Plus the matching list in `opensip-tools.config.yml`:
 ```yaml
 plugins:
   fit:
-    - '@opensip-tools/checks-typescript'
-    - '@my-org/checks-internal'
+    - '@my-org/checks-internal'         # arbitrary scope — must be pinned
   sim:
     - '@my-org/sim-scenarios'
 ```
 
 The discoverer walks `.runtime/plugins/<domain>/node_modules/` but **only loads the packages explicitly listed in `plugins.<domain>:`**. Everything else in node_modules (transitive deps, hoisted packages, accidental installs) is ignored.
 
-The explicit list is the contract. Auto-loading every npm package in the runtime dir would mean a transitive devDep could silently inject checks. Requiring the list makes plugin loading intentional: a check pack is registered exactly when the user (or the `plugin add` command) adds its name to `plugins.<domain>:`.
+The explicit list is the contract for arbitrary-scope packs. A transitive devDep can't silently inject checks — the user (or the `plugin add` command) has to add its name to `plugins.<domain>:` for it to load.
 
-If `plugins.checkPackages:` is set on the fitness side, that list is even more strict — only those packages load, including the bundled `@opensip-tools/checks-*` packs. Use it when a project wants to refuse default check packs entirely (e.g. an internal-only deployment shipping only its own checks).
+### 3. `@opensip-tools/checks-*` auto-discovery (fit only)
+
+Beyond the project-pinned form, fitness has a second discovery path for any package whose name starts with `@opensip-tools/checks-`. The fitness engine walks `node_modules` (from `cwd` upward through ancestor `node_modules` directories, matching Node's resolution algorithm) and registers every package whose name matches that prefix. Source: [`packages/fitness/engine/src/plugins/check-package-discovery.ts`](../../../packages/fitness/engine/src/plugins/check-package-discovery.ts).
+
+Resolution rules apply in order:
+
+1. **`plugins.checkPackages:` is set** — that explicit list wins. Auto-discovery is skipped entirely. Lets users pin their check set deterministically:
+
+   ```yaml
+   plugins:
+     checkPackages:
+       - '@opensip-tools/checks-universal'
+       - '@my-org/fitness-checks'              # outside the @opensip-tools/checks-* prefix → must be pinned
+   ```
+
+2. **`plugins.autoDiscoverChecks: false`** — no additional check packages are loaded. Lets users opt out of dependency-based discovery (e.g. when running in an environment with unrelated `@opensip-tools` packages installed).
+
+3. **Default** — scan `node_modules` for any `@opensip-tools/checks-*` package and register them all.
+
+No package is privileged — the bundled packs (`@opensip-tools/checks-universal`, `@opensip-tools/checks-typescript`, etc.) are discovered the same way as third-party `@opensip-tools/checks-*` packs. Add a `@opensip-tools/checks-mything` to your project's `dependencies`, and it's loaded on the next run with no further wiring.
+
+The name-prefix shape is what makes "install and use" frictionless for the bundled packs and any packs published into the official scope. The explicit-pinning shape (`plugins.checkPackages:` or `plugins.fit:`) is what handles arbitrary-scope packs (`@my-org/...`) and locked-down deployments.
 
 ---
 
-## Language adapter "discovery" — actually direct imports
+## 4. Language adapter "discovery" — actually direct imports
 
 [`packages/cli/src/index.ts:64-69`](../../../packages/cli/src/index.ts) registers the six bundled language adapters at module load time:
 
@@ -134,9 +154,7 @@ This isn't discovery. It's a static side-effect import. Why?
 
 - Language adapters are needed *before* any Tool runs. A check that runs against a language with no registered adapter would treat every file as raw text — silent miss.
 - The six bundled adapters are part of the CLI's contract. A project that needs Rust support gets it without installing anything; same for the others.
-- A custom language adapter (say, `@my-co/lang-erlang`) would still be discoverable through a future `opensipTools.kind === 'lang'` shape — but the bundled six are non-optional and direct imports keep them ahead of any plugin.
-
-The `LangPluginExports` shape exists in [`packages/core/src/plugins/types.ts:29`](../../../packages/core/src/plugins/types.ts) so a custom-language plugin path can be added later without a kernel change. No package ships with `kind: 'lang'` today.
+- A custom language adapter (say, `@my-co/lang-erlang`) would need a future plugin path to be added — today's CLI registers only the six bundled adapters. The `LangPluginExports` shape ([`packages/core/src/plugins/types.ts:29`](../../../packages/core/src/plugins/types.ts)) exists as a forward-compatible export shape, but no discovery walker reads it yet.
 
 ---
 

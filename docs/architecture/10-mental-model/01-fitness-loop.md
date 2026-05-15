@@ -134,7 +134,7 @@ Source: [`packages/core/src/plugins/discover.ts`](../../../packages/core/src/plu
 Three sources of checks get loaded, in order:
 
 1. **Language adapters.** Bound at module load time by the CLI before any tool initializes — `lang-typescript`, `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp` each register one `LanguageAdapter` into `defaultLanguageRegistry`. Without this, the framework would treat every file as raw text and a regex check looking for `console.log` would also match the literal string in a comment.
-2. **npm-package check packs.** The plugin loader walks `node_modules` for any package whose `package.json` declares `opensipTools.kind === 'fit-checks'`. Each one exports a list of `defineCheck()` results. Bundled packs include `@opensip-tools/checks-universal`, `@opensip-tools/checks-typescript`, `@opensip-tools/checks-python`, etc.
+2. **npm-package check packs.** The plugin loader walks `node_modules` for any package whose name matches `@opensip-tools/checks-*` (the auto-discovery prefix), or any package listed in `plugins.checkPackages:` (the explicit-pin form). Each one exports a list of `defineCheck()` results. Bundled packs include `@opensip-tools/checks-universal`, `@opensip-tools/checks-typescript`, `@opensip-tools/checks-python`, etc.
 3. **Project-local checks.** `.mjs` files under `<project>/opensip-tools/fit/checks/` are loaded via dynamic `import()`. Each module either exports a single `Check` (the value returned by `defineCheck()`) or an array of them.
 
 If `plugins.checkPackages:` is set in the config, **only** those packages are loaded — auto-discovery is disabled for the run. This lets a project pin its check pack list and refuse anything pulled in transitively.

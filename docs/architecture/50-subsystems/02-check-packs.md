@@ -20,7 +20,7 @@ related-docs:
 ---
 # Check pack architecture
 
-A check pack is an npm package that contributes one or more `Check` objects. Six pack packages ship today; an arbitrary number of third-party packs can be added by `plugin add`. The pack contract is simple, the marketplace shape is intentional, and the discovery layer (covered in [`40-runtime/02-plugin-loader.md`](../40-runtime/02-plugin-loader.md)) takes care of the rest.
+A check pack is an npm package that contributes one or more `Check` objects. Six pack packages ship today; an arbitrary number of third-party packs can be added by `plugin add` (or by name-prefix auto-discovery in the `@opensip-tools/checks-*` scope). The pack contract is simple, the marketplace shape is intentional, and the discovery layer (covered in [`40-runtime/02-plugin-loader.md`](../40-runtime/02-plugin-loader.md)) takes care of the rest.
 
 > **What you'll understand after this:**
 > - The `FitPluginExports` shape every pack implements.
@@ -50,17 +50,21 @@ export const metadata: {
 
 `checks` is the flat list of every `defineCheck()` result the pack provides. `checkDisplay` is a map from slug → `[icon, displayName]` that the CLI uses for table rendering and dashboard grouping. `metadata` carries the pack's name, version, and one-line description.
 
-Plus the package.json marker:
+Plus a discoverable package.json shape:
 
 ```json
 {
   "name": "@opensip-tools/checks-universal",
-  "main": "dist/index.js",
-  "opensipTools": { "kind": "fit-checks" }
+  "main": "dist/index.js"
 }
 ```
 
-The `kind: 'fit-checks'` marker is what discovery looks for. A pack that omits the marker is invisible to the loader.
+There is **no `opensipTools.kind` marker** for check packs. Discovery is **name-based**:
+
+- A package whose name starts with `@opensip-tools/checks-*` is auto-discovered when installed in `node_modules`. This is how the six bundled packs and any packs published in the official scope load.
+- A package with any other name (e.g. `@my-org/fitness-checks`) is only loaded when listed in `plugins.checkPackages:` (or `plugins.fit:`) in `opensip-tools.config.yml`. This is how arbitrary-scope packs load.
+
+See [`40-runtime/02-plugin-loader.md`](../40-runtime/02-plugin-loader.md) for the resolution rules and how `plugins.autoDiscoverChecks: false` lets you opt out of auto-discovery entirely.
 
 The `collectChecks` helper in [`packages/fitness/checks-universal/src/index.ts`](../../../packages/fitness/checks-universal/src/index.ts) walks the package's own subdirectory exports and flattens them, deduplicating by check id. New checks are added by writing a new file under `src/checks/<category>/` — the barrel export picks them up automatically.
 
@@ -203,7 +207,7 @@ Minimum viable pack:
 
 ```
 @my-co/checks-internal/
-├── package.json                # opensipTools.kind: 'fit-checks'
+├── package.json                # name: '@opensip-tools/checks-*' or pinned in config
 ├── dist/index.js               # exports: checks, checkDisplay, metadata
 └── README.md                   # author affordance
 ```

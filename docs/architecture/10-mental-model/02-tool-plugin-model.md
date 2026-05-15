@@ -209,7 +209,7 @@ What you *don't* need:
 - A code change in `@opensip-tools/core`.
 - A schema migration for the project config (unless your tool has its own config — which goes in a tool-namespaced section under `opensip-tools.config.yml`).
 
-If your tool also wants to ship checks (the way `@opensip-tools/checks-typescript` does for `fit`), you have a separate option: a check-pack plugin (`opensipTools.kind === 'fit-checks'`). That's a different contract — see [`60-surfaces/02-plugin-authoring.md`](../60-surfaces/02-plugin-authoring.md).
+If your tool also wants to ship checks (the way `@opensip-tools/checks-typescript` does for `fit`), you have a separate option: a check pack — any npm package whose name matches `@opensip-tools/checks-*` (or is listed in `plugins.checkPackages:`). That's a different contract — see [`60-surfaces/02-plugin-authoring.md`](../60-surfaces/02-plugin-authoring.md).
 
 ---
 

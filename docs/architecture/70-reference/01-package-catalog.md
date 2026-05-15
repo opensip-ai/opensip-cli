@@ -60,7 +60,7 @@ Peer packages at the same layer. Tools implement the `Tool` contract; language a
 
 ## Layer 4 — fitness check packs
 
-Each pack ships `checks: Check[]`, `checkDisplay`, and `metadata`. Discoverable via `opensipTools.kind: 'fit-checks'`.
+Each pack ships `checks: Check[]`, `checkDisplay`, and `metadata`. Discovered by name prefix (`@opensip-tools/checks-*`) when installed, or by explicit pinning in `plugins.checkPackages:` for arbitrary scopes.
 
 | Package | Path | Role | Key exports |
 |---|---|---|---|
