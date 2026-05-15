@@ -347,6 +347,51 @@ beforeAll(async () => {
       '  return Number(process.env.MAX_REQUESTS);',
       '}',
     ].join('\n')),
+
+    // --- DEPENDENCY-SECURITY-AUDIT — outdated deps ---
+    fixture('package-deps.json', JSON.stringify({
+      dependencies: { 'lodash': '4.0.0', 'express': '3.0.0' },
+    }, null, 2)),
+
+    // --- LOGGER-COVERAGE — unstructured + structured patterns ---
+    fixture('src/services/order-service.ts', [
+      'export class OrderService {',
+      '  async place(order: { id: string }) {',
+      '    console.log("placing order", order.id);',
+      '    if (Math.random() > 0.5) console.error("order failed");',
+      '    return order;',
+      '  }',
+      '  async cancel() {',
+      '    console.warn("cancellation requested");',
+      '  }',
+      '}',
+    ].join('\n')),
+
+    // --- EVENT-NAME-CONSISTENCY pattern (use the same domain prefix) ---
+    fixture('src/events/order-events.ts', [
+      'export type OrderEvent =',
+      '  | { type: "order.placed"; id: string }',
+      '  | { type: "order.shipped"; id: string }',
+      '  | { type: "OrderCancelled"; id: string }',
+      '  | { type: "user_created"; id: string };',
+    ].join('\n')),
+
+    // --- ZOD-OPENAPI-SYNC: missing satisfies ---
+    fixture('src/schemas/no-type-constraint.ts', [
+      'import { z } from "zod";',
+      'export const ProductSchema = z.object({',
+      '  id: z.string(),',
+      '  name: z.string(),',
+      '  price: z.number(),',
+      '});',
+    ].join('\n')),
+
+    // --- DEAD CODE / unused exports ---
+    fixture('src/orphans/never-imported.ts', [
+      'export function neverCalled() { return "boo"; }',
+      'export const NEVER_REFERENCED = 0;',
+      'export interface NeverUsed { v: number }',
+    ].join('\n')),
   ];
 
   // Prewarm so the file cache contains every fixture for any check

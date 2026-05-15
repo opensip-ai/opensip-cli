@@ -315,6 +315,274 @@ beforeAll(async () => {
     fixture('src/big/manyfns.ts', Array.from({ length: 60 }, (_, i) =>
       `export function fn${i}(x: number): number { return x + ${i}; }`,
     ).join('\n')),
+
+    // --- FASTIFY routes WITHOUT schema (fastify-schema-coverage) ---
+    fixture('src/routes/fastify-unvalidated.ts', [
+      'import fastify from "fastify";',
+      'const app = fastify();',
+      'app.post("/users", async (req, res) => {',
+      '  const body = req.body as any;',
+      '  return { id: body.id };',
+      '});',
+      'app.get("/search/:id", (req, res) => {',
+      '  return res.send({ query: req.query });',
+      '});',
+    ].join('\n')),
+
+    // --- ARRAY parameter validation (array-validation) ---
+    fixture('src/util/unvalidated-arrays.ts', [
+      'export function processItems(items: string[]): number {',
+      '  // No length / type validation before access',
+      '  return items.length + (items[0]?.length ?? 0);',
+      '}',
+      'export function findUser(ids: number[]): unknown {',
+      '  return lookupUsers(ids);',
+      '}',
+      'async function lookupUsers(ids: number[]) { return ids.map((i) => ({ id: i })); }',
+    ].join('\n')),
+
+    // --- TYPEORM @Entity missing standard columns (database-schema-validation) ---
+    fixture('src/db/incomplete-entity.ts', [
+      'import { Entity, Column } from "typeorm";',
+      '@Entity()',
+      'export class Address {',
+      '  @Column({ nullable: true }) line1!: string;',
+      '  @Column() city!: string;',
+      '}',
+    ].join('\n')),
+
+    // --- ZOD schema without .satisfies (zod-schema-coverage) ---
+    fixture('src/schemas/no-satisfies.ts', [
+      'import { z } from "zod";',
+      'export const UserSchema = z.object({ id: z.string(), name: z.string() });',
+      'export const CreateUserSchema = z.object({ name: z.string() });',
+    ].join('\n')),
+
+    // --- NUMERIC validation (numeric-validation) ---
+    fixture('src/util/unvalidated-numbers.ts', [
+      'export function scale(factor: number): number {',
+      '  return factor * 2;',
+      '}',
+      'export function parsePort(portStr: string): number {',
+      '  return Number.parseInt(portStr, 10);',
+      '}',
+      'export function divider(a: number, b: number): number {',
+      '  return a / b; // no zero check',
+      '}',
+    ].join('\n')),
+
+    // --- React .map without memo (memo-list-items) ---
+    fixture('src/components/ListWithoutMemo.tsx', [
+      'export function UserList({ users }: { users: { id: string; name: string }[] }) {',
+      '  return (',
+      '    <div>',
+      '      {users.map((u) => <UserCard key={u.id} user={u} />)}',
+      '    </div>',
+      '  );',
+      '}',
+      'function UserCard({ user }: { user: { id: string; name: string } }) {',
+      '  return <div>{user.name}</div>;',
+      '}',
+    ].join('\n')),
+
+    // --- Silent early returns (silent-early-returns) ---
+    fixture('src/handlers/silent-returns.ts', [
+      'export function fetchUser(id: string) {',
+      '  if (!id) return null;',
+      '  if (id.length > 100) return false;',
+      '  return { id };',
+      '}',
+      'export function findItem(items: { id: string }[], id: string) {',
+      '  for (const item of items) {',
+      '    if (item.id === id) return item;',
+      '  }',
+      '  return undefined;',
+      '}',
+    ].join('\n')),
+
+    // --- Incomplete regex escaping (incomplete-regex-escaping) ---
+    fixture('src/util/bad-regex-escape.ts', [
+      'export function sanitize(input: string): string {',
+      String.raw`  return input.replaceAll(/[abc]/g, "\\$&");`,
+      '}',
+      'export function escape2(input: string) {',
+      '  // Missing escape for special regex chars',
+      '  return input.replaceAll(new RegExp("a.b"), "x");',
+      '}',
+    ].join('\n')),
+
+    // --- Stream / buffer size limits (stream-buffer-size-limits) ---
+    fixture('src/streams/unbounded-buffer.ts', [
+      'export async function readStream(stream: AsyncIterable<Buffer>): Promise<Buffer> {',
+      '  const chunks: Buffer[] = [];',
+      '  for await (const chunk of stream) {',
+      '    chunks.push(chunk);',
+      '  }',
+      '  return Buffer.concat(chunks);',
+      '}',
+    ].join('\n')),
+
+    // --- Lazy validation after expensive await (frontend/lazy-loading) ---
+    fixture('src/handlers/fail-fast-violation.ts', [
+      'export async function validateAndFetch(userId: string) {',
+      '  const user = await fetchFromDB(userId);',
+      '  if (!userId) return null;',
+      '  return user;',
+      '}',
+      'async function fetchFromDB(id: string) { return { id }; }',
+    ].join('\n')),
+
+    // --- DEAD CODE / unused exports ---
+    fixture('src/unused/unused-export.ts', [
+      'export function unusedFunction() { return 42; }',
+      'export const UNUSED_CONSTANT = "never used";',
+      'export type UnusedType = { x: number };',
+    ].join('\n')),
+
+    // --- DISPOSE pattern completeness ---
+    fixture('src/lifecycle/incomplete-dispose.ts', [
+      'export interface IDisposable {',
+      '  dispose(): void;',
+      '}',
+      'export class ResourceHolder implements IDisposable {',
+      '  private subscription = { unsubscribe() { /* */ } };',
+      '  private interval = setInterval(() => undefined, 1000);',
+      '  // No dispose body — should flag',
+      '  dispose(): void {}',
+      '}',
+    ].join('\n')),
+
+    // --- LIFECYCLE cleanup enforcement (timer / subscription / event-listener) ---
+    fixture('src/lifecycle/leaks.ts', [
+      'export function startWatcher() {',
+      '  setInterval(() => console.log("tick"), 5000);',
+      '  globalThis.addEventListener("beforeunload", () => undefined);',
+      '  const ws = { close() { /* */ }, on() { /* */ } };',
+      '  return ws;',
+      '}',
+    ].join('\n')),
+
+    // --- ERROR handling quality (catch + log without rethrow / context) ---
+    fixture('src/errors/poor-handling.ts', [
+      'export async function poorlyHandled() {',
+      '  try {',
+      '    await fetch("/api");',
+      '  } catch (e) {',
+      '    console.error(e);',
+      '  }',
+      '  try {',
+      '    JSON.parse("not json");',
+      '  } catch (e) {',
+      '    // swallowed',
+      '  }',
+      '}',
+    ].join('\n')),
+
+    // --- FLASHLIST enforcement (FlatList vs FlashList) ---
+    fixture('src/components/UserList.tsx', [
+      'import { FlatList } from "react-native";',
+      'export function UserList({ data }: { data: { id: string }[] }) {',
+      '  return <FlatList data={data} renderItem={({ item }) => <></>} />;',
+      '}',
+    ].join('\n')),
+
+    // --- ARRAY mutation ordering ---
+    fixture('src/util/mutation-ordering.ts', [
+      'export function mutate(items: number[]): number[] {',
+      '  // Mutates the input then returns a sliced copy',
+      '  items.sort((a, b) => a - b);',
+      '  return items.slice();',
+      '}',
+    ].join('\n')),
+
+    // --- ASYNC PATTERNS (forgotten await + parallel batch) ---
+    fixture('src/async/missing-await.ts', [
+      'export async function risky() {',
+      '  // Missing await — fire and forget',
+      '  fetch("/api/track");',
+      '  // Sequential awaits where Promise.all would do',
+      '  const a = await fetch("/api/a");',
+      '  const b = await fetch("/api/b");',
+      '  return [a, b];',
+      '}',
+    ].join('\n')),
+
+    // --- THROWS-DOCUMENTATION (functions that throw without @throws JSDoc) ---
+    fixture('src/errors/thrower.ts', [
+      'export function validate(input: string) {',
+      '  if (!input) throw new Error("empty input");',
+      '  if (input.length > 1024) throw new RangeError("too long");',
+      '  return input;',
+      '}',
+    ].join('\n')),
+
+    // --- TOCTOU race condition (read-then-update on shared map) ---
+    fixture('src/cache/toctou.ts', [
+      'export class Counter {',
+      '  private state = new Map<string, number>();',
+      '  increment(key: string) {',
+      '    const v = this.state.get(key) ?? 0;',
+      '    this.state.set(key, v + 1);',
+      '  }',
+      '}',
+    ].join('\n')),
+
+    // --- STUBBED IMPLEMENTATION (NotImplemented / TODO function bodies) ---
+    fixture('src/api/stubs.ts', [
+      'export function notDone(): never {',
+      '  throw new Error("Not implemented");',
+      '}',
+      'export async function todoFn() {',
+      '  // TODO',
+      '  return undefined;',
+      '}',
+    ].join('\n')),
+
+    // --- CIRCULAR import detection (stronger pair) ---
+    fixture('src/cyc/x.ts', 'import { y } from "./y.js"; export const x = () => y();'),
+    fixture('src/cyc/y.ts', 'import { x } from "./x.js"; export const y = () => x();'),
+
+    // --- DUPLICATE UTILITY FUNCTIONS ---
+    fixture('src/utils/dup-a.ts', [
+      'export function camelCase(s: string) { return s.replaceAll(/_([a-z])/g, (_, c: string) => c.toUpperCase()); }',
+    ].join('\n')),
+    fixture('src/utils/dup-b.ts', [
+      'export function camelCase(input: string) {',
+      '  return input.replaceAll(/_([a-z])/g, (_, c: string) => c.toUpperCase());',
+      '}',
+    ].join('\n')),
+
+    // --- API CONTRACT MISMATCH (drizzle field vs DTO) ---
+    fixture('src/api/dto-mismatch.ts', [
+      'import { pgTable, integer, text } from "drizzle-orm/pg-core";',
+      'export const products = pgTable("products", {',
+      '  id: integer("id").primaryKey(),',
+      '  name: text("name").notNull(),',
+      '  internalCode: text("internal_code"),',
+      '});',
+      '// DTO is missing internalCode but the table has it',
+      'export interface ProductDto { id: number; name: string }',
+    ].join('\n')),
+
+    // --- USE-CASE FUNCTIONS (silent / lazy) ---
+    fixture('src/usecase/listing-fail-fast.ts', [
+      'export async function createListing(input: { sellerId: string; title: string }) {',
+      '  const seller = await fetch(`/api/sellers/${input.sellerId}`);',
+      '  if (!input.title) return null;',
+      '  return seller.json();',
+      '}',
+    ].join('\n')),
+
+    // --- STREAM / network buffering ---
+    fixture('src/streams/big-buffer.ts', [
+      'export async function readEverything(req: { on: (e: string, cb: (c: Buffer) => void) => void }) {',
+      '  return new Promise<Buffer>((resolve) => {',
+      '    const chunks: Buffer[] = [];',
+      '    req.on("data", (c) => { chunks.push(c); });',
+      '    req.on("end", () => resolve(Buffer.concat(chunks)));',
+      '  });',
+      '}',
+    ].join('\n')),
   ];
 
   await fileCache.prewarm(cwd, ['**/*']);

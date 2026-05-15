@@ -1,6 +1,6 @@
 # Coverage Status
 
-Snapshot taken 2026-05-14 against v3.0.0.
+Snapshot taken 2026-05-15 against v3.0.0.
 
 ## Per-package coverage
 
@@ -18,11 +18,13 @@ Snapshot taken 2026-05-14 against v3.0.0.
 | `@opensip-tools/checks-python` | 100 | 100 | 50 | 100 | ✅ |
 | `@opensip-tools/checks-java` | 100 | 100 | 50 | 100 | ✅ |
 | `@opensip-tools/checks-cpp` | 100 | 84.6 | 50 | 100 | ✅ |
-| `@opensip-tools/fitness` | 83.1 | 81.9 | 88.8 | 83.1 | close |
-| `@opensip-tools/simulation` | 51.0 | 69.8 | 57.1 | 51.0 | gap |
-| `@opensip-tools/checks-typescript` | 44.6 | 58.7 | 43.9 | 44.6 | gap |
-| `@opensip-tools/checks-universal` | 60.5 | 65.7 | 62.6 | 60.5 | gap |
+| `@opensip-tools/fitness` | 83.2 | 81.9 | 88.8 | 83.2 | close |
+| `@opensip-tools/simulation` | 69.8 | 82.0 | 77.1 | 69.8 | gap |
+| `@opensip-tools/checks-typescript` | 62.3 | 66.4 | 69.9 | 62.3 | gap |
+| `@opensip-tools/checks-universal` | 71.8 | 67.9 | 77.6 | 71.8 | gap |
 | `@opensip-tools/cli` | 0 | 0 | 0 | 0 | not measured |
+
+Workspace test count: **1410** passing across 17 packages.
 
 ## What 50% function coverage means for `checks-*`
 
@@ -38,69 +40,80 @@ are exercised end-to-end by the CLI's e2e suite.
 
 Direct unit tests now drive the orchestrator:
 
-- **`recipes/service.ts`** (89%) — `service.test.ts` exercises start /
-  abort / disabledChecks / includeViolations / onCheckStart-Complete-
-  Catalog callbacks / explicit + tags + all selectors / sequential
-  execution / error containment / `createAdHocRecipe`. Covers parallel
-  and sequential paths.
-- **`framework/file-cache.ts`** (94%) — file-cache.test.ts
-- **`framework/file-accessor.ts`** (99%) — file-accessor.test.ts
-- **`framework/path-matcher.ts`** (96%) — path-matcher.test.ts
-- **`framework/define-check.ts`** (65%) — analyze + analyzeAll +
-  command modes via define-check.test.ts
-- **`framework/result-builder.ts`** (100%)
-- **`framework/severity-mapping.ts`** (100%)
-- **`framework/strip-literals.ts`** (90%) — strip-literals.test.ts
-- **`framework/ast-utilities.ts`** (100%)
-- **`framework/scope-resolver.ts`** (79%) — scope-resolver.test.ts
-- **`framework/command-executor.ts`** (79%) — command-executor.test.ts
-  (skips the bin-not-found and unexpected-exit-code paths via real shell)
-- **`framework/register-helpers.ts`** (100%)
-- **`recipes/registry.ts`** (100%)
-- **`recipes/built-in-recipes.ts`** (100%)
-- **`recipes/check-resolution.ts`** (96%)
-- **`recipes/retry.ts`** (100%)
-- **`signalers/loader.ts`** (100%)
-- **`targets/loader.ts`** (94%)
-- **`targets/resolver.ts`** (100%)
-- **`targets/target-registry.ts`** (100%)
-- **`gate.ts`** (99%), **`sarif.ts`** (53% — render path tested via e2e)
+- `recipes/service.ts` (89%) — `service.test.ts` (28 tests)
+- `framework/file-cache.ts` (94%), `framework/file-accessor.ts` (99%)
+- `framework/path-matcher.ts` (96%), `framework/result-builder.ts` (100%)
+- `framework/define-check.ts` (65%) — analyze + analyzeAll + command modes
+- `framework/severity-mapping.ts` (100%), `framework/strip-literals.ts` (90%)
+- `framework/ast-utilities.ts` (100%), `framework/scope-resolver.ts` (79%)
+- `framework/command-executor.ts` (79%), `framework/register-helpers.ts` (100%)
+- `recipes/registry.ts` (100%), `recipes/built-in-recipes.ts` (100%)
+- `recipes/check-resolution.ts` (96%), `recipes/retry.ts` (100%)
+- `signalers/loader.ts` (100%), `targets/loader.ts` (94%)
+- `targets/resolver.ts` (100%), `targets/target-registry.ts` (100%)
+- `gate.ts` (99%), `sarif.ts` (53% — render path tested via e2e)
 
-What's left in fitness (the remaining 17%):
-- `framework/cacheable-exec.ts` — caches external command output;
-  exercised end-to-end by the e2e suite when a command-mode check runs
-- `framework/ignore-processing.ts` — `@fitness-ignore-*` directive
-  application; exercised via the directive-inventory tests + e2e
-- `framework/directive-parsing.ts` — the parser is partially covered
-- `recipes/parallel-execution.ts` / `sequential-execution.ts` /
-  `callback-processor.ts` — exercised through the FitnessRecipeService
-  tests but with all callback variants the coverage isn't 100%
+What's left in fitness (~17%): `cacheable-exec.ts` (caches external
+command output), `ignore-processing.ts` (`@fitness-ignore-*` directive
+application), `directive-parsing.ts` (parser is partially covered),
+parts of `parallel-execution.ts` / `sequential-execution.ts` /
+`callback-processor.ts` exercised through the FitnessRecipeService
+tests but not every callback variant.
 
-## Simulation gaps
+## Simulation — 70% (lifted from 51%)
 
-Simulation is the experimental tool. Recipes framework (the v3
-addition) is at 100%. The kind-specific `define`/`executor` files for
-`load`, `chaos`, `invariant`, and `fix-evaluation` carry partial
-coverage — most paths run via the `define-*.test.ts` files, but the
-full execution engine (`framework/execution/orchestration-engine.ts`,
-`assertion-handlers.ts`) is dedicated experimental code without
-production users yet. A scenario harness will land alongside the first
-production scenario.
+New tests:
+- `framework/__tests__/assertions.test.ts` (51 tests) — every
+  ASSERTIONS factory + evaluators
+- `framework/__tests__/personas.test.ts` (19 tests) — persona
+  helpers + every PERSONAS preset
+- `framework/__tests__/result-builder.test.ts` (21 tests) —
+  ScenarioResultBuilder, metric resolution, `mergeMetrics`
+- `framework/execution/__tests__/execution-engine.test.ts` (30 tests)
+  — `validateAssertions`, `getMetricValue` (every branch),
+  `updateLatencyMetrics`, `sleepWithAbort` (resolve / pre-aborted /
+  mid-sleep abort), `scenarioAborted`, `ScenarioAbortedError`
+- `cli/__tests__/sim.test.ts` (9 tests) — `executeSim` recipe
+  lookup + `--kind` filter + shouldFail propagation
+- `__tests__/tool.test.ts` (8 tests) — `simulationTool` metadata,
+  `register()` mounting the sim subcommand, action routing
+- `__tests__/scenario-execution.test.ts` (4 tests) — load and
+  chaos scenarios run end-to-end
+
+Recipes module is at 100%. Remaining gaps: the kind-specific
+`define`/`executor` files for `load`, `chaos`, `invariant`, and
+`fix-evaluation` carry partial coverage; the full execution engine
+runs in the load + chaos tests but invariant and fix-evaluation
+require richer scenario harnesses (relatesToInvariant doc anchors
++ async setup/assert + signal payloads). Those land alongside the
+first production scenarios.
 
 ## Check pack gaps
 
-`checks-typescript` (66 checks) and `checks-universal` (88 checks) now
-have parametric coverage tests (`all-checks-execute.test.ts`) that drive
-every check's `run()` method against a curated fixture corpus. This
-exercises the analyze paths each check declares, lifting coverage from
-25%/33% to 44%/60%.
+`checks-typescript` (62%, up from 25%) and `checks-universal` (72%,
+up from 33%) have parametric coverage tests
+(`all-checks-execute.test.ts`) that drive every check's `run()`
+method against a curated fixture corpus. The fixtures exercise:
 
-The remaining gap is content-specific: each check has detection branches
-that fire only on very specific code patterns (e.g. drizzle-orm table
-definitions with `.primaryKey()`, React effect hooks with stale-deps,
-etc.). To reach 90% per pack, each check needs a dedicated fixture.
-The follow-on work is incremental — every new check should ship with
-a per-check fixture file.
+- Common detection markers: `EXAMPLE_TODO`, `console.log`,
+  hardcoded secrets, `eval`, `process.env.X`, dangerous regex,
+  silent early returns
+- TS-AST patterns: drizzle-orm `pgTable` + `relations` +
+  migrations, typed-inject containers, React components with
+  `.map` without memo, async waterfall, dispose pattern,
+  TypeORM entities, Zod schemas, lifecycle leaks, n+1 queries,
+  TOCTOU races, throws-without-docs, fastify routes without schema
+- Universal patterns: directive-audit (TS / ESLint / fitness /
+  semgrep), PII logging, lockfile dependency-security-audit,
+  webhook handlers, OpenAPI sync, frontend forms, CSP/CORS,
+  test convention violations, env-var direct access
+
+Each check's analyze function still has internal branches that
+fire only on very specific code shapes (e.g. drizzle-orm tables
+with composite keys, TypeORM `@Entity` classes missing standard
+columns of a particular kind, very specific frontend list rendering
+patterns). To reach 90% per pack, each check needs a dedicated
+fixture matching its specific detection.
 
 The checks are also exercised end-to-end:
 - The DART parity scan runs 121 of these checks against real source
@@ -108,6 +121,10 @@ The checks are also exercised end-to-end:
 - `e2e.test.ts` runs `fit --recipe quick-smoke` and `fit --check
   no-console-log`, which load and execute checks through the full
   framework path.
+
+Adding per-check unit tests is the next coverage investment. The
+parametric pattern means new fixtures lift coverage immediately
+without per-check test maintenance.
 
 ## How to run coverage
 
