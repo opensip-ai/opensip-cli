@@ -3,5 +3,21 @@ export default defineConfig({
   test: {
     include: ['src/**/*.test.ts'],
     passWithNoTests: true,
+    coverage: {
+      include: ['src/**'],
+      exclude: [
+        'src/**/*.test.ts',
+        'src/**/__tests__/**',
+        'src/**/index.ts',
+        // Pure type modules (only `export type ...`) — no runtime code.
+        'src/types/**',
+        'src/recipes/types.ts',
+        'src/framework/result-types.ts',
+        'src/kinds/load/result.ts',
+        'src/kinds/chaos/result.ts',
+        'src/kinds/invariant/result.ts',
+        'src/kinds/fix-evaluation/result.ts',
+      ],
+    },
   },
 });

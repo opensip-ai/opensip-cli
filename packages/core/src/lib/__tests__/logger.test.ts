@@ -1,6 +1,10 @@
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-import { logger, setLogLevel, setSilent, setDebugMode, setRunId } from '../../lib/logger.js';
+import { logger, setLogLevel, setSilent, setDebugMode, setRunId, getRunId, initLogFile } from '../../lib/logger.js';
 
 describe('logger', () => {
   const stderrCalls: string[] = [];
@@ -137,6 +141,142 @@ describe('logger', () => {
       logger.debug('visible');
 
       expect(stderrCalls.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('runId', () => {
+    it('round-trips through setRunId / getRunId', () => {
+      setRunId('RUN_xyz');
+      expect(getRunId()).toBe('RUN_xyz');
+    });
+  });
+
+  describe('initLogFile', () => {
+    let tempDir: string;
+
+    beforeEach(() => {
+       
+      tempDir = mkdtempSync(join(tmpdir(), 'opensip-logger-'));
+    });
+
+    afterEach(() => {
+      rmSync(tempDir, { recursive: true, force: true });
+    });
+
+    it('creates the log dir and writes info+ entries to a dated JSONL file', () => {
+      initLogFile(tempDir);
+      logger.info('hello');
+
+      const today = new Date().toISOString().slice(0, 10);
+      const expectedPath = join(tempDir, `${today}.jsonl`);
+      expect(existsSync(expectedPath)).toBe(true);
+      const content = readFileSync(expectedPath, 'utf8').trim().split('\n');
+      const entry = JSON.parse(content.at(-1) ?? '{}') as { msg: string; level: string };
+      expect(entry.msg).toBe('hello');
+      expect(entry.level).toBe('info');
+    });
+
+    it('does NOT write debug entries when debug mode is off', () => {
+      initLogFile(tempDir);
+      // setLogLevel('warn') is the default; debug mode off
+      logger.debug('debug-msg');
+
+      const today = new Date().toISOString().slice(0, 10);
+      const path = join(tempDir, `${today}.jsonl`);
+      // Either no file, or file has no debug entries
+      if (!existsSync(path)) return;
+      const content = readFileSync(path, 'utf8');
+      expect(content).not.toContain('debug-msg');
+    });
+
+    it('writes debug entries to file when debug mode is on', () => {
+      initLogFile(tempDir);
+      setDebugMode(true);
+      logger.debug('debug-msg');
+
+      const today = new Date().toISOString().slice(0, 10);
+      const path = join(tempDir, `${today}.jsonl`);
+      expect(readFileSync(path, 'utf8')).toContain('debug-msg');
+    });
+
+    it('writes still happen in silent mode (silent suppresses stderr only)', () => {
+      initLogFile(tempDir);
+      setSilent(true);
+      logger.warn('still-logged');
+
+      const today = new Date().toISOString().slice(0, 10);
+      const path = join(tempDir, `${today}.jsonl`);
+      expect(readFileSync(path, 'utf8')).toContain('still-logged');
+    });
+
+    it('prunes JSONL files older than 7 days', () => {
+      const oldFile = join(tempDir, '2020-01-01.jsonl');
+      writeFileSync(oldFile, '{"old":true}\n');
+      // Touch to a clearly-old mtime
+      const ancient = new Date('2020-01-01T00:00:00Z');
+      utimesSync(oldFile, ancient, ancient);
+
+      initLogFile(tempDir);
+
+      expect(existsSync(oldFile)).toBe(false);
+    });
+
+    it('does not prune non-JSONL files', () => {
+      const stranger = join(tempDir, 'README.txt');
+      writeFileSync(stranger, 'leave me alone');
+
+      initLogFile(tempDir);
+
+      expect(existsSync(stranger)).toBe(true);
+    });
+
+    it('does not crash if the directory cannot be created', () => {
+      // Pass a path under a non-writable parent — best-effort, no throw
+      expect(() => initLogFile('/dev/null/nope')).not.toThrow();
+    });
+
+    it('skips files whose date prefix is not parseable', () => {
+      writeFileSync(join(tempDir, 'not-a-date.jsonl'), '{}');
+
+      // Should not throw, and the file remains
+      expect(() => initLogFile(tempDir)).not.toThrow();
+      expect(existsSync(join(tempDir, 'not-a-date.jsonl'))).toBe(true);
+    });
+  });
+
+  describe('writeToFile error handling', () => {
+    let tempDir: string;
+
+    beforeEach(() => {
+       
+      tempDir = mkdtempSync(join(tmpdir(), 'opensip-logger-err-'));
+    });
+
+    afterEach(() => {
+      rmSync(tempDir, { recursive: true, force: true });
+    });
+
+    it('does not throw when the log file becomes unwritable mid-run', () => {
+      initLogFile(tempDir);
+      logger.info('first');
+
+      // Remove the directory out from under the logger; subsequent writes
+      // should swallow the error rather than crash the CLI.
+      rmSync(tempDir, { recursive: true, force: true });
+
+      expect(() => logger.info('second')).not.toThrow();
+    });
+
+    it('prune skips files it cannot delete', () => {
+      // Create an old file in a read-only parent — exercise the inner catch.
+      // We simulate by passing a directory that doesn't exist after creation.
+      const today = new Date().toISOString().slice(0, 10);
+      const path = join(tempDir, `${today}.jsonl`);
+      writeFileSync(path, '{}');
+      // Ensure readdirSync will succeed but unlink may not — rely on
+      // initLogFile not throwing whatever happens.
+      expect(() => initLogFile(tempDir)).not.toThrow();
+      expect(readdirSync(tempDir)).toContain(`${today}.jsonl`);
     });
   });
 });

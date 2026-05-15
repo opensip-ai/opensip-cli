@@ -11,15 +11,41 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { ASSERTIONS } from '../../framework/assertions.js';
 import { persona } from '../../framework/personas.js';
-import { clearScenarioRegistry } from '../../framework/registry.js';
+import { clearScenarioRegistry, scenarioRegistry } from '../../framework/registry.js';
 import { defineChaosScenario } from '../../kinds/chaos/define.js';
 import { defineLoadScenario } from '../../kinds/load/define.js';
+import { isBuiltInSimulationRecipe } from '../built-in-recipes.js';
 import { defineSimulationRecipe } from '../define-recipe.js';
 import {
   SimulationRecipeRegistry,
   defaultSimulationRecipeRegistry,
 } from '../registry.js';
 import { SimulationRecipeService } from '../service.js';
+
+import type { RunnableScenario } from '../../framework/runnable-scenario.js';
+import type { ScenarioExecutorResult } from '../../framework/scenario-executor-result.js';
+
+// Helper: build a minimal RunnableScenario for tests. The shape matches
+// RunnableScenario but uses a stub LoadOutcome via type assertion so we
+// don't need to construct the full domain payload for control-flow tests.
+function makeStubScenario(id: string, run: () => Promise<unknown>): RunnableScenario {
+  return {
+    id,
+    name: id,
+    description: id,
+    kind: 'load',
+    tags: [],
+    run: run as (sig: AbortSignal) => Promise<ScenarioExecutorResult>,
+  };
+}
+
+const stubLoadResult = (id: string) => Promise.resolve({
+  kind: 'load' as const,
+  scenarioId: id,
+  passed: true,
+  durationMs: 0,
+  signals: [] as const,
+});
 
 afterEach(() => {
   clearScenarioRegistry();
@@ -87,6 +113,25 @@ describe('defineSimulationRecipe', () => {
       }),
     ).toThrow(/missing required `scenarios`/);
   });
+
+  it('isBuiltInSimulationRecipe identifies built-in names', () => {
+    expect(isBuiltInSimulationRecipe('default')).toBe(true);
+    expect(isBuiltInSimulationRecipe('user-recipe')).toBe(false);
+  });
+
+  it('throws when execution block is missing', () => {
+    expect(() =>
+      defineSimulationRecipe({
+        id: 'URCP_test',
+        name: 'test',
+        displayName: 'Test',
+        description: 'x',
+        scenarios: { type: 'all' },
+        // @ts-expect-error — testing the runtime guard
+        execution: undefined,
+      }),
+    ).toThrow(/missing required `execution`/);
+  });
 });
 
 // =============================================================================
@@ -138,6 +183,61 @@ describe('SimulationRecipeRegistry', () => {
     expect(registry.getByName('default')).toBeUndefined();
     registry.reset();
     expect(registry.getByName('default')).toBeDefined();
+  });
+
+  it('loadRecipe accepts both name and id', () => {
+    const registry = new SimulationRecipeRegistry();
+    expect(registry.loadRecipe('default')).toBeDefined();
+    expect(registry.loadRecipe('BSCP_default')).toBeDefined();
+    expect(registry.loadRecipe('nope')).toBeUndefined();
+  });
+
+  it('getByName / getById / has return the right answers', () => {
+    const registry = new SimulationRecipeRegistry();
+    expect(registry.getById('BSCP_default')).toBeDefined();
+    expect(registry.getById('NOPE')).toBeUndefined();
+    expect(registry.has('default')).toBe(true);
+    expect(registry.has('BSCP_default')).toBe(true);
+    expect(registry.has('nope')).toBe(false);
+  });
+
+  it('size, getAllRecipes, and getNames reflect the registered set', () => {
+    const registry = new SimulationRecipeRegistry();
+    expect(registry.size).toBeGreaterThan(0);
+    expect(registry.getAllRecipes().length).toBe(registry.size);
+    expect(registry.getNames()).toContain('default');
+  });
+
+  it('registerAll mounts every recipe in a list', () => {
+    const registry = new SimulationRecipeRegistry();
+    registry.clear();
+    registry.registerAll([
+      { id: 'URCP_a', name: 'a', displayName: 'A', description: 'a', scenarios: { type: 'all' }, execution: { mode: 'parallel' } },
+      { id: 'URCP_b', name: 'b', displayName: 'B', description: 'b', scenarios: { type: 'all' }, execution: { mode: 'parallel' } },
+    ]);
+    expect(registry.size).toBe(2);
+  });
+
+  it('remove returns true on hit, false on miss', () => {
+    const registry = new SimulationRecipeRegistry();
+    expect(registry.remove('BSCP_default')).toBe(true);
+    expect(registry.has('default')).toBe(false);
+    expect(registry.remove('BSCP_default')).toBe(false);
+  });
+
+  it('listForDisplay distinguishes built-in vs user-defined', () => {
+    const registry = new SimulationRecipeRegistry();
+    registry.register({
+      id: 'URCP_user',
+      name: 'user',
+      displayName: 'User',
+      description: 'd',
+      scenarios: { type: 'all' },
+      execution: { mode: 'parallel' },
+    });
+    const display = registry.listForDisplay();
+    expect(display.find((d) => d.name === 'default')?.isBuiltIn).toBe(true);
+    expect(display.find((d) => d.name === 'user')?.isUserDefined).toBe(true);
   });
 });
 
@@ -261,5 +361,130 @@ describe('SimulationRecipeService — selector resolution', () => {
     expect(result.totalScenarios).toBe(0);
     expect(result.passedScenarios).toBe(0);
     expect(result.failedScenarios).toBe(0);
+  });
+
+  it('selector type=all honors the exclude list', async () => {
+    defineThreeScenarios();
+    const service = new SimulationRecipeService();
+    const result = await service.runRecipe({
+      id: 'URCP_test',
+      name: 'test',
+      displayName: 'Test',
+      description: 'x',
+      scenarios: { type: 'all', exclude: ['load-a'] },
+      execution: { mode: 'parallel' },
+    });
+    expect(result.totalScenarios).toBe(2);
+    expect(result.scenarios.map((s) => s.scenarioId)).not.toContain('load-a');
+  });
+
+  it('selector type=tags honors the exclude list', async () => {
+    defineThreeScenarios();
+    const service = new SimulationRecipeService();
+    const result = await service.runRecipe({
+      id: 'URCP_test',
+      name: 'test',
+      displayName: 'Test',
+      description: 'x',
+      scenarios: { type: 'tags', include: ['demo'], exclude: ['chaos-a'] },
+      execution: { mode: 'parallel' },
+    });
+    expect(result.totalScenarios).toBe(1);
+    expect(result.scenarios[0]?.scenarioId).toBe('load-a');
+  });
+});
+
+describe('SimulationRecipeService — execution modes + failure handling', () => {
+  it('records a failed scenario when run() throws and continues with the rest', async () => {
+    scenarioRegistry.register(
+      makeStubScenario('failing', () => Promise.reject(new Error('boom'))),
+    );
+    scenarioRegistry.register(makeStubScenario('passing', () => stubLoadResult('passing')));
+
+    const service = new SimulationRecipeService();
+    const result = await service.runRecipe({
+      id: 'URCP_test',
+      name: 'test',
+      displayName: 'Test',
+      description: 'x',
+      scenarios: { type: 'all' },
+      execution: { mode: 'parallel' },
+    });
+
+    expect(result.totalScenarios).toBe(2);
+    expect(result.failedScenarios).toBe(1);
+    expect(result.passedScenarios).toBe(1);
+    const failing = result.scenarios.find((s) => s.scenarioId === 'failing');
+    expect(failing?.passed).toBe(false);
+    expect(failing?.error).toContain('boom');
+  });
+
+  it('runs sequentially when execution.mode === sequential', async () => {
+    const order: string[] = [];
+    scenarioRegistry.register(makeStubScenario('first', () => {
+      order.push('first');
+      return stubLoadResult('first');
+    }));
+    scenarioRegistry.register(makeStubScenario('second', () => {
+      order.push('second');
+      return stubLoadResult('second');
+    }));
+
+    const service = new SimulationRecipeService();
+    await service.runRecipe({
+      id: 'URCP_test',
+      name: 'test',
+      displayName: 'Test',
+      description: 'x',
+      scenarios: { type: 'all' },
+      execution: { mode: 'sequential' },
+    });
+
+    expect(order).toEqual(['first', 'second']);
+  });
+
+  it('stops on first failure in sequential mode when stopOnFirstFailure is set', async () => {
+    const order: string[] = [];
+    scenarioRegistry.register(makeStubScenario('crashes', () => {
+      order.push('crashes');
+      return Promise.reject(new Error('nope'));
+    }));
+    scenarioRegistry.register(makeStubScenario('never-runs', () => {
+      order.push('never-runs');
+      return stubLoadResult('never-runs');
+    }));
+
+    const service = new SimulationRecipeService();
+    const result = await service.runRecipe({
+      id: 'URCP_test',
+      name: 'test',
+      displayName: 'Test',
+      description: 'x',
+      scenarios: { type: 'all' },
+      execution: { mode: 'sequential', stopOnFirstFailure: true },
+    });
+
+    expect(order).toEqual(['crashes']);
+    expect(result.scenarios).toHaveLength(1);
+  });
+
+  it('respects an aborted signal in sequential mode', async () => {
+    scenarioRegistry.register(makeStubScenario('s1', () => stubLoadResult('s1')));
+    scenarioRegistry.register(makeStubScenario('s2', () => stubLoadResult('s2')));
+
+    const ac = new AbortController();
+    ac.abort();
+    const service = new SimulationRecipeService({ abortSignal: ac.signal });
+    const result = await service.runRecipe({
+      id: 'URCP_test',
+      name: 'test',
+      displayName: 'Test',
+      description: 'x',
+      scenarios: { type: 'all' },
+      execution: { mode: 'sequential' },
+    });
+
+    // Pre-aborted: nothing runs
+    expect(result.totalScenarios).toBe(0);
   });
 });
