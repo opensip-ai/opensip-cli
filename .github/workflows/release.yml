@@ -9,38 +9,102 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      id-token: write
+      contents: write       # softprops/action-gh-release creates the GitHub Release
+      id-token: write       # OIDC token for npm trusted publishing
     steps:
       - uses: actions/checkout@v4
+
       - uses: pnpm/action-setup@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
           registry-url: https://registry.npmjs.org
+
+      # npm 11.5+ is required for the OIDC token-exchange handshake with
+      # GitHub Actions. Node 22 ships with npm 10. We install npm 11 to a
+      # separate prefix and prepend to $PATH because `npm install -g npm@11`
+      # corrupts mid-install on hosted runners (npm unlinks files of its
+      # own running process — "Cannot find module 'promise-retry'").
       - name: Install npm 11 to separate prefix (avoids self-replace bug)
         run: |
           npm install --prefix "$HOME/.npm-cli" npm@11
           echo "$HOME/.npm-cli/node_modules/.bin" >> "$GITHUB_PATH"
+
       - run: npm --version
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm typecheck
       - run: pnpm test
-      - name: Pack workspace packages (resolves workspace:*)
+
+      # Pack every workspace package into a tarball. `pnpm pack` resolves
+      # workspace:* deps into concrete versions, which `npm publish` then
+      # uploads. We pack all 17 up front so the publish step can run
+      # against a known-good set of tarballs in dependency order.
+      - name: Pack all workspace packages (resolves workspace:*)
         run: |
           mkdir -p /tmp/tarballs
-          pnpm --filter @opensip-tools/core pack --pack-destination /tmp/tarballs
-          pnpm --filter @opensip-tools/checks-builtin pack --pack-destination /tmp/tarballs
-          pnpm --filter @opensip-tools/simulation pack --pack-destination /tmp/tarballs
-          pnpm --filter @opensip-tools/cli pack --pack-destination /tmp/tarballs
+          # Layer 1 — kernel
+          pnpm --filter @opensip-tools/core             pack --pack-destination /tmp/tarballs
+          # Layer 2 — shared CLI infra
+          pnpm --filter @opensip-tools/cli-shared       pack --pack-destination /tmp/tarballs
+          # Layer 3 — language adapters
+          pnpm --filter @opensip-tools/lang-typescript  pack --pack-destination /tmp/tarballs
+          pnpm --filter @opensip-tools/lang-rust        pack --pack-destination /tmp/tarballs
+          pnpm --filter @opensip-tools/lang-python      pack --pack-destination /tmp/tarballs
+          pnpm --filter @opensip-tools/lang-go          pack --pack-destination /tmp/tarballs
+          pnpm --filter @opensip-tools/lang-java        pack --pack-destination /tmp/tarballs
+          pnpm --filter @opensip-tools/lang-cpp         pack --pack-destination /tmp/tarballs
+          # Layer 3 — tools
+          pnpm --filter @opensip-tools/fitness          pack --pack-destination /tmp/tarballs
+          pnpm --filter @opensip-tools/simulation       pack --pack-destination /tmp/tarballs
+          # Layer 4 — check packs
+          pnpm --filter @opensip-tools/checks-universal  pack --pack-destination /tmp/tarballs
+          pnpm --filter @opensip-tools/checks-typescript pack --pack-destination /tmp/tarballs
+          pnpm --filter @opensip-tools/checks-python     pack --pack-destination /tmp/tarballs
+          pnpm --filter @opensip-tools/checks-go         pack --pack-destination /tmp/tarballs
+          pnpm --filter @opensip-tools/checks-java       pack --pack-destination /tmp/tarballs
+          pnpm --filter @opensip-tools/checks-cpp        pack --pack-destination /tmp/tarballs
+          # Layer 5 — composition root
+          pnpm --filter @opensip-tools/cli              pack --pack-destination /tmp/tarballs
+          ls -la /tmp/tarballs
+
+      # Publish in strict dependency order. Sequential (not parallel) by
+      # design — racing a downstream publish ahead of its upstream
+      # produces a broken release because the upstream version isn't in
+      # the registry yet when downstream's `dependencies` field is
+      # resolved by consumers.
+      #
+      # `npm publish <tarball>` performs the OIDC handshake (unlike
+      # `pnpm publish`, which uses its own HTTP client and skips OIDC).
       - name: Publish via npm (OIDC trusted publishing)
         run: |
-          npm publish /tmp/tarballs/opensip-tools-core-*.tgz --access public --provenance
-          npm publish /tmp/tarballs/opensip-tools-checks-builtin-*.tgz --access public --provenance
-          npm publish /tmp/tarballs/opensip-tools-simulation-*.tgz --access public --provenance
-          npm publish /tmp/tarballs/opensip-tools-cli-*.tgz --access public --provenance
+          set -e
+          # Layer 1 — kernel
+          npm publish /tmp/tarballs/opensip-tools-core-*.tgz             --access public --provenance
+          # Layer 2 — shared CLI infra
+          npm publish /tmp/tarballs/opensip-tools-cli-shared-*.tgz       --access public --provenance
+          # Layer 3 — language adapters (lang-typescript first; downstream check packs depend on it)
+          npm publish /tmp/tarballs/opensip-tools-lang-typescript-*.tgz  --access public --provenance
+          npm publish /tmp/tarballs/opensip-tools-lang-rust-*.tgz        --access public --provenance
+          npm publish /tmp/tarballs/opensip-tools-lang-python-*.tgz      --access public --provenance
+          npm publish /tmp/tarballs/opensip-tools-lang-go-*.tgz          --access public --provenance
+          npm publish /tmp/tarballs/opensip-tools-lang-java-*.tgz        --access public --provenance
+          npm publish /tmp/tarballs/opensip-tools-lang-cpp-*.tgz         --access public --provenance
+          # Layer 3 — tools (depend on core, cli-shared, lang-typescript)
+          npm publish /tmp/tarballs/opensip-tools-fitness-*.tgz          --access public --provenance
+          npm publish /tmp/tarballs/opensip-tools-simulation-*.tgz       --access public --provenance
+          # Layer 4 — check packs (depend on fitness)
+          npm publish /tmp/tarballs/opensip-tools-checks-universal-*.tgz  --access public --provenance
+          npm publish /tmp/tarballs/opensip-tools-checks-typescript-*.tgz --access public --provenance
+          npm publish /tmp/tarballs/opensip-tools-checks-python-*.tgz     --access public --provenance
+          npm publish /tmp/tarballs/opensip-tools-checks-go-*.tgz         --access public --provenance
+          npm publish /tmp/tarballs/opensip-tools-checks-java-*.tgz       --access public --provenance
+          npm publish /tmp/tarballs/opensip-tools-checks-cpp-*.tgz        --access public --provenance
+          # Layer 5 — CLI (depends on every tool, every check pack, every adapter)
+          npm publish /tmp/tarballs/opensip-tools-cli-*.tgz              --access public --provenance
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
