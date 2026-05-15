@@ -33,6 +33,9 @@ import type { DiscoveredPlugin, PluginDomain } from './types.js'
 
 const CONFIG_FILENAME = 'opensip-tools.config.yml'
 
+/** Logger module tag used by every event in this file. */
+const MODULE_TAG = 'core:plugins'
+
 // Bridge ESM ↔ CJS to load js-yaml from this package's deps without
 // relying on a (nonexistent) global `require` in ESM context.
 const requireFromHere = createRequire(import.meta.url)
@@ -107,7 +110,7 @@ export function discoverPlugins(
 
   logger.info({
     evt: 'plugin.loader.discover',
-    module: 'core:plugins',
+    module: MODULE_TAG,
     domain,
     packageCount: plugins.filter(p => p.type === 'package').length,
     fileCount: plugins.filter(p => p.type === 'file').length,
@@ -170,7 +173,7 @@ function discoverNpmPackages(
     if (name.length === 0 || name.includes('..') || name.startsWith('/') || name.includes('\0')) {
       logger.warn({
         evt: 'plugin.loader.discover.reject',
-        module: 'core:plugins',
+        module: MODULE_TAG,
         reason: 'invalid plugin name',
         name,
       })
@@ -183,7 +186,7 @@ function discoverNpmPackages(
     if (!isPathInside(packageDir, nodeModulesDir)) {
       logger.warn({
         evt: 'plugin.loader.discover.reject',
-        module: 'core:plugins',
+        module: MODULE_TAG,
         reason: 'package path resolves outside node_modules',
         name,
       })
@@ -233,7 +236,7 @@ function tryDiscoverPackage(packageDir: string, name: string): DiscoveredPlugin 
     if (!existsSync(entryPoint)) {
       logger.debug({
         evt: 'plugin.loader.discover.skip',
-        module: 'core:plugins',
+        module: MODULE_TAG,
         reason: 'entry point not found',
         packageName,
         entryPoint,
@@ -250,7 +253,7 @@ function tryDiscoverPackage(packageDir: string, name: string): DiscoveredPlugin 
   } catch {
     logger.debug({
       evt: 'plugin.loader.discover.skip',
-      module: 'core:plugins',
+      module: MODULE_TAG,
       reason: 'invalid package.json',
       name,
     })
@@ -290,7 +293,7 @@ function discoverLooseFiles(dir: string, namespacePrefix: string): DiscoveredPlu
     if (!isPathInside(fullPath, dir)) {
       logger.warn({
         evt: 'plugin.loader.discover.reject',
-        module: 'core:plugins',
+        module: MODULE_TAG,
         reason: 'loose file resolves outside plugin dir',
         entry,
       })

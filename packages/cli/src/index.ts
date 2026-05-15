@@ -318,12 +318,15 @@ function registerAllTools(): void {
 // any single tool.
 // =============================================================================
 
+/** Commander spec for the shared --cwd <path> option (de-duplication for sonarjs). */
+const CWD_OPTION_SPEC = '--cwd <path>';
+
 function registerCliCommands(): void {
   // -- init --------------------------------------------------------------
   program
     .command('init')
     .description('Scaffold opensip-tools.config.yml + example checks/scenarios for your project')
-    .option('--cwd <path>', 'Target directory', process.cwd())
+    .option(CWD_OPTION_SPEC, 'Target directory', process.cwd())
     .option('--language <list>', 'Comma-separated language list (typescript|rust|python|go|java|cpp). Default: detect from filesystem markers.')
     .option('--force', 'Overwrite an existing config + example files', false)
     .option('--json', 'Output structured JSON', false)
@@ -407,7 +410,7 @@ function registerCliCommands(): void {
   pluginCmd
     .command('list')
     .description('List installed plugins')
-    .option('--cwd <path>', 'Project root', process.cwd())
+    .option(CWD_OPTION_SPEC, 'Project root', process.cwd())
     .action(async (opts: { cwd?: string }) => {
       const result = await pluginList(opts.cwd ?? process.cwd());
       await renderResult(result);
@@ -417,7 +420,7 @@ function registerCliCommands(): void {
     .command('add <package>')
     .description('Install a plugin AND register it in opensip-tools.config.yml')
     .option('--domain <fit|sim>', 'Target domain (default: inferred from package name)')
-    .option('--cwd <path>', 'Project root', process.cwd())
+    .option(CWD_OPTION_SPEC, 'Project root', process.cwd())
     .action(async (packageName: string, opts: { domain?: string; cwd?: string }) => {
       const result = await pluginAdd(packageName, opts.cwd ?? process.cwd(), opts.domain);
       await renderResult(result);
@@ -427,7 +430,7 @@ function registerCliCommands(): void {
     .command('remove <package>')
     .description('Uninstall a plugin AND remove it from opensip-tools.config.yml')
     .option('--domain <fit|sim>', 'Target domain (default: inferred from package name)')
-    .option('--cwd <path>', 'Project root', process.cwd())
+    .option(CWD_OPTION_SPEC, 'Project root', process.cwd())
     .action(async (packageName: string, opts: { domain?: string; cwd?: string }) => {
       const result = await pluginRemove(packageName, opts.cwd ?? process.cwd(), opts.domain);
       await renderResult(result);
@@ -437,7 +440,7 @@ function registerCliCommands(): void {
     .command('sync')
     .description('Install every plugin declared in opensip-tools.config.yml (post-clone bootstrap)')
     .option('--domain <fit|sim>', 'Sync only one domain')
-    .option('--cwd <path>', 'Project root', process.cwd())
+    .option(CWD_OPTION_SPEC, 'Project root', process.cwd())
     .action(async (opts: { domain?: string; cwd?: string }) => {
       const result = await pluginSync(opts.cwd ?? process.cwd(), opts.domain);
       await renderResult(result);

@@ -5,6 +5,9 @@ import type { CliOutput } from '@opensip-tools/cli-shared';
 const SARIF_SCHEMA = 'https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json';
 const MAX_FINDINGS_PER_CHUNK = 500;
 
+/** Logger module tag used by every event emitted from SARIF upload. */
+const MODULE_TAG = 'cli:report';
+
 /** Result of a cloud report upload */
 export interface ReportResult {
   readonly url: string;
@@ -166,7 +169,7 @@ export async function reportToCloud(output: CliOutput, url: string, apiKey?: str
     const timeoutMs = Math.min(300_000, 60_000 + chunkFindings * 100);
     const sarifLog = wrapSarifLog(chunk);
 
-    logger.info({ evt: 'cli.report.chunk.start', module: 'cli:report', chunk: `${ci + 1}/${chunks.length}`, findings: chunkFindings, timeoutMs });
+    logger.info({ evt: 'cli.report.chunk.start', module: MODULE_TAG, chunk: `${ci + 1}/${chunks.length}`, findings: chunkFindings, timeoutMs });
 
     try {
       const res = await withRetry(
@@ -183,7 +186,7 @@ export async function reportToCloud(output: CliOutput, url: string, apiKey?: str
           onRetry: (attempt, error, delayMs) => {
             logger.info({
               evt: 'cli.report.retry',
-              module: 'cli:report',
+              module: MODULE_TAG,
               attempt,
               error: error.message,
               delayMs,
@@ -201,19 +204,19 @@ export async function reportToCloud(output: CliOutput, url: string, apiKey?: str
 
         if (!isTransientError(res.status)) {
           // Non-transient (4xx) — no point sending remaining chunks
-          logger.info({ evt: 'cli.report.abort', module: 'cli:report', reason: msg, remaining: chunks.length - ci - 1 });
+          logger.info({ evt: 'cli.report.abort', module: MODULE_TAG, reason: msg, remaining: chunks.length - ci - 1 });
           break;
         }
         continue;
       }
 
       succeeded++;
-      logger.info({ evt: 'cli.report.chunk.done', module: 'cli:report', chunk: `${ci + 1}/${chunks.length}`, findings: chunkFindings });
+      logger.info({ evt: 'cli.report.chunk.done', module: MODULE_TAG, chunk: `${ci + 1}/${chunks.length}`, findings: chunkFindings });
     } catch (error) {
       // Network errors and timeouts are transient — continue with next chunk
       const errMsg = error instanceof Error ? error.message : String(error);
       errors.push(errMsg);
-      logger.info({ evt: 'cli.report.chunk.error', module: 'cli:report', chunk: `${ci + 1}/${chunks.length}`, error: errMsg });
+      logger.info({ evt: 'cli.report.chunk.error', module: MODULE_TAG, chunk: `${ci + 1}/${chunks.length}`, error: errMsg });
     }
   }
 

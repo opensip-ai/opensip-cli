@@ -19,6 +19,9 @@ import type { FitnessRecipe } from './types.js'
 import type { Check } from '../framework/check-types.js'
 import type { CheckResult } from '../types/findings.js'
 
+/** Logger module tag used by every event emitted from the parallel execution engine. */
+const MODULE_TAG = 'fitness:execution'
+
 // =============================================================================
 // TYPES
 // =============================================================================
@@ -143,7 +146,7 @@ export async function executeParallel(ctx: ExecutionServiceContext, opts: Execut
       const checkTimeout = check.config.timeout ?? recipeTimeout
       memoryBeforeMap.set(checkId, memoryProfiler.recordCheckStart())
       callbacks.onCheckStart?.(check.config.slug, displayIndex, totalChecks)
-      logger.info({ evt: 'fitness.check.start', module: 'fitness:execution', checkSlug: check.config.slug, index: displayIndex, total: totalChecks, timeoutMs: checkTimeout })
+      logger.info({ evt: 'fitness.check.start', module: MODULE_TAG, checkSlug: check.config.slug, index: displayIndex, total: totalChecks, timeoutMs: checkTimeout })
 
       const startTime = Date.now()
       const checkAbortController = new AbortController()
@@ -166,7 +169,7 @@ export async function executeParallel(ctx: ExecutionServiceContext, opts: Execut
           if (retryResult.result === undefined) {
             clearTimeout(timeoutId)
             const isTimeout = checkAbortController.signal.aborted
-            logger.info({ evt: 'fitness.check.error', module: 'fitness:execution', checkSlug: check.config.slug, durationMs, timedOut: isTimeout, error: retryResult.lastError instanceof Error ? retryResult.lastError.message : String(retryResult.lastError) })
+            logger.info({ evt: 'fitness.check.error', module: MODULE_TAG, checkSlug: check.config.slug, durationMs, timedOut: isTimeout, error: retryResult.lastError instanceof Error ? retryResult.lastError.message : String(retryResult.lastError) })
             void processCheckError(
               displayIndex,
               checkId,
@@ -178,7 +181,7 @@ export async function executeParallel(ctx: ExecutionServiceContext, opts: Execut
             )
           } else if (checkAbortController.signal.aborted) {
             clearTimeout(timeoutId)
-            logger.info({ evt: 'fitness.check.timeout', module: 'fitness:execution', checkSlug: check.config.slug, durationMs, timeoutMs: checkTimeout })
+            logger.info({ evt: 'fitness.check.timeout', module: MODULE_TAG, checkSlug: check.config.slug, durationMs, timeoutMs: checkTimeout })
             void processCheckError(
               displayIndex,
               checkId,
@@ -190,14 +193,14 @@ export async function executeParallel(ctx: ExecutionServiceContext, opts: Execut
             )
           } else {
             clearTimeout(timeoutId)
-            logger.info({ evt: 'fitness.check.done', module: 'fitness:execution', checkSlug: check.config.slug, durationMs, signals: retryResult.result.signals.length })
+            logger.info({ evt: 'fitness.check.done', module: MODULE_TAG, checkSlug: check.config.slug, durationMs, signals: retryResult.result.signals.length })
             await processCheckResult(displayIndex, checkId, check.config.slug, check.config.tags ?? [], retryResult.result, durationMs)
           }
         })
         .catch((error: unknown) => {
           clearTimeout(timeoutId)
           const durationMs = Date.now() - startTime
-          logger.info({ evt: 'fitness.check.error', module: 'fitness:execution', checkSlug: check.config.slug, durationMs, error: error instanceof Error ? error.message : String(error) })
+          logger.info({ evt: 'fitness.check.error', module: MODULE_TAG, checkSlug: check.config.slug, durationMs, error: error instanceof Error ? error.message : String(error) })
           void processCheckError(displayIndex, checkId, check.config.slug, error, durationMs)
         })
         .finally(() => advanceWindow())

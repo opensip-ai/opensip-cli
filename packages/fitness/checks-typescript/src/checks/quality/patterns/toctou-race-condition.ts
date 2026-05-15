@@ -319,14 +319,20 @@ function collectClassInMemoryFieldNames(node: FunctionLikeNode): Set<string> {
   return names
 }
 
+/** Call-site classification kinds — narrow string literal alias set. */
+const KIND_READ_SHARED = 'read-shared' as const
+const KIND_UPDATE_SHARED = 'update-shared' as const
+const KIND_READ_LOCAL = 'read-local' as const
+const KIND_UPDATE_LOCAL = 'update-local' as const
+
 /**
  * Classification of a `<receiver>.<method>(...)` call site.
  */
 type CallKind =
-  | { kind: 'read-shared' }
-  | { kind: 'update-shared' }
-  | { kind: 'read-local' }
-  | { kind: 'update-local' }
+  | { kind: typeof KIND_READ_SHARED }
+  | { kind: typeof KIND_UPDATE_SHARED }
+  | { kind: typeof KIND_READ_LOCAL }
+  | { kind: typeof KIND_UPDATE_LOCAL }
   | { kind: 'atomic-sql-write' }
   | { kind: 'unrelated' }
 
@@ -407,7 +413,7 @@ function classifyCall(
   const receiver = getReceiverName(call)
   if (!receiver) {
     // chained / non-simple receiver — treat as shared
-    return { kind: isRead ? 'read-shared' : 'update-shared' }
+    return { kind: isRead ? KIND_READ_SHARED : KIND_UPDATE_SHARED }
   }
 
   const isLocal =
@@ -419,9 +425,9 @@ function classifyCall(
     (!receiver.isThisField && isInMemoryCacheReceiverText(receiver.name))
 
   if (isLocal) {
-    return { kind: isRead ? 'read-local' : 'update-local' }
+    return { kind: isRead ? KIND_READ_LOCAL : KIND_UPDATE_LOCAL }
   }
-  return { kind: isRead ? 'read-shared' : 'update-shared' }
+  return { kind: isRead ? KIND_READ_SHARED : KIND_UPDATE_SHARED }
 }
 
 /**

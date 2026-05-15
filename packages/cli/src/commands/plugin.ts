@@ -51,6 +51,9 @@ import type { PluginResult } from '@opensip-tools/cli-shared';
 
 const VALID_DOMAINS: ReadonlySet<PathDomain> = new Set(['fit', 'sim']);
 
+/** Filename of the host package.json that pins plugin installs. */
+const HOST_PACKAGE_JSON = 'package.json';
+
 function inferDomain(packageName: string): PathDomain {
   if (/\bsim\b/.test(packageName)) return 'sim';
   return 'fit';
@@ -201,7 +204,7 @@ function ensurePluginHostDir(domain: PathDomain, cwd: string): string {
   const dir = paths.pluginsDir(domain);
   mkdirSync(dir, { recursive: true });
 
-  const pkgJsonPath = join(dir, 'package.json');
+  const pkgJsonPath = join(dir, HOST_PACKAGE_JSON);
   if (!existsSync(pkgJsonPath)) {
     writeFileSync(
       pkgJsonPath,
@@ -378,7 +381,7 @@ export async function pluginRemove(
   const paths = resolveProjectPaths(cwd);
   const dir = paths.pluginsDir(domain);
 
-  if (!existsSync(join(dir, 'package.json'))) {
+  if (!existsSync(join(dir, HOST_PACKAGE_JSON))) {
     return {
       type: 'plugin',
       action: 'remove',
@@ -518,7 +521,7 @@ function findInstalledPackage(
 
   const namedSpec = extractNameFromSpec(requestedSpec);
   if (namedSpec) {
-    const pkg = readPackageJson(join(nodeModulesDir, namedSpec, 'package.json'));
+    const pkg = readPackageJson(join(nodeModulesDir, namedSpec, HOST_PACKAGE_JSON));
     if (pkg) return pkg;
   }
 
@@ -527,14 +530,14 @@ function findInstalledPackage(
   const depsAfter = readHostDependencies(dir);
   for (const name of depsAfter) {
     if (depsBefore.has(name)) continue;
-    const pkg = readPackageJson(join(nodeModulesDir, name, 'package.json'));
+    const pkg = readPackageJson(join(nodeModulesDir, name, HOST_PACKAGE_JSON));
     if (pkg?.name === name) return pkg;
   }
   return undefined;
 }
 
 function readHostDependencies(dir: string): Set<string> {
-  const hostPkg = readPackageJson(join(dir, 'package.json'));
+  const hostPkg = readPackageJson(join(dir, HOST_PACKAGE_JSON));
   return new Set(Object.keys(hostPkg?.dependencies ?? {}));
 }
 

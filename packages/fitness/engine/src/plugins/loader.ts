@@ -24,6 +24,9 @@ import type {
   PluginLoadResult,
 } from '@opensip-tools/core'
 
+/** Logger module tag used by every event emitted from this loader. */
+const MODULE_TAG = 'core:plugins'
+
 /**
  * Load a single discovered plugin.
  *
@@ -59,7 +62,7 @@ export async function loadPlugin(
         adaptersRegistered++
         logger.debug({
           evt: 'plugin.loader.adapter.registered',
-          module: 'core:plugins',
+          module: MODULE_TAG,
           namespace: plugin.namespace,
           source: sourceLabel,
           id,
@@ -74,7 +77,7 @@ export async function loadPlugin(
             } else {
               logger.warn({
                 evt: 'plugin.loader.invalid_adapter_item',
-                module: 'core:plugins',
+                module: MODULE_TAG,
                 namespace: plugin.namespace,
                 source: plugin.source,
                 index,
@@ -85,7 +88,7 @@ export async function loadPlugin(
         } else {
           logger.warn({
             evt: 'plugin.loader.invalid_adapters_export',
-            module: 'core:plugins',
+            module: MODULE_TAG,
             namespace: plugin.namespace,
             source: plugin.source,
             msg: `Plugin "${plugin.namespace}" exports "adapters" but it is not an array — skipping adapter registration.`,
@@ -137,7 +140,7 @@ export async function loadPlugin(
             } else {
               logger.warn({
                 evt: 'plugin.loader.invalid_check_item',
-                module: 'core:plugins',
+                module: MODULE_TAG,
                 namespace: plugin.namespace,
                 source: plugin.source,
                 index,
@@ -148,7 +151,7 @@ export async function loadPlugin(
         } else {
           logger.warn({
             evt: 'plugin.loader.invalid_checks_export',
-            module: 'core:plugins',
+            module: MODULE_TAG,
             namespace: plugin.namespace,
             source: plugin.source,
             msg: `Plugin "${plugin.namespace}" exports "checks" but it is not an array — skipping checks registration.`,
@@ -189,7 +192,7 @@ export async function loadPlugin(
         } else {
           logger.warn({
             evt: 'plugin.loader.invalid_recipe_item',
-            module: 'core:plugins',
+            module: MODULE_TAG,
             namespace: plugin.namespace,
             source: plugin.source,
             index,
@@ -210,7 +213,7 @@ export async function loadPlugin(
     if (nothingRegistered) {
       logger.warn({
         evt: 'plugin.loader.no_exports',
-        module: 'core:plugins',
+        module: MODULE_TAG,
         namespace: plugin.namespace,
         source: plugin.source,
         domain,
@@ -223,7 +226,7 @@ export async function loadPlugin(
 
     logger.info({
       evt: 'plugin.loader.load.success',
-      module: 'core:plugins',
+      module: MODULE_TAG,
       namespace: plugin.namespace,
       source: plugin.source,
       domain,
@@ -245,7 +248,7 @@ export async function loadPlugin(
 
     logger.warn({
       evt: 'plugin.loader.load.error',
-      module: 'core:plugins',
+      module: MODULE_TAG,
       namespace: plugin.namespace,
       source: plugin.source,
       error: errorMsg,
