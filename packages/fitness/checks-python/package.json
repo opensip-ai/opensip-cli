@@ -1,6 +1,6 @@
 {
   "name": "@opensip-tools/checks-python",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "license": "MIT",
   "description": "Python fitness checks for opensip-tools",
   "repository": {
