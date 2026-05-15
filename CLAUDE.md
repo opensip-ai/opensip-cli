@@ -121,7 +121,7 @@ Subcommands available out of the box:
 - `opensip-tools sim` — Run simulation scenarios [experimental]
 - `opensip-tools init` — Generate `opensip-tools.config.yml`
 - `opensip-tools sessions list|purge` — Manage stored sessions
-- `opensip-tools plugin list|install|remove|sync|add` — Manage plugins
+- `opensip-tools plugin list|add|remove|sync` — Manage plugins
 - `opensip-tools configure` — Set up OpenSIP Cloud API key
 
 ## Fitness Check System
@@ -254,9 +254,19 @@ npm's self-replacement and pnpm's lack of OIDC support.
 
 ## Project Status
 
-**v2.0.0** — architecture refactor complete. opensip-tools is now a true
-tool-plugin platform. fitness and simulation are peer packages
-implementing a shared Tool contract. core is a strict kernel; cli is a
+**v3.0.0** — onboarding refactor complete. The new-customer flow is
+`init` (language detection + scaffolded layout) → `fit --recipe example`
+→ `sim --recipe example`, three commands to a working pipeline.
+Project layout flipped from user-global `~/.opensip-tools/` to
+project-local `<project>/opensip-tools/`, with user-authored content
+under `opensip-tools/{fit,sim}/{checks,recipes,scenarios}/` (tracked)
+and tool-generated state under `opensip-tools/.runtime/` (gitignored).
+Plugin loader auto-discovers `.mjs` files by directory presence; npm
+packages must be explicitly listed in `plugins.<domain>` to load.
+
+**v2.0.0** — architecture refactor. opensip-tools became a true
+tool-plugin platform: fitness and simulation are peer packages
+implementing a shared Tool contract; core is a strict kernel; cli is a
 generic dispatcher. Adding a new tool requires zero CLI changes.
 
 Future tool ideas (not implemented): `audit`, `lint`, `bench`. Any of

@@ -4,6 +4,100 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.0.0] — 2026-05-14
+
+Onboarding refactor. New customers go from `npm install -g
+@opensip-tools/cli` to a working end-to-end pipeline in three commands
+— `init` scaffolds a language-aware project layout, then `fit --recipe
+example` and `sim --recipe example` prove the kernel, plugin loader,
+recipe service, and rendering layer all work against the user's repo.
+
+### Added
+
+- **`opensip-tools init`** — language detection + full v3 scaffolding.
+  Inspects the project root for filesystem markers (`Cargo.toml`,
+  `pyproject.toml`, `setup.py`, `go.mod`, `pom.xml`, `build.gradle`,
+  `CMakeLists.txt`, `tsconfig.json`, `package.json`) and writes a
+  config plus example check, recipe, scenario, and simulation recipe
+  matching the detected language(s). Polyglot projects (e.g. Rust +
+  TypeScript) get one example check per language with distinct
+  slugs. Ambiguous detection exits 2 with a prompt — no partial
+  scaffolding. Pass `--language <comma-separated>` to override
+  detection or specify polyglot configurations explicitly.
+  `--force` overwrites an existing config.
+- **Sim recipes framework** — `defineSimulationRecipe()`,
+  `SimulationRecipeRegistry`, `SimulationRecipeService.runRecipe()`
+  with a built-in `default` recipe. `opensip-tools sim --recipe <name>`
+  resolves and runs the named recipe; selectors mirror fitness
+  (`explicit` / `all` / `tags` / `kind`).
+- **`@opensip-tools/core/lib/paths`** — `resolveProjectPaths(cwd)` and
+  `resolveUserPaths()`. Single source of truth for every project-local
+  and user-level path the CLI reads/writes. All callers (sessions,
+  logs, baselines, plugin loader, init scaffolding) go through it.
+- **`opensip-tools plugin sync`** — re-installs pinned plugins listed
+  in `plugins.<domain>` after a fresh clone. Mirrors `npm install`
+  for the project's plugin tree.
+
+### Changed — BREAKING
+
+- **Project layout flips from `~/.opensip-tools/` to
+  `<project>/opensip-tools/`.** Tool-generated state (sessions, logs,
+  reports, baselines, AST cache, plugin npm tree) now lives at
+  `<project>/opensip-tools/.runtime/` — gitignored and per-project.
+  User-authored content (custom checks, recipes, scenarios) lives at
+  `<project>/opensip-tools/{fit,sim}/{checks,recipes,scenarios}/` —
+  tracked in git. `~/.opensip-tools/` retains only `config.yml` for
+  user-level identity (cloud API key).
+- **Plugin auto-load semantics flip.** v2: project-local plugins
+  required `plugins.fit:` declaration in the config. v3: any
+  `.mjs` file in `opensip-tools/{fit,sim}/{checks,recipes,scenarios}/`
+  is auto-loaded by directory presence. The config's
+  `plugins.<domain>` is now reserved for npm-package pinning —
+  installed packages must be explicitly listed there to load (no
+  silent loading of transitive deps under the runtime tree).
+- **Plugin install location moves.** v2:
+  `~/.opensip-tools/fit/node_modules/` user-globally. v3:
+  `<project>/opensip-tools/.runtime/plugins/{fit,sim}/node_modules/`
+  project-locally.
+- **`opensip-tools plugin install` renamed to `add`.** The `install`
+  command was always doing two operations (npm install + config
+  update). The split-step variant has been removed; there is now one
+  command per intent: `add`, `remove`, `list`, `sync`.
+- **Custom check / scenario directory layout split.** v2 mixed checks
+  and recipes in a flat `~/.opensip-tools/fit/`. v3 has explicit
+  subdirectories: `opensip-tools/fit/checks/`,
+  `opensip-tools/fit/recipes/`, `opensip-tools/sim/scenarios/`,
+  `opensip-tools/sim/recipes/`.
+
+### Removed — BREAKING
+
+- **No automatic v2 → v3 migration.** Earlier in the v3 cycle a
+  migration command was scoped; it was dropped after we confirmed
+  v2 had very few production users. Migrate by hand: move
+  `~/.opensip-tools/fit/*.mjs` into
+  `<project>/opensip-tools/fit/{checks,recipes}/` (sorted by what each
+  file exports — `checks` array → `checks/`, `recipes` array →
+  `recipes/`), move sim files into `sim/{scenarios,recipes}/`,
+  re-run `opensip-tools init --force` to regenerate the config (or
+  hand-edit the `targets:` block to add the v3 shape), and add
+  `opensip-tools/.runtime/` to `.gitignore`.
+
+### Migration from 2.0.0
+
+1. From your project root, run `opensip-tools init` (or
+   `opensip-tools init --force` if you already have a config). This
+   detects your language, scaffolds the v3 layout, writes example
+   files, and updates `.gitignore`.
+2. If you had custom checks in `~/.opensip-tools/fit/`, move them into
+   `<project>/opensip-tools/fit/checks/` (or `recipes/` if they export
+   recipes). Same shape, just a different directory.
+3. If your config declared `plugins.checkPackages:` for npm-installed
+   packs, run `opensip-tools plugin sync` to reinstall them under
+   `<project>/opensip-tools/.runtime/plugins/`.
+4. Delete `~/.opensip-tools/{fit,sim}/`, `~/.opensip-tools/sessions/`,
+   `~/.opensip-tools/logs/`, and `~/.opensip-tools/reports/` — they're
+   no longer read.
+
 ## [2.0.0] — 2026-05-14
 
 Architecture refactor. opensip-tools is now a true tool-plugin platform —

@@ -30,16 +30,61 @@ cd opensip-tools && pnpm install && pnpm build
 node packages/cli/dist/index.js fit
 ```
 
-## First run
+## Quick start
+
+A fresh project goes from zero to a working pipeline in three commands:
 
 ```bash
-cd your-project
+$ cd your-project
+$ opensip-tools init                     # detects language, scaffolds the layout
+$ opensip-tools fit --recipe example     # smoke test — runs the example check
+$ opensip-tools sim --recipe example     # smoke test — runs the example scenario
+```
+
+`init` detects your project's primary language(s) from filesystem
+markers (`Cargo.toml`, `pyproject.toml`, `go.mod`, `pom.xml`,
+`build.gradle`, `CMakeLists.txt`, `tsconfig.json`, `package.json`) and
+scaffolds:
+
+```
+your-project/
+├── opensip-tools.config.yml                ← project config
+├── opensip-tools/
+│   ├── fit/
+│   │   ├── checks/example-check.mjs        ← demo check, scope matches your language
+│   │   └── recipes/example-recipe.mjs      ← runs the demo check
+│   └── sim/
+│       ├── scenarios/example-scenario.mjs  ← demo scenario
+│       └── recipes/example-recipe.mjs      ← runs the demo scenario
+└── .gitignore                              ← adds opensip-tools/.runtime/
+```
+
+Polyglot projects (e.g. Rust + TypeScript) get one example check per
+language. To override detection or pick a polyglot configuration
+explicitly:
+
+```bash
+opensip-tools init --language rust              # explicit single language
+opensip-tools init --language rust,typescript   # polyglot
+opensip-tools init --language typescript --force  # overwrite an existing config
+```
+
+After the smoke tests pass, edit (or delete) the example files and
+write your own. The plugin loader auto-discovers anything under
+`opensip-tools/{fit,sim}/`, so adding a new `.mjs` file is enough — no
+config change required.
+
+## First-run alternatives
+
+```bash
 opensip-tools fit                 # runs the default recipe (all enabled checks)
 opensip-tools fit --findings      # + detailed per-violation output
 opensip-tools fit --list          # browse the check catalog
 ```
 
-If `opensip-tools fit` reports zero checks ran, you likely need a targets file — create one with `opensip-tools init` (see [Configuration](#configuration)).
+If `opensip-tools fit` reports zero checks ran, you likely need a
+targets file — `opensip-tools init` writes one (see
+[Configuration](#configuration)).
 
 ## Commands
 
@@ -60,7 +105,9 @@ opensip-tools fit --gate-compare    # compare against baseline; exit 1 on regres
 
 ### Project setup & dashboards
 ```bash
-opensip-tools init                  # generate opensip-tools.config.yml
+opensip-tools init                  # detect language, scaffold opensip-tools/ layout
+opensip-tools init --language <l>   # override detection (comma-separated for polyglot)
+opensip-tools init --force          # overwrite an existing config
 opensip-tools configure             # set up OpenSIP Cloud API key (interactive)
 opensip-tools dashboard             # HTML report — opens in browser
 opensip-tools sessions list         # run history
@@ -70,8 +117,9 @@ opensip-tools sessions purge        # delete session data (prompts for confirm)
 ### Plugins
 ```bash
 opensip-tools plugin list           # installed plugins
-opensip-tools plugin install <pkg>  # install a plugin package or local path
-opensip-tools plugin remove  <pkg>  # remove
+opensip-tools plugin add <pkg>      # install + pin to opensip-tools.config.yml
+opensip-tools plugin remove <pkg>   # uninstall + unpin
+opensip-tools plugin sync           # reinstall pinned plugins after a fresh clone
 ```
 
 ### `sim` — simulations *(experimental)*
@@ -133,30 +181,37 @@ Checks are organized by tags: `security`, `quality`, `architecture`, `modularity
 
 ## Configuration
 
-Generate a config file with `opensip-tools init`:
+`opensip-tools init` writes `opensip-tools.config.yml` at your project
+root with one named target per detected language. For a Rust project:
 
 ```yaml
 # opensip-tools.config.yml
 
 globalExcludes:
-  - "docs/**"
+  - "**/node_modules/**"
+  - "**/dist/**"
 
 targets:
-  backend:
-    description: Backend source code
-    languages: [typescript]
-    concerns: [backend, server, api]
+  rust-source:
+    description: Rust source code
+    languages: [rust]
+    concerns: [backend]
     include:
-      - "src/**/*.ts"
+      - "src/**/*.rs"
+      - "crates/**/*.rs"
+      - "services/**/*.rs"
     exclude:
-      - "**/*.test.ts"
-      - "**/node_modules/**"
+      - "**/target/**"
 
 fitness:
   failOnErrors: 1      # Exit code 1 if errors >= this (default: 1)
   failOnWarnings: 0    # Exit code 1 if warnings >= this (default: 0, warnings don't fail)
   disabledChecks: []
 ```
+
+For a polyglot project, init writes one named target per language
+(`rust-source:`, `typescript-source:`, etc.) so checks can scope to
+each language independently.
 
 ### CI/CD Exit Codes
 
@@ -198,7 +253,9 @@ Resolved (1):
 - `1` — regression detected (at least one new violation)
 - `2` — config error (missing baseline, malformed SARIF)
 
-**Default baseline location** is `<cwd>/.opensip-tools/baseline.sarif`. Use `--baseline <path>` to override. Add `.opensip-tools/` to `.gitignore` — baselines are repo-state snapshots, not source.
+**Default baseline location** is `<cwd>/opensip-tools/.runtime/baseline.sarif`
+— gitignored automatically by `opensip-tools init`. Use `--baseline <path>`
+to override.
 
 **How diffs are matched:** by `(filePath, ruleId, message)` tuple. Line numbers are intentionally **not** in the matching key — unrelated edits that shift lines won't register as false-positive added/resolved entries.
 
@@ -216,23 +273,46 @@ Combined with `--report-to` and the dashboard, you get a continuous record of ev
 
 ## Plugins
 
-Plugins live in `~/.opensip-tools/fit/` (checks) and `~/.opensip-tools/sim/` (simulation scenarios). They can be npm packages or single `.mjs` files and can contribute **checks** and **recipes**.
+Plugins are project-local in v3. Two kinds:
 
-```bash
-# Install an npm-published plugin
-opensip-tools plugin install @company/checks-custom
+**User-authored source files** — drop a `.mjs` file into the
+appropriate directory and it auto-loads:
 
-# Install a local plugin under development
-opensip-tools plugin install /abs/path/to/my-plugin
-
-# List installed plugins
-opensip-tools plugin list
-
-# Remove a plugin
-opensip-tools plugin remove @company/checks-custom
+```
+opensip-tools/
+  fit/
+    checks/      ← .mjs exporting `checks`  (auto-loaded)
+    recipes/     ← .mjs exporting `recipes` (auto-loaded)
+  sim/
+    scenarios/   ← .mjs exporting `scenarios` (auto-loaded)
+    recipes/     ← .mjs exporting `recipes`   (auto-loaded)
 ```
 
-`plugin install` runs `npm install` under the hood in `~/.opensip-tools/fit/` and also installs any `peerDependencies` the plugin declares (see below).
+No config opt-in required. `opensip-tools init` scaffolds working
+example files in each of these directories.
+
+**npm-installed plugin packages** — explicit pinning in the config.
+The pinned packages are installed under
+`opensip-tools/.runtime/plugins/<domain>/node_modules/`:
+
+```bash
+opensip-tools plugin add @company/checks-custom    # installs + pins
+opensip-tools plugin remove @company/checks-custom  # uninstalls + unpins
+opensip-tools plugin list                           # what's installed
+opensip-tools plugin sync                           # reinstall after a fresh clone
+```
+
+`plugin add` updates the `plugins.<domain>` list in
+`opensip-tools.config.yml` so the install is reproducible across
+machines. Only packages explicitly listed there are loaded — transitive
+deps that happen to land in the runtime tree do not auto-load.
+
+```yaml
+# opensip-tools.config.yml
+plugins:
+  fit:
+    - "@company/checks-custom"
+```
 
 ### Authoring a check package
 
@@ -257,10 +337,10 @@ won't need to.
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "peerDependencies": {
-    "@opensip-tools/fitness": "^2.0.0"
+    "@opensip-tools/fitness": "^3.0.0"
   },
   "devDependencies": {
-    "@opensip-tools/fitness": "^2.0.0",
+    "@opensip-tools/fitness": "^3.0.0",
     "typescript": "^5.7.0"
   }
 }
@@ -332,10 +412,11 @@ expectations are explicit. This mirrors the ESLint / Rollup plugin model.
 
 ### Single-file plugins
 
-For quick local experiments, drop a `.js` or `.mjs` file directly in `~/.opensip-tools/fit/`:
+For quick local experiments, drop a `.mjs` file in
+`opensip-tools/fit/checks/`:
 
 ```javascript
-// ~/.opensip-tools/fit/my-check.mjs
+// opensip-tools/fit/checks/my-check.mjs
 import { defineCheck } from '@opensip-tools/fitness';
 
 export const checks = [
@@ -353,14 +434,19 @@ export const checks = [
 ];
 ```
 
-Single-file plugins resolve `@opensip-tools/fitness` from whatever copy is already sitting in `~/.opensip-tools/fit/node_modules/` (installed by any prior `plugin install`). If no package plugins are installed, run `opensip-tools plugin install @opensip-tools/fitness` once to seed it.
+`@opensip-tools/fitness` resolves from the global install (when the CLI
+is installed via `npm install -g`) or from your project's
+`node_modules` (when installed as a local devDependency). For pure
+single-file plugins with no other npm setup, install the CLI globally
+— that's the supported path.
 
-### Recipes in plugins
+### Recipes
 
-Recipes are named check bundles — useful when you want to run a specific set of checks across multiple repos:
+Recipes are named check or scenario bundles — useful when you want to
+run a specific set across multiple repos:
 
 ```javascript
-// ~/.opensip-tools/fit/my-recipes.mjs
+// opensip-tools/fit/recipes/my-recipes.mjs
 export const recipes = [{
   id: 'URCP_backend-strict',
   name: 'backend-strict',
@@ -372,7 +458,9 @@ export const recipes = [{
 }];
 ```
 
-Then: `opensip-tools fit --recipe backend-strict`.
+Then: `opensip-tools fit --recipe backend-strict`. Sim recipes work
+the same way under `opensip-tools/sim/recipes/` and run via
+`opensip-tools sim --recipe <name>`.
 
 ## Cloud Integration
 
@@ -467,7 +555,11 @@ opensip-tools sessions purge --yes           # Skip confirmation
 
 ## Observability
 
-Every CLI invocation generates a `runId` (ULID) for log correlation. Structured JSON logs are written to `~/.opensip-tools/logs/`.
+Every CLI invocation generates a `runId` (ULID) for log correlation.
+Structured JSON logs are written to
+`<project>/opensip-tools/.runtime/logs/` (gitignored). Sessions and
+HTML reports live alongside in `.runtime/sessions/` and
+`.runtime/reports/`.
 
 ```bash
 opensip-tools fit --debug    # Show structured log events on stderr
