@@ -8,11 +8,6 @@
 
 export {
   discoverPlugins,
-  getPluginDir,
-  getBaseDir,
-  getProjectPluginDir,
-  resolvePluginDir,
-  hasProjectPluginsDeclared,
   readProjectPluginsList,
 } from './discover.js'
 export {

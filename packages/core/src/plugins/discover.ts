@@ -1,138 +1,109 @@
 /**
- * @fileoverview Plugin discovery for ~/.opensip-tools/{fit,sim,asm}/
+ * @fileoverview Plugin discovery for v3 project-local layout.
  *
- * Scans for npm packages in node_modules/ and loose .js/.mjs files.
+ * Two artifact sources are walked per fit/sim domain:
+ *
+ *   1. USER SOURCE — `<project>/opensip-tools/<tool>/<kind>/*.{js,mjs}`
+ *      where `<kind>` is `checks`/`recipes` for fit, or
+ *      `scenarios`/`recipes` for sim. Auto-loaded by directory presence;
+ *      no config opt-in.
+ *
+ *   2. NPM PLUGINS — packages installed under
+ *      `<project>/opensip-tools/.runtime/plugins/<domain>/node_modules/`
+ *      whose names appear in the project's
+ *      `opensip-tools.config.yml#plugins.<domain>: [...]`. The explicit
+ *      list is required so a `plugin install` step is intentional, not
+ *      an accidental load of every transitive devDep.
+ *
+ * Other domains (`'lang'` for language adapters; `'asm'` reserved for
+ * a future tool) don't have project-local plugin dirs in v3 — they
+ * resolve through `discoverProjectV3Plugins()` returning an empty
+ * array. Language adapters ship as direct deps of the CLI; assess is
+ * not yet implemented.
  */
 
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { homedir } from 'node:os'
 import { join, basename, extname, sep } from 'node:path'
 
 import { logger } from '../lib/logger.js'
+import { resolveProjectPaths } from '../lib/paths.js'
 
 import type { DiscoveredPlugin, PluginDomain } from './types.js'
 
-const DEFAULT_BASE_DIR = join(homedir(), '.opensip-tools')
 const CONFIG_FILENAME = 'opensip-tools.config.yml'
 
 // Bridge ESM ↔ CJS to load js-yaml from this package's deps without
 // relying on a (nonexistent) global `require` in ESM context.
 const requireFromHere = createRequire(import.meta.url)
 
-/** Get the absolute path to a user-level plugin domain directory. */
-export function getPluginDir(domain: PluginDomain, baseDir?: string): string {
-  return join(baseDir ?? DEFAULT_BASE_DIR, domain)
-}
-
-/** Get the user-level base directory for all plugins. */
-export function getBaseDir(baseDir?: string): string {
-  return baseDir ?? DEFAULT_BASE_DIR
-}
-
-/** Absolute path to the project-local plugin dir for a given domain. */
-export function getProjectPluginDir(projectDir: string, domain: PluginDomain): string {
-  return join(projectDir, '.opensip-tools', domain)
-}
-
 /**
- * Resolve the plugin dir to use for a given domain + project.
- *
- * Precedence:
- *   1. Project-local (`<projectDir>/.opensip-tools/<domain>/`) IF the
- *      project's `opensip-tools.config.yml` declares a non-empty
- *      `plugins.<domain>` section.
- *   2. User-level (`~/.opensip-tools/<domain>/`) otherwise.
- *
- * Project-local takes precedence when opted in, so a project's plugin
- * set is reproducible across developers and CI. The user-level dir
- * remains the default so projects that don't declare plugins keep
- * the original behavior.
- *
- * @param domain      One of `fit` / `sim` / `asm`.
- * @param projectDir  Absolute path to the project root. When undefined,
- *                    always returns the user-level dir.
- * @param baseDir     Override the user-level base (primarily for tests).
+ * v3 user-source subdirectories per fit/sim domain. Each entry walks
+ * a different artifact type. Domains other than fit/sim have no v3
+ * subdirs and discoverPlugins() returns empty for them.
  */
-export function resolvePluginDir(
-  domain: PluginDomain,
-  projectDir?: string,
-  baseDir?: string,
-): { dir: string; source: 'project' | 'user' } {
-  if (projectDir && hasProjectPluginsDeclared(projectDir, domain)) {
-    return { dir: getProjectPluginDir(projectDir, domain), source: 'project' }
-  }
-  return { dir: getPluginDir(domain, baseDir), source: 'user' }
+const V3_USER_SUBDIRS: Partial<Record<PluginDomain, readonly string[]>> = {
+  fit: ['checks', 'recipes'],
+  sim: ['scenarios', 'recipes'],
 }
 
-/** True when the project config declares at least one plugin in `plugins.<domain>`. */
-export function hasProjectPluginsDeclared(projectDir: string, domain: PluginDomain): boolean {
-  const list = readProjectPluginsList(projectDir, domain)
-  return list !== undefined && list.length > 0
-}
+// =============================================================================
+// PUBLIC ENTRY POINT
+// =============================================================================
 
 /**
- * Read the declared plugin list for a domain from the project config.
- * Returns undefined when the config is absent, unreadable, or has no
- * entry for the domain. Does NOT throw on YAML parse errors — returns
- * undefined so discovery falls back to the user-level dir and the
- * config-layer schema validation surfaces the parse error on its own
- * path (avoids double-reporting).
- */
-export function readProjectPluginsList(
-  projectDir: string,
-  domain: PluginDomain,
-): readonly string[] | undefined {
-  const configPath = join(projectDir, CONFIG_FILENAME)
-  if (!existsSync(configPath)) return undefined
-  try {
-    // Parse YAML inline to avoid a circular dep between plugins/ and targets/.
-    // We only need the `plugins.<domain>` array; anything else is
-    // validated by the targets loader.
-    const raw = readFileSync(configPath, 'utf8')
-    // Minimal YAML parse — defer to the shared yaml dep.
-    const yaml = requireFromHere('js-yaml') as { load: (s: string) => unknown }
-    const doc = yaml.load(raw) as Record<string, unknown> | null
-    if (!doc || typeof doc !== 'object') return undefined
-    const plugins = doc.plugins
-    if (!plugins || typeof plugins !== 'object') return undefined
-    const list = (plugins as Record<string, unknown>)[domain]
-    if (!Array.isArray(list)) return undefined
-    return list.filter((v): v is string => typeof v === 'string')
-  } catch {
-    return undefined
-  }
-}
-
-/**
- * Discover all plugins in a domain directory.
- * Returns discovered plugins sorted: packages first, then files.
+ * Discover all plugins for a domain in the v3 project layout.
  *
- * When `projectDir` is passed AND the project declares plugins in
- * `opensip-tools.config.yml` under `plugins.<domain>`, scans the
- * project-local dir (`<projectDir>/.opensip-tools/<domain>/`).
- * Otherwise falls back to `~/.opensip-tools/<domain>/`.
+ * Returns a list of `DiscoveredPlugin` entries (loose .mjs files +
+ * npm packages) for the loader to import. Discovery is silent on a
+ * missing project directory or absent subdirs — callers that care
+ * about "did we find anything?" should check the returned length.
+ *
+ * @param domain      'fit' / 'sim' / 'asm' / 'lang'.
+ * @param projectDir  Project root. Required for v3 — there is no
+ *                    user-global fallback. Pass undefined to discover
+ *                    nothing (used by callers that don't have a
+ *                    project context yet).
  */
 export function discoverPlugins(
   domain: PluginDomain,
-  baseDir?: string,
   projectDir?: string,
 ): DiscoveredPlugin[] {
-  const { dir } = resolvePluginDir(domain, projectDir, baseDir)
-  if (!existsSync(dir)) return []
+  if (!projectDir) return []
 
-  const plugins: DiscoveredPlugin[] = []
-
-  // 1. Discover npm packages declared as direct dependencies of the plugin
-  //    dir's package.json. Transitive deps under node_modules/ are skipped
-  //    so unrelated packages (peers, their deps) aren't treated as plugins.
-  const nodeModulesDir = join(dir, 'node_modules')
-  if (existsSync(nodeModulesDir)) {
-    plugins.push(...discoverNpmPackages(nodeModulesDir, dir))
+  const subdirs = V3_USER_SUBDIRS[domain]
+  if (!subdirs) {
+    // 'lang' / 'asm' — no v3 user-source layout. Return empty;
+    // caller (e.g. CLI bootstrap) registers language adapters via
+    // direct package imports, not the file-plugin path.
+    return []
   }
 
-  // 2. Discover loose JS/MJS files
-  plugins.push(...discoverLooseFiles(dir))
+  const projectPaths = resolveProjectPaths(projectDir)
+  const plugins: DiscoveredPlugin[] = []
+
+  // 1. User-source loose files: opensip-tools/<tool>/<kind>/*.{js,mjs}
+  const toolDir = join(projectPaths.userSourceDir, domain)
+  for (const kind of subdirs) {
+    const kindDir = join(toolDir, kind)
+    if (!existsSync(kindDir)) continue
+    plugins.push(...discoverLooseFiles(kindDir, `${domain}/${kind}`))
+  }
+
+  // 2. Npm-installed plugins under .runtime/plugins/<domain>/.
+  //    Only walked when the config explicitly declares
+  //    plugins.<domain>: [...]. The runtime dir is gitignored, so
+  //    silently auto-loading anything in it would be a recipe for
+  //    "where did this check come from?" surprises. Explicit listing
+  //    is the contract for npm plugins.
+  const declared = readProjectPluginsList(projectDir, domain)
+  if (declared && declared.length > 0) {
+    const pluginsDir = projectPaths.pluginsDir(domain as 'fit' | 'sim')
+    const nodeModulesDir = join(pluginsDir, 'node_modules')
+    if (existsSync(nodeModulesDir)) {
+      plugins.push(...discoverNpmPackages(nodeModulesDir, pluginsDir, declared))
+    }
+  }
 
   logger.info({
     evt: 'plugin.loader.discover',
@@ -146,34 +117,69 @@ export function discoverPlugins(
 }
 
 // =============================================================================
+// CONFIG READING (plugins.<domain> from opensip-tools.config.yml)
+// =============================================================================
+
+/**
+ * Read the declared plugin list for a domain from the project config.
+ * Returns undefined when the config is absent, unreadable, or has no
+ * entry for the domain. Does NOT throw on YAML parse errors — returns
+ * undefined so discovery falls through gracefully and the config-layer
+ * schema validation surfaces parse errors on its own path.
+ */
+export function readProjectPluginsList(
+  projectDir: string,
+  domain: PluginDomain,
+): readonly string[] | undefined {
+  const configPath = join(projectDir, CONFIG_FILENAME)
+  if (!existsSync(configPath)) return undefined
+  try {
+    // Parse YAML inline to avoid a circular dep between plugins/ and targets/.
+    // We only need the `plugins.<domain>` array; anything else is
+    // validated by the targets loader.
+    const raw = readFileSync(configPath, 'utf8')
+    const yaml = requireFromHere('js-yaml') as { load: (s: string) => unknown }
+    const doc = yaml.load(raw) as Record<string, unknown> | null
+    if (!doc || typeof doc !== 'object') return undefined
+    const plugins = doc.plugins
+    if (!plugins || typeof plugins !== 'object') return undefined
+    const list = (plugins as Record<string, unknown>)[domain]
+    if (!Array.isArray(list)) return undefined
+    return list.filter((v): v is string => typeof v === 'string')
+  } catch {
+    return undefined
+  }
+}
+
+// =============================================================================
 // NPM PACKAGE DISCOVERY
 // =============================================================================
 
-function discoverNpmPackages(nodeModulesDir: string, pluginDir: string): DiscoveredPlugin[] {
+function discoverNpmPackages(
+  nodeModulesDir: string,
+  pluginDir: string,
+  declared: readonly string[],
+): DiscoveredPlugin[] {
   const plugins: DiscoveredPlugin[] = []
-
-  const declared = readDeclaredDependencies(pluginDir)
-  if (declared.length === 0) return plugins
 
   for (const name of declared) {
     // Reject names that could traverse before they ever touch the filesystem.
-    // The plugin dir's package.json is user-controlled (and edited directly
-    // by `plugin add` / hand edits), so dependency keys are an attacker-
-    // influenced input flowing into a path join.
+    // The plugin list comes from opensip-tools.config.yml — user-controlled
+    // content under a project that runs `opensip-tools fit` would otherwise
+    // act as an attacker-influenced input flowing into a path join.
     if (name.length === 0 || name.includes('..') || name.startsWith('/') || name.includes('\0')) {
       logger.warn({
         evt: 'plugin.loader.discover.reject',
         module: 'core:plugins',
-        reason: 'invalid dependency name',
+        reason: 'invalid plugin name',
         name,
       })
       continue
     }
     const packageDir = join(nodeModulesDir, name)
-    // Containment check: resolved path (after any symlinks) must stay inside
-    // node_modules. This catches both string-level traversal that survives
-    // path.join (none currently, but defense-in-depth) and symlink-based
-    // escapes if an attacker can plant a symlink in node_modules itself.
+    // Containment check: the resolved real path (after symlinks) must
+    // stay inside node_modules. Catches symlink-based escapes if an
+    // attacker plants a symlink.
     if (!isPathInside(packageDir, nodeModulesDir)) {
       logger.warn({
         evt: 'plugin.loader.discover.reject',
@@ -187,23 +193,10 @@ function discoverNpmPackages(nodeModulesDir: string, pluginDir: string): Discove
     if (plugin) plugins.push(plugin)
   }
 
-  return plugins
-}
+  // pluginDir reference kept for parity with prior log shape
+  void pluginDir
 
-/**
- * Read the plugin dir's package.json and return direct-dependency names.
- * Only these are treated as plugins — transitive deps in node_modules/
- * (such as peer deps of plugins, or their transitive installs) are ignored.
- */
-function readDeclaredDependencies(pluginDir: string): string[] {
-  const pkgJsonPath = join(pluginDir, 'package.json')
-  if (!existsSync(pkgJsonPath)) return []
-  try {
-    const pkg = JSON.parse(readFileSync(pkgJsonPath, 'utf8')) as { dependencies?: Record<string, string> }
-    return Object.keys(pkg.dependencies ?? {})
-  } catch {
-    return []
-  }
+  return plugins
 }
 
 // eslint-disable-next-line sonarjs/cognitive-complexity -- entry point resolution: walks exports map (string vs object vs nested condition) + main + default; each branch documents a real npm shape
@@ -271,7 +264,7 @@ function tryDiscoverPackage(packageDir: string, name: string): DiscoveredPlugin 
 
 const LOOSE_FILE_EXTENSIONS = new Set(['.js', '.mjs'])
 
-function discoverLooseFiles(dir: string): DiscoveredPlugin[] {
+function discoverLooseFiles(dir: string, namespacePrefix: string): DiscoveredPlugin[] {
   const plugins: DiscoveredPlugin[] = []
 
   let entries: string[]
@@ -288,11 +281,12 @@ function discoverLooseFiles(dir: string): DiscoveredPlugin[] {
     const fullPath = join(dir, entry)
     if (!safeIsFile(fullPath)) continue
 
-    // Containment check: a symlink in the plugin dir pointing outside it
-    // would otherwise be dynamically imported, executing arbitrary code from
-    // wherever the symlink leads. statSync follows symlinks (intentionally —
-    // pnpm uses symlinks inside node_modules for legitimate reasons), so we
-    // verify the real path stays inside the plugin dir.
+    // Containment check: a symlink in the plugin dir pointing outside
+    // it would otherwise be dynamically imported, executing arbitrary
+    // code from wherever the symlink leads. statSync follows symlinks
+    // (intentionally — pnpm uses symlinks inside node_modules for
+    // legitimate reasons), so we verify the real path stays inside
+    // the plugin dir.
     if (!isPathInside(fullPath, dir)) {
       logger.warn({
         evt: 'plugin.loader.discover.reject',
@@ -303,12 +297,12 @@ function discoverLooseFiles(dir: string): DiscoveredPlugin[] {
       continue
     }
 
-    const name = basename(entry, ext)
+    const baseName = basename(entry, ext)
 
     plugins.push({
       type: 'file',
       entryPoint: fullPath,
-      namespace: name,
+      namespace: `${namespacePrefix}/${baseName}`,
       source: entry,
     })
   }
@@ -337,16 +331,9 @@ function safeIsFile(path: string): boolean {
 }
 
 /**
- * Returns true iff `child`, after resolving symlinks, is the same path as
- * `parent` or located inside it. Used as a security boundary check against
- * attacker-influenced paths in plugin discovery: a malicious package.json
- * dependency key (`"../../etc/passwd"`) or a symlink planted in the plugin
- * dir would pass `existsSync` / `statSync` but fail this check.
- *
- * Both paths are resolved with `realpathSync`, so the comparison reflects
- * the real filesystem location regardless of intermediate symlinks. If
- * either path can't be resolved (doesn't exist, permission denied), we
- * fail closed and return false.
+ * Returns true iff `child`, after resolving symlinks, is the same path
+ * as `parent` or located inside it. Used as a security boundary check
+ * against attacker-influenced paths in plugin discovery.
  */
 function isPathInside(child: string, parent: string): boolean {
   let realChild: string

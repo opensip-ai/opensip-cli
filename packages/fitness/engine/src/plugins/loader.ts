@@ -285,20 +285,23 @@ function looksLikeLanguageAdapter(value: unknown): boolean {
 }
 
 /**
- * Discover and load all plugins for a domain.
- * Loads sequentially to ensure deterministic registration order.
+ * Discover and load all plugins for a domain. Loads sequentially to
+ * ensure deterministic registration order.
  *
- * Pass `projectDir` to honor the project's `opensip-tools.config.yml`
- * `plugins.<domain>` declaration — plugins are then loaded from
- * `<projectDir>/.opensip-tools/<domain>/`. When absent, falls back to
- * the user-level dir (`~/.opensip-tools/<domain>/`).
+ * v3 layout: discovers loose `.mjs` files under
+ * `<projectDir>/opensip-tools/<tool>/{checks,recipes,scenarios}/` plus
+ * any npm-installed packages in
+ * `<projectDir>/opensip-tools/.runtime/plugins/<domain>/node_modules/`
+ * that are listed in `plugins.<domain>` in the project config.
+ *
+ * Without a `projectDir`, no plugins are loaded — there's no
+ * user-global fallback in v3.
  */
 export async function loadAllPlugins(
   domain: PluginDomain,
-  baseDir?: string,
   projectDir?: string,
 ): Promise<PluginLoadResult> {
-  const discovered = discoverPlugins(domain, baseDir, projectDir)
+  const discovered = discoverPlugins(domain, projectDir)
 
   const plugins: LoadedPlugin[] = []
   const errors: string[] = []

@@ -13,6 +13,7 @@ import {
   resolveUserPaths,
 } from '../paths.js';
 
+// eslint-disable-next-line sonarjs/publicly-writable-directories -- string-only fixture; resolver is pure (no fs touch)
 const PROJECT = '/tmp/test-project';
 
 describe('resolveProjectPaths', () => {

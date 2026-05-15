@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -180,37 +180,17 @@ describe('lang plugin domain', () => {
     expect(result.adaptersRegistered).toBe(1)
   })
 
-  it('loadAllPlugins with lang domain aggregates totalAdapters', async () => {
+  it('loadAllPlugins for the lang domain returns empty in v3', async () => {
+    // v3 doesn't have a project-local lang plugin discovery path —
+    // language adapters ship as direct deps of @opensip-tools/cli
+    // and are registered by the CLI bootstrap, not by walking a
+    // user-source dir. Verify that loadAllPlugins('lang', ...)
+    // discovers nothing rather than reading from a stray directory.
     const baseDir = mkdtempSync(join(tmpdir(), 'opensip-lang-base-'))
-    const langDir = join(baseDir, 'lang')
-    mkdirSync(langDir, { recursive: true })
-
-    writeFileSync(
-      join(langDir, 'a.mjs'),
-      `export const adapters = [{
-        id: 'lang-a',
-        fileExtensions: ['.a'],
-        parse: () => ({}),
-        stripStrings: (s) => s,
-        stripComments: (s) => s,
-      }];`,
-    )
-    writeFileSync(
-      join(langDir, 'b.mjs'),
-      `export const adapters = [{
-        id: 'lang-b',
-        fileExtensions: ['.b'],
-        parse: () => ({}),
-        stripStrings: (s) => s,
-        stripComments: (s) => s,
-      }];`,
-    )
-
     try {
       const result = await loadAllPlugins('lang', baseDir)
-      expect(result.totalAdapters).toBe(2)
-      expect(defaultLanguageRegistry.get('lang-a')).toBeDefined()
-      expect(defaultLanguageRegistry.get('lang-b')).toBeDefined()
+      expect(result.totalAdapters).toBe(0)
+      expect(result.plugins).toHaveLength(0)
     } finally {
       rmSync(baseDir, { recursive: true, force: true })
     }

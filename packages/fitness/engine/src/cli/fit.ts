@@ -112,23 +112,16 @@ export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
     await preLoadHook(projectDir);
   }
 
-  // 1. Discover additional language packs via the `lang` plugin domain.
-  //    The bundled language adapters are registered by the CLI before
-  //    the first command runs — fitness doesn't take a direct dep on
-  //    @opensip-tools/lang-* packages.
-  const langPluginResult = await loadAllPlugins('lang', undefined, projectDir);
-  if (langPluginResult.errors.length > 0) {
-    for (const err of langPluginResult.errors) {
-      process.stderr.write(`opensip-tools: lang plugin failed to load — ${err}\n`);
-      logger.warn({ evt: 'cli.lang_plugin.warning', module: 'cli:fit', message: err });
-    }
-  }
-
-  // 2. Load fit plugins — project-local `<projectDir>/.opensip-tools/fit/`
-  //    when the project config declares `plugins.fit`, otherwise
-  //    `~/.opensip-tools/fit/`. Pass-through baseDir=undefined, so
-  //    resolvePluginDir picks the default.
-  const pluginResult = await loadAllPlugins('fit', undefined, projectDir);
+  // 1. Load fit plugins — discovers .mjs files in
+  //    <projectDir>/opensip-tools/fit/{checks,recipes}/ and any
+  //    npm packages declared in plugins.fit in the project config.
+  //
+  //    Bundled language adapters (TypeScript, Rust, Python, etc.)
+  //    are registered separately by the CLI bootstrap; fitness
+  //    doesn't take direct deps on @opensip-tools/lang-* packages,
+  //    and v3 has no project-local 'lang' plugin discovery path
+  //    (the lang adapter set is fixed and shipped with the CLI).
+  const pluginResult = await loadAllPlugins('fit', projectDir);
   pluginLoadErrors = pluginResult.errors;
   if (pluginResult.errors.length > 0) {
     // Surface plugin load errors to the user. The logger is silenced in

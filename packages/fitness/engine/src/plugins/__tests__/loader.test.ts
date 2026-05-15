@@ -202,20 +202,21 @@ describe('loadAllPlugins', () => {
   })
 
   it('aggregates results from multiple plugins', async () => {
-    const fitDir = join(testDir, 'fit')
-    mkdirSync(fitDir, { recursive: true })
-    writeFileSync(join(fitDir, 'a.mjs'), 'export const checks = []')
-    writeFileSync(join(fitDir, 'b.mjs'), 'export const checks = []')
+    // v3 layout: opensip-tools/fit/checks/<file>.mjs
+    const checksDir = join(testDir, 'opensip-tools', 'fit', 'checks')
+    mkdirSync(checksDir, { recursive: true })
+    writeFileSync(join(checksDir, 'a.mjs'), 'export const checks = []')
+    writeFileSync(join(checksDir, 'b.mjs'), 'export const checks = []')
 
     const result = await loadAllPlugins('fit', testDir)
     expect(result.plugins).toHaveLength(2)
   })
 
   it('collects errors from failed plugins', async () => {
-    const fitDir = join(testDir, 'fit')
-    mkdirSync(fitDir, { recursive: true })
-    writeFileSync(join(fitDir, 'ok.mjs'), 'export const checks = []')
-    writeFileSync(join(fitDir, 'bad.mjs'), 'throw new Error("boom")')
+    const checksDir = join(testDir, 'opensip-tools', 'fit', 'checks')
+    mkdirSync(checksDir, { recursive: true })
+    writeFileSync(join(checksDir, 'ok.mjs'), 'export const checks = []')
+    writeFileSync(join(checksDir, 'bad.mjs'), 'throw new Error("boom")')
 
     const result = await loadAllPlugins('fit', testDir)
     expect(result.plugins).toHaveLength(2)

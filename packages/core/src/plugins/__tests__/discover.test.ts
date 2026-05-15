@@ -1,14 +1,15 @@
-import { mkdirSync, writeFileSync, rmSync, symlinkSync , mkdtempSync } from 'node:fs'
+import { mkdirSync, writeFileSync, rmSync, symlinkSync, mkdtempSync } from 'node:fs'
 import { tmpdir, platform } from 'node:os'
 import { join } from 'node:path'
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 
-import { discoverPlugins, getPluginDir } from '../discover.js'
+import { discoverPlugins } from '../discover.js'
 
 let testDir: string
 
 beforeEach(() => {
+  // eslint-disable-next-line sonarjs/publicly-writable-directories -- mkdtempSync creates a private 700 dir under tmpdir; safe for test fixtures
   testDir = mkdtempSync(join(tmpdir(), 'opensip-plugins-test-'))
 })
 
@@ -16,83 +17,131 @@ afterEach(() => {
   rmSync(testDir, { recursive: true, force: true })
 })
 
-describe('getPluginDir', () => {
-  it('returns domain subdirectory of base dir', () => {
-    expect(getPluginDir('fit', '/base')).toBe('/base/fit')
-    expect(getPluginDir('sim', '/base')).toBe('/base/sim')
-    expect(getPluginDir('asm', '/base')).toBe('/base/asm')
-  })
-})
+/**
+ * Helpers to build the v3 layout in the test tmpdir:
+ *
+ *   <testDir>/opensip-tools/<tool>/<kind>/<file>.mjs
+ *   <testDir>/opensip-tools/<tool>/<kind>/<file>.js
+ *   <testDir>/opensip-tools/.runtime/plugins/<domain>/...
+ *   <testDir>/opensip-tools.config.yml  (declares plugins.<domain>)
+ */
 
-describe('discoverPlugins', () => {
-  it('returns empty array when directory does not exist', () => {
-    const result = discoverPlugins('fit', join(testDir, 'nonexistent'))
-    expect(result).toEqual([])
+function fitChecksDir(): string {
+  return join(testDir, 'opensip-tools', 'fit', 'checks')
+}
+function fitRecipesDir(): string {
+  return join(testDir, 'opensip-tools', 'fit', 'recipes')
+}
+function simScenariosDir(): string {
+  return join(testDir, 'opensip-tools', 'sim', 'scenarios')
+}
+function fitPluginsDir(): string {
+  return join(testDir, 'opensip-tools', '.runtime', 'plugins', 'fit')
+}
+function writeConfig(yaml: string): void {
+  writeFileSync(join(testDir, 'opensip-tools.config.yml'), yaml)
+}
+
+/** Build a `plugins.fit:` config block with the given declared deps. */
+function setupPluginsConfig(deps: string[]): void {
+  const list = deps.map(d => `    - "${d}"`).join('\n')
+  writeConfig(`plugins:\n  fit:\n${list}\n`)
+}
+
+describe('discoverPlugins (v3 layout)', () => {
+  it('returns empty array when projectDir is undefined', () => {
+    expect(discoverPlugins('fit')).toEqual([])
   })
 
-  it('returns empty array when directory is empty', () => {
-    mkdirSync(join(testDir, 'fit'), { recursive: true })
-    const result = discoverPlugins('fit', testDir)
-    expect(result).toEqual([])
+  it('returns empty array when no opensip-tools/ directory exists', () => {
+    expect(discoverPlugins('fit', testDir)).toEqual([])
   })
 
-  describe('loose files', () => {
-    it('discovers .js files', () => {
-      const fitDir = join(testDir, 'fit')
-      mkdirSync(fitDir, { recursive: true })
-      writeFileSync(join(fitDir, 'my-check.js'), 'export const checks = []')
+  it('returns empty array for `lang` and `asm` (no v3 subdir model)', () => {
+    mkdirSync(join(testDir, 'opensip-tools', 'lang'), { recursive: true })
+    mkdirSync(join(testDir, 'opensip-tools', 'asm'), { recursive: true })
+    expect(discoverPlugins('lang', testDir)).toEqual([])
+    expect(discoverPlugins('asm', testDir)).toEqual([])
+  })
+
+  describe('user-source files (no config opt-in needed)', () => {
+    it('discovers .mjs files in opensip-tools/fit/checks/', () => {
+      mkdirSync(fitChecksDir(), { recursive: true })
+      writeFileSync(join(fitChecksDir(), 'my-check.mjs'), 'export const checks = []')
 
       const result = discoverPlugins('fit', testDir)
       expect(result).toHaveLength(1)
       expect(result[0]).toMatchObject({
         type: 'file',
-        namespace: 'my-check',
-        source: 'my-check.js',
+        source: 'my-check.mjs',
       })
+      expect(result[0]?.namespace).toContain('my-check')
     })
 
-    it('discovers .mjs files', () => {
-      const fitDir = join(testDir, 'fit')
-      mkdirSync(fitDir, { recursive: true })
-      writeFileSync(join(fitDir, 'plugin.mjs'), 'export const checks = []')
+    it('discovers .js files in opensip-tools/fit/checks/', () => {
+      mkdirSync(fitChecksDir(), { recursive: true })
+      writeFileSync(join(fitChecksDir(), 'plugin.js'), 'export const checks = []')
 
       const result = discoverPlugins('fit', testDir)
       expect(result).toHaveLength(1)
-      expect(result[0].source).toBe('plugin.mjs')
+      expect(result[0]?.source).toBe('plugin.js')
+    })
+
+    it('discovers files in BOTH opensip-tools/fit/checks/ and opensip-tools/fit/recipes/', () => {
+      mkdirSync(fitChecksDir(), { recursive: true })
+      mkdirSync(fitRecipesDir(), { recursive: true })
+      writeFileSync(join(fitChecksDir(), 'my-check.mjs'), 'export const checks = []')
+      writeFileSync(join(fitRecipesDir(), 'my-recipe.mjs'), 'export const recipes = []')
+
+      const result = discoverPlugins('fit', testDir)
+      expect(result).toHaveLength(2)
+      const sources = result.map(p => p.source).sort()
+      expect(sources).toEqual(['my-check.mjs', 'my-recipe.mjs'])
+    })
+
+    it('namespaces sim files under sim/scenarios distinctly from sim/recipes', () => {
+      mkdirSync(simScenariosDir(), { recursive: true })
+      writeFileSync(join(simScenariosDir(), 'load.mjs'), 'export const scenarios = []')
+
+      const result = discoverPlugins('sim', testDir)
+      expect(result).toHaveLength(1)
+      expect(result[0]?.namespace).toContain('sim/scenarios/load')
     })
 
     it('ignores non-js files', () => {
-      const fitDir = join(testDir, 'fit')
-      mkdirSync(fitDir, { recursive: true })
-      writeFileSync(join(fitDir, 'readme.txt'), 'not a plugin')
-      writeFileSync(join(fitDir, 'data.json'), '{}')
+      mkdirSync(fitChecksDir(), { recursive: true })
+      writeFileSync(join(fitChecksDir(), 'readme.txt'), 'not a plugin')
+      writeFileSync(join(fitChecksDir(), 'data.json'), '{}')
 
-      const result = discoverPlugins('fit', testDir)
-      expect(result).toEqual([])
+      expect(discoverPlugins('fit', testDir)).toEqual([])
     })
 
-    it('ignores directories when scanning loose files', () => {
-      const fitDir = join(testDir, 'fit')
-      mkdirSync(join(fitDir, 'subdir'), { recursive: true })
-
-      const result = discoverPlugins('fit', testDir)
-      expect(result).toEqual([])
+    it('ignores subdirectories when scanning loose files', () => {
+      mkdirSync(join(fitChecksDir(), 'subdir'), { recursive: true })
+      expect(discoverPlugins('fit', testDir)).toEqual([])
     })
   })
 
-  describe('npm packages', () => {
-    it('discovers packages declared as dependencies in the plugin dir package.json', () => {
-      const fitDir = join(testDir, 'fit')
-      mkdirSync(join(fitDir, 'node_modules', 'my-plugin'), { recursive: true })
-      writeFileSync(join(fitDir, 'package.json'), JSON.stringify({
-        name: 'plugins-host',
-        dependencies: { 'my-plugin': '*' },
-      }))
-      writeFileSync(join(fitDir, 'node_modules', 'my-plugin', 'package.json'), JSON.stringify({
-        name: 'my-plugin',
-        main: './index.js',
-      }))
-      writeFileSync(join(fitDir, 'node_modules', 'my-plugin', 'index.js'), 'export const checks = []')
+  describe('npm-installed plugins (config opt-in required)', () => {
+    it('does NOT auto-load packages when plugins.fit is not declared', () => {
+      const pluginsRoot = fitPluginsDir()
+      const pkgDir = join(pluginsRoot, 'node_modules', 'silent-pkg')
+      mkdirSync(pkgDir, { recursive: true })
+      writeFileSync(join(pkgDir, 'package.json'), JSON.stringify({ name: 'silent-pkg', main: './index.js' }))
+      writeFileSync(join(pkgDir, 'index.js'), 'export const checks = []')
+
+      // Config is absent → no opt-in → package not loaded
+      expect(discoverPlugins('fit', testDir)).toEqual([])
+    })
+
+    it('discovers packages listed in plugins.fit when installed', () => {
+      const pluginsRoot = fitPluginsDir()
+      const pkgDir = join(pluginsRoot, 'node_modules', 'my-plugin')
+      mkdirSync(pkgDir, { recursive: true })
+      writeFileSync(join(pkgDir, 'package.json'), JSON.stringify({ name: 'my-plugin', main: './index.js' }))
+      writeFileSync(join(pkgDir, 'index.js'), 'export const checks = []')
+
+      setupPluginsConfig(['my-plugin'])
 
       const result = discoverPlugins('fit', testDir)
       expect(result).toHaveLength(1)
@@ -103,20 +152,18 @@ describe('discoverPlugins', () => {
       })
     })
 
-    it('discovers scoped packages declared as dependencies', () => {
-      const fitDir = join(testDir, 'fit')
-      const pkgDir = join(fitDir, 'node_modules', '@scope', 'checks')
+    it('discovers scoped packages declared in plugins.fit', () => {
+      const pluginsRoot = fitPluginsDir()
+      const pkgDir = join(pluginsRoot, 'node_modules', '@scope', 'checks')
       mkdirSync(pkgDir, { recursive: true })
-      writeFileSync(join(fitDir, 'package.json'), JSON.stringify({
-        name: 'plugins-host',
-        dependencies: { '@scope/checks': '*' },
-      }))
       writeFileSync(join(pkgDir, 'package.json'), JSON.stringify({
         name: '@scope/checks',
         main: './dist/index.js',
       }))
       mkdirSync(join(pkgDir, 'dist'))
       writeFileSync(join(pkgDir, 'dist', 'index.js'), 'export const checks = []')
+
+      setupPluginsConfig(['@scope/checks'])
 
       const result = discoverPlugins('fit', testDir)
       expect(result).toHaveLength(1)
@@ -126,62 +173,29 @@ describe('discoverPlugins', () => {
       })
     })
 
-    it('ignores transitive packages not listed as direct dependencies', () => {
-      const fitDir = join(testDir, 'fit')
-      mkdirSync(join(fitDir, 'node_modules', 'transitive'), { recursive: true })
-      writeFileSync(join(fitDir, 'package.json'), JSON.stringify({
-        name: 'plugins-host',
-        dependencies: {},
-      }))
-      writeFileSync(join(fitDir, 'node_modules', 'transitive', 'package.json'), JSON.stringify({
-        name: 'transitive',
-        main: './index.js',
-      }))
-      writeFileSync(join(fitDir, 'node_modules', 'transitive', 'index.js'), '')
-
-      const result = discoverPlugins('fit', testDir)
-      expect(result).toEqual([])
+    it('skips packages that are listed but not installed', () => {
+      setupPluginsConfig(['ghost-package'])
+      // No node_modules/ghost-package/ exists
+      expect(discoverPlugins('fit', testDir)).toEqual([])
     })
 
-    it('skips packages without entry point', () => {
-      const fitDir = join(testDir, 'fit')
-      const pkgDir = join(fitDir, 'node_modules', 'broken')
+    it('skips packages without an entry point', () => {
+      const pluginsRoot = fitPluginsDir()
+      const pkgDir = join(pluginsRoot, 'node_modules', 'broken')
       mkdirSync(pkgDir, { recursive: true })
-      writeFileSync(join(fitDir, 'package.json'), JSON.stringify({
-        name: 'plugins-host',
-        dependencies: { broken: '*' },
-      }))
       writeFileSync(join(pkgDir, 'package.json'), JSON.stringify({
         name: 'broken',
         main: './nonexistent.js',
       }))
+      setupPluginsConfig(['broken'])
 
-      const result = discoverPlugins('fit', testDir)
-      expect(result).toEqual([])
-    })
-
-    it('skips directories without package.json', () => {
-      const fitDir = join(testDir, 'fit')
-      const pkgDir = join(fitDir, 'node_modules', 'not-a-package')
-      mkdirSync(pkgDir, { recursive: true })
-      writeFileSync(join(fitDir, 'package.json'), JSON.stringify({
-        name: 'plugins-host',
-        dependencies: { 'not-a-package': '*' },
-      }))
-      writeFileSync(join(pkgDir, 'index.js'), 'export const checks = []')
-
-      const result = discoverPlugins('fit', testDir)
-      expect(result).toEqual([])
+      expect(discoverPlugins('fit', testDir)).toEqual([])
     })
 
     it('uses exports["."] when available', () => {
-      const fitDir = join(testDir, 'fit')
-      const pkgDir = join(fitDir, 'node_modules', 'exports-pkg')
+      const pluginsRoot = fitPluginsDir()
+      const pkgDir = join(pluginsRoot, 'node_modules', 'exports-pkg')
       mkdirSync(pkgDir, { recursive: true })
-      writeFileSync(join(fitDir, 'package.json'), JSON.stringify({
-        name: 'plugins-host',
-        dependencies: { 'exports-pkg': '*' },
-      }))
       writeFileSync(join(pkgDir, 'package.json'), JSON.stringify({
         name: 'exports-pkg',
         exports: { '.': './lib/main.js' },
@@ -189,117 +203,84 @@ describe('discoverPlugins', () => {
       mkdirSync(join(pkgDir, 'lib'))
       writeFileSync(join(pkgDir, 'lib', 'main.js'), 'export const checks = []')
 
+      setupPluginsConfig(['exports-pkg'])
+
       const result = discoverPlugins('fit', testDir)
       expect(result).toHaveLength(1)
-      expect(result[0].entryPoint).toContain('lib/main.js')
+      expect(result[0]?.entryPoint).toContain('lib/main.js')
     })
   })
 
   describe('security: path traversal and symlink containment', () => {
-    it('rejects dependency names containing .. (would traverse out of node_modules)', () => {
-      // Layout: testDir/fit/package.json declares "../escapee" as a dependency.
-      // testDir/escapee/ is a real plugin sitting OUTSIDE testDir/fit/.
-      // Without the containment check, join(node_modules, "../escapee") would
-      // resolve to testDir/fit/node_modules/../escapee = testDir/fit/escapee,
-      // and the loader would happily import code from there.
-      const fitDir = join(testDir, 'fit')
-      mkdirSync(fitDir, { recursive: true })
-      writeFileSync(join(fitDir, 'package.json'), JSON.stringify({
-        name: 'plugins-host',
-        dependencies: { '../escapee': '*' },
-      }))
-      // Set up the would-be victim location so the realpath check would
-      // succeed if our string-level check failed — proving the test
-      // exercises the rejection path, not just a missing file.
-      const escapee = join(fitDir, 'node_modules', '..', 'escapee')
+    it('rejects plugin names containing .. (would traverse out of node_modules)', () => {
+      // The plugin list comes from opensip-tools.config.yml. A malicious
+      // (or careless) entry like "../escapee" would, without the
+      // containment check, resolve relative to node_modules and pull in
+      // arbitrary code.
+      const pluginsRoot = fitPluginsDir()
+      mkdirSync(join(pluginsRoot, 'node_modules'), { recursive: true })
+      const escapee = join(pluginsRoot, 'node_modules', '..', 'escapee')
       mkdirSync(escapee, { recursive: true })
       writeFileSync(join(escapee, 'package.json'), JSON.stringify({ name: 'escapee', main: './index.js' }))
       writeFileSync(join(escapee, 'index.js'), 'export const checks = []')
 
-      const result = discoverPlugins('fit', testDir)
-      expect(result).toHaveLength(0)
+      setupPluginsConfig(['../escapee'])
+
+      expect(discoverPlugins('fit', testDir)).toEqual([])
     })
 
-    it('rejects absolute-path dependency names', () => {
-      const fitDir = join(testDir, 'fit')
-      mkdirSync(fitDir, { recursive: true })
-      writeFileSync(join(fitDir, 'package.json'), JSON.stringify({
-        name: 'plugins-host',
-        dependencies: { '/etc/passwd': '*' },
-      }))
-
-      const result = discoverPlugins('fit', testDir)
-      expect(result).toHaveLength(0)
+    it('rejects absolute-path plugin names', () => {
+      mkdirSync(fitPluginsDir(), { recursive: true })
+      setupPluginsConfig(['/etc/passwd'])
+      expect(discoverPlugins('fit', testDir)).toEqual([])
     })
 
-    it('rejects dependency names containing NUL bytes', () => {
-      const fitDir = join(testDir, 'fit')
-      mkdirSync(fitDir, { recursive: true })
-      writeFileSync(join(fitDir, 'package.json'), JSON.stringify({
-        name: 'plugins-host',
-        dependencies: { 'pkg evil': '*' },
-      }))
-
-      const result = discoverPlugins('fit', testDir)
-      expect(result).toHaveLength(0)
-    })
-
-    it('rejects loose-file plugins that are symlinks pointing outside the plugin dir', () => {
-      // Skip on Windows where symlink creation requires elevated privileges
-      // in CI and isn't part of the threat model we're testing here.
+    it('rejects loose-file plugins that are symlinks pointing outside the source dir', () => {
+      // Skip on Windows where symlink creation needs elevated privileges
+      // in CI and isn't part of the threat model.
       if (platform() === 'win32') return
 
-      const fitDir = join(testDir, 'fit')
-      mkdirSync(fitDir, { recursive: true })
+      mkdirSync(fitChecksDir(), { recursive: true })
 
-      // Set up a target file outside the plugin dir — this stands in for
-      // /etc/passwd or any other attacker-readable file.
       const outsideTarget = join(testDir, 'evil-target.mjs')
       writeFileSync(outsideTarget, 'export const checks = []')
 
-      // Plant a symlink inside the plugin dir that points to it.
-      const symlinkPath = join(fitDir, 'looks-legit.mjs')
+      const symlinkPath = join(fitChecksDir(), 'looks-legit.mjs')
       symlinkSync(outsideTarget, symlinkPath)
 
-      const result = discoverPlugins('fit', testDir)
-      expect(result).toHaveLength(0)
+      expect(discoverPlugins('fit', testDir)).toEqual([])
     })
 
-    it('accepts symlinks that resolve INSIDE the plugin dir (pnpm-style layout)', () => {
-      // pnpm uses symlinks within node_modules pointing to .pnpm/<pkg>@<ver>/...
-      // — those must keep working. Verify a same-dir-tree symlink is allowed.
+    it('accepts symlinks that resolve INSIDE the source dir (pnpm-style)', () => {
       if (platform() === 'win32') return
 
-      const fitDir = join(testDir, 'fit')
-      mkdirSync(fitDir, { recursive: true })
+      mkdirSync(fitChecksDir(), { recursive: true })
 
-      const realFile = join(fitDir, 'real-plugin.mjs')
+      const realFile = join(fitChecksDir(), 'real-plugin.mjs')
       writeFileSync(realFile, 'export const checks = []')
 
-      const symlinkPath = join(fitDir, 'aliased.mjs')
+      const symlinkPath = join(fitChecksDir(), 'aliased.mjs')
       symlinkSync(realFile, symlinkPath)
 
       const result = discoverPlugins('fit', testDir)
-      // Both the real file and the symlink should be discovered.
       expect(result.length).toBeGreaterThanOrEqual(1)
       expect(result.every(p => p.type === 'file')).toBe(true)
     })
   })
 
   describe('mixed discovery', () => {
-    it('discovers both packages and loose files', () => {
-      const fitDir = join(testDir, 'fit')
-      mkdirSync(fitDir, { recursive: true })
-      writeFileSync(join(fitDir, 'loose.js'), 'export const checks = []')
-      writeFileSync(join(fitDir, 'package.json'), JSON.stringify({
-        name: 'plugins-host',
-        dependencies: { pkg: '*' },
-      }))
+    it('discovers both packages and loose user-source files in one pass', () => {
+      // User source: fit/checks/loose.mjs
+      mkdirSync(fitChecksDir(), { recursive: true })
+      writeFileSync(join(fitChecksDir(), 'loose.mjs'), 'export const checks = []')
 
-      const pkgDir = join(fitDir, 'node_modules', 'pkg')
+      // npm plugin: declared and installed
+      const pluginsRoot = fitPluginsDir()
+      const pkgDir = join(pluginsRoot, 'node_modules', 'pkg')
       mkdirSync(pkgDir, { recursive: true })
       writeFileSync(join(pkgDir, 'package.json'), JSON.stringify({ name: 'pkg', main: './index.js' }))
       writeFileSync(join(pkgDir, 'index.js'), 'export const checks = []')
+      writeConfig('plugins:\n  fit:\n    - "pkg"\n')
 
       const result = discoverPlugins('fit', testDir)
       expect(result).toHaveLength(2)

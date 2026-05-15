@@ -11,11 +11,6 @@ export { PROJECT_CONFIG_FILENAME, resolveProjectConfigPath } from './config-reso
 // Plugins
 export {
   discoverPlugins,
-  getPluginDir,
-  getBaseDir,
-  getProjectPluginDir,
-  resolvePluginDir,
-  hasProjectPluginsDeclared,
   readProjectPluginsList,
   discoverToolPackages,
   readToolPackageMetadata,

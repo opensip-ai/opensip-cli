@@ -74,7 +74,7 @@ defaultLanguageRegistry.register(cppAdapter);
 import { printCompletionScript } from './commands/completion.js';
 import { executeConfigure, resolveApiKey } from './commands/configure.js';
 import { executeInit } from './commands/init.js';
-import { pluginList, pluginInstall, pluginRemove } from './commands/plugin.js';
+import { pluginAdd, pluginList, pluginRemove, pluginSync } from './commands/plugin.js';
 import { executeUninstall } from './commands/uninstall.js';
 import { decideOpen, launchBrowser } from './open-dashboard.js';
 import { maybeNotify } from './update-notifier.js';
@@ -386,61 +386,44 @@ function registerCliCommands(): void {
   // -- plugin ------------------------------------------------------------
   const pluginCmd = program
     .command('plugin')
-    .description('Manage installed plugins (install, list, remove)');
+    .description('Manage project-local plugins (add, list, remove, sync)');
 
   pluginCmd
     .command('list')
     .description('List installed plugins')
-    .option('--domain <fit|sim>', 'Target domain')
-    .action(async () => {
-      const result = await pluginList();
-      await renderResult(result);
-    });
-
-  pluginCmd
-    .command('install <package>')
-    .description('Install a plugin package')
-    .option('--domain <fit|sim>', 'Target domain')
-    .action(async (packageName: string, opts: { domain?: string }) => {
-      const result = await pluginInstall(packageName, opts.domain);
-      await renderResult(result);
-    });
-
-  pluginCmd
-    .command('remove <package>')
-    .description('Remove a plugin package')
-    .option('--domain <fit|sim>', 'Target domain')
-    .option('--project', 'Remove from project-local .opensip-tools/ instead of ~/.opensip-tools/', false)
-    .action(async (packageName: string, opts: { domain?: string; project?: boolean }) => {
-      if (opts.project) {
-        const { pluginRemoveFromConfig } = await import('./commands/project-plugins.js');
-        const result = await pluginRemoveFromConfig(packageName, process.cwd(), opts.domain);
-        await renderResult(result);
-        return;
-      }
-      const result = await pluginRemove(packageName, opts.domain);
-      await renderResult(result);
-    });
-
-  pluginCmd
-    .command('sync')
-    .description('Install project-local plugins declared in opensip-tools.config.yml')
-    .option('--domain <fit|sim|asm>', 'Sync only one domain')
     .option('--cwd <path>', 'Project root', process.cwd())
-    .action(async (opts: { domain?: string; cwd?: string }) => {
-      const { pluginSync } = await import('./commands/project-plugins.js');
-      const result = await pluginSync(opts.cwd ?? process.cwd(), opts.domain);
+    .action(async (opts: { cwd?: string }) => {
+      const result = await pluginList(opts.cwd ?? process.cwd());
       await renderResult(result);
     });
 
   pluginCmd
     .command('add <package>')
-    .description('Add a plugin to the project config AND install it into .opensip-tools/')
-    .option('--domain <fit|sim|asm>', 'Target domain (default: inferred from package name)')
+    .description('Install a plugin AND register it in opensip-tools.config.yml')
+    .option('--domain <fit|sim>', 'Target domain (default: inferred from package name)')
     .option('--cwd <path>', 'Project root', process.cwd())
     .action(async (packageName: string, opts: { domain?: string; cwd?: string }) => {
-      const { pluginAdd } = await import('./commands/project-plugins.js');
       const result = await pluginAdd(packageName, opts.cwd ?? process.cwd(), opts.domain);
+      await renderResult(result);
+    });
+
+  pluginCmd
+    .command('remove <package>')
+    .description('Uninstall a plugin AND remove it from opensip-tools.config.yml')
+    .option('--domain <fit|sim>', 'Target domain (default: inferred from package name)')
+    .option('--cwd <path>', 'Project root', process.cwd())
+    .action(async (packageName: string, opts: { domain?: string; cwd?: string }) => {
+      const result = await pluginRemove(packageName, opts.cwd ?? process.cwd(), opts.domain);
+      await renderResult(result);
+    });
+
+  pluginCmd
+    .command('sync')
+    .description('Install every plugin declared in opensip-tools.config.yml (post-clone bootstrap)')
+    .option('--domain <fit|sim>', 'Sync only one domain')
+    .option('--cwd <path>', 'Project root', process.cwd())
+    .action(async (opts: { domain?: string; cwd?: string }) => {
+      const result = await pluginSync(opts.cwd ?? process.cwd(), opts.domain);
       await renderResult(result);
     });
 
