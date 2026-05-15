@@ -119,7 +119,7 @@ export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
   //    Bundled language adapters (TypeScript, Rust, Python, etc.)
   //    are registered separately by the CLI bootstrap; fitness
   //    doesn't take direct deps on @opensip-tools/lang-* packages,
-  //    and v3 has no project-local 'lang' plugin discovery path
+  //    and there's no project-local 'lang' plugin discovery path
   //    (the lang adapter set is fixed and shipped with the CLI).
   const pluginResult = await loadAllPlugins('fit', projectDir);
   pluginLoadErrors = pluginResult.errors;

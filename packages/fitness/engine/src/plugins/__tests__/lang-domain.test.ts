@@ -180,8 +180,8 @@ describe('lang plugin domain', () => {
     expect(result.adaptersRegistered).toBe(1)
   })
 
-  it('loadAllPlugins for the lang domain returns empty in v3', async () => {
-    // v3 doesn't have a project-local lang plugin discovery path —
+  it('loadAllPlugins for the lang domain returns empty', async () => {
+    // There is no project-local lang plugin discovery path —
     // language adapters ship as direct deps of @opensip-tools/cli
     // and are registered by the CLI bootstrap, not by walking a
     // user-source dir. Verify that loadAllPlugins('lang', ...)

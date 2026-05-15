@@ -1,6 +1,6 @@
 // @fitness-ignore-file fitness-check-standards -- Uses fs for directory listing/stat operations, not file content reading
 /**
- * @fileoverview No Duplicate Packages check (v2)
+ * @fileoverview No Duplicate Packages check
  */
 
 import * as fs from 'node:fs'

@@ -199,9 +199,10 @@ or `pnpm --filter=@opensip-tools/<pkg> test`.
 ### Imports
 
 - **Workspace packages** — `import { x } from '@opensip-tools/<pkg>'`
-- **Subpath exports** are strongly discouraged for v2.0.0; prefer the
-  package barrel. The exception is `@opensip-tools/core/languages/parse-cache.js`
-  (used by language adapters).
+- **Subpath exports** are strongly discouraged; prefer the package
+  barrel. The exception is
+  `@opensip-tools/core/languages/parse-cache.js` (used by language
+  adapters).
 - **Internal** — relative paths within a package, always with `.js`
   extension (ESM Node16 module resolution requires it).
 - **Type-only imports** — `import type { X }` whenever possible. The
@@ -254,20 +255,19 @@ npm's self-replacement and pnpm's lack of OIDC support.
 
 ## Project Status
 
-**v3.0.0** — onboarding refactor complete. The new-customer flow is
-`init` (language detection + scaffolded layout) → `fit --recipe example`
-→ `sim --recipe example`, three commands to a working pipeline.
-Project layout flipped from user-global `~/.opensip-tools/` to
-project-local `<project>/opensip-tools/`, with user-authored content
-under `opensip-tools/{fit,sim}/{checks,recipes,scenarios}/` (tracked)
-and tool-generated state under `opensip-tools/.runtime/` (gitignored).
-Plugin loader auto-discovers `.mjs` files by directory presence; npm
-packages must be explicitly listed in `plugins.<domain>` to load.
-
-**v2.0.0** — architecture refactor. opensip-tools became a true
-tool-plugin platform: fitness and simulation are peer packages
-implementing a shared Tool contract; core is a strict kernel; cli is a
+**v1.0.0** — first stable release. opensip-tools is a tool-plugin
+platform: `core` is a strict kernel, `fitness` and `simulation` are
+peer tools implementing a shared Tool contract, and `cli` is a
 generic dispatcher. Adding a new tool requires zero CLI changes.
+
+The new-customer flow is three commands: `init` (language detection
++ scaffolded layout) → `fit --recipe example` → `sim --recipe
+example`. Project layout is local: user-authored content under
+`<project>/opensip-tools/{fit,sim}/{checks,recipes,scenarios}/`
+(tracked) and tool-generated state under
+`<project>/opensip-tools/.runtime/` (gitignored). Plugin loader
+auto-discovers `.mjs` files by directory presence; npm packages
+must be explicitly listed in `plugins.<domain>` to load.
 
 Future tool ideas (not implemented): `audit`, `lint`, `bench`. Any of
 these would slot in by writing a Tool implementation and shipping a

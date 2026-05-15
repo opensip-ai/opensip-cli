@@ -57,10 +57,10 @@ import { simulationTool } from '@opensip-tools/simulation';
 import { Command } from 'commander';
 
 // Register the bundled language adapters at module load time, BEFORE the
-// fitness tool's initialize() runs. Empty adapter registry would let
+// fitness tool's initialize() runs. An empty adapter registry would let
 // scope-empty checks scan everything as plain text and produce zero
-// findings — the exact silent-success failure mode v2.0.0 was designed
-// to avoid. Side-effect registrations are imported here (not in
+// findings — a silent-success failure mode this layer is designed to
+// avoid. Side-effect registrations are imported here (not in
 // fitness/engine) so fitness doesn't take a hard dep on every lang
 // pack: the layered architecture has CLI as the one component that
 // wires concrete adapters into the kernel registries.
@@ -221,7 +221,7 @@ program.hook('preAction', (_thisCommand, actionCommand) => {
   mergeConfigDefaults(opts, config);
 
   // Configure project-local persistence and logging paths from the
-  // v3 path resolver. Logger writes JSONL to
+  // path resolver. Logger writes JSONL to
   // <cwd>/opensip-tools/.runtime/logs/<YYYY-MM-DD>.jsonl; sessions and
   // dashboard reports land alongside it. Both functions are
   // idempotent + best-effort, so a non-init'd project (no

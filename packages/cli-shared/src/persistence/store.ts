@@ -1,14 +1,14 @@
 /**
  * JSON file persistence for opensip-tools results.
  *
- * v3.0.0 layout: stores session results in
- * `<project>/opensip-tools/.runtime/sessions/` per project.
- * Each run creates one file: {timestamp}-{tool}-{recipe}.json.
+ * Sessions land at `<project>/opensip-tools/.runtime/sessions/`
+ * (per-project). Each run creates one file:
+ * `{timestamp}-{tool}-{recipe}.json`.
  *
  * The CLI bootstrap calls `configurePersistencePaths(projectPaths)`
  * once on startup with paths from `resolveProjectPaths(cwd)`. Until
- * that call, the module falls back to the v2 user-global location
- * (~/.opensip-tools/) so any caller who imports persistence helpers
+ * that call, the module falls back to a user-global location
+ * (`~/.opensip-tools/`) so any caller who imports persistence helpers
  * before the CLI's preAction hook still gets a valid path. The
  * fallback is also exercised by tests that don't bootstrap a CLI.
  */
@@ -80,10 +80,10 @@ export interface RecipeCatalogEntry {
 }
 
 /**
- * v2 fallback: user-global ~/.opensip-tools/ used by tests and any
- * code path that imports persistence helpers before the CLI has
+ * Fallback path: user-global `~/.opensip-tools/`, used by tests and
+ * any code path that imports persistence helpers before the CLI has
  * called `configurePersistencePaths`. New code should not rely on
- * this fallback.
+ * this fallback — call `configurePersistencePaths` first.
  */
 export const TOOLS_HOME = join(homedir(), '.opensip-tools');
 
@@ -94,8 +94,8 @@ const MAX_SESSIONS = 100;
 
 /**
  * Configure where this module writes sessions and reports. Called
- * once by the CLI bootstrap with the v3 project paths. Idempotent
- * and safe to call repeatedly (e.g. tests that switch project dirs).
+ * once by the CLI bootstrap with the project paths. Idempotent and
+ * safe to call repeatedly (e.g. tests that switch project dirs).
  */
 export function configurePersistencePaths(paths: Pick<ProjectPaths, 'sessionsDir' | 'reportsDir'>): void {
   storeDir = paths.sessionsDir;

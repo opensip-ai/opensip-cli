@@ -282,7 +282,7 @@ async function runGateMode(args: CliArgs, cli: ToolCliContext): Promise<void> {
 export const fitnessTool: Tool = {
   metadata: {
     id: 'fitness',
-    version: '3.0.0',
+    version: '1.0.0',
     description: 'Run fitness checks against a codebase',
   },
   commands: [FIT, DASHBOARD, FIT_LIST, FIT_RECIPES],

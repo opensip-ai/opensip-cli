@@ -1,7 +1,7 @@
 // @fitness-ignore-file toctou-race-condition -- TOCTOU acceptable in this non-concurrent context
 // @fitness-ignore-file silent-early-returns -- Guard clauses in analyzeDIFile validate inputs before analysis
 /**
- * @fileoverview DI Static Inject Usage check (v2)
+ * @fileoverview DI Static Inject Usage check
  */
 
 import * as path from 'node:path'

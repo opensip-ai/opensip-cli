@@ -235,12 +235,12 @@ export function defineCheck(config: UnifiedCheckConfig): Check {
       scansFiles: !isCommandConfig(config),
       fileTypes: config.fileTypes ? [...config.fileTypes] : undefined,
       checkScope: config.scope ? { languages: [...config.scope.languages], concerns: [...config.scope.concerns] } : undefined,
-      // @fitness-ignore-next-line concurrency-safety -- async arrow delegates to executeCheckV2 which is async; needed for type compatibility
-      execute: async (ctx) => executeCheckV2(config, ctx),
+      // @fitness-ignore-next-line concurrency-safety -- async arrow delegates to executeUnifiedCheck which is async; needed for type compatibility
+      execute: async (ctx) => executeUnifiedCheck(config, ctx),
     },
 
     getScope() {
-      return { include: [], exclude: [], description: 'v2 target-based scope' }
+      return { include: [], exclude: [], description: 'target-based scope' }
     },
 
     getMatcher(cwd: string): PathMatcher {
@@ -271,14 +271,14 @@ export function defineCheck(config: UnifiedCheckConfig): Check {
         disabled: config.disabled,
         timeout: config.timeout,
         scansFiles: !isCommandConfig(config),
-        // @fitness-ignore-next-line concurrency-safety -- async arrow delegates to executeCheckV2 which is async; needed for type compatibility
-        execute: async (ctx: ExecutionContext) => executeCheckV2(config, ctx),
+        // @fitness-ignore-next-line concurrency-safety -- async arrow delegates to executeUnifiedCheck which is async; needed for type compatibility
+        execute: async (ctx: ExecutionContext) => executeUnifiedCheck(config, ctx),
       }
 
       const ctx = createExecutionContext(legacyConfig, cwd, matcher, options)
 
       try {
-        const result = await executeCheckV2(config, ctx)
+        const result = await executeUnifiedCheck(config, ctx)
 
         const { filteredSignals, ignoredCount, appliedDirectives } = await filterSignalsByDirectives(
           result.signals,
@@ -307,11 +307,12 @@ export function defineCheck(config: UnifiedCheckConfig): Check {
 }
 
 /**
- * Internal: Execute a v2 check based on its analysis mode.
+ * Internal: Execute a check based on its analysis mode (analyze /
+ * analyzeAll / command).
  * @throws {CheckAbortedError} When the check is aborted via AbortSignal
  * @throws {SystemError} When an unknown analysis mode is encountered
  */
-async function executeCheckV2(
+async function executeUnifiedCheck(
   config: UnifiedCheckConfig,
   ctx: ExecutionContext,
 ): Promise<CheckResult> {

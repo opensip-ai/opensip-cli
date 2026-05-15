@@ -33,7 +33,7 @@ their `dependencies`.
 
 ## Cutting a release
 
-1. Bump every `version` field to the same value (e.g. `2.0.0`):
+1. Bump every `version` field to the same value (e.g. `1.1.0`):
    ```bash
    pnpm -r --filter '@opensip-tools/*' exec npm version <patch|minor|major> --no-git-tag-version
    ```

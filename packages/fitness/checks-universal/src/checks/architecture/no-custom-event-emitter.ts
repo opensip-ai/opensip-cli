@@ -1,5 +1,5 @@
 /**
- * @fileoverview No Custom Event Emitter check (v2)
+ * @fileoverview No Custom Event Emitter check
  */
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'

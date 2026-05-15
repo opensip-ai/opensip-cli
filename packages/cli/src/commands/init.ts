@@ -1,5 +1,5 @@
 /**
- * init command — scaffold the v3 project layout.
+ * init command — scaffold the project layout.
  *
  * Creates:
  *   <cwd>/opensip-tools.config.yml                                    (TRACKED)
@@ -8,8 +8,8 @@
  *   <cwd>/opensip-tools/sim/scenarios/example-scenario.mjs            (TRACKED)
  *   <cwd>/opensip-tools/sim/recipes/example-recipe.mjs                (TRACKED)
  *
- * Appends `opensip-tools/.runtime/` to <cwd>/.gitignore so v3 tool-
- * generated state (sessions, logs, dashboards, baselines, plugin
+ * Appends `opensip-tools/.runtime/` to <cwd>/.gitignore so the
+ * tool-generated state (sessions, logs, dashboards, baselines, plugin
  * installs) stays untracked.
  *
  * Language selection drives:
@@ -351,7 +351,7 @@ function ensureGitignore(cwd: string): boolean {
   }
 
   const sep = content.endsWith('\n') ? '' : '\n';
-  writeFileSync(path, `${content}${sep}\n# opensip-tools v3 runtime state\n${GITIGNORE_LINE}\n`, 'utf8');
+  writeFileSync(path, `${content}${sep}\n# opensip-tools runtime state\n${GITIGNORE_LINE}\n`, 'utf8');
   return true;
 }
 

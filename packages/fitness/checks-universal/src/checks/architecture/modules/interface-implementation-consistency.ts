@@ -3,7 +3,7 @@
 // @fitness-ignore-file interface-implementation-consistency -- Fitness check definition file; references interface patterns for detection, not actual implementations
 // @fitness-ignore-file performance-anti-patterns -- sequential file reading and bounded violation loops; not hot paths
 /**
- * @fileoverview Interface Implementation Consistency check (v2)
+ * @fileoverview Interface Implementation Consistency check
  */
 
 import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'

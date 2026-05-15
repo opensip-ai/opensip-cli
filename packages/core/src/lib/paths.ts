@@ -1,7 +1,7 @@
 /**
  * @fileoverview Path resolution for opensip-tools project + user state.
  *
- * v3.0.0 introduces a per-project state model:
+ * Per-project state lives at:
  *
  *   <project>/opensip-tools.config.yml          ← TRACKED — project config
  *   <project>/opensip-tools/                    ← TRACKED — user-authored
@@ -24,9 +24,6 @@
  * configure command, uninstall command) constructs paths through this
  * resolver instead of using inline string concatenation, so a future
  * change to the layout is a single-file edit.
- *
- * v2 paths (legacy) are also exposed for the migration command and
- * the deprecated-fallback-with-notice behavior in the plugin loader.
  */
 
 import { homedir } from 'node:os';
@@ -66,12 +63,6 @@ export interface ProjectPaths {
   readonly baselinePath: string;
   /** <project>/opensip-tools/.runtime/plugins/<domain> — npm-installed plugins. */
   readonly pluginsDir: (domain: PathDomain) => string;
-  /**
-   * Marker file written after a successful v2→v3 migration. Presence
-   * means migration ran already; the auto-migrator skips when it
-   * exists, so the migration runs at most once per project.
-   */
-  readonly migrationMarker: string;
 }
 
 /**
@@ -83,7 +74,7 @@ export interface ProjectPaths {
  */
 export type PathDomain = 'fit' | 'sim';
 
-/** Resolve the v3 project path layout for a given project directory. */
+/** Resolve the project path layout for a given project directory. */
 export function resolveProjectPaths(projectDir: string): ProjectPaths {
   const userSourceDir = join(projectDir, 'opensip-tools');
   const runtimeDir = join(userSourceDir, '.runtime');
@@ -102,7 +93,6 @@ export function resolveProjectPaths(projectDir: string): ProjectPaths {
     cacheDir: join(runtimeDir, 'cache'),
     baselinePath: join(runtimeDir, 'baseline.sarif'),
     pluginsDir: (domain) => join(runtimeDir, 'plugins', domain),
-    migrationMarker: join(runtimeDir, 'migrated-from-v2'),
   };
 }
 
@@ -118,54 +108,11 @@ export interface UserPaths {
   readonly configFile: string;
 }
 
-/** Resolve the v3 user-level path layout. */
+/** Resolve the user-level path layout. */
 export function resolveUserPaths(): UserPaths {
   const userHomeDir = join(homedir(), '.opensip-tools');
   return {
     userHomeDir,
     configFile: join(userHomeDir, 'config.yml'),
-  };
-}
-
-// =============================================================================
-// LEGACY (v2) PATHS — used only by the migration command.
-// =============================================================================
-
-/**
- * v2 paths — exposed exclusively for the migration command and the
- * deprecated-fallback notice in the plugin loader. New code MUST NOT
- * reference these.
- */
-export interface LegacyV2Paths {
-  /** v2: <project>/.opensip-tools — old project-local plugin dir. */
-  readonly projectV2Dir: string;
-  /** v2: <project>/.opensip-tools/fit */
-  readonly projectV2FitDir: string;
-  /** v2: <project>/.opensip-tools/sim */
-  readonly projectV2SimDir: string;
-  /** v2: <project>/.opensip-tools/baseline.sarif */
-  readonly projectV2BaselinePath: string;
-  /** v2: ~/.opensip-tools/sessions — was the global session store. */
-  readonly userV2SessionsDir: string;
-  /** v2: ~/.opensip-tools/reports */
-  readonly userV2ReportsDir: string;
-  /** v2: ~/.opensip-tools/logs */
-  readonly userV2LogsDir: string;
-  /** v2: ~/.opensip-tools/<domain> — was the global user-plugin dir. */
-  readonly userV2PluginDir: (domain: PathDomain) => string;
-}
-
-export function resolveLegacyV2Paths(projectDir: string): LegacyV2Paths {
-  const projectV2Dir = join(projectDir, '.opensip-tools');
-  const userV2HomeDir = join(homedir(), '.opensip-tools');
-  return {
-    projectV2Dir,
-    projectV2FitDir: join(projectV2Dir, 'fit'),
-    projectV2SimDir: join(projectV2Dir, 'sim'),
-    projectV2BaselinePath: join(projectV2Dir, 'baseline.sarif'),
-    userV2SessionsDir: join(userV2HomeDir, 'sessions'),
-    userV2ReportsDir: join(userV2HomeDir, 'reports'),
-    userV2LogsDir: join(userV2HomeDir, 'logs'),
-    userV2PluginDir: (domain) => join(userV2HomeDir, domain),
   };
 }

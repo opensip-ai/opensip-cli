@@ -1,5 +1,5 @@
 /**
- * @fileoverview Plugin discovery for v3 project-local layout.
+ * @fileoverview Plugin discovery for the project-local layout.
  *
  * Two artifact sources are walked per fit/sim domain:
  *
@@ -16,10 +16,9 @@
  *      an accidental load of every transitive devDep.
  *
  * Other domains (`'lang'` for language adapters; `'asm'` reserved for
- * a future tool) don't have project-local plugin dirs in v3 — they
- * resolve through `discoverProjectV3Plugins()` returning an empty
- * array. Language adapters ship as direct deps of the CLI; assess is
- * not yet implemented.
+ * a future tool) don't have project-local plugin dirs — they return
+ * an empty array. Language adapters ship as direct deps of the CLI;
+ * assess is not yet implemented.
  */
 
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs'
@@ -41,11 +40,11 @@ const MODULE_TAG = 'core:plugins'
 const requireFromHere = createRequire(import.meta.url)
 
 /**
- * v3 user-source subdirectories per fit/sim domain. Each entry walks
- * a different artifact type. Domains other than fit/sim have no v3
+ * User-source subdirectories per fit/sim domain. Each entry walks
+ * a different artifact type. Domains other than fit/sim have no
  * subdirs and discoverPlugins() returns empty for them.
  */
-const V3_USER_SUBDIRS: Partial<Record<PluginDomain, readonly string[]>> = {
+const USER_SUBDIRS: Partial<Record<PluginDomain, readonly string[]>> = {
   fit: ['checks', 'recipes'],
   sim: ['scenarios', 'recipes'],
 }
@@ -55,7 +54,7 @@ const V3_USER_SUBDIRS: Partial<Record<PluginDomain, readonly string[]>> = {
 // =============================================================================
 
 /**
- * Discover all plugins for a domain in the v3 project layout.
+ * Discover all plugins for a domain in the project layout.
  *
  * Returns a list of `DiscoveredPlugin` entries (loose .mjs files +
  * npm packages) for the loader to import. Discovery is silent on a
@@ -63,10 +62,10 @@ const V3_USER_SUBDIRS: Partial<Record<PluginDomain, readonly string[]>> = {
  * about "did we find anything?" should check the returned length.
  *
  * @param domain      'fit' / 'sim' / 'asm' / 'lang'.
- * @param projectDir  Project root. Required for v3 — there is no
- *                    user-global fallback. Pass undefined to discover
- *                    nothing (used by callers that don't have a
- *                    project context yet).
+ * @param projectDir  Project root. Required — there is no user-global
+ *                    fallback. Pass undefined to discover nothing
+ *                    (used by callers that don't have a project
+ *                    context yet).
  */
 export function discoverPlugins(
   domain: PluginDomain,
@@ -74,11 +73,11 @@ export function discoverPlugins(
 ): DiscoveredPlugin[] {
   if (!projectDir) return []
 
-  const subdirs = V3_USER_SUBDIRS[domain]
+  const subdirs = USER_SUBDIRS[domain]
   if (!subdirs) {
-    // 'lang' / 'asm' — no v3 user-source layout. Return empty;
-    // caller (e.g. CLI bootstrap) registers language adapters via
-    // direct package imports, not the file-plugin path.
+    // 'lang' / 'asm' — no user-source layout. Return empty; caller
+    // (e.g. CLI bootstrap) registers language adapters via direct
+    // package imports, not the file-plugin path.
     return []
   }
 

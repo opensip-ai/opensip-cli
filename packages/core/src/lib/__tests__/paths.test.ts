@@ -7,11 +7,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import {
-  resolveLegacyV2Paths,
-  resolveProjectPaths,
-  resolveUserPaths,
-} from '../paths.js';
+import { resolveProjectPaths, resolveUserPaths } from '../paths.js';
 
 // eslint-disable-next-line sonarjs/publicly-writable-directories -- string-only fixture; resolver is pure (no fs touch)
 const PROJECT = '/tmp/test-project';
@@ -39,7 +35,6 @@ describe('resolveProjectPaths', () => {
     expect(p.logsDir).toBe(join(p.runtimeDir, 'logs'));
     expect(p.cacheDir).toBe(join(p.runtimeDir, 'cache'));
     expect(p.baselinePath).toBe(join(p.runtimeDir, 'baseline.sarif'));
-    expect(p.migrationMarker).toBe(join(p.runtimeDir, 'migrated-from-v2'));
   });
 
   it('resolves per-domain plugin install dirs under runtime/plugins', () => {
@@ -57,19 +52,3 @@ describe('resolveUserPaths', () => {
   });
 });
 
-describe('resolveLegacyV2Paths', () => {
-  it('exposes the v2 hidden project dir for migration purposes', () => {
-    const v2 = resolveLegacyV2Paths(PROJECT);
-    expect(v2.projectV2Dir).toBe(join(PROJECT, '.opensip-tools'));
-    expect(v2.projectV2FitDir).toBe(join(v2.projectV2Dir, 'fit'));
-    expect(v2.projectV2SimDir).toBe(join(v2.projectV2Dir, 'sim'));
-    expect(v2.projectV2BaselinePath).toBe(join(v2.projectV2Dir, 'baseline.sarif'));
-  });
-
-  it('exposes the v2 user-global session/log dirs for migration', () => {
-    const v2 = resolveLegacyV2Paths(PROJECT);
-    expect(v2.userV2SessionsDir).toBe(join(homedir(), '.opensip-tools', 'sessions'));
-    expect(v2.userV2LogsDir).toBe(join(homedir(), '.opensip-tools', 'logs'));
-    expect(v2.userV2PluginDir('fit')).toBe(join(homedir(), '.opensip-tools', 'fit'));
-  });
-});

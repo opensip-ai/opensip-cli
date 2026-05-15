@@ -18,7 +18,7 @@ afterEach(() => {
 })
 
 /**
- * Helpers to build the v3 layout in the test tmpdir:
+ * Helpers to build the project layout in the test tmpdir:
  *
  *   <testDir>/opensip-tools/<tool>/<kind>/<file>.mjs
  *   <testDir>/opensip-tools/<tool>/<kind>/<file>.js
@@ -48,7 +48,7 @@ function setupPluginsConfig(deps: string[]): void {
   writeConfig(`plugins:\n  fit:\n${list}\n`)
 }
 
-describe('discoverPlugins (v3 layout)', () => {
+describe('discoverPlugins', () => {
   it('returns empty array when projectDir is undefined', () => {
     expect(discoverPlugins('fit')).toEqual([])
   })
@@ -57,7 +57,7 @@ describe('discoverPlugins (v3 layout)', () => {
     expect(discoverPlugins('fit', testDir)).toEqual([])
   })
 
-  it('returns empty array for `lang` and `asm` (no v3 subdir model)', () => {
+  it('returns empty array for `lang` and `asm` (no subdir model)', () => {
     mkdirSync(join(testDir, 'opensip-tools', 'lang'), { recursive: true })
     mkdirSync(join(testDir, 'opensip-tools', 'asm'), { recursive: true })
     expect(discoverPlugins('lang', testDir)).toEqual([])

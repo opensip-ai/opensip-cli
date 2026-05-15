@@ -78,7 +78,7 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('DEFAULT_BASELINE_PATH', () => {
-  it('is the v3 project-local path under the gitignored runtime dir', () => {
+  it('is the project-local path under the gitignored runtime dir', () => {
     expect(DEFAULT_BASELINE_PATH).toBe('opensip-tools/.runtime/baseline.sarif');
   });
 });

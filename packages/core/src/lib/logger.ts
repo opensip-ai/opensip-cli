@@ -142,13 +142,14 @@ export function getRunId(): string | undefined {
 }
 
 /**
+
  * Initialize the log file for this session.
  *
- * v3.0.0: writes to `<project>/opensip-tools/.runtime/logs/` when the
- * caller passes a `dir` (the CLI bootstrap supplies it from
+ * Writes to `<project>/opensip-tools/.runtime/logs/` when the caller
+ * passes a `dir` (the CLI bootstrap supplies it from
  * `resolveProjectPaths(cwd).logsDir`). Without an explicit dir, falls
- * back to `~/.opensip-tools/logs/` so callers that haven't migrated
- * still get logs.
+ * back to `~/.opensip-tools/logs/` so callers without a project
+ * context still get logs.
  *
  * Opens a JSONL file for today's date. Prunes log files older than
  * 7 days inside the chosen directory.

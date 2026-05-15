@@ -273,7 +273,7 @@ Combined with `--report-to` and the dashboard, you get a continuous record of ev
 
 ## Plugins
 
-Plugins are project-local in v3. Two kinds:
+Plugins are project-local. Two kinds:
 
 **User-authored source files** — drop a `.mjs` file into the
 appropriate directory and it auto-loads:
@@ -337,10 +337,10 @@ won't need to.
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "peerDependencies": {
-    "@opensip-tools/fitness": "^3.0.0"
+    "@opensip-tools/fitness": "^1.0.0"
   },
   "devDependencies": {
-    "@opensip-tools/fitness": "^3.0.0",
+    "@opensip-tools/fitness": "^1.0.0",
     "typescript": "^5.7.0"
   }
 }

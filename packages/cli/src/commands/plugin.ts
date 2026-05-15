@@ -1,7 +1,7 @@
 /**
  * plugin command — manage project-local npm-installed plugins.
  *
- * v3 layout (no user-global plugin dir):
+ * Layout (no user-global plugin dir):
  *
  *   <project>/opensip-tools/.runtime/plugins/<domain>/
  *   ├── package.json       — host package; "dependencies" is the
@@ -260,10 +260,9 @@ export async function pluginList(cwd: string = process.cwd()): Promise<PluginRes
 /**
  * Install a plugin AND add it to the project config in one step.
  *
- * v3 unifies what was previously two flows (`plugin install` to
- * filesystem + `plugin add` to config). Without the config update
- * the package wouldn't get loaded — making "install" alone always
- * incomplete. Single-step is the only sensible default.
+ * Without the config update, the package wouldn't get loaded — making
+ * "install" alone always incomplete. Single-step is the only sensible
+ * default.
  */
 // eslint-disable-next-line @typescript-eslint/require-await -- async to keep the Promise<PluginResult> contract; npm install is synchronous via execFileSync
 export async function pluginAdd(

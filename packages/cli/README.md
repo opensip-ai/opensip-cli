@@ -32,8 +32,8 @@ opensip-tools sim --recipe example       # smoke-test the example scenario
 - **`plugin list|add|remove|sync`** — manage npm-installed plugin
   packages declared in `plugins.<domain>:` (project-local).
 - **`completion`** — print a shell-completion script for bash / zsh / fish.
-- **`uninstall`** — remove `~/.opensip-tools/` (legacy v2 user-level
-  state) for a clean-slate reset. Project-local
+- **`uninstall`** — remove `~/.opensip-tools/` (user-level cloud
+  config) for a clean-slate reset. Project-local
   `opensip-tools/.runtime/` is gitignored — delete it manually if
   needed.
 

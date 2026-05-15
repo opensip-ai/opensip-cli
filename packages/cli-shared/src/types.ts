@@ -241,9 +241,9 @@ export interface InitResult {
   /** Languages selected for this scaffold (post-detection or from --language). */
   languages?: readonly ('typescript' | 'rust' | 'python' | 'go' | 'java' | 'cpp')[];
   /**
-   * Every file v3 init created, in display order. Includes the
-   * config file plus example check / recipe / scenario scaffolds.
-   * Empty when alreadyExists is true (nothing was written).
+   * Every file init created, in display order. Includes the config
+   * file plus example check / recipe / scenario scaffolds. Empty
+   * when alreadyExists is true (nothing was written).
    */
   createdFiles?: readonly string[];
   /** True when init appended `opensip-tools/.runtime/` to .gitignore. */

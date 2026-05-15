@@ -53,7 +53,7 @@ function makeFakeContext(program: Command): {
 describe('simulationTool metadata', () => {
   it('exposes id, version, description', () => {
     expect(simulationTool.metadata.id).toBe('simulation');
-    expect(simulationTool.metadata.version).toBe('3.0.0');
+    expect(simulationTool.metadata.version).toBe('1.0.0');
     expect(simulationTool.metadata.description).toContain('simulation');
   });
 

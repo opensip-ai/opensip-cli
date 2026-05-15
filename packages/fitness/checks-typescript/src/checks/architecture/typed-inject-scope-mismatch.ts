@@ -1,5 +1,5 @@
 /**
- * @fileoverview Typed-Inject Scope Mismatch check (v2)
+ * @fileoverview Typed-Inject Scope Mismatch check
  */
 
 

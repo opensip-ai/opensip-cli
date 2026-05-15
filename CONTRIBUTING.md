@@ -138,7 +138,7 @@ After creating a check file:
 ### Custom checks (plugin)
 
 For checks that aren't suitable for the built-in set, you have two
-project-local options under v3:
+project-local options:
 
 **Source files (auto-loaded)** — drop a `.mjs` file in your project's
 `opensip-tools/fit/checks/` (or `recipes/`) directory. The plugin

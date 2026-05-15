@@ -128,7 +128,7 @@ describe('parseLanguageFlag', () => {
 // =============================================================================
 
 describe('executeInit (single language)', () => {
-  it('scaffolds the v3 layout for a Rust project', () => {
+  it('scaffolds the project layout for a Rust project', () => {
     writeFileSync(join(testDir, 'Cargo.toml'), '[package]\nname = "x"');
 
     const result = executeInit(makeArgs());

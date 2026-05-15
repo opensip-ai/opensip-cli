@@ -9,13 +9,13 @@
  * - Hardcoded stub returns
  * - Placeholder comments
  *
- * v3.1.0 - Reduced false positives by walking the AST for context:
- *   - Promise.resolve() in lifecycle methods (destroy/dispose/close/shutdown/cleanup) is skipped
- *   - Promise.resolve() inside conditional blocks (guard clauses) is skipped
- *   - Promise.resolve() in functions with substantive statements is skipped
- *   - { success: true, data: [] } inside conditional branches or functions with multiple returns is skipped
- *   - ({}) as T where T is a generic type parameter is skipped
- *   - ({}) as T used as Proxy target is skipped
+ * False-positive reduction: the check walks the AST for context to skip:
+ *   - Promise.resolve() in lifecycle methods (destroy/dispose/close/shutdown/cleanup)
+ *   - Promise.resolve() inside conditional blocks (guard clauses)
+ *   - Promise.resolve() in functions with substantive statements
+ *   - { success: true, data: [] } inside conditional branches or functions with multiple returns
+ *   - ({}) as T where T is a generic type parameter
+ *   - ({}) as T used as Proxy target
  */
 
 

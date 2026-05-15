@@ -202,7 +202,7 @@ describe('loadAllPlugins', () => {
   })
 
   it('aggregates results from multiple plugins', async () => {
-    // v3 layout: opensip-tools/fit/checks/<file>.mjs
+    // Project layout: opensip-tools/fit/checks/<file>.mjs
     const checksDir = join(testDir, 'opensip-tools', 'fit', 'checks')
     mkdirSync(checksDir, { recursive: true })
     writeFileSync(join(checksDir, 'a.mjs'), 'export const checks = []')

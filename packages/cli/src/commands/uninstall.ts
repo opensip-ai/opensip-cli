@@ -2,14 +2,12 @@
  * @fileoverview `opensip-tools uninstall` — removes ~/.opensip-tools/
  * for a clean-slate reset.
  *
- * In v3 the user-level dir holds only `config.yml` (cloud API key /
- * default theme). Project-local state — sessions, logs, reports,
- * plugin npm tree, AST cache, gate baseline — lives at
- * `<project>/opensip-tools/.runtime/`, which is gitignored and
- * removed by deleting the project. `uninstall` does NOT touch any
- * project-local directory; it also wipes leftover v2 artifacts
- * (`~/.opensip-tools/{fit,sim,sessions,logs,reports}/`) since the
- * whole user-level dir goes.
+ * The user-level dir holds only `config.yml` (cloud API key / default
+ * theme). Project-local state — sessions, logs, reports, plugin npm
+ * tree, AST cache, gate baseline — lives at
+ * `<project>/opensip-tools/.runtime/`, which is gitignored and removed
+ * by deleting the project. `uninstall` does NOT touch any
+ * project-local directory.
  *
  * Does NOT remove the npm global install — the running binary can't
  * safely self-delete. Prints the exact next-step command for that.

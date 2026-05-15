@@ -10,15 +10,13 @@
  * or third-party (any npm package whose package.json declares
  * `opensipTools.kind === 'tool'` — discovered via tool-package-discovery).
  *
- * Contract evolution:
- *   - v2.0.0 phase 2: Tool exposed `commands[]` with a `run(argv, ctx)`
- *     stub. The CLI still drove its own Commander definitions for
- *     fit/sim/etc. directly.
- *   - v2.0.0 phase 4: `commands[]` carries metadata only (name +
- *     description, used for `--help` listings). The actual subcommand
- *     wiring is done by each tool's `register(cli)` method, which
- *     receives a `ToolCliContext` with the Commander program + shared
- *     UX helpers (Ink renderer, dashboard auto-open, logger).
+ * Contract:
+ *   - `commands[]` carries metadata only (name + description, used for
+ *     `--help` listings).
+ *   - The actual subcommand wiring is done by each tool's
+ *     `register(cli)` method, which receives a `ToolCliContext` with
+ *     the Commander program + shared UX helpers (Ink renderer,
+ *     dashboard auto-open, logger).
  *
  * The two-method shape (commands[] for metadata; register() for wiring)
  * keeps `--help` discovery cheap (no per-tool Commander invocation

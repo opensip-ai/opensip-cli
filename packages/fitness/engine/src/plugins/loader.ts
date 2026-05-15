@@ -291,14 +291,14 @@ function looksLikeLanguageAdapter(value: unknown): boolean {
  * Discover and load all plugins for a domain. Loads sequentially to
  * ensure deterministic registration order.
  *
- * v3 layout: discovers loose `.mjs` files under
+ * Discovers loose `.mjs` files under
  * `<projectDir>/opensip-tools/<tool>/{checks,recipes,scenarios}/` plus
  * any npm-installed packages in
  * `<projectDir>/opensip-tools/.runtime/plugins/<domain>/node_modules/`
  * that are listed in `plugins.<domain>` in the project config.
  *
  * Without a `projectDir`, no plugins are loaded — there's no
- * user-global fallback in v3.
+ * user-global fallback.
  */
 export async function loadAllPlugins(
   domain: PluginDomain,

@@ -4,252 +4,160 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [3.0.0] — 2026-05-14
+## [1.0.0] — 2026-05-15
 
-Onboarding refactor. New customers go from `npm install -g
-@opensip-tools/cli` to a working end-to-end pipeline in three commands
-— `init` scaffolds a language-aware project layout, then `fit --recipe
-example` and `sim --recipe example` prove the kernel, plugin loader,
-recipe service, and rendering layer all work against the user's repo.
+First stable release. Everything below was developed and iterated
+internally; nothing in the 1.x range was ever published. The 0.x
+releases listed further down are the actual public history.
 
-### Added
+### Architecture
 
-- **`opensip-tools init`** — language detection + full v3 scaffolding.
-  Inspects the project root for filesystem markers (`Cargo.toml`,
-  `pyproject.toml`, `setup.py`, `go.mod`, `pom.xml`, `build.gradle`,
-  `CMakeLists.txt`, `tsconfig.json`, `package.json`) and writes a
-  config plus example check, recipe, scenario, and simulation recipe
-  matching the detected language(s). Polyglot projects (e.g. Rust +
-  TypeScript) get one example check per language with distinct
-  slugs. Ambiguous detection exits 2 with a prompt — no partial
-  scaffolding. Pass `--language <comma-separated>` to override
-  detection or specify polyglot configurations explicitly.
-  `--force` overwrites an existing config.
-- **Sim recipes framework** — `defineSimulationRecipe()`,
-  `SimulationRecipeRegistry`, `SimulationRecipeService.runRecipe()`
-  with a built-in `default` recipe. `opensip-tools sim --recipe <name>`
-  resolves and runs the named recipe; selectors mirror fitness
-  (`explicit` / `all` / `tags` / `kind`).
-- **`@opensip-tools/core/lib/paths`** — `resolveProjectPaths(cwd)` and
-  `resolveUserPaths()`. Single source of truth for every project-local
-  and user-level path the CLI reads/writes. All callers (sessions,
-  logs, baselines, plugin loader, init scaffolding) go through it.
-- **`opensip-tools plugin sync`** — re-installs pinned plugins listed
-  in `plugins.<domain>` after a fresh clone. Mirrors `npm install`
-  for the project's plugin tree.
+- **Tool-plugin platform.** `@opensip-tools/core` is a strict kernel
+  (errors, logger, IDs, language adapters, plugin loader, Tool
+  contract). Fitness and simulation are first-party tools that
+  implement the Tool contract; the CLI is a generic dispatcher that
+  walks `defaultToolRegistry` and asks each tool to mount its own
+  Commander subcommands. Adding a new tool — `audit`, `lint`,
+  whatever — requires zero CLI changes.
+- **Auto-discovery for tool packages.** Any npm package whose
+  `package.json` declares `opensipTools.kind === 'tool'` is loaded
+  by the CLI on startup; the walker matches Node's nearest-ancestor
+  resolution.
+- **Layered architecture enforced by dependency-cruiser.** core →
+  cli-shared → fitness / simulation / lang-* (peers) → checks-* → cli.
+  Forbidden edges fail CI.
 
-### Changed — BREAKING
+### Packages (17)
 
-- **Project layout flips from `~/.opensip-tools/` to
-  `<project>/opensip-tools/`.** Tool-generated state (sessions, logs,
-  reports, baselines, AST cache, plugin npm tree) now lives at
-  `<project>/opensip-tools/.runtime/` — gitignored and per-project.
-  User-authored content (custom checks, recipes, scenarios) lives at
-  `<project>/opensip-tools/{fit,sim}/{checks,recipes,scenarios}/` —
-  tracked in git. `~/.opensip-tools/` retains only `config.yml` for
-  user-level identity (cloud API key).
-- **Plugin auto-load semantics flip.** v2: project-local plugins
-  required `plugins.fit:` declaration in the config. v3: any
-  `.mjs` file in `opensip-tools/{fit,sim}/{checks,recipes,scenarios}/`
-  is auto-loaded by directory presence. The config's
-  `plugins.<domain>` is now reserved for npm-package pinning —
-  installed packages must be explicitly listed there to load (no
-  silent loading of transitive deps under the runtime tree).
-- **Plugin install location moves.** v2:
-  `~/.opensip-tools/fit/node_modules/` user-globally. v3:
-  `<project>/opensip-tools/.runtime/plugins/{fit,sim}/node_modules/`
-  project-locally.
-- **`opensip-tools plugin install` renamed to `add`.** The `install`
-  command was always doing two operations (npm install + config
-  update). The split-step variant has been removed; there is now one
-  command per intent: `add`, `remove`, `list`, `sync`.
-- **Custom check / scenario directory layout split.** v2 mixed checks
-  and recipes in a flat `~/.opensip-tools/fit/`. v3 has explicit
-  subdirectories: `opensip-tools/fit/checks/`,
-  `opensip-tools/fit/recipes/`, `opensip-tools/sim/scenarios/`,
-  `opensip-tools/sim/recipes/`.
+- **`@opensip-tools/cli`** — generic tool dispatcher (Ink/React UI).
+- **`@opensip-tools/core`** — kernel: errors, logger, IDs, language
+  adapters, plugin loader, Tool contract, path resolution.
+- **`@opensip-tools/cli-shared`** — CLI types, exit codes, session
+  persistence, dashboard HTML generator.
+- **`@opensip-tools/fitness`** — fitness engine + commands
+  (`fit`, `dashboard`, `fit-list`, `fit-recipes`), recipe service,
+  architecture gate (baseline/compare), SARIF reporting.
+- **`@opensip-tools/simulation`** — simulation engine, sim recipes,
+  built-in `default` recipe (selects all scenarios). Load + chaos
+  scenario kinds are end-to-end functional; invariant and
+  fix-evaluation are usable but their executors are MVP.
+- **`@opensip-tools/checks-typescript`** (66 checks) — TS-AST checks
+  (drizzle-orm, typed-inject, react, package.json#exports, tsconfig).
+- **`@opensip-tools/checks-universal`** (88 checks) — text/regex/glob
+  checks (Docker, .env, Sentry, generic structure).
+- **`@opensip-tools/checks-{python,go,java,cpp}`** — language-specific
+  packs (Python `no-bare-except`, Go `no-fmt-print`, Java
+  `no-printstacktrace`, C/C++ `clang-tidy` passthrough).
+- **`@opensip-tools/lang-{typescript,rust,python,go,java,cpp}`** —
+  language adapters (typescript ships a tsc-based parser; the others
+  are hand-written lexers, with tree-sitter integration deferred).
 
-### Removed — BREAKING
+### CLI surface
 
-- **No automatic v2 → v3 migration.** Earlier in the v3 cycle a
-  migration command was scoped; it was dropped after we confirmed
-  v2 had very few production users. Migrate by hand: move
-  `~/.opensip-tools/fit/*.mjs` into
-  `<project>/opensip-tools/fit/{checks,recipes}/` (sorted by what each
-  file exports — `checks` array → `checks/`, `recipes` array →
-  `recipes/`), move sim files into `sim/{scenarios,recipes}/`,
-  re-run `opensip-tools init --force` to regenerate the config (or
-  hand-edit the `targets:` block to add the v3 shape), and add
-  `opensip-tools/.runtime/` to `.gitignore`.
+```bash
+opensip-tools                              # welcome screen
+opensip-tools init                         # detect language + scaffold
+opensip-tools fit --recipe example         # smoke test the example check
+opensip-tools sim --recipe example         # smoke test the example scenario
+opensip-tools fit                          # run the default recipe
+opensip-tools fit --check <slug>           # run a single check
+opensip-tools fit --tags <list>            # tag filter
+opensip-tools fit --gate-save              # save baseline
+opensip-tools fit --gate-compare           # diff against baseline
+opensip-tools fit --report-to <url>        # SARIF upload to OpenSIP Cloud
+opensip-tools dashboard                    # HTML report
+opensip-tools fit-list / fit-recipes       # catalog browsing
+opensip-tools sessions list|purge          # run history
+opensip-tools plugin add|remove|list|sync  # project-local npm plugins
+opensip-tools configure                    # cloud API key setup
+opensip-tools completion                   # shell completion script
+opensip-tools uninstall                    # remove ~/.opensip-tools/
+```
 
-### Migration from 2.0.0
+### Project layout (v1)
 
-1. From your project root, run `opensip-tools init` (or
-   `opensip-tools init --force` if you already have a config). This
-   detects your language, scaffolds the v3 layout, writes example
-   files, and updates `.gitignore`.
-2. If you had custom checks in `~/.opensip-tools/fit/`, move them into
-   `<project>/opensip-tools/fit/checks/` (or `recipes/` if they export
-   recipes). Same shape, just a different directory.
-3. If your config declared `plugins.checkPackages:` for npm-installed
+User identity (cloud API key, theme) lives at `~/.opensip-tools/config.yml`.
+Everything else is project-local:
+
+```
+<project>/
+├── opensip-tools.config.yml                       (TRACKED)
+├── opensip-tools/
+│   ├── fit/{checks,recipes}/*.mjs                 (TRACKED — auto-loaded)
+│   ├── sim/{scenarios,recipes}/*.mjs              (TRACKED — auto-loaded)
+│   └── .runtime/                                  (GITIGNORED)
+│       ├── sessions/         — run history
+│       ├── reports/          — dashboard HTML
+│       ├── logs/             — structured JSONL (rotated 7 days)
+│       ├── cache/            — AST + prewarm caches
+│       ├── plugins/<domain>/ — npm-installed plugin packages
+│       └── baseline.sarif    — gate baseline
+└── ...
+```
+
+### Plugin model
+
+- **Source files (auto-loaded):** drop a `.mjs` into
+  `opensip-tools/{fit,sim}/{checks,recipes,scenarios}/` and the loader
+  picks it up. No config opt-in required.
+- **npm packages (explicit):** `opensip-tools plugin add <pkg>`
+  installs to `opensip-tools/.runtime/plugins/<domain>/node_modules/`
+  and pins the name in `plugins.<domain>:` in
+  `opensip-tools.config.yml`. Only packages explicitly listed there
+  are loaded — transitive deps in the runtime tree do not auto-load.
+- **`@opensip-tools/checks-*` packages** found in `node_modules/`
+  (any ancestor) are auto-discovered as fitness check packs unless
+  `plugins.autoDiscoverChecks: false` is set.
+
+### `init` and onboarding
+
+`opensip-tools init` detects the project's language(s) from filesystem
+markers (`Cargo.toml`, `pyproject.toml`, `setup.py`, `go.mod`,
+`pom.xml`, `build.gradle`, `CMakeLists.txt`, `tsconfig.json`,
+`package.json`) and scaffolds:
+
+- `opensip-tools.config.yml` with one named target per detected language
+- `opensip-tools/fit/checks/example-check.mjs` (one per language for
+  polyglot projects, distinct slugs)
+- `opensip-tools/fit/recipes/example-recipe.mjs`
+- `opensip-tools/sim/scenarios/example-scenario.mjs`
+- `opensip-tools/sim/recipes/example-recipe.mjs`
+- `.gitignore` entry for `opensip-tools/.runtime/`
+
+`--language <comma-separated>` overrides detection or specifies a
+polyglot configuration explicitly. Ambiguous detection exits 2 with a
+prompt — no partial scaffolding.
+
+### Quality gates
+
+- ESLint flat config (`typescript-eslint:recommendedTypeChecked` +
+  sonarjs + unicorn + import) — workspace at 0 errors / 0 warnings.
+- dependency-cruiser layer rules — 0 violations across 465 modules.
+- knip — 0 unused exports / files.
+- Vitest — 1410 tests passing across 17 packages.
+
+### Migration from 0.x
+
+1. Replace `@opensip-tools/checks-builtin` in your `package.json` with
+   `@opensip-tools/checks-typescript` + `@opensip-tools/checks-universal`.
+   The 158-check builtin pack is split: TS-AST checks moved into
+   `checks-typescript`, text/regex/glob checks into `checks-universal`.
+2. If you imported fitness symbols (`defineCheck`, `CheckViolation`,
+   etc.) from `@opensip-tools/core`, switch the import to
+   `@opensip-tools/fitness`. Core is a strict kernel now.
+3. From your project root, run `opensip-tools init` to scaffold the
+   v1 directory layout. Move any custom `.mjs` files from
+   `~/.opensip-tools/fit/` into `<project>/opensip-tools/fit/checks/`
+   (or `recipes/` if the file exports `recipes`). Move sim files the
+   same way under `<project>/opensip-tools/sim/`.
+4. If your config declared `plugins.checkPackages:` for npm-installed
    packs, run `opensip-tools plugin sync` to reinstall them under
    `<project>/opensip-tools/.runtime/plugins/`.
-4. Delete `~/.opensip-tools/{fit,sim}/`, `~/.opensip-tools/sessions/`,
-   `~/.opensip-tools/logs/`, and `~/.opensip-tools/reports/` — they're
-   no longer read.
-
-## [2.0.0] — 2026-05-14
-
-Architecture refactor. opensip-tools is now a true tool-plugin platform —
-a kernel + a Tool contract + first-party fitness and simulation tools.
-Adding a third tool is "write a Tool, install the package."
-
-### Added
-
-- **`@opensip-tools/fitness`** (new package, v2.0.0) — extracted from
-  `@opensip-tools/core`. Holds the fitness engine (defineCheck, recipes,
-  framework, signalers, targets, types/findings, gate, SARIF reporting,
-  fit/dashboard/list-checks/list-recipes commands). 188 tests.
-- **`@opensip-tools/cli-shared`** (new package) — CLI types, exit codes,
-  session persistence, dashboard HTML generator. Tools depend on this
-  for shared CLI infrastructure without taking a hard dep on the CLI
-  entry point.
-- **Tool plugin contract** in `@opensip-tools/core/tools` —
-  `Tool { metadata, commands, register(cli), initialize? }`. Tools mount
-  their own Commander subcommands via `register(cli)`; the CLI walks
-  `defaultToolRegistry` and never imports tool-specific code directly.
-- **Auto-discovery for tool packages** — any npm package whose
-  `package.json` declares `opensipTools.kind === 'tool'` is loaded by
-  the CLI on startup. Walks ancestor `node_modules/` directories,
-  matching Node's resolution algorithm.
-- **dependency-cruiser** with architecture rules encoding the layer
-  order (core → cli-shared → fitness/simulation/lang-* → checks-* →
-  cli). Forbidden edges fail CI.
-- **ESLint flat config** with `typescript-eslint:recommendedTypeChecked`,
-  `eslint-plugin-sonarjs`, `eslint-plugin-unicorn`, `eslint-plugin-import`.
-  Workspace runs at 0 errors.
-- **knip** for orphan / dead-export detection. Workspace runs at 0
-  findings.
-- **Multi-language fitness checks** — Rust, Python, Java, Go, C/C++
-  language packs with hand-written lexers (or clang-tidy command mode
-  for C/C++). 158 checks total across the typescript / universal /
-  per-language packs.
-- **Scope-resolver fix**: scope-empty checks (e.g. `file-length-limit`)
-  now honor the project config's `globalExcludes`. Previously the
-  fileCache fallback path returned every prewarmed file regardless of
-  exclusion config — causing findings inside `docs/`, `tests/fixtures/`,
-  etc. (D14 in the multi-language decisions log.)
-- **No-checks-loaded warning** — silent zero-checks runs are now
-  impossible. The CLI prints to stderr if no check packages registered.
-
-### Changed — BREAKING
-
-- **`@opensip-tools/core` is now a strict kernel.** Every fitness symbol
-  (`defineCheck`, `Check`, `CheckRegistry`, `defaultRegistry`,
-  `FitnessRecipeService`, `FitnessRecipeResult`, `Finding`, `Severity`,
-  `loadTargetsConfig`, `loadSignalersConfig`, `buildScopeBasedFileMap`,
-  `parseSource`, `walkNodes`, `getLineNumber`, etc.) moved to
-  `@opensip-tools/fitness`. Plugin authors must update imports:
-  ```ts
-  // before
-  import { defineCheck } from '@opensip-tools/core';
-  // after
-  import { defineCheck } from '@opensip-tools/fitness';
-  ```
-- **CLI no longer hardcodes any check pack import.** What was
-  `@opensip-tools/checks-builtin` (deleted) is now split into
-  `@opensip-tools/checks-typescript` (66 TS-AST checks) and
-  `@opensip-tools/checks-universal` (92 cross-language checks). Both
-  are auto-discovered.
-- **`FitPluginExports` interface moved to `@opensip-tools/fitness`.**
-  Tool-package-discovery is in core; check-package-discovery is in
-  fitness (it's fitness-specific).
-- **Workspace layout reorganized** to `packages/<tool>/<pkg>/`:
-  ```
-  packages/lang-*               → packages/languages/lang-*
-  packages/fitness              → packages/fitness/engine
-  packages/checks-*             → packages/fitness/checks-*
-  packages/simulation           → packages/simulation/engine
-  ```
-  npm package names are unchanged — pure DX cleanup. The new check
-  packs (`checks-python/go/java/cpp`) live alongside `checks-typescript`
-  and `checks-universal` under `packages/fitness/`.
-- **`@opensip-tools/cli` shrinks from 627 to ~430 lines.** All
-  fitness-specific command implementations (fit, dashboard, list-checks,
-  list-recipes) and the gate / SARIF code moved to
-  `@opensip-tools/fitness`. The CLI is now a tool dispatcher with
-  argv setup, the rendering layer, and cross-tool housekeeping
-  commands (init, plugin, sessions, configure, completion, uninstall).
-
-### Removed — BREAKING
-
-- **`@opensip-tools/checks-builtin`** (was the v1.0.0 package) —
-  replaced by `@opensip-tools/checks-typescript` (TS-AST checks) and
-  `@opensip-tools/checks-universal` (text/regex/glob checks). No
-  deprecation alias; consumers update their `package.json` directly:
-  ```json
-  // before
-  "dependencies": { "@opensip-tools/checks-builtin": "^1.0.0" }
-  // after
-  "dependencies": {
-    "@opensip-tools/checks-typescript": "^2.0.0",
-    "@opensip-tools/checks-universal": "^2.0.0"
-  }
-  ```
-
-### Fixed
-
-- **`globalExcludes` now flows into scope-empty checks.** Fixes a
-  regression introduced when scope-empty checks (file-length-limit)
-  were first added — they bypassed the project config's exclude list
-  by reading directly from the prewarmed file cache. (D14.)
-- **Cleaned up ~700 ESLint violations and ~12 truly-dead source files.**
-  Build/test/parity all green; check pack behavior unchanged.
-
-### Migration from 1.0.0
-
-1. In any package depending on `@opensip-tools/core` for fitness
-   symbols, add `@opensip-tools/fitness` and switch the imports:
-   ```ts
-   import { defineCheck, type CheckViolation } from '@opensip-tools/fitness';
-   ```
-2. If you depended on `@opensip-tools/checks-builtin`, replace it
-   with `@opensip-tools/checks-typescript` + `@opensip-tools/checks-universal`.
-3. If you implement a Tool plugin, the contract is in
-   `@opensip-tools/core/tools`. See `packages/fitness/engine/src/tool.ts`
-   for a worked example.
-
-## [1.0.0] — 2026-05-14
-
-### Changed — BREAKING
-
-- **`@opensip-tools/checks-builtin` deleted; split into two packages:**
-  - **`@opensip-tools/checks-typescript`** (new, 66 checks) — checks
-    that import the TypeScript compiler API or are conceptually only
-    meaningful in a TS/Node ecosystem (drizzle-orm, typed-inject, react,
-    package.json#exports, tsconfig).
-  - **`@opensip-tools/checks-universal`** (existing, re-versioned) — 92
-    checks that operate on raw text, regex, file globs, or
-    language-agnostic config (Docker, .env, Sentry, generic structure).
-- **CLI decoupled from any privileged check pack.** The hardcoded
-  `await import('@opensip-tools/checks-builtin')` is gone. Every check
-  package goes through the same `discoverCheckPackages()` path. The
-  plugin contract gained `FitPluginExports.checkDisplay` so packages
-  contribute their own display names; the CLI merges from every
-  loaded pack.
-- **Auto-discovery of `@opensip-tools/checks-*` packages.** The CLI
-  scans `node_modules/` and ancestor `node_modules/` for any package
-  in the `@opensip-tools/checks-*` namespace and loads them. Override
-  via `plugins.checkPackages: [...]` in the project config or opt
-  out via `plugins.autoDiscoverChecks: false`.
-- **No-checks-loaded warning.** Silent zero-checks runs are now
-  impossible — the CLI prints to stderr if no check packages
-  registered.
-
-### Migration
-
-Replace `@opensip-tools/checks-builtin` in your `package.json` with
-`@opensip-tools/checks-typescript` + `@opensip-tools/checks-universal`.
+5. Replace any `opensip-tools plugin install` calls with
+   `opensip-tools plugin add`. The `install` command was always doing
+   two operations; `add` is the one-step equivalent.
+6. Delete `~/.opensip-tools/{fit,sim,sessions,logs,reports}/` —
+   they're no longer read. `opensip-tools uninstall` does this for you.
 
 ## [0.6.1] — 2026-05-07
 

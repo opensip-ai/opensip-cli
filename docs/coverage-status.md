@@ -1,6 +1,6 @@
 # Coverage Status
 
-Snapshot taken 2026-05-15 against v3.0.0.
+Snapshot taken 2026-05-15 against v1.0.0.
 
 ## Per-package coverage
 

@@ -57,17 +57,8 @@ export { generateId, generatePrefixedId, extractTimestamp, generateUUID } from '
 export { withRetry } from './lib/retry.js';
 export type { RetryOptions } from './lib/retry.js';
 
-// Lib — path resolver (v3 layout: project-local opensip-tools/.runtime,
-// user-level ~/.opensip-tools/config.yml). Every consumer constructs
-// paths through this module so a layout change is a single-file edit.
-export {
-  resolveProjectPaths,
-  resolveUserPaths,
-  resolveLegacyV2Paths,
-} from './lib/paths.js';
-export type {
-  ProjectPaths,
-  UserPaths,
-  LegacyV2Paths,
-  PathDomain,
-} from './lib/paths.js';
+// Lib — path resolver (project-local opensip-tools/.runtime, user-level
+// ~/.opensip-tools/config.yml). Every consumer constructs paths through
+// this module so a layout change is a single-file edit.
+export { resolveProjectPaths, resolveUserPaths } from './lib/paths.js';
+export type { ProjectPaths, UserPaths, PathDomain } from './lib/paths.js';

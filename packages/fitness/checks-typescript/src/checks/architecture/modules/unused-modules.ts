@@ -1,6 +1,6 @@
 // @fitness-ignore-file unused-config-options -- Config options reserved for future use or environment-specific
 /**
- * @fileoverview Unused Modules check (v2)
+ * @fileoverview Unused Modules check
  */
 
 
