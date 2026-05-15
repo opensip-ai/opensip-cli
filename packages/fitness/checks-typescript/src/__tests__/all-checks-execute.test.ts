@@ -342,7 +342,7 @@ beforeAll(async () => {
     ].join('\n')),
 
     // --- TYPEORM @Entity missing standard columns (database-schema-validation) ---
-    fixture('src/db/incomplete-entity.ts', [
+    fixture('src/entities/address.entity.ts', [
       'import { Entity, Column } from "typeorm";',
       '@Entity()',
       'export class Address {',
@@ -611,10 +611,46 @@ beforeAll(async () => {
       '  const filter = (req.query as { search?: string }).search ?? "";',
       '  return res.send({ filter });',
       '});',
+      'app.post("/users", async (request, reply) => {',
+      '  // Reads request.body but no body schema',
+      '  const body = request.body as { name: string };',
+      '  return reply.send({ name: body.name });',
+      '});',
+      'app.put("/users/:id", async (request, reply) => {',
+      '  // Reads body and params; no schema',
+      '  const params = request.params as { id: string };',
+      '  const body = request.body as { name: string };',
+      '  return reply.send({ id: params.id, name: body.name });',
+      '});',
+      'app.patch("/users/:id", async (request) => {',
+      '  return request.body;',
+      '});',
+    ].join('\n')),
+
+    // Object-literal route style (matches the alternate fastify shape)
+    fixture('src/routes/fastify-object.ts', [
+      'import fastify from "fastify";',
+      'const app = fastify();',
+      'app.route({',
+      '  method: "POST",',
+      '  url: "/items",',
+      '  handler: async (request, reply) => {',
+      '    const body = request.body as { name: string };',
+      '    return reply.send({ name: body.name });',
+      '  },',
+      '});',
+      'app.route({',
+      '  method: "GET",',
+      '  url: "/items/:id",',
+      '  handler: async (request, reply) => {',
+      '    const params = request.params as { id: string };',
+      '    return reply.send({ id: params.id });',
+      '  },',
+      '});',
     ].join('\n')),
 
     // --- TYPEORM EDGE entities (some columns/decorators present, some absent) ---
-    fixture('src/db/typeorm-edges.ts', [
+    fixture('src/models/product.model.ts', [
       'import { Entity, Column, CreateDateColumn, UpdateDateColumn } from "typeorm";',
       '@Entity()',
       'export class Product {',
@@ -750,8 +786,50 @@ beforeAll(async () => {
       'function Picker(_props: any) { return null; }',
     ].join('\n')),
 
+    // --- IN-MEMORY repository detection ---
+    fixture('src/repositories/listing-repository.ts', [
+      'export class ListingRepository {',
+      '  private items = new Map<string, { id: string }>();',
+      '  async findAll() { return [...this.items.values()]; }',
+      '}',
+      'export class ProfileStore {',
+      '  private profiles: { id: string }[] = [];',
+      '  add(p: { id: string }) { this.profiles.push(p); }',
+      '}',
+    ].join('\n')),
+
+    // --- DYNAMODB scan detection ---
+    fixture('src/repositories/scan-heavy-repository.ts', [
+      'declare const ddb: { scan(args: unknown): Promise<unknown> };',
+      'export class AuditRepository {',
+      '  async listAll() {',
+      '    return ddb.scan({ TableName: "audit" });',
+      '  }',
+      '}',
+    ].join('\n')),
+
+    // --- PLATFORM CHECKS (Platform.OS pattern) ---
+    fixture('src/components/PlatformAware.tsx', [
+      'import { Platform } from "react-native";',
+      'export function PlatformAware() {',
+      '  if (Platform.OS === "ios") return <></>;',
+      '  if (Platform.OS === "android") return <></>;',
+      '  return null;',
+      '}',
+    ].join('\n')),
+
+    // --- TYPESCRIPT-FRONTEND tsconfig variations (jsx mode) ---
+    fixture('packages/web/tsconfig.json', JSON.stringify({
+      compilerOptions: {
+        target: 'es5',
+        module: 'commonjs',
+        jsx: 'react',
+        lib: ['dom', 'es2015'],
+      },
+    }, null, 2)),
+
     // --- DATABASE INDEX COVERAGE — query patterns + find ops ---
-    fixture('src/db/repository/userRepository.ts', [
+    fixture('src/repositories/user-repository.ts', [
       'declare const db: {',
       '  query(sql: string): Promise<unknown>;',
       '  users: { find(where?: unknown): Promise<unknown>; findOne(where?: unknown): Promise<unknown> };',
