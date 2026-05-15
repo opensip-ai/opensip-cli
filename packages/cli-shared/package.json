@@ -1,6 +1,6 @@
 {
   "name": "@opensip-tools/cli-shared",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "license": "MIT",
   "description": "Shared CLI infrastructure for OpenSIP Tools — types, exit codes, session persistence",
   "repository": {
