@@ -34,6 +34,15 @@ jobs:
 
       - run: npm --version
       - run: pnpm install --frozen-lockfile
+      # Clean every package's dist/ before build. tsc never deletes orphan
+      # output files when their source is moved or removed, and `files:
+      # ["dist"]` in package.json blindly globs the whole tree — so a
+      # stale dist (from a local build or a Turbo cache restore) can
+      # leak ghost modules into the published tarball, which is exactly
+      # how v1.0.4 shipped with orphaned commands/{fit,sim,dashboard,
+      # list-checks,list-recipes}.js after they moved into the tool
+      # packages. Cleaning here is cheap and guarantees a fresh dist.
+      - run: pnpm -r run clean
       - run: pnpm build
       - run: pnpm typecheck
       - run: pnpm test

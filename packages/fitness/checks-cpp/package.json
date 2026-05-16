@@ -1,6 +1,6 @@
 {
   "name": "@opensip-tools/checks-cpp",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "license": "MIT",
   "description": "C/C++ fitness checks (clang-tidy backed)",
   "repository": {

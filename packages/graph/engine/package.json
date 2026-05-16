@@ -1,6 +1,6 @@
 {
   "name": "@opensip-tools/graph",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "license": "MIT",
   "description": "Code-path graph + dead-end detector for OpenSIP Tools (TypeScript-first)",
   "repository": {

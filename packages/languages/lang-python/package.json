@@ -1,6 +1,6 @@
 {
   "name": "@opensip-tools/lang-python",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "license": "MIT",
   "description": "Python language adapter for opensip-tools",
   "repository": {
