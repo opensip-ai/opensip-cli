@@ -5,3 +5,4 @@ packages:
   - "packages/fitness/*"
   - "packages/simulation/*"
   - "packages/languages/*"
+  - "packages/graph/*"

@@ -61,23 +61,35 @@ export interface ProjectPaths {
   readonly cacheDir: string;
   /** <project>/opensip-tools/.runtime/baseline.sarif (default gate baseline). */
   readonly baselinePath: string;
+  /** <project>/opensip-tools/.runtime/cache/graph — graph-tool catalog cache root. */
+  readonly graphCacheDir: string;
+  /** <project>/opensip-tools/.runtime/cache/graph/catalog.json — staged catalog. */
+  readonly graphCatalogPath: string;
+  /** <project>/opensip-tools/.runtime/cache/graph/baseline.json — gate baseline. */
+  readonly graphBaselinePath: string;
   /** <project>/opensip-tools/.runtime/plugins/<domain> — npm-installed plugins. */
   readonly pluginsDir: (domain: PathDomain) => string;
 }
 
 /**
- * Path-resolver domain set — the two tools whose plugins land in
- * project paths. Intentionally narrower than `core/plugins`'s
- * 4-element `PluginDomain` (`'fit' | 'sim' | 'asm' | 'lang'`); 'asm'
- * is reserved for a future tool, and 'lang' adapters install via
- * package deps not project-local plugin dirs.
+ * Path-resolver domain set — tools whose plugins land in project
+ * paths. Intentionally narrower than `core/plugins`'s `PluginDomain`
+ * (`'fit' | 'sim' | 'asm' | 'lang'`); 'asm' is reserved for a future
+ * tool, and 'lang' adapters install via package deps not
+ * project-local plugin dirs.
+ *
+ * `'graph'` is included so graph-tool can persist per-project cache +
+ * baseline state under `.runtime/cache/graph/` and (later) load
+ * project-local rule plugins from `.runtime/plugins/graph/`.
  */
-export type PathDomain = 'fit' | 'sim';
+export type PathDomain = 'fit' | 'sim' | 'graph';
 
 /** Resolve the project path layout for a given project directory. */
 export function resolveProjectPaths(projectDir: string): ProjectPaths {
   const userSourceDir = join(projectDir, 'opensip-tools');
   const runtimeDir = join(userSourceDir, '.runtime');
+  const cacheDir = join(runtimeDir, 'cache');
+  const graphCacheDir = join(cacheDir, 'graph');
   return {
     projectDir,
     configFile: join(projectDir, 'opensip-tools.config.yml'),
@@ -90,8 +102,11 @@ export function resolveProjectPaths(projectDir: string): ProjectPaths {
     sessionsDir: join(runtimeDir, 'sessions'),
     reportsDir: join(runtimeDir, 'reports'),
     logsDir: join(runtimeDir, 'logs'),
-    cacheDir: join(runtimeDir, 'cache'),
+    cacheDir,
     baselinePath: join(runtimeDir, 'baseline.sarif'),
+    graphCacheDir,
+    graphCatalogPath: join(graphCacheDir, 'catalog.json'),
+    graphBaselinePath: join(graphCacheDir, 'baseline.json'),
     pluginsDir: (domain) => join(runtimeDir, 'plugins', domain),
   };
 }

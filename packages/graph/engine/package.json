@@ -1,0 +1,43 @@
+{
+  "name": "@opensip-tools/graph",
+  "version": "1.0.5",
+  "license": "MIT",
+  "description": "Static call-graph + dead-end analysis (six-stage staged pipeline)",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opensip-ai/opensip-tools.git",
+    "directory": "packages/graph/engine"
+  },
+  "homepage": "https://github.com/opensip-ai/opensip-tools",
+  "bugs": {
+    "url": "https://github.com/opensip-ai/opensip-tools/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "opensipTools": {
+    "kind": "tool"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@opensip-tools/contracts": "workspace:*",
+    "@opensip-tools/core": "workspace:*",
+    "@opensip-tools/fitness": "workspace:*",
+    "@opensip-tools/lang-typescript": "workspace:*",
+    "commander": "^13.1.0",
+    "glob": "^11.0.0",
+    "typescript": "~5.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "vitest": "^2.1.0"
+  }
+}

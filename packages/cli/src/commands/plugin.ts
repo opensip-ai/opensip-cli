@@ -433,10 +433,16 @@ export async function pluginSync(
   cwd: string = process.cwd(),
   domainOverride?: string,
 ): Promise<PluginResult> {
-  const domains: PathDomain[] = (
+  // pluginSync only iterates plugin-supporting domains. The domain
+  // type here is the intersection of PathDomain (fit|sim|graph) and
+  // PluginDomain (fit|sim|asm|lang), which is fit|sim. Graph does not
+  // yet load project-local rule plugins (deferred to v0.3 per DEC-6).
+  type SyncDomain = 'fit' | 'sim';
+  const syncDomains: SyncDomain[] = ['fit', 'sim'];
+  const domains: SyncDomain[] = (
     domainOverride && VALID_DOMAINS.has(domainOverride as PathDomain)
-      ? [domainOverride as PathDomain]
-      : (['fit', 'sim'] as PathDomain[])
+      ? [domainOverride as SyncDomain]
+      : syncDomains
   );
 
   const synced: { domain: string; package: string; installed: boolean }[] = [];

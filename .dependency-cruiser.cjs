@@ -197,6 +197,67 @@ module.exports = {
       },
       to: { path: '^@opensip-tools/fitness' },
     },
+
+    // -------------------------------------------------------------------
+    // graph tool — staged-pipeline architecture invariants (§9, AC-9).
+    // -------------------------------------------------------------------
+    {
+      name: 'graph-no-cli',
+      severity: 'error',
+      comment:
+        'Graph is a Tool plugin; it must not depend on the CLI entry point. ' +
+        'Tool callbacks happen through the ToolCliContext interface from core.',
+      from: { path: '^packages/graph/' },
+      to: { path: '^@opensip-tools/cli($|/)' },
+    },
+    {
+      name: 'graph-no-check-packs',
+      severity: 'error',
+      comment:
+        'Graph sits in the tools/lang peer layer. It must not import any check pack.',
+      from: { path: '^packages/graph/engine/src/' },
+      to: { path: '^@opensip-tools/checks-' },
+    },
+    {
+      name: 'graph-rules-no-parser',
+      severity: 'error',
+      comment:
+        'Rules consume frozen catalog/indexes only. They must not import the ' +
+        'TypeScript parser or any pipeline stage.',
+      from: { path: '^packages/graph/engine/src/rules/' },
+      to: {
+        path: [
+          '^typescript$',
+          '^packages/graph/engine/src/pipeline/',
+        ],
+      },
+    },
+    {
+      name: 'graph-renderers-no-pipeline',
+      severity: 'error',
+      comment:
+        'Renderers consume Signal[] and a RenderContext. They do not see the ' +
+        'catalog or any rule logic.',
+      from: { path: '^packages/graph/engine/src/render/' },
+      to: { path: '^packages/graph/engine/src/(pipeline|rules)/' },
+    },
+    {
+      name: 'graph-visitors-resolvers-disjoint',
+      severity: 'error',
+      comment:
+        'Inventory visitors handle declarations; edge resolvers handle call ' +
+        'sites. They share helpers but not each other.',
+      from: { path: '^packages/graph/engine/src/pipeline/inventory-visitors/' },
+      to: { path: '^packages/graph/engine/src/pipeline/edge-resolvers/' },
+    },
+    {
+      name: 'graph-resolvers-visitors-disjoint',
+      severity: 'error',
+      comment:
+        'Symmetric counterpart of graph-visitors-resolvers-disjoint.',
+      from: { path: '^packages/graph/engine/src/pipeline/edge-resolvers/' },
+      to: { path: '^packages/graph/engine/src/pipeline/inventory-visitors/' },
+    },
   ],
 
   options: {
