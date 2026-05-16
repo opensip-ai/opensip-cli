@@ -6,9 +6,10 @@
  * dispatches to the right renderer.
  */
 
-import { EXIT_CODES } from '@opensip-tools/contracts';
+import { EXIT_CODES, saveSession } from '@opensip-tools/contracts';
 import {
   ConfigurationError,
+  generatePrefixedId,
   logger,
   resolveProjectPaths,
   ToolError,
@@ -93,6 +94,7 @@ export async function executeGraph(
       process.stdout.write(out);
       logger.info({ evt: 'graph.render.table.complete', module: 'graph:render' });
     }
+    persistSession(opts, result.signals);
     cli.setExitCode(EXIT_CODES.SUCCESS);
     logger.info({
       evt: 'graph.cli.graph.complete',
@@ -101,6 +103,39 @@ export async function executeGraph(
     });
   } catch (error) {
     handleGraphError('graph', error, cli);
+  }
+}
+
+function persistSession(opts: GraphCommandOptions, signals: readonly Signal[]): void {
+  try {
+    const cliOutput = buildCliOutput(signals, 'graph');
+    saveSession({
+      id: generatePrefixedId('graph'),
+      tool: 'graph',
+      timestamp: cliOutput.timestamp,
+      cwd: opts.cwd,
+      score: cliOutput.score,
+      passed: cliOutput.passed,
+      summary: cliOutput.summary,
+      checks: cliOutput.checks.map((c) => ({
+        checkSlug: c.checkSlug,
+        passed: c.passed,
+        violationCount: c.violationCount,
+        findings: c.findings.map((f) => ({
+          ruleId: f.ruleId,
+          message: f.message,
+          severity: f.severity,
+          filePath: f.filePath,
+          line: f.line,
+          column: f.column,
+          suggestion: f.suggestion,
+        })),
+        durationMs: c.durationMs,
+      })),
+      durationMs: 0,
+    });
+  } catch {
+    // best effort; don't fail the run
   }
 }
 
