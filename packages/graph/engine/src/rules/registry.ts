@@ -1,11 +1,14 @@
 /**
- * Rule registry (skeleton; populated in P4 + P5).
+ * Rule registry.
  *
- * A plain `readonly Rule[]` — not a Registry singleton. v0.2 ships
- * with five built-in rules. Per PR-6, runtime rule loading is deferred
- * to v0.3.
+ * A plain readonly Rule[] — not a Registry singleton (PR-6). P4 wires
+ * orphan-subtree; P5 adds the remaining four rules.
  */
+
+import { orphanSubtreeRule } from './orphan-subtree.js';
 
 import type { Rule } from '../types.js';
 
-export const rules: readonly Rule[] = [];
+export const rules: readonly Rule[] = [
+  orphanSubtreeRule,
+];

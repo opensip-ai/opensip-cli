@@ -63,28 +63,14 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
   const catalog = edgeResult.catalog;
   const resolutionStats: ResolutionStats | null = edgeResult.resolutionStats;
 
-  // Stage 3 (indexes): pass-through if not yet implemented.
-  let indexes: Indexes | null = null;
-  try {
-    indexes = buildIndexes(catalog);
-  } catch (error) {
-    if (
-      error instanceof Error &&
-      error.message.includes('not implemented (Phase P4)')
-    ) {
-      indexes = null;
-    } else {
-      throw error;
-    }
-  }
+  // Stage 3 (indexes).
+  const indexes: Indexes = buildIndexes(catalog);
 
-  // Stage 4 (rules): only run if indexes are available.
+  // Stage 4 (rules).
   const signals: Signal[] = [];
-  if (indexes) {
-    for (const rule of ruleSet) {
-      const out = rule.evaluate(catalog, indexes, config);
-      signals.push(...out);
-    }
+  for (const rule of ruleSet) {
+    const out = rule.evaluate(catalog, indexes, config);
+    signals.push(...out);
   }
 
   return {

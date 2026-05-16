@@ -1,11 +1,11 @@
 /**
  * `opensip-tools graph-entry-points` — print inferred entry-point set.
- *
- * P0 ships a no-op shape; P4 wires the inference helper.
  */
 
 import { EXIT_CODES } from '@opensip-tools/contracts';
-import { logger } from '@opensip-tools/core';
+import { ConfigurationError, logger, ToolError } from '@opensip-tools/core';
+
+import { inferEntryPoints } from '../rules/_entry-points.js';
 
 import { runGraph } from './orchestrate.js';
 
@@ -27,20 +27,40 @@ export async function executeGraphEntryPoints(
   });
   try {
     const result = await runGraph({ cwd: opts.cwd });
-    const entryPoints: string[] = [];
-    if (result.catalog && result.indexes) {
-      // Implemented in Phase P4 — see rules/_entry-points.ts.
+    if (!result.catalog || !result.indexes) {
+      throw new Error('Pipeline produced no catalog or indexes.');
     }
+    const eps = inferEntryPoints(result.catalog, result.indexes);
+    const enriched = eps
+      .map((ep) => {
+        const occ = result.indexes!.byBodyHash.get(ep.bodyHash);
+        return occ
+          ? {
+              simpleName: occ.simpleName,
+              qualifiedName: occ.qualifiedName,
+              filePath: occ.filePath,
+              line: occ.line,
+              kind: occ.kind,
+              reason: ep.reason,
+            }
+          : null;
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null);
+
     if (opts.json === true) {
-      process.stdout.write(`${JSON.stringify({ entryPoints }, null, 2)}\n`);
+      process.stdout.write(`${JSON.stringify({ tool: 'graph', entryPoints: enriched }, null, 2)}\n`);
     } else {
-      process.stdout.write(`graph-entry-points: ${String(entryPoints.length)} entry point(s)\n`);
+      process.stdout.write(`graph-entry-points: ${String(enriched.length)} entry point(s)\n`);
+      const sorted = [...enriched].sort((a, b) => a.qualifiedName.localeCompare(b.qualifiedName));
+      for (const ep of sorted) {
+        process.stdout.write(`  [${ep.reason}] ${ep.qualifiedName} (${ep.filePath}:${String(ep.line)})\n`);
+      }
     }
     cli.setExitCode(EXIT_CODES.SUCCESS);
     logger.info({
       evt: 'graph.cli.graph-entry-points.complete',
       module: 'graph:cli',
-      count: entryPoints.length,
+      count: enriched.length,
     });
   } catch (error) {
     logger.error({
@@ -48,7 +68,13 @@ export async function executeGraphEntryPoints(
       module: 'graph:cli',
       err: error instanceof Error ? error.message : String(error),
     });
-    cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
+    if (error instanceof ConfigurationError) {
+      cli.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
+    } else if (error instanceof ToolError) {
+      cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
+    } else {
+      cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
+    }
     process.stderr.write(
       `graph-entry-points: ${error instanceof Error ? error.message : String(error)}\n`,
     );

@@ -3,7 +3,10 @@
  */
 
 import { EXIT_CODES } from '@opensip-tools/contracts';
-import { logger } from '@opensip-tools/core';
+import { ConfigurationError, logger, ToolError } from '@opensip-tools/core';
+
+import { renderJson } from '../render/json.js';
+import { renderTable } from '../render/table.js';
 
 import { runGraph } from './orchestrate.js';
 
@@ -22,11 +25,9 @@ export async function executeGraphOrphans(
   try {
     const result = await runGraph({ cwd: opts.cwd });
     const orphans = result.signals.filter((s) => s.ruleId === 'graph:orphan-subtree');
-    if (opts.json === true) {
-      process.stdout.write(`${JSON.stringify({ tool: 'graph', signals: orphans }, null, 2)}\n`);
-    } else {
-      process.stdout.write(`graph-orphans: ${String(orphans.length)} orphan(s)\n`);
-    }
+    const renderer = opts.json === true ? renderJson : renderTable;
+    const out = renderer(orphans, { cwd: opts.cwd, tool: 'graph', command: 'graph-orphans' });
+    process.stdout.write(`${out}${out.endsWith('\n') ? '' : '\n'}`);
     cli.setExitCode(EXIT_CODES.SUCCESS);
     logger.info({
       evt: 'graph.cli.graph-orphans.complete',
@@ -39,7 +40,13 @@ export async function executeGraphOrphans(
       module: 'graph:cli',
       err: error instanceof Error ? error.message : String(error),
     });
-    cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
+    if (error instanceof ConfigurationError) {
+      cli.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
+    } else if (error instanceof ToolError) {
+      cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
+    } else {
+      cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
+    }
     process.stderr.write(
       `graph-orphans: ${error instanceof Error ? error.message : String(error)}\n`,
     );

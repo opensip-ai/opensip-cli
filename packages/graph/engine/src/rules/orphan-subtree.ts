@@ -1,0 +1,73 @@
+/**
+ * graph:orphan-subtree — find functions not reachable from any entry point.
+ *
+ * Reachability: BFS from inferEntryPoints + config.entryPointHashes
+ * across the forward callees adjacency. Any FunctionOccurrence not
+ * visited is an orphan. Test-only reachability is a separate rule
+ * (test-only-reachable); orphan-subtree treats test files as part of
+ * the graph (their module-init is its own entry by name-match).
+ */
+
+import { createSignal } from '@opensip-tools/core';
+
+import { inferEntryPoints } from './_entry-points.js';
+
+import type { Catalog, GraphConfig, Indexes, Rule } from '../types.js';
+import type { Signal } from '@opensip-tools/core';
+
+export const orphanSubtreeRule: Rule = {
+  slug: 'graph:orphan-subtree',
+  defaultSeverity: 'warning',
+  evaluate(catalog, indexes, config): readonly Signal[] {
+    const reachable = computeReachable(catalog, indexes, config);
+    const orphans: Signal[] = [];
+    for (const occ of indexes.byBodyHash.values()) {
+      if (reachable.has(occ.bodyHash)) continue;
+      // module-init occurrences are entry points themselves; never orphan.
+      if (occ.kind === 'module-init') continue;
+      // Skip occurrences with empty filePath (defensive — shouldn't happen).
+      if (!occ.filePath) continue;
+      orphans.push(
+        createSignal({
+          source: 'graph',
+          provider: 'opensip-tools',
+          severity: 'medium',
+          category: 'quality',
+          ruleId: 'graph:orphan-subtree',
+          message: `${occ.simpleName} is not reachable from any inferred entry point.`,
+          code: { file: occ.filePath, line: occ.line, column: occ.column },
+          suggestion: 'Either delete the function, mark it as an entry point in opensip-tools.config.yml, or add a caller.',
+          metadata: {
+            simpleName: occ.simpleName,
+            qualifiedName: occ.qualifiedName,
+            kind: occ.kind,
+            visibility: occ.visibility,
+            inTestFile: occ.inTestFile,
+            bodyHash: occ.bodyHash,
+          },
+        }),
+      );
+    }
+    return orphans;
+  },
+};
+
+function computeReachable(catalog: Catalog, indexes: Indexes, config: GraphConfig): Set<string> {
+  const entryPoints = inferEntryPoints(catalog, indexes);
+  const seeds = new Set<string>();
+  for (const ep of entryPoints) seeds.add(ep.bodyHash);
+  for (const h of config.entryPointHashes ?? []) seeds.add(h);
+
+  const visited = new Set<string>();
+  const queue: string[] = [...seeds];
+  while (queue.length > 0) {
+    const cur = queue.shift();
+    if (cur === undefined || visited.has(cur)) continue;
+    visited.add(cur);
+    const next = indexes.callees.get(cur) ?? [];
+    for (const n of next) {
+      if (!visited.has(n)) queue.push(n);
+    }
+  }
+  return visited;
+}

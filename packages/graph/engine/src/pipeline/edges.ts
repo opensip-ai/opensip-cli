@@ -17,6 +17,7 @@ import { relative, sep } from 'node:path';
 import { logger } from '@opensip-tools/core';
 import ts from 'typescript';
 
+import { findCatalogEntry } from './edge-helpers/find-catalog-entry.js';
 import { resolveByCatalogFallback } from './edge-resolvers/catalog-fallback.js';
 import { resolveDirectCall } from './edge-resolvers/direct-call.js';
 import { resolveJsxElement } from './edge-resolvers/jsx-element.js';
@@ -120,6 +121,23 @@ function walkFileForEdges(args: WalkArgs): void {
       maybeCollectCallSite(node, ownerHash, args);
     }
 
+    // Record a creation edge from the parent owner to this nested
+    // function ONLY for inline-callables: arrows, function
+    // expressions, and class members (methods / constructors /
+    // accessors). These are alive whenever their enclosing scope is
+    // alive — they are never "called by name." Function declarations
+    // are deliberately excluded; they need a real call edge to be
+    // considered reachable, which is what makes the orphan rule
+    // catch genuinely unused top-level functions.
+    if (
+      hash !== null &&
+      ownerHash !== null &&
+      hash !== ownerHash &&
+      isInlineCallable(node)
+    ) {
+      recordCreationEdge(node, ownerHash, hash, args);
+    }
+
     ts.forEachChild(node, (c) => { walk(c, childOwner); });
   }
 
@@ -128,20 +146,57 @@ function walkFileForEdges(args: WalkArgs): void {
   ts.forEachChild(args.sourceFile, (c) => { walk(c, moduleInitHash); });
 }
 
-function maybeCollectCallSite(node: ts.Node, ownerHash: string, args: WalkArgs): void {
-  if (ts.isCallExpression(node)) {
-    args.stats.totalCallSites++;
-    const verdict = dispatchCall(node, args.ctx);
-    pushEdge(node, verdict, ownerHash, args);
-  } else if (ts.isNewExpression(node)) {
-    args.stats.totalCallSites++;
-    const verdict = resolveNewExpression(node, args.ctx);
-    pushEdge(node, verdict, ownerHash, args);
-  } else if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
-    args.stats.totalCallSites++;
-    const verdict = resolveJsxElement(node, args.ctx);
-    pushEdge(node, verdict, ownerHash, args);
+function recordCreationEdge(
+  node: ts.Node,
+  ownerHash: string,
+  childHash: string,
+  args: WalkArgs,
+): void {
+  const start = node.getStart(args.sourceFile);
+  const startLC = args.sourceFile.getLineAndCharacterOfPosition(start);
+  const text = node.getText(args.sourceFile);
+  const truncated = text.length > 70 ? `${text.slice(0, 67)}...` : text;
+  const edge: CallEdge = {
+    to: [childHash],
+    line: startLC.line + 1,
+    column: startLC.character,
+    resolution: 'static',
+    confidence: 'high',
+    text: `[creates] ${truncated}`,
+  };
+  const list = args.callsByHash.get(ownerHash);
+  if (list) {
+    list.push(edge);
+  } else {
+    args.callsByHash.set(ownerHash, [edge]);
   }
+  args.stats.totalCallSites++;
+  args.stats.resolvedHigh++;
+}
+
+function maybeCollectCallSite(node: ts.Node, ownerHash: string, args: WalkArgs): void {
+  const verdict = computeVerdict(node, args.ctx);
+  if (verdict === null) return;
+  args.stats.totalCallSites++;
+  pushEdge(node, verdict, ownerHash, args);
+}
+
+/** Returns null if `node` is not a call/new/jsx/value-reference site. */
+function computeVerdict(node: ts.Node, ctx: ResolverContext): ResolverVerdict | null {
+  if (ts.isCallExpression(node)) return dispatchCall(node, ctx);
+  if (ts.isNewExpression(node)) return resolveNewExpression(node, ctx);
+  if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
+    return resolveJsxElement(node, ctx);
+  }
+  if (ts.isIdentifier(node) && isValueReference(node)) {
+    const v = resolveValueReference(node, ctx);
+    return v.to.length > 0 ? v : null;
+  }
+  if (ts.isShorthandPropertyAssignment(node)) {
+    const v = resolveShorthandAssignment(node, ctx);
+    return v.to.length > 0 ? v : null;
+  }
+  return null;
 }
 
 function dispatchCall(
@@ -195,9 +250,162 @@ function pushEdge(
   else args.stats.resolvedLow++;
 }
 
+/**
+ * Identifier appears in a value position — not as a call target, not as
+ * a binding name, not as the property name of a property access. We
+ * want to capture handoff cases: function passed as argument, shorthand
+ * property assignment, default value, return value.
+ */
+function isValueReference(node: ts.Identifier): boolean {
+  const parent = node.parent;
+  if (!parent) return false;
+  return !isStructuralName(node, parent) && !isCallSiteTarget(node, parent);
+}
+
+/**
+ * Identifier is the *name* of some declaration / property, or part of
+ * a type / import / export. Not a value use.
+ */
+function isStructuralName(node: ts.Identifier, parent: ts.Node): boolean {
+  return isParentNamePosition(node, parent) || isUnconditionallyStructural(parent);
+}
+
+function isParentNamePosition(node: ts.Identifier, parent: ts.Node): boolean {
+  // Each entry: matcher for the parent kind + the property whose value
+  // we compare with `node` to decide whether the identifier is the
+  // structural name slot.
+  const slot = readNamedSlot(parent);
+  return slot === node;
+}
+
+function readNamedSlot(parent: ts.Node): ts.Node | undefined {
+  if (ts.isVariableDeclaration(parent)) return parent.name;
+  if (ts.isParameter(parent)) return parent.name;
+  if (ts.isFunctionDeclaration(parent)) return parent.name;
+  if (ts.isClassDeclaration(parent)) return parent.name;
+  if (ts.isMethodDeclaration(parent)) return parent.name;
+  if (ts.isPropertyDeclaration(parent)) return parent.name;
+  if (ts.isPropertyAssignment(parent)) return parent.name;
+  if (ts.isPropertyAccessExpression(parent)) return parent.name;
+  if (ts.isLabeledStatement(parent)) return parent.label;
+  if (ts.isBindingElement(parent)) return parent.name;
+  return undefined;
+}
+
+function isUnconditionallyStructural(parent: ts.Node): boolean {
+  return (
+    ts.isQualifiedName(parent) ||
+    ts.isImportSpecifier(parent) ||
+    ts.isImportClause(parent) ||
+    ts.isExportSpecifier(parent) ||
+    ts.isTypeReferenceNode(parent)
+  );
+}
+
+/** Identifier is the call target / new target / JSX tag — we handle those elsewhere. */
+function isCallSiteTarget(node: ts.Identifier, parent: ts.Node): boolean {
+  if (ts.isCallExpression(parent) && parent.expression === node) return true;
+  if (ts.isNewExpression(parent) && parent.expression === node) return true;
+  if (ts.isJsxOpeningElement(parent) && parent.tagName === node) return true;
+  if (ts.isJsxSelfClosingElement(parent) && parent.tagName === node) return true;
+  return false;
+}
+
+function resolveValueReference(
+  node: ts.Identifier,
+  ctx: ResolverContext,
+): ResolverVerdict {
+  const symbol = ctx.typeChecker.getSymbolAtLocation(node);
+  return resolveSymbolToHash(symbol, node.text, ctx);
+}
+
+function resolveShorthandAssignment(
+  node: ts.ShorthandPropertyAssignment,
+  ctx: ResolverContext,
+): ResolverVerdict {
+  const symbol = ctx.typeChecker.getShorthandAssignmentValueSymbol(node);
+  return resolveSymbolToHash(symbol, node.name.text, ctx);
+}
+
+/**
+ * Resolve any symbol whose declarations might be a function-shaped
+ * node to its catalog bodyHash. Used by value-reference and shorthand
+ * resolvers — they share this lookup logic.
+ */
+function resolveSymbolToHash(
+  symbol: ts.Symbol | undefined,
+  fallbackName: string,
+  ctx: ResolverContext,
+): ResolverVerdict {
+  if (!symbol) return { to: [], resolution: 'unknown', confidence: 'low' };
+  for (const d of symbol.getDeclarations() ?? []) {
+    const hash = hashFromDeclaration(d, fallbackName, ctx);
+    if (hash) return { to: [hash], resolution: 'static', confidence: 'medium' };
+  }
+  return { to: [], resolution: 'unknown', confidence: 'low' };
+}
+
+function hashFromDeclaration(
+  d: ts.Declaration,
+  fallbackName: string,
+  ctx: ResolverContext,
+): string | null {
+  if (ts.isClassDeclaration(d) || ts.isClassExpression(d)) {
+    const ctor = findClassConstructor(d);
+    if (!ctor) return null;
+    const className = d.name?.text;
+    return findCatalogEntry(ctor, d.getSourceFile(), ctx.catalog, className ? [className] : []);
+  }
+  if (
+    ts.isFunctionDeclaration(d) ||
+    ts.isArrowFunction(d) ||
+    ts.isFunctionExpression(d) ||
+    ts.isMethodDeclaration(d)
+  ) {
+    return findCatalogEntry(d, d.getSourceFile(), ctx.catalog, [fallbackName]);
+  }
+  if (ts.isVariableDeclaration(d) && d.initializer) {
+    const init = d.initializer;
+    if (ts.isArrowFunction(init) || ts.isFunctionExpression(init)) {
+      return findCatalogEntry(init, d.getSourceFile(), ctx.catalog, [fallbackName]);
+    }
+  }
+  return null;
+}
+
+function findClassConstructor(cls: ts.ClassLikeDeclaration): ts.ConstructorDeclaration | null {
+  for (const m of cls.members) {
+    if (ts.isConstructorDeclaration(m)) return m;
+  }
+  return null;
+}
+
 function isFunctionLike(node: ts.Node): boolean {
   return (
     ts.isFunctionDeclaration(node) ||
+    ts.isArrowFunction(node) ||
+    ts.isFunctionExpression(node) ||
+    ts.isMethodDeclaration(node) ||
+    ts.isConstructorDeclaration(node) ||
+    ts.isGetAccessor(node) ||
+    ts.isSetAccessor(node)
+  );
+}
+
+/**
+ * An inline callable is an arrow / function-expression / method /
+ * accessor whose only call path is the value it produces (callback,
+ * property assignment, instance method via dispatch, etc.).
+ *
+ * Methods/getters/setters/constructors get a creation edge from
+ * their enclosing class declaration's owner: an instance method is
+ * alive whenever the class is instantiated, and we don't always
+ * resolve method-dispatch perfectly. The creation edge keeps a
+ * reachable class's members reachable without depending on
+ * type-checker accuracy for every dispatch site.
+ */
+function isInlineCallable(node: ts.Node): boolean {
+  return (
     ts.isArrowFunction(node) ||
     ts.isFunctionExpression(node) ||
     ts.isMethodDeclaration(node) ||

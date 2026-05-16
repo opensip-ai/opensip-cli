@@ -99,7 +99,7 @@ export interface CliArgs {
 /** Structured JSON output format */
 export interface CliOutput {
   readonly version: '1.0';
-  readonly tool: 'fit' | 'sim';
+  readonly tool: 'fit' | 'sim' | 'graph';
   readonly timestamp: string;
   readonly recipe?: string;
   readonly score: number;
