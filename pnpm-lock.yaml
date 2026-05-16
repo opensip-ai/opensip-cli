@@ -65,6 +65,9 @@ importers:
       '@opensip-tools/fitness':
         specifier: workspace:*
         version: link:../fitness/engine
+      '@opensip-tools/graph':
+        specifier: workspace:*
+        version: link:../graph/engine
       '@opensip-tools/lang-cpp':
         specifier: workspace:*
         version: link:../languages/lang-cpp
@@ -282,6 +285,34 @@ importers:
       '@types/js-yaml':
         specifier: ^4.0.0
         version: 4.0.9
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.15
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.15)
+
+  packages/graph/engine:
+    dependencies:
+      '@opensip-tools/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
+      '@opensip-tools/core':
+        specifier: workspace:*
+        version: link:../../core
+      '@opensip-tools/lang-typescript':
+        specifier: workspace:*
+        version: link:../../languages/lang-typescript
+      commander:
+        specifier: ^13.1.0
+        version: 13.1.0
+      glob:
+        specifier: ^11.0.0
+        version: 11.1.0
+      typescript:
+        specifier: ~5.7.0
+        version: 5.7.3
+    devDependencies:
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.15
