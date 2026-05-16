@@ -25,10 +25,29 @@ Four commands from a clean shell to a passing fitness run. The point of this pag
 
 ---
 
+## Works with
+
+opensip-tools auto-detects your project's language(s) from filesystem markers and runs the matching checks. Polyglot projects get every relevant pack.
+
+| Language | Detection marker | Language-specific checks | Universal checks |
+|---|---|---|---|
+| **TypeScript** / JS / TSX | `package.json`, `tsconfig.json` | 66 (TS-AST-driven) | ✓ |
+| **Python** | `pyproject.toml` | yes | ✓ |
+| **Java** | `pom.xml`, `build.gradle` | yes | ✓ |
+| **Go** | `go.mod` | yes | ✓ |
+| **C / C++** | `CMakeLists.txt` | yes (via clang-tidy) | ✓ |
+| **Rust** | `Cargo.toml` | — | ✓ |
+
+All six get the **92 universal checks** (Docker, `.env`, Sentry, generic structure, dead-code, package conventions). TypeScript additionally gets the deepest treatment — 66 AST-driven checks for typed-inject, drizzle-orm, React patterns, package.json exports, tsconfig posture.
+
+For the full per-language breakdown, see [`../70-reference/01-package-catalog.md`](../70-reference/01-package-catalog.md).
+
+---
+
 ## Prerequisites
 
 - **Node.js 22+** — `node --version` should print `v22.x` or higher.
-- A project directory you don't mind a scaffold landing in. Any language from the [supported six](./03-system-context.md) — TypeScript, Rust, Python, Java, Go, C/C++ — works; this page assumes whatever you have.
+- A project directory you don't mind a scaffold landing in.
 - *(Optional)* `pnpm` if you're installing from source. `npm` is fine for global install.
 
 If you don't have a project handy, `git clone https://github.com/opensip-ai/opensip-tools.git` and run these commands inside the clone — opensip-tools fits checks against its own codebase as the smoke test.
