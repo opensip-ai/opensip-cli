@@ -6,6 +6,11 @@
  * happens inside one of the stages.
  */
 
+import { resolveProjectPaths } from '@opensip-tools/core';
+
+import { currentTsCompilerVersion, isCatalogValid } from '../cache/invalidate.js';
+import { readCatalog } from '../cache/read.js';
+import { writeCatalog } from '../cache/write.js';
 import { discoverFiles } from '../pipeline/discover.js';
 import { resolveEdges } from '../pipeline/edges.js';
 import { buildIndexes } from '../pipeline/indexes.js';
@@ -35,38 +40,62 @@ export interface RunGraphResult {
 
 /**
  * Run the pipeline end-to-end. Each stage runs in isolation; the
- * orchestrator wires their outputs together.
+ * orchestrator wires their outputs together and consults the cache
+ * before redoing stages 1+2.
  */
-// eslint-disable-next-line @typescript-eslint/require-await -- async surface; cache I/O lands in P6
+// eslint-disable-next-line @typescript-eslint/require-await -- async surface for future cache I/O
 export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
   const config: GraphConfig = input.config ?? {};
   const ruleSet: readonly Rule[] = input.rules ?? defaultRules;
+  const paths = resolveProjectPaths(input.cwd);
 
   const discovery = discoverFiles({
     projectDir: input.cwd,
     tsConfigPath: input.tsConfigPath,
   });
 
-  const inventory = buildInventory({
-    projectDirAbs: discovery.projectDirAbs,
-    files: discovery.files,
-    compilerOptions: discovery.compilerOptions,
-    tsConfigPathAbs: discovery.tsConfigPathAbs,
-  });
+  // Cache lookup: stages 1+2 are cached; stages 0/3/4/5 always rerun.
+  const useCache = input.noCache !== true;
+  let catalog: Catalog | null = useCache ? readCatalog(paths.graphCatalogPath) : null;
+  let cacheHit = false;
+  if (catalog) {
+    const valid = isCatalogValid(catalog, {
+      currentTsCompilerVersion: currentTsCompilerVersion(),
+      currentTsConfigPath: discovery.tsConfigPathAbs,
+    });
+    if (valid) {
+      cacheHit = true;
+    } else {
+      catalog = null;
+    }
+  }
 
-  // Stage 2 (edges).
-  const edgeResult = resolveEdges({
-    catalog: inventory.catalog,
-    program: inventory.program,
-    projectDirAbs: discovery.projectDirAbs,
-  });
-  const catalog = edgeResult.catalog;
-  const resolutionStats: ResolutionStats | null = edgeResult.resolutionStats;
+  let resolutionStats: ResolutionStats | null = null;
+  if (!catalog) {
+    const inventory = buildInventory({
+      projectDirAbs: discovery.projectDirAbs,
+      files: discovery.files,
+      compilerOptions: discovery.compilerOptions,
+      tsConfigPathAbs: discovery.tsConfigPathAbs,
+    });
+    const edgeResult = resolveEdges({
+      catalog: inventory.catalog,
+      program: inventory.program,
+      projectDirAbs: discovery.projectDirAbs,
+    });
+    catalog = edgeResult.catalog;
+    resolutionStats = edgeResult.resolutionStats;
+    if (useCache) {
+      try {
+        writeCatalog(paths.graphCatalogPath, catalog);
+      } catch {
+        // Cache write failure is non-fatal — already logged.
+      }
+    }
+  }
 
-  // Stage 3 (indexes).
   const indexes: Indexes = buildIndexes(catalog);
 
-  // Stage 4 (rules).
   const signals: Signal[] = [];
   for (const rule of ruleSet) {
     const out = rule.evaluate(catalog, indexes, config);
@@ -78,6 +107,6 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
     indexes,
     signals,
     resolutionStats,
-    cacheHit: false,
+    cacheHit,
   };
 }

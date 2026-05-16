@@ -7,15 +7,23 @@
  */
 
 import { EXIT_CODES } from '@opensip-tools/contracts';
-import { ConfigurationError, logger, ToolError } from '@opensip-tools/core';
+import {
+  ConfigurationError,
+  logger,
+  resolveProjectPaths,
+  ToolError,
+  ValidationError,
+} from '@opensip-tools/core';
 
-import { renderJson } from '../render/json.js';
+import { compareToBaseline, fingerprintSignal, saveBaseline } from '../gate.js';
+import { buildCliOutput, renderJson } from '../render/json.js';
+import { renderSarif, reportToCloud } from '../render/sarif.js';
 import { renderTable } from '../render/table.js';
 
 import { runGraph } from './orchestrate.js';
 
 import type { Catalog } from '../types.js';
-import type { ToolCliContext } from '@opensip-tools/core';
+import type { Signal, ToolCliContext } from '@opensip-tools/core';
 
 function countFiles(catalog: Catalog): number {
   const files = new Set<string>();
@@ -44,6 +52,7 @@ export interface GraphCommandOptions {
   readonly gateCompare?: boolean;
   readonly baseline?: string;
   readonly reportTo?: string;
+  readonly apiKey?: string;
 }
 
 export async function executeGraph(
@@ -52,7 +61,20 @@ export async function executeGraph(
 ): Promise<void> {
   logger.info({ evt: 'graph.cli.graph.start', module: 'graph:cli', cwd: opts.cwd });
   try {
+    if (opts.gateSave === true && opts.gateCompare === true) {
+      throw new ConfigurationError('--gate-save and --gate-compare are mutually exclusive.');
+    }
     const result = await runGraph({ cwd: opts.cwd, noCache: opts.noCache });
+    if (opts.gateSave === true || opts.gateCompare === true) {
+      await runGateMode(opts, result.signals, cli);
+      logger.info({ evt: 'graph.cli.graph.complete', module: 'graph:cli' });
+      return;
+    }
+    if (typeof opts.reportTo === 'string' && opts.reportTo.length > 0) {
+      await runReportMode(opts, result.signals, cli);
+      logger.info({ evt: 'graph.cli.graph.complete', module: 'graph:cli' });
+      return;
+    }
     if (opts.json === true) {
       logger.info({ evt: 'graph.render.json.start', module: 'graph:render' });
       const out = renderJson(result.signals, { cwd: opts.cwd, tool: 'graph', command: 'graph' });
@@ -78,18 +100,77 @@ export async function executeGraph(
       signals: result.signals.length,
     });
   } catch (error) {
-    logger.error({
-      evt: 'graph.cli.graph.error',
-      module: 'graph:cli',
-      err: error instanceof Error ? error.message : String(error),
-    });
-    if (error instanceof ConfigurationError) {
-      cli.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
-    } else if (error instanceof ToolError) {
-      cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
-    } else {
-      cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
-    }
-    process.stderr.write(`graph: ${error instanceof Error ? error.message : String(error)}\n`);
+    handleGraphError('graph', error, cli);
   }
+}
+
+function handleGraphError(label: string, error: unknown, cli: ToolCliContext): void {
+  logger.error({
+    evt: `graph.cli.${label}.error`,
+    module: 'graph:cli',
+    err: error instanceof Error ? error.message : String(error),
+  });
+  if (error instanceof ConfigurationError) {
+    cli.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
+  } else if (error instanceof ValidationError) {
+    cli.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
+  } else if (error instanceof ToolError) {
+    cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
+  } else {
+    cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
+  }
+  process.stderr.write(`${label}: ${error instanceof Error ? error.message : String(error)}\n`);
+}
+
+async function runGateMode(
+  opts: GraphCommandOptions,
+  signals: readonly Signal[],
+  cli: ToolCliContext,
+): Promise<void> {
+  const paths = resolveProjectPaths(opts.cwd);
+  const baselinePath = opts.baseline ?? paths.graphBaselinePath;
+  if (opts.gateSave === true) {
+    saveBaseline(signals, baselinePath);
+    process.stdout.write(`Graph baseline saved to ${baselinePath} (${String(signals.length)} signals)\n`);
+    cli.setExitCode(EXIT_CODES.SUCCESS);
+    return;
+  }
+  // gate-compare
+  const result = compareToBaseline(signals, baselinePath);
+  if (result.degraded) {
+    cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
+    process.stdout.write(
+      `Graph gate FAILED: ${String(result.newSignals.length)} new finding(s) since baseline.\n`,
+    );
+    for (const s of result.newSignals) {
+      process.stdout.write(`  + ${fingerprintSignal(s)}\n`);
+    }
+  } else {
+    cli.setExitCode(EXIT_CODES.SUCCESS);
+    process.stdout.write(
+      `Graph gate PASS: no regressions (${String(result.resolvedFingerprints.length)} resolved since baseline).\n`,
+    );
+  }
+  // Defer-await is fine; nothing else to do.
+  await Promise.resolve();
+}
+
+async function runReportMode(
+  opts: GraphCommandOptions,
+  signals: readonly Signal[],
+  cli: ToolCliContext,
+): Promise<void> {
+  const cliOutput = buildCliOutput(signals, 'graph');
+  const url = opts.reportTo!;
+  const sarif = renderSarif(cliOutput);
+  const result = await reportToCloud(cliOutput, url, opts.apiKey);
+  if (!result.success) {
+    cli.setExitCode(EXIT_CODES.REPORT_FAILED);
+    process.stderr.write(`Graph report failed: ${result.error ?? 'unknown error'}\n`);
+    return;
+  }
+  cli.setExitCode(EXIT_CODES.SUCCESS);
+  process.stdout.write(
+    `Graph report sent to ${url} (${String(signals.length)} signals, ${sarif.length} bytes).\n`,
+  );
 }

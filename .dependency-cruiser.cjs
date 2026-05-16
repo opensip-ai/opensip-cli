@@ -258,6 +258,20 @@ module.exports = {
       from: { path: '^packages/graph/engine/src/pipeline/edge-resolvers/' },
       to: { path: '^packages/graph/engine/src/pipeline/inventory-visitors/' },
     },
+    {
+      // Documented exception: graph imports SARIF helpers from fitness
+      // (DEC-3 in docs/plans/graph-tool-v2-design.md Appendix C).
+      // Both packages sit at the tools/lang peer layer; the import is
+      // restricted to render/sarif.ts via the rule below. Listed as
+      // 'info' so the build records the edge but doesn't reject it.
+      name: 'graph-may-import-fitness-sarif',
+      severity: 'info',
+      comment:
+        'Graph imports SARIF helpers from fitness as a peer-layer dependency. ' +
+        'Allowed cross-tool import documented in DEC-3.',
+      from: { path: '^packages/graph/engine/src/render/sarif\\.ts$' },
+      to: { path: '^@opensip-tools/fitness$' },
+    },
   ],
 
   options: {
