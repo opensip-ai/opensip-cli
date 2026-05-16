@@ -90,6 +90,22 @@ const main = async () => {
       }
       if (existing !== transformed) stale.push(srcRel);
     }
+
+    // Manifest must also stay in sync. Deterministic build means a
+    // straight string compare suffices.
+    const expectedManifestText =
+      JSON.stringify(buildManifest(results, releaseRef), null, 2) + '\n';
+    const manifestPath = join(REPO_ROOT, OUTPUT_DOC_ROOT, 'manifest.json');
+    let existingManifestText = '';
+    try {
+      existingManifestText = await fs.readFile(manifestPath, 'utf8');
+    } catch {
+      // missing — treat as stale
+    }
+    if (existingManifestText !== expectedManifestText) {
+      stale.push('manifest.json');
+    }
+
     // Also flag files in docs/web/ that have no corresponding source
     const expectedDsts = new Set(results.map((r) => r.dstAbs));
     const actualDsts = (
@@ -126,7 +142,142 @@ const main = async () => {
     await fs.mkdir(dirname(dstAbs), { recursive: true });
     await fs.writeFile(dstAbs, transformed);
   }
-  log(`Wrote ${results.length} file(s) to ${OUTPUT_DOC_ROOT}/`);
+
+  // Manifest — single fetch on the website discovers every page.
+  // The shape is intentionally small: enough for routing + nav, no
+  // more. The website can fetch individual .md files for body content
+  // and parse their frontmatter directly if it needs richer metadata.
+  const manifest = buildManifest(results, releaseRef);
+  await fs.writeFile(
+    join(REPO_ROOT, OUTPUT_DOC_ROOT, 'manifest.json'),
+    JSON.stringify(manifest, null, 2) + '\n'
+  );
+
+  log(`Wrote ${results.length} file(s) + manifest.json to ${OUTPUT_DOC_ROOT}/`);
+};
+
+// ---------------------------------------------------------------------
+// Manifest
+// ---------------------------------------------------------------------
+
+const buildManifest = (results, releaseRef) => {
+  const pages = results.map(({ srcRel, transformed }) => {
+    const fm = parseFrontmatter(transformed);
+    return {
+      file: `${OUTPUT_DOC_ROOT}/${srcRel}`,
+      path: srcRelToWebPath(srcRel),
+      section: srcRel.includes('/') ? srcRel.split('/')[0] : '',
+      title: fm.title || filenameToTitle(srcRel),
+      ...(fm.audience ? { audience: fm.audience } : {}),
+      ...(fm.purpose ? { purpose: fm.purpose } : {}),
+    };
+  });
+
+  // Sort: root README first, then by directory and filename
+  pages.sort((a, b) => {
+    if (a.file === `${OUTPUT_DOC_ROOT}/README.md`) return -1;
+    if (b.file === `${OUTPUT_DOC_ROOT}/README.md`) return 1;
+    return a.file.localeCompare(b.file);
+  });
+
+  // Group into sections for nav.
+  const sectionMap = new Map();
+  for (const page of pages) {
+    if (!page.section) continue;
+    if (!sectionMap.has(page.section)) {
+      sectionMap.set(page.section, {
+        section: page.section,
+        title: sectionTitle(page.section),
+        pages: [],
+      });
+    }
+    sectionMap.get(page.section).pages.push(page.path);
+  }
+  const nav = [...sectionMap.values()];
+
+  // No build timestamp on purpose — manifest is fully deterministic so
+  // re-running the build never produces a spurious diff. The website
+  // can derive "last updated" from the GitHub commit timestamp via API.
+  return {
+    version: releaseRef.replace(/^v/, ''),
+    rawBase: `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${releaseRef}/`,
+    pages,
+    nav,
+  };
+};
+
+const parseFrontmatter = (text) => {
+  const match = text.match(/^---\n([\s\S]*?)\n---/);
+  if (!match) return {};
+  const out = {};
+  const lines = match[1].split('\n');
+  for (const line of lines) {
+    const m = line.match(/^([A-Za-z_-]+):\s*(.*)$/);
+    if (!m) continue;
+    const key = m[1];
+    let value = m[2].trim();
+    // Strip surrounding quotes
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    // Inline JSON-ish arrays — best-effort
+    if (value.startsWith('[') && value.endsWith(']')) {
+      try {
+        // Convert YAML inline array to JSON: single-quoted -> double, no quotes around bare words
+        const jsonish = value.replace(/'/g, '"').replace(/([A-Za-z_-][\w-]*)/g, (m) =>
+          /^(true|false|null)$/.test(m) ? m : `"${m}"`
+        );
+        out[key] = JSON.parse(jsonish);
+        continue;
+      } catch {
+        // fall through, store as raw string
+      }
+    }
+    out[key] = value;
+  }
+  return out;
+};
+
+const srcRelToWebPath = (srcRel) => {
+  // Mirror the link-rewriting logic so manifest paths match what
+  // rewritten links inside other docs point to.
+  if (srcRel === 'README.md') {
+    return WEB_BASE_URL + (TRAILING_SLASH ? '/' : '');
+  }
+  if (srcRel.endsWith('/README.md')) {
+    const dir = srcRel.slice(0, -'/README.md'.length);
+    return `${WEB_BASE_URL}/${dir}${TRAILING_SLASH ? '/' : ''}`;
+  }
+  let path = srcRel;
+  if (STRIP_MD_EXTENSION && path.endsWith('.md')) {
+    path = path.slice(0, -3);
+  }
+  return `${WEB_BASE_URL}/${path}${TRAILING_SLASH ? '/' : ''}`;
+};
+
+const filenameToTitle = (srcRel) => {
+  const base = srcRel.split('/').pop().replace(/\.md$/, '');
+  // Drop leading numeric prefix like "00-" or "10-"
+  const stripped = base.replace(/^\d+[-_]/, '');
+  return stripped
+    .split(/[-_]/)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+};
+
+const sectionTitle = (section) => {
+  // "00-orientation" → "00 — Orientation"
+  const m = section.match(/^(\d+)[-_](.+)$/);
+  if (!m) return section;
+  const num = m[1];
+  const rest = m[2]
+    .split(/[-_]/)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+  return `${num} — ${rest}`;
 };
 
 // ---------------------------------------------------------------------

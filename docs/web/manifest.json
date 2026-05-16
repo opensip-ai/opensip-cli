@@ -1,0 +1,424 @@
+{
+  "version": "1.0.4",
+  "rawBase": "https://raw.githubusercontent.com/opensip-ai/opensip-tools/v1.0.4/",
+  "pages": [
+    {
+      "file": "docs/web/README.md",
+      "path": "/docs/opensip-tools/",
+      "section": "",
+      "title": "opensip-tools Architecture",
+      "audience": [
+        "contributors",
+        "plugin-authors",
+        "ci-integrators"
+      ],
+      "purpose": "Teaching path through opensip-tools — what it is, how it thinks, how it runs — plus a lookup-shaped reference catalog."
+    },
+    {
+      "file": "docs/web/00-orientation/00-quick-start.md",
+      "path": "/docs/opensip-tools/00-orientation/00-quick-start/",
+      "section": "00-orientation",
+      "title": "Quick start",
+      "audience": [
+        "contributors",
+        "plugin-authors",
+        "ci-integrators",
+        "evaluators"
+      ],
+      "purpose": "Four commands from zero to a passing fitness run. Hands-on before the conceptual material."
+    },
+    {
+      "file": "docs/web/00-orientation/01-what-is-opensip-tools.md",
+      "path": "/docs/opensip-tools/00-orientation/01-what-is-opensip-tools/",
+      "section": "00-orientation",
+      "title": "What is opensip-tools",
+      "audience": [
+        "contributors",
+        "plugin-authors",
+        "ci-integrators"
+      ],
+      "purpose": "The product entry point — what problem opensip-tools solves, what it actually does, the philosophy, and what it deliberately is not."
+    },
+    {
+      "file": "docs/web/00-orientation/02-vocabulary.md",
+      "path": "/docs/opensip-tools/00-orientation/02-vocabulary/",
+      "section": "00-orientation",
+      "title": "Vocabulary",
+      "audience": [
+        "contributors",
+        "plugin-authors",
+        "ci-integrators"
+      ],
+      "purpose": "The terms used everywhere in opensip-tools. Read this once before going deeper."
+    },
+    {
+      "file": "docs/web/00-orientation/03-system-context.md",
+      "path": "/docs/opensip-tools/00-orientation/03-system-context/",
+      "section": "00-orientation",
+      "title": "System context",
+      "audience": [
+        "contributors",
+        "plugin-authors",
+        "ci-integrators"
+      ],
+      "purpose": "Where opensip-tools sits between you, your codebase, CI, and OpenSIP Cloud — and what it touches on disk."
+    },
+    {
+      "file": "docs/web/10-mental-model/01-fitness-loop.md",
+      "path": "/docs/opensip-tools/10-mental-model/01-fitness-loop/",
+      "section": "10-mental-model",
+      "title": "The fitness loop",
+      "audience": [
+        "contributors",
+        "plugin-authors",
+        "ci-integrators"
+      ],
+      "purpose": "One check, end to end. Definition → loading → recipe selection → scope resolution → execution → signal → render → exit. The spine of the doc set."
+    },
+    {
+      "file": "docs/web/10-mental-model/02-tool-plugin-model.md",
+      "path": "/docs/opensip-tools/10-mental-model/02-tool-plugin-model/",
+      "section": "10-mental-model",
+      "title": "The tool-plugin model",
+      "audience": [
+        "contributors",
+        "plugin-authors"
+      ],
+      "purpose": "How the CLI doesn't know what `fit` does. The Tool contract, the registry, the dispatcher, and what it takes to add a third tool."
+    },
+    {
+      "file": "docs/web/10-mental-model/03-modular-monolith.md",
+      "path": "/docs/opensip-tools/10-mental-model/03-modular-monolith/",
+      "section": "10-mental-model",
+      "title": "Layered package graph",
+      "audience": [
+        "contributors"
+      ],
+      "purpose": "The 17-package monorepo, the five-layer dependency rule, why dependency-cruiser exists, and the trade-offs."
+    },
+    {
+      "file": "docs/web/10-mental-model/04-contract-surfaces.md",
+      "path": "/docs/opensip-tools/10-mental-model/04-contract-surfaces/",
+      "section": "10-mental-model",
+      "title": "Contract surfaces",
+      "audience": [
+        "contributors",
+        "plugin-authors",
+        "ci-integrators"
+      ],
+      "purpose": "The system's public edges. Every contract opensip-tools makes with the outside world, and what changing each one would cost."
+    },
+    {
+      "file": "docs/web/20-the-fit-loop/01-recipes-and-checks.md",
+      "path": "/docs/opensip-tools/20-the-fit-loop/01-recipes-and-checks/",
+      "section": "20-the-fit-loop",
+      "title": "Recipes and checks",
+      "audience": [
+        "contributors",
+        "plugin-authors"
+      ],
+      "purpose": "What a recipe is, what a check is, and how they compose. The two primary author-facing primitives in fit."
+    },
+    {
+      "file": "docs/web/20-the-fit-loop/02-targets-and-scope.md",
+      "path": "/docs/opensip-tools/20-the-fit-loop/02-targets-and-scope/",
+      "section": "20-the-fit-loop",
+      "title": "Targets and scope",
+      "audience": [
+        "contributors",
+        "plugin-authors"
+      ],
+      "purpose": "How the framework decides which files a check runs against. Targets, scope, glob expansion, and the marketplace shape."
+    },
+    {
+      "file": "docs/web/20-the-fit-loop/03-ignore-directives.md",
+      "path": "/docs/opensip-tools/20-the-fit-loop/03-ignore-directives/",
+      "section": "20-the-fit-loop",
+      "title": "Ignore directives",
+      "audience": [
+        "contributors",
+        "plugin-authors",
+        "ci-integrators"
+      ],
+      "purpose": "Inline source-level suppression — how `@fitness-ignore-next-line` and `@fitness-ignore-file` work, when to use them, and where they fit in the run."
+    },
+    {
+      "file": "docs/web/20-the-fit-loop/04-output-gate-sarif.md",
+      "path": "/docs/opensip-tools/20-the-fit-loop/04-output-gate-sarif/",
+      "section": "20-the-fit-loop",
+      "title": "Output, gate, SARIF",
+      "audience": [
+        "contributors",
+        "ci-integrators"
+      ],
+      "purpose": "What happens to the violations a check produces — render layer, JSON output, SARIF, the gate, cloud reporting."
+    },
+    {
+      "file": "docs/web/30-the-sim-loop/01-scenarios-and-recipes.md",
+      "path": "/docs/opensip-tools/30-the-sim-loop/01-scenarios-and-recipes/",
+      "section": "30-the-sim-loop",
+      "title": "Scenarios and recipes (sim)",
+      "audience": [
+        "contributors",
+        "plugin-authors"
+      ],
+      "purpose": "What a sim scenario is, the four kinds, and how recipes compose them. The author-facing primitives in the simulation tool."
+    },
+    {
+      "file": "docs/web/30-the-sim-loop/02-execution-model.md",
+      "path": "/docs/opensip-tools/30-the-sim-loop/02-execution-model/",
+      "section": "30-the-sim-loop",
+      "title": "Sim execution model",
+      "audience": [
+        "contributors"
+      ],
+      "purpose": "How the sim engine runs scenarios. Dispatcher, executor lifecycle, result aggregation, exit semantics."
+    },
+    {
+      "file": "docs/web/40-runtime/01-cli-dispatch.md",
+      "path": "/docs/opensip-tools/40-runtime/01-cli-dispatch/",
+      "section": "40-runtime",
+      "title": "CLI dispatch",
+      "audience": [
+        "contributors"
+      ],
+      "purpose": "How argv becomes a Tool action handler. The CLI bootstrap, registration order, the global flag set, error suggestions."
+    },
+    {
+      "file": "docs/web/40-runtime/02-plugin-loader.md",
+      "path": "/docs/opensip-tools/40-runtime/02-plugin-loader/",
+      "section": "40-runtime",
+      "title": "Plugin loader",
+      "audience": [
+        "contributors",
+        "plugin-authors"
+      ],
+      "purpose": "How plugins are discovered, loaded, and registered. Source files, npm packages, project pinning, the sync command."
+    },
+    {
+      "file": "docs/web/40-runtime/03-session-and-persistence.md",
+      "path": "/docs/opensip-tools/40-runtime/03-session-and-persistence/",
+      "section": "40-runtime",
+      "title": "Session and persistence",
+      "audience": [
+        "contributors"
+      ],
+      "purpose": "What gets written to disk during and after a run. The runtime dir layout, session records, logs, reports, the cache."
+    },
+    {
+      "file": "docs/web/50-subsystems/01-language-adapters.md",
+      "path": "/docs/opensip-tools/50-subsystems/01-language-adapters/",
+      "section": "50-subsystems",
+      "title": "Language adapters",
+      "audience": [
+        "contributors",
+        "plugin-authors"
+      ],
+      "purpose": "What a LanguageAdapter is, the six bundled adapters, and how to author a new one."
+    },
+    {
+      "file": "docs/web/50-subsystems/02-check-packs.md",
+      "path": "/docs/opensip-tools/50-subsystems/02-check-packs/",
+      "section": "50-subsystems",
+      "title": "Check pack architecture",
+      "audience": [
+        "contributors",
+        "plugin-authors"
+      ],
+      "purpose": "How check packs are structured, the bundled six, scope filters, parameterization, and the marketplace shape."
+    },
+    {
+      "file": "docs/web/50-subsystems/03-architecture-gate.md",
+      "path": "/docs/opensip-tools/50-subsystems/03-architecture-gate/",
+      "section": "50-subsystems",
+      "title": "Architecture gate",
+      "audience": [
+        "contributors",
+        "ci-integrators"
+      ],
+      "purpose": "The baseline-and-compare workflow. Identity hash, line-shift invariance, partial-SARIF tolerance, CI integration patterns."
+    },
+    {
+      "file": "docs/web/60-surfaces/01-cli-command-tree.md",
+      "path": "/docs/opensip-tools/60-surfaces/01-cli-command-tree/",
+      "section": "60-surfaces",
+      "title": "CLI command tree",
+      "audience": [
+        "users",
+        "ci-integrators",
+        "contributors"
+      ],
+      "purpose": "Lookup-shaped reference for every CLI command, its flags, and when to use each."
+    },
+    {
+      "file": "docs/web/60-surfaces/02-plugin-authoring.md",
+      "path": "/docs/opensip-tools/60-surfaces/02-plugin-authoring/",
+      "section": "60-surfaces",
+      "title": "Plugin authoring",
+      "audience": [
+        "plugin-authors"
+      ],
+      "purpose": "Write your own check, recipe, scenario, check pack, or full Tool plugin. End-to-end."
+    },
+    {
+      "file": "docs/web/60-surfaces/03-dashboard.md",
+      "path": "/docs/opensip-tools/60-surfaces/03-dashboard/",
+      "section": "60-surfaces",
+      "title": "Dashboard",
+      "audience": [
+        "users",
+        "contributors"
+      ],
+      "purpose": "The HTML report — what it shows, when it opens, how it's generated, and where it lives."
+    },
+    {
+      "file": "docs/web/70-reference/01-package-catalog.md",
+      "path": "/docs/opensip-tools/70-reference/01-package-catalog/",
+      "section": "70-reference",
+      "title": "Package catalog",
+      "audience": [
+        "contributors",
+        "plugin-authors"
+      ],
+      "purpose": "Flat reference of every package in the monorepo: name, path, layer, one-line role, key exports. Lookup-only; the conceptual layer narrative lives in 10-mental-model/03-modular-monolith.md."
+    },
+    {
+      "file": "docs/web/70-reference/02-configuration.md",
+      "path": "/docs/opensip-tools/70-reference/02-configuration/",
+      "section": "70-reference",
+      "title": "Configuration",
+      "audience": [
+        "users",
+        "ci-integrators",
+        "plugin-authors"
+      ],
+      "purpose": "The opensip-tools.config.yml schema, every field, defaults, and where each is read."
+    },
+    {
+      "file": "docs/web/70-reference/03-json-output-schema.md",
+      "path": "/docs/opensip-tools/70-reference/03-json-output-schema/",
+      "section": "70-reference",
+      "title": "JSON output schema",
+      "audience": [
+        "ci-integrators",
+        "plugin-authors"
+      ],
+      "purpose": "The CliOutput shape (and the SimDoneResult shape). Every field, every type, every presence rule."
+    },
+    {
+      "file": "docs/web/80-conventions/01-coding-standards.md",
+      "path": "/docs/opensip-tools/80-conventions/01-coding-standards/",
+      "section": "80-conventions",
+      "title": "Coding standards",
+      "audience": [
+        "contributors"
+      ],
+      "purpose": "How code in this workspace is written. ESLint posture, error handling, exit codes, log style."
+    },
+    {
+      "file": "docs/web/80-conventions/02-layer-policy.md",
+      "path": "/docs/opensip-tools/80-conventions/02-layer-policy/",
+      "section": "80-conventions",
+      "title": "Layer policy",
+      "audience": [
+        "contributors"
+      ],
+      "purpose": "The dependency-cruiser rules that enforce the five-layer architecture, rule by rule, with rationale."
+    },
+    {
+      "file": "docs/web/80-conventions/03-doc-conventions.md",
+      "path": "/docs/opensip-tools/80-conventions/03-doc-conventions/",
+      "section": "80-conventions",
+      "title": "Doc conventions",
+      "audience": [
+        "contributors"
+      ],
+      "purpose": "Voice, frontmatter, diagrams, and verification trail conventions for the architecture doc set."
+    }
+  ],
+  "nav": [
+    {
+      "section": "00-orientation",
+      "title": "00 — Orientation",
+      "pages": [
+        "/docs/opensip-tools/00-orientation/00-quick-start/",
+        "/docs/opensip-tools/00-orientation/01-what-is-opensip-tools/",
+        "/docs/opensip-tools/00-orientation/02-vocabulary/",
+        "/docs/opensip-tools/00-orientation/03-system-context/"
+      ]
+    },
+    {
+      "section": "10-mental-model",
+      "title": "10 — Mental Model",
+      "pages": [
+        "/docs/opensip-tools/10-mental-model/01-fitness-loop/",
+        "/docs/opensip-tools/10-mental-model/02-tool-plugin-model/",
+        "/docs/opensip-tools/10-mental-model/03-modular-monolith/",
+        "/docs/opensip-tools/10-mental-model/04-contract-surfaces/"
+      ]
+    },
+    {
+      "section": "20-the-fit-loop",
+      "title": "20 — The Fit Loop",
+      "pages": [
+        "/docs/opensip-tools/20-the-fit-loop/01-recipes-and-checks/",
+        "/docs/opensip-tools/20-the-fit-loop/02-targets-and-scope/",
+        "/docs/opensip-tools/20-the-fit-loop/03-ignore-directives/",
+        "/docs/opensip-tools/20-the-fit-loop/04-output-gate-sarif/"
+      ]
+    },
+    {
+      "section": "30-the-sim-loop",
+      "title": "30 — The Sim Loop",
+      "pages": [
+        "/docs/opensip-tools/30-the-sim-loop/01-scenarios-and-recipes/",
+        "/docs/opensip-tools/30-the-sim-loop/02-execution-model/"
+      ]
+    },
+    {
+      "section": "40-runtime",
+      "title": "40 — Runtime",
+      "pages": [
+        "/docs/opensip-tools/40-runtime/01-cli-dispatch/",
+        "/docs/opensip-tools/40-runtime/02-plugin-loader/",
+        "/docs/opensip-tools/40-runtime/03-session-and-persistence/"
+      ]
+    },
+    {
+      "section": "50-subsystems",
+      "title": "50 — Subsystems",
+      "pages": [
+        "/docs/opensip-tools/50-subsystems/01-language-adapters/",
+        "/docs/opensip-tools/50-subsystems/02-check-packs/",
+        "/docs/opensip-tools/50-subsystems/03-architecture-gate/"
+      ]
+    },
+    {
+      "section": "60-surfaces",
+      "title": "60 — Surfaces",
+      "pages": [
+        "/docs/opensip-tools/60-surfaces/01-cli-command-tree/",
+        "/docs/opensip-tools/60-surfaces/02-plugin-authoring/",
+        "/docs/opensip-tools/60-surfaces/03-dashboard/"
+      ]
+    },
+    {
+      "section": "70-reference",
+      "title": "70 — Reference",
+      "pages": [
+        "/docs/opensip-tools/70-reference/01-package-catalog/",
+        "/docs/opensip-tools/70-reference/02-configuration/",
+        "/docs/opensip-tools/70-reference/03-json-output-schema/"
+      ]
+    },
+    {
+      "section": "80-conventions",
+      "title": "80 — Conventions",
+      "pages": [
+        "/docs/opensip-tools/80-conventions/01-coding-standards/",
+        "/docs/opensip-tools/80-conventions/02-layer-policy/",
+        "/docs/opensip-tools/80-conventions/03-doc-conventions/"
+      ]
+    }
+  ]
+}
