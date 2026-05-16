@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync, rmSync, symlinkSync, mkdtempSync } from 'node:fs'
+import { existsSync, mkdirSync, writeFileSync, rmSync, symlinkSync, mkdtempSync } from 'node:fs'
 import { tmpdir, platform } from 'node:os'
 import { join } from 'node:path'
 
@@ -265,6 +265,76 @@ describe('discoverPlugins', () => {
       const result = discoverPlugins('fit', testDir)
       expect(result.length).toBeGreaterThanOrEqual(1)
       expect(result.every(p => p.type === 'file')).toBe(true)
+    })
+  })
+
+  describe('config-path resolution (package.json#opensip-tools.configPath)', () => {
+    // Regression: readProjectPluginsList used to hardcode
+    // `join(projectDir, 'opensip-tools.config.yml')`, ignoring the
+    // package.json pointer that the targets loader already honored. As
+    // a result, projects whose config lived elsewhere (e.g.,
+    // `<projectDir>/opensip-tools/opensip-tools.config.yml`) had their
+    // `plugins.<domain>: [...]` declaration silently skipped — the
+    // plugins-dir fallback returned an empty user-level dir and no
+    // pack registered.
+    //
+    // The fix routes config-path lookup through `resolveProjectConfigPath`,
+    // so the precedence (--config → package.json pointer → default)
+    // is identical across the targets and plugins loaders.
+
+    it('honors `package.json#opensip-tools.configPath` for plugin declarations', () => {
+      // Config lives at a non-default path; the package.json points there.
+      mkdirSync(join(testDir, 'sub'), { recursive: true })
+      writeFileSync(
+        join(testDir, 'sub', 'opensip-tools.config.yml'),
+        'plugins:\n  fit:\n    - "pointed-pkg"\n',
+      )
+      writeFileSync(
+        join(testDir, 'package.json'),
+        JSON.stringify({
+          name: 'test-project',
+          'opensip-tools': { configPath: 'sub/opensip-tools.config.yml' },
+        }),
+      )
+
+      // Install the declared package into the plugins dir.
+      const pluginsRoot = fitPluginsDir()
+      const pkgDir = join(pluginsRoot, 'node_modules', 'pointed-pkg')
+      mkdirSync(pkgDir, { recursive: true })
+      writeFileSync(
+        join(pkgDir, 'package.json'),
+        JSON.stringify({ name: 'pointed-pkg', main: './index.js' }),
+      )
+      writeFileSync(join(pkgDir, 'index.js'), 'export const checks = []')
+
+      // Sanity: the default path has NO config — only the pointer path does.
+      expect(existsSync(join(testDir, 'opensip-tools.config.yml'))).toBe(false)
+
+      const result = discoverPlugins('fit', testDir)
+      expect(result).toHaveLength(1)
+      expect(result[0]).toMatchObject({ type: 'package', namespace: 'pointed-pkg' })
+    })
+
+    it('falls back to default config path when no pointer is set', () => {
+      // No package.json pointer; default path has the config.
+      setupPluginsConfig(['default-pkg'])
+      const pluginsRoot = fitPluginsDir()
+      const pkgDir = join(pluginsRoot, 'node_modules', 'default-pkg')
+      mkdirSync(pkgDir, { recursive: true })
+      writeFileSync(
+        join(pkgDir, 'package.json'),
+        JSON.stringify({ name: 'default-pkg', main: './index.js' }),
+      )
+      writeFileSync(join(pkgDir, 'index.js'), 'export const checks = []')
+
+      const result = discoverPlugins('fit', testDir)
+      expect(result).toHaveLength(1)
+      expect(result[0]).toMatchObject({ type: 'package', namespace: 'default-pkg' })
+    })
+
+    it('returns undefined-equivalent (no findings) when neither config exists', () => {
+      // No config anywhere → discovery falls through gracefully.
+      expect(discoverPlugins('fit', testDir)).toEqual([])
     })
   })
 

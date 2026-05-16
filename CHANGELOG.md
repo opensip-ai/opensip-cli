@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.6] — 2026-05-16
+
+### Fixed
+
+- **Plugin discovery now honors `package.json#opensip-tools.configPath`.**
+  `readProjectPluginsList` in `@opensip-tools/core` previously hardcoded
+  `<projectDir>/opensip-tools.config.yml`, ignoring the package.json
+  pointer that the targets loader (`resolveProjectConfigPath`) already
+  honored. Projects whose config lived at a non-default path — e.g.,
+  pointing at `opensip-tools/opensip-tools.config.yml` in a monorepo
+  with a vendor-tooling subdir — had their `plugins.<domain>: [...]`
+  declaration silently skipped. The plugins dir then fell through to
+  the empty default, and the declared pack never registered (so no
+  recipes, no checks beyond the built-ins).
+
+  The fix routes `readProjectPluginsList` through
+  `resolveProjectConfigPath` so the precedence is identical across
+  the two loaders: `--config` → `package.json#opensip-tools.configPath`
+  → `<projectDir>/opensip-tools.config.yml`. Coverage added to
+  `discover.test.ts` for the pointer + default-fallback cases.
+
 ## [1.0.0] — 2026-05-15
 
 First stable release. Everything below was developed and iterated
