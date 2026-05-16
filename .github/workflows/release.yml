@@ -54,7 +54,7 @@ jobs:
             core \
             contracts \
             lang-typescript lang-rust lang-python lang-go lang-java lang-cpp \
-            fitness simulation \
+            fitness simulation graph \
             checks-universal checks-typescript checks-python checks-go checks-java checks-cpp \
             cli ; do
             name="@opensip-tools/$pkg"
@@ -90,6 +90,7 @@ jobs:
           # Layer 3 — tools
           pnpm --filter @opensip-tools/fitness          pack --pack-destination /tmp/tarballs
           pnpm --filter @opensip-tools/simulation       pack --pack-destination /tmp/tarballs
+          pnpm --filter @opensip-tools/graph            pack --pack-destination /tmp/tarballs
           # Layer 4 — check packs
           pnpm --filter @opensip-tools/checks-universal  pack --pack-destination /tmp/tarballs
           pnpm --filter @opensip-tools/checks-typescript pack --pack-destination /tmp/tarballs
@@ -129,6 +130,22 @@ jobs:
             npm publish /tmp/tarballs/opensip-tools-${pkg}-*.tgz --access public --provenance
           }
 
+          # Bootstrap publish without --provenance. Required for the very
+          # first publish of a new package because OIDC trusted publishing
+          # has to be configured on npmjs.com (org → package settings →
+          # Publishing access) AFTER the package exists. Use this for the
+          # first publish of a package, then switch to publish_if_new
+          # for subsequent releases once trusted publishing is set up.
+          publish_if_new_no_provenance() {
+            local pkg="$1"
+            local name="@opensip-tools/$pkg"
+            if npm view "${name}@${VERSION}" version >/dev/null 2>&1; then
+              echo "::notice::skip ${name}@${VERSION} (already on npm)"
+              return 0
+            fi
+            npm publish /tmp/tarballs/opensip-tools-${pkg}-*.tgz --access public
+          }
+
           # Layer 1 — kernel
           publish_if_new core
           # Layer 2 — shared CLI infra
@@ -143,6 +160,11 @@ jobs:
           # Layer 3 — tools (depend on core, contracts, lang-typescript)
           publish_if_new fitness
           publish_if_new simulation
+          # @opensip-tools/graph is new on npm — first publish runs without
+          # --provenance because trusted publishing has to be configured
+          # on npmjs.com after the package exists. Switch to publish_if_new
+          # after the bootstrap publish.
+          publish_if_new_no_provenance graph
           # Layer 4 — check packs (depend on fitness)
           publish_if_new checks-universal
           publish_if_new checks-typescript

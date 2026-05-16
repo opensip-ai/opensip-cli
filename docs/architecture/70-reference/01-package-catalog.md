@@ -46,6 +46,7 @@ Peer packages at the same layer. Tools implement the `Tool` contract; language a
 |---|---|---|---|
 | `@opensip-tools/fitness` | `packages/fitness/engine/` | Fitness check engine, `defineCheck`, `defineRecipe`, gate, SARIF builder | `defineCheck`, `defineRecipe`, `getCheckConfig`, `executeFit`, `loadSignalersConfig`, `fitnessTool`, `saveBaseline`, `compareToBaseline`, `buildSarifLog`, `reportToCloud`, `openDashboard` |
 | `@opensip-tools/simulation` | `packages/simulation/engine/` | Simulation engine, four scenario kinds | `defineLoadScenario`, `defineChaosScenario`, `defineInvariantScenario`, `defineFixEvaluationScenario`, `defineRecipe`, `simulationTool`, `scenarioRegistry`, `SCENARIO_KINDS` |
+| `@opensip-tools/graph` | `packages/graph/engine/` | Code-path graph + dead-end detector (TypeScript). Catalog builder, polymorphic resolver, rule registry. P0–P3 ship two active rules: `graph:duplicated-function-body` and `graph:orphan-subtree`; P4–P7 stubs are registered. Direct dep on `lang-typescript` (documented carve-out). | `graphTool`, `buildCatalog`, `evaluateAllRules`, `GRAPH_RULES`, `runGraph`, `executeGraph`, `executeOrphans`, `executeEntryPoints`, `saveBaseline`, `compareToBaseline`, `DEFAULT_GRAPH_BASELINE_PATH` |
 
 ### Language adapters
 
@@ -92,6 +93,6 @@ Imports every layer below. The published binary.
 
 Last verified at v1.0.0 against:
 
-- `packages/` directory listing (17 packages — 1 kernel + 1 contracts + 6 lang + 1 fitness + 1 simulation + 6 check packs + 1 cli).
+- `packages/` directory listing (18 packages — 1 kernel + 1 contracts + 6 lang + 3 tools (fitness, simulation, graph) + 6 check packs + 1 cli).
 - Each package's `package.json` `description` and `name` field, read directly.
 - The dep-cruiser config for layer rules.
