@@ -127,6 +127,7 @@ The full command tree is at [`../60-surfaces/01-cli-command-tree.md`](/docs/open
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
+| Behavior doesn't match what these docs describe | Older CLI version than the docs you're reading | Check installed version: `opensip-tools --version` (or `-V`). Latest is on [npm](https://www.npmjs.com/package/@opensip-tools/cli). Update with `npm install -g @opensip-tools/cli@latest`. |
 | `command not found: opensip-tools` | Global install isn't on `$PATH` | `npm config get prefix` — make sure that path's `bin/` is on `$PATH`, or use `npx @opensip-tools/cli` instead |
 | `init` says it detected no language | No supported language marker found (no `package.json`, `Cargo.toml`, etc.) | Pass `--language <name>` explicitly: `opensip-tools init --language typescript` |
 | `fit --recipe example` says "0 checks ran" | Targets in `opensip-tools.config.yml` don't match any files | Open the config; widen `targets.<your-language>-source.include` to cover where your code actually lives |
