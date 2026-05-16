@@ -27,5 +27,7 @@ export function normalizeCatalogForSerialization(catalog: Catalog): Catalog {
     });
     functions[key] = sortedOccurrences;
   }
+  // Spread catalog last so filesFingerprint and any future fields are
+  // preserved through the round-trip.
   return { ...catalog, functions };
 }

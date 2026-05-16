@@ -8,7 +8,11 @@
 
 import { resolveProjectPaths } from '@opensip-tools/core';
 
-import { currentTsCompilerVersion, isCatalogValid } from '../cache/invalidate.js';
+import {
+  computeFilesFingerprint,
+  currentTsCompilerVersion,
+  isCatalogValid,
+} from '../cache/invalidate.js';
 import { readCatalog } from '../cache/read.js';
 import { writeCatalog } from '../cache/write.js';
 import { discoverFiles } from '../pipeline/discover.js';
@@ -62,6 +66,7 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
     const valid = isCatalogValid(catalog, {
       currentTsCompilerVersion: currentTsCompilerVersion(),
       currentTsConfigPath: discovery.tsConfigPathAbs,
+      currentFiles: discovery.files,
     });
     if (valid) {
       cacheHit = true;
@@ -83,7 +88,10 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
       program: inventory.program,
       projectDirAbs: discovery.projectDirAbs,
     });
-    catalog = edgeResult.catalog;
+    catalog = {
+      ...edgeResult.catalog,
+      filesFingerprint: computeFilesFingerprint(discovery.files),
+    };
     resolutionStats = edgeResult.resolutionStats;
     if (useCache) {
       try {

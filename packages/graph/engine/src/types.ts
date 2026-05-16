@@ -97,6 +97,13 @@ export interface Catalog {
   readonly builtAt: string;
   readonly tsConfigPath: string;
   readonly tsCompilerVersion: string;
+  /**
+   * Concatenated fingerprint of the source files at build time
+   * (mtime + size per file). Used by cache invalidation; absence
+   * means "this catalog was built before fingerprinting landed,"
+   * which invalidates the catalog conservatively.
+   */
+  readonly filesFingerprint?: string;
   readonly functions: Readonly<Record<string, readonly FunctionOccurrence[]>>;
 }
 
