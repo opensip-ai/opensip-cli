@@ -24,7 +24,9 @@
     "cli": "node packages/cli/dist/index.js",
     "fit": "node packages/cli/dist/index.js fit",
     "dashboard": "node packages/cli/dist/index.js dashboard",
-    "sessions": "node packages/cli/dist/index.js sessions"
+    "sessions": "node packages/cli/dist/index.js sessions",
+    "docs:build": "node tools/build-web-docs.mjs",
+    "docs:check": "node tools/build-web-docs.mjs --check"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
