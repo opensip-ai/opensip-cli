@@ -1,6 +1,13 @@
 # OpenSIP Tools
 
-Open-source codebase analysis toolkit. Run fitness checks against TypeScript, Rust, Python, Java, Go, or C/C++ codebases standalone, in CI, or as a regression detector around AI-agent coding sessions. Integrates with [OpenSIP Cloud](https://opensip.ai) for centralized reporting.
+[![npm](https://img.shields.io/npm/v/@opensip-tools/cli)](https://www.npmjs.com/package/@opensip-tools/cli)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](#license)
+[![Node](https://img.shields.io/badge/node-%E2%89%A522-brightgreen)](https://nodejs.org)
+[![OpenSIP](https://img.shields.io/badge/part%20of-OpenSIP-7c3aed)](https://opensip.ai)
+
+> **opensip-tools is part of [OpenSIP](https://opensip.ai)** — the home for our developer-productivity stack. Start at **[opensip.ai](https://opensip.ai)** for the full product family, including our hosted SaaS.
+
+Open-source codebase analysis toolkit. Run fitness checks against TypeScript, Rust, Python, Java, Go, or C/C++ codebases standalone, in CI, or as a regression detector around AI-agent coding sessions.
 
 opensip-tools is a **collection of tools**, not a single tool. Today it ships
 with two: `fit` (fitness checks) and `sim` (simulation scenarios, experimental).
@@ -38,6 +45,29 @@ git clone https://github.com/opensip-ai/opensip-tools.git
 cd opensip-tools && pnpm install && pnpm build
 node packages/cli/dist/index.js fit
 ```
+
+## OpenSIP — the bigger picture
+
+opensip-tools is the open-source CLI piece. The OpenSIP product family at **[opensip.ai](https://opensip.ai)** is where the rest lives — including the hosted platform our customers use day-to-day. If you're evaluating whether opensip-tools fits into a team workflow rather than just one developer's terminal, start at [opensip.ai](https://opensip.ai).
+
+### Sending CLI results to OpenSIP
+
+opensip-tools posts findings to any SARIF-compatible endpoint, including the OpenSIP hosted platform:
+
+```bash
+# One-time setup (interactive prompt for your API key)
+opensip-tools configure
+
+# Then send findings on every run
+opensip-tools fit --report-to https://your-opensip-instance/api/ingest
+
+# Or pass the key per-invocation
+opensip-tools fit --report-to https://your-opensip-instance/api/ingest --api-key sk-...
+```
+
+Findings are posted in SARIF 2.1.0 format with automatic retry on network failures.
+
+API key resolution: `--api-key` flag > `OPENSIP_API_KEY` env var > `~/.opensip-tools/config.yml`.
 
 ## What `init` writes
 
@@ -464,25 +494,6 @@ Then: `opensip-tools fit --recipe backend-strict`. Sim recipes work
 the same way under `opensip-tools/sim/recipes/` and run via
 `opensip-tools sim --recipe <name>`.
 
-## Cloud Integration
-
-Send findings to OpenSIP Cloud as SARIF:
-
-```bash
-# One-time setup (interactive prompt for your API key)
-opensip-tools configure
-
-# Then send findings
-opensip-tools fit --report-to https://your-opensip-instance/api/ingest
-
-# Or pass the key per-invocation
-opensip-tools fit --report-to https://your-opensip-instance/api/ingest --api-key sk-...
-```
-
-Findings are posted in SARIF 2.1.0 format with automatic retry on network failures.
-
-API key resolution: `--api-key` flag > `OPENSIP_API_KEY` env var > `~/.opensip-tools/config.yml`.
-
 ## CI Integration
 
 ### GitHub Actions
@@ -636,6 +647,14 @@ tool ship without touching CLI source.
 To author a new tool, see the source of `packages/fitness/engine/src/tool.ts`
 or `packages/simulation/engine/src/tool.ts`. The shape is small enough to
 keep the contract honest.
+
+---
+
+## About OpenSIP
+
+opensip-tools is built and maintained by [**OpenSIP**](https://opensip.ai) — visit **[opensip.ai](https://opensip.ai)** for the full product family, including our hosted developer-productivity platform.
+
+This CLI is MIT-licensed and developed in the open at [github.com/opensip-ai/opensip-tools](https://github.com/opensip-ai/opensip-tools). Contributions welcome.
 
 ## License
 
