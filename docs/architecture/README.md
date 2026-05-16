@@ -35,7 +35,8 @@ These docs are written for engineers fluent in TypeScript and Node tooling. Voic
 ### 00 — Orientation
 *Read once. Establishes context for everything below.*
 
-1. [**What is opensip-tools**](./00-orientation/01-what-is-opensip-tools.md) — The product, the problem, the philosophy. **Start here.**
+0. [**Quick start**](./00-orientation/00-quick-start.md) — Four commands from clean shell to a passing fitness run. **Start here** if you want hands-on context before the conceptual material.
+1. [**What is opensip-tools**](./00-orientation/01-what-is-opensip-tools.md) — The product, the problem, the philosophy.
 2. [**Vocabulary**](./00-orientation/02-vocabulary.md) — Tool, recipe, check, scenario, signaler, target, language adapter, plugin, session. The terms used everywhere.
 3. [**System context**](./00-orientation/03-system-context.md) — Where opensip-tools sits between you, your codebase, CI, and OpenSIP Cloud. The runtime layout.
 
