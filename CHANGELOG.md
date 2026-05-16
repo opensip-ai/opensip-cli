@@ -4,6 +4,70 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.7] — 2026-05-16
+
+### Fixed — false-positive triage
+
+Four built-in checks were producing high-rate false positives against
+real-world TypeScript codebases. Each fix tightens the heuristic
+without losing real-bug coverage; regression tests pin the FP cases.
+
+- **`sql-injection`** (`@opensip-tools/checks-typescript`)
+  - `SQL_CLAUSE_PATTERN` was case-insensitive — `/\b(?:WHERE|AND|OR|
+    SET|VALUES)\b/i` matched the English words "and"/"or"/"set"/"where"
+    inside CLI help text (`cli.info('Usage: ...\n' + '...and continues
+    here\n')`), producing one error per concatenated help-string. Now
+    case-sensitive; real SQL conventionally uppercases these.
+  - Arm-3 (right-side string + clause keyword) now requires the SAME
+    `+` chain to contain a real SQL keyword (`SELECT|INSERT|UPDATE|
+    DELETE|...`) somewhere. Closes the residual FP where uppercase
+    "AND" appears in non-SQL text.
+  - Both template-literal and concat arms now skip arguments to
+    output methods (`cli.info`, `console.log`, `logger.warn`, …).
+    These call sites carry user-facing text, never SQL.
+  - Extracted `analyzeSqlInjection(content, filePath)` as a top-level
+    function for direct test invocation; added 7-test FP regression
+    suite in `__tests__/sql-injection.test.ts`.
+
+- **`context-mutation-check`** (`@opensip-tools/checks-typescript`)
+  - Flagged `ctx.X = value` mutations even when `ctx` was a locally-
+    declared `const`/`let`/`var` (object-construction pattern), not
+    a shared request context. Now scans the file for local
+    declarations of `ctx`/`context` via `LOCAL_DECLARATION_PATTERNS`
+    and skips mutations rooted at locally-declared names.
+  - Extracted `analyzeContextMutation` for direct test invocation;
+    added 4-test FP regression suite.
+
+- **`no-hardcoded-secrets`** (`@opensip-tools/checks-universal`)
+  - Matched secret patterns inside REGEX LITERALS (the file IS the
+    redactor — `[/-----BEGIN PRIVATE KEY-----.../g, replacement]`)
+    and inside REDACTION PLACEHOLDERS (`'-----BEGIN PRIVATE KEY-----
+    ***-----END PRIVATE KEY-----'`). Now adds two filters:
+    `isInsideRegexLiteral(line, pos)` and `lineHasRedactionPlaceholder
+    (line)` — the latter scans the whole line for `***`, `[REDACTED]`,
+    `<REDACTED>`, or `XXXX+` runs, since the project-defined patterns
+    typically only match the header (e.g. `-----BEGIN PRIVATE KEY-----`)
+    and the redacted value follows.
+  - Extracted `analyzeHardcodedSecrets`; added 3-test FP regression
+    suite.
+
+- **`eslint-justifications`** (`@opensip-tools/checks-universal`)
+  - Reported "Malformed ESLint suppression comment" for rationales
+    between 401 and 500 characters. The disable-pattern regex
+    accepted bodies up to 500 chars (matching `MAX_JUSTIFICATION_
+    LENGTH`) but the rationale-extraction regex capped at 400 — so
+    rationales in the 401–500 window matched the outer pattern but
+    failed the inner parse, producing the wrong error message
+    instead of the accurate "too long" one. Now both bounds are 500.
+
+### Internal
+
+- All 17 packages bumped 1.0.6 → 1.0.7; cross-package `workspace:*`
+  deps resolved to `1.0.7` via `pnpm pack`.
+- Regression-test count: 14 new tests across the four fixes (all
+  passing); 79 / 83 / 110 totals across `checks-typescript` and
+  `checks-universal`.
+
 ## [1.0.6] — 2026-05-16
 
 ### Fixed

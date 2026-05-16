@@ -69,8 +69,16 @@ const ESLINT_DISABLE_NEXT_LINE_PATTERN = /\/\/\s{0,5}eslint-disable-next-line\s{
 const ESLINT_DISABLE_LINE_PATTERN = /\/\/\s{0,5}eslint-disable-line\s{1,5}([^\n]{1,500})/
 const ESLINT_DISABLE_INLINE_PATTERN = /\/\/\s{0,5}eslint-disable\s{1,5}([^\n]{1,500})/
 const ESLINT_DISABLE_BLOCK_PATTERN = /\/\*\s{0,5}eslint-disable(?:\s{1,5}([^*]{1,400}))?\s{0,5}\*\//
+// Rationale capture caps at MAX_JUSTIFICATION_LENGTH so the boundary
+// the regex enforces matches the explicit length check at line 160.
+// Previously the regex capped at 400 while the constant was 500 —
+// rationales between 401 and 500 chars matched the disable pattern
+// (which accepts up to 500) but failed the rationale regex, producing
+// a misleading "Malformed ESLint suppression comment" error instead
+// of the accurate "too long" message. Aligning both to 500 closes
+// that gap.
 const JUSTIFICATION_PATTERN =
-  /^([\w/@-]{1,100}(?:\s{0,3},\s{0,3}[\w/@-]{1,100}){0,9})(?:\s{1,5}--\s{1,5}([^\n]{1,400}))?$/
+  /^([\w/@-]{1,100}(?:\s{0,3},\s{0,3}[\w/@-]{1,100}){0,9})(?:\s{1,5}--\s{1,5}([^\n]{1,500}))?$/
 const MAX_JUSTIFICATION_LENGTH = 500
 
 // Track multi-line block disable/enable pairs

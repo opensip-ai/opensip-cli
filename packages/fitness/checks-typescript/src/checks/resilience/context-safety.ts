@@ -43,6 +43,33 @@ function usesContextPattern(content: string): boolean {
 }
 
 /**
+ * Detects local declarations of `ctx` or `context` as a function-scoped
+ * variable — `const ctx = {...}`, `const ctx: T = {...}`, `let ctx`,
+ * `var ctx`. When such a declaration exists in the file, every
+ * subsequent `ctx.X =` mutation is a local-object-construction
+ * pattern, NOT a mutation of a shared request context. Skipping those
+ * lines eliminates the canonical false-positive where a function
+ * builds a return object named `ctx` and the check flags it as
+ * request-context mutation.
+ *
+ * Whole-word matching prevents collisions with `myCtx`, `subContext`,
+ * etc. Returns the set of identifier names that are locally declared
+ * — callers consult it before flagging a mutation rooted at that
+ * identifier.
+ */
+const LOCAL_DECLARATION_PATTERNS: readonly (readonly [string, RegExp])[] = [
+  ['ctx', /\b(?:const|let|var)\s+ctx\b(?!\s*\.)/],
+  ['context', /\b(?:const|let|var)\s+context\b(?!\s*\.)/],
+]
+function findLocallyDeclaredNames(content: string): Set<string> {
+  const declared = new Set<string>()
+  for (const [name, pattern] of LOCAL_DECLARATION_PATTERNS) {
+    if (pattern.test(content)) declared.add(name)
+  }
+  return declared
+}
+
+/**
  * Mutation detection configuration.
  * Using simple string matching for linear-time detection.
  */
@@ -288,6 +315,55 @@ function isDefensiveMutation(lines: string[], index: number): boolean {
 }
 
 /**
+ * Pure analysis function. Exported so unit tests can exercise the
+ * detection logic without standing up the full Check framework
+ * (defineCheck wraps `analyze` into an `execute` closure that requires
+ * an ExecutionContext to invoke).
+ */
+export function analyzeContextMutation(content: string, filePath: string): CheckViolation[] {
+  logger.debug({
+    evt: 'fitness.checks.context_safety.context_mutation_check_analyze',
+    msg: 'Analyzing file for unsafe context mutations',
+  })
+  const violations: CheckViolation[] = []
+
+  if (!usesContextPattern(content)) return violations
+
+  const locallyDeclared = findLocallyDeclaredNames(content)
+
+  const lines = content.split('\n')
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    if (line === undefined || !line) continue
+    if (isCommentLine(line)) continue
+
+    const match = findMutationMatch(line)
+    if (!match || match.isSafe) continue
+
+    // eslint-disable-next-line sonarjs/slow-regex -- bounded input: patternName is a short literal like 'ctx.*=' / 'context.*=' authored above in MUTATION_DETECTORS, not attacker input
+    const rootName = match.detector.patternName.replace(/\..*$/, '')
+    if (locallyDeclared.has(rootName)) continue
+
+    const isDefensive = isDefensiveMutation(lines, i)
+    const lineNumber = i + 1
+
+    violations.push({
+      line: lineNumber,
+      column: 0,
+      message: 'Mutation of context object may cause side effects',
+      severity: isDefensive ? 'warning' : 'error',
+      suggestion:
+        'Create a new context object instead of mutating. Use spread operator: const newCtx = { ...ctx, property: newValue }; or Object.freeze() for immutability.',
+      match: match.detector.patternName,
+      type: 'context-mutation',
+      filePath,
+    })
+  }
+
+  return violations
+}
+
+/**
  * Check: resilience/context-mutation-check
  *
  * Detects potentially unsafe mutations of request/execution context objects.
@@ -317,43 +393,7 @@ export const contextMutationCheck = defineCheck({
   fileTypes: ['ts'],
 
   analyze(content: string, filePath: string): CheckViolation[] {
-    logger.debug({
-      evt: 'fitness.checks.context_safety.context_mutation_check_analyze',
-      msg: 'Analyzing file for unsafe context mutations',
-    })
-    const violations: CheckViolation[] = []
-
-    // Skip files that don't use context patterns
-    if (!usesContextPattern(content)) {
-      return violations
-    }
-
-    const lines = content.split('\n')
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i]
-      if (line === undefined || !line) continue
-      if (isCommentLine(line)) continue
-
-      const match = findMutationMatch(line)
-      if (!match || match.isSafe) continue
-
-      const isDefensive = isDefensiveMutation(lines, i)
-      const lineNumber = i + 1
-
-      violations.push({
-        line: lineNumber,
-        column: 0,
-        message: 'Mutation of context object may cause side effects',
-        severity: isDefensive ? 'warning' : 'error',
-        suggestion:
-          'Create a new context object instead of mutating. Use spread operator: const newCtx = { ...ctx, property: newValue }; or Object.freeze() for immutability.',
-        match: match.detector.patternName,
-        type: 'context-mutation',
-        filePath,
-      })
-    }
-
-    return violations
+    return analyzeContextMutation(content, filePath)
   },
 })
 

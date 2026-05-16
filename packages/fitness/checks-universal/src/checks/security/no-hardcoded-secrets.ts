@@ -126,40 +126,95 @@ export const noHardcodedSecrets = defineCheck({
   fileTypes: ['ts', 'tsx'],
 
   analyze(content: string, filePath: string): CheckViolation[] {
-    logger.debug({
-      evt: 'fitness.checks.no_hardcoded_secrets.analyze',
-      msg: 'Analyzing file for hardcoded secrets and credentials',
-    })
-    const violations: CheckViolation[] = []
-    const lines = content.split('\n')
-
-    for (const [lineNum, line_] of lines.entries()) {
-      const line = line_ ?? ''
-
-      // Skip comments
-      const trimmed = line.trim()
-      if (trimmed.startsWith('//') || trimmed.startsWith('*')) {
-        continue
-      }
-
-      for (const pattern of SECRET_PATTERNS) {
-        // Reset regex state
-        pattern.regex.lastIndex = 0
-        const match = pattern.regex.exec(line)
-        if (match) {
-          violations.push({
-            line: lineNum + 1,
-            column: match.index,
-            message: pattern.message,
-            severity: 'error',
-            suggestion: pattern.suggestion,
-            match: match[0],
-            filePath,
-          })
-        }
-      }
-    }
-
-    return violations
+    return analyzeHardcodedSecrets(content, filePath)
   },
 })
+
+/**
+ * Pure analysis function. Exported so unit tests can exercise the
+ * detection logic without standing up the full Check framework.
+ */
+export function analyzeHardcodedSecrets(content: string, filePath: string): CheckViolation[] {
+  logger.debug({
+    evt: 'fitness.checks.no_hardcoded_secrets.analyze',
+    msg: 'Analyzing file for hardcoded secrets and credentials',
+  })
+  const violations: CheckViolation[] = []
+  const lines = content.split('\n')
+
+  for (const [lineNum, line_] of lines.entries()) {
+    const line = line_ ?? ''
+    analyzeLine(line, lineNum + 1, filePath, violations)
+  }
+
+  return violations
+}
+
+function analyzeLine(
+  line: string,
+  lineNumber: number,
+  filePath: string,
+  violations: CheckViolation[],
+): void {
+  const trimmed = line.trim()
+  if (trimmed.startsWith('//') || trimmed.startsWith('*')) return
+
+  for (const pattern of SECRET_PATTERNS) {
+    pattern.regex.lastIndex = 0
+    const matched = pattern.regex.exec(line)
+    if (!matched) continue
+    if (isInsideRegexLiteral(line, matched.index)) continue
+    if (lineHasRedactionPlaceholder(line)) continue
+    violations.push({
+      line: lineNumber,
+      column: matched.index,
+      message: pattern.message,
+      severity: 'error',
+      suggestion: pattern.suggestion,
+      match: matched[0],
+      filePath,
+    })
+  }
+}
+
+/**
+ * Heuristic: is `pos` inside a regex literal on `line`? Walks the line
+ * tracking unescaped `/` chars as regex-literal delimiters. A position
+ * with an odd number of unescaped `/` chars to its left, and another
+ * unescaped `/` after, is inside a literal.
+ *
+ * Heuristic — division operators and JSX can confuse it, but lines
+ * with those tokens AND a secret-pattern match in the same line are
+ * rare; the trade-off favors silencing the redaction-pattern FPs.
+ */
+function isInsideRegexLiteral(line: string, pos: number): boolean {
+  // Count unescaped slashes before pos.
+  let slashesBefore = 0
+  for (let i = 0; i < pos; i++) {
+    if (line[i] === '/' && line[i - 1] !== '\\') slashesBefore++
+  }
+  if (slashesBefore % 2 !== 1) return false
+  // Check at least one unescaped slash follows.
+  for (let i = pos; i < line.length; i++) {
+    if (line[i] === '/' && line[i - 1] !== '\\') return true
+  }
+  return false
+}
+
+/**
+ * True iff the LINE around a secret match contains a redaction-
+ * placeholder marker. Many of the project-defined patterns only match
+ * the HEADER (e.g. `-----BEGIN PRIVATE KEY-----`) but the surrounding
+ * value is replaced with `***`, `[REDACTED]`, etc. Checking the line
+ * (not just the matched span) catches those.
+ *
+ * Markers: `***`, `<REDACTED>`, `[REDACTED]`, runs of `X` (4+).
+ */
+function lineHasRedactionPlaceholder(line: string): boolean {
+  return (
+    line.includes('***') ||
+    line.includes('[REDACTED]') ||
+    line.includes('<REDACTED>') ||
+    /X{4,}/.test(line)
+  )
+}
