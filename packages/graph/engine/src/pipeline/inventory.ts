@@ -51,7 +51,10 @@ export function buildInventory(input: InventoryInput): InventoryOutput {
   // visitors and resolvers walk parent chains.
   program.getTypeChecker();
 
-  const functions: Record<string, FunctionOccurrence[]> = {};
+  // Use a null-prototype object so reserved identifier names like
+  // "constructor", "toString", "hasOwnProperty" can safely be used
+  // as keys without colliding with Object.prototype.
+  const functions: Record<string, FunctionOccurrence[]> = Object.create(null) as Record<string, FunctionOccurrence[]>;
   const parseErrors: ParseError[] = [];
   const filesSet = new Set(input.files.map(normalizeForCompare));
 

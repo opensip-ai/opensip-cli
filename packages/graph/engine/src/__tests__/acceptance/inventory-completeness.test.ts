@@ -6,9 +6,12 @@
  * spot-check assertions for src/gate.ts and src/framework/define-check.ts.
  */
 
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
 
 import { discoverFiles } from '../../pipeline/discover.js';
 import { buildInventory } from '../../pipeline/inventory.js';
@@ -16,7 +19,7 @@ import { buildInventory } from '../../pipeline/inventory.js';
 import type { Catalog } from '../../types.js';
 
 function loadFitnessCatalog(): Catalog {
-  const projectDir = resolve(__dirname, '../../../../../fitness/engine');
+  const projectDir = resolve(HERE, '../../../../../fitness/engine');
   const discovery = discoverFiles({ projectDir });
   const inventory = buildInventory({
     projectDirAbs: discovery.projectDirAbs,

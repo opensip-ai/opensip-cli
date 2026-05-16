@@ -54,28 +54,14 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
     tsConfigPathAbs: discovery.tsConfigPathAbs,
   });
 
-  // Stage 2 (edges): pass-through this phase if the function still throws.
-  let catalog = inventory.catalog;
-  let resolutionStats: ResolutionStats | null = null;
-  try {
-    const edgeResult = resolveEdges({
-      catalog: inventory.catalog,
-      program: inventory.program,
-      projectDirAbs: discovery.projectDirAbs,
-    });
-    catalog = edgeResult.catalog;
-    resolutionStats = edgeResult.resolutionStats;
-  } catch (error) {
-    // P1 phase: edges not implemented yet — leave catalog with empty calls.
-    if (
-      error instanceof Error &&
-      error.message.includes('not implemented (Phase P2/P3)')
-    ) {
-      // expected — fall through.
-    } else {
-      throw error;
-    }
-  }
+  // Stage 2 (edges).
+  const edgeResult = resolveEdges({
+    catalog: inventory.catalog,
+    program: inventory.program,
+    projectDirAbs: discovery.projectDirAbs,
+  });
+  const catalog = edgeResult.catalog;
+  const resolutionStats: ResolutionStats | null = edgeResult.resolutionStats;
 
   // Stage 3 (indexes): pass-through if not yet implemented.
   let indexes: Indexes | null = null;
