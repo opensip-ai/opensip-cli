@@ -32,6 +32,7 @@
     "@opensip-tools/contracts": "workspace:*",
     "@opensip-tools/core": "workspace:*",
     "@opensip-tools/fitness": "workspace:*",
+    "@opensip-tools/graph": "workspace:*",
     "@opensip-tools/lang-cpp": "workspace:*",
     "@opensip-tools/lang-go": "workspace:*",
     "@opensip-tools/lang-java": "workspace:*",

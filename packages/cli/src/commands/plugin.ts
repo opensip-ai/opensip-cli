@@ -443,7 +443,11 @@ export async function pluginSync(
   const errors: string[] = [];
 
   for (const domain of domains) {
-    const declared = readProjectPluginsList(cwd, domain);
+    // PathDomain is the path-resolver superset and now includes 'graph';
+    // PluginDomain narrows to the four user-plugin domains. The loop above
+    // only iterates 'fit' / 'sim', so the cast is safe — VALID_DOMAINS
+    // restricts the override path the same way.
+    const declared = readProjectPluginsList(cwd, domain as PluginDomain);
     if (!declared || declared.length === 0) continue;
 
     const dir = ensurePluginHostDir(domain, cwd);

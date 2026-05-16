@@ -47,6 +47,7 @@ import {
   type ToolCliContext,
 } from '@opensip-tools/core';
 import { loadSignalersConfig, fitnessTool, openDashboard } from '@opensip-tools/fitness';
+import { graphTool } from '@opensip-tools/graph';
 import { cppAdapter } from '@opensip-tools/lang-cpp';
 import { goAdapter } from '@opensip-tools/lang-go';
 import { javaAdapter } from '@opensip-tools/lang-java';
@@ -266,6 +267,7 @@ const cliContext = buildToolCliContext();
 // First-party tools — declared as direct deps of @opensip-tools/cli.
 defaultToolRegistry.register(fitnessTool);
 defaultToolRegistry.register(simulationTool);
+defaultToolRegistry.register(graphTool);
 
 // Third-party tools — npm packages whose package.json declares
 // opensipTools.kind === 'tool'. Discovered relative to the CLI's own
@@ -277,7 +279,12 @@ async function loadDiscoveredTools(): Promise<void> {
   for (const pkg of discovered) {
     try {
       const mod = (await import(pkg.name)) as { tool?: Tool };
-      if (mod.tool && mod.tool.metadata.id !== fitnessTool.metadata.id && mod.tool.metadata.id !== simulationTool.metadata.id) {
+      if (
+        mod.tool &&
+        mod.tool.metadata.id !== fitnessTool.metadata.id &&
+        mod.tool.metadata.id !== simulationTool.metadata.id &&
+        mod.tool.metadata.id !== graphTool.metadata.id
+      ) {
         defaultToolRegistry.register(mod.tool);
       }
     } catch (error) {
