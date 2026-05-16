@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.8] — 2026-05-16
+
+### Fixed
+
+- **Directive parser now recognises Markdown (`<!--`) and shell/YAML
+  (`#`) comment prefixes.** Pre-1.0.8 `extractCheckIdFromDirective` in
+  `@opensip-tools/fitness` only matched `//` and `/*` openers, so
+  `@fitness-ignore-file <slug>` / `@fitness-ignore-next-line <slug>`
+  pragmas inside Markdown documents, HTML files, YAML configs, shell
+  scripts, and Python were silently ignored — the file got scanned
+  despite the author's intent. Authors hit this when trying to
+  suppress `file-length-limit` on intentionally-long doc-set
+  catalogues (DEC indices, metric taxonomies) where the only natural
+  comment syntax is `<!-- ... -->`. The fix extends the comment-prefix
+  table to include `<!--` (4 chars) and `#` (1 char) alongside the
+  existing `//` and `/*`. Eight new regression tests in
+  `directive-parsing.test.ts` cover the four supported prefixes plus
+  the rejection of unsupported forms (`;`, plain text).
+
 ## [1.0.7] — 2026-05-16
 
 ### Fixed — false-positive triage
