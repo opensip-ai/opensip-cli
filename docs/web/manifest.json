@@ -1,6 +1,6 @@
 {
-  "version": "1.0.4",
-  "rawBase": "https://raw.githubusercontent.com/opensip-ai/opensip-tools/v1.0.4/",
+  "version": "1.0.5",
+  "rawBase": "https://raw.githubusercontent.com/opensip-ai/opensip-tools/v1.0.5/",
   "pages": [
     {
       "file": "docs/web/README.md",

@@ -18,7 +18,7 @@ The five-layer architecture (kernel → contracts → tools/lang/ → checks →
 
 For the conceptual layer narrative, see [`../10-mental-model/03-modular-monolith.md`](/docs/opensip-tools/10-mental-model/03-modular-monolith/).
 
-The literal rules are at [`.dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.4/.dependency-cruiser.cjs).
+The literal rules are at [`.dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.5/.dependency-cruiser.cjs).
 
 ---
 

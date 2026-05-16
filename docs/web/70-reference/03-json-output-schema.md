@@ -16,7 +16,7 @@ related-docs:
 
 `opensip-tools fit --json` and `opensip-tools sim --json` emit structured JSON on stdout. This is the contract surface for CI integrations.
 
-The shapes live in [`packages/contracts/src/types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.4/packages/contracts/src/types.ts).
+The shapes live in [`packages/contracts/src/types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.5/packages/contracts/src/types.ts).
 
 > **Stability:** the `version: '1.0'` discriminator on `CliOutput` is part of the contract. Adding optional fields is a minor change; removing or changing types is a major change.
 

@@ -24,7 +24,7 @@ opensip-tools reads two config files. One per project (committed); one per user 
 
 This doc walks the project file. The user file holds one secret and is documented inline below.
 
-The Zod schema lives at [`packages/fitness/engine/src/signalers/schema.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.4/packages/fitness/engine/src/signalers/schema.ts).
+The Zod schema lives at [`packages/fitness/engine/src/signalers/schema.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.5/packages/fitness/engine/src/signalers/schema.ts).
 
 ---
 

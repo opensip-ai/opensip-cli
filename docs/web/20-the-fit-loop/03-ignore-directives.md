@@ -47,7 +47,7 @@ Suppresses violations of the named check on the line immediately following the d
 console.log(`[startup] PID ${process.pid}`);
 ```
 
-…and the fitness directive lands on the `console.log` call, even though two unrelated linter directives sit between it and the line. The recognized neighbors are listed in `KNOWN_DIRECTIVE_KEYWORDS` ([`packages/fitness/engine/src/framework/directive-parsing.ts:16`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.4/packages/fitness/engine/src/framework/directive-parsing.ts)): `eslint-disable-next-line`, `eslint-disable-line`, `@ts-expect-error`, `@ts-ignore`, `@ts-nocheck`, `prettier-ignore`, `biome-ignore`, plus the fitness directives themselves.
+…and the fitness directive lands on the `console.log` call, even though two unrelated linter directives sit between it and the line. The recognized neighbors are listed in `KNOWN_DIRECTIVE_KEYWORDS` ([`packages/fitness/engine/src/framework/directive-parsing.ts:16`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.5/packages/fitness/engine/src/framework/directive-parsing.ts)): `eslint-disable-next-line`, `eslint-disable-line`, `@ts-expect-error`, `@ts-ignore`, `@ts-nocheck`, `prettier-ignore`, `biome-ignore`, plus the fitness directives themselves.
 
 ### `@fitness-ignore-file`
 
@@ -92,7 +92,7 @@ Why after, not before? Two reasons:
 1. **Directives are accurate.** The check produced the violation by inspecting the line. The framework dropping it after the fact is cheap and side-effect-free; pre-filtering would require the check to know about directives, which couples every check author to the directive parser.
 2. **Counts are honest.** The dashboard and the CLI both show "found 5, ignored 2" rather than "found 3." Engineers can spot a file with too many suppressions even though they don't fail the build.
 
-The parser implementation lives in [`packages/fitness/engine/src/framework/directive-parsing.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.4/packages/fitness/engine/src/framework/directive-parsing.ts). The aggregation that produces the per-run `DirectiveEntry[]` lives in [`packages/fitness/engine/src/framework/ignore-processing.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.4/packages/fitness/engine/src/framework/ignore-processing.ts) and [`packages/fitness/engine/src/framework/directive-inventory.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.4/packages/fitness/engine/src/framework/directive-inventory.ts).
+The parser implementation lives in [`packages/fitness/engine/src/framework/directive-parsing.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.5/packages/fitness/engine/src/framework/directive-parsing.ts). The aggregation that produces the per-run `DirectiveEntry[]` lives in [`packages/fitness/engine/src/framework/ignore-processing.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.5/packages/fitness/engine/src/framework/ignore-processing.ts) and [`packages/fitness/engine/src/framework/directive-inventory.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.5/packages/fitness/engine/src/framework/directive-inventory.ts).
 
 ---
 
@@ -142,7 +142,7 @@ The dashboard's "Ignored" tab surfaces directive density per check; a check with
 
 ## How directives appear in output
 
-The `DirectiveEntry` shape ([`packages/fitness/engine/src/framework/directive-inventory.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.4/packages/fitness/engine/src/framework/directive-inventory.ts)) carries:
+The `DirectiveEntry` shape ([`packages/fitness/engine/src/framework/directive-inventory.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.5/packages/fitness/engine/src/framework/directive-inventory.ts)) carries:
 
 - The check slug being suppressed.
 - The file path.
