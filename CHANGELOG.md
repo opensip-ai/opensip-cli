@@ -4,6 +4,35 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.9] — 2026-05-16
+
+### Fixed
+
+- **Per-check recipe config now reaches the check.** The
+  `getCheckConfig(slug)` plumbing in `@opensip-tools/fitness` stored
+  the recipe-service-supplied config map on a module-local `let` —
+  which meant the CLI's bundled `@opensip-tools/fitness` (running the
+  recipe service) and the plugin pack's resolved
+  `@opensip-tools/fitness` (running the check + calling
+  `getCheckConfig`) saw separate module-scope state. The recipe's
+  `additionalSyncFunctions` / `additionalSelfDocumentingSuffixes` /
+  `additionalSafeTOCTOUPaths` allowlists were silently never reaching
+  the checks that read them — detached-promises / throws-documentation
+  / null-safety / toctou-race-condition warned on every project-
+  declared safe call site despite the recipe authoring them.
+
+  The fix hoists the slot onto a `Symbol.for('@opensip-tools/fitness/
+  currentRecipeCheckConfig')` entry on `globalThis`, so every loaded
+  copy reads + writes the same well-known slot regardless of which
+  package instance imported the module. The single-session contract
+  (recipe service throws SESSION_IN_PROGRESS for concurrent runs) is
+  unchanged; only the storage location moves.
+
+  Regression coverage added in
+  `recipes/__tests__/check-config.test.ts` — simulates "two copies"
+  by reading `globalThis[Symbol.for(...)]` after `set`, confirming
+  the value lands at the shared slot.
+
 ## [1.0.8] — 2026-05-16
 
 ### Fixed
