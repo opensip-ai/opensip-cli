@@ -5,7 +5,7 @@
 [![Node](https://img.shields.io/badge/node-%E2%89%A522-brightgreen)](https://nodejs.org)
 [![OpenSIP](https://img.shields.io/badge/part%20of-OpenSIP-7c3aed)](https://opensip.ai)
 
-> **opensip-tools is part of [OpenSIP](https://opensip.ai)** — the home for our developer-productivity stack. Start at **[opensip.ai](https://opensip.ai)** for the full product family, including our hosted SaaS.
+> **opensip-tools is part of [OpenSIP](https://opensip.ai)** — our developer-productivity platform. Visit **[opensip.ai](https://opensip.ai)** for the full picture.
 
 Open-source codebase analysis toolkit. Run fitness checks against TypeScript, Rust, Python, Java, Go, or C/C++ codebases standalone, in CI, or as a regression detector around AI-agent coding sessions.
 
@@ -48,11 +48,11 @@ node packages/cli/dist/index.js fit
 
 ## OpenSIP — the bigger picture
 
-opensip-tools is the open-source CLI piece. The OpenSIP product family at **[opensip.ai](https://opensip.ai)** is where the rest lives — including the hosted platform our customers use day-to-day. If you're evaluating whether opensip-tools fits into a team workflow rather than just one developer's terminal, start at [opensip.ai](https://opensip.ai).
+opensip-tools is the open-source CLI. **OpenSIP**, our hosted developer-productivity platform, is where teams take this beyond one developer's terminal — visit **[opensip.ai](https://opensip.ai)** to see what's there.
 
 ### Sending CLI results to OpenSIP
 
-opensip-tools posts findings to any SARIF-compatible endpoint, including the OpenSIP hosted platform:
+opensip-tools posts findings to any SARIF-compatible endpoint, including OpenSIP:
 
 ```bash
 # One-time setup (interactive prompt for your API key)
@@ -652,7 +652,7 @@ keep the contract honest.
 
 ## About OpenSIP
 
-opensip-tools is built and maintained by [**OpenSIP**](https://opensip.ai) — visit **[opensip.ai](https://opensip.ai)** for the full product family, including our hosted developer-productivity platform.
+opensip-tools is built and maintained by the team at [**OpenSIP**](https://opensip.ai). Visit **[opensip.ai](https://opensip.ai)** for OpenSIP itself — our hosted developer-productivity platform — and the rest of the product family.
 
 This CLI is MIT-licensed and developed in the open at [github.com/opensip-ai/opensip-tools](https://github.com/opensip-ai/opensip-tools). Contributions welcome.
 
