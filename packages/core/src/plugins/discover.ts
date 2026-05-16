@@ -25,12 +25,11 @@ import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from 'n
 import { createRequire } from 'node:module'
 import { join, basename, extname, sep } from 'node:path'
 
+import { resolveProjectConfigPath } from '../config-resolution.js'
 import { logger } from '../lib/logger.js'
 import { resolveProjectPaths } from '../lib/paths.js'
 
 import type { DiscoveredPlugin, PluginDomain } from './types.js'
-
-const CONFIG_FILENAME = 'opensip-tools.config.yml'
 
 /** Logger module tag used by every event in this file. */
 const MODULE_TAG = 'core:plugins'
@@ -128,12 +127,34 @@ export function discoverPlugins(
  * entry for the domain. Does NOT throw on YAML parse errors — returns
  * undefined so discovery falls through gracefully and the config-layer
  * schema validation surfaces parse errors on its own path.
+ *
+ * Config-path resolution mirrors `resolveProjectConfigPath` (the same
+ * helper the targets loader uses): --config flag → `package.json#
+ * opensip-tools.configPath` pointer → default `<projectDir>/opensip-
+ * tools.config.yml`. Without this, projects that locate their config
+ * via the package.json pointer have their `plugins.<domain>: [...]`
+ * declaration silently ignored — discovery falls through to the empty
+ * default path and the plugin pack never registers.
+ *
+ * The `--config` precedence is honored only when callers pass through
+ * their explicit value via `explicitConfigPath`; this entry point is
+ * the implicit one (no --config available at the discovery seam), so
+ * we resolve without an explicit path and rely on the pointer + default.
  */
 export function readProjectPluginsList(
   projectDir: string,
   domain: PluginDomain,
 ): readonly string[] | undefined {
-  const configPath = join(projectDir, CONFIG_FILENAME)
+  let configPath: string
+  try {
+    configPath = resolveProjectConfigPath(projectDir)
+  } catch {
+    // resolveProjectConfigPath throws on "no config found anywhere" —
+    // discovery is implicit (no --config), so a missing config falls
+    // through gracefully here (the explicit-path layer surfaces its own
+    // error when the caller asked for one).
+    return undefined
+  }
   if (!existsSync(configPath)) return undefined
   try {
     // Parse YAML inline to avoid a circular dep between plugins/ and targets/.
