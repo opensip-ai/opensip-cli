@@ -1,5 +1,5 @@
 ---
-status: draft
+status: implemented
 last_verified: 2026-05-16
 title: "graph Tool — design spec (v2)"
 audience: [contributors, plugin-authors]

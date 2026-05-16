@@ -108,6 +108,54 @@ opensip-tools sim --kind <kind>
 
 ---
 
+## `graph` — static call-graph + dead-end analysis
+
+Tool-owned: [`packages/graph/engine/src/tool.ts`](../../../packages/graph/engine/src/tool.ts). See [`docs/plans/graph-tool-v2-design.md`](../../plans/graph-tool-v2-design.md) for the architecture spec.
+
+```
+opensip-tools graph
+opensip-tools graph --json
+opensip-tools graph --gate-save
+opensip-tools graph --gate-compare
+opensip-tools graph --report-to <url>
+```
+
+| Flag | Type | Default | Effect |
+|---|---|---|---|
+| `--cwd <path>` | string | `process.cwd()` | Target directory (must contain a `tsconfig.json`). |
+| `--json` | bool | `false` | Output a `CliOutput`-shaped JSON document instead of the table renderer. |
+| `--no-cache` | bool | `false` | Skip the catalog cache and re-run stages 1+2. |
+| `--gate-save` | bool | `false` | Save the current Signal set to `<project>/opensip-tools/.runtime/cache/graph/baseline.json`. Mutually exclusive with `--gate-compare`. |
+| `--gate-compare` | bool | `false` | Compare current Signals to the baseline; exit non-zero on regression. |
+| `--baseline <path>` | string | `<project>/opensip-tools/.runtime/cache/graph/baseline.json` | Override the baseline path for `--gate-save` / `--gate-compare`. |
+| `--report-to <url>` | string | — | POST findings to OpenSIP Cloud or a compatible SARIF endpoint. |
+
+**Exit codes:** 0 (success / gate clean), 1 (runtime error / gate regression), 2 (configuration error), 4 (`--report-to` upload failed).
+
+**Catalog file:** `<project>/opensip-tools/.runtime/cache/graph/catalog.json` — content-keyed by `tsCompilerVersion`, `tsConfigPath`, and a per-file mtime+size fingerprint. Atomic write via tmp + rename.
+
+## `graph-orphans` — orphan-subtree findings only
+
+Tool-owned. Filters the full pipeline output to only the `graph:orphan-subtree` rule.
+
+```
+opensip-tools graph-orphans
+opensip-tools graph-orphans --json
+```
+
+## `graph-entry-points` — list inferred entry points
+
+Tool-owned. Prints the entry-point set used by `graph:orphan-subtree` (and other reachability rules).
+
+```
+opensip-tools graph-entry-points
+opensip-tools graph-entry-points --json
+```
+
+Entry-point reasons in v0.2: `module-init` (every file's top-level statements), `name-match` (`main` / `run` / `start` / `register` / `init` / `bootstrap` / `initialize`), `no-callers-exported` (exported with no in-project caller). Bin-entry and tool-registration heuristics are deferred to v0.3.
+
+---
+
 ## `dashboard` — open the HTML report
 
 Tool-owned (fitness Tool registers it). Renders the most recent run as HTML and opens it in the user's default browser.

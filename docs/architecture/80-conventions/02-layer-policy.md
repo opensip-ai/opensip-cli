@@ -178,6 +178,9 @@ Concrete examples of edges that fail the build:
 - **`packages/fitness/checks-typescript/src/foo.ts` imports from `@opensip-tools/cli`** — `check-pack-no-cli` fails. Check packs only depend on fitness + core.
 - **`packages/languages/lang-rust/src/foo.ts` imports from `@opensip-tools/fitness`** — `lang-no-fitness-except-typescript` fails. Only the typescript adapter is exempt.
 - **`packages/contracts/src/foo.ts` imports from `@opensip-tools/simulation`** — `contracts-imports-core-only` fails. contracts talks to core only.
+- **`packages/graph/engine/src/rules/foo.ts` imports `typescript` or anything under `pipeline/`** — `graph-rules-no-parser` fails. Rules consume frozen catalog/indexes only.
+- **`packages/graph/engine/src/render/foo.ts` imports from `pipeline/` or `rules/`** — `graph-renderers-no-pipeline` fails. Renderers consume `Signal[]`.
+- **`packages/graph/engine/src/pipeline/inventory-visitors/foo.ts` imports from `pipeline/edge-resolvers/`** — `graph-visitors-resolvers-disjoint` fails (and the symmetric counterpart). They share helpers, not each other.
 - **A circular import inside any package** — `no-circular` fails. Refactor.
 
 All of these surface during `pnpm depcruise` (run as part of `pnpm lint`). Each violation prints the offending file, the import line, and the rule name.
@@ -186,7 +189,7 @@ All of these surface during `pnpm depcruise` (run as part of `pnpm lint`). Each 
 
 ## How to add a new exception
 
-The two existing exceptions (`tsPreCompilationDeps: false` for type-only edges; `lang-typescript → fitness` for legacy re-exports) cover the realistic cases. New exceptions are rare and require justification.
+The three existing exceptions (`tsPreCompilationDeps: false` for type-only edges; `lang-typescript → fitness` for legacy re-exports; `graph → fitness` via `render/sarif.ts` for the SARIF helpers per DEC-3) cover the realistic cases. New exceptions are rare and require justification.
 
 Process:
 

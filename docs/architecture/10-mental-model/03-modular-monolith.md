@@ -106,9 +106,9 @@ The build runs `pnpm depcruise` as part of the standard `pnpm lint` flow. A forb
 
 ---
 
-## The two documented exceptions
+## The three documented exceptions
 
-Real codebases have edge cases. This one has two, both written into [`.dependency-cruiser.cjs`](../../../.dependency-cruiser.cjs).
+Real codebases have edge cases. This one has three, all written into [`.dependency-cruiser.cjs`](../../../.dependency-cruiser.cjs).
 
 ### `lang-typescript` → `fitness`
 
@@ -122,6 +122,20 @@ Real codebases have edge cases. This one has two, both written into [`.dependenc
 ```
 
 This is a mild architectural smell, not a bug — it means `lang-typescript` lives at Layer 3 like its peers but takes a sideways dep on `fitness`. The exception is named so you trip a different alarm if any *other* lang pack starts taking the same shortcut.
+
+### `graph` → `fitness` (peer-layer SARIF reuse)
+
+`@opensip-tools/graph` imports `buildSarifLog`, `chunkSarifRuns`, and `reportToCloud` from `@opensip-tools/fitness` (DEC-3 in [`docs/plans/graph-tool-v2-design.md`](../../plans/graph-tool-v2-design.md) Appendix C). Both packages sit at Layer 3 (the tools/lang peer layer); cross-tool imports at the same layer are allowed when the alternative is a duplicate implementation that would drift over time. The dep-cruiser rule restricts the edge to the single permitted file and tags it `info`-severity so the build records but does not reject:
+
+```js
+{ name: 'graph-may-import-fitness-sarif',
+  severity: 'info',
+  from: { path: '^packages/graph/engine/src/render/sarif\\.ts$' },
+  to:   { path: '^@opensip-tools/fitness$' },
+}
+```
+
+The eventual extraction to a shared `@opensip-tools/sarif` package becomes a mechanical refactor when both `fit` and `graph` already import from one source.
 
 ### Type-only edges
 
