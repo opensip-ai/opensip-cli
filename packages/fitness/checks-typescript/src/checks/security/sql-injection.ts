@@ -19,8 +19,20 @@ const SQL_STRUCTURE_PATTERN =
 /** Simpler pattern for SQL keywords at start of string concatenation */
 const SQL_KEYWORD_PATTERN = /^\s*(?:SELECT|INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE)\b/i
 
-/** SQL clause keywords for detecting concatenation in WHERE/SET/VALUES clauses */
-const SQL_CLAUSE_PATTERN = /\b(?:WHERE|AND|OR|SET|VALUES)\b/i
+/**
+ * SQL clause keywords for detecting concatenation in WHERE/SET/VALUES clauses.
+ *
+ * Case-SENSITIVE intentionally — lowercase `and`, `or`, `set`, `values`,
+ * `where` are extremely common English words and produce massive false-
+ * positive rates against CLI help-text strings (`'Usage: ...\n' +
+ * 'AND swapped into tenant.keys'`). Real SQL keyword usage in code is
+ * conventionally uppercase; the few projects that lowercase them can
+ * either uppercase or pragma per-site. (See checkConcatenationInjection
+ * for the additional "walk the concat chain for a real SQL keyword"
+ * filter that prevents arm-3 from firing on incidental WHERE/AND inside
+ * non-SQL text.)
+ */
+const SQL_CLAUSE_PATTERN = /\b(?:WHERE|AND|OR|SET|VALUES)\b/
 
 /** Safe tagged template tags that use parameterized queries */
 const SAFE_TEMPLATE_TAGS = new Set(['sql', 'query', 'raw'])
@@ -94,6 +106,96 @@ function isInQueryCall(node: ts.Node): boolean {
 }
 
 /**
+ * Walk the binary-`+` concat chain rooted at `node` and collect every
+ * string-literal segment's text. Used by `checkConcatenationInjection`
+ * to gate arm-3 — a right-side string containing a clause keyword
+ * (WHERE/AND/OR/SET/VALUES) is only treated as SQL when the SAME
+ * concatenation also has at least one segment that starts with a real
+ * SQL statement keyword (SELECT/INSERT/...).
+ *
+ * Why this matters: without the gate, the loose right-side check
+ * fires on `cli.info('Usage: ...\n' + 'AND continues here\n')` because
+ * "AND" appears in English help text. The gate requires the same
+ * concat chain to also contain a "SELECT * FROM" or similar real-SQL
+ * fragment, which CLI help text never has.
+ *
+ * Walks both up (ancestor +) and down (descendant +) from `node` so a
+ * mid-chain finding still sees the whole expression.
+ */
+function collectConcatChainStrings(node: ts.BinaryExpression): string[] {
+  const strings: string[] = []
+  // Walk up to the root of the contiguous + chain.
+  let root: ts.Node = node
+  while (
+    ts.isBinaryExpression(root.parent) &&
+    root.parent.operatorToken.kind === ts.SyntaxKind.PlusToken
+  ) {
+    root = root.parent
+  }
+  // Walk down collecting every string-literal leaf.
+  function collect(n: ts.Node): void {
+    if (
+      ts.isBinaryExpression(n) &&
+      n.operatorToken.kind === ts.SyntaxKind.PlusToken
+    ) {
+      collect(n.left)
+      collect(n.right)
+      return
+    }
+    if (ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n)) {
+      strings.push(n.text)
+    }
+  }
+  collect(root)
+  return strings
+}
+
+/**
+ * True iff the concat chain rooted at the parent of `node` contains
+ * at least one string segment that starts with a real SQL keyword
+ * (SELECT/INSERT/...). This is the "this is actually SQL" sanity check
+ * for arm-3 of checkConcatenationInjection.
+ */
+function concatChainHasSqlKeyword(node: ts.BinaryExpression): boolean {
+  for (const s of collectConcatChainStrings(node)) {
+    if (SQL_KEYWORD_PATTERN.test(s)) return true
+  }
+  return false
+}
+
+/**
+ * Known CLI-output property-access call patterns: `cli.info(...)`,
+ * `cli.error(...)`, `console.log(...)`, `logger.warn(...)`, etc.
+ * Binary-string-concat arguments to these calls are never SQL.
+ */
+const OUTPUT_METHOD_NAMES = new Set([
+  'log', 'info', 'warn', 'error', 'debug', 'trace', 'fatal',
+  'print', 'println', 'raw', 'write', 'writeln',
+])
+
+/**
+ * True iff `node` is an argument (direct or wrapped) to an output-style
+ * call expression (`cli.info(...)`, `console.log(...)`, `logger.warn(...)`).
+ * These call sites carry user-facing text, not SQL — concatenation
+ * inside them is help/status text composition.
+ */
+function isInOutputCall(node: ts.Node): boolean {
+  let current = node.parent
+  while (!ts.isSourceFile(current)) {
+    if (ts.isCallExpression(current)) {
+      const callee = current.expression
+      return (
+        ts.isPropertyAccessExpression(callee) &&
+        ts.isIdentifier(callee.name) &&
+        OUTPUT_METHOD_NAMES.has(callee.name.text)
+      )
+    }
+    current = current.parent
+  }
+  return false
+}
+
+/**
  * Get the full text content of a template expression (head + spans).
  */
 function getTemplateText(node: ts.TemplateExpression): string {
@@ -117,6 +219,7 @@ function checkTemplateInjection(
   if (!ts.isTemplateExpression(node)) return
   if (isInTaggedTemplate(node)) return
   if (isInSuggestionProperty(node)) return
+  if (isInOutputCall(node)) return
 
   const templateText = getTemplateText(node)
   if (!SQL_STRUCTURE_PATTERN.test(templateText)) return
@@ -151,6 +254,7 @@ function checkConcatenationInjection(
   if (!ts.isBinaryExpression(node)) return
   if (node.operatorToken.kind !== ts.SyntaxKind.PlusToken) return
   if (isInSuggestionProperty(node)) return
+  if (isInOutputCall(node)) return
 
   const leftIsString = ts.isStringLiteral(node.left)
   const rightIsString = ts.isStringLiteral(node.right)
@@ -172,7 +276,16 @@ function checkConcatenationInjection(
     })
   }
 
-  if (rightIsString && SQL_CLAUSE_PATTERN.test(rightText) && !leftIsString) {
+  if (
+    rightIsString &&
+    SQL_CLAUSE_PATTERN.test(rightText) &&
+    !leftIsString &&
+    // Gate: the concat chain must also contain a real SQL keyword
+    // somewhere (SELECT/INSERT/...). Without this, the loose clause
+    // pattern fires on incidental WHERE/AND inside non-SQL text
+    // (CLI help strings, error message composition, etc.).
+    concatChainHasSqlKeyword(node)
+  ) {
     violations.push({
       line: getASTLineNumber(node, sourceFile),
       column: 0,
@@ -193,6 +306,27 @@ function checkConcatenationInjection(
  * Walks template literals and string concatenation to find SQL patterns,
  * while filtering out suggestion text, messages, and tagged templates.
  */
+/**
+ * Pure analysis function. Exported so unit tests can exercise the
+ * detection logic without standing up the full Check framework
+ * (defineCheck wraps `analyze` into an `execute` closure that
+ * requires an ExecutionContext to invoke).
+ */
+export function analyzeSqlInjection(content: string, filePath: string): CheckViolation[] {
+  const sourceFile = parseSource(content, filePath)
+  if (!sourceFile) return []
+
+  const violations: CheckViolation[] = []
+
+  walkNodes(sourceFile, (node) => {
+    // @lazy-ok -- synchronous callback; no awaits in analyze(); "resolved async result" in suggestion text triggers false positive
+    checkTemplateInjection(node, sourceFile, filePath, violations)
+    checkConcatenationInjection(node, sourceFile, filePath, violations)
+  })
+
+  return violations
+}
+
 export const sqlInjection = defineCheck({
   id: '73c198ff-3d68-4e9b-a2aa-9e5d511cd89c',
   slug: 'sql-injection',
@@ -214,17 +348,6 @@ export const sqlInjection = defineCheck({
   confidence: 'high',
 
   analyze(content: string, filePath: string): CheckViolation[] {
-    const sourceFile = parseSource(content, filePath)
-    if (!sourceFile) return []
-
-    const violations: CheckViolation[] = []
-
-    walkNodes(sourceFile, (node) => {
-      // @lazy-ok -- synchronous callback; no awaits in analyze(); "resolved async result" in suggestion text triggers false positive
-      checkTemplateInjection(node, sourceFile, filePath, violations)
-      checkConcatenationInjection(node, sourceFile, filePath, violations)
-    })
-
-    return violations
+    return analyzeSqlInjection(content, filePath)
   },
 })
