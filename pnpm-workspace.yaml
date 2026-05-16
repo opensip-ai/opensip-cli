@@ -4,4 +4,5 @@ packages:
   # Tool-grouped subdirectories: each tool's engine + sub-packages
   - "packages/fitness/*"
   - "packages/simulation/*"
+  - "packages/graph/*"
   - "packages/languages/*"

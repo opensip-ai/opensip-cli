@@ -140,6 +140,35 @@ module.exports = {
       from: { path: '^packages/simulation/' },
       to: { path: '^@opensip-tools/cli($|/)' },
     },
+    {
+      name: 'graph-no-cli',
+      severity: 'error',
+      comment:
+        'Tool packages must not depend on the CLI entry point. Use the ' +
+        'ToolCliContext from @opensip-tools/core to call back into render / ' +
+        'maybeOpenDashboard. Adding cli would create a cycle (cli depends ' +
+        'on graph).',
+      from: { path: '^packages/graph/' },
+      to: { path: '^@opensip-tools/cli($|/)' },
+    },
+    {
+      name: 'graph-typescript-only-on-lang-typescript',
+      severity: 'error',
+      comment:
+        'graph depends on lang-typescript by design (TS-first scope). ' +
+        'It must not depend on any other lang-* pack — adding multi-language ' +
+        'support is a deliberate scope expansion that should be reviewed.',
+      from: { path: '^packages/graph/' },
+      to: {
+        path: [
+          '^@opensip-tools/lang-rust',
+          '^@opensip-tools/lang-python',
+          '^@opensip-tools/lang-go',
+          '^@opensip-tools/lang-java',
+          '^@opensip-tools/lang-cpp',
+        ],
+      },
+    },
 
     // -------------------------------------------------------------------
     // Layer enforcement — checks-* must not depend on cli/contracts
