@@ -56,14 +56,37 @@ function isCheckIdChar(char: string): boolean {
   return isLowerCase || isUpperCase || isDigit || isSpecialChar
 }
 
+/**
+ * Comment-opener prefixes the directive parser recognizes. `//` and
+ * `/*` cover the TypeScript / JavaScript / C-family languages; `<!--`
+ * covers Markdown and HTML so doc files (READMEs, arch docs, the
+ * metric taxonomy) can carry `@fitness-ignore-file <slug>` pragmas
+ * the same way source code does. `#` covers shell / YAML / Python so
+ * config files and scripts use the same surface.
+ *
+ * Tuple shape: `[opener, length]`. Length is encoded once here so the
+ * scanner doesn't repeat it per opener — `<!--` is 4 chars, the
+ * others are 2/1.
+ */
+const COMMENT_OPENERS: readonly (readonly [string, number])[] = [
+  ['//', 2],
+  ['/*', 2],
+  ['<!--', 4],
+  ['#', 1],
+]
+
 function extractCheckIdFromDirective(line: string, directiveKeyword: string): string | null {
-  // Both `//` and `/*` are 2-char prefixes; sliceLen is fixed.
-  const sliceLen = 2
-  let commentIndex = line.indexOf('//')
-  if (commentIndex === -1) {
-    commentIndex = line.indexOf('/*')
-    if (commentIndex === -1) return null
+  let commentIndex = -1
+  let sliceLen = 0
+  for (const [opener, length] of COMMENT_OPENERS) {
+    const idx = line.indexOf(opener)
+    if (idx !== -1) {
+      commentIndex = idx
+      sliceLen = length
+      break
+    }
   }
+  if (commentIndex === -1) return null
 
   const afterComment = line.slice(commentIndex + sliceLen).trimStart()
   if (!afterComment.startsWith(directiveKeyword)) return null
