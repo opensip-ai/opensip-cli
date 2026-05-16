@@ -24,7 +24,7 @@ import type { ProjectPaths } from '@opensip-tools/core';
 
 export interface StoredSession {
   readonly id: string;
-  readonly tool: 'fit' | 'sim' | 'graph';
+  readonly tool: 'fit' | 'sim';
   readonly timestamp: string;
   readonly cwd: string;
   readonly recipe?: string;

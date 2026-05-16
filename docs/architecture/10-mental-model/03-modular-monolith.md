@@ -19,7 +19,7 @@ related-docs:
 ---
 # Layered package graph
 
-Eighteen packages. Five layers. One enforced rule: dependencies flow up only.
+Seventeen packages. Five layers. One enforced rule: dependencies flow up only.
 
 This document is the conceptual map. For the lookup-shaped catalog of every package's role and exports, jump to [`70-reference/01-package-catalog.md`](../70-reference/01-package-catalog.md). For the literal dep-cruiser rules, see [`80-conventions/02-layer-policy.md`](../80-conventions/02-layer-policy.md).
 
@@ -45,9 +45,9 @@ This document is the conceptual map. For the lookup-shaped catalog of every pack
 │           │     checks-typescript    checks-universal         │   │
 │           └──────────────────────────────────────────────────┘    │
 │                                  ▲                                 │
-│  Layer 3  ┌──────────┬─────────────┬───────┴───────────────────┐  │
-│           │ fitness  │ simulation  │ graph │ lang-cpp lang-go… │  │
-│           └──────────┴─────────────┴───────┴───────────────────┘  │
+│  Layer 3  ┌──────────┬───────────┴───────────┬───────────────┐    │
+│           │ fitness  │ simulation │ lang-cpp lang-go lang-…  │    │
+│           └──────────┴────────────┴──────────────────────────┘    │
 │                                  ▲                                 │
 │  Layer 2  ┌──────────────────────┴───────────────────────────┐    │
 │           │            @opensip-tools/contracts             │    │
@@ -65,13 +65,13 @@ This document is the conceptual map. For the lookup-shaped catalog of every pack
 
 **Layer 2 — `@opensip-tools/contracts`.** The shared contract layer between Tools and the runner: the `CliOutput`/`CheckOutput`/`FindingOutput` shape every tool produces, the `CommandResult` discriminated union the renderer dispatches on, the exit-code constants, and the session persistence helpers (session writer, dashboard HTML generator). Depends on `core` only. Does not import any tool.
 
-**Layer 3 — `@opensip-tools/fitness`, `@opensip-tools/simulation`, `@opensip-tools/graph`, `@opensip-tools/lang-*`.** Peer packages, all depending on `contracts` and `core`. Each tool engine (`fitness`, `simulation`, `graph`) implements the `Tool` contract. Each language adapter (`lang-typescript`, `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp`) implements the `LanguageAdapter` contract. Two documented Layer-3-to-Layer-3 carve-outs are wired into the dep-cruiser config: `lang-typescript → fitness` for `filterContent` (legacy P1 export), and `graph → lang-typescript` for the TS-AST parse path that the catalog builder relies on.
+**Layer 3 — `@opensip-tools/fitness`, `@opensip-tools/simulation`, `@opensip-tools/lang-*`.** Peer packages, all depending on `contracts` and `core`. Each tool engine (`fitness`, `simulation`) implements the `Tool` contract. Each language adapter (`lang-typescript`, `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp`) implements the `LanguageAdapter` contract.
 
 **Layer 4 — `@opensip-tools/checks-*`.** Six check packs: `checks-universal`, `checks-typescript`, `checks-python`, `checks-go`, `checks-java`, `checks-cpp`. Each pack depends on `fitness` (for `defineCheck`) and `core` (for `Signal`, errors, the language adapter type). Check packs do **not** depend on `cli` or `contracts` — they're the marketplace shape, designed to be installable from npm without dragging the CLI in.
 
 **Layer 5 — `@opensip-tools/cli`.** The composition root. Imports every first-party tool and language adapter, registers them, builds the Commander tree, runs the dispatcher. The only package that knows everything below it.
 
-That's it. Five layers, eighteen packages.
+That's it. Five layers, seventeen packages.
 
 ---
 
@@ -91,10 +91,9 @@ The layer rule — "dependencies flow up only" — is enforced by [dependency-cr
 // contracts imports only core.
 { name: 'contracts-imports-core-only', /* ... */ }
 
-// fitness / simulation / graph cannot import cli (would create a cycle).
+// fitness / simulation cannot import cli (would create a cycle).
 { name: 'fitness-no-cli',     from: { path: '^packages/fitness/' },    to: { path: '^@opensip-tools/cli($|/)' } }
 { name: 'simulation-no-cli',  from: { path: '^packages/simulation/' }, to: { path: '^@opensip-tools/cli($|/)' } }
-{ name: 'graph-no-cli',       from: { path: '^packages/graph/' },      to: { path: '^@opensip-tools/cli($|/)' } }
 
 // checks-* cannot reach into cli or contracts.
 { name: 'check-pack-no-cli', /* ... */ }
@@ -109,7 +108,7 @@ The build runs `pnpm depcruise` as part of the standard `pnpm lint` flow. A forb
 
 ## The two documented exceptions
 
-Real codebases have edge cases. This one has three, all written into [`.dependency-cruiser.cjs`](../../../.dependency-cruiser.cjs).
+Real codebases have edge cases. This one has two, both written into [`.dependency-cruiser.cjs`](../../../.dependency-cruiser.cjs).
 
 ### `lang-typescript` → `fitness`
 
@@ -123,21 +122,6 @@ Real codebases have edge cases. This one has three, all written into [`.dependen
 ```
 
 This is a mild architectural smell, not a bug — it means `lang-typescript` lives at Layer 3 like its peers but takes a sideways dep on `fitness`. The exception is named so you trip a different alarm if any *other* lang pack starts taking the same shortcut.
-
-### `graph` → `lang-typescript`
-
-`@opensip-tools/graph` depends directly on `@opensip-tools/lang-typescript` for its TS-AST parse path — the catalog builder uses `ts.createSourceFile` and the program/TypeChecker via the same compiler API the language adapter is built against. Same shape as the `lang-typescript → fitness` edge: a peer-to-peer Layer-3 dep, justified once because it follows from the design (graph is TS-first), and bounded by a second dep-cruiser rule that forbids `graph` from depending on any *other* `lang-*` pack:
-
-```js
-{ name: 'graph-typescript-only-on-lang-typescript',
-  from: { path: '^packages/graph/' },
-  to:   { path: ['^@opensip-tools/lang-rust', '^@opensip-tools/lang-python',
-                 '^@opensip-tools/lang-go',   '^@opensip-tools/lang-java',
-                 '^@opensip-tools/lang-cpp'] },
-}
-```
-
-If graph ever needs multi-language support, the rule trips and forces the conversation about whether that's a deliberate scope expansion or accidental coupling.
 
 ### Type-only edges
 

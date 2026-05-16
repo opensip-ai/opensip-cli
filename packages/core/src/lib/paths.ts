@@ -63,27 +63,16 @@ export interface ProjectPaths {
   readonly baselinePath: string;
   /** <project>/opensip-tools/.runtime/plugins/<domain> — npm-installed plugins. */
   readonly pluginsDir: (domain: PathDomain) => string;
-  /** <project>/opensip-tools/.runtime/cache/graph — graph catalog cache root. */
-  readonly graphCacheDir: string;
-  /** <project>/opensip-tools/.runtime/cache/graph/catalog.json — graph catalog cache file. */
-  readonly graphCatalogPath: string;
-  /** <project>/opensip-tools/.runtime/graph-baseline.sarif (default graph gate baseline). */
-  readonly graphBaselinePath: string;
 }
 
 /**
- * Path-resolver domain set — the tools whose plugins or runtime state
- * land in project paths. Intentionally narrower than `core/plugins`'s
+ * Path-resolver domain set — the two tools whose plugins land in
+ * project paths. Intentionally narrower than `core/plugins`'s
  * 4-element `PluginDomain` (`'fit' | 'sim' | 'asm' | 'lang'`); 'asm'
  * is reserved for a future tool, and 'lang' adapters install via
  * package deps not project-local plugin dirs.
- *
- * `'graph'` is included so future graph plugins can land at
- * `<runtime>/plugins/graph/`; the v1 graph tool ships with built-in
- * rules only and does not load user plugins, but the path slot is
- * reserved for symmetry with the other tools.
  */
-export type PathDomain = 'fit' | 'sim' | 'graph';
+export type PathDomain = 'fit' | 'sim';
 
 /** Resolve the project path layout for a given project directory. */
 export function resolveProjectPaths(projectDir: string): ProjectPaths {
@@ -104,9 +93,6 @@ export function resolveProjectPaths(projectDir: string): ProjectPaths {
     cacheDir: join(runtimeDir, 'cache'),
     baselinePath: join(runtimeDir, 'baseline.sarif'),
     pluginsDir: (domain) => join(runtimeDir, 'plugins', domain),
-    graphCacheDir: join(runtimeDir, 'cache', 'graph'),
-    graphCatalogPath: join(runtimeDir, 'cache', 'graph', 'catalog.json'),
-    graphBaselinePath: join(runtimeDir, 'graph-baseline.sarif'),
   };
 }
 
