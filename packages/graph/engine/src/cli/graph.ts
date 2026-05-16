@@ -11,7 +11,22 @@ import { logger } from '@opensip-tools/core';
 
 import { runGraph } from './orchestrate.js';
 
+import type { Catalog } from '../types.js';
 import type { ToolCliContext } from '@opensip-tools/core';
+
+function countFiles(catalog: Catalog): number {
+  const files = new Set<string>();
+  for (const occs of Object.values(catalog.functions)) {
+    for (const o of occs) files.add(o.filePath);
+  }
+  return files.size;
+}
+
+function countOccurrences(catalog: Catalog): number {
+  let n = 0;
+  for (const occs of Object.values(catalog.functions)) n += occs.length;
+  return n;
+}
 
 export interface GraphCommandOptions {
   readonly cwd: string;
@@ -35,8 +50,20 @@ export async function executeGraph(
         tool: 'graph',
         signals: result.signals,
         cacheHit: result.cacheHit,
+        inventory: result.catalog
+          ? {
+              files: countFiles(result.catalog),
+              functions: countOccurrences(result.catalog),
+            }
+          : null,
       };
       process.stdout.write(`${JSON.stringify(payload, null, 2)}\n`);
+    } else if (result.catalog) {
+      const fileCount = countFiles(result.catalog);
+      const fnCount = countOccurrences(result.catalog);
+      process.stdout.write(
+        `graph: inventory built (${String(fnCount)} functions across ${String(fileCount)} files); signals=${String(result.signals.length)}, cacheHit=${String(result.cacheHit)}\n`,
+      );
     } else {
       process.stdout.write(
         `graph: pipeline ran (signals=${String(result.signals.length)}, cacheHit=${String(result.cacheHit)})\n`,

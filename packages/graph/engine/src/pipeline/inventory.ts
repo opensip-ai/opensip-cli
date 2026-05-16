@@ -1,14 +1,26 @@
 /**
- * Stage 1 — Inventory (skeleton; implemented in P1).
+ * Stage 1 — Inventory.
  *
  * Walks every file's AST and emits a complete catalog of callable
  * functions. No edges, no resolution. Just "every function that
  * exists, with its metadata."
  */
 
-import type { Catalog, ParseError } from '../types.js';
-import type ts from 'typescript';
+import { relative, sep } from 'node:path';
 
+import { logger } from '@opensip-tools/core';
+import ts from 'typescript';
+
+import { visitArrowFunction } from './inventory-visitors/arrow-function.js';
+import { visitConstructorDeclaration } from './inventory-visitors/constructor-declaration.js';
+import { visitFunctionDeclaration } from './inventory-visitors/function-declaration.js';
+import { visitFunctionExpression } from './inventory-visitors/function-expression.js';
+import { visitGetterSetter } from './inventory-visitors/getter-setter.js';
+import { visitMethodDeclaration } from './inventory-visitors/method-declaration.js';
+import { synthesizeModuleInit } from './inventory-visitors/module-init.js';
+
+import type { Catalog, FunctionOccurrence, ParseError } from '../types.js';
+import type { VisitorContext } from './inventory-visitors/types.js';
 
 export interface InventoryInput {
   readonly projectDirAbs: string;
@@ -23,6 +35,127 @@ export interface InventoryOutput {
   readonly parseErrors: readonly ParseError[];
 }
 
-export function buildInventory(_input: InventoryInput): InventoryOutput {
-  throw new Error('buildInventory: not implemented (Phase P1).');
+export function buildInventory(input: InventoryInput): InventoryOutput {
+  logger.info({
+    evt: 'graph.inventory.start',
+    module: 'graph:inventory',
+    files: input.files.length,
+  });
+
+  const program = ts.createProgram({
+    rootNames: [...input.files],
+    options: input.compilerOptions,
+  });
+
+  // Force binder to run so parent pointers are set on every node;
+  // visitors and resolvers walk parent chains.
+  program.getTypeChecker();
+
+  const functions: Record<string, FunctionOccurrence[]> = {};
+  const parseErrors: ParseError[] = [];
+  const filesSet = new Set(input.files.map(normalizeForCompare));
+
+  for (const sf of program.getSourceFiles()) {
+    if (sf.isDeclarationFile) continue;
+    const sfPath = normalizeForCompare(sf.fileName);
+    if (!filesSet.has(sfPath)) continue;
+    try {
+      collectFromFile(sf, input.projectDirAbs, functions);
+    } catch (error) {
+      parseErrors.push({
+        filePath: relative(input.projectDirAbs, sf.fileName),
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  const catalog: Catalog = {
+    version: '2.0',
+    tool: 'graph',
+    language: 'typescript',
+    builtAt: new Date().toISOString(),
+    tsConfigPath: input.tsConfigPathAbs,
+    tsCompilerVersion: ts.version,
+    functions,
+  };
+
+  const totalOccurrences = Object.values(functions).reduce((n, arr) => n + arr.length, 0);
+  logger.info({
+    evt: 'graph.inventory.complete',
+    module: 'graph:inventory',
+    files: input.files.length,
+    occurrences: totalOccurrences,
+    parseErrors: parseErrors.length,
+  });
+
+  return { catalog, program, parseErrors };
+}
+
+function collectFromFile(
+  sourceFile: ts.SourceFile,
+  projectDirAbs: string,
+  out: Record<string, FunctionOccurrence[]>,
+): void {
+  const filePathProjectRel = relative(projectDirAbs, sourceFile.fileName)
+    .split(sep)
+    .join('/');
+
+  const baseCtx: VisitorContext = {
+    sourceFile,
+    projectDirAbs,
+    filePathProjectRel,
+    inTestFile: isTestFile(filePathProjectRel),
+    definedInGenerated: isGeneratedFile(filePathProjectRel),
+    enclosingClass: null,
+  };
+
+  function record(occ: FunctionOccurrence): void {
+    const list = out[occ.simpleName];
+    if (list) {
+      list.push(occ);
+    } else {
+      out[occ.simpleName] = [occ];
+    }
+  }
+
+  function walk(node: ts.Node, ctx: VisitorContext): void {
+    const occ = dispatchVisitor(node, ctx);
+    if (occ) record(occ);
+
+    if (ts.isClassDeclaration(node) || ts.isClassExpression(node)) {
+      const className = node.name?.text ?? '<anon-class>';
+      const childCtx: VisitorContext = { ...ctx, enclosingClass: className };
+      ts.forEachChild(node, (c) => { walk(c, childCtx); });
+      return;
+    }
+
+    ts.forEachChild(node, (c) => { walk(c, ctx); });
+  }
+
+  walk(sourceFile, baseCtx);
+
+  // Always synthesize one module-init per file.
+  record(synthesizeModuleInit(sourceFile, baseCtx));
+}
+
+function normalizeForCompare(p: string): string {
+  return p.split(sep).join('/');
+}
+
+function dispatchVisitor(node: ts.Node, ctx: VisitorContext): FunctionOccurrence | null {
+  if (ts.isFunctionDeclaration(node)) return visitFunctionDeclaration(node, ctx);
+  if (ts.isArrowFunction(node)) return visitArrowFunction(node, ctx);
+  if (ts.isMethodDeclaration(node)) return visitMethodDeclaration(node, ctx);
+  if (ts.isConstructorDeclaration(node)) return visitConstructorDeclaration(node, ctx);
+  if (ts.isGetAccessor(node) || ts.isSetAccessor(node)) return visitGetterSetter(node, ctx);
+  if (ts.isFunctionExpression(node)) return visitFunctionExpression(node, ctx);
+  return null;
+}
+
+function isTestFile(rel: string): boolean {
+  return /\.test\.tsx?$|__tests__\//.test(rel);
+}
+
+function isGeneratedFile(rel: string): boolean {
+  return /\bdist\/|\bbuild\/|\.generated\./.test(rel);
 }
