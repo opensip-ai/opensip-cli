@@ -1,6 +1,6 @@
 {
   "name": "@opensip-tools/contracts",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "license": "MIT",
   "description": "Shared contract types for OpenSIP Tools — CliOutput / CommandResult shapes, exit codes, session persistence",
   "repository": {
