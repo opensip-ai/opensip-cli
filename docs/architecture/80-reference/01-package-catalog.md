@@ -53,7 +53,7 @@ Peer packages at the same layer. Tools implement the `Tool` contract; language a
 | Package | Path | Role | Key exports |
 |---|---|---|---|
 | `@opensip-tools/lang-typescript` | `packages/languages/lang-typescript/` | TypeScript/JavaScript adapter — TS compiler API + query layer | `typescriptAdapter`, `filterContent`, `clearFilterCache` (re-exported from fitness) |
-| `@opensip-tools/lang-rust` | `packages/languages/lang-rust/` | Rust adapter — hand-written tokenizer + strip | `rustAdapter` |
+| `@opensip-tools/lang-rust` | `packages/languages/lang-rust/` | Rust adapter — strip routines + line-offset metadata (tree-sitter integration deferred) | `rustAdapter` |
 | `@opensip-tools/lang-python` | `packages/languages/lang-python/` | Python adapter — strip routines | `pythonAdapter` |
 | `@opensip-tools/lang-java` | `packages/languages/lang-java/` | Java adapter — strip routines | `javaAdapter` |
 | `@opensip-tools/lang-go` | `packages/languages/lang-go/` | Go adapter — strip routines | `goAdapter` |
