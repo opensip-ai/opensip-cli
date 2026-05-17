@@ -1,9 +1,11 @@
 /**
  * BFS from inferred entry-point set to a target bodyHash.
  *
- * Phase P0 stub: returns null. Phase P9 implements the BFS + entry-point
- * heuristic (any function in `packages/cli/src/index.ts`, or any function
- * with no callers AND `visibility === 'exported'`).
+ * Entry-point heuristic mirrors v0.2's: any function in
+ * `packages/cli/src/index.ts`, plus any exported function with no
+ * callers in catalog. Returns the shortest path as a bodyHash[]
+ * starting at an entry point and ending at the target. Returns null
+ * when no entry point reaches the target.
  */
 
 export function dashboardTraceJs(): string {
@@ -21,7 +23,37 @@ function inferEntryPointHashes(catalog, indexes) {
 }
 
 function traceFromEntry(targetHash, catalog, indexes) {
-  // Phase P9 fills in BFS shortest-path. Phase P0 returns null.
+  if (!targetHash || !indexes || !indexes.byBodyHash.has(targetHash)) return null;
+  const entries = inferEntryPointHashes(catalog, indexes);
+  if (entries.length === 0) return null;
+  // BFS over the forward (callees) graph; record predecessors so we
+  // can reconstruct the path on the first hit.
+  const queue = [];
+  const visited = new Set();
+  const parent = new Map();
+  for (const e of entries) {
+    queue.push(e);
+    visited.add(e);
+  }
+  while (queue.length > 0) {
+    const v = queue.shift();
+    if (v === targetHash) {
+      const path = [];
+      let cur = v;
+      while (cur !== undefined) {
+        path.unshift(cur);
+        cur = parent.get(cur);
+      }
+      return path;
+    }
+    const adj = indexes.callees.get(v) || [];
+    for (const w of adj) {
+      if (visited.has(w)) continue;
+      visited.add(w);
+      parent.set(w, v);
+      queue.push(w);
+    }
+  }
   return null;
 }
 `;

@@ -1,8 +1,10 @@
 /**
- * Editor deep-link URL generator — vscode://file/<path>:<line> etc.
+ * Editor deep-link URL generator.
  *
- * Phase P0 stub: returns null. Phase P9 reads `dashboard.editor` from
- * the embedded `EDITOR_PROTOCOL` constant and produces real URLs.
+ * Reads the embedded `EDITOR_PROTOCOL` constant set by `generator.ts`
+ * (passed through from `dashboard.editor` in opensip-tools.config.yml).
+ * Recognized values: 'vscode', 'cursor'. Anything else returns null and
+ * the Function Card falls back to a "Copy path" button.
  */
 
 export function dashboardEditorLinkJs(): string {
