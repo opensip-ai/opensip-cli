@@ -43,7 +43,7 @@ Different kinds, different lifetimes. Tools are global to the binary — once re
 
 ## Tool discovery (`opensipTools.kind === 'tool'`)
 
-[`packages/core/src/plugins/tool-package-discovery.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/core/src/plugins/tool-package-discovery.ts) implements the walk. From `cwd`, walk upward through ancestor directories, looking at each `node_modules/`. For each node_modules entry (and one level into scoped directories like `@opensip-tools/`), inspect the `package.json`:
+[`packages/core/src/plugins/tool-package-discovery.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/core/src/plugins/tool-package-discovery.ts) implements the walk. The CLI passes its own install directory as the `projectDir` argument (`packages/cli/src/index.ts:277-278` — `cliInstallDir = dirname(__dirname)`); the function then walks upward through that directory's ancestors, looking at each `node_modules/`. Anchoring discovery at the CLI's install location (rather than the user's cwd) is deliberate — third-party tool packages installed alongside `@opensip-tools/cli` are picked up regardless of where the user runs the binary from. For each `node_modules` entry (and one level into scoped directories like `@opensip-tools/`), inspect the `package.json`:
 
 ```ts
 const isToolPackage = (pkgDir: string): boolean => {
