@@ -41,3 +41,6 @@ opensip-tools-report.html
 # opensip-tools repo itself, and any consumer all generate this.
 opensip-tools/.runtime/
 **/opensip-tools/.runtime/
+
+# Claude Code session state
+.claude/scheduled_tasks.lock
