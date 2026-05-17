@@ -49,8 +49,10 @@ function inferNameFromParent(node: ts.ArrowFunction): string | null {
   // const foo = () => ...
   const p = node.parent;
   if (ts.isVariableDeclaration(p) && ts.isIdentifier(p.name)) return p.name.text;
-  // class X { foo = () => ... }
-  if (ts.isPropertyDeclaration(p) && ts.isIdentifier(p.name)) return p.name.text;
+  // class X { foo = () => ... } — both public and #private fields.
+  if (ts.isPropertyDeclaration(p) && (ts.isIdentifier(p.name) || ts.isPrivateIdentifier(p.name))) {
+    return p.name.text;
+  }
   // { foo: () => ... }
   if (ts.isPropertyAssignment(p) && ts.isIdentifier(p.name)) return p.name.text;
   return null;

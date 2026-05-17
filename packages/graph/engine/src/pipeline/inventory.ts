@@ -12,6 +12,7 @@ import { logger } from '@opensip-tools/core';
 import ts from 'typescript';
 
 import { visitArrowFunction } from './inventory-visitors/arrow-function.js';
+import { visitClassStaticBlock } from './inventory-visitors/class-static-init.js';
 import { visitConstructorDeclaration } from './inventory-visitors/constructor-declaration.js';
 import { visitFunctionDeclaration } from './inventory-visitors/function-declaration.js';
 import { visitFunctionExpression } from './inventory-visitors/function-expression.js';
@@ -152,6 +153,7 @@ function dispatchVisitor(node: ts.Node, ctx: VisitorContext): FunctionOccurrence
   if (ts.isConstructorDeclaration(node)) return visitConstructorDeclaration(node, ctx);
   if (ts.isGetAccessor(node) || ts.isSetAccessor(node)) return visitGetterSetter(node, ctx);
   if (ts.isFunctionExpression(node)) return visitFunctionExpression(node, ctx);
+  if (ts.isClassStaticBlockDeclaration(node)) return visitClassStaticBlock(node, ctx);
   return null;
 }
 

@@ -3,17 +3,22 @@
  */
 
 
+import ts from 'typescript';
+
 import { classifyVisibility } from '../inventory-helpers/classify-visibility.js';
 import { extractDecorators } from '../inventory-helpers/extract-decorators.js';
 import { extractParams } from '../inventory-helpers/extract-params.js';
 import { hashFunctionBody } from '../inventory-helpers/hash-body.js';
 
 import type { InventoryVisitor } from './types.js';
-import type ts from 'typescript';
 
 export const visitFunctionDeclaration: InventoryVisitor<ts.FunctionDeclaration> = (node, ctx) => {
-  if (!node.name) return null;
-  const name = node.name.text;
+  // Body-less function declarations (overload signatures, ambient
+  // `declare function` forms) are not callables — they have no
+  // implementation to enter the call graph.
+  if (!node.body) return null;
+  const name = resolveFunctionName(node);
+  if (name === null) return null;
   const start = node.getStart(ctx.sourceFile);
   const startLC = ctx.sourceFile.getLineAndCharacterOfPosition(start);
   const end = ctx.sourceFile.getLineAndCharacterOfPosition(node.getEnd());
@@ -36,3 +41,17 @@ export const visitFunctionDeclaration: InventoryVisitor<ts.FunctionDeclaration> 
     calls: [],
   };
 };
+
+/**
+ * `export default function() {}` is the special case where a
+ * FunctionDeclaration is allowed to be anonymous. We synthesize a
+ * stable simpleName so the catalog records the callable. Anywhere else,
+ * an unnamed FunctionDeclaration is a parser-level error and we drop
+ * it safely.
+ */
+function resolveFunctionName(node: ts.FunctionDeclaration): string | null {
+  if (node.name) return node.name.text;
+  const isDefaultExport = node.modifiers?.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword) === true;
+  if (isDefaultExport) return '<default>';
+  return null;
+}

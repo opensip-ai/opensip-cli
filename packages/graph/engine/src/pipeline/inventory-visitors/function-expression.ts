@@ -49,6 +49,9 @@ function inferNameFromParent(node: ts.FunctionExpression): string | null {
   const p = node.parent;
   if (ts.isVariableDeclaration(p) && ts.isIdentifier(p.name)) return p.name.text;
   if (ts.isPropertyAssignment(p) && ts.isIdentifier(p.name)) return p.name.text;
-  if (ts.isPropertyDeclaration(p) && ts.isIdentifier(p.name)) return p.name.text;
+  // class X { foo = function() {} } — both public and #private fields.
+  if (ts.isPropertyDeclaration(p) && (ts.isIdentifier(p.name) || ts.isPrivateIdentifier(p.name))) {
+    return p.name.text;
+  }
   return null;
 }

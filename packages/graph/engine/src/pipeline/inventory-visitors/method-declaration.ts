@@ -12,6 +12,11 @@ import { hashFunctionBody } from '../inventory-helpers/hash-body.js';
 import type { InventoryVisitor } from './types.js';
 
 export const visitMethodDeclaration: InventoryVisitor<ts.MethodDeclaration> = (node, ctx) => {
+  // Body-less method declarations (overload signatures, abstract methods,
+  // method signatures inside ambient declarations) are not callables —
+  // they have no implementation to enter the call graph. Per the
+  // "real callable iff has body" rule.
+  if (!node.body) return null;
   const name = methodName(node);
   if (name === null) return null;
   const start = node.getStart(ctx.sourceFile);
@@ -46,6 +51,9 @@ function methodName(node: ts.MethodDeclaration): string | null {
   if (ts.isIdentifier(n)) return n.text;
   if (ts.isStringLiteral(n)) return n.text;
   if (ts.isComputedPropertyName(n)) return n.expression.getText();
+  // PrivateIdentifier carries the leading '#' in its text already
+  // (e.g. '#priv'), which matches how TypeScript's own AST exposes it.
+  if (ts.isPrivateIdentifier(n)) return n.text;
   return null;
 }
 
