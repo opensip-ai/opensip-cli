@@ -36,7 +36,7 @@ function openFunctionCard(bodyHash) {
   const closeBtn = el('button', { class: 'fc-close', text: '×', onclick: closeFunctionCard });
   card.appendChild(closeBtn);
 
-  card.appendChild(el('h3', { text: occ.simpleName || '<anonymous>' }));
+  card.appendChild(el('h3', { text: displayName(occ.simpleName || '<anonymous>') }));
   card.appendChild(el('div', { class: 'fc-loc', text: occ.filePath + ':' + occ.line }));
 
   const paramText = (occ.params || []).map(p => (p.rest ? '...' : '') + p.name + (p.optional ? '?' : '')).join(', ');
@@ -71,7 +71,7 @@ function openFunctionCard(bodyHash) {
       for (const c of grouped.get(pkg)) {
         const item = el('li', {
           'data-body-hash': c.bodyHash,
-          text: c.simpleName + '  —  ' + c.filePath + ':' + c.line,
+          text: displayName(c.simpleName) + '  —  ' + c.filePath + ':' + c.line,
         });
         item.addEventListener('click', () => openFunctionCard(c.bodyHash));
         list.appendChild(item);
@@ -97,7 +97,7 @@ function openFunctionCard(bodyHash) {
     for (const h of calleeHashes) {
       const c = graphIndexes.byBodyHash.get(h);
       if (!c) continue;
-      const item = el('li', { 'data-body-hash': c.bodyHash, text: c.simpleName + '  —  ' + c.filePath + ':' + c.line });
+      const item = el('li', { 'data-body-hash': c.bodyHash, text: displayName(c.simpleName) + '  —  ' + c.filePath + ':' + c.line });
       item.addEventListener('click', () => openFunctionCard(c.bodyHash));
       list.appendChild(item);
     }
@@ -153,7 +153,7 @@ function renderTraceInCard(card, path) {
     for (const h of path) {
       const occ = graphIndexes.byBodyHash.get(h);
       if (!occ) continue;
-      const item = el('li', { 'data-body-hash': occ.bodyHash, text: occ.simpleName + '  —  ' + occ.filePath + ':' + occ.line });
+      const item = el('li', { 'data-body-hash': occ.bodyHash, text: displayName(occ.simpleName) + '  —  ' + occ.filePath + ':' + occ.line });
       item.addEventListener('click', () => openFunctionCard(occ.bodyHash));
       list.appendChild(item);
     }

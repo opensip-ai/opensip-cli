@@ -34,7 +34,7 @@ views.push({
       container,
       ranked.map(r => Object.assign({}, r.occ, { __callers: r.callerCount })),
       [
-        { label: 'Function', value: o => o.simpleName },
+        { label: 'Function', value: o => displayName(o.simpleName) },
         { label: 'Callers', value: o => o.__callers },
         { label: 'Package', value: o => packageOfPath(o.filePath) },
         { label: 'File', value: o => o.filePath + ':' + o.line },

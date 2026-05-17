@@ -36,7 +36,7 @@ views.push({
     const tbody = el('tbody');
     for (const scc of sccs) {
       const members = scc.map(h => indexes.byBodyHash.get(h)).filter(Boolean);
-      const previewNames = members.slice(0, 5).map(m => m.simpleName);
+      const previewNames = members.slice(0, 5).map(m => displayName(m.simpleName));
       const previewMore = members.length > 5 ? ', ...' + (members.length - 5) + ' more' : '';
       const previewText = previewNames.join(', ') + previewMore;
       const pkgs = Array.from(new Set(members.map(m => packageOfPath(m.filePath)))).sort();

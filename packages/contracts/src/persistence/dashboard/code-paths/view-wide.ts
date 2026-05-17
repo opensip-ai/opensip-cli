@@ -38,7 +38,7 @@ views.push({
       container,
       ranked.map(r => Object.assign({}, r.occ, { __arity: r.arity, __thumb: paramThumb(r.occ) })),
       [
-        { label: 'Function', value: o => o.simpleName },
+        { label: 'Function', value: o => displayName(o.simpleName) },
         { label: 'Params', value: o => o.__arity },
         { label: 'Signature', value: o => o.__thumb },
         { label: 'Package', value: o => packageOfPath(o.filePath) },

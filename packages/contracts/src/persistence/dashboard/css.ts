@@ -151,6 +151,12 @@ h3 { font-size: 14px; font-weight: 600; margin-bottom: 8px; color: var(--text-mu
 .code-paths-view { display: none; }
 .code-paths-view.active { display: block; }
 
+/* Code Paths tables can hold long file paths and synthetic function
+   names; allow cells to wrap rather than overflow the card width. */
+.code-paths-view .data-table { table-layout: fixed; width: 100%; }
+.code-paths-view .data-table td,
+.code-paths-view .data-table th { white-space: normal; word-break: break-all; overflow-wrap: anywhere; vertical-align: top; }
+
 /* Coupling heat map cell shading — set --coupling-density per cell */
 .coupling-cell { background: color-mix(in srgb, var(--bg-surface), var(--accent) calc(var(--coupling-density, 0) * 60%)); cursor: pointer; }
 .coupling-cell.empty { color: var(--text-dim); cursor: default; }

@@ -32,7 +32,7 @@ views.push({
       container,
       ranked.map(r => Object.assign({}, r.occ, { __size: r.size })),
       [
-        { label: 'Function', value: o => o.simpleName },
+        { label: 'Function', value: o => displayName(o.simpleName) },
         { label: 'Lines', value: o => o.__size },
         { label: 'Kind', value: o => o.kind },
         { label: 'Package', value: o => packageOfPath(o.filePath) },

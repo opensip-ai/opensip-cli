@@ -122,7 +122,13 @@ describe('Function Card overlay', () => {
       functions: { '<arrow:foo.ts:1:1>': [makeOcc({ bodyHash: 'a1', simpleName: '<arrow:foo.ts:1:1>', kind: 'arrow' })] },
     });
     w().openFunctionCard('a1');
-    expect(document.querySelector('.function-card-overlay')!.textContent).toContain('<arrow:foo.ts:1:1>');
+    const overlay = document.querySelector('.function-card-overlay')!;
+    // Synthetic names are collapsed to just the kind tag in the card
+    // header; the full simpleName never appears verbatim.
+    expect(overlay.querySelector('.function-card h3')!.textContent).toBe('<arrow>');
+    expect(overlay.textContent).not.toContain('<arrow:foo.ts:1:1>');
+    // The kind label still surfaces in the meta row.
+    expect(overlay.querySelector('.fc-meta')!.textContent).toContain('arrow');
   });
 
   it('renders a getter and constructor with the right kind label', () => {

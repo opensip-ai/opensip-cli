@@ -114,7 +114,7 @@ function openCouplingDrilldown(callerPkg, calleePkg, indexes, filterState) {
         if (packageOfPath(callee.filePath) !== calleePkg) continue;
         const item = el('li', {
           'data-body-hash': occ.bodyHash,
-          text: occ.simpleName + '  →  ' + callee.simpleName + '   (' + occ.filePath + ':' + edge.line + ')',
+          text: displayName(occ.simpleName) + '  →  ' + displayName(callee.simpleName) + '   (' + occ.filePath + ':' + edge.line + ')',
         });
         item.addEventListener('click', () => openFunctionCard(occ.bodyHash));
         list.appendChild(item);

@@ -66,7 +66,7 @@ views.push({
         results,
         occurrences,
         [
-          { label: 'Function', value: o => o.simpleName },
+          { label: 'Function', value: o => displayName(o.simpleName) },
           { label: 'Kind', value: o => o.kind },
           { label: 'Package', value: o => packageOfPath(o.filePath) },
           { label: 'File', value: o => o.filePath + ':' + o.line },
