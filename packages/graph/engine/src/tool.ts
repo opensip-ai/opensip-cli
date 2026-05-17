@@ -1,37 +1,31 @@
 /**
  * graphTool — graph as a Tool plugin.
  *
- * Owns the Commander wiring for `graph`, `graph-orphans`, and
- * `graph-entry-points`. The CLI calls register() once at startup; this
- * file owns the option-parsing surface and dispatches to the
- * cli/<command>.ts handlers.
+ * Owns the Commander wiring for the single `graph` subcommand. The CLI
+ * calls register() once at startup; this file owns the option-parsing
+ * surface and dispatches to cli/graph.ts.
  *
  * Per spec §10A AC-2 / AC-1: this module does NOT import from
  * @opensip-tools/cli. It receives the ToolCliContext interface from
  * @opensip-tools/core and uses it for setExitCode + logger.
+ *
+ * History: v0.2 originally registered three subcommands (`graph`,
+ * `graph-orphans`, `graph-entry-points`). The orphans and entry-points
+ * subcommands were folded into the unified `graph` output — all three
+ * data slices (rules, entry points, catalog summary) are reachable via
+ * the single `graph` invocation.
  */
 
 import { type Command } from 'commander';
 
-import { executeGraphEntryPoints } from './cli/graph-entry-points.js';
-import { executeGraphOrphans } from './cli/graph-orphans.js';
 import { executeGraph } from './cli/graph.js';
 
 import type { Tool, ToolCliContext, ToolCommandDescriptor } from '@opensip-tools/core';
 
 const GRAPH: ToolCommandDescriptor = {
   name: 'graph',
-  description: 'Run static call-graph analysis (orphans, duplicates, dead branches)',
-};
-
-const GRAPH_ORPHANS: ToolCommandDescriptor = {
-  name: 'graph-orphans',
-  description: 'List orphan-subtree findings only',
-};
-
-const GRAPH_ENTRY_POINTS: ToolCommandDescriptor = {
-  name: 'graph-entry-points',
-  description: 'List inferred entry points for the project',
+  description:
+    'Run static call-graph analysis (rules, entry points, catalog summary in one report)',
 };
 
 function register(cli: ToolCliContext): void {
@@ -70,26 +64,6 @@ function register(cli: ToolCliContext): void {
         cli,
       );
     });
-
-  program
-    .command(GRAPH_ORPHANS.name)
-    .description(GRAPH_ORPHANS.description)
-    .option('--cwd <path>', 'Target directory', process.cwd())
-    .option('--json', 'Output structured JSON', false)
-    .option('--debug', 'Enable debug mode for structured log output', false)
-    .action(async (opts: { cwd: string; json?: boolean }) => {
-      await executeGraphOrphans({ cwd: opts.cwd, json: opts.json }, cli);
-    });
-
-  program
-    .command(GRAPH_ENTRY_POINTS.name)
-    .description(GRAPH_ENTRY_POINTS.description)
-    .option('--cwd <path>', 'Target directory', process.cwd())
-    .option('--json', 'Output structured JSON', false)
-    .option('--debug', 'Enable debug mode for structured log output', false)
-    .action(async (opts: { cwd: string; json?: boolean }) => {
-      await executeGraphEntryPoints({ cwd: opts.cwd, json: opts.json }, cli);
-    });
 }
 
 export const graphTool: Tool = {
@@ -98,6 +72,6 @@ export const graphTool: Tool = {
     version: '1.0.5',
     description: 'Static call-graph + dead-end analysis',
   },
-  commands: [GRAPH, GRAPH_ORPHANS, GRAPH_ENTRY_POINTS],
+  commands: [GRAPH],
   register,
 };

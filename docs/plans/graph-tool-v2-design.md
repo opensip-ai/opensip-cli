@@ -449,9 +449,8 @@ packages/graph/engine/
 │   │   ├── json.ts
 │   │   └── sarif.ts
 │   ├── cli/
-│   │   ├── graph.ts                      # `opensip-tools graph` action
-│   │   ├── graph-orphans.ts              # `opensip-tools graph-orphans` action
-│   │   ├── graph-entry-points.ts         # `opensip-tools graph-entry-points` action
+│   │   ├── graph.ts                      # `opensip-tools graph` action (unified report:
+│   │   │                                 #   catalog summary + findings + entry points)
 │   │   └── orchestrate.ts                # threads stages 0-5 together
 │   ├── cache/
 │   │   ├── read.ts
@@ -757,7 +756,7 @@ This is the build order an AI coder agent follows. Each phase is shippable as a 
 |---|---|
 | Tool registration | `packages/cli/src/index.ts` — `defaultToolRegistry.register(graphTool)` |
 | Tool contract | `packages/graph/engine/src/tool.ts` — `graphTool: Tool` |
-| CLI subcommands | `packages/graph/engine/src/cli/{graph,graph-orphans,graph-entry-points}.ts` |
+| CLI subcommand | `packages/graph/engine/src/cli/graph.ts` (single unified command; orphans + entry-points are sections in its output) |
 | Signal output | `packages/graph/engine/src/render/{table,json,sarif}.ts` consumed by `CliOutput` |
 | Cache file | `<project>/opensip-tools/.runtime/cache/graph/catalog.json` |
 | Path domain | `packages/core/src/lib/paths.ts` — `'graph'` PathDomain + `graphCacheDir`, `graphCatalogPath`, `graphBaselinePath` |
@@ -776,15 +775,15 @@ A phase that introduces functionality but does not wire it into the relevant sur
 1. Create `packages/graph/engine/{package.json, tsconfig.json, vitest.config.ts}`. `package.json` declares `opensipTools.kind = 'tool'` and `main`/`types` from `dist/`. Direct dependencies: `@opensip-tools/contracts`, `@opensip-tools/core`, `@opensip-tools/lang-typescript`, `commander`, `glob`, `typescript`.
 2. Create `packages/graph/engine/src/types.ts` with the `Catalog`, `FunctionOccurrence`, `CallEdge`, `Param`, and `Indexes` interfaces from §2.2 and §2.4. No implementation yet.
 3. Create `packages/graph/engine/src/index.ts` (public barrel) re-exporting `graphTool` from `./tool.js`.
-4. Create `packages/graph/engine/src/tool.ts` with a minimal `graphTool: Tool` whose `metadata.id = 'graph'`, `metadata.version` matches `package.json`, and `register(cli, ctx)` mounts three Commander subcommands (`graph`, `graph-orphans`, `graph-entry-points`) all dispatching to no-op handlers in `cli/`.
-5. Create `packages/graph/engine/src/cli/{graph,graph-orphans,graph-entry-points,orchestrate}.ts` as no-op skeletons. Each handler logs `evt: 'graph.cli.<command>.start'` then returns `EXIT_CODES.SUCCESS`.
+4. Create `packages/graph/engine/src/tool.ts` with a minimal `graphTool: Tool` whose `metadata.id = 'graph'`, `metadata.version` matches `package.json`, and `register(cli, ctx)` mounts the single `graph` Commander subcommand dispatching to a no-op handler in `cli/graph.ts`.
+5. Create `packages/graph/engine/src/cli/{graph,orchestrate}.ts` as no-op skeletons. The handler logs `evt: 'graph.cli.graph.start'` then returns `EXIT_CODES.SUCCESS`.
 6. Create empty stage modules: `pipeline/{discover,inventory,edges,indexes}.ts`, `rules/registry.ts`, `render/{table,json,sarif}.ts`, `cache/{read,write,invalidate}.ts`, `gate.ts`. Each file exports the public function declared in §2 with a `throw new Error('not implemented')` body.
 7. **Wire registration**: edit `packages/cli/src/index.ts` to add `import { graphTool } from '@opensip-tools/graph'` and `defaultToolRegistry.register(graphTool)`. Edit `packages/cli/package.json` to add `"@opensip-tools/graph": "workspace:*"`.
 8. **Wire path domain**: edit `packages/core/src/lib/paths.ts` to extend `PathDomain` with `'graph'` and add `graphCacheDir`, `graphCatalogPath`, `graphBaselinePath` to `ProjectPaths`.
 9. **Wire session persistence**: edit `packages/contracts/src/persistence/store.ts` to widen `StoredSession.tool` from `'fit' | 'sim'` to `'fit' | 'sim' | 'graph'`.
 10. **Wire workspace**: confirm `pnpm-workspace.yaml` includes `packages/graph/*` (already present per §11).
 
-**Acceptance.** `pnpm install && pnpm build` succeeds. `pnpm test` passes (no graph tests yet, existing 1308 tests unchanged). `opensip-tools graph --help` lists all three subcommands. `opensip-tools graph` exits 0 and writes a session row with `tool: 'graph'`.
+**Acceptance.** `pnpm install && pnpm build` succeeds. `pnpm test` passes (no graph tests yet, existing 1308 tests unchanged). `opensip-tools graph --help` describes the unified subcommand. `opensip-tools graph` exits 0 and writes a session row with `tool: 'graph'`.
 
 ### Phase P1 — Stage 0 (discover) + Stage 1 (inventory)
 
@@ -837,10 +836,10 @@ A phase that introduces functionality but does not wire it into the relevant sur
 4. Implement `rules/registry.ts` exporting an array `rules: Rule[]` containing only `orphanSubtreeRule` for now.
 5. Implement `render/table.ts` and `render/json.ts` per §2.6. `render/sarif.ts` is deferred to P6.
 6. **Wire orchestration**: `cli/orchestrate.ts::runGraph` now calls Stage 3 → for each rule in registry, call `rule.evaluate(catalog, indexes, config)` → concat Signals → return.
-7. **Wire CLI handler**: `cli/graph.ts` chooses renderer based on `--json` flag. `cli/graph-orphans.ts` filters Signals to only `graph:orphan-subtree`. `cli/graph-entry-points.ts` invokes `_entry-points.ts` directly and prints the inferred set.
+7. **Wire CLI handler**: `cli/graph.ts` chooses renderer based on `--json` flag. The default (non-JSON) output is the unified terminal report — catalog summary, findings grouped by rule (top 10 each, with overflow indicator), top 10 inferred entry points, and a one-line summary. `--json` emits the full `CliOutput` document.
 8. **Wire exit codes**: handler sets `EXIT_CODES.SUCCESS` if no error-severity Signals, otherwise the appropriate code from `@opensip-tools/contracts`.
 
-**Acceptance.** Dogfood gate passes: `opensip-tools graph` against opensip-tools itself reports ≤ 20 orphan-subtree findings. `opensip-tools graph-orphans` and `opensip-tools graph-entry-points` produce reasonable output. Existing 1308 tests pass.
+**Acceptance.** Dogfood gate passes: `opensip-tools graph` against opensip-tools itself reports ≤ 20 orphan-subtree findings. The unified `opensip-tools graph` report renders the orphans section and the entry-points section in one invocation. Existing 1308 tests pass.
 
 ### Phase P5 — Remaining rules
 
@@ -947,8 +946,6 @@ packages/graph/engine/src/__tests__/
 │   └── normalize.test.ts                    # DRY-4
 ├── cli/
 │   ├── graph.test.ts
-│   ├── graph-orphans.test.ts
-│   ├── graph-entry-points.test.ts
 │   ├── orchestrate.test.ts
 │   └── exit-codes.test.ts                   # AC-12: exit-code mapping
 ├── tool.test.ts                             # AC-12: Tool contract conformance
@@ -993,7 +990,7 @@ packages/fitness/checks-typescript/src/checks/architecture/__tests__/
 - **AC-2 (Tool contract)** — `tool.test.ts` asserts:
   - `graphTool.metadata.id === 'graph'`.
   - `graphTool.metadata.version` matches `package.json`'s `version` field at runtime.
-  - `graphTool.commands` includes descriptors for `graph`, `graph-orphans`, `graph-entry-points`.
+  - `graphTool.commands` includes the single `graph` descriptor (orphans + entry-points are sections of its unified output, not separate subcommands).
   - The module that exports `graphTool` does not import from `@opensip-tools/cli` (compile-time test via `import { graphTool }` succeeding without `@opensip-tools/cli` installed).
 - **AC-4 (Exit codes)** — `cli/exit-codes.test.ts` asserts each handler returns the correct `EXIT_CODES.*`:
   - Bad tsconfig → `CONFIGURATION_ERROR`.
@@ -1059,9 +1056,9 @@ Each flow lists the originating phase that introduced it.
    - stdout matches the table renderer's expected shape.
    - Logger emits `graph.cli.graph.start` and `graph.cli.graph.complete`.
 
-2. **`opensip-tools graph-orphans --json` dogfood** *(P4 acceptance)* — produces a parseable `CliOutput` (validated against the contracts JSON schema). All Signals have `slug.startsWith('graph:orphan-subtree')`.
+2. **`opensip-tools graph --json` dogfood** *(P4 acceptance)* — produces a parseable `CliOutput` (validated against the contracts JSON schema). The orphan-subtree section of the unified report contains only Signals with `ruleId === 'graph:orphan-subtree'`.
 
-3. **`opensip-tools graph-entry-points` dogfood** *(P4 acceptance)* — lists at least:
+3. **Entry-points section dogfood** *(P4 acceptance)* — the unified `graph` report's "Entry points" section lists at least:
    - `fitnessTool` from `@opensip-tools/fitness`
    - `simulationTool` from `@opensip-tools/simulation`
    - `graphTool` from `@opensip-tools/graph`
@@ -1155,7 +1152,7 @@ Each entry lists the file, the change required, and the originating phase or sec
    - Cross-references this design spec.
    - Driven by: §1, §2, §5, Appendix C. The narrative shape mirrors the existing `01-language-adapters.md`, `02-check-packs.md`, `03-architecture-gate.md`.
 
-6. **`docs/architecture/60-surfaces/01-cli-command-tree.md`** — add the three new subcommands (`graph`, `graph-orphans`, `graph-entry-points`) with flag tables.
+6. **`docs/architecture/60-surfaces/01-cli-command-tree.md`** — document the unified `graph` subcommand with its flag table. (v0.2 originally introduced `graph-orphans` and `graph-entry-points` as separate subcommands; both were folded into `graph`'s output. The doc records this history.)
    - Driven by: §10 P0 step 4, P4 step 7, P6 step 5.
 
 7. **`docs/architecture/README.md`** — bump `last_verified` to the v0.2 release date. Add row(s) to the "How to read this" or "reading order" tables if the new subsystem doc justifies one.
@@ -1231,7 +1228,7 @@ The plan above must obey the codebase invariants documented in `CLAUDE.md` and e
 `graphTool` implements `Tool` from `@opensip-tools/core/src/tools/types.ts`. Required:
 - `metadata.id = 'graph'` (stable across versions).
 - `metadata.version` matches `packages/graph/engine/package.json`'s `version` field at runtime; do not hard-code.
-- `commands: ToolCommandDescriptor[]` declares all three subcommands (`graph`, `graph-orphans`, `graph-entry-points`) with their flags so the dispatcher can render `--help` without invoking `register`.
+- `commands: ToolCommandDescriptor[]` declares the single `graph` subcommand with its flags so the dispatcher can render `--help` without invoking `register`. (v0.2 originally registered `graph-orphans` and `graph-entry-points` as separate subcommands; both were folded into the unified `graph` output.)
 - `register(cli, ctx)` is called once at CLI startup; it mounts Commander subcommands. The Tool itself **does not** import from `@opensip-tools/cli` — it consumes the shared `ToolCliContext` interface from `@opensip-tools/core`.
 
 **Locations.** P0 step 4 (Tool object), P0 step 7 (registration in `packages/cli/src/index.ts`).

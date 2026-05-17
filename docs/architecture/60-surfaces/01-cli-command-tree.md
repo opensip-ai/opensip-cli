@@ -120,10 +120,12 @@ opensip-tools graph --gate-compare
 opensip-tools graph --report-to <url>
 ```
 
+`graph` is the single entry point for static call-graph analysis. The default (non-JSON) output is a structured terminal report with four sections: catalog summary, findings grouped by rule (top 10 per rule, with overflow indicator), top 10 inferred entry points, and a one-line summary. The full data is always available via `--json`.
+
 | Flag | Type | Default | Effect |
 |---|---|---|---|
 | `--cwd <path>` | string | `process.cwd()` | Target directory (must contain a `tsconfig.json`). |
-| `--json` | bool | `false` | Output a `CliOutput`-shaped JSON document instead of the table renderer. |
+| `--json` | bool | `false` | Output a `CliOutput`-shaped JSON document instead of the unified terminal report. |
 | `--no-cache` | bool | `false` | Skip the catalog cache and re-run stages 1+2. |
 | `--gate-save` | bool | `false` | Save the current Signal set to `<project>/opensip-tools/.runtime/cache/graph/baseline.json`. Mutually exclusive with `--gate-compare`. |
 | `--gate-compare` | bool | `false` | Compare current Signals to the baseline; exit non-zero on regression. |
@@ -134,25 +136,9 @@ opensip-tools graph --report-to <url>
 
 **Catalog file:** `<project>/opensip-tools/.runtime/cache/graph/catalog.json` — content-keyed by `tsCompilerVersion`, `tsConfigPath`, and a per-file mtime+size fingerprint. Atomic write via tmp + rename.
 
-## `graph-orphans` — orphan-subtree findings only
+**Entry-point reasons** (rendered in the entry-points section): `module-init` (every file's top-level statements), `name-match` (`main` / `run` / `start` / `register` / `init` / `bootstrap` / `initialize`), `no-callers-exported` (exported with no in-project caller). Bin-entry and tool-registration heuristics are deferred to v0.3.
 
-Tool-owned. Filters the full pipeline output to only the `graph:orphan-subtree` rule.
-
-```
-opensip-tools graph-orphans
-opensip-tools graph-orphans --json
-```
-
-## `graph-entry-points` — list inferred entry points
-
-Tool-owned. Prints the entry-point set used by `graph:orphan-subtree` (and other reachability rules).
-
-```
-opensip-tools graph-entry-points
-opensip-tools graph-entry-points --json
-```
-
-Entry-point reasons in v0.2: `module-init` (every file's top-level statements), `name-match` (`main` / `run` / `start` / `register` / `init` / `bootstrap` / `initialize`), `no-callers-exported` (exported with no in-project caller). Bin-entry and tool-registration heuristics are deferred to v0.3.
+> **History.** v0.2 originally registered three subcommands — `graph`, `graph-orphans`, and `graph-entry-points`. The two filtered views were folded into the unified `graph` output; all three data slices (rules, entry points, catalog summary) are now reachable from the single `graph` invocation.
 
 ---
 

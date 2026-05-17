@@ -1,9 +1,13 @@
 /**
  * `opensip-tools graph` — main subcommand handler.
  *
- * Runs the full pipeline; renders Signals as table or JSON; surfaces
- * exit code via cli.setExitCode. Per DEC-8, a switch in this handler
- * dispatches to the right renderer.
+ * Runs the full pipeline and prints a comprehensive report covering
+ * rules, entry points, and catalog summary in one invocation. Per
+ * DEC-8, a switch in this handler dispatches to the right renderer.
+ *
+ * History: v0.2 originally split this into three subcommands (`graph`,
+ * `graph-orphans`, `graph-entry-points`). The two filtered views are
+ * now sections in this unified report.
  */
 
 import { EXIT_CODES, saveSession } from '@opensip-tools/contracts';
@@ -19,12 +23,17 @@ import {
 import { compareToBaseline, fingerprintSignal, saveBaseline } from '../gate.js';
 import { buildCliOutput, renderJson } from '../render/json.js';
 import { renderSarif, reportToCloud } from '../render/sarif.js';
-import { renderTable } from '../render/table.js';
+import { inferEntryPoints } from '../rules/_entry-points.js';
+import { rules as defaultRules } from '../rules/registry.js';
 
 import { runGraph } from './orchestrate.js';
 
-import type { Catalog } from '../types.js';
+import type { EntryPoint } from '../rules/_entry-points.js';
+import type { Catalog, Indexes } from '../types.js';
 import type { Signal, ToolCliContext } from '@opensip-tools/core';
+
+const ENTRY_POINTS_PREVIEW = 10;
+const FINDINGS_PREVIEW = 10;
 
 function countFiles(catalog: Catalog): number {
   const files = new Set<string>();
@@ -83,15 +92,12 @@ export async function executeGraph(
       logger.info({ evt: 'graph.render.json.complete', module: 'graph:render' });
     } else {
       logger.info({ evt: 'graph.render.table.start', module: 'graph:render' });
-      if (result.catalog) {
-        const fileCount = countFiles(result.catalog);
-        const fnCount = countOccurrences(result.catalog);
-        process.stdout.write(
-          `graph: inventory built (${String(fnCount)} functions across ${String(fileCount)} files); cacheHit=${String(result.cacheHit)}\n`,
-        );
-      }
-      const out = renderTable(result.signals, { cwd: opts.cwd, tool: 'graph', command: 'graph' });
-      process.stdout.write(out);
+      writeUnifiedReport({
+        catalog: result.catalog,
+        indexes: result.indexes,
+        signals: result.signals,
+        cacheHit: result.cacheHit,
+      });
       logger.info({ evt: 'graph.render.table.complete', module: 'graph:render' });
     }
     persistSession(opts, result.signals);
@@ -104,6 +110,151 @@ export async function executeGraph(
   } catch (error) {
     handleGraphError('graph', error, cli);
   }
+}
+
+interface UnifiedReportInput {
+  readonly catalog: Catalog | null;
+  readonly indexes: Indexes | null;
+  readonly signals: readonly Signal[];
+  readonly cacheHit: boolean;
+}
+
+/**
+ * Render the unified terminal report: catalog summary, findings grouped
+ * by rule, top-N entry points, and a single-line summary.
+ *
+ * Each section is a small pure helper returning string[]; this function
+ * just sequences them.
+ */
+function writeUnifiedReport(input: UnifiedReportInput): void {
+  const knownRuleIds = defaultRules.map((r) => r.slug);
+  const byRule = groupSignalsByRule(input.signals);
+  const eps = input.catalog && input.indexes
+    ? enrichEntryPoints(input.catalog, input.indexes)
+    : [];
+
+  const sections: readonly string[] = [
+    'opensip-tools graph',
+    '',
+    ...renderCatalogSection(input.catalog, input.cacheHit),
+    '',
+    ...renderFindingsSection(input.signals.length, byRule, knownRuleIds),
+    ...renderEntryPointsSection(eps),
+    '',
+    ...renderSummarySection(byRule, knownRuleIds, input.signals.length),
+  ];
+
+  process.stdout.write(`${sections.join('\n')}\n`);
+}
+
+function renderCatalogSection(catalog: Catalog | null, cacheHit: boolean): readonly string[] {
+  const lines: string[] = ['== Catalog =='];
+  if (catalog) {
+    const fileCount = countFiles(catalog);
+    const fnCount = countOccurrences(catalog);
+    lines.push(
+      `${String(fnCount)} functions across ${String(fileCount)} files (cacheHit=${String(cacheHit)})`,
+    );
+  } else {
+    lines.push('(no catalog produced)');
+  }
+  return lines;
+}
+
+function renderFindingsSection(
+  totalSignals: number,
+  byRule: ReadonlyMap<string, readonly Signal[]>,
+  knownRuleIds: readonly string[],
+): readonly string[] {
+  const lines: string[] = [`== Findings (${String(totalSignals)}) ==`];
+  for (const ruleId of knownRuleIds) {
+    lines.push(...renderRuleBlock(ruleId, byRule.get(ruleId) ?? []));
+  }
+  return lines;
+}
+
+function renderRuleBlock(ruleId: string, findings: readonly Signal[]): readonly string[] {
+  const header = `[${ruleId}] ${String(findings.length)} finding(s)`;
+  const preview = findings.slice(0, FINDINGS_PREVIEW).map((f) => {
+    const loc = f.line ? `:${String(f.line)}` : '';
+    return `  ${f.filePath}${loc} — ${f.message}`;
+  });
+  const overflow = findings.length > preview.length
+    ? [`  ... ${String(findings.length - preview.length)} more (use --json for full list)`]
+    : [];
+  return [header, ...preview, ...overflow, ''];
+}
+
+function renderEntryPointsSection(eps: readonly EnrichedEntryPoint[]): readonly string[] {
+  const header = `== Entry points (${String(eps.length)}) ==`;
+  if (eps.length === 0) return [header, '(none inferred)'];
+  const top = [...eps].sort((a, b) => a.qualifiedName.localeCompare(b.qualifiedName)).slice(0, ENTRY_POINTS_PREVIEW);
+  const intro = `Top ${String(top.length)} (use --json for full list):`;
+  const items = top.map((ep) => `  [${ep.reason}] ${ep.qualifiedName}`);
+  return [header, intro, ...items];
+}
+
+function renderSummarySection(
+  byRule: ReadonlyMap<string, readonly Signal[]>,
+  knownRuleIds: readonly string[],
+  totalSignals: number,
+): readonly string[] {
+  const stats = summarizeRules(byRule, knownRuleIds);
+  return [
+    '== Summary ==',
+    `${String(stats.clean)} rule(s) clean, ${String(stats.dirty)} with findings (${String(totalSignals)} total).`,
+    'Run `opensip-tools dashboard` for the interactive Code Paths view.',
+  ];
+}
+
+interface EnrichedEntryPoint {
+  readonly reason: EntryPoint['reason'];
+  readonly qualifiedName: string;
+  readonly filePath: string;
+  readonly line: number;
+}
+
+function enrichEntryPoints(catalog: Catalog, indexes: Indexes): readonly EnrichedEntryPoint[] {
+  const eps = inferEntryPoints(catalog, indexes);
+  const out: EnrichedEntryPoint[] = [];
+  for (const ep of eps) {
+    const occ = indexes.byBodyHash.get(ep.bodyHash);
+    if (!occ) continue;
+    out.push({
+      reason: ep.reason,
+      qualifiedName: occ.qualifiedName,
+      filePath: occ.filePath,
+      line: occ.line,
+    });
+  }
+  return out;
+}
+
+function groupSignalsByRule(signals: readonly Signal[]): ReadonlyMap<string, readonly Signal[]> {
+  const out = new Map<string, Signal[]>();
+  for (const s of signals) {
+    let arr = out.get(s.ruleId);
+    if (!arr) {
+      arr = [];
+      out.set(s.ruleId, arr);
+    }
+    arr.push(s);
+  }
+  return out;
+}
+
+function summarizeRules(
+  byRule: ReadonlyMap<string, readonly Signal[]>,
+  knownRuleIds: readonly string[],
+): { readonly clean: number; readonly dirty: number } {
+  let clean = 0;
+  let dirty = 0;
+  for (const ruleId of knownRuleIds) {
+    const findings = byRule.get(ruleId) ?? [];
+    if (findings.length === 0) clean += 1;
+    else dirty += 1;
+  }
+  return { clean, dirty };
 }
 
 function persistSession(opts: GraphCommandOptions, signals: readonly Signal[]): void {

@@ -4,7 +4,9 @@
  * Asserts:
  *  - graphTool.metadata.id === 'graph'
  *  - graphTool.metadata.version matches package.json
- *  - graphTool.commands lists graph, graph-orphans, graph-entry-points
+ *  - graphTool.commands lists exactly the single `graph` subcommand
+ *    (orphans and entry-points were folded into the unified `graph`
+ *    output — no longer separately registered)
  *  - graphTool does NOT import from @opensip-tools/cli (compile-time
  *    via TypeScript imports — if it did, package wouldn't build)
  */
@@ -31,11 +33,9 @@ describe('graphTool contract conformance (AC-2)', () => {
     expect(graphTool.metadata.version).toBe(pkg.version);
   });
 
-  it('commands lists graph, graph-orphans, graph-entry-points', () => {
+  it('commands lists only the unified graph subcommand', () => {
     const names = graphTool.commands.map((c) => c.name);
-    expect(names).toContain('graph');
-    expect(names).toContain('graph-orphans');
-    expect(names).toContain('graph-entry-points');
+    expect(names).toEqual(['graph']);
   });
 
   it('register is callable', () => {
