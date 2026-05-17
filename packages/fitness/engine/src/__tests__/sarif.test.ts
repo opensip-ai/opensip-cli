@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 
-import { buildSarifLog, chunkSarifRuns } from '../sarif.js';
+import { buildSarifLog, chunkSarifRuns, reportToCloud } from '../sarif.js';
 
 import type { CliOutput } from '@opensip-tools/contracts';
 
@@ -199,3 +199,167 @@ describe('chunkSarifRuns', () => {
     expect(chunks).toHaveLength(2);
   });
 });
+
+// ─── reportToCloud ────────────────────────────────────────────────
+
+function makeOutputWithFindings(count: number, severity: 'error' | 'warning' = 'error'): CliOutput {
+  return {
+    version: '1.0',
+    tool: 'fit',
+    timestamp: '2026-03-31T00:00:00.000Z',
+    score: 0,
+    passed: false,
+    summary: { total: 1, passed: 0, failed: 1, errors: count, warnings: 0 },
+    durationMs: 100,
+    checks: [
+      {
+        checkSlug: 'demo-check',
+        passed: false,
+        durationMs: 100,
+        findings: Array.from({ length: count }, (_, i) => ({
+          ruleId: 'demo-check',
+          message: `finding ${i}`,
+          severity,
+          filePath: 'src/x.ts',
+          line: i + 1,
+        })),
+      },
+    ],
+  };
+}
+
+type FetchInput = Parameters<typeof globalThis.fetch>[0];
+
+function urlString(input: FetchInput): string {
+  if (typeof input === 'string') return input;
+  if (input instanceof URL) return input.toString();
+  // Request — has a .url string property
+  return input.url;
+}
+
+describe('reportToCloud', () => {
+  let originalFetch: typeof globalThis.fetch;
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  it('returns success with findingCount=0 when there are no runs', async () => {
+    const output: CliOutput = {
+      version: '1.0',
+      tool: 'fit',
+      timestamp: '2026-03-31T00:00:00.000Z',
+      score: 100,
+      passed: true,
+      summary: { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 },
+      durationMs: 0,
+      checks: [],
+    };
+    const result = await reportToCloud(output, 'https://example.test/api');
+    expect(result.success).toBe(true);
+    expect(result.findingCount).toBe(0);
+    expect(result.runCount).toBe(0);
+  });
+
+  it('appends /sarif suffix when not present', async () => {
+    const seenUrls: string[] = [];
+    globalThis.fetch = vi.fn((url: FetchInput) => {
+      seenUrls.push(urlString(url));
+      return Promise.resolve(new Response('ok', { status: 200 }));
+    });
+
+    const result = await reportToCloud(makeOutputWithFindings(2), 'https://example.test/api');
+    expect(seenUrls[0]).toContain('/sarif');
+    expect(result.success).toBe(true);
+    expect(result.url).toBe('https://example.test/api/sarif');
+  });
+
+  it('does not double-append /sarif when already present', async () => {
+    const seenUrls: string[] = [];
+    globalThis.fetch = vi.fn((url: FetchInput) => {
+      seenUrls.push(urlString(url));
+      return Promise.resolve(new Response('ok', { status: 200 }));
+    });
+
+    const result = await reportToCloud(makeOutputWithFindings(1), 'https://example.test/api/sarif');
+    const matches = seenUrls[0]?.match(/\/sarif/g);
+    expect(matches).toHaveLength(1);
+    expect(result.success).toBe(true);
+  });
+
+  it('forwards X-API-Key header when an apiKey is provided', async () => {
+    let capturedHeaders: Record<string, string> = {};
+    globalThis.fetch = vi.fn((_url: FetchInput, init?: RequestInit) => {
+      capturedHeaders = (init?.headers ?? {}) as Record<string, string>;
+      return Promise.resolve(new Response('ok', { status: 200 }));
+    });
+
+    await reportToCloud(makeOutputWithFindings(1), 'https://example.test', 'secret-key');
+    expect(capturedHeaders['X-API-Key']).toBe('secret-key');
+  });
+
+  it('returns success=false with the response error on a non-transient (4xx) status', async () => {
+    globalThis.fetch = vi.fn(() =>
+      Promise.resolve(new Response('bad request body', { status: 400, statusText: 'Bad Request' })),
+    );
+
+    const result = await reportToCloud(makeOutputWithFindings(1), 'https://example.test');
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('400');
+    expect(result.chunksSucceeded).toBe(0);
+  });
+
+  it('aborts remaining chunks when a chunk returns 4xx', async () => {
+    let calls = 0;
+    globalThis.fetch = vi.fn(() => {
+      calls++;
+      return Promise.resolve(new Response('forbidden', { status: 403 }));
+    });
+
+    const result = await reportToCloud(makeOutputWithFindings(1200), 'https://example.test');
+    expect(result.success).toBe(false);
+    expect(calls).toBe(1);
+  });
+
+  it('treats 5xx as transient and continues to remaining chunks', async () => {
+    // withRetry only retries when the awaited fn THROWS. A resolved
+    // 500 response is not an exception, so each chunk gets one fetch
+    // call. The 5xx classifier prevents the early break used for 4xx,
+    // so all chunks are still attempted.
+    let calls = 0;
+    globalThis.fetch = vi.fn(() => {
+      calls++;
+      return Promise.resolve(new Response('server down', { status: 500 }));
+    });
+
+    // Two chunks (700 findings, cap = 500) -> two fetch attempts.
+    const result = await reportToCloud(makeOutputWithFindings(700), 'https://example.test');
+    expect(result.success).toBe(false);
+    expect(calls).toBe(2);
+    expect(result.chunksSucceeded).toBe(0);
+  }, 30_000);
+
+  it('captures fetch rejections (network errors) without breaking the run', async () => {
+    globalThis.fetch = vi.fn(() => Promise.reject(new Error('ECONNRESET')));
+
+    const result = await reportToCloud(makeOutputWithFindings(1), 'https://example.test');
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('ECONNRESET');
+  }, 30_000);
+
+  it('aggregates per-chunk results (chunksTotal / chunksSucceeded)', async () => {
+    globalThis.fetch = vi.fn(() => Promise.resolve(new Response('ok', { status: 200 })));
+
+    const result = await reportToCloud(makeOutputWithFindings(1200), 'https://example.test');
+    expect(result.success).toBe(true);
+    expect(result.chunksTotal).toBe(3);
+    expect(result.chunksSucceeded).toBe(3);
+    expect(result.findingCount).toBe(1200);
+  });
+});
+

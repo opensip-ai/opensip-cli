@@ -76,4 +76,40 @@ describe('executeCommand', () => {
     expect(result.violations).toHaveLength(1);
     expect(result.exitCode).toBe(1);
   });
+
+  it('returns aborted=true when the abort signal fires mid-run', async () => {
+    const ctrl = new AbortController();
+    const config: CommandConfig = {
+      bin: 'sh',
+      args: ['-c', 'sleep 5'],
+      parseOutput: () => [],
+    };
+    setTimeout(() => ctrl.abort(), 30);
+    const result = await executeCommand(config, [], { cwd, signal: ctrl.signal });
+    expect(result.aborted).toBe(true);
+    expect(result.violations).toEqual([]);
+  });
+
+  it('reports "not installed" via shell-mode 127 when the bin exits 127', async () => {
+    const config: CommandConfig = {
+      bin: 'sh',
+      args: ['-c', 'exit 127'],
+      parseOutput: () => [],
+    };
+    const result = await executeCommand(config, [], { cwd });
+    expect(result.exitCode).toBe(127);
+    expect(result.error).toContain('not installed');
+  });
+
+  it('truncates very long stderr in error messages', async () => {
+    const config: CommandConfig = {
+      bin: 'sh',
+      args: ['-c', 'yes x | head -c 1000 1>&2; exit 5'],
+      parseOutput: () => [],
+      expectedExitCodes: [0],
+    };
+    const result = await executeCommand(config, [], { cwd });
+    expect(result.error).toContain('unexpected code 5');
+    expect(result.error).toContain('truncated');
+  });
 });

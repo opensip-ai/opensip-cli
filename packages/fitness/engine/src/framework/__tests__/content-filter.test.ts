@@ -133,4 +133,77 @@ describe('filterContent', () => {
       expect(codeNoComments).not.toContain('@deprecated')
     })
   })
+
+  describe('isInString / isInComment range queries', () => {
+    it('isInString reports true for positions inside a string literal', () => {
+      clearFilterCache()
+      const src = `const x = 'hello'`
+      const { isInString } = filterContent(src)
+      expect(isInString(1, 12)).toBe(true)
+    })
+
+    it('isInString reports false for positions outside any string', () => {
+      clearFilterCache()
+      const src = `const x = 'hello'`
+      const { isInString } = filterContent(src)
+      expect(isInString(1, 0)).toBe(false)
+    })
+
+    it('isInString returns false for an out-of-range line', () => {
+      clearFilterCache()
+      const src = `const x = 'a'`
+      const { isInString } = filterContent(src)
+      expect(isInString(99, 0)).toBe(false)
+    })
+
+    it('isInString returns false when there are no strings', () => {
+      clearFilterCache()
+      const { isInString } = filterContent('const x = 1')
+      expect(isInString(1, 5)).toBe(false)
+    })
+
+    it('isInComment reports true for positions inside a line comment', () => {
+      clearFilterCache()
+      const src = `const x = 1 // hello`
+      const { isInComment } = filterContent(src)
+      expect(isInComment(1, 15)).toBe(true)
+    })
+
+    it('isInComment reports false outside any comment', () => {
+      clearFilterCache()
+      const src = `const x = 1 // hello`
+      const { isInComment } = filterContent(src)
+      expect(isInComment(1, 2)).toBe(false)
+    })
+  })
+
+  describe('cache behavior', () => {
+    it('returns the same FilteredContent instance for repeated calls with identical content', () => {
+      clearFilterCache()
+      const src = `const x = 'cached'`
+      const first = filterContent(src)
+      const second = filterContent(src)
+      expect(second).toBe(first)
+    })
+
+    it('clearFilterCache forces a re-parse', () => {
+      clearFilterCache()
+      const src = `const x = 'cleared'`
+      const first = filterContent(src)
+      clearFilterCache()
+      const second = filterContent(src)
+      expect(second).not.toBe(first)
+    })
+  })
+
+  describe('template middle (multi-substitution)', () => {
+    it('masks text between substitutions in a multi-${ } template', () => {
+      clearFilterCache()
+      const src = 'const x = `pre ${a} mid ${b} post`'
+      const { code } = filterContent(src)
+      expect(code).not.toContain(' mid ')
+      expect(code).toContain('${a}')
+      expect(code).toContain('${b}')
+    })
+  })
 })

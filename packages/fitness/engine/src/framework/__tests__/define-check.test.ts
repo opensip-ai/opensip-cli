@@ -1,6 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { defineCheck } from '../define-check.js';
+import { fileCache } from '../file-cache.js';
 
 describe('defineCheck', () => {
   describe('analyze mode', () => {
@@ -176,5 +181,191 @@ describe('defineCheck', () => {
         }),
       ).toThrow();
     });
+  });
+});
+
+// =============================================================================
+// RUNTIME EXECUTION (Check.run)
+// =============================================================================
+
+let testDir: string;
+
+function fixture(rel: string, content: string): string {
+  const abs = join(testDir, rel);
+  mkdirSync(dirname(abs), { recursive: true });
+  writeFileSync(abs, content);
+  return abs;
+}
+
+beforeEach(() => {
+  testDir = mkdtempSync(join(tmpdir(), 'opensip-define-check-run-'));
+});
+
+afterEach(() => {
+  fileCache.clear();
+  rmSync(testDir, { recursive: true, force: true });
+});
+
+describe('defineCheck — analyze mode end-to-end run', () => {
+  it('produces signals for matched lines via Check.run()', async () => {
+    fixture('a.ts', 'const x = "FOO";\nconst y = 2;');
+    await fileCache.prewarm(testDir, ['**/*.ts']);
+
+    const check = defineCheck({
+      id: 'aa000000-aa00-4aa0-8aa0-aa0000000001',
+      slug: 'flag-foo-rt',
+      description: 'd',
+      tags: ['quality'],
+      analyze: (content, filePath) => {
+        const out: { line: number; message: string; severity: 'error' | 'warning'; filePath: string }[] = [];
+        const lines = content.split('\n');
+        for (const [i, line] of lines.entries()) {
+          if (line.includes('FOO')) {
+            out.push({ line: i + 1, message: 'no foo', severity: 'error', filePath });
+          }
+        }
+        return out;
+      },
+    });
+
+    const result = await check.run(testDir);
+    expect(result.passed).toBe(false);
+    expect(result.signals.length).toBeGreaterThanOrEqual(1);
+    expect(result.errors).toBeGreaterThanOrEqual(1);
+  });
+
+  it('returns a passing result when analyze returns nothing', async () => {
+    fixture('a.ts', 'const x = 1;');
+    await fileCache.prewarm(testDir, ['**/*.ts']);
+
+    const check = defineCheck({
+      id: 'aa000000-aa00-4aa0-8aa0-aa0000000002',
+      slug: 'pass-rt',
+      description: 'd',
+      tags: ['quality'],
+      analyze: () => [],
+    });
+
+    const result = await check.run(testDir);
+    expect(result.passed).toBe(true);
+    expect(result.errors).toBe(0);
+  });
+
+  it('captures a thrown error in analyzeAll and surfaces it as an error result', async () => {
+    fixture('a.ts', 'const x = 1;');
+    await fileCache.prewarm(testDir, ['**/*.ts']);
+
+    const check = defineCheck({
+      id: 'aa000000-aa00-4aa0-8aa0-aa0000000003',
+      slug: 'crash-rt',
+      description: 'd',
+      tags: ['quality'],
+      // eslint-disable-next-line @typescript-eslint/require-await
+      analyzeAll: async () => {
+        throw new Error('analyze blew up');
+      },
+    });
+
+    const result = await check.run(testDir);
+    expect(result.passed).toBe(false);
+    expect(result.errors).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('defineCheck — analyzeAll mode end-to-end run', () => {
+  it('runs analyzeAll once with a FileAccessor and returns its violations', async () => {
+    fixture('a.ts', 'export const a = 1');
+    fixture('b.ts', 'export const b = 2');
+    await fileCache.prewarm(testDir, ['**/*.ts']);
+
+    const check = defineCheck({
+      id: 'bb000000-bb00-4bb0-8bb0-bb0000000001',
+      slug: 'all-rt',
+      description: 'all-mode',
+      tags: ['quality'],
+      // eslint-disable-next-line @typescript-eslint/require-await -- analyzeAll signature is Promise<Violation[]>; this body is synchronous
+      analyzeAll: async (accessor) => {
+        const files = accessor.paths;
+        return [
+          { line: 1, message: `saw ${files.length} files`, severity: 'warning' as const, filePath: files[0] ?? 'unknown' },
+        ];
+      },
+    });
+
+    const result = await check.run(testDir);
+    expect(result.signals).toHaveLength(1);
+    expect(result.signals[0]?.message).toContain('saw');
+  });
+
+  it('warns (via log) when an analyzeAll violation is missing filePath', async () => {
+    fixture('a.ts', 'export const a = 1');
+    await fileCache.prewarm(testDir, ['**/*.ts']);
+
+    const check = defineCheck({
+      id: 'bb000000-bb00-4bb0-8bb0-bb0000000002',
+      slug: 'no-filepath',
+      description: 'd',
+      tags: ['quality'],
+      // eslint-disable-next-line @typescript-eslint/require-await -- analyzeAll signature is Promise<Violation[]>; this body is synchronous
+      analyzeAll: async () => [
+        { line: 1, message: 'global', severity: 'warning' as const },
+      ],
+    });
+
+    const result = await check.run(testDir, { verbose: true });
+    expect(result.signals).toHaveLength(1);
+  });
+});
+
+describe('defineCheck — command mode end-to-end run', () => {
+  it('runs the configured external command and parses output', async () => {
+    fixture('a.ts', 'export const a = 1');
+    await fileCache.prewarm(testDir, ['**/*.ts']);
+
+    const check = defineCheck({
+      id: 'cc000000-cc00-4cc0-8cc0-cc0000000001',
+      slug: 'echo-cmd',
+      description: 'echo',
+      tags: ['quality'],
+      command: {
+        bin: 'echo',
+        args: ['1 finding'],
+        parseOutput: (stdout) => [{
+          line: 1,
+          message: stdout.trim(),
+          severity: 'warning' as const,
+          filePath: 'virtual',
+        }],
+      },
+    });
+
+    const result = await check.run(testDir);
+    expect(result.signals.length).toBeGreaterThanOrEqual(1);
+    expect(result.signals[0]?.message).toBe('1 finding');
+  });
+
+  it('runs the command-mode error path when the bin is missing (ENOENT)', async () => {
+    fixture('a.ts', 'export const a = 1');
+    await fileCache.prewarm(testDir, ['**/*.ts']);
+
+    const check = defineCheck({
+      id: 'cc000000-cc00-4cc0-8cc0-cc0000000002',
+      slug: 'missing-cmd',
+      description: 'd',
+      tags: ['quality'],
+      command: {
+        bin: 'definitely-not-a-real-binary-zzz',
+        args: [],
+        parseOutput: () => [],
+      },
+    });
+
+    // The command-executor surfaces the missing-bin error and the
+    // builder converts it to an error result. After the directive
+    // filter pass, the result still completes (no exception) — exercising
+    // executeCommandMode's `if (result.error)` branch is the goal.
+    const result = await check.run(testDir);
+    expect(result).toBeDefined();
+    expect(Array.isArray(result.signals)).toBe(true);
   });
 });
