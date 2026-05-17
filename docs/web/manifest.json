@@ -175,6 +175,30 @@
       "purpose": "How the sim engine runs scenarios. Dispatcher, executor lifecycle, result aggregation, exit semantics."
     },
     {
+      "file": "docs/web/35-the-graph-loop/01-stages-and-catalog.md",
+      "path": "/docs/opensip-tools/35-the-graph-loop/01-stages-and-catalog/",
+      "section": "35-the-graph-loop",
+      "title": "Stages and catalog (graph)",
+      "audience": [
+        "contributors",
+        "plugin-authors",
+        "ci-integrators"
+      ],
+      "purpose": "How `graph` builds its picture of the codebase — the six-stage pipeline, the catalog format, and the content-keyed cache."
+    },
+    {
+      "file": "docs/web/35-the-graph-loop/02-rules-and-gating.md",
+      "path": "/docs/opensip-tools/35-the-graph-loop/02-rules-and-gating/",
+      "section": "35-the-graph-loop",
+      "title": "Rules and gating (graph)",
+      "audience": [
+        "contributors",
+        "plugin-authors",
+        "ci-integrators"
+      ],
+      "purpose": "The five graph rules, what each one detects, and how the save/compare gate flow integrates with CI."
+    },
+    {
       "file": "docs/web/40-runtime/01-cli-dispatch.md",
       "path": "/docs/opensip-tools/40-runtime/01-cli-dispatch/",
       "section": "40-runtime",
@@ -373,6 +397,14 @@
       "pages": [
         "/docs/opensip-tools/30-the-sim-loop/01-scenarios-and-recipes/",
         "/docs/opensip-tools/30-the-sim-loop/02-execution-model/"
+      ]
+    },
+    {
+      "section": "35-the-graph-loop",
+      "title": "35 — The Graph Loop",
+      "pages": [
+        "/docs/opensip-tools/35-the-graph-loop/01-stages-and-catalog/",
+        "/docs/opensip-tools/35-the-graph-loop/02-rules-and-gating/"
       ]
     },
     {

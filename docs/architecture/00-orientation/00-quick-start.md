@@ -117,6 +117,9 @@ opensip-tools fit --findings
 
 # Emit structured JSON for CI
 opensip-tools fit --json
+
+# Run the static call-graph tool (different question shape: "what is reachable from where?")
+opensip-tools graph
 ```
 
 The full command tree is at [`../60-surfaces/01-cli-command-tree.md`](../60-surfaces/01-cli-command-tree.md).
@@ -144,3 +147,5 @@ You've seen the loop run. The orientation track is three more docs:
 3. **[`./03-system-context.md`](./03-system-context.md)** — Where the binary sits between you, the codebase, CI, and OpenSIP Cloud.
 
 After orientation, the mental-model section ([`../10-mental-model/`](../10-mental-model/)) takes you deep — starting with [`01-fitness-loop.md`](../10-mental-model/01-fitness-loop.md), which threads one check end-to-end through the system you just ran.
+
+Once you've internalized the fitness loop, the tool-specific sections — [`../20-the-fit-loop/`](../20-the-fit-loop/), [`../30-the-sim-loop/`](../30-the-sim-loop/), and [`../35-the-graph-loop/`](../35-the-graph-loop/) — go deep on each first-party tool's pipeline, primitives, and gating model.

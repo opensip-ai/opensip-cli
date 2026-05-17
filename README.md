@@ -160,6 +160,18 @@ opensip-tools plugin sync           # reinstall pinned plugins after a fresh clo
 opensip-tools sim                   # run simulations
 ```
 
+### `graph` — static call-graph analysis
+```bash
+opensip-tools graph                 # run all rules, terminal report
+opensip-tools graph --json          # CliOutput-shaped JSON (for CI)
+opensip-tools graph --no-cache      # skip the catalog cache; re-run stages 1+2
+opensip-tools graph --gate-save     # save current signals as baseline
+opensip-tools graph --gate-compare  # compare against baseline; exit 1 on new signals
+opensip-tools graph --report-to <url>  # POST SARIF 2.1.0 to an endpoint
+```
+
+Five rules ship today: `orphan-subtree`, `duplicated-function-body`, `no-side-effect-path`, `test-only-reachable`, `always-throws-branch`. Output is grouped by rule with the top 10 findings per rule plus a summary; the full set is always available via `--json`. See [the graph loop docs](./docs/architecture/35-the-graph-loop/) for what each rule detects and how the gate workflow integrates with CI.
+
 ### Standalone listing commands
 
 These mirror the `fit --list` / `fit --recipes` flags but work as
