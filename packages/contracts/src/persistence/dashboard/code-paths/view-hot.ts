@@ -1,9 +1,10 @@
 /**
  * View 1 — "Hot functions" (most callers).
  *
- * Top 50 functions sorted by `indexes.callers[bodyHash].length` desc,
- * filtered by `filterState`, rendered through `renderFunctionRows` so
- * the table shape stays consistent with Big/Wide/Untested (§11.2).
+ * Functions sorted by `indexes.callers[bodyHash].length` desc and
+ * filtered by `filterState`, rendered through `renderFunctionRows`
+ * which paginates at 10 rows/page (no slice cap — pagination shows
+ * everything).
  */
 
 export function dashboardViewHotJs(): string {
@@ -25,20 +26,20 @@ views.push({
       ranked.push({ occ, callerCount });
     }
     ranked.sort((a, b) => b.callerCount - a.callerCount);
-    const top = ranked.slice(0, 50);
-    if (top.length === 0) {
+    if (ranked.length === 0) {
       container.appendChild(el('div', { class: 'empty', text: 'No called functions match the active filters.' }));
       return;
     }
     renderFunctionRows(
       container,
-      top.map(r => Object.assign({}, r.occ, { __callers: r.callerCount })),
+      ranked.map(r => Object.assign({}, r.occ, { __callers: r.callerCount })),
       [
         { label: 'Function', value: o => o.simpleName },
         { label: 'Callers', value: o => o.__callers },
         { label: 'Package', value: o => packageOfPath(o.filePath) },
         { label: 'File', value: o => o.filePath + ':' + o.line },
       ],
+      'Hot functions',
     );
   },
 });

@@ -75,7 +75,7 @@ function makeOcc(over: Partial<GraphFunctionOccurrence> & { bodyHash: string; si
 }
 
 describe('View 2 — Big functions', () => {
-  it('sorts by endLine - line descending and shows up to top 30', () => {
+  it('sorts by endLine - line descending and renders all functions (paginated)', () => {
     const fns: Record<string, GraphFunctionOccurrence[]> = {};
     for (let i = 0; i < 35; i++) {
       fns['f' + i] = [makeOcc({ bodyHash: 'h' + i, simpleName: 'f' + i, line: 1, endLine: i + 5 })];
@@ -84,7 +84,9 @@ describe('View 2 — Big functions', () => {
     const c = document.createElement('div');
     env.views.find(v => v.id === 'big')!.render(c, env.graphCatalog, env.graphIndexes, env.filterState);
     const rows = c.querySelectorAll('tr.clickable');
-    expect(rows.length).toBe(30);
+    expect(rows.length).toBe(35);
+    expect(c.querySelector('.section > h3')!.textContent).toContain('Big functions');
+    expect(c.querySelector('.card > .pagination')).not.toBeNull();
     const firstRowName = rows[0].children[0].textContent;
     expect(firstRowName).toBe('f34');
   });

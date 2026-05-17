@@ -79,7 +79,7 @@ function makeOcc(over: Partial<GraphFunctionOccurrence> & { bodyHash: string; si
 beforeEach(() => { document.body.innerHTML = ''; });
 
 describe('View 1 — Hot functions', () => {
-  it('sorts by inbound call count descending and shows up to top 50', () => {
+  it('sorts by inbound call count descending and renders all called functions (paginated)', () => {
     // Build 60 functions where target_i is called by callers_0..i.
     const fns: Record<string, GraphFunctionOccurrence[]> = {};
     for (let i = 0; i < 60; i++) {
@@ -97,8 +97,13 @@ describe('View 1 — Hot functions', () => {
     const c = document.createElement('div');
     env.views.find(v => v.id === 'hot')!.render(c, env.graphCatalog, env.graphIndexes, env.filterState);
     const rows = c.querySelectorAll('tr.clickable');
-    expect(rows.length).toBe(50);
-    // f0 has the most callers (called by f1..f59 = 59), f1 is called by f2..f59 = 58, etc.
+    // f0..f58 are all called (f59 has no callers); 59 rows, no slice cap.
+    expect(rows.length).toBe(59);
+    // Standard table shell + heading.
+    expect(c.querySelector('.section > h3')!.textContent).toContain('Hot functions');
+    expect(c.querySelector('.card > table.data-table.sortable')).not.toBeNull();
+    expect(c.querySelector('.card > .pagination')).not.toBeNull();
+    // f0 has the most callers (called by f1..f59 = 59).
     const firstRowName = rows[0].children[0].textContent;
     expect(firstRowName).toBe('f0');
   });

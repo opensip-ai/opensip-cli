@@ -45,7 +45,7 @@ views.push({
         return;
       }
       const allNames = Array.from(indexes.bySimpleName.keys());
-      const matches = fuzzyMatch(searchQuery, allNames).slice(0, 50);
+      const matches = fuzzyMatch(searchQuery, allNames);
       if (matches.length === 0) {
         results.appendChild(el('div', { class: 'empty', text: 'No matches for "' + searchQuery + '".' }));
         return;
@@ -56,9 +56,7 @@ views.push({
         for (const h of hashes) {
           const occ = indexes.byBodyHash.get(h);
           if (occ && passesFilter(occ, filterState)) occurrences.push(occ);
-          if (occurrences.length >= 50) break;
         }
-        if (occurrences.length >= 50) break;
       }
       if (occurrences.length === 0) {
         results.appendChild(el('div', { class: 'empty', text: 'Matches exist but none pass the active filters.' }));
@@ -73,6 +71,7 @@ views.push({
           { label: 'Package', value: o => packageOfPath(o.filePath) },
           { label: 'File', value: o => o.filePath + ':' + o.line },
         ],
+        'Search results',
       );
     }
 

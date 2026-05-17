@@ -45,6 +45,9 @@ views.push({
       container.appendChild(el('div', { class: 'empty', text: 'No cross-package calls match the active filters.' }));
       return;
     }
+    const section = el('div', { class: 'section' });
+    section.appendChild(el('h3', { text: 'Package coupling (' + pkgs.length + '×' + pkgs.length + ')' }));
+    const card = el('div', { class: 'card' });
     const table = el('table', { class: 'coupling-table' });
     const thead = el('thead');
     const headRow = el('tr');
@@ -77,7 +80,9 @@ views.push({
       tbody.appendChild(row);
     }
     table.appendChild(tbody);
-    container.appendChild(table);
+    card.appendChild(table);
+    section.appendChild(card);
+    container.appendChild(section);
   },
 });
 

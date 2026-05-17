@@ -1,22 +1,29 @@
 /**
- * Reusable simple-table renderer for the Hot/Big/Wide/Untested views.
+ * Reusable simple-table renderer for the Hot/Big/Wide/Untested/Search
+ * views.
  *
- * Pulled out per §11.2: 4 callers justify the rule-of-three extraction.
- * Each caller passes its own `columns` array; the helper handles header,
- * body, the `data-body-hash` row attribute, and click delegation.
+ * Wraps the rendered table in the same .section + .card shell used by
+ * fit/sim's renderSessionTable so all dashboard tables share one shape:
+ * a section heading, a card-bordered sortable table, and a pagination
+ * footer wired through paginateTable (defined in shared.ts).
  *
- * Phase P4 first uses this helper; Phase P5 and P7 add the additional
- * callers (Big/Wide/Untested).
+ * Each caller passes its own `columns` array and a `heading` string;
+ * the helper handles header, body, click delegation via data-body-hash,
+ * sortable activation, and pagination at 10 rows/page.
  */
 
 export function dashboardFunctionRowJs(): string {
   return String.raw`
-function renderFunctionRows(container, occurrences, columns) {
+function renderFunctionRows(container, occurrences, columns, heading) {
   while (container.firstChild) container.removeChild(container.firstChild);
   if (!occurrences || occurrences.length === 0) {
     container.appendChild(el('div', { class: 'empty', text: 'No functions to show.' }));
     return;
   }
+  const headingText = (heading || 'Results') + ' (' + occurrences.length + ')';
+  const section = el('div', { class: 'section' });
+  section.appendChild(el('h3', { text: headingText }));
+  const card = el('div', { class: 'card' });
   const table = el('table', { class: 'data-table sortable' });
   const thead = el('thead');
   const headRow = el('tr');
@@ -33,7 +40,13 @@ function renderFunctionRows(container, occurrences, columns) {
     tbody.appendChild(tr);
   }
   table.appendChild(tbody);
-  container.appendChild(table);
+  const pag = el('div', { class: 'pagination' });
+  card.appendChild(table);
+  card.appendChild(pag);
+  section.appendChild(card);
+  container.appendChild(section);
+  if (typeof paginateTable === 'function') paginateTable(tbody, pag, 10);
+  if (typeof makeSortable === 'function') makeSortable(table);
 }
 `;
 }

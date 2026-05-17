@@ -1,8 +1,8 @@
 /**
  * View 3 — "Wide functions" (most parameters).
  *
- * Top 20 functions by `params.length` descending, with a thumbnail
- * of the parameter list inline.
+ * Functions sorted by `params.length` descending, with a thumbnail
+ * of the parameter list inline. Paginates via `renderFunctionRows`.
  */
 
 export function dashboardViewWideJs(): string {
@@ -24,8 +24,7 @@ views.push({
       ranked.push({ occ, arity });
     }
     ranked.sort((a, b) => b.arity - a.arity);
-    const top = ranked.slice(0, 20);
-    if (top.length === 0) {
+    if (ranked.length === 0) {
       container.appendChild(el('div', { class: 'empty', text: 'No parameterized functions match the active filters.' }));
       return;
     }
@@ -37,7 +36,7 @@ views.push({
     }
     renderFunctionRows(
       container,
-      top.map(r => Object.assign({}, r.occ, { __arity: r.arity, __thumb: paramThumb(r.occ) })),
+      ranked.map(r => Object.assign({}, r.occ, { __arity: r.arity, __thumb: paramThumb(r.occ) })),
       [
         { label: 'Function', value: o => o.simpleName },
         { label: 'Params', value: o => o.__arity },
@@ -45,6 +44,7 @@ views.push({
         { label: 'Package', value: o => packageOfPath(o.filePath) },
         { label: 'File', value: o => o.filePath + ':' + o.line },
       ],
+      'Wide functions',
     );
   },
 });

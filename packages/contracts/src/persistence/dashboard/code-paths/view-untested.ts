@@ -38,14 +38,13 @@ views.push({
       ranked.push({ occ, callerCount: callerHashes.length });
     }
     ranked.sort((a, b) => b.callerCount - a.callerCount);
-    const top = ranked.slice(0, 100);
-    if (top.length === 0) {
+    if (ranked.length === 0) {
       container.appendChild(el('div', { class: 'empty', text: 'Every production function is reachable from a test file (according to static analysis).' }));
       return;
     }
     renderFunctionRows(
       container,
-      top.map(r => Object.assign({}, r.occ, { __callers: r.callerCount })),
+      ranked.map(r => Object.assign({}, r.occ, { __callers: r.callerCount })),
       [
         { label: 'Function', value: o => o.simpleName },
         { label: 'Prod callers', value: o => o.__callers },
@@ -53,6 +52,7 @@ views.push({
         { label: 'Package', value: o => packageOfPath(o.filePath) },
         { label: 'File', value: o => o.filePath + ':' + o.line },
       ],
+      'Untested production code',
     );
   },
 });

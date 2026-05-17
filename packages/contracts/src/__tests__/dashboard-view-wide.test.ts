@@ -78,7 +78,7 @@ function makeOcc(over: Partial<GraphFunctionOccurrence> & { bodyHash: string; si
 }
 
 describe('View 3 — Wide functions', () => {
-  it('sorts by params.length descending and shows up to top 20', () => {
+  it('sorts by params.length descending and renders all parameterized functions (paginated)', () => {
     const fns: Record<string, GraphFunctionOccurrence[]> = {};
     for (let i = 1; i < 25; i++) {
       const params: GraphParam[] = [];
@@ -89,7 +89,9 @@ describe('View 3 — Wide functions', () => {
     const c = document.createElement('div');
     env.views.find(v => v.id === 'wide')!.render(c, env.graphCatalog, env.graphIndexes, env.filterState);
     const rows = c.querySelectorAll('tr.clickable');
-    expect(rows.length).toBe(20);
+    expect(rows.length).toBe(24);
+    expect(c.querySelector('.section > h3')!.textContent).toContain('Wide functions');
+    expect(c.querySelector('.card > .pagination')).not.toBeNull();
     const firstRowName = rows[0].children[0].textContent;
     expect(firstRowName).toBe('f24');
   });

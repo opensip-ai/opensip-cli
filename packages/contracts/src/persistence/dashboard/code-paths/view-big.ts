@@ -1,8 +1,9 @@
 /**
  * View 2 — "Big functions" (largest body length).
  *
- * Top 30 functions by `endLine - line` descending. Filterable;
- * rendered through `renderFunctionRows`.
+ * Functions sorted by `endLine - line` descending. Filterable; the
+ * full ranked set is handed to `renderFunctionRows` which paginates
+ * at 10 rows/page.
  */
 
 export function dashboardViewBigJs(): string {
@@ -23,14 +24,13 @@ views.push({
       ranked.push({ occ, size });
     }
     ranked.sort((a, b) => b.size - a.size);
-    const top = ranked.slice(0, 30);
-    if (top.length === 0) {
+    if (ranked.length === 0) {
       container.appendChild(el('div', { class: 'empty', text: 'No functions match the active filters.' }));
       return;
     }
     renderFunctionRows(
       container,
-      top.map(r => Object.assign({}, r.occ, { __size: r.size })),
+      ranked.map(r => Object.assign({}, r.occ, { __size: r.size })),
       [
         { label: 'Function', value: o => o.simpleName },
         { label: 'Lines', value: o => o.__size },
@@ -38,6 +38,7 @@ views.push({
         { label: 'Package', value: o => packageOfPath(o.filePath) },
         { label: 'File', value: o => o.filePath + ':' + o.line },
       ],
+      'Big functions',
     );
   },
 });
