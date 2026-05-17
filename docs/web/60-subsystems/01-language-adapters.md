@@ -129,7 +129,7 @@ If a file's extension matches no registered adapter, dispatch falls through to "
 | Adapter | Path | Extensions | Implementation |
 |---|---|---|---|
 | `lang-typescript` | `packages/languages/lang-typescript/` | `.ts`, `.tsx`, `.js`, `.jsx`, `.cjs`, `.mjs` | TypeScript compiler API + custom strip routines |
-| `lang-rust` | `packages/languages/lang-rust/` | `.rs` | Hand-written tokenizer + strip |
+| `lang-rust` | `packages/languages/lang-rust/` | `.rs` | Strip routines + line-offset metadata (tree-sitter integration deferred) |
 | `lang-python` | `packages/languages/lang-python/` | `.py`, `.pyi` | Hand-written strip routines |
 | `lang-java` | `packages/languages/lang-java/` | `.java` | Hand-written strip routines |
 | `lang-go` | `packages/languages/lang-go/` | `.go` | Hand-written strip routines |

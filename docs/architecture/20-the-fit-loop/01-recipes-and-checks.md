@@ -16,7 +16,7 @@ related-docs:
   - ../10-mental-model/01-fitness-loop.md
   - ./02-targets-and-scope.md
   - ./03-ignore-directives.md
-  - ../60-surfaces/02-plugin-authoring.md
+  - ../70-surfaces/02-plugin-authoring.md
 ---
 # Recipes and checks
 
@@ -337,4 +337,4 @@ All three are in `acme-api/opensip-tools/fit/recipes/`. Nothing in the kernel kn
 
 - **[`02-targets-and-scope.md`](./02-targets-and-scope.md)** — how the framework decides which files a check runs against. Where `scope`, `fileTypes`, and the targets registry interact.
 - **[`03-ignore-directives.md`](./03-ignore-directives.md)** — inline source-level suppression for individual violations.
-- **[`../60-surfaces/02-plugin-authoring.md`](../60-surfaces/02-plugin-authoring.md)** — full walkthrough of authoring a check pack, a project-local check, and a custom recipe.
+- **[`../70-surfaces/02-plugin-authoring.md`](../70-surfaces/02-plugin-authoring.md)** — full walkthrough of authoring a check pack, a project-local check, and a custom recipe.

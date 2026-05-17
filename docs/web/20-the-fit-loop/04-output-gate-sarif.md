@@ -13,8 +13,8 @@ source-files:
 related-docs:
   - ./01-recipes-and-checks.md
   - ./03-ignore-directives.md
-  - ../50-subsystems/03-architecture-gate.md
-  - ../70-reference/03-json-output-schema.md
+  - ../60-subsystems/03-architecture-gate.md
+  - ../80-reference/03-json-output-schema.md
 ---
 # Output, gate, SARIF
 
@@ -155,7 +155,7 @@ The gate is the regression-detection workflow. `--gate-save` writes the current 
 
 The default baseline path is `<project>/opensip-tools/.runtime/baseline.sarif` ([`packages/fitness/engine/src/gate.ts:89`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/fitness/engine/src/gate.ts)). Override with `--baseline <path>` if you want it elsewhere — e.g. checked into git outside `.runtime/`.
 
-The full gate behavior — diff classification, line-shift invariance, partial-SARIF tolerance — is documented in [`50-subsystems/03-architecture-gate.md`](/docs/opensip-tools/50-subsystems/03-architecture-gate/). The short version:
+The full gate behavior — diff classification, line-shift invariance, partial-SARIF tolerance — is documented in [`60-subsystems/03-architecture-gate.md`](/docs/opensip-tools/60-subsystems/03-architecture-gate/). The short version:
 
 ### The identity hash
 
@@ -284,6 +284,6 @@ If they'd intentionally added the `console.log` (it's the CLI's startup banner, 
 You've now seen the four mental-model docs and the four fit-loop docs. That's the complete picture of the `fit` command.
 
 - **[`../30-the-sim-loop/`](/docs/opensip-tools/30-the-sim-loop/)** — the simulation tool's parallel architecture. Read after `fit` is solid.
-- **[`../40-runtime/`](/docs/opensip-tools/40-runtime/)** — execution mechanics: dispatch, plugin loader, persistence.
-- **[`../50-subsystems/03-architecture-gate.md`](/docs/opensip-tools/50-subsystems/03-architecture-gate/)** — the gate's full behavior, edge cases, CI patterns.
-- **[`../70-reference/03-json-output-schema.md`](/docs/opensip-tools/70-reference/03-json-output-schema/)** — every field of `CliOutput` with type and presence rules.
+- **[`../50-runtime/`](/docs/opensip-tools/50-runtime/)** — execution mechanics: dispatch, plugin loader, persistence.
+- **[`../60-subsystems/03-architecture-gate.md`](/docs/opensip-tools/60-subsystems/03-architecture-gate/)** — the gate's full behavior, edge cases, CI patterns.
+- **[`../80-reference/03-json-output-schema.md`](/docs/opensip-tools/80-reference/03-json-output-schema/)** — every field of `CliOutput` with type and presence rules.

@@ -11,7 +11,7 @@ source-files:
 related-docs:
   - ./01-recipes-and-checks.md
   - ./04-output-gate-sarif.md
-  - ../50-subsystems/03-architecture-gate.md
+  - ../60-subsystems/03-architecture-gate.md
 ---
 # Ignore directives
 
@@ -35,6 +35,17 @@ Ignore directives are how you tell the framework "yes, I know — keep going." T
 ```
 
 Both expect a check slug as the second token (separated by space or tab). The slug must match the offending check's slug. Directives without a slug are ignored — there's no "ignore everything" form, by design.
+
+The parser recognizes the directive after any of four comment openers, so the same syntax works in TypeScript/JavaScript, Markdown/HTML, and shell/YAML/Python sources — see `COMMENT_OPENERS` in [`directive-parsing.ts`](../../../packages/fitness/engine/src/framework/directive-parsing.ts):
+
+| Opener | Languages |
+|---|---|
+| `//` | TypeScript, JavaScript, Rust, Go, Java, C/C++ |
+| `/* … */` | Same set, plus CSS — the directive must appear on the line after `/*` or inline before `*/` |
+| `<!-- … -->` | Markdown, HTML |
+| `#` | Shell, YAML, Python, TOML, Dockerfile |
+
+The doc examples below use `//`; substitute the correct opener for your file's language.
 
 ### `@fitness-ignore-next-line`
 
@@ -126,7 +137,7 @@ git commit
 opensip-tools fit --gate-compare              # CI gate from now on
 ```
 
-See [`50-subsystems/03-architecture-gate.md`](../50-subsystems/03-architecture-gate.md) for the full baseline workflow.
+See [`60-subsystems/03-architecture-gate.md`](../60-subsystems/03-architecture-gate.md) for the full baseline workflow.
 
 ### When NOT to directive
 
@@ -171,4 +182,4 @@ The CLI's run summary reports: "12 violations found, 5 ignored." CI gates on the
 ## What's next
 
 - **[`04-output-gate-sarif.md`](./04-output-gate-sarif.md)** — what happens to the surviving violations: render layer, JSON output, SARIF, the gate.
-- **[`../50-subsystems/03-architecture-gate.md`](../50-subsystems/03-architecture-gate.md)** — the complementary mechanism for legacy violation sets.
+- **[`../60-subsystems/03-architecture-gate.md`](../60-subsystems/03-architecture-gate.md)** — the complementary mechanism for legacy violation sets.

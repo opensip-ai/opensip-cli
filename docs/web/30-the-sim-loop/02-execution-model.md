@@ -81,27 +81,29 @@ A load scenario that's interrupted (signal abort, timeout) returns whatever stat
 The chaos executor extends the load executor:
 
 1. Run the base load (same as load executor).
-2. At `delayBeforeInjection`, inject the configured fault.
-3. After `fault.duration`, lift the fault.
-4. Continue running base load. Measure when the system "recovers" (error rate drops below the configured threshold).
-5. Assert that recovery happened within `recoverWithin`.
+2. While the load runs, inject faults from the `chaos` config — each `ChaosInjection` fires at the configured `probability` against requests matching its `target` pattern.
+3. Evaluate the `steadyStateAssertions` against the load metrics collected while chaos is active.
+4. After the chaos window ends, evaluate the `recoveryAssertions` over the next `recoveryWindow` milliseconds.
 
-The result type is `ChaosScenarioExecutorResult` — load metrics plus `injectionAt`, `recoveredAt`, `recoveryDurationMs`. Pass/fail is the AND of recovery success and the load assertions.
+The result type is `ChaosScenarioExecutorResult` — load metrics plus the steady-state and recovery verdicts. Pass/fail is the AND of every steady-state and recovery assertion.
 
-The fault interface is pluggable. The bundled faults are `kill`, `latency`, `partition` (against named targets like `database`, `cache`, `service`). Custom faults can be registered through the same plugin shape as scenarios.
+The bundled `ChaosType` set ([`packages/simulation/engine/src/types/base-types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/simulation/engine/src/types/base-types.ts)) is `'latency' | 'error' | 'timeout' | 'rate-limit' | 'connection-drop' | 'data-corruption'`. Each type has its own `*ChaosConfig` payload (e.g. `LatencyChaosConfig` with `minMs`/`maxMs`; `ErrorChaosConfig` with `statusCode`/`message`). `target` is a free-form pattern matched against the request's service or endpoint — there's no fixed `database`/`cache`/`service` enum.
 
 ### Invariant executor
 
 [`packages/simulation/engine/src/kinds/invariant/executor.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/simulation/engine/src/kinds/invariant/executor.ts)
 
-The invariant executor:
+The invariant executor drives a workflow-integration lifecycle, not a property-based test loop:
 
-1. Call `seed()` to produce the initial state.
-2. Call `act(state)` to mutate the state through the (typically randomized) sequence.
-3. Call `assert(finalState)` — returns true (pass) or false (fail).
-4. On fail, capture the seed value (RNG seed if used), the operation sequence, and the final state as a counterexample.
+1. Build an `InvariantContext` backed by the configured drivers (`deps`). Defaults are throw-on-call stubs (Phase 7 wires real ones); tests inject fakes via `deps`.
+2. Run `setup(ctx)` — seed tenants, register fakes, configure the world.
+3. Run `act(ctx)` — emit signals, dispatch agents, advance reconcilers.
+4. Run `assert(ctx)` — call `ctx.expectStage`, `ctx.expectOutcome`, `assertEquals`, `assertThat`, etc. Each assertion is recorded into `state.assertions`.
+5. Each phase's status (`pass`/`fail`/`error`/`aborted`) and duration are captured into the `phases` log.
 
-The result type is `InvariantScenarioExecutorResult` — carries `passed`, optional `counterexample`, plus runtime stats. Counterexamples are how authors debug a failed invariant — the executor preserves the exact reproduction case, not just the failure flag.
+All three callbacks have signature `(ctx: InvariantContext) => Promise<void>` — none takes or returns state. There is no random operation sequence, no counterexample capture, no RNG seed preservation; the model is "set up the world, act on it, observe via expectations."
+
+The result type is `InvariantScenarioExecutorResult` ([`packages/simulation/engine/src/framework/scenario-executor-result.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/simulation/engine/src/framework/scenario-executor-result.ts)): `outcome.phases` (per-phase status + duration) and `outcome.assertions` (the assertion records the assert phase produced). Pass/fail = every assertion held AND every phase ended in `pass`.
 
 ### Fix-evaluation executor
 
@@ -206,5 +208,5 @@ The session record carries the full per-scenario results; the dashboard shows la
 
 ## What's next
 
-- **[`../40-runtime/`](/docs/opensip-tools/40-runtime/)** — how the CLI dispatches both fit and sim. Plugin loading, session writing, persistence layout.
-- **[`../60-surfaces/02-plugin-authoring.md`](/docs/opensip-tools/60-surfaces/02-plugin-authoring/)** — author your first sim scenario.
+- **[`../50-runtime/`](/docs/opensip-tools/50-runtime/)** — how the CLI dispatches both fit and sim. Plugin loading, session writing, persistence layout.
+- **[`../70-surfaces/02-plugin-authoring.md`](/docs/opensip-tools/70-surfaces/02-plugin-authoring/)** — author your first sim scenario.

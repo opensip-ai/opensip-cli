@@ -19,7 +19,7 @@ related-docs:
   - ../20-the-fit-loop/01-recipes-and-checks.md
   - ../20-the-fit-loop/03-ignore-directives.md
   - ../20-the-fit-loop/04-output-gate-sarif.md
-  - ../40-runtime/01-cli-dispatch.md
+  - ../50-runtime/01-cli-dispatch.md
 ---
 # The fitness loop
 
@@ -119,7 +119,7 @@ Source: [`packages/core/src/lib/paths.ts`](../../../packages/core/src/lib/paths.
 The handler resolves two things:
 
 1. **Project paths.** `resolveProjectPaths(cwd)` returns the canonical layout: where the config file is, where checks live, where the runtime dir is, where the gate baseline default lives. Every other component reads paths through this resolver — there's no `path.join('opensip-tools', '.runtime', ...)` scattered through the codebase.
-2. **The project config.** Read from `<project>/opensip-tools.config.yml` (or the path passed via `--config`). The config carries `targets:`, `plugins:`, `globalExcludes:`, recipe overrides, and reporting defaults. See [`70-reference/02-configuration.md`](../70-reference/02-configuration.md) for the full schema.
+2. **The project config.** Read from `<project>/opensip-tools.config.yml` (or the path passed via `--config`). The config carries `targets:`, `plugins:`, `globalExcludes:`, recipe overrides, and reporting defaults. See [`80-reference/02-configuration.md`](../80-reference/02-configuration.md) for the full schema.
 
 If the config is missing, the CLI exits 2 with a pointer to `opensip-tools init`. If the config is malformed, the CLI exits 2 with the validation error.
 
@@ -264,7 +264,7 @@ These are policy choices, not technical limits. They keep the loop comprehensibl
 The fitness loop is the spine. The next three docs in this section sharpen it:
 
 - **[`02-tool-plugin-model.md`](./02-tool-plugin-model.md)** — how the CLI doesn't know what `fit` does. Stage 1 in depth.
-- **[`03-modular-monolith.md`](./03-modular-monolith.md)** — the 17-package layer cake that makes Stages 1, 3, and 6 isolatable.
+- **[`03-modular-monolith.md`](./03-modular-monolith.md)** — the 18-package layer cake that makes Stages 1, 3, and 6 isolatable.
 - **[`04-contract-surfaces.md`](./04-contract-surfaces.md)** — the public edges: argv, Tool interface, plugin manifest, CliOutput.
 
 When you want stage-by-stage detail, jump to [`../20-the-fit-loop/`](../20-the-fit-loop/) — each doc there expands one of these stages with full code paths.

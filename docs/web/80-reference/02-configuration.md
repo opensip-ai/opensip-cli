@@ -166,7 +166,7 @@ cli:
   verbose: false                    # default for --verbose
   json: false                       # default for --json
   reportTo: 'https://opensip.ai/api' # --report-to URL
-  apiKey: '${OPENSIP_API_KEY}'      # --api-key (env-var interpolation)
+  apiKey: 'sk_live_…'               # literal --api-key (see precedence below)
   fileTypes: ['ts', 'py']           # restrict to these extensions
   ignore: []                        # extra --exclude entries
 ```
@@ -178,9 +178,11 @@ cli:
 | `verbose` | bool | Default for `--verbose`. |
 | `json` | bool | Default for `--json`. |
 | `reportTo` | URL | Default for `--report-to`. |
-| `apiKey` | string | Default for `--api-key`. Supports env-var interpolation. |
+| `apiKey` | string | Literal API key. **No `${VAR}` interpolation** — the YAML value is used as-is. Use the env-var or user-level config (below) instead of committing a literal key. |
 | `fileTypes` | string[] | Restrict the run to these extensions. |
 | `ignore` | string[] | Additional exclude patterns. |
+
+API key resolution precedence (`packages/cli/src/commands/configure.ts:50-55`): `--api-key` flag > `OPENSIP_API_KEY` env var > user-level `~/.opensip-tools/config.yml`. The project-level `cli.apiKey` is the fallback when none of the above is set.
 
 CLI flags always override config — passing `--no-json` overrides a `cli.json: true` setting.
 
@@ -275,7 +277,8 @@ fitness:
 cli:
   recipe: default
   reportTo: 'https://opensip.ai/api'
-  apiKey: '${OPENSIP_API_KEY}'
+  # apiKey is read from the OPENSIP_API_KEY env var or ~/.opensip-tools/config.yml;
+  # avoid committing a literal key here.
 
 plugins:
   fit:

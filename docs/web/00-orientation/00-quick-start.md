@@ -11,7 +11,7 @@ source-files:
 related-docs:
   - ./01-what-is-opensip-tools.md
   - ./02-vocabulary.md
-  - ../60-surfaces/01-cli-command-tree.md
+  - ../70-surfaces/01-cli-command-tree.md
 ---
 # Quick start
 
@@ -40,7 +40,7 @@ opensip-tools auto-detects your project's language(s) from filesystem markers an
 
 All six get the **92 universal checks** (Docker, `.env`, Sentry, generic structure, dead-code, package conventions). TypeScript additionally gets the deepest treatment — 66 AST-driven checks for typed-inject, drizzle-orm, React patterns, package.json exports, tsconfig posture.
 
-For the full per-language breakdown, see [`../70-reference/01-package-catalog.md`](/docs/opensip-tools/70-reference/01-package-catalog/).
+For the full per-language breakdown, see [`../80-reference/01-package-catalog.md`](/docs/opensip-tools/80-reference/01-package-catalog/).
 
 ---
 
@@ -122,7 +122,7 @@ opensip-tools fit --json
 opensip-tools graph
 ```
 
-The full command tree is at [`../60-surfaces/01-cli-command-tree.md`](/docs/opensip-tools/60-surfaces/01-cli-command-tree/).
+The full command tree is at [`../70-surfaces/01-cli-command-tree.md`](/docs/opensip-tools/70-surfaces/01-cli-command-tree/).
 
 ---
 
@@ -148,4 +148,4 @@ You've seen the loop run. The orientation track is three more docs:
 
 After orientation, the mental-model section ([`../10-mental-model/`](/docs/opensip-tools/10-mental-model/)) takes you deep — starting with [`01-fitness-loop.md`](/docs/opensip-tools/10-mental-model/01-fitness-loop/), which threads one check end-to-end through the system you just ran.
 
-Once you've internalized the fitness loop, the tool-specific sections — [`../20-the-fit-loop/`](/docs/opensip-tools/20-the-fit-loop/), [`../30-the-sim-loop/`](/docs/opensip-tools/30-the-sim-loop/), and [`../35-the-graph-loop/`](/docs/opensip-tools/35-the-graph-loop/) — go deep on each first-party tool's pipeline, primitives, and gating model.
+Once you've internalized the fitness loop, the tool-specific sections — [`../20-the-fit-loop/`](/docs/opensip-tools/20-the-fit-loop/), [`../30-the-sim-loop/`](/docs/opensip-tools/30-the-sim-loop/), and [`../40-the-graph-loop/`](/docs/opensip-tools/40-the-graph-loop/) — go deep on each first-party tool's pipeline, primitives, and gating model.

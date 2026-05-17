@@ -13,8 +13,8 @@ source-files:
 related-docs:
   - ./01-what-is-opensip-tools.md
   - ./02-vocabulary.md
-  - ../40-runtime/03-session-and-persistence.md
-  - ../70-reference/02-configuration.md
+  - ../50-runtime/03-session-and-persistence.md
+  - ../80-reference/02-configuration.md
 ---
 # System context
 
@@ -187,7 +187,7 @@ This doc set threads a single hypothetical project — call it `acme-api` — th
 >
 > Their `opensip-tools.config.yml` declares two languages, one custom check directory, and a `quick-smoke` recipe that runs only the universal checks for fast PR feedback. Their full `fit` recipe runs against everything and is wired to `--gate-compare` in CI.
 
-We'll see how each layer of the system handles this project — from the CLI dispatch in [`../40-runtime/01-cli-dispatch.md`](/docs/opensip-tools/40-runtime/01-cli-dispatch/), to the language-adapter registration, to the recipe selection, to the gate diff. Every runtime doc has a "Where the example lands" section so you can trace the same scenario all the way down.
+We'll see how each layer of the system handles this project — from the CLI dispatch in [`../50-runtime/01-cli-dispatch.md`](/docs/opensip-tools/50-runtime/01-cli-dispatch/), to the language-adapter registration, to the recipe selection, to the gate diff. Every runtime doc has a "Where the example lands" section so you can trace the same scenario all the way down.
 
 ---
 

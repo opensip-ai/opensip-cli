@@ -14,7 +14,7 @@ source-files:
 related-docs:
   - ./01-fitness-loop.md
   - ./02-tool-plugin-model.md
-  - ../70-reference/03-json-output-schema.md
+  - ../80-reference/03-json-output-schema.md
 ---
 # Contract surfaces
 
@@ -137,7 +137,7 @@ interface FindingOutput {
 
 The `version: '1.0'` discriminator is part of the contract. A future minor can add fields; a major can change `version` to `'2.0'` and break old consumers.
 
-The full per-field reference (when each field is present, what each value can be) is in [`70-reference/03-json-output-schema.md`](/docs/opensip-tools/70-reference/03-json-output-schema/).
+The full per-field reference (when each field is present, what each value can be) is in [`80-reference/03-json-output-schema.md`](/docs/opensip-tools/80-reference/03-json-output-schema/).
 
 **Stability rule.** Adding optional fields is a minor change. Adding required fields, removing fields, or changing types is a major change. Reordering keys within objects is *not* part of the contract — consumers must parse, not pattern-match — but in practice the renderer emits keys in declared order.
 
@@ -149,7 +149,7 @@ When `--gate-save` runs, the baseline is a SARIF 2.1.0 document built by [`packa
 
 **Stability rule.** The fields opensip-tools fills in are: `runs[].tool.driver.name = 'opensip-tools'`, `runs[].results[]` carrying `ruleId`, `message.text`, `level`, and `locations[].physicalLocation.{artifactLocation, region}`. Future versions may fill in more SARIF fields; we won't stop filling in those.
 
-The gate's identity hash for diff matching is **not** SARIF-spec — it's an opensip-tools internal: `sha256(filePath + '\n' + ruleId + '\n' + message)`, deliberately excluding line numbers so unrelated line shifts don't register as added/resolved. See [`packages/fitness/engine/src/gate.ts:243`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/fitness/engine/src/gate.ts) and [`50-subsystems/03-architecture-gate.md`](/docs/opensip-tools/50-subsystems/03-architecture-gate/).
+The gate's identity hash for diff matching is **not** SARIF-spec — it's an opensip-tools internal: `sha256(filePath + '\n' + ruleId + '\n' + message)`, deliberately excluding line numbers so unrelated line shifts don't register as added/resolved. See [`packages/fitness/engine/src/gate.ts:243`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/fitness/engine/src/gate.ts) and [`60-subsystems/03-architecture-gate.md`](/docs/opensip-tools/60-subsystems/03-architecture-gate/).
 
 ---
 
@@ -254,7 +254,7 @@ You've now seen the four mental-model docs:
 
 1. [`01-fitness-loop.md`](/docs/opensip-tools/10-mental-model/01-fitness-loop/) — the spine, eight stages.
 2. [`02-tool-plugin-model.md`](/docs/opensip-tools/10-mental-model/02-tool-plugin-model/) — how the CLI doesn't know what `fit` does.
-3. [`03-modular-monolith.md`](/docs/opensip-tools/10-mental-model/03-modular-monolith/) — five layers, 17 packages.
+3. [`03-modular-monolith.md`](/docs/opensip-tools/10-mental-model/03-modular-monolith/) — five layers, 18 packages.
 4. This doc — the public edges.
 
 Time to go deeper. Section [`20-the-fit-loop/`](/docs/opensip-tools/20-the-fit-loop/) expands stages 4–8 of the loop with full code paths. Section [`30-the-sim-loop/`](/docs/opensip-tools/30-the-sim-loop/) does the same for `sim`. Sections 40+ cover runtime mechanics, subsystems, surfaces, reference, and conventions.

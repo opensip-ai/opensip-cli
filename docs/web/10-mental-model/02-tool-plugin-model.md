@@ -15,7 +15,7 @@ related-docs:
   - ./01-fitness-loop.md
   - ./03-modular-monolith.md
   - ./04-contract-surfaces.md
-  - ../60-surfaces/02-plugin-authoring.md
+  - ../70-surfaces/02-plugin-authoring.md
 ---
 # The tool-plugin model
 
@@ -211,7 +211,7 @@ What you *don't* need:
 - A code change in `@opensip-tools/core`.
 - A schema migration for the project config (unless your tool has its own config — which goes in a tool-namespaced section under `opensip-tools.config.yml`).
 
-If your tool also wants to ship checks (the way `@opensip-tools/checks-typescript` does for `fit`), you have a separate option: a check pack — any npm package whose name matches `@opensip-tools/checks-*` (or is listed in `plugins.checkPackages:`). That's a different contract — see [`60-surfaces/02-plugin-authoring.md`](/docs/opensip-tools/60-surfaces/02-plugin-authoring/).
+If your tool also wants to ship checks (the way `@opensip-tools/checks-typescript` does for `fit`), you have a separate option: a check pack — any npm package whose name matches `@opensip-tools/checks-*` (or is listed in `plugins.checkPackages:`). That's a different contract — see [`70-surfaces/02-plugin-authoring.md`](/docs/opensip-tools/70-surfaces/02-plugin-authoring/).
 
 ---
 
@@ -229,4 +229,4 @@ Three things, in order of importance:
 
 - **[`03-modular-monolith.md`](/docs/opensip-tools/10-mental-model/03-modular-monolith/)** — the layer cake the Tool contract sits at the top of. Why `fitness` is one package and not three; why `core` is the only thing every tool depends on.
 - **[`04-contract-surfaces.md`](/docs/opensip-tools/10-mental-model/04-contract-surfaces/)** — every public edge: argv, Tool, plugin manifest, JSON output. The contract budget.
-- **[`../60-surfaces/02-plugin-authoring.md`](/docs/opensip-tools/60-surfaces/02-plugin-authoring/)** — full walkthrough of writing a Tool, a check pack, and a project-local check.
+- **[`../70-surfaces/02-plugin-authoring.md`](/docs/opensip-tools/70-surfaces/02-plugin-authoring/)** — full walkthrough of writing a Tool, a check pack, and a project-local check.

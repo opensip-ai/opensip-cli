@@ -96,14 +96,14 @@ Source: [`packages/contracts/src/persistence/dashboard/recipes.ts`](https://gith
 
 The Code Paths panel is the dashboard's interactive call-graph explorer. It's powered by the catalog produced by `opensip-tools graph` (v0.2) and surfaces seven curated views, each answering a real developer question with a clear next step. See the v0.3 design doc — [`docs/plans/graph-dashboard-v3-design.md`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/docs/plans/graph-dashboard-v3-design.md) — for the full rationale, ADRs, and architectural invariants.
 
-The seven views (each with the same row-click → universal Function Card flow):
+The seven views (each with the same row-click → universal Function Card flow). The non-Search views are paginated at 10 rows per page rather than capped — every function in the catalog (after filter chips apply) is reachable by paging through the table:
 
-- **Hot functions** — top 50 by inbound caller count. "Who depends on `logger`?"
-- **Big functions** — top 30 by `endLine - line`. "What should I split during this refactor?"
-- **Wide functions** — top 20 by `params.length`, with a parameter thumbnail. "Where would a config-object refactor pay off?"
+- **Hot functions** — sorted by inbound caller count. "Who depends on `logger`?"
+- **Big functions** — sorted by `endLine - line`. "What should I split during this refactor?"
+- **Wide functions** — sorted by `params.length`, with a parameter thumbnail. "Where would a config-object refactor pay off?"
 - **Coupling heat map** — N×N package-by-package call density matrix; click a cell for the actual call sites. "Is `core` really the bottom layer?"
 - **Untested production code** — production functions with no static caller from any test file, sorted by inbound count. "What's the highest-risk gap?"
-- **Cycles / SCCs** — Tarjan's SCC over the call graph, top 10 components of size ≥ 2. "Where's the tightest knot?"
+- **Cycles / SCCs** — Tarjan's SCC over the call graph, every component of size ≥ 2. "Where's the tightest knot?"
 - **Search** — fuzzy match over `simpleName`, bound to the persistent search input at the top of the panel.
 
 The **Universal Function Card** is the cross-cutting drill-down: every clickable function name in any view opens the same overlay with name + location, body length, kind, params, return type, callers grouped by package, callees (resolved + external), an "Open in editor" deep link (or "Copy path" fallback), and a "Trace from entry" BFS.

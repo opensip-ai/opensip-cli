@@ -15,8 +15,8 @@ source-files:
 related-docs:
   - ./01-recipes-and-checks.md
   - ./03-ignore-directives.md
-  - ../50-subsystems/01-language-adapters.md
-  - ../70-reference/02-configuration.md
+  - ../60-subsystems/01-language-adapters.md
+  - ../80-reference/02-configuration.md
 ---
 # Targets and scope
 
@@ -247,5 +247,5 @@ The trade-off: complex targets (e.g. "include any file in a directory that has a
 
 - **[`03-ignore-directives.md`](/docs/opensip-tools/20-the-fit-loop/03-ignore-directives/)** — inline source-level suppression that survives the resolver and lands in the framework's filter step.
 - **[`04-output-gate-sarif.md`](/docs/opensip-tools/20-the-fit-loop/04-output-gate-sarif/)** — what happens to the violations a check produces.
-- **[`../50-subsystems/01-language-adapters.md`](/docs/opensip-tools/50-subsystems/01-language-adapters/)** — how a check's `contentFilter` setting dispatches through a per-language adapter.
-- **[`../70-reference/02-configuration.md`](/docs/opensip-tools/70-reference/02-configuration/)** — the full `targets:` schema in `opensip-tools.config.yml`.
+- **[`../60-subsystems/01-language-adapters.md`](/docs/opensip-tools/60-subsystems/01-language-adapters/)** — how a check's `contentFilter` setting dispatches through a per-language adapter.
+- **[`../80-reference/02-configuration.md`](/docs/opensip-tools/80-reference/02-configuration/)** — the full `targets:` schema in `opensip-tools.config.yml`.
