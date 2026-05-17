@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-05-15
+last_verified: 2026-05-17
 title: "Dashboard"
 audience: [users, contributors]
 purpose: "The HTML report — what it shows, when it opens, how it's generated, and where it lives."
@@ -10,11 +10,15 @@ source-files:
   - packages/contracts/src/persistence/dashboard/overview.ts
   - packages/contracts/src/persistence/dashboard/checks.ts
   - packages/contracts/src/persistence/dashboard/sessions.ts
+  - packages/contracts/src/persistence/dashboard/code-paths.ts
+  - packages/contracts/src/persistence/dashboard/code-paths/
   - packages/cli/src/open-dashboard.ts
   - packages/fitness/engine/src/cli/dashboard.ts
 related-docs:
   - ../40-runtime/03-session-and-persistence.md
   - ./01-cli-command-tree.md
+  - ../../plans/graph-tool-v2-design.md
+  - ../../plans/graph-dashboard-v3-design.md
 ---
 # Dashboard
 
@@ -87,6 +91,26 @@ The configured recipes, with per-recipe stats. Same shape as the checks catalog 
 
 Source: [`packages/contracts/src/persistence/dashboard/recipes.ts`](../../../packages/contracts/src/persistence/dashboard/recipes.ts).
 
+### Code Paths panel
+
+The Code Paths panel is the dashboard's interactive call-graph explorer. It's powered by the catalog produced by `opensip-tools graph` (v0.2) and surfaces seven curated views, each answering a real developer question with a clear next step. See the v0.3 design doc — [`docs/plans/graph-dashboard-v3-design.md`](../../plans/graph-dashboard-v3-design.md) — for the full rationale, ADRs, and architectural invariants.
+
+The seven views (each with the same row-click → universal Function Card flow):
+
+- **Hot functions** — top 50 by inbound caller count. "Who depends on `logger`?"
+- **Big functions** — top 30 by `endLine - line`. "What should I split during this refactor?"
+- **Wide functions** — top 20 by `params.length`, with a parameter thumbnail. "Where would a config-object refactor pay off?"
+- **Coupling heat map** — N×N package-by-package call density matrix; click a cell for the actual call sites. "Is `core` really the bottom layer?"
+- **Untested production code** — production functions with no static caller from any test file, sorted by inbound count. "What's the highest-risk gap?"
+- **Cycles / SCCs** — Tarjan's SCC over the call graph, top 10 components of size ≥ 2. "Where's the tightest knot?"
+- **Search** — fuzzy match over `simpleName`, bound to the persistent search input at the top of the panel.
+
+The **Universal Function Card** is the cross-cutting drill-down: every clickable function name in any view opens the same overlay with name + location, body length, kind, params, return type, callers grouped by package, callees (resolved + external), an "Open in editor" deep link (or "Copy path" fallback), and a "Trace from entry" BFS.
+
+Filter chips above the view tabs apply to every view: package multi-select, kind multi-select, and a production/test toggle (default: production-only).
+
+Source: [`packages/contracts/src/persistence/dashboard/code-paths.ts`](../../../packages/contracts/src/persistence/dashboard/code-paths.ts) and the per-view files under [`packages/contracts/src/persistence/dashboard/code-paths/`](../../../packages/contracts/src/persistence/dashboard/code-paths/).
+
 ### Tool tabs
 
 The dashboard supports both fit and sim runs. The top-of-page tab switcher (fit / sim) filters the four panels by tool. Sim runs are sparser today; the panel shapes are the same.
@@ -101,7 +125,8 @@ Static HTML. The generator ([`packages/contracts/src/persistence/dashboard/gener
 2. The CSS, inlined via `<style>` (from [`css.ts`](../../../packages/contracts/src/persistence/dashboard/css.ts)).
 3. The session data, embedded via `<script type="application/json" id="sessions-data">…</script>`.
 4. The catalog data (checks, recipes), embedded the same way.
-5. The JS panels, inlined via `<script type="module">…</script>` (from each panel's `dashboard*Js()` function).
+5. The graph catalog (v0.3 Code Paths panel) when present, embedded as `<script type="application/json" id="graph-catalog">…</script>` — same idiom as the sessions blob; consumed by the panel JS at panel-init time.
+6. The JS panels, inlined via `<script type="module">…</script>` (from each panel's `dashboard*Js()` function).
 
 The output is one self-contained `index.html` plus a tiny asset directory. No CDN, no external script tags, no fetch calls. You can save the file and open it in three weeks on a plane.
 

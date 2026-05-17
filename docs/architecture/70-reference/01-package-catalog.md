@@ -34,7 +34,7 @@ The contract layer between Tools and the runner. Output shapes, exit codes, pers
 
 | Package | Path | Role | Key exports |
 |---|---|---|---|
-| `@opensip-tools/contracts` | `packages/contracts/` | Shared contract types — `CliOutput`/`CommandResult` shapes, exit codes, session persistence | `CliOutput`, `CheckOutput`, `FindingOutput`, `CommandResult`, `EXIT_CODES`, `getErrorSuggestion`, `configurePersistencePaths`, `StoredSession` |
+| `@opensip-tools/contracts` | `packages/contracts/` | Shared contract types — `CliOutput`/`CommandResult` shapes, exit codes, session persistence, dashboard generator | `CliOutput`, `CheckOutput`, `FindingOutput`, `CommandResult`, `EXIT_CODES`, `getErrorSuggestion`, `configurePersistencePaths`, `StoredSession`, `generateDashboardHtml`, `GraphCatalog` |
 
 ## Layer 3 — tools and language adapters
 

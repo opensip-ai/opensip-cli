@@ -1,5 +1,5 @@
 ---
-status: draft
+status: implemented
 last_verified: 2026-05-17
 title: "graph Tool — v0.3 dashboard design"
 audience: [contributors, plugin-authors]

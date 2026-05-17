@@ -1718,6 +1718,7 @@ Calling out things that are *good ideas* but not v0.2 scope:
 - **User-authored rule plugins** (`<project>/opensip-tools/graph/checks/*.mjs`). Architecture supports it (rules are pure functions over typed inputs); we just don't expose the loader yet.
 - **Confidence-aware rule output.** Rules currently emit `severity: 'error' | 'warning'`. The catalog has per-edge confidence, but rules don't yet propagate "the orphan determination is medium-confidence because some callees were unresolved." Add in v0.3.
 - **Incompleteness flags.** A `file.complete` boolean per FunctionOccurrence indicating "this file had unresolved imports / `// @ts-ignore` / etc." Surfaces in dashboard. v0.3.
+- **Interactive Code Paths dashboard panel.** Designed and being implemented under [`./graph-dashboard-v3-design.md`](./graph-dashboard-v3-design.md). The v0.3 dashboard consumes the catalog produced by v0.2 (no engine changes) and exposes seven interactive views: Hot, Big, Wide, Coupling, Untested, SCCs, Search.
 
 ---
 
