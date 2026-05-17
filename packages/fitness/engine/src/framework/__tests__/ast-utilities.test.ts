@@ -2,88 +2,36 @@ import * as ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 import {
-  getIdentifierName,
   getLineNumber,
-  getPropertyChain,
   isInStringLiteral,
   isLiteral,
   isPropertyAccess,
-  parseSource,
-  walkNodes,
 } from '../ast-utilities.js';
 
-const parse = (content: string) => parseSource(content, 'x.ts');
+// parseSource / walkNodes / getIdentifierName / getPropertyChain are tested
+// in their canonical home at @opensip-tools/lang-typescript. fitness/engine
+// keeps a small overlap (getLineNumber, isPropertyAccess, isLiteral,
+// isInStringLiteral) — those are the helpers exercised below. The test
+// setup inlines the TS compiler API rather than depending on
+// lang-typescript directly, since the two packages are peers in the
+// layered architecture.
 
-describe('parseSource', () => {
-  it('parses valid TypeScript', () => {
-    expect(parse('const x = 1;')).not.toBeNull();
-  });
+const parse = (content: string): ts.SourceFile =>
+  ts.createSourceFile('x.ts', content, ts.ScriptTarget.Latest, true);
 
-  it('returns null on parse failure', () => {
-    expect(parseSource(undefined as unknown as string, 'x.ts')).toBeNull();
-  });
-});
-
-describe('walkNodes', () => {
-  it('visits every descendant node', () => {
-    const sf = parse('const x = 1; const y = 2;');
-    if (!sf) throw new Error('parse failed');
-    let count = 0;
-    walkNodes(sf, () => count++);
-    expect(count).toBeGreaterThan(2);
-  });
-});
-
-describe('getIdentifierName / getPropertyChain', () => {
-  it('returns identifier text', () => {
-    const sf = parse('foo;');
-    if (!sf) throw new Error('parse failed');
-    let leaf = '';
-    walkNodes(sf, (n) => {
-      if (ts.isIdentifier(n) && leaf === '') leaf = getIdentifierName(n);
-    });
-    expect(leaf).toBe('foo');
-  });
-
-  it('returns property chain', () => {
-    const sf = parse('a.b.c;');
-    if (!sf) throw new Error('parse failed');
-    let result = '';
-    walkNodes(sf, (n) => {
-      if (ts.isPropertyAccessExpression(n) && result === '') result = getPropertyChain(n);
-    });
-    expect(result).toBe('a.b.c');
-  });
-
-  it('returns empty for non-identifier non-property nodes', () => {
-    const sf = parse('1 + 2;');
-    if (!sf) throw new Error('parse failed');
-    let result = '';
-    walkNodes(sf, (n) => {
-      if (ts.isBinaryExpression(n)) {
-        result = getIdentifierName(n);
-      }
-    });
-    expect(result).toBe('');
-  });
-
-  it('getPropertyChain returns empty for non-identifier non-property', () => {
-    const sf = parse('1 + 2;');
-    if (!sf) throw new Error('parse failed');
-    let result = '';
-    walkNodes(sf, (n) => {
-      if (ts.isBinaryExpression(n) && result === '') result = getPropertyChain(n);
-    });
-    expect(result).toBe('');
-  });
-});
+function walk(root: ts.Node, visitor: (n: ts.Node) => void): void {
+  function visit(n: ts.Node): void {
+    visitor(n);
+    ts.forEachChild(n, visit);
+  }
+  ts.forEachChild(root, visit);
+}
 
 describe('getLineNumber', () => {
   it('returns 1-based line numbers', () => {
     const sf = parse('\n\nconst x = 1;');
-    if (!sf) throw new Error('parse failed');
     let line = 0;
-    walkNodes(sf, (n) => {
+    walk(sf, (n) => {
       if (ts.isVariableDeclaration(n)) {
         line = getLineNumber(n, sf);
       }
@@ -95,9 +43,8 @@ describe('getLineNumber', () => {
 describe('isPropertyAccess', () => {
   it('matches the right property name', () => {
     const sf = parse('foo.bar();');
-    if (!sf) throw new Error('parse failed');
     let matched = false;
-    walkNodes(sf, (n) => {
+    walk(sf, (n) => {
       if (ts.isPropertyAccessExpression(n) && isPropertyAccess(n, 'bar')) matched = true;
     });
     expect(matched).toBe(true);
@@ -105,9 +52,8 @@ describe('isPropertyAccess', () => {
 
   it('returns false for the wrong property name', () => {
     const sf = parse('foo.bar();');
-    if (!sf) throw new Error('parse failed');
     let matched = false;
-    walkNodes(sf, (n) => {
+    walk(sf, (n) => {
       if (ts.isPropertyAccessExpression(n) && isPropertyAccess(n, 'baz')) matched = true;
     });
     expect(matched).toBe(false);
@@ -125,9 +71,8 @@ describe('isLiteral', () => {
     ['x', false],
   ])('isLiteral(%s) === %s', (src, expected) => {
     const sf = parse(`(${src});`);
-    if (!sf) throw new Error('parse failed');
     let result: boolean | null = null;
-    walkNodes(sf, (n) => {
+    walk(sf, (n) => {
       if (ts.isParenthesizedExpression(n) && result === null) result = isLiteral(n.expression);
     });
     expect(result).toBe(expected);
@@ -137,9 +82,8 @@ describe('isLiteral', () => {
 describe('isInStringLiteral', () => {
   it('returns true for nodes inside a template', () => {
     const sf = parse('const x = `${foo}`;');
-    if (!sf) throw new Error('parse failed');
     let found = false;
-    walkNodes(sf, (n) => {
+    walk(sf, (n) => {
       if (ts.isIdentifier(n) && n.text === 'foo' && isInStringLiteral(n)) found = true;
     });
     expect(found).toBe(true);
@@ -147,9 +91,8 @@ describe('isInStringLiteral', () => {
 
   it('returns false for nodes outside any string', () => {
     const sf = parse('const x = 1; const y = x;');
-    if (!sf) throw new Error('parse failed');
     let found = false;
-    walkNodes(sf, (n) => {
+    walk(sf, (n) => {
       if (ts.isIdentifier(n) && n.text === 'y' && !isInStringLiteral(n)) found = true;
     });
     expect(found).toBe(true);

@@ -11,10 +11,13 @@ export type { ExecutionContext, RunOptions } from './framework/execution-context
 
 // Framework utilities used by checks
 export { getLineNumber, extractSnippet, isAPIFile } from './framework/result-builder.js';
+// parseSource / walkNodes / getIdentifierName / getPropertyChain moved
+// to @opensip-tools/lang-typescript (single canonical home for the TS
+// compiler-API helpers that already existed there as a superset).
+// The remaining AST helpers stay here until/unless future graph runs
+// flag them as duplicates worth migrating.
 export {
-  parseSource, walkNodes,
   getLineNumber as getASTLineNumber,
-  getIdentifierName, getPropertyChain,
   isInStringLiteral,
   isLiteral, isPropertyAccess,
 } from './framework/ast-utilities.js';

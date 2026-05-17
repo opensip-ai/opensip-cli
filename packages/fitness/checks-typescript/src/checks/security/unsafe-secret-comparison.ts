@@ -7,7 +7,8 @@
  * constant-time comparison function like safeCompare().
  */
 
-import { defineCheck, type CheckViolation, parseSource, walkNodes, getIdentifierName, isLiteral, isPropertyAccess, getASTLineNumber, ts } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation, isLiteral, isPropertyAccess, getASTLineNumber, ts } from '@opensip-tools/fitness'
+import { parseSource, walkNodes, getIdentifierName } from '@opensip-tools/lang-typescript'
 
 /**
  * Variable name pattern that indicates a secret value.

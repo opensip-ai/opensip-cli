@@ -1,68 +1,24 @@
 // @fitness-ignore-file batch-operation-limits -- iterates bounded collections (config entries, registry items, or small analysis results)
 /**
- * @fileoverview Shared AST utilities for fitness checks
+ * @fileoverview Local AST helpers used by the fitness engine itself.
  *
- * Common TypeScript AST operations for source parsing, tree walking,
- * and node inspection. Used by AST-based fitness checks.
+ * The canonical TS compiler-API helpers — parseSource, walkNodes,
+ * getIdentifierName, getPropertyChain — live in
+ * @opensip-tools/lang-typescript. They are NOT re-exported from here.
+ * Check packs import them directly from the language adapter.
+ *
+ * What remains in this file is the smaller set of node-inspection
+ * helpers that fitness exposes through its public barrel for check
+ * authors (getLineNumber, isPropertyAccess, isLiteral,
+ * isInStringLiteral). These overlap with the lang-typescript versions
+ * but the duplication hasn't yet been flagged for migration.
  */
 
 import * as ts from 'typescript'
 
 // =============================================================================
-// SOURCE PARSING
-// =============================================================================
-
-/**
- * Parse TypeScript/JavaScript source into an AST SourceFile.
- * Returns null on parse failure.
- */
-export function parseSource(content: string, filePath: string): ts.SourceFile | null {
-  try {
-    return ts.createSourceFile(filePath, content, ts.ScriptTarget.Latest, true)
-  } catch {
-    // @swallow-ok Parse failure returns null for graceful degradation
-    return null
-  }
-}
-
-// =============================================================================
-// TREE WALKING
-// =============================================================================
-
-/**
- * Depth-first walk of all nodes in a SourceFile or subtree.
- */
-export function walkNodes(root: ts.Node, visitor: (node: ts.Node) => void): void {
-  function visit(node: ts.Node): void {
-    visitor(node)
-    ts.forEachChild(node, visit)
-  }
-  ts.forEachChild(root, visit)
-}
-
-// =============================================================================
 // NODE INSPECTION
 // =============================================================================
-
-/**
- * Get the leaf identifier text from an expression node.
- */
-export function getIdentifierName(node: ts.Node): string {
-  if (ts.isIdentifier(node)) return node.text
-  if (ts.isPropertyAccessExpression(node)) return node.name.text
-  return ''
-}
-
-/**
- * Get the full dotted path of a property access chain.
- */
-export function getPropertyChain(node: ts.Node): string {
-  if (ts.isIdentifier(node)) return node.text
-  if (ts.isPropertyAccessExpression(node)) {
-    return `${getPropertyChain(node.expression)}.${node.name.text}`
-  }
-  return ''
-}
 
 /**
  * Get the 1-indexed line number for a node.
