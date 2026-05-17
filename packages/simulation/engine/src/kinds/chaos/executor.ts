@@ -11,13 +11,11 @@
  * recording. The result type already accommodates that growth.
  */
 
-import { logger } from '@opensip-tools/core'
-
-
 import { ScenarioAbortedError } from '../../framework/execution/execution-engine.js'
 import { LatencyTracker } from '../../framework/execution/latency-tracker.js'
 import { getEstimatedRps } from '../../framework/personas.js'
 import { ScenarioResultBuilder, createEmptyMetrics } from '../../framework/result-builder.js'
+import { createScenarioLogger } from '../../framework/scenario-logger.js'
 
 import type { ChaosScenarioConfig } from './define.js'
 import type { ChaosAssertionVerdict, ChaosEvent } from './result.js'
@@ -26,32 +24,8 @@ import type { ChaosScenarioExecutorResult } from '../../framework/scenario-execu
 import type { SimulationMetrics } from '../../types/base-types.js'
 import type {
   ScenarioExecutionContext,
-  ScenarioLogger,
 } from '../../types/framework-types.js'
 import type { Signal } from '@opensip-tools/core'
-
-function createScenarioLogger(scenarioId: string): ScenarioLogger {
-  return {
-    info: (message, data) => {
-      logger.info({ evt: 'simulation.scenario.info', scenarioId, msg: message, ...data })
-    },
-    warn: (message, data) => {
-      logger.warn({ evt: 'simulation.scenario.warn', scenarioId, msg: message, ...data })
-    },
-    error: (message, data) => {
-      logger.error({
-        evt: 'simulation.scenario.error',
-        err: data?.err instanceof Error ? data.err : undefined,
-        scenarioId,
-        msg: message,
-        ...data,
-      })
-    },
-    debug: (message, data) => {
-      logger.debug({ evt: 'simulation.scenario.debug', scenarioId, msg: message, ...data })
-    },
-  }
-}
 
 /**
  * Run a single load-style window producing aggregate metrics + signals.
