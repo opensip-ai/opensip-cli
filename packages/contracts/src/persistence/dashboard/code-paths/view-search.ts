@@ -81,6 +81,7 @@ views.push({
           { label: 'File', value: o => o.filePath + ':' + o.line },
         ],
         'Search results',
+        'search',
       );
     }
 

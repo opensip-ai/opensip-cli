@@ -49,6 +49,7 @@ views.push({
         { label: 'File', value: o => o.filePath + ':' + o.line },
       ],
       'Hot functions',
+      'hot',
     );
   },
 });

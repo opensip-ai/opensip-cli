@@ -55,7 +55,7 @@ views.push({
       return;
     }
     const section = el('div', { class: 'section' });
-    section.appendChild(el('h3', { text: 'Package coupling (' + pkgs.length + '×' + pkgs.length + ')' }));
+    section.appendChild(makeSectionHeading('Package coupling (' + pkgs.length + '×' + pkgs.length + ')', 'coupling'));
     const card = el('div', { class: 'card' });
     const table = el('table', { class: 'coupling-table' });
     const thead = el('thead');

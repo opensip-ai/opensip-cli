@@ -145,12 +145,13 @@ h3 { font-size: 14px; font-weight: 600; margin-bottom: 8px; color: var(--text-mu
 .code-paths-chip:hover { background: var(--bg-hover); color: var(--text); }
 .code-paths-chip.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
 .code-paths-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 16px; flex-wrap: wrap; }
-.code-paths-tab { padding: 8px 16px; color: var(--text-dim); font-size: 13px; font-weight: 500; border-bottom: 2px solid transparent; transition: color 0.15s, border-color 0.15s; user-select: none; display: inline-flex; align-items: center; gap: 6px; }
-.code-paths-tab-label { cursor: pointer; }
+.code-paths-tab { padding: 8px 16px; cursor: pointer; color: var(--text-dim); font-size: 13px; font-weight: 500; border-bottom: 2px solid transparent; transition: color 0.15s, border-color 0.15s; user-select: none; }
 .code-paths-tab:hover { color: var(--text-secondary); }
 .code-paths-tab.active { color: var(--text); border-bottom-color: var(--accent); }
-.code-paths-tab-info { background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-dim); width: 16px; height: 16px; border-radius: 50%; font-size: 10px; font-style: italic; font-weight: 700; line-height: 14px; padding: 0; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: color 0.15s, border-color 0.15s; }
-.code-paths-tab-info:hover { color: var(--accent); border-color: var(--accent); }
+
+/* Inline ⓘ button next to a section heading; opens the help drawer. */
+.section-info { background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-dim); width: 18px; height: 18px; border-radius: 50%; font-size: 11px; font-style: italic; font-weight: 700; line-height: 16px; padding: 0; margin-left: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; transition: color 0.15s, border-color 0.15s; }
+.section-info:hover { color: var(--accent); border-color: var(--accent); }
 .code-paths-view { display: none; }
 .code-paths-view.active { display: block; }
 

@@ -8,6 +8,7 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 
 import { dashboardFiltersJs } from '../persistence/dashboard/code-paths/filters.js';
+import { dashboardFunctionRowJs } from '../persistence/dashboard/code-paths/function-row.js';
 import { dashboardIndexesJs } from '../persistence/dashboard/code-paths/indexes.js';
 import { dashboardPathUtilsJs } from '../persistence/dashboard/code-paths/path-utils.js';
 import { dashboardSccJs } from '../persistence/dashboard/code-paths/scc.js';
@@ -50,6 +51,7 @@ return { views, graphCatalog, graphIndexes, filterState };
       + dashboardViewsRegistryJs()
       + dashboardFiltersJs()
       + dashboardSccJs()
+      + dashboardFunctionRowJs()
       + dashboardViewSccsJs()
       + tail,
   );

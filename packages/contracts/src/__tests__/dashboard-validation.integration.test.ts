@@ -146,17 +146,18 @@ describe.runIf(existsSync(REPORT))('Phase V — dashboard end-to-end validation'
     expect(Boolean(hasRows) || Boolean(hasEmpty)).toBe(true);
   });
 
-  it('every Explore tab has an info button that opens the help drawer', () => {
+  it('the active view section heading exposes an info button that opens the help drawer', () => {
     const html = readReportOrSkip();
     if (!html) { expect(true).toBe(true); return; }
-    bootDashboard(html);
+    const env = bootDashboard(html);
     activateExploreSubtab();
-    const infoButtons = document.querySelectorAll('.code-paths-tab-info');
-    expect(infoButtons.length).toBe(7); // hot, big, wide, coupling, untested, sccs, search
-    (infoButtons[0] as HTMLElement).click();
+    env.activateView('hot');
+    const info = document.querySelector<HTMLButtonElement>('#code-paths-view-hot .section-info');
+    expect(info).not.toBeNull();
+    info!.click();
     const drawer = document.querySelector('.help-drawer');
     expect(drawer).not.toBeNull();
-    expect(drawer!.querySelector('h3')!.textContent!.length).toBeGreaterThan(0);
+    expect(drawer!.querySelector('h3')!.textContent).toBe('Hot functions');
     // Close.
     document.querySelector<HTMLElement>('.help-drawer-close')!.click();
     expect(document.querySelector('.help-drawer-overlay')).toBeNull();

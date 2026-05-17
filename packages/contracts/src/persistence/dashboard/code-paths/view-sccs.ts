@@ -34,7 +34,7 @@ views.push({
       return;
     }
     const section = el('div', { class: 'section' });
-    section.appendChild(el('h3', { text: 'Cycles / SCCs (' + sccs.length + ')' }));
+    section.appendChild(makeSectionHeading('Cycles / SCCs (' + sccs.length + ')', 'sccs'));
     const card = el('div', { class: 'card' });
     const table = el('table', { class: 'data-table sortable' });
     const thead = el('thead');

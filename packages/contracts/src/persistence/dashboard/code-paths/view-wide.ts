@@ -54,6 +54,7 @@ views.push({
         { label: 'File', value: o => o.filePath + ':' + o.line },
       ],
       'Wide functions',
+      'wide',
     );
   },
 });

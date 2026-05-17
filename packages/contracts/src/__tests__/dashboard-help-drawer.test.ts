@@ -68,7 +68,8 @@ describe('help drawer', () => {
     const drawer = document.querySelector('.help-drawer');
     expect(drawer).not.toBeNull();
     expect(drawer!.querySelector('h3')!.textContent).toBe('Hot functions');
-    const headings = [...drawer!.querySelectorAll('h4')].map(h => h.textContent);
+    // eslint-disable-next-line unicorn/prefer-spread -- NodeListOf spread requires lib.dom.iterable.
+    const headings = Array.from(drawer!.querySelectorAll('h4')).map(h => h.textContent);
     expect(headings).toEqual(['What this is', 'Why you care']);
     expect(drawer!.textContent).toContain('Functions ranked by inbound call count.');
   });

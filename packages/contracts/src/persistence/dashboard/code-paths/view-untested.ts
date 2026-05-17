@@ -62,6 +62,7 @@ views.push({
         { label: 'File', value: o => o.filePath + ':' + o.line },
       ],
       'Untested production code',
+      'untested',
     );
   },
 });

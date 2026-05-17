@@ -7,14 +7,37 @@
  * a section heading, a card-bordered sortable table, and a pagination
  * footer wired through paginateTable (defined in shared.ts).
  *
- * Each caller passes its own `columns` array and a `heading` string;
- * the helper handles header, body, click delegation via data-body-hash,
- * sortable activation, and pagination at 10 rows/page.
+ * Each caller passes its own `columns` array, a `heading` string, and
+ * an optional `viewId` (used to attach the help-drawer info icon to
+ * the heading). The helper handles header, body, click delegation
+ * via data-body-hash, sortable activation, and pagination at 10
+ * rows/page.
  */
 
 export function dashboardFunctionRowJs(): string {
   return String.raw`
-function renderFunctionRows(container, occurrences, columns, heading) {
+function makeSectionHeading(text, viewId) {
+  // Heading + optional ⓘ button that opens the help drawer for this
+  // view. SCCs and Coupling use the same shape inline.
+  const h3 = el('h3');
+  h3.appendChild(document.createTextNode(text));
+  if (viewId && typeof openHelpDrawer === 'function') {
+    const info = el('button', {
+      class: 'section-info',
+      'aria-label': 'About this view',
+      title: 'About this view',
+      text: 'i',
+    });
+    info.addEventListener('click', e => {
+      e.stopPropagation();
+      openHelpDrawer(viewId);
+    });
+    h3.appendChild(info);
+  }
+  return h3;
+}
+
+function renderFunctionRows(container, occurrences, columns, heading, viewId) {
   while (container.firstChild) container.removeChild(container.firstChild);
   if (!occurrences || occurrences.length === 0) {
     container.appendChild(el('div', { class: 'empty', text: 'No functions to show.' }));
@@ -22,7 +45,7 @@ function renderFunctionRows(container, occurrences, columns, heading) {
   }
   const headingText = (heading || 'Results') + ' (' + occurrences.length + ')';
   const section = el('div', { class: 'section' });
-  section.appendChild(el('h3', { text: headingText }));
+  section.appendChild(makeSectionHeading(headingText, viewId));
   const card = el('div', { class: 'card' });
   const table = el('table', { class: 'data-table sortable' });
   const thead = el('thead');
