@@ -38,27 +38,35 @@ their `dependencies`.
    pnpm -r --filter '@opensip-tools/*' exec npm version <patch|minor|major> --no-git-tag-version
    ```
 
-2. Sanity-check locally:
+2. Update `CHANGELOG.md` — add a `## [X.Y.Z] — YYYY-MM-DD` entry at the
+   top. The release-consistency gate (step 3) refuses to publish without
+   one.
+
+3. Sanity-check locally:
    ```bash
    pnpm install && pnpm typecheck && pnpm test && pnpm lint
+   pnpm docs:build                                # regenerate docs/web/ at the new version pin
+   pnpm verify-release --expected-version vX.Y.Z  # version + CHANGELOG + docs + cross-pkg deps
    ```
 
    `pnpm lint` runs both ESLint and dependency-cruiser. Both must be
-   zero-error.
+   zero-error. `pnpm verify-release` runs the same gate CI uses (see
+   `tools/verify-release.mjs`); a green local run guarantees CI's
+   pre-publish step will also be green.
 
-3. Commit, tag, push:
+4. Commit, tag, push:
    ```bash
    git commit -am "chore: release X.Y.Z"
    git tag vX.Y.Z
    git push origin main vX.Y.Z
    ```
 
-4. Watch the run:
+5. Watch the run:
    ```bash
    gh run watch $(gh run list --workflow=release.yml --limit 1 --json databaseId -q '.[0].databaseId')
    ```
 
-5. Verify on npm:
+6. Verify on npm:
    ```bash
    for p in core contracts cli fitness simulation \
             lang-typescript lang-rust lang-python lang-go lang-java lang-cpp \

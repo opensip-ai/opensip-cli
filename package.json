@@ -26,7 +26,8 @@
     "dashboard": "node packages/cli/dist/index.js dashboard",
     "sessions": "node packages/cli/dist/index.js sessions",
     "docs:build": "node tools/build-web-docs.mjs",
-    "docs:check": "node tools/build-web-docs.mjs --check"
+    "docs:check": "node tools/build-web-docs.mjs --check",
+    "verify-release": "node tools/verify-release.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

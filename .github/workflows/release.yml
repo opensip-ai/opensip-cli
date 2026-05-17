@@ -34,6 +34,17 @@ jobs:
 
       - run: npm --version
       - run: pnpm install --frozen-lockfile
+
+      # Release consistency gate. Catches half-bumped versions, tag
+      # mismatch, missing CHANGELOG entry, stale generated docs, and
+      # cross-package dep ranges that drifted off-consensus. Cheap (~1s);
+      # fail-fast here saves a wasted build + the post-publish blast
+      # radius of a broken release.
+      - name: Verify release consistency
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: node tools/verify-release.mjs --expected-version "$RELEASE_TAG"
+
       # Clean every package's dist/ before build. tsc never deletes orphan
       # output files when their source is moved or removed, and `files:
       # ["dist"]` in package.json blindly globs the whole tree — so a
