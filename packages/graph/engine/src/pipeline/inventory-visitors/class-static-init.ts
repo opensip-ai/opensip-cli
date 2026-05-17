@@ -12,7 +12,7 @@
  * and produce one occurrence per block (line/column disambiguates).
  */
 
-import { hashFunctionBody } from '../inventory-helpers/hash-body.js';
+import { digestFunctionBody } from '../inventory-helpers/hash-body.js';
 
 import type { InventoryVisitor } from './types.js';
 import type ts from 'typescript';
@@ -28,8 +28,10 @@ export const visitClassStaticBlock: InventoryVisitor<ts.ClassStaticBlockDeclarat
   const qualified = enclosingClass
     ? `${ctx.filePathProjectRel.replace(/\.tsx?$/, '')}.${enclosingClass}.<static-init>`
     : `${ctx.filePathProjectRel.replace(/\.tsx?$/, '')}.<static-init>`;
+  const digest = digestFunctionBody(node, ctx.sourceFile);
   return {
-    bodyHash: hashFunctionBody(node, ctx.sourceFile),
+    bodyHash: digest.hash,
+    bodySize: digest.size,
     simpleName: '<static-init>',
     qualifiedName: qualified,
     filePath: ctx.filePathProjectRel,

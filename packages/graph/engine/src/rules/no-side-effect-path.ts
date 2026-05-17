@@ -1,19 +1,21 @@
 /**
- * graph:no-side-effect-path — flag functions whose entire transitive
- * callees are pure (no I/O, no logging, no mutation), suggesting the
- * function may be safe to memoize / inline / cache.
+ * graph:no-side-effect-path — flag functions that are pure-by-design
+ * AND whose return value is discarded by at least one caller, i.e.
+ * functions whose computation has no observable effect on the program.
  *
- * Heuristic: a function is "side-effecting" if any call site in its
- * body has a confidence:'low' / unresolved edge (we don't know what it
- * does — assume the worst), OR its raw text contains a known sink
- * (logger.*, fs.*, http.*, fetch, console.*).
+ * Heuristic, in order:
+ *   1. The function's entire transitive callee set is side-effect free
+ *      (no I/O, logging, mutation, or unresolved edges).
+ *   2. At least one inbound caller invokes this function as an
+ *      ExpressionStatement (its return value is discarded).
  *
- * Then walk the transitive closure: if NONE of a function's reachable
- * callees are side-effecting, AND the function itself isn't, it's
- * pure-subtree material.
+ * Step 2 is what makes the signal actionable. A pure function that
+ * returns data is a feature when its return value is consumed
+ * (`const x = pureHelper(...)`); it is dead code when the value is
+ * thrown away (`pureHelper(...);` as a standalone statement).
  *
- * The rule is conservative — it only fires for functions whose edges
- * are mostly resolved, so a Signal here is a strong hint.
+ * Catalogs from older runs that lack the `discarded` field on call
+ * edges fall back to the legacy "any pure callee" check.
  */
 
 import { createSignal } from '@opensip-tools/core';
@@ -34,15 +36,16 @@ export const noSideEffectPathRule: Rule = {
       const reachable = transitiveCallees(occ, indexes);
       const anyEffecting = [...reachable].some((h) => sideEffecting.has(h));
       if (anyEffecting) continue;
+      if (!hasDiscardedCaller(occ, indexes)) continue;
       signals.push(
         createSignal({
           source: 'graph',
           severity: 'low',
           category: 'quality',
           ruleId: 'graph:no-side-effect-path',
-          message: `${occ.simpleName} appears to have no side effects in its transitive callee set.`,
+          message: `${occ.simpleName} is pure but at least one caller discards its return value, so the call has no observable effect.`,
           code: { file: occ.filePath, line: occ.line, column: occ.column },
-          suggestion: 'Consider memoizing or simplifying this function; its callees are all pure.',
+          suggestion: 'Either consume the return value at the call site, or remove the call.',
           metadata: {
             qualifiedName: occ.qualifiedName,
             transitiveCount: reachable.size,
@@ -53,6 +56,32 @@ export const noSideEffectPathRule: Rule = {
     return signals;
   },
 };
+
+/**
+ * True when at least one caller invokes this function as an
+ * ExpressionStatement (return value discarded). Catalogs that
+ * predate the `discarded` field surface every edge as undefined,
+ * which we treat as "unknown" — fall back to the prior behavior
+ * (always pass) so older catalogs aren't silently filtered out.
+ */
+function hasDiscardedCaller(occ: FunctionOccurrence, indexes: Indexes): boolean {
+  const callerHashes = indexes.callers.get(occ.bodyHash) ?? [];
+  if (callerHashes.length === 0) return false;
+  let sawDiscardedField = false;
+  for (const callerHash of callerHashes) {
+    const caller = indexes.byBodyHash.get(callerHash);
+    if (!caller) continue;
+    for (const edge of caller.calls) {
+      if (!edge.to.includes(occ.bodyHash)) continue;
+      if (edge.discarded === undefined) continue;
+      sawDiscardedField = true;
+      if (edge.discarded) return true;
+    }
+  }
+  // No edge carried a `discarded` field — older catalog. Preserve the
+  // pre-refinement behavior so we don't drop legitimate signals.
+  return !sawDiscardedField;
+}
 
 /** Filters out occurrences we never want to flag — short, test-only, has unresolved edges, etc. */
 function isPureCandidate(occ: FunctionOccurrence, sideEffecting: ReadonlySet<string>): boolean {

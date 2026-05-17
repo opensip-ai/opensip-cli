@@ -6,7 +6,7 @@ import ts from 'typescript';
 
 import { classifyVisibility } from '../inventory-helpers/classify-visibility.js';
 import { extractParams } from '../inventory-helpers/extract-params.js';
-import { hashFunctionBody } from '../inventory-helpers/hash-body.js';
+import { digestFunctionBody } from '../inventory-helpers/hash-body.js';
 import { synthesizeFunctionExpressionName } from '../inventory-helpers/synthesize-name.js';
 
 import type { InventoryVisitor } from './types.js';
@@ -25,8 +25,10 @@ export const visitFunctionExpression: InventoryVisitor<ts.FunctionExpression> = 
       column: startLC.character,
     });
 
+  const digest = digestFunctionBody(node, ctx.sourceFile);
   return {
-    bodyHash: hashFunctionBody(node, ctx.sourceFile),
+    bodyHash: digest.hash,
+    bodySize: digest.size,
     simpleName: name,
     qualifiedName: `${ctx.filePathProjectRel.replace(/\.tsx?$/, '')}.${name}`,
     filePath: ctx.filePathProjectRel,

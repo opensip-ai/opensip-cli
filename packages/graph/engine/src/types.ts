@@ -54,12 +54,28 @@ export interface CallEdge {
   readonly confidence: CallConfidence;
   /** Raw call expression text, truncated to ≤ 80 chars. */
   readonly text: string;
+  /**
+   * True when the call expression appears as an ExpressionStatement
+   * (its return value is discarded). Used by `no-side-effect-path` to
+   * distinguish "pure helper called for its return value" (correct)
+   * from "pure helper called for nothing" (dead computation).
+   * Optional for forward-compatibility with pre-discard catalogs.
+   */
+  readonly discarded?: boolean;
 }
 
 /** A single callable function or method, by simple name + per-occurrence record. */
 export interface FunctionOccurrence {
   /** sha256(normalized body) — the primary identifier. */
   readonly bodyHash: string;
+  /**
+   * Length of the normalized body in characters (comments stripped,
+   * whitespace collapsed). Used by `duplicated-function-body` to skip
+   * trivial wrapper bodies whose duplication is not actionable.
+   * Optional for forward-compatibility with pre-bodySize catalogs;
+   * absent values are treated as "passes the threshold."
+   */
+  readonly bodySize?: number;
   /** "saveBaseline", "<arrow:gate.ts:42:7>", "<module-init:gate.ts>". */
   readonly simpleName: string;
   /** "fitness/engine/src/gate.saveBaseline" — for human display. */
@@ -121,6 +137,12 @@ export interface Indexes {
 export interface GraphConfig {
   /** Minimum lines for a duplicated-function-body match (defaults: 5). */
   readonly minDuplicateBodyLines?: number;
+  /**
+   * Minimum normalized body size (in characters) for a duplicated-
+   * function-body match. Filters out trivial pass-through wrappers
+   * whose duplication is structural, not actionable. Default: 200.
+   */
+  readonly minDuplicateBodySize?: number;
   /** Override the inferred entry-point list. */
   readonly entryPointHashes?: readonly string[];
   /** Per-rule severity overrides. */

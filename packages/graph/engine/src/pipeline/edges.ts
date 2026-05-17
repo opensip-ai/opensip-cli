@@ -163,6 +163,7 @@ function recordCreationEdge(
     resolution: 'static',
     confidence: 'high',
     text: `[creates] ${truncated}`,
+    discarded: false,
   };
   const list = args.callsByHash.get(ownerHash);
   if (list) {
@@ -237,6 +238,7 @@ function pushEdge(
     resolution: verdict.resolution,
     confidence: verdict.confidence,
     text: text.length > 80 ? `${text.slice(0, 77)}...` : text,
+    discarded: isReturnValueDiscarded(node),
   };
   const list = args.callsByHash.get(ownerHash);
   if (list) {
@@ -248,6 +250,27 @@ function pushEdge(
   else if (verdict.confidence === 'high') args.stats.resolvedHigh++;
   else if (verdict.confidence === 'medium') args.stats.resolvedMedium++;
   else args.stats.resolvedLow++;
+}
+
+/**
+ * The call's return value is discarded when the call expression is the
+ * entire expression of an ExpressionStatement (`foo();`). Anything else
+ * — assignment RHS, return value, argument, conditional, member chain
+ * — consumes the return value.
+ *
+ * `await foo()` and `(foo())` wrappers are unwrapped so the underlying
+ * intent is preserved.
+ */
+function isReturnValueDiscarded(node: ts.Node): boolean {
+  let parent: ts.Node | undefined = node.parent;
+  while (parent) {
+    if (ts.isParenthesizedExpression(parent) || ts.isAwaitExpression(parent)) {
+      parent = parent.parent;
+      continue;
+    }
+    return ts.isExpressionStatement(parent);
+  }
+  return false;
 }
 
 /**

@@ -74,4 +74,35 @@ export function isCheck(value: unknown): value is Check {
   return true
 }
 
+/**
+ * Walk a barrel-export object and collect every Check it contains,
+ * deduplicated by `config.id`. Recurses into nested object exports;
+ * arrays are not traversed (they are typically the `checks` re-export
+ * the loader handles separately).
+ *
+ * Pack authors call this in their package's `index.ts`:
+ *
+ *     import * as allChecks from './checks/index.js'
+ *     export const checks = collectCheckObjects(allChecks)
+ *
+ * `seen` is exposed for callers that need to merge multiple barrels.
+ */
+export function collectCheckObjects(
+  obj: Record<string, unknown>,
+  seen: Set<string> = new Set<string>(),
+): Check[] {
+  const result: Check[] = []
+  for (const value of Object.values(obj)) {
+    if (isCheck(value)) {
+      if (!seen.has(value.config.id)) {
+        seen.add(value.config.id)
+        result.push(value)
+      }
+    } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      result.push(...collectCheckObjects(value as Record<string, unknown>, seen))
+    }
+  }
+  return result
+}
+
 export {type ResolvedScope} from './check-config.js'

@@ -10,7 +10,7 @@
  * TS/Node ecosystem (drizzle-orm, typed-inject, React-specific, etc.).
  */
 
-import { isCheck } from '@opensip-tools/fitness'
+import { collectCheckObjects } from '@opensip-tools/fitness'
 
 import * as allChecks from './checks/index.js'
 import { CHECK_DISPLAY } from './display/index.js'
@@ -18,24 +18,8 @@ import { CHECK_DISPLAY } from './display/index.js'
 import type { CheckDisplayEntry } from '@opensip-tools/core'
 import type { Check } from '@opensip-tools/fitness'
 
-// Collect all Check objects from the barrel exports, deduplicated by ID
-function collectChecks(obj: Record<string, unknown>, seen = new Set<string>()): Check[] {
-  const result: Check[] = []
-  for (const value of Object.values(obj)) {
-    if (isCheck(value)) {
-      if (!seen.has(value.config.id)) {
-        seen.add(value.config.id)
-        result.push(value)
-      }
-    } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-      result.push(...collectChecks(value as Record<string, unknown>, seen))
-    }
-  }
-  return result
-}
-
 /** All TypeScript-only checks, exported as a flat array per plugin contract */
-export const checks: readonly Check[] = collectChecks(allChecks)
+export const checks: readonly Check[] = collectCheckObjects(allChecks)
 
 /**
  * Display map for this package's checks, contributed to the CLI's merged

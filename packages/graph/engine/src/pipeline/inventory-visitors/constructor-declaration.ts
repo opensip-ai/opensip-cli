@@ -6,7 +6,7 @@ import ts from 'typescript';
 
 import { classifyVisibility } from '../inventory-helpers/classify-visibility.js';
 import { extractParams } from '../inventory-helpers/extract-params.js';
-import { hashFunctionBody } from '../inventory-helpers/hash-body.js';
+import { digestFunctionBody } from '../inventory-helpers/hash-body.js';
 
 import type { InventoryVisitor } from './types.js';
 
@@ -18,8 +18,10 @@ export const visitConstructorDeclaration: InventoryVisitor<ts.ConstructorDeclara
   const startLC = ctx.sourceFile.getLineAndCharacterOfPosition(start);
   const end = ctx.sourceFile.getLineAndCharacterOfPosition(node.getEnd());
   const className = ctx.enclosingClass ?? findClassName(node) ?? '<anon-class>';
+  const digest = digestFunctionBody(node, ctx.sourceFile);
   return {
-    bodyHash: hashFunctionBody(node, ctx.sourceFile),
+    bodyHash: digest.hash,
+    bodySize: digest.size,
     simpleName: className,
     qualifiedName: `${ctx.filePathProjectRel.replace(/\.tsx?$/, '')}.${className}.constructor`,
     filePath: ctx.filePathProjectRel,

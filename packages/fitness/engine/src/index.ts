@@ -6,7 +6,7 @@ export { registerChecks } from './framework/register-helpers.js';
 // Framework types — the real check API types
 export type { CheckViolation, CheckScope, FileAccessor, CheckConcern, CheckLanguage } from './framework/check-config.js';
 export type { Check, CheckConfig, ResolvedScope } from './framework/check-types.js';
-export { isCheck } from './framework/check-types.js';
+export { isCheck, collectCheckObjects } from './framework/check-types.js';
 export type { ExecutionContext, RunOptions } from './framework/execution-context.js';
 
 // Framework utilities used by checks

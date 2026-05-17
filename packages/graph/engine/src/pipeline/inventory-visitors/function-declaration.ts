@@ -8,7 +8,7 @@ import ts from 'typescript';
 import { classifyVisibility } from '../inventory-helpers/classify-visibility.js';
 import { extractDecorators } from '../inventory-helpers/extract-decorators.js';
 import { extractParams } from '../inventory-helpers/extract-params.js';
-import { hashFunctionBody } from '../inventory-helpers/hash-body.js';
+import { digestFunctionBody } from '../inventory-helpers/hash-body.js';
 
 import type { InventoryVisitor } from './types.js';
 
@@ -22,8 +22,10 @@ export const visitFunctionDeclaration: InventoryVisitor<ts.FunctionDeclaration> 
   const start = node.getStart(ctx.sourceFile);
   const startLC = ctx.sourceFile.getLineAndCharacterOfPosition(start);
   const end = ctx.sourceFile.getLineAndCharacterOfPosition(node.getEnd());
+  const digest = digestFunctionBody(node, ctx.sourceFile);
   return {
-    bodyHash: hashFunctionBody(node, ctx.sourceFile),
+    bodyHash: digest.hash,
+    bodySize: digest.size,
     simpleName: name,
     qualifiedName: `${ctx.filePathProjectRel.replace(/\.tsx?$/, '')}.${name}`,
     filePath: ctx.filePathProjectRel,

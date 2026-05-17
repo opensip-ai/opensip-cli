@@ -23,7 +23,11 @@ describe('duplicated-function-body rule', () => {
   });
   const catalog = runFixture(fixtureDir);
   const indexes = buildIndexes(catalog);
-  const signals = duplicatedFunctionBodyRule.evaluate(catalog, indexes, {});
+  // The fixture's `calculate` body is small (~100 normalized chars).
+  // Disable the wrapper-suppression threshold for this test so we are
+  // exercising the rule's core grouping behavior, not its anti-wrapper
+  // heuristic.
+  const signals = duplicatedFunctionBodyRule.evaluate(catalog, indexes, { minDuplicateBodySize: 0 });
 
   it('flags duplicated bodies across files', () => {
     expect(signals.length).toBeGreaterThanOrEqual(1);

@@ -9,7 +9,7 @@
  * top-level statements rather than dispatching on a single node.
  */
 
-import { hashSyntheticBody } from '../inventory-helpers/hash-body.js';
+import { digestSyntheticBody } from '../inventory-helpers/hash-body.js';
 import { synthesizeModuleInitName } from '../inventory-helpers/synthesize-name.js';
 
 import type { VisitorContext } from './types.js';
@@ -27,8 +27,10 @@ export function synthesizeModuleInit(
     .map((s) => s.getText(sourceFile))
     .join('\n');
   const name = synthesizeModuleInitName(ctx.filePathProjectRel);
+  const digest = digestSyntheticBody(`${ctx.filePathProjectRel}\n${topLevelText}`);
   return {
-    bodyHash: hashSyntheticBody(`${ctx.filePathProjectRel}\n${topLevelText}`),
+    bodyHash: digest.hash,
+    bodySize: digest.size,
     simpleName: name,
     qualifiedName: `${ctx.filePathProjectRel.replace(/\.tsx?$/, '')}.<module-init>`,
     filePath: ctx.filePathProjectRel,
