@@ -82,8 +82,10 @@ The flow lives in [`packages/cli/src/index.ts`](https://github.com/opensip-ai/op
 1. Static imports (compile-time):
    import { fitnessTool } from '@opensip-tools/fitness';
    import { simulationTool } from '@opensip-tools/simulation';
+   import { graphTool } from '@opensip-tools/graph';
    defaultToolRegistry.register(fitnessTool);
    defaultToolRegistry.register(simulationTool);
+   defaultToolRegistry.register(graphTool);
 
 2. Discovery (runtime):
    for each package in node_modules where package.json

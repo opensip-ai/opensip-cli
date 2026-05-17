@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-05-15
+last_verified: 2026-05-16
 owner: opensip-tools
 indexable: true
 title: "opensip-tools Architecture"

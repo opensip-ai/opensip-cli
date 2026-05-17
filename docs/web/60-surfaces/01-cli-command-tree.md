@@ -108,6 +108,40 @@ opensip-tools sim --kind <kind>
 
 ---
 
+## `graph` — static call-graph + dead-end analysis
+
+Tool-owned: [`packages/graph/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/graph/engine/src/tool.ts). See [`docs/plans/graph-tool-v2-design.md`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/docs/plans/graph-tool-v2-design.md) for the architecture spec.
+
+```
+opensip-tools graph
+opensip-tools graph --json
+opensip-tools graph --gate-save
+opensip-tools graph --gate-compare
+opensip-tools graph --report-to <url>
+```
+
+`graph` is the single entry point for static call-graph analysis. The default (non-JSON) output is a structured terminal report with four sections: catalog summary, findings grouped by rule (top 10 per rule, with overflow indicator), top 10 inferred entry points, and a one-line summary. The full data is always available via `--json`.
+
+| Flag | Type | Default | Effect |
+|---|---|---|---|
+| `--cwd <path>` | string | `process.cwd()` | Target directory (must contain a `tsconfig.json`). |
+| `--json` | bool | `false` | Output a `CliOutput`-shaped JSON document instead of the unified terminal report. |
+| `--no-cache` | bool | `false` | Skip the catalog cache and re-run stages 1+2. |
+| `--gate-save` | bool | `false` | Save the current Signal set to `<project>/opensip-tools/.runtime/cache/graph/baseline.json`. Mutually exclusive with `--gate-compare`. |
+| `--gate-compare` | bool | `false` | Compare current Signals to the baseline; exit non-zero on regression. |
+| `--baseline <path>` | string | `<project>/opensip-tools/.runtime/cache/graph/baseline.json` | Override the baseline path for `--gate-save` / `--gate-compare`. |
+| `--report-to <url>` | string | — | POST findings to OpenSIP Cloud or a compatible SARIF endpoint. |
+
+**Exit codes:** 0 (success / gate clean), 1 (runtime error / gate regression), 2 (configuration error), 4 (`--report-to` upload failed).
+
+**Catalog file:** `<project>/opensip-tools/.runtime/cache/graph/catalog.json` — content-keyed by `tsCompilerVersion`, `tsConfigPath`, and a per-file mtime+size fingerprint. Atomic write via tmp + rename.
+
+**Entry-point reasons** (rendered in the entry-points section): `module-init` (every file's top-level statements), `name-match` (`main` / `run` / `start` / `register` / `init` / `bootstrap` / `initialize`), `no-callers-exported` (exported with no in-project caller). Bin-entry and tool-registration heuristics are deferred to v0.3.
+
+> **History.** v0.2 originally registered three subcommands — `graph`, `graph-orphans`, and `graph-entry-points`. The two filtered views were folded into the unified `graph` output; all three data slices (rules, entry points, catalog summary) are now reachable from the single `graph` invocation.
+
+---
+
 ## `dashboard` — open the HTML report
 
 Tool-owned (fitness Tool registers it). Renders the most recent run as HTML and opens it in the user's default browser.
