@@ -4,6 +4,45 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.10] — 2026-05-16
+
+### Added
+
+- **`opensip-tools uninstall --project [path]`** — project-local
+  cleanup. Removes both `<path>/opensip-tools/` (user-authored checks +
+  recipes and the gitignored `.runtime/` cache) and
+  `<path>/opensip-tools.config.yml`. Path defaults to cwd; pass
+  `--project /path/to/repo` to target another location. Refuses to run
+  when neither target exists at the resolved path, so an accidental
+  `--project /unrelated/dir` is a no-op rather than a destructive
+  accident. Both modes support `--dry-run` and `--yes`.
+
+- **Updating & uninstalling section** in `README.md` plus a forward-
+  link from Quick start. Documents the three independent removal steps
+  (project state, user-level config, npm-global binary), the
+  state-lives table, the daily update-notifier behaviour, and the
+  `OPENSIP_NO_UPDATE` / `NO_UPDATE_NOTIFIER` opt-outs.
+
+### Fixed
+
+- **`~/.opensip-tools/` is now reserved for `config.yml` only.**
+  `@opensip-tools/contracts/persistence/store` and
+  `@opensip-tools/core/lib/logger` previously defaulted to writing
+  sessions, reports, and logs under the home directory if no caller
+  bootstrapped them — letting the user-level dir accumulate state that
+  the documented architecture said only ever held config. The
+  fallbacks are gone; persistence APIs throw if used before
+  `configurePersistencePaths()` and `initLogFile(dir)` requires its
+  `dir` argument at compile time. Any pre-existing
+  `~/.opensip-tools/{sessions,reports,logs,fit}` dirs are legacy cruft
+  and are swept up by `opensip-tools uninstall`.
+
+- **Stale `--force` flag in the architecture docs.** The
+  `docs/architecture/60-surfaces/01-cli-command-tree.md` uninstall
+  section documented a `--force` option; the actual flag has always
+  been `--yes` / `-y`. Section rewritten to match reality and document
+  the new `--project` mode.
+
 ## [1.0.9] — 2026-05-16
 
 ### Fixed

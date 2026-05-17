@@ -270,7 +270,7 @@ describe('no-fixme', () => {
 });
 ```
 
-The fitness package's own test fixtures (e.g. [`packages/fitness/engine/src/__tests__/`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.9/packages/fitness/engine/src/__tests__/)) show patterns for both unit and integration tests.
+The fitness package's own test fixtures (e.g. [`packages/fitness/engine/src/__tests__/`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/fitness/engine/src/__tests__/)) show patterns for both unit and integration tests.
 
 ---
 

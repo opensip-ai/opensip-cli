@@ -1,6 +1,6 @@
 {
   "name": "@opensip-tools/lang-go",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "license": "MIT",
   "description": "Go language adapter for opensip-tools",
   "repository": {

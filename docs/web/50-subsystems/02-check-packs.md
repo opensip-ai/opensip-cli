@@ -66,7 +66,7 @@ There is **no `opensipTools.kind` marker** for check packs. Discovery is **name-
 
 See [`40-runtime/02-plugin-loader.md`](/docs/opensip-tools/40-runtime/02-plugin-loader/) for the resolution rules and how `plugins.autoDiscoverChecks: false` lets you opt out of auto-discovery entirely.
 
-The `collectChecks` helper in [`packages/fitness/checks-universal/src/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.9/packages/fitness/checks-universal/src/index.ts) walks the package's own subdirectory exports and flattens them, deduplicating by check id. New checks are added by writing a new file under `src/checks/<category>/` — the barrel export picks them up automatically.
+The `collectChecks` helper in [`packages/fitness/checks-universal/src/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/fitness/checks-universal/src/index.ts) walks the package's own subdirectory exports and flattens them, deduplicating by check id. New checks are added by writing a new file under `src/checks/<category>/` — the barrel export picks them up automatically.
 
 ---
 
@@ -168,7 +168,7 @@ The recipe service projects the `config:` map into module-level state before exe
 
 ## The display map
 
-The `CHECK_DISPLAY` map ([`packages/fitness/checks-universal/src/display/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.9/packages/fitness/checks-universal/src/display/index.ts) and analogues) maps a check slug to `[icon, displayName]`:
+The `CHECK_DISPLAY` map ([`packages/fitness/checks-universal/src/display/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/fitness/checks-universal/src/display/index.ts) and analogues) maps a check slug to `[icon, displayName]`:
 
 ```ts
 export const CHECK_DISPLAY: Record<string, CheckDisplayEntry> = {

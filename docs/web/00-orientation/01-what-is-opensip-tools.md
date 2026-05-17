@@ -71,7 +71,7 @@ The second loop, opt-in. A scenario is a Node `.mjs` module that simulates a wor
 - `completion` — print a shell completion script.
 - `uninstall` — remove the user-level dotdir.
 
-Every command lives in [`packages/cli/src/commands/`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.9/packages/cli/src/commands/).
+Every command lives in [`packages/cli/src/commands/`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/cli/src/commands/).
 
 ---
 
@@ -87,13 +87,13 @@ A few principles shape every design decision. They're load-bearing — most of t
 
 ### A platform, not a linter
 
-opensip-tools is a platform with two tools shipped today, designed for a third you haven't installed yet. The CLI ([`packages/cli/src/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.9/packages/cli/src/index.ts)) is a generic dispatcher: it walks `defaultToolRegistry`, calls `Tool.register(cli)` on each entry, and lets each tool wire its own Commander commands. Adding a new tool is a plugin operation — install a package whose `package.json` declares `opensipTools.kind === 'tool'`, and the CLI picks it up.
+opensip-tools is a platform with two tools shipped today, designed for a third you haven't installed yet. The CLI ([`packages/cli/src/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/cli/src/index.ts)) is a generic dispatcher: it walks `defaultToolRegistry`, calls `Tool.register(cli)` on each entry, and lets each tool wire its own Commander commands. Adding a new tool is a plugin operation — install a package whose `package.json` declares `opensipTools.kind === 'tool'`, and the CLI picks it up.
 
-This is not a hypothetical: it's why `fit` and `sim` ship in separate packages, depend on the same kernel ([`@opensip-tools/core`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.9/packages/core/)), and have completely separate command surfaces. If `fit` ever wanted to know what `sim` was doing, it'd have to import it — which the layer policy forbids. They communicate through the CLI's render layer, not directly.
+This is not a hypothetical: it's why `fit` and `sim` ship in separate packages, depend on the same kernel ([`@opensip-tools/core`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/core/)), and have completely separate command surfaces. If `fit` ever wanted to know what `sim` was doing, it'd have to import it — which the layer policy forbids. They communicate through the CLI's render layer, not directly.
 
 ### Layered, not modular
 
-The 17 packages are organized as a strict dependency layer cake: `core` at the bottom, `contracts` above it, then `fitness/simulation/lang-*` as peers, then `checks-*` packs (which depend on the language packs), then `cli` at the top. The layer policy is enforced by [dependency-cruiser](https://github.com/opensip-ai/opensip-tools/blob/v1.0.9/.dependency-cruiser.cjs) at lint time — the build fails if a `core` module imports from `fitness`, or if `lang-typescript` imports from `cli`.
+The 17 packages are organized as a strict dependency layer cake: `core` at the bottom, `contracts` above it, then `fitness/simulation/lang-*` as peers, then `checks-*` packs (which depend on the language packs), then `cli` at the top. The layer policy is enforced by [dependency-cruiser](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/.dependency-cruiser.cjs) at lint time — the build fails if a `core` module imports from `fitness`, or if `lang-typescript` imports from `cli`.
 
 This shape is what makes the tool-plugin model possible: the kernel doesn't know what tools exist (`core` defines `Tool` and `ToolRegistry` but never imports a Tool implementation), and tools don't know what other tools exist. New tools slot in *between* layers without touching anyone else.
 
@@ -101,19 +101,19 @@ See [`../10-mental-model/03-modular-monolith.md`](/docs/opensip-tools/10-mental-
 
 ### Polyglot via adapters
 
-opensip-tools runs on TypeScript, but the checks it runs apply to TypeScript, Rust, Python, Java, Go, and C/C++ code. The trick is the `LanguageAdapter` interface ([`packages/core/src/languages/adapter.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.9/packages/core/src/languages/adapter.ts)): each language pack contributes one adapter that knows how to strip comments and string literals from that language's source. Checks operate on the *filtered* content, so a regex like `/console\.log/` doesn't match the literal string `"console.log"` inside a JS comment.
+opensip-tools runs on TypeScript, but the checks it runs apply to TypeScript, Rust, Python, Java, Go, and C/C++ code. The trick is the `LanguageAdapter` interface ([`packages/core/src/languages/adapter.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/core/src/languages/adapter.ts)): each language pack contributes one adapter that knows how to strip comments and string literals from that language's source. Checks operate on the *filtered* content, so a regex like `/console\.log/` doesn't match the literal string `"console.log"` inside a JS comment.
 
-The kernel ships zero adapters. The CLI binds the six bundled adapters at startup ([`packages/cli/src/index.ts:64-69`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.9/packages/cli/src/index.ts)). A polyglot project gets every relevant pack; a single-language project still loads them all (cheap) and only invokes the relevant ones (per-file dispatch).
+The kernel ships zero adapters. The CLI binds the six bundled adapters at startup ([`packages/cli/src/index.ts:64-69`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/cli/src/index.ts)). A polyglot project gets every relevant pack; a single-language project still loads them all (cheap) and only invokes the relevant ones (per-file dispatch).
 
 ### The CLI is the only consumer
 
-The kernel exports types, errors, IDs, the logger, the path resolver, and the registries. It does not export anything that knows about Commander, Ink, the dashboard browser-launcher, or the user's TTY. Those are CLI concerns, and they live in [`packages/cli/`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.9/packages/cli/) — a single package that takes the dependency on every visual concern.
+The kernel exports types, errors, IDs, the logger, the path resolver, and the registries. It does not export anything that knows about Commander, Ink, the dashboard browser-launcher, or the user's TTY. Those are CLI concerns, and they live in [`packages/cli/`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/cli/) — a single package that takes the dependency on every visual concern.
 
 This means tests can run the kernel headlessly. It means a future GUI front-end could share everything below `packages/cli/`. It means the JSON output (which is structured by `contracts`) is portable: any consumer that can parse a `CliOutput` can integrate, without depending on the CLI itself.
 
 ### Determinism over flexibility
 
-A check must produce the same result for the same input, full stop. There is no per-run network call inside a check (a check that requires a network call lives outside opensip-tools and feeds *signals* in via JSON). There is no time-of-day-dependent behavior. There is no shared mutable state between checks — each check gets its own `ExecutionContext` ([`packages/fitness/engine/src/framework/execution-context.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.9/packages/fitness/engine/src/framework/execution-context.ts)).
+A check must produce the same result for the same input, full stop. There is no per-run network call inside a check (a check that requires a network call lives outside opensip-tools and feeds *signals* in via JSON). There is no time-of-day-dependent behavior. There is no shared mutable state between checks — each check gets its own `ExecutionContext` ([`packages/fitness/engine/src/framework/execution-context.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/fitness/engine/src/framework/execution-context.ts)).
 
 Determinism is what makes the `--gate-compare` flow possible: save a baseline today, compare next week, and the only differences are real changes in the codebase. See [`../50-subsystems/03-architecture-gate.md`](/docs/opensip-tools/50-subsystems/03-architecture-gate/).
 

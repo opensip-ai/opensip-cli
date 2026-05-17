@@ -1,6 +1,6 @@
 {
   "name": "@opensip-tools/fitness",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "license": "MIT",
   "description": "Fitness checks engine for OpenSIP Tools",
   "repository": {

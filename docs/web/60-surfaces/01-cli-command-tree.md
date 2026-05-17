@@ -21,7 +21,7 @@ related-docs:
 
 Every command, alphabetized by command name. Use this when you need to look up a flag, not when you're learning what a command is for. For "why", read the relevant subsystem doc.
 
-The grouping mirrors the source split: tool-owned commands (`fit`, `sim`, `dashboard`, `fit-list`, `fit-recipes`) come from each Tool's `register()` call. CLI-owned commands (everything else) live under [`packages/cli/src/commands/`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.9/packages/cli/src/commands/).
+The grouping mirrors the source split: tool-owned commands (`fit`, `sim`, `dashboard`, `fit-list`, `fit-recipes`) come from each Tool's `register()` call. CLI-owned commands (everything else) live under [`packages/cli/src/commands/`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/cli/src/commands/).
 
 ---
 
@@ -48,7 +48,7 @@ Global flags applicable to most commands:
 
 ## `fit` — run fitness checks
 
-Tool-owned: [`packages/fitness/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.9/packages/fitness/engine/src/tool.ts).
+Tool-owned: [`packages/fitness/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/fitness/engine/src/tool.ts).
 
 ```
 opensip-tools fit
@@ -87,7 +87,7 @@ opensip-tools fit --gate-compare
 
 ## `sim` — run simulation scenarios
 
-Tool-owned: [`packages/simulation/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.9/packages/simulation/engine/src/tool.ts). Marked **experimental** in `--help`.
+Tool-owned: [`packages/simulation/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/simulation/engine/src/tool.ts). Marked **experimental** in `--help`.
 
 ```
 opensip-tools sim
@@ -170,7 +170,7 @@ JSON shape:
 
 ## `init` — scaffold the project layout
 
-CLI-owned: [`packages/cli/src/commands/init.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.9/packages/cli/src/commands/init.ts).
+CLI-owned: [`packages/cli/src/commands/init.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/cli/src/commands/init.ts).
 
 ```
 opensip-tools init
@@ -214,7 +214,7 @@ Ambiguous detection (multiple markers, no `--language`) exits 2 with a prompt to
 
 ## `configure` — manage user-level settings
 
-CLI-owned: [`packages/cli/src/commands/configure.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.9/packages/cli/src/commands/configure.ts). Interactive — sets up the OpenSIP Cloud API key in `~/.opensip-tools/config.yml`.
+CLI-owned: [`packages/cli/src/commands/configure.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/cli/src/commands/configure.ts). Interactive — sets up the OpenSIP Cloud API key in `~/.opensip-tools/config.yml`.
 
 ```
 opensip-tools configure
@@ -261,7 +261,7 @@ opensip-tools sessions purge --keep 10
 
 ## `plugin add/remove/list/sync` — manage project-pinned plugins
 
-CLI-owned: [`packages/cli/src/commands/plugin.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.9/packages/cli/src/commands/plugin.ts).
+CLI-owned: [`packages/cli/src/commands/plugin.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/cli/src/commands/plugin.ts).
 
 ```
 opensip-tools plugin list
@@ -284,7 +284,7 @@ opensip-tools plugin sync
 
 ## `completion` — print shell completion script
 
-CLI-owned: [`packages/cli/src/commands/completion.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.9/packages/cli/src/commands/completion.ts).
+CLI-owned: [`packages/cli/src/commands/completion.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/cli/src/commands/completion.ts).
 
 ```
 opensip-tools completion             # zsh by default
@@ -305,7 +305,7 @@ The completion catalog is sourced from `defaultToolRegistry.list()`, so installe
 
 ## `uninstall` — remove opensip-tools state
 
-CLI-owned: [`packages/cli/src/commands/uninstall.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.9/packages/cli/src/commands/uninstall.ts).
+CLI-owned: [`packages/cli/src/commands/uninstall.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/cli/src/commands/uninstall.ts).
 
 ```
 opensip-tools uninstall                       # remove ~/.opensip-tools/
@@ -334,7 +334,7 @@ Both modes:
 - Refuse to run when no targets exist (`--project` against a directory that contains no opensip-tools state is a no-op, not a destructive accident).
 - Do **not** remove the npm-global binary — the running binary can't safely self-delete. The user-mode success message prints the next step (`npm uninstall -g @opensip-tools/cli`); the project-mode success message points back at the user-mode command for the matching cleanup.
 
-State contract enforced by code: `~/.opensip-tools/` holds `config.yml` only. Persistence and logging modules throw when asked to write there (see [`store.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.9/packages/contracts/src/persistence/store.ts), [`logger.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.9/packages/core/src/lib/logger.ts)). Anything else in that directory is legacy cruft from pre-1.0 versions and is swept up by the default `uninstall`.
+State contract enforced by code: `~/.opensip-tools/` holds `config.yml` only. Persistence and logging modules throw when asked to write there (see [`store.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/contracts/src/persistence/store.ts), [`logger.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/core/src/lib/logger.ts)). Anything else in that directory is legacy cruft from pre-1.0 versions and is swept up by the default `uninstall`.
 
 ---
 

@@ -36,7 +36,7 @@ Three triggers, all opt-in:
 2. **Auto-open config.** `cli.open: true` in `opensip-tools.config.yml` makes `--open` the default. The user can still override with `--no-open` (Commander's negation flag).
 3. **Explicit `dashboard` command.** `opensip-tools dashboard` opens the most recent run's report regardless of any pending fit run.
 
-The launcher checks three conditions before actually opening a browser ([`packages/cli/src/open-dashboard.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.9/packages/cli/src/open-dashboard.ts)):
+The launcher checks three conditions before actually opening a browser ([`packages/cli/src/open-dashboard.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/cli/src/open-dashboard.ts)):
 
 - The user requested it (one of the three triggers).
 - Output isn't `--json` (machine-readable runs don't open browsers).
@@ -48,7 +48,7 @@ If any check fails, the dashboard doesn't open. The HTML file is still written; 
 
 ## What it shows
 
-Four primary panels, each with its own JS module under [`packages/contracts/src/persistence/dashboard/`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.9/packages/contracts/src/persistence/dashboard/).
+Four primary panels, each with its own JS module under [`packages/contracts/src/persistence/dashboard/`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/contracts/src/persistence/dashboard/).
 
 ### Overview
 
@@ -59,7 +59,7 @@ The default landing panel. Shows:
 - The breakdown by category (security, quality, architecture, etc.).
 - Quick links into the other panels.
 
-Source: [`packages/contracts/src/persistence/dashboard/overview.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.9/packages/contracts/src/persistence/dashboard/overview.ts).
+Source: [`packages/contracts/src/persistence/dashboard/overview.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/contracts/src/persistence/dashboard/overview.ts).
 
 ### Sessions
 
@@ -67,7 +67,7 @@ A list of every past run, sorted reverse-chronological. Click into one to see it
 
 Per-run detail expands into a tree: check → file → finding. Each finding shows the rule id, severity, line, and (when present) the suggestion text.
 
-Source: [`packages/contracts/src/persistence/dashboard/sessions.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.9/packages/contracts/src/persistence/dashboard/sessions.ts).
+Source: [`packages/contracts/src/persistence/dashboard/sessions.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/contracts/src/persistence/dashboard/sessions.ts).
 
 ### Checks catalog
 
@@ -79,13 +79,13 @@ Every check that was registered for the current project, with per-check stats:
 
 Filterable by tag, by source pack, by pass-rate. Useful for spotting the noisiest checks (high failure rate) and the dormant ones (haven't run in weeks — maybe a recipe drift).
 
-Source: [`packages/contracts/src/persistence/dashboard/checks.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.9/packages/contracts/src/persistence/dashboard/checks.ts).
+Source: [`packages/contracts/src/persistence/dashboard/checks.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/contracts/src/persistence/dashboard/checks.ts).
 
 ### Recipes
 
 The configured recipes, with per-recipe stats. Same shape as the checks catalog but a level up: how often each recipe has run, its pass rate, its average duration.
 
-Source: [`packages/contracts/src/persistence/dashboard/recipes.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.9/packages/contracts/src/persistence/dashboard/recipes.ts).
+Source: [`packages/contracts/src/persistence/dashboard/recipes.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/contracts/src/persistence/dashboard/recipes.ts).
 
 ### Tool tabs
 
@@ -95,10 +95,10 @@ The dashboard supports both fit and sim runs. The top-of-page tab switcher (fit 
 
 ## How it's generated
 
-Static HTML. The generator ([`packages/contracts/src/persistence/dashboard/generator.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.9/packages/contracts/src/persistence/dashboard/generator.ts)) assembles:
+Static HTML. The generator ([`packages/contracts/src/persistence/dashboard/generator.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/contracts/src/persistence/dashboard/generator.ts)) assembles:
 
 1. The base HTML scaffold (head, body shell, the four panel containers).
-2. The CSS, inlined via `<style>` (from [`css.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.9/packages/contracts/src/persistence/dashboard/css.ts)).
+2. The CSS, inlined via `<style>` (from [`css.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/contracts/src/persistence/dashboard/css.ts)).
 3. The session data, embedded via `<script type="application/json" id="sessions-data">…</script>`.
 4. The catalog data (checks, recipes), embedded the same way.
 5. The JS panels, inlined via `<script type="module">…</script>` (from each panel's `dashboard*Js()` function).
