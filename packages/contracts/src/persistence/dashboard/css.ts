@@ -140,10 +140,33 @@ h3 { font-size: 14px; font-weight: 600; margin-bottom: 8px; color: var(--text-mu
 
 /* ====== Code Paths panel (v0.3) ====== */
 .code-paths-search { width: 320px; margin-bottom: 12px; display: block; }
-.code-paths-filter-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
-.code-paths-chip { font-size: 12px; padding: 3px 10px; border-radius: 12px; cursor: pointer; background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-muted); user-select: none; }
+.code-paths-filter-chips { display: block; margin-bottom: 12px; }
+.code-paths-chip { font-size: 12px; padding: 3px 10px; border-radius: 12px; cursor: pointer; background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-muted); user-select: none; display: inline-block; }
 .code-paths-chip:hover { background: var(--bg-hover); color: var(--text); }
 .code-paths-chip.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+
+/* Collapsible filter drawer header */
+.code-paths-filter-header { display: flex; align-items: center; gap: 12px; }
+.code-paths-filter-toggle { background: var(--bg-surface); border: 1px solid var(--border); color: var(--text); padding: 5px 12px; border-radius: var(--radius-sm); font-size: 12px; font-family: var(--font); cursor: pointer; user-select: none; }
+.code-paths-filter-toggle:hover { background: var(--bg-hover); border-color: var(--border-light); }
+.code-paths-filter-toggle.open { border-color: var(--accent); color: var(--accent); }
+.code-paths-filter-count { font-size: 12px; color: var(--text-dim); }
+.code-paths-filter-count.active { color: var(--accent); }
+.code-paths-filter-clear { margin-left: auto; background: none; border: none; color: var(--text-dim); font-size: 12px; cursor: pointer; padding: 4px 8px; border-radius: var(--radius-sm); }
+.code-paths-filter-clear:hover { color: var(--text); background: var(--bg-hover); }
+
+/* Filter drawer body — labeled rows */
+.code-paths-filter-body { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; margin-top: 8px; }
+.code-paths-filter-row { display: flex; gap: 12px; align-items: flex-start; padding: 6px 0; }
+.code-paths-filter-row + .code-paths-filter-row { border-top: 1px solid var(--border); margin-top: 4px; padding-top: 10px; }
+.code-paths-filter-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; min-width: 70px; padding-top: 4px; }
+.code-paths-filter-chips-wrap { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; }
+.code-paths-filter-scope { display: flex; gap: 16px; }
+.code-paths-filter-radio { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; user-select: none; padding: 4px 0; }
+.code-paths-filter-radio:hover { color: var(--text); }
+.code-paths-filter-radio.active { color: var(--text); }
+.code-paths-filter-radio-dot { width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--border-light); background: transparent; display: inline-block; }
+.code-paths-filter-radio-dot.active { border-color: var(--accent); background: radial-gradient(circle, var(--accent) 0 4px, transparent 5px); }
 .code-paths-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 16px; flex-wrap: wrap; }
 .code-paths-tab { padding: 8px 16px; cursor: pointer; color: var(--text-dim); font-size: 13px; font-weight: 500; border-bottom: 2px solid transparent; transition: color 0.15s, border-color 0.15s; user-select: none; }
 .code-paths-tab:hover { color: var(--text-secondary); }
