@@ -11,15 +11,13 @@ export type { ExecutionContext, RunOptions } from './framework/execution-context
 
 // Framework utilities used by checks
 export { getLineNumber, extractSnippet, isAPIFile } from './framework/result-builder.js';
-// parseSource / walkNodes / getIdentifierName / getPropertyChain moved
-// to @opensip-tools/lang-typescript (single canonical home for the TS
-// compiler-API helpers that already existed there as a superset).
-// The remaining AST helpers stay here until/unless future graph runs
-// flag them as duplicates worth migrating.
+// Most TS compiler-API helpers (parseSource, walkNodes,
+// getIdentifierName, getPropertyChain, isLiteral, isInStringLiteral)
+// live in @opensip-tools/lang-typescript. Only the narrow set fitness
+// still owns is re-exported from here.
 export {
   getLineNumber as getASTLineNumber,
-  isInStringLiteral,
-  isLiteral, isPropertyAccess,
+  isPropertyAccess,
 } from './framework/ast-utilities.js';
 export { execAbortable } from './framework/abortable-exec.js';
 // File cache (used by checks for content access; tests may seed/clear).

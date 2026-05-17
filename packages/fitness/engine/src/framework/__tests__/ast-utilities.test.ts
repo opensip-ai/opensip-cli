@@ -3,18 +3,16 @@ import { describe, expect, it } from 'vitest';
 
 import {
   getLineNumber,
-  isInStringLiteral,
-  isLiteral,
   isPropertyAccess,
 } from '../ast-utilities.js';
 
-// parseSource / walkNodes / getIdentifierName / getPropertyChain are tested
-// in their canonical home at @opensip-tools/lang-typescript. fitness/engine
-// keeps a small overlap (getLineNumber, isPropertyAccess, isLiteral,
-// isInStringLiteral) — those are the helpers exercised below. The test
-// setup inlines the TS compiler API rather than depending on
-// lang-typescript directly, since the two packages are peers in the
-// layered architecture.
+// Most TS compiler-API helpers (parseSource, walkNodes, getIdentifierName,
+// getPropertyChain, isLiteral, isInStringLiteral) are tested in their
+// canonical home at @opensip-tools/lang-typescript. fitness/engine keeps
+// only getLineNumber and isPropertyAccess — those are the helpers
+// exercised below. The setup inlines the TS compiler API rather than
+// depending on lang-typescript directly, since the two packages are
+// peers in the layered architecture.
 
 const parse = (content: string): ts.SourceFile =>
   ts.createSourceFile('x.ts', content, ts.ScriptTarget.Latest, true);
@@ -57,44 +55,5 @@ describe('isPropertyAccess', () => {
       if (ts.isPropertyAccessExpression(n) && isPropertyAccess(n, 'baz')) matched = true;
     });
     expect(matched).toBe(false);
-  });
-});
-
-describe('isLiteral', () => {
-  it.each([
-    ['"hi"', true],
-    ['42', true],
-    ['true', true],
-    ['false', true],
-    ['null', true],
-    ['undefined', true],
-    ['x', false],
-  ])('isLiteral(%s) === %s', (src, expected) => {
-    const sf = parse(`(${src});`);
-    let result: boolean | null = null;
-    walk(sf, (n) => {
-      if (ts.isParenthesizedExpression(n) && result === null) result = isLiteral(n.expression);
-    });
-    expect(result).toBe(expected);
-  });
-});
-
-describe('isInStringLiteral', () => {
-  it('returns true for nodes inside a template', () => {
-    const sf = parse('const x = `${foo}`;');
-    let found = false;
-    walk(sf, (n) => {
-      if (ts.isIdentifier(n) && n.text === 'foo' && isInStringLiteral(n)) found = true;
-    });
-    expect(found).toBe(true);
-  });
-
-  it('returns false for nodes outside any string', () => {
-    const sf = parse('const x = 1; const y = x;');
-    let found = false;
-    walk(sf, (n) => {
-      if (ts.isIdentifier(n) && n.text === 'y' && !isInStringLiteral(n)) found = true;
-    });
-    expect(found).toBe(true);
   });
 });
