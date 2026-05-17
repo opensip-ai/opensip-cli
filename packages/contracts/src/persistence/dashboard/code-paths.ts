@@ -135,8 +135,20 @@ function renderCodePathsTab() {
     if (e.key === 'Escape') closeFunctionCard();
   });
 
-  // Activate the first registered view by default.
-  if (views.length > 0) activateView(views[0].id);
+  // Render every view once on init (so hidden views are populated for
+  // when the user activates them). Then respect the URL hash if it
+  // matches a known view.
+  for (const view of views) {
+    const container = document.getElementById('code-paths-view-' + view.id);
+    if (container) view.render(container, graphCatalog, graphIndexes, filterState);
+  }
+  const initialId = readViewIdFromHash() || (views[0] && views[0].id);
+  if (initialId) activateView(initialId);
+}
+
+function readViewIdFromHash() {
+  const m = /^#code-paths\/([a-z]+)/.exec(window.location.hash || '');
+  return m ? m[1] : null;
 }
 `;
 }
