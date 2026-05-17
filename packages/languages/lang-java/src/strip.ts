@@ -11,10 +11,7 @@
 // Both strip functions preserve byte length: replacement is whitespace
 // (newlines preserved) so line/column positions remain stable.
 
-interface Region {
-  readonly start: number
-  readonly end: number
-}
+import { applyRegions, scanRegularString, type Region } from '@opensip-tools/core'
 
 interface Scan {
   readonly stringRegions: Region[]
@@ -132,47 +129,6 @@ function scan(src: string): Scan {
   }
 
   return { stringRegions, commentRegions }
-}
-
-interface RegStrResult {
-  readonly contentEnd: number
-  readonly next: number
-}
-
-function scanRegularString(src: string, openQuotePos: number): RegStrResult {
-  const len = src.length
-  let i = openQuotePos + 1
-  while (i < len) {
-    const ch = src[i]
-    if (ch === '\\') {
-      // Skip escape sequence — at minimum 2 chars
-      i += 2
-      continue
-    }
-    if (ch === '"') {
-      return { contentEnd: i, next: i + 1 }
-    }
-    if (ch === '\n') {
-      // Unterminated regular string — Java string literals cannot span
-      // raw newlines. Stop here so we don't consume the rest of the file.
-      return { contentEnd: i, next: i }
-    }
-    i++
-  }
-  // Unterminated — return EOF position
-  return { contentEnd: len, next: len }
-}
-
-function applyRegions(src: string, regions: readonly Region[]): string {
-  if (regions.length === 0) return src
-  // eslint-disable-next-line unicorn/prefer-spread -- split('') keeps UTF-16 unit indexing; spread/Array.from use code points and break offsets
-  const buf = src.split('')
-  for (const r of regions) {
-    for (let i = r.start; i < r.end; i++) {
-      if (buf[i] !== '\n') buf[i] = ' '
-    }
-  }
-  return buf.join('')
 }
 
 /** Replace string literal content with whitespace; preserves length. */

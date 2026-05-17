@@ -6,10 +6,7 @@
 // - Raw strings (R"delim(...)delim", and prefixed forms u8R, uR, UR, LR)
 // - Char literals ('a', '\n', preserved as code)
 
-interface Region {
-  readonly start: number
-  readonly end: number
-}
+import { applyRegions, scanRegularString, type Region } from '@opensip-tools/core'
 
 interface Scan {
   readonly stringRegions: Region[]
@@ -138,44 +135,6 @@ function matchStringPrefix(src: string, i: number): number {
   if (src[i] === 'u' && src[i + 1] === '8') return 2
   if (src[i] === 'u' || src[i] === 'U' || src[i] === 'L') return 1
   return 0
-}
-
-interface RegStrResult {
-  readonly contentEnd: number
-  readonly next: number
-}
-
-function scanRegularString(src: string, openQuotePos: number): RegStrResult {
-  const len = src.length
-  let i = openQuotePos + 1
-  while (i < len) {
-    const ch = src[i]
-    if (ch === '\\') {
-      i += 2
-      continue
-    }
-    if (ch === '"') {
-      return { contentEnd: i, next: i + 1 }
-    }
-    if (ch === '\n') {
-      // Unterminated regular string at end of line
-      return { contentEnd: i, next: i }
-    }
-    i++
-  }
-  return { contentEnd: len, next: len }
-}
-
-function applyRegions(src: string, regions: readonly Region[]): string {
-  if (regions.length === 0) return src
-  // eslint-disable-next-line unicorn/prefer-spread -- split('') keeps UTF-16 unit indexing; spread/Array.from use code points and break offsets
-  const buf = src.split('')
-  for (const r of regions) {
-    for (let i = r.start; i < r.end; i++) {
-      if (buf[i] !== '\n') buf[i] = ' '
-    }
-  }
-  return buf.join('')
 }
 
 export function stripStrings(content: string): string {

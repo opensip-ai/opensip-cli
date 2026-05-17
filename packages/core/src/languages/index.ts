@@ -8,3 +8,9 @@ export {
   getParseTreeForFile,
 } from './parse-cache.js'
 export { applyContentFilter, type ContentFilterMode } from './content-filter-dispatch.js'
+export {
+  applyRegions,
+  buildLineStarts,
+  scanRegularString,
+} from './strip-utils.js'
+export type { Region, RegStrResult } from './strip-utils.js'

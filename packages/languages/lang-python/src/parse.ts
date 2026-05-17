@@ -11,21 +11,12 @@
  * grows.
  */
 
+import { buildLineStarts } from '@opensip-tools/core'
+
 export interface PythonTree {
   readonly source: string
   readonly filePath: string
   readonly lineStarts: readonly number[]
-}
-
-function buildLineStarts(src: string): number[] {
-  const out = [0]
-  // Index loop: we need the UTF-16 code unit offset (i + 1) for line starts.
-  // [...src] would split by code points and break offsets for surrogate pairs.
-  // eslint-disable-next-line unicorn/no-for-loop -- offset-bearing scan, not pure iteration
-  for (let i = 0; i < src.length; i++) {
-    if (src[i] === '\n') out.push(i + 1)
-  }
-  return out
 }
 
 export function parsePython(content: string, filePath: string): PythonTree | null {
