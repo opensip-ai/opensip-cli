@@ -272,6 +272,72 @@ module.exports = {
       from: { path: '^packages/graph/engine/src/render/sarif\\.ts$' },
       to: { path: '^@opensip-tools/fitness$' },
     },
+
+    // -------------------------------------------------------------------
+    // graph dashboard v0.3 — Code Paths panel architectural invariants
+    // (§9.1 of docs/plans/graph-dashboard-v3-design.md). The panel is
+    // self-contained inside @opensip-tools/contracts; it consumes the
+    // graph catalog by JSON shape only. Each rule below codifies a
+    // single architectural-invariant claim from the design doc.
+    // -------------------------------------------------------------------
+    {
+      name: 'dashboard-no-graph-import',
+      severity: 'error',
+      comment:
+        'AI-3: dashboard code-paths must not import @opensip-tools/graph; ' +
+        'consume the catalog by JSON shape only.',
+      from: { path: '^packages/contracts/src/persistence/dashboard/code-paths' },
+      to: { path: '^@opensip-tools/graph(/|$)' },
+    },
+    {
+      name: 'dashboard-code-paths-self-contained',
+      severity: 'error',
+      comment:
+        'MI-1: code-paths/* may import only from contracts itself, dashboard ' +
+        'siblings, and Node built-ins. No cross-package imports.',
+      from: { path: '^packages/contracts/src/persistence/dashboard/code-paths/' },
+      to: {
+        path: '^@opensip-tools/(?!contracts(/|$))',
+        pathNot: '^node:',
+      },
+    },
+    {
+      name: 'dashboard-views-disjoint',
+      severity: 'error',
+      comment:
+        'MI-2: code-paths/view-*.ts files must not import each other. They ' +
+        'share state through views-registry, filterState, and indexes only.',
+      from: { path: '^packages/contracts/src/persistence/dashboard/code-paths/view-' },
+      to: { path: '^packages/contracts/src/persistence/dashboard/code-paths/view-' },
+    },
+    {
+      name: 'dashboard-algorithms-no-view-deps',
+      severity: 'error',
+      comment:
+        'MI-3: pure-algorithm modules (scc, search, trace) must not import ' +
+        'view files or function-card.',
+      from: { path: '^packages/contracts/src/persistence/dashboard/code-paths/(scc|search|trace)\\.ts$' },
+      to: { path: '^packages/contracts/src/persistence/dashboard/code-paths/(view-|function-card\\.ts)' },
+    },
+    {
+      name: 'dashboard-no-side-stylesheets',
+      severity: 'error',
+      comment:
+        'AI-4: new CSS must extend dashboard/css.ts. No external .css imports ' +
+        'inside contracts.',
+      from: { path: '^packages/contracts/src/' },
+      to: { path: '\\.css$' },
+    },
+    {
+      name: 'dashboard-no-ui-framework',
+      severity: 'error',
+      comment:
+        'AI-2: contracts must not depend on any UI framework or visualization library.',
+      from: { path: '^packages/contracts/src/' },
+      to: {
+        path: '^(react|preact|vue|svelte|@?solidjs|d3|d3-.+|three|cytoscape|sigma|vis-network|@?angular)(/|$)',
+      },
+    },
   ],
 
   options: {

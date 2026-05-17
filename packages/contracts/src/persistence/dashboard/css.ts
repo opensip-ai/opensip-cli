@@ -137,5 +137,44 @@ h3 { font-size: 14px; font-weight: 600; margin-bottom: 8px; color: var(--text-mu
 .pass-rate-bar { display: inline-flex; align-items: center; gap: 6px; }
 .pass-rate-track { width: 48px; height: 6px; border-radius: 3px; background: var(--bg-hover); overflow: hidden; display: inline-block; vertical-align: middle; }
 .pass-rate-fill { height: 6px; border-radius: 3px; display: block; }
+
+/* ====== Code Paths panel (v0.3) ====== */
+.code-paths-search { width: 320px; margin-bottom: 12px; display: block; }
+.code-paths-filter-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.code-paths-chip { font-size: 12px; padding: 3px 10px; border-radius: 12px; cursor: pointer; background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-muted); user-select: none; }
+.code-paths-chip:hover { background: var(--bg-hover); color: var(--text); }
+.code-paths-chip.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+.code-paths-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 16px; flex-wrap: wrap; }
+.code-paths-tab { padding: 8px 16px; cursor: pointer; color: var(--text-dim); font-size: 13px; font-weight: 500; border-bottom: 2px solid transparent; transition: color 0.15s, border-color 0.15s; user-select: none; }
+.code-paths-tab:hover { color: var(--text-secondary); }
+.code-paths-tab.active { color: var(--text); border-bottom-color: var(--accent); }
+.code-paths-view { display: none; }
+.code-paths-view.active { display: block; }
+
+/* Coupling heat map cell shading — set --coupling-density per cell */
+.coupling-cell { background: color-mix(in srgb, var(--bg-surface), var(--accent) calc(var(--coupling-density, 0) * 60%)); cursor: pointer; }
+.coupling-cell.empty { color: var(--text-dim); cursor: default; }
+.coupling-table { width: auto; border-collapse: collapse; font-size: 12px; }
+.coupling-table th, .coupling-table td { border: 1px solid var(--border); padding: 4px 8px; text-align: center; min-width: 36px; }
+.coupling-table th { color: var(--text-muted); background: var(--bg-surface); }
+.coupling-table th.row-label { text-align: right; padding-right: 10px; }
+
+/* Function Card overlay */
+.function-card-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.55); display: flex; align-items: flex-start; justify-content: center; padding: 60px 16px 16px; z-index: 1000; overflow-y: auto; }
+.function-card { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; max-width: 720px; width: 100%; max-height: calc(100vh - 80px); overflow-y: auto; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+.function-card h3 { color: var(--accent); text-transform: none; letter-spacing: 0; font-size: 16px; margin-bottom: 4px; }
+.function-card .fc-loc { color: var(--text-dim); font-size: 12px; margin-bottom: 10px; word-break: break-all; }
+.function-card .fc-meta { color: var(--text-muted); font-size: 12px; margin-bottom: 10px; }
+.function-card .fc-section { border-top: 1px solid var(--border); padding-top: 10px; margin-top: 10px; }
+.function-card .fc-section h4 { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; font-weight: 600; }
+.function-card .fc-list { list-style: none; padding: 0; margin: 0; }
+.function-card .fc-list li { padding: 4px 0; font-size: 13px; cursor: pointer; color: var(--text); border-left: 2px solid transparent; padding-left: 8px; }
+.function-card .fc-list li[data-body-hash]:hover { background: var(--bg-hover); border-left-color: var(--accent); }
+.function-card .fc-list li.external { color: var(--text-dim); cursor: default; }
+.function-card .fc-actions { display: flex; gap: 8px; margin-top: 12px; }
+.function-card .fc-action { background: var(--bg-hover); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 12px; font-size: 12px; cursor: pointer; text-decoration: none; display: inline-block; }
+.function-card .fc-action:hover { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+.function-card .fc-close { float: right; background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 18px; padding: 0 6px; }
+.function-card .fc-close:hover { color: var(--text); }
 `;
 }

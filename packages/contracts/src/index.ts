@@ -68,3 +68,13 @@ export type {
 
 // Dashboard HTML generator
 export { generateDashboardHtml } from './persistence/dashboard/index.js';
+export type {
+  GraphCatalog,
+  GraphFunctionOccurrence,
+  GraphCallEdge,
+  GraphParam,
+  GraphFunctionKind,
+  GraphCallResolution,
+  GraphCallConfidence,
+  GraphVisibility,
+} from './persistence/dashboard/code-paths/types.js';

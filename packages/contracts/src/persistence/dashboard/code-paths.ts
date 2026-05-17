@@ -1,64 +1,142 @@
 /**
- * Dashboard Code Paths panel — renders the graph tool's static
- * call-graph findings (orphans, duplicates, dead branches, etc.).
+ * Dashboard Code Paths panel — interactive seven-views explorer
+ * (v0.3). Reads the embedded graph catalog (a `<script type=
+ * "application/json" id="graph-catalog">` block) and renders the
+ * Hot, Big, Wide, Coupling, Untested, SCCs, and Search views.
  *
- * Sessions whose `tool === 'graph'` are picked up automatically by
- * the existing session-load path. The panel is purely client-side
- * JS that filters those sessions and produces a navigable list.
+ * Architecture: vanilla DOM, no framework. Each view-*.ts emits a
+ * JS string that pushes a `View` literal into the singleton `views`
+ * registry. The orchestrator (this file) wires the persistent search
+ * input, filter chips, view tab bar, and seven empty containers.
+ *
+ * The file imports JS-string emitters from sibling modules under
+ * `code-paths/`. It MUST NOT import from `@opensip-tools/graph` —
+ * the catalog is consumed by JSON shape only (see §2.4 of
+ * docs/plans/graph-dashboard-v3-design.md).
  */
 
+import { dashboardEditorLinkJs } from './code-paths/editor-link.js';
+import { dashboardFiltersJs } from './code-paths/filters.js';
+import { dashboardFunctionCardJs } from './code-paths/function-card.js';
+import { dashboardFunctionRowJs } from './code-paths/function-row.js';
+import { dashboardIndexesJs } from './code-paths/indexes.js';
+import { dashboardPathUtilsJs } from './code-paths/path-utils.js';
+import { dashboardSccJs } from './code-paths/scc.js';
+import { dashboardSearchJs } from './code-paths/search.js';
+import { dashboardTraceJs } from './code-paths/trace.js';
+import { dashboardViewBigJs } from './code-paths/view-big.js';
+import { dashboardViewCouplingJs } from './code-paths/view-coupling.js';
+import { dashboardViewHotJs } from './code-paths/view-hot.js';
+import { dashboardViewSccsJs } from './code-paths/view-sccs.js';
+import { dashboardViewSearchJs } from './code-paths/view-search.js';
+import { dashboardViewUntestedJs } from './code-paths/view-untested.js';
+import { dashboardViewWideJs } from './code-paths/view-wide.js';
+import { dashboardViewsRegistryJs } from './code-paths/views-registry.js';
+
 export function dashboardCodePathsJs(): string {
-  return `
+  return [
+    dashboardPathUtilsJs(),
+    dashboardIndexesJs(),
+    dashboardFiltersJs(),
+    dashboardEditorLinkJs(),
+    dashboardTraceJs(),
+    dashboardSccJs(),
+    dashboardSearchJs(),
+    dashboardFunctionRowJs(),
+    dashboardFunctionCardJs(),
+    dashboardViewsRegistryJs(),
+    dashboardViewHotJs(),
+    dashboardViewBigJs(),
+    dashboardViewWideJs(),
+    dashboardViewCouplingJs(),
+    dashboardViewUntestedJs(),
+    dashboardViewSccsJs(),
+    dashboardViewSearchJs(),
+    panelOrchestratorJs(),
+  ].join('\n');
+}
+
+function panelOrchestratorJs(): string {
+  return String.raw`
+let graphCatalog = null;
+let graphIndexes = { byBodyHash: new Map(), bySimpleName: new Map(), callees: new Map(), callers: new Map() };
+
+function loadGraphCatalogFromBlob() {
+  const blob = document.getElementById('graph-catalog');
+  if (!blob || !blob.textContent) return null;
+  try {
+    return JSON.parse(blob.textContent);
+  } catch (err) {
+    return null;
+  }
+}
+
 function renderCodePathsTab() {
   const panel = document.getElementById('panel-code-paths');
   if (!panel) return;
-  const graphSessions = sessions.filter(s => s.tool === 'graph');
-  if (graphSessions.length === 0) {
-    panel.innerHTML = \`
-      <div class="card">
-        <h2>Code Paths</h2>
-        <p>No graph sessions yet. Run <code>opensip-tools graph</code> to generate one.</p>
-      </div>\`;
+  while (panel.firstChild) panel.removeChild(panel.firstChild);
+
+  graphCatalog = loadGraphCatalogFromBlob();
+
+  if (!graphCatalog) {
+    panel.appendChild(el('div', { class: 'card' }, [
+      el('h2', { text: 'Code Paths' }),
+      el('p', { class: 'muted', text: 'No graph sessions yet. Run opensip-tools graph to generate one.' }),
+    ]));
     return;
   }
-  const latest = graphSessions[0];
-  const total = (latest.summary && latest.summary.total) ? latest.summary.total : 0;
-  const findings = (latest.summary && (latest.summary.errors + latest.summary.warnings)) || 0;
 
-  const byRule = {};
-  for (const c of latest.checks || []) {
-    const rule = c.checkSlug;
-    byRule[rule] = byRule[rule] || [];
-    for (const f of c.findings || []) byRule[rule].push(f);
-  }
+  graphIndexes = buildIndexes(graphCatalog);
 
-  let html = \`
-    <div class="card">
-      <h2>Code Paths — graph tool</h2>
-      <p class="muted">Static call-graph + dead-end findings from the most recent <code>opensip-tools graph</code> run.</p>
-      <ul class="metrics">
-        <li><strong>\${total}</strong> rule(s) ran</li>
-        <li><strong>\${findings}</strong> finding(s)</li>
-        <li><strong>\${graphSessions.length}</strong> historical session(s)</li>
-      </ul>
-    </div>\`;
-  const slugs = Object.keys(byRule).sort();
-  for (const slug of slugs) {
-    const items = byRule[slug] || [];
-    html += \`
-      <div class="card">
-        <h3>\${slug} <span class="badge">\${items.length}</span></h3>
-        <ul class="findings">\`;
-    for (const f of items.slice(0, 50)) {
-      const loc = (f.line ? ':' + f.line : '');
-      html += \`<li><code>\${f.filePath || ''}\${loc}</code> — \${f.message}</li>\`;
-    }
-    if (items.length > 50) {
-      html += \`<li class="muted">…and \${items.length - 50} more.</li>\`;
-    }
-    html += \`</ul></div>\`;
+  // Persistent search bar — always visible above the tabs.
+  const search = el('input', {
+    type: 'search',
+    class: 'search-input code-paths-search',
+    id: 'code-paths-search-input',
+    placeholder: 'Search functions by name…',
+  });
+  panel.appendChild(search);
+
+  // Filter chip bar — populated by filters.ts (Phase P3).
+  const chips = el('div', { class: 'code-paths-filter-chips', id: 'code-paths-filter-chips' });
+  panel.appendChild(chips);
+  renderFilterChips(chips, graphCatalog);
+
+  // View tab bar — built from the registered views.
+  const tabBar = el('div', { class: 'code-paths-tabs', id: 'code-paths-tabs' });
+  for (const view of views) {
+    const tab = el('div', {
+      class: 'code-paths-tab',
+      'data-view': view.id,
+      text: view.label,
+      onclick: () => activateView(view.id),
+    });
+    tabBar.appendChild(tab);
   }
-  panel.innerHTML = html;
+  panel.appendChild(tabBar);
+
+  // One container per view; only one is .active at a time.
+  const stack = el('div', { class: 'code-paths-view-container', id: 'code-paths-view-container' });
+  for (const view of views) {
+    const c = el('div', { class: 'code-paths-view', id: 'code-paths-view-' + view.id });
+    stack.appendChild(c);
+  }
+  panel.appendChild(stack);
+
+  // Delegate row clicks to the function card.
+  stack.addEventListener('click', e => {
+    const row = e.target.closest && e.target.closest('[data-body-hash]');
+    if (!row) return;
+    openFunctionCard(row.dataset.bodyHash);
+  });
+
+  // Escape closes the function card.
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeFunctionCard();
+  });
+
+  // Activate the first registered view by default.
+  if (views.length > 0) activateView(views[0].id);
 }
 `;
 }

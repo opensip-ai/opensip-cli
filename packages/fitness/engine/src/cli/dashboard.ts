@@ -3,7 +3,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import {
@@ -11,9 +11,11 @@ import {
   getReportsDir,
   generateDashboardHtml,
   type CheckCatalogEntry,
+  type GraphCatalog,
   type RecipeCatalogEntry,
   type DashboardResult,
 } from '@opensip-tools/contracts';
+import { logger, resolveProjectPaths } from '@opensip-tools/core';
 
 import { defaultRegistry } from '../framework/registry.js';
 import { defaultRecipeRegistry } from '../recipes/registry.js';
@@ -36,6 +38,31 @@ const FIRST_PARTY_SCOPE = '@opensip-tools/';
 
 function classifyCheckSource(namespace: string | undefined): 'built-in' | 'community' {
   return namespace?.startsWith(FIRST_PARTY_SCOPE) ? 'built-in' : 'community';
+}
+
+/**
+ * Read the v0.2 graph catalog if it exists, otherwise return null. Parse
+ * errors are logged and treated as "no catalog" — never fatal.
+ */
+function loadGraphCatalog(projectDir?: string): GraphCatalog | null {
+  const paths = resolveProjectPaths(projectDir ?? process.cwd());
+  const catalogPath = paths.graphCatalogPath;
+  if (!existsSync(catalogPath)) return null;
+  try {
+    const raw = readFileSync(catalogPath, 'utf8');
+    const parsed = JSON.parse(raw) as GraphCatalog;
+    logger.info({ evt: 'graph.dashboard.catalog.load', module: 'fitness:dashboard', msg: 'Loaded graph catalog', catalogPath });
+    return parsed;
+  } catch (error) {
+    logger.warn({
+      evt: 'graph.dashboard.catalog.parse-error',
+      module: 'fitness:dashboard',
+      msg: 'Failed to parse graph catalog; rendering panel without it',
+      catalogPath,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
 }
 
 export async function openDashboard(projectDir?: string): Promise<DashboardResult> {
@@ -68,7 +95,10 @@ export async function openDashboard(projectDir?: string): Promise<DashboardResul
     timeout: r.execution.timeout ?? 30_000,
   }));
 
-  const html = generateDashboardHtml(sessions, catalog, recipes);
+  const graphCatalog = loadGraphCatalog(projectDir);
+  const editorProtocol = null;
+
+  const html = generateDashboardHtml(sessions, catalog, recipes, graphCatalog, editorProtocol);
   const reportPath = join(getReportsDir(), 'latest.html');
   writeFileSync(reportPath, html, 'utf8');
 
