@@ -1,0 +1,20 @@
+{
+  "version": "1",
+  "tool": "graph",
+  "capturedAt": "2026-05-17T05:37:55.451Z",
+  "fingerprints": [
+    "graph:duplicated-function-body|packages/fitness/checks-typescript/src/checks/quality/api/api-response-validation.ts|233|analyze has the same body as packages/fitness/checks-typescript/src/checks/quality/api/api-contract-validation.analyze (packages/fitness/checks-typescript/src/checks/quality/api/api-contract-validation.ts:343).",
+    "graph:duplicated-function-body|packages/fitness/checks-typescript/src/checks/quality/data-integrity/null-safety.ts|691|analyze has the same body as packages/fitness/checks-typescript/src/checks/quality/data-integrity/array-validation.analyze (packages/fitness/checks-typescript/src/checks/quality/data-integrity/array-validation.ts:568).",
+    "graph:duplicated-function-body|packages/fitness/checks-universal/src/index.ts|22|collectChecks has the same body as packages/fitness/checks-typescript/src/index.collectChecks (packages/fitness/checks-typescript/src/index.ts:22).",
+    "graph:no-side-effect-path|packages/cli/src/commands/completion.ts|181|buildCompletionScript appears to have no side effects in its transitive callee set.",
+    "graph:no-side-effect-path|packages/fitness/checks-typescript/src/checks/architecture/typed-inject-scope-mismatch.ts|245|analyze appears to have no side effects in its transitive callee set.",
+    "graph:no-side-effect-path|packages/fitness/checks-typescript/src/checks/quality/api/api-response-validation.ts|233|analyze appears to have no side effects in its transitive callee set.",
+    "graph:no-side-effect-path|packages/fitness/engine/src/types/findings.ts|171|createResultWithSignals appears to have no side effects in its transitive callee set.",
+    "graph:no-side-effect-path|packages/fitness/engine/src/types/findings.ts|230|createPassingResult appears to have no side effects in its transitive callee set.",
+    "graph:no-side-effect-path|packages/languages/lang-typescript/src/ast-utilities.ts|141|findCallExpressions appears to have no side effects in its transitive callee set.",
+    "graph:no-side-effect-path|packages/languages/lang-typescript/src/ast-utilities.ts|163|findBinaryExpressions appears to have no side effects in its transitive callee set.",
+    "graph:no-side-effect-path|packages/languages/lang-typescript/src/query.ts|17|findFunctions appears to have no side effects in its transitive callee set.",
+    "graph:no-side-effect-path|packages/languages/lang-typescript/src/query.ts|32|findImports appears to have no side effects in its transitive callee set.",
+    "graph:no-side-effect-path|packages/languages/lang-typescript/src/query.ts|48|findCallsTo appears to have no side effects in its transitive callee set."
+  ]
+}
