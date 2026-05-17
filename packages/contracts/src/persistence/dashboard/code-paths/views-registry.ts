@@ -45,6 +45,9 @@ function activateView(id) {
     try { history.replaceState(null, '', next); } catch (e) { /* ignore */ }
   }
   renderActiveView();
+  if (typeof view.onActivate === 'function') {
+    try { view.onActivate(); } catch (e) { /* ignore */ }
+  }
 }
 `;
 }

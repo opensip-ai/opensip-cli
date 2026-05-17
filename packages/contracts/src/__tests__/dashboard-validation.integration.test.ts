@@ -72,11 +72,16 @@ describe.runIf(existsSync(REPORT))('Phase V — dashboard end-to-end validation'
     expect(env.views.length).toBe(7);
   });
 
-  it('renders the Code Paths panel with the persistent search input', () => {
+  it('renders the search input inside the Search tab (not above the tab bar)', () => {
     const html = readReportOrSkip();
     if (!html) { expect(true).toBe(true); return; }
-    bootDashboard(html);
-    expect(document.querySelector('#code-paths-search-input')).not.toBeNull();
+    const env = bootDashboard(html);
+    env.activateView('search');
+    const inSearchTab = document.querySelector('#code-paths-view-search #code-paths-search-input');
+    expect(inSearchTab).not.toBeNull();
+    // And it must NOT exist outside the Search tab.
+    const allInputs = document.querySelectorAll('#code-paths-search-input');
+    expect(allInputs.length).toBe(1);
   });
 
   it('every view container exists and the active one renders something', () => {
@@ -107,14 +112,20 @@ describe.runIf(existsSync(REPORT))('Phase V — dashboard end-to-end validation'
     expect(overlays.length).toBe(1);
   });
 
-  it('typing into the search input shows results and switches the active tab', () => {
+  it('typing into the search input renders results in place', () => {
     const html = readReportOrSkip();
     if (!html) { expect(true).toBe(true); return; }
-    bootDashboard(html);
-    const input = document.querySelector('#code-paths-search-input')!;
+    const env = bootDashboard(html);
+    env.activateView('search');
+    const input = document.querySelector('#code-paths-view-search #code-paths-search-input')!;
     (input as HTMLInputElement).value = 'logger';
     input.dispatchEvent(new Event('input', { bubbles: true }));
     const search = document.querySelector('#code-paths-view-search')!;
     expect(search.classList.contains('active')).toBe(true);
+    // Either we get rows or an explicit empty state — both prove the
+    // results region re-rendered.
+    const hasRows = search.querySelector('[data-body-hash]');
+    const hasEmpty = search.querySelector('.code-paths-search-results .empty');
+    expect(Boolean(hasRows) || Boolean(hasEmpty)).toBe(true);
   });
 });

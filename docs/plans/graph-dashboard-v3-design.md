@@ -1316,3 +1316,9 @@ A final-pass audit performed after all six phases of the plan-improvement pipeli
 The plan is internally consistent. No remediation required.
 
 One forward-looking note recorded above (Phase 4 vs Phase 1/2/3): the rule-of-three justification for `function-row.ts` and `path-utils.ts` formally lands when the third caller appears (P5/P7). The implementation can introduce the file at P4 when the first user arrives without violating the rule, but Phase 4's audit records that the extraction is justified across the lifetime of the implementation phases, not at any single phase. This is a minor scheduling note, not a coherence defect.
+
+---
+
+## Errata (post-implementation)
+
+- **Search input location (2026-05-17).** The original spec sited the search input at the top of the panel, above the filter chip and tab bars (§7 P0 step 4, §7 P8 step 3, §10.4, Phase V step 11). Post-ship UX review concluded that a permanently visible input above the tabs implies it filters every view, when in fact it only feeds the Search view. The input was moved into the Search view's body and now auto-focuses when the Search tab activates. The Search tab itself is retained — it is the destination for matched results. References to `code-paths-search-input` and "persistent search input" elsewhere in this document should be read as "search input lives inside the Search view." `view-search.ts` owns the input, the results region, and the on-activate focus call; the panel orchestrator (`code-paths.ts`) no longer mounts an input above the tabs.

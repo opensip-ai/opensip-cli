@@ -88,15 +88,6 @@ function renderCodePathsTab() {
 
   graphIndexes = buildIndexes(graphCatalog);
 
-  // Persistent search bar — always visible above the tabs.
-  const search = el('input', {
-    type: 'search',
-    class: 'search-input code-paths-search',
-    id: 'code-paths-search-input',
-    placeholder: 'Search functions by name…',
-  });
-  panel.appendChild(search);
-
   // Filter chip bar — populated by filters.ts (Phase P3).
   const chips = el('div', { class: 'code-paths-filter-chips', id: 'code-paths-filter-chips' });
   panel.appendChild(chips);
@@ -142,7 +133,6 @@ function renderCodePathsTab() {
     const container = document.getElementById('code-paths-view-' + view.id);
     if (container) view.render(container, graphCatalog, graphIndexes, filterState);
   }
-  attachSearchInputHandler();
   const initialId = readViewIdFromHash() || (views[0] && views[0].id);
   if (initialId) activateView(initialId);
 }

@@ -89,8 +89,10 @@ describe('View 7 — Search', () => {
     });
     const c = document.createElement('div');
     env.views.find(v => v.id === 'search')!.render(c, env.graphCatalog, env.graphIndexes, env.filterState);
+    // The search input lives inside the tab body.
+    expect(c.querySelector('#code-paths-search-input')).not.toBeNull();
     expect(c.querySelector('.empty')).not.toBeNull();
-    expect(c.querySelector('.empty')!.textContent).toContain('Type into the search box');
+    expect(c.querySelector('.empty')!.textContent).toContain('Type a function name above');
   });
 
   it('renders matching results when the query matches', () => {
