@@ -206,5 +206,5 @@ The session record carries the full per-scenario results; the dashboard shows la
 
 ## What's next
 
-- **[`../40-runtime/`](../40-runtime/)** — how the CLI dispatches both fit and sim. Plugin loading, session writing, persistence layout.
-- **[`../60-surfaces/02-plugin-authoring.md`](../60-surfaces/02-plugin-authoring.md)** — author your first sim scenario.
+- **[`../50-runtime/`](../50-runtime/)** — how the CLI dispatches both fit and sim. Plugin loading, session writing, persistence layout.
+- **[`../70-surfaces/02-plugin-authoring.md`](../70-surfaces/02-plugin-authoring.md)** — author your first sim scenario.

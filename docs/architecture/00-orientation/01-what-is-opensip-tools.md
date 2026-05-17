@@ -115,7 +115,7 @@ This means tests can run the kernel headlessly. It means a future GUI front-end 
 
 A check must produce the same result for the same input, full stop. There is no per-run network call inside a check (a check that requires a network call lives outside opensip-tools and feeds *signals* in via JSON). There is no time-of-day-dependent behavior. There is no shared mutable state between checks — each check gets its own `ExecutionContext` ([`packages/fitness/engine/src/framework/execution-context.ts`](../../../packages/fitness/engine/src/framework/execution-context.ts)).
 
-Determinism is what makes the `--gate-compare` flow possible: save a baseline today, compare next week, and the only differences are real changes in the codebase. See [`../50-subsystems/03-architecture-gate.md`](../50-subsystems/03-architecture-gate.md).
+Determinism is what makes the `--gate-compare` flow possible: save a baseline today, compare next week, and the only differences are real changes in the codebase. See [`../60-subsystems/03-architecture-gate.md`](../60-subsystems/03-architecture-gate.md).
 
 ---
 

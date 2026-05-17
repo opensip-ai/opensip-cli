@@ -13,7 +13,7 @@ A teaching path through opensip-tools. Read sections 00–20 top-to-bottom on yo
 
 These docs are written for engineers fluent in TypeScript and Node tooling. Voice is second-person, narrative, and assumes you can read source. Every claim traces to source files; every doc carries a verification trail in its frontmatter.
 
-**If you're an AI agent reading this:** the same docs work for you, but jump straight to [`70-reference/`](./70-reference/) for lookup-shaped material — the 00-30 sections are written narratively for human onboarding.
+**If you're an AI agent reading this:** the same docs work for you, but jump straight to [`80-reference/`](./80-reference/) for lookup-shaped material — the 00-30 sections are written narratively for human onboarding.
 
 ---
 
@@ -65,37 +65,37 @@ These docs are written for engineers fluent in TypeScript and Node tooling. Voic
 ### 40 — Runtime
 *How the system actually executes. Read after the loops for the mechanics behind the narrative.*
 
-14. [**CLI dispatch**](./40-runtime/01-cli-dispatch.md) — argv parsing, tool registration, command tree assembly.
-15. [**Plugin loader**](./40-runtime/02-plugin-loader.md) — Source-file auto-discovery, npm-package pinning, `plugin sync`.
-16. [**Session and persistence**](./40-runtime/03-session-and-persistence.md) — Runtime dir layout, sessions, reports, logs, cache, baseline.
+14. [**CLI dispatch**](./50-runtime/01-cli-dispatch.md) — argv parsing, tool registration, command tree assembly.
+15. [**Plugin loader**](./50-runtime/02-plugin-loader.md) — Source-file auto-discovery, npm-package pinning, `plugin sync`.
+16. [**Session and persistence**](./50-runtime/03-session-and-persistence.md) — Runtime dir layout, sessions, reports, logs, cache, baseline.
 
 ### 50 — Subsystems
 *Narrative deep-dives. Each spans multiple packages; each gets a single end-to-end story.*
 
-17. [**Language adapters**](./50-subsystems/01-language-adapters.md) — What an adapter is, the six bundled, authoring a new one.
-18. [**Check pack architecture**](./50-subsystems/02-check-packs.md) — Built-in packs, scope filters, parameterization, marketplace shape.
-19. [**Architecture gate**](./50-subsystems/03-architecture-gate.md) — Baseline workflow, drift detection, line-shift invariance, CI integration.
+17. [**Language adapters**](./60-subsystems/01-language-adapters.md) — What an adapter is, the six bundled, authoring a new one.
+18. [**Check pack architecture**](./60-subsystems/02-check-packs.md) — Built-in packs, scope filters, parameterization, marketplace shape.
+19. [**Architecture gate**](./60-subsystems/03-architecture-gate.md) — Baseline workflow, drift detection, line-shift invariance, CI integration.
 
 ### 60 — Surfaces
 *The edges of the system. What users and external systems touch.*
 
-20. [**CLI command tree**](./60-surfaces/01-cli-command-tree.md) — Every command, its flags, when to use each.
-21. [**Plugin authoring**](./60-surfaces/02-plugin-authoring.md) — Write your own check, recipe, scenario, or full Tool.
-22. [**Dashboard**](./60-surfaces/03-dashboard.md) — The HTML report: what it shows, when it opens, where it lives.
+20. [**CLI command tree**](./70-surfaces/01-cli-command-tree.md) — Every command, its flags, when to use each.
+21. [**Plugin authoring**](./70-surfaces/02-plugin-authoring.md) — Write your own check, recipe, scenario, or full Tool.
+22. [**Dashboard**](./70-surfaces/03-dashboard.md) — The HTML report: what it shows, when it opens, where it lives.
 
 ### 70 — Reference
 *Lookup-shaped. Not for sequential reading.*
 
-23. [**Package catalog**](./70-reference/01-package-catalog.md) — All 18 packages with one-line role and key exports. Grouped by layer.
-24. [**Configuration**](./70-reference/02-configuration.md) — `opensip-tools.config.yml` schema, every field, defaults.
-25. [**JSON output schema**](./70-reference/03-json-output-schema.md) — The `CliOutput` shape consumed by CI and dashboards.
+23. [**Package catalog**](./80-reference/01-package-catalog.md) — All 18 packages with one-line role and key exports. Grouped by layer.
+24. [**Configuration**](./80-reference/02-configuration.md) — `opensip-tools.config.yml` schema, every field, defaults.
+25. [**JSON output schema**](./80-reference/03-json-output-schema.md) — The `CliOutput` shape consumed by CI and dashboards.
 
 ### 80 — Conventions
 *Policy and style. For contributors.*
 
-26. [**Coding standards**](./80-conventions/01-coding-standards.md) — TS strictness, error handling, exit codes, ESLint posture.
-27. [**Layer policy**](./80-conventions/02-layer-policy.md) — Dependency-cruiser rules, allowed imports, why the kernel can't import a tool.
-28. [**Doc conventions**](./80-conventions/03-doc-conventions.md) — Voice, frontmatter, diagrams, verification trails.
+26. [**Coding standards**](./90-conventions/01-coding-standards.md) — TS strictness, error handling, exit codes, ESLint posture.
+27. [**Layer policy**](./90-conventions/02-layer-policy.md) — Dependency-cruiser rules, allowed imports, why the kernel can't import a tool.
+28. [**Doc conventions**](./90-conventions/03-doc-conventions.md) — Voice, frontmatter, diagrams, verification trails.
 
 ---
 
@@ -115,14 +115,14 @@ ASCII boxes inline by default — they survive plain-text rendering, code review
 ### Worked example
 A single hypothetical project — a TypeScript service called `acme-api` with a Python data pipeline — threads through multiple docs. Each runtime doc has a "Where the example lands" section so you can see the same scenario at every layer.
 
-See [`./80-conventions/03-doc-conventions.md`](./80-conventions/03-doc-conventions.md) for the full conventions.
+See [`./90-conventions/03-doc-conventions.md`](./90-conventions/03-doc-conventions.md) for the full conventions.
 
 ---
 
 ## Relationship to other docs
 
 - **[`docs/coverage-status.md`](../coverage-status.md)** — Test coverage snapshot.
-- **[`docs/json-output-schema.md`](../json-output-schema.md)** — JSON output reference (mirrored into [`70-reference/03-json-output-schema.md`](./70-reference/03-json-output-schema.md)).
+- **[`docs/json-output-schema.md`](../json-output-schema.md)** — JSON output reference (mirrored into [`80-reference/03-json-output-schema.md`](./80-reference/03-json-output-schema.md)).
 - **[`docs/release-smoke-test.md`](../release-smoke-test.md)** — Release verification checklist.
 - **[`README.md`](../../README.md)** — Marketing-shaped product README. Start *here* for architecture, not there.
 

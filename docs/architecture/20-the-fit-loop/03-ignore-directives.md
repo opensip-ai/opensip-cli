@@ -11,7 +11,7 @@ source-files:
 related-docs:
   - ./01-recipes-and-checks.md
   - ./04-output-gate-sarif.md
-  - ../50-subsystems/03-architecture-gate.md
+  - ../60-subsystems/03-architecture-gate.md
 ---
 # Ignore directives
 
@@ -137,7 +137,7 @@ git commit
 opensip-tools fit --gate-compare              # CI gate from now on
 ```
 
-See [`50-subsystems/03-architecture-gate.md`](../50-subsystems/03-architecture-gate.md) for the full baseline workflow.
+See [`60-subsystems/03-architecture-gate.md`](../60-subsystems/03-architecture-gate.md) for the full baseline workflow.
 
 ### When NOT to directive
 
@@ -182,4 +182,4 @@ The CLI's run summary reports: "12 violations found, 5 ignored." CI gates on the
 ## What's next
 
 - **[`04-output-gate-sarif.md`](./04-output-gate-sarif.md)** — what happens to the surviving violations: render layer, JSON output, SARIF, the gate.
-- **[`../50-subsystems/03-architecture-gate.md`](../50-subsystems/03-architecture-gate.md)** — the complementary mechanism for legacy violation sets.
+- **[`../60-subsystems/03-architecture-gate.md`](../60-subsystems/03-architecture-gate.md)** — the complementary mechanism for legacy violation sets.

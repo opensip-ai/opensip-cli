@@ -128,7 +128,7 @@ The runtime dir is gitignored — sessions are local artifacts, not source. The 
 
 A **gate** is the architecture-baseline workflow. `opensip-tools fit --gate-save` writes the current findings to a SARIF baseline. `opensip-tools fit --gate-compare` runs again, compares to the baseline, and exits non-zero if any *new* violation appeared (existing ones are tolerated; resolved ones are celebrated).
 
-The gate matches by `(filePath, ruleId, message)` — line numbers are deliberately excluded from the identity hash so unrelated line shifts don't register as added/resolved violations. See [`packages/fitness/engine/src/gate.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/fitness/engine/src/gate.ts) and [`../50-subsystems/03-architecture-gate.md`](/docs/opensip-tools/50-subsystems/03-architecture-gate/).
+The gate matches by `(filePath, ruleId, message)` — line numbers are deliberately excluded from the identity hash so unrelated line shifts don't register as added/resolved violations. See [`packages/fitness/engine/src/gate.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/fitness/engine/src/gate.ts) and [`../60-subsystems/03-architecture-gate.md`](/docs/opensip-tools/60-subsystems/03-architecture-gate/).
 
 ---
 

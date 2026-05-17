@@ -206,5 +206,5 @@ The session record carries the full per-scenario results; the dashboard shows la
 
 ## What's next
 
-- **[`../40-runtime/`](/docs/opensip-tools/40-runtime/)** — how the CLI dispatches both fit and sim. Plugin loading, session writing, persistence layout.
-- **[`../60-surfaces/02-plugin-authoring.md`](/docs/opensip-tools/60-surfaces/02-plugin-authoring/)** — author your first sim scenario.
+- **[`../50-runtime/`](/docs/opensip-tools/50-runtime/)** — how the CLI dispatches both fit and sim. Plugin loading, session writing, persistence layout.
+- **[`../70-surfaces/02-plugin-authoring.md`](/docs/opensip-tools/70-surfaces/02-plugin-authoring/)** — author your first sim scenario.

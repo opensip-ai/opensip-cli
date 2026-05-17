@@ -16,7 +16,7 @@ source-files:
 related-docs:
   - ../20-the-fit-loop/01-recipes-and-checks.md
   - ./02-execution-model.md
-  - ../60-surfaces/02-plugin-authoring.md
+  - ../70-surfaces/02-plugin-authoring.md
 ---
 # Scenarios and recipes (sim)
 
@@ -218,4 +218,4 @@ If you're not sure which one applies, ask whether the answer is in the source (f
 
 - **[`02-execution-model.md`](./02-execution-model.md)** — how the sim engine actually runs scenarios. Dispatcher, executor lifecycle, result aggregation.
 - **[`../20-the-fit-loop/01-recipes-and-checks.md`](../20-the-fit-loop/01-recipes-and-checks.md)** — the fit-side analogue of this doc. Same shape, different primitives.
-- **[`../60-surfaces/02-plugin-authoring.md`](../60-surfaces/02-plugin-authoring.md)** — full walkthrough of authoring scenarios and recipes.
+- **[`../70-surfaces/02-plugin-authoring.md`](../70-surfaces/02-plugin-authoring.md)** — full walkthrough of authoring scenarios and recipes.
