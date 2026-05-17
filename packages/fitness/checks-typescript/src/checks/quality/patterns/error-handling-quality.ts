@@ -9,11 +9,9 @@
  */
 
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
 import * as ts from 'typescript'
-
-import { isTestFile } from '../../../utils/index.js'
 
 // =============================================================================
 // WHITELIST PATTERNS

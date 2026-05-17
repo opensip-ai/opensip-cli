@@ -4,9 +4,7 @@
  */
 
 import { logger } from '@opensip-tools/core/logger'
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
-
-import { isCommentLine } from '../../utils/index.js'
+import { defineCheck, isCommentLine, type CheckViolation } from '@opensip-tools/fitness'
 
 // =============================================================================
 // PATTERN DEFINITIONS (inlined from config/patterns.ts)

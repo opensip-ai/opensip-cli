@@ -6,9 +6,7 @@
  */
 
 import { logger } from '@opensip-tools/core/logger'
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
-
-import { isCommentLine, isTestFile } from '../../utils/index.js'
+import { defineCheck, isCommentLine, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
 
 /**
  * Focus pattern configuration

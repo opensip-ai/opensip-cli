@@ -5,11 +5,9 @@
  */
 
 
-import { defineCheck, getCheckConfig, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, getCheckConfig, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
 import * as ts from 'typescript'
-
-import { isTestFile } from '../../../utils/index.js'
 
 /**
  * Recipe-config shape for null-safety. Project-specific safe-by-construction

@@ -5,9 +5,7 @@
  */
 
 import { logger } from '@opensip-tools/core/logger'
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
-
-import { isCommentLine } from '../../utils/index.js'
+import { defineCheck, isCommentLine, type CheckViolation } from '@opensip-tools/fitness'
 
 // Patterns that indicate dangerous dynamic code execution
 const EVAL_PATTERNS = [

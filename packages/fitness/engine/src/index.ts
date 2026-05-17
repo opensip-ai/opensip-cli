@@ -108,3 +108,7 @@ export {
 export type { GateCompareResult } from './gate.js';
 export { buildSarifLog, chunkSarifRuns, reportToCloud } from './sarif.js';
 export type { ReportResult } from './sarif.js';
+
+// Shared utilities for check authors (extracted from per-pack copies).
+export { isCommentLine, isTestFile, getCheckDisplayName, getCheckIcon } from './check-utils/index.js';
+export type { IsCommentLineOptions, IsTestFileOptions } from './check-utils/index.js';

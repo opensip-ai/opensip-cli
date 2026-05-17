@@ -3,9 +3,7 @@
  * @fileoverview Disallow console.log in production code
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
-
-import { isCommentLine } from '../../../utils/index.js'
+import { defineCheck, isCommentLine, type CheckViolation } from '@opensip-tools/fitness'
 
 /**
  * Pattern definitions for console method detection.

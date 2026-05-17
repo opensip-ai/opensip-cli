@@ -118,4 +118,3 @@ export function isTestFile(filePath: string, options: IsTestFileOptions = {}): b
 
   return false
 }
-

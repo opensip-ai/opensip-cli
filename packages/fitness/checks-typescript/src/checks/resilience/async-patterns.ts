@@ -7,11 +7,9 @@
 
 
 import { defineCheck, getCheckConfig, type CheckViolation, getLineNumber } from '@opensip-tools/fitness'
-import { stripStringsAndCommentsPreservingPositions } from '@opensip-tools/fitness'
+import { isCommentLine, isTestFile, stripStringsAndCommentsPreservingPositions } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
 import * as ts from 'typescript'
-
-import { isCommentLine, isTestFile } from '../../utils/index.js'
 
 /**
  * Recipe-config shape for the detached-promises check. Each field augments the

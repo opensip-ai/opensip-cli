@@ -10,9 +10,7 @@
 import * as path from 'node:path'
 
 import { ValidationError } from '@opensip-tools/core/errors'
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
-
-import { isTestFile } from '../../utils/index.js'
+import { defineCheck, isTestFile, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
 
 /**
  * Check if a file is an implementation file.

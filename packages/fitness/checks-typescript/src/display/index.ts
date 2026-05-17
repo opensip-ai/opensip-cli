@@ -3,7 +3,13 @@
  *
  * Maps check slugs to display entries (icon + display name) for CLI and dashboard output.
  * Falls back to kebab-to-title-case conversion for unknown slugs.
+ *
+ * The lookup logic itself lives in @opensip-tools/fitness/check-utils; this
+ * file owns only the per-pack CHECK_DISPLAY map and binds the shared helpers
+ * to it.
  */
+
+import { getCheckDisplayName as getCheckDisplayNameImpl, getCheckIcon as getCheckIconImpl } from '@opensip-tools/fitness'
 
 import { ARCHITECTURE_DISPLAY, DOCUMENTATION_DISPLAY } from './architecture.js'
 import { QUALITY_DISPLAY } from './quality.js'
@@ -28,18 +34,12 @@ export const CHECK_DISPLAY = Object.freeze<Record<string, CheckDisplayEntry>>({
 
 /** Get the icon for a check by slug. Falls back to magnifying glass. */
 export function getCheckIcon(checkSlug: string): string {
-  const display = CHECK_DISPLAY[checkSlug]
-  return display ? display[0] : '\uD83D\uDD0D'
+  return getCheckIconImpl(CHECK_DISPLAY, checkSlug)
 }
 
 /** Get the display name for a check by slug. Falls back to kebab-to-title-case. */
 export function getCheckDisplayName(checkSlug: string): string {
-  const display = CHECK_DISPLAY[checkSlug]
-  if (display) return display[1]
-  return checkSlug
-    .split('-')
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ')
+  return getCheckDisplayNameImpl(CHECK_DISPLAY, checkSlug)
 }
 
 export {type CheckDisplayEntry} from './types.js'

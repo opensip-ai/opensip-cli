@@ -5,10 +5,8 @@
  */
 
 import { logger } from '@opensip-tools/core/logger'
-import { defineCheck, type CheckViolation, getLineNumber } from '@opensip-tools/fitness'
+import { defineCheck, isTestFile, type CheckViolation, getLineNumber } from '@opensip-tools/fitness'
 import { stripStringsAndCommentsPreservingPositions } from '@opensip-tools/fitness'
-
-import { isTestFile } from '../../utils/index.js'
 
 interface UnboundedBatchPattern {
   pattern: string

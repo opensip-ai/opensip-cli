@@ -2,9 +2,7 @@
  * @fileoverview No non-null assertions check
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
-
-import { isTestFile } from '../../../utils/index.js'
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
 
 /**
  * Regex to detect non-null assertion operator usage.
