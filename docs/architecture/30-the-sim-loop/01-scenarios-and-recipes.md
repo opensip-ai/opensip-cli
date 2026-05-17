@@ -100,24 +100,26 @@ import { defineInvariantScenario } from '@opensip-tools/simulation';
 
 export default defineInvariantScenario({
   id: '...',
-  name: 'inventory-never-negative',
-  description: 'After any sequence of orders and refunds, inventory ≥ 0',
-  tags: ['invariant', 'inventory'],
-  seed: async () => ({ inventory: { sku123: 100 } }),
-  act: async (state) => {
-    // Run a randomized sequence of operations.
-    for (const op of randomOps(20)) {
-      state = await applyOp(state, op);
-    }
-    return state;
+  name: 'signal-reaches-fixed-stage',
+  description: 'Emitting a recipe-matched signal advances the workflow to FIXED',
+  tags: ['invariant', 'workflow'],
+  relatesToInvariant: 'docs/invariants.md#signal-reaches-fixed',
+  setup: async (ctx) => {
+    const tenant = await ctx.seedTenant({ /* fakes wired by deps */ });
+    ctx.scratch.tenant = tenant;
   },
-  assert: (finalState) => {
-    return Object.values(finalState.inventory).every((v) => v >= 0);
+  act: async (ctx) => {
+    await ctx.emitSignal({ tenant: ctx.scratch.tenant, ruleId: 'fit:no-console-log', /* ... */ });
+    await ctx.runReconcilerTick(ctx.scratch.tenant);
+  },
+  assert: async (ctx) => {
+    await ctx.expectStage({ tenant: ctx.scratch.tenant, stage: 'FIXED' });
+    await ctx.expectAuditEntry({ tenant: ctx.scratch.tenant, kind: 'fix-applied' });
   },
 });
 ```
 
-The invariant kind is the property-based-testing shape. Seed produces an initial state; `act` mutates it through a (typically randomized) sequence of operations; `assert` verifies the property holds. Failure produces a counterexample.
+The invariant kind drives a workflow-integration lifecycle: `setup`/`act`/`assert` callbacks all receive `InvariantContext` (none takes or returns state). Setup seeds tenants and wires drivers; act emits signals, runs reconciler ticks, dispatches agents; assert calls `ctx.expectStage` / `ctx.expectOutcome` / `ctx.expectAuditEntry` / `assertEquals` / `assertThat` to record assertions. Pass/fail is the AND of every recorded assertion holding AND every phase finishing in `pass`. The default driver implementations throw NOT_IMPLEMENTED — Phase 7 wires real drivers; tests pass fakes via `deps`.
 
 ### `defineFixEvaluationScenario`
 
@@ -146,16 +148,16 @@ The fix-evaluation kind replays a corpus of past signals against a fix-generatin
 
 ## The shared runtime contract
 
-Despite four entry points, every scenario produces a `RunnableScenario` ([`packages/simulation/engine/src/framework/runnable-scenario.ts`](../../../packages/simulation/engine/src/framework/runnable-scenario.ts)) — a struct carrying the scenario's id, name, kind, and an `execute(ctx)` method. The engine's dispatcher reads the kind discriminator and hands the scenario to the appropriate executor:
+Despite four entry points, every scenario produces a `RunnableScenario` ([`packages/simulation/engine/src/framework/runnable-scenario.ts`](../../../packages/simulation/engine/src/framework/runnable-scenario.ts)) — a struct carrying the scenario's id, name, description, kind, tags, and a `run(abortSignal)` method that returns `Promise<ScenarioExecutorResult>`. The engine's dispatcher reads the kind discriminator and hands the scenario to the appropriate executor:
 
 ```
-RunnableScenario { kind: 'load', execute(ctx)    } ─► loadExecutor      ─► LoadScenarioExecutorResult
-RunnableScenario { kind: 'chaos', execute(ctx)   } ─► chaosExecutor     ─► ChaosScenarioExecutorResult
-RunnableScenario { kind: 'invariant', execute()  } ─► invariantExecutor ─► InvariantScenarioExecutorResult
-RunnableScenario { kind: 'fix-evaluation', exec()} ─► fixEvalExecutor   ─► FixEvaluationScenarioExecutorResult
+RunnableScenario { kind: 'load', run(signal)           } ─► loadExecutor      ─► LoadScenarioExecutorResult
+RunnableScenario { kind: 'chaos', run(signal)          } ─► chaosExecutor     ─► ChaosScenarioExecutorResult
+RunnableScenario { kind: 'invariant', run(signal)      } ─► invariantExecutor ─► InvariantScenarioExecutorResult
+RunnableScenario { kind: 'fix-evaluation', run(signal) } ─► fixEvalExecutor   ─► FixEvaluationScenarioExecutorResult
 ```
 
-The result types are kind-specific (a load result has `p99LatencyMs`; an invariant result has `counterexample`). The recipe layer projects each kind's result into a common `ScenarioResult` shape so the renderer doesn't need to know the kind.
+The result types are kind-specific (a load result has `p99LatencyMs` and percentiles; an invariant result has per-phase status logs and the assertion records the assert phase produced). The recipe layer projects each kind's result into a common `ScenarioResult` shape so the renderer doesn't need to know the kind.
 
 This shape — kind-specific authoring + shared runtime contract — is why the simulation engine can be one package today and four+ packages tomorrow without a rewrite. A new scenario kind is a new directory under `kinds/`, a new entry point exported from `index.ts`, and an updated dispatcher.
 

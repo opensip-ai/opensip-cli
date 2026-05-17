@@ -93,14 +93,17 @@ The bundled `ChaosType` set ([`packages/simulation/engine/src/types/base-types.t
 
 [`packages/simulation/engine/src/kinds/invariant/executor.ts`](../../../packages/simulation/engine/src/kinds/invariant/executor.ts)
 
-The invariant executor:
+The invariant executor drives a workflow-integration lifecycle, not a property-based test loop:
 
-1. Call `seed()` to produce the initial state.
-2. Call `act(state)` to mutate the state through the (typically randomized) sequence.
-3. Call `assert(finalState)` — returns true (pass) or false (fail).
-4. On fail, capture the seed value (RNG seed if used), the operation sequence, and the final state as a counterexample.
+1. Build an `InvariantContext` backed by the configured drivers (`deps`). Defaults are throw-on-call stubs (Phase 7 wires real ones); tests inject fakes via `deps`.
+2. Run `setup(ctx)` — seed tenants, register fakes, configure the world.
+3. Run `act(ctx)` — emit signals, dispatch agents, advance reconcilers.
+4. Run `assert(ctx)` — call `ctx.expectStage`, `ctx.expectOutcome`, `assertEquals`, `assertThat`, etc. Each assertion is recorded into `state.assertions`.
+5. Each phase's status (`pass`/`fail`/`error`/`aborted`) and duration are captured into the `phases` log.
 
-The result type is `InvariantScenarioExecutorResult` — carries `passed`, optional `counterexample`, plus runtime stats. Counterexamples are how authors debug a failed invariant — the executor preserves the exact reproduction case, not just the failure flag.
+All three callbacks have signature `(ctx: InvariantContext) => Promise<void>` — none takes or returns state. There is no random operation sequence, no counterexample capture, no RNG seed preservation; the model is "set up the world, act on it, observe via expectations."
+
+The result type is `InvariantScenarioExecutorResult` ([`packages/simulation/engine/src/framework/scenario-executor-result.ts`](../../../packages/simulation/engine/src/framework/scenario-executor-result.ts)): `outcome.phases` (per-phase status + duration) and `outcome.assertions` (the assertion records the assert phase produced). Pass/fail = every assertion held AND every phase ended in `pass`.
 
 ### Fix-evaluation executor
 
