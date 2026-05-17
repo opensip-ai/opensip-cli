@@ -48,7 +48,6 @@ export type { ErrorSuggestion } from './exit-codes.js';
 
 // Session persistence
 export {
-  TOOLS_HOME,
   configurePersistencePaths,
   saveSession,
   loadSessions,

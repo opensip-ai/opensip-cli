@@ -5,17 +5,10 @@ import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 import type * as cliShared from '@opensip-tools/contracts';
-import type * as nodeOs from 'node:os';
 
 type StoredSession = cliShared.StoredSession;
 
-// Module-level variable that the hoisted mock can close over
-let _mockHome = '';
-
-vi.mock('node:os', async (importOriginal) => {
-  const orig = await importOriginal<typeof nodeOs>();
-  return { ...orig, homedir: () => _mockHome };
-});
+let tempRoot = '';
 
 function makeTempDir(): string {
   const dir = join(tmpdir(), `cli-store-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -43,14 +36,18 @@ describe('persistence/store', () => {
   let storeModule: typeof cliShared;
 
   beforeEach(async () => {
-    _mockHome = makeTempDir();
-    // Force fresh import so TOOLS_HOME picks up the new mock value
+    tempRoot = makeTempDir();
+    // Force fresh import so module-level state is reset between tests.
     vi.resetModules();
     storeModule = await import('@opensip-tools/contracts');
+    storeModule.configurePersistencePaths({
+      sessionsDir: join(tempRoot, 'sessions'),
+      reportsDir: join(tempRoot, 'reports'),
+    });
   });
 
   afterEach(() => {
-    try { rmSync(_mockHome, { recursive: true, force: true }); } catch { /* ignore */ }
+    try { rmSync(tempRoot, { recursive: true, force: true }); } catch { /* ignore */ }
   });
 
   describe('sanitizeForFilename', () => {

@@ -1,55 +1,78 @@
 /**
- * @fileoverview `opensip-tools uninstall` — removes ~/.opensip-tools/
- * for a clean-slate reset.
+ * @fileoverview `opensip-tools uninstall` — remove opensip-tools state
+ * from a user account and/or project.
  *
- * The user-level dir holds only `config.yml` (cloud API key / default
- * theme). Project-local state — sessions, logs, reports, plugin npm
- * tree, AST cache, gate baseline — lives at
- * `<project>/opensip-tools/.runtime/`, which is gitignored and removed
- * by deleting the project. `uninstall` does NOT touch any
- * project-local directory.
+ * Two modes:
+ *
+ *  • Default (no flag) — remove the user-level directory
+ *    `~/.opensip-tools/`. Contract: this dir holds `config.yml` only
+ *    (cloud API key + per-user defaults). Persistence and logging code
+ *    throws if asked to write anywhere user-global, so the dir does
+ *    not grow over time. Any pre-existing `sessions/`, `reports/`,
+ *    `logs/`, or `fit/` subdirectories on disk are legacy cruft from
+ *    earlier versions and are swept up by the same removal.
+ *
+ *  • `--project [path]` — remove project-local state at `[path]` (or
+ *    cwd if omitted): both `<path>/opensip-tools/` (user-authored
+ *    checks + recipes plus the gitignored `.runtime/` cache) and
+ *    `<path>/opensip-tools.config.yml`. Refuses to run if neither
+ *    target exists at the resolved path, to avoid `rm -rf`-ing an
+ *    unrelated directory.
  *
  * Does NOT remove the npm global install — the running binary can't
  * safely self-delete. Prints the exact next-step command for that.
  *
  * Flags:
- *   --yes        Skip confirmation prompt.
- *   --dry-run    Print what would be removed; take no action.
- *
- * Designed for:
- *   1. Customers cleaning up ("I'm done with opensip-tools, remove my data").
- *   2. Our own test loop: uninstall, npm uninstall, reinstall, confirm
- *      the first-run welcome fires. Without this command the test loop
- *      requires `rm -rf ~/.opensip-tools/` by hand, which is easy to
- *      forget and not something we'd tell customers to type.
+ *   --project [path]   Remove project-local state instead of user-level.
+ *   --yes              Skip confirmation prompt.
+ *   --dry-run          Print what would be removed; take no action.
  */
 
 import { existsSync, rmSync, statSync, readdirSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { createInterface } from 'node:readline/promises'
+
+import { resolveProjectPaths } from '@opensip-tools/core'
+
+export type UninstallMode = 'user' | 'project'
 
 export interface UninstallOptions {
   readonly yes?: boolean
   readonly dryRun?: boolean
-  /** Override the default dir (primarily for tests). */
+  /**
+   * If set, run in project mode and target this path. If `true`, use
+   * cwd. If `undefined`, run in user-level mode.
+   */
+  readonly project?: string | true
+  /** Override the user-level root dir (primarily for tests). */
   readonly rootDir?: string
+  /** Override cwd resolution for `--project` with no arg (tests). */
+  readonly cwd?: string
   /** Override stdout (primarily for tests). */
   readonly write?: (s: string) => void
   /** Override the confirmation prompt (primarily for tests). */
   readonly prompt?: (question: string) => Promise<string>
 }
 
+/** Discrete target to remove (a file or a directory). */
+interface Target {
+  readonly path: string
+  readonly kind: 'file' | 'dir'
+  readonly sizeBytes: number
+}
+
 export interface UninstallResult {
   readonly type: 'uninstall'
+  readonly mode: UninstallMode
   readonly removed: boolean
-  readonly path: string
+  readonly targets: readonly { readonly path: string; readonly kind: 'file' | 'dir' }[]
   readonly sizeBytes: number
   readonly dryRun: boolean
   readonly cancelled: boolean
 }
 
-const DEFAULT_ROOT = join(homedir(), '.opensip-tools')
+const DEFAULT_USER_ROOT = join(homedir(), '.opensip-tools')
 
 /** Recursively tally size of a directory. */
 function dirSize(path: string): number {
@@ -91,31 +114,100 @@ function defaultPrompt(question: string): Promise<string> {
   return rl.question(question).finally(() => rl.close())
 }
 
+/** Resolve the project directory for `--project [path]`. */
+function resolveProjectDir(opts: UninstallOptions): string {
+  if (typeof opts.project === 'string') return resolve(opts.project)
+  return opts.cwd ?? process.cwd()
+}
+
+/** Build the list of targets that currently exist for the given mode. */
+function collectTargets(mode: UninstallMode, root: string, opts: UninstallOptions): Target[] {
+  if (mode === 'user') {
+    if (!existsSync(root)) return []
+    return [{ path: root, kind: 'dir', sizeBytes: dirSize(root) }]
+  }
+
+  // Project mode: probe both the dir and the config file.
+  const paths = resolveProjectPaths(resolveProjectDir(opts))
+  const targets: Target[] = []
+
+  if (existsSync(paths.userSourceDir)) {
+    targets.push({ path: paths.userSourceDir, kind: 'dir', sizeBytes: dirSize(paths.userSourceDir) })
+  }
+  if (existsSync(paths.configFile)) {
+    targets.push({ path: paths.configFile, kind: 'file', sizeBytes: statSync(paths.configFile).size })
+  }
+
+  return targets
+}
+
+function printTargets(write: (s: string) => void, mode: UninstallMode, targets: readonly Target[]): void {
+  const totalSize = targets.reduce((sum, t) => sum + t.sizeBytes, 0)
+  const label = mode === 'user' ? 'user-level state' : 'project-local state'
+  write('\n')
+  write(`About to remove ${label} (${formatSize(totalSize)}):\n`)
+  for (const t of targets) {
+    write(`  - ${t.path}${t.kind === 'dir' ? '/' : ''} (${formatSize(t.sizeBytes)})\n`)
+  }
+  write('\n')
+}
+
+/** Project a `Target[]` into the result-shape `{path, kind}[]`. */
+function targetsForResult(targets: readonly Target[]): readonly { readonly path: string; readonly kind: 'file' | 'dir' }[] {
+  return targets.map(t => ({ path: t.path, kind: t.kind }))
+}
+
+/** Render the "nothing to remove" message for the given mode. */
+function handleEmptyTargets(
+  mode: UninstallMode,
+  opts: UninstallOptions,
+  userRoot: string,
+  write: (s: string) => void,
+): UninstallResult {
+  const where = mode === 'user' ? userRoot : resolveProjectDir(opts)
+  const note = mode === 'project'
+    ? `\nNothing to remove — no opensip-tools state found at ${where}.\n\n`
+    : `\nNothing to remove — ${where} does not exist.\n\n`
+  write(note)
+  return {
+    type: 'uninstall', mode, removed: false, targets: [], sizeBytes: 0,
+    dryRun: opts.dryRun ?? false, cancelled: false,
+  }
+}
+
+/** Print the per-mode trailing hint after a successful removal. */
+function printSuccessHint(mode: UninstallMode, write: (s: string) => void): void {
+  if (mode === 'user') {
+    write(`  To remove the CLI itself: npm uninstall -g @opensip-tools/cli\n\n`)
+  } else {
+    write(`  To also remove user-level config: opensip-tools uninstall\n\n`)
+  }
+}
+
 export async function executeUninstall(opts: UninstallOptions = {}): Promise<UninstallResult> {
-  const root = opts.rootDir ?? DEFAULT_ROOT
+  const mode: UninstallMode = opts.project === undefined ? 'user' : 'project'
+  const userRoot = opts.rootDir ?? DEFAULT_USER_ROOT
   const write = opts.write ?? ((s: string) => process.stdout.write(s))
 
-  if (!existsSync(root)) {
-    write(`\nNothing to remove — ${root} does not exist.\n\n`)
-    return { type: 'uninstall', removed: false, path: root, sizeBytes: 0, dryRun: opts.dryRun ?? false, cancelled: false }
+  const targets = collectTargets(mode, userRoot, opts)
+  if (targets.length === 0) {
+    return handleEmptyTargets(mode, opts, userRoot, write)
   }
 
-  const size = dirSize(root)
-  const sizeStr = formatSize(size)
+  const totalSize = targets.reduce((sum, t) => sum + t.sizeBytes, 0)
+  printTargets(write, mode, targets)
 
-  // Enumerate top-level entries so the user sees what's about to go.
-  const entries = readdirSync(root).sort()
-
-  write('\n')
-  write(`About to remove ${root} (${sizeStr}):\n`)
-  for (const e of entries) {
-    write(`  - ${e}\n`)
+  if (mode === 'project') {
+    write(`Note: this removes user-authored content (custom checks, recipes) along with runtime state.\n`)
+    write(`Git history is your safety net.\n\n`)
   }
-  write('\n')
 
   if (opts.dryRun) {
     write(`[dry-run] No changes made. Re-run without --dry-run to remove.\n\n`)
-    return { type: 'uninstall', removed: false, path: root, sizeBytes: size, dryRun: true, cancelled: false }
+    return {
+      type: 'uninstall', mode, removed: false, targets: targetsForResult(targets),
+      sizeBytes: totalSize, dryRun: true, cancelled: false,
+    }
   }
 
   if (!opts.yes) {
@@ -123,13 +215,22 @@ export async function executeUninstall(opts: UninstallOptions = {}): Promise<Uni
     const ok = await confirm(prompt, `Proceed? [y/N] `)
     if (!ok) {
       write(`Cancelled. No changes made.\n\n`)
-      return { type: 'uninstall', removed: false, path: root, sizeBytes: size, dryRun: false, cancelled: true }
+      return {
+        type: 'uninstall', mode, removed: false, targets: targetsForResult(targets),
+        sizeBytes: totalSize, dryRun: false, cancelled: true,
+      }
     }
   }
 
-  rmSync(root, { recursive: true, force: true })
-  write(`\n\u2713 Removed ${root} (${sizeStr}).\n`)
-  write(`  To remove the CLI itself: npm uninstall -g @opensip-tools/cli\n\n`)
+  for (const t of targets) {
+    rmSync(t.path, { recursive: true, force: true })
+  }
 
-  return { type: 'uninstall', removed: true, path: root, sizeBytes: size, dryRun: false, cancelled: false }
+  write(`\n✓ Removed ${targets.length} target${targets.length === 1 ? '' : 's'} (${formatSize(totalSize)}).\n`)
+  printSuccessHint(mode, write)
+
+  return {
+    type: 'uninstall', mode, removed: true, targets: targetsForResult(targets),
+    sizeBytes: totalSize, dryRun: false, cancelled: false,
+  }
 }

@@ -303,18 +303,38 @@ The completion catalog is sourced from `defaultToolRegistry.list()`, so installe
 
 ---
 
-## `uninstall` — remove user-level dotdir
+## `uninstall` — remove opensip-tools state
 
-CLI-owned: [`packages/cli/src/commands/uninstall.ts`](../../../packages/cli/src/commands/uninstall.ts). Deletes `~/.opensip-tools/`.
+CLI-owned: [`packages/cli/src/commands/uninstall.ts`](../../../packages/cli/src/commands/uninstall.ts).
 
 ```
-opensip-tools uninstall
-opensip-tools uninstall --force      # skip confirmation prompt
+opensip-tools uninstall                       # remove ~/.opensip-tools/
+opensip-tools uninstall --project             # remove project state at cwd
+opensip-tools uninstall --project /path/repo  # remove project state at <path>
+opensip-tools uninstall --dry-run             # print targets, take no action
+opensip-tools uninstall --yes                 # skip confirmation prompt
 ```
 
-Does **not** remove the binary itself or any project-level state. To fully remove opensip-tools: `opensip-tools uninstall && npm uninstall -g @opensip-tools/cli`.
+Two modes:
 
-The interactive flow shows what will be deleted (paths + sizes) and prompts for confirmation. `--force` skips the prompt.
+| Mode | Targets removed | When to use |
+|---|---|---|
+| Default | `~/.opensip-tools/` (user-level config dir) | Removing the cloud API key + per-user defaults; cleaning legacy cruft from earlier versions. |
+| `--project [path]` | `<path>/opensip-tools/` and `<path>/opensip-tools.config.yml` | Disengaging from opensip-tools in one repo. Removes user-authored checks/recipes alongside generated `.runtime/` state. |
+
+| Flag | Effect |
+|---|---|
+| `--project [path]` | Switch to project mode. Path defaults to cwd. |
+| `--yes`, `-y` | Skip the `[y/N]` confirmation prompt. |
+| `--dry-run` | Enumerate targets and total size; make no changes. |
+
+Both modes:
+
+- Print every target path and its size before acting.
+- Refuse to run when no targets exist (`--project` against a directory that contains no opensip-tools state is a no-op, not a destructive accident).
+- Do **not** remove the npm-global binary — the running binary can't safely self-delete. The user-mode success message prints the next step (`npm uninstall -g @opensip-tools/cli`); the project-mode success message points back at the user-mode command for the matching cleanup.
+
+State contract enforced by code: `~/.opensip-tools/` holds `config.yml` only. Persistence and logging modules throw when asked to write there (see [`store.ts`](../../../packages/contracts/src/persistence/store.ts), [`logger.ts`](../../../packages/core/src/lib/logger.ts)). Anything else in that directory is legacy cruft from pre-1.0 versions and is swept up by the default `uninstall`.
 
 ---
 

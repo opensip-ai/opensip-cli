@@ -11,15 +11,15 @@
  *
  * Destinations:
  * - File: <project>/opensip-tools/.runtime/logs/{YYYY-MM-DD}.jsonl
- *   (always, even when silent — when the CLI bootstrap supplies a path
- *   via initLogFile(); falls back to ~/.opensip-tools/logs/ otherwise)
+ *   The CLI bootstrap supplies this path via initLogFile(). Without
+ *   initLogFile(), file output is disabled — user-global state
+ *   (`~/.opensip-tools/`) is reserved for config.yml only.
  * - stderr: when debug mode is enabled (Ink renders to stdout, logs to stderr)
  *
  * The setSilent(true) flag only suppresses stderr output, NOT file output.
  */
 
 import { appendFileSync, mkdirSync, readdirSync, unlinkSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 export interface Logger {
@@ -142,21 +142,19 @@ export function getRunId(): string | undefined {
 }
 
 /**
-
  * Initialize the log file for this session.
  *
- * Writes to `<project>/opensip-tools/.runtime/logs/` when the caller
- * passes a `dir` (the CLI bootstrap supplies it from
- * `resolveProjectPaths(cwd).logsDir`). Without an explicit dir, falls
- * back to `~/.opensip-tools/logs/` so callers without a project
- * context still get logs.
+ * Writes to `<project>/opensip-tools/.runtime/logs/`; the CLI bootstrap
+ * supplies the path from `resolveProjectPaths(cwd).logsDir`. Without
+ * a call to this function, file output is disabled (logs still hit
+ * stderr in debug mode).
  *
  * Opens a JSONL file for today's date. Prunes log files older than
  * 7 days inside the chosen directory.
  */
-export function initLogFile(dir?: string): void {
+export function initLogFile(dir: string): void {
   try {
-    logDir = dir ?? join(homedir(), '.opensip-tools', 'logs');
+    logDir = dir;
     mkdirSync(logDir, { recursive: true });
 
     const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD

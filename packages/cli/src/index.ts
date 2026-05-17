@@ -463,11 +463,17 @@ function registerCliCommands(): void {
   // -- uninstall ---------------------------------------------------------
   program
     .command('uninstall')
-    .description('Remove ~/.opensip-tools/ (plugins, sessions, logs) for a clean-slate reset')
+    .description('Remove user-level config at ~/.opensip-tools/ (cloud API key, defaults). Use --project to remove project-local state instead.')
     .option('-y, --yes', 'Skip confirmation prompt', false)
     .option('--dry-run', 'Print what would be removed; take no action', false)
-    .action(async (opts: { yes?: boolean; dryRun?: boolean }) => {
-      const result = await executeUninstall({ yes: opts.yes, dryRun: opts.dryRun });
+    .option('--project [path]', 'Remove project-local state (opensip-tools/ and opensip-tools.config.yml) at [path] (defaults to cwd)')
+    .action(async (opts: { yes?: boolean; dryRun?: boolean; project?: string | boolean }) => {
+      // Commander passes `true` when the flag is present without a value,
+      // a string when given a value, or undefined when omitted.
+      let project: string | true | undefined;
+      if (opts.project === true) project = true;
+      else if (typeof opts.project === 'string') project = opts.project;
+      const result = await executeUninstall({ yes: opts.yes, dryRun: opts.dryRun, project });
       if (result.cancelled) process.exitCode = EXIT_CODES.SUCCESS;
     });
 }

@@ -33,7 +33,7 @@ That's the load-bearing part. Adapters also expose a richer query API (functions
 
 ## The contract
 
-[`packages/core/src/languages/adapter.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.5/packages/core/src/languages/adapter.ts):
+[`packages/core/src/languages/adapter.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.9/packages/core/src/languages/adapter.ts):
 
 ```ts
 interface LanguageAdapter<TTree = unknown, TNode = unknown> {
@@ -64,7 +64,7 @@ The two filter operations are the spine of the content-filter system. Both must:
 
 The names describe what's left, not what's stripped: `stripStrings` removes strings (comments preserved), `stripComments` removes both strings *and* comments. The asymmetry is intentional: a check that reads comment-based directives (e.g. `// @fitness-ignore-next-line`) wants strings stripped but comments kept, while a check that scans for identifier patterns (e.g. `console.log`) wants both stripped.
 
-The framework's content-filter dispatcher ([`packages/core/src/languages/content-filter-dispatch.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.5/packages/core/src/languages/content-filter-dispatch.ts)) maps the check's `contentFilter` setting to one of these:
+The framework's content-filter dispatcher ([`packages/core/src/languages/content-filter-dispatch.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.9/packages/core/src/languages/content-filter-dispatch.ts)) maps the check's `contentFilter` setting to one of these:
 
 | Check declares | Adapter call |
 |---|---|
@@ -87,7 +87,7 @@ interface LanguageQueryAPI<TTree, TNode> {
 }
 ```
 
-The query API is for AST-shaped checks. A check that wants "every function with cyclomatic complexity > 25" calls `adapter.query.findFunctions(tree)` and inspects each function's body. The shapes (`GenericFunction`, `Import`, `Location`) are language-neutral — see [`packages/core/src/languages/generic-types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.5/packages/core/src/languages/generic-types.ts).
+The query API is for AST-shaped checks. A check that wants "every function with cyclomatic complexity > 25" calls `adapter.query.findFunctions(tree)` and inspects each function's body. The shapes (`GenericFunction`, `Import`, `Location`) are language-neutral — see [`packages/core/src/languages/generic-types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.9/packages/core/src/languages/generic-types.ts).
 
 The query API is **optional**. An adapter that only implements `parse` + `stripStrings` + `stripComments` is fully functional for regex-shaped checks. Implementing `query` is what unlocks the cross-language check pattern — `@opensip-tools/checks-universal`'s complexity check calls `adapter.query?.findFunctions(...)` and runs against any language whose adapter ships a query API.
 
@@ -103,7 +103,7 @@ The CLI awaits `Promise.all(adapter.warmup?.() ...)` if any adapter declares war
 
 ## The registry
 
-[`packages/core/src/languages/registry.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.5/packages/core/src/languages/registry.ts) holds the in-memory list. Registration is by id; dispatch is by extension:
+[`packages/core/src/languages/registry.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.9/packages/core/src/languages/registry.ts) holds the in-memory list. Registration is by id; dispatch is by extension:
 
 ```ts
 defaultLanguageRegistry.register(typescriptAdapter);
@@ -115,7 +115,7 @@ defaultLanguageRegistry.byId('rust');               // → rustAdapter
 defaultLanguageRegistry.byScopeLanguage('rust');    // checks 'aliases' too
 ```
 
-The CLI registers all six bundled adapters at module load time before any Tool runs. See [`packages/cli/src/index.ts:64-69`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.5/packages/cli/src/index.ts).
+The CLI registers all six bundled adapters at module load time before any Tool runs. See [`packages/cli/src/index.ts:64-69`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.9/packages/cli/src/index.ts).
 
 If a file's extension matches no registered adapter, dispatch falls through to "pass content unchanged." This is the fail-safe — a YAML file or a Markdown file goes through every check unmodified, and checks that target text content (TODO scanners, secret scanners) still work. Checks that depend on language-specific filtering and don't have an adapter for the file simply don't filter.
 
@@ -142,7 +142,7 @@ The trade-off: a check that *would* benefit from AST-aware analysis on Rust (say
 
 ## The exception: `lang-typescript` → `fitness`
 
-`@opensip-tools/lang-typescript` re-exports `filterContent`, `clearFilterCache`, and `FilteredContent` from `@opensip-tools/fitness`. This is the documented exception to the "lang packs depend only on core" layer rule — see [`80-conventions/02-layer-policy.md`](/docs/opensip-tools/80-conventions/02-layer-policy/) and the carve-out in [`.dependency-cruiser.cjs:171`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.5/.dependency-cruiser.cjs).
+`@opensip-tools/lang-typescript` re-exports `filterContent`, `clearFilterCache`, and `FilteredContent` from `@opensip-tools/fitness`. This is the documented exception to the "lang packs depend only on core" layer rule — see [`80-conventions/02-layer-policy.md`](/docs/opensip-tools/80-conventions/02-layer-policy/) and the carve-out in [`.dependency-cruiser.cjs:171`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.9/.dependency-cruiser.cjs).
 
 The history: those symbols moved out of `core` during an earlier refactor but the typescript adapter still re-exports them for downstream consumers that grew used to importing them from `lang-typescript`. The exception is named (`lang-no-fitness-except-typescript`) so any *other* lang pack reaching into fitness trips the rule.
 

@@ -6,16 +6,16 @@
  * `{timestamp}-{tool}-{recipe}.json`.
  *
  * The CLI bootstrap calls `configurePersistencePaths(projectPaths)`
- * once on startup with paths from `resolveProjectPaths(cwd)`. Until
- * that call, the module falls back to a user-global location
- * (`~/.opensip-tools/`) so any caller who imports persistence helpers
- * before the CLI's preAction hook still gets a valid path. The
- * fallback is also exercised by tests that don't bootstrap a CLI.
+ * once on startup with paths from `resolveProjectPaths(cwd)`. Any
+ * persistence call made before that throws — there is no implicit
+ * fallback. This guarantees that user-global state (`~/.opensip-tools/`)
+ * only ever contains config.yml, which makes `opensip-tools uninstall`
+ * a precise operation. Tests must call `configurePersistencePaths`
+ * with a temp dir in their setup.
  */
 
 import { randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync, readdirSync, writeFileSync, unlinkSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
 
 import { logger } from '@opensip-tools/core';
@@ -79,17 +79,9 @@ export interface RecipeCatalogEntry {
   readonly timeout: number;
 }
 
-/**
- * Fallback path: user-global `~/.opensip-tools/`, used by tests and
- * any code path that imports persistence helpers before the CLI has
- * called `configurePersistencePaths`. New code should not rely on
- * this fallback — call `configurePersistencePaths` first.
- */
-export const TOOLS_HOME = join(homedir(), '.opensip-tools');
-
 /** Mutable per-process state — set by `configurePersistencePaths`. */
-let storeDir: string = join(TOOLS_HOME, 'sessions');
-let reportsDir: string = join(TOOLS_HOME, 'reports');
+let storeDir: string | null = null;
+let reportsDir: string | null = null;
 const MAX_SESSIONS = 100;
 
 /**
@@ -100,6 +92,20 @@ const MAX_SESSIONS = 100;
 export function configurePersistencePaths(paths: Pick<ProjectPaths, 'sessionsDir' | 'reportsDir'>): void {
   storeDir = paths.sessionsDir;
   reportsDir = paths.reportsDir;
+}
+
+function requireStoreDir(): string {
+  if (storeDir === null) {
+    throw new Error('Persistence not configured. Call configurePersistencePaths() before using session APIs.');
+  }
+  return storeDir;
+}
+
+function requireReportsDir(): string {
+  if (reportsDir === null) {
+    throw new Error('Persistence not configured. Call configurePersistencePaths() before using report APIs.');
+  }
+  return reportsDir;
 }
 
 /** Ensure directory exists — mkdirSync with recursive is idempotent */
@@ -114,11 +120,12 @@ export function sanitizeForFilename(s: string): string {
 
 /** Save a session result to disk */
 export function saveSession(session: StoredSession): string {
-  ensureDir(storeDir);
+  const dir = requireStoreDir();
+  ensureDir(dir);
   const safeRecipe = session.recipe ? `-${sanitizeForFilename(session.recipe)}` : '';
   const filename = `${session.timestamp.replaceAll(/[:.]/g, '-')}-${session.tool}${safeRecipe}.json`;
   // Ensure filename stays within the sessions directory
-  const filepath = join(storeDir, basename(filename));
+  const filepath = join(dir, basename(filename));
   writeFileSync(filepath, JSON.stringify(session, null, 2), 'utf8');
 
   pruneOldSessions();
@@ -127,30 +134,33 @@ export function saveSession(session: StoredSession): string {
 
 /** Count session files in the store directory */
 export function countSessions(): number {
-  ensureDir(storeDir);
-  return readdirSync(storeDir).filter(f => f.endsWith('.json')).length;
+  const dir = requireStoreDir();
+  ensureDir(dir);
+  return readdirSync(dir).filter(f => f.endsWith('.json')).length;
 }
 
 /** Delete all sessions. Returns the number of files deleted. */
 export function clearAllSessions(): number {
-  ensureDir(storeDir);
-  const files = readdirSync(storeDir).filter(f => f.endsWith('.json'));
+  const dir = requireStoreDir();
+  ensureDir(dir);
+  const files = readdirSync(dir).filter(f => f.endsWith('.json'));
   for (const file of files) {
-    unlinkSync(join(storeDir, file));
+    unlinkSync(join(dir, file));
   }
   return files.length;
 }
 
 /** Delete sessions older than the given number of days. Returns the number of files deleted. */
 export function clearSessionsOlderThan(days: number): number {
-  ensureDir(storeDir);
+  const dir = requireStoreDir();
+  ensureDir(dir);
   const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
-  const files = readdirSync(storeDir).filter(f => f.endsWith('.json'));
+  const files = readdirSync(dir).filter(f => f.endsWith('.json'));
   let deleted = 0;
 
   for (const file of files) {
     try {
-      const filepath = join(storeDir, file);
+      const filepath = join(dir, file);
       const raw = readFileSync(filepath, 'utf8');
       const session = JSON.parse(raw) as { timestamp?: string };
       if (session.timestamp) {
@@ -170,8 +180,9 @@ export function clearSessionsOlderThan(days: number): number {
 
 /** Load all sessions, newest first. Optional limit to avoid reading everything. */
 export function loadSessions(limit?: number): StoredSession[] {
-  ensureDir(storeDir);
-  const files = readdirSync(storeDir)
+  const dir = requireStoreDir();
+  ensureDir(dir);
+  const files = readdirSync(dir)
     .filter(f => f.endsWith('.json'))
     .sort()
     // eslint-disable-next-line unicorn/no-array-reverse -- target ES2022; Array#toReversed is ES2023 and not in the lib
@@ -181,7 +192,7 @@ export function loadSessions(limit?: number): StoredSession[] {
   const sessions: StoredSession[] = [];
   for (const file of toRead) {
     try {
-      const raw = readFileSync(join(storeDir, file), 'utf8');
+      const raw = readFileSync(join(dir, file), 'utf8');
       sessions.push(JSON.parse(raw) as StoredSession);
     } catch {
       // Warn about corrupted files — don't crash
@@ -199,7 +210,8 @@ export function loadLatestSession(): StoredSession | null {
 
 /** Prune sessions beyond the max count */
 function pruneOldSessions(): void {
-  const files = readdirSync(storeDir)
+  const dir = requireStoreDir();
+  const files = readdirSync(dir)
     .filter(f => f.endsWith('.json'))
     .sort()
     // eslint-disable-next-line unicorn/no-array-reverse -- target ES2022; Array#toReversed is ES2023 and not in the lib
@@ -209,7 +221,7 @@ function pruneOldSessions(): void {
 
   for (const file of files.slice(MAX_SESSIONS)) {
     try {
-      unlinkSync(join(storeDir, file));
+      unlinkSync(join(dir, file));
     } catch {
       // Best effort
     }
@@ -218,13 +230,14 @@ function pruneOldSessions(): void {
 
 /** Get the store directory path */
 export function getStoreDir(): string {
-  return storeDir;
+  return requireStoreDir();
 }
 
 /** Get the reports directory path, creating it if needed */
 export function getReportsDir(): string {
-  ensureDir(reportsDir);
-  return reportsDir;
+  const dir = requireReportsDir();
+  ensureDir(dir);
+  return dir;
 }
 
 /** Generate a unique session ID */

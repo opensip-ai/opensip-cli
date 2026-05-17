@@ -47,7 +47,7 @@ Notable settings:
 
 ## ESLint
 
-Flat config at [`eslint.config.mjs`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.5/eslint.config.mjs). The base layers:
+Flat config at [`eslint.config.mjs`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.9/eslint.config.mjs). The base layers:
 
 - `@eslint/js` recommended.
 - `typescript-eslint` `recommendedTypeChecked` + `stylisticTypeChecked`.
@@ -79,7 +79,7 @@ The `@fitness-ignore-file` directives are opensip-tools' own (eaten by the fitne
 
 ## Errors
 
-[`packages/core/src/lib/errors.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.5/packages/core/src/lib/errors.ts) defines the workspace's error hierarchy:
+[`packages/core/src/lib/errors.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.9/packages/core/src/lib/errors.ts) defines the workspace's error hierarchy:
 
 ```ts
 class ToolError extends Error {
@@ -107,7 +107,7 @@ Plus the `Result<T, E>` pattern with `ok(value)` / `err(error)` / `tryCatchAsync
 
 Code format: `DOMAIN.SUBDOMAIN.SPECIFIC` — e.g. `'CONFIG.MISSING'`, `'GATE.BASELINE.NOT_FOUND'`, `'PLUGIN.LOADER.IMPORT_FAILED'`. The dot-separated shape is greppable and the prefix is meaningful for filter rules.
 
-Codes are mapped to user-facing suggestions in [`packages/contracts/src/exit-codes.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.5/packages/contracts/src/exit-codes.ts):
+Codes are mapped to user-facing suggestions in [`packages/contracts/src/exit-codes.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.9/packages/contracts/src/exit-codes.ts):
 
 ```ts
 export function getErrorSuggestion(code: string): string | undefined {
@@ -125,7 +125,7 @@ The CLI calls `getErrorSuggestion(error.code)` and threads the result into the `
 
 ## Exit codes
 
-Defined exactly once in [`packages/contracts/src/exit-codes.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.5/packages/contracts/src/exit-codes.ts):
+Defined exactly once in [`packages/contracts/src/exit-codes.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.9/packages/contracts/src/exit-codes.ts):
 
 ```ts
 export const EXIT_CODES = {
@@ -143,7 +143,7 @@ Adding a new exit code is a major-version change — see [`10-mental-model/04-co
 
 ## Logging
 
-The structured logger is in [`packages/core/src/lib/logger.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.5/packages/core/src/lib/logger.ts). Every log entry carries:
+The structured logger is in [`packages/core/src/lib/logger.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.9/packages/core/src/lib/logger.ts). Every log entry carries:
 
 - `evt` — dot-separated event name (`cli.fit.run.start`, `plugin.loader.discover`, `gate.compare.complete`).
 - `module` — the module that emitted it (`cli:fit`, `core:plugins`, `cli:gate`).

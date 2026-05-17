@@ -47,6 +47,8 @@ cd opensip-tools && pnpm install && pnpm build
 node packages/cli/dist/index.js fit
 ```
 
+**Updating or removing later?** See [Updating & uninstalling](#updating--uninstalling).
+
 ## OpenSIP — the bigger picture
 
 opensip-tools is the open-source CLI. **OpenSIP**, our hosted developer-productivity platform, is where teams take this beyond one developer's terminal — visit **[opensip.ai](https://opensip.ai)** to see what's there.
@@ -566,6 +568,63 @@ opensip-tools sessions purge                 # Delete all sessions (prompts y/n)
 opensip-tools sessions purge --older-than 7  # Delete sessions older than 7 days
 opensip-tools sessions purge --yes           # Skip confirmation
 ```
+
+## Updating & uninstalling
+
+### Update
+
+```bash
+# Update to the latest release
+npm install -g @opensip-tools/cli@latest        # or: pnpm add -g @opensip-tools/cli@latest
+
+# Check the installed version
+opensip-tools --version
+```
+
+The CLI checks npm once per day in interactive shells and prints a one-line
+notice on stderr when a newer version is available. The check is suppressed
+in CI, non-TTY pipelines, and `--json` invocations; opt out entirely with
+`OPENSIP_NO_UPDATE=1` (or the upstream `NO_UPDATE_NOTIFIER=1`).
+
+Release notes for every version live in
+[`CHANGELOG.md`](./CHANGELOG.md).
+
+### Uninstall
+
+Removal is split into three independent steps so each can be done in
+isolation — most users only need the first.
+
+```bash
+# 1. Project state — `opensip-tools/` and `opensip-tools.config.yml` in a repo
+opensip-tools uninstall --project                 # cwd
+opensip-tools uninstall --project /path/to/repo   # explicit path
+
+# 2. User-level config — cloud API key + per-user defaults
+opensip-tools uninstall
+
+# 3. The CLI binary itself
+npm uninstall -g @opensip-tools/cli               # or: pnpm rm -g @opensip-tools/cli
+```
+
+The running binary can't safely self-delete, so step 3 is always a separate
+`npm uninstall`. Steps 1 and 2 both support:
+
+- `--dry-run` — print every target path and total size, take no action.
+- `--yes` / `-y` — skip the `[y/N]` confirmation prompt (intended for scripts).
+
+Project-mode uninstall removes user-authored content (custom checks, recipes)
+alongside the gitignored `.runtime/` state — git history is the safety net.
+It refuses to run when neither `opensip-tools/` nor `opensip-tools.config.yml`
+exists at the resolved path, so an accidental `--project /unrelated/dir`
+is a no-op rather than a destructive accident.
+
+### Where state lives
+
+| Path | Tracked by git? | Removed by |
+|---|---|---|
+| `~/.opensip-tools/config.yml` | no — user-level | `opensip-tools uninstall` |
+| `<project>/opensip-tools.config.yml` | yes — project config | `opensip-tools uninstall --project` |
+| `<project>/opensip-tools/` (custom checks, recipes, `.runtime/` cache) | mixed — user-authored content tracked, `.runtime/` gitignored | `opensip-tools uninstall --project` |
 
 ## Observability
 
