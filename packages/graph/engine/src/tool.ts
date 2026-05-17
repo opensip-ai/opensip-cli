@@ -69,7 +69,7 @@ function register(cli: ToolCliContext): void {
 export const graphTool: Tool = {
   metadata: {
     id: 'graph',
-    version: '1.0.5',
+    version: '1.0.10',
     description: 'Static call-graph + dead-end analysis',
   },
   commands: [GRAPH],
