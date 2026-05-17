@@ -142,6 +142,7 @@ function renderCodePathsTab() {
     const container = document.getElementById('code-paths-view-' + view.id);
     if (container) view.render(container, graphCatalog, graphIndexes, filterState);
   }
+  attachSearchInputHandler();
   const initialId = readViewIdFromHash() || (views[0] && views[0].id);
   if (initialId) activateView(initialId);
 }
