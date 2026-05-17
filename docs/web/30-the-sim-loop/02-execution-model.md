@@ -81,14 +81,13 @@ A load scenario that's interrupted (signal abort, timeout) returns whatever stat
 The chaos executor extends the load executor:
 
 1. Run the base load (same as load executor).
-2. At `delayBeforeInjection`, inject the configured fault.
-3. After `fault.duration`, lift the fault.
-4. Continue running base load. Measure when the system "recovers" (error rate drops below the configured threshold).
-5. Assert that recovery happened within `recoverWithin`.
+2. While the load runs, inject faults from the `chaos` config — each `ChaosInjection` fires at the configured `probability` against requests matching its `target` pattern.
+3. Evaluate the `steadyStateAssertions` against the load metrics collected while chaos is active.
+4. After the chaos window ends, evaluate the `recoveryAssertions` over the next `recoveryWindow` milliseconds.
 
-The result type is `ChaosScenarioExecutorResult` — load metrics plus `injectionAt`, `recoveredAt`, `recoveryDurationMs`. Pass/fail is the AND of recovery success and the load assertions.
+The result type is `ChaosScenarioExecutorResult` — load metrics plus the steady-state and recovery verdicts. Pass/fail is the AND of every steady-state and recovery assertion.
 
-The fault interface is pluggable. The bundled faults are `kill`, `latency`, `partition` (against named targets like `database`, `cache`, `service`). Custom faults can be registered through the same plugin shape as scenarios.
+The bundled `ChaosType` set ([`packages/simulation/engine/src/types/base-types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/simulation/engine/src/types/base-types.ts)) is `'latency' | 'error' | 'timeout' | 'rate-limit' | 'connection-drop' | 'data-corruption'`. Each type has its own `*ChaosConfig` payload (e.g. `LatencyChaosConfig` with `minMs`/`maxMs`; `ErrorChaosConfig` with `statusCode`/`message`). `target` is a free-form pattern matched against the request's service or endpoint — there's no fixed `database`/`cache`/`service` enum.
 
 ### Invariant executor
 

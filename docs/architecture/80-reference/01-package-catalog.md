@@ -44,7 +44,7 @@ Peer packages at the same layer. Tools implement the `Tool` contract; language a
 
 | Package | Path | Role | Key exports |
 |---|---|---|---|
-| `@opensip-tools/fitness` | `packages/fitness/engine/` | Fitness check engine, `defineCheck`, recipe service, gate, SARIF builder | `defineCheck`, `FitnessRecipeService`, `defaultRecipeRegistry`, `getCheckConfig`, `executeFit`, `loadSignalersConfig`, `fitnessTool`, `saveBaseline`, `compareToBaseline`, `buildSarifLog`, `reportToCloud`, `openDashboard` |
+| `@opensip-tools/fitness` | `packages/fitness/engine/` | Fitness check engine, `defineCheck`, `defineRecipe`, gate, SARIF builder | `defineCheck`, `defineRecipe`, `FitnessRecipeService`, `defaultRecipeRegistry`, `getCheckConfig`, `executeFit`, `loadSignalersConfig`, `fitnessTool`, `saveBaseline`, `compareToBaseline`, `buildSarifLog`, `reportToCloud`, `openDashboard` |
 | `@opensip-tools/simulation` | `packages/simulation/engine/` | Simulation engine, four scenario kinds | `defineLoadScenario`, `defineChaosScenario`, `defineInvariantScenario`, `defineFixEvaluationScenario`, `defineSimulationRecipe`, `simulationTool`, `defaultSimulationRecipeRegistry`, `SCENARIO_KINDS` |
 | `@opensip-tools/graph` | `packages/graph/engine/` | Static call-graph + dead-end analysis, six-stage staged pipeline (discover → inventory → edges → indexes → rules → render). Imports SARIF helpers from `@opensip-tools/fitness` (peer-layer dep, DEC-3) | `graphTool`, `Catalog`, `FunctionOccurrence`, `CallEdge`, `Indexes`, `Rule`, `Renderer`, `EdgeResolver`, `InventoryVisitor` |
 

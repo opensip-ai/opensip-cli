@@ -43,7 +43,8 @@ export { createResultWithSignals, createErrorResult, createPassingResult, CheckI
 // Recipe service
 export { FitnessRecipeService } from './recipes/service.js';
 export type { FitnessRecipeServiceConfig, FitnessRecipeServiceCallbacks, CheckSummary } from './recipes/service-types.js';
-export type { FitnessRecipeResult, RecipeCheckResult, RecipeCheckConfigMap } from './recipes/types.js';
+export type { FitnessRecipe, FitnessRecipeDefinition, FitnessRecipeResult, RecipeCheckResult, RecipeCheckConfigMap } from './recipes/types.js';
+export { defineRecipe } from './recipes/types.js';
 export { builtInRecipesByName } from './recipes/built-in-recipes.js';
 export { defaultRecipeRegistry, FitnessRecipeRegistry } from './recipes/registry.js';
 export { getCheckConfig, setCurrentRecipeCheckConfig, clearCurrentRecipeCheckConfig } from './recipes/check-config.js';
