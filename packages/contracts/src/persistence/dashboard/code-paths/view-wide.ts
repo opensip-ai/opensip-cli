@@ -10,6 +10,15 @@ export function dashboardViewWideJs(): string {
 views.push({
   id: 'wide',
   label: 'Wide functions',
+  help: {
+    title: 'Wide functions',
+    sections: [
+      { heading: 'What this is', body: 'Functions ranked by parameter count. The Signature column is a thumbnail of the parameter list (rest and optional markers preserved).' },
+      { heading: 'Why you care', body: 'High parameter counts are a coupling smell — every parameter is a piece of context the caller has to assemble. They make functions hard to invoke, hard to mock, and hard to reuse.' },
+      { heading: 'How to read it', body: 'Sort by Params descending (default). Anything above 5–6 parameters is worth scrutinizing. Watch for "boolean flag" parameters — those usually indicate a function doing two jobs that should be split.' },
+      { heading: 'What to do', body: 'For top offenders, the usual moves are: introduce a parameter object (group related args into one type), split the function (if a flag controls divergent behavior), or invert the dependency (pass a smaller interface, not the kitchen sink).' },
+    ],
+  },
   render(container, catalog, indexes, filterState) {
     while (container.firstChild) container.removeChild(container.firstChild);
     if (!catalog || !catalog.functions) {

@@ -16,6 +16,15 @@ let searchQuery = '';
 views.push({
   id: 'search',
   label: 'Search',
+  help: {
+    title: 'Function search',
+    sections: [
+      { heading: 'What this is', body: 'A fuzzy-match search across every function in the catalog. Matches the simple name (last identifier in the qualified path) — type any subsequence of characters and it finds candidates that contain them in order.' },
+      { heading: 'Why you care', body: 'When you half-remember a function name, or want to find every function whose name contains "validate", this is faster than grep and gives you click-through to the Function Card with callers and callees in context.' },
+      { heading: 'How to read it', body: 'Results sort by match score: prefix matches and contiguous-character runs score higher. Each row shows the kind, owning package, and source file:line. Click a row to open the Function Card.' },
+      { heading: 'What to do', body: 'Use it as the entry point for any "where is X" question. Combined with the package and kind filter chips above, you can scope a search to "every getter in the contracts package whose name contains state". The results respect the active filters.' },
+    ],
+  },
   render(container, catalog, indexes, filterState) {
     while (container.firstChild) container.removeChild(container.firstChild);
     if (!catalog || !catalog.functions) {

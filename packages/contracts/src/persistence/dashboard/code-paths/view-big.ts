@@ -11,6 +11,15 @@ export function dashboardViewBigJs(): string {
 views.push({
   id: 'big',
   label: 'Big functions',
+  help: {
+    title: 'Big functions',
+    sections: [
+      { heading: 'What this is', body: 'Functions ranked by body length (endLine − startLine + 1). Pure structural metric — no semantic analysis, just lines.' },
+      { heading: 'Why you care', body: 'Long functions are hard to test, hard to read, and tend to grow more concerns over time. They are the most reliable rough proxy for accidental complexity.' },
+      { heading: 'How to read it', body: 'Sort by Lines descending (default). Above ~80 lines is worth questioning; above ~150 is almost always doing too much. The Kind column distinguishes class methods from free functions — methods often legitimately get bigger because they share state.' },
+      { heading: 'What to do', body: 'Pick a top offender, open it (click the row), and look at the Callees in the Function Card. If the body splits cleanly along callee boundaries, that is your refactor seam. If it is mostly inline logic, extract the largest cohesive block first.' },
+    ],
+  },
   render(container, catalog, indexes, filterState) {
     while (container.firstChild) container.removeChild(container.firstChild);
     if (!catalog || !catalog.functions) {

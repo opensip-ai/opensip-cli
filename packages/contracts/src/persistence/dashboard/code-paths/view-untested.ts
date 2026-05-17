@@ -15,6 +15,15 @@ export function dashboardViewUntestedJs(): string {
 views.push({
   id: 'untested',
   label: 'Untested',
+  help: {
+    title: 'Untested production code',
+    sections: [
+      { heading: 'What this is', body: 'Production functions (defined outside test files) with zero static callers from any test file. Prod callers shows how many production functions still depend on each one — high values indicate broadly-used, untested code.' },
+      { heading: 'Why you care', body: 'These are functions that ship without any compile-time tether to a test. They might still be exercised by integration tests at runtime, but the compiler gives you no signal if you break their contract.' },
+      { heading: 'How to read it', body: 'Sort by Prod callers descending (default). The top rows are the highest-leverage gaps: code with broad reach and no test coverage. The Kind column tells you the function shape (utility, method, exported); the Package shows ownership.' },
+      { heading: 'What to do', body: 'This list is not a quality gate — it is a prompt. For the top entries, ask: is this exercised through some other path I trust? If yes, write that down. If no, it is a coverage gap worth filling. False positives are normal: dynamic imports and reflection-based callers are invisible to static analysis.' },
+    ],
+  },
   render(container, catalog, indexes, filterState) {
     while (container.firstChild) container.removeChild(container.firstChild);
     if (!catalog || !catalog.functions) {

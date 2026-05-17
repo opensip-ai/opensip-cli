@@ -21,6 +21,7 @@ import { dashboardEditorLinkJs } from './code-paths/editor-link.js';
 import { dashboardFiltersJs } from './code-paths/filters.js';
 import { dashboardFunctionCardJs } from './code-paths/function-card.js';
 import { dashboardFunctionRowJs } from './code-paths/function-row.js';
+import { dashboardHelpDrawerJs } from './code-paths/help-drawer.js';
 import { dashboardIndexesJs } from './code-paths/indexes.js';
 import { dashboardPathUtilsJs } from './code-paths/path-utils.js';
 import { dashboardSccJs } from './code-paths/scc.js';
@@ -47,6 +48,7 @@ export function dashboardCodePathsJs(): string {
     dashboardFunctionRowJs(),
     dashboardFunctionCardJs(),
     dashboardViewsRegistryJs(),
+    dashboardHelpDrawerJs(),
     dashboardViewHotJs(),
     dashboardViewBigJs(),
     dashboardViewWideJs(),
@@ -139,12 +141,23 @@ function renderCodePathsExplore(host) {
   // View tab bar — built from the registered views.
   const tabBar = el('div', { class: 'code-paths-tabs', id: 'code-paths-tabs' });
   for (const view of views) {
-    const tab = el('div', {
-      class: 'code-paths-tab',
-      'data-view': view.id,
-      text: view.label,
-      onclick: () => activateView(view.id),
-    });
+    const tab = el('div', { class: 'code-paths-tab', 'data-view': view.id });
+    const labelEl = el('span', { class: 'code-paths-tab-label', text: view.label });
+    labelEl.addEventListener('click', () => activateView(view.id));
+    tab.appendChild(labelEl);
+    if (view.help) {
+      const info = el('button', {
+        class: 'code-paths-tab-info',
+        'aria-label': 'About ' + view.label,
+        title: 'About ' + view.label,
+        text: 'i',
+      });
+      info.addEventListener('click', e => {
+        e.stopPropagation();
+        openHelpDrawer(view.id);
+      });
+      tab.appendChild(info);
+    }
     tabBar.appendChild(tab);
   }
   host.appendChild(tabBar);

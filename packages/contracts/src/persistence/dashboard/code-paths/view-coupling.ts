@@ -15,6 +15,15 @@ export function dashboardViewCouplingJs(): string {
 views.push({
   id: 'coupling',
   label: 'Coupling',
+  help: {
+    title: 'Package coupling heat map',
+    sections: [
+      { heading: 'What this is', body: 'A caller-by-callee matrix. Each cell counts the static call edges from one package into another. Darker shading = more calls. Click a cell to see the actual call sites.' },
+      { heading: 'Why you care', body: 'Layered architectures want a clear flow of dependencies. Surprises in this matrix — a leaf package calling into core, a kernel package calling a peer — are usually layering violations or stale abstractions.' },
+      { heading: 'How to read it', body: 'Read rows as "this package calls". Read columns as "this package is called by". The diagonal (a package calling itself) is normally densest. Off-diagonal density tells you which packages know about each other; absence of a cell means no call sites in that direction.' },
+      { heading: 'What to do', body: 'Cells you did not expect deserve investigation. If a package is called by everyone (a column with many filled cells), that is a hub — make sure its API is intentional. If two peers both call into each other, you may have a circular dependency hiding in plain sight.' },
+    ],
+  },
   render(container, catalog, indexes, filterState) {
     while (container.firstChild) container.removeChild(container.firstChild);
     if (!catalog || !catalog.functions) {

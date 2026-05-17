@@ -12,6 +12,15 @@ export function dashboardViewSccsJs(): string {
 views.push({
   id: 'sccs',
   label: 'Cycles / SCCs',
+  help: {
+    title: 'Strongly-connected components (cycles)',
+    sections: [
+      { heading: 'What this is', body: 'Groups of functions that can all reach each other through call edges, found via Tarjan’s SCC algorithm. Size is the number of functions in the cycle; Members previews the first few; Packages shows which workspaces participate.' },
+      { heading: 'Why you care', body: 'A non-trivial SCC means the functions are mutually recursive. That can be intentional (a parser, a tree walker) but more often it indicates accidental tangling — code that grew in two directions and met in the middle.' },
+      { heading: 'How to read it', body: 'Sort by Size descending (default). Size 2 is usually fine (direct mutual recursion is a known pattern). Size 3+ that spans multiple packages is a layering smell — packages are not supposed to depend cyclically on each other.' },
+      { heading: 'What to do', body: 'For unexpected cycles, click into a member to inspect its callers and callees. Breaking the cycle usually means extracting the shared protocol into a third place that both sides depend on, or inverting one of the calls (callback / event instead of direct invocation).' },
+    ],
+  },
   render(container, catalog, indexes, filterState) {
     while (container.firstChild) container.removeChild(container.firstChild);
     if (!catalog || !catalog.functions) {
