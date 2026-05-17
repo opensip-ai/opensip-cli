@@ -82,6 +82,10 @@ export default tseslint.config(
         typescript: {
           alwaysTryTypes: true,
           project: ['packages/*/tsconfig.json', 'packages/*/*/tsconfig.json'],
+          // The workspace's per-package tsconfigs are intentional (see
+          // CLAUDE.md layering); we're not consolidating into project
+          // references. Silence the resolver's nag-on-startup.
+          noWarnOnMultipleProjects: true,
         },
       },
     },
