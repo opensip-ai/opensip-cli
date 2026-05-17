@@ -45,7 +45,7 @@ These docs are written for engineers fluent in TypeScript and Node tooling. Voic
 
 4. [**The fitness loop**](./10-mental-model/01-fitness-loop.md) — **The spine.** One check from definition to violation to gate decision. Threads through every later doc.
 5. [**The tool-plugin model**](./10-mental-model/02-tool-plugin-model.md) — Kernel + Tool contract + first-party tools + dispatcher. Why the CLI doesn't know what `fit` does.
-6. [**Layered package graph**](./10-mental-model/03-modular-monolith.md) — The 17-package monorepo, the layer rules, why dependency-cruiser exists.
+6. [**Layered package graph**](./10-mental-model/03-modular-monolith.md) — The 18-package monorepo, the layer rules, why dependency-cruiser exists.
 7. [**Contract surfaces**](./10-mental-model/04-contract-surfaces.md) — The system's public edges: CLI argv, Tool interface, plugin manifests, JSON output.
 
 ### 20 — The fit loop
@@ -86,7 +86,7 @@ These docs are written for engineers fluent in TypeScript and Node tooling. Voic
 ### 70 — Reference
 *Lookup-shaped. Not for sequential reading.*
 
-23. [**Package catalog**](./70-reference/01-package-catalog.md) — All 17 packages with one-line role and key exports. Grouped by layer.
+23. [**Package catalog**](./70-reference/01-package-catalog.md) — All 18 packages with one-line role and key exports. Grouped by layer.
 24. [**Configuration**](./70-reference/02-configuration.md) — `opensip-tools.config.yml` schema, every field, defaults.
 25. [**JSON output schema**](./70-reference/03-json-output-schema.md) — The `CliOutput` shape consumed by CI and dashboards.
 

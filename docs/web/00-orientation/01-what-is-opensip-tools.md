@@ -77,7 +77,7 @@ Every command lives in [`packages/cli/src/commands/`](https://github.com/opensip
 
 ## The big picture in three sentences
 
-opensip-tools is a CLI dispatcher whose job is to find Tools (`fit`, `sim`, anything you write), find recipes inside those Tools, run them, and render the result. Tools are decoupled from the CLI by a plugin contract; the CLI cannot tell `fit` from `sim` from `audit-sec` you wrote yesterday — they all implement the same `Tool` interface, mount their own subcommands, and consume a shared rendering layer. The platform is intentionally narrow: no daemon, no server, no database, no orchestration — just a 17-package TypeScript monorepo that produces one binary and runs end-to-end in under a second on a small project.
+opensip-tools is a CLI dispatcher whose job is to find Tools (`fit`, `sim`, anything you write), find recipes inside those Tools, run them, and render the result. Tools are decoupled from the CLI by a plugin contract; the CLI cannot tell `fit` from `sim` from `audit-sec` you wrote yesterday — they all implement the same `Tool` interface, mount their own subcommands, and consume a shared rendering layer. The platform is intentionally narrow: no daemon, no server, no database, no orchestration — just a 18-package TypeScript monorepo that produces one binary and runs end-to-end in under a second on a small project.
 
 ---
 
@@ -93,7 +93,7 @@ This is not a hypothetical: it's why `fit` and `sim` ship in separate packages, 
 
 ### Layered, not modular
 
-The 17 packages are organized as a strict dependency layer cake: `core` at the bottom, `contracts` above it, then `fitness/simulation/lang-*` as peers, then `checks-*` packs (which depend on the language packs), then `cli` at the top. The layer policy is enforced by [dependency-cruiser](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/.dependency-cruiser.cjs) at lint time — the build fails if a `core` module imports from `fitness`, or if `lang-typescript` imports from `cli`.
+The 18 packages are organized as a strict dependency layer cake: `core` at the bottom, `contracts` above it, then `fitness/simulation/lang-*` as peers, then `checks-*` packs (which depend on the language packs), then `cli` at the top. The layer policy is enforced by [dependency-cruiser](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/.dependency-cruiser.cjs) at lint time — the build fails if a `core` module imports from `fitness`, or if `lang-typescript` imports from `cli`.
 
 This shape is what makes the tool-plugin model possible: the kernel doesn't know what tools exist (`core` defines `Tool` and `ToolRegistry` but never imports a Tool implementation), and tools don't know what other tools exist. New tools slot in *between* layers without touching anyone else.
 

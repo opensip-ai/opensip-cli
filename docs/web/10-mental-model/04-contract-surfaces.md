@@ -254,7 +254,7 @@ You've now seen the four mental-model docs:
 
 1. [`01-fitness-loop.md`](/docs/opensip-tools/10-mental-model/01-fitness-loop/) — the spine, eight stages.
 2. [`02-tool-plugin-model.md`](/docs/opensip-tools/10-mental-model/02-tool-plugin-model/) — how the CLI doesn't know what `fit` does.
-3. [`03-modular-monolith.md`](/docs/opensip-tools/10-mental-model/03-modular-monolith/) — five layers, 17 packages.
+3. [`03-modular-monolith.md`](/docs/opensip-tools/10-mental-model/03-modular-monolith/) — five layers, 18 packages.
 4. This doc — the public edges.
 
 Time to go deeper. Section [`20-the-fit-loop/`](/docs/opensip-tools/20-the-fit-loop/) expands stages 4–8 of the loop with full code paths. Section [`30-the-sim-loop/`](/docs/opensip-tools/30-the-sim-loop/) does the same for `sim`. Sections 40+ cover runtime mechanics, subsystems, surfaces, reference, and conventions.

@@ -3,7 +3,7 @@ status: current
 last_verified: 2026-05-15
 title: "Layered package graph"
 audience: [contributors]
-purpose: "The 17-package monorepo, the five-layer dependency rule, why dependency-cruiser exists, and the trade-offs."
+purpose: "The 18-package monorepo, the five-layer dependency rule, why dependency-cruiser exists, and the trade-offs."
 source-files:
   - .dependency-cruiser.cjs
   - pnpm-workspace.yaml
@@ -19,12 +19,12 @@ related-docs:
 ---
 # Layered package graph
 
-Seventeen packages. Five layers. One enforced rule: dependencies flow up only.
+Eighteen packages. Five layers. One enforced rule: dependencies flow up only.
 
 This document is the conceptual map. For the lookup-shaped catalog of every package's role and exports, jump to [`70-reference/01-package-catalog.md`](../70-reference/01-package-catalog.md). For the literal dep-cruiser rules, see [`80-conventions/02-layer-policy.md`](../80-conventions/02-layer-policy.md).
 
 > **What you'll understand after this:**
-> - Why opensip-tools ships as 17 packages instead of one.
+> - Why opensip-tools ships as 18 packages instead of one.
 > - The five layers, in order, and what each one is for.
 > - How the layer rule is enforced (and what happens if you break it).
 > - The two documented exceptions and why they exist.
@@ -71,7 +71,7 @@ This document is the conceptual map. For the lookup-shaped catalog of every pack
 
 **Layer 5 — `@opensip-tools/cli`.** The composition root. Imports every first-party tool and language adapter, registers them, builds the Commander tree, runs the dispatcher. The only package that knows everything below it.
 
-That's it. Five layers, seventeen packages.
+That's it. Five layers, eighteen packages.
 
 ---
 
@@ -145,7 +145,7 @@ The trade-off: a *true* type-only cycle (which is a structural smell — usually
 
 ---
 
-## Why 17 packages and not 1
+## Why 18 packages and not 1
 
 A single mega-package was considered. It would compile faster, ship faster, and have a simpler `package.json`. We chose against it for three load-bearing reasons:
 
@@ -157,7 +157,7 @@ A check pack like `@opensip-tools/checks-python` has to be installable on its ow
 opensip-tools plugin add @opensip-tools/checks-python
 ```
 
-…and not pull in the JavaScript universe. With a single mega-package, every install pulls every check. With 17 packages, an install pulls only what's needed. (Today the bundled distribution still installs everything; tomorrow's tree-shaken or selectively-installed distribution doesn't have to.)
+…and not pull in the JavaScript universe. With a single mega-package, every install pulls every check. With 18 packages, an install pulls only what's needed. (Today the bundled distribution still installs everything; tomorrow's tree-shaken or selectively-installed distribution doesn't have to.)
 
 ### 2. The Tool contract's promise
 
@@ -165,13 +165,13 @@ The Tool contract says "any npm package can be a Tool." That promise only holds 
 
 ### 3. The layer rule needs to be visible
 
-A flat package can have any internal structure. With 17 packages, the layer is the directory structure: looking at `packages/` tells you the architecture in five seconds. If a contributor accidentally adds an upward edge, the build fails before the PR is even reviewed. The layer rule isn't aspiration — it's a wall.
+A flat package can have any internal structure. With 18 packages, the layer is the directory structure: looking at `packages/` tells you the architecture in five seconds. If a contributor accidentally adds an upward edge, the build fails before the PR is even reviewed. The layer rule isn't aspiration — it's a wall.
 
 ---
 
 ## What this shape costs
 
-Trade-offs are real. The 17-package layout is more expensive in three places:
+Trade-offs are real. The 18-package layout is more expensive in three places:
 
 - **More `package.json` files to maintain.** Version bumps span 17 files. We use `pnpm` workspace protocol (`workspace:*`) so internal deps are auto-linked, and a release script bumps all 17 in lockstep.
 - **More `tsconfig.json` files.** Each package has its own. Project references handle the build graph. The cost is configuration footprint, not build speed.

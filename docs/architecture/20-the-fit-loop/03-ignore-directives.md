@@ -36,6 +36,17 @@ Ignore directives are how you tell the framework "yes, I know — keep going." T
 
 Both expect a check slug as the second token (separated by space or tab). The slug must match the offending check's slug. Directives without a slug are ignored — there's no "ignore everything" form, by design.
 
+The parser recognizes the directive after any of four comment openers, so the same syntax works in TypeScript/JavaScript, Markdown/HTML, and shell/YAML/Python sources — see `COMMENT_OPENERS` in [`directive-parsing.ts`](../../../packages/fitness/engine/src/framework/directive-parsing.ts):
+
+| Opener | Languages |
+|---|---|
+| `//` | TypeScript, JavaScript, Rust, Go, Java, C/C++ |
+| `/* … */` | Same set, plus CSS — the directive must appear on the line after `/*` or inline before `*/` |
+| `<!-- … -->` | Markdown, HTML |
+| `#` | Shell, YAML, Python, TOML, Dockerfile |
+
+The doc examples below use `//`; substitute the correct opener for your file's language.
+
 ### `@fitness-ignore-next-line`
 
 Suppresses violations of the named check on the line immediately following the directive. Tolerates a stack of neighboring linter directives (up to three) before locking onto the actual target — so you can write:
