@@ -26,13 +26,20 @@ function renderOverview() {
   const toolBadgeStyles = {
     fit: 'background:rgba(124,160,104,0.15);color:var(--accent-fitness)',
     sim: 'background:rgba(155,138,165,0.15);color:var(--accent-sim)',
+    graph: 'background:rgba(196,154,108,0.15);color:var(--accent)',
   };
-  const tabMap = { fit: 'fitness', sim: 'simulation' };
+  const tabMap = { fit: 'fitness', sim: 'simulation', graph: 'code-paths' };
 
   sessions.forEach(s => {
     const sc2 = s.score >= 90 ? 'color:var(--success)' : s.score >= 70 ? 'color:var(--warning)' : 'color:var(--error)';
     const row = el('tr', {class:'clickable', onclick: () => {
-      // Navigate to the tool's tab
+      // Graph rows route through the Code Paths panel's session-aware
+      // helper, which forces the Sessions subtab and selects the row
+      // matching this session id. Fit/sim rows just switch top-level tab.
+      if (s.tool === 'graph' && typeof openCodePathsSession === 'function') {
+        openCodePathsSession(s.id);
+        return;
+      }
       const tabName = tabMap[s.tool] || s.tool;
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));

@@ -1,13 +1,15 @@
 /**
- * Dashboard Code Paths panel — interactive seven-views explorer
- * (v0.3). Reads the embedded graph catalog (a `<script type=
- * "application/json" id="graph-catalog">` block) and renders the
- * Hot, Big, Wide, Coupling, Untested, SCCs, and Search views.
+ * Dashboard Code Paths panel — graph-tool surface with two subtabs:
+ *   1. Sessions — recent graph runs and their per-rule findings
+ *      (uses the shared renderSessionTable from sessions.ts).
+ *   2. Explore — interactive seven-views catalog browser
+ *      (Hot, Big, Wide, Coupling, Untested, SCCs, Search).
  *
  * Architecture: vanilla DOM, no framework. Each view-*.ts emits a
  * JS string that pushes a `View` literal into the singleton `views`
- * registry. The orchestrator (this file) wires the persistent search
- * input, filter chips, view tab bar, and seven empty containers.
+ * registry. The Explore subtab renders filter chips + view tab bar
+ * + seven view containers; Sessions subtab renders the standard
+ * session table.
  *
  * The file imports JS-string emitters from sibling modules under
  * `code-paths/`. It MUST NOT import from `@opensip-tools/graph` —
@@ -76,9 +78,10 @@ function renderCodePathsTab() {
   if (!panel) return;
   while (panel.firstChild) panel.removeChild(panel.firstChild);
 
+  const graphSessions = sessions.filter(s => s.tool === 'graph');
   graphCatalog = loadGraphCatalogFromBlob();
 
-  if (!graphCatalog) {
+  if (graphSessions.length === 0 && !graphCatalog) {
     panel.appendChild(el('div', { class: 'card' }, [
       el('h2', { text: 'Code Paths' }),
       el('p', { class: 'muted', text: 'No graph sessions yet. Run opensip-tools graph to generate one.' }),
@@ -86,11 +89,51 @@ function renderCodePathsTab() {
     return;
   }
 
+  // Subtab bar (Sessions | Explore). Mirrors fit/sim's subtab pattern
+  // visually; built directly here because Code Paths' two-tab shape
+  // doesn't fit renderToolTab's three-tab Overview/Catalog/Recipes mold.
+  const subtabBar = el('div', { class: 'subtab-bar' });
+  const sessionsSub = el('div', { class: 'subtab active', 'data-subtab': 'sessions', text: 'Sessions' });
+  const exploreSub = el('div', { class: 'subtab', 'data-subtab': 'explore', text: 'Explore' });
+  subtabBar.appendChild(sessionsSub);
+  subtabBar.appendChild(exploreSub);
+  panel.appendChild(subtabBar);
+
+  const sessionsPanel = el('div', { class: 'subtab-panel active', id: 'panel-code-paths-sessions' });
+  const explorePanel = el('div', { class: 'subtab-panel', id: 'panel-code-paths-explore' });
+  panel.appendChild(sessionsPanel);
+  panel.appendChild(explorePanel);
+
+  subtabBar.addEventListener('click', e => {
+    const tab = e.target.closest('.subtab');
+    if (!tab) return;
+    subtabBar.querySelectorAll('.subtab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    sessionsPanel.classList.toggle('active', tab.dataset.subtab === 'sessions');
+    explorePanel.classList.toggle('active', tab.dataset.subtab === 'explore');
+  });
+
+  // Sessions subtab: shared session table (same UX as fit/sim).
+  if (graphSessions.length > 0) {
+    renderSessionTable(sessionsPanel, graphSessions, 'var(--accent)');
+  } else {
+    sessionsPanel.appendChild(el('div', { class: 'empty', text: 'No graph sessions yet.' }));
+  }
+
+  // Explore subtab: catalog views. Only meaningful with a catalog.
+  if (graphCatalog) {
+    renderCodePathsExplore(explorePanel);
+  } else {
+    explorePanel.appendChild(el('div', { class: 'empty', text: 'Catalog cache missing. Re-run opensip-tools graph to populate.' }));
+  }
+}
+
+function renderCodePathsExplore(host) {
   graphIndexes = buildIndexes(graphCatalog);
 
-  // Filter chip bar — populated by filters.ts (Phase P3).
+  // Filter chip bar.
   const chips = el('div', { class: 'code-paths-filter-chips', id: 'code-paths-filter-chips' });
-  panel.appendChild(chips);
+  host.appendChild(chips);
   renderFilterChips(chips, graphCatalog);
 
   // View tab bar — built from the registered views.
@@ -104,7 +147,7 @@ function renderCodePathsTab() {
     });
     tabBar.appendChild(tab);
   }
-  panel.appendChild(tabBar);
+  host.appendChild(tabBar);
 
   // One container per view; only one is .active at a time.
   const stack = el('div', { class: 'code-paths-view-container', id: 'code-paths-view-container' });
@@ -112,7 +155,7 @@ function renderCodePathsTab() {
     const c = el('div', { class: 'code-paths-view', id: 'code-paths-view-' + view.id });
     stack.appendChild(c);
   }
-  panel.appendChild(stack);
+  host.appendChild(stack);
 
   // Delegate row clicks to the function card.
   stack.addEventListener('click', e => {
@@ -126,9 +169,7 @@ function renderCodePathsTab() {
     if (e.key === 'Escape') closeFunctionCard();
   });
 
-  // Render every view once on init (so hidden views are populated for
-  // when the user activates them). Then respect the URL hash if it
-  // matches a known view.
+  // Render every view once on init.
   for (const view of views) {
     const container = document.getElementById('code-paths-view-' + view.id);
     if (container) view.render(container, graphCatalog, graphIndexes, filterState);
@@ -140,6 +181,34 @@ function renderCodePathsTab() {
 function readViewIdFromHash() {
   const m = /^#code-paths\/([a-z]+)/.exec(window.location.hash || '');
   return m ? m[1] : null;
+}
+
+/**
+ * Open the Code Paths tab on the Sessions subtab, scrolling to and
+ * selecting the row matching the given session id. Used by the
+ * Overview row-click handler so a graph row in Recent Activity opens
+ * the same per-session detail view that fit/sim rows open.
+ */
+function openCodePathsSession(sessionId) {
+  const tab = document.querySelector('.tab[data-tab="code-paths"]');
+  const panel = document.getElementById('panel-code-paths');
+  if (!tab || !panel) return;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  tab.classList.add('active');
+  panel.classList.add('active');
+  // Force the Sessions subtab.
+  const sessionsSub = panel.querySelector('.subtab[data-subtab="sessions"]');
+  const exploreSub = panel.querySelector('.subtab[data-subtab="explore"]');
+  const sessionsPanel = document.getElementById('panel-code-paths-sessions');
+  const explorePanel = document.getElementById('panel-code-paths-explore');
+  if (sessionsSub) sessionsSub.classList.add('active');
+  if (exploreSub) exploreSub.classList.remove('active');
+  if (sessionsPanel) sessionsPanel.classList.add('active');
+  if (explorePanel) explorePanel.classList.remove('active');
+  // Click the matching row to trigger the standard renderDetail flow.
+  const row = sessionsPanel && sessionsPanel.querySelector('tr[data-session-id="' + sessionId + '"]');
+  if (row) row.click();
 }
 `;
 }

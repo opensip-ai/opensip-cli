@@ -42,7 +42,7 @@ function renderSessionTable(panel, toolSessions, accentColor) {
   const tbody = el('tbody');
   toolSessions.forEach((s, idx) => {
     const sc = s.score >= 90 ? 'color:var(--success)' : s.score >= 70 ? 'color:var(--warning)' : 'color:var(--error)';
-    const row = el('tr', {class:'clickable', id: 'session-row-' + tool + '-' + idx, onclick: () => {
+    const row = el('tr', {class:'clickable', id: 'session-row-' + tool + '-' + idx, 'data-session-id': s.id, onclick: () => {
       tbody.querySelectorAll('tr.selected').forEach(r => r.classList.remove('selected'));
       row.classList.add('selected');
       renderDetail(s, idx);

@@ -34,6 +34,7 @@ interface BootResult {
   views: { id: string; label: string }[];
   activateView: (id: string) => void;
   openFunctionCard: (h: string) => void;
+  openCodePathsSession: (id: string) => void;
 }
 
 function bootDashboard(html: string): BootResult {
@@ -52,9 +53,14 @@ function bootDashboard(html: string): BootResult {
     if (src.length === 0) continue;
     combined += '\n' + src;
   }
-  combined += '\nreturn { views, activateView, openFunctionCard };';
+  combined += '\nreturn { views, activateView, openFunctionCard, openCodePathsSession };';
   // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source: our own emitted HTML.
   return new Function(combined).call(globalThis) as BootResult;
+}
+
+function activateExploreSubtab(): void {
+  const exploreTab = document.querySelector<HTMLElement>('#panel-code-paths .subtab[data-subtab="explore"]');
+  if (exploreTab) exploreTab.click();
 }
 
 describe.runIf(existsSync(REPORT))('Phase V — dashboard end-to-end validation', () => {
@@ -72,29 +78,40 @@ describe.runIf(existsSync(REPORT))('Phase V — dashboard end-to-end validation'
     expect(env.views.length).toBe(7);
   });
 
-  it('renders the search input inside the Search tab (not above the tab bar)', () => {
+  it('Code Paths panel hosts Sessions and Explore subtabs', () => {
+    const html = readReportOrSkip();
+    if (!html) { expect(true).toBe(true); return; }
+    bootDashboard(html);
+    expect(document.querySelector('#panel-code-paths-sessions')).not.toBeNull();
+    expect(document.querySelector('#panel-code-paths-explore')).not.toBeNull();
+    expect(document.querySelector('#panel-code-paths .subtab[data-subtab="sessions"]')).not.toBeNull();
+    expect(document.querySelector('#panel-code-paths .subtab[data-subtab="explore"]')).not.toBeNull();
+  });
+
+  it('renders the search input inside the Search view (not above the tab bar)', () => {
     const html = readReportOrSkip();
     if (!html) { expect(true).toBe(true); return; }
     const env = bootDashboard(html);
+    activateExploreSubtab();
     env.activateView('search');
     const inSearchTab = document.querySelector('#code-paths-view-search #code-paths-search-input');
     expect(inSearchTab).not.toBeNull();
-    // And it must NOT exist outside the Search tab.
+    // And it must NOT exist outside the Search view.
     const allInputs = document.querySelectorAll('#code-paths-search-input');
     expect(allInputs.length).toBe(1);
   });
 
-  it('every view container exists and the active one renders something', () => {
+  it('every Explore view container exists and the active one renders something', () => {
     const html = readReportOrSkip();
     if (!html) { expect(true).toBe(true); return; }
     bootDashboard(html);
+    activateExploreSubtab();
     for (const id of ['hot', 'big', 'wide', 'coupling', 'untested', 'sccs', 'search']) {
       const c = document.querySelector('#code-paths-view-' + id);
       expect(c).not.toBeNull();
     }
     const active = document.querySelector('.code-paths-view.active');
     expect(active).not.toBeNull();
-    // The active view either has a real row OR shows the documented empty state.
     const hasRows = active!.querySelector('[data-body-hash]');
     const hasEmpty = active!.querySelector('.empty');
     expect(Boolean(hasRows) || Boolean(hasEmpty)).toBe(true);
@@ -104,9 +121,10 @@ describe.runIf(existsSync(REPORT))('Phase V — dashboard end-to-end validation'
     const html = readReportOrSkip();
     if (!html) { expect(true).toBe(true); return; }
     const env = bootDashboard(html);
+    activateExploreSubtab();
     env.activateView('hot');
     const firstRow = document.querySelector('#code-paths-view-hot [data-body-hash]');
-    if (!firstRow) { expect(true).toBe(true); return; } // Empty hot view is acceptable.
+    if (!firstRow) { expect(true).toBe(true); return; }
     env.openFunctionCard((firstRow as HTMLElement).dataset.bodyHash!);
     const overlays = document.querySelectorAll('.function-card-overlay');
     expect(overlays.length).toBe(1);
@@ -116,16 +134,31 @@ describe.runIf(existsSync(REPORT))('Phase V — dashboard end-to-end validation'
     const html = readReportOrSkip();
     if (!html) { expect(true).toBe(true); return; }
     const env = bootDashboard(html);
+    activateExploreSubtab();
     env.activateView('search');
     const input = document.querySelector('#code-paths-view-search #code-paths-search-input')!;
     (input as HTMLInputElement).value = 'logger';
     input.dispatchEvent(new Event('input', { bubbles: true }));
     const search = document.querySelector('#code-paths-view-search')!;
     expect(search.classList.contains('active')).toBe(true);
-    // Either we get rows or an explicit empty state — both prove the
-    // results region re-rendered.
     const hasRows = search.querySelector('[data-body-hash]');
     const hasEmpty = search.querySelector('.code-paths-search-results .empty');
     expect(Boolean(hasRows) || Boolean(hasEmpty)).toBe(true);
+  });
+
+  it('openCodePathsSession switches to Code Paths and selects the session row', () => {
+    const html = readReportOrSkip();
+    if (!html) { expect(true).toBe(true); return; }
+    const env = bootDashboard(html);
+    const firstGraphRow = document.querySelector<HTMLElement>('#panel-code-paths-sessions tr[data-session-id]');
+    if (!firstGraphRow) { expect(true).toBe(true); return; } // No graph sessions yet.
+    const sessionId = firstGraphRow.dataset.sessionId!;
+    env.openCodePathsSession(sessionId);
+    const codePathsTab = document.querySelector('.tab[data-tab="code-paths"]');
+    expect(codePathsTab!.classList.contains('active')).toBe(true);
+    expect(document.querySelector('#panel-code-paths-sessions')!.classList.contains('active')).toBe(true);
+    const selected = document.querySelector<HTMLElement>('#panel-code-paths-sessions tr.selected');
+    expect(selected).not.toBeNull();
+    expect(selected!.dataset.sessionId).toBe(sessionId);
   });
 });
