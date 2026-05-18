@@ -38,7 +38,7 @@ Two triggers, both opt-in:
 1. **`--open` flag.** `opensip-tools fit --open` (or `sim --open`) runs the recipe, then launches the dashboard if conditions allow.
 2. **Explicit `dashboard` command.** `opensip-tools dashboard` opens the most recent run's report regardless of any pending fit run.
 
-The launcher's `decideOpen` ([`packages/cli/src/open-dashboard.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.10.0/packages/cli/src/open-dashboard.ts)) returns `shouldOpen: true` only when **all** of these hold:
+The launcher's `decideOpen` ([`packages/cli/src/open-dashboard.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/cli/src/open-dashboard.ts)) returns `shouldOpen: true` only when **all** of these hold:
 
 - The user requested it (`--open` was passed).
 - Output isn't `--json` (machine-readable runs don't open browsers).
@@ -52,7 +52,7 @@ The HTML file is always written. If any guard skips the browser launch, the user
 
 ## What it shows
 
-Five primary panels — Overview, Sessions, Checks catalog, Recipes, Code Paths — each with its own module under [`packages/contracts/src/persistence/dashboard/`](https://github.com/opensip-ai/opensip-tools/blob/v1.10.0/packages/contracts/src/persistence/dashboard/), plus a top-level fit/sim tab switcher.
+Five primary panels — Overview, Sessions, Checks catalog, Recipes, Code Paths — each with its own module under [`packages/contracts/src/persistence/dashboard/`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/contracts/src/persistence/dashboard/), plus a top-level fit/sim tab switcher.
 
 ### Overview
 
@@ -63,7 +63,7 @@ The default landing panel. Shows:
 - The breakdown by category (security, quality, architecture, etc.).
 - Quick links into the other panels.
 
-Source: [`packages/contracts/src/persistence/dashboard/overview.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.10.0/packages/contracts/src/persistence/dashboard/overview.ts).
+Source: [`packages/contracts/src/persistence/dashboard/overview.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/contracts/src/persistence/dashboard/overview.ts).
 
 ### Sessions
 
@@ -71,7 +71,7 @@ A list of every past run, sorted reverse-chronological. Click into one to see it
 
 Per-run detail expands into a tree: check → file → finding. Each finding shows the rule id, severity, line, and (when present) the suggestion text.
 
-Source: [`packages/contracts/src/persistence/dashboard/sessions.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.10.0/packages/contracts/src/persistence/dashboard/sessions.ts).
+Source: [`packages/contracts/src/persistence/dashboard/sessions.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/contracts/src/persistence/dashboard/sessions.ts).
 
 ### Checks catalog
 
@@ -83,13 +83,13 @@ Every check that was registered for the current project, with per-check stats:
 
 Filterable by tag, by source pack, by pass-rate. Useful for spotting the noisiest checks (high failure rate) and the dormant ones (haven't run in weeks — maybe a recipe drift).
 
-Source: [`packages/contracts/src/persistence/dashboard/checks.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.10.0/packages/contracts/src/persistence/dashboard/checks.ts).
+Source: [`packages/contracts/src/persistence/dashboard/checks.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/contracts/src/persistence/dashboard/checks.ts).
 
 ### Recipes
 
 The configured recipes, with per-recipe stats. Same shape as the checks catalog but a level up: how often each recipe has run, its pass rate, its average duration.
 
-Source: [`packages/contracts/src/persistence/dashboard/recipes.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.10.0/packages/contracts/src/persistence/dashboard/recipes.ts).
+Source: [`packages/contracts/src/persistence/dashboard/recipes.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/contracts/src/persistence/dashboard/recipes.ts).
 
 ### Code Paths panel
 
@@ -109,7 +109,7 @@ The **Universal Function Card** is the cross-cutting drill-down: every clickable
 
 Filter chips above the view tabs apply to every view: package multi-select, kind multi-select, and a production/test toggle (default: production-only).
 
-Source: [`packages/contracts/src/persistence/dashboard/code-paths.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.10.0/packages/contracts/src/persistence/dashboard/code-paths.ts) and the per-view files under [`packages/contracts/src/persistence/dashboard/code-paths/`](https://github.com/opensip-ai/opensip-tools/blob/v1.10.0/packages/contracts/src/persistence/dashboard/code-paths/).
+Source: [`packages/contracts/src/persistence/dashboard/code-paths.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/contracts/src/persistence/dashboard/code-paths.ts) and the per-view files under [`packages/contracts/src/persistence/dashboard/code-paths/`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/contracts/src/persistence/dashboard/code-paths/).
 
 ### Tool tabs
 
@@ -119,10 +119,10 @@ The dashboard supports both fit and sim runs. The top-of-page tab switcher (fit 
 
 ## How it's generated
 
-Static HTML. The generator ([`packages/contracts/src/persistence/dashboard/generator.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.10.0/packages/contracts/src/persistence/dashboard/generator.ts)) assembles:
+Static HTML. The generator ([`packages/contracts/src/persistence/dashboard/generator.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/contracts/src/persistence/dashboard/generator.ts)) assembles:
 
 1. The base HTML scaffold (head, body shell, the panel containers).
-2. The CSS, inlined via `<style>` (from [`css.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.10.0/packages/contracts/src/persistence/dashboard/css.ts)).
+2. The CSS, inlined via `<style>` (from [`css.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/contracts/src/persistence/dashboard/css.ts)).
 3. Session and catalog data (checks, recipes), inlined directly into the panel `<script type="module">` blocks as `const sessions = …` / `const catalog = …` literals — there's no separate `<script type="application/json">` for these.
 4. The graph catalog (v0.3 Code Paths panel) when present, embedded as `<script type="application/json" id="graph-catalog">…</script>` and consumed by the Code Paths panel JS at init time. This one *does* use the `application/json` idiom because it's loaded across module boundaries.
 5. The JS panels, inlined via `<script type="module">…</script>` (from each panel's `dashboard*Js()` function).

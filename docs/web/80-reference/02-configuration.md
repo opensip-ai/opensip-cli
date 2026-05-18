@@ -24,7 +24,7 @@ opensip-tools reads two config files. One per project (committed); one per user 
 
 This doc walks the project file. The user file holds one secret and is documented inline below.
 
-The Zod schema lives at [`packages/fitness/engine/src/signalers/schema.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.10.0/packages/fitness/engine/src/signalers/schema.ts).
+The Zod schema lives at [`packages/fitness/engine/src/signalers/schema.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/fitness/engine/src/signalers/schema.ts).
 
 ---
 
@@ -42,7 +42,7 @@ plugins: {}                                 # per-domain pin lists (read out-of-
 
 Every Zod-validated section is optional. A missing section becomes `{}` (the schema preprocesses YAML `null` → `{}` so empty sections still parse cleanly).
 
-The validated schema (`SignalersConfigSchema` in [`packages/fitness/engine/src/signalers/schema.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.10.0/packages/fitness/engine/src/signalers/schema.ts)) covers `globalExcludes`, `targets`, `checkOverrides`, `fitness`, `simulation`, and `cli`. The `plugins:` block is **not** in that schema — it's read separately by the plugin loader (`readProjectPluginsList` in [`packages/core/src/plugins/discover.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.10.0/packages/core/src/plugins/discover.ts)) which inline-parses the YAML. Practically the file looks like one document; structurally `plugins:` lives outside the validated tree so it can evolve independently of the fitness schema.
+The validated schema (`SignalersConfigSchema` in [`packages/fitness/engine/src/signalers/schema.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/fitness/engine/src/signalers/schema.ts)) covers `globalExcludes`, `targets`, `checkOverrides`, `fitness`, `simulation`, and `cli`. The `plugins:` block is **not** in that schema — it's read separately by the plugin loader (`readProjectPluginsList` in [`packages/core/src/plugins/discover.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/core/src/plugins/discover.ts)) which inline-parses the YAML. Practically the file looks like one document; structurally `plugins:` lives outside the validated tree so it can evolve independently of the fitness schema.
 
 ---
 

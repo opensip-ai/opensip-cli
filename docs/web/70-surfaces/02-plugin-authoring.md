@@ -275,7 +275,7 @@ describe('no-fixme', () => {
 
 For a tighter unit test, call the analyzer directly — `defineCheck` keeps the original `analyze`/`analyzeAll`/`command` callable on the source module, so a unit test imports that function and feeds it a string of source code. The integration shape above is the one to reach for when you want the targets/scope wiring exercised end-to-end.
 
-The fitness package's own test fixtures (e.g. [`packages/fitness/engine/src/__tests__/`](https://github.com/opensip-ai/opensip-tools/blob/v1.10.0/packages/fitness/engine/src/__tests__/)) show patterns for both unit and integration tests.
+The fitness package's own test fixtures (e.g. [`packages/fitness/engine/src/__tests__/`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/fitness/engine/src/__tests__/)) show patterns for both unit and integration tests.
 
 ---
 
