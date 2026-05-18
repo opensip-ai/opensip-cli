@@ -66,7 +66,7 @@ The rule does a forward BFS from the entry-point seeds (computed by [`_entry-poi
 
 [`rules/duplicated-function-body.ts`](../../../packages/graph/engine/src/rules/duplicated-function-body.ts) — group catalog entries by `bodyHash`; report any group with more than one occurrence (above a minimum-line threshold to skip trivial bodies like `return null`).
 
-**False-positive shape**: the rule matches function bodies *textually* and does not currently resolve called identifiers through lexical scope. A codebase using a wrapper-and-delegate convention (every check has an `analyze(content, filePath)` that delegates to a local `analyzeFile()`) produces a wave of false matches because every wrapper looks identical. Tracked in [`docs/plans/graph-rule-enhancements.md`](../../plans/graph-rule-enhancements.md) for v0.3. Until then, cross-package duplications (where lexical scope can't fool the rule) are the high-signal subset.
+**False-positive shape**: the rule matches function bodies *textually* and does not currently resolve called identifiers through lexical scope. A codebase using a wrapper-and-delegate convention (every check has an `analyze(content, filePath)` that delegates to a local `analyzeFile()`) produces a wave of false matches because every wrapper looks identical. The 2026-05-17 mitigation was a `minDuplicateBodySize` threshold (default 200 normalised chars) that suppresses thin-wrapper bodies; the deeper "two functions whose bodies textually match but whose called identifiers resolve to different declarations are not duplicates" invariant remains unenforced. Cross-package duplications (where lexical scope can't fool the rule) are the high-signal subset.
 
 ### `graph:no-side-effect-path`
 
@@ -169,4 +169,4 @@ Exit code 4 is reserved for `--report-to` upload failure (network error or non-2
 - **[`01-stages-and-catalog.md`](./01-stages-and-catalog.md)** — the pipeline and catalog that feeds these rules.
 - **[`70-surfaces/01-cli-command-tree.md#graph`](../70-surfaces/01-cli-command-tree.md)** — every flag, with exit-code semantics.
 - **[`70-surfaces/03-dashboard.md`](../70-surfaces/03-dashboard.md)** — the interactive Code Paths view, which renders graph results alongside fit's.
-- **[`../plans/graph-rule-enhancements.md`](../../plans/graph-rule-enhancements.md)** — open work on the rules themselves, including the lexical-scope fix for `duplicated-function-body`.
+- **[`../plans/graph-performance-improvements.md`](../../plans/graph-performance-improvements.md)** — perf-plan history covering the rule and pipeline evolution since v1.1.

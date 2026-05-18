@@ -287,6 +287,6 @@ Correctness gate: every file whose cached edges might point at a stale hash is i
 
 ## 5. References
 
-- Pipeline architecture: [`graph-tool-v2-design.md`](./graph-tool-v2-design.md).
-- Rule semantics: [`graph-rule-enhancements.md`](./graph-rule-enhancements.md).
+- Pipeline architecture: [`docs/architecture/40-the-graph-loop/01-stages-and-catalog.md`](../architecture/40-the-graph-loop/01-stages-and-catalog.md).
+- Rule semantics: [`docs/architecture/40-the-graph-loop/02-rules-and-gating.md`](../architecture/40-the-graph-loop/02-rules-and-gating.md).
 - OpenSIP measurement run: 5476 files, 61131 functions, 6192 entry points, 121 findings; OOM at 4 GB heap after ~17 min; ~25 min with 12 GB heap, peak resident ~4.2 GB.

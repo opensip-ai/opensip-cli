@@ -111,14 +111,17 @@ opensip-tools sim --kind <kind>
 
 ## `graph` — static call-graph + dead-end analysis
 
-Tool-owned: [`packages/graph/engine/src/tool.ts`](../../../packages/graph/engine/src/tool.ts). See [`docs/plans/graph-tool-v2-design.md`](../../plans/graph-tool-v2-design.md) for the architecture spec.
+Tool-owned: [`packages/graph/engine/src/tool.ts`](../../../packages/graph/engine/src/tool.ts). The pipeline architecture and cache invalidation are documented in [`40-the-graph-loop/01-stages-and-catalog.md`](../40-the-graph-loop/01-stages-and-catalog.md); the perf-plan history is in [`docs/plans/graph-performance-improvements.md`](../../plans/graph-performance-improvements.md).
 
 ```
 opensip-tools graph
 opensip-tools graph --json
+opensip-tools graph --no-cache
 opensip-tools graph --gate-save
 opensip-tools graph --gate-compare
 opensip-tools graph --report-to <url>
+opensip-tools graph --package <name|path>
+opensip-tools graph --packages
 ```
 
 `graph` is the single entry point for static call-graph analysis. The default (non-JSON) output is a structured terminal report with four sections: catalog summary, findings grouped by rule (top 10 per rule, with overflow indicator), top 10 inferred entry points, and a one-line summary. The full data is always available via `--json`.
@@ -127,15 +130,22 @@ opensip-tools graph --report-to <url>
 |---|---|---|---|
 | `--cwd <path>` | string | `process.cwd()` | Target directory (must contain a `tsconfig.json`). |
 | `--json` | bool | `false` | Output a `CliOutput`-shaped JSON document instead of the unified terminal report. |
-| `--no-cache` | bool | `false` | Skip the catalog cache and re-run stages 1+2. |
+| `--no-cache` | bool | `false` | Skip the catalog cache and force a full rebuild. |
 | `--gate-save` | bool | `false` | Save the current Signal set to `<project>/opensip-tools/.runtime/cache/graph/baseline.json`. Mutually exclusive with `--gate-compare`. |
 | `--gate-compare` | bool | `false` | Compare current Signals to the baseline; exit non-zero on regression. |
 | `--baseline <path>` | string | `<project>/opensip-tools/.runtime/cache/graph/baseline.json` | Override the baseline path for `--gate-save` / `--gate-compare`. |
 | `--report-to <url>` | string | — | POST findings to OpenSIP Cloud or a compatible SARIF endpoint. |
+| `--package <name\|path>` | string | — | Scope the run to one workspace package (faster on monorepos; cross-package edges become unresolved). Searches `packages/**` for a basename match, or accepts an explicit directory path. Mutually exclusive with `--packages`. |
+| `--packages` | bool | `false` | Fan the run across every workspace package under `packages/**` with a `tsconfig.json`. One child process per package; concurrency capped at `cpus()-1`. Aggregates per-package findings. |
+| `--packages-concurrency <n>` | int | `cpus()-1` | Override `--packages` concurrency cap. |
 
-**Exit codes:** 0 (success / gate clean), 1 (runtime error / gate regression), 2 (configuration error), 4 (`--report-to` upload failed).
+**Exit codes:** 0 (success / gate clean), 1 (runtime error / gate regression / any `--packages` child failed), 2 (configuration error), 4 (`--report-to` upload failed).
 
-**Catalog file:** `<project>/opensip-tools/.runtime/cache/graph/catalog.json` — content-keyed by `tsCompilerVersion`, `tsConfigPath`, and a per-file mtime+size fingerprint. Atomic write via tmp + rename.
+**Heap sizing:** for projects with > 1000 source files, `graph` emits a one-line stderr hint at startup recommending `NODE_OPTIONS=--max-old-space-size=8192` (or higher). On a 5476-file repo the default 4 GB heap is not enough for a global run.
+
+**Catalog file:** `<project>/opensip-tools/.runtime/cache/graph/catalog.json` — content-keyed by `tsCompilerVersion`, `tsConfigPath`, and a per-file mtime+size fingerprint. The streamed write emits the catalog entry-by-entry (Phase 2, see perf plan) but produces byte-identical output to a `JSON.stringify` round-trip.
+
+**Cache behavior:** three verdicts — `valid` (full cache hit), `incremental` (re-walk only the changed files plus their transitive edge-dependents), `invalid` (full rebuild). The incremental path makes single-file edits ~6× faster than a `--no-cache` rebuild while producing byte-identical output. See the cache section in the stages-and-catalog doc.
 
 **Entry-point reasons** (rendered in the entry-points section): `module-init` (every file's top-level statements), `name-match` (`main` / `run` / `start` / `register` / `init` / `bootstrap` / `initialize`), `no-callers-exported` (exported with no in-project caller). Bin-entry and tool-registration heuristics are deferred to v0.3.
 

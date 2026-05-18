@@ -17,8 +17,7 @@ source-files:
 related-docs:
   - ../50-runtime/03-session-and-persistence.md
   - ./01-cli-command-tree.md
-  - ../../plans/graph-tool-v2-design.md
-  - ../../plans/graph-dashboard-v3-design.md
+  - ../40-the-graph-loop/01-stages-and-catalog.md
 ---
 # Dashboard
 
@@ -94,7 +93,7 @@ Source: [`packages/contracts/src/persistence/dashboard/recipes.ts`](../../../pac
 
 ### Code Paths panel
 
-The Code Paths panel is the dashboard's interactive call-graph explorer. It's powered by the catalog produced by `opensip-tools graph` (v0.2) and surfaces seven curated views, each answering a real developer question with a clear next step. See the v0.3 design doc — [`docs/plans/graph-dashboard-v3-design.md`](../../plans/graph-dashboard-v3-design.md) — for the full rationale, ADRs, and architectural invariants.
+The Code Paths panel is the dashboard's interactive call-graph explorer. It's powered by the catalog produced by `opensip-tools graph` and surfaces seven curated views, each answering a real developer question with a clear next step. The pipeline that builds the underlying catalog is documented in [`40-the-graph-loop/01-stages-and-catalog.md`](../40-the-graph-loop/01-stages-and-catalog.md).
 
 The seven views (each with the same row-click → universal Function Card flow). The non-Search views are paginated at 10 rows per page rather than capped — every function in the catalog (after filter chips apply) is reachable by paging through the table:
 
