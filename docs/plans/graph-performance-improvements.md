@@ -178,11 +178,11 @@ Spike outcome: **no net win**. Detail below for posterity.
 
 ---
 
-### Phase 7 — Parallelize Stage 1 via `worker_threads` (1–2 weeks)
+### Phase 7 — Parallelize Stage 1 via `worker_threads` (≤ 1 week, conditional on Wave 3 measurement)
 
-**Scope.** Partition source files across N workers (N = `os.cpus().length - 1`). Each worker creates an isolated Program over its slice and emits a partial catalog. The main thread merges. Cross-file edges within a partition resolve normally; cross-partition edges are resolved in a second main-thread pass that consults the merged catalog (no full Program needed for that lookup).
+**Pre-condition.** Phase 6 + xargs may already meet the 5-min Wave 3 target (see §4 Q7). Run that measurement first. Phase 7 only proceeds if a *single* package dominates the global run.
 
-**Open question to resolve before starting (added — see §4).** Cross-partition edges resolve via the merged catalog — but property-access and JSX resolvers in Stage 2 currently rely on the typechecker, not just catalog lookup. Catalog-only fallback is meaningfully lower fidelity. Either (a) accept a fidelity drop on cross-partition call sites and tag them `cross-partition-fallback`, or (b) re-instantiate a Program on the main thread for cross-partition resolution — which puts the OOM back. The byte-identical-catalog acceptance gate is incompatible with option (a) unless cross-partition sites happen to be resolvable purely via catalog matching. Resolve this design question before writing Phase 7 code.
+**Scope.** Partition source files across N workers (N = `os.cpus().length - 1`). Each worker creates an isolated Program over its slice and emits a partial catalog plus its own resolved edges for intra-partition call sites. Cross-partition sites are emitted from each worker as unresolved-with-target-name records `{ targetName, targetShape }`; the main thread runs `resolveByCatalogFallback` over those records against the merged catalog. Edges produced by the main-thread join are tagged `cross-partition-fallback` so consumers see the fidelity downgrade in `resolutionStats`. (See §4 Q5 for the design rationale and the resolver-by-resolver fidelity breakdown.)
 
 **Files**
 - New `packages/graph/engine/src/pipeline/parallel.ts` — the orchestrator.
@@ -217,28 +217,51 @@ Expected after Wave 1: OpenSIP-scale global runs fit in 2 GB heap with no silent
 
 Expected after Wave 2: OpenSIP wall-clock improvement from Phase 4 alone. Quantify after the refactor lands.
 
-**Wave 3 — multi-core for the global run (1–2 weeks)**
-- Phase 7 design resolution (see Phase 7 open question + §4 question 5).
-- Phase 7 (parallel workers).
+**Wave 3 — multi-core for the global run (≤ 1 week, scope contingent on measurement)**
 
-Expected: OpenSIP-scale global run in ≤ 5 min on an 8-core dev box.
+Step 1 — measure Phase 6 + xargs against the OpenSIP-scale workload (≤ 1 hour):
+```
+time xargs -P 8 -I {} opensip-tools graph --package {} <<< "$(list-of-packages)"
+```
+- If wall-clock ≤ 5 min: Wave 3 becomes a thin shipping exercise. Add an `opensip-tools graph --packages <glob>` flag that iterates packages in-process with a worker pool, document the xargs pattern in the README, ship. Phase 7's `worker_threads`-on-one-Program design becomes deferred or unnecessary.
+- If wall-clock > 5 min: identify the dominating package(s). Phase 7 becomes scoped to *those single-package cases*, not a general parallelism story.
+
+Step 2 (only if step 1 motivates it) — measure resolver-fallback rates (≤ 1 hour, per §4 Q5):
+- Instrument `property-access` and `polymorphic` resolvers; count checker-hits vs. catalog-fallback hits.
+- If checker hits dominate, README must document the fidelity trade-off for parallel-mode users.
+
+Step 3 (only if steps 1+2 motivate it) — Phase 7 implementation per §4 Q5 option (c):
+- Workers resolve intra-partition edges normally.
+- Cross-partition sites emit as `(targetName, targetShape)` unresolved records.
+- Main thread runs `resolveByCatalogFallback` over those records against the merged catalog; edges tagged `cross-partition-fallback`.
+- `resolutionStats` reports the cross-partition-fallback count.
+
+Expected outcome: Wave 3 ships in days, not the original 1–2 weeks, by leaning on Phase 6 + a thin parallel wrapper. Phase 7's worker-thread infrastructure only built if the measurement justifies it.
 
 **Wave 4 — incremental rebuild (deferred; scope after Wave 2 ships)**
 - See §4 question 4. Today's "any file change → full rebuild" makes graph essentially unusable in watch mode on monorepos. Per-file occurrences cached, only changed files re-walked. Worth a dedicated plan.
 
 ## 4. Open questions
 
-1. **Does `getTypeChecker()` in Stage 1 actually do something Stage 1 needs?** Phase 5's premise hinges on this. The eager call's *real* effect is forcing the binder, which builds the symbol table — the same one Stage 2 resolvers consult. Removing the eager call may simply shift cost from Stage 1 to Stage 2 with no net win. Resolution: the spike described in Phase 5 (≤ 1 hour). If the spike shows the cost just shifts, drop Phase 5.
+1. **Does `getTypeChecker()` in Stage 1 actually do something Stage 1 needs? — RESOLVED 2026-05-17.** Yes, it does. Stage 1 visitors walk parent chains (arrow-function name inference, method enclosing-class lookup); only the binder sets parent pointers, and only `getTypeChecker()` triggers the binder eagerly. Spike measured the alternatives: dropping the call gave 12× wall-clock improvement but produced silently wrong catalogs (visitors threw, errors swallowed by per-file try/catch); switching to `ts.setParentRecursive` produced correct catalogs but identical wall-clock to baseline (binder cost simply shifted to Stage 2's first `getSymbolAtLocation`). Phase 5 dropped from the plan; eager call retained.
 
-2. **Should the cache file format change in Phase 2, or stay byte-identical?** The streamed write can produce identical JSON output (just chunked); preserving that lets existing on-disk caches stay valid. Worth keeping unless there's a separate reason to bump the version.
+2. **Should the cache file format change in Phase 2, or stay byte-identical? — RESOLVED 2026-05-17.** Stay byte-identical. The streamed writer uses a sentinel-split metadata serialization that emits the exact same bytes as the legacy `JSON.stringify(_, null, 2)` path, so existing on-disk caches survive the upgrade. Verified by golden-file test in `__tests__/cache/read-write.test.ts`.
 
-3. **Is per-worker isolation enough in Phase 7?** Workers will each load TypeScript fresh — that's ~50 MB of TypeScript itself × N workers. May want to share the TypeScript module via `worker_threads` SharedArrayBuffer transfer, or accept the duplication.
+3. **Is per-worker isolation enough in Phase 7? — RESOLVED 2026-05-17.** Yes. The TypeScript module is ~50 MB; with 7 workers that's ~350 MB of duplicated module memory. The plan's per-worker heap budget is 1.5 GB — the duplicated TS module is 3.3 % of that, dwarfed by the per-worker AST + symbol table (~600 MB on a 700-file partition). Sharing TypeScript across workers via `SharedArrayBuffer` would require deep work in TypeScript itself (closures, mutable internal tables); not worth the effort. Accept the duplication.
 
-4. **What's the target for incremental runs?** Today Stage 1's cache invalidation is at file-list granularity (any file changes → full rebuild). A finer-grained invalidation (per-file occurrences cached, only changed files re-walked) is a separate plan worth scoping after Wave 2 ships.
+4. **What's the target for incremental runs? — Deferred to Wave 4.** Today Stage 1's cache invalidation is at file-list granularity (any file changes → full rebuild). A finer-grained invalidation (per-file occurrences cached, only changed files re-walked) is a separate plan worth scoping after Wave 2 ships. Not a Phase-7 blocker.
 
-5. **How should Phase 7 handle cross-partition edges that today require the typechecker?** Property-access and JSX resolvers consult `getSymbolAtLocation()`. With per-worker partitions, a call site in worker A pointing at a function defined in worker B can't run those resolvers without re-instantiating a Program for the join. Two options: (a) accept lower fidelity for cross-partition sites, tag them `cross-partition-fallback`, and report the count via `resolutionStats`; or (b) re-run resolution on the main thread with a global Program — which reintroduces the OOM Phase 7 was meant to avoid. Resolve before starting Phase 7; the answer determines whether the byte-identical-catalog acceptance gate is achievable.
+5. **How should Phase 7 handle cross-partition edges that today require the typechecker? — RESOLVED 2026-05-17 (option c, fallback-on-main).** The fidelity-loss surface is narrower than the original framing suggested. Of the seven Stage 2 resolvers, four (`direct-call`, `jsx`, `new-expression`, `value-reference`) already gracefully degrade to `resolveByCatalogFallback` when the checker doesn't help — cross-partition resolution costs them nothing. Two (`property-access`, `polymorphic`) genuinely depend on the checker; for these, cross-partition sites become catalog-fallback (high-recall, low-precision: matched by method name alone instead of by class). One (`shorthand-assignment`) behaves like value-reference.
+
+   Design: workers resolve their own intra-partition edges normally. Cross-partition sites are emitted from workers as unresolved-with-target-name (and target-shape: 'method' / 'value' / etc.), and the main thread runs `resolveByCatalogFallback` against the merged catalog. Edges produced by the main-thread join are tagged `cross-partition-fallback` and the count is reported in `resolutionStats`. The Phase 7 acceptance gate softens to "byte-identical except for the `cross-partition-fallback` subset" — which is exactly what option (a) in the original framing offered, just with a clear implementation story.
+
+   Optional measurement to do once before starting Phase 7 (≤ 1 hour): instrument `property-access` and `polymorphic` resolvers on the self-graph. Count what fraction of their hits actually came from the checker vs. the catalog-fallback layer. If most hits are already catalog-fallback in practice, Phase 7's fidelity loss on cross-partition sites is small and not worth a doc warning. If checker hits dominate, document the trade-off in the README so users running parallel mode know what they lose.
 
 6. **Is there a string-interning win orthogonal to the phase plan?** At 61k function occurrences, file paths, qualified names, and resolution targets are heavily duplicated across catalog entries. A simple intern pool over `FunctionOccurrence.filePath` and `CallEdge.to` could shrink memory measurably without touching pipeline structure. Worth measuring with a heap snapshot during the Phase 1 work — if string duplication dominates, scope a Phase 1.5.
+
+7. **Is Phase 7 still necessary now that Phase 6 ships? — RESOLVED 2026-05-17 (deferred pending measurement).** Phase 6 (`--package <name>`) reduced a global run to a per-package run. On monorepos with N reasonably-sized packages, `xargs -P 8 opensip-tools graph --package {}` provides 8-core parallelism today with zero new infrastructure: no worker_threads, no cross-partition edges, no merge logic, full per-package fidelity. Phase 7 is genuinely necessary only for **single-package giant-tsconfig** monorepos that Phase 6 can't split. The OpenSIP measurement run was 6 workspace packages; it might already meet Wave 3's 5-min target via Phase 6 + xargs.
+
+   Resolution: before designing Phase 7, measure `xargs -P 8 opensip-tools graph --package {}` against the OpenSIP-scale workload. If wall-clock ≤ 5 min, scope Phase 7 down to "document the xargs pattern + add `opensip-tools graph --packages` for ergonomics" and defer the worker_threads design indefinitely. If wall-clock > 5 min (because one package dominates), proceed with Phase 7 against that single-package case only.
 
 ## 5. References
 
