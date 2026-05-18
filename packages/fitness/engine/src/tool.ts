@@ -14,6 +14,7 @@
 
 
 import { EXIT_CODES } from '@opensip-tools/contracts';
+import { readPackageVersion } from '@opensip-tools/core';
 import { type Command } from 'commander';
 
 import { openDashboard } from './cli/dashboard.js';
@@ -28,6 +29,7 @@ import {
   GateBaselineInvalidError,
   DEFAULT_BASELINE_PATH,
 } from './gate.js';
+
 
 import type { CliArgs, FitOptions, ToolOptions } from '@opensip-tools/contracts';
 import type { Tool, ToolCliContext, ToolCommandDescriptor } from '@opensip-tools/core';
@@ -282,7 +284,7 @@ async function runGateMode(args: CliArgs, cli: ToolCliContext): Promise<void> {
 export const fitnessTool: Tool = {
   metadata: {
     id: 'fitness',
-    version: '1.0.0',
+    version: readPackageVersion(import.meta.url),
     description: 'Run fitness checks against a codebase',
   },
   commands: [FIT, DASHBOARD, FIT_LIST, FIT_RECIPES],

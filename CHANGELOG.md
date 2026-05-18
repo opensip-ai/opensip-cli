@@ -4,6 +4,65 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.1.0] — 2026-05-17
+
+> **DRAFT — please review and rewrite the framing before tagging.** The
+> lead bullet under _Added_ should reflect how you want users to
+> perceive `@opensip-tools/graph`: as a first-class third tool, or
+> still flagged experimental like `sim` has been.
+
+### Added
+
+- **`@opensip-tools/graph` — new tool package**, the third first-party
+  Tool alongside `fit` and `sim`. Static call-graph + dead-end analysis
+  with a six-stage staged pipeline and an interactive HTML dashboard
+  (`graph dashboard`). Dashboard views shipped: Function Card overlay,
+  fuzzy Search, Hot Functions, Big/Wide functions, Untested, SCCs
+  (Tarjan), Coupling heat map, plus collapsible filter chips, hash
+  routing, editor deep-links from entry, and a slide-out per-tab help
+  drawer. Initial gate baseline is committed at
+  `opensip-tools/graph/baseline.json` so the tool can gate itself in CI
+  from day one.
+
+- **Coverage gate at ≥90%** across the engine and language packs:
+  `@opensip-tools/core`, `fitness`, `simulation`, `graph`, `lang-rust`,
+  `checks-typescript`, `checks-universal`, and exported helpers in
+  `checks-{cpp,go,java,python}`. Exercises previously-uncovered
+  exported surfaces, not synthetic coverage padding.
+
+### Fixed
+
+- **`defineRecipe` is now exported from `@opensip-tools/fitness`.**
+  The helper was used internally but never re-exported through the
+  package barrel, blocking out-of-tree recipe authors. The
+  `chaos-executor` doc reference was corrected at the same time.
+
+- **Tool `metadata.version` no longer drifts from package.json.**
+  All three first-party Tools (`fitness`, `simulation`, `graph`) now
+  read their version from package.json at module-load time via a new
+  `readPackageVersion(import.meta.url)` helper exported from
+  `@opensip-tools/core`. Previously the version was a hardcoded
+  literal in each `tool.ts`; `fitness` and `simulation` reported
+  `'1.0.0'` through several releases because nothing forced a sync
+  on bump. `fitness` and `simulation` now have contract tests
+  matching `graph`'s, so drift is caught at test time rather than at
+  release time. Implements the proposal in
+  `docs/plans/tool-version-from-package-json.md`.
+
+### Internal
+
+- Architecture-doc audit completed across passes 15–21 (worktree-arch-
+  audit branch merged). Fixes include: stale section path refs, stale
+  17-package counts, per-language pack contents accuracy, README
+  headings + `configuration.apiKey` + plugin-loader `projectDir`
+  surfaces, ignore-directive comment forms, paginated (not capped) Code
+  Paths views, invariant scenarios documented as workflow integration
+  (not property-based), and lang-rust adapter description.
+- Release plumbing updated for the third tool: `RELEASING.md`,
+  `.github/workflows/release.yml` (preflight, pack, publish steps),
+  and `tools/bootstrap-publish.sh` now account for 18 packages
+  including `@opensip-tools/graph`.
+
 ## [1.0.10] — 2026-05-16
 
 ### Added

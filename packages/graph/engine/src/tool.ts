@@ -16,7 +16,9 @@
  * the single `graph` invocation.
  */
 
+import { readPackageVersion } from '@opensip-tools/core';
 import { type Command } from 'commander';
+
 
 import { executeGraph } from './cli/graph.js';
 
@@ -69,7 +71,7 @@ function register(cli: ToolCliContext): void {
 export const graphTool: Tool = {
   metadata: {
     id: 'graph',
-    version: '1.0.10',
+    version: readPackageVersion(import.meta.url),
     description: 'Static call-graph + dead-end analysis',
   },
   commands: [GRAPH],

@@ -8,6 +8,10 @@
  * a fake ToolCliContext so we can verify the subcommand surface.
  */
 
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { Command } from 'commander';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -16,6 +20,11 @@ import { defaultSimulationRecipeRegistry } from '../recipes/registry.js';
 import { simulationTool } from '../tool.js';
 
 import type { ToolCliContext } from '@opensip-tools/core';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const PKG = JSON.parse(
+  readFileSync(resolve(HERE, '../../package.json'), 'utf8'),
+) as { version: string };
 
 afterEach(() => {
   clearScenarioRegistry();
@@ -53,7 +62,7 @@ function makeFakeContext(program: Command): {
 describe('simulationTool metadata', () => {
   it('exposes id, version, description', () => {
     expect(simulationTool.metadata.id).toBe('simulation');
-    expect(simulationTool.metadata.version).toBe('1.0.0');
+    expect(simulationTool.metadata.version).toBe(PKG.version);
     expect(simulationTool.metadata.description).toContain('simulation');
   });
 

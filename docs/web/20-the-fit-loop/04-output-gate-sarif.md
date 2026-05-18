@@ -52,7 +52,7 @@ The paths are mutually exclusive in their effect on stdout, but composable in th
 
 ## The `CliOutput` envelope
 
-Every output path starts from the same shape — a `CliOutput` produced after the recipe runs. Defined at [`packages/contracts/src/types.ts:100`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/contracts/src/types.ts):
+Every output path starts from the same shape — a `CliOutput` produced after the recipe runs. Defined at [`packages/contracts/src/types.ts:100`](https://github.com/opensip-ai/opensip-tools/blob/v1.1.0/packages/contracts/src/types.ts):
 
 ```ts
 interface CliOutput {
@@ -109,7 +109,7 @@ fitnessTool.action()
        → unmounts when the user closes (or process exits)
 ```
 
-The renderer is in [`packages/cli/src/ui/`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/cli/src/ui/) and depends on Ink + React. It's the only consumer of those libraries; nothing in `core`, `fitness`, or any check pack imports them. This is why a future GUI front-end could replace the renderer without touching a Tool — the Tool calls `cli.renderLive('fit', args)` and the CLI maps that to whatever rendering layer is in place.
+The renderer is in [`packages/cli/src/ui/`](https://github.com/opensip-ai/opensip-tools/blob/v1.1.0/packages/cli/src/ui/) and depends on Ink + React. It's the only consumer of those libraries; nothing in `core`, `fitness`, or any check pack imports them. This is why a future GUI front-end could replace the renderer without touching a Tool — the Tool calls `cli.renderLive('fit', args)` and the CLI maps that to whatever rendering layer is in place.
 
 `-v` / `--verbose` adds inline finding details to the table. `--findings` adds a per-check finding listing after the table. `--quiet` suppresses the banner and shows only the pass/fail summary line.
 
@@ -153,7 +153,7 @@ opensip-tools fit --gate-compare --baseline path  # custom baseline location
 
 The gate is the regression-detection workflow. `--gate-save` writes the current run's findings to a SARIF baseline file. `--gate-compare` runs the same checks, compares the new findings to the baseline, and exits 1 if any *new* finding appears.
 
-The default baseline path is `<project>/opensip-tools/.runtime/baseline.sarif` ([`packages/fitness/engine/src/gate.ts:89`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/fitness/engine/src/gate.ts)). Override with `--baseline <path>` if you want it elsewhere — e.g. checked into git outside `.runtime/`.
+The default baseline path is `<project>/opensip-tools/.runtime/baseline.sarif` ([`packages/fitness/engine/src/gate.ts:89`](https://github.com/opensip-ai/opensip-tools/blob/v1.1.0/packages/fitness/engine/src/gate.ts)). Override with `--baseline <path>` if you want it elsewhere — e.g. checked into git outside `.runtime/`.
 
 The full gate behavior — diff classification, line-shift invariance, partial-SARIF tolerance — is documented in [`60-subsystems/03-architecture-gate.md`](/docs/opensip-tools/60-subsystems/03-architecture-gate/). The short version:
 
@@ -201,7 +201,7 @@ opensip-tools fit --report-to https://opensip.ai/api --api-key $OPENSIP_API_KEY
 
 The same `CliOutput` is converted to SARIF runs and POSTed in chunks to the configured URL. This path is composable — `--report-to` runs alongside the default Ink renderer, alongside `--json`, alongside `--gate-compare`. Reporting is a side-channel, not a stdout-replacement.
 
-The chunker lives in [`packages/fitness/engine/src/sarif.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/fitness/engine/src/sarif.ts):
+The chunker lives in [`packages/fitness/engine/src/sarif.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.1.0/packages/fitness/engine/src/sarif.ts):
 
 ```ts
 chunkSarifRuns(runs, maxFindings = 500): SarifRun[][]
@@ -226,7 +226,7 @@ The result is a `ReportResult` with `chunksTotal` / `chunksSucceeded`. Partial s
 
 ## SARIF, specifically
 
-opensip-tools emits SARIF 2.1.0. The schema URI is hardcoded in [`packages/fitness/engine/src/sarif.ts:5`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/fitness/engine/src/sarif.ts):
+opensip-tools emits SARIF 2.1.0. The schema URI is hardcoded in [`packages/fitness/engine/src/sarif.ts:5`](https://github.com/opensip-ai/opensip-tools/blob/v1.1.0/packages/fitness/engine/src/sarif.ts):
 
 ```
 https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json
@@ -254,7 +254,7 @@ The full SARIF spec has many more optional fields (`taxonomies`, `invocations`, 
 
 ### Reading SARIF as a baseline
 
-The baseline reader is forgiving — it tolerates partial SARIF (a run with no `results` array, a result with no `locations`, etc.) so a hand-edited baseline doesn't crash the gate. See [`packages/fitness/engine/src/gate.ts:287`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/packages/fitness/engine/src/gate.ts) (`extractViolationsFromSarif`).
+The baseline reader is forgiving — it tolerates partial SARIF (a run with no `results` array, a result with no `locations`, etc.) so a hand-edited baseline doesn't crash the gate. See [`packages/fitness/engine/src/gate.ts:287`](https://github.com/opensip-ai/opensip-tools/blob/v1.1.0/packages/fitness/engine/src/gate.ts) (`extractViolationsFromSarif`).
 
 This permissiveness exists for a real reason: teams sometimes hand-edit baselines to remove a finding they've intentionally fixed, or to add an entry that they want grandfathered. The gate parser shouldn't refuse those edits as long as the document is structurally a SARIF log.
 

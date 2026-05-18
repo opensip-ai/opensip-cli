@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: implemented
 title: "Tools — read metadata.version from package.json"
 audience: [contributors]
 ---

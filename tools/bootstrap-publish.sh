@@ -53,7 +53,7 @@ PACKAGES=(
   core
   contracts
   lang-typescript lang-rust lang-python lang-go lang-java lang-cpp
-  fitness simulation
+  fitness simulation graph
   checks-universal checks-typescript checks-python checks-go checks-java checks-cpp
   cli
 )

@@ -57,6 +57,10 @@ export { generateId, generatePrefixedId, extractTimestamp, generateUUID } from '
 export { withRetry } from './lib/retry.js';
 export type { RetryOptions } from './lib/retry.js';
 
+// Lib — package-version reader (used by first-party Tools to set
+// metadata.version without duplicating the literal in source).
+export { readPackageVersion } from './lib/package-version.js';
+
 // Lib — path resolver (project-local opensip-tools/.runtime, user-level
 // ~/.opensip-tools/config.yml). Every consumer constructs paths through
 // this module so a layout change is a single-file edit.

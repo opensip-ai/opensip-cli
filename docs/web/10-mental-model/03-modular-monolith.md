@@ -77,7 +77,7 @@ That's it. Five layers, eighteen packages.
 
 ## How the layer rule is enforced
 
-The layer rule — "dependencies flow up only" — is enforced by [dependency-cruiser](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/.dependency-cruiser.cjs) at lint time. The relevant rules:
+The layer rule — "dependencies flow up only" — is enforced by [dependency-cruiser](https://github.com/opensip-ai/opensip-tools/blob/v1.1.0/.dependency-cruiser.cjs) at lint time. The relevant rules:
 
 ```js
 // core imports nothing else from the workspace.
@@ -108,7 +108,7 @@ The build runs `pnpm depcruise` as part of the standard `pnpm lint` flow. A forb
 
 ## The three documented exceptions
 
-Real codebases have edge cases. This one has three, all written into [`.dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/.dependency-cruiser.cjs).
+Real codebases have edge cases. This one has three, all written into [`.dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-tools/blob/v1.1.0/.dependency-cruiser.cjs).
 
 ### `lang-typescript` → `fitness`
 
@@ -125,7 +125,7 @@ This is a mild architectural smell, not a bug — it means `lang-typescript` liv
 
 ### `graph` → `fitness` (peer-layer SARIF reuse)
 
-`@opensip-tools/graph` imports `buildSarifLog`, `chunkSarifRuns`, and `reportToCloud` from `@opensip-tools/fitness` (DEC-3 in [`docs/plans/graph-tool-v2-design.md`](https://github.com/opensip-ai/opensip-tools/blob/v1.0.10/docs/plans/graph-tool-v2-design.md) Appendix C). Both packages sit at Layer 3 (the tools/lang peer layer); cross-tool imports at the same layer are allowed when the alternative is a duplicate implementation that would drift over time. The dep-cruiser rule restricts the edge to the single permitted file and tags it `info`-severity so the build records but does not reject:
+`@opensip-tools/graph` imports `buildSarifLog`, `chunkSarifRuns`, and `reportToCloud` from `@opensip-tools/fitness` (DEC-3 in [`docs/plans/graph-tool-v2-design.md`](https://github.com/opensip-ai/opensip-tools/blob/v1.1.0/docs/plans/graph-tool-v2-design.md) Appendix C). Both packages sit at Layer 3 (the tools/lang peer layer); cross-tool imports at the same layer are allowed when the alternative is a duplicate implementation that would drift over time. The dep-cruiser rule restricts the edge to the single permitted file and tags it `info`-severity so the build records but does not reject:
 
 ```js
 { name: 'graph-may-import-fitness-sarif',

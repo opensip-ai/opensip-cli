@@ -7,9 +7,11 @@
  */
 
 import { EXIT_CODES } from '@opensip-tools/contracts';
+import { readPackageVersion } from '@opensip-tools/core';
 import { type Command } from 'commander';
 
 import { executeSim } from './cli/sim.js';
+
 
 import type { CliArgs, ToolOptions } from '@opensip-tools/contracts';
 import type { Tool, ToolCliContext, ToolCommandDescriptor } from '@opensip-tools/core';
@@ -91,7 +93,7 @@ function register(cli: ToolCliContext): void {
 export const simulationTool: Tool = {
   metadata: {
     id: 'simulation',
-    version: '1.0.0',
+    version: readPackageVersion(import.meta.url),
     description: 'Run simulation scenarios against a codebase',
   },
   commands: [SIM],

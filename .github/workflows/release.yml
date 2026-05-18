@@ -74,7 +74,7 @@ jobs:
             core \
             contracts \
             lang-typescript lang-rust lang-python lang-go lang-java lang-cpp \
-            fitness simulation \
+            fitness simulation graph \
             checks-universal checks-typescript checks-python checks-go checks-java checks-cpp \
             cli ; do
             name="@opensip-tools/$pkg"
@@ -91,7 +91,7 @@ jobs:
 
       # Pack every workspace package into a tarball. `pnpm pack` resolves
       # workspace:* deps into concrete versions, which `npm publish` then
-      # uploads. We pack all 17 up front so the publish step can run
+      # uploads. We pack all 18 up front so the publish step can run
       # against a known-good set of tarballs in dependency order.
       - name: Pack all workspace packages (resolves workspace:*)
         run: |
@@ -110,6 +110,7 @@ jobs:
           # Layer 3 — tools
           pnpm --filter @opensip-tools/fitness          pack --pack-destination /tmp/tarballs
           pnpm --filter @opensip-tools/simulation       pack --pack-destination /tmp/tarballs
+          pnpm --filter @opensip-tools/graph            pack --pack-destination /tmp/tarballs
           # Layer 4 — check packs
           pnpm --filter @opensip-tools/checks-universal  pack --pack-destination /tmp/tarballs
           pnpm --filter @opensip-tools/checks-typescript pack --pack-destination /tmp/tarballs
@@ -163,6 +164,7 @@ jobs:
           # Layer 3 — tools (depend on core, contracts, lang-typescript)
           publish_if_new fitness
           publish_if_new simulation
+          publish_if_new graph
           # Layer 4 — check packs (depend on fitness)
           publish_if_new checks-universal
           publish_if_new checks-typescript

@@ -2,10 +2,10 @@
 
 Releases are tag-driven. Pushing a tag matching `v*` triggers
 `.github/workflows/release.yml`, which builds, tests, packs, and
-publishes all 17 `@opensip-tools/*` packages to npm via OIDC trusted
+publishes all 18 `@opensip-tools/*` packages to npm via OIDC trusted
 publishing — no `NPM_TOKEN` required.
 
-## The 17 packages
+## The 18 packages
 
 | Layer | Package | Path |
 |-------|---------|------|
@@ -19,6 +19,7 @@ publishing — no `NPM_TOKEN` required.
 | Languages | `@opensip-tools/lang-cpp` | `packages/languages/lang-cpp` |
 | Tools | `@opensip-tools/fitness` | `packages/fitness/engine` |
 | Tools | `@opensip-tools/simulation` | `packages/simulation/engine` |
+| Tools | `@opensip-tools/graph` | `packages/graph/engine` |
 | Check packs | `@opensip-tools/checks-typescript` | `packages/fitness/checks-typescript` |
 | Check packs | `@opensip-tools/checks-universal` | `packages/fitness/checks-universal` |
 | Check packs | `@opensip-tools/checks-python` | `packages/fitness/checks-python` |
@@ -27,7 +28,7 @@ publishing — no `NPM_TOKEN` required.
 | Check packs | `@opensip-tools/checks-cpp` | `packages/fitness/checks-cpp` |
 | CLI | `@opensip-tools/cli` | `packages/cli` |
 
-All 17 share the same version. The release workflow publishes them in
+All 18 share the same version. The release workflow publishes them in
 dependency order; downstream packages reference upstream versions in
 their `dependencies`.
 
@@ -104,7 +105,7 @@ Order:
 ## Prerequisites (one-time setup)
 
 - **npm Trusted Publishers** must be configured per-package on
-  npmjs.com → package settings → Publishing access. Each of the 17
+  npmjs.com → package settings → Publishing access. Each of the 18
   packages needs an entry pointing to:
   - Organization: `opensip-ai`
   - Repository: `opensip-tools`
@@ -136,7 +137,7 @@ To unblock:
    NPM_TOKEN=npm_xxx ./tools/bootstrap-publish.sh
    ```
 
-   The script is **idempotent**. It iterates the 17 packages in
+   The script is **idempotent**. It iterates the 18 packages in
    dependency order, skips any whose current source version is already
    on npm, packs and publishes the rest using the token, and at the
    end prints a list of newly-created packages with direct links to
