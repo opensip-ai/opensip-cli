@@ -56,7 +56,7 @@ related-docs:
      first write.
 ```
 
-The whole thing fits in [`packages/cli/src/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.1.0/packages/cli/src/index.ts) at ~530 lines. Every step is direct — no plugin lifecycle hooks, no startup phases, no DI container. Just static imports and explicit registration calls.
+The whole thing fits in [`packages/cli/src/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.10.0/packages/cli/src/index.ts) at ~530 lines. Every step is direct — no plugin lifecycle hooks, no startup phases, no DI container. Just static imports and explicit registration calls.
 
 ### Why this order
 
@@ -71,7 +71,7 @@ A few of the constraints that pinned the order:
 
 ## CLI-owned commands
 
-Some commands belong to the CLI itself, not to any Tool. They live under [`packages/cli/src/commands/`](https://github.com/opensip-ai/opensip-tools/blob/v1.1.0/packages/cli/src/commands/) and are mounted directly in `index.ts` (not via the Tool contract):
+Some commands belong to the CLI itself, not to any Tool. They live under [`packages/cli/src/commands/`](https://github.com/opensip-ai/opensip-tools/blob/v1.10.0/packages/cli/src/commands/) and are mounted directly in `index.ts` (not via the Tool contract):
 
 | Command | Owner | Why CLI-owned |
 |---|---|---|
@@ -103,9 +103,9 @@ The `--help` text for the program lists every registered Tool's `commands[]`. Th
 
 ## The welcome screen
 
-When the binary is invoked without arguments (or with bare `--help`), the CLI prints a welcome banner: the version, a short description of what `opensip-tools` does, and a numbered list of common next-step commands. Source: [`packages/cli/src/welcome.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.1.0/packages/cli/src/welcome.ts).
+When the binary is invoked without arguments (or with bare `--help`), the CLI prints a welcome banner: the version, a short description of what `opensip-tools` does, and a numbered list of common next-step commands. Source: [`packages/cli/src/welcome.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.10.0/packages/cli/src/welcome.ts).
 
-The welcome screen is also where the update-notifier hook runs. If a newer version of `@opensip-tools/cli` is published, a small "update available" line is printed below the banner. The check is rate-limited (one per 24 hours, cached in `~/.opensip-tools/.update-cache`) and is skipped under CI environment detection. See [`packages/cli/src/update-notifier.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.1.0/packages/cli/src/update-notifier.ts).
+The welcome screen is also where the update-notifier hook runs. If a newer version of `@opensip-tools/cli` is published, a small "update available" line is printed below the banner. The check is rate-limited (one per 24 hours, cached in `~/.opensip-tools/.update-cache`) and is skipped under CI environment detection. See [`packages/cli/src/update-notifier.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.10.0/packages/cli/src/update-notifier.ts).
 
 The banner does not appear when a command is invoked. It's strictly a no-argv affordance — running `opensip-tools fit` skips the welcome and goes straight to the run.
 
@@ -127,7 +127,7 @@ catch (error) {
 }
 ```
 
-The suggestion is a one-line hint — "Run `opensip-tools init` to create one." or "Check `opensip-tools.config.yml` for syntax errors." The mapping is centralized in [`packages/contracts/src/exit-codes.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.1.0/packages/contracts/src/exit-codes.ts) so the same error message surfaces the same suggestion regardless of which Tool threw it.
+The suggestion is a one-line hint — "Run `opensip-tools init` to create one." or "Check `opensip-tools.config.yml` for syntax errors." The mapping is centralized in [`packages/contracts/src/exit-codes.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.10.0/packages/contracts/src/exit-codes.ts) so the same error message surfaces the same suggestion regardless of which Tool threw it.
 
 This is the polite way the CLI extends Tool errors. The Tool just throws; the CLI does the message-matching and rendering.
 

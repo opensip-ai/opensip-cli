@@ -21,7 +21,7 @@ related-docs:
 
 Every command, alphabetized by command name. Use this when you need to look up a flag, not when you're learning what a command is for. For "why", read the relevant subsystem doc.
 
-The grouping mirrors the source split: tool-owned commands (`fit`, `sim`, `dashboard`, `fit-list`, `fit-recipes`) come from each Tool's `register()` call. CLI-owned commands (everything else) live under [`packages/cli/src/commands/`](https://github.com/opensip-ai/opensip-tools/blob/v1.1.0/packages/cli/src/commands/).
+The grouping mirrors the source split: tool-owned commands (`fit`, `sim`, `dashboard`, `fit-list`, `fit-recipes`) come from each Tool's `register()` call. CLI-owned commands (everything else) live under [`packages/cli/src/commands/`](https://github.com/opensip-ai/opensip-tools/blob/v1.10.0/packages/cli/src/commands/).
 
 ---
 
@@ -47,7 +47,7 @@ Per-command flags that appear on most subcommands (registered individually by ea
 
 ## `fit` — run fitness checks
 
-Tool-owned: [`packages/fitness/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.1.0/packages/fitness/engine/src/tool.ts).
+Tool-owned: [`packages/fitness/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.10.0/packages/fitness/engine/src/tool.ts).
 
 ```
 opensip-tools fit
@@ -88,7 +88,7 @@ opensip-tools fit --gate-compare
 
 ## `sim` — run simulation scenarios
 
-Tool-owned: [`packages/simulation/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.1.0/packages/simulation/engine/src/tool.ts). Marked **experimental** in `--help`.
+Tool-owned: [`packages/simulation/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.10.0/packages/simulation/engine/src/tool.ts). Marked **experimental** in `--help`.
 
 ```
 opensip-tools sim
@@ -111,14 +111,17 @@ opensip-tools sim --kind <kind>
 
 ## `graph` — static call-graph + dead-end analysis
 
-Tool-owned: [`packages/graph/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.1.0/packages/graph/engine/src/tool.ts). See [`docs/plans/graph-tool-v2-design.md`](https://github.com/opensip-ai/opensip-tools/blob/v1.1.0/docs/plans/graph-tool-v2-design.md) for the architecture spec.
+Tool-owned: [`packages/graph/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.10.0/packages/graph/engine/src/tool.ts). The pipeline architecture and cache invalidation are documented in [`40-the-graph-loop/01-stages-and-catalog.md`](/docs/opensip-tools/40-the-graph-loop/01-stages-and-catalog/); the perf-plan history is in [`docs/plans/graph-performance-improvements.md`](https://github.com/opensip-ai/opensip-tools/blob/v1.10.0/docs/plans/graph-performance-improvements.md).
 
 ```
 opensip-tools graph
 opensip-tools graph --json
+opensip-tools graph --no-cache
 opensip-tools graph --gate-save
 opensip-tools graph --gate-compare
 opensip-tools graph --report-to <url>
+opensip-tools graph --package <name|path>
+opensip-tools graph --packages
 ```
 
 `graph` is the single entry point for static call-graph analysis. The default (non-JSON) output is a structured terminal report with four sections: catalog summary, findings grouped by rule (top 10 per rule, with overflow indicator), top 10 inferred entry points, and a one-line summary. The full data is always available via `--json`.
@@ -127,15 +130,22 @@ opensip-tools graph --report-to <url>
 |---|---|---|---|
 | `--cwd <path>` | string | `process.cwd()` | Target directory (must contain a `tsconfig.json`). |
 | `--json` | bool | `false` | Output a `CliOutput`-shaped JSON document instead of the unified terminal report. |
-| `--no-cache` | bool | `false` | Skip the catalog cache and re-run stages 1+2. |
+| `--no-cache` | bool | `false` | Skip the catalog cache and force a full rebuild. |
 | `--gate-save` | bool | `false` | Save the current Signal set to `<project>/opensip-tools/.runtime/cache/graph/baseline.json`. Mutually exclusive with `--gate-compare`. |
 | `--gate-compare` | bool | `false` | Compare current Signals to the baseline; exit non-zero on regression. |
 | `--baseline <path>` | string | `<project>/opensip-tools/.runtime/cache/graph/baseline.json` | Override the baseline path for `--gate-save` / `--gate-compare`. |
 | `--report-to <url>` | string | — | POST findings to OpenSIP Cloud or a compatible SARIF endpoint. |
+| `--package <name\|path>` | string | — | Scope the run to one workspace package (faster on monorepos; cross-package edges become unresolved). Searches `packages/**` for a basename match, or accepts an explicit directory path. Mutually exclusive with `--packages`. |
+| `--packages` | bool | `false` | Fan the run across every workspace package under `packages/**` with a `tsconfig.json`. One child process per package; concurrency capped at `cpus()-1`. Aggregates per-package findings. |
+| `--packages-concurrency <n>` | int | `cpus()-1` | Override `--packages` concurrency cap. |
 
-**Exit codes:** 0 (success / gate clean), 1 (runtime error / gate regression), 2 (configuration error), 4 (`--report-to` upload failed).
+**Exit codes:** 0 (success / gate clean), 1 (runtime error / gate regression / any `--packages` child failed), 2 (configuration error), 4 (`--report-to` upload failed).
 
-**Catalog file:** `<project>/opensip-tools/.runtime/cache/graph/catalog.json` — content-keyed by `tsCompilerVersion`, `tsConfigPath`, and a per-file mtime+size fingerprint. Atomic write via tmp + rename.
+**Heap sizing:** for projects with > 1000 source files, `graph` emits a one-line stderr hint at startup recommending `NODE_OPTIONS=--max-old-space-size=8192` (or higher). On a 5476-file repo the default 4 GB heap is not enough for a global run.
+
+**Catalog file:** `<project>/opensip-tools/.runtime/cache/graph/catalog.json` — content-keyed by `tsCompilerVersion`, `tsConfigPath`, and a per-file mtime+size fingerprint. The streamed write emits the catalog entry-by-entry (Phase 2, see perf plan) but produces byte-identical output to a `JSON.stringify` round-trip.
+
+**Cache behavior:** three verdicts — `valid` (full cache hit), `incremental` (re-walk only the changed files plus their transitive edge-dependents), `invalid` (full rebuild). The incremental path makes single-file edits ~6× faster than a `--no-cache` rebuild while producing byte-identical output. See the cache section in the stages-and-catalog doc.
 
 **Entry-point reasons** (rendered in the entry-points section): `module-init` (every file's top-level statements), `name-match` (`main` / `run` / `start` / `register` / `init` / `bootstrap` / `initialize`), `no-callers-exported` (exported with no in-project caller). Bin-entry and tool-registration heuristics are deferred to v0.3.
 
@@ -211,7 +221,7 @@ JSON shape:
 
 ## `init` — scaffold the project layout
 
-CLI-owned: [`packages/cli/src/commands/init.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.1.0/packages/cli/src/commands/init.ts).
+CLI-owned: [`packages/cli/src/commands/init.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.10.0/packages/cli/src/commands/init.ts).
 
 ```
 opensip-tools init
@@ -258,7 +268,7 @@ Ambiguous detection (multiple markers, no `--language`) exits 2 with a prompt to
 
 ## `configure` — manage user-level settings
 
-CLI-owned: [`packages/cli/src/commands/configure.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.1.0/packages/cli/src/commands/configure.ts). Interactive — sets up the OpenSIP Cloud API key in `~/.opensip-tools/config.yml`.
+CLI-owned: [`packages/cli/src/commands/configure.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.10.0/packages/cli/src/commands/configure.ts). Interactive — sets up the OpenSIP Cloud API key in `~/.opensip-tools/config.yml`.
 
 ```
 opensip-tools configure
@@ -298,7 +308,7 @@ opensip-tools sessions purge -y
 
 ## `plugin add/remove/list/sync` — manage project-pinned plugins
 
-CLI-owned: [`packages/cli/src/commands/plugin.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.1.0/packages/cli/src/commands/plugin.ts).
+CLI-owned: [`packages/cli/src/commands/plugin.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.10.0/packages/cli/src/commands/plugin.ts).
 
 ```
 opensip-tools plugin list
@@ -321,7 +331,7 @@ opensip-tools plugin sync
 
 ## `completion` — print shell completion script
 
-CLI-owned: [`packages/cli/src/commands/completion.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.1.0/packages/cli/src/commands/completion.ts).
+CLI-owned: [`packages/cli/src/commands/completion.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.10.0/packages/cli/src/commands/completion.ts).
 
 ```
 opensip-tools completion bash
@@ -344,7 +354,7 @@ The completion catalog is sourced from `defaultToolRegistry.list()`, so installe
 
 ## `uninstall` — remove opensip-tools state
 
-CLI-owned: [`packages/cli/src/commands/uninstall.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.1.0/packages/cli/src/commands/uninstall.ts).
+CLI-owned: [`packages/cli/src/commands/uninstall.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.10.0/packages/cli/src/commands/uninstall.ts).
 
 ```
 opensip-tools uninstall                       # remove ~/.opensip-tools/
@@ -373,7 +383,7 @@ Both modes:
 - Refuse to run when no targets exist (`--project` against a directory that contains no opensip-tools state is a no-op, not a destructive accident).
 - Do **not** remove the npm-global binary — the running binary can't safely self-delete. The user-mode success message prints the next step (`npm uninstall -g @opensip-tools/cli`); the project-mode success message points back at the user-mode command for the matching cleanup.
 
-State contract enforced by code: `~/.opensip-tools/` holds `config.yml` only. Persistence and logging modules throw when asked to write there (see [`store.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.1.0/packages/contracts/src/persistence/store.ts), [`logger.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.1.0/packages/core/src/lib/logger.ts)). Anything else in that directory is legacy cruft from pre-1.0 versions and is swept up by the default `uninstall`.
+State contract enforced by code: `~/.opensip-tools/` holds `config.yml` only. Persistence and logging modules throw when asked to write there (see [`store.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.10.0/packages/contracts/src/persistence/store.ts), [`logger.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.10.0/packages/core/src/lib/logger.ts)). Anything else in that directory is legacy cruft from pre-1.0 versions and is swept up by the default `uninstall`.
 
 ---
 

@@ -48,7 +48,7 @@ A run produces five kinds of on-disk artifacts: the session record, the structur
 └── baseline.sarif                              ← fit gate baseline (default location)
 ```
 
-Source of truth: [`packages/core/src/lib/paths.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.1.0/packages/core/src/lib/paths.ts). Every consumer reads paths through `resolveProjectPaths(cwd)`.
+Source of truth: [`packages/core/src/lib/paths.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.10.0/packages/core/src/lib/paths.ts). Every consumer reads paths through `resolveProjectPaths(cwd)`.
 
 The dir is created lazily by whichever consumer needs a subpath first. `mkdirSync(..., { recursive: true })` is the standard idiom — there's no startup pass that pre-creates the layout.
 
@@ -60,7 +60,7 @@ A session is one record per `fit` or `sim` run. Stored at `<project>/opensip-too
 
 ### Schema
 
-The shape lives in [`packages/contracts/src/persistence/store.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.1.0/packages/contracts/src/persistence/store.ts):
+The shape lives in [`packages/contracts/src/persistence/store.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.10.0/packages/contracts/src/persistence/store.ts):
 
 ```ts
 interface StoredSession {
@@ -101,7 +101,7 @@ A flat directory of JSON files instead of a SQLite database, because:
 - **No native dependency.** SQLite would pull `better-sqlite3` or a similar binary into the install. The marketplace shape is "pure Node, install everywhere."
 - **Read patterns are list + lookup.** Both are fast against a sorted directory listing of ~hundreds of files. We're not running aggregate queries.
 
-The session store auto-prunes: `MAX_SESSIONS = 100` is enforced inside the persistence module ([`packages/contracts/src/persistence/store.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.1.0/packages/contracts/src/persistence/store.ts)). Once 100 entries are on disk, the oldest are silently dropped on each subsequent write — so the directory size is bounded without user intervention. `sessions purge` is the manual cleanup for an immediate wipe; `sessions purge --older-than <days>` trims by age. The dir is gitignored, so it doesn't grow the repo either way.
+The session store auto-prunes: `MAX_SESSIONS = 100` is enforced inside the persistence module ([`packages/contracts/src/persistence/store.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.10.0/packages/contracts/src/persistence/store.ts)). Once 100 entries are on disk, the oldest are silently dropped on each subsequent write — so the directory size is bounded without user intervention. `sessions purge` is the manual cleanup for an immediate wipe; `sessions purge --older-than <days>` trims by age. The dir is gitignored, so it doesn't grow the repo either way.
 
 ---
 
@@ -112,7 +112,7 @@ Structured JSON Lines, one event per line. Written to two destinations simultane
 1. **stderr** — for live observation (`opensip-tools fit 2>&1 | jq`).
 2. **`<project>/opensip-tools/.runtime/logs/<YYYY-MM-DD>.jsonl`** — one file per local day; every run on the same day appends to the same file. Filter with `jq` on the `runId` field to isolate a specific run.
 
-The logger is in [`packages/core/src/lib/logger.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.1.0/packages/core/src/lib/logger.ts). Every log entry carries:
+The logger is in [`packages/core/src/lib/logger.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.10.0/packages/core/src/lib/logger.ts). Every log entry carries:
 
 - `evt` — the event name (`cli.fit.run.start`, `plugin.loader.discover`, etc.).
 - `module` — the module that emitted it (`cli:fit`, `core:plugins`, …).
@@ -133,13 +133,13 @@ The `evt` field is the primary axis for filtering. Every event has a stable `evt
 
 ## Reports
 
-The HTML dashboard writes a single self-contained file at `<project>/opensip-tools/.runtime/reports/latest.html` ([`packages/fitness/engine/src/cli/dashboard.ts:153`](https://github.com/opensip-ai/opensip-tools/blob/v1.1.0/packages/fitness/engine/src/cli/dashboard.ts)). Each generation overwrites the previous file — the dashboard is "always show the most recent state", not a per-run archive.
+The HTML dashboard writes a single self-contained file at `<project>/opensip-tools/.runtime/reports/latest.html` ([`packages/fitness/engine/src/cli/dashboard.ts:153`](https://github.com/opensip-ai/opensip-tools/blob/v1.10.0/packages/fitness/engine/src/cli/dashboard.ts)). Each generation overwrites the previous file — the dashboard is "always show the most recent state", not a per-run archive.
 
-Dashboard JS, CSS, and panel modules live in [`packages/contracts/src/persistence/dashboard/`](https://github.com/opensip-ai/opensip-tools/blob/v1.1.0/packages/contracts/src/persistence/dashboard/). The generator inlines all of them — JS via `<script type="module">`, CSS via `<style>`, session data via `<script type="application/json">` — so `latest.html` is one file you can email to a teammate. No CDN, no asset bundle, no server.
+Dashboard JS, CSS, and panel modules live in [`packages/contracts/src/persistence/dashboard/`](https://github.com/opensip-ai/opensip-tools/blob/v1.10.0/packages/contracts/src/persistence/dashboard/). The generator inlines all of them — JS via `<script type="module">`, CSS via `<style>`, session data via `<script type="application/json">` — so `latest.html` is one file you can email to a teammate. No CDN, no asset bundle, no server.
 
 Per-run history lives in `sessions/`, not `reports/`. The dashboard reads every session record to render its run-history view, but the HTML on disk is always the latest snapshot.
 
-The dashboard auto-open hook is wired into the Tool action handler. After a run, if (a) `--open` was requested or auto-open is configured, (b) output isn't `--json`, and (c) stdout is a TTY, the CLI launches the user's default browser onto the report URL. Logic in [`packages/cli/src/open-dashboard.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.1.0/packages/cli/src/open-dashboard.ts).
+The dashboard auto-open hook is wired into the Tool action handler. After a run, if (a) `--open` was requested or auto-open is configured, (b) output isn't `--json`, and (c) stdout is a TTY, the CLI launches the user's default browser onto the report URL. Logic in [`packages/cli/src/open-dashboard.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.10.0/packages/cli/src/open-dashboard.ts).
 
 ---
 
@@ -151,7 +151,7 @@ Two caches live under `<project>/opensip-tools/.runtime/cache/`:
 
 Per-file parsed AST representation, keyed by content hash. When a check parses a file (typescript adapter compiling, or any analyzer using `parseCache`), the result is cached. Subsequent reads of the same file (within the same run, or across runs as long as the file hasn't changed) skip the parse.
 
-Source: [`packages/fitness/engine/src/framework/parse-cache.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.1.0/packages/fitness/engine/src/framework/parse-cache.ts).
+Source: [`packages/fitness/engine/src/framework/parse-cache.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.10.0/packages/fitness/engine/src/framework/parse-cache.ts).
 
 The cache is **content-addressed**, not path-addressed. Two files with identical content share a cache entry. Renaming a file doesn't invalidate.
 
@@ -159,7 +159,7 @@ The cache is **content-addressed**, not path-addressed. Two files with identical
 
 Pre-resolved glob results. The scope resolver pre-globs every target's include patterns once per run, but those results are also persisted across runs as long as the project tree hasn't changed. The cache key is a hash of the patterns + a digest of the directory listing.
 
-Source: [`packages/fitness/engine/src/framework/file-cache.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.1.0/packages/fitness/engine/src/framework/file-cache.ts).
+Source: [`packages/fitness/engine/src/framework/file-cache.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.10.0/packages/fitness/engine/src/framework/file-cache.ts).
 
 ### Invalidation
 
@@ -177,7 +177,7 @@ Some teams keep it in `.runtime/` (gitignored) and trust the gate to track regre
 
 Both are valid. The default path is in `.runtime/` because the most common workflow is "save once locally, compare against it on the next CI run on the same branch." Teams with a stable main-branch reference move it out.
 
-The `clear` command ([`packages/cli/src/commands/clear.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.1.0/packages/cli/src/commands/clear.ts)) only deletes session JSON files under `.runtime/sessions/`. It does not touch reports, logs, cache, plugins, or the baseline — those have to be removed manually if you want them gone.
+The `clear` command ([`packages/cli/src/commands/clear.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.10.0/packages/cli/src/commands/clear.ts)) only deletes session JSON files under `.runtime/sessions/`. It does not touch reports, logs, cache, plugins, or the baseline — those have to be removed manually if you want them gone.
 
 ---
 

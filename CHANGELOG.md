@@ -4,6 +4,106 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.10.0] — 2026-05-18
+
+A performance-focused release for `@opensip-tools/graph`. Implements
+[`docs/plans/graph-performance-improvements.md`](docs/plans/graph-performance-improvements.md)
+waves 1–4. Driven by an OpenSIP measurement run (5476 files) that
+OOM'd Node's default 4 GB heap and took ~25 minutes under a 12 GB
+heap.
+
+### Added
+
+- **`graph --packages`** — fan a graph run across every workspace
+  package under `packages/**` with a `tsconfig.json`. One child
+  process per package, concurrency capped at `cpus()-1`. Aggregates
+  per-package findings into a unified report. On the opensip-tools
+  self-graph (18 packages), a parallel run is ~2.3× faster than the
+  global run with no fidelity change. `--packages-concurrency <n>`
+  overrides the cap.
+
+- **`graph --package <name|path>`** — scope a graph run to a single
+  workspace package's tsconfig. Per-package runs typically complete
+  in seconds and fit in the default Node heap; cross-package call
+  sites become unresolved (lower fidelity, much faster). Searches
+  `packages/**` for a basename match, or accepts an explicit
+  directory path.
+
+- **Heap-sizing hint at startup** — when `discoverFiles` returns
+  more than 1000 files, `graph` emits a one-line stderr hint
+  recommending `NODE_OPTIONS=--max-old-space-size=8192` (or higher
+  for very large monorepos). Below the threshold, silent.
+
+### Changed
+
+- **`graph` stage 1+2 fused into a single AST walk per file**
+  ([`packages/graph/engine/src/pipeline/walk.ts`](packages/graph/engine/src/pipeline/walk.ts)).
+  Legacy pipeline walked every file twice — once to emit function
+  occurrences, once to find and resolve call sites. The unified walk
+  emits both in one descent and feeds the call-site list to
+  `resolveEdgesFromRecords` for resolver dispatch. Eliminates the
+  redundant `hashFunctionBody` calls Stage 2's `hashOf` previously
+  performed on every function-shape. Catalog output is byte-identical
+  to the pre-refactor pipeline.
+
+- **`graph` cache is now incrementally updated.** Previous behaviour
+  was binary: any file change → full rebuild. New behaviour:
+  `classifyCatalog` returns `valid | incremental | invalid`; on
+  `incremental`, the orchestrator re-walks only the changed files
+  plus their transitive edge-dependents and merges with cached
+  entries from unchanged files. Iterates to fixpoint so no cached
+  edge dangles. Editing a single file in the opensip-tools self-
+  graph drops rebuild time from ~15 s (full) to ~2.5 s (incremental,
+  ~6×) with byte-identical output. `--no-cache` still forces a full
+  rebuild.
+
+- **Streamed catalog write** — `cache/write.ts` emits the catalog
+  metadata via `JSON.stringify` with a sentinel placeholder for the
+  `functions` field, then writes the functions map entry-by-entry
+  via `writeSync`. Bounds the write peak by the largest single
+  occurrence array rather than the full catalog. Output is
+  byte-identical to the legacy `JSON.stringify(_, null, 2)` path so
+  existing on-disk caches stay valid.
+
+- **Slice-not-getText for body hashing** — `digestFunctionBody` uses
+  `sourceFile.text.slice(start, end)` instead of
+  `node.getText(sourceFile)`, avoiding the per-call AST walk that
+  materialises a fresh string. Identical hash output.
+
+- **TypeScript `Program` is freed before serialization** —
+  orchestrator's stage 1+2 work is scoped so the program reference
+  becomes unreachable as soon as edge resolution returns. With
+  ~3000+ files the program plus its bound symbol table is ~1–2 GB;
+  freeing it before stages 3–5 (indexes, rules, serialization) keeps
+  peak resident lower.
+
+### Internal
+
+- New module: [`packages/graph/engine/src/pipeline/walk.ts`](packages/graph/engine/src/pipeline/walk.ts)
+  (unified Stage 1+2 walk).
+- New module: [`packages/graph/engine/src/cli/scope.ts`](packages/graph/engine/src/cli/scope.ts)
+  (`--package` and workspace-discovery resolution).
+- New module: [`packages/graph/engine/src/cli/packages-runner.ts`](packages/graph/engine/src/cli/packages-runner.ts)
+  (`--packages` parallel runner).
+- `cache/invalidate.ts` gains `classifyCatalog` and `diffFingerprints`;
+  `isCatalogValid` retained as a back-compat boolean wrapper.
+- `cli/orchestrate.ts` gains `obtainCatalog` (cache verdict
+  dispatch), `buildAndResolveCatalogIncremental` (Wave 4),
+  `expandClosureToFixpoint`, `mergeOccurrences`, and
+  `restoreCachedCalls`.
+- Phase 5 (lazy typechecker init) was spiked and rejected: the
+  apparent ~12× speedup was an artefact of stale-cache comparison
+  and the binder cost simply shifts to Stage 2's first
+  `getSymbolAtLocation` call. Eager `program.getTypeChecker()` in
+  Stage 1 is retained.
+- Architecture docs updated under [`docs/architecture/40-the-graph-loop/`](docs/architecture/40-the-graph-loop/)
+  and [`docs/architecture/70-surfaces/01-cli-command-tree.md`](docs/architecture/70-surfaces/01-cli-command-tree.md)
+  to reflect the fused walk, incremental rebuild, `--package` /
+  `--packages`, and updated catalog shape (`bodySize`,
+  `discarded`). Dead links to retired plan docs (`graph-tool-v2-design`,
+  `graph-rule-enhancements`, `graph-dashboard-v3-design`,
+  `tool-version-from-package-json`) replaced with live references.
+
 ## [1.1.0] — 2026-05-17
 
 > **DRAFT — please review and rewrite the framing before tagging.** The
