@@ -26,6 +26,7 @@ import { resolvePolymorphicCall } from './edge-resolvers/polymorphic.js';
 import { resolvePropertyAccessCall } from './edge-resolvers/property-access.js';
 import { hashFunctionBody, hashSyntheticBody } from './inventory-helpers/hash-body.js';
 import { synthesizeModuleInitName } from './inventory-helpers/synthesize-name.js';
+import { isInlineCallable } from './walk.js';
 
 import type {
   CallEdge,
@@ -35,6 +36,7 @@ import type {
   ResolverVerdict,
 } from '../types.js';
 import type { ResolverContext } from './edge-resolvers/types.js';
+import type { CallSiteRecord } from './walk.js';
 
 export interface EdgeResolutionInput {
   readonly catalog: Catalog;
@@ -45,6 +47,119 @@ export interface EdgeResolutionInput {
 export interface EdgeResolutionOutput {
   readonly catalog: Catalog;
   readonly resolutionStats: ResolutionStats;
+}
+
+export interface EdgeResolutionFromRecordsInput {
+  readonly catalog: Catalog;
+  readonly program: ts.Program;
+  readonly projectDirAbs: string;
+  readonly callSites: readonly CallSiteRecord[];
+}
+
+/**
+ * Phase 4 entry point: resolve a pre-collected list of call-site
+ * records produced by `walkProgram`. Skips the AST descent that the
+ * legacy `resolveEdges` did. Used by the orchestrator. The legacy
+ * `resolveEdges` is retained for tests and external callers that
+ * want a one-shot Stage 1+2 from a catalog.
+ */
+export function resolveEdgesFromRecords(
+  input: EdgeResolutionFromRecordsInput,
+): EdgeResolutionOutput {
+  logger.info({ evt: 'graph.edges.start', module: 'graph:edges' });
+  const checker = input.program.getTypeChecker();
+  const callsByHash = new Map<string, CallEdge[]>();
+  const stats = { totalCallSites: 0, resolvedHigh: 0, resolvedMedium: 0, resolvedLow: 0, unresolved: 0 };
+
+  for (const r of input.callSites) {
+    if (r.kind === 'creation') {
+      if (r.childHash === undefined) continue;
+      pushCreationEdgeFromRecord(r.node, r.sourceFile, r.ownerHash, r.childHash, callsByHash, stats);
+      continue;
+    }
+    const ctx: ResolverContext = {
+      catalog: input.catalog,
+      program: input.program,
+      typeChecker: checker,
+      sourceFile: r.sourceFile,
+      projectDirAbs: input.projectDirAbs,
+    };
+    const verdict = computeVerdict(r.node, ctx);
+    if (verdict === null) continue;
+    pushEdgeFromRecord(r.node, r.sourceFile, verdict, r.ownerHash, callsByHash, stats);
+  }
+
+  const newCatalog = rebuildCatalog(input.catalog, callsByHash);
+
+  logger.info({
+    evt: 'graph.edges.complete',
+    module: 'graph:edges',
+    totalCallSites: stats.totalCallSites,
+    resolvedHigh: stats.resolvedHigh,
+    resolvedMedium: stats.resolvedMedium,
+    resolvedLow: stats.resolvedLow,
+    unresolved: stats.unresolved,
+  });
+
+  return { catalog: newCatalog, resolutionStats: stats };
+}
+
+function pushCreationEdgeFromRecord(
+  node: ts.Node,
+  sourceFile: ts.SourceFile,
+  ownerHash: string,
+  childHash: string,
+  callsByHash: Map<string, CallEdge[]>,
+  stats: { totalCallSites: number; resolvedHigh: number; resolvedMedium: number; resolvedLow: number; unresolved: number },
+): void {
+  const start = node.getStart(sourceFile);
+  const startLC = sourceFile.getLineAndCharacterOfPosition(start);
+  const text = sourceFile.text.slice(start, node.getEnd());
+  const truncated = text.length > 70 ? `${text.slice(0, 67)}...` : text;
+  const edge: CallEdge = {
+    to: [childHash],
+    line: startLC.line + 1,
+    column: startLC.character,
+    resolution: 'static',
+    confidence: 'high',
+    text: `[creates] ${truncated}`,
+    discarded: false,
+  };
+  const list = callsByHash.get(ownerHash);
+  if (list) list.push(edge);
+  else callsByHash.set(ownerHash, [edge]);
+  stats.totalCallSites++;
+  stats.resolvedHigh++;
+}
+
+function pushEdgeFromRecord(
+  node: ts.Node,
+  sourceFile: ts.SourceFile,
+  verdict: ResolverVerdict,
+  ownerHash: string,
+  callsByHash: Map<string, CallEdge[]>,
+  stats: { totalCallSites: number; resolvedHigh: number; resolvedMedium: number; resolvedLow: number; unresolved: number },
+): void {
+  stats.totalCallSites++;
+  const start = node.getStart(sourceFile);
+  const startLC = sourceFile.getLineAndCharacterOfPosition(start);
+  const text = sourceFile.text.slice(start, node.getEnd());
+  const edge: CallEdge = {
+    to: verdict.to,
+    line: startLC.line + 1,
+    column: startLC.character,
+    resolution: verdict.resolution,
+    confidence: verdict.confidence,
+    text: text.length > 80 ? `${text.slice(0, 77)}...` : text,
+    discarded: isReturnValueDiscarded(node),
+  };
+  const list = callsByHash.get(ownerHash);
+  if (list) list.push(edge);
+  else callsByHash.set(ownerHash, [edge]);
+  if (verdict.to.length === 0) stats.unresolved++;
+  else if (verdict.confidence === 'high') stats.resolvedHigh++;
+  else if (verdict.confidence === 'medium') stats.resolvedMedium++;
+  else stats.resolvedLow++;
 }
 
 export function resolveEdges(input: EdgeResolutionInput): EdgeResolutionOutput {
@@ -406,29 +521,6 @@ function findClassConstructor(cls: ts.ClassLikeDeclaration): ts.ConstructorDecla
 function isFunctionLike(node: ts.Node): boolean {
   return (
     ts.isFunctionDeclaration(node) ||
-    ts.isArrowFunction(node) ||
-    ts.isFunctionExpression(node) ||
-    ts.isMethodDeclaration(node) ||
-    ts.isConstructorDeclaration(node) ||
-    ts.isGetAccessor(node) ||
-    ts.isSetAccessor(node)
-  );
-}
-
-/**
- * An inline callable is an arrow / function-expression / method /
- * accessor whose only call path is the value it produces (callback,
- * property assignment, instance method via dispatch, etc.).
- *
- * Methods/getters/setters/constructors get a creation edge from
- * their enclosing class declaration's owner: an instance method is
- * alive whenever the class is instantiated, and we don't always
- * resolve method-dispatch perfectly. The creation edge keeps a
- * reachable class's members reachable without depending on
- * type-checker accuracy for every dispatch site.
- */
-function isInlineCallable(node: ts.Node): boolean {
-  return (
     ts.isArrowFunction(node) ||
     ts.isFunctionExpression(node) ||
     ts.isMethodDeclaration(node) ||

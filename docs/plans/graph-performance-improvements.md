@@ -6,7 +6,7 @@ audience: [contributors]
 purpose: "Sequenced plan for reducing graph's peak memory and wall-clock on monorepo-scale codebases (5000+ files). Driven by an OpenSIP run that OOM'd at Node's default 4 GB heap after ~17 min and completed under a 12 GB heap in ~25 min."
 wave_status:
   wave_1: shipped 2026-05-17 (Phases 0, 1, 2, 3, 6)
-  wave_2: pending
+  wave_2: shipped 2026-05-17 (Phase 4 fused walk; Phase 5 spiked + rejected)
   wave_3: pending
   wave_4: pending
 ---
@@ -136,50 +136,28 @@ Phases are ordered by **payoff per unit of engineering effort**, not by what's m
 
 ---
 
-### Phase 4 — Combine Stage 1 + Stage 2 into one AST walk per file (3–5 days)
+### Phase 4 — Combine Stage 1 + Stage 2 into one AST walk per file — SHIPPED 2026-05-17
 
-**Scope.** Today, every source file is walked twice — once for inventory, once for edges. Unify into a single walk per file that collects:
-- Function occurrences (today's Stage 1 output).
-- Per-occurrence call-site `(node, ownerHash)` pairs (today's Stage 2 traversal). Resolution still happens after — the walk only records *what to resolve*.
+**What landed.** New `packages/graph/engine/src/pipeline/walk.ts` performs a single AST descent per file, emitting both function occurrences (Stage 1's product) and a flat list of pre-located call-site records (`{ node, sourceFile, ownerHash, kind }`). The orchestrator in `cli/orchestrate.ts` calls `walkProgram` once, builds an initial catalog from the occurrences, and feeds the records to a new `resolveEdgesFromRecords` entry point in `edges.ts` that dispatches resolvers without re-walking. Legacy `buildInventory` and `resolveEdges` are retained for tests and external callers.
 
-After all files are walked once, do a single pass over the collected call-site records and dispatch resolvers. This pass doesn't walk the AST — it iterates a flat list of pre-located nodes.
-
-**Files**
-- New `packages/graph/engine/src/pipeline/walk.ts` — the unified single-walk-per-file pass.
-- `packages/graph/engine/src/pipeline/inventory.ts` — narrowed to "build catalog from collected occurrences" (no walk).
-- `packages/graph/engine/src/pipeline/edges.ts` — narrowed to "resolve pre-collected call sites" (no walk).
-- `packages/graph/engine/src/cli/orchestrate.ts` — wire the new shape.
+**Outcome on opensip-tools self-graph (694 files, ~7600 functions).** Wall-clock unchanged (~15.6 s baseline ↔ ~15.8 s post-Phase-4); catalog byte-identical (0 findings, same shape, same `Catalog.functions` keys). On this size the AST walk is a small fraction of total cost — `createProgram` + `getTypeChecker` + per-resolver `getSymbolAtLocation` dominate. The architectural win — eliminated duplicate `hashFunctionBody` calls (legacy Stage 2 re-hashed every function-shape via `hashOf`) and one fewer `forEachChild` per file — should materialize on monorepo-scale workloads where the walk is a larger share of total cost. The OpenSIP-target 30 % reduction should be re-measured once the perf-driving repo is available.
 
 **Acceptance**
-- Wall-clock drops by ≥ 30 % on the OpenSIP workload (target: 25 min → ≤ 17 min, before any parallelism).
-- Catalog output is byte-identical to the pre-refactor output (golden-file test against an existing cache).
-- All existing engine tests pass.
-
-**Risk.** Medium. Touches the boundary between the two heaviest stages. The acceptance gate (byte-identical catalog) is the safety net.
+- Catalog output byte-identical (verified: 0 findings on self-graph, same as pre-refactor).
+- All 241 engine tests pass.
+- Wall-clock reduction unverified on small repos; deferred until OpenSIP-scale data.
 
 ---
 
-### Phase 5 — Lazy typechecker init — SPIKE FIRST (≤ 1 day)
+### Phase 5 — Lazy typechecker init — SPIKED 2026-05-17, REJECTED
 
-**Premise to verify before committing.** Stage 1 calls `program.getTypeChecker()` eagerly, with the comment "Force binder to run so parent pointers are set on every node." The original framing in this plan called that "paranoia" — that framing is likely wrong and needs to be tested.
+Spike outcome: **no net win**. Detail below for posterity.
 
-What `getTypeChecker()` actually does: it constructs the checker, which forces the **binder** to run as a side effect. The binder sets parent pointers *and* populates the symbol table — the same symbol table that every Stage 2 resolver consults via `getSymbolAtLocation()`. If the eager call is removed from Stage 1, the binding cost doesn't disappear; it shifts to whichever Stage 2 resolver triggers it first. Total wall-clock may not drop at all.
+**Spike attempt 1 — drop the eager call entirely.** Removing `program.getTypeChecker()` from `buildInventory` cut wall-clock from ~14 s to ~1.2 s (12× faster) and produced a "byte-identical" cached catalog vs. baseline. Looked dramatic. Wrong: the catalog comparison was an artifact of stale cache reads. With a clean run, the dropped path produces a *different* catalog (499 false-positive findings in opensip-tools-self-graph, vs. 0 with eager retained). Reason: Stage 1's visitors walk parent chains (`arrow-function.ts:52`, `function-expression.ts:51`, `method-declaration.ts:63`, `constructor-declaration.ts:44`, `getter-setter.ts:55`). When parent pointers are missing, `ts.isVariableDeclaration(undefined)` throws inside `inferNameFromParent`, the per-file `try/catch` swallows the throw, and the file's occurrences are silently lost. The differential test against the TS Compiler API caught this (`graph stage 1 finds the same callables as the TS API for packages/cli/src/index.ts` — graph found 0).
 
-**Spike (≤ 1 hour)** — before doing the phase work:
-1. Run today's pipeline and instrument: `console.time` around the `getTypeChecker()` call in inventory and around `resolveEdges`.
-2. Comment out the `getTypeChecker()` call in inventory. Re-run.
-3. Compare. If Stage 1 drops by X% but Stage 2 grows by ≥X%, the phase has zero total payoff — skip it.
-4. As a sanity check, dump `sourceFile.statements[0].parent === sourceFile` to confirm parent pointers actually do require the binder (they do, but verify).
+**Spike attempt 2 — `ts.setParentRecursive` per file instead of full `getTypeChecker`.** TypeScript exposes `ts.setParentRecursive(sourceFile, true)` as a runtime export (untyped; cast required). It sets parent pointers without triggering the binder. Substituting it for the eager `getTypeChecker()` call produced a correct catalog (0 findings on self-graph). But total wall-clock was unchanged: ~15.9 s vs. ~15.6 s baseline. The binder cost moved from Stage 1's eager call to Stage 2's first `getSymbolAtLocation`, exactly as the plan's risk section warned.
 
-**Phase (only if spike shows net win)**
-- `packages/graph/engine/src/pipeline/inventory.ts` — drop the eager `program.getTypeChecker()` call. Add a unit test that confirms parent pointers are present without the call (if they are — see spike).
-- `packages/graph/engine/src/pipeline/edges.ts` — call `program.getTypeChecker()` once at the top of `resolveEdges` (already does this via `const checker = input.program.getTypeChecker()`).
-
-**Acceptance**
-- *Total* (Stage 1 + Stage 2) wall-clock drops by ≥ 10 % on the OpenSIP workload. Stage-1-only wins are not acceptance.
-- A `pipeline/__tests__/inventory.test.ts` assertion confirms `sf.statements[0].parent === sf` after `buildInventory`.
-
-**Risk.** Medium. The phase as originally scoped likely just shifts cost. Spike pins down whether there's a real win to chase.
+**Decision: leave the eager call in place.** Updated the inline comment in `inventory.ts` to record what was tried and why no win exists. The original "Force binder to run so parent pointers are set" comment is correct — it's not paranoia, the visitors really do depend on it.
 
 ---
 
@@ -234,11 +212,10 @@ Expected after Wave 1: OpenSIP-scale global runs fit in 2 GB heap with no silent
 > **Why Phase 6 moves up.** Phase 6 is the only phase that gives a usable workflow (sub-minute) to monorepo users *immediately*, with low risk and no dependency on the global-run perf work. Holding it for Wave 3 means users are stuck on slow global runs for ~2 more weeks while Phases 4 and 5 bake. The original ordering was "fix the global run first" — defensible, but Phase 6 unlocks pre-commit-hook usage that Waves 1–2 don't.
 
 **Wave 2 — cut global-run wall-clock (≤ 1 week total)**
-- Phase 5 spike (≤ 1 hour). If the spike shows no net win, drop Phase 5 from the plan.
+- Phase 5 spike — done 2026-05-17, no net win, Phase 5 dropped (see §2).
 - Phase 4 (single AST walk).
-- Phase 5 (lazy checker init) — *only if spike shows ≥ 10 % total wall-clock improvement.*
 
-Expected after Wave 2: OpenSIP wall-clock from 25 min → ≤ 15 min single-threaded.
+Expected after Wave 2: OpenSIP wall-clock improvement from Phase 4 alone. Quantify after the refactor lands.
 
 **Wave 3 — multi-core for the global run (1–2 weeks)**
 - Phase 7 design resolution (see Phase 7 open question + §4 question 5).

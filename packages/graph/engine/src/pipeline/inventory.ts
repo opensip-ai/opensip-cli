@@ -11,14 +11,8 @@ import { relative, sep } from 'node:path';
 import { logger } from '@opensip-tools/core';
 import ts from 'typescript';
 
-import { visitArrowFunction } from './inventory-visitors/arrow-function.js';
-import { visitClassStaticBlock } from './inventory-visitors/class-static-init.js';
-import { visitConstructorDeclaration } from './inventory-visitors/constructor-declaration.js';
-import { visitFunctionDeclaration } from './inventory-visitors/function-declaration.js';
-import { visitFunctionExpression } from './inventory-visitors/function-expression.js';
-import { visitGetterSetter } from './inventory-visitors/getter-setter.js';
-import { visitMethodDeclaration } from './inventory-visitors/method-declaration.js';
 import { synthesizeModuleInit } from './inventory-visitors/module-init.js';
+import { dispatchVisitor } from './walk.js';
 
 import type { Catalog, FunctionOccurrence, ParseError } from '../types.js';
 import type { VisitorContext } from './inventory-visitors/types.js';
@@ -49,7 +43,14 @@ export function buildInventory(input: InventoryInput): InventoryOutput {
   });
 
   // Force binder to run so parent pointers are set on every node;
-  // visitors and resolvers walk parent chains.
+  // visitors and resolvers walk parent chains. Phase 5 of
+  // docs/plans/graph-performance-improvements.md spiked dropping this
+  // call: the timing looked dramatic (14 s → 1.2 s) but the catalog
+  // was wrong because Stage 1 visitors silently failed on undefined
+  // parents. Switching to per-file `ts.setParentRecursive` produced a
+  // correct catalog but ran in the same total wall-clock — the binder
+  // cost simply moved from Stage 1 to Stage 2's first
+  // `getSymbolAtLocation` call. No net win; left as-is.
   program.getTypeChecker();
 
   // Use a null-prototype object so reserved identifier names like
@@ -144,17 +145,6 @@ function collectFromFile(
 
 function normalizeForCompare(p: string): string {
   return p.split(sep).join('/');
-}
-
-function dispatchVisitor(node: ts.Node, ctx: VisitorContext): FunctionOccurrence | null {
-  if (ts.isFunctionDeclaration(node)) return visitFunctionDeclaration(node, ctx);
-  if (ts.isArrowFunction(node)) return visitArrowFunction(node, ctx);
-  if (ts.isMethodDeclaration(node)) return visitMethodDeclaration(node, ctx);
-  if (ts.isConstructorDeclaration(node)) return visitConstructorDeclaration(node, ctx);
-  if (ts.isGetAccessor(node) || ts.isSetAccessor(node)) return visitGetterSetter(node, ctx);
-  if (ts.isFunctionExpression(node)) return visitFunctionExpression(node, ctx);
-  if (ts.isClassStaticBlockDeclaration(node)) return visitClassStaticBlock(node, ctx);
-  return null;
 }
 
 function isTestFile(rel: string): boolean {

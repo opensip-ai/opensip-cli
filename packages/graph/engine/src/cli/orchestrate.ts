@@ -7,6 +7,7 @@
  */
 
 import { logger, resolveProjectPaths } from '@opensip-tools/core';
+import ts from 'typescript';
 
 import {
   computeFilesFingerprint,
@@ -16,9 +17,9 @@ import {
 import { readCatalog } from '../cache/read.js';
 import { writeCatalog } from '../cache/write.js';
 import { discoverFiles } from '../pipeline/discover.js';
-import { resolveEdges } from '../pipeline/edges.js';
+import { resolveEdgesFromRecords } from '../pipeline/edges.js';
 import { buildIndexes } from '../pipeline/indexes.js';
-import { buildInventory } from '../pipeline/inventory.js';
+import { walkProgram } from '../pipeline/walk.js';
 import { rules as defaultRules } from '../rules/registry.js';
 
 import type { Catalog, GraphConfig, Indexes, ResolutionStats, Rule } from '../types.js';
@@ -136,17 +137,43 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
 function buildAndResolveCatalog(
   discovery: ReturnType<typeof discoverFiles>,
 ): { readonly catalog: Catalog; readonly resolutionStats: ResolutionStats } {
-  const inventory = buildInventory({
-    projectDirAbs: discovery.projectDirAbs,
+  // Phase 4 unified walk: Stage 1's catalog construction and Stage 2's
+  // call-site location share a single AST descent per file. The walk
+  // emits the catalog plus a flat list of pre-located call-site
+  // records; resolveEdgesFromRecords dispatches resolvers without
+  // re-walking. See docs/plans/graph-performance-improvements.md.
+  const program = ts.createProgram({
+    rootNames: [...discovery.files],
+    options: discovery.compilerOptions,
+  });
+  // Force binder so parent pointers and the symbol table are populated
+  // before either the inventory visitors (which walk parent chains)
+  // or the resolvers (which call getSymbolAtLocation) need them.
+  program.getTypeChecker();
+
+  const walked = walkProgram({
+    program,
     files: discovery.files,
-    compilerOptions: discovery.compilerOptions,
-    tsConfigPathAbs: discovery.tsConfigPathAbs,
-  });
-  const edgeResult = resolveEdges({
-    catalog: inventory.catalog,
-    program: inventory.program,
     projectDirAbs: discovery.projectDirAbs,
   });
+
+  const initialCatalog: Catalog = {
+    version: '2.0',
+    tool: 'graph',
+    language: 'typescript',
+    builtAt: new Date().toISOString(),
+    tsConfigPath: discovery.tsConfigPathAbs,
+    tsCompilerVersion: ts.version,
+    functions: walked.functions,
+  };
+
+  const edgeResult = resolveEdgesFromRecords({
+    catalog: initialCatalog,
+    program,
+    projectDirAbs: discovery.projectDirAbs,
+    callSites: walked.callSites,
+  });
+
   return { catalog: edgeResult.catalog, resolutionStats: edgeResult.resolutionStats };
 }
 
