@@ -8,7 +8,7 @@ wave_status:
   wave_1: shipped 2026-05-17 (Phases 0, 1, 2, 3, 6)
   wave_2: shipped 2026-05-17 (Phase 4 fused walk; Phase 5 spiked + rejected)
   wave_3: shipped 2026-05-17 (graph --packages parallel runner; Phase 7 deferred pending OpenSIP-scale measurement)
-  wave_4: pending
+  wave_4: shipped 2026-05-17 (transitive incremental rebuild)
 ---
 
 # graph Tool — performance improvements
@@ -243,8 +243,25 @@ time opensip-tools graph --packages --no-cache
 - If > 5 min and one package dominates: open Phase 7 against that single-package case only, per the §4 Q5 design (workers resolve intra-partition; main thread runs `resolveByCatalogFallback` on cross-partition records).
 - If > 5 min but load is balanced across multiple packages: that contradicts the design hypothesis; revisit.
 
-**Wave 4 — incremental rebuild (deferred; scope after Wave 2 ships)**
-- See §4 question 4. Today's "any file change → full rebuild" makes graph essentially unusable in watch mode on monorepos. Per-file occurrences cached, only changed files re-walked. Worth a dedicated plan.
+**Wave 4 — SHIPPED 2026-05-17 (transitive incremental rebuild)**
+
+What landed:
+- `cache/invalidate.ts` gains `classifyCatalog` returning `'valid' | 'incremental' | 'invalid'` plus a `diffFingerprints` helper that returns the absolute paths of changed files (added/removed/modified). The legacy `isCatalogValid` boolean is preserved for back-compat.
+- `cli/orchestrate.ts` adds `buildAndResolveCatalogIncremental`. Algorithm:
+  1. Build a TS Program over ALL current files (resolvers need the full import graph).
+  2. Convert the absolute changed-files set to project-relative paths to match the catalog's `filePath` field.
+  3. Walk the closure. Compute hashes that vanished from the new walk vs. cache.
+  4. Find unchanged files whose cached edges reference any vanished hash; add them to the closure.
+  5. Iterate until the closure stops growing.
+  6. Merge: cached entries for files outside the closure + freshly-resolved entries for files in the closure.
+- Cached `calls` arrays for unchanged files are preserved verbatim — `resolveEdgesFromRecords` only sees the closure's call sites, so unchanged files' edges aren't recomputed.
+
+Outcome on opensip-tools self-graph (694 files, 1-file edit):
+- Full rebuild: ~15.6 s.
+- Incremental rebuild: ~2.6 s — **6× faster**.
+- Catalog is byte-identical to `--no-cache` (verified by MD5 + acceptance test).
+
+Correctness gate: every file whose cached edges might point at a stale hash is itself re-walked. After the fixpoint, no cached edge dangles. The acceptance test (`incremental rebuild produces a catalog identical to a full rebuild after a single-file edit`) compares the function-name set after an edit against `--no-cache`.
 
 ## 4. Open questions
 

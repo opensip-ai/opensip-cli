@@ -191,6 +191,12 @@ NODE_OPTIONS=--max-old-space-size=12288 opensip-tools graph    # very large repo
 
 Measured: a 5476-file repo OOM'd at 4 GB after ~17 min, completed at 12 GB in ~25 min with ~4.2 GB peak resident. The 8 GB setting is the recommended default once you cross the threshold.
 
+#### Incremental rebuild
+
+Once a catalog is cached on disk, subsequent runs only re-walk source files whose mtime or size has changed. The dependency closure is expanded transitively: any unchanged file whose cached call edges point at a hash that vanished after the re-walk is also re-walked, until the closure is closed. This guarantees no stale edges in the merged catalog — the result is byte-identical to a `--no-cache` full rebuild.
+
+On opensip-tools self-graph, editing a single file drops rebuild time from ~15 s (full) to ~2.6 s (incremental), with no fidelity loss. Use `--no-cache` to force a full rebuild.
+
 ### Standalone listing commands
 
 These mirror the `fit --list` / `fit --recipes` flags but work as

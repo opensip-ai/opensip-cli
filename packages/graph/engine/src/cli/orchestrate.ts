@@ -6,13 +6,15 @@
  * happens inside one of the stages.
  */
 
+import { relative, sep } from 'node:path';
+
 import { logger, resolveProjectPaths } from '@opensip-tools/core';
 import ts from 'typescript';
 
 import {
+  classifyCatalog,
   computeFilesFingerprint,
   currentTsCompilerVersion,
-  isCatalogValid,
 } from '../cache/invalidate.js';
 import { readCatalog } from '../cache/read.js';
 import { writeCatalog } from '../cache/write.js';
@@ -22,7 +24,7 @@ import { buildIndexes } from '../pipeline/indexes.js';
 import { walkProgram } from '../pipeline/walk.js';
 import { rules as defaultRules } from '../rules/registry.js';
 
-import type { Catalog, GraphConfig, Indexes, ResolutionStats, Rule } from '../types.js';
+import type { Catalog, FunctionOccurrence, GraphConfig, Indexes, ResolutionStats, Rule } from '../types.js';
 import type { Signal } from '@opensip-tools/core';
 
 /**
@@ -70,45 +72,11 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
 
   emitLargeRepoHint(discovery.files.length);
 
-  // Cache lookup: stages 1+2 are cached; stages 0/3/4/5 always rerun.
-  const useCache = input.noCache !== true;
-  let catalog: Catalog | null = useCache ? readCatalog(paths.graphCatalogPath) : null;
-  let cacheHit = false;
-  if (catalog) {
-    const valid = isCatalogValid(catalog, {
-      currentTsCompilerVersion: currentTsCompilerVersion(),
-      currentTsConfigPath: discovery.tsConfigPathAbs,
-      currentFiles: discovery.files,
-    });
-    if (valid) {
-      cacheHit = true;
-    } else {
-      catalog = null;
-    }
-  }
-
-  let resolutionStats: ResolutionStats | null = null;
-  if (!catalog) {
-    // Stages 1+2 are scoped to a block so the ts.Program reference held
-    // by `inventory.program` becomes unreachable as soon as edge
-    // resolution finishes. With ~3000+ files the program plus its bound
-    // symbol table is ~1-2 GB; freeing it before stages 3-5 (indexes,
-    // rules, serialization) keeps peak resident lower. See
-    // docs/plans/graph-performance-improvements.md Phase 1.
-    const built = buildAndResolveCatalog(discovery);
-    catalog = {
-      ...built.catalog,
-      filesFingerprint: computeFilesFingerprint(discovery.files),
-    };
-    resolutionStats = built.resolutionStats;
-    if (useCache) {
-      try {
-        writeCatalog(paths.graphCatalogPath, catalog);
-      } catch {
-        // Cache write failure is non-fatal — already logged.
-      }
-    }
-  }
+  const { catalog, cacheHit, resolutionStats } = obtainCatalog({
+    discovery,
+    catalogPath: paths.graphCatalogPath,
+    useCache: input.noCache !== true,
+  });
 
   const indexes: Indexes = buildIndexes(catalog);
 
@@ -175,6 +143,383 @@ function buildAndResolveCatalog(
   });
 
   return { catalog: edgeResult.catalog, resolutionStats: edgeResult.resolutionStats };
+}
+
+interface ObtainCatalogInput {
+  readonly discovery: ReturnType<typeof discoverFiles>;
+  readonly catalogPath: string;
+  readonly useCache: boolean;
+}
+
+interface ObtainCatalogOutput {
+  readonly catalog: Catalog;
+  readonly cacheHit: boolean;
+  readonly resolutionStats: ResolutionStats | null;
+}
+
+/**
+ * Resolve the catalog for this run by consulting the on-disk cache,
+ * dispatching to the right rebuild path (full vs Wave 4 incremental
+ * vs cache hit) per `classifyCatalog`'s verdict.
+ */
+function obtainCatalog(input: ObtainCatalogInput): ObtainCatalogOutput {
+  const cachedCatalog: Catalog | null = input.useCache
+    ? readCatalog(input.catalogPath)
+    : null;
+  const verdict = cachedCatalog
+    ? classifyCatalog(cachedCatalog, {
+        currentTsCompilerVersion: currentTsCompilerVersion(),
+        currentTsConfigPath: input.discovery.tsConfigPathAbs,
+        currentFiles: input.discovery.files,
+      })
+    : ({ kind: 'invalid', reason: 'no-cache' } as const);
+
+  if (verdict.kind === 'valid' && cachedCatalog) {
+    return { catalog: cachedCatalog, cacheHit: true, resolutionStats: null };
+  }
+  const built = verdict.kind === 'incremental' && cachedCatalog
+    ? buildAndResolveCatalogIncremental(input.discovery, cachedCatalog, verdict.changedFiles)
+    : buildAndResolveCatalog(input.discovery);
+
+  const catalog: Catalog = {
+    ...built.catalog,
+    filesFingerprint: computeFilesFingerprint(input.discovery.files),
+  };
+  if (input.useCache) {
+    try {
+      writeCatalog(input.catalogPath, catalog);
+    } catch {
+      // Cache write failure is non-fatal — already logged.
+    }
+  }
+  return { catalog, cacheHit: false, resolutionStats: built.resolutionStats };
+}
+
+/**
+ * Wave 4 incremental rebuild — re-walk only changed files plus their
+ * transitive edge-dependents, then merge with cached entries for
+ * unchanged files.
+ *
+ * Algorithm:
+ *   1. Build a TypeScript Program over ALL current files. (We need
+ *      the full program for resolver dispatch — symbol lookup walks
+ *      the whole import graph.)
+ *   2. Convert the absolute changed-files set to project-relative
+ *      paths so we can match the catalog's filePath field.
+ *   3. Iterate to fixpoint: walk closure files, identify hashes that
+ *      vanished or changed, find unchanged files whose cached edges
+ *      reference those hashes, add them to the closure, repeat until
+ *      no new dependents are discovered.
+ *   4. Merge cached entries for files NOT in the closure with
+ *      freshly-walked-and-resolved entries for files IN the closure.
+ *
+ * Correctness vs full rebuild: every file whose cached edges might
+ * point at a stale hash is itself re-walked. After the fixpoint, no
+ * cached edge dangles. Verified by `incremental rebuild produces a
+ * catalog identical to a full rebuild` test.
+ */
+function buildAndResolveCatalogIncremental(
+  discovery: ReturnType<typeof discoverFiles>,
+  cachedCatalog: Catalog,
+  changedFilesAbs: readonly string[],
+): { readonly catalog: Catalog; readonly resolutionStats: ResolutionStats } {
+  const program = ts.createProgram({
+    rootNames: [...discovery.files],
+    options: discovery.compilerOptions,
+  });
+  program.getTypeChecker();
+
+  const { walked, closureRel } = expandClosureToFixpoint({
+    discovery,
+    cachedCatalog,
+    program,
+    changedFilesAbs,
+  });
+
+  // Build the resolver-input catalog from the merged occurrence set
+  // so name- and hash-based fallbacks see the full project.
+  const mergedFunctions = mergeOccurrences(cachedCatalog, walked.functions, closureRel);
+  const initialCatalog: Catalog = {
+    version: '2.0',
+    tool: 'graph',
+    language: 'typescript',
+    builtAt: new Date().toISOString(),
+    tsConfigPath: discovery.tsConfigPathAbs,
+    tsCompilerVersion: ts.version,
+    functions: mergedFunctions,
+  };
+
+  const edgeResult = resolveEdgesFromRecords({
+    catalog: initialCatalog,
+    program,
+    projectDirAbs: discovery.projectDirAbs,
+    callSites: walked.callSites,
+  });
+
+  // resolveEdgesFromRecords replaced ALL `calls` arrays in the catalog
+  // it returned. Restore the cached `calls` for unchanged files —
+  // their bodyHashes are present in the merged catalog by construction
+  // so the cached edges are still valid.
+  const finalFunctions = restoreCachedCalls(
+    edgeResult.catalog,
+    cachedCatalog,
+    closureRel,
+  );
+  const finalCatalog: Catalog = { ...edgeResult.catalog, functions: finalFunctions };
+
+  return { catalog: finalCatalog, resolutionStats: edgeResult.resolutionStats };
+}
+
+interface ClosureInput {
+  readonly discovery: ReturnType<typeof discoverFiles>;
+  readonly cachedCatalog: Catalog;
+  readonly program: ts.Program;
+  readonly changedFilesAbs: readonly string[];
+}
+
+interface ClosureOutput {
+  readonly walked: ReturnType<typeof walkProgram>;
+  readonly closureRel: ReadonlySet<string>;
+}
+
+/**
+ * Expand the re-walk closure to a fixpoint. Starts with the directly
+ * changed files; on each iteration walks the closure, finds hashes
+ * that vanished, scans cached edges for any that still point at
+ * vanished hashes, and adds those callers to the closure. Stops when
+ * no new dependents are discovered.
+ */
+function expandClosureToFixpoint(input: ClosureInput): ClosureOutput {
+  const { discovery, cachedCatalog, program, changedFilesAbs } = input;
+  const closureRel = new Set(
+    changedFilesAbs.map((p) => relative(discovery.projectDirAbs, p).split(sep).join('/')),
+  );
+  const closureAbs = new Set(changedFilesAbs);
+  const cachedHashesByFile = groupCachedHashesByFile(cachedCatalog);
+
+  let walked: ReturnType<typeof walkProgram> | null = null;
+  // Iterate to fixpoint. On a typical 1-file change, this loop runs
+  // exactly once — a file's hashes generally don't reach into
+  // unchanged callers' edges. Worst case is bounded by file count
+  // (each iteration adds at least one file).
+  for (;;) {
+    walked = walkProgram({
+      program,
+      files: discovery.files.filter((p) => closureAbs.has(p)),
+      projectDirAbs: discovery.projectDirAbs,
+    });
+    const grew = expandClosureOnce(
+      walked,
+      cachedCatalog,
+      closureRel,
+      closureAbs,
+      cachedHashesByFile,
+      discovery.projectDirAbs,
+    );
+    if (!grew) break;
+  }
+  if (!walked) {
+    throw new Error('incremental walk produced no result; closure was empty');
+  }
+  return { walked, closureRel };
+}
+
+function expandClosureOnce(
+  walked: ReturnType<typeof walkProgram>,
+  cachedCatalog: Catalog,
+  closureRel: Set<string>,
+  closureAbs: Set<string>,
+  cachedHashesByFile: ReadonlyMap<string, ReadonlySet<string>>,
+  projectDirAbs: string,
+): boolean {
+  const newHashes = collectHashesFromOccurrences(walked.functions);
+  const staleHashes = collectStaleHashes(closureRel, cachedHashesByFile, newHashes);
+  if (staleHashes.size === 0) return false;
+  const newDependents = findEdgeDependents(cachedCatalog, staleHashes, closureRel);
+  if (newDependents.length === 0) return false;
+
+  let grew = false;
+  for (const dep of newDependents) {
+    if (closureRel.has(dep)) continue;
+    closureRel.add(dep);
+    closureAbs.add(`${projectDirAbs}/${dep}`.split('/').join(sep));
+    grew = true;
+  }
+  if (grew) {
+    logger.info({
+      evt: 'graph.cache.incremental.expand',
+      module: 'graph:cache',
+      addedDependents: newDependents.length,
+      closureSize: closureRel.size,
+    });
+  }
+  return grew;
+}
+
+function collectHashesFromOccurrences(
+  functions: Record<string, FunctionOccurrence[]>,
+): ReadonlySet<string> {
+  const out = new Set<string>();
+  for (const occs of Object.values(functions)) {
+    if (!occs) continue;
+    for (const o of occs) out.add(o.bodyHash);
+  }
+  return out;
+}
+
+function collectStaleHashes(
+  closureRel: ReadonlySet<string>,
+  cachedHashesByFile: ReadonlyMap<string, ReadonlySet<string>>,
+  newHashes: ReadonlySet<string>,
+): ReadonlySet<string> {
+  const stale = new Set<string>();
+  for (const fileRel of closureRel) {
+    const cachedHashes = cachedHashesByFile.get(fileRel);
+    if (!cachedHashes) continue;
+    for (const h of cachedHashes) {
+      if (!newHashes.has(h)) stale.add(h);
+    }
+  }
+  return stale;
+}
+
+function groupCachedHashesByFile(catalog: Catalog): Map<string, Set<string>> {
+  const out = new Map<string, Set<string>>();
+  for (const occs of Object.values(catalog.functions)) {
+    if (!occs) continue;
+    for (const o of occs) {
+      let set = out.get(o.filePath);
+      if (!set) {
+        set = new Set();
+        out.set(o.filePath, set);
+      }
+      set.add(o.bodyHash);
+    }
+  }
+  return out;
+}
+
+/**
+ * Find unchanged files whose cached edges have any `to` containing
+ * a hash from `staleHashes`. Used by the incremental closure
+ * expansion: if file A's cached edges point at a hash that no longer
+ * exists, A must be re-walked too.
+ */
+function findEdgeDependents(
+  catalog: Catalog,
+  staleHashes: ReadonlySet<string>,
+  alreadyClosed: ReadonlySet<string>,
+): readonly string[] {
+  const dependents = new Set<string>();
+  for (const occs of Object.values(catalog.functions)) {
+    if (!occs) continue;
+    for (const o of occs) {
+      if (alreadyClosed.has(o.filePath)) continue;
+      if (dependents.has(o.filePath)) continue;
+      if (occHasEdgeIntoStale(o, staleHashes)) dependents.add(o.filePath);
+    }
+  }
+  return [...dependents].sort();
+}
+
+function occHasEdgeIntoStale(
+  occ: FunctionOccurrence,
+  staleHashes: ReadonlySet<string>,
+): boolean {
+  for (const edge of occ.calls) {
+    for (const target of edge.to) {
+      if (staleHashes.has(target)) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Merge occurrences: for files in `closureRel`, take the freshly-
+ * walked entries; for everything else, take the cached entries.
+ * Re-keys by simpleName so the catalog shape matches the full-rebuild
+ * output.
+ */
+function mergeOccurrences(
+  cachedCatalog: Catalog,
+  walkedFunctions: Record<string, FunctionOccurrence[]>,
+  closureRel: ReadonlySet<string>,
+): Record<string, readonly FunctionOccurrence[]> {
+  const out: Record<string, FunctionOccurrence[]> = Object.create(null) as Record<
+    string,
+    FunctionOccurrence[]
+  >;
+  // Lift cached entries for files NOT in the closure.
+  for (const [name, occs] of Object.entries(cachedCatalog.functions)) {
+    if (!occs) continue;
+    for (const o of occs) {
+      if (closureRel.has(o.filePath)) continue;
+      pushOccurrence(out, name, o);
+    }
+  }
+  // Add freshly-walked entries for closure files.
+  for (const [name, occs] of Object.entries(walkedFunctions)) {
+    if (!occs) continue;
+    for (const o of occs) pushOccurrence(out, name, o);
+  }
+  return out;
+}
+
+function pushOccurrence(
+  out: Record<string, FunctionOccurrence[]>,
+  name: string,
+  occ: FunctionOccurrence,
+): void {
+  let arr = out[name];
+  if (!arr) {
+    arr = [];
+    out[name] = arr;
+  }
+  arr.push(occ);
+}
+
+/**
+ * After resolveEdgesFromRecords, every occurrence in the merged
+ * catalog has its `calls` array set to whatever the resolver
+ * dispatch produced — which is empty for unchanged files because we
+ * didn't pass any of their call-sites to the resolver. Restore the
+ * cached `calls` for those occurrences.
+ */
+function restoreCachedCalls(
+  resolved: Catalog,
+  cached: Catalog,
+  closureRel: ReadonlySet<string>,
+): Record<string, readonly FunctionOccurrence[]> {
+  // Build a quick index of cached occurrences by bodyHash so we can
+  // look up the right cached calls without scanning the catalog
+  // per-occurrence.
+  const cachedByHash = new Map<string, FunctionOccurrence>();
+  for (const occs of Object.values(cached.functions)) {
+    if (!occs) continue;
+    for (const o of occs) cachedByHash.set(o.bodyHash, o);
+  }
+  const out: Record<string, FunctionOccurrence[]> = Object.create(null) as Record<
+    string,
+    FunctionOccurrence[]
+  >;
+  for (const [name, occs] of Object.entries(resolved.functions)) {
+    if (!occs) continue;
+    const arr: FunctionOccurrence[] = [];
+    for (const o of occs) {
+      if (closureRel.has(o.filePath)) {
+        // Closure files keep their freshly-resolved edges.
+        arr.push(o);
+      } else {
+        // Unchanged files: restore cached calls. The hash matched
+        // because we lifted the cached occurrence into the merged
+        // catalog before resolver dispatch.
+        const cachedOcc = cachedByHash.get(o.bodyHash);
+        arr.push({ ...o, calls: cachedOcc?.calls ?? [] });
+      }
+    }
+    out[name] = arr;
+  }
+  return out;
 }
 
 /**

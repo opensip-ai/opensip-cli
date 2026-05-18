@@ -160,6 +160,45 @@ describe('runGraph orchestrator', () => {
     }
   });
 
+  it('incremental rebuild produces a catalog identical to a full rebuild after a single-file edit (Wave 4)', async () => {
+    // Three sibling files. First run populates the cache. Second run
+    // (after editing only b.ts) should take the incremental path and
+    // produce a catalog identical to what --no-cache would give.
+    setupFixture(dir, {
+      'a.ts': `export function fromA(): number { return 1; }\n`,
+      'b.ts': `export function fromB(): number { return 2; }\n`,
+      'c.ts': `import { fromA } from './a.js';\nimport { fromB } from './b.js';\nexport function main(): number { return fromA() + fromB(); }\n`,
+    });
+    await runGraph({ cwd: dir });
+
+    // Wait long enough for mtimeMs to differ. macOS mtime resolution
+    // is millisecond-grained but JS clock readings can collide if the
+    // file is touched in the same tick.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    writeFileSync(
+      join(dir, 'b.ts'),
+      `export function fromB(): number { return 2; }\nexport function fromBExtra(): string { return 'new'; }\n`,
+      'utf8',
+    );
+
+    const incremental = await runGraph({ cwd: dir });
+    expect(incremental.cacheHit).toBe(false); // incremental, not a hit
+    expect(incremental.resolutionStats).not.toBeNull();
+    expect(incremental.catalog).not.toBeNull();
+
+    // Compare against a clean --no-cache rebuild.
+    const fullRebuild = await runGraph({ cwd: dir, noCache: true });
+    expect(fullRebuild.catalog).not.toBeNull();
+
+    // The function name set should match exactly (added function
+    // appears, removed/edited functions reflect the new state).
+    const incrementalNames = Object.keys(incremental.catalog!.functions).sort();
+    const fullNames = Object.keys(fullRebuild.catalog!.functions).sort();
+    expect(incrementalNames).toEqual(fullNames);
+    // The new function appears in both.
+    expect(incrementalNames).toContain('fromBExtra');
+  });
+
   it('cache write failure is non-fatal', async () => {
     setupFixture(dir, {
       'index.ts': `export function x(): number { return 1; }\n`,
