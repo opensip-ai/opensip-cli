@@ -736,16 +736,29 @@ describe('dead-code (command mode)', () => {
 
   afterAll(() => rmSync(cwd, { recursive: true, force: true }))
 
+  // Bumped from the 5 s vitest default. The dead-code check's bin is
+  // `npx`, which on a cold CI runner can spend >5 s deciding whether
+  // to download knip before failing. Locally, `npx` finds knip in
+  // `node_modules` instantly. The 30 s window covers both. The check
+  // itself caps at 120 s via `deadCode.config.timeout` so a runaway
+  // invocation can't hang indefinitely.
   it('does not throw when knip is missing', async () => {
     // Without knip installed, the command executor returns an ENOENT-style
     // result; the framework converts that into a check result with no
     // violations and a populated `error` string. We just verify the run
     // does not throw.
-    const result = await findCheck('dead-code').run(cwd, {
-      targetFiles: [join(cwd, 'src/orphan.ts')],
-    })
-    expect(result).toBeDefined()
-  })
+    const controller = new AbortController()
+    const guard = setTimeout(() => { controller.abort() }, 25_000)
+    try {
+      const result = await findCheck('dead-code').run(cwd, {
+        targetFiles: [join(cwd, 'src/orphan.ts')],
+        signal: controller.signal,
+      })
+      expect(result).toBeDefined()
+    } finally {
+      clearTimeout(guard)
+    }
+  }, 30_000)
 })
 
 // =============================================================================

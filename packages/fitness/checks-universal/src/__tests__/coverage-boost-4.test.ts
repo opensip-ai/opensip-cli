@@ -677,12 +677,23 @@ describe('security-scan-suite', () => {
 
   afterAll(() => rmSync(cwd, { recursive: true, force: true }))
 
+  // Bumped from the 5 s vitest default. security-scan-suite shells out
+  // (`sh -c '...pnpm audit...'`); the spawn + audit can take several
+  // seconds on CI runners. The check itself caps at 90 s via its own
+  // timeout config so a runaway invocation can't hang.
   it('runs without throwing on cookie/exec patterns', async () => {
-    const result = await findCheck('security-scan-suite').run(cwd, {
-      targetFiles: [join(cwd, 'src/cookies.ts'), join(cwd, 'src/exec.ts')],
-    })
-    expect(result).toBeDefined()
-  })
+    const controller = new AbortController()
+    const guard = setTimeout(() => { controller.abort() }, 25_000)
+    try {
+      const result = await findCheck('security-scan-suite').run(cwd, {
+        targetFiles: [join(cwd, 'src/cookies.ts'), join(cwd, 'src/exec.ts')],
+        signal: controller.signal,
+      })
+      expect(result).toBeDefined()
+    } finally {
+      clearTimeout(guard)
+    }
+  }, 30_000)
 })
 
 // =============================================================================
