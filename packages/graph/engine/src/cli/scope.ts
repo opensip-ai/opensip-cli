@@ -127,3 +127,44 @@ function findPackageByName(root: string, name: string, maxDepth: number): readon
     }
   }
 }
+
+/**
+ * Find every workspace package under `<cwd>/packages/**` that has a
+ * tsconfig.json. Used by `--packages` to enumerate the targets a
+ * parallel run should fan out over.
+ *
+ * Returns absolute package directory paths, sorted lexicographically
+ * for deterministic output ordering.
+ */
+export function discoverWorkspacePackages(cwd: string): readonly string[] {
+  const root = resolve(cwd, PACKAGES_SEARCH_ROOT);
+  if (!existsSync(root) || !safeIsDir(root)) return [];
+  const out: string[] = [];
+  walk(root, 0);
+  out.sort();
+  return out;
+
+  function walk(dir: string, depth: number): void {
+    if (depth > SEARCH_MAX_DEPTH) return;
+    // A directory with a tsconfig.json is a candidate; record it and
+    // do not recurse into it. Without this short-circuit, nested
+    // tsconfigs (e.g., a sub-package with its own tsconfig under a
+    // parent package) would all be enumerated, double-counting code.
+    if (existsSync(join(dir, 'tsconfig.json'))) {
+      out.push(dir);
+      return;
+    }
+    let entries: readonly string[];
+    try {
+      entries = readdirSync(dir);
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (entry === 'node_modules' || entry === 'dist' || entry === 'build') continue;
+      const sub = join(dir, entry);
+      if (!safeIsDir(sub)) continue;
+      walk(sub, depth + 1);
+    }
+  }
+}

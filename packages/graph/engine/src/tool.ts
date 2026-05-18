@@ -47,6 +47,16 @@ function register(cli: ToolCliContext): void {
       '--package <name|path>',
       'Scope the run to a single workspace package (faster on monorepos; cross-package call sites become unresolved)',
     )
+    .option(
+      '--packages',
+      'Fan the run across every workspace package under packages/** (parallel; aggregates per-package findings)',
+      false,
+    )
+    .option(
+      '--packages-concurrency <n>',
+      'Concurrency cap for --packages (default: cpus()-1)',
+      (v) => Number.parseInt(v, 10),
+    )
     .option('--debug', 'Enable debug mode for structured log output', false)
     .action(async (opts: {
       cwd: string;
@@ -57,6 +67,8 @@ function register(cli: ToolCliContext): void {
       baseline?: string;
       reportTo?: string;
       package?: string;
+      packages?: boolean;
+      packagesConcurrency?: number;
     }) => {
       await executeGraph(
         {
@@ -68,6 +80,9 @@ function register(cli: ToolCliContext): void {
           baseline: opts.baseline,
           reportTo: opts.reportTo,
           packageScope: opts.package,
+          allPackages: opts.packages,
+          packagesConcurrency: opts.packagesConcurrency,
+          cliScript: process.argv[1],
         },
         cli,
       );

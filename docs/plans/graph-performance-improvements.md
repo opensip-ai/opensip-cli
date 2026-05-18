@@ -7,7 +7,7 @@ purpose: "Sequenced plan for reducing graph's peak memory and wall-clock on mono
 wave_status:
   wave_1: shipped 2026-05-17 (Phases 0, 1, 2, 3, 6)
   wave_2: shipped 2026-05-17 (Phase 4 fused walk; Phase 5 spiked + rejected)
-  wave_3: pending
+  wave_3: shipped 2026-05-17 (graph --packages parallel runner; Phase 7 deferred pending OpenSIP-scale measurement)
   wave_4: pending
 ---
 
@@ -217,26 +217,31 @@ Expected after Wave 1: OpenSIP-scale global runs fit in 2 GB heap with no silent
 
 Expected after Wave 2: OpenSIP wall-clock improvement from Phase 4 alone. Quantify after the refactor lands.
 
-**Wave 3 — multi-core for the global run (≤ 1 week, scope contingent on measurement)**
+**Wave 3 — SHIPPED 2026-05-17 (parallel runner; Phase 7 deferred)**
 
-Step 1 — measure Phase 6 + xargs against the OpenSIP-scale workload (≤ 1 hour):
+What landed:
+- `opensip-tools graph --packages` discovers every workspace package under `packages/**` with a `tsconfig.json` and fans out one child process per package, with concurrency capped at `cpus()-1`. Each child runs `graph --package <dir> --json`; the parent parses each child's output and aggregates findings.
+- New helper `discoverWorkspacePackages` in `cli/scope.ts`. Walker stops at any directory with a `tsconfig.json` so nested workspaces don't double-count.
+- New module `cli/packages-runner.ts` owns the spawn/aggregate loop. Each child has its own Node heap, so the per-package memory ceiling Phase 6 already provides scales naturally: N packages × per-package-budget ≈ total budget.
+- README documents `--packages` and the equivalent `xargs -P 8` external-orchestration pattern.
+
+Outcome on opensip-tools self-graph (18 packages):
+- Global run: ~15.2 s
+- `--packages` run: ~6.5 s
+- 2.3× speedup with 8 cores. Speedup will grow on monorepos with more packages.
+
+What did NOT ship — Phase 7 (`worker_threads` partition):
+- Step 1 of the original Wave-3 plan was: measure Phase 6 + xargs against the OpenSIP-scale 5476-file workload. That measurement requires access to the OpenSIP repo and is deferred until you can run it. Until that measurement lands, Phase 7 stays speculative.
+- Phase 7 is genuinely necessary only if a *single* package dominates the OpenSIP global run (i.e. the parallel `--packages` mode can't break it up). If every OpenSIP package fits in default heap individually, `--packages` is the entire story and Phase 7 becomes unnecessary.
+
+Step to run before considering Phase 7:
 ```
-time xargs -P 8 -I {} opensip-tools graph --package {} <<< "$(list-of-packages)"
+cd /path/to/opensip
+time opensip-tools graph --packages --no-cache
 ```
-- If wall-clock ≤ 5 min: Wave 3 becomes a thin shipping exercise. Add an `opensip-tools graph --packages <glob>` flag that iterates packages in-process with a worker pool, document the xargs pattern in the README, ship. Phase 7's `worker_threads`-on-one-Program design becomes deferred or unnecessary.
-- If wall-clock > 5 min: identify the dominating package(s). Phase 7 becomes scoped to *those single-package cases*, not a general parallelism story.
-
-Step 2 (only if step 1 motivates it) — measure resolver-fallback rates (≤ 1 hour, per §4 Q5):
-- Instrument `property-access` and `polymorphic` resolvers; count checker-hits vs. catalog-fallback hits.
-- If checker hits dominate, README must document the fidelity trade-off for parallel-mode users.
-
-Step 3 (only if steps 1+2 motivate it) — Phase 7 implementation per §4 Q5 option (c):
-- Workers resolve intra-partition edges normally.
-- Cross-partition sites emit as `(targetName, targetShape)` unresolved records.
-- Main thread runs `resolveByCatalogFallback` over those records against the merged catalog; edges tagged `cross-partition-fallback`.
-- `resolutionStats` reports the cross-partition-fallback count.
-
-Expected outcome: Wave 3 ships in days, not the original 1–2 weeks, by leaning on Phase 6 + a thin parallel wrapper. Phase 7's worker-thread infrastructure only built if the measurement justifies it.
+- If ≤ 5 min: Phase 7 unnecessary. Wave 3 is fully done.
+- If > 5 min and one package dominates: open Phase 7 against that single-package case only, per the §4 Q5 design (workers resolve intra-partition; main thread runs `resolveByCatalogFallback` on cross-partition records).
+- If > 5 min but load is balanced across multiple packages: that contradicts the design hypothesis; revisit.
 
 **Wave 4 — incremental rebuild (deferred; scope after Wave 2 ships)**
 - See §4 question 4. Today's "any file change → full rebuild" makes graph essentially unusable in watch mode on monorepos. Per-file occurrences cached, only changed files re-walked. Worth a dedicated plan.

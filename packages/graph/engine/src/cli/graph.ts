@@ -27,10 +27,13 @@ import { inferEntryPoints } from '../rules/_entry-points.js';
 import { rules as defaultRules } from '../rules/registry.js';
 
 import { runGraph } from './orchestrate.js';
-import { resolvePackageScope } from './scope.js';
+import { runPackagesInParallel } from './packages-runner.js';
+import { discoverWorkspacePackages, resolvePackageScope } from './scope.js';
 
+import type { PackageRunResult } from './packages-runner.js';
 import type { EntryPoint } from '../rules/_entry-points.js';
 import type { Catalog, Indexes } from '../types.js';
+import type { FindingOutput } from '@opensip-tools/contracts';
 import type { Signal, ToolCliContext } from '@opensip-tools/core';
 
 const ENTRY_POINTS_PREVIEW = 10;
@@ -70,6 +73,24 @@ export interface GraphCommandOptions {
    * See docs/plans/graph-performance-improvements.md Phase 6.
    */
   readonly packageScope?: string;
+  /**
+   * Optional --packages flag (no argument). When set, the run fans out
+   * across every workspace package under packages/** with a tsconfig.
+   * Each package runs in its own child process; findings are
+   * aggregated in the parent. Wave 3 of the perf plan.
+   */
+  readonly allPackages?: boolean;
+  /**
+   * Optional concurrency cap for --packages. Defaults to
+   * `os.cpus().length - 1`. Exposed primarily for tests.
+   */
+  readonly packagesConcurrency?: number;
+  /**
+   * Path to the CLI entry script. When --packages is set, child
+   * processes invoke `node <cliScript> graph --package <dir> --json`.
+   * Tools wiring `executeGraph` should pass `process.argv[1]`.
+   */
+  readonly cliScript?: string;
 }
 
 export async function executeGraph(
@@ -80,6 +101,13 @@ export async function executeGraph(
   try {
     if (opts.gateSave === true && opts.gateCompare === true) {
       throw new ConfigurationError('--gate-save and --gate-compare are mutually exclusive.');
+    }
+    if (opts.allPackages === true) {
+      if (typeof opts.packageScope === 'string' && opts.packageScope.length > 0) {
+        throw new ConfigurationError('--package and --packages are mutually exclusive.');
+      }
+      await executePackagesGraph(opts, cli);
+      return;
     }
     let runCwd = opts.cwd;
     let runTsConfig: string | undefined;
@@ -134,6 +162,153 @@ export async function executeGraph(
   } catch (error) {
     handleGraphError('graph', error, cli);
   }
+}
+
+/**
+ * `graph --packages` — fan a graph run out across every workspace
+ * package under <cwd>/packages/** and aggregate the findings. Each
+ * package runs in its own child process; per-package memory ceiling
+ * scales naturally. See docs/plans/graph-performance-improvements.md
+ * Wave 3.
+ */
+async function executePackagesGraph(
+  opts: GraphCommandOptions,
+  cli: ToolCliContext,
+): Promise<void> {
+  const cliScript = opts.cliScript ?? process.argv[1];
+  if (typeof cliScript !== 'string' || cliScript.length === 0) {
+    throw new ConfigurationError(
+      '--packages: could not determine the CLI entry script (process.argv[1] is empty).',
+    );
+  }
+  const packageDirs = discoverWorkspacePackages(opts.cwd);
+  if (packageDirs.length === 0) {
+    throw new ConfigurationError(
+      `--packages: no workspace packages with tsconfig.json found under ${opts.cwd}/packages/**.`,
+    );
+  }
+
+  const startedAt = Date.now();
+  const result = await runPackagesInParallel({
+    cwd: opts.cwd,
+    packageDirs,
+    cliScript,
+    concurrency: opts.packagesConcurrency,
+    noCache: opts.noCache,
+  });
+  const durationMs = Date.now() - startedAt;
+
+  const allFindings: FindingOutput[] = [];
+  for (const r of result.perPackage) allFindings.push(...r.findings);
+
+  if (opts.json === true) {
+    process.stdout.write(`${renderPackagesJson(result.perPackage, durationMs)}\n`);
+  } else {
+    writePackagesReport(result.perPackage, durationMs);
+  }
+
+  // If any child failed to spawn or exited with an error, surface it
+  // as a runtime error. The parent itself succeeded if every child
+  // returned exit 0.
+  if (result.anyChildFailed) {
+    cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
+    process.stderr.write(
+      `graph --packages: at least one package run failed; see per-package output above.\n`,
+    );
+  } else {
+    cli.setExitCode(EXIT_CODES.SUCCESS);
+  }
+  logger.info({
+    evt: 'graph.cli.graph.complete',
+    module: 'graph:cli',
+    packages: result.perPackage.length,
+    findings: allFindings.length,
+    failed: result.anyChildFailed,
+    durationMs,
+  });
+}
+
+function writePackagesReport(
+  perPackage: readonly PackageRunResult[],
+  durationMs: number,
+): void {
+  const totalFindings = perPackage.reduce((n, r) => n + r.findings.length, 0);
+  const lines: string[] = [
+    'opensip-tools graph --packages',
+    '',
+    `== Packages (${String(perPackage.length)}) ==`,
+    ...renderPackagesStatusLines(perPackage),
+    '',
+    '== Findings ==',
+    ...renderPackagesFindingsLines(perPackage),
+    '== Summary ==',
+    `${String(totalFindings)} total finding(s) across ${String(perPackage.length)} package(s) in ${String(durationMs)} ms.`,
+  ];
+  process.stdout.write(`${lines.join('\n')}\n`);
+}
+
+function renderPackagesStatusLines(perPackage: readonly PackageRunResult[]): readonly string[] {
+  const out: string[] = [];
+  for (const r of perPackage) {
+    const status = r.exitCode === 0 ? 'ok' : `FAILED (exit ${String(r.exitCode)})`;
+    const display = packageDisplay(r);
+    out.push(`  ${display}: ${String(r.findings.length)} finding(s) — ${status}`);
+    if (r.exitCode !== 0 && r.stderr.length > 0) {
+      const stderrPreview = r.stderr.split('\n').slice(0, 3).join('\n    ');
+      out.push(`    stderr: ${stderrPreview}`);
+    }
+  }
+  return out;
+}
+
+function renderPackagesFindingsLines(perPackage: readonly PackageRunResult[]): readonly string[] {
+  const out: string[] = [];
+  for (const r of perPackage) {
+    if (r.findings.length === 0) continue;
+    out.push(`[${packageDisplay(r)}]`, ...renderPackageFindingPreview(r), '');
+  }
+  return out;
+}
+
+function renderPackageFindingPreview(r: PackageRunResult): readonly string[] {
+  const preview = r.findings.slice(0, FINDINGS_PREVIEW);
+  const lines = preview.map((f) => {
+    const loc = typeof f.line === 'number' ? `:${String(f.line)}` : '';
+    return `  ${f.filePath}${loc} — ${f.message}`;
+  });
+  if (r.findings.length > preview.length) {
+    lines.push(`  ... ${String(r.findings.length - preview.length)} more (use --json for full list)`);
+  }
+  return lines;
+}
+
+function packageDisplay(r: PackageRunResult): string {
+  return r.displayPath.length > 0 ? r.displayPath : r.packageDir;
+}
+
+function renderPackagesJson(
+  perPackage: readonly PackageRunResult[],
+  durationMs: number,
+): string {
+  return JSON.stringify(
+    {
+      version: '1.0',
+      tool: 'graph',
+      command: 'graph',
+      mode: 'packages',
+      timestamp: new Date().toISOString(),
+      durationMs,
+      packages: perPackage.map((r) => ({
+        packageDir: r.packageDir,
+        displayPath: r.displayPath,
+        exitCode: r.exitCode,
+        findings: r.findings,
+      })),
+      totalFindings: perPackage.reduce((n, r) => n + r.findings.length, 0),
+    },
+    null,
+    2,
+  );
 }
 
 interface UnifiedReportInput {
