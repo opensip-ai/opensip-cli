@@ -168,9 +168,23 @@ opensip-tools graph --no-cache      # skip the catalog cache; re-run stages 1+2
 opensip-tools graph --gate-save     # save current signals as baseline
 opensip-tools graph --gate-compare  # compare against baseline; exit 1 on new signals
 opensip-tools graph --report-to <url>  # POST SARIF 2.1.0 to an endpoint
+opensip-tools graph --package <name>   # scope to one workspace package (faster)
 ```
 
+The `--package` flag accepts either a workspace-package basename (searched under `packages/**`) or an explicit directory path. Useful on monorepos where a global run is slow: per-package runs typically complete in seconds and fit easily in the default Node heap. The trade-off is fidelity — call sites that cross package boundaries become unresolved, so the orphan-subtree and other reachability rules report against the in-scope package only.
+
 Five rules ship today: `orphan-subtree`, `duplicated-function-body`, `no-side-effect-path`, `test-only-reachable`, `always-throws-branch`. Output is grouped by rule with the top 10 findings per rule plus a summary; the full set is always available via `--json`. See [the graph loop docs](./docs/architecture/35-the-graph-loop/) for what each rule detects and how the gate workflow integrates with CI.
+
+#### Heap sizing on large monorepos
+
+`graph` builds a single TypeScript program over every `.ts`/`.tsx` file in the project's `tsconfig.json`. On large monorepos the program plus bound symbol table can exceed Node's default ~4 GB heap. When `graph` detects more than 1000 source files it prints a one-line hint to stderr at startup; if it OOMs, retry with a larger heap:
+
+```bash
+NODE_OPTIONS=--max-old-space-size=8192 opensip-tools graph     # most monorepos
+NODE_OPTIONS=--max-old-space-size=12288 opensip-tools graph    # very large repos
+```
+
+Measured: a 5476-file repo OOM'd at 4 GB after ~17 min, completed at 12 GB in ~25 min with ~4.2 GB peak resident. The 8 GB setting is the recommended default once you cross the threshold.
 
 ### Standalone listing commands
 

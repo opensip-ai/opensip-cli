@@ -7,7 +7,10 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { normalizeCatalogForSerialization } from '../../cache/normalize.js';
+import {
+  iterateNormalizedFunctionEntries,
+  normalizeCatalogForSerialization,
+} from '../../cache/normalize.js';
 
 import type { Catalog, FunctionOccurrence } from '../../types.js';
 
@@ -70,6 +73,28 @@ describe('normalizeCatalogForSerialization (DRY-4)', () => {
     };
     const norm = normalizeCatalogForSerialization(catalog);
     expect(Object.keys(norm.functions)).toEqual(['apple', 'zebra']);
+  });
+
+  it('iterateNormalizedFunctionEntries yields the same name+occurrence pairs as the materializing helper', () => {
+    const catalog: Catalog = {
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'x',
+      tsConfigPath: 'x',
+      tsCompilerVersion: 'x',
+      functions: {
+        zebra: [occ({ simpleName: 'zebra', filePath: 'src/z.ts' })],
+        alpha: [
+          occ({ simpleName: 'alpha', filePath: 'src/a.ts', line: 5 }),
+          occ({ simpleName: 'alpha', filePath: 'src/a.ts', line: 1 }),
+        ],
+      },
+    };
+    const fromIter = [...iterateNormalizedFunctionEntries(catalog)];
+    const fromMaterialize = Object.entries(normalizeCatalogForSerialization(catalog).functions);
+    expect(fromIter.map(([k]) => k)).toEqual(['alpha', 'zebra']);
+    expect(fromIter).toEqual(fromMaterialize);
   });
 
   it('sorts occurrences within a name by file/line/column', () => {

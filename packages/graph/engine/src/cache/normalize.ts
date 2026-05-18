@@ -19,15 +19,37 @@ export function normalizeCatalogForSerialization(catalog: Catalog): Catalog {
     if (!Object.hasOwn(catalog.functions, key)) continue;
     const occurrences: readonly FunctionOccurrence[] | undefined = catalog.functions[key];
     if (!occurrences) continue;
-    // Within a name, sort by filePath + line for stability.
-    const sortedOccurrences = [...occurrences].sort((a, b) => {
-      if (a.filePath !== b.filePath) return a.filePath.localeCompare(b.filePath);
-      if (a.line !== b.line) return a.line - b.line;
-      return a.column - b.column;
-    });
-    functions[key] = sortedOccurrences;
+    functions[key] = sortOccurrencesForSerialization(occurrences);
   }
   // Spread catalog last so filesFingerprint and any future fields are
   // preserved through the round-trip.
   return { ...catalog, functions };
+}
+
+/**
+ * Streaming-friendly view of `normalizeCatalogForSerialization`: yields
+ * [name, sorted occurrences] in sorted-name order without materializing
+ * the full normalized catalog. Used by the streaming writer (Phase 2)
+ * so the catalog write peak doesn't scale with catalog size.
+ */
+export function* iterateNormalizedFunctionEntries(
+  catalog: Catalog,
+): Generator<readonly [string, readonly FunctionOccurrence[]]> {
+  const sortedKeys = Object.keys(catalog.functions).sort();
+  for (const key of sortedKeys) {
+    if (!Object.hasOwn(catalog.functions, key)) continue;
+    const occurrences: readonly FunctionOccurrence[] | undefined = catalog.functions[key];
+    if (!occurrences) continue;
+    yield [key, sortOccurrencesForSerialization(occurrences)];
+  }
+}
+
+function sortOccurrencesForSerialization(
+  occurrences: readonly FunctionOccurrence[],
+): readonly FunctionOccurrence[] {
+  return [...occurrences].sort((a, b) => {
+    if (a.filePath !== b.filePath) return a.filePath.localeCompare(b.filePath);
+    if (a.line !== b.line) return a.line - b.line;
+    return a.column - b.column;
+  });
 }

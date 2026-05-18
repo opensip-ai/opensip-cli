@@ -1,12 +1,14 @@
 ---
-status: proposed
+status: in-progress
 last_verified: 2026-05-17
 title: "graph Tool — performance improvements"
 audience: [contributors]
 purpose: "Sequenced plan for reducing graph's peak memory and wall-clock on monorepo-scale codebases (5000+ files). Driven by an OpenSIP run that OOM'd at Node's default 4 GB heap after ~17 min and completed under a 12 GB heap in ~25 min."
-related-docs:
-  - ./graph-tool-v2-design.md
-  - ./graph-rule-enhancements.md
+wave_status:
+  wave_1: shipped 2026-05-17 (Phases 0, 1, 2, 3, 6)
+  wave_2: pending
+  wave_3: pending
+  wave_4: pending
 ---
 
 # graph Tool — performance improvements
@@ -86,8 +88,11 @@ Phases are ordered by **payoff per unit of engineering effort**, not by what's m
 - `packages/graph/engine/src/cli/orchestrate.ts` — narrow `RunGraphResult` to `{ catalog, indexes, signals, resolutionStats, cacheHit }`; explicit `program = null` after edge resolution.
 - `packages/graph/engine/src/pipeline/inventory.ts` — return the program separately so the orchestrator can drop it without changing the function's shape.
 
+**Pre-work — verify the catalog is node-free.** The 25 % memory-drop target only holds if `FunctionOccurrence` retains zero references into the AST. Take a heap snapshot after Stage 2 and confirm no `FunctionOccurrence` field (or anything reachable from `Catalog.functions`) holds a `ts.Node`, `ts.SourceFile`, or `ts.Symbol`. If any field does, the program won't actually be collectible regardless of dropping the orchestrator's variable. The on-disk JSON shape suggests the catalog is node-free, but verify before targeting the drop.
+
 **Acceptance**
-- Peak resident drops by ≥ 25 % on the OpenSIP workload (target: 4.2 GB → ≤ 3.2 GB).
+- Heap snapshot after `resolveEdges` returns confirms no `ts.*` retainers reachable from `Catalog`.
+- Peak resident drops by ≥ 25 % on the OpenSIP workload (target: 4.2 GB → ≤ 3.2 GB). If the snapshot reveals retained nodes, fix those first; the memory target is conditional on a clean catalog.
 - All existing graph engine tests pass unchanged.
 
 **Risk.** Low — purely a memory-management change. The program reference isn't part of the public output.
@@ -108,6 +113,8 @@ Phases are ordered by **payoff per unit of engineering effort**, not by what's m
 - Cache write peak (RSS delta during write) drops to a constant (≤ 50 MB regardless of catalog size).
 - Cache read still works against the new file shape — same byte-stable JSON, same `JSON.parse` round-trip.
 - Catalog file is byte-identical (or only-whitespace-different) to today's output, so existing on-disk caches aren't invalidated.
+
+**Caveat — don't oversell this phase.** The OOM is in Stage 1's program construction, not in serialization. The 50 MB single-string allocation is real, but it isn't the limiting factor on the OpenSIP run. Doing this phase for hygiene is fine; positioning it as memory relief overstates the impact. Keep it in Wave 1 because it's small and removes a constant cost, but don't expect it to move the OOM threshold on its own.
 
 **Risk.** Low. The on-disk format is unchanged; this is purely a serialisation refactor.
 
@@ -152,19 +159,27 @@ After all files are walked once, do a single pass over the collected call-site r
 
 ---
 
-### Phase 5 — Lazy typechecker init (≤ 1 day)
+### Phase 5 — Lazy typechecker init — SPIKE FIRST (≤ 1 day)
 
-**Scope.** Stage 1 doesn't need `getTypeChecker()`. Today, `inventory.ts:53` forces it eagerly to populate parent pointers — but parent pointers are populated by AST construction in the program, not by the checker; the eager call is paranoia. Defer the call to the first resolver in Stage 2 that actually needs it.
+**Premise to verify before committing.** Stage 1 calls `program.getTypeChecker()` eagerly, with the comment "Force binder to run so parent pointers are set on every node." The original framing in this plan called that "paranoia" — that framing is likely wrong and needs to be tested.
 
-**Files**
-- `packages/graph/engine/src/pipeline/inventory.ts` — drop the eager `program.getTypeChecker()` call. Add a unit test that confirms parent pointers are present without the call.
+What `getTypeChecker()` actually does: it constructs the checker, which forces the **binder** to run as a side effect. The binder sets parent pointers *and* populates the symbol table — the same symbol table that every Stage 2 resolver consults via `getSymbolAtLocation()`. If the eager call is removed from Stage 1, the binding cost doesn't disappear; it shifts to whichever Stage 2 resolver triggers it first. Total wall-clock may not drop at all.
+
+**Spike (≤ 1 hour)** — before doing the phase work:
+1. Run today's pipeline and instrument: `console.time` around the `getTypeChecker()` call in inventory and around `resolveEdges`.
+2. Comment out the `getTypeChecker()` call in inventory. Re-run.
+3. Compare. If Stage 1 drops by X% but Stage 2 grows by ≥X%, the phase has zero total payoff — skip it.
+4. As a sanity check, dump `sourceFile.statements[0].parent === sourceFile` to confirm parent pointers actually do require the binder (they do, but verify).
+
+**Phase (only if spike shows net win)**
+- `packages/graph/engine/src/pipeline/inventory.ts` — drop the eager `program.getTypeChecker()` call. Add a unit test that confirms parent pointers are present without the call (if they are — see spike).
 - `packages/graph/engine/src/pipeline/edges.ts` — call `program.getTypeChecker()` once at the top of `resolveEdges` (already does this via `const checker = input.program.getTypeChecker()`).
 
 **Acceptance**
-- Stage 1 wall-clock drops by 20–40 % (checker init is most of Stage 1's tail cost today).
+- *Total* (Stage 1 + Stage 2) wall-clock drops by ≥ 10 % on the OpenSIP workload. Stage-1-only wins are not acceptance.
 - A `pipeline/__tests__/inventory.test.ts` assertion confirms `sf.statements[0].parent === sf` after `buildInventory`.
 
-**Risk.** Low–medium. If parent pointers turn out to need the checker for some constructs (decorators in some compiler-options combos?), revert and document. The assertion in the test pins the contract.
+**Risk.** Medium. The phase as originally scoped likely just shifts cost. Spike pins down whether there's a real win to chase.
 
 ---
 
@@ -189,6 +204,8 @@ After all files are walked once, do a single pass over the collected call-site r
 
 **Scope.** Partition source files across N workers (N = `os.cpus().length - 1`). Each worker creates an isolated Program over its slice and emits a partial catalog. The main thread merges. Cross-file edges within a partition resolve normally; cross-partition edges are resolved in a second main-thread pass that consults the merged catalog (no full Program needed for that lookup).
 
+**Open question to resolve before starting (added — see §4).** Cross-partition edges resolve via the merged catalog — but property-access and JSX resolvers in Stage 2 currently rely on the typechecker, not just catalog lookup. Catalog-only fallback is meaningfully lower fidelity. Either (a) accept a fidelity drop on cross-partition call sites and tag them `cross-partition-fallback`, or (b) re-instantiate a Program on the main thread for cross-partition resolution — which puts the OOM back. The byte-identical-catalog acceptance gate is incompatible with option (a) unless cross-partition sites happen to be resolvable purely via catalog matching. Resolve this design question before writing Phase 7 code.
+
 **Files**
 - New `packages/graph/engine/src/pipeline/parallel.ts` — the orchestrator.
 - New `packages/graph/engine/src/pipeline/worker-entry.ts` — the worker body.
@@ -196,48 +213,55 @@ After all files are walked once, do a single pass over the collected call-site r
 
 **Acceptance**
 - Wall-clock on the OpenSIP workload drops by ≥ 4× on an 8-core machine (target: post-Phase 4 17 min → ≤ 5 min on 8 cores).
-- Catalog output is byte-identical to the single-threaded run (modulo non-deterministic Map iteration, which `normalizeCatalogForSerialization` already sorts away).
+- Catalog output is byte-identical to the single-threaded run (modulo non-deterministic Map iteration, which `normalizeCatalogForSerialization` already sorts away). If the cross-partition design accepts fidelity loss (option (a) above), this gate softens to "byte-identical except for cross-partition call sites tagged `cross-partition-fallback`," and the count of such sites must be reported in `resolutionStats`.
 - Per-worker peak heap stays under 1.5 GB so the global Node heap (worker pool + main thread) fits in 8 GB.
 
-**Risk.** Medium-high. Worker-thread boundaries are an error-prone surface (serialisation overhead, error propagation, GC tuning per worker). The byte-identical-catalog acceptance gate is the safety net.
+**Risk.** Medium-high. Worker-thread boundaries are an error-prone surface (serialisation overhead, error propagation, GC tuning per worker). The cross-partition-resolution question above is the structural risk; the byte-identical-catalog acceptance gate is the implementation safety net.
 
 ---
 
 ## 3. Sequencing & deliverables
 
-**Wave 1 — eliminate the silent OOM (≤ 2 days total)**
+**Wave 1 — eliminate the silent OOM AND give users a fast escape hatch (≤ 1 week total)**
 - Phase 0 (UX hint).
 - Phase 1 (free the program).
 - Phase 2 (stream the write).
 - Phase 3 (slice-not-getText).
+- Phase 6 (per-workspace mode) — *promoted from Wave 3.*
 
-Expected after Wave 1: OpenSIP-scale runs fit in 2 GB heap; no silent OOM.
+Expected after Wave 1: OpenSIP-scale global runs fit in 2 GB heap with no silent OOM, *and* per-package runs complete in ≤ 60 s, making graph viable for pre-commit hooks and per-package CI today rather than after Wave 2 ships.
 
-**Wave 2 — cut wall-clock (≤ 1 week total)**
+> **Why Phase 6 moves up.** Phase 6 is the only phase that gives a usable workflow (sub-minute) to monorepo users *immediately*, with low risk and no dependency on the global-run perf work. Holding it for Wave 3 means users are stuck on slow global runs for ~2 more weeks while Phases 4 and 5 bake. The original ordering was "fix the global run first" — defensible, but Phase 6 unlocks pre-commit-hook usage that Waves 1–2 don't.
+
+**Wave 2 — cut global-run wall-clock (≤ 1 week total)**
+- Phase 5 spike (≤ 1 hour). If the spike shows no net win, drop Phase 5 from the plan.
 - Phase 4 (single AST walk).
-- Phase 5 (lazy checker init).
+- Phase 5 (lazy checker init) — *only if spike shows ≥ 10 % total wall-clock improvement.*
 
 Expected after Wave 2: OpenSIP wall-clock from 25 min → ≤ 15 min single-threaded.
 
-**Wave 3 — give users an "I just want my package" escape hatch (≤ 1 week)**
-- Phase 6 (per-workspace mode).
-
-Expected: per-package runs in seconds, suitable for pre-commit hooks and per-package CI.
-
-**Wave 4 — multi-core for the global run (1–2 weeks)**
+**Wave 3 — multi-core for the global run (1–2 weeks)**
+- Phase 7 design resolution (see Phase 7 open question + §4 question 5).
 - Phase 7 (parallel workers).
 
 Expected: OpenSIP-scale global run in ≤ 5 min on an 8-core dev box.
 
+**Wave 4 — incremental rebuild (deferred; scope after Wave 2 ships)**
+- See §4 question 4. Today's "any file change → full rebuild" makes graph essentially unusable in watch mode on monorepos. Per-file occurrences cached, only changed files re-walked. Worth a dedicated plan.
+
 ## 4. Open questions
 
-1. **Does `getTypeChecker()` in Stage 1 actually do something Stage 1 needs?** Phase 5's risk hinges on this. Worth a 1-hour investigation before committing to that phase — write a unit test that asserts parent pointers and a few sample symbol lookups still work when the eager call is removed.
+1. **Does `getTypeChecker()` in Stage 1 actually do something Stage 1 needs?** Phase 5's premise hinges on this. The eager call's *real* effect is forcing the binder, which builds the symbol table — the same one Stage 2 resolvers consult. Removing the eager call may simply shift cost from Stage 1 to Stage 2 with no net win. Resolution: the spike described in Phase 5 (≤ 1 hour). If the spike shows the cost just shifts, drop Phase 5.
 
 2. **Should the cache file format change in Phase 2, or stay byte-identical?** The streamed write can produce identical JSON output (just chunked); preserving that lets existing on-disk caches stay valid. Worth keeping unless there's a separate reason to bump the version.
 
 3. **Is per-worker isolation enough in Phase 7?** Workers will each load TypeScript fresh — that's ~50 MB of TypeScript itself × N workers. May want to share the TypeScript module via `worker_threads` SharedArrayBuffer transfer, or accept the duplication.
 
 4. **What's the target for incremental runs?** Today Stage 1's cache invalidation is at file-list granularity (any file changes → full rebuild). A finer-grained invalidation (per-file occurrences cached, only changed files re-walked) is a separate plan worth scoping after Wave 2 ships.
+
+5. **How should Phase 7 handle cross-partition edges that today require the typechecker?** Property-access and JSX resolvers consult `getSymbolAtLocation()`. With per-worker partitions, a call site in worker A pointing at a function defined in worker B can't run those resolvers without re-instantiating a Program for the join. Two options: (a) accept lower fidelity for cross-partition sites, tag them `cross-partition-fallback`, and report the count via `resolutionStats`; or (b) re-run resolution on the main thread with a global Program — which reintroduces the OOM Phase 7 was meant to avoid. Resolve before starting Phase 7; the answer determines whether the byte-identical-catalog acceptance gate is achievable.
+
+6. **Is there a string-interning win orthogonal to the phase plan?** At 61k function occurrences, file paths, qualified names, and resolution targets are heavily duplicated across catalog entries. A simple intern pool over `FunctionOccurrence.filePath` and `CallEdge.to` could shrink memory measurably without touching pipeline structure. Worth measuring with a heap snapshot during the Phase 1 work — if string duplication dominates, scope a Phase 1.5.
 
 ## 5. References
 

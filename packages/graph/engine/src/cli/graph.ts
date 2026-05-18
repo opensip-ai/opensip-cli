@@ -27,6 +27,7 @@ import { inferEntryPoints } from '../rules/_entry-points.js';
 import { rules as defaultRules } from '../rules/registry.js';
 
 import { runGraph } from './orchestrate.js';
+import { resolvePackageScope } from './scope.js';
 
 import type { EntryPoint } from '../rules/_entry-points.js';
 import type { Catalog, Indexes } from '../types.js';
@@ -63,6 +64,12 @@ export interface GraphCommandOptions {
   readonly baseline?: string;
   readonly reportTo?: string;
   readonly apiKey?: string;
+  /**
+   * Optional --package <name|path> scope. When set, the run targets a
+   * single workspace package's tsconfig instead of the whole project.
+   * See docs/plans/graph-performance-improvements.md Phase 6.
+   */
+  readonly packageScope?: string;
 }
 
 export async function executeGraph(
@@ -74,7 +81,24 @@ export async function executeGraph(
     if (opts.gateSave === true && opts.gateCompare === true) {
       throw new ConfigurationError('--gate-save and --gate-compare are mutually exclusive.');
     }
-    const result = await runGraph({ cwd: opts.cwd, noCache: opts.noCache });
+    let runCwd = opts.cwd;
+    let runTsConfig: string | undefined;
+    if (typeof opts.packageScope === 'string' && opts.packageScope.length > 0) {
+      const scope = resolvePackageScope({ cwd: opts.cwd, packageArg: opts.packageScope });
+      runCwd = scope.packageDirAbs;
+      runTsConfig = scope.tsConfigPathAbs;
+      logger.info({
+        evt: 'graph.cli.graph.scope',
+        module: 'graph:cli',
+        package: opts.packageScope,
+        packageDir: scope.packageDirAbs,
+      });
+    }
+    const result = await runGraph({
+      cwd: runCwd,
+      noCache: opts.noCache,
+      tsConfigPath: runTsConfig,
+    });
     if (opts.gateSave === true || opts.gateCompare === true) {
       await runGateMode(opts, result.signals, cli);
       logger.info({ evt: 'graph.cli.graph.complete', module: 'graph:cli' });

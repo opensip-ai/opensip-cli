@@ -43,6 +43,10 @@ function register(cli: ToolCliContext): void {
     .option('--gate-compare', 'Compare current Signals to the gate baseline', false)
     .option('--baseline <path>', 'Override the default baseline path')
     .option('--report-to <url>', 'POST findings to OpenSIP Cloud or compatible')
+    .option(
+      '--package <name|path>',
+      'Scope the run to a single workspace package (faster on monorepos; cross-package call sites become unresolved)',
+    )
     .option('--debug', 'Enable debug mode for structured log output', false)
     .action(async (opts: {
       cwd: string;
@@ -52,6 +56,7 @@ function register(cli: ToolCliContext): void {
       gateCompare?: boolean;
       baseline?: string;
       reportTo?: string;
+      package?: string;
     }) => {
       await executeGraph(
         {
@@ -62,6 +67,7 @@ function register(cli: ToolCliContext): void {
           gateCompare: opts.gateCompare,
           baseline: opts.baseline,
           reportTo: opts.reportTo,
+          packageScope: opts.package,
         },
         cli,
       );

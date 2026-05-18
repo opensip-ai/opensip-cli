@@ -35,9 +35,16 @@ export function hashFunctionBody(node: ts.Node, sourceFile: ts.SourceFile): stri
 
 /**
  * Like `hashFunctionBody`, but also returns the normalized size.
+ *
+ * Uses `sourceFile.text.slice(...)` instead of `node.getText(sourceFile)`
+ * to avoid the per-call AST walk that materializes a fresh string.
+ * V8 implements substring as a slice into the parent string when the
+ * source buffer is large, so this is also lower-allocation. The two
+ * paths produce identical content for the same node (both span from
+ * `getStart()` to `getEnd()`).
  */
 export function digestFunctionBody(node: ts.Node, sourceFile: ts.SourceFile): BodyDigest {
-  const text = node.getText(sourceFile);
+  const text = sourceFile.text.slice(node.getStart(sourceFile), node.getEnd());
   const normalized = normalizeWhitespace(stripComments(text));
   return { hash: sha256(normalized), size: normalized.length };
 }
