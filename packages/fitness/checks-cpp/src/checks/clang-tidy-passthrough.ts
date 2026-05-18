@@ -51,6 +51,11 @@ export const clangTidyPassthrough = defineCheck({
   description: 'Run clang-tidy and surface its diagnostics as opensip-tools violations',
   scope: { languages: ['cpp'], concerns: [] },
   tags: ['quality', 'cpp'],
+  // Cap the per-invocation runtime so a slow clang-tidy (or one hung
+  // on an unusual TU) can't block the run indefinitely. Most healthy
+  // clang-tidy invocations finish within a few seconds; anything
+  // taking longer is more useful aborted than awaited.
+  timeout: 30_000,
   command: {
     bin: 'clang-tidy',
     args: (files) => [...files, '--quiet'],
