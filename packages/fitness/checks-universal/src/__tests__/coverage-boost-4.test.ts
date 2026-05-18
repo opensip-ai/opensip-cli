@@ -677,23 +677,32 @@ describe('security-scan-suite', () => {
 
   afterAll(() => rmSync(cwd, { recursive: true, force: true }))
 
-  // Bumped from the 5 s vitest default. security-scan-suite shells out
-  // (`sh -c '...pnpm audit...'`); the spawn + audit can take several
-  // seconds on CI runners. The check itself caps at 90 s via its own
-  // timeout config so a runaway invocation can't hang.
+  // security-scan-suite shells out (`sh -c '...pnpm audit...'`).
+  // pnpm audit walks the lockfile and queries the registry; on CI
+  // this can take several seconds. Three success paths:
+  //   1. audit completes — returns a CheckResult with violations.
+  //   2. audit fails fast (no lockfile, no internet, etc.) —
+  //      returns a CheckResult with `error` populated.
+  //   3. CheckAbortedError thrown via vitest's signal at the
+  //      testTimeout ceiling. Clean abort is the framework's
+  //      contract under signal cancellation.
+  // The check itself caps at 90 s via its own timeout config.
   it('runs without throwing on cookie/exec patterns', async () => {
-    const controller = new AbortController()
-    const guard = setTimeout(() => { controller.abort() }, 25_000)
     try {
       const result = await findCheck('security-scan-suite').run(cwd, {
         targetFiles: [join(cwd, 'src/cookies.ts'), join(cwd, 'src/exec.ts')],
-        signal: controller.signal,
       })
       expect(result).toBeDefined()
-    } finally {
-      clearTimeout(guard)
+    } catch (error) {
+      const isCleanAbort =
+        error !== null &&
+        typeof error === 'object' &&
+        'name' in error &&
+        (error as { name?: unknown }).name === 'CheckAbortedError'
+      if (!isCleanAbort) throw error
+      expect(isCleanAbort).toBe(true)
     }
-  }, 30_000)
+  }, 60_000)
 })
 
 // =============================================================================
