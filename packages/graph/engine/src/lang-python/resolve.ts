@@ -32,6 +32,8 @@
 
 import { logger } from '@opensip-tools/core';
 
+import { appendEdge } from '../lang-adapter/edge-helpers.js';
+
 import type { ResolveInput, ResolveOutput } from '../lang-adapter/types.js';
 import type { CallEdge, FunctionOccurrence, ResolutionStats } from '../types.js';
 import type { PythonParsedFile, PythonParsedProject } from './parse.js';
@@ -193,16 +195,6 @@ function pushCreationEdge(
   appendEdge(edgesByOwner, ownerHash, edge);
   stats.totalCallSites++;
   stats.resolvedHigh++;
-}
-
-function appendEdge(
-  edgesByOwner: Map<string, CallEdge[]>,
-  ownerHash: string,
-  edge: CallEdge,
-): void {
-  const existing = edgesByOwner.get(ownerHash);
-  if (existing) existing.push(edge);
-  else edgesByOwner.set(ownerHash, [edge]);
 }
 
 /**

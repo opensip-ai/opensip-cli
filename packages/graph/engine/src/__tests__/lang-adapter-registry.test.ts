@@ -1,0 +1,86 @@
+/**
+ * Unit tests for the language-adapter registry's `pickAdapter` heuristic.
+ *
+ * PR 6 of plan docs/plans/10-graph-language-pluggability.md introduced
+ * file-extension dominance counting when ≥ 2 adapters are registered.
+ * These tests cover the dominance heuristic + tie-breaking preference
+ * order.
+ */
+
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import {
+  _clearAdaptersForTesting,
+  pickAdapter,
+  registerAdapter,
+} from '../lang-adapter/registry.js';
+import { pythonGraphAdapter } from '../lang-python/index.js';
+import { rustGraphAdapter } from '../lang-rust/index.js';
+import { typescriptGraphAdapter } from '../lang-typescript/index.js';
+
+describe('pickAdapter — multi-adapter dominance heuristic', () => {
+  let dir: string;
+
+  beforeEach(() => {
+    _clearAdaptersForTesting();
+    registerAdapter(typescriptGraphAdapter);
+    registerAdapter(pythonGraphAdapter);
+    registerAdapter(rustGraphAdapter);
+    dir = mkdtempSync(join(tmpdir(), 'graph-pick-'));
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+    _clearAdaptersForTesting();
+  });
+
+  it('picks Python when only .py files are present', () => {
+    writeFileSync(join(dir, 'a.py'), 'def foo(): pass\n', 'utf8');
+    writeFileSync(join(dir, 'b.py'), 'def bar(): pass\n', 'utf8');
+    const adapter = pickAdapter(dir);
+    expect(adapter.id).toBe('python');
+  });
+
+  it('picks Rust when only .rs files are present', () => {
+    mkdirSync(join(dir, 'src'), { recursive: true });
+    writeFileSync(join(dir, 'src/lib.rs'), 'fn foo() {}\n', 'utf8');
+    writeFileSync(join(dir, 'src/main.rs'), 'fn main() {}\n', 'utf8');
+    const adapter = pickAdapter(dir);
+    expect(adapter.id).toBe('rust');
+  });
+
+  it('picks the dominant language when multiple are present', () => {
+    // 3 .py files, 1 .rs file → Python wins.
+    writeFileSync(join(dir, 'a.py'), 'pass', 'utf8');
+    writeFileSync(join(dir, 'b.py'), 'pass', 'utf8');
+    writeFileSync(join(dir, 'c.py'), 'pass', 'utf8');
+    mkdirSync(join(dir, 'src'), { recursive: true });
+    writeFileSync(join(dir, 'src/lib.rs'), 'fn foo() {}', 'utf8');
+    expect(pickAdapter(dir).id).toBe('python');
+  });
+
+  it('breaks ties by preferring TypeScript', () => {
+    // 1 .ts and 1 .py file → tie at 1; TypeScript wins.
+    writeFileSync(join(dir, 'tsconfig.json'), '{}', 'utf8');
+    mkdirSync(join(dir, 'src'), { recursive: true });
+    writeFileSync(join(dir, 'src/index.ts'), 'export {};\n', 'utf8');
+    writeFileSync(join(dir, 'a.py'), 'pass', 'utf8');
+    expect(pickAdapter(dir).id).toBe('typescript');
+  });
+
+  it('falls back to TypeScript when no language files match', () => {
+    // Empty dir — heuristic returns no winner; preference list picks TS.
+    expect(pickAdapter(dir).id).toBe('typescript');
+  });
+
+  it('ignores excluded directories when counting', () => {
+    mkdirSync(join(dir, 'target'), { recursive: true });
+    writeFileSync(join(dir, 'target/cached.rs'), 'fn x() {}', 'utf8');
+    writeFileSync(join(dir, 'a.py'), 'pass', 'utf8');
+    expect(pickAdapter(dir).id).toBe('python');
+  });
+});
