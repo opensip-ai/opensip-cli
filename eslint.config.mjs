@@ -221,6 +221,41 @@ export default tseslint.config(
   },
 
   // ---------------------------------------------------------------------------
+  // graph engine — only the lang-typescript/ adapter subtree may import the
+  // TypeScript compiler API. Everywhere else routes through the
+  // GraphLanguageAdapter contract from lang-adapter/. The dep-cruiser rule
+  // graph-no-typescript-import-outside-lang-typescript documents the same
+  // intent at the architecture level, but with this project's
+  // tsPreCompilationDeps: false setting, dep-cruiser does not observe
+  // 'typescript' import edges at all — so ESLint is the active enforcer.
+  //
+  // Plan: docs/plans/10-graph-language-pluggability.md PR 3.
+  // ---------------------------------------------------------------------------
+  {
+    files: ['packages/graph/engine/src/**/*.ts'],
+    ignores: [
+      'packages/graph/engine/src/lang-typescript/**',
+      // Tests legitimately construct ts.SourceFile etc. as fixtures and
+      // exercise the adapter's TS-coupled internals. The architectural
+      // rule applies to production engine code only.
+      'packages/graph/engine/src/**/__tests__/**',
+      'packages/graph/engine/src/**/*.test.ts',
+    ],
+    rules: {
+      'no-restricted-imports': ['error', {
+        paths: [{
+          name: 'typescript',
+          message:
+            'Only the lang-typescript/ adapter may import the TypeScript ' +
+            'compiler API. Engine code must route through the ' +
+            'GraphLanguageAdapter contract from lang-adapter/. See ' +
+            'docs/plans/10-graph-language-pluggability.md.',
+        }],
+      }],
+    },
+  },
+
+  // ---------------------------------------------------------------------------
   // Dist files (some intermediate scripts emit JS during builds).
   // ---------------------------------------------------------------------------
   {
