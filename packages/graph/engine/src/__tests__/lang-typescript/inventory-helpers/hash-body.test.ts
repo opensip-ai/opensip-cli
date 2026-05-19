@@ -10,7 +10,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { hashSyntheticBody } from '../../../pipeline/inventory-helpers/hash-body.js';
+import { hashSyntheticBody } from '../../../lang-typescript/inventory-helpers/hash-body.js';
 
 describe('hashFunctionBody (DRY-4)', () => {
   it('produces identical hashes for identical bodies', () => {

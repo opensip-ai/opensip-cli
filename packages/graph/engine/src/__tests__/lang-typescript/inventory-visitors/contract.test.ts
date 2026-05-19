@@ -9,14 +9,14 @@
 import { describe, expect, it } from 'vitest';
 
 
-import { visitArrowFunction } from '../../../pipeline/inventory-visitors/arrow-function.js';
-import { visitConstructorDeclaration } from '../../../pipeline/inventory-visitors/constructor-declaration.js';
-import { visitFunctionDeclaration } from '../../../pipeline/inventory-visitors/function-declaration.js';
-import { visitFunctionExpression } from '../../../pipeline/inventory-visitors/function-expression.js';
-import { visitGetterSetter } from '../../../pipeline/inventory-visitors/getter-setter.js';
-import { visitMethodDeclaration } from '../../../pipeline/inventory-visitors/method-declaration.js';
+import { visitArrowFunction } from '../../../lang-typescript/inventory-visitors/arrow-function.js';
+import { visitConstructorDeclaration } from '../../../lang-typescript/inventory-visitors/constructor-declaration.js';
+import { visitFunctionDeclaration } from '../../../lang-typescript/inventory-visitors/function-declaration.js';
+import { visitFunctionExpression } from '../../../lang-typescript/inventory-visitors/function-expression.js';
+import { visitGetterSetter } from '../../../lang-typescript/inventory-visitors/getter-setter.js';
+import { visitMethodDeclaration } from '../../../lang-typescript/inventory-visitors/method-declaration.js';
 
-import type { InventoryVisitor } from '../../../pipeline/inventory-visitors/types.js';
+import type { InventoryVisitor } from '../../../lang-typescript/inventory-visitors/types.js';
 import type ts from 'typescript';
 
 const _decl: InventoryVisitor<ts.FunctionDeclaration> = visitFunctionDeclaration;

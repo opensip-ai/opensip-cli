@@ -8,7 +8,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'vitest';
 
-import { normalizeProjectDir } from '../../pipeline/normalize-project-dir.js';
+import { normalizeProjectDir } from '../../lang-typescript/normalize-project-dir.js';
 
 describe('normalizeProjectDir (DRY-4)', () => {
   const realDir = realpathSync(mkdtempSync(join(tmpdir(), 'graph-norm-')));

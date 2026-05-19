@@ -24,5 +24,5 @@ export type {
   Visibility,
 } from './types.js';
 export type { Renderer, RenderContext } from './render/types.js';
-export type { EdgeResolver, ResolverContext } from './pipeline/edge-resolvers/types.js';
-export type { InventoryVisitor, VisitorContext } from './pipeline/inventory-visitors/types.js';
+export type { EdgeResolver, ResolverContext } from './lang-typescript/edge-resolvers/types.js';
+export type { InventoryVisitor, VisitorContext } from './lang-typescript/inventory-visitors/types.js';

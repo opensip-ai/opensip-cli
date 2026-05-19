@@ -27,9 +27,9 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { discoverFiles } from '../pipeline/discover.js';
-import { resolveEdges } from '../pipeline/edges.js';
-import { buildInventory } from '../pipeline/inventory.js';
+import { discoverFiles } from '../lang-typescript/discover.js';
+import { resolveEdges } from '../lang-typescript/edges.js';
+import { buildInventory } from '../lang-typescript/inventory.js';
 
 import type { Catalog, FunctionOccurrence } from '../types.js';
 

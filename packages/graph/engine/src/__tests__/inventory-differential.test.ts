@@ -18,8 +18,8 @@ import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
-import { discoverFiles } from '../pipeline/discover.js';
-import { buildInventory } from '../pipeline/inventory.js';
+import { discoverFiles } from '../lang-typescript/discover.js';
+import { buildInventory } from '../lang-typescript/inventory.js';
 
 import type { Catalog, FunctionOccurrence } from '../types.js';
 

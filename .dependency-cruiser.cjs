@@ -223,12 +223,13 @@ module.exports = {
       severity: 'error',
       comment:
         'Rules consume frozen catalog/indexes only. They must not import the ' +
-        'TypeScript parser or any pipeline stage.',
+        'TypeScript parser, any pipeline stage, or the lang-typescript adapter.',
       from: { path: '^packages/graph/engine/src/rules/' },
       to: {
         path: [
           '^typescript$',
           '^packages/graph/engine/src/pipeline/',
+          '^packages/graph/engine/src/lang-typescript/',
         ],
       },
     },
@@ -239,7 +240,12 @@ module.exports = {
         'Renderers consume Signal[] and a RenderContext. They do not see the ' +
         'catalog or any rule logic.',
       from: { path: '^packages/graph/engine/src/render/' },
-      to: { path: '^packages/graph/engine/src/(pipeline|rules)/' },
+      to: {
+        path: [
+          '^packages/graph/engine/src/(pipeline|rules)/',
+          '^packages/graph/engine/src/lang-typescript/',
+        ],
+      },
     },
     {
       name: 'graph-visitors-resolvers-disjoint',
@@ -247,16 +253,41 @@ module.exports = {
       comment:
         'Inventory visitors handle declarations; edge resolvers handle call ' +
         'sites. They share helpers but not each other.',
-      from: { path: '^packages/graph/engine/src/pipeline/inventory-visitors/' },
-      to: { path: '^packages/graph/engine/src/pipeline/edge-resolvers/' },
+      from: { path: '^packages/graph/engine/src/lang-typescript/inventory-visitors/' },
+      to: { path: '^packages/graph/engine/src/lang-typescript/edge-resolvers/' },
     },
     {
       name: 'graph-resolvers-visitors-disjoint',
       severity: 'error',
       comment:
         'Symmetric counterpart of graph-visitors-resolvers-disjoint.',
-      from: { path: '^packages/graph/engine/src/pipeline/edge-resolvers/' },
-      to: { path: '^packages/graph/engine/src/pipeline/inventory-visitors/' },
+      from: { path: '^packages/graph/engine/src/lang-typescript/edge-resolvers/' },
+      to: { path: '^packages/graph/engine/src/lang-typescript/inventory-visitors/' },
+    },
+    {
+      // PR 2 of plan docs/plans/10-graph-language-pluggability.md.
+      // The TypeScript compiler API may be imported only inside the
+      // lang-typescript adapter subtree. PR 3 removes the orchestrate.ts
+      // and cache/invalidate.ts allowances once parseProject and
+      // cacheKey land in the adapter; until then those two files keep
+      // their direct `import ts from 'typescript'` so the byte-identical
+      // catalog gate can hold across the move.
+      name: 'graph-no-typescript-import-outside-lang-typescript',
+      severity: 'error',
+      comment:
+        'Only the lang-typescript adapter subtree may import the TypeScript ' +
+        'compiler API. cli/orchestrate.ts and cache/invalidate.ts retain a ' +
+        'transitional waiver until PR 3 lifts ts.createProgram and ts.version ' +
+        'into the adapter.',
+      from: {
+        path: '^packages/graph/engine/src/',
+        pathNot: [
+          '^packages/graph/engine/src/lang-typescript/',
+          '^packages/graph/engine/src/cli/orchestrate\\.ts$',
+          '^packages/graph/engine/src/cache/invalidate\\.ts$',
+        ],
+      },
+      to: { path: '^typescript$' },
     },
     {
       // Documented exception: graph imports SARIF helpers from fitness

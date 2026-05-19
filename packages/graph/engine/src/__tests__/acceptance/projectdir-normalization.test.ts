@@ -10,7 +10,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'vitest';
 
-import { discoverFiles } from '../../pipeline/discover.js';
+import { discoverFiles } from '../../lang-typescript/discover.js';
 
 import { writeFixture } from './_fixture-runner.js';
 

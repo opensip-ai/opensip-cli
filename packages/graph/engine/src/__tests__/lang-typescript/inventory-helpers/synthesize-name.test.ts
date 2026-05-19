@@ -12,7 +12,7 @@ import {
   synthesizeArrowName,
   synthesizeFunctionExpressionName,
   synthesizeModuleInitName,
-} from '../../../pipeline/inventory-helpers/synthesize-name.js';
+} from '../../../lang-typescript/inventory-helpers/synthesize-name.js';
 
 describe('synthesizeName (DRY-4)', () => {
   it('arrow names are angle-bracketed with file:line:column', () => {

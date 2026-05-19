@@ -8,13 +8,13 @@
 import { describe, expect, it } from 'vitest';
 
 
-import { resolveDirectCall } from '../../../pipeline/edge-resolvers/direct-call.js';
-import { resolveJsxElement } from '../../../pipeline/edge-resolvers/jsx-element.js';
-import { resolveNewExpression } from '../../../pipeline/edge-resolvers/new-expression.js';
-import { resolvePolymorphicCall } from '../../../pipeline/edge-resolvers/polymorphic.js';
-import { resolvePropertyAccessCall } from '../../../pipeline/edge-resolvers/property-access.js';
+import { resolveDirectCall } from '../../../lang-typescript/edge-resolvers/direct-call.js';
+import { resolveJsxElement } from '../../../lang-typescript/edge-resolvers/jsx-element.js';
+import { resolveNewExpression } from '../../../lang-typescript/edge-resolvers/new-expression.js';
+import { resolvePolymorphicCall } from '../../../lang-typescript/edge-resolvers/polymorphic.js';
+import { resolvePropertyAccessCall } from '../../../lang-typescript/edge-resolvers/property-access.js';
 
-import type { EdgeResolver } from '../../../pipeline/edge-resolvers/types.js';
+import type { EdgeResolver } from '../../../lang-typescript/edge-resolvers/types.js';
 import type ts from 'typescript';
 
 const _direct: EdgeResolver<ts.CallExpression> = resolveDirectCall;

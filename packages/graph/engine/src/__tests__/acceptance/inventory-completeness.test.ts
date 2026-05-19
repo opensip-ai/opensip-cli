@@ -13,8 +13,8 @@ import { describe, expect, it } from 'vitest';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
-import { discoverFiles } from '../../pipeline/discover.js';
-import { buildInventory } from '../../pipeline/inventory.js';
+import { discoverFiles } from '../../lang-typescript/discover.js';
+import { buildInventory } from '../../lang-typescript/inventory.js';
 
 import type { Catalog } from '../../types.js';
 

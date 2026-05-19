@@ -18,10 +18,8 @@ import {
 } from '../cache/invalidate.js';
 import { readCatalog } from '../cache/read.js';
 import { writeCatalog } from '../cache/write.js';
-import { discoverFiles } from '../pipeline/discover.js';
-import { resolveEdgesFromRecords } from '../pipeline/edges.js';
+import { discoverFiles, resolveEdgesFromRecords, walkProgram } from '../lang-typescript/index.js';
 import { buildIndexes } from '../pipeline/indexes.js';
-import { walkProgram } from '../pipeline/walk.js';
 import { rules as defaultRules } from '../rules/registry.js';
 
 import type { Catalog, FunctionOccurrence, GraphConfig, Indexes, ResolutionStats, Rule } from '../types.js';
