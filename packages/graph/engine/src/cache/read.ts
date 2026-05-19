@@ -14,7 +14,13 @@ import { CatalogIntegrityError } from '../errors.js';
 
 import type { Catalog } from '../types.js';
 
-const SUPPORTED_VERSION = '2.0';
+/**
+ * v3 catalogs ship with `language` + `cacheKey`. v2 (older) catalogs
+ * stored `tsConfigPath` + `tsCompilerVersion`; loading them returns
+ * null so the orchestrator triggers exactly one cold rebuild. See
+ * docs/plans/10-graph-language-pluggability.md §5 (catalog v3 migration).
+ */
+const SUPPORTED_VERSION = '3.0';
 
 export function readCatalog(catalogPath: string): Catalog | null {
   if (!existsSync(catalogPath)) {
@@ -39,9 +45,19 @@ export function readCatalog(catalogPath: string): Catalog | null {
       });
       return null;
     }
-    if (parsed.tool !== 'graph' || parsed.language !== 'typescript') {
+    if (parsed.tool !== 'graph') {
       throw new CatalogIntegrityError(
-        `Catalog at ${catalogPath} has wrong tool/language: ${parsed.tool}/${parsed.language}`,
+        `Catalog at ${catalogPath} has wrong tool: ${String((parsed as { tool: unknown }).tool)}`,
+      );
+    }
+    if (typeof parsed.language !== 'string' || parsed.language.length === 0) {
+      throw new CatalogIntegrityError(
+        `Catalog at ${catalogPath} has missing/invalid language field.`,
+      );
+    }
+    if (typeof parsed.cacheKey !== 'string' || parsed.cacheKey.length === 0) {
+      throw new CatalogIntegrityError(
+        `Catalog at ${catalogPath} has missing/invalid cacheKey field.`,
       );
     }
     logger.info({

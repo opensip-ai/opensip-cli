@@ -105,14 +105,31 @@ export interface ParseError {
   readonly message: string;
 }
 
-/** The catalog: functions keyed by simple name. Multiple occurrences per name. */
+/**
+ * The catalog: functions keyed by simple name. Multiple occurrences
+ * per name.
+ *
+ * v3 — generic over language. PR 3 of plan
+ * docs/plans/10-graph-language-pluggability.md replaced the v2
+ * fields `tsConfigPath` and `tsCompilerVersion` with adapter-supplied
+ * `language` (the registered adapter id) and `cacheKey` (an opaque
+ * per-adapter invalidation key). v2 catalogs on disk return
+ * `{ kind: 'invalid', reason: 'version-mismatch' }` from
+ * `classifyCatalog`, so users see exactly one cold rebuild.
+ */
 export interface Catalog {
-  readonly version: '2.0';
+  readonly version: '3.0';
   readonly tool: 'graph';
-  readonly language: 'typescript';
+  /** Adapter id — currently always 'typescript'; future adapters add their own. */
+  readonly language: string;
   readonly builtAt: string;
-  readonly tsConfigPath: string;
-  readonly tsCompilerVersion: string;
+  /**
+   * Opaque per-adapter cache invalidation key. The TypeScript adapter
+   * sets `ts-${ts.version}-${tsconfigContentHash}`. Different adapters
+   * MUST emit different prefixes so cross-adapter accidents (e.g. a
+   * Python catalog read by the TS adapter) hash-mismatch immediately.
+   */
+  readonly cacheKey: string;
   /**
    * Concatenated fingerprint of the source files at build time
    * (mtime + size per file). Used by cache invalidation; absence

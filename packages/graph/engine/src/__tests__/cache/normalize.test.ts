@@ -39,12 +39,11 @@ function occ(over: Partial<FunctionOccurrence>): FunctionOccurrence {
 describe('normalizeCatalogForSerialization (DRY-4)', () => {
   it('round-trips a catalog byte-identical via JSON.stringify', () => {
     const catalog: Catalog = {
-      version: '2.0',
+      version: '3.0',
       tool: 'graph',
       language: 'typescript',
       builtAt: '2026-05-16T00:00:00.000Z',
-      tsConfigPath: '/tsconfig.json',
-      tsCompilerVersion: '5.7.0',
+      cacheKey: 'ts-test-v3',
       functions: {
         beta: [occ({ simpleName: 'beta', filePath: 'src/b.ts', bodyHash: 'b' })],
         alpha: [
@@ -60,12 +59,11 @@ describe('normalizeCatalogForSerialization (DRY-4)', () => {
 
   it('produces sorted top-level keys', () => {
     const catalog: Catalog = {
-      version: '2.0',
+      version: '3.0',
       tool: 'graph',
       language: 'typescript',
       builtAt: 'x',
-      tsConfigPath: 'x',
-      tsCompilerVersion: 'x',
+      cacheKey: 'ts-test-v3',
       functions: {
         zebra: [occ({ simpleName: 'zebra' })],
         apple: [occ({ simpleName: 'apple' })],
@@ -77,12 +75,11 @@ describe('normalizeCatalogForSerialization (DRY-4)', () => {
 
   it('iterateNormalizedFunctionEntries yields the same name+occurrence pairs as the materializing helper', () => {
     const catalog: Catalog = {
-      version: '2.0',
+      version: '3.0',
       tool: 'graph',
       language: 'typescript',
       builtAt: 'x',
-      tsConfigPath: 'x',
-      tsCompilerVersion: 'x',
+      cacheKey: 'ts-test-v3',
       functions: {
         zebra: [occ({ simpleName: 'zebra', filePath: 'src/z.ts' })],
         alpha: [
@@ -99,12 +96,11 @@ describe('normalizeCatalogForSerialization (DRY-4)', () => {
 
   it('sorts occurrences within a name by file/line/column', () => {
     const catalog: Catalog = {
-      version: '2.0',
+      version: '3.0',
       tool: 'graph',
       language: 'typescript',
       builtAt: 'x',
-      tsConfigPath: 'x',
-      tsCompilerVersion: 'x',
+      cacheKey: 'ts-test-v3',
       functions: {
         foo: [
           occ({ simpleName: 'foo', filePath: 'src/b.ts', line: 1, bodyHash: 'b' }),

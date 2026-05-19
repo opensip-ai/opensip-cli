@@ -18,12 +18,11 @@ import type { Catalog, FunctionOccurrence } from '../../types.js';
 
 function makeCatalog(over: Partial<Catalog> = {}): Catalog {
   return {
-    version: '2.0',
+    version: '3.0',
     tool: 'graph',
     language: 'typescript',
     builtAt: '2026-05-17T00:00:00.000Z',
-    tsConfigPath: 'fake/tsconfig.json',
-    tsCompilerVersion: '5.7.0',
+    cacheKey: 'ts-5.7.0-abcdef0123456789',
     filesFingerprint: '1\nsrc/a.ts|0|0',
     functions: { foo: [] as never[] },
     ...over,
@@ -72,7 +71,28 @@ describe('cache write/read round trip', () => {
     expect(readBack).not.toBeNull();
     expect(readBack?.tool).toBe('graph');
     expect(readBack?.language).toBe('typescript');
-    expect(readBack?.version).toBe('2.0');
+    expect(readBack?.version).toBe('3.0');
+    expect(readBack?.cacheKey).toBe('ts-5.7.0-abcdef0123456789');
+  });
+
+  it('returns null when reading a v2-format catalog (one cold rebuild path)', () => {
+    // A user upgrading from v2 to v3 has a v2 catalog on disk. The
+    // reader rejects the version mismatch; the orchestrator falls
+    // through to a full rebuild. Verifies the catalog v3 migration
+    // story from docs/plans/10-graph-language-pluggability.md §5.
+    mkdirSync(join(dir, 'cache'), { recursive: true });
+    const v2 = {
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: '2026-05-17T00:00:00.000Z',
+      tsConfigPath: 'fake/tsconfig.json',
+      tsCompilerVersion: '5.6.0',
+      filesFingerprint: '0',
+      functions: {},
+    };
+    writeFileSync(path, JSON.stringify(v2), 'utf8');
+    expect(readCatalog(path)).toBeNull();
   });
 
   it('returns null on cache miss (file not present)', () => {
@@ -91,10 +111,17 @@ describe('cache write/read round trip', () => {
     expect(readCatalog(path)).toBeNull();
   });
 
-  it('throws CatalogIntegrityError when tool/language do not match', () => {
+  it('throws CatalogIntegrityError when tool does not match', () => {
     mkdirSync(join(dir, 'cache'), { recursive: true });
     const wrong = { ...makeCatalog(), tool: 'wrong' };
     writeFileSync(path, JSON.stringify(wrong), 'utf8');
+    expect(() => readCatalog(path)).toThrow(CatalogIntegrityError);
+  });
+
+  it('throws CatalogIntegrityError when cacheKey is missing', () => {
+    mkdirSync(join(dir, 'cache'), { recursive: true });
+    const stripped = { ...makeCatalog(), cacheKey: '' };
+    writeFileSync(path, JSON.stringify(stripped), 'utf8');
     expect(() => readCatalog(path)).toThrow(CatalogIntegrityError);
   });
 

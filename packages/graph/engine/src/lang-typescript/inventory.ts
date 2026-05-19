@@ -75,12 +75,11 @@ export function buildInventory(input: InventoryInput): InventoryOutput {
   }
 
   const catalog: Catalog = {
-    version: '2.0',
+    version: '3.0',
     tool: 'graph',
     language: 'typescript',
     builtAt: new Date().toISOString(),
-    tsConfigPath: input.tsConfigPathAbs,
-    tsCompilerVersion: ts.version,
+    cacheKey: `ts-${ts.version}-${input.tsConfigPathAbs}`,
     functions,
   };
 

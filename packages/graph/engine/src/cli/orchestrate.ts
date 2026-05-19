@@ -1,28 +1,52 @@
 /**
  * Pipeline orchestrator — threads stages 0–5 together.
  *
- * The single module that imports from multiple stages. Per spec §5,
- * the orchestrator is straight-line code; every interesting decision
- * happens inside one of the stages.
+ * The single module that wires adapter outputs into the rule pipeline.
+ * Per spec §5, the orchestrator is straight-line code; every
+ * interesting decision happens inside one of the stages.
+ *
+ * PR 3 of plan docs/plans/10-graph-language-pluggability.md: this
+ * module no longer imports `'typescript'` directly. The orchestrator
+ * looks up an adapter from the lang-adapter registry and routes
+ * file-discovery / parse / walk / resolution through its method
+ * surface. The TypeScript adapter is the only one registered today;
+ * future adapters slot in by calling `registerAdapter` at bootstrap.
  */
 
 import { relative, sep } from 'node:path';
 
 import { logger, resolveProjectPaths } from '@opensip-tools/core';
-import ts from 'typescript';
+
+// Side-effect import: ensures default adapters are registered even
+// when callers reach `runGraph` without going through `tool.ts`
+// (e.g. orchestrator unit tests).
+import '../bootstrap.js';
 
 import {
   classifyCatalog,
   computeFilesFingerprint,
-  currentTsCompilerVersion,
 } from '../cache/invalidate.js';
 import { readCatalog } from '../cache/read.js';
 import { writeCatalog } from '../cache/write.js';
-import { discoverFiles, resolveEdgesFromRecords, walkProgram } from '../lang-typescript/index.js';
+import { pickAdapter } from '../lang-adapter/registry.js';
 import { buildIndexes } from '../pipeline/indexes.js';
 import { rules as defaultRules } from '../rules/registry.js';
 
-import type { Catalog, FunctionOccurrence, GraphConfig, Indexes, ResolutionStats, Rule } from '../types.js';
+import type {
+  DiscoverOutput,
+  GraphLanguageAdapter,
+  ParsedProject,
+  WalkOutput,
+} from '../lang-adapter/types.js';
+import type {
+  Catalog,
+  CallEdge,
+  FunctionOccurrence,
+  GraphConfig,
+  Indexes,
+  ResolutionStats,
+  Rule,
+} from '../types.js';
 import type { Signal } from '@opensip-tools/core';
 
 /**
@@ -30,7 +54,7 @@ import type { Signal } from '@opensip-tools/core';
  * The OpenSIP measurement run (5476 files) OOM'd on a default 4 GB heap;
  * 1000 is conservative and gives users a chance to bump the heap before
  * the slow Stage 1 program-construction kicks in. See
- * docs/plans/graph-performance-improvements.md Phase 0.
+ * docs/plans/00-graph-performance-improvements.md Phase 0.
  */
 const LARGE_REPO_FILE_THRESHOLD = 1000;
 
@@ -40,7 +64,7 @@ export interface RunGraphInput {
   readonly config?: GraphConfig;
   /** Override the rule set (tests, custom invocations). */
   readonly rules?: readonly Rule[];
-  /** Override the tsconfig path (default: <cwd>/tsconfig.json). */
+  /** Override the adapter's config-file path (e.g. tsconfig.json). */
   readonly tsConfigPath?: string;
 }
 
@@ -63,14 +87,16 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
   const ruleSet: readonly Rule[] = input.rules ?? defaultRules;
   const paths = resolveProjectPaths(input.cwd);
 
-  const discovery = discoverFiles({
-    projectDir: input.cwd,
-    tsConfigPath: input.tsConfigPath,
+  const adapter = pickAdapter();
+  const discovery = adapter.discoverFiles({
+    cwd: input.cwd,
+    configPathOverride: input.tsConfigPath,
   });
 
   emitLargeRepoHint(discovery.files.length);
 
   const { catalog, cacheHit, resolutionStats } = obtainCatalog({
+    adapter,
     discovery,
     catalogPath: paths.graphCatalogPath,
     useCache: input.noCache !== true,
@@ -95,56 +121,94 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
 
 /**
  * Run Stage 1 + Stage 2 and return only the catalog and resolution
- * stats. The TypeScript Program is created inside this function and
- * does not escape — once edge resolution returns, the program is
- * unreachable from any caller, so V8 can reclaim ~1-2 GB of bound AST
- * before Stage 3 (`buildIndexes`) and the cache write run.
+ * stats. The parsed project is created inside this function and does
+ * not escape — once edge resolution returns, it is unreachable from
+ * any caller, so V8 can reclaim the bound AST before Stage 3
+ * (`buildIndexes`) and the cache write run.
  */
 function buildAndResolveCatalog(
-  discovery: ReturnType<typeof discoverFiles>,
+  adapter: GraphLanguageAdapter,
+  discovery: DiscoverOutput,
 ): { readonly catalog: Catalog; readonly resolutionStats: ResolutionStats } {
   // Phase 4 unified walk: Stage 1's catalog construction and Stage 2's
   // call-site location share a single AST descent per file. The walk
   // emits the catalog plus a flat list of pre-located call-site
-  // records; resolveEdgesFromRecords dispatches resolvers without
-  // re-walking. See docs/plans/graph-performance-improvements.md.
-  const program = ts.createProgram({
-    rootNames: [...discovery.files],
-    options: discovery.compilerOptions,
+  // records; resolveCallSites dispatches resolvers without re-walking.
+  const parsed = adapter.parseProject({
+    projectDirAbs: discovery.projectDirAbs,
+    files: discovery.files,
+    compilerOptions: discovery.compilerOptions,
   });
-  // Force binder so parent pointers and the symbol table are populated
-  // before either the inventory visitors (which walk parent chains)
-  // or the resolvers (which call getSymbolAtLocation) need them.
-  program.getTypeChecker();
-
-  const walked = walkProgram({
-    program,
+  const walked = adapter.walkProject({
+    project: parsed.project,
     files: discovery.files,
     projectDirAbs: discovery.projectDirAbs,
   });
 
-  const initialCatalog: Catalog = {
-    version: '2.0',
-    tool: 'graph',
-    language: 'typescript',
-    builtAt: new Date().toISOString(),
-    tsConfigPath: discovery.tsConfigPathAbs,
-    tsCompilerVersion: ts.version,
-    functions: walked.functions,
-  };
+  const initialCatalog = assembleCatalog(adapter, discovery, walked.occurrences);
 
-  const edgeResult = resolveEdgesFromRecords({
+  const resolved = adapter.resolveCallSites({
+    project: parsed.project,
     catalog: initialCatalog,
-    program,
-    projectDirAbs: discovery.projectDirAbs,
     callSites: walked.callSites,
+    projectDirAbs: discovery.projectDirAbs,
   });
 
-  return { catalog: edgeResult.catalog, resolutionStats: edgeResult.resolutionStats };
+  const catalog = stitchEdges(initialCatalog, resolved.edgesByOwner);
+  return { catalog, resolutionStats: resolved.stats };
+}
+
+/**
+ * Build the catalog skeleton from walked occurrences. The catalog has
+ * empty `calls` arrays at this point; `resolveCallSites` produces the
+ * edges, and `stitchEdges` writes them in.
+ */
+function assembleCatalog(
+  adapter: GraphLanguageAdapter,
+  discovery: DiscoverOutput,
+  occurrences: Record<string, FunctionOccurrence[]>,
+): Catalog {
+  return {
+    version: '3.0',
+    tool: 'graph',
+    language: adapter.id,
+    builtAt: new Date().toISOString(),
+    cacheKey: adapter.cacheKey({
+      projectDirAbs: discovery.projectDirAbs,
+      configPathAbs: discovery.configPathAbs,
+      compilerOptions: discovery.compilerOptions,
+    }),
+    functions: occurrences,
+  };
+}
+
+/**
+ * Stitch resolved edges into the catalog. The adapter returns a
+ * `bodyHash → CallEdge[]` map; we walk the catalog and replace each
+ * occurrence's `calls` array with the resolved edges (or an empty
+ * array if the resolver produced none).
+ */
+function stitchEdges(
+  initial: Catalog,
+  edgesByOwner: ReadonlyMap<string, readonly CallEdge[]>,
+): Catalog {
+  const next: Record<string, FunctionOccurrence[]> = Object.create(null) as Record<
+    string,
+    FunctionOccurrence[]
+  >;
+  for (const [name, occs] of Object.entries(initial.functions)) {
+    if (!occs) continue;
+    next[name] = occs.map((o) => ({
+      ...o,
+      calls: edgesByOwner.get(o.bodyHash) ?? [],
+    }));
+  }
+  return { ...initial, functions: next };
 }
 
 interface ObtainCatalogInput {
-  readonly discovery: ReturnType<typeof discoverFiles>;
+  readonly adapter: GraphLanguageAdapter;
+  readonly discovery: DiscoverOutput;
   readonly catalogPath: string;
   readonly useCache: boolean;
 }
@@ -164,10 +228,15 @@ function obtainCatalog(input: ObtainCatalogInput): ObtainCatalogOutput {
   const cachedCatalog: Catalog | null = input.useCache
     ? readCatalog(input.catalogPath)
     : null;
+  const currentCacheKey = input.adapter.cacheKey({
+    projectDirAbs: input.discovery.projectDirAbs,
+    configPathAbs: input.discovery.configPathAbs,
+    compilerOptions: input.discovery.compilerOptions,
+  });
   const verdict = cachedCatalog
     ? classifyCatalog(cachedCatalog, {
-        currentTsCompilerVersion: currentTsCompilerVersion(),
-        currentTsConfigPath: input.discovery.tsConfigPathAbs,
+        currentLanguage: input.adapter.id,
+        currentCacheKey,
         currentFiles: input.discovery.files,
       })
     : ({ kind: 'invalid', reason: 'no-cache' } as const);
@@ -176,8 +245,13 @@ function obtainCatalog(input: ObtainCatalogInput): ObtainCatalogOutput {
     return { catalog: cachedCatalog, cacheHit: true, resolutionStats: null };
   }
   const built = verdict.kind === 'incremental' && cachedCatalog
-    ? buildAndResolveCatalogIncremental(input.discovery, cachedCatalog, verdict.changedFiles)
-    : buildAndResolveCatalog(input.discovery);
+    ? buildAndResolveCatalogIncremental(
+        input.adapter,
+        input.discovery,
+        cachedCatalog,
+        verdict.changedFiles,
+      )
+    : buildAndResolveCatalog(input.adapter, input.discovery);
 
   const catalog: Catalog = {
     ...built.catalog,
@@ -199,9 +273,8 @@ function obtainCatalog(input: ObtainCatalogInput): ObtainCatalogOutput {
  * unchanged files.
  *
  * Algorithm:
- *   1. Build a TypeScript Program over ALL current files. (We need
- *      the full program for resolver dispatch — symbol lookup walks
- *      the whole import graph.)
+ *   1. Parse the project once over ALL current files (the resolver
+ *      pass needs the full program for cross-file symbol lookup).
  *   2. Convert the absolute changed-files set to project-relative
  *      paths so we can match the catalog's filePath field.
  *   3. Iterate to fixpoint: walk closure files, identify hashes that
@@ -217,66 +290,64 @@ function obtainCatalog(input: ObtainCatalogInput): ObtainCatalogOutput {
  * catalog identical to a full rebuild` test.
  */
 function buildAndResolveCatalogIncremental(
-  discovery: ReturnType<typeof discoverFiles>,
+  adapter: GraphLanguageAdapter,
+  discovery: DiscoverOutput,
   cachedCatalog: Catalog,
   changedFilesAbs: readonly string[],
 ): { readonly catalog: Catalog; readonly resolutionStats: ResolutionStats } {
-  const program = ts.createProgram({
-    rootNames: [...discovery.files],
-    options: discovery.compilerOptions,
+  const parsed = adapter.parseProject({
+    projectDirAbs: discovery.projectDirAbs,
+    files: discovery.files,
+    compilerOptions: discovery.compilerOptions,
   });
-  program.getTypeChecker();
 
   const { walked, closureRel } = expandClosureToFixpoint({
+    adapter,
     discovery,
     cachedCatalog,
-    program,
+    parsedProject: parsed.project,
     changedFilesAbs,
   });
 
   // Build the resolver-input catalog from the merged occurrence set
   // so name- and hash-based fallbacks see the full project.
-  const mergedFunctions = mergeOccurrences(cachedCatalog, walked.functions, closureRel);
-  const initialCatalog: Catalog = {
-    version: '2.0',
-    tool: 'graph',
-    language: 'typescript',
-    builtAt: new Date().toISOString(),
-    tsConfigPath: discovery.tsConfigPathAbs,
-    tsCompilerVersion: ts.version,
+  const mergedFunctions = mergeOccurrences(cachedCatalog, walked.occurrences, closureRel);
+  const initialCatalog = {
+    ...assembleCatalog(adapter, discovery, mergedFunctions as Record<string, FunctionOccurrence[]>),
     functions: mergedFunctions,
-  };
+  } as Catalog;
 
-  const edgeResult = resolveEdgesFromRecords({
+  const resolved = adapter.resolveCallSites({
+    project: parsed.project,
     catalog: initialCatalog,
-    program,
-    projectDirAbs: discovery.projectDirAbs,
     callSites: walked.callSites,
+    projectDirAbs: discovery.projectDirAbs,
   });
 
-  // resolveEdgesFromRecords replaced ALL `calls` arrays in the catalog
-  // it returned. Restore the cached `calls` for unchanged files —
-  // their bodyHashes are present in the merged catalog by construction
-  // so the cached edges are still valid.
-  const finalFunctions = restoreCachedCalls(
-    edgeResult.catalog,
+  // Apply resolved edges only to closure files; unchanged files keep
+  // their cached edges. Their bodyHashes are present in the merged
+  // catalog by construction, so cached edges are still valid.
+  const finalFunctions = mergeResolvedAndCachedEdges(
+    initialCatalog,
     cachedCatalog,
+    resolved.edgesByOwner,
     closureRel,
   );
-  const finalCatalog: Catalog = { ...edgeResult.catalog, functions: finalFunctions };
+  const finalCatalog: Catalog = { ...initialCatalog, functions: finalFunctions };
 
-  return { catalog: finalCatalog, resolutionStats: edgeResult.resolutionStats };
+  return { catalog: finalCatalog, resolutionStats: resolved.stats };
 }
 
 interface ClosureInput {
-  readonly discovery: ReturnType<typeof discoverFiles>;
+  readonly adapter: GraphLanguageAdapter;
+  readonly discovery: DiscoverOutput;
   readonly cachedCatalog: Catalog;
-  readonly program: ts.Program;
+  readonly parsedProject: ParsedProject;
   readonly changedFilesAbs: readonly string[];
 }
 
 interface ClosureOutput {
-  readonly walked: ReturnType<typeof walkProgram>;
+  readonly walked: WalkOutput;
   readonly closureRel: ReadonlySet<string>;
 }
 
@@ -288,21 +359,21 @@ interface ClosureOutput {
  * no new dependents are discovered.
  */
 function expandClosureToFixpoint(input: ClosureInput): ClosureOutput {
-  const { discovery, cachedCatalog, program, changedFilesAbs } = input;
+  const { adapter, discovery, cachedCatalog, parsedProject, changedFilesAbs } = input;
   const closureRel = new Set(
     changedFilesAbs.map((p) => relative(discovery.projectDirAbs, p).split(sep).join('/')),
   );
   const closureAbs = new Set(changedFilesAbs);
   const cachedHashesByFile = groupCachedHashesByFile(cachedCatalog);
 
-  let walked: ReturnType<typeof walkProgram> | null = null;
+  let walked: WalkOutput | null = null;
   // Iterate to fixpoint. On a typical 1-file change, this loop runs
   // exactly once — a file's hashes generally don't reach into
   // unchanged callers' edges. Worst case is bounded by file count
   // (each iteration adds at least one file).
   for (;;) {
-    walked = walkProgram({
-      program,
+    walked = adapter.walkProject({
+      project: parsedProject,
       files: discovery.files.filter((p) => closureAbs.has(p)),
       projectDirAbs: discovery.projectDirAbs,
     });
@@ -323,14 +394,14 @@ function expandClosureToFixpoint(input: ClosureInput): ClosureOutput {
 }
 
 function expandClosureOnce(
-  walked: ReturnType<typeof walkProgram>,
+  walked: WalkOutput,
   cachedCatalog: Catalog,
   closureRel: Set<string>,
   closureAbs: Set<string>,
   cachedHashesByFile: ReadonlyMap<string, ReadonlySet<string>>,
   projectDirAbs: string,
 ): boolean {
-  const newHashes = collectHashesFromOccurrences(walked.functions);
+  const newHashes = collectHashesFromOccurrences(walked.occurrences);
   const staleHashes = collectStaleHashes(closureRel, cachedHashesByFile, newHashes);
   if (staleHashes.size === 0) return false;
   const newDependents = findEdgeDependents(cachedCatalog, staleHashes, closureRel);
@@ -477,15 +548,14 @@ function pushOccurrence(
 }
 
 /**
- * After resolveEdgesFromRecords, every occurrence in the merged
- * catalog has its `calls` array set to whatever the resolver
- * dispatch produced — which is empty for unchanged files because we
- * didn't pass any of their call-sites to the resolver. Restore the
- * cached `calls` for those occurrences.
+ * Stitch resolved edges into closure files; restore cached edges for
+ * unchanged files. The merged catalog already has cached occurrences
+ * for unchanged files; we just preserve their `calls` array.
  */
-function restoreCachedCalls(
-  resolved: Catalog,
+function mergeResolvedAndCachedEdges(
+  merged: Catalog,
   cached: Catalog,
+  edgesByOwner: ReadonlyMap<string, readonly CallEdge[]>,
   closureRel: ReadonlySet<string>,
 ): Record<string, readonly FunctionOccurrence[]> {
   // Build a quick index of cached occurrences by bodyHash so we can
@@ -500,13 +570,13 @@ function restoreCachedCalls(
     string,
     FunctionOccurrence[]
   >;
-  for (const [name, occs] of Object.entries(resolved.functions)) {
+  for (const [name, occs] of Object.entries(merged.functions)) {
     if (!occs) continue;
     const arr: FunctionOccurrence[] = [];
     for (const o of occs) {
       if (closureRel.has(o.filePath)) {
         // Closure files keep their freshly-resolved edges.
-        arr.push(o);
+        arr.push({ ...o, calls: edgesByOwner.get(o.bodyHash) ?? [] });
       } else {
         // Unchanged files: restore cached calls. The hash matched
         // because we lifted the cached occurrence into the merged
@@ -521,11 +591,11 @@ function restoreCachedCalls(
 }
 
 /**
- * On large repos, the TypeScript Program built in Stage 1 can exhaust
- * Node's default ~4 GB heap before Stage 2 starts. Emit a single hint
- * to stderr (and a structured log line) before Stage 1 runs so users
- * see actionable guidance up front instead of a V8 OOM stack 17 minutes
- * in. Below the threshold, stays silent.
+ * On large repos, the parse step in Stage 1 can exhaust Node's
+ * default ~4 GB heap before Stage 2 starts. Emit a single hint to
+ * stderr (and a structured log line) before Stage 1 runs so users
+ * see actionable guidance up front instead of a V8 OOM stack 17
+ * minutes in. Below the threshold, stays silent.
  *
  * Exported for unit tests; otherwise an internal helper.
  */

@@ -76,12 +76,11 @@ export function makeCatalog(occs: readonly FunctionOccurrence[]): Catalog {
     bucket.push(o);
   }
   return {
-    version: '2.0',
+    version: '3.0',
     tool: 'graph',
     language: 'typescript',
     builtAt: 'x',
-    tsConfigPath: 'x',
-    tsCompilerVersion: 'x',
+    cacheKey: 'ts-test-v3',
     functions,
   };
 }

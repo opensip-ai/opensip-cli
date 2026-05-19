@@ -265,29 +265,56 @@ module.exports = {
       to: { path: '^packages/graph/engine/src/lang-typescript/inventory-visitors/' },
     },
     {
-      // PR 2 of plan docs/plans/10-graph-language-pluggability.md.
-      // The TypeScript compiler API may be imported only inside the
-      // lang-typescript adapter subtree. PR 3 removes the orchestrate.ts
-      // and cache/invalidate.ts allowances once parseProject and
-      // cacheKey land in the adapter; until then those two files keep
-      // their direct `import ts from 'typescript'` so the byte-identical
-      // catalog gate can hold across the move.
+      // PR 3 of plan docs/plans/10-graph-language-pluggability.md.
+      // After parseProject and cacheKey moved into the adapter, the
+      // engine has zero direct imports of `'typescript'` outside the
+      // lang-typescript subtree.
       name: 'graph-no-typescript-import-outside-lang-typescript',
       severity: 'error',
       comment:
         'Only the lang-typescript adapter subtree may import the TypeScript ' +
-        'compiler API. cli/orchestrate.ts and cache/invalidate.ts retain a ' +
-        'transitional waiver until PR 3 lifts ts.createProgram and ts.version ' +
-        'into the adapter.',
+        'compiler API. The engine itself routes through the GraphLanguageAdapter ' +
+        'contract from lang-adapter/.',
       from: {
         path: '^packages/graph/engine/src/',
-        pathNot: [
-          '^packages/graph/engine/src/lang-typescript/',
-          '^packages/graph/engine/src/cli/orchestrate\\.ts$',
-          '^packages/graph/engine/src/cache/invalidate\\.ts$',
-        ],
+        pathNot: '^packages/graph/engine/src/lang-typescript/',
       },
       to: { path: '^typescript$' },
+    },
+    {
+      // PR 3 of plan docs/plans/10-graph-language-pluggability.md.
+      // pipeline/, cache/, rules/, render/ are language-agnostic.
+      // They MUST NOT reach into any lang-* adapter directory; instead
+      // they consume the catalog (built by the orchestrator from
+      // adapter outputs) and adapter-supplied hints via the contract.
+      name: 'graph-pipeline-no-lang-import',
+      severity: 'error',
+      comment:
+        'pipeline/, cache/, rules/, render/ are language-agnostic. They must ' +
+        'not import from any lang-* adapter directory.',
+      from: {
+        path: '^packages/graph/engine/src/(?:pipeline|cache|rules|render)/',
+      },
+      to: { path: '^packages/graph/engine/src/lang-' },
+    },
+    {
+      // PR 3 of plan docs/plans/10-graph-language-pluggability.md.
+      // The orchestrator routes through the lang-adapter registry,
+      // not a specific adapter. tool.ts is the bootstrap point — it
+      // imports the first-party TypeScript adapter to register it;
+      // no other cli/ file may.
+      name: 'graph-orchestrate-no-direct-lang-import',
+      severity: 'error',
+      comment:
+        'cli/* (including the orchestrator) routes through ' +
+        'lang-adapter/registry only, not a specific lang-* adapter. ' +
+        'tool.ts is the documented exception for first-party adapter ' +
+        'registration; that file is allowed to import lang-typescript ' +
+        'because it lives at the engine root, not under cli/.',
+      from: {
+        path: '^packages/graph/engine/src/cli/',
+      },
+      to: { path: '^packages/graph/engine/src/lang-typescript/' },
     },
     {
       // Documented exception: graph imports SARIF helpers from fitness

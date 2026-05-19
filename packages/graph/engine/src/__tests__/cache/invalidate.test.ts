@@ -1,5 +1,9 @@
 /**
  * Tests for cache invalidation logic.
+ *
+ * v3 (PR 3 of plan 10): the cache key is `language` + adapter-supplied
+ * `cacheKey`, replacing v2's separate `tsCompilerVersion` and
+ * `tsConfigPath` fields.
  */
 
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -11,24 +15,22 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   classifyCatalog,
   computeFilesFingerprint,
-  currentTsCompilerVersion,
   diffFingerprints,
   isCatalogValid,
 } from '../../cache/invalidate.js';
 
 import type { Catalog } from '../../types.js';
 
-const FAKE_TS_VERSION = '5.7.0';
-const FAKE_TSCONFIG = 'fake/tsconfig.json';
+const FAKE_LANG = 'typescript';
+const FAKE_CACHE_KEY = 'ts-5.7.0-abcdef0123456789';
 
 function makeCatalog(over: Partial<Catalog> = {}): Catalog {
   return {
-    version: '2.0',
+    version: '3.0',
     tool: 'graph',
-    language: 'typescript',
+    language: FAKE_LANG,
     builtAt: '2026-05-17T00:00:00.000Z',
-    tsConfigPath: FAKE_TSCONFIG,
-    tsCompilerVersion: FAKE_TS_VERSION,
+    cacheKey: FAKE_CACHE_KEY,
     filesFingerprint: 'fp',
     functions: {},
     ...over,
@@ -36,23 +38,23 @@ function makeCatalog(over: Partial<Catalog> = {}): Catalog {
 }
 
 describe('isCatalogValid', () => {
-  it('returns false when ts compiler version differs', () => {
-    const cat = makeCatalog({ tsCompilerVersion: '5.6.0' });
+  it('returns false when language differs', () => {
+    const cat = makeCatalog({ language: 'python' });
     expect(
       isCatalogValid(cat, {
-        currentTsCompilerVersion: FAKE_TS_VERSION,
-        currentTsConfigPath: FAKE_TSCONFIG,
+        currentLanguage: FAKE_LANG,
+        currentCacheKey: FAKE_CACHE_KEY,
         currentFiles: [],
       }),
     ).toBe(false);
   });
 
-  it('returns false when tsConfigPath differs', () => {
-    const cat = makeCatalog({ tsConfigPath: 'fake/old.json' });
+  it('returns false when cacheKey differs', () => {
+    const cat = makeCatalog({ cacheKey: 'ts-5.6.0-abcdef0123456789' });
     expect(
       isCatalogValid(cat, {
-        currentTsCompilerVersion: FAKE_TS_VERSION,
-        currentTsConfigPath: 'fake/new.json',
+        currentLanguage: FAKE_LANG,
+        currentCacheKey: FAKE_CACHE_KEY,
         currentFiles: [],
       }),
     ).toBe(false);
@@ -63,8 +65,8 @@ describe('isCatalogValid', () => {
     const stripped: Catalog = { ...noFp, filesFingerprint: undefined };
     expect(
       isCatalogValid(stripped, {
-        currentTsCompilerVersion: FAKE_TS_VERSION,
-        currentTsConfigPath: FAKE_TSCONFIG,
+        currentLanguage: FAKE_LANG,
+        currentCacheKey: FAKE_CACHE_KEY,
         currentFiles: [],
       }),
     ).toBe(false);
@@ -74,8 +76,8 @@ describe('isCatalogValid', () => {
     const cat = makeCatalog({ filesFingerprint: 'old-fp' });
     expect(
       isCatalogValid(cat, {
-        currentTsCompilerVersion: FAKE_TS_VERSION,
-        currentTsConfigPath: FAKE_TSCONFIG,
+        currentLanguage: FAKE_LANG,
+        currentCacheKey: FAKE_CACHE_KEY,
         currentFiles: ['fake/does-not-exist.ts'],
       }),
     ).toBe(false);
@@ -86,8 +88,8 @@ describe('isCatalogValid', () => {
     const cat = makeCatalog({ filesFingerprint: fp });
     expect(
       isCatalogValid(cat, {
-        currentTsCompilerVersion: FAKE_TS_VERSION,
-        currentTsConfigPath: FAKE_TSCONFIG,
+        currentLanguage: FAKE_LANG,
+        currentCacheKey: FAKE_CACHE_KEY,
         currentFiles: [],
       }),
     ).toBe(true);
@@ -126,13 +128,6 @@ describe('computeFilesFingerprint', () => {
   });
 });
 
-describe('currentTsCompilerVersion', () => {
-  it('returns a non-empty version string', () => {
-    expect(typeof currentTsCompilerVersion()).toBe('string');
-    expect(currentTsCompilerVersion().length).toBeGreaterThan(0);
-  });
-});
-
 describe('classifyCatalog (Wave 4)', () => {
   let dir: string;
 
@@ -150,8 +145,8 @@ describe('classifyCatalog (Wave 4)', () => {
     const fp = computeFilesFingerprint([f]);
     const cat = makeCatalog({ filesFingerprint: fp });
     const verdict = classifyCatalog(cat, {
-      currentTsCompilerVersion: FAKE_TS_VERSION,
-      currentTsConfigPath: FAKE_TSCONFIG,
+      currentLanguage: FAKE_LANG,
+      currentCacheKey: FAKE_CACHE_KEY,
       currentFiles: [f],
     });
     expect(verdict.kind).toBe('valid');
@@ -167,8 +162,8 @@ describe('classifyCatalog (Wave 4)', () => {
     // Simulate edit to b only.
     writeFileSync(b, 'bbbb-modified-much-bigger', 'utf8');
     const verdict = classifyCatalog(cat, {
-      currentTsCompilerVersion: FAKE_TS_VERSION,
-      currentTsConfigPath: FAKE_TSCONFIG,
+      currentLanguage: FAKE_LANG,
+      currentCacheKey: FAKE_CACHE_KEY,
       currentFiles: [a, b],
     });
     expect(verdict.kind).toBe('incremental');
@@ -189,8 +184,8 @@ describe('classifyCatalog (Wave 4)', () => {
     const c = join(dir, 'c.ts');
     writeFileSync(c, 'cccc', 'utf8');
     const verdict = classifyCatalog(cat, {
-      currentTsCompilerVersion: FAKE_TS_VERSION,
-      currentTsConfigPath: FAKE_TSCONFIG,
+      currentLanguage: FAKE_LANG,
+      currentCacheKey: FAKE_CACHE_KEY,
       currentFiles: [a, c],
     });
     expect(verdict.kind).toBe('incremental');
@@ -200,11 +195,11 @@ describe('classifyCatalog (Wave 4)', () => {
     }
   });
 
-  it('returns `invalid` when the compiler version differs (no incremental path)', () => {
-    const cat = makeCatalog({ tsCompilerVersion: '5.6.0' });
+  it('returns `invalid` when the cacheKey differs (no incremental path)', () => {
+    const cat = makeCatalog({ cacheKey: 'ts-5.6.0-abcdef0123456789' });
     const verdict = classifyCatalog(cat, {
-      currentTsCompilerVersion: FAKE_TS_VERSION,
-      currentTsConfigPath: FAKE_TSCONFIG,
+      currentLanguage: FAKE_LANG,
+      currentCacheKey: FAKE_CACHE_KEY,
       currentFiles: [],
     });
     expect(verdict.kind).toBe('invalid');
@@ -213,8 +208,31 @@ describe('classifyCatalog (Wave 4)', () => {
   it('returns `invalid` when the catalog has no fingerprint', () => {
     const stripped: Catalog = { ...makeCatalog(), filesFingerprint: undefined };
     const verdict = classifyCatalog(stripped, {
-      currentTsCompilerVersion: FAKE_TS_VERSION,
-      currentTsConfigPath: FAKE_TSCONFIG,
+      currentLanguage: FAKE_LANG,
+      currentCacheKey: FAKE_CACHE_KEY,
+      currentFiles: [],
+    });
+    expect(verdict.kind).toBe('invalid');
+  });
+
+  it('returns `invalid` for a v2 catalog with the old field shape', () => {
+    // Hand-rolled v2 catalog as users would have on disk before PR 3.
+    // The runtime classifyCatalog accepts `Catalog` as input but the
+    // v3 fields aren't there, so language/cacheKey are undefined and
+    // mismatch every current adapter's id/cacheKey.
+    const v2Catalog = {
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: '2026-05-17T00:00:00.000Z',
+      tsConfigPath: 'fake/tsconfig.json',
+      tsCompilerVersion: '5.6.0',
+      filesFingerprint: '0',
+      functions: {},
+    } as unknown as Catalog;
+    const verdict = classifyCatalog(v2Catalog, {
+      currentLanguage: FAKE_LANG,
+      currentCacheKey: FAKE_CACHE_KEY,
       currentFiles: [],
     });
     expect(verdict.kind).toBe('invalid');

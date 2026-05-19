@@ -1,31 +1,31 @@
 /**
  * Cache invalidation per §6.2.
  *
- * The catalog is content-keyed via three signals:
- *  1. tsCompilerVersion — TS upgrade invalidates everything.
- *  2. tsConfigPath agreement — different config means different files.
- *  3. Per-file mtime agreement against the catalog's recorded
- *     filesFingerprint — any source file change re-runs stages 1+2.
+ * v3: the catalog is content-keyed via three signals:
+ *  1. language       — adapter id; mismatch invalidates immediately.
+ *  2. cacheKey       — opaque per-adapter invalidation key; mismatch
+ *                      invalidates (e.g. TS upgrade or tsconfig change).
+ *  3. filesFingerprint — per-file mtime + size agreement; any source
+ *                      file change re-runs stages 1+2.
  *
  * Per-file fingerprinting uses mtime + size to keep the cost low.
  *
- * Wave 4 layered an "incremental" verdict on top: when the compiler
- * version + tsconfig agree but some files have changed mtimes, the
- * orchestrator can re-walk only the changed files (plus their
- * transitive edge-dependents) instead of rebuilding everything. See
- * `classifyCatalog` and the orchestrator's incremental path.
+ * Wave 4 layered an "incremental" verdict on top: when language +
+ * cacheKey agree but some files have changed mtimes, the orchestrator
+ * can re-walk only the changed files (plus their transitive edge-
+ * dependents) instead of rebuilding everything. See `classifyCatalog`
+ * and the orchestrator's incremental path.
  */
 
 import { statSync } from 'node:fs';
 
 import { logger } from '@opensip-tools/core';
-import ts from 'typescript';
 
 import type { Catalog } from '../types.js';
 
 export interface ValidationContext {
-  readonly currentTsCompilerVersion: string;
-  readonly currentTsConfigPath: string;
+  readonly currentLanguage: string;
+  readonly currentCacheKey: string;
   readonly currentFiles: readonly string[];
 }
 
@@ -33,12 +33,12 @@ export interface ValidationContext {
  * Wave 4 verdict — three states:
  *   - 'valid': cached catalog matches current file set on every axis;
  *     orchestrator returns it untouched.
- *   - 'incremental': compiler + tsconfig agree, but some files changed.
+ *   - 'incremental': language + cacheKey agree, but some files changed.
  *     `changedFiles` lists the absolute paths whose cached entries
  *     must be re-walked. Orchestrator builds the program over all
  *     current files and only walks/resolves the changed set.
- *   - 'invalid': structural mismatch (compiler version, tsconfig path,
- *     missing fingerprint). Orchestrator does a full rebuild.
+ *   - 'invalid': structural mismatch (language, cacheKey, missing
+ *     fingerprint). Orchestrator does a full rebuild.
  */
 export type CatalogVerdict =
   | { readonly kind: 'valid' }
@@ -46,25 +46,25 @@ export type CatalogVerdict =
   | { readonly kind: 'invalid'; readonly reason: string };
 
 export function classifyCatalog(cached: Catalog, ctx: ValidationContext): CatalogVerdict {
-  if (cached.tsCompilerVersion !== ctx.currentTsCompilerVersion) {
+  if (cached.language !== ctx.currentLanguage) {
     logger.info({
       evt: 'graph.cache.invalidate.miss',
       module: 'graph:cache',
-      reason: 'ts-version-changed',
-      cached: cached.tsCompilerVersion,
-      current: ctx.currentTsCompilerVersion,
+      reason: 'language-changed',
+      cached: cached.language,
+      current: ctx.currentLanguage,
     });
-    return { kind: 'invalid', reason: 'ts-version-changed' };
+    return { kind: 'invalid', reason: 'language-changed' };
   }
-  if (cached.tsConfigPath !== ctx.currentTsConfigPath) {
+  if (cached.cacheKey !== ctx.currentCacheKey) {
     logger.info({
       evt: 'graph.cache.invalidate.miss',
       module: 'graph:cache',
-      reason: 'tsconfig-path-changed',
-      cached: cached.tsConfigPath,
-      current: ctx.currentTsConfigPath,
+      reason: 'cache-key-changed',
+      cached: cached.cacheKey,
+      current: ctx.currentCacheKey,
     });
-    return { kind: 'invalid', reason: 'tsconfig-path-changed' };
+    return { kind: 'invalid', reason: 'cache-key-changed' };
   }
   const cachedFingerprint = (cached as { filesFingerprint?: string }).filesFingerprint;
   if (typeof cachedFingerprint !== 'string') {
@@ -95,10 +95,6 @@ export function classifyCatalog(cached: Catalog, ctx: ValidationContext): Catalo
  */
 export function isCatalogValid(cached: Catalog, ctx: ValidationContext): boolean {
   return classifyCatalog(cached, ctx).kind === 'valid';
-}
-
-export function currentTsCompilerVersion(): string {
-  return ts.version;
 }
 
 /**

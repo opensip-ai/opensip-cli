@@ -19,7 +19,9 @@
 import { readPackageVersion } from '@opensip-tools/core';
 import { type Command } from 'commander';
 
-
+// Side-effect import: registers the first-party TypeScript adapter
+// at module load. PR 3 of docs/plans/10-graph-language-pluggability.md.
+import './bootstrap.js';
 import { executeGraph } from './cli/graph.js';
 
 import type { Tool, ToolCliContext, ToolCommandDescriptor } from '@opensip-tools/core';
