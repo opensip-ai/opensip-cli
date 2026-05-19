@@ -174,6 +174,8 @@ opensip-tools graph --packages         # fan across every workspace package in p
 
 The `--package` flag accepts either a workspace-package basename (searched under `packages/**`) or an explicit directory path. Useful on monorepos where a global run is slow: per-package runs typically complete in seconds and fit easily in the default Node heap. The trade-off is fidelity — call sites that cross package boundaries become unresolved, so the orphan-subtree and other reachability rules report against the in-scope package only.
 
+Python projects are also supported (lower fidelity, name-based resolution): the Python adapter detects projects with `pyproject.toml` / `setup.py` and uses tree-sitter for parsing. Call edges resolve by simple name and carry `confidence: 'medium'` (or `'low'` for ambiguous matches). Rust support landed alongside it via tree-sitter-rust. The `--package` / `--packages` flags are TypeScript-only today; for Python and Rust, run `graph` from the project root.
+
 The `--packages` flag fans out across every workspace package under `packages/**` that has a `tsconfig.json`, running one child process per package with concurrency `cpus()-1`. Same fidelity as `--package` (cross-package edges remain unresolved per child), but covers the whole repo. Tune the concurrency with `--packages-concurrency <n>`. On opensip-tools (18 packages) this is ~2.3× faster than the global run; on monorepos with many packages the speedup grows linearly with cores.
 
 For users who prefer external orchestration, `xargs -P 8 -I {} opensip-tools graph --package {}` over a list of package paths achieves the same effect.

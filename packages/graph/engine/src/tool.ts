@@ -47,11 +47,11 @@ function register(cli: ToolCliContext): void {
     .option('--report-to <url>', 'POST findings to OpenSIP Cloud or compatible')
     .option(
       '--package <name|path>',
-      'Scope the run to a single workspace package (faster on monorepos; cross-package call sites become unresolved)',
+      'Scope the run to a single workspace package (TypeScript-only; faster on monorepos; cross-package call sites become unresolved)',
     )
     .option(
       '--packages',
-      'Fan the run across every workspace package under packages/** (parallel; aggregates per-package findings)',
+      'Fan the run across every workspace package under packages/** (TypeScript-only; parallel; aggregates per-package findings)',
       false,
     )
     .option(

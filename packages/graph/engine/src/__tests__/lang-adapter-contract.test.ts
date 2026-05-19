@@ -21,12 +21,15 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { pythonGraphAdapter } from '../lang-python/index.js';
 import { typescriptGraphAdapter } from '../lang-typescript/index.js';
 
 import type {
   CallSiteRecord,
+  GraphLanguageAdapter,
   WalkOutput,
 } from '../lang-adapter/types.js';
+import type { PythonParsedProject } from '../lang-python/parse.js';
 import type { TypescriptParsedProject } from '../lang-typescript/parse.js';
 import type { Catalog, FunctionOccurrence } from '../types.js';
 import type ts from 'typescript';
@@ -349,5 +352,298 @@ describe('GraphLanguageAdapter contract — TypeScript', () => {
         projectDirAbs: dir,
       }),
     ).not.toThrow();
+  });
+});
+
+// ── Python adapter ──────────────────────────────────────────────────
+
+const PY_FIXTURE_PYPROJECT = `[project]
+name = "contract-fixture"
+version = "0.1.0"
+requires-python = ">=3.10"
+`;
+
+const PY_FIXTURE_FILES: Readonly<Record<string, string>> = {
+  'main.py': `from util import helper, Greeter
+
+
+def entry(x):
+    g = Greeter("hi")
+    msg = g.greet(x)
+    return helper(msg)
+
+
+def unused():
+    print("orphan")
+
+
+if __name__ == "__main__":
+    entry(7)
+`,
+  'util.py': `def helper(value):
+    return f"helper:{value}"
+
+
+class Greeter:
+    def __init__(self, prefix):
+        self.prefix = prefix
+
+    def greet(self, who):
+        return f"{self.prefix} {who}"
+
+
+add_one = lambda n: n + 1
+`,
+  'tests/test_sample.py': `from util import helper
+
+
+def test_helper_returns_prefixed_value():
+    assert helper("ok") == "helper:ok"
+`,
+};
+
+function setupPythonFixture(dir: string): void {
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'pyproject.toml'), PY_FIXTURE_PYPROJECT, 'utf8');
+  for (const [rel, content] of Object.entries(PY_FIXTURE_FILES)) {
+    const p = join(dir, rel);
+    mkdirSync(p.slice(0, Math.max(0, p.lastIndexOf('/'))), { recursive: true });
+    writeFileSync(p, content, 'utf8');
+  }
+}
+
+function buildPythonPipeline(
+  adapter: GraphLanguageAdapter<PythonParsedProject>,
+  dir: string,
+): {
+  readonly project: PythonParsedProject;
+  readonly walk: WalkOutput;
+  readonly catalog: Catalog;
+  readonly discovery: ReturnType<typeof adapter.discoverFiles>;
+} {
+  const discovery = adapter.discoverFiles({ cwd: dir });
+  const parsed = adapter.parseProject({
+    projectDirAbs: discovery.projectDirAbs,
+    files: discovery.files,
+    compilerOptions: discovery.compilerOptions,
+  });
+  const walk = adapter.walkProject({
+    project: parsed.project,
+    projectDirAbs: discovery.projectDirAbs,
+    files: discovery.files,
+  });
+  const cacheKeyArgs: Parameters<typeof adapter.cacheKey>[0] = {
+    projectDirAbs: discovery.projectDirAbs,
+    ...(discovery.configPathAbs === undefined ? {} : { configPathAbs: discovery.configPathAbs }),
+    ...(discovery.compilerOptions === undefined ? {} : { compilerOptions: discovery.compilerOptions }),
+  };
+  const catalog: Catalog = {
+    version: '3.0',
+    tool: 'graph',
+    language: adapter.id,
+    builtAt: '2026-05-18T00:00:00.000Z',
+    cacheKey: adapter.cacheKey(cacheKeyArgs),
+    functions: walk.occurrences,
+  };
+  return { project: parsed.project, walk, catalog, discovery };
+}
+
+describe('GraphLanguageAdapter contract — Python', () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'graph-contract-py-'));
+    setupPythonFixture(dir);
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('exposes the six required adapter methods + identity fields', () => {
+    expect(pythonGraphAdapter.id).toBe('python');
+    expect(pythonGraphAdapter.fileExtensions).toContain('.py');
+    expect(pythonGraphAdapter.displayName).toBeDefined();
+    expect(typeof pythonGraphAdapter.discoverFiles).toBe('function');
+    expect(typeof pythonGraphAdapter.parseProject).toBe('function');
+    expect(typeof pythonGraphAdapter.walkProject).toBe('function');
+    expect(typeof pythonGraphAdapter.resolveCallSites).toBe('function');
+    expect(typeof pythonGraphAdapter.cacheKey).toBe('function');
+  });
+
+  it('I-1 — walkProject is deterministic across two runs over the same project', () => {
+    const a = buildPythonPipeline(pythonGraphAdapter, dir);
+    const b = buildPythonPipeline(pythonGraphAdapter, dir);
+    const ca = canonicalizeWalkOutput(a.walk);
+    const cb = canonicalizeWalkOutput(b.walk);
+    expect(cb.occurrences).toEqual(ca.occurrences);
+    expect(cb.callSiteSummary).toEqual(ca.callSiteSummary);
+  });
+
+  it('I-2 — different function bodies produce different bodyHashes', () => {
+    const { walk } = buildPythonPipeline(pythonGraphAdapter, dir);
+    const allOccs: FunctionOccurrence[] = [];
+    for (const arr of Object.values(walk.occurrences)) allOccs.push(...arr);
+    const byHash = new Map<string, number>();
+    for (const o of allOccs) byHash.set(o.bodyHash, (byHash.get(o.bodyHash) ?? 0) + 1);
+    const collisions = [...byHash.values()].filter((n) => n > 1);
+    expect(collisions).toHaveLength(0);
+  });
+
+  it('I-3 — every CallSiteRecord.ownerHash maps to a known occurrence', () => {
+    const { walk } = buildPythonPipeline(pythonGraphAdapter, dir);
+    const knownHashes = new Set<string>();
+    for (const arr of Object.values(walk.occurrences)) {
+      for (const o of arr) knownHashes.add(o.bodyHash);
+    }
+    for (const r of walk.callSites) {
+      expect(knownHashes.has(r.ownerHash)).toBe(true);
+    }
+  });
+
+  it('I-4 — resolveCallSites does not mutate the input catalog', () => {
+    const { walk, catalog, project } = buildPythonPipeline(pythonGraphAdapter, dir);
+    const before = JSON.stringify(catalog);
+    pythonGraphAdapter.resolveCallSites({
+      project,
+      catalog,
+      callSites: walk.callSites,
+      projectDirAbs: dir,
+    });
+    const after = JSON.stringify(catalog);
+    expect(after).toBe(before);
+  });
+
+  it('I-5 — every CallEdge.to references a catalog bodyHash or is empty', () => {
+    const { walk, catalog, project } = buildPythonPipeline(pythonGraphAdapter, dir);
+    const knownHashes = new Set<string>();
+    for (const arr of Object.values(catalog.functions)) {
+      for (const o of arr) knownHashes.add(o.bodyHash);
+    }
+    const resolved = pythonGraphAdapter.resolveCallSites({
+      project,
+      catalog,
+      callSites: walk.callSites,
+      projectDirAbs: dir,
+    });
+    for (const edges of resolved.edgesByOwner.values()) {
+      for (const e of edges) {
+        if (e.to.length === 0) continue;
+        for (const target of e.to) {
+          expect(knownHashes.has(target)).toBe(true);
+        }
+      }
+    }
+  });
+
+  it('I-6 — cacheKey is stable for the same projectDir / configPath input', () => {
+    const { discovery } = buildPythonPipeline(pythonGraphAdapter, dir);
+    const k1 = pythonGraphAdapter.cacheKey({
+      projectDirAbs: discovery.projectDirAbs,
+      ...(discovery.configPathAbs === undefined ? {} : { configPathAbs: discovery.configPathAbs }),
+    });
+    const k2 = pythonGraphAdapter.cacheKey({
+      projectDirAbs: discovery.projectDirAbs,
+      ...(discovery.configPathAbs === undefined ? {} : { configPathAbs: discovery.configPathAbs }),
+    });
+    expect(k2).toBe(k1);
+    expect(k1.startsWith('py-')).toBe(true);
+  });
+
+  it('I-6 — cacheKey changes when the pyproject content changes', () => {
+    const { discovery } = buildPythonPipeline(pythonGraphAdapter, dir);
+    const before = pythonGraphAdapter.cacheKey({
+      projectDirAbs: discovery.projectDirAbs,
+      ...(discovery.configPathAbs === undefined ? {} : { configPathAbs: discovery.configPathAbs }),
+    });
+    if (discovery.configPathAbs) {
+      writeFileSync(
+        discovery.configPathAbs,
+        `[project]
+name = "contract-fixture"
+version = "0.2.0"
+requires-python = ">=3.11"
+`,
+        'utf8',
+      );
+    }
+    const after = pythonGraphAdapter.cacheKey({
+      projectDirAbs: discovery.projectDirAbs,
+      ...(discovery.configPathAbs === undefined ? {} : { configPathAbs: discovery.configPathAbs }),
+    });
+    expect(after).not.toBe(before);
+  });
+
+  it('I-7 — parseProject is total: every file is either parsed or in parseErrors', () => {
+    const discovery = pythonGraphAdapter.discoverFiles({ cwd: dir });
+    const parsed = pythonGraphAdapter.parseProject({
+      projectDirAbs: discovery.projectDirAbs,
+      files: discovery.files,
+    });
+    const erroredFiles = new Set(parsed.parseErrors.map((e) => e.filePath));
+    for (const f of discovery.files) {
+      const inProject = parsed.project.files.has(f);
+      const rel = f.startsWith(discovery.projectDirAbs)
+        ? f.slice(discovery.projectDirAbs.length + 1)
+        : f;
+      const inErrors = erroredFiles.has(rel);
+      expect(inProject || inErrors).toBe(true);
+    }
+  });
+
+  it('I-8 — adapter id matches its handled language family', () => {
+    expect(pythonGraphAdapter.id).toBe('python');
+    const k = pythonGraphAdapter.cacheKey({ projectDirAbs: dir });
+    expect(k).toMatch(/^py-/);
+    // Cross-adapter prefix isolation: the TS adapter must NEVER produce
+    // a key starting with `py-` and vice-versa. (I-8 backstop.)
+    expect(k.startsWith('ts-')).toBe(false);
+  });
+
+  it('I-9 — repeated discoverFiles calls return the same files list', () => {
+    const a = pythonGraphAdapter.discoverFiles({ cwd: dir });
+    const b = pythonGraphAdapter.discoverFiles({ cwd: dir });
+    expect(b.projectDirAbs).toBe(a.projectDirAbs);
+    expect([...b.files].sort()).toEqual([...a.files].sort());
+    expect(b.configPathAbs).toBe(a.configPathAbs);
+  });
+
+  it('walkProject emits the expected occurrence kinds for the fixture', () => {
+    const { walk } = buildPythonPipeline(pythonGraphAdapter, dir);
+    const kinds = new Set<string>();
+    for (const arr of Object.values(walk.occurrences)) {
+      for (const o of arr) kinds.add(o.kind);
+    }
+    expect(kinds.has('module-init')).toBe(true);
+    expect(kinds.has('function-declaration')).toBe(true);
+    expect(kinds.has('method')).toBe(true);
+    expect(kinds.has('constructor')).toBe(true);
+    expect(kinds.has('arrow')).toBe(true);
+  });
+
+  it('resolveCallSites produces non-empty edges for the fixture', () => {
+    const { walk, catalog, project } = buildPythonPipeline(pythonGraphAdapter, dir);
+    expect(walk.callSites.length).toBeGreaterThan(0);
+    const resolved = pythonGraphAdapter.resolveCallSites({
+      project,
+      catalog,
+      callSites: walk.callSites,
+      projectDirAbs: dir,
+    });
+    let resolvedEdges = 0;
+    for (const edges of resolved.edgesByOwner.values()) {
+      for (const e of edges) {
+        if (e.to.length > 0) resolvedEdges++;
+      }
+    }
+    expect(resolvedEdges).toBeGreaterThan(0);
+    // The Python adapter's name-based resolution produces medium/low —
+    // never high — for ordinary call edges. Creation edges (lambda) are
+    // the only `'high'` source.
+    const allConfidences = new Set<string>();
+    for (const edges of resolved.edgesByOwner.values()) {
+      for (const e of edges) allConfidences.add(e.confidence);
+    }
+    expect(allConfidences.has('high') || allConfidences.has('medium')).toBe(true);
   });
 });

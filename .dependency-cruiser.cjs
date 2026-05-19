@@ -300,21 +300,47 @@ module.exports = {
     {
       // PR 3 of plan docs/plans/10-graph-language-pluggability.md.
       // The orchestrator routes through the lang-adapter registry,
-      // not a specific adapter. tool.ts is the bootstrap point — it
-      // imports the first-party TypeScript adapter to register it;
-      // no other cli/ file may.
+      // not a specific adapter. tool.ts and bootstrap.ts are the
+      // bootstrap points — they import first-party adapters to
+      // register them; no cli/* file may.
       name: 'graph-orchestrate-no-direct-lang-import',
       severity: 'error',
       comment:
         'cli/* (including the orchestrator) routes through ' +
         'lang-adapter/registry only, not a specific lang-* adapter. ' +
-        'tool.ts is the documented exception for first-party adapter ' +
-        'registration; that file is allowed to import lang-typescript ' +
-        'because it lives at the engine root, not under cli/.',
+        'bootstrap.ts and tool.ts are the documented exceptions for ' +
+        'first-party adapter registration; they live at the engine ' +
+        'root, not under cli/.',
       from: {
         path: '^packages/graph/engine/src/cli/',
       },
-      to: { path: '^packages/graph/engine/src/lang-typescript/' },
+      to: {
+        path: [
+          '^packages/graph/engine/src/lang-typescript/',
+          '^packages/graph/engine/src/lang-python/',
+          '^packages/graph/engine/src/lang-rust/',
+        ],
+      },
+    },
+    {
+      // PR 5/6 of plan docs/plans/10-graph-language-pluggability.md.
+      // Only adapter subtrees may import tree-sitter and its grammars;
+      // the engine itself routes through the GraphLanguageAdapter
+      // contract.
+      name: 'graph-no-tree-sitter-import-outside-lang-packs',
+      severity: 'error',
+      comment:
+        'Only language-adapter subtrees (lang-python, lang-rust, ...) ' +
+        'may import tree-sitter or its grammars. The engine itself uses ' +
+        'the GraphLanguageAdapter contract from lang-adapter/.',
+      from: {
+        path: '^packages/graph/engine/src/',
+        pathNot: [
+          '^packages/graph/engine/src/lang-python/',
+          '^packages/graph/engine/src/lang-rust/',
+        ],
+      },
+      to: { path: '^tree-sitter' },
     },
     {
       // Documented exception: graph imports SARIF helpers from fitness

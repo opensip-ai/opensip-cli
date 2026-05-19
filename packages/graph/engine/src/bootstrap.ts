@@ -19,6 +19,8 @@
  */
 
 import { registerAdapter } from './lang-adapter/registry.js';
+import { pythonGraphAdapter } from './lang-python/index.js';
 import { typescriptGraphAdapter } from './lang-typescript/index.js';
 
 registerAdapter(typescriptGraphAdapter);
+registerAdapter(pythonGraphAdapter);

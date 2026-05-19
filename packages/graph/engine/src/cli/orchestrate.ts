@@ -87,7 +87,7 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
   const ruleSet: readonly Rule[] = input.rules ?? defaultRules;
   const paths = resolveProjectPaths(input.cwd);
 
-  const adapter = pickAdapter();
+  const adapter = pickAdapter(input.cwd);
   const discovery = adapter.discoverFiles({
     cwd: input.cwd,
     configPathOverride: input.tsConfigPath,

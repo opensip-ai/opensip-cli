@@ -13,6 +13,7 @@
  */
 
 import { ConfigurationError } from '@opensip-tools/core';
+import { globSync } from 'glob';
 
 import type { GraphLanguageAdapter } from './types.js';
 
@@ -38,12 +39,23 @@ export function registeredAdapterIds(): readonly string[] {
 }
 
 /**
- * Pick the adapter for the current run. PR 3 ships a trivial
- * implementation: if there is exactly one registered adapter, return
- * it; otherwise, throw a configuration error. Future PRs may inspect
- * project files to auto-detect.
+ * Pick the adapter for the current run.
+ *
+ * - Zero registered adapters → fail with a configuration error.
+ * - One registered adapter   → return it.
+ * - Multiple adapters        → choose by file-extension dominance in
+ *   `cwd` when supplied; fall back to a deterministic preference order
+ *   (TypeScript first, then Python, then alphabetical).
+ *
+ * The dominance heuristic is intentionally simple: count files for
+ * each adapter's `fileExtensions` (recursive, ignoring common
+ * non-source dirs), pick whichever has the most matches. Ties prefer
+ * TypeScript so the legacy TS-only behavior is preserved when a repo
+ * has both. A real `--language` CLI flag is the right long-term
+ * answer; until it lands, this heuristic is the best the registry can
+ * do without inspecting tool config.
  */
-export function pickAdapter(): GraphLanguageAdapter {
+export function pickAdapter(cwd?: string): GraphLanguageAdapter {
   if (adapters.size === 0) {
     throw new ConfigurationError(
       'graph: no language adapter registered. The TypeScript adapter ' +
@@ -56,20 +68,79 @@ export function pickAdapter(): GraphLanguageAdapter {
     if (!only) throw new ConfigurationError('graph: registry corrupted');
     return only;
   }
-  // Multiple adapters: deterministic until auto-detection lands.
-  // Prefer 'typescript' if present so the legacy TS-only behavior is
-  // preserved. Adapter authors who need disambiguation should add an
-  // explicit `--language` flag in a follow-up PR.
+  if (cwd !== undefined && cwd.length > 0) {
+    const dominant = pickByFileDominance(cwd);
+    if (dominant) return dominant;
+  }
+  // Deterministic fallback: prefer TypeScript when present; otherwise
+  // the first id alphabetically.
   const ts = adapters.get('typescript');
   if (ts) return ts;
-  // Fallback: the first id alphabetically. Stable; lets tests reason
-  // about behavior.
   const ids = [...adapters.keys()].sort();
   const id = ids[0];
   if (!id) throw new ConfigurationError('graph: registry corrupted');
   const adapter = adapters.get(id);
   if (!adapter) throw new ConfigurationError('graph: registry corrupted');
   return adapter;
+}
+
+const COUNT_EXCLUDES: readonly string[] = [
+  '**/.venv/**',
+  '**/venv/**',
+  '**/__pycache__/**',
+  '**/node_modules/**',
+  '**/dist/**',
+  '**/build/**',
+  '**/target/**',
+];
+
+function pickByFileDominance(cwd: string): GraphLanguageAdapter | undefined {
+  const counts = countFilesPerAdapter(cwd);
+  const best = findMaxCount(counts);
+  if (!best) return undefined;
+  const tied = collectTies(counts, best.count);
+  if (tied.length > 1) return resolveTie(tied);
+  return adapters.get(best.id);
+}
+
+function countFilesPerAdapter(cwd: string): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const adapter of adapters.values()) {
+    if (adapter.fileExtensions.length === 0) continue;
+    let total = 0;
+    for (const ext of adapter.fileExtensions) {
+      const trimmed = ext.startsWith('.') ? ext.slice(1) : ext;
+      const matches = globSync(`**/*.${trimmed}`, {
+        cwd,
+        ignore: [...COUNT_EXCLUDES],
+        nodir: true,
+        follow: false,
+      });
+      total += matches.length;
+    }
+    counts.set(adapter.id, total);
+  }
+  return counts;
+}
+
+function findMaxCount(counts: ReadonlyMap<string, number>): { id: string; count: number } | null {
+  let best: { id: string; count: number } | null = null;
+  for (const [id, count] of counts) {
+    if (count === 0) continue;
+    if (best === null || count > best.count) best = { id, count };
+  }
+  return best;
+}
+
+function collectTies(counts: ReadonlyMap<string, number>, target: number): readonly string[] {
+  return [...counts.entries()].filter(([, c]) => c === target).map(([id]) => id);
+}
+
+function resolveTie(tied: readonly string[]): GraphLanguageAdapter | undefined {
+  const preference = ['typescript', 'python', 'rust'];
+  for (const pref of preference) if (tied.includes(pref)) return adapters.get(pref);
+  const sorted = [...tied].sort();
+  return adapters.get(sorted[0] ?? '');
 }
 
 /**
