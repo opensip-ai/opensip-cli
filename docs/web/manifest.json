@@ -207,7 +207,7 @@
         "contributors",
         "plugin-authors"
       ],
-      "purpose": "Step-by-step guide for writing a new GraphLanguageAdapter — Python, Rust, Go, Java, C/C++, or anything else — without touching the engine."
+      "purpose": "Step-by-step guide for writing a new GraphLanguageAdapter — Go, Java, C/C++, or anything else — without touching the engine."
     },
     {
       "file": "docs/web/50-runtime/01-cli-dispatch.md",
@@ -244,12 +244,12 @@
       "file": "docs/web/60-subsystems/01-language-adapters.md",
       "path": "/docs/opensip-tools/60-subsystems/01-language-adapters/",
       "section": "60-subsystems",
-      "title": "Language adapters",
+      "title": "Language adapters (fitness)",
       "audience": [
         "contributors",
         "plugin-authors"
       ],
-      "purpose": "What a LanguageAdapter is, the six bundled adapters, and how to author a new one."
+      "purpose": "What the fitness LanguageAdapter is, the six bundled adapters, and how to author a new one."
     },
     {
       "file": "docs/web/60-subsystems/02-check-packs.md",

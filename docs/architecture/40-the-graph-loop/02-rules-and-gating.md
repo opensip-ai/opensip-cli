@@ -1,6 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-16
+last_verified: 2026-05-18
+release: v1.3.0
 title: "Rules and gating (graph)"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "The five graph rules, what each one detects, and how the save/compare gate flow integrates with CI."
@@ -14,11 +15,13 @@ source-files:
   - packages/graph/engine/src/rules/_entry-points.ts
   - packages/graph/engine/src/gate.ts
   - packages/graph/engine/src/render/sarif.ts
+  - packages/graph/engine/src/lang-adapter/types.ts
 related-docs:
   - ./01-stages-and-catalog.md
   - ./03-adding-a-language.md
   - ../20-the-fit-loop/04-output-gate-sarif.md
   - ../70-surfaces/01-cli-command-tree.md
+  - ../../plans/10-graph-language-pluggability.md
 ---
 # Rules and gating (graph)
 
@@ -96,6 +99,24 @@ type EntryPointReason = 'module-init' | 'name-match' | 'no-callers-exported';
 ```
 
 The five rules above don't know how the entry point list was built — they consume the resulting `EntryPoint[]`. That decoupling means refining the inference (e.g. teaching it about `bin` fields or framework route registrations) doesn't touch any rule.
+
+---
+
+## Per-language fidelity
+
+Rules don't know which adapter built the catalog — they consume `Catalog` + `Indexes` only — but each `CallEdge` carries a `confidence` field (`'high' | 'medium' | 'low'`) that reflects how the adapter resolved it. The TypeScript adapter uses the symbol table for direct calls and emits `'high'` confidence; the tree-sitter Python and Rust adapters resolve by name and emit `'medium'` (or `'low'` when multiple catalog entries share a simple name). The same rule on a Python catalog therefore produces a noisier output than on a TypeScript catalog — same logic, different input quality.
+
+The fidelity matrix from [plan 10 §6](../../plans/10-graph-language-pluggability.md):
+
+| Rule | TypeScript adapter | Tree-sitter adapter (Python, Rust) |
+|---|---|---|
+| `orphan-subtree` | High — symbol resolution gives accurate transitive callee sets | Medium — name-based resolution; multiple `process` functions may pick the wrong target |
+| `duplicated-function-body` | Medium — body hash is textual; lexical-scope FPs documented | Medium — same fidelity (body hashing is language-agnostic) |
+| `no-side-effect-path` | High — accurate edges + side-effect primitive list | Low — edge inaccuracy compounds; the side-effect primitives list is per-adapter via `ruleHints.sideEffectPrimitives` |
+| `test-only-reachable` | High — symbol resolution makes "callable from test only" precise | Low — same fidelity issue as no-side-effect-path |
+| `always-throws-branch` | Medium — textual heuristic on `CallEdge.text`, language-agnostic | Medium — same heuristic, different syntax via `ruleHints.throwSyntaxRegex` |
+
+The `ruleHints` surface ([`lang-adapter/types.ts`](../../../packages/graph/engine/src/lang-adapter/types.ts)) is how an adapter customises the per-rule inputs without changing rule logic: `isTestFile` for `test-only-reachable`, `sideEffectPrimitives` for `no-side-effect-path`, `throwSyntaxRegex` for `always-throws-branch`. An adapter that doesn't supply hints gets the engine's defaults and the corresponding rules silently degrade in precision rather than failing.
 
 ---
 

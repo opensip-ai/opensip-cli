@@ -1,13 +1,18 @@
 ---
 status: current
 last_verified: 2026-05-18
+release: v1.3.0
 title: "Adding a language to graph"
 audience: [contributors, plugin-authors]
-purpose: "Step-by-step guide for writing a new GraphLanguageAdapter — Python, Rust, Go, Java, C/C++, or anything else — without touching the engine."
+purpose: "Step-by-step guide for writing a new GraphLanguageAdapter — Go, Java, C/C++, or anything else — without touching the engine."
 source-files:
   - packages/graph/engine/src/lang-adapter/types.ts
   - packages/graph/engine/src/lang-adapter/registry.ts
+  - packages/graph/engine/src/lang-adapter/edge-helpers.ts
   - packages/graph/engine/src/lang-typescript/index.ts
+  - packages/graph/engine/src/lang-python/index.ts
+  - packages/graph/engine/src/lang-rust/index.ts
+  - packages/graph/engine/src/bootstrap.ts
   - packages/graph/engine/src/__tests__/lang-adapter-contract.test.ts
 related-docs:
   - ./01-stages-and-catalog.md
@@ -18,7 +23,7 @@ related-docs:
 
 # Adding a language to graph
 
-The `graph` tool started as a TypeScript-only call-graph engine. PR 3 of [plan 10](../../plans/10-graph-language-pluggability.md) introduced a six-method `GraphLanguageAdapter` contract so the engine itself doesn't know any specific language; first-party adapters (Python, Rust, Go, Java, C/C++) and third-party adapters slot in by implementing the contract and registering themselves.
+The `graph` tool started as a TypeScript-only call-graph engine. PR 3 of [plan 10](../../plans/10-graph-language-pluggability.md) introduced a six-method `GraphLanguageAdapter` contract so the engine itself doesn't know any specific language. v1.3.0 ships three first-party adapters — TypeScript (symbol-resolved), Python (tree-sitter), Rust (tree-sitter) — and any first-party or third-party adapter slots in by implementing the contract and registering itself.
 
 This doc walks a contributor through that workflow.
 
@@ -37,9 +42,11 @@ Two short docs are the contract you implement against:
 - [`docs/plans/11-graph-language-adapter-contract.md`](../../plans/11-graph-language-adapter-contract.md) — the interface signatures, behavioral invariants I-1 through I-9, and per-language feasibility sketches (Python, Rust, Go, Java, C/C++).
 - [`packages/graph/engine/src/lang-adapter/types.ts`](../../../packages/graph/engine/src/lang-adapter/types.ts) — the canonical TypeScript source for the interface and all I/O shapes.
 
-Then look at the reference implementation:
+Then look at the reference implementations. Three ship in v1.3.0:
 
-- [`packages/graph/engine/src/lang-typescript/index.ts`](../../../packages/graph/engine/src/lang-typescript/index.ts) — `typescriptGraphAdapter` is a thin façade over the existing TypeScript-specific machinery. Each contract method delegates to a sibling file (`discover.ts`, `parse.ts`, `walk.ts`, `edges.ts`, `cache-key.ts`) and translates I/O shapes.
+- [`packages/graph/engine/src/lang-typescript/index.ts`](../../../packages/graph/engine/src/lang-typescript/index.ts) — `typescriptGraphAdapter` is a thin façade over the existing TypeScript-specific machinery. Each contract method delegates to a sibling file (`discover.ts`, `parse.ts`, `walk.ts`, `edges.ts`, `cache-key.ts`) and translates I/O shapes. Symbol-resolved (`'high'` confidence on direct calls).
+- [`packages/graph/engine/src/lang-python/index.ts`](../../../packages/graph/engine/src/lang-python/index.ts) — `pythonGraphAdapter` is the canonical tree-sitter reference. ~8 source files plus a fixture project. Discovery via `pyproject.toml` / `setup.py` with `**/*.py` glob fallback; resolution by simple name. **If you're writing a tree-sitter adapter, read this one first** — its layout is the recommended template.
+- [`packages/graph/engine/src/lang-rust/index.ts`](../../../packages/graph/engine/src/lang-rust/index.ts) — `rustGraphAdapter` adds receiver-type narrowing on top of the Python pattern (`Foo::method(...)` lifts confidence when the receiver type is statically present in the call expression). Discovery via `Cargo.toml` with `**/*.rs` glob fallback.
 
 ---
 
@@ -71,6 +78,7 @@ src/lang-<id>/
   walk.ts            — walkProject implementation (one pass, emit occurrences + call-site records)
   resolve.ts         — resolveCallSites implementation (name-based or symbol-based)
   cache-key.ts       — cacheKey implementation (hash language config + toolchain version)
+  rule-hints.ts      — ruleHints constant (isTestFile, sideEffectPrimitives, throwSyntaxRegex)
   index.ts           — exports the adapter:
                           export const <id>GraphAdapter: GraphLanguageAdapter<P> = {
                             id: '<id>',
@@ -78,11 +86,13 @@ src/lang-<id>/
                             displayName: '<DisplayName>',
                             discoverFiles, parseProject, walkProject,
                             resolveCallSites, cacheKey,
-                            ruleHints: { isTestFile, sideEffectPrimitives, throwSyntaxRegex },
+                            ruleHints,
                           };
+  __fixtures__/<id>/ — small project that exercises file discovery,
+                       parsing, occurrence emission, call resolution
 ```
 
-This mirrors `lang-typescript/`. Adapters that prefer one big file or a different breakdown are fine — the contract doesn't care, only the public `index.ts` export matters.
+This mirrors `lang-python/` and `lang-rust/` — the recommended template for tree-sitter adapters. The TypeScript adapter has a deeper subdir layout (`inventory-visitors/`, `edge-resolvers/`, `inventory-helpers/`) because its symbol-resolved walk is genuinely more complex; for a tree-sitter adapter the flat layout is plenty. Adapters that prefer one big file or a different breakdown are fine — the contract doesn't care, only the public `index.ts` export matters.
 
 For a third-party adapter, ship it as a separate npm package (e.g. `@your-org/graph-lang-elixir`) that exports the adapter. Users add it to their `plugins.tools` list and the graph tool's bootstrap calls `registerAdapter` on it.
 
@@ -114,9 +124,9 @@ Different adapters produce different-fidelity edges. This is intrinsic — TypeS
 
 | Adapter | `confidence` for direct calls | Notes |
 |---|---|---|
-| `typescript` | `'high'` (symbol-resolved) | Reference. Has the TS type-checker. |
-| `python` (planned) | Mostly `'medium'` | Tree-sitter; multiple functions named `process` may resolve to the wrong target. |
-| `rust` (planned) | `'medium'` (with `impl` context) → `'high'` (with rust-analyzer) | First-cut: tree-sitter; trait dispatch is the wrinkle. |
+| `typescript` (shipped, v1.0) | `'high'` (symbol-resolved) | Reference. Has the TS type-checker. |
+| `python` (shipped, v1.3.0) | Mostly `'medium'`; `'low'` on simple-name collisions | Tree-sitter; multiple functions named `process` may resolve to the wrong target. |
+| `rust` (shipped, v1.3.0) | `'medium'` (with `impl` block context for receivers) | Tree-sitter; trait dispatch and method-on-generic resolution stay name-only. |
 | `go` (planned) | `'medium'` | Receiver type carries info that helps disambiguation but not via a symbol table. |
 | `java` (planned) | `'medium'` | Class context is rich (everything is in a class). |
 | `c/c++` (planned) | `'medium'` | Header/source duplication and namespace resolution are the wrinkles. |
@@ -137,16 +147,24 @@ When you ship a new adapter, add a row to this table in your PR.
 
 ## 6. Registration
 
-For first-party adapters in this repo, add one line to [`packages/graph/engine/src/bootstrap.ts`](../../../packages/graph/engine/src/bootstrap.ts):
+For first-party adapters in this repo, add one line to [`packages/graph/engine/src/bootstrap.ts`](../../../packages/graph/engine/src/bootstrap.ts) (which today registers the three first-party adapters):
 
 ```ts
 import { registerAdapter } from './lang-adapter/registry.js';
+import { pythonGraphAdapter } from './lang-python/index.js';
+import { rustGraphAdapter } from './lang-rust/index.js';
 import { typescriptGraphAdapter } from './lang-typescript/index.js';
-import { pythonGraphAdapter } from './lang-python/index.js'; // ← new
+import { goGraphAdapter } from './lang-go/index.js'; // ← new
 
 registerAdapter(typescriptGraphAdapter);
-registerAdapter(pythonGraphAdapter); // ← new
+registerAdapter(pythonGraphAdapter);
+registerAdapter(rustGraphAdapter);
+registerAdapter(goGraphAdapter); // ← new
 ```
+
+`bootstrap.ts` is imported as a side-effect module from both `tool.ts` (the Tool plugin entry) and `cli/orchestrate.ts` (so direct `runGraph()` callers in tests don't need to register manually). A new adapter is live the moment it's registered there.
+
+Once two or more adapters are registered, [`pickAdapter(cwd)`](../../../packages/graph/engine/src/lang-adapter/registry.ts) chooses by file-extension dominance with a deterministic preference list (TS > Python > Rust on ties). Add your language to the preference list in `resolveTie` if you ship a new first-party adapter.
 
 For third-party adapters: ship an npm package whose `tool.ts` (or any module imported when the package loads) calls `registerAdapter(yourAdapter)`. Users add the package to their `plugins.tools` list per the standard plugin docs.
 
@@ -168,11 +186,17 @@ When you open the PR for a new adapter, verify each of these:
 
 ## 8. Common gotchas
 
+These are drawn from real bugs caught while shipping the Python (PR 5) and Rust (PR 6) adapters in v1.3.0.
+
 - **Don't reach back into the catalog inside `walkProject`.** The catalog is built _after_ the walk from the walker's occurrence output. If your walker tries to look up a callee in the catalog mid-walk, you'll get `undefined` for half of them. That's what `resolveCallSites` is for — it runs after the catalog is frozen.
 - **Don't mutate `catalog` from `resolveCallSites`.** Per I-4, the catalog is frozen by the time it reaches the resolver. Build name-lookup helpers locally in the resolver function and discard them on return.
 - **Module-init synthetic occurrences are mandatory.** Top-level statements in a file own call sites that need a stable `ownerHash`. Synthesize one `<module-init:<filePath>>` occurrence per file with a body hash derived from the file path (not the file contents), so it's stable.
-- **Adapter cacheKey prefixes must not collide.** A Python catalog with `cacheKey: ts-...` would falsely match a TypeScript run. Always include the language id at the start of your prefix (e.g. `py-`, `rs-`, `go-`).
+- **Adapter cacheKey prefixes must not collide.** A Python catalog with `cacheKey: ts-...` would falsely match a TypeScript run. Always include the language id at the start of your prefix (e.g. `py-`, `rs-`, `go-`). Invariant I-8 enforces this in the contract test suite.
 - **Keep `walkProject` deterministic.** Don't rely on `Map` iteration order across runs (it's stable in V8 but worth being explicit); always sort outputs by a stable key (file path, then position) before emission. The byte-identical-catalog gate will catch most violations on the second test run.
+- **Watch for `*/` inside JSDoc-style block comments in source you generate.** When emitting comments into your adapter's TypeScript files, a literal `*/` inside a `/** … */` block silently terminates the comment and the next character flips into code. Escape as `*​/` or split across lines.
+- **Tree-sitter's `Language` type unifies awkwardly across grammar packages.** `tree-sitter-python` and `tree-sitter-rust` re-declare `Language` from their own `tree-sitter` peer dep. Cast to `any` at the parser-construction boundary or pin a single tree-sitter version across both grammar packages; the type-only mismatch is otherwise unfixable without a contract change.
+- **Tree-sitter peer-dep warnings during install are non-fatal.** pnpm flags `tree-sitter-python@x` wants `tree-sitter@y` mismatches as warnings; the adapters work fine at the version we ship. If you see them, pin the grammar version to one your tree-sitter is known to support, or accept the warning.
+- **Reuse the shared `appendEdge` helper.** [`lang-adapter/edge-helpers.ts`](../../../packages/graph/engine/src/lang-adapter/edge-helpers.ts) was extracted in PR 6 because the duplicated-function-body rule legitimately fired across the three adapters' near-identical helpers. Use it instead of writing your own; if you need a variant, add a parameter rather than forking.
 
 ---
 

@@ -1,11 +1,13 @@
 ---
 status: current
 last_verified: 2026-05-18
+release: v1.3.0
 title: "Stages and catalog (graph)"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "How `graph` builds its picture of the codebase — the six-stage pipeline, the catalog format, and the content-keyed cache."
 source-files:
   - packages/graph/engine/src/tool.ts
+  - packages/graph/engine/src/bootstrap.ts
   - packages/graph/engine/src/lang-adapter/types.ts
   - packages/graph/engine/src/lang-adapter/registry.ts
   - packages/graph/engine/src/lang-typescript/discover.ts
@@ -15,6 +17,8 @@ source-files:
   - packages/graph/engine/src/lang-typescript/parse.ts
   - packages/graph/engine/src/lang-typescript/cache-key.ts
   - packages/graph/engine/src/lang-typescript/index.ts
+  - packages/graph/engine/src/lang-python/index.ts
+  - packages/graph/engine/src/lang-rust/index.ts
   - packages/graph/engine/src/pipeline/indexes.ts
   - packages/graph/engine/src/cache/read.ts
   - packages/graph/engine/src/cache/write.ts
@@ -51,15 +55,20 @@ The `graph` command is the static call-graph tool. Where `fit` answers "is the c
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
 │  Stage 0  —  DISCOVER FILES                                          │
-│  Walk tsconfig include/exclude. Output: AbsolutePath[]               │
+│  adapter.discoverFiles({ cwd, configPathOverride? }).                │
+│  TypeScript: walk tsconfig include/exclude.                          │
+│  Python: read pyproject.toml / setup.py + **/*.py glob fallback.     │
+│  Rust:   read Cargo.toml + **/*.rs glob fallback.                    │
+│  Output: { projectDirAbs, files, configPathAbs?, compilerOptions? }  │
 └──────────────────────────────┬───────────────────────────────────────┘
                                ▼
 ┌──────────────────────────────────────────────────────────────────────┐
-│  Stage 1+2 — UNIFIED WALK                                            │
-│  Per file: one AST descent that emits FunctionOccurrence records     │
-│  AND pre-located call-site records. Resolvers dispatch over the      │
-│  flat call-site list (no second walk). See pipeline/walk.ts.         │
-│  Output: Catalog (functions + resolved CallEdges)                    │
+│  Stage 1+2 — PARSE + UNIFIED WALK + RESOLVE                          │
+│  adapter.parseProject + adapter.walkProject + adapter.resolveCallSites.│
+│  Per file: one descent that emits FunctionOccurrences AND pre-       │
+│  located CallSiteRecords (owner-keyed by bodyHash). Resolvers        │
+│  dispatch over the flat record list — no second walk.                │
+│  Output: Catalog (functions + resolved CallEdges) + ResolutionStats  │
 └──────────────────────────────┬───────────────────────────────────────┘
                                ▼
 ┌──────────────────────────────────────────────────────────────────────┐
@@ -81,25 +90,25 @@ The `graph` command is the static call-graph tool. Where `fit` answers "is the c
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-Each stage is one module in [`packages/graph/engine/src/pipeline/`](../../../packages/graph/engine/src/pipeline/) (stages 0–3) or [`packages/graph/engine/src/rules/`](../../../packages/graph/engine/src/rules/) and [`packages/graph/engine/src/render/`](../../../packages/graph/engine/src/render/) (stages 4–5). Stages communicate only through their typed outputs; a stage cannot import a sibling stage, cannot reach back to read its predecessor's intermediate state, cannot peek into the next stage's expectations. This isolation is the single most important property of the design — every other guarantee derives from it.
+Stages 0–2 are language-agnostic over the [`GraphLanguageAdapter`](../../../packages/graph/engine/src/lang-adapter/types.ts) contract; the orchestrator looks up an adapter via [`lang-adapter/registry.ts`](../../../packages/graph/engine/src/lang-adapter/registry.ts) and dispatches `discoverFiles` / `parseProject` / `walkProject` / `resolveCallSites` through it. Stage 3 (`buildIndexes`) lives in [`packages/graph/engine/src/pipeline/indexes.ts`](../../../packages/graph/engine/src/pipeline/indexes.ts); stages 4–5 live in [`packages/graph/engine/src/rules/`](../../../packages/graph/engine/src/rules/) and [`packages/graph/engine/src/render/`](../../../packages/graph/engine/src/render/). Stages communicate only through their typed outputs; a stage cannot import a sibling stage, cannot reach back to read its predecessor's intermediate state, cannot peek into the next stage's expectations. This isolation is the single most important property of the design — every other guarantee derives from it.
 
 > **History — Stage 1 + Stage 2 fused (Phase 4, 2026-05-17).** Originally these were two separate AST walks per file: Stage 1 emitted function occurrences; Stage 2 walked the same AST a second time to find and resolve call sites. The two walks descended in identical order and the only data flowing between them was each function-shape's bodyHash — which Stage 1 already computed. Phase 4 of [`docs/plans/00-graph-performance-improvements.md`](../../plans/00-graph-performance-improvements.md) fused the two passes into [`lang-typescript/walk.ts`](../../../packages/graph/engine/src/lang-typescript/walk.ts). Legacy `buildInventory` and `resolveEdges` entry points are retained for tests and external callers; they share the dispatch helpers from `walk.ts`. The orchestrator calls `walkProgram` once and feeds the resulting call-site records to `resolveEdgesFromRecords`.
 >
-> **Adapter layer (PR 3 of plan 10, 2026-05-18).** Stages 0, 1, and 2 are now adapter-driven: file discovery, parsing, walk, and call-site resolution all run through the [`GraphLanguageAdapter`](../../../packages/graph/engine/src/lang-adapter/types.ts) contract. The orchestrator looks up an adapter via the [`lang-adapter/registry.ts`](../../../packages/graph/engine/src/lang-adapter/registry.ts) registry; today the only registered adapter is `typescriptGraphAdapter` ([`lang-typescript/index.ts`](../../../packages/graph/engine/src/lang-typescript/index.ts)), but Python, Rust, Go, Java, and C/C++ adapters can slot in without changing the engine. Stages 3 (indexes), 4 (rules), and 5 (render) are unchanged — they consume the catalog and don't know which adapter built it. See [`03-adding-a-language.md`](./03-adding-a-language.md) for the contributor walkthrough.
+> **Adapter layer (PRs 3–6 of plan 10, v1.3.0).** Stages 0, 1, and 2 are adapter-driven: every file discovery, parse, walk, and call-site resolution call routes through the [`GraphLanguageAdapter`](../../../packages/graph/engine/src/lang-adapter/types.ts) contract. Three first-party adapters ship in v1.3.0 — TypeScript ([`lang-typescript/index.ts`](../../../packages/graph/engine/src/lang-typescript/index.ts)), Python ([`lang-python/index.ts`](../../../packages/graph/engine/src/lang-python/index.ts)), Rust ([`lang-rust/index.ts`](../../../packages/graph/engine/src/lang-rust/index.ts)) — registered by [`bootstrap.ts`](../../../packages/graph/engine/src/bootstrap.ts) at module load. `pickAdapter(cwd)` chooses one by file-extension dominance with a deterministic preference order (TS > Python > Rust on ties). Stages 3 (indexes), 4 (rules), and 5 (render) are unchanged — they consume the catalog and don't know which adapter built it. See [`03-adding-a-language.md`](./03-adding-a-language.md) for the contributor walkthrough.
 
 ### Stage 0 — Discover
 
-[`lang-typescript/discover.ts`](../../../packages/graph/engine/src/lang-typescript/discover.ts) resolves the project's `tsconfig.json`, applies its `include` / `exclude` patterns, and produces a sorted, deduplicated list of absolute file paths. No TypeScript `Program` is created here — that's stage 1's job. Stage 0 is purely about *what files exist*.
+`adapter.discoverFiles({ cwd, configPathOverride? })` produces a sorted, deduplicated list of absolute file paths. The adapter chooses how — the TypeScript adapter ([`lang-typescript/discover.ts`](../../../packages/graph/engine/src/lang-typescript/discover.ts)) resolves `tsconfig.json` and applies its `include` / `exclude`; the Python adapter ([`lang-python/discover.ts`](../../../packages/graph/engine/src/lang-python/discover.ts)) reads `pyproject.toml` / `setup.py` and falls back to a `**/*.py` glob; the Rust adapter ([`lang-rust/discover.ts`](../../../packages/graph/engine/src/lang-rust/discover.ts)) reads `Cargo.toml` and falls back to `**/*.rs`. No parser state is created here — that's stage 1's job. Stage 0 is purely about *what files exist*.
 
-Output: `{ projectDirAbs, tsConfigPathAbs, files, compilerOptions }`. Typical runtime on this repo: ~50ms.
+Output: `{ projectDirAbs, files, configPathAbs?, compilerOptions? }`. The optional `configPathAbs` and `compilerOptions` are adapter-private and thread through to `parseProject` / `cacheKey` unchanged.
 
-### Stage 1+2 — Unified walk
+### Stage 1+2 — Parse, walk, resolve
 
-[`lang-typescript/walk.ts`](../../../packages/graph/engine/src/lang-typescript/walk.ts) parses every file from stage 0, walks each AST exactly once, and emits both:
-- A **Catalog** — a flat, indexed list of every callable thing in the project. "Callable thing" is broader than function: function declarations, arrow functions, methods, constructors, getter/setter pairs, function expressions, and one synthetic `<module-init>` entry per file that owns its top-level statements.
-- A list of **CallSiteRecord**s — pre-located nodes that Stage 2's resolvers will dispatch over (call/new/jsx/identifier-in-value-position/shorthand assignment). Each record carries the `bodyHash` of the enclosing function-shape, computed by the same visitor pass, so the resolver dispatcher doesn't need to re-walk the AST or re-hash to find ownership.
+`adapter.parseProject` builds adapter-internal parse state (TypeScript: a `ts.Program` with `getTypeChecker()` forced eagerly so parent pointers are populated; Python and Rust: a `Map<filePath, tree-sitter Tree>`). `adapter.walkProject` then walks every file from stage 0 exactly once and emits both:
+- A **Catalog** — a flat, indexed list of every callable thing in the project. "Callable thing" is broader than function: function/method declarations, arrow functions / lambdas / closures, constructors, getter/setter pairs, function expressions, and one synthetic `<module-init>` entry per file that owns its top-level statements.
+- A list of **CallSiteRecord**s — pre-located nodes that the resolver pass will dispatch over (call/new/jsx/identifier-in-value-position/shorthand assignment for TypeScript; `call`/`attribute`/`macro_invocation`/etc. for tree-sitter adapters). Each record carries the `bodyHash` of the enclosing function-shape, computed by the same walker pass, so the resolver dispatcher doesn't need to re-walk the AST or re-hash to find ownership.
 
-The orchestrator then runs `resolveEdgesFromRecords` from [`lang-typescript/edges.ts`](../../../packages/graph/engine/src/lang-typescript/edges.ts) over the flat record list. Resolvers dispatch by node shape — direct call, property access, JSX, new expression, polymorphic dispatch, value reference, shorthand — and write a `CallEdge` to the matching `FunctionOccurrence`'s `calls` array.
+`adapter.resolveCallSites({ project, catalog, callSites, projectDirAbs })` then runs over the flat record list and returns a `bodyHash → CallEdge[]` map. The TypeScript adapter's resolvers (under [`lang-typescript/edge-resolvers/`](../../../packages/graph/engine/src/lang-typescript/edge-resolvers/)) dispatch by node shape using `getSymbolAtLocation` for high-confidence resolution; the tree-sitter adapters resolve by simple name (and impl-block context for Rust receivers), producing `confidence: 'medium'` or `'low'` edges.
 
 Each entry is a `FunctionOccurrence`:
 
@@ -125,9 +134,9 @@ interface FunctionOccurrence {
 }
 ```
 
-The visitor logic lives in [`pipeline/inventory-visitors/`](../../../packages/graph/engine/src/lang-typescript/inventory-visitors/) — one file per node kind. The helpers that compute body hashes, synthesize names for anonymous functions, classify visibility, and extract decorators live alongside in [`pipeline/inventory-helpers/`](../../../packages/graph/engine/src/lang-typescript/inventory-helpers/). The shared dispatch table (`dispatchVisitor`, `isInlineCallable`) lives in [`lang-typescript/walk.ts`](../../../packages/graph/engine/src/lang-typescript/walk.ts) so Stage 1's legacy `buildInventory` and the unified walk share the same node-shape detection.
+The TypeScript adapter's visitor logic lives in [`lang-typescript/inventory-visitors/`](../../../packages/graph/engine/src/lang-typescript/inventory-visitors/) — one file per node kind. The helpers that compute body hashes, synthesize names for anonymous functions, classify visibility, and extract decorators live alongside in [`lang-typescript/inventory-helpers/`](../../../packages/graph/engine/src/lang-typescript/inventory-helpers/). The shared dispatch table (`dispatchVisitor`, `isInlineCallable`) lives in [`lang-typescript/walk.ts`](../../../packages/graph/engine/src/lang-typescript/walk.ts) so the legacy `buildInventory` entry point and the unified walk share the same node-shape detection. The Python and Rust adapters keep a flatter layout (`walk.ts` / `resolve.ts` per adapter); see [`03-adding-a-language.md`](./03-adding-a-language.md) for the recommended layout. Shared edge-emission helpers (e.g. `appendEdge`) live at [`lang-adapter/edge-helpers.ts`](../../../packages/graph/engine/src/lang-adapter/edge-helpers.ts) — extracted in PR 6 of plan 10 because the duplicated-function-body rule legitimately fired across the three adapters' near-identical helpers.
 
-**Why inventory finishes building before resolvers run.** Resolvers look up callees by name and bodyHash in the catalog. The unified walk emits all occurrences first, then the orchestrator builds the initial catalog, then `resolveEdgesFromRecords` dispatches over the call-site list. By the time any resolver runs, the catalog is frozen and complete, so every callee resolution is either "found in catalog" or "unresolved" — never "not yet in catalog."
+**Why inventory finishes building before resolvers run.** Resolvers look up callees by name and bodyHash in the catalog. The walk emits all occurrences first, then the orchestrator builds the initial catalog, then `adapter.resolveCallSites` dispatches over the call-site list. By the time any resolver runs, the catalog is frozen and complete, so every callee resolution is either "found in catalog" or "unresolved" — never "not yet in catalog." This invariant is codified as I-4 ("`resolveCallSites` does not mutate its input catalog") in the [adapter contract](../../../packages/graph/engine/src/lang-adapter/types.ts).
 
 Each edge:
 
@@ -145,9 +154,9 @@ interface CallEdge {
 
 `to` is always an array. A static call resolves to one element. Method-dispatch (`config.method()` where `method` is an interface member with multiple implementations) resolves to many. An unresolved call (`fs.writeFileSync(...)`) resolves to zero.
 
-Resolver logic is split into one file per call shape in [`pipeline/edge-resolvers/`](../../../packages/graph/engine/src/lang-typescript/edge-resolvers/): direct calls, property-access calls, JSX elements, `new` expressions, polymorphic dispatch, and a catalog-fallback resolver that handles the long tail.
+For the TypeScript adapter, resolver logic is split into one file per call shape in [`lang-typescript/edge-resolvers/`](../../../packages/graph/engine/src/lang-typescript/edge-resolvers/): direct calls, property-access calls, JSX elements, `new` expressions, polymorphic dispatch, and a catalog-fallback resolver that handles the long tail. The Python and Rust adapters take the simpler approach — a single `resolve.ts` per adapter that does name-based lookup against the frozen catalog ([`lang-python/resolve.ts`](../../../packages/graph/engine/src/lang-python/resolve.ts), [`lang-rust/resolve.ts`](../../../packages/graph/engine/src/lang-rust/resolve.ts)).
 
-A single TypeScript `Program` is created in the orchestrator and shared across the unified walk and the resolver pass; `getTypeChecker()` is forced eagerly so parent pointers are populated before visitors walk parent chains. Total runtime on opensip-tools self-graph (~7,600 functions across ~700 files) is ~15 s for a cold full rebuild; subsequent runs hit the incremental path described under "Cache invalidation" below.
+For the TypeScript adapter, a single `ts.Program` is created in `parseProject` and shared across the walk and the resolver pass; `getTypeChecker()` is forced eagerly so parent pointers are populated before visitors walk parent chains. Cold full-rebuild runtime on the opensip-tools self-graph today is ~15 s; subsequent runs hit the incremental path described under "Cache invalidation" below. Tree-sitter adapters parse files lazily into a per-file `Tree` and never build a project-wide symbol table.
 
 ### Stage 3 — Index build
 
@@ -196,7 +205,7 @@ The two rules that consume entry-points only see the resulting `EntryPoint[]` �
 
 ## The catalog on disk
 
-The output of stages 1+2 is cached to [`<project>/opensip-tools/.runtime/cache/graph/catalog.json`](../../../packages/graph/engine/src/cache/) (gitignored). Format (v3, generic over language; PR 3 of plan 10 replaced v2's `tsConfigPath` + `tsCompilerVersion` with adapter-supplied `language` + `cacheKey`):
+The output of stages 1+2 is cached to [`<project>/opensip-tools/.runtime/cache/graph/catalog.json`](../../../packages/graph/engine/src/cache/) (gitignored). Format v3 (v1.3.0) is generic over language: the catalog carries a `language` field (the adapter id) and an opaque `cacheKey` (an adapter-supplied invalidation string). The pre-v3 fields `tsConfigPath` and `tsCompilerVersion` are gone; v2 catalogs on disk classify as `invalid` and trigger one cold rebuild on upgrade.
 
 ```jsonc
 {
@@ -278,7 +287,7 @@ Performance: editing a single file in opensip-tools self-graph drops rebuild tim
 
 ### `--package` and `--packages`
 
-Two scoping flags from Wave 1 + Wave 3 of the perf plan:
+Two scoping flags from Wave 1 + Wave 3 of the perf plan. **Both are TypeScript-only today** — they assume `tsconfig.json` discovery and the workspace-package shape that the TypeScript adapter expects. For Python and Rust projects, run `graph` from the project root.
 
 - **`graph --package <name|path>`** scopes a run to one workspace package's tsconfig. Cross-package call sites become unresolved (lower fidelity, much faster). Resolves a basename via [`cli/scope.ts`](../../../packages/graph/engine/src/cli/scope.ts) by searching `<cwd>/packages/**` for a directory with a `tsconfig.json`; an explicit path is also accepted.
 - **`graph --packages`** fans the run out across every workspace package under `<cwd>/packages/**`. One child process per package, concurrency capped at `cpus()-1`. Each child has its own Node heap, so the per-package memory ceiling scales naturally. Implementation: [`cli/packages-runner.ts`](../../../packages/graph/engine/src/cli/packages-runner.ts).
