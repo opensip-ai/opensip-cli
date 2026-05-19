@@ -16,6 +16,7 @@ source-files:
   - packages/graph/engine/src/render/sarif.ts
 related-docs:
   - ./01-stages-and-catalog.md
+  - ./03-adding-a-language.md
   - ../20-the-fit-loop/04-output-gate-sarif.md
   - ../70-surfaces/01-cli-command-tree.md
 ---

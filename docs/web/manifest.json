@@ -199,6 +199,17 @@
       "purpose": "The five graph rules, what each one detects, and how the save/compare gate flow integrates with CI."
     },
     {
+      "file": "docs/web/40-the-graph-loop/03-adding-a-language.md",
+      "path": "/docs/opensip-tools/40-the-graph-loop/03-adding-a-language/",
+      "section": "40-the-graph-loop",
+      "title": "Adding a language to graph",
+      "audience": [
+        "contributors",
+        "plugin-authors"
+      ],
+      "purpose": "Step-by-step guide for writing a new GraphLanguageAdapter — Python, Rust, Go, Java, C/C++, or anything else — without touching the engine."
+    },
+    {
       "file": "docs/web/50-runtime/01-cli-dispatch.md",
       "path": "/docs/opensip-tools/50-runtime/01-cli-dispatch/",
       "section": "50-runtime",
@@ -404,7 +415,8 @@
       "title": "40 — The Graph Loop",
       "pages": [
         "/docs/opensip-tools/40-the-graph-loop/01-stages-and-catalog/",
-        "/docs/opensip-tools/40-the-graph-loop/02-rules-and-gating/"
+        "/docs/opensip-tools/40-the-graph-loop/02-rules-and-gating/",
+        "/docs/opensip-tools/40-the-graph-loop/03-adding-a-language/"
       ]
     },
     {
