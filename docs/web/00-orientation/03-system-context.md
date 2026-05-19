@@ -82,7 +82,7 @@ There is no fifth actor. Specifically: no daemon, no database, no message queue,
 
 ## The on-disk layout
 
-The layout is set by [`packages/core/src/lib/paths.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/core/src/lib/paths.ts) and is the single source of truth for every consumer (logger, gate, plugin loader, dashboard, sessions store).
+The layout is set by [`packages/core/src/lib/paths.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/core/src/lib/paths.ts) and is the single source of truth for every consumer (logger, gate, plugin loader, dashboard, sessions store).
 
 ### Project-level (`<project>/`)
 
@@ -135,7 +135,7 @@ The user-level dir is intentionally small. Anything project-specific (checks, re
 
 ## Exit codes
 
-opensip-tools follows the conventional Unix exit-code shape, defined in [`packages/contracts/src/exit-codes.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/contracts/src/exit-codes.ts):
+opensip-tools follows the conventional Unix exit-code shape, defined in [`packages/contracts/src/exit-codes.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/contracts/src/exit-codes.ts):
 
 | Code | Meaning |
 |---|---|

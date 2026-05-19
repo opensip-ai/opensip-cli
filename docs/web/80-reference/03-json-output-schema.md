@@ -17,7 +17,7 @@ related-docs:
 
 `opensip-tools fit --json` and `opensip-tools sim --json` emit structured JSON on stdout. This is the contract surface for CI integrations.
 
-The shapes live in [`packages/contracts/src/types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/contracts/src/types.ts).
+The shapes live in [`packages/contracts/src/types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/contracts/src/types.ts).
 
 > **Stability:** the `version: '1.0'` discriminator on `CliOutput` is part of the contract. Adding optional fields is a minor change; removing or changing types is a major change.
 
@@ -190,7 +190,7 @@ The line and column are **1-based** to match SARIF and most editor conventions. 
 }
 ```
 
-Each rule appears as a `CheckOutput` whose `checkSlug` is the graph rule slug (`graph:orphan-subtree`, `graph:duplicated-function-body`, `graph:no-side-effect-path`, `graph:test-only-reachable`, `graph:always-throws-branch`). Findings carry the same `FindingOutput` shape; graph attaches a `partialFingerprints.bodyHash` in the SARIF output but the JSON envelope keeps the standard fields. See the renderer at [`packages/graph/engine/src/render/json.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/graph/engine/src/render/json.ts).
+Each rule appears as a `CheckOutput` whose `checkSlug` is the graph rule slug (`graph:orphan-subtree`, `graph:duplicated-function-body`, `graph:no-side-effect-path`, `graph:test-only-reachable`, `graph:always-throws-branch`). Findings carry the same `FindingOutput` shape; graph attaches a `partialFingerprints.bodyHash` in the SARIF output but the JSON envelope keeps the standard fields. See the renderer at [`packages/graph/engine/src/render/json.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/graph/engine/src/render/json.ts).
 
 ---
 
