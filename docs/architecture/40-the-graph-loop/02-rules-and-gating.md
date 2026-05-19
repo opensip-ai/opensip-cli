@@ -169,4 +169,4 @@ Exit code 4 is reserved for `--report-to` upload failure (network error or non-2
 - **[`01-stages-and-catalog.md`](./01-stages-and-catalog.md)** — the pipeline and catalog that feeds these rules.
 - **[`70-surfaces/01-cli-command-tree.md#graph`](../70-surfaces/01-cli-command-tree.md)** — every flag, with exit-code semantics.
 - **[`70-surfaces/03-dashboard.md`](../70-surfaces/03-dashboard.md)** — the interactive Code Paths view, which renders graph results alongside fit's.
-- **[`../plans/graph-performance-improvements.md`](../../plans/graph-performance-improvements.md)** — perf-plan history covering the rule and pipeline evolution since v1.1.
+- **[`../plans/00-graph-performance-improvements.md`](../../plans/00-graph-performance-improvements.md)** — perf-plan history covering the rule and pipeline evolution since v1.1.

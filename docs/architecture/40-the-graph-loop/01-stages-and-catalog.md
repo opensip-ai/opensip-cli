@@ -22,7 +22,7 @@ related-docs:
   - ./02-rules-and-gating.md
   - ../10-mental-model/02-tool-plugin-model.md
   - ../60-subsystems/01-language-adapters.md
-  - ../../plans/graph-performance-improvements.md
+  - ../../plans/00-graph-performance-improvements.md
 ---
 # Stages and catalog (graph)
 
@@ -75,7 +75,7 @@ The `graph` command is the static call-graph tool. Where `fit` answers "is the c
 
 Each stage is one module in [`packages/graph/engine/src/pipeline/`](../../../packages/graph/engine/src/pipeline/) (stages 0–3) or [`packages/graph/engine/src/rules/`](../../../packages/graph/engine/src/rules/) and [`packages/graph/engine/src/render/`](../../../packages/graph/engine/src/render/) (stages 4–5). Stages communicate only through their typed outputs; a stage cannot import a sibling stage, cannot reach back to read its predecessor's intermediate state, cannot peek into the next stage's expectations. This isolation is the single most important property of the design — every other guarantee derives from it.
 
-> **History — Stage 1 + Stage 2 fused (Phase 4, 2026-05-17).** Originally these were two separate AST walks per file: Stage 1 emitted function occurrences; Stage 2 walked the same AST a second time to find and resolve call sites. The two walks descended in identical order and the only data flowing between them was each function-shape's bodyHash — which Stage 1 already computed. Phase 4 of [`docs/plans/graph-performance-improvements.md`](../../plans/graph-performance-improvements.md) fused the two passes into [`pipeline/walk.ts`](../../../packages/graph/engine/src/pipeline/walk.ts). Legacy `buildInventory` and `resolveEdges` entry points are retained for tests and external callers; they share the dispatch helpers from `walk.ts`. The orchestrator calls `walkProgram` once and feeds the resulting call-site records to `resolveEdgesFromRecords`.
+> **History — Stage 1 + Stage 2 fused (Phase 4, 2026-05-17).** Originally these were two separate AST walks per file: Stage 1 emitted function occurrences; Stage 2 walked the same AST a second time to find and resolve call sites. The two walks descended in identical order and the only data flowing between them was each function-shape's bodyHash — which Stage 1 already computed. Phase 4 of [`docs/plans/00-graph-performance-improvements.md`](../../plans/00-graph-performance-improvements.md) fused the two passes into [`pipeline/walk.ts`](../../../packages/graph/engine/src/pipeline/walk.ts). Legacy `buildInventory` and `resolveEdges` entry points are retained for tests and external callers; they share the dispatch helpers from `walk.ts`. The orchestrator calls `walkProgram` once and feeds the resulting call-site records to `resolveEdgesFromRecords`.
 
 ### Stage 0 — Discover
 
@@ -282,4 +282,4 @@ Both flags trade cross-package edge fidelity for speed and memory. Use `--no-cac
 
 - **[`02-rules-and-gating.md`](./02-rules-and-gating.md)** — the five rules that consume the catalog, the gate workflow, and the SARIF integration.
 - **[`70-surfaces/01-cli-command-tree.md#graph`](../70-surfaces/01-cli-command-tree.md)** — the CLI flag reference.
-- **[`../plans/graph-performance-improvements.md`](../../plans/graph-performance-improvements.md)** — the perf-plan history (waves 1-4): heap-sizing hint, freed Program, streamed write, sliced hashing, per-package scope, fused walk, parallel runner, transitive incremental rebuild.
+- **[`../plans/00-graph-performance-improvements.md`](../../plans/00-graph-performance-improvements.md)** — the perf-plan history (waves 1-4): heap-sizing hint, freed Program, streamed write, sliced hashing, per-package scope, fused walk, parallel runner, transitive incremental rebuild.

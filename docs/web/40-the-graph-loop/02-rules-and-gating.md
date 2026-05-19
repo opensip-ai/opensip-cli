@@ -169,4 +169,4 @@ Exit code 4 is reserved for `--report-to` upload failure (network error or non-2
 - **[`01-stages-and-catalog.md`](/docs/opensip-tools/40-the-graph-loop/01-stages-and-catalog/)** — the pipeline and catalog that feeds these rules.
 - **[`70-surfaces/01-cli-command-tree.md#graph`](/docs/opensip-tools/70-surfaces/01-cli-command-tree/)** — every flag, with exit-code semantics.
 - **[`70-surfaces/03-dashboard.md`](/docs/opensip-tools/70-surfaces/03-dashboard/)** — the interactive Code Paths view, which renders graph results alongside fit's.
-- **[`../plans/graph-performance-improvements.md`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/docs/plans/graph-performance-improvements.md)** — perf-plan history covering the rule and pipeline evolution since v1.1.
+- **[`../plans/00-graph-performance-improvements.md`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/docs/plans/00-graph-performance-improvements.md)** — perf-plan history covering the rule and pipeline evolution since v1.1.

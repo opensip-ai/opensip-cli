@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [1.2.0] — 2026-05-18
 
 A performance-focused release for `@opensip-tools/graph`. Implements
-[`docs/plans/graph-performance-improvements.md`](docs/plans/graph-performance-improvements.md)
+[`docs/plans/00-graph-performance-improvements.md`](docs/plans/00-graph-performance-improvements.md)
 waves 1–4. Driven by an OpenSIP measurement run (5476 files) that
 OOM'd Node's default 4 GB heap and took ~25 minutes under a 12 GB
 heap.

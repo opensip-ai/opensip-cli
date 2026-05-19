@@ -111,7 +111,7 @@ opensip-tools sim --kind <kind>
 
 ## `graph` — static call-graph + dead-end analysis
 
-Tool-owned: [`packages/graph/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/graph/engine/src/tool.ts). The pipeline architecture and cache invalidation are documented in [`40-the-graph-loop/01-stages-and-catalog.md`](/docs/opensip-tools/40-the-graph-loop/01-stages-and-catalog/); the perf-plan history is in [`docs/plans/graph-performance-improvements.md`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/docs/plans/graph-performance-improvements.md).
+Tool-owned: [`packages/graph/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/graph/engine/src/tool.ts). The pipeline architecture and cache invalidation are documented in [`40-the-graph-loop/01-stages-and-catalog.md`](/docs/opensip-tools/40-the-graph-loop/01-stages-and-catalog/); the perf-plan history is in [`docs/plans/00-graph-performance-improvements.md`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/docs/plans/00-graph-performance-improvements.md).
 
 ```
 opensip-tools graph
