@@ -1,6 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-16
+last_verified: 2026-05-18
+release: v1.3.0
 title: "Package catalog"
 audience: [contributors, plugin-authors]
 purpose: "Flat reference of every package in the monorepo: name, path, layer, one-line role, key exports. Lookup-only; the conceptual layer narrative lives in 10-mental-model/03-modular-monolith.md."
@@ -46,7 +47,7 @@ Peer packages at the same layer. Tools implement the `Tool` contract; language a
 |---|---|---|---|
 | `@opensip-tools/fitness` | `packages/fitness/engine/` | Fitness check engine, `defineCheck`, `defineRecipe`, gate, SARIF builder | `defineCheck`, `defineRecipe`, `FitnessRecipeService`, `defaultRecipeRegistry`, `getCheckConfig`, `executeFit`, `loadSignalersConfig`, `fitnessTool`, `saveBaseline`, `compareToBaseline`, `buildSarifLog`, `reportToCloud`, `openDashboard` |
 | `@opensip-tools/simulation` | `packages/simulation/engine/` | Simulation engine, four scenario kinds | `defineLoadScenario`, `defineChaosScenario`, `defineInvariantScenario`, `defineFixEvaluationScenario`, `defineSimulationRecipe`, `simulationTool`, `defaultSimulationRecipeRegistry`, `SCENARIO_KINDS` |
-| `@opensip-tools/graph` | `packages/graph/engine/` | Static call-graph + dead-end analysis, six-stage staged pipeline (discover → inventory → edges → indexes → rules → render). Imports SARIF helpers from `@opensip-tools/fitness` (peer-layer dep, DEC-3) | `graphTool`, `Catalog`, `FunctionOccurrence`, `CallEdge`, `Indexes`, `Rule`, `Renderer`, `EdgeResolver`, `InventoryVisitor` |
+| `@opensip-tools/graph` | `packages/graph/engine/` | Static call-graph + dead-end analysis, six-stage staged pipeline (discover → inventory → edges → indexes → rules → render). Language-pluggable as of v1.3.0: ships TypeScript, Python, and Rust adapters as internal subdirs (`lang-typescript/`, `lang-python/`, `lang-rust/`), all implementing the `GraphLanguageAdapter` contract under `lang-adapter/`. Imports SARIF helpers from `@opensip-tools/fitness` (peer-layer dep, DEC-3) | `graphTool`, `Catalog`, `FunctionOccurrence`, `CallEdge`, `Indexes`, `Rule`, `Renderer`, `GraphLanguageAdapter`, `registerAdapter`, `pickAdapter` |
 
 ### Language adapters
 
@@ -91,8 +92,8 @@ Imports every layer below. The published binary.
 
 ## Verification trail
 
-Last verified at v1.0.0 against:
+Last verified at v1.3.0 against:
 
-- `packages/` directory listing (18 packages — 1 kernel + 1 contracts + 6 lang + 1 fitness + 1 simulation + 1 graph + 6 check packs + 1 cli).
+- `packages/` directory listing (18 packages — 1 kernel + 1 contracts + 6 lang + 1 fitness + 1 simulation + 1 graph + 6 check packs + 1 cli). v1.3.0 added Python and Rust **graph** adapters as internal subdirs of `@opensip-tools/graph` (`lang-python/`, `lang-rust/`); the published-package count is unchanged. The fitness `lang-python` / `lang-rust` packages at Layer 3 are unrelated siblings — see [`60-subsystems/01-language-adapters.md`](/docs/opensip-tools/60-subsystems/01-language-adapters/) for the `LanguageAdapter` vs. `GraphLanguageAdapter` distinction.
 - Each package's `package.json` `description` and `name` field, read directly.
 - The dep-cruiser config for layer rules.

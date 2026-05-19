@@ -1,6 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-15
+last_verified: 2026-05-18
+release: v1.3.0
 title: "Layer policy"
 audience: [contributors]
 purpose: "The dependency-cruiser rules that enforce the five-layer architecture and the tool-internal partitioning rules (graph stages, dashboard panels), rule by rule, with rationale."
@@ -175,17 +176,21 @@ Beyond the cross-package layer cake, two tools define their own internal-shape r
 
 ### Graph tool — the six-stage pipeline
 
-Seven rules in `.dependency-cruiser.cjs` keep the graph tool's stages clean:
+Eleven rules in `.dependency-cruiser.cjs` keep the graph tool's stages clean. Six predate v1.3.0 and pin the original cross-stage discipline; four landed in v1.3.0 (PRs 3–6 of plan 10) to enforce the language-pluggability layering; one is the `info`-severity allow-rule for the documented SARIF cross-tool edge.
 
 - **`graph-no-cli`** — graph engine doesn't import the CLI.
 - **`graph-no-check-packs`** — graph never reaches into fitness check packs.
-- **`graph-rules-no-parser`** — Stage 4 rules consume frozen catalog/indexes only; no `typescript` import, no `pipeline/` import.
-- **`graph-renderers-no-pipeline`** — Stage 5 renderers consume `Signal[]` only; no `pipeline/` or `rules/` import.
+- **`graph-rules-no-parser`** — Stage 4 rules consume frozen catalog/indexes only; no `typescript` import, no `pipeline/` import, no `lang-typescript/` import.
+- **`graph-renderers-no-pipeline`** — Stage 5 renderers consume `Signal[]` only; no `pipeline/`, `rules/`, or `lang-typescript/` import.
 - **`graph-visitors-resolvers-disjoint`** — inventory visitors don't import edge resolvers.
 - **`graph-resolvers-visitors-disjoint`** — edge resolvers don't import inventory visitors.
+- **`graph-no-typescript-import-outside-lang-typescript`** *(v1.3.0)* — only the `lang-typescript/` subtree may import the `typescript` compiler API. The engine itself routes through the `GraphLanguageAdapter` contract. Also enforced by ESLint's `no-restricted-imports` because dep-cruiser cannot observe `node_modules` edges under this project's `tsPreCompilationDeps: false` setting.
+- **`graph-no-tree-sitter-import-outside-lang-packs`** *(v1.3.0)* — only `lang-python/` and `lang-rust/` may import `tree-sitter` and its grammars.
+- **`graph-pipeline-no-lang-import`** *(v1.3.0)* — `pipeline/`, `cache/`, `rules/`, `render/` are language-agnostic; they must not import any `lang-*` adapter.
+- **`graph-orchestrate-no-direct-lang-import`** *(v1.3.0)* — `cli/*` (including the orchestrator) routes through `lang-adapter/registry` only, not a specific `lang-*` adapter. `bootstrap.ts` and `tool.ts` are the documented exceptions for first-party adapter registration; they live at the engine root, not under `cli/`.
 - **`graph-may-import-fitness-sarif`** — `info`-severity allow rule that records (but does not reject) the documented `graph/render/sarif.ts → @opensip-tools/fitness` peer-layer edge from DEC-3.
 
-These mirror the conceptual six-stage pipeline ([`../40-the-graph-loop/01-stages-and-catalog.md`](/docs/opensip-tools/40-the-graph-loop/01-stages-and-catalog/)). Stages can't reach forward; visitors and resolvers share helpers, not each other; rules and renderers consume frozen data.
+These mirror the conceptual six-stage pipeline ([`../40-the-graph-loop/01-stages-and-catalog.md`](/docs/opensip-tools/40-the-graph-loop/01-stages-and-catalog/)) and the language-pluggability layering ([`../40-the-graph-loop/03-adding-a-language.md`](/docs/opensip-tools/40-the-graph-loop/03-adding-a-language/)). Stages can't reach forward; visitors and resolvers share helpers, not each other; rules and renderers consume frozen data; language-specific code is quarantined to its `lang-*/` subtree.
 
 ### Dashboard — panel isolation
 
