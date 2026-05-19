@@ -180,18 +180,18 @@ The `--packages` flag fans out across every workspace package under `packages/**
 
 For users who prefer external orchestration, `xargs -P 8 -I {} opensip-tools graph --package {}` over a list of package paths achieves the same effect.
 
-Five rules ship today: `orphan-subtree`, `duplicated-function-body`, `no-side-effect-path`, `test-only-reachable`, `always-throws-branch`. Output is grouped by rule with the top 10 findings per rule plus a summary; the full set is always available via `--json`. See [the graph loop docs](./docs/architecture/35-the-graph-loop/) for what each rule detects and how the gate workflow integrates with CI.
+Five rules ship today: `orphan-subtree`, `duplicated-function-body`, `no-side-effect-path`, `test-only-reachable`, `always-throws-branch`. Output is grouped by rule with the top 10 findings per rule plus a summary; the full set is always available via `--json`. See [the graph loop docs](./docs/architecture/40-the-graph-loop/) for what each rule detects and how the gate workflow integrates with CI.
 
 #### Heap sizing on large monorepos
 
-`graph` builds a single TypeScript program over every `.ts`/`.tsx` file in the project's `tsconfig.json`. On large monorepos the program plus bound symbol table can exceed Node's default ~4 GB heap. When `graph` detects more than 1000 source files it prints a one-line hint to stderr at startup; if it OOMs, retry with a larger heap:
+For TypeScript projects, `graph` builds a single TypeScript program over every `.ts`/`.tsx` file in the project's `tsconfig.json`. On large monorepos the program plus bound symbol table can exceed Node's default ~4 GB heap. When `graph` detects more than 1000 source files it prints a one-line hint to stderr at startup; if it OOMs, retry with a larger heap:
 
 ```bash
 NODE_OPTIONS=--max-old-space-size=8192 opensip-tools graph     # most monorepos
 NODE_OPTIONS=--max-old-space-size=12288 opensip-tools graph    # very large repos
 ```
 
-Measured: a 5476-file repo OOM'd at 4 GB after ~17 min, completed at 12 GB in ~25 min with ~4.2 GB peak resident. The 8 GB setting is the recommended default once you cross the threshold.
+Measured: a 5476-file repo OOM'd at 4 GB after ~17 min, completed at 12 GB in ~25 min with ~4.2 GB peak resident. The 8 GB setting is the recommended default once you cross the threshold. (Heap pressure is most acute for the TypeScript adapter; the Python and Rust tree-sitter adapters parse files lazily and use far less memory.)
 
 #### Incremental rebuild
 
