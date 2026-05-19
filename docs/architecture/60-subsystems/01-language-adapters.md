@@ -1,9 +1,10 @@
 ---
 status: current
-last_verified: 2026-05-15
-title: "Language adapters"
+last_verified: 2026-05-18
+release: v1.3.0
+title: "Language adapters (fitness)"
 audience: [contributors, plugin-authors]
-purpose: "What a LanguageAdapter is, the six bundled adapters, and how to author a new one."
+purpose: "What the fitness LanguageAdapter is, the six bundled adapters, and how to author a new one."
 source-files:
   - packages/core/src/languages/adapter.ts
   - packages/core/src/languages/registry.ts
@@ -16,8 +17,16 @@ related-docs:
   - ../00-orientation/02-vocabulary.md
   - ../10-mental-model/03-modular-monolith.md
   - ../20-the-fit-loop/02-targets-and-scope.md
+  - ../40-the-graph-loop/03-adding-a-language.md
 ---
-# Language adapters
+# Language adapters (fitness)
+
+> **Two adapter contracts, one ambiguous word.** opensip-tools has two distinct language-adapter interfaces, used by different subsystems:
+>
+> - **`LanguageAdapter`** (this doc) lives in [`@opensip-tools/core`](../../../packages/core/src/languages/adapter.ts). Used by the **fitness** engine. Three required methods (`parse`, `stripStrings`, `stripComments`) plus an optional query API. Lets fitness checks operate on filtered (comment- and string-stripped) source. Implemented by the six `@opensip-tools/lang-*` packages.
+> - **`GraphLanguageAdapter`** (separate, [`@opensip-tools/graph`](../../../packages/graph/engine/src/lang-adapter/types.ts)) is used by the **graph** engine. Six methods (`discoverFiles`, `parseProject`, `walkProject`, `resolveCallSites`, `cacheKey`, optional `ruleHints`). Lets graph build call catalogs across languages. Implemented by `lang-typescript`, `lang-python`, `lang-rust` adapters that live *inside* `packages/graph/engine/src/lang-*/`.
+>
+> They are siblings, not the same thing. A given language has one of each (e.g. TypeScript has both a fitness `typescriptAdapter` and a graph `typescriptGraphAdapter`). For graph adapters, see [`40-the-graph-loop/03-adding-a-language.md`](../40-the-graph-loop/03-adding-a-language.md). The rest of this doc covers the fitness `LanguageAdapter` only.
 
 A check is a regex over `console.log`. The naive run flags `// console.log("debug")` (a comment) and `"console.log"` (a string literal). A `LanguageAdapter` is what makes the regex correct — it strips comments and string literals before the check sees the content.
 
