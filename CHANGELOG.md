@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.3.1] — 2026-05-18
+
+Maintenance release. Clears the `glob@11.1.0` deprecation warning that
+surfaced on `npm install -g @opensip-tools/cli` by bumping the
+first-party `glob` dependency to the current major. No behavioral or
+API changes.
+
+### Changed
+
+- **`glob` bumped from `^11.0.0` to `^13.0.0`** in
+  `@opensip-tools/fitness` and `@opensip-tools/graph`. Both packages
+  use only the stable `glob` / `globSync` named exports, so the
+  upgrade is drop-in. The previous `glob@11.x` major was deprecated
+  upstream by npm; v13 is the current release line.
+
 ## [1.3.0] — 2026-05-18
 
 Language pluggability for `@opensip-tools/graph`. Implements [plan
