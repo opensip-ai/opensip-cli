@@ -65,13 +65,26 @@ export interface GraphFunctionOccurrence {
   readonly calls: readonly GraphCallEdge[];
 }
 
+/**
+ * Public catalog shape consumed by the dashboard.
+ *
+ * v3 (release 1.3.0) generic over language: the `language` field
+ * carries the adapter id (e.g. 'typescript', 'python', 'rust') and
+ * `cacheKey` is an opaque per-adapter invalidation string. The
+ * pre-v3 fields `tsConfigPath` and `tsCompilerVersion` are gone
+ * from the engine; v2 catalogs on disk classify as `invalid` at
+ * load time.
+ *
+ * `cacheKey` is optional here because external callers parsing
+ * a v2 catalog they have on disk would otherwise fail to load
+ * the file with this type. Engine-internal code requires it.
+ */
 export interface GraphCatalog {
   readonly version: string;
   readonly tool: string;
   readonly language: string;
   readonly builtAt: string;
-  readonly tsConfigPath?: string;
-  readonly tsCompilerVersion?: string;
+  readonly cacheKey?: string;
   readonly filesFingerprint?: string;
   readonly functions: Readonly<Record<string, readonly GraphFunctionOccurrence[]>>;
 }
