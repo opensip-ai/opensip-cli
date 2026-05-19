@@ -18,7 +18,7 @@ related-docs:
 
 # Adding a language to graph
 
-The `graph` tool started as a TypeScript-only call-graph engine. PR 3 of [plan 10](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/docs/plans/10-graph-language-pluggability.md) introduced a six-method `GraphLanguageAdapter` contract so the engine itself doesn't know any specific language; first-party adapters (Python, Rust, Go, Java, C/C++) and third-party adapters slot in by implementing the contract and registering themselves.
+The `graph` tool started as a TypeScript-only call-graph engine. PR 3 of [plan 10](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/docs/plans/10-graph-language-pluggability.md) introduced a six-method `GraphLanguageAdapter` contract so the engine itself doesn't know any specific language; first-party adapters (Python, Rust, Go, Java, C/C++) and third-party adapters slot in by implementing the contract and registering themselves.
 
 This doc walks a contributor through that workflow.
 
@@ -34,12 +34,12 @@ This doc walks a contributor through that workflow.
 
 Two short docs are the contract you implement against:
 
-- [`docs/plans/11-graph-language-adapter-contract.md`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/docs/plans/11-graph-language-adapter-contract.md) — the interface signatures, behavioral invariants I-1 through I-9, and per-language feasibility sketches (Python, Rust, Go, Java, C/C++).
-- [`packages/graph/engine/src/lang-adapter/types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/graph/engine/src/lang-adapter/types.ts) — the canonical TypeScript source for the interface and all I/O shapes.
+- [`docs/plans/11-graph-language-adapter-contract.md`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/docs/plans/11-graph-language-adapter-contract.md) — the interface signatures, behavioral invariants I-1 through I-9, and per-language feasibility sketches (Python, Rust, Go, Java, C/C++).
+- [`packages/graph/engine/src/lang-adapter/types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/graph/engine/src/lang-adapter/types.ts) — the canonical TypeScript source for the interface and all I/O shapes.
 
 Then look at the reference implementation:
 
-- [`packages/graph/engine/src/lang-typescript/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/graph/engine/src/lang-typescript/index.ts) — `typescriptGraphAdapter` is a thin façade over the existing TypeScript-specific machinery. Each contract method delegates to a sibling file (`discover.ts`, `parse.ts`, `walk.ts`, `edges.ts`, `cache-key.ts`) and translates I/O shapes.
+- [`packages/graph/engine/src/lang-typescript/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/graph/engine/src/lang-typescript/index.ts) — `typescriptGraphAdapter` is a thin façade over the existing TypeScript-specific machinery. Each contract method delegates to a sibling file (`discover.ts`, `parse.ts`, `walk.ts`, `edges.ts`, `cache-key.ts`) and translates I/O shapes.
 
 ---
 
@@ -49,14 +49,14 @@ A `GraphLanguageAdapter` exposes six methods plus three identity fields (`id`, `
 
 | Method | Responsibility | TypeScript reference |
 |---|---|---|
-| `discoverFiles` | Resolve which files belong to the project for a given cwd. Reads language-specific config (tsconfig.json, pyproject.toml, Cargo.toml, etc.). Returns absolute, realpath-normalized, sorted file paths. | [`lang-typescript/discover.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/graph/engine/src/lang-typescript/discover.ts) |
-| `parseProject` | Build adapter-internal parse state. The shape is opaque (`P = unknown`); the engine passes it back into `walkProject` and `resolveCallSites` unchanged. TypeScript holds a `ts.Program`; a tree-sitter adapter would hold a `Map<filePath, Tree>` plus a project-wide call-graph hint. | [`lang-typescript/parse.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/graph/engine/src/lang-typescript/parse.ts) |
-| `walkProject` | One pass over the parsed project. Emit `FunctionOccurrence`s (one per callable thing — function, method, arrow, constructor, getter/setter, plus a synthetic module-init per file) AND `CallSiteRecord`s (pre-located call expressions, owner-keyed by `bodyHash`). | [`lang-typescript/walk.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/graph/engine/src/lang-typescript/walk.ts) |
-| `resolveCallSites` | Resolve the call-site list against the frozen catalog. Return a `bodyHash → CallEdge[]` map plus resolution stats. Call edges carry a `confidence` (`'high'` for symbol-resolved, `'medium'`/`'low'` for name-only resolution). | [`lang-typescript/edges.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/graph/engine/src/lang-typescript/edges.ts) (`resolveEdgesFromRecords`) |
-| `cacheKey` | Compute an opaque per-adapter cache invalidation key. Different adapters MUST emit different prefixes (e.g. `ts-…`, `py-…`, `rs-…`) so cross-adapter accidents hash-mismatch immediately. | [`lang-typescript/cache-key.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/graph/engine/src/lang-typescript/cache-key.ts) |
-| `ruleHints` | Optional. Declare what counts as a test file in your language and which side-effect primitives the `no-side-effect-path` rule should look for. Without this, defaults apply and rules silently degrade. | [`lang-typescript/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/graph/engine/src/lang-typescript/index.ts) (`ruleHints`) |
+| `discoverFiles` | Resolve which files belong to the project for a given cwd. Reads language-specific config (tsconfig.json, pyproject.toml, Cargo.toml, etc.). Returns absolute, realpath-normalized, sorted file paths. | [`lang-typescript/discover.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/graph/engine/src/lang-typescript/discover.ts) |
+| `parseProject` | Build adapter-internal parse state. The shape is opaque (`P = unknown`); the engine passes it back into `walkProject` and `resolveCallSites` unchanged. TypeScript holds a `ts.Program`; a tree-sitter adapter would hold a `Map<filePath, Tree>` plus a project-wide call-graph hint. | [`lang-typescript/parse.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/graph/engine/src/lang-typescript/parse.ts) |
+| `walkProject` | One pass over the parsed project. Emit `FunctionOccurrence`s (one per callable thing — function, method, arrow, constructor, getter/setter, plus a synthetic module-init per file) AND `CallSiteRecord`s (pre-located call expressions, owner-keyed by `bodyHash`). | [`lang-typescript/walk.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/graph/engine/src/lang-typescript/walk.ts) |
+| `resolveCallSites` | Resolve the call-site list against the frozen catalog. Return a `bodyHash → CallEdge[]` map plus resolution stats. Call edges carry a `confidence` (`'high'` for symbol-resolved, `'medium'`/`'low'` for name-only resolution). | [`lang-typescript/edges.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/graph/engine/src/lang-typescript/edges.ts) (`resolveEdgesFromRecords`) |
+| `cacheKey` | Compute an opaque per-adapter cache invalidation key. Different adapters MUST emit different prefixes (e.g. `ts-…`, `py-…`, `rs-…`) so cross-adapter accidents hash-mismatch immediately. | [`lang-typescript/cache-key.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/graph/engine/src/lang-typescript/cache-key.ts) |
+| `ruleHints` | Optional. Declare what counts as a test file in your language and which side-effect primitives the `no-side-effect-path` rule should look for. Without this, defaults apply and rules silently degrade. | [`lang-typescript/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/graph/engine/src/lang-typescript/index.ts) (`ruleHints`) |
 
-The exact TypeScript signatures live in [`lang-adapter/types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/graph/engine/src/lang-adapter/types.ts). Read that file once — it's the technical reference.
+The exact TypeScript signatures live in [`lang-adapter/types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/graph/engine/src/lang-adapter/types.ts). Read that file once — it's the technical reference.
 
 ---
 
@@ -90,7 +90,7 @@ For a third-party adapter, ship it as a separate npm package (e.g. `@your-org/gr
 
 ## 4. The contract test suite
 
-Every adapter MUST pass the contract test suite at [`packages/graph/engine/src/__tests__/lang-adapter-contract.test.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/graph/engine/src/__tests__/lang-adapter-contract.test.ts). It validates the nine behavioral invariants from [`docs/plans/11-graph-language-adapter-contract.md`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/docs/plans/11-graph-language-adapter-contract.md) §3:
+Every adapter MUST pass the contract test suite at [`packages/graph/engine/src/__tests__/lang-adapter-contract.test.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/graph/engine/src/__tests__/lang-adapter-contract.test.ts). It validates the nine behavioral invariants from [`docs/plans/11-graph-language-adapter-contract.md`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/docs/plans/11-graph-language-adapter-contract.md) §3:
 
 | Invariant | What the test checks |
 |---|---|
@@ -121,7 +121,7 @@ Different adapters produce different-fidelity edges. This is intrinsic — TypeS
 | `java` (planned) | `'medium'` | Class context is rich (everything is in a class). |
 | `c/c++` (planned) | `'medium'` | Header/source duplication and namespace resolution are the wrinkles. |
 
-Per-rule fidelity expectations (from [plan 10 §6](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/docs/plans/10-graph-language-pluggability.md)):
+Per-rule fidelity expectations (from [plan 10 §6](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/docs/plans/10-graph-language-pluggability.md)):
 
 | Rule | TS adapter (today) | Tree-sitter adapter (Python/Rust/Go/Java/C++) |
 |---|---|---|
@@ -137,7 +137,7 @@ When you ship a new adapter, add a row to this table in your PR.
 
 ## 6. Registration
 
-For first-party adapters in this repo, add one line to [`packages/graph/engine/src/bootstrap.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/graph/engine/src/bootstrap.ts):
+For first-party adapters in this repo, add one line to [`packages/graph/engine/src/bootstrap.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/graph/engine/src/bootstrap.ts):
 
 ```ts
 import { registerAdapter } from './lang-adapter/registry.js';
@@ -178,8 +178,8 @@ When you open the PR for a new adapter, verify each of these:
 
 ## 9. Where to ask
 
-- The contract docs ([`10`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/docs/plans/10-graph-language-pluggability.md) and [`11`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/docs/plans/11-graph-language-adapter-contract.md)) discuss every design decision and call out deferred questions.
-- The TypeScript adapter ([`lang-typescript/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/graph/engine/src/lang-typescript/index.ts)) is the concrete reference; reading it end-to-end takes ~30 minutes.
+- The contract docs ([`10`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/docs/plans/10-graph-language-pluggability.md) and [`11`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/docs/plans/11-graph-language-adapter-contract.md)) discuss every design decision and call out deferred questions.
+- The TypeScript adapter ([`lang-typescript/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/graph/engine/src/lang-typescript/index.ts)) is the concrete reference; reading it end-to-end takes ~30 minutes.
 - The contract test suite is the spec — if the test passes for your adapter, you're conforming.
 
 ---
@@ -188,4 +188,4 @@ When you open the PR for a new adapter, verify each of these:
 
 - **[`01-stages-and-catalog.md`](/docs/opensip-tools/40-the-graph-loop/01-stages-and-catalog/)** — the engine pipeline your adapter feeds into.
 - **[`02-rules-and-gating.md`](/docs/opensip-tools/40-the-graph-loop/02-rules-and-gating/)** — the five rules that consume the catalog and the gate workflow.
-- **[`docs/plans/10-graph-language-pluggability.md`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/docs/plans/10-graph-language-pluggability.md)** — the master plan covering motivation, sequencing, and acceptance gates for the language-pluggability initiative.
+- **[`docs/plans/10-graph-language-pluggability.md`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/docs/plans/10-graph-language-pluggability.md)** — the master plan covering motivation, sequencing, and acceptance gates for the language-pluggability initiative.

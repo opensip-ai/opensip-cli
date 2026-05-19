@@ -34,7 +34,7 @@ The `sim` command is the simulation tool. Where `fit` answers "is the codebase c
 
 ## The four scenario kinds
 
-opensip-tools sim recognizes four kinds today, each with its own author-facing entry point in [`packages/simulation/engine/src/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/simulation/engine/src/index.ts):
+opensip-tools sim recognizes four kinds today, each with its own author-facing entry point in [`packages/simulation/engine/src/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/simulation/engine/src/index.ts):
 
 | Kind | Entry point | Models |
 |---|---|---|
@@ -43,9 +43,9 @@ opensip-tools sim recognizes four kinds today, each with its own author-facing e
 | **invariant** | `defineInvariantScenario` | Seed state → act → assert a property holds. Property-based testing shape. |
 | **fix-evaluation** | `defineFixEvaluationScenario` | Replay a corpus of signals against a fix-generating agent → score with predicates. |
 
-Each kind has its own `define.ts`, `executor.ts`, and `result.ts` under [`packages/simulation/engine/src/kinds/<kind>/`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/simulation/engine/src/kinds/). They share a common runtime contract (`RunnableScenario`, `ScenarioExecutorResult`) so the engine can execute any kind through the same dispatcher.
+Each kind has its own `define.ts`, `executor.ts`, and `result.ts` under [`packages/simulation/engine/src/kinds/<kind>/`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/simulation/engine/src/kinds/). They share a common runtime contract (`RunnableScenario`, `ScenarioExecutorResult`) so the engine can execute any kind through the same dispatcher.
 
-The legacy `defineScenario` ([`packages/simulation/engine/src/framework/define-scenario.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/simulation/engine/src/framework/define-scenario.ts)) is a deprecated alias that routes to `defineLoadScenario`. New code uses the kind-specific entry points.
+The legacy `defineScenario` ([`packages/simulation/engine/src/framework/define-scenario.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/simulation/engine/src/framework/define-scenario.ts)) is a deprecated alias that routes to `defineLoadScenario`. New code uses the kind-specific entry points.
 
 ### `defineLoadScenario`
 
@@ -148,7 +148,7 @@ The fix-evaluation kind replays a corpus of past signals against a fix-generatin
 
 ## The shared runtime contract
 
-Despite four entry points, every scenario produces a `RunnableScenario` ([`packages/simulation/engine/src/framework/runnable-scenario.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/simulation/engine/src/framework/runnable-scenario.ts)) — a struct carrying the scenario's id, name, description, kind, tags, and a `run(abortSignal)` method that returns `Promise<ScenarioExecutorResult>`. The engine's dispatcher reads the kind discriminator and hands the scenario to the appropriate executor:
+Despite four entry points, every scenario produces a `RunnableScenario` ([`packages/simulation/engine/src/framework/runnable-scenario.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/simulation/engine/src/framework/runnable-scenario.ts)) — a struct carrying the scenario's id, name, description, kind, tags, and a `run(abortSignal)` method that returns `Promise<ScenarioExecutorResult>`. The engine's dispatcher reads the kind discriminator and hands the scenario to the appropriate executor:
 
 ```
 RunnableScenario { kind: 'load', run(signal)           } ─► loadExecutor      ─► LoadScenarioExecutorResult
@@ -165,7 +165,7 @@ This shape — kind-specific authoring + shared runtime contract — is why the 
 
 ## Sim recipes
 
-A sim recipe is the same shape as a fit recipe: a named selection of scenarios + execution options + reporting options. Defined in [`packages/simulation/engine/src/recipes/types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/simulation/engine/src/recipes/types.ts) and constructed via [`defineRecipe`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/simulation/engine/src/recipes/define-recipe.ts).
+A sim recipe is the same shape as a fit recipe: a named selection of scenarios + execution options + reporting options. Defined in [`packages/simulation/engine/src/recipes/types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/simulation/engine/src/recipes/types.ts) and constructed via [`defineRecipe`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/simulation/engine/src/recipes/define-recipe.ts).
 
 ```ts
 import { defineRecipe } from '@opensip-tools/simulation';
@@ -183,7 +183,7 @@ Selectors mirror fit's: `all`, `tags`, `pattern`, `explicit`. The `kind:` filter
 
 `sequential` mode is the typical shape for sim recipes — load scenarios contend for resources, so running them in parallel is rarely correct. `parallel` is available for invariant scenarios (which are usually pure) or fix-evaluation scenarios that fan out across independent inputs.
 
-The default recipe ([`packages/simulation/engine/src/recipes/built-in-recipes.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/simulation/engine/src/recipes/built-in-recipes.ts)) selects every registered scenario in sequential order. Project-local recipes live under `<project>/opensip-tools/sim/recipes/*.mjs`.
+The default recipe ([`packages/simulation/engine/src/recipes/built-in-recipes.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/simulation/engine/src/recipes/built-in-recipes.ts)) selects every registered scenario in sequential order. Project-local recipes live under `<project>/opensip-tools/sim/recipes/*.mjs`.
 
 ---
 
@@ -195,7 +195,7 @@ Same three sources as checks:
 2. **Project-local.** `<project>/opensip-tools/sim/scenarios/*.mjs`. Loaded by the plugin discoverer at startup.
 3. **npm-package.** Any package listed in `plugins.sim:` in the project config. The package's main entry exports `scenarios: RunnableScenario[]` and optionally `recipes: SimulationRecipe[]`. Sim packs use explicit pinning only — there is no `@opensip-tools/sim-*` name-prefix auto-discovery today.
 
-The registry ([`packages/simulation/engine/src/framework/registry.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/simulation/engine/src/framework/registry.ts)) is last-writer-wins on id collision. Discovery surfaces conflicts in the CLI's startup logs.
+The registry ([`packages/simulation/engine/src/framework/registry.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/simulation/engine/src/framework/registry.ts)) is last-writer-wins on id collision. Discovery surfaces conflicts in the CLI's startup logs.
 
 ---
 

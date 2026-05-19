@@ -4,6 +4,113 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.3.0] — 2026-05-18
+
+Language pluggability for `@opensip-tools/graph`. Implements [plan
+10](docs/plans/10-graph-language-pluggability.md) end-to-end (PRs
+2-6): the graph engine is no longer TypeScript-only. A new
+`GraphLanguageAdapter` contract lets any language pack participate;
+Python and Rust adapters ship as the first two non-TypeScript
+implementations. The TypeScript adapter is unchanged in behavior —
+catalog output is byte-identical pre vs. post refactor.
+
+### Added
+
+- **Python adapter** (`@opensip-tools/graph` ships it first-party).
+  Tree-sitter parser, name-based call resolution, file discovery
+  via `pyproject.toml` / `setup.py` with `**/*.py` glob fallback.
+  Emits function/method/lambda + module-init occurrences.
+  Per-rule fidelity: medium for `orphan-subtree` and
+  `duplicated-function-body`, low for `no-side-effect-path` and
+  `test-only-reachable`, medium for `always-throws-branch`.
+  Detected automatically when a project has more `.py` than `.ts`
+  files; `pickAdapter()` resolves ties by language preference (TS
+  > Python > Rust).
+
+- **Rust adapter**. Tree-sitter parser, name-based + impl-block
+  context for method receivers. File discovery via `Cargo.toml`
+  with `**/*.rs` glob fallback. Handles `fn`, `impl` methods,
+  closures, `macro_invocation` as calls. Same fidelity tier as
+  Python.
+
+- **`GraphLanguageAdapter` contract** under
+  [`packages/graph/engine/src/lang-adapter/`](packages/graph/engine/src/lang-adapter/).
+  Six methods (`discoverFiles`, `parseProject`, `walkProject`,
+  `resolveCallSites`, `cacheKey`, optional `ruleHints`) plus three
+  identity fields (`id`, `fileExtensions`, `displayName`). Nine
+  behavioral invariants (I-1 through I-9) validated by a contract
+  test suite that runs against every registered adapter.
+
+- **Contributor authoring guide**:
+  [`docs/architecture/40-the-graph-loop/03-adding-a-language.md`](docs/architecture/40-the-graph-loop/03-adding-a-language.md).
+  Walks a contributor through implementing a new adapter against
+  the contract test suite. Includes a per-rule fidelity matrix and
+  a first-PR checklist.
+
+### Changed
+
+- **Graph catalog format bumped to v3.** The TypeScript-specific
+  `tsConfigPath` and `tsCompilerVersion` fields are replaced with
+  `language: string` (the adapter id) and `cacheKey: string` (an
+  opaque per-adapter invalidation key). v2 catalogs invalidate
+  gracefully; users see one cold rebuild on upgrade.
+
+- **Engine code is now language-agnostic.** Everything under
+  `packages/graph/engine/src/pipeline/`, `cache/`, `rules/`,
+  `render/`, and `cli/` (except `bootstrap.ts` and the
+  scope-resolution helpers) is generic over `GraphLanguageAdapter`.
+  TypeScript-specific code lives entirely under
+  [`packages/graph/engine/src/lang-typescript/`](packages/graph/engine/src/lang-typescript/);
+  Python under `lang-python/`; Rust under `lang-rust/`.
+
+### Internal
+
+- New module: [`packages/graph/engine/src/lang-adapter/`](packages/graph/engine/src/lang-adapter/)
+  (interface, registry, shared edge helpers).
+- New module: [`packages/graph/engine/src/lang-typescript/`](packages/graph/engine/src/lang-typescript/)
+  (TypeScript adapter — code-moved from `pipeline/`, then wrapped
+  in the contract).
+- New module: [`packages/graph/engine/src/lang-python/`](packages/graph/engine/src/lang-python/)
+  (Python adapter, ~8 source files + fixture).
+- New module: [`packages/graph/engine/src/lang-rust/`](packages/graph/engine/src/lang-rust/)
+  (Rust adapter, ~8 source files + fixture).
+- `bootstrap.ts` registers the three first-party adapters at
+  module load. Imported by `tool.ts` (Tool plugin entry) and
+  `cli/orchestrate.ts` (so direct `runGraph()` callers in tests
+  don't need to register manually).
+- New tests: 39 contract tests in
+  [`__tests__/lang-adapter-contract.test.ts`](packages/graph/engine/src/__tests__/lang-adapter-contract.test.ts)
+  (13 invariants × 3 languages). New `lang-adapter-registry.test.ts`
+  validates `pickAdapter()` ties.
+- `pickAdapter(cwd?)` now does file-extension dominance counting
+  with a deterministic preference list (TS > Python > Rust on
+  ties). Necessary once two non-TS adapters were registered.
+- `lang-adapter/edge-helpers.ts:appendEdge` extracted because the
+  duplicated-function-body rule legitimately fired across the
+  three adapters' near-identical helpers.
+- New dep-cruiser rules:
+  `graph-no-typescript-import-outside-lang-typescript`,
+  `graph-no-tree-sitter-import-outside-lang-packs`,
+  `graph-pipeline-no-lang-import`,
+  `graph-orchestrate-no-direct-lang-import`. The TypeScript-import
+  rule is also enforced by ESLint's `no-restricted-imports`
+  because dep-cruiser cannot observe `node_modules` edges under
+  this project's `tsPreCompilationDeps: false` setting.
+
+### Trade-offs
+
+- Cross-package call sites in `--package` / `--packages` mode and
+  cross-language graphs are still single-language per project. A
+  TS file calling a WASM-built Rust function produces two separate
+  graphs.
+- Python and Rust resolution is name-based, not type-aware.
+  `getSymbolAtLocation`-grade fidelity for those languages would
+  require integrating an LSP server (jedi/pyright for Python,
+  rust-analyzer for Rust); deferred per [plan 10
+  §1](docs/plans/10-graph-language-pluggability.md) non-goals.
+  The `CallEdge.confidence` field carries the fidelity tier so
+  rule consumers can degrade gracefully.
+
 ## [1.2.0] — 2026-05-18
 
 A performance-focused release for `@opensip-tools/graph`. Implements

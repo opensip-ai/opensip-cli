@@ -34,7 +34,7 @@ opensip-tools fit --gate-compare              # CI gate from now on
 opensip-tools fit --gate-compare --baseline path     # custom location
 ```
 
-`--gate-save` runs the configured recipe, then writes the resulting findings as a SARIF document to the baseline path. The default path is `<project>/opensip-tools/.runtime/baseline.sarif` ([`packages/fitness/engine/src/gate.ts:89`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/fitness/engine/src/gate.ts)). Override with `--baseline <path>`.
+`--gate-save` runs the configured recipe, then writes the resulting findings as a SARIF document to the baseline path. The default path is `<project>/opensip-tools/.runtime/baseline.sarif` ([`packages/fitness/engine/src/gate.ts:89`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/fitness/engine/src/gate.ts)). Override with `--baseline <path>`.
 
 `--gate-compare` runs the same recipe, parses the saved baseline, computes the diff, and prints a structured report:
 
@@ -72,7 +72,7 @@ function hashViolation(filePath: string, ruleId: string, message: string): strin
 }
 ```
 
-[`packages/fitness/engine/src/gate.ts:243`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/fitness/engine/src/gate.ts).
+[`packages/fitness/engine/src/gate.ts:243`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/fitness/engine/src/gate.ts).
 
 Three things stay in the hash:
 
@@ -84,13 +84,13 @@ One thing is **deliberately excluded**: the line number. A regex check that flag
 
 The trade-off is symmetric: if a *different* `console.log` is added at the same file with the exact same message, the hash collides and we treat it as unchanged. In practice this hasn't been a problem — messages are usually specific enough that two distinct violations have different messages, and a duplicate-message-same-file pair is rare and benign.
 
-The line-shift invariance is exercised by [`packages/fitness/engine/src/__tests__/gate.test.ts:222`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/fitness/engine/src/__tests__/gate.test.ts) with explicit cases for the moved-line scenario and the changed-message scenario.
+The line-shift invariance is exercised by [`packages/fitness/engine/src/__tests__/gate.test.ts:222`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/fitness/engine/src/__tests__/gate.test.ts) with explicit cases for the moved-line scenario and the changed-message scenario.
 
 ---
 
 ## What `compareToBaseline` actually does
 
-[`packages/fitness/engine/src/gate.ts:127`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/fitness/engine/src/gate.ts):
+[`packages/fitness/engine/src/gate.ts:127`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/fitness/engine/src/gate.ts):
 
 ```ts
 export function compareToBaseline(output: CliOutput, baselinePath: string): GateCompareResult {
@@ -115,7 +115,7 @@ The `degraded` flag is `added.length > 0`. A run can resolve violations *and* ad
 
 ## Partial-SARIF tolerance
 
-The reader is forgiving. From [`packages/fitness/engine/src/gate.ts:287`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/fitness/engine/src/gate.ts) (`extractViolationsFromSarif`):
+The reader is forgiving. From [`packages/fitness/engine/src/gate.ts:287`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/fitness/engine/src/gate.ts) (`extractViolationsFromSarif`):
 
 - A run with no `results` array → skipped silently. (Maybe the user removed all findings from a run; that's not a parse error.)
 - A run with `results` but missing `tool.driver` → still parsed, the result entries become violations.

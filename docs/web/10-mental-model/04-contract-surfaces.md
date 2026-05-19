@@ -77,7 +77,7 @@ opensip-tools
 └── fit-recipes            (alias: list-recipes)
 ```
 
-Each command's flag list is owned by the Tool that registers it. `fit` flags live in [`packages/fitness/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/fitness/engine/src/tool.ts); `sim` flags in [`packages/simulation/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/simulation/engine/src/tool.ts); top-level commands like `init`, `plugin`, and `configure` live in [`packages/cli/src/commands/`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/cli/src/commands/).
+Each command's flag list is owned by the Tool that registers it. `fit` flags live in [`packages/fitness/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/fitness/engine/src/tool.ts); `sim` flags in [`packages/simulation/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/simulation/engine/src/tool.ts); top-level commands like `init`, `plugin`, and `configure` live in [`packages/cli/src/commands/`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/cli/src/commands/).
 
 **Stability rule.** Removing a flag, removing a command, or changing a default value is a major-version change. Adding a flag with a safe default is a minor. Renaming a flag with an alias for the old name (the way `fit-list` aliases `list-checks`) is a minor; renaming without an alias is a major.
 
@@ -85,7 +85,7 @@ Each command's flag list is owned by the Tool that registers it. `fit` flags liv
 
 ## 2. Exit codes
 
-The integer the binary returns when it ends. Defined exactly once in [`packages/contracts/src/exit-codes.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/contracts/src/exit-codes.ts):
+The integer the binary returns when it ends. Defined exactly once in [`packages/contracts/src/exit-codes.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/contracts/src/exit-codes.ts):
 
 | Code | Constant | Meaning |
 |---|---|---|
@@ -101,7 +101,7 @@ CI integrations are the primary consumer. `opensip-tools fit && deploy` is an id
 
 ## 3. JSON output (`CliOutput`)
 
-The structured stdout when `--json` is set. Shape lives at [`packages/contracts/src/types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/contracts/src/types.ts):
+The structured stdout when `--json` is set. Shape lives at [`packages/contracts/src/types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/contracts/src/types.ts):
 
 ```ts
 interface CliOutput {
@@ -145,17 +145,17 @@ The full per-field reference (when each field is present, what each value can be
 
 ## 4. SARIF output
 
-When `--gate-save` runs, the baseline is a SARIF 2.1.0 document built by [`packages/fitness/engine/src/sarif.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/fitness/engine/src/sarif.ts). The shape is the SARIF spec's, not ours — opensip-tools commits to producing valid SARIF 2.1.0, not to a custom shape. Consumers (GitHub Code Scanning, VS Code SARIF Viewer, custom CI tooling) can read these files with any SARIF parser.
+When `--gate-save` runs, the baseline is a SARIF 2.1.0 document built by [`packages/fitness/engine/src/sarif.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/fitness/engine/src/sarif.ts). The shape is the SARIF spec's, not ours — opensip-tools commits to producing valid SARIF 2.1.0, not to a custom shape. Consumers (GitHub Code Scanning, VS Code SARIF Viewer, custom CI tooling) can read these files with any SARIF parser.
 
 **Stability rule.** The fields opensip-tools fills in are: `runs[].tool.driver.name = 'opensip-tools'`, `runs[].results[]` carrying `ruleId`, `message.text`, `level`, and `locations[].physicalLocation.{artifactLocation, region}`. Future versions may fill in more SARIF fields; we won't stop filling in those.
 
-The gate's identity hash for diff matching is **not** SARIF-spec — it's an opensip-tools internal: `sha256(filePath + '\n' + ruleId + '\n' + message)`, deliberately excluding line numbers so unrelated line shifts don't register as added/resolved. See [`packages/fitness/engine/src/gate.ts:243`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/fitness/engine/src/gate.ts) and [`60-subsystems/03-architecture-gate.md`](/docs/opensip-tools/60-subsystems/03-architecture-gate/).
+The gate's identity hash for diff matching is **not** SARIF-spec — it's an opensip-tools internal: `sha256(filePath + '\n' + ruleId + '\n' + message)`, deliberately excluding line numbers so unrelated line shifts don't register as added/resolved. See [`packages/fitness/engine/src/gate.ts:243`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/fitness/engine/src/gate.ts) and [`60-subsystems/03-architecture-gate.md`](/docs/opensip-tools/60-subsystems/03-architecture-gate/).
 
 ---
 
 ## 5. The Tool plugin contract
 
-Discussed at length in [`02-tool-plugin-model.md`](/docs/opensip-tools/10-mental-model/02-tool-plugin-model/). The interface lives at [`packages/core/src/tools/types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/core/src/tools/types.ts):
+Discussed at length in [`02-tool-plugin-model.md`](/docs/opensip-tools/10-mental-model/02-tool-plugin-model/). The interface lives at [`packages/core/src/tools/types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/core/src/tools/types.ts):
 
 ```ts
 interface Tool {
@@ -188,7 +188,7 @@ opensip-tools discovers third-party packages two different ways depending on wha
 }
 ```
 
-The kernel's [`discoverToolPackages`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/core/src/plugins/tool-package-discovery.ts) walks `node_modules` looking for the `opensipTools.kind === 'tool'` marker. The package's main entry must export a `tool: Tool` symbol.
+The kernel's [`discoverToolPackages`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/core/src/plugins/tool-package-discovery.ts) walks `node_modules` looking for the `opensipTools.kind === 'tool'` marker. The package's main entry must export a `tool: Tool` symbol.
 
 ### Check packs — name-prefix discovery
 
@@ -199,7 +199,7 @@ The kernel's [`discoverToolPackages`](https://github.com/opensip-ai/opensip-tool
 }
 ```
 
-The fitness engine's [`discoverCheckPackages`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/fitness/engine/src/plugins/check-package-discovery.ts) walks `node_modules` looking for any package whose name matches `@opensip-tools/checks-*`. **No `opensipTools.kind` marker is required** — the name prefix is the contract. The package's main entry must export `checks: Check[]`, optionally `recipes: FitnessRecipe[]`, and optionally `checkDisplay: Record<string, [icon, name]>`.
+The fitness engine's [`discoverCheckPackages`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/fitness/engine/src/plugins/check-package-discovery.ts) walks `node_modules` looking for any package whose name matches `@opensip-tools/checks-*`. **No `opensipTools.kind` marker is required** — the name prefix is the contract. The package's main entry must export `checks: Check[]`, optionally `recipes: FitnessRecipe[]`, and optionally `checkDisplay: Record<string, [icon, name]>`.
 
 For names outside the `@opensip-tools/checks-*` prefix (e.g. an internal scope), declare the package explicitly in the project config:
 
@@ -221,7 +221,7 @@ Currently use the same project-pinned shape as fit (declare the package in `plug
 - **Changing what an existing shape requires is a major change.** A pack at `@opensip-tools/checks-*` that exports `checks: Check[]` should keep working across minors.
 - **The Tool marker (`opensipTools.kind: 'tool'`) is a stable surface.** A future fifth kind would be a deliberate addition, not an accident.
 
-The `PluginDomain` type ([`packages/core/src/plugins/types.ts:91`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/core/src/plugins/types.ts)) lists `'fit' | 'sim' | 'asm' | 'lang'` — these are domain identifiers used for path resolution (`<project>/opensip-tools/.runtime/plugins/<domain>/`), not `package.json` `kind` values. `asm` is reserved for a future tool.
+The `PluginDomain` type ([`packages/core/src/plugins/types.ts:91`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/core/src/plugins/types.ts)) lists `'fit' | 'sim' | 'asm' | 'lang'` — these are domain identifiers used for path resolution (`<project>/opensip-tools/.runtime/plugins/<domain>/`), not `package.json` `kind` values. `asm` is reserved for a future tool.
 
 ---
 

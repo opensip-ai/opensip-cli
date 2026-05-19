@@ -81,25 +81,25 @@ The `graph` command is the static call-graph tool. Where `fit` answers "is the c
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-Each stage is one module in [`packages/graph/engine/src/pipeline/`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/graph/engine/src/pipeline/) (stages 0–3) or [`packages/graph/engine/src/rules/`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/graph/engine/src/rules/) and [`packages/graph/engine/src/render/`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/graph/engine/src/render/) (stages 4–5). Stages communicate only through their typed outputs; a stage cannot import a sibling stage, cannot reach back to read its predecessor's intermediate state, cannot peek into the next stage's expectations. This isolation is the single most important property of the design — every other guarantee derives from it.
+Each stage is one module in [`packages/graph/engine/src/pipeline/`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/graph/engine/src/pipeline/) (stages 0–3) or [`packages/graph/engine/src/rules/`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/graph/engine/src/rules/) and [`packages/graph/engine/src/render/`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/graph/engine/src/render/) (stages 4–5). Stages communicate only through their typed outputs; a stage cannot import a sibling stage, cannot reach back to read its predecessor's intermediate state, cannot peek into the next stage's expectations. This isolation is the single most important property of the design — every other guarantee derives from it.
 
-> **History — Stage 1 + Stage 2 fused (Phase 4, 2026-05-17).** Originally these were two separate AST walks per file: Stage 1 emitted function occurrences; Stage 2 walked the same AST a second time to find and resolve call sites. The two walks descended in identical order and the only data flowing between them was each function-shape's bodyHash — which Stage 1 already computed. Phase 4 of [`docs/plans/00-graph-performance-improvements.md`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/docs/plans/00-graph-performance-improvements.md) fused the two passes into [`lang-typescript/walk.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/graph/engine/src/lang-typescript/walk.ts). Legacy `buildInventory` and `resolveEdges` entry points are retained for tests and external callers; they share the dispatch helpers from `walk.ts`. The orchestrator calls `walkProgram` once and feeds the resulting call-site records to `resolveEdgesFromRecords`.
+> **History — Stage 1 + Stage 2 fused (Phase 4, 2026-05-17).** Originally these were two separate AST walks per file: Stage 1 emitted function occurrences; Stage 2 walked the same AST a second time to find and resolve call sites. The two walks descended in identical order and the only data flowing between them was each function-shape's bodyHash — which Stage 1 already computed. Phase 4 of [`docs/plans/00-graph-performance-improvements.md`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/docs/plans/00-graph-performance-improvements.md) fused the two passes into [`lang-typescript/walk.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/graph/engine/src/lang-typescript/walk.ts). Legacy `buildInventory` and `resolveEdges` entry points are retained for tests and external callers; they share the dispatch helpers from `walk.ts`. The orchestrator calls `walkProgram` once and feeds the resulting call-site records to `resolveEdgesFromRecords`.
 >
-> **Adapter layer (PR 3 of plan 10, 2026-05-18).** Stages 0, 1, and 2 are now adapter-driven: file discovery, parsing, walk, and call-site resolution all run through the [`GraphLanguageAdapter`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/graph/engine/src/lang-adapter/types.ts) contract. The orchestrator looks up an adapter via the [`lang-adapter/registry.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/graph/engine/src/lang-adapter/registry.ts) registry; today the only registered adapter is `typescriptGraphAdapter` ([`lang-typescript/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/graph/engine/src/lang-typescript/index.ts)), but Python, Rust, Go, Java, and C/C++ adapters can slot in without changing the engine. Stages 3 (indexes), 4 (rules), and 5 (render) are unchanged — they consume the catalog and don't know which adapter built it. See [`03-adding-a-language.md`](/docs/opensip-tools/40-the-graph-loop/03-adding-a-language/) for the contributor walkthrough.
+> **Adapter layer (PR 3 of plan 10, 2026-05-18).** Stages 0, 1, and 2 are now adapter-driven: file discovery, parsing, walk, and call-site resolution all run through the [`GraphLanguageAdapter`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/graph/engine/src/lang-adapter/types.ts) contract. The orchestrator looks up an adapter via the [`lang-adapter/registry.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/graph/engine/src/lang-adapter/registry.ts) registry; today the only registered adapter is `typescriptGraphAdapter` ([`lang-typescript/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/graph/engine/src/lang-typescript/index.ts)), but Python, Rust, Go, Java, and C/C++ adapters can slot in without changing the engine. Stages 3 (indexes), 4 (rules), and 5 (render) are unchanged — they consume the catalog and don't know which adapter built it. See [`03-adding-a-language.md`](/docs/opensip-tools/40-the-graph-loop/03-adding-a-language/) for the contributor walkthrough.
 
 ### Stage 0 — Discover
 
-[`lang-typescript/discover.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/graph/engine/src/lang-typescript/discover.ts) resolves the project's `tsconfig.json`, applies its `include` / `exclude` patterns, and produces a sorted, deduplicated list of absolute file paths. No TypeScript `Program` is created here — that's stage 1's job. Stage 0 is purely about *what files exist*.
+[`lang-typescript/discover.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/graph/engine/src/lang-typescript/discover.ts) resolves the project's `tsconfig.json`, applies its `include` / `exclude` patterns, and produces a sorted, deduplicated list of absolute file paths. No TypeScript `Program` is created here — that's stage 1's job. Stage 0 is purely about *what files exist*.
 
 Output: `{ projectDirAbs, tsConfigPathAbs, files, compilerOptions }`. Typical runtime on this repo: ~50ms.
 
 ### Stage 1+2 — Unified walk
 
-[`lang-typescript/walk.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/graph/engine/src/lang-typescript/walk.ts) parses every file from stage 0, walks each AST exactly once, and emits both:
+[`lang-typescript/walk.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/graph/engine/src/lang-typescript/walk.ts) parses every file from stage 0, walks each AST exactly once, and emits both:
 - A **Catalog** — a flat, indexed list of every callable thing in the project. "Callable thing" is broader than function: function declarations, arrow functions, methods, constructors, getter/setter pairs, function expressions, and one synthetic `<module-init>` entry per file that owns its top-level statements.
 - A list of **CallSiteRecord**s — pre-located nodes that Stage 2's resolvers will dispatch over (call/new/jsx/identifier-in-value-position/shorthand assignment). Each record carries the `bodyHash` of the enclosing function-shape, computed by the same visitor pass, so the resolver dispatcher doesn't need to re-walk the AST or re-hash to find ownership.
 
-The orchestrator then runs `resolveEdgesFromRecords` from [`lang-typescript/edges.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/graph/engine/src/lang-typescript/edges.ts) over the flat record list. Resolvers dispatch by node shape — direct call, property access, JSX, new expression, polymorphic dispatch, value reference, shorthand — and write a `CallEdge` to the matching `FunctionOccurrence`'s `calls` array.
+The orchestrator then runs `resolveEdgesFromRecords` from [`lang-typescript/edges.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/graph/engine/src/lang-typescript/edges.ts) over the flat record list. Resolvers dispatch by node shape — direct call, property access, JSX, new expression, polymorphic dispatch, value reference, shorthand — and write a `CallEdge` to the matching `FunctionOccurrence`'s `calls` array.
 
 Each entry is a `FunctionOccurrence`:
 
@@ -125,7 +125,7 @@ interface FunctionOccurrence {
 }
 ```
 
-The visitor logic lives in [`pipeline/inventory-visitors/`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/graph/engine/src/lang-typescript/inventory-visitors/) — one file per node kind. The helpers that compute body hashes, synthesize names for anonymous functions, classify visibility, and extract decorators live alongside in [`pipeline/inventory-helpers/`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/graph/engine/src/lang-typescript/inventory-helpers/). The shared dispatch table (`dispatchVisitor`, `isInlineCallable`) lives in [`lang-typescript/walk.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/graph/engine/src/lang-typescript/walk.ts) so Stage 1's legacy `buildInventory` and the unified walk share the same node-shape detection.
+The visitor logic lives in [`pipeline/inventory-visitors/`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/graph/engine/src/lang-typescript/inventory-visitors/) — one file per node kind. The helpers that compute body hashes, synthesize names for anonymous functions, classify visibility, and extract decorators live alongside in [`pipeline/inventory-helpers/`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/graph/engine/src/lang-typescript/inventory-helpers/). The shared dispatch table (`dispatchVisitor`, `isInlineCallable`) lives in [`lang-typescript/walk.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/graph/engine/src/lang-typescript/walk.ts) so Stage 1's legacy `buildInventory` and the unified walk share the same node-shape detection.
 
 **Why inventory finishes building before resolvers run.** Resolvers look up callees by name and bodyHash in the catalog. The unified walk emits all occurrences first, then the orchestrator builds the initial catalog, then `resolveEdgesFromRecords` dispatches over the call-site list. By the time any resolver runs, the catalog is frozen and complete, so every callee resolution is either "found in catalog" or "unresolved" — never "not yet in catalog."
 
@@ -145,13 +145,13 @@ interface CallEdge {
 
 `to` is always an array. A static call resolves to one element. Method-dispatch (`config.method()` where `method` is an interface member with multiple implementations) resolves to many. An unresolved call (`fs.writeFileSync(...)`) resolves to zero.
 
-Resolver logic is split into one file per call shape in [`pipeline/edge-resolvers/`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/graph/engine/src/lang-typescript/edge-resolvers/): direct calls, property-access calls, JSX elements, `new` expressions, polymorphic dispatch, and a catalog-fallback resolver that handles the long tail.
+Resolver logic is split into one file per call shape in [`pipeline/edge-resolvers/`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/graph/engine/src/lang-typescript/edge-resolvers/): direct calls, property-access calls, JSX elements, `new` expressions, polymorphic dispatch, and a catalog-fallback resolver that handles the long tail.
 
 A single TypeScript `Program` is created in the orchestrator and shared across the unified walk and the resolver pass; `getTypeChecker()` is forced eagerly so parent pointers are populated before visitors walk parent chains. Total runtime on opensip-tools self-graph (~7,600 functions across ~700 files) is ~15 s for a cold full rebuild; subsequent runs hit the incremental path described under "Cache invalidation" below.
 
 ### Stage 3 — Index build
 
-[`pipeline/indexes.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/graph/engine/src/pipeline/indexes.ts) performs a linear scan over the now-complete catalog and builds inverted indexes that rules need:
+[`pipeline/indexes.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/graph/engine/src/pipeline/indexes.ts) performs a linear scan over the now-complete catalog and builds inverted indexes that rules need:
 
 - `byBodyHash`: bodyHash → occurrence (single-entry lookup for the canonical occurrence)
 - `bySimpleName`: simpleName → bodyHashes (for duplicated-name dispatch resolution)
@@ -162,17 +162,17 @@ Indexes are in-memory only — never persisted. They rebuild on every run from t
 
 ### Stage 4 — Rules
 
-[`rules/<rule-name>.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/graph/engine/src/rules/) — one file per rule. Each rule receives `(catalog, indexes, config)` and returns a list of typed `Signal`s. Rules don't import the parser, don't import each other, don't read files. They consume frozen data and emit findings. Detailed in [`02-rules-and-gating.md`](/docs/opensip-tools/40-the-graph-loop/02-rules-and-gating/).
+[`rules/<rule-name>.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/graph/engine/src/rules/) — one file per rule. Each rule receives `(catalog, indexes, config)` and returns a list of typed `Signal`s. Rules don't import the parser, don't import each other, don't read files. They consume frozen data and emit findings. Detailed in [`02-rules-and-gating.md`](/docs/opensip-tools/40-the-graph-loop/02-rules-and-gating/).
 
 ### Stage 5 — Render
 
-[`render/`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/graph/engine/src/render/) — one file per output mode:
+[`render/`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/graph/engine/src/render/) — one file per output mode:
 
 - `table.ts` — terminal report (default): four sections — catalog summary, findings grouped by rule (top 10 per rule with overflow indicator), top 10 entry points, one-line summary.
 - `json.ts` — `CliOutput` shape from `@opensip-tools/contracts`; same envelope `fit` uses.
 - `sarif.ts` — SARIF 2.1.0 for `--gate-save` / `--gate-compare` / `--report-to`.
 
-The CLI handler [`cli/graph.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/graph/engine/src/cli/graph.ts) picks the renderer based on flags and writes its output.
+The CLI handler [`cli/graph.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/graph/engine/src/cli/graph.ts) picks the renderer based on flags and writes its output.
 
 ---
 
@@ -180,7 +180,7 @@ The CLI handler [`cli/graph.ts`](https://github.com/opensip-ai/opensip-tools/blo
 
 Two rules — `orphan-subtree` and `test-only-reachable` — need to know which functions count as legitimate "starts of execution." A function with zero callers isn't an orphan if it's a bin entry, a tool registration, an exported library API, or a route handler.
 
-Entry-point inference is its own module: [`rules/_entry-points.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/graph/engine/src/rules/_entry-points.ts). The leading underscore signals "shared by other rules in this directory, not a rule itself." The current heuristic chain produces a tagged `EntryPoint` for any occurrence matching one of:
+Entry-point inference is its own module: [`rules/_entry-points.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/graph/engine/src/rules/_entry-points.ts). The leading underscore signals "shared by other rules in this directory, not a rule itself." The current heuristic chain produces a tagged `EntryPoint` for any occurrence matching one of:
 
 | Reason | What it matches |
 |---|---|
@@ -196,7 +196,7 @@ The two rules that consume entry-points only see the resulting `EntryPoint[]` �
 
 ## The catalog on disk
 
-The output of stages 1+2 is cached to [`<project>/opensip-tools/.runtime/cache/graph/catalog.json`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/graph/engine/src/cache/) (gitignored). Format (v3, generic over language; PR 3 of plan 10 replaced v2's `tsConfigPath` + `tsCompilerVersion` with adapter-supplied `language` + `cacheKey`):
+The output of stages 1+2 is cached to [`<project>/opensip-tools/.runtime/cache/graph/catalog.json`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/graph/engine/src/cache/) (gitignored). Format (v3, generic over language; PR 3 of plan 10 replaced v2's `tsConfigPath` + `tsCompilerVersion` with adapter-supplied `language` + `cacheKey`):
 
 ```jsonc
 {
@@ -246,7 +246,7 @@ Notable shape choices:
 
 ## Cache invalidation
 
-[`cache/invalidate.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/graph/engine/src/cache/invalidate.ts) classifies a cached catalog into one of three verdicts:
+[`cache/invalidate.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/graph/engine/src/cache/invalidate.ts) classifies a cached catalog into one of three verdicts:
 
 | Verdict | When | Action |
 |---|---|---|
@@ -256,13 +256,13 @@ Notable shape choices:
 
 The fingerprint is per-file `path|mtimeMs|size`, computed by `computeFilesFingerprint`. Mtime is cheap to read and stable enough — the ones that lie (formatter passes, `touch`, git clean rebuilds) cause an unnecessary incremental rebuild that produces a byte-identical result, not a correctness bug.
 
-Writes go through [`cache/write.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/graph/engine/src/cache/write.ts) and use the standard atomic pattern: `openSync(tmpPath); writeStreamed(fd, catalog); rename(tmpPath, catalogPath)`. The streamed writer (Phase 2 of the perf plan) emits the catalog entry-by-entry rather than as one materialised string, bounding the write peak by the largest single occurrence array. Output is byte-identical to the legacy `JSON.stringify(_, null, 2)` path so existing on-disk caches stay valid.
+Writes go through [`cache/write.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/graph/engine/src/cache/write.ts) and use the standard atomic pattern: `openSync(tmpPath); writeStreamed(fd, catalog); rename(tmpPath, catalogPath)`. The streamed writer (Phase 2 of the perf plan) emits the catalog entry-by-entry rather than as one materialised string, bounding the write peak by the largest single occurrence array. Output is byte-identical to the legacy `JSON.stringify(_, null, 2)` path so existing on-disk caches stay valid.
 
 `--no-cache` skips both read and write — useful for the CI gate workflow and when investigating a suspected stale-catalog bug.
 
 ### Incremental rebuild
 
-When `classifyCatalog` returns `incremental`, the orchestrator runs `buildAndResolveCatalogIncremental` in [`cli/orchestrate.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/graph/engine/src/cli/orchestrate.ts). The algorithm:
+When `classifyCatalog` returns `incremental`, the orchestrator runs `buildAndResolveCatalogIncremental` in [`cli/orchestrate.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/graph/engine/src/cli/orchestrate.ts). The algorithm:
 
 1. Build a TypeScript `Program` over **all** current files. Resolvers walk the full import graph, so a partial program produces wrong symbols.
 2. Convert the absolute changed-files set to project-relative paths to match the catalog's `filePath` field.
@@ -280,8 +280,8 @@ Performance: editing a single file in opensip-tools self-graph drops rebuild tim
 
 Two scoping flags from Wave 1 + Wave 3 of the perf plan:
 
-- **`graph --package <name|path>`** scopes a run to one workspace package's tsconfig. Cross-package call sites become unresolved (lower fidelity, much faster). Resolves a basename via [`cli/scope.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/graph/engine/src/cli/scope.ts) by searching `<cwd>/packages/**` for a directory with a `tsconfig.json`; an explicit path is also accepted.
-- **`graph --packages`** fans the run out across every workspace package under `<cwd>/packages/**`. One child process per package, concurrency capped at `cpus()-1`. Each child has its own Node heap, so the per-package memory ceiling scales naturally. Implementation: [`cli/packages-runner.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/packages/graph/engine/src/cli/packages-runner.ts).
+- **`graph --package <name|path>`** scopes a run to one workspace package's tsconfig. Cross-package call sites become unresolved (lower fidelity, much faster). Resolves a basename via [`cli/scope.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/graph/engine/src/cli/scope.ts) by searching `<cwd>/packages/**` for a directory with a `tsconfig.json`; an explicit path is also accepted.
+- **`graph --packages`** fans the run out across every workspace package under `<cwd>/packages/**`. One child process per package, concurrency capped at `cpus()-1`. Each child has its own Node heap, so the per-package memory ceiling scales naturally. Implementation: [`cli/packages-runner.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/packages/graph/engine/src/cli/packages-runner.ts).
 
 Both flags trade cross-package edge fidelity for speed and memory. Use `--no-cache` (and a global run, no scope flag) for full-fidelity CI gates.
 
@@ -291,4 +291,4 @@ Both flags trade cross-package edge fidelity for speed and memory. Use `--no-cac
 
 - **[`02-rules-and-gating.md`](/docs/opensip-tools/40-the-graph-loop/02-rules-and-gating/)** — the five rules that consume the catalog, the gate workflow, and the SARIF integration.
 - **[`70-surfaces/01-cli-command-tree.md#graph`](/docs/opensip-tools/70-surfaces/01-cli-command-tree/)** — the CLI flag reference.
-- **[`../plans/00-graph-performance-improvements.md`](https://github.com/opensip-ai/opensip-tools/blob/v1.2.0/docs/plans/00-graph-performance-improvements.md)** — the perf-plan history (waves 1-4): heap-sizing hint, freed Program, streamed write, sliced hashing, per-package scope, fused walk, parallel runner, transitive incremental rebuild.
+- **[`../plans/00-graph-performance-improvements.md`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.0/docs/plans/00-graph-performance-improvements.md)** — the perf-plan history (waves 1-4): heap-sizing hint, freed Program, streamed write, sliced hashing, per-package scope, fused walk, parallel runner, transitive incremental rebuild.
