@@ -18,7 +18,10 @@
   "exports": {
     ".": "./dist/index.js"
   },
-  "files": ["dist", "migrations"],
+  "files": [
+    "dist",
+    "migrations"
+  ],
   "scripts": {
     "build": "tsc",
     "test": "vitest run --passWithNoTests",
@@ -28,7 +31,8 @@
     "db:check": "drizzle-kit check"
   },
   "dependencies": {
-    "@opensip-tools/core": "workspace:*"
+    "@opensip-tools/core": "workspace:*",
+    "drizzle-orm": "^0.45.2"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
