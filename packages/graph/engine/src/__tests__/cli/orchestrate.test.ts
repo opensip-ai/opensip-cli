@@ -9,9 +9,9 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { emitLargeRepoHint, runGraph } from '../../cli/orchestrate.js';
+import { runGraph } from '../../cli/orchestrate.js';
 
 const FIXTURE_TSCONFIG = JSON.stringify({
   compilerOptions: {
@@ -89,35 +89,6 @@ describe('runGraph orchestrator', () => {
     });
     const result = await runGraph({ cwd: dir, rules: [] });
     expect(result.signals).toHaveLength(0);
-  });
-
-  it('emits a heap-sizing hint to stderr when file count exceeds threshold', () => {
-    const writes: string[] = [];
-    const spy = vi.spyOn(process.stderr, 'write').mockImplementation((chunk: unknown) => {
-      writes.push(typeof chunk === 'string' ? chunk : String(chunk));
-      return true;
-    });
-    try {
-      emitLargeRepoHint(1500);
-    } finally {
-      spy.mockRestore();
-    }
-    expect(writes).toHaveLength(1);
-    const firstWrite = writes[0];
-    expect(firstWrite).toBeDefined();
-    expect(firstWrite).toContain('1500 files');
-    expect(firstWrite).toContain('--max-old-space-size');
-  });
-
-  it('stays silent at or below the heap-hint threshold', () => {
-    const spy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
-    try {
-      emitLargeRepoHint(1000);
-      emitLargeRepoHint(50);
-    } finally {
-      spy.mockRestore();
-    }
-    expect(spy).not.toHaveBeenCalled();
   });
 
   it('honors a tsConfigPath override (proves --package wiring will work end-to-end)', async () => {

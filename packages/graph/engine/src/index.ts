@@ -7,6 +7,22 @@
  */
 
 export { graphTool } from './tool.js';
+export { runGraph, GRAPH_STAGES } from './cli/orchestrate.js';
+export type {
+  GraphStage,
+  GraphProgressEvent,
+  GraphProgressCallback,
+  RunGraphInput,
+  RunGraphResult,
+} from './cli/orchestrate.js';
+export { buildUnifiedReportLines } from './cli/graph.js';
+export type { UnifiedReportInput } from './cli/graph.js';
+export { MemoryPressureError } from './cli/pressure-monitor.js';
+export {
+  HEAP_TARGETS,
+  decideHeapTargetMb,
+  systemHasMemoryFor,
+} from './cli/heap-preflight.js';
 export type {
   Catalog,
   FunctionOccurrence,

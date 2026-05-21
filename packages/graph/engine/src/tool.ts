@@ -23,6 +23,7 @@ import { type Command } from 'commander';
 // at module load. PR 3 of docs/plans/10-graph-language-pluggability.md.
 import './bootstrap.js';
 import { executeGraph } from './cli/graph.js';
+import { runHeapPreflight } from './cli/heap-preflight.js';
 
 import type { Tool, ToolCliContext, ToolCommandDescriptor } from '@opensip-tools/core';
 
@@ -72,6 +73,35 @@ function register(cli: ToolCliContext): void {
       packages?: boolean;
       packagesConcurrency?: number;
     }) => {
+      // Preflight runs BEFORE any heavy work. If the repo's file count
+      // exceeds a threshold AND the current heap cap is too low, this
+      // re-execs the process with elevated `--max-old-space-size`. The
+      // re-execing parent never returns from this call (it `process.exit`s
+      // with the child's code), so `returned === true` only matters for
+      // the type checker. Skipped when `--package <name>` is set: scoped
+      // runs touch a fraction of files and don't need the global heap
+      // sizing — the user has already opted into a smaller working set.
+      if (typeof opts.package !== 'string' || opts.package.length === 0) {
+        const reExecing = await runHeapPreflight({ cwd: opts.cwd });
+        if (reExecing) return;
+      }
+
+      const isInteractiveDefault =
+        opts.json !== true
+        && opts.gateSave !== true
+        && opts.gateCompare !== true
+        && (typeof opts.reportTo !== 'string' || opts.reportTo.length === 0)
+        && opts.packages !== true
+        && (typeof opts.package !== 'string' || opts.package.length === 0);
+
+      if (isInteractiveDefault) {
+        await cli.renderLive('graph', {
+          cwd: opts.cwd,
+          noCache: opts.cache === false,
+        });
+        return;
+      }
+
       await executeGraph(
         {
           cwd: opts.cwd,

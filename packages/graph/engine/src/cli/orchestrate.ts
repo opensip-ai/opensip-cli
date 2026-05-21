@@ -32,6 +32,8 @@ import { pickAdapter } from '../lang-adapter/registry.js';
 import { buildIndexes } from '../pipeline/indexes.js';
 import { rules as defaultRules } from '../rules/registry.js';
 
+import { createPressureMonitor, type PressureMonitor } from './pressure-monitor.js';
+
 import type {
   DiscoverOutput,
   GraphLanguageAdapter,
@@ -49,15 +51,6 @@ import type {
 } from '../types.js';
 import type { Signal } from '@opensip-tools/core';
 
-/**
- * File-count threshold above which we emit a heap-sizing hint to stderr.
- * The OpenSIP measurement run (5476 files) OOM'd on a default 4 GB heap;
- * 1000 is conservative and gives users a chance to bump the heap before
- * the slow Stage 1 program-construction kicks in. See
- * docs/plans/00-graph-performance-improvements.md Phase 0.
- */
-const LARGE_REPO_FILE_THRESHOLD = 1000;
-
 export interface RunGraphInput {
   readonly cwd: string;
   readonly noCache?: boolean;
@@ -66,6 +59,14 @@ export interface RunGraphInput {
   readonly rules?: readonly Rule[];
   /** Override the adapter's config-file path (e.g. tsconfig.json). */
   readonly tsConfigPath?: string;
+  /**
+   * Optional structured progress callback. The orchestrator emits one
+   * `stage-start` + one of `stage-done` / `stage-cached` per pipeline
+   * stage (discover, parse, walk, resolve, index, rules). Used by the
+   * Ink live view; non-interactive callers (json/gate/report) leave it
+   * undefined.
+   */
+  readonly onProgress?: GraphProgressCallback;
 }
 
 export interface RunGraphResult {
@@ -74,6 +75,64 @@ export interface RunGraphResult {
   readonly signals: readonly Signal[];
   readonly resolutionStats: ResolutionStats | null;
   readonly cacheHit: boolean;
+}
+
+/** Pipeline stage identity, in canonical order. */
+export type GraphStage =
+  | 'discover'
+  | 'parse'
+  | 'walk'
+  | 'resolve'
+  | 'index'
+  | 'rules';
+
+/** Canonical stage order — consumed by the live view to render the checklist. */
+export const GRAPH_STAGES: readonly GraphStage[] = [
+  'discover',
+  'parse',
+  'walk',
+  'resolve',
+  'index',
+  'rules',
+];
+
+/**
+ * Structured progress event. `stage-cached` fires for parse/walk/resolve
+ * when the on-disk catalog cache satisfies the run; the view renders
+ * those stages as "(cached)" instead of running them.
+ */
+export interface GraphProgressEvent {
+  readonly type: 'stage-start' | 'stage-done' | 'stage-cached';
+  readonly stage: GraphStage;
+  readonly durationMs?: number;
+  readonly detail?: string;
+}
+
+export type GraphProgressCallback = (event: GraphProgressEvent) => void;
+
+function runStage<T>(
+  stage: GraphStage,
+  onProgress: GraphProgressCallback | undefined,
+  monitor: PressureMonitor | undefined,
+  fn: () => T,
+  detailFn?: (result: T) => string | undefined,
+): T {
+  monitor?.setStage(stage);
+  // Sample BEFORE the stage starts. The previous stage may have left
+  // the heap near the threshold; bail out before doing more work that
+  // would push us over and forfeit the ability to report cleanly.
+  monitor?.check();
+  onProgress?.({ type: 'stage-start', stage });
+  const startedAt = Date.now();
+  const result = fn();
+  const durationMs = Date.now() - startedAt;
+  onProgress?.({
+    type: 'stage-done',
+    stage,
+    durationMs,
+    detail: detailFn?.(result),
+  });
+  return result;
 }
 
 /**
@@ -87,36 +146,61 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
   const ruleSet: readonly Rule[] = input.rules ?? defaultRules;
   const paths = resolveProjectPaths(input.cwd);
 
-  const adapter = pickAdapter(input.cwd);
-  const discovery = adapter.discoverFiles({
-    cwd: input.cwd,
-    configPathOverride: input.tsConfigPath,
-  });
+  const monitor = createPressureMonitor();
+  try {
+    const adapter = pickAdapter(input.cwd);
+    const discovery = runStage(
+      'discover',
+      input.onProgress,
+      monitor,
+      () => adapter.discoverFiles({
+        cwd: input.cwd,
+        configPathOverride: input.tsConfigPath,
+      }),
+      (d) => `${String(d.files.length)} files`,
+    );
 
-  emitLargeRepoHint(discovery.files.length);
+    const { catalog, cacheHit, resolutionStats } = obtainCatalog({
+      adapter,
+      discovery,
+      catalogPath: paths.graphCatalogPath,
+      useCache: input.noCache !== true,
+      onProgress: input.onProgress,
+      monitor,
+    });
 
-  const { catalog, cacheHit, resolutionStats } = obtainCatalog({
-    adapter,
-    discovery,
-    catalogPath: paths.graphCatalogPath,
-    useCache: input.noCache !== true,
-  });
+    const indexes: Indexes = runStage(
+      'index',
+      input.onProgress,
+      monitor,
+      () => buildIndexes(catalog),
+    );
 
-  const indexes: Indexes = buildIndexes(catalog);
+    const signals: Signal[] = runStage(
+      'rules',
+      input.onProgress,
+      monitor,
+      () => {
+        const collected: Signal[] = [];
+        for (const rule of ruleSet) {
+          const out = rule.evaluate(catalog, indexes, config);
+          collected.push(...out);
+        }
+        return collected;
+      },
+      (sigs) => `${String(ruleSet.length)} rule(s), ${String(sigs.length)} signal(s)`,
+    );
 
-  const signals: Signal[] = [];
-  for (const rule of ruleSet) {
-    const out = rule.evaluate(catalog, indexes, config);
-    signals.push(...out);
+    return {
+      catalog,
+      indexes,
+      signals,
+      resolutionStats,
+      cacheHit,
+    };
+  } finally {
+    monitor.dispose();
   }
-
-  return {
-    catalog,
-    indexes,
-    signals,
-    resolutionStats,
-    cacheHit,
-  };
 }
 
 /**
@@ -129,30 +213,50 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
 function buildAndResolveCatalog(
   adapter: GraphLanguageAdapter,
   discovery: DiscoverOutput,
+  onProgress?: GraphProgressCallback,
+  monitor?: PressureMonitor,
 ): { readonly catalog: Catalog; readonly resolutionStats: ResolutionStats } {
   // Phase 4 unified walk: Stage 1's catalog construction and Stage 2's
   // call-site location share a single AST descent per file. The walk
   // emits the catalog plus a flat list of pre-located call-site
   // records; resolveCallSites dispatches resolvers without re-walking.
-  const parsed = adapter.parseProject({
-    projectDirAbs: discovery.projectDirAbs,
-    files: discovery.files,
-    compilerOptions: discovery.compilerOptions,
-  });
-  const walked = adapter.walkProject({
-    project: parsed.project,
-    files: discovery.files,
-    projectDirAbs: discovery.projectDirAbs,
-  });
+  const parsed = runStage(
+    'parse',
+    onProgress,
+    monitor,
+    () => adapter.parseProject({
+      projectDirAbs: discovery.projectDirAbs,
+      files: discovery.files,
+      compilerOptions: discovery.compilerOptions,
+    }),
+    () => adapter.displayName,
+  );
+  const walked = runStage(
+    'walk',
+    onProgress,
+    monitor,
+    () => adapter.walkProject({
+      project: parsed.project,
+      files: discovery.files,
+      projectDirAbs: discovery.projectDirAbs,
+    }),
+    (w) => `${String(Object.keys(w.occurrences).length)} functions`,
+  );
 
   const initialCatalog = assembleCatalog(adapter, discovery, walked.occurrences);
 
-  const resolved = adapter.resolveCallSites({
-    project: parsed.project,
-    catalog: initialCatalog,
-    callSites: walked.callSites,
-    projectDirAbs: discovery.projectDirAbs,
-  });
+  const resolved = runStage(
+    'resolve',
+    onProgress,
+    monitor,
+    () => adapter.resolveCallSites({
+      project: parsed.project,
+      catalog: initialCatalog,
+      callSites: walked.callSites,
+      projectDirAbs: discovery.projectDirAbs,
+    }),
+    (r) => `${String(r.stats.totalCallSites)} call site(s)`,
+  );
 
   const catalog = stitchEdges(initialCatalog, resolved.edgesByOwner);
   return { catalog, resolutionStats: resolved.stats };
@@ -211,6 +315,8 @@ interface ObtainCatalogInput {
   readonly discovery: DiscoverOutput;
   readonly catalogPath: string;
   readonly useCache: boolean;
+  readonly onProgress?: GraphProgressCallback;
+  readonly monitor?: PressureMonitor;
 }
 
 interface ObtainCatalogOutput {
@@ -242,6 +348,11 @@ function obtainCatalog(input: ObtainCatalogInput): ObtainCatalogOutput {
     : ({ kind: 'invalid', reason: 'no-cache' } as const);
 
   if (verdict.kind === 'valid' && cachedCatalog) {
+    // Parse/walk/resolve are skipped wholesale. Tell the view so it can
+    // render those stages as "(cached)" rather than leaving them pending.
+    for (const stage of ['parse', 'walk', 'resolve'] as const) {
+      input.onProgress?.({ type: 'stage-cached', stage });
+    }
     return { catalog: cachedCatalog, cacheHit: true, resolutionStats: null };
   }
   const built = verdict.kind === 'incremental' && cachedCatalog
@@ -250,8 +361,10 @@ function obtainCatalog(input: ObtainCatalogInput): ObtainCatalogOutput {
         input.discovery,
         cachedCatalog,
         verdict.changedFiles,
+        input.onProgress,
+        input.monitor,
       )
-    : buildAndResolveCatalog(input.adapter, input.discovery);
+    : buildAndResolveCatalog(input.adapter, input.discovery, input.onProgress, input.monitor);
 
   const catalog: Catalog = {
     ...built.catalog,
@@ -294,20 +407,34 @@ function buildAndResolveCatalogIncremental(
   discovery: DiscoverOutput,
   cachedCatalog: Catalog,
   changedFilesAbs: readonly string[],
+  onProgress?: GraphProgressCallback,
+  monitor?: PressureMonitor,
 ): { readonly catalog: Catalog; readonly resolutionStats: ResolutionStats } {
-  const parsed = adapter.parseProject({
-    projectDirAbs: discovery.projectDirAbs,
-    files: discovery.files,
-    compilerOptions: discovery.compilerOptions,
-  });
+  const parsed = runStage(
+    'parse',
+    onProgress,
+    monitor,
+    () => adapter.parseProject({
+      projectDirAbs: discovery.projectDirAbs,
+      files: discovery.files,
+      compilerOptions: discovery.compilerOptions,
+    }),
+    () => `${adapter.displayName} (incremental)`,
+  );
 
-  const { walked, closureRel } = expandClosureToFixpoint({
-    adapter,
-    discovery,
-    cachedCatalog,
-    parsedProject: parsed.project,
-    changedFilesAbs,
-  });
+  const { walked, closureRel } = runStage(
+    'walk',
+    onProgress,
+    monitor,
+    () => expandClosureToFixpoint({
+      adapter,
+      discovery,
+      cachedCatalog,
+      parsedProject: parsed.project,
+      changedFilesAbs,
+    }),
+    (out) => `${String(out.closureRel.size)} closure file(s)`,
+  );
 
   // Build the resolver-input catalog from the merged occurrence set
   // so name- and hash-based fallbacks see the full project.
@@ -317,12 +444,18 @@ function buildAndResolveCatalogIncremental(
     functions: mergedFunctions,
   } as Catalog;
 
-  const resolved = adapter.resolveCallSites({
-    project: parsed.project,
-    catalog: initialCatalog,
-    callSites: walked.callSites,
-    projectDirAbs: discovery.projectDirAbs,
-  });
+  const resolved = runStage(
+    'resolve',
+    onProgress,
+    monitor,
+    () => adapter.resolveCallSites({
+      project: parsed.project,
+      catalog: initialCatalog,
+      callSites: walked.callSites,
+      projectDirAbs: discovery.projectDirAbs,
+    }),
+    (r) => `${String(r.stats.totalCallSites)} call site(s)`,
+  );
 
   // Apply resolved edges only to closure files; unchanged files keep
   // their cached edges. Their bodyHashes are present in the merged
@@ -590,24 +723,3 @@ function mergeResolvedAndCachedEdges(
   return out;
 }
 
-/**
- * On large repos, the parse step in Stage 1 can exhaust Node's
- * default ~4 GB heap before Stage 2 starts. Emit a single hint to
- * stderr (and a structured log line) before Stage 1 runs so users
- * see actionable guidance up front instead of a V8 OOM stack 17
- * minutes in. Below the threshold, stays silent.
- *
- * Exported for unit tests; otherwise an internal helper.
- */
-export function emitLargeRepoHint(fileCount: number): void {
-  if (fileCount <= LARGE_REPO_FILE_THRESHOLD) return;
-  logger.warn({
-    evt: 'graph.heap.largeRepoHint',
-    module: 'graph:cli',
-    files: fileCount,
-    threshold: LARGE_REPO_FILE_THRESHOLD,
-  });
-  process.stderr.write(
-    `graph: ${String(fileCount)} files detected (> ${String(LARGE_REPO_FILE_THRESHOLD)}). If the run OOMs, retry with NODE_OPTIONS=--max-old-space-size=8192 (or 12288 for very large monorepos).\n`,
-  );
-}

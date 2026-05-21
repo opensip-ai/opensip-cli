@@ -28,6 +28,7 @@ import { rules as defaultRules } from '../rules/registry.js';
 
 import { runGraph } from './orchestrate.js';
 import { runPackagesInParallel } from './packages-runner.js';
+import { MemoryPressureError } from './pressure-monitor.js';
 import { discoverWorkspacePackages, resolvePackageScope } from './scope.js';
 
 import type { PackageRunResult } from './packages-runner.js';
@@ -311,7 +312,7 @@ function renderPackagesJson(
   );
 }
 
-interface UnifiedReportInput {
+export interface UnifiedReportInput {
   readonly catalog: Catalog | null;
   readonly indexes: Indexes | null;
   readonly signals: readonly Signal[];
@@ -319,22 +320,19 @@ interface UnifiedReportInput {
 }
 
 /**
- * Render the unified terminal report: catalog summary, findings grouped
- * by rule, top-N entry points, and a single-line summary.
- *
- * Each section is a small pure helper returning string[]; this function
- * just sequences them.
+ * Build the unified terminal report lines: catalog summary, findings
+ * grouped by rule, top-N entry points, and a single-line summary. The
+ * caller decides where to write them (raw stdout for non-interactive
+ * paths, or the Ink view in the default human-report path).
  */
-function writeUnifiedReport(input: UnifiedReportInput): void {
+export function buildUnifiedReportLines(input: UnifiedReportInput): readonly string[] {
   const knownRuleIds = defaultRules.map((r) => r.slug);
   const byRule = groupSignalsByRule(input.signals);
   const eps = input.catalog && input.indexes
     ? enrichEntryPoints(input.catalog, input.indexes)
     : [];
 
-  const sections: readonly string[] = [
-    'opensip-tools graph',
-    '',
+  return [
     ...renderCatalogSection(input.catalog, input.cacheHit),
     '',
     ...renderFindingsSection(input.signals.length, byRule, knownRuleIds),
@@ -342,8 +340,11 @@ function writeUnifiedReport(input: UnifiedReportInput): void {
     '',
     ...renderSummarySection(byRule, knownRuleIds, input.signals.length),
   ];
+}
 
-  process.stdout.write(`${sections.join('\n')}\n`);
+function writeUnifiedReport(input: UnifiedReportInput): void {
+  const lines = ['opensip-tools graph', '', ...buildUnifiedReportLines(input)];
+  process.stdout.write(`${lines.join('\n')}\n`);
 }
 
 function renderCatalogSection(catalog: Catalog | null, cacheHit: boolean): readonly string[] {
@@ -499,6 +500,11 @@ function handleGraphError(label: string, error: unknown, cli: ToolCliContext): v
     cli.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
   } else if (error instanceof ValidationError) {
     cli.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
+  } else if (error instanceof MemoryPressureError) {
+    // Distinct exit code is desirable but the contracts package doesn't
+    // yet have OUT_OF_MEMORY; reuse RUNTIME_ERROR. The thrown message
+    // already carries actionable guidance (--package / --packages).
+    cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
   } else if (error instanceof ToolError) {
     cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
   } else {

@@ -172,6 +172,11 @@ async function renderLive(viewKey: string, args: unknown): Promise<void> {
     await renderFitView(args as CliArgs);
     return;
   }
+  if (viewKey === 'graph') {
+    const { renderGraphView } = await import('./ui/render.js');
+    await renderGraphView(args as { cwd: string; noCache?: boolean });
+    return;
+  }
   // Future tools that want a live view register their key here. Until
   // then, fall back to the static renderApp so unknown view keys don't
   // silently no-op.
