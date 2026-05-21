@@ -1,69 +1,13 @@
-# Phase 5: Cleanup and v2 release
+# Phase 5: Cleanup, CHANGELOG, version bump
 
-**Goal:** Documentation rewrites, fixture cleanup, CHANGELOG, version bump, and any straggler removals that finalize the v2.0.0 release.
+**Goal:** CHANGELOG, README upgrade notes, test-fixture cleanup, and workspace version bump. Architecture-doc rewrites and the web-sync regeneration move to Phase 6.
 **Depends on:** Phases 1, 2, 3, 4
 
-This phase is mostly subtraction and documentation. No new architecture; the production code is already in its v2 shape by the end of Phase 4.
+This phase is the non-architecture cleanup. Production code is already in its v2 shape after Phase 4; architecture-docs work runs in Phase 6 against the now-finished code.
 
 ---
 
-## Task 5.1: Rewrite the session-and-persistence runtime doc
-
-**Files:** [size: M]
-- Modify: `docs/web/50-runtime/03-session-and-persistence.md`
-
-**Context:** This doc currently describes "five kinds of on-disk artifacts: the session record, the structured log, the dashboard report, the cache, and (optionally) the gate baseline" — all as JSON files. After the migration, sessions, cache, and baseline live in SQLite. Logs and reports stay as files. The doc must reflect the new architecture truthfully.
-
-**Steps:**
-
-1. Re-read the existing doc to internalize its conventions (frontmatter, voice, audience).
-2. Rewrite the body:
-   - "Three artifact kinds live in SQLite (`datastore.sqlite`): sessions, the graph catalog + baseline, the fit file-cache + baseline."
-   - "Two artifact kinds stay as files (`logs/*.jsonl`, `reports/*.html`)."
-   - Show the new `.runtime/` layout.
-   - Cross-link to `decisions.md` (`../../plans/persistence-migration/decisions.md`) for rationale.
-3. Update the frontmatter:
-   - `last_verified: 2026-05-21`
-   - `source-files` — drop deleted files (`cache/read.ts`, `cache/write.ts`); add `packages/datastore/src/data-store.ts`, the schema files, the repo files.
-   - `related-docs` — add a pointer to `90-conventions/02-layer-policy.md` (which will be updated in Task 5.2 to describe the new layer).
-4. If the doc has a "What you'll understand after this" section, refresh the bullets.
-
-**Wiring:** Documentation-only. Should pass the fitness checks that validate doc structure (if any apply).
-
-**Verification:**
-
-```bash
-pnpm lint                                    # 0 errors; docs pass any structural checks
-```
-
-**Commit:** `docs(runtime): rewrite session-and-persistence for SQLite + Drizzle`
-
----
-
-## Task 5.2: Update the layer-policy convention doc
-
-**Files:** [size: S]
-- Modify: `docs/web/90-conventions/02-layer-policy.md`
-
-**Context:** The layer policy doc describes the architectural layering enforced by `.dependency-cruiser.cjs`. The new `@opensip-tools/datastore` package between `core` and `contracts` belongs in the diagram and policy text.
-
-**Steps:**
-
-1. Add `@opensip-tools/datastore` to the layer diagram between `core` and `contracts`.
-2. Document the policy: datastore depends only on core; contracts and tool packages depend on datastore; core does not depend on datastore.
-3. Refresh `last_verified`.
-
-**Verification:**
-
-```bash
-pnpm lint
-```
-
-**Commit:** `docs(conventions): document datastore layer in layer-policy`
-
----
-
-## Task 5.3: CHANGELOG and README upgrade entry
+## Task 5.1: CHANGELOG and README upgrade entry
 
 **Files:** [size: S]
 - Modify: `CHANGELOG.md` (or create if absent — verify)
@@ -75,10 +19,12 @@ pnpm lint
 
 1. Add a CHANGELOG entry for `2.0.0` (Unreleased until publish) under sections:
    - **Breaking changes:** Runtime state has migrated from JSON files to SQLite. v1 `.runtime/` is ignored on first v2 run. Users wanting to preserve v1 state should stay on v1.x.
-   - **Added:** `@opensip-tools/datastore` package; SQLite + Drizzle persistence layer.
-   - **Removed:** `cache/read.ts`, `cache/write.ts`, `cache/normalize.ts` from graph engine. `configurePersistencePaths` global API from contracts.
+   - **Added:** `@opensip-tools/datastore` package; SQLite + Drizzle persistence layer. Automatic schema migrations on upgrade between v2.x versions (no user action required).
+   - **Removed:** `cache/read.ts`, `cache/write.ts`, `cache/normalize.ts` from graph engine. `configurePersistencePaths` global API from contracts. `DEFAULT_BASELINE_PATH` constant and `--baseline <path>` flag from fitness (everything in the SQLite store now; no per-baseline file paths).
    - **Changed:** `ToolCliContext` gains `datastore` field. `StoredSession` shape unchanged; layout changes from JSON files to SQLite tables.
-2. README: add an "Upgrading from v1.x to v2.x" section near the top. One paragraph: states the break, links to the CHANGELOG, says "stay on v1.x if you need the v1 layout."
+   - **Upgrade behavior (v2.x → v2.y):** first invocation applies pending schema migrations automatically. No user action.
+   - **Downgrade unsupported:** downgrading across schema changes will throw `DataStoreMigrationError` on next run; recover by deleting `<project>/opensip-tools/.runtime/datastore.sqlite` (cache rebuilds; session history lost).
+2. README: add an "Upgrading from v1.x to v2.x" section near the top. One paragraph: states the break, notes the runtime state reset, links to the CHANGELOG, says "stay on v1.x if you need the v1 layout."
 
 **Verification:**
 
@@ -90,19 +36,25 @@ pnpm lint
 
 ---
 
-## Task 5.4: Confirm release ordering and run release-smoke-test
+## Task 5.2: Confirm release ordering, document schema evolution, run release-smoke-test
 
-**Files:** [size: S]
-- Modify: `RELEASING.md` (final check; primary change was Phase 0 Task 0.6)
+**Files:** [size: M]
+- Modify: `RELEASING.md` (final check + new schema-evolution section)
 - Modify: `docs/release-smoke-test.md` (if it enumerates `.runtime/` layout expectations)
 
-**Context:** Release tooling needs to publish `@opensip-tools/datastore` between `core` and `contracts`. Phase 0 set this; Phase 5 confirms.
+**Context:** Release tooling needs to publish `@opensip-tools/datastore` between `core` and `contracts`. Phase 0 set this; Phase 5 confirms. `RELEASING.md` is also the natural home for the schema-evolution workflow developers will need going forward — it sits alongside the existing publish-order and OIDC documentation.
 
 **Steps:**
 
 1. Re-read `RELEASING.md`. Verify datastore appears in the publish order between core and contracts. Verify package count matches the new total (18).
-2. Read `docs/release-smoke-test.md` for any assertions about `.runtime/` contents. Update assertions that mention JSON files (catalog.json, baseline.json, session JSONs) to assert SQLite-table presence instead.
-3. Run the smoke test locally if the CLI supports it.
+2. Add a new section to `RELEASING.md` titled "Schema evolution between versions." Contents (drawn from Phase 0 Task 0.5's workflow description):
+   - When to add a migration: any change to a Drizzle schema file (`packages/contracts/src/persistence/schema/`, `packages/graph/engine/src/persistence/schema.ts`, `packages/fitness/engine/src/persistence/schema.ts`).
+   - How to generate: `pnpm --filter=@opensip-tools/datastore db:generate`. Review the produced SQL before committing.
+   - Never edit a previously-committed migration file in place — Drizzle tracks by content hash; in-place edits leave users undefined.
+   - Migration files ship in the package tarball; users on a new version run migrations automatically on next `DataStoreFactory.open()`.
+   - Downgrades are unsupported; users downgrading hit `DataStoreMigrationError` and recover by deleting `datastore.sqlite`.
+3. Read `docs/release-smoke-test.md` for any assertions about `.runtime/` contents. Update assertions that mention JSON files (catalog.json, baseline.json, session JSONs) to assert SQLite-table presence instead.
+4. Run the smoke test locally if the CLI supports it.
 
 **Verification:**
 
@@ -115,12 +67,12 @@ pnpm install && pnpm build && pnpm test && pnpm lint
 
 ---
 
-## Task 5.5: Test fixtures cleanup
+## Task 5.3: Test fixtures cleanup
 
 **Files:** [size: S]
 - Delete or clear: `packages/cli/src/__tests__/fixtures/*/opensip-tools/.runtime/` (sessions JSON files, baseline JSON files, catalog JSON files in fixtures)
 
-**Context:** Test fixtures under `packages/cli/src/__tests__/fixtures/` carry v1 `.runtime/` state from when they were authored. Some tests will rely on this; others may have already been updated in Phase 6 of this plan. This task is the final sweep.
+**Context:** Test fixtures under `packages/cli/src/__tests__/fixtures/` carry v1 `.runtime/` state from when they were authored. Some tests will rely on this; others may have already been updated in Phase 7 of this plan. This task is the final sweep.
 
 **Steps:**
 
@@ -128,7 +80,7 @@ pnpm install && pnpm build && pnpm test && pnpm lint
    ```bash
    find packages/cli/src/__tests__/fixtures -path "*/opensip-tools/.runtime/*" -type f
    ```
-2. For each fixture: if the tests using it have been updated to construct a fresh in-memory DataStore in setup (Phase 6), the fixture's `.runtime/` contents are no longer consulted and should be deleted to avoid confusion. If a test still depends on a fixture state, fix the test (return to Phase 6 if needed).
+2. For each fixture: if the tests using it have been updated to construct a fresh in-memory DataStore in setup (Phase 7), the fixture's `.runtime/` contents are no longer consulted and should be deleted to avoid confusion. If a test still depends on a fixture state, fix the test (return to Phase 7 if needed).
 3. After cleanup, leave the `.runtime/` directories themselves in place (they exist as project markers).
 
 **Verification:**
@@ -143,13 +95,13 @@ find packages/cli/src/__tests__/fixtures -path "*/opensip-tools/.runtime/*" -typ
 
 ---
 
-## Task 5.6: Workspace version bump to 2.0.0
+## Task 5.4: Workspace version bump to 2.0.0
 
 **Files:** [size: XS]
 - Modify: root `package.json`
 - Modify: every workspace package's `package.json` (`core`, `datastore`, `contracts`, all `lang-*`, `fitness/engine`, `simulation/engine`, `graph/engine`, all `checks-*`, `cli`)
 
-**Context:** All packages publish at the same version (verify from `RELEASING.md`'s coordinated-publish description). Bumping the root + all 17 (or 18) packages to `2.0.0` is the release-prep step. Per CLAUDE.md and `RELEASING.md`, the publish itself is OIDC-driven and runs separately; this task does only the version-string bump.
+**Context:** All packages publish at the same version (verify from `RELEASING.md`'s coordinated-publish description). Bumping the root + all 18 packages (17 existing + new `@opensip-tools/datastore`) to `2.0.0` is the release-prep step. Per CLAUDE.md and `RELEASING.md`, the publish itself is OIDC-driven and runs in Phase 9; this task does only the version-string bump.
 
 **Steps:**
 
@@ -172,8 +124,6 @@ pnpm build && pnpm typecheck && pnpm test && pnpm lint
 ```bash
 pnpm install
 pnpm build && pnpm typecheck && pnpm test && pnpm lint
-# Inspect docs
-ls docs/web/50-runtime/ docs/web/90-conventions/
 grep -l "2.0.0" CHANGELOG.md README.md
 # Confirm no JSON-era state in fixtures
 find packages/cli/src/__tests__/fixtures -path "*/opensip-tools/.runtime/*" -type f
@@ -181,4 +131,4 @@ find packages/cli/src/__tests__/fixtures -path "*/opensip-tools/.runtime/*" -typ
 grep '"version"' package.json packages/*/package.json packages/*/*/package.json
 ```
 
-Expected state: every package at 2.0.0, documentation reflects SQLite+Drizzle architecture, CHANGELOG documents the v2 break, fixtures no longer carry v1 JSON state. The release is ready for the standard publish flow.
+Expected state: every package at 2.0.0, CHANGELOG and README document the v2 break, fixtures no longer carry v1 JSON state. Architecture docs are not yet updated — that's Phase 6.

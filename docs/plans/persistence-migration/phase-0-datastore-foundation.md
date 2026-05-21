@@ -63,6 +63,7 @@ pnpm --filter=@opensip-tools/datastore test
    - `close(): void` — releases the underlying connection.
    - `transaction<T>(fn: (tx: BetterSQLite3Database<...>) => T): T` — Drizzle's `db.transaction(...)` returns synchronously over better-sqlite3; surface that directly.
 3. Define `interface DataStoreOpenOptions` with at minimum `{ path: string }` for the SQLite backend; backends may extend this internally.
+4. Define `class DataStoreMigrationError extends Error` — thrown by the factory (Task 0.5) when `migrate()` fails. Carries the failed migration's filename and the underlying error message. Public API surface so consumers can `catch (e) if (e instanceof DataStoreMigrationError)` and present a recovery-oriented error message.
 4. Re-export from `src/index.ts`.
 
 **Wiring:** Used in Phase 1 by `cli/src/index.ts` to construct the store, and by `ToolCliContext` consumers via the `datastore` field added in Phase 1.
@@ -159,6 +160,14 @@ pnpm --filter=@opensip-tools/datastore build && pnpm --filter=@opensip-tools/dat
    - Dispatches to `openSqliteBackend` or `openMemoryBackend`.
    - After opening, applies pending Drizzle migrations from `./migrations/` via `migrate(db, { migrationsFolder: './migrations' })` from `drizzle-orm/better-sqlite3/migrator` — sync.
    - Returns the `DataStore`.
+   - **On `migrate()` failure: re-throw with a wrapped error class** (`DataStoreMigrationError`) that includes a recovery hint: "Schema migration failed; the local cache may be corrupted or from a future version. Delete `<path>` to start fresh (cache will rebuild on next run; session history will be lost)." The CLI bootstrap surfaces this error message to the user — never silently swallow.
+3. **Schema evolution workflow** (developer-facing, documented in this task because the factory is where it lands). When a future change modifies any schema file:
+   - Edit the schema (e.g., add a column to `catalog_functions`).
+   - Run `pnpm --filter=@opensip-tools/datastore db:generate`. Drizzle-kit diffs against the last applied migration and produces a new `NNNN_<name>.sql` file under `packages/datastore/migrations/`.
+   - **Read and review the generated SQL** before committing. Drizzle-kit's automatic diffing handles most cases correctly but column renames are detected as drop+add (data loss); use the interactive prompts or hand-edit the migration if needed.
+   - Commit the SQL alongside the schema edit. The factory's `migrate()` call applies it on the user's next run.
+   - **Never** edit a previously-committed migration file. Drizzle tracks applied migrations by content hash; editing one in-place leaves users in undefined state. Add a new migration instead.
+   - **Downgrades are unsupported.** Drizzle has no down-migration concept. If a user downgrades and the schema is incompatible, the error class above fires; recovery is to delete `datastore.sqlite`.
 3. In `drizzle.config.ts`, configure for `dialect: 'sqlite'`. **At Phase 0 the schema array is empty** — `schema: []` — because no owning package has declared schemas yet. drizzle-kit's behavior on missing files is unreliable across versions; an empty array is unambiguous. Each subsequent phase (1, 2, 3, 4) appends its schema path to this array as part of that phase's first task.
    ```ts
    // Initial Phase 0 state:

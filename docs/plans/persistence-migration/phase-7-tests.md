@@ -1,7 +1,7 @@
-# Phase 6: Tests
+# Phase 7: Tests
 
-**Goal:** Cover the work in Phases 0–5 with unit and integration tests using the in-memory backend for unit tests and SQLite-in-tmp-dir for integration tests.
-**Depends on:** All implementation phases (0–5).
+**Goal:** Cover the work in Phases 0–6 with unit and integration tests using the in-memory backend for unit tests and SQLite-in-tmp-dir for integration tests.
+**Depends on:** All implementation phases (0–6).
 
 This phase is a scaffold. opensip-tools does not have the OpenSIP backend's plan-improvements pipeline (which would enrich test patterns from a Phase 10 prompt). Test patterns here follow the existing conventions in this repo: Vitest, `*.test.ts` adjacent to source, no global mocks unless necessary.
 
@@ -9,7 +9,7 @@ The phase is structured around three test scopes: per-package unit tests (agains
 
 ---
 
-## Task 6.1: Datastore package unit tests
+## Task 7.1: Datastore package unit tests
 
 **Files:** [size: M]
 - Create: `packages/datastore/src/__tests__/data-store.test.ts`
@@ -39,7 +39,7 @@ pnpm --filter=@opensip-tools/datastore test
 
 ---
 
-## Task 6.2: Sessions / `SessionRepo` tests
+## Task 7.2: Sessions / `SessionRepo` tests
 
 **Files:** [size: M]
 - Create: `packages/contracts/src/__tests__/session-repo.test.ts`
@@ -70,7 +70,7 @@ pnpm --filter=@opensip-tools/contracts test
 
 ---
 
-## Task 6.3: Graph baseline + catalog repo tests
+## Task 7.3: Graph baseline + catalog repo tests
 
 **Files:** [size: L]
 - Create: `packages/graph/engine/src/__tests__/persistence/baseline-repo.test.ts`
@@ -104,14 +104,14 @@ pnpm --filter=@opensip-tools/graph test
 
 ---
 
-## Task 6.4: Fit file-cache + baseline repo tests
+## Task 7.4: Fit file-cache + baseline repo tests
 
 **Files:** [size: M]
 - Create: `packages/fitness/engine/src/__tests__/persistence/baseline-repo.test.ts`
 - Create: `packages/fitness/engine/src/__tests__/persistence/file-cache-repo.test.ts`
 - Modify: any existing fitness gate or file-cache tests to use the new repo surfaces.
 
-**Context:** Mirrors Task 6.3 structurally. File-cache tests focus on the composite primary-key behavior (file_path + content_hash + check_slug) and on invalidation semantics.
+**Context:** Mirrors Task 7.3 structurally. File-cache tests focus on the composite primary-key behavior (file_path + content_hash + check_slug) and on invalidation semantics.
 
 **Steps:**
 
@@ -134,7 +134,7 @@ pnpm --filter=@opensip-tools/fitness test
 
 ---
 
-## Task 6.5: Dashboard regression tests (the safety net)
+## Task 7.5: Dashboard regression tests (the safety net)
 
 **Files:** [size: M]
 - Modify: `packages/contracts/src/__tests__/dashboard-*.test.ts` (all of them — see the list below)
@@ -247,7 +247,7 @@ If any dashboard test fails for reasons other than test-setup syntax, **do not u
 
 ---
 
-## Task 6.6: CLI command tests
+## Task 7.6: CLI command tests
 
 **Files:** [size: S]
 - Modify: `packages/cli/src/__tests__/*.test.ts` (or wherever CLI integration tests live)
@@ -270,7 +270,7 @@ pnpm --filter=@opensip-tools/cli test
 
 ---
 
-## Phase 6 End-to-End Verification
+## Phase 7 End-to-End Verification
 
 ```bash
 pnpm install

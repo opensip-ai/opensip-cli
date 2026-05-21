@@ -1,13 +1,13 @@
-# Phase 7: Validation
+# Phase 8: Validation
 
 **Goal:** Exercise the full integrated flow against real SQLite-on-disk. Confirm parity with v1 behavior on this repo and on a representative sample of consumer projects.
-**Depends on:** All prior phases including Phase 6.
+**Depends on:** All prior phases including Phase 7 (Tests).
 
 This phase is a scaffold. opensip-tools does not have the OpenSIP backend's "lab infrastructure" (Postgres, OTel, Redis); validation runs against real on-disk SQLite at production-equivalent settings and uses the existing test corpus + this repo itself as the realistic input.
 
 ---
 
-## Task 7.1: End-to-end run against this repo
+## Task 8.1: End-to-end run against this repo
 
 **Files:** [no files modified — runtime validation only]
 
@@ -49,7 +49,7 @@ This phase is a scaffold. opensip-tools does not have the OpenSIP backend's "lab
 
 ---
 
-## Task 7.2: Multi-process safety (`--packages` runner)
+## Task 8.2: Multi-process safety (`--packages` runner)
 
 **Files:** [no files modified — runtime validation only]
 
@@ -66,7 +66,7 @@ This phase is a scaffold. opensip-tools does not have the OpenSIP backend's "lab
 
 ---
 
-## Task 7.3: Cross-platform smoke (best-effort)
+## Task 8.3: Cross-platform smoke (best-effort)
 
 **Files:** [no files modified — runtime validation only]
 
@@ -82,7 +82,7 @@ This phase is a scaffold. opensip-tools does not have the OpenSIP backend's "lab
 
 ---
 
-## Task 7.4: Uninstall round-trip
+## Task 8.4: Uninstall round-trip
 
 **Files:** [no files modified — runtime validation only]
 
@@ -99,7 +99,7 @@ This phase is a scaffold. opensip-tools does not have the OpenSIP backend's "lab
 
 ---
 
-## Task 7.5: Release-smoke-test pass
+## Task 8.5: Release-smoke-test pass
 
 **Files:** [no files modified — runtime validation only]
 
@@ -115,7 +115,7 @@ This phase is a scaffold. opensip-tools does not have the OpenSIP backend's "lab
 
 ---
 
-## Phase 7 End-to-End Verification
+## Phase 8 End-to-End Verification
 
 After all tasks pass, the v2.0.0-rc.1 release is ready to publish. Document the validation results (parity benchmark numbers, any platform-specific notes) in the v2.0.0 CHANGELOG entry before publishing.
 

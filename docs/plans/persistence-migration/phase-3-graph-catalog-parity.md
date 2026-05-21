@@ -198,7 +198,7 @@ pnpm graph                                   # warm hit on second run
 - Delete: `packages/graph/engine/src/__tests__/cache/read-write.test.ts` (consumed `normalize.ts`/`write.ts`)
 - Delete: `packages/graph/engine/src/__tests__/cache/normalize.test.ts`
 
-**Context:** `read.ts` and `write.ts` are the JSON-streaming readers/writers that the migration replaces. `normalize.ts` is consumed only by `write.ts` in production code; the only other consumers are the two test files listed below (verified during plan refinement via `grep -rn "from '.*cache/normalize\|cache/normalize.js" packages/graph/engine/src`). Their tests go too; equivalent coverage lands as `CatalogRepo` tests in Phase 6.
+**Context:** `read.ts` and `write.ts` are the JSON-streaming readers/writers that the migration replaces. `normalize.ts` is consumed only by `write.ts` in production code; the only other consumers are the two test files listed below (verified during plan refinement via `grep -rn "from '.*cache/normalize\|cache/normalize.js" packages/graph/engine/src`). Their tests go too; equivalent coverage lands as `CatalogRepo` tests in Phase 7.
 
 **Steps:**
 
