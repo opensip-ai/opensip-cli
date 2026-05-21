@@ -13,14 +13,23 @@ Before any task in this phase begins, **the implementing agent must capture v1 c
 # From main, before Phase 3 work:
 git stash                                                     # if you have phase-0..2 work staged
 git checkout main && pnpm install && pnpm build
-rm -rf opensip-tools/.runtime
-time pnpm graph                                               # COLD: record wall-clock seconds
-time pnpm graph                                               # WARM: record wall-clock seconds
-# Record both numbers in a comment in this phase doc or in the Phase 8 doc.
+
+# Take median of 3 for each metric — single readings are too noisy to compare against
+# the 1.5× / 1.2× thresholds in Phase 8 Task 8.1. Quiesce the machine between runs.
+for i in 1 2 3; do
+  rm -rf opensip-tools/.runtime
+  time pnpm graph                                             # COLD run #i
+done
+for i in 1 2 3; do
+  time pnpm graph                                             # WARM run #i (cache populated by the last cold run)
+done
+
+# Record COLD median, WARM median in a comment block at the top of phase-8-validation.md
+# (or in a tracking issue) so Phase 8 Task 8.1 can compare against them.
 git checkout - && git stash pop                               # back to your work
 ```
 
-Phase 8 Task 8.1 will compare v2 numbers against these. Without this measurement, "parity" cannot be verified objectively.
+Phase 8 Task 8.1 will compare v2 medians against these v1 medians. Without this measurement, "parity" cannot be verified objectively.
 
 ## Locked design calls (resolved before phase begins)
 
@@ -147,10 +156,11 @@ pnpm --filter=@opensip-tools/graph build && pnpm --filter=@opensip-tools/graph t
 
 ---
 
-## Task 3.3: Rewrite the orchestrator's catalog I/O
+## Task 3.3: Rewrite the orchestrator's catalog I/O (and the dashboard's catalog read)
 
 **Files:** [size: M]
 - Modify: `packages/graph/engine/src/cli/orchestrate.ts`
+- Modify: `packages/fitness/engine/src/cli/dashboard.ts` — swap the catalog read path that Phase 1 deliberately deferred (see Phase 1 Task 1.6 step 6). Note: contracts is pure — it receives the parsed catalog as a `generateDashboardHtml` argument; the actual catalog read lives in the fitness dashboard CLI command (`loadGraphCatalog` at `dashboard.ts:98`, which today reads `paths.graphCatalogPath` via `readFileSync`+`JSON.parse`). No layer-policy change needed; fitness already depends on graph.
 
 **Context:** `runGraph(input)` in `orchestrate.ts` is the pipeline entry point. Today it calls `readCatalog(catalogPath)` and `writeCatalog(catalogPath, catalog)` (imported from `cache/read.ts`+`cache/write.ts`, both deleted in Task 3.5). After this task, it works directly against the `CatalogRepo`.
 
@@ -162,6 +172,7 @@ pnpm --filter=@opensip-tools/graph build && pnpm --filter=@opensip-tools/graph t
 4. Accept a `CatalogRepo` instance via `RunGraphInput` (or construct from `ctx.datastore`); thread it through the pipeline stages that need it. The repo is constructed once per run by the caller, not per-stage.
 5. Drop the `catalogPath` argument from `RunGraphInput`. Update internal pipeline types that mentioned it.
 6. Fingerprint storage: `setFingerprint(language, packageDir, computeFilesFingerprint(...))` at end of run; this previously lived as the catalog's embedded `cacheKey` field.
+7. **Swap the dashboard's catalog read path.** In `packages/fitness/engine/src/cli/dashboard.ts`, replace `loadGraphCatalog(projectDir)` (the helper at line 98 that does `existsSync` + `readFileSync` + `JSON.parse` on `paths.graphCatalogPath`) with a call that constructs a `CatalogRepo` from `ctx.datastore` and returns `repo.loadFullCatalog()`. Preserve the existing logger events (`graph.dashboard.catalog.load`, `graph.dashboard.catalog.parse-error`) — the `parse-error` variant becomes effectively unreachable but keep the call shape so observability schemas are stable. The downstream `generateDashboardHtml(sessions, catalog, recipes, graphCatalog, editorProtocol)` call at line 152 is unchanged — it still receives a parsed `GraphCatalog` object. **This step is what allows Task 3.5 to delete `cache/read.ts` without breaking the dashboard.**
 
 **Wiring:** Callers of `runGraph` (the `graph` CLI command, the `--packages` runner) pass through the `ToolCliContext.datastore`. The packages runner already spawns child processes — each child opens its own DataStore on the shared `.runtime/datastore.sqlite` file in WAL mode, which is concurrent-safe (verify by smoke-testing the packages runner).
 

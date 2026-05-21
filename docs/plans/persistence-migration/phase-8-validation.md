@@ -31,7 +31,10 @@ This phase is a scaffold. opensip-tools does not have the OpenSIP backend's "lab
    time pnpm graph                           # warm; catalog cache hit
    ```
    Both warm runs should be measurably faster than cold. **Record cold and warm wall-clock seconds for both fit and graph.**
-4. **Parity benchmark — quantitative comparison against v1.** Compare v2 numbers to the v1 baseline captured before Phase 3 began (per Phase 3's pre-phase prerequisite). Apply these thresholds:
+
+   **Methodology.** Wall-clock from `time` is noisy (thermal throttling, background processes, filesystem cache state). Run each measurement **3 times and take the median**, not the minimum or the first reading. Capture v1 timings (Phase 3 pre-phase prerequisite) the same way. Before each measurement, quiesce the machine: close other heavy processes, let the laptop cool for ~30 seconds. For cold-run timing, `rm -rf opensip-tools/.runtime` between runs. For warm-run timing, run once to warm, then time the next run. A 3-run median against a 3-run median has noise ~10–15%; that's well below the 1.5× threshold and is the cheapest defensible methodology.
+
+4. **Parity benchmark — quantitative comparison against v1.** Compare v2 numbers (median of 3) to the v1 baseline (median of 3) captured before Phase 3 began (per Phase 3's pre-phase prerequisite). Apply these thresholds:
    - **v2 cold rebuild ≤ 1.5× v1 cold rebuild** — parity allows some overhead for the SQLite write path (whole-catalog replace, FK constraints, WAL journaling); a regression beyond 1.5× indicates a missing index, an unbatched insert, or a transaction-boundary issue worth investigating before merge.
    - **v2 warm load ≤ v1 warm load** — the load path is what `pipeline/indexes.ts` consumes; at parity it's still building in-memory maps from a `Catalog` value. SQLite's read shouldn't add overhead vs `JSON.parse`. If it does, the `loadFullCatalog()` join is likely missing an index.
    - **v2 dashboard generation ≤ 1.2× v1 dashboard generation** — the dashboard's view derivations still consume the legacy `Catalog`; only the load path changed.
@@ -81,14 +84,11 @@ This phase is a scaffold. opensip-tools does not have the OpenSIP backend's "lab
 **Steps:**
 
 1. On the developer's machine (Darwin per the environment): `pnpm install && pnpm build && pnpm test` — verify clean.
-2. Inspect `.github/workflows/` to confirm the existing CI matrix covers, at minimum:
-   - Linux glibc x64 (most common runner)
-   - macOS x64 + macOS arm64
-   - Windows x64
-   
-   These are the platforms with reliable better-sqlite3 prebuilts. If the matrix includes **Alpine Linux (musl)**, prebuilt binaries may not exist — confirm by inspecting `better-sqlite3`'s npm prebuilds page or by checking the install log on an Alpine runner. If Alpine is in the matrix and prebuilts don't cover it, either drop Alpine from the supported set or document the build-from-source fallback (`apt-get install python3 make g++` equivalent for Alpine) in the README.
+2. Inspect `.github/workflows/`. **Confirmed at plan-write time: the CI matrix is `ubuntu-latest` only** (Linux glibc x64). better-sqlite3 ships prebuilts for that platform — install should be fast and deterministic. If the matrix is later extended to other platforms, re-evaluate:
+   - **macOS x64 / arm64, Windows x64** — also have reliable prebuilts; expected to work.
+   - **Alpine Linux (musl)** — prebuilts may be missing. If added to CI, verify before relying on it; fallback is build-from-source via `npm_config_build_from_source=true` with a C++ toolchain (`apk add python3 make g++`).
 3. If install fails on any platform due to prebuilt-binary unavailability, document the workaround in the README upgrade section. The fallback is `npm_config_build_from_source=true` (env var) — slower install but always works given a C++ toolchain.
-4. Native-module reinstall: `rm -rf node_modules && pnpm install` on each platform; confirm clean install times are reasonable (target: under 60s on a warm cache; under 5min on a cold cache including better-sqlite3 prebuilt download).
+4. Native-module reinstall: `rm -rf node_modules && pnpm install`; confirm clean install times are reasonable (target: under 60s on a warm cache; under 5min on a cold cache including better-sqlite3 prebuilt download).
 
 **Verification:** Builds clean on the developer's platform and in CI.
 

@@ -130,8 +130,12 @@ pnpm --filter=@opensip-tools/fitness build && pnpm --filter=@opensip-tools/fitne
    - `grep -rn "DEFAULT_BASELINE_PATH" packages/fitness packages/cli --include="*.ts"` — internal call sites
    - `grep -rn "\\-\\-baseline" .github/workflows/ docs/ README.md CHANGELOG.md` — CI integration docs and user-facing examples
    - `grep -rn "baseline.sarif\\|baseline\\.json" docs/ README.md` — references in examples
-   
-   If the flag is used outside the v1 internal `gate.ts` call sites — especially in CI examples or README — **decide explicitly** before removal: (a) drop the flag and document loudly in CHANGELOG breaking-changes (current plan); (b) keep `--baseline <name>` as a named-baseline selector pointing at a row in the table (feature work; out of scope). Default to (a) unless meaningful external usage is found.
+
+   **Decision matrix.** Two outcomes possible; **the implementing agent must surface the grep findings to the human maintainer for the call** rather than deciding silently:
+   - **(a) Drop the flag** (current default plan) — only valid if grep finds zero external usage outside internal `gate.ts` call sites. Land in v2.0.0 with a prominent CHANGELOG breaking-changes entry and migration note: "if you previously passed `--baseline path/to/file`, the baseline is now stored in the project's SQLite database; remove the flag from your invocation."
+   - **(b) Keep `--baseline <name>` as a named-baseline selector** — required if grep finds the flag in `.github/workflows/`, README examples, or any pinned CI integration that downstream users rely on. Becomes a row-key into the `fit_baseline` table (the table's PK changes from `id INTEGER CONSTANT 1` to `name TEXT PK`; `save`/`load`/`exists` take an optional `name` argument defaulting to `'default'`). This is feature work, not parity — it expands the migration scope. **Maintainer call required.**
+
+   Decision rule for the agent: do the grep, report results to maintainer with concrete file:line counts, ask which path. Default to (a) only if the grep is genuinely empty.
 8. Update all call sites. Grep: `grep -rn "saveBaseline\|compareToBaseline" packages/fitness packages/cli --include="*.ts" | grep -v __tests__`. Thread the repo from `ToolCliContext.datastore`.
 
 **Wiring:** Gate commands invoked via `ToolCliContext.datastore`. The fitness tool's `register(cli, ctx)` constructs a `FitBaselineRepo` from `ctx.datastore` and passes it down.

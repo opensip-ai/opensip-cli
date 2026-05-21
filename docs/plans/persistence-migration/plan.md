@@ -136,6 +136,19 @@ Phases 1, 2, and 4 are independent after Phase 0. Phase 3 depends on Phase 2 (sh
 | `tools/bootstrap-publish.sh` | OIDC bootstrap publish script (unchanged; invoked Phase 9) | Idempotent. Iterates 18 packages in dependency order; publishes any missing versions with the supplied `NPM_TOKEN`; prints links to trusted-publisher settings pages for newly-created packages |
 | `RELEASING.md` | Release procedure reference | Bootstrap workflow at lines 132–152; OIDC handoff at 151–152 |
 
+## Release Atomicity and Partial-State Policy
+
+**Phases 1, 2, 3, and 4 ship together as v2.0.0. There is no intermediate published release.** The dependency graph permits parallel work after Phase 0 — Phases 1, 2/3, and 4 are independent — but the **published artifact** is the unified set.
+
+Why this matters: each of Phases 1–4 swaps one persistence concern from JSON to SQLite. If Phase 3 (graph catalog) merged but Phase 4 (fit file-cache + baseline) stalled, the workspace would still produce v1-shape `fit_baseline` JSON alongside the v2-shape `datastore.sqlite` — a hybrid that is harder to document, harder to debug, and not what the CHANGELOG describes.
+
+Operational consequences:
+
+- **Branch model.** Implementer should land Phases 0–4 on a long-lived `v2` branch. Each phase commits to that branch; the branch is rebased onto `main` only when all four phases are green. Phases 5–9 then run on the `v2` branch in order.
+- **Half-state during development is acceptable on the `v2` branch.** Phase 1 can land before Phase 4 on the branch; the workspace will produce both SQLite sessions and JSON fit baselines mid-migration. Tests during this window cover only the migrated concerns; the unmigrated ones keep their v1 tests until their phase lands.
+- **Rollback within v2 development.** If Phase 3 hits a blocker (e.g. the catalog parity benchmark in Phase 8 Task 8.1 regresses past the 1.5× threshold and can't be recovered), the recovery is to revert the Phase 3 commits on the `v2` branch and pause the release. Phases 1, 2, and 4 stay on the branch — they are independent and shouldn't be reverted to "match." A v2 release without graph catalog migration would still be a coherent step (sessions + graph baseline + fit cache + fit baseline all on SQLite; graph catalog still JSON), but **only if the CHANGELOG and architecture docs are updated to match** before publish. Default assumption: don't ship partial; pause and resolve.
+- **Post-publish rollback.** Once v2.0.0 is on npm (Phase 9), there is no rollback — npm unpublish is restricted and SemVer doesn't allow re-using the version. Issues found post-publish are fixed by v2.0.1+, never by reverting the schema migration. This is why Phase 8 (Validation) is non-negotiable before Phase 9.
+
 ## Per-Task Verification Standard
 
 At the end of every task, run:

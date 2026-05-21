@@ -138,8 +138,17 @@ pnpm --filter=@opensip-tools/fitness test
 
 ## Task 7.5: Dashboard regression tests (the safety net)
 
-**Files:** [size: M]
-- Modify: `packages/contracts/src/__tests__/dashboard-*.test.ts` (all of them — see the list below)
+**Files:** [size: L — **23 test files**, see scope note below]
+- Modify: `packages/contracts/src/__tests__/dashboard-*.test.ts` (all 23 files — see the list below)
+
+**Scope sizing.** Counted at plan-write time (`ls packages/contracts/src/__tests__/dashboard-*.test.ts | wc -l` → 23). Many of these are pure-DOM/pure-render tests with no catalog or session dependency (e.g. `dashboard-filter-drawer.test.ts`, `dashboard-help-drawer.test.ts`, `dashboard-path-utils.test.ts`) — they need no refactor at all. The expected refactor split, derived from filename patterns:
+
+- **No change expected (~12 files):** filter-drawer, filter-observer, filters, function-card-singleton, function-row, help-drawer, indexes, path-utils, search, view-big, view-conformance, view-search.
+- **Catalog-seeded refactor (~8 files):** generator-graph-catalog, function-card, scc, trace, view-coupling, view-hot, view-sccs, view-untested. These are the canonical-pattern targets in the worked example below.
+- **Session-seeded refactor (~2 files):** any test exercising a `StoredSession` literal.
+- **Integration test (~1 file):** `dashboard-validation.integration.test.ts` — likely needs both repos.
+
+Budget: ~10–15 minutes per refactored file × ~10 files ≈ 2–3 hours of focused work, plus ~15 minutes per file to read each "no change expected" test and confirm it really needs no change. Total Phase 7 Task 7.5 budget: **half a day**, not a multi-day effort. If a test resists the canonical pattern, escalate before forcing it.
 
 **Context:** The dashboard generator tests (`dashboard-generator-graph-catalog.test.ts`, `dashboard-view-coupling.test.ts`, `dashboard-view-hot.test.ts`, `dashboard-view-sccs.test.ts`, `dashboard-trace.test.ts`, `dashboard-function-card.test.ts`, etc.) cover the rich derivations that this migration most affects. They are the strongest correctness signal we have; they must pass.
 
