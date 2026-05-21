@@ -40,6 +40,10 @@ After the migration:
 
 **Architectural compliance, observability, hardening, audit, and pattern decisions.** opensip-tools does not have the OpenSIP backend's downstream plan-improvements pipeline. Compliance concerns that *do* apply (dependency-cruiser layer rules, ESLint enforcement, the existing 0-error lint policy from `CLAUDE.md`) are exercised through normal `pnpm lint` runs at every phase; they are not pre-baked into task descriptions.
 
+**Logger event parity.** Existing persistence call sites emit structured logger events with stable `evt:` names (e.g., `graph.cache.read.hit`, `graph.cache.write.complete`, `graph.cache.read.miss`, `graph.cache.write.error`). Every repository introduced in this plan must emit equivalent events on the equivalent operations (read hit, read miss, write complete, write error) with the same naming pattern (`<tool>.<concern>.<op>.<outcome>`). Observability must not regress with the storage swap. This is a cross-cutting requirement; each repo task in Phases 1–4 carries a one-line reminder, but the policy is set here.
+
+**Plugin contract for `ctx.datastore` is narrow in v2.** Third-party tool plugins (npm packages with `opensipTools.kind === 'tool'`) receive `ToolCliContext.datastore` after the migration. The contract is **read/write via the Drizzle handle for transient operations only**. Plugin-declared schemas (i.e., a plugin shipping its own Drizzle tables and contributing migrations) are **not supported in v2** — the workspace's `drizzle.config.ts` is build-time and cannot pick up schemas from arbitrary npm packages at install time. Plugins requiring persistent state of their own should manage a separate SQLite file under a path they own. This is an explicit limitation, not an oversight; lifting it is feature work for a future minor.
+
 The long-form architectural reasoning (Drizzle vs raw SQL, rejection of paradigm-bridging adapters, why no Postgres, the Drizzle margin honest reassessment) lives in [`decisions.md`](./decisions.md).
 
 ## Phases

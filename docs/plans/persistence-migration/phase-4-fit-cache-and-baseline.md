@@ -61,6 +61,7 @@ pnpm --filter=@opensip-tools/datastore db:generate && pnpm --filter=@opensip-too
    - `load(): SarifLog | null` — selects row 1; returns null if not present.
    - `exists(): boolean` — `SELECT 1 FROM fit_baseline WHERE id = 1`.
 3. No mapping helpers needed — the payload is a single opaque JSON blob.
+4. **Emit logger events** per the plan's logger-event-parity convention: `fit.baseline.save.complete` (include `findingCount` from the SARIF, mirroring the `findingCount` field already emitted at `packages/fitness/engine/src/gate.ts:108-113`), `fit.baseline.load.complete`, `fit.baseline.load.miss` for the empty case, `fit.baseline.*.error` on thrown errors.
 
 **Wiring:** Consumed by `gate.ts` (Task 4.4).
 
@@ -91,6 +92,7 @@ pnpm --filter=@opensip-tools/fitness build && pnpm --filter=@opensip-tools/fitne
    - `invalidateFile(filePath: string): number` — delete all entries for a file (when content changes); returns rowcount. Synchronous.
    - `purge(olderThan: Date): number` — cleanup for stale entries. Synchronous.
 4. Result serialization: store as JSON in `result` (mode: `'json'`). Define the round-trip shape clearly — the cached result must be small and self-contained (don't store full ASTs).
+5. **Emit logger events** per the plan's logger-event-parity convention: `fit.file-cache.lookup.hit` (include `filePath`, `checkSlug`), `fit.file-cache.lookup.miss`, `fit.file-cache.store.complete`, `fit.file-cache.invalidate.complete` (include rowcount), `fit.file-cache.purge.complete` (include rowcount), `fit.file-cache.*.error` on thrown errors. The hit/miss split is the earliest signal of cache-key regressions.
 
 **Wiring:** Consumed by `framework/file-cache.ts` (Task 4.5).
 
@@ -124,7 +126,12 @@ pnpm --filter=@opensip-tools/fitness build && pnpm --filter=@opensip-tools/fitne
 4. Inside `saveBaseline`, replace `writeFileSync(...)` with `repo.save(buildSarifLog(output))`.
 5. Inside `compareToBaseline`, replace `readFileSync` + `JSON.parse` with `const baselineDoc = repo.load()`. If `baselineDoc === null`, throw `GateBaselineMissingError` (preserving today's error semantics at lines 124-126). The downstream `extractViolationsFromSarif(baselineDoc, baselinePath)` call still works — pass a synthetic identifier for the second arg (e.g. `'<datastore>'`) since there's no file path anymore.
 6. `GateBaselineInvalidError` becomes effectively unreachable (we control the encode/decode), but keep the class — it's part of the public exception surface. The `JSON.parse` try/catch at lines 134-138 can be deleted since `repo.load()` returns the already-parsed object.
-7. The constant `DEFAULT_BASELINE_PATH` (`gate.ts:97`) becomes meaningless and should be removed. Audit consumers via `grep -rn "DEFAULT_BASELINE_PATH" packages/fitness packages/cli --include="*.ts"` and update them — the `--baseline <path>` CLI flag no longer makes sense in v2 (everything goes to the single datastore.sqlite); document the removal in the CHANGELOG (Phase 5).
+7. The constant `DEFAULT_BASELINE_PATH` (`gate.ts:97`) becomes meaningless and should be removed. **Before removing the `--baseline <path>` CLI flag, verify external usage:**
+   - `grep -rn "DEFAULT_BASELINE_PATH" packages/fitness packages/cli --include="*.ts"` — internal call sites
+   - `grep -rn "\\-\\-baseline" .github/workflows/ docs/ README.md CHANGELOG.md` — CI integration docs and user-facing examples
+   - `grep -rn "baseline.sarif\\|baseline\\.json" docs/ README.md` — references in examples
+   
+   If the flag is used outside the v1 internal `gate.ts` call sites — especially in CI examples or README — **decide explicitly** before removal: (a) drop the flag and document loudly in CHANGELOG breaking-changes (current plan); (b) keep `--baseline <name>` as a named-baseline selector pointing at a row in the table (feature work; out of scope). Default to (a) unless meaningful external usage is found.
 8. Update all call sites. Grep: `grep -rn "saveBaseline\|compareToBaseline" packages/fitness packages/cli --include="*.ts" | grep -v __tests__`. Thread the repo from `ToolCliContext.datastore`.
 
 **Wiring:** Gate commands invoked via `ToolCliContext.datastore`. The fitness tool's `register(cli, ctx)` constructs a `FitBaselineRepo` from `ctx.datastore` and passes it down.

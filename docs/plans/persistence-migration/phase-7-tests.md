@@ -24,8 +24,10 @@ The phase is structured around three test scopes: per-package unit tests (agains
 1. Lifecycle tests: open → use → close cycle for both backends. Verify close is idempotent (calling twice doesn't throw) and post-close access fails predictably.
 2. Transaction tests: nested transactions (Drizzle's behavior — likely throws or no-ops; verify expected behavior and lock it down); rollback on error; commit on success.
 3. Factory tests: opening with `backend: 'memory'` produces an isolated store (two memory backends in the same process don't share data); opening with `backend: 'sqlite'` produces a file that re-opens with state intact across factory calls.
-4. Migration application: open against an empty SQLite file, observe that all migrations apply cleanly. Open against a SQLite file at the latest migration, observe no-op.
-5. Concurrency smoke (WAL mode): open two SQLite handles against the same file path; one writer + one reader can coexist; document any locking caveats observed.
+4. Migration application — happy path: open against an empty SQLite file, observe that all migrations apply cleanly. Open against a SQLite file at the latest migration, observe no-op.
+5. **Migration application — schema bump path** (covers the v2.x → v2.y upgrade story): seed an in-memory DB with the *initial* migration only (skipping later ones via a custom `migrationsFolder` pointing at a fixture), then re-open with the *full* migrations folder and confirm later migrations apply on top. This is the test that catches "we shipped an in-place edit of a previous migration" type bugs — without it, the schema-evolution workflow documented in Phase 0 Task 0.5 has no verification.
+6. **`DataStoreMigrationError` corruption recovery path** (covers the failure-mode story): corrupt the SQLite file header (e.g., write garbage to the first 16 bytes), attempt to open, assert `DataStoreMigrationError` is thrown, assert the error message contains the recovery hint about deleting the file. Without this test, the documented recovery path is unverified.
+7. Concurrency smoke (WAL mode): open two SQLite handles against the same file path; one writer + one reader can coexist; document any locking caveats observed.
 
 **Wiring:** Tests run via `pnpm --filter=@opensip-tools/datastore test`.
 

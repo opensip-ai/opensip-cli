@@ -25,6 +25,7 @@ Tasks 0.1 → 0.6 are ordered by dependency: scaffolding first, then interface, 
    - `name: "@opensip-tools/datastore"`
    - `version: "0.0.0"` (will be bumped to 2.0.0 in Phase 5)
    - `type: "module"`, `main: "./dist/index.js"`, `types: "./dist/index.d.ts"`, `exports: { ".": "./dist/index.js" }`
+   - **`files: ["dist", "migrations"]`** — critical. By default npm publishes everything under the package root, but the project convention (visible in `packages/core/package.json` etc.) uses an explicit `files` allowlist. If datastore follows that convention without including `migrations/`, the published tarball ships without migration SQL and users hit "no migrations folder" on first run. This is the single subtlest gotcha in the entire plan.
    - Standard scripts: `build` (tsc), `test` (vitest run), `typecheck` (tsc --noEmit), `clean` (rm -rf dist)
    - License, repository, homepage, bugs fields matching the other packages
 3. Create `packages/datastore/tsconfig.json` extending the root `tsconfig.json` (mirror what `packages/core/tsconfig.json` does); set `outDir: "./dist"` and include `src/**/*.ts`.

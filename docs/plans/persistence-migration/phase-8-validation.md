@@ -25,13 +25,18 @@ This phase is a scaffold. opensip-tools does not have the OpenSIP backend's "lab
    pnpm exec opensip-tools dashboard         # generates HTML report
    pnpm exec opensip-tools sessions list     # lists 3+ sessions
    ```
-3. Warm run (second invocation):
+3. Warm run (second invocation), **timed**:
    ```bash
-   pnpm fit                                  # warm; fit_file_cache hits
-   pnpm graph                                # warm; catalog cache hit
+   time pnpm fit                             # warm; fit_file_cache hits
+   time pnpm graph                           # warm; catalog cache hit
    ```
-   Both warm runs should be measurably faster than cold. Record the times for the parity benchmark.
-4. Invalidation check: edit a source file, re-run `pnpm graph`; observe partial rebuild driven by fingerprint mismatch (full rebuild is acceptable at parity — the perf follow-up makes it partial).
+   Both warm runs should be measurably faster than cold. **Record cold and warm wall-clock seconds for both fit and graph.**
+4. **Parity benchmark — quantitative comparison against v1.** Compare v2 numbers to the v1 baseline captured before Phase 3 began (per Phase 3's pre-phase prerequisite). Apply these thresholds:
+   - **v2 cold rebuild ≤ 1.5× v1 cold rebuild** — parity allows some overhead for the SQLite write path (whole-catalog replace, FK constraints, WAL journaling); a regression beyond 1.5× indicates a missing index, an unbatched insert, or a transaction-boundary issue worth investigating before merge.
+   - **v2 warm load ≤ v1 warm load** — the load path is what `pipeline/indexes.ts` consumes; at parity it's still building in-memory maps from a `Catalog` value. SQLite's read shouldn't add overhead vs `JSON.parse`. If it does, the `loadFullCatalog()` join is likely missing an index.
+   - **v2 dashboard generation ≤ 1.2× v1 dashboard generation** — the dashboard's view derivations still consume the legacy `Catalog`; only the load path changed.
+   
+   **If any threshold is exceeded, do not merge Phase 3.** Investigate the regression. The catalog-perf follow-up plan is for *additive* wins on top of parity; it cannot recover from a parity regression introduced here.
 5. Database inspection:
    ```bash
    sqlite3 opensip-tools/.runtime/datastore.sqlite '.tables'
@@ -39,13 +44,14 @@ This phase is a scaffold. opensip-tools does not have the OpenSIP backend's "lab
    sqlite3 opensip-tools/.runtime/datastore.sqlite "SELECT name, sql FROM sqlite_master WHERE type='index';"
    ```
    Verify every expected table and index is present.
-6. WAL files check:
+6. Invalidation check: edit a source file, re-run `pnpm graph`; observe partial rebuild driven by fingerprint mismatch (full rebuild is acceptable at parity — the perf follow-up makes it partial).
+7. WAL files check:
    ```bash
    ls opensip-tools/.runtime/datastore.sqlite*
    ```
    Expect `datastore.sqlite`, `datastore.sqlite-wal`, `datastore.sqlite-shm` during operation; the WAL/SHM files may be empty or absent after clean shutdown depending on SQLite's WAL checkpoint timing — both states are acceptable.
 
-**Verification:** All commands above complete without error. Warm runs are not slower than cold runs.
+**Verification:** All commands above complete without error. Cold/warm timing thresholds met against v1 baseline.
 
 ---
 
@@ -70,13 +76,19 @@ This phase is a scaffold. opensip-tools does not have the OpenSIP backend's "lab
 
 **Files:** [no files modified — runtime validation only]
 
-**Context:** `better-sqlite3` ships prebuilt binaries for the common platforms. Smoke-test on at least the developer's platform; CI matrix exercises additional platforms in normal builds.
+**Context:** `better-sqlite3` ships prebuilt binaries for the common platforms. The native-module concern is real and worth verifying at PR time, not after release. Smoke-test on the developer's platform; CI matrix exercises additional platforms.
 
 **Steps:**
 
 1. On the developer's machine (Darwin per the environment): `pnpm install && pnpm build && pnpm test` — verify clean.
-2. CI: confirm the build matrix runs against Linux x64, macOS x64+arm64, Windows x64 (whatever the existing matrix is — verify in `.github/workflows/`).
-3. If install fails on any platform due to prebuilt-binary unavailability, document the workaround (likely `npm config set build-from-source true`) in the README upgrade section.
+2. Inspect `.github/workflows/` to confirm the existing CI matrix covers, at minimum:
+   - Linux glibc x64 (most common runner)
+   - macOS x64 + macOS arm64
+   - Windows x64
+   
+   These are the platforms with reliable better-sqlite3 prebuilts. If the matrix includes **Alpine Linux (musl)**, prebuilt binaries may not exist — confirm by inspecting `better-sqlite3`'s npm prebuilds page or by checking the install log on an Alpine runner. If Alpine is in the matrix and prebuilts don't cover it, either drop Alpine from the supported set or document the build-from-source fallback (`apt-get install python3 make g++` equivalent for Alpine) in the README.
+3. If install fails on any platform due to prebuilt-binary unavailability, document the workaround in the README upgrade section. The fallback is `npm_config_build_from_source=true` (env var) — slower install but always works given a C++ toolchain.
+4. Native-module reinstall: `rm -rf node_modules && pnpm install` on each platform; confirm clean install times are reasonable (target: under 60s on a warm cache; under 5min on a cold cache including better-sqlite3 prebuilt download).
 
 **Verification:** Builds clean on the developer's platform and in CI.
 

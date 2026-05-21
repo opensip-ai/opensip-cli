@@ -5,6 +5,23 @@
 
 This is the structural heart of the migration. Catalog is the largest object (~38MB JSON in this repo) and the dashboard's coupling/SCC/hot/trace derivations all read from it. The goal here is correctness; speed comes later.
 
+## Pre-phase prerequisite: capture v1 baseline timings
+
+Before any task in this phase begins, **the implementing agent must capture v1 catalog timing numbers from `main`** for the Phase 8 parity comparison. These numbers cannot be measured after Phase 3 lands.
+
+```bash
+# From main, before Phase 3 work:
+git stash                                                     # if you have phase-0..2 work staged
+git checkout main && pnpm install && pnpm build
+rm -rf opensip-tools/.runtime
+time pnpm graph                                               # COLD: record wall-clock seconds
+time pnpm graph                                               # WARM: record wall-clock seconds
+# Record both numbers in a comment in this phase doc or in the Phase 8 doc.
+git checkout - && git stash pop                               # back to your work
+```
+
+Phase 8 Task 8.1 will compare v2 numbers against these. Without this measurement, "parity" cannot be verified objectively.
+
 ## Locked design calls (resolved before phase begins)
 
 Two decisions need to be made up front; both are answered here rather than deferred to PR scoping.
@@ -116,6 +133,7 @@ Be deliberate about what's in this PR vs the perf follow-up:
 4. Co-locate row ↔ domain mapping helpers (`rowToOccurrence`, `occurrenceToRow`, etc.) inside this file. Do not leak Drizzle column names outside the repo.
 5. **Do not** add per-view query methods (`getCouplingFor(...)`, `enumerateSCCs()`, etc.) in this phase. Those belong to the catalog-perf follow-up.
 6. The "whole-catalog write" pattern is intentionally non-incremental. The `--packages` runner's children each call `replaceAll` for their own scope — under WAL mode this is safe but serialized. The perf follow-up replaces this with per-package incremental writes.
+7. **Emit logger events** per the plan's logger-event-parity convention, mirroring the v1 events that lived in `cache/read.ts` and `cache/write.ts`: `graph.catalog.read.hit` (include `functions` count, matching v1's `cache/read.ts:67`), `graph.catalog.read.miss` (include `reason` field: `'empty-catalog'`, `'fingerprint-mismatch'`), `graph.catalog.write.complete` (include row counts), `graph.catalog.*.error` on thrown errors.
 
 **Wiring:** Consumed by `orchestrate.ts` (Task 3.3) and `cache/invalidate.ts` (Task 3.4). The dashboard's view-derivation modules under `packages/contracts/src/persistence/dashboard/code-paths/` keep calling `loadFullCatalog()` at parity in this PR; they migrate to targeted queries in the follow-up.
 

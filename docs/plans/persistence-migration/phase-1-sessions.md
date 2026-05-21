@@ -58,6 +58,7 @@ pnpm --filter=@opensip-tools/datastore db:check
    - `get(id: string): StoredSession | null` — by primary key.
    - `purge(before: Date): number` — deletes sessions with timestamp earlier than the given date; FK cascade removes findings. Returns affected rowcount.
 3. `StoredSession` type stays in `store.ts` for now (Task 1.3 collapses store.ts to a facade); SessionRepo imports it.
+4. **Emit logger events** per the plan's logger-event-parity convention: `session.save.complete` on successful save (include `sessionId`, `tool`, `findingCount`), `session.list.complete` (include result count), `session.purge.complete` (include affected rowcount), `session.*.error` on any thrown error. Use `logger.info` for happy paths and `logger.error` for the error variants, matching the v1 pattern in `cache/write.ts`.
 
 **Wiring:** Constructed by `cli/src/index.ts` when building `ToolCliContext` (Task 1.4) and exposed via the context's `datastore`-derived API. The dashboard generator (Task 1.6) takes a `SessionRepo` instance.
 
@@ -174,6 +175,7 @@ pnpm fit                                     # smoke: runs against the real CLI
 3. Update `dashboard/sessions.ts` to take a `SessionRepo` instance (or the `DataStore`) as input rather than reading from old module state.
 4. Update `dashboard/generator.ts`'s signature to accept `{ datastore: DataStore }` (or a constructed repo) so it can hydrate session data. Confirm the dashboard's overall entrypoint (likely `generator.ts`'s exported function) propagates this.
 5. Audit other files under `packages/contracts/src/persistence/dashboard/` for any other consumer of the old store helpers (search for `readSession`, `listSessions`, or whatever exported names existed). Update each.
+6. **Catalog read path through the dashboard.** The dashboard's view derivations (`view-coupling.ts`, `view-sccs.ts`, etc. under `dashboard/code-paths/`) currently receive a `Catalog` value as input. After this task, **`generator.ts` constructs both `SessionRepo` and `CatalogRepo` from the DataStore, calls `catalogRepo.loadFullCatalog()`, and passes the resulting legacy `Catalog` shape down to the view derivations.** The view files themselves do not change in this phase; they keep consuming the same `Catalog` shape. The catalog-perf follow-up plan rewrites them to query the DataStore directly.
 
 **Wiring:** Dashboard tests (`packages/contracts/src/__tests__/dashboard-*.test.ts`) are the regression net. They must continue to pass once they're updated to construct an in-memory DataStore in setup. Test updates land in Phase 6; signature changes here may temporarily break those tests — acceptable within the phase.
 
@@ -201,6 +203,7 @@ pnpm fit && pnpm exec opensip-tools sessions list
 
 1. Open `packages/cli/src/commands/uninstall.ts` and confirm the `--project` mode removes `<path>/opensip-tools/` recursively (the file's top-comment at lines 12–22 documents exactly this behavior). The SQLite database, its `-wal` and `-shm` sidecar files, and any logs/reports are all under that path.
 2. No code change. Add a single inline comment near the removal call noting that `.runtime/datastore.sqlite` and its sidecars are covered transitively — future contributors should not need to re-derive this.
+3. **Windows file-locking caveat.** On Windows, if the CLI is actively running (holding the DB open) when `uninstall --project` is invoked from another process, file locking may prevent removal of `datastore.sqlite-wal` and `datastore.sqlite-shm`. Linux/macOS unlink semantics tolerate this. Add a note to the comment: "On Windows, ensure no opensip-tools CLI process is active when running uninstall — open file handles may block WAL/SHM removal."
 
 **Wiring:** Used directly by the `opensip-tools uninstall` command.
 

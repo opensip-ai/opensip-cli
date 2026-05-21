@@ -58,6 +58,7 @@ pnpm --filter=@opensip-tools/datastore db:check
    - `load(): readonly Signal[]` — `db.select().from(graphBaselineSignals).all()`; map rows back to `Signal` shape via `JSON.parse(row.payload)`.
    - `exists(): boolean` — for the `if no baseline, suggest --gate-save first` error path. Implement as a `SELECT 1 FROM graph_baseline_signals LIMIT 1`. Today's check at `gate.ts:63-67` is `existsSync(baselinePath)`; the row-presence check is the SQLite equivalent.
 3. Co-locate the row ↔ Signal mapping helpers inside this file (don't leak Drizzle column names outside the repo).
+4. **Emit logger events** per the plan's logger-event-parity convention: `graph.baseline.save.complete` (include signal count), `graph.baseline.load.complete` (include signal count), `graph.baseline.load.miss` for the empty-baseline case, `graph.baseline.*.error` on thrown errors.
 
 **Wiring:** Consumed by `gate.ts` (Task 2.3). Eventually consumed by any `--report-to` upload flow that snapshots the baseline.
 
