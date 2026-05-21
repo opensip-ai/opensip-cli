@@ -1,0 +1,125 @@
+# Persistence migration — JSON files to SQLite + Drizzle (v2)
+
+Replace JSON-file runtime persistence (`opensip-tools/.runtime/`) with a unified `DataStore` abstraction backed by SQLite via Drizzle ORM. Hard cut at v2.0.0; no data migration.
+
+## Problem
+
+opensip-tools persists internal runtime state as JSON files. This worked at v1 scale but no longer fits the access patterns:
+
+- `packages/graph/engine/src/cache/read.ts:36` rehydrates the entire catalog via `readFileSync + JSON.parse` on every warm run. The catalog is **38MB** in this repo today; on a large monorepo it extrapolates to GB-scale.
+- Sessions accrete as one-JSON-file-per-run under `.runtime/sessions/`. `sessions list` is a directory scan; no indexed queries, no time-range filters.
+- The dashboard generator (`packages/contracts/src/persistence/dashboard/`) builds rich derivations — SCCs, coupling, hot functions, traces — as in-memory passes over the loaded catalog rather than as SQL queries.
+- Every tool reaches directly into `node:fs` for persistence; there's no abstraction seam, no test isolation, no central schema versioning.
+
+The first-order pain is catalog read time. The second-order pain is the architectural debt that blocks any structural fix.
+
+## Target State
+
+A new `@opensip-tools/datastore` package between `core` and `contracts` exposes a `DataStore` interface backed by SQLite. Each tool owns its own Drizzle schema (sessions in contracts; catalog + baseline in graph; file-cache + baseline in fitness). The CLI bootstrap opens one DataStore per invocation, passes it through `ToolCliContext`, and closes it on shutdown.
+
+After the migration:
+
+- `opensip-tools/.runtime/datastore.sqlite` is the single binary store for tool-produced data.
+- `cache/read.ts`, `cache/write.ts`, `cache/normalize.ts` are deleted.
+- `persistence/store.ts` is a thin facade over `SessionRepo`.
+- Both `gate.ts` files (graph + fitness) use repository APIs.
+- v1's `.runtime/` JSON layout is **not migrated**. v2 ignores v1 state; users wanting old data stay on v1.x.
+- Logs, dashboard HTML reports, SARIF, `--json` output, user-authored content (`opensip-tools.config.yml`, recipes, scenarios, custom checks) all stay as files.
+
+## Design Principles
+
+**No backwards compatibility.** v2 is a hard cut. No JSON-fallback code paths, no feature flags, no compatibility shims.
+
+**No data migration.** Runtime state under `.runtime/` is already classified as ephemeral (gitignored, rebuildable). A JSON → SQLite migrator is one-release dead code with no reusable payoff. Document the break in CHANGELOG; SemVer is the contract.
+
+**One paradigm, one dialect, one query layer.** Relational, SQLite, Drizzle. No Postgres backend (opensip is the separate SaaS product). No JSON-as-backend adapter (paradigm-bridging adapters collapse to lowest common denominator).
+
+**Tool-produced data → SQLite. Everything else stays as files.** The "regenerate or lost?" litmus test: if deleting `datastore.sqlite` should rebuild automatically, it belongs there. If deletion is data loss (user authored, source, contract output), it stays as a file.
+
+**Schemas live with their owners.** Datastore is paradigm-agnostic infrastructure. `@opensip-tools/contracts` owns the sessions schema. `@opensip-tools/graph` owns catalog and baseline schemas. `@opensip-tools/fitness` owns file-cache and baseline schemas. Adding a new tool means adding a new schema module; no datastore changes.
+
+**Architectural compliance, observability, hardening, audit, and pattern decisions.** opensip-tools does not have the OpenSIP backend's downstream plan-improvements pipeline. Compliance concerns that *do* apply (dependency-cruiser layer rules, ESLint enforcement, the existing 0-error lint policy from `CLAUDE.md`) are exercised through normal `pnpm lint` runs at every phase; they are not pre-baked into task descriptions.
+
+The long-form architectural reasoning (Drizzle vs raw SQL, rejection of paradigm-bridging adapters, why no Postgres, the Drizzle margin honest reassessment) lives in [`decisions.md`](./decisions.md).
+
+## Phases
+
+| Phase | Name | Description | Depends On |
+|-------|------|-------------|------------|
+| 0 | Datastore foundation | New `@opensip-tools/datastore` package; `DataStore` interface; SQLite + in-memory backends; Drizzle wiring; layer policy update | — |
+| 1 | Sessions on datastore | Sessions schema in contracts; rewrite `store.ts` as facade; extend `ToolCliContext`; CLI commands; dashboard hookup | 0 |
+| 2 | Graph baseline on datastore | Graph `persistence/` module; `BaselineRepo`; rewrite `graph/gate.ts` | 0 |
+| 3 | Graph catalog on datastore (parity) | Catalog schema; `CatalogRepo`; rewrite orchestrator; fingerprint storage; delete `cache/read.ts`+`cache/write.ts`+`cache/normalize.ts` | 0, 2 |
+| 4 | Fit file-cache and baseline | Fitness `persistence/` module; `FileCacheRepo`+`BaselineRepo`; rewrite `fitness/gate.ts` and `file-cache.ts` | 0 |
+| 5 | Cleanup and v2 release | Docs rewrite (`session-and-persistence.md`, `layer-policy.md`); CHANGELOG; README upgrade; fixture cleanup; version bump | 1, 2, 3, 4 |
+| 6 | Tests | Scaffold — unit + integration coverage for every phase | All |
+| 7 | Validation | Scaffold — end-to-end against real SQLite-on-disk; dashboard tests as regression net | All including 6 |
+
+Notes:
+- **Catalog perf work** (sharded reads, view derivations to SQL, content-addressed dedup, incremental rebuild) is explicitly **out of scope** for this plan. It lands as a follow-up: anticipated `docs/plans/graph-catalog-perf/`. This plan delivers SQLite-at-parity for the catalog; the follow-up delivers the perf wins.
+- Phases 2 and 4 are independent of each other and of Phase 1; they may run in parallel after Phase 0.
+
+## Dependency Graph
+
+```
+Phase 0 (Datastore foundation)
+├── Phase 1 (Sessions on datastore)
+├── Phase 2 (Graph baseline on datastore)
+│     └── Phase 3 (Graph catalog on datastore — parity)
+└── Phase 4 (Fit file-cache and baseline)
+                                              ↓
+                                Phase 5 (Cleanup and v2 release)
+                                              ↓
+                                Phase 6 (Tests)
+                                              ↓
+                                Phase 7 (Validation)
+```
+
+Phases 1, 2, and 4 are independent after Phase 0. Phase 3 depends on Phase 2 (shares the graph `persistence/` module). Phases 1, 3, and 4 can be merged in any order before Phase 5.
+
+## File Change Summary
+
+| Phase | New Files | Modified Files |
+|-------|-----------|----------------|
+| 0 | `packages/datastore/` (entire new package: package.json, tsconfig, vitest.config, drizzle.config, src/index.ts, src/data-store.ts, src/factory.ts, src/backends/sqlite.ts, src/backends/memory.ts, migrations/, tests) | `.dependency-cruiser.cjs`, root `tsconfig.json`, `turbo.json` (verify), `RELEASING.md` |
+| 1 | `packages/contracts/src/persistence/schema/sessions.ts`, `schema/index.ts`, `session-repo.ts` | `packages/contracts/src/persistence/store.ts`, `dashboard/sessions.ts`, `dashboard/generator.ts`, `index.ts`, `package.json`; `packages/cli/src/index.ts`, `commands/uninstall.ts`, `commands/sessions.ts` (or wherever list/purge live), `package.json`; `packages/core/src/tools/types.ts` |
+| 2 | `packages/graph/engine/src/persistence/index.ts`, `schema.ts`, `baseline-repo.ts` | `packages/graph/engine/src/gate.ts`, `package.json` |
+| 3 | `packages/graph/engine/src/persistence/catalog-repo.ts`; additions to existing `schema.ts` | `packages/graph/engine/src/cli/orchestrate.ts`, `cache/invalidate.ts`, `pipeline/indexes.ts` |
+| 3 (deletes) | — | Delete: `packages/graph/engine/src/cache/read.ts`, `cache/write.ts`, `cache/normalize.ts` |
+| 4 | `packages/fitness/engine/src/persistence/index.ts`, `schema.ts`, `baseline-repo.ts`, `file-cache-repo.ts` | `packages/fitness/engine/src/gate.ts`, `framework/file-cache.ts`, `package.json` |
+| 5 | `CHANGELOG.md` v2.0.0 entry | `docs/web/50-runtime/03-session-and-persistence.md`, `docs/web/90-conventions/02-layer-policy.md`, `README.md`, `RELEASING.md` (confirm), root `package.json` (version bump), test fixtures under `packages/cli/src/__tests__/fixtures/*/opensip-tools/.runtime/` |
+| 6 | Test files alongside new source files (`__tests__/*.test.ts`) | Test updates in dashboard tests, gate tests, session tests |
+| 7 | — | — (validation scaffolding only) |
+
+## Critical Files Reference
+
+| File | Role | Key Structures |
+|------|------|----------------|
+| `packages/graph/engine/src/cache/read.ts` | Catalog JSON reader (to be deleted, Phase 3) | `readCatalog(catalogPath: string): Catalog \| null` at line 25 |
+| `packages/graph/engine/src/cache/write.ts` | Streamed catalog JSON writer (to be deleted, Phase 3) | `writeCatalog(catalogPath, catalog)` at line 36; streaming logic at lines 71–148 |
+| `packages/graph/engine/src/cache/normalize.ts` | Helper for the streamed writer (to be deleted, Phase 3) | Consumed only by `write.ts`; tests reference directly |
+| `packages/graph/engine/src/cache/invalidate.ts` | Fingerprint algorithm + classifier (to be modified, Phase 3) | `computeFilesFingerprint`, `classifyCatalog` |
+| `packages/graph/engine/src/gate.ts` | Graph baseline I/O (to be rewritten, Phase 2) | `saveBaseline(signals, baselinePath)` at line 34; `compareBaseline(...)` at line 61 |
+| `packages/graph/engine/src/cli/orchestrate.ts` | Pipeline orchestrator (modified Phase 3) | `runGraph(input: RunGraphInput): Promise<RunGraphResult>`; calls `readCatalog`/`writeCatalog` today |
+| `packages/graph/engine/src/pipeline/indexes.ts` | In-memory catalog indexes (modified Phase 3 at parity) | `buildIndexes(catalog): Indexes` — at parity, still in-memory; perf follow-up rewrites |
+| `packages/contracts/src/persistence/store.ts` | Sessions JSON store + global path config (to be rewritten, Phase 1) | `StoredSession` interface; `configurePersistencePaths(paths)` at line 92; mutable singleton state |
+| `packages/contracts/src/persistence/dashboard/generator.ts` | Dashboard HTML generator (modified Phase 1) | Reads sessions + catalog data to produce HTML |
+| `packages/contracts/src/persistence/dashboard/sessions.ts` | Session-list rendering for dashboard (modified Phase 1) | Reads from store today; reads from `SessionRepo` after migration |
+| `packages/fitness/engine/src/gate.ts` | Fit baseline I/O (to be rewritten, Phase 4) | `writeFileSync(baselinePath, ...)` at line 104; `readFileSync(baselinePath, ...)` at line 132 |
+| `packages/fitness/engine/src/framework/file-cache.ts` | Fit file-cache (persistent — modified Phase 4) | Reads/writes cache entries; confirmed persistent during research |
+| `packages/cli/src/index.ts` | CLI bootstrap (modified Phase 1) | `resolveProjectPaths(cwd)` at line 236; `configurePersistencePaths(projectPaths)` at line 238; `buildToolCliContext()` at line 247 |
+| `packages/cli/src/commands/uninstall.ts` | Uninstall flow (modified Phase 1) | Currently cleans up config + state dirs; extend to drop `datastore.sqlite` |
+| `packages/core/src/tools/types.ts` | `ToolCliContext` type (modified Phase 1) | `interface ToolCliContext` at line 60 — gains `datastore: DataStore` field |
+| `packages/datastore/src/data-store.ts` (new — Phase 0) | DataStore interface | `interface DataStore` with Drizzle handle, transaction wrapper, close |
+| `packages/datastore/src/factory.ts` (new — Phase 0) | DataStore construction | `DataStoreFactory.open(opts): Promise<DataStore>` |
+| `.dependency-cruiser.cjs` | Layer-policy enforcement (modified Phase 0) | Add `@opensip-tools/datastore` between `core` and `contracts`; datastore depends only on core |
+
+## Per-Task Verification Standard
+
+At the end of every task, run:
+
+```bash
+pnpm build && pnpm typecheck && pnpm test && pnpm lint
+```
+
+`pnpm lint` runs both ESLint and dependency-cruiser; both must be 0-error per `CLAUDE.md`. Phase-specific verification commands appear in each phase file.
