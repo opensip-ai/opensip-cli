@@ -165,6 +165,22 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.19.15)(jsdom@29.1.1)
 
+  packages/datastore:
+    dependencies:
+      '@opensip-tools/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.15
+      typescript:
+        specifier: ~5.7.0
+        version: 5.7.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.15)(jsdom@29.1.1)
+
   packages/fitness/checks-cpp:
     dependencies:
       '@opensip-tools/fitness':
