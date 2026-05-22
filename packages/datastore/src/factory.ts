@@ -15,19 +15,27 @@ function defaultMigrationsFolder(): string {
 
 export const DataStoreFactory = {
   open(opts: DataStoreOpenOptions & { migrationsFolder?: string }): DataStore {
-    const datastore =
-      opts.backend === 'memory'
-        ? openMemoryBackend()
-        : openSqliteBackend({ path: requireSqlitePath(opts) });
+    const recoveryHint =
+      opts.backend === 'sqlite' && opts.path
+        ? `Schema migration failed; the local cache may be corrupted or from a future version. Delete \`${opts.path}\` to start fresh (cache will rebuild on next run; session history will be lost).`
+        : 'Schema migration failed against the in-memory backend; this is likely a programming error.';
+
+    let datastore: DataStore;
+    try {
+      datastore =
+        opts.backend === 'memory'
+          ? openMemoryBackend()
+          : openSqliteBackend({ path: requireSqlitePath(opts) });
+    } catch (error) {
+      // Corrupted file (bad SQLite header), missing dir, permission errors, etc.
+      throw new DataStoreMigrationError(recoveryHint, { cause: error });
+    }
+
     const migrationsFolder = opts.migrationsFolder ?? defaultMigrationsFolder();
     try {
       migrate(datastore.db, { migrationsFolder });
     } catch (error) {
       datastore.close();
-      const recoveryHint =
-        opts.backend === 'sqlite' && opts.path
-          ? `Schema migration failed; the local cache may be corrupted or from a future version. Delete \`${opts.path}\` to start fresh (cache will rebuild on next run; session history will be lost).`
-          : 'Schema migration failed against the in-memory backend; this is likely a programming error.';
       throw new DataStoreMigrationError(recoveryHint, { cause: error });
     }
     return datastore;
