@@ -70,6 +70,7 @@ function extractNodeMajor(constraint: string): number | null {
  */
 function extractPnpmVersion(packageManager: string): string | null {
   const match = /^pnpm@([\d.]+)/.exec(packageManager)
+  /* v8 ignore next -- defensive: regex ([\d.]+) capture is guaranteed when match succeeds */
   return match?.[1] ?? null
 }
 
@@ -78,8 +79,10 @@ function extractPnpmVersion(packageManager: string): string | null {
  * e.g. "10.28.2" → 10
  */
 function extractMajor(version: string): number {
+  /* v8 ignore next -- defensive: split always returns at least one element */
   const major = version.split('.')[0] ?? '0'
   const parsed = Number.parseInt(major, 10)
+  /* v8 ignore next -- defensive: parseInt on digit-only string is always finite */
   return Number.isFinite(parsed) ? parsed : 0
 }
 

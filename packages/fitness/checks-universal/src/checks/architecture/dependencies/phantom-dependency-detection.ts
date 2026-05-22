@@ -139,6 +139,7 @@ function extractPackageName(importSpecifier: string): string | null {
   // Skip Node.js built-ins
   if (
     NODE_BUILTINS.has(importSpecifier) ||
+    /* v8 ignore next -- defensive: split always returns at least one element */
     NODE_BUILTINS.has(importSpecifier.split('/')[0] ?? '')
   ) {
     return null
@@ -154,6 +155,7 @@ function extractPackageName(importSpecifier: string): string | null {
   }
 
   // Handle regular packages (pkg or pkg/subpath)
+  /* v8 ignore next -- defensive: split always returns at least one element */
   return importSpecifier.split('/')[0] ?? null
 }
 

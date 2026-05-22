@@ -113,6 +113,7 @@ export const hasuraProductionConfig = defineCheck({
       msg: 'Analyzing production docker-compose files for Hasura security settings',
     })
     const prodFiles = files.paths.filter((p) => {
+      /* v8 ignore next -- defensive: split + pop on a non-empty string never returns undefined */
       const filename = p.split('/').pop() ?? ''
       return filename.includes('prod')
     })

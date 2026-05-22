@@ -19,6 +19,7 @@ function analyzeTimerLifecycle(content: string, _filePath: string): CheckViolati
   let hasClearInterval = false
 
   for (const [i, line_] of lines.entries()) {
+    /* v8 ignore next -- defensive: lines.entries() never yields undefined */
     const line = line_ ?? ''
     const trimmed = line.trim()
 
@@ -28,6 +29,7 @@ function analyzeTimerLifecycle(content: string, _filePath: string): CheckViolati
     // Detect setInterval with variable capture
     const intervalMatch = /(?:const|let|var)\s+(\w+)\s*=\s*setInterval\s*\(/.exec(line)
     if (intervalMatch) {
+      /* v8 ignore next -- defensive: regex (\w+) capture group always yields a string */
       intervalCreations.push({ line: i + 1, varName: intervalMatch[1] ?? null })
     } else if (/\bsetInterval\s*\(/.test(line) && !line.includes('clearInterval')) {
       // setInterval without variable capture
