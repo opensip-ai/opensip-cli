@@ -152,3 +152,32 @@ describe('SessionRepo — JSON round-trip', () => {
     expect(repo.get(session.id)?.summary).toEqual(session.summary);
   });
 });
+
+describe('SessionRepo — latest', () => {
+  it('returns null when no sessions exist', () => {
+    expect(repo.latest()).toBeNull();
+  });
+
+  it('returns the most recent session by timestamp', () => {
+    repo.save(makeSession({ id: 'old', timestamp: '2026-05-01T00:00:00.000Z' }));
+    repo.save(makeSession({ id: 'newer', timestamp: '2026-05-15T00:00:00.000Z' }));
+    expect(repo.latest()?.id).toBe('newer');
+  });
+});
+
+describe('SessionRepo — error paths', () => {
+  it('save() rethrows after closing datastore', () => {
+    datastore.close();
+    expect(() => repo.save(makeSession())).toThrow();
+  });
+
+  it('list() rethrows after closing datastore', () => {
+    datastore.close();
+    expect(() => repo.list()).toThrow();
+  });
+
+  it('purge() rethrows after closing datastore', () => {
+    datastore.close();
+    expect(() => repo.purge(new Date())).toThrow();
+  });
+});
