@@ -1,10 +1,10 @@
 ---
 status: current
-last_verified: 2026-05-18
-release: v1.3.0
+last_verified: 2026-05-21
+release: v2.0.0
 title: "Layer policy"
 audience: [contributors]
-purpose: "The dependency-cruiser rules that enforce the five-layer architecture and the tool-internal partitioning rules (graph stages, dashboard panels), rule by rule, with rationale."
+purpose: "The dependency-cruiser rules that enforce the six-layer architecture and the tool-internal partitioning rules (graph stages, dashboard panels), rule by rule, with rationale."
 source-files:
   - .dependency-cruiser.cjs
   - pnpm-workspace.yaml
@@ -12,10 +12,11 @@ related-docs:
   - ../10-mental-model/03-modular-monolith.md
   - ./01-coding-standards.md
   - ../80-reference/01-package-catalog.md
+  - ../50-runtime/03-session-and-persistence.md
 ---
 # Layer policy
 
-The five-layer architecture (kernel → contracts → tools/lang/ → checks → cli) is enforced by [dependency-cruiser](https://github.com/sverweij/dependency-cruiser). Build fails on any forbidden edge. This doc walks every rule and the reasoning.
+The six-layer architecture (kernel → datastore → contracts → tools/lang/ → checks → cli) is enforced by [dependency-cruiser](https://github.com/sverweij/dependency-cruiser). Build fails on any forbidden edge. This doc walks every rule and the reasoning.
 
 For the conceptual layer narrative, see [`../10-mental-model/03-modular-monolith.md`](../10-mental-model/03-modular-monolith.md).
 
@@ -69,7 +70,7 @@ Production code can't import test files; source code can't import devDependencie
 
 ## Layer enforcement rules
 
-The seven rules that pin the cross-package layer cake.
+The eight rules that pin the cross-package layer cake.
 
 ### `core-imports-nothing-workspace`
 
@@ -78,6 +79,7 @@ The seven rules that pin the cross-package layer cake.
   from: { path: '^packages/core/src/' },
   to: {
     path: [
+      '^@opensip-tools/datastore',
       '^@opensip-tools/contracts',
       '^@opensip-tools/cli($|/)',
       '^@opensip-tools/fitness',
@@ -94,6 +96,31 @@ The kernel imports nothing from the workspace. Period.
 This is the load-bearing rule. The kernel is what every Tool depends on; if the kernel reached up to a Tool, every Tool would transitively import every other Tool. The Tool plugin model breaks; the layer cake collapses.
 
 The rule's path-list is exhaustive — every package outside `packages/core/` is forbidden. Adding a new package below `core` would require updating this rule (it doesn't, today — the kernel is the bottom).
+
+### `datastore-imports-core-only`
+
+```js
+{
+  from: { path: '^packages/datastore/src/' },
+  to: {
+    path: [
+      '^@opensip-tools/contracts',
+      '^@opensip-tools/cli($|/)',
+      '^@opensip-tools/fitness',
+      '^@opensip-tools/simulation',
+      '^@opensip-tools/lang-',
+      '^@opensip-tools/checks-',
+      '^@opensip-tools/graph',
+    ],
+  },
+}
+```
+
+`@opensip-tools/datastore` is paradigm-agnostic infrastructure (SQLite + Drizzle wrapper, factory, migration runner). It depends on `core` only — not on any tool, lang pack, check pack, or contracts package.
+
+The reasoning mirrors `contracts`: schemas live with their owning packages (sessions in contracts; baseline/catalog in graph; baseline in fitness). Datastore knows nothing about domain shapes — bundling them would invert the ownership and force schema changes to ripple through datastore.
+
+For the deeper rationale (why a separate package, why not core, why not contracts), see [`../50-runtime/03-session-and-persistence.md`](../50-runtime/03-session-and-persistence.md) and the persistence-migration decisions log.
 
 ### `contracts-imports-core-only`
 

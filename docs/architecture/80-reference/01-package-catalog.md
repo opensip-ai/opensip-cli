@@ -29,13 +29,16 @@ Pure types, registries, errors, IDs, logger, paths. No tool-specific knowledge.
 |---|---|---|---|
 | `@opensip-tools/core` | `packages/core/` | Kernel — language adapters, plugin loader, errors, logger, IDs, retry, project config, Tool registry | `Tool`, `ToolRegistry`, `defaultToolRegistry`, `LanguageAdapter`, `defaultLanguageRegistry`, `Signal`, `createSignal`, `discoverPlugins`, `discoverToolPackages`, `resolveProjectPaths`, `resolveUserPaths`, `logger`, `ToolError`, `ValidationError` |
 
-## Layer 2 — shared contract types
+## Layer 2 — datastore and shared contract types
 
-The contract layer between Tools and the runner. Output shapes, exit codes, persistence helpers consumed by every tool. Imports `core` only.
+`@opensip-tools/datastore` is the SQLite + Drizzle persistence kernel; it sits between `core` and `contracts` and depends only on `core`. Tools own their domain schemas (sessions in contracts; baseline/catalog in graph; baseline in fitness). Adding a new tool means adding a new schema module — datastore is paradigm-agnostic infrastructure.
+
+`@opensip-tools/contracts` defines the contract layer between Tools and the runner. Output shapes, exit codes, persistence helpers, dashboard generator. Imports `core` and `datastore` only.
 
 | Package | Path | Role | Key exports |
 |---|---|---|---|
-| `@opensip-tools/contracts` | `packages/contracts/` | Shared contract types — `CliOutput`/`CommandResult` shapes, exit codes, session persistence, dashboard generator | `CliOutput`, `CheckOutput`, `FindingOutput`, `CommandResult`, `EXIT_CODES`, `getErrorSuggestion`, `configurePersistencePaths`, `StoredSession`, `generateDashboardHtml`, `GraphCatalog` |
+| `@opensip-tools/datastore` | `packages/datastore/` | SQLite + Drizzle persistence kernel — `DataStore` interface, factory, in-memory + on-disk backends, workspace migration store under `migrations/` | `DataStore`, `DataStoreFactory`, `DataStoreOpenOptions`, `DataStoreMigrationError` |
+| `@opensip-tools/contracts` | `packages/contracts/` | Shared contract types — `CliOutput`/`CommandResult` shapes, exit codes, session persistence, dashboard generator | `CliOutput`, `CheckOutput`, `FindingOutput`, `CommandResult`, `EXIT_CODES`, `getErrorSuggestion`, `SessionRepo`, `StoredSession`, `generateDashboardHtml`, `GraphCatalog` |
 
 ## Layer 3 — tools and language adapters
 

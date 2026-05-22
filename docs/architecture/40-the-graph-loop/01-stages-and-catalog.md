@@ -20,8 +20,8 @@ source-files:
   - packages/graph/engine/src/lang-python/index.ts
   - packages/graph/engine/src/lang-rust/index.ts
   - packages/graph/engine/src/pipeline/indexes.ts
-  - packages/graph/engine/src/cache/read.ts
-  - packages/graph/engine/src/cache/write.ts
+  - packages/graph/engine/src/persistence/catalog-repo.ts
+  - packages/graph/engine/src/persistence/schema.ts
   - packages/graph/engine/src/cache/invalidate.ts
   - packages/graph/engine/src/cli/orchestrate.ts
   - packages/graph/engine/src/cli/scope.ts
@@ -203,9 +203,11 @@ The two rules that consume entry-points only see the resulting `EntryPoint[]` �
 
 ---
 
-## The catalog on disk
+## The catalog in SQLite
 
-The output of stages 1+2 is cached to [`<project>/opensip-tools/.runtime/cache/graph/catalog.json`](../../../packages/graph/engine/src/cache/) (gitignored). Format v3 (v1.3.0) is generic over language: the catalog carries a `language` field (the adapter id) and an opaque `cacheKey` (an adapter-supplied invalidation string). The pre-v3 fields `tsConfigPath` and `tsCompilerVersion` are gone; v2 catalogs on disk classify as `invalid` and trigger one cold rebuild on upgrade.
+The output of stages 1+2 is persisted to the project-local SQLite store at `<project>/opensip-tools/.runtime/datastore.sqlite` via [`CatalogRepo.replaceAll(catalog)`](../../../packages/graph/engine/src/persistence/catalog-repo.ts). The catalog rides a single row in the `graph_catalog` table: cache-validity fields (language, cacheKey, filesFingerprint) live in typed columns; the function/occurrence/edge data is stored as a JSON payload preserving v1's wire-shape exactly.
+
+The reconstructed `Catalog` value returned by `CatalogRepo.loadFullCatalog()` is identical to v1's `readCatalog` output — dashboard view derivations, rules, and indexes consume the same shape. Format v3 (v1.3.0) carries a `language` field (the adapter id) and an opaque `cacheKey` (an adapter-supplied invalidation string).
 
 ```jsonc
 {
@@ -248,7 +250,7 @@ The output of stages 1+2 is cached to [`<project>/opensip-tools/.runtime/cache/g
 
 Notable shape choices:
 
-- **Functions keyed by `simpleName`, not `bodyHash`.** The catalog file is meant to be `grep`-able. `grep -n '"saveBaseline"' catalog.json` lands you on the right entry; `grep -n 'a3f9c204'` does not.
+- **Functions keyed by `simpleName`, not `bodyHash`.** v1 stored the catalog as a `grep`-able JSON file; v2 stores it as a JSON payload inside SQLite. The keying is preserved for the in-memory `Catalog` shape that downstream views consume — switching to bodyHash-keyed in-memory would force every consumer to rewrite its lookups.
 - **Each value is an array.** Two functions named `analyze` in different files don't collide; the array holds both occurrences.
 - **`calls[i].to` is always an array.** Static (one element), polymorphic (many), unresolved (zero). Consumers don't switch on shape.
 - **Anonymous functions get angle-bracketed names** (`<arrow:...>`, `<module-init:...>`) so they can't collide with real identifiers.
@@ -265,7 +267,7 @@ Notable shape choices:
 
 The fingerprint is per-file `path|mtimeMs|size`, computed by `computeFilesFingerprint`. Mtime is cheap to read and stable enough — the ones that lie (formatter passes, `touch`, git clean rebuilds) cause an unnecessary incremental rebuild that produces a byte-identical result, not a correctness bug.
 
-Writes go through [`cache/write.ts`](../../../packages/graph/engine/src/cache/write.ts) and use the standard atomic pattern: `openSync(tmpPath); writeStreamed(fd, catalog); rename(tmpPath, catalogPath)`. The streamed writer (Phase 2 of the perf plan) emits the catalog entry-by-entry rather than as one materialised string, bounding the write peak by the largest single occurrence array. Output is byte-identical to the legacy `JSON.stringify(_, null, 2)` path so existing on-disk caches stay valid.
+Writes go through [`CatalogRepo.replaceAll`](../../../packages/graph/engine/src/persistence/catalog-repo.ts), an UPSERT into `graph_catalog` row 1 in a single transaction. SQLite's WAL mode + transactional semantics replace v1's tmp-file-and-rename atomicity; concurrent reads (e.g. from `graph --packages` child processes) don't see torn writes. Per-package incremental writes are explicitly deferred to a follow-up `graph-catalog-perf` plan.
 
 `--no-cache` skips both read and write — useful for the CI gate workflow and when investigating a suspected stale-catalog bug.
 

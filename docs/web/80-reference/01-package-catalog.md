@@ -29,13 +29,16 @@ Pure types, registries, errors, IDs, logger, paths. No tool-specific knowledge.
 |---|---|---|---|
 | `@opensip-tools/core` | `packages/core/` | Kernel — language adapters, plugin loader, errors, logger, IDs, retry, project config, Tool registry | `Tool`, `ToolRegistry`, `defaultToolRegistry`, `LanguageAdapter`, `defaultLanguageRegistry`, `Signal`, `createSignal`, `discoverPlugins`, `discoverToolPackages`, `resolveProjectPaths`, `resolveUserPaths`, `logger`, `ToolError`, `ValidationError` |
 
-## Layer 2 — shared contract types
+## Layer 2 — datastore and shared contract types
 
-The contract layer between Tools and the runner. Output shapes, exit codes, persistence helpers consumed by every tool. Imports `core` only.
+`@opensip-tools/datastore` is the SQLite + Drizzle persistence kernel; it sits between `core` and `contracts` and depends only on `core`. Tools own their domain schemas (sessions in contracts; baseline/catalog in graph; baseline in fitness). Adding a new tool means adding a new schema module — datastore is paradigm-agnostic infrastructure.
+
+`@opensip-tools/contracts` defines the contract layer between Tools and the runner. Output shapes, exit codes, persistence helpers, dashboard generator. Imports `core` and `datastore` only.
 
 | Package | Path | Role | Key exports |
 |---|---|---|---|
-| `@opensip-tools/contracts` | `packages/contracts/` | Shared contract types — `CliOutput`/`CommandResult` shapes, exit codes, session persistence, dashboard generator | `CliOutput`, `CheckOutput`, `FindingOutput`, `CommandResult`, `EXIT_CODES`, `getErrorSuggestion`, `configurePersistencePaths`, `StoredSession`, `generateDashboardHtml`, `GraphCatalog` |
+| `@opensip-tools/datastore` | `packages/datastore/` | SQLite + Drizzle persistence kernel — `DataStore` interface, factory, in-memory + on-disk backends, workspace migration store under `migrations/` | `DataStore`, `DataStoreFactory`, `DataStoreOpenOptions`, `DataStoreMigrationError` |
+| `@opensip-tools/contracts` | `packages/contracts/` | Shared contract types — `CliOutput`/`CommandResult` shapes, exit codes, session persistence, dashboard generator | `CliOutput`, `CheckOutput`, `FindingOutput`, `CommandResult`, `EXIT_CODES`, `getErrorSuggestion`, `SessionRepo`, `StoredSession`, `generateDashboardHtml`, `GraphCatalog` |
 
 ## Layer 3 — tools and language adapters
 
@@ -84,7 +87,7 @@ Imports every layer below. The published binary.
 ## Adding a new package
 
 1. **Decide the layer.** Apply the rules in [`../10-mental-model/03-modular-monolith.md`](/docs/opensip-tools/10-mental-model/03-modular-monolith/): kernel = zero tool knowledge; contracts = used by every tool; tools = own a Tool contract; language adapters = implement `LanguageAdapter`; check packs = ship `Check[]`; cli = composition root only.
-2. **Add the dep-cruiser carve-out** if needed. The default layer rules forbid most cross-layer edges; if your package needs an exception, add it to [`.dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/.dependency-cruiser.cjs) and document it in [`../90-conventions/02-layer-policy.md`](/docs/opensip-tools/90-conventions/02-layer-policy/).
+2. **Add the dep-cruiser carve-out** if needed. The default layer rules forbid most cross-layer edges; if your package needs an exception, add it to [`.dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/.dependency-cruiser.cjs) and document it in [`../90-conventions/02-layer-policy.md`](/docs/opensip-tools/90-conventions/02-layer-policy/).
 3. **Add a row** in the right table above with the canonical npm name, path, one-line role (concrete, not "fitness concerns"), and 1–3 key exports a reader would grep for.
 4. **Update the layer narrative** in `10-mental-model/03-modular-monolith.md` if the new package changes what the layer *means*. Pure additions to an existing pattern don't need a narrative edit — just the row here.
 
