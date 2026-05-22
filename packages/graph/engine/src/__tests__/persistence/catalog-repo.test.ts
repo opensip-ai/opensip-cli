@@ -81,7 +81,7 @@ describe('CatalogRepo', () => {
   it('falls back to empty filesFingerprint when input lacks it', () => {
     const { filesFingerprint, ...withoutFp } = makeCatalog();
     void filesFingerprint;
-    repo.replaceAll(withoutFp as Catalog);
+    repo.replaceAll(withoutFp);
     expect(repo.loadFullCatalog()?.filesFingerprint).toBeUndefined();
   });
 

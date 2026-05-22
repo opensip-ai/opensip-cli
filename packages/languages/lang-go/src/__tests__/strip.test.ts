@@ -15,7 +15,7 @@ describe('stripStrings (Go)', () => {
   });
 
   it('handles escape sequences in double-quoted strings', () => {
-    const out = stripStrings('s := "a\\"b"');
+    const out = stripStrings(String.raw`s := "a\"b"`);
     expect(out).not.toContain('a');
   });
 
@@ -24,7 +24,7 @@ describe('stripStrings (Go)', () => {
   });
 
   it('preserves rune literals with escape', () => {
-    expect(stripStrings("c := '\\n'")).toContain("'\\n'");
+    expect(stripStrings(String.raw`c := '\n'`)).toContain(String.raw`'\n'`);
   });
 
   it('handles unterminated rune literal at newline', () => {

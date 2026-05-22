@@ -34,9 +34,9 @@ export function parseClangTidyOutput(
     // (message); only group 6 (lintName) is optional. Non-null
     // assertions reflect the regex contract — runtime undefined here
     // would mean the regex changed without updating these reads.
-    const lineStr = match[2]!
-    const severity = match[4]!
-    const message = match[5]!
+    const lineStr = match[2]
+    const severity = match[4]
+    const message = match[5]
     const lintName = match[6]
     if (severity === 'note') continue
     violations.push({

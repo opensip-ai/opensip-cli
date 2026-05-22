@@ -61,7 +61,7 @@ other();
     const tree = parseSource(src, 'a.ts')!;
     const fns = typescriptQuery.findFunctions(tree);
     void fns;
-    const child = tree.statements[0]!;
+    const child = tree.statements[0];
     const loc = typescriptQuery.getLocation(tree, child);
     expect(loc.line).toBe(2);
     expect(loc.column).toBe(0);
@@ -70,7 +70,7 @@ other();
   it('getText returns the source text of the node', () => {
     const src = `const x = 1;`;
     const tree = parseSource(src, 'a.ts')!;
-    expect(typescriptQuery.getText(tree, tree.statements[0]!)).toBe('const x = 1;');
+    expect(typescriptQuery.getText(tree, tree.statements[0])).toBe('const x = 1;');
   });
 
   it('parseSource returns null on absurd input that can never form a SourceFile', () => {

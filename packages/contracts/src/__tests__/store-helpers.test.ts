@@ -17,7 +17,7 @@ describe('generateSessionId', () => {
 
 describe('sanitizeForFilename', () => {
   it('replaces path separators with dashes', () => {
-    expect(sanitizeForFilename('a/b\\c')).toBe('a-b-c');
+    expect(sanitizeForFilename(String.raw`a/b\c`)).toBe('a-b-c');
   });
 
   it('replaces special filesystem characters with dashes', () => {

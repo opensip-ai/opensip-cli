@@ -56,7 +56,7 @@ describe('stripStrings (C/C++)', () => {
   });
 
   it('preserves char literal with escape sequence', () => {
-    expect(stripStrings("char c = '\\n';")).toContain("'\\n'");
+    expect(stripStrings(String.raw`char c = '\n';`)).toContain(String.raw`'\n'`);
   });
 
   it('handles u8R, uR, UR, LR raw-string prefixes', () => {

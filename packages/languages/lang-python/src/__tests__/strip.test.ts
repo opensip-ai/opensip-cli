@@ -28,7 +28,7 @@ describe('stripStrings', () => {
   });
 
   it('handles escape sequences', () => {
-    const out = stripStrings(`x = 'a\\'b'`);
+    const out = stripStrings(String.raw`x = 'a\'b'`);
     expect(out).not.toContain('a');
   });
 
@@ -48,7 +48,7 @@ describe('stripStrings', () => {
   });
 
   it('handles triple string with escaped quotes', () => {
-    const out = stripStrings(`x = '''line1\\'still in string'''`);
+    const out = stripStrings(String.raw`x = '''line1\'still in string'''`);
     expect(out).not.toContain('line1');
   });
 

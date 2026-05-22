@@ -16,7 +16,7 @@ describe('stripStrings (Java)', () => {
   });
 
   it('handles escape sequences', () => {
-    const out = stripStrings('String s = "a\\"b";');
+    const out = stripStrings(String.raw`String s = "a\"b";`);
     expect(out).not.toContain('a');
   });
 
