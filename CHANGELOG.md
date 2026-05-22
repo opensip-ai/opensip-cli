@@ -4,6 +4,97 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.0.0] — Unreleased
+
+Persistence migration: every internal runtime artifact (sessions, graph
+catalog, graph + fitness baselines) moves from JSON files to SQLite
+behind a unified `DataStore` abstraction. The full plan and decision
+log live under [`docs/plans/persistence-migration/`](docs/plans/persistence-migration/).
+
+This release introduces one new package, swaps storage on three tools,
+and breaks compatibility with v1.x runtime layouts.
+
+### Breaking changes
+
+- **Runtime state migrates from JSON files to SQLite.** v2 ignores any
+  pre-existing files under `<project>/opensip-tools/.runtime/` and
+  initializes a fresh `<project>/opensip-tools/.runtime/datastore.sqlite`
+  on first run. Caches rebuild automatically; **session history from
+  v1.x is not preserved**. Users who need the old layout should pin to
+  v1.x.
+- **`--baseline <path>` flag removed from `opensip-tools fit`.** The
+  baseline is now a single SQLite-backed row per project; the flag has
+  no equivalent. Drop `--baseline path/to/file.sarif` from CI
+  invocations. The default location of the SARIF baseline (previously
+  `opensip-tools/.runtime/baseline.sarif`) is now embedded as a row in
+  the project's `datastore.sqlite`. Same for the graph baseline (was
+  `opensip-tools/.runtime/cache/graph/baseline.json`).
+- **`configurePersistencePaths` removed from
+  `@opensip-tools/contracts`.** This was an internal API used by the
+  CLI bootstrap and a small number of tests; replaced by passing a
+  `DataStore` through `ToolCliContext`. External consumers who reached
+  for it should switch to constructing a `SessionRepo` over the
+  context's `datastore` field.
+
+### Added
+
+- **`@opensip-tools/datastore` package** — paradigm-agnostic SQLite +
+  Drizzle persistence layer. Houses the `DataStore` interface, SQLite
+  + in-memory backends, factory, and the workspace-wide migration
+  store (`migrations/`). Tools own their domain schemas (sessions in
+  contracts; baseline/catalog in graph; baseline in fitness).
+- **`ToolCliContext.datastore`** — every tool plugin now receives a
+  per-process `DataStore` handle for its persistence work. Built-in
+  tools use it via the relevant repo class (`SessionRepo`,
+  `GraphBaselineRepo`, `CatalogRepo`, `FitBaselineRepo`).
+- **Automatic schema migrations.** `DataStoreFactory.open()` applies
+  any pending Drizzle migrations on every CLI invocation; users see no
+  extra step. Migrations are content-hashed and idempotent.
+
+### Changed
+
+- **`@opensip-tools/contracts`** gains `SessionRepo` and the sessions
+  schema. `StoredSession` shape is unchanged; layout shifts from
+  one-JSON-per-run files to `sessions` + `session_checks` +
+  `session_findings` rows.
+- **`@opensip-tools/graph`** loads/saves the call-graph catalog and
+  the gate baseline through `CatalogRepo` and `GraphBaselineRepo`.
+  Catalog write is whole-replace at end of pipeline; the cached read
+  shape is identical to v1's (`Catalog` value with the same fields),
+  so dashboard view derivations and rules are unchanged. Performance
+  is at parity; per-package incremental writes and view-targeted
+  queries land in a follow-up `graph-catalog-perf` plan.
+- **`@opensip-tools/fitness`** stores the SARIF gate baseline in
+  `fit_baseline` (single row). The hash-based diff algorithm
+  (`extractViolationsFromSarif`/`extractViolationsFromCliOutput`) is
+  unchanged; only the I/O moves. The fitness file-cache stays as v1's
+  in-process `Map<string, string>` — it is per-run only, not
+  persistent, so no migration applies.
+
+### Removed
+
+- **`packages/graph/engine/src/cache/{read,write,normalize}.ts`** — the
+  streamed JSON catalog reader/writer. Replaced by `CatalogRepo`.
+- **`@opensip-tools/contracts` exports**: `configurePersistencePaths`,
+  `saveSession`, `loadSessions`, `loadLatestSession`, `countSessions`,
+  `clearAllSessions`, `clearSessionsOlderThan`, `getStoreDir`,
+  `getReportsDir`. Replaced by `SessionRepo`.
+- **`DEFAULT_BASELINE_PATH`** and the `--baseline <path>` flag from
+  fitness (see Breaking changes).
+
+### Upgrade path
+
+- **v1.x → v2.0.0**: re-run `opensip-tools fit --gate-save` to
+  re-establish the architecture-gate baseline; the rest is automatic.
+  Drop `--baseline <path>` from any CI invocations.
+- **v2.x → v2.y** (future minor releases): first run of the new
+  version applies any pending Drizzle migrations on top of the
+  existing `datastore.sqlite`. Users see no extra step. Downgrades
+  across schema changes are unsupported and produce a
+  `DataStoreMigrationError` on next run; recovery is to delete
+  `<project>/opensip-tools/.runtime/datastore.sqlite` (cache rebuilds;
+  session history lost).
+
 ## [1.3.1] — 2026-05-18
 
 Maintenance release. Clears the `glob@11.1.0` deprecation warning that

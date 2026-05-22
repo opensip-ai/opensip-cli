@@ -15,6 +15,18 @@ with two: `fit` (fitness checks) and `sim` (simulation scenarios, experimental).
 Adding a new tool is a plugin operation — install a package that implements the
 [Tool contract](#tool-plugin-architecture) and the CLI picks it up automatically.
 
+## Upgrading from v1.x to v2.x
+
+v2.0.0 swaps internal runtime persistence from JSON files to SQLite. **v2 ignores
+v1's `<project>/opensip-tools/.runtime/` contents** and initializes a fresh
+`datastore.sqlite` on first run. Caches rebuild automatically; session history
+from v1 is **not preserved**. The `--baseline <path>` flag is removed — there is
+now exactly one gate baseline per project, stored in the SQLite database.
+
+If you depend on the v1 layout (committed `baseline.sarif`, scripts that read
+`.runtime/sessions/*.json`, etc.), pin to v1.x. See the v2.0.0 entry in
+[CHANGELOG.md](CHANGELOG.md) for details.
+
 ## Quick start
 
 Four commands from zero to a passing fitness run:

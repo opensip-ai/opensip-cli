@@ -158,6 +158,40 @@ provenance** (provenance requires OIDC, which the script doesn't have).
 This is a one-time visible artifact in the npm UI; all subsequent
 versions published by the release workflow include provenance.
 
+## Schema evolution between versions
+
+opensip-tools v2 stores runtime state in SQLite via Drizzle. Drizzle
+migrations live under `packages/datastore/migrations/` and are applied
+automatically by `DataStoreFactory.open()` on every CLI invocation.
+
+When a release modifies any schema file —
+`packages/contracts/src/persistence/schema/*.ts`,
+`packages/graph/engine/src/persistence/schema.ts`, or
+`packages/fitness/engine/src/persistence/schema.ts` — the release
+workflow needs a fresh migration. Steps:
+
+1. Edit the schema (e.g. add a column to `catalog_functions`).
+2. Run `pnpm --filter=@opensip-tools/datastore db:generate`. Drizzle-kit
+   diffs against the last applied migration and writes a new
+   `NNNN_<name>.sql` file under `packages/datastore/migrations/`.
+3. **Read and review the generated SQL before committing.** Drizzle-kit's
+   automatic diffing handles most cases correctly, but column renames are
+   detected as drop+add (data loss). For renames, hand-edit the generated
+   SQL to use `ALTER TABLE ... RENAME COLUMN`.
+4. Commit the SQL alongside the schema edit. Migration files **must**
+   ship in the published tarball — `packages/datastore/package.json`'s
+   `files: ["dist", "migrations"]` allowlist enforces this. If you add
+   a `files` entry that excludes `migrations/`, users hit "no migrations
+   folder" on first run.
+5. **Never edit a previously-committed migration file.** Drizzle tracks
+   applied migrations by content hash; editing one in place leaves users
+   in undefined state. Add a new migration instead.
+
+Downgrades across schema changes are unsupported. A user who downgrades
+will see `DataStoreMigrationError` on next run; the recovery message
+points them at deleting `<project>/opensip-tools/.runtime/datastore.sqlite`
+(cache rebuilds; session history is lost).
+
 ## Why the workflow looks the way it does
 
 These steps are non-obvious. **Do not "simplify" them** without
