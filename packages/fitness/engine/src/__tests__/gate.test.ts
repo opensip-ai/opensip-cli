@@ -390,4 +390,26 @@ describe('renderGateCompareOutput', () => {
     // Only 5 sampled lines, then "... and 20 more"
     expect(text).toContain('... and 20 more');
   });
+
+  it('truncates very long violation messages with an ellipsis', () => {
+    const longMessage = 'x'.repeat(150);
+    const text = renderGateCompareOutput(
+      makeResult({
+        added: [
+          {
+            hash: 'h1',
+            ruleId: 'long-rule',
+            message: longMessage,
+            filePath: 'f.ts',
+            severity: 'error',
+          },
+        ],
+        degraded: true,
+      }),
+    );
+    // truncate(message, 120) keeps 119 chars + ellipsis. The full
+    // 150-char string MUST NOT appear.
+    expect(text).not.toContain(longMessage);
+    expect(text).toContain('…');
+  });
 });

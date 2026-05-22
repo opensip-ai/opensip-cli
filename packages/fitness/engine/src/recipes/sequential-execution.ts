@@ -90,6 +90,7 @@ export async function executeSequential(ctx: ExecutionServiceContext, opts: Exec
         continue
       }
 
+      /* v8 ignore start -- defensive: check.run only throws CheckAbortedError, which is always paired with signal.aborted=true (caught by the timeout branch above). retry never returns undefined result without signal.aborted in the framework's flow. */
       if (retryResult.result === undefined) {
         const durationMs = Date.now() - startTime
         const output = processErrorResult(processorCtx, {
@@ -105,6 +106,7 @@ export async function executeSequential(ctx: ExecutionServiceContext, opts: Exec
         if (output.shouldStop) break
         continue
       }
+      /* v8 ignore stop */
 
       const durationMs = Date.now() - startTime
       const output = processSuccessResult(processorCtx, {
@@ -118,6 +120,7 @@ export async function executeSequential(ctx: ExecutionServiceContext, opts: Exec
         memoryBeforeMB,
       })
       if (output.shouldStop) break
+    /* v8 ignore start -- defensive: executeWithRetry never throws (it wraps fn calls in try/catch), and processSuccessResult/processErrorResult are pure function calls that don't throw in any code path covered by tests. */
     } catch (error) {
       clearTimeout(timeoutId)
       const durationMs = Date.now() - startTime
@@ -135,5 +138,6 @@ export async function executeSequential(ctx: ExecutionServiceContext, opts: Exec
       })
       if (output.shouldStop) break
     }
+    /* v8 ignore stop */
   }
 }

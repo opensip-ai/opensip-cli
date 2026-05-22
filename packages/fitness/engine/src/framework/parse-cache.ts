@@ -32,7 +32,9 @@ export function getSharedSourceFile(filePath: string, content: string): ts.Sourc
   // Fall back to direct parse — preserves prior behavior.
   try {
     return ts.createSourceFile(filePath, content, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  /* v8 ignore start -- defensive: ts.createSourceFile is permissive (recovers from syntax errors) and effectively does not throw on real input */
   } catch {
     return null
   }
+  /* v8 ignore stop */
 }

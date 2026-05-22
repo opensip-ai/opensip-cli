@@ -32,10 +32,12 @@ export function resolveChecks(selector: CheckSelector, registry: CheckRegistry):
     case 'all': {
       return resolveAllSelector(selector.exclude ?? [], allCheckSlugs, registry)
     }
+    /* v8 ignore start -- exhaustive check: CheckSelector is a closed union; this fires only if a new selector type is added without updating this switch */
     default: {
       const _exhaustive: never = selector
       throw new SystemError(`Unknown selector type: ${JSON.stringify(_exhaustive)}`, { code: 'SYSTEM.FITNESS.UNKNOWN_SELECTOR' })
     }
+    /* v8 ignore stop */
   }
 }
 

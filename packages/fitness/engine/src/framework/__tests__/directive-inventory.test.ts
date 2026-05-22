@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 
-import { parseDirectiveLine } from '../directive-inventory.js'
+import { parseDirectiveLine, isWeakReason, extractGroup } from '../directive-inventory.js'
 
 describe('parseDirectiveLine', () => {
   describe('line comments (// form)', () => {
@@ -49,5 +49,45 @@ describe('parseDirectiveLine', () => {
     it('rejects empty checkId', () => {
       expect(parseDirectiveLine('// @fitness-ignore-file ')).toBeNull()
     })
+
+    it('rejects empty checkId before the " -- " separator', () => {
+      // separatorIndex !== -1 path with empty checkId — exercises the
+      // post-separator validation branch.
+      expect(parseDirectiveLine('// @fitness-ignore-file  -- reason here')).toBeNull()
+    })
+
+    it('rejects checkId with embedded spaces before the " -- " separator', () => {
+      expect(parseDirectiveLine('// @fitness-ignore-file foo bar -- reason')).toBeNull()
+    })
+  })
+})
+
+describe('isWeakReason', () => {
+  it('returns true for null reason', () => {
+    expect(isWeakReason(null)).toBe(true)
+  })
+
+  it('returns true for known weak phrases', () => {
+    expect(isWeakReason('TODO')).toBe(true)
+    expect(isWeakReason('temp')).toBe(true)
+  })
+
+  it('returns false for substantive justifications', () => {
+    expect(isWeakReason('Required for backwards compatibility with v1 client')).toBe(false)
+  })
+})
+
+describe('extractGroup', () => {
+  it('returns the directory prefix when one is present', () => {
+    expect(extractGroup('security/no-eval')).toBe('security')
+  })
+
+  it('returns "other" when no slash is present', () => {
+    expect(extractGroup('some-rule')).toBe('other')
+  })
+
+  it('returns "other" when slash is at index 0', () => {
+    // slashIndex > 0 — index 0 falls through to the "other" branch.
+    expect(extractGroup('/leading-slash')).toBe('other')
   })
 })

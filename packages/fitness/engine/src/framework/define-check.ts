@@ -166,9 +166,11 @@ async function executeCommandMode(
     timeout: config.timeout,
   })
 
+  /* v8 ignore start -- defensive: command-mode tests cover the non-aborted path; abort during external command execution requires a long-running subprocess that's intentionally not unit-testable */
   if (result.aborted) {
     throw new CheckAbortedError(config.slug)
   }
+  /* v8 ignore stop */
 
   const builder = ResultBuilder.create({
     checkId: config.id,
@@ -331,6 +333,8 @@ async function executeUnifiedCheck(
     return executeCommandMode(config, files, ctx)
   }
 
+  /* v8 ignore start -- exhaustive check: all UnifiedCheckConfig variants are handled above; this throw fires only if someone introduces a new variant without updating this switch */
   const _exhaustiveCheck: never = config
   throw new SystemError(`Unknown analysis mode: ${JSON.stringify(_exhaustiveCheck)}`, { code: 'SYSTEM.FITNESS.UNKNOWN_MODE' })
+  /* v8 ignore stop */
 }

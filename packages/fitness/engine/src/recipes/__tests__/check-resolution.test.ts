@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 
 import { CheckRegistry } from '../../framework/registry.js'
-import { resolveChecks } from '../check-resolution.js'
+import { resolveChecks, validateCheckReferences } from '../check-resolution.js'
 
 import type { Check } from '../../framework/check-types.js'
 import type { CheckSelector } from '../types.js'
@@ -181,5 +181,25 @@ describe('resolveChecks', () => {
       const result = resolveChecks(selector, reg)
       expect(result).toEqual(['null-safety'])
     })
+  })
+})
+
+describe('validateCheckReferences', () => {
+  it('partitions ids into valid and missing sets', () => {
+    const out = validateCheckReferences(['a', 'b', 'c'], ['a', 'c'])
+    expect(out.valid).toEqual(['a', 'c'])
+    expect(out.missing).toEqual(['b'])
+  })
+
+  it('returns all valid when every id exists', () => {
+    const out = validateCheckReferences(['a', 'b'], ['a', 'b', 'c'])
+    expect(out.valid).toEqual(['a', 'b'])
+    expect(out.missing).toEqual([])
+  })
+
+  it('returns all missing when nothing exists', () => {
+    const out = validateCheckReferences(['x', 'y'], [])
+    expect(out.valid).toEqual([])
+    expect(out.missing).toEqual(['x', 'y'])
   })
 })

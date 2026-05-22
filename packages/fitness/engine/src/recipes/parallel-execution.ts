@@ -179,6 +179,7 @@ export async function executeParallel(ctx: ExecutionServiceContext, opts: Execut
               isTimeout,
               isTimeout ? checkTimeout : undefined,
             )
+          /* v8 ignore start -- defensive: when retry returns a defined result the abort signal cannot have fired between fn() resolution and this branch (Promise resolution is microtask-synchronous). Practically unreachable. */
           } else if (checkAbortController.signal.aborted) {
             clearTimeout(timeoutId)
             logger.info({ evt: 'fitness.check.timeout', module: MODULE_TAG, checkSlug: check.config.slug, durationMs, timeoutMs: checkTimeout })
@@ -191,18 +192,21 @@ export async function executeParallel(ctx: ExecutionServiceContext, opts: Execut
               true,
               checkTimeout,
             )
+          /* v8 ignore stop */
           } else {
             clearTimeout(timeoutId)
             logger.info({ evt: 'fitness.check.done', module: MODULE_TAG, checkSlug: check.config.slug, durationMs, signals: retryResult.result.signals.length })
             await processCheckResult(displayIndex, checkId, check.config.slug, check.config.tags ?? [], retryResult.result, durationMs)
           }
         })
+        /* v8 ignore start -- defensive: executeWithRetry never throws (always returns RetryResult), and the .then handler's processSuccessResult/processCheckError do not throw. This catch exists as a guardrail only. */
         .catch((error: unknown) => {
           clearTimeout(timeoutId)
           const durationMs = Date.now() - startTime
           logger.info({ evt: 'fitness.check.error', module: MODULE_TAG, checkSlug: check.config.slug, durationMs, error: error instanceof Error ? error.message : String(error) })
           void processCheckError(displayIndex, checkId, check.config.slug, error, durationMs)
         })
+        /* v8 ignore stop */
         .finally(() => advanceWindow())
     }
 

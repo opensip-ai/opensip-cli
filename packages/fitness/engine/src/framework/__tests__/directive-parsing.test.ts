@@ -12,7 +12,7 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { parseFileIgnoreDirective } from '../directive-parsing.js'
+import { parseFileIgnoreDirective, parseIgnoreDirectives } from '../directive-parsing.js'
 
 describe('parseFileIgnoreDirective — comment-prefix support', () => {
   it('recognises `//` (TypeScript / JavaScript / C-family)', () => {
@@ -54,5 +54,48 @@ describe('parseFileIgnoreDirective — comment-prefix support', () => {
     const filler = Array.from({ length: 60 }, () => 'x').join('\n')
     const content = `${filler}\n<!-- @fitness-ignore-file file-length-limit -- too late -->`
     expect(parseFileIgnoreDirective(content, 'file-length-limit')).toBe(false)
+  })
+
+  it('rejects directives missing the required space/tab separator before the check id', () => {
+    // No space between "@fitness-ignore-file" and slug — extractCheckIdFromDirective
+    // returns null for this shape.
+    const content = '// @fitness-ignore-file:my-rule\nrest'
+    expect(parseFileIgnoreDirective(content, 'my-rule')).toBe(false)
+  })
+
+  it('accepts an array of check ids and matches any', () => {
+    const content = '// @fitness-ignore-file second-id -- ok\nrest'
+    expect(parseFileIgnoreDirective(content, ['first-id', 'second-id'])).toBe(true)
+  })
+})
+
+describe('parseIgnoreDirectives — multi-line directive skipping', () => {
+  it('skips intervening directive lines to reach the next real source line', () => {
+    // Place a fitness-ignore-next-line followed by another directive
+    // (eslint-disable-next-line). The skipper should walk past the
+    // eslint directive and apply the ignore to the actual next line.
+    const content = [
+      '// @fitness-ignore-next-line my-rule -- justified',
+      '// eslint-disable-next-line some-rule',
+      'const offending = 1',
+      'const safe = 2',
+    ].join('\n')
+
+    const ignored = parseIgnoreDirectives(content, 'my-rule')
+    // The directive sits at line 1 (1-indexed); after skipping the
+    // eslint directive on line 2 the marker lands on line 3 — the
+    // function records it in the set.
+    expect(ignored.size).toBeGreaterThan(0)
+  })
+
+  it('returns an empty set when no directives match', () => {
+    const ignored = parseIgnoreDirectives('const x = 1\n', 'unrelated')
+    expect(ignored.size).toBe(0)
+  })
+
+  it('accepts an array of check ids', () => {
+    const content = '// @fitness-ignore-next-line target-b -- justified\nconst x = 1'
+    const ignored = parseIgnoreDirectives(content, ['target-a', 'target-b'])
+    expect(ignored.size).toBeGreaterThan(0)
   })
 })
