@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "00e6b41a-9f6a-4eab-80b0-c1b45b745f10",
+  "id": "a1cc5bfe-5aaa-4d7a-a783-8b0dcbcc8f3b",
   "prevId": "79fc9add-aa32-40ce-b157-72b5df13fa7e",
   "tables": {
     "session_checks": {
@@ -299,6 +299,58 @@
         "captured_at": {
           "name": "captured_at",
           "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "graph_catalog": {
+      "name": "graph_catalog",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "language": {
+          "name": "language",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "cache_key": {
+          "name": "cache_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "files_fingerprint": {
+          "name": "files_fingerprint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "built_at": {
+          "name": "built_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "payload": {
+          "name": "payload",
+          "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
