@@ -519,6 +519,7 @@ function checkConsistencyForClass(
   getInterfaceMethods: (name: string) => string[],
   issues: ConsistencyIssue[],
 ): void {
+  /* v8 ignore next -- defensive: callers always pass an array */
   if (!Array.isArray(issues)) return
   if (cls.implements.length === 0) return
   if (TEST_DOUBLE_CLASS_NAME_PATTERN.test(cls.name)) return

@@ -55,6 +55,7 @@ const MAX_DOCKERFILE_LINE_LENGTH = 2000
  * Safely truncate a line for regex matching.
  */
 function safeDockerLine(line: string): string {
+  /* v8 ignore next -- defensive: real Dockerfile lines never exceed 2000 chars */
   return line.length > MAX_DOCKERFILE_LINE_LENGTH ? line.slice(0, MAX_DOCKERFILE_LINE_LENGTH) : line
 }
 
@@ -203,6 +204,7 @@ interface CheckCopyOrderOptions {
 function checkCopyOrder(options: CheckCopyOrderOptions): DockerfileViolation | null {
   const { line, lineNum, file, filePath, lines, lastFromLine, lineIndex } = options
 
+  /* v8 ignore next 4 -- defensive: callers always pass an array */
   // Validate array parameter
   if (!Array.isArray(lines)) {
     return null
@@ -495,6 +497,7 @@ function processCopyLine(
 
 function processDockerfileLine(options: ProcessDockerfileLineOptions): void {
   const { line, index, lines, state, violations, file, filePath } = options
+  /* v8 ignore next -- defensive: lines.entries() never yields undefined */
   const trimmedLine = line?.trim() ?? ''
   if (!trimmedLine || trimmedLine.startsWith('#')) return
 

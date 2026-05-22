@@ -165,6 +165,7 @@ function detectSingleLinePattern(lines: string[], pattern: PatternDefinition): C
   const violations: CheckViolation[] = []
 
   for (const [i, line] of lines.entries()) {
+    /* v8 ignore next -- defensive: lines.entries() never yields undefined */
     if (line === undefined) continue
     if (pattern.skipInComments && isCommentLine(line)) continue
 

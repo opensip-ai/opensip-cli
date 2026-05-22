@@ -182,6 +182,7 @@ function checkLineForComments(
   lineNumber: number,
   violations: CommentViolation[],
 ): void {
+  /* v8 ignore next 4 -- defensive: callers always pass an array */
   // Validate array parameter
   if (!Array.isArray(violations)) {
     return

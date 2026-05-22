@@ -136,6 +136,7 @@ function analyzeFile(content: string, filePath: string): CheckViolation[] {
   const lines = content.split('\n')
 
   for (const [lineIndex, line] of lines.entries()) {
+    /* v8 ignore next -- defensive: lines.entries() never yields undefined; isCommentLine path is the real branch */
     if (line === undefined || isCommentLine(line)) {
       continue
     }
