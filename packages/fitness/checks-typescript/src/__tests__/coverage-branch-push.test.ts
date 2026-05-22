@@ -580,7 +580,7 @@ describe('incomplete-regex-escaping — branches', () => {
       '  const escaped = input.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")',
       '  return new RegExp(escaped)',
       '}',
-      'export function literal() { return /foo\\.bar/ }',
+      String.raw`export function literal() { return /foo\.bar/ }`,
       'export function fromTemplate(input: string) {',
       '  return new RegExp(`prefix-${input}-suffix`)',
       '}',
