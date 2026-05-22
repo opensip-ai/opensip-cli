@@ -19,6 +19,13 @@
  *    target exists at the resolved path, to avoid `rm -rf`-ing an
  *    unrelated directory.
  *
+ *    The recursive removal of `<path>/opensip-tools/` transitively
+ *    sweeps up `.runtime/datastore.sqlite` and its `-wal`/`-shm` SQLite
+ *    sidecars introduced in v2 — no datastore-specific path needs to be
+ *    enumerated here. Caveat for Windows: open file handles can block
+ *    removal of WAL/SHM files; ensure no opensip-tools CLI process is
+ *    active when running uninstall.
+ *
  * Does NOT remove the npm global install — the running binary can't
  * safely self-delete. Prints the exact next-step command for that.
  *
