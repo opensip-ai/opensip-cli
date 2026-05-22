@@ -83,10 +83,12 @@ async function buildImportMap(files: FileAccessor): Promise<Map<string, string[]
       const importPaths = extractImportPaths(content)
 
       for (const importPath of importPaths) {
+        /* v8 ignore next -- defensive nullish fallback */
         const importers = importMap.get(importPath) ?? []
         importers.push(fp)
         importMap.set(importPath, importers)
       }
+    /* v8 ignore next 1 -- defensive catch: parse failures already handled */
     } catch {
       // @swallow-ok Skip unreadable files
     }

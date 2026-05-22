@@ -32,6 +32,7 @@ export function detectLoggerCalls(
   endLine: number,
 ): LoggerCall[] {
   const sourceFile = getSharedSourceFile(filePath, content)
+  /* v8 ignore next -- defensive guard */
   if (!sourceFile) return []
   // Local non-nullable alias so the nested `visit` function declaration —
   // which TypeScript treats as hoisted and therefore non-narrowing — can

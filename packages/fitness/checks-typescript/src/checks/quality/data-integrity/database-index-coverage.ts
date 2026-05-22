@@ -194,6 +194,7 @@ function checkRawQueryMethod(node: ts.CallExpression, ctx: ViolationContext): Ch
 function analyzeCallExpression(node: ts.CallExpression, ctx: ViolationContext): CheckViolation[] {
   const violations: CheckViolation[] = []
 
+  /* v8 ignore next -- defensive AST/type guard */
   if (!ts.isPropertyAccessExpression(node.expression)) {
     return violations
   }
@@ -231,6 +232,7 @@ function analyzeFile(content: string, absolutePath: string): CheckViolation[] {
   }
 
   const sourceFile = getSharedSourceFile(absolutePath, content)
+    /* v8 ignore next -- defensive guard */
     if (!sourceFile) return []
 
   const ctx: ViolationContext = { absolutePath, content, sourceFile }

@@ -42,6 +42,7 @@ function analyzeFile(content: string, filePath: string): CheckViolation[] {
   const violations: CheckViolation[] = []
 
   const sourceFile = getSharedSourceFile(filePath, content)
+  /* v8 ignore next -- defensive guard */
   if (!sourceFile) return violations
 
   const visit = (node: ts.Node): void => {

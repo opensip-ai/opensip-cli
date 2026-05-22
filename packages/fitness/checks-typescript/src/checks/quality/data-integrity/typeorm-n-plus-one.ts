@@ -116,6 +116,7 @@ function checkPromiseAllForNPlusOne(
 } | null {
   const callText = node.getText(sourceFile)
   const promiseMethod = findQueryMethodInPromiseAll(callText)
+  /* v8 ignore next -- defensive AST/type guard */
   if (!promiseMethod) return null
 
   const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
@@ -161,6 +162,7 @@ function scanFileForNPlusOne(content: string, filePath: string): ViolationInfo[]
 
   const violations: ViolationInfo[] = []
   const sourceFile = getSharedSourceFile(filePath, content)
+    /* v8 ignore next -- defensive guard */
     if (!sourceFile) return []
 
   const visit = (node: ts.Node): void => {

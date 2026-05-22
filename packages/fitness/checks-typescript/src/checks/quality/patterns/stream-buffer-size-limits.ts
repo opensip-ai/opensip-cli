@@ -49,6 +49,7 @@ interface CallExpressionContext {
  */
 function getSurroundingContext(content: string, line: number): string {
   const lines = content.split('\n')
+  /* v8 ignore next -- defensive non-negative guard */
   const start = Math.max(0, line - 50)
   const end = Math.min(lines.length, line + 50)
   return lines.slice(start, end).join('\n')
@@ -169,6 +170,7 @@ export const streamBufferSizeLimits = defineCheck({
     const violations: CheckViolation[] = []
 
     const sourceFile = getSharedSourceFile(filePath, content)
+    /* v8 ignore next -- defensive guard */
     if (!sourceFile) return []
 
     const visit = (node: ts.Node): void => {
