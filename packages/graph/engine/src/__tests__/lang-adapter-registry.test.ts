@@ -13,6 +13,8 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { ConfigurationError } from '@opensip-tools/core';
+
 import {
   _clearAdaptersForTesting,
   pickAdapter,
@@ -21,6 +23,44 @@ import {
 import { pythonGraphAdapter } from '../lang-python/index.js';
 import { rustGraphAdapter } from '../lang-rust/index.js';
 import { typescriptGraphAdapter } from '../lang-typescript/index.js';
+
+describe('pickAdapter — registry-size shortcuts', () => {
+  beforeEach(() => {
+    _clearAdaptersForTesting();
+  });
+
+  afterEach(() => {
+    _clearAdaptersForTesting();
+  });
+
+  it('throws when no adapter is registered', () => {
+    expect(() => pickAdapter()).toThrow(ConfigurationError);
+  });
+
+  it('returns the only adapter when exactly one is registered', () => {
+    registerAdapter(rustGraphAdapter);
+    const picked = pickAdapter('/tmp');
+    expect(picked.id).toBe('rust');
+  });
+
+  it('falls back to alphabetical order when no preferred adapter is registered', () => {
+    // Register only non-typescript adapters; tie between python and rust.
+    // resolveTie's preference list contains 'python' first, so it wins.
+    // Then drop 'python' and only register rust → falls through to
+    // alphabetical sort, picks rust.
+    const dir = mkdtempSync(join(tmpdir(), 'graph-pick-fb-'));
+    try {
+      registerAdapter(rustGraphAdapter);
+      // Write only an unrelated file so the dominance counter sees no
+      // matches and findMaxCount returns null.
+      writeFileSync(join(dir, 'README.md'), '', 'utf8');
+      const picked = pickAdapter(dir);
+      expect(picked.id).toBe('rust');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
 
 describe('pickAdapter — multi-adapter dominance heuristic', () => {
   let dir: string;

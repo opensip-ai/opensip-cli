@@ -183,4 +183,191 @@ describe('executeGraph', () => {
     expect(exitCodes).toContain(4);
     expect(stderr).toContain('Graph report failed');
   });
+
+  it('errors when --package and --packages are passed together', async () => {
+    setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });
+    const { cli, exitCodes } = makeCli();
+    await executeGraph({ cwd: dir, packageScope: 'foo', allPackages: true }, cli);
+    expect(stderr).toContain('mutually exclusive');
+    expect(exitCodes).toContain(2);
+  });
+
+  it('errors when --packages is passed but cliScript is empty', async () => {
+    setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });
+    const { cli, exitCodes } = makeCli();
+    await executeGraph({ cwd: dir, allPackages: true, cliScript: '' }, cli);
+    expect(stderr).toContain('CLI entry script');
+    expect(exitCodes).toContain(2);
+  });
+
+  it('errors when --packages is passed but no workspace packages exist', async () => {
+    setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });
+    const { cli, exitCodes } = makeCli();
+    // No packages/** dir exists — discoverWorkspacePackages returns [].
+    await executeGraph(
+      { cwd: dir, allPackages: true, cliScript: '/usr/bin/node' },
+      cli,
+    );
+    expect(stderr).toContain('no workspace packages');
+    expect(exitCodes).toContain(2);
+  });
+
+  it('--package <relative dir> scopes to a sub-package tsconfig', async () => {
+    // Create a nested package layout: cwd has its own tsconfig and the
+    // sub-package has its own. Pass `--package` as an explicit path.
+    setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });
+    mkdirSync(join(dir, 'packages', 'inner'), { recursive: true });
+    writeFileSync(
+      join(dir, 'packages', 'inner', 'tsconfig.json'),
+      FIXTURE_TSCONFIG,
+      'utf8',
+    );
+    writeFileSync(
+      join(dir, 'packages', 'inner', 'main.ts'),
+      `export function fromInner(): number { return 1; }\n`,
+      'utf8',
+    );
+    const { cli, exitCodes } = makeCli();
+    await executeGraph(
+      { cwd: dir, packageScope: 'packages/inner', json: true },
+      cli,
+    );
+    const parsed = JSON.parse(stdout) as { tool: string };
+    expect(parsed.tool).toBe('graph');
+    expect(exitCodes).toContain(0);
+  });
+
+  it('--report-to with no findings short-circuits to success', async () => {
+    // No findings — reportToCloud short-circuits and returns success.
+    setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });
+    const { cli, exitCodes } = makeCli();
+    await executeGraph({ cwd: dir, reportTo: 'http://127.0.0.1:1' }, cli);
+    // Should succeed because the "no findings" short-circuit doesn't
+    // attempt the network request.
+    expect(stdout).toContain('Graph report sent');
+    expect(exitCodes).toContain(0);
+  });
+
+  it('--packages runs successfully across discovered package dirs', async () => {
+    // Set up a packages/** layout and run --packages. Use a CLI script
+    // that prints a known JSON shape so the parent's parsing path is
+    // exercised. We use `node -e ...` indirectly by pointing cliScript
+    // at a tiny helper script written into the fixture.
+    setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });
+    // Two packages with tsconfigs.
+    mkdirSync(join(dir, 'packages', 'a'), { recursive: true });
+    mkdirSync(join(dir, 'packages', 'b'), { recursive: true });
+    writeFileSync(join(dir, 'packages', 'a', 'tsconfig.json'), FIXTURE_TSCONFIG, 'utf8');
+    writeFileSync(join(dir, 'packages', 'a', 'main.ts'), `export function a(): number { return 1; }\n`, 'utf8');
+    writeFileSync(join(dir, 'packages', 'b', 'tsconfig.json'), FIXTURE_TSCONFIG, 'utf8');
+    writeFileSync(join(dir, 'packages', 'b', 'main.ts'), `export function b(): number { return 1; }\n`, 'utf8');
+    // Helper script that pretends to be the CLI for child invocations:
+    // takes the graph subcommand args, ignores them, and emits an empty
+    // CliOutput JSON document.
+    const helper = join(dir, 'fake-cli.cjs');
+    writeFileSync(
+      helper,
+      `process.stdout.write(JSON.stringify({\n` +
+        `  version: '1.0', tool: 'graph', recipe: 'graph',\n` +
+        `  timestamp: new Date().toISOString(), durationMs: 0,\n` +
+        `  score: 100, passed: true, summary: 'ok', checks: []\n` +
+        `}));\n` +
+        `process.exit(0);\n`,
+      'utf8',
+    );
+    const { cli, exitCodes } = makeCli();
+    await executeGraph(
+      {
+        cwd: dir,
+        allPackages: true,
+        cliScript: helper,
+        json: true,
+        packagesConcurrency: 1,
+      },
+      cli,
+    );
+    const parsed = JSON.parse(stdout) as { tool: string; mode: string; packages: unknown[] };
+    expect(parsed.tool).toBe('graph');
+    expect(parsed.mode).toBe('packages');
+    expect(parsed.packages.length).toBeGreaterThanOrEqual(2);
+    expect(exitCodes).toContain(0);
+  });
+
+  it('--packages text report renders status + findings sections', async () => {
+    setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });
+    mkdirSync(join(dir, 'packages', 'a'), { recursive: true });
+    writeFileSync(join(dir, 'packages', 'a', 'tsconfig.json'), FIXTURE_TSCONFIG, 'utf8');
+    writeFileSync(join(dir, 'packages', 'a', 'main.ts'), `export function a(): number { return 1; }\n`, 'utf8');
+    // Helper that emits one finding so the findings section renders.
+    const helper = join(dir, 'fake-cli.cjs');
+    writeFileSync(
+      helper,
+      `process.stdout.write(JSON.stringify({\n` +
+        `  version: '1.0', tool: 'graph', recipe: 'graph',\n` +
+        `  timestamp: new Date().toISOString(), durationMs: 0,\n` +
+        `  score: 50, passed: false, summary: 'one',\n` +
+        `  checks: [{\n` +
+        `    checkSlug: 'graph:orphan-subtree', passed: false, violationCount: 1,\n` +
+        `    findings: [{ ruleId: 'graph:orphan-subtree', message: 'orphan x', severity: 'low', filePath: 'main.ts', line: 1, column: 1 }],\n` +
+        `    durationMs: 0\n` +
+        `  }]\n` +
+        `}));\n` +
+        `process.exit(0);\n`,
+      'utf8',
+    );
+    const { cli, exitCodes } = makeCli();
+    await executeGraph(
+      { cwd: dir, allPackages: true, cliScript: helper, packagesConcurrency: 1 },
+      cli,
+    );
+    expect(stdout).toContain('opensip-tools graph --packages');
+    expect(stdout).toContain('== Packages');
+    expect(stdout).toContain('== Findings ==');
+    expect(stdout).toContain('orphan x');
+    expect(exitCodes).toContain(0);
+  });
+
+  it('gate mode without a DataStore raises a configuration error', async () => {
+    setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });
+    // Build a CLI without a datastore
+    const exitCodes: number[] = [];
+    const cli: ToolCliContext = {
+      program: {},
+      render: vi.fn(() => Promise.resolve()),
+      renderLive: vi.fn(() => Promise.resolve()),
+      maybeOpenDashboard: vi.fn(() => Promise.resolve()),
+      logger: {
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
+        debug: vi.fn(),
+      },
+      setExitCode: (c: number) => { exitCodes.push(c); },
+      datastore: undefined,
+    };
+    await executeGraph({ cwd: dir, gateSave: true }, cli);
+    expect(stderr).toContain('requires a DataStore');
+    expect(exitCodes).toContain(2);
+  });
+
+  it('--packages surfaces child failure as a runtime-error exit code', async () => {
+    setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });
+    mkdirSync(join(dir, 'packages', 'a'), { recursive: true });
+    writeFileSync(join(dir, 'packages', 'a', 'tsconfig.json'), FIXTURE_TSCONFIG, 'utf8');
+    writeFileSync(join(dir, 'packages', 'a', 'main.ts'), `export function a(): number { return 1; }\n`, 'utf8');
+    // Failing helper: writes some stderr + exits 1.
+    const helper = join(dir, 'failing-cli.cjs');
+    writeFileSync(
+      helper,
+      `process.stderr.write('boom\\n');\nprocess.exit(1);\n`,
+      'utf8',
+    );
+    const { cli, exitCodes } = makeCli();
+    await executeGraph(
+      { cwd: dir, allPackages: true, cliScript: helper, packagesConcurrency: 1 },
+      cli,
+    );
+    expect(exitCodes).toContain(1);
+    expect(stderr).toContain('at least one package run failed');
+  });
 });
