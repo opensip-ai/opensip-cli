@@ -5,6 +5,8 @@ import { fitBaseline } from './schema.js';
 
 import type { DataStore } from '@opensip-tools/datastore';
 
+const MODULE_NAME = 'fitness:baseline-repo';
+
 export class FitBaselineRepo {
   constructor(private readonly datastore: DataStore) {}
 
@@ -25,14 +27,14 @@ export class FitBaselineRepo {
         .run();
       logger.info({
         evt: 'fit.baseline.save.complete',
-        module: 'fitness:baseline-repo',
+        module: MODULE_NAME,
         msg: 'Saved fit baseline',
         findingCount,
       });
     } catch (error) {
       logger.error({
         evt: 'fit.baseline.save.error',
-        module: 'fitness:baseline-repo',
+        module: MODULE_NAME,
         msg: 'Failed to save fit baseline',
         error: error instanceof Error ? error.message : String(error),
       });
@@ -47,20 +49,20 @@ export class FitBaselineRepo {
       if (!row) {
         logger.info({
           evt: 'fit.baseline.load.miss',
-          module: 'fitness:baseline-repo',
+          module: MODULE_NAME,
           msg: 'No fit baseline row',
         });
         return null;
       }
       logger.info({
         evt: 'fit.baseline.load.complete',
-        module: 'fitness:baseline-repo',
+        module: MODULE_NAME,
       });
       return row.sarifPayload;
     } catch (error) {
       logger.error({
         evt: 'fit.baseline.load.error',
-        module: 'fitness:baseline-repo',
+        module: MODULE_NAME,
         msg: 'Failed to load fit baseline',
         error: error instanceof Error ? error.message : String(error),
       });

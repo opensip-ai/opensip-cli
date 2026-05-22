@@ -7,6 +7,8 @@ import { graphBaselineMeta, graphBaselineSignals } from './schema.js';
 
 import type { DataStore } from '@opensip-tools/datastore';
 
+const MODULE_NAME = 'graph:baseline-repo';
+
 export class GraphBaselineRepo {
   constructor(private readonly datastore: DataStore) {}
 
@@ -38,14 +40,14 @@ export class GraphBaselineRepo {
       });
       logger.info({
         evt: 'graph.baseline.save.complete',
-        module: 'graph:baseline-repo',
+        module: MODULE_NAME,
         msg: 'Saved graph baseline',
         count: rows.length,
       });
     } catch (error) {
       logger.error({
         evt: 'graph.baseline.save.error',
-        module: 'graph:baseline-repo',
+        module: MODULE_NAME,
         msg: 'Failed to save graph baseline',
         error: error instanceof Error ? error.message : String(error),
       });
@@ -62,7 +64,7 @@ export class GraphBaselineRepo {
         .all();
       logger.info({
         evt: 'graph.baseline.load.complete',
-        module: 'graph:baseline-repo',
+        module: MODULE_NAME,
         msg: 'Loaded graph baseline',
         count: rows.length,
       });
@@ -70,7 +72,7 @@ export class GraphBaselineRepo {
     } catch (error) {
       logger.error({
         evt: 'graph.baseline.load.error',
-        module: 'graph:baseline-repo',
+        module: MODULE_NAME,
         msg: 'Failed to load graph baseline',
         error: error instanceof Error ? error.message : String(error),
       });
@@ -84,7 +86,7 @@ export class GraphBaselineRepo {
     if (!row) {
       logger.info({
         evt: 'graph.baseline.load.miss',
-        module: 'graph:baseline-repo',
+        module: MODULE_NAME,
         msg: 'No graph baseline marker present',
       });
     }

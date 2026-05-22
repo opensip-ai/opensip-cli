@@ -19,6 +19,8 @@ import { graphCatalog } from './schema.js';
 import type { Catalog } from '../types.js';
 import type { DataStore } from '@opensip-tools/datastore';
 
+const MODULE_NAME = 'graph:catalog-repo';
+
 interface CatalogRowPayload {
   readonly version: '3.0';
   readonly tool: 'graph';
@@ -72,14 +74,14 @@ export class CatalogRepo {
         .run();
       logger.info({
         evt: 'graph.catalog.write.complete',
-        module: 'graph:catalog-repo',
+        module: MODULE_NAME,
         msg: 'Catalog written',
         functions: Object.keys(catalog.functions).length,
       });
     } catch (error) {
       logger.error({
         evt: 'graph.catalog.write.error',
-        module: 'graph:catalog-repo',
+        module: MODULE_NAME,
         msg: 'Failed to write catalog',
         error: error instanceof Error ? error.message : String(error),
       });
@@ -100,7 +102,7 @@ export class CatalogRepo {
       if (!row) {
         logger.info({
           evt: 'graph.catalog.read.miss',
-          module: 'graph:catalog-repo',
+          module: MODULE_NAME,
           reason: 'empty-catalog',
         });
         return null;
@@ -108,7 +110,7 @@ export class CatalogRepo {
       const payload = row.payload as CatalogRowPayload;
       logger.info({
         evt: 'graph.catalog.read.hit',
-        module: 'graph:catalog-repo',
+        module: MODULE_NAME,
         functions: Object.keys(payload.functions).length,
       });
       return {
@@ -123,7 +125,7 @@ export class CatalogRepo {
     } catch (error) {
       logger.error({
         evt: 'graph.catalog.read.error',
-        module: 'graph:catalog-repo',
+        module: MODULE_NAME,
         msg: 'Failed to read catalog',
         error: error instanceof Error ? error.message : String(error),
       });

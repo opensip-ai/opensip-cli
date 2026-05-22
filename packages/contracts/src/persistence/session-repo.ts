@@ -6,6 +6,8 @@ import { sessions, sessionChecks, sessionFindings } from './schema/sessions.js';
 import type { StoredSession } from './store.js';
 import type { DataStore } from '@opensip-tools/datastore';
 
+const MODULE_NAME = 'contracts:session-repo';
+
 export interface SessionListOptions {
   readonly tool?: 'fit' | 'sim' | 'graph';
   readonly limit?: number;
@@ -72,7 +74,7 @@ export class SessionRepo {
       });
       logger.info({
         evt: 'session.save.complete',
-        module: 'contracts:session-repo',
+        module: MODULE_NAME,
         msg: 'Session saved',
         sessionId: session.id,
         tool: session.tool,
@@ -81,7 +83,7 @@ export class SessionRepo {
     } catch (error) {
       logger.error({
         evt: 'session.save.error',
-        module: 'contracts:session-repo',
+        module: MODULE_NAME,
         msg: 'Failed to save session',
         sessionId: session.id,
         error: error instanceof Error ? error.message : String(error),
@@ -103,7 +105,7 @@ export class SessionRepo {
       }
       logger.info({
         evt: 'session.list.complete',
-        module: 'contracts:session-repo',
+        module: MODULE_NAME,
         msg: 'Listed sessions',
         count: results.length,
       });
@@ -111,7 +113,7 @@ export class SessionRepo {
     } catch (error) {
       logger.error({
         evt: 'session.list.error',
-        module: 'contracts:session-repo',
+        module: MODULE_NAME,
         msg: 'Failed to list sessions',
         error: error instanceof Error ? error.message : String(error),
       });
@@ -144,7 +146,7 @@ export class SessionRepo {
         .run();
       logger.info({
         evt: 'session.purge.complete',
-        module: 'contracts:session-repo',
+        module: MODULE_NAME,
         msg: 'Purged sessions older than cutoff',
         cutoff: before.toISOString(),
         deleted: removed.changes,
@@ -153,7 +155,7 @@ export class SessionRepo {
     } catch (error) {
       logger.error({
         evt: 'session.purge.error',
-        module: 'contracts:session-repo',
+        module: MODULE_NAME,
         msg: 'Failed to purge sessions',
         error: error instanceof Error ? error.message : String(error),
       });
@@ -166,7 +168,7 @@ export class SessionRepo {
     const removed = this.datastore.db.delete(sessions).run();
     logger.info({
       evt: 'session.clear.complete',
-      module: 'contracts:session-repo',
+      module: MODULE_NAME,
       msg: 'Cleared all sessions',
       deleted: removed.changes,
     });
