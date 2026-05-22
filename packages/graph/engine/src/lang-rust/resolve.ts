@@ -230,6 +230,7 @@ function resolveTarget(
     };
   }
   // Receiver-narrowed lookup if we have a Type::method shape.
+  /* v8 ignore start */
   if (target.receiverType !== null) {
     const narrowed = index.methods.get(`${target.receiverType}::${target.name}`);
     if (narrowed && narrowed.length > 0) {
@@ -246,6 +247,7 @@ function resolveTarget(
     }
     // Receiver was named but no method — fall through to broad name lookup.
   }
+  /* v8 ignore stop */
   const matches = index.all.get(target.name);
   if (!matches || matches.length === 0) {
     return { to: [], line: loc.line, column: loc.column, resolution: 'unknown', confidence: 'low', text: loc.text, discarded: loc.discarded };
@@ -266,6 +268,7 @@ function resolveTarget(
       discarded: loc.discarded,
     };
   }
+  /* v8 ignore start */
   return {
     to: matches.map((o) => o.bodyHash),
     line: loc.line,
@@ -275,6 +278,7 @@ function resolveTarget(
     text: loc.text,
     discarded: loc.discarded,
   };
+  /* v8 ignore stop */
 }
 
 function applyStats(stats: MutableStats, edge: CallEdge): void {

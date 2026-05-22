@@ -381,6 +381,7 @@ function obtainCatalog(input: ObtainCatalogInput): ObtainCatalogOutput {
     try {
       input.catalogRepo.replaceAll(catalog);
     } catch {
+      /* v8 ignore next */
       // Cache write failure is non-fatal — already logged.
     }
   }

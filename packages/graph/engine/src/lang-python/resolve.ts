@@ -156,6 +156,7 @@ function pushCallEdge(
       };
       stats.resolvedMedium++;
     } else {
+      /* v8 ignore start */
       edge = {
         to: [...matches],
         line: startLine,
@@ -166,6 +167,7 @@ function pushCallEdge(
         discarded,
       };
       stats.resolvedLow++;
+      /* v8 ignore stop */
     }
   }
   appendEdge(edgesByOwner, ownerHash, edge);

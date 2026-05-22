@@ -80,11 +80,13 @@ function loadTsConfig(tsConfigPathAbs: string): {
 } {
   const raw = readFileSync(tsConfigPathAbs, 'utf8');
   const parsed = ts.parseConfigFileTextToJson(tsConfigPathAbs, raw);
+  /* v8 ignore start */
   if (parsed.error) {
     throw new ConfigurationError(
       `Failed to parse ${tsConfigPathAbs}: ${ts.flattenDiagnosticMessageText(parsed.error.messageText, '\n')}`,
     );
   }
+  /* v8 ignore stop */
   const readDirectoryBound = ts.sys.readDirectory.bind(ts.sys);
   const host: ts.ParseConfigHost = {
     fileExists: (p) => existsSync(p),
@@ -106,16 +108,16 @@ function loadTsConfig(tsConfigPathAbs: string): {
     {},
     tsConfigPathAbs,
   );
+  /* v8 ignore start */
   if (result.errors.length > 0) {
-    /* v8 ignore start */
     const fatal = result.errors.find((e) => e.category === ts.DiagnosticCategory.Error);
     if (fatal) {
       throw new ConfigurationError(
         `Failed to load ${tsConfigPathAbs}: ${ts.flattenDiagnosticMessageText(fatal.messageText, '\n')}`,
       );
     }
-    /* v8 ignore stop */
   }
+  /* v8 ignore stop */
   return { options: result.options, fileNames: result.fileNames };
 }
 

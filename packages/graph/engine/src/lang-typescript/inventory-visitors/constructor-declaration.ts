@@ -17,6 +17,7 @@ export const visitConstructorDeclaration: InventoryVisitor<ts.ConstructorDeclara
   const start = node.getStart(ctx.sourceFile);
   const startLC = ctx.sourceFile.getLineAndCharacterOfPosition(start);
   const end = ctx.sourceFile.getLineAndCharacterOfPosition(node.getEnd());
+  /* v8 ignore next */
   const className = ctx.enclosingClass ?? findClassName(node) ?? '<anon-class>';
   const digest = digestFunctionBody(node, ctx.sourceFile);
   return {

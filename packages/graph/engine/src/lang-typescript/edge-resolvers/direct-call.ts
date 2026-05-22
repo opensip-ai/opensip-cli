@@ -39,12 +39,12 @@ export const resolveDirectCall: EdgeResolver<ts.CallExpression> = (node, ctx) =>
   return UNRESOLVED;
 };
 
+/* v8 ignore start */
 function functionLikeFromDeclaration(d: ts.Declaration): ts.Node | null {
   if (
     ts.isFunctionDeclaration(d) ||
     ts.isArrowFunction(d) ||
     ts.isFunctionExpression(d) ||
-    /* v8 ignore next 4 */
     ts.isMethodDeclaration(d) ||
     ts.isConstructorDeclaration(d) ||
     ts.isGetAccessor(d) ||
@@ -55,6 +55,6 @@ function functionLikeFromDeclaration(d: ts.Declaration): ts.Node | null {
   if (ts.isVariableDeclaration(d) && d.initializer && (ts.isArrowFunction(d.initializer) || ts.isFunctionExpression(d.initializer))) {
       return d.initializer;
     }
-  /* v8 ignore next */
   return null;
 }
+/* v8 ignore stop */

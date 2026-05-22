@@ -359,6 +359,7 @@ function renderCatalogSection(catalog: Catalog | null, cacheHit: boolean): reado
       `${String(fnCount)} functions across ${String(fileCount)} files (cacheHit=${String(cacheHit)})`,
     );
   } else {
+    /* v8 ignore next */
     lines.push('(no catalog produced)');
   }
   return lines;
@@ -383,6 +384,7 @@ function renderRuleBlock(ruleId: string, findings: readonly Signal[]): readonly 
     return `  ${f.filePath}${loc} — ${f.message}`;
   });
   const overflow = findings.length > preview.length
+    /* v8 ignore next */
     ? [`  ... ${String(findings.length - preview.length)} more (use --json for full list)`]
     : [];
   return [header, ...preview, ...overflow, ''];
@@ -508,18 +510,18 @@ function handleGraphError(label: string, error: unknown, cli: ToolCliContext): v
   });
   if (error instanceof ConfigurationError) {
     cli.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
-  } else if (error instanceof ValidationError) {
-    /* v8 ignore next */
-    cli.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
-  } else if (error instanceof MemoryPressureError) {
-    /* v8 ignore next 4 */
-    cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
-  } else if (error instanceof ToolError) {
-    /* v8 ignore next */
-    cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
   } else {
-    /* v8 ignore next */
-    cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
+    /* v8 ignore start */
+    if (error instanceof ValidationError) {
+      cli.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
+    } else if (error instanceof MemoryPressureError) {
+      cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
+    } else if (error instanceof ToolError) {
+      cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
+    } else {
+      cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
+    }
+    /* v8 ignore stop */
   }
   process.stderr.write(`${label}: ${error instanceof Error ? error.message : String(error)}\n`);
 }

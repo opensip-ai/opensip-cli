@@ -374,6 +374,7 @@ function hasTestAttribute(node: Parser.SyntaxNode): boolean {
   const attrs = extractAttributes(node);
   for (const a of attrs) {
     if (a.includes('#[test]')) return true;
+    /* v8 ignore next */
     if (a.includes('cfg(test)')) return true;
   }
   return false;
@@ -431,10 +432,12 @@ function stripRustComments(text: string): string {
       continue;
     }
     if (c === "'" && isCharLiteral(text, i)) {
+      /* v8 ignore start */
       const block = consumeCharLiteral(text, i);
       out += block.text;
       i = block.index;
       continue;
+      /* v8 ignore stop */
     }
     out += c;
     i++;

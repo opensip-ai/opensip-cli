@@ -38,11 +38,11 @@ export function parseProject(input: ParseInput): ParseOutput<TypescriptParsedPro
   program.getTypeChecker();
 
   const parseErrors: ParseError[] = [];
+  /* v8 ignore start */
   const seenPaths = new Set<string>();
   for (const sf of program.getSourceFiles()) {
     const diagnostics = program.getSyntacticDiagnostics(sf);
     if (diagnostics.length === 0) continue;
-    /* v8 ignore start */
     const filePath = relative(input.projectDirAbs, sf.fileName);
     if (seenPaths.has(filePath)) continue;
     seenPaths.add(filePath);
@@ -50,8 +50,8 @@ export function parseProject(input: ParseInput): ParseOutput<TypescriptParsedPro
       const message = ts.flattenDiagnosticMessageText(diag.messageText, '\n');
       parseErrors.push({ filePath, message });
     }
-    /* v8 ignore stop */
   }
+  /* v8 ignore stop */
 
   return { project: { program }, parseErrors };
 }

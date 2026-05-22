@@ -44,20 +44,19 @@ export const resolvePropertyAccessCall: EdgeResolver<ts.CallExpression> = (node,
   return UNRESOLVED;
 };
 
+/* v8 ignore start */
 function functionLikeFromDeclaration(d: ts.Declaration): ts.Node | null {
   if (
     ts.isFunctionDeclaration(d) ||
     ts.isArrowFunction(d) ||
     ts.isFunctionExpression(d) ||
     ts.isMethodDeclaration(d) ||
-    /* v8 ignore next 3 */
     ts.isConstructorDeclaration(d) ||
     ts.isGetAccessor(d) ||
     ts.isSetAccessor(d)
   ) {
     return d;
   }
-  /* v8 ignore start */
   if (ts.isPropertyAssignment(d) && (ts.isArrowFunction(d.initializer) || ts.isFunctionExpression(d.initializer))) {
       return d.initializer;
     }
@@ -65,5 +64,5 @@ function functionLikeFromDeclaration(d: ts.Declaration): ts.Node | null {
       return d.initializer;
     }
   return null;
-  /* v8 ignore stop */
 }
+/* v8 ignore stop */

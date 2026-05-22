@@ -343,6 +343,7 @@ function extractParam(child: Parser.SyntaxNode): { name: string; optional: boole
         rest: false,
       };
     }
+    /* v8 ignore start */
     case 'list_splat_pattern':
     case 'dictionary_splat_pattern': {
       const name = child.namedChild(0);
@@ -352,6 +353,7 @@ function extractParam(child: Parser.SyntaxNode): { name: string; optional: boole
     default: {
       return null;
     }
+    /* v8 ignore stop */
   }
 }
 

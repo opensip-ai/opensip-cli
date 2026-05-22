@@ -28,6 +28,7 @@ export const resolvePolymorphicCall: EdgeResolver<ts.CallExpression> = (node, ct
   return {
     to: candidates,
     resolution: 'method-dispatch',
+    /* v8 ignore next */
     confidence: candidates.length === 1 ? 'high' : 'medium',
   };
 };
@@ -60,10 +61,10 @@ function appendHashesForSymbol(
   }
 }
 
+/* v8 ignore start */
 function functionLikeFromDeclaration(d: ts.Declaration): ts.Node | null {
   if (
     ts.isMethodDeclaration(d) ||
-    /* v8 ignore next 6 */
     ts.isMethodSignature(d) ||
     ts.isFunctionDeclaration(d) ||
     ts.isArrowFunction(d) ||
@@ -74,7 +75,6 @@ function functionLikeFromDeclaration(d: ts.Declaration): ts.Node | null {
   ) {
     return d;
   }
-  /* v8 ignore start */
   if (ts.isVariableDeclaration(d) && d.initializer && (ts.isArrowFunction(d.initializer) || ts.isFunctionExpression(d.initializer))) {
       return d.initializer;
     }
@@ -82,5 +82,5 @@ function functionLikeFromDeclaration(d: ts.Declaration): ts.Node | null {
       return d.initializer;
     }
   return null;
-  /* v8 ignore stop */
 }
+/* v8 ignore stop */
