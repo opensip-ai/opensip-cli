@@ -174,7 +174,10 @@ async function renderLive(viewKey: string, args: unknown): Promise<void> {
   }
   if (viewKey === 'graph') {
     const { renderGraphView } = await import('./ui/render.js');
-    await renderGraphView(args as { cwd: string; noCache?: boolean });
+    await renderGraphView(
+      args as { cwd: string; noCache?: boolean },
+      activeDatastore ?? undefined,
+    );
     return;
   }
   // Future tools that want a live view register their key here. Until

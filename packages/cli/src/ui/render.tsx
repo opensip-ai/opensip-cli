@@ -56,13 +56,13 @@ export interface GraphViewArgs {
 }
 
 /** Render the graph command with a live stage checklist. */
-export async function renderGraphView(args: GraphViewArgs): Promise<void> {
+export async function renderGraphView(args: GraphViewArgs, datastore?: DataStore): Promise<void> {
   const { render } = await import('ink');
 
   const app = render(
     <ThemeProvider>
       <ClockProvider>
-        <GraphView args={args} />
+        <GraphView args={args} datastore={datastore} />
       </ClockProvider>
     </ThemeProvider>,
   );

@@ -15,7 +15,8 @@
 
 import { relative, sep } from 'node:path';
 
-import { logger, resolveProjectPaths } from '@opensip-tools/core';
+import { logger } from '@opensip-tools/core';
+
 
 // Side-effect import: ensures default adapters are registered even
 // when callers reach `runGraph` without going through `tool.ts`
@@ -26,9 +27,8 @@ import {
   classifyCatalog,
   computeFilesFingerprint,
 } from '../cache/invalidate.js';
-import { readCatalog } from '../cache/read.js';
-import { writeCatalog } from '../cache/write.js';
 import { pickAdapter } from '../lang-adapter/registry.js';
+import { CatalogRepo } from '../persistence/catalog-repo.js';
 import { buildIndexes } from '../pipeline/indexes.js';
 import { rules as defaultRules } from '../rules/registry.js';
 
@@ -50,6 +50,7 @@ import type {
   Rule,
 } from '../types.js';
 import type { Signal } from '@opensip-tools/core';
+import type { DataStore } from '@opensip-tools/datastore';
 
 export interface RunGraphInput {
   readonly cwd: string;
@@ -67,6 +68,13 @@ export interface RunGraphInput {
    * undefined.
    */
   readonly onProgress?: GraphProgressCallback;
+  /**
+   * Datastore for catalog persistence. v2: replaces the v1
+   * `paths.graphCatalogPath` JSON file. Optional so legacy callers
+   * (acceptance tests pre-Phase-3) can still drive the orchestrator
+   * without a DataStore — the catalog will be rebuilt every run.
+   */
+  readonly datastore?: DataStore;
 }
 
 export interface RunGraphResult {
@@ -144,7 +152,7 @@ function runStage<T>(
 export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
   const config: GraphConfig = input.config ?? {};
   const ruleSet: readonly Rule[] = input.rules ?? defaultRules;
-  const paths = resolveProjectPaths(input.cwd);
+  const catalogRepo = input.datastore ? new CatalogRepo(input.datastore) : null;
 
   const monitor = createPressureMonitor();
   try {
@@ -163,7 +171,7 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
     const { catalog, cacheHit, resolutionStats } = obtainCatalog({
       adapter,
       discovery,
-      catalogPath: paths.graphCatalogPath,
+      catalogRepo,
       useCache: input.noCache !== true,
       onProgress: input.onProgress,
       monitor,
@@ -313,7 +321,7 @@ function stitchEdges(
 interface ObtainCatalogInput {
   readonly adapter: GraphLanguageAdapter;
   readonly discovery: DiscoverOutput;
-  readonly catalogPath: string;
+  readonly catalogRepo: CatalogRepo | null;
   readonly useCache: boolean;
   readonly onProgress?: GraphProgressCallback;
   readonly monitor?: PressureMonitor;
@@ -331,9 +339,8 @@ interface ObtainCatalogOutput {
  * vs cache hit) per `classifyCatalog`'s verdict.
  */
 function obtainCatalog(input: ObtainCatalogInput): ObtainCatalogOutput {
-  const cachedCatalog: Catalog | null = input.useCache
-    ? readCatalog(input.catalogPath)
-    : null;
+  const cachedCatalog: Catalog | null =
+    input.useCache && input.catalogRepo ? input.catalogRepo.loadFullCatalog() : null;
   const currentCacheKey = input.adapter.cacheKey({
     projectDirAbs: input.discovery.projectDirAbs,
     configPathAbs: input.discovery.configPathAbs,
@@ -370,9 +377,9 @@ function obtainCatalog(input: ObtainCatalogInput): ObtainCatalogOutput {
     ...built.catalog,
     filesFingerprint: computeFilesFingerprint(input.discovery.files),
   };
-  if (input.useCache) {
+  if (input.useCache && input.catalogRepo) {
     try {
-      writeCatalog(input.catalogPath, catalog);
+      input.catalogRepo.replaceAll(catalog);
     } catch {
       // Cache write failure is non-fatal — already logged.
     }

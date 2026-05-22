@@ -9,6 +9,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { runGraph } from '../../cli/orchestrate.js';
@@ -39,26 +40,29 @@ function setupFixture(dir: string, files: Readonly<Record<string, string>>): voi
 
 describe('runGraph orchestrator', () => {
   let dir: string;
+  let datastore: DataStore;
 
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), 'graph-orch-'));
+    datastore = DataStoreFactory.open({ backend: 'memory' });
   });
 
   afterEach(() => {
     rmSync(dir, { recursive: true, force: true });
+    datastore.close();
   });
 
   it('first run is a cache miss; second run is a cache hit', async () => {
     setupFixture(dir, {
       'index.ts': `export function main(): number { return helper(); }\nfunction helper(): number { return 1; }\n`,
     });
-    const first = await runGraph({ cwd: dir });
+    const first = await runGraph({ cwd: dir, datastore });
     expect(first.cacheHit).toBe(false);
     expect(first.catalog).not.toBeNull();
     expect(first.indexes).not.toBeNull();
     expect(first.resolutionStats).not.toBeNull();
 
-    const second = await runGraph({ cwd: dir });
+    const second = await runGraph({ cwd: dir, datastore });
     expect(second.cacheHit).toBe(true);
     expect(second.resolutionStats).toBeNull(); // not recomputed on hit
     expect(second.catalog).not.toBeNull();
@@ -68,8 +72,8 @@ describe('runGraph orchestrator', () => {
     setupFixture(dir, {
       'index.ts': `export function main(): number { return helper(); }\nfunction helper(): number { return 1; }\n`,
     });
-    await runGraph({ cwd: dir });
-    const second = await runGraph({ cwd: dir, noCache: true });
+    await runGraph({ cwd: dir, datastore });
+    const second = await runGraph({ cwd: dir, noCache: true, datastore });
     expect(second.cacheHit).toBe(false);
     expect(second.resolutionStats).not.toBeNull();
   });
@@ -78,7 +82,7 @@ describe('runGraph orchestrator', () => {
     setupFixture(dir, {
       'index.ts': `function unused(): number { return 7; }\nexport function main(): void { return; }\n`,
     });
-    const result = await runGraph({ cwd: dir });
+    const result = await runGraph({ cwd: dir, datastore });
     // unused has no callers → orphan
     expect(result.signals.some((s) => s.ruleId === 'graph:orphan-subtree')).toBe(true);
   });
@@ -87,7 +91,7 @@ describe('runGraph orchestrator', () => {
     setupFixture(dir, {
       'index.ts': `function unused(): number { return 7; }\nexport function main(): void { return; }\n`,
     });
-    const result = await runGraph({ cwd: dir, rules: [] });
+    const result = await runGraph({ cwd: dir, rules: [], datastore });
     expect(result.signals).toHaveLength(0);
   });
 
@@ -140,7 +144,7 @@ describe('runGraph orchestrator', () => {
       'b.ts': `export function fromB(): number { return 2; }\n`,
       'c.ts': `import { fromA } from './a.js';\nimport { fromB } from './b.js';\nexport function main(): number { return fromA() + fromB(); }\n`,
     });
-    await runGraph({ cwd: dir });
+    await runGraph({ cwd: dir, datastore });
 
     // Wait long enough for mtimeMs to differ. macOS mtime resolution
     // is millisecond-grained but JS clock readings can collide if the
@@ -152,13 +156,13 @@ describe('runGraph orchestrator', () => {
       'utf8',
     );
 
-    const incremental = await runGraph({ cwd: dir });
+    const incremental = await runGraph({ cwd: dir, datastore });
     expect(incremental.cacheHit).toBe(false); // incremental, not a hit
     expect(incremental.resolutionStats).not.toBeNull();
     expect(incremental.catalog).not.toBeNull();
 
     // Compare against a clean --no-cache rebuild.
-    const fullRebuild = await runGraph({ cwd: dir, noCache: true });
+    const fullRebuild = await runGraph({ cwd: dir, noCache: true, datastore });
     expect(fullRebuild.catalog).not.toBeNull();
 
     // The function name set should match exactly (added function
@@ -180,7 +184,7 @@ describe('runGraph orchestrator', () => {
     const cachePath = join(dir, 'opensip-tools', '.runtime', 'cache');
     mkdirSync(join(dir, 'opensip-tools', '.runtime'), { recursive: true });
     writeFileSync(cachePath, 'block', 'utf8');
-    const result = await runGraph({ cwd: dir });
+    const result = await runGraph({ cwd: dir, datastore });
     // Run still produced a catalog; cache simply could not be written.
     expect(result.catalog).not.toBeNull();
   });

@@ -129,6 +129,7 @@ export async function executeGraph(
       cwd: runCwd,
       noCache: opts.noCache,
       tsConfigPath: runTsConfig,
+      datastore: cli.datastore as DataStore | undefined,
     });
     if (opts.gateSave === true || opts.gateCompare === true) {
       await runGateMode(opts, result.signals, cli);

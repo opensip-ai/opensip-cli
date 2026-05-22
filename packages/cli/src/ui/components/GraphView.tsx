@@ -31,6 +31,8 @@ import { Banner } from './Banner.js';
 import { ErrorMessage } from './ErrorMessage.js';
 import { RunHeader } from './RunHeader.js';
 
+import type { DataStore } from '@opensip-tools/datastore';
+
 interface GraphViewArgs {
   readonly cwd: string;
   readonly noCache?: boolean;
@@ -38,6 +40,7 @@ interface GraphViewArgs {
 
 export interface GraphViewProps {
   readonly args: GraphViewArgs;
+  readonly datastore?: DataStore;
 }
 
 type StageStatus =
@@ -78,7 +81,7 @@ function initialStages(): Record<GraphStage, StageStatus> {
   return out;
 }
 
-export function GraphView({ args }: GraphViewProps): React.ReactElement {
+export function GraphView({ args, datastore }: GraphViewProps): React.ReactElement {
   const { exit } = useApp();
   const [state, setState] = useState<ViewState>({ phase: 'loading' });
 
@@ -111,6 +114,7 @@ export function GraphView({ args }: GraphViewProps): React.ReactElement {
           cwd: args.cwd,
           noCache: args.noCache,
           onProgress,
+          datastore,
         });
         if (cancelled) return;
         const reportLines = buildUnifiedReportLines({

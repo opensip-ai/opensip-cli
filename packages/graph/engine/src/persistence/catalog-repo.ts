@@ -12,12 +12,12 @@
  */
 
 import { logger } from '@opensip-tools/core';
-import type { DataStore } from '@opensip-tools/datastore';
 import { sql } from 'drizzle-orm';
 
-import type { Catalog } from '../types.js';
-
 import { graphCatalog } from './schema.js';
+
+import type { Catalog } from '../types.js';
+import type { DataStore } from '@opensip-tools/datastore';
 
 interface CatalogRowPayload {
   readonly version: '3.0';
