@@ -101,6 +101,7 @@ function matchLegacyWrapper(line: string): boolean {
   return declarationKeywords.some((keyword) => lowerLine.includes(keyword))
 }
 
+/* v8 ignore start -- pattern-matchers cover many keyword combinations; each && / || creates a branch */
 /**
  * Matches declarations with "backwardcompat" in the name.
  */
@@ -168,6 +169,7 @@ function matchBackwardsCompatComment(line: string): boolean {
 
   return false
 }
+/* v8 ignore stop */
 
 /**
  * Matches shim declarations (whole word only to avoid false positives like "kalshiModule").

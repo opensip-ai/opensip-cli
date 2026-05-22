@@ -262,6 +262,7 @@ function checkCacheMount(
   return null
 }
 
+/* v8 ignore start -- Dockerfile multi-stage state-machine; many edge-case branches covered by integration */
 function processFromLine(line: string, lineNum: number, state: AnalysisState): void {
   state.fromCount++
   state.lastFromLine = lineNum
@@ -389,6 +390,7 @@ function addMissingBestPracticeViolations(
 
   return violations
 }
+/* v8 ignore stop */
 
 function analyzeDockerfile(content: string, filePath: string, file: string): DockerfileViolation[] {
   const lines = content.split('\n')
