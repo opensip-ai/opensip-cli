@@ -26,7 +26,6 @@ import { fileURLToPath } from 'node:url';
 
 import {
   EXIT_CODES,
-  configurePersistencePaths,
   getErrorSuggestion,
   type CliArgs,
   type CommandResult,
@@ -46,6 +45,7 @@ import {
   type Tool,
   type ToolCliContext,
 } from '@opensip-tools/core';
+import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
 import { loadSignalersConfig, fitnessTool, openDashboard } from '@opensip-tools/fitness';
 import { graphTool } from '@opensip-tools/graph';
 import { cppAdapter } from '@opensip-tools/lang-cpp';
@@ -214,6 +214,22 @@ const program = new Command('opensip-tools')
   .description('Codebase analysis toolkit — pluggable tools for fitness, simulation, and more')
   .version(PKG_VERSION);
 
+/**
+ * Mutable slot for the per-process DataStore. Opened lazily in the
+ * `preAction` hook (we need `cwd` to resolve the SQLite path) and
+ * closed in the `process.exit` handler. Tools read it via the
+ * ToolCliContext.datastore field — by the time any tool's action runs,
+ * preAction has populated this.
+ */
+let activeDatastore: DataStore | null = null;
+
+function getDatastore(): DataStore {
+  if (!activeDatastore) {
+    throw new Error('DataStore not opened — preAction hook did not run before this code path.');
+  }
+  return activeDatastore;
+}
+
 program.hook('preAction', (_thisCommand, actionCommand) => {
   const runId = generatePrefixedId('run');
   setRunId(runId);
@@ -226,18 +242,35 @@ program.hook('preAction', (_thisCommand, actionCommand) => {
   const config = loadCliDefaults(cwd, opts.config as string | undefined);
   mergeConfigDefaults(opts, config);
 
-  // Configure project-local persistence and logging paths from the
-  // path resolver. Logger writes JSONL to
-  // <cwd>/opensip-tools/.runtime/logs/<YYYY-MM-DD>.jsonl; sessions and
-  // dashboard reports land alongside it. Both functions are
-  // idempotent + best-effort, so a non-init'd project (no
-  // opensip-tools/ dir yet) still gets a logger that fails silently
-  // and a session store that creates the dir on first write.
+  // Resolve project-local paths and open the per-project SQLite store.
+  // Logger JSONL still lands at
+  // <cwd>/opensip-tools/.runtime/logs/<YYYY-MM-DD>.jsonl; the database
+  // sits alongside as datastore.sqlite (+ WAL/SHM sidecars). The path
+  // resolver is best-effort — a non-init'd project still gets a logger
+  // that fails silently and a DB that creates its parent dir on open.
   const projectPaths = resolveProjectPaths(cwd);
   initLogFile(projectPaths.logsDir);
-  configurePersistencePaths(projectPaths);
+
+  if (!activeDatastore) {
+    const dbPath = join(projectPaths.runtimeDir, 'datastore.sqlite');
+    activeDatastore = DataStoreFactory.open({ backend: 'sqlite', path: dbPath });
+  }
 
   logger.info({ evt: 'cli.start', module: 'cli:bootstrap', runId, command: actionCommand.name(), cwd });
+});
+
+// Best-effort cleanup. better-sqlite3 close is sync; process.on('exit')
+// only accepts sync handlers, so this is the right spot. WAL replay on
+// the next open handles consistency if the process crashes hard.
+process.on('exit', () => {
+  if (activeDatastore) {
+    try {
+      activeDatastore.close();
+    } catch {
+      // best effort — process is exiting anyway
+    }
+    activeDatastore = null;
+  }
 });
 
 // =============================================================================
@@ -259,6 +292,12 @@ function buildToolCliContext(): ToolCliContext {
     setExitCode: (code) => {
       exitCode = code;
       process.exitCode = code;
+    },
+    // The datastore is opened lazily in the preAction hook (see above).
+    // Tools that read this field run inside Commander actions, which
+    // fire after preAction — by then `activeDatastore` is populated.
+    get datastore(): DataStore {
+      return getDatastore();
     },
   };
   // Reference exitCode so the linter doesn't drop it; useful for

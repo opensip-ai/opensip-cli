@@ -62,6 +62,9 @@ importers:
       '@opensip-tools/core':
         specifier: workspace:*
         version: link:../core
+      '@opensip-tools/datastore':
+        specifier: workspace:*
+        version: link:../datastore
       '@opensip-tools/fitness':
         specifier: workspace:*
         version: link:../fitness/engine
