@@ -10,7 +10,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { configurePersistencePaths } from '@opensip-tools/contracts';
+import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
 import { executeGraph } from '../../cli/graph.js';
@@ -38,19 +38,17 @@ function setupFixture(dir: string, files: Readonly<Record<string, string>>): voi
     mkdirSync(p.slice(0, Math.max(0, p.lastIndexOf('/'))), { recursive: true });
     writeFileSync(p, content, 'utf8');
   }
-  configurePersistencePaths({
-    sessionsDir: join(dir, '.sessions'),
-    reportsDir: join(dir, '.reports'),
-  });
 }
 
 interface CapturedCli {
   readonly cli: ToolCliContext;
   readonly exitCodes: number[];
+  readonly datastore: DataStore;
 }
 
 function makeCli(): CapturedCli {
   const exitCodes: number[] = [];
+  const datastore = DataStoreFactory.open({ backend: 'memory' });
   const cli: ToolCliContext = {
     program: {},
     render: vi.fn(() => Promise.resolve()),
@@ -63,8 +61,9 @@ function makeCli(): CapturedCli {
       debug: vi.fn(),
     },
     setExitCode: (c: number) => { exitCodes.push(c); },
+    datastore,
   };
-  return { cli, exitCodes };
+  return { cli, exitCodes, datastore };
 }
 
 describe('executeGraph', () => {

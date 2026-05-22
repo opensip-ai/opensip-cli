@@ -169,7 +169,7 @@ async function renderResult(result: CommandResult): Promise<void> {
 async function renderLive(viewKey: string, args: unknown): Promise<void> {
   if (viewKey === 'fit') {
     const { renderFitView } = await import('./ui/render.js');
-    await renderFitView(args as CliArgs);
+    await renderFitView(args as CliArgs, activeDatastore ?? undefined);
     return;
   }
   if (viewKey === 'graph') {
@@ -426,13 +426,13 @@ function registerCliCommands(): void {
     .description('List stored sessions')
     .action(async () => {
       const { showHistory } = await import('./commands/history.js');
-      const result = showHistory();
+      const result = showHistory(cliContext.datastore as DataStore);
       await renderResult(result);
     });
 
   sessionsCmd
     .command('purge')
-    .description('Delete session data from opensip-tools/.runtime/sessions/')
+    .description('Delete session data from the project-local SQLite store')
     .option('--older-than <days>', 'Only delete sessions older than N days', (v: string) => {
       const n = Number.parseInt(v, 10);
       if (Number.isNaN(n) || n < 0) throw new Error(`Invalid --older-than value: '${v}'. Must be a non-negative integer.`);
@@ -441,7 +441,11 @@ function registerCliCommands(): void {
     .option('-y, --yes', 'Skip confirmation prompt', false)
     .action(async (opts: { olderThan?: number; yes: boolean }) => {
       const { executeClear } = await import('./commands/clear.js');
-      await executeClear({ olderThan: opts.olderThan, yes: opts.yes });
+      await executeClear({
+        olderThan: opts.olderThan,
+        yes: opts.yes,
+        datastore: cliContext.datastore as DataStore,
+      });
     });
 
   // -- configure ---------------------------------------------------------

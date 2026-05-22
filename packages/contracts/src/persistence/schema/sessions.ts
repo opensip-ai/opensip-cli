@@ -14,9 +14,9 @@ export const sessions = sqliteTable(
     summary: text('summary', { mode: 'json' }).notNull(),
     durationMs: integer('duration_ms').notNull(),
   },
-  (table) => ({
-    toolTimestampIdx: index('sessions_tool_timestamp_idx').on(table.tool, sql`${table.timestamp} DESC`),
-  }),
+  (table) => [
+    index('sessions_tool_timestamp_idx').on(table.tool, sql`${table.timestamp} DESC`),
+  ],
 );
 
 export const sessionChecks = sqliteTable(
@@ -31,9 +31,7 @@ export const sessionChecks = sqliteTable(
     violationCount: integer('violation_count'),
     durationMs: integer('duration_ms').notNull(),
   },
-  (table) => ({
-    sessionIdx: index('session_checks_session_idx').on(table.sessionId),
-  }),
+  (table) => [index('session_checks_session_idx').on(table.sessionId)],
 );
 
 export const sessionFindings = sqliteTable(
@@ -52,7 +50,5 @@ export const sessionFindings = sqliteTable(
     suggestion: text('suggestion'),
     category: text('category'),
   },
-  (table) => ({
-    sessionCheckIdx: index('session_findings_check_idx').on(table.sessionCheckId),
-  }),
+  (table) => [index('session_findings_check_idx').on(table.sessionCheckId)],
 );

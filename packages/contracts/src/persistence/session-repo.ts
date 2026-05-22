@@ -1,9 +1,10 @@
 import { logger } from '@opensip-tools/core';
-import type { DataStore } from '@opensip-tools/datastore';
 import { desc, eq, lt } from 'drizzle-orm';
 
 import { sessions, sessionChecks, sessionFindings } from './schema/sessions.js';
+
 import type { StoredSession } from './store.js';
+import type { DataStore } from '@opensip-tools/datastore';
 
 export interface SessionListOptions {
   readonly tool?: 'fit' | 'sim' | 'graph';

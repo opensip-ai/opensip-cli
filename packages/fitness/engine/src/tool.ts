@@ -33,6 +33,7 @@ import {
 
 import type { CliArgs, FitOptions, ToolOptions } from '@opensip-tools/contracts';
 import type { Tool, ToolCliContext, ToolCommandDescriptor } from '@opensip-tools/core';
+import type { DataStore } from '@opensip-tools/datastore';
 
 // =============================================================================
 // COMMAND DESCRIPTORS — used by --help listings and conflict detection.
@@ -145,7 +146,7 @@ function register(cli: ToolCliContext): void {
 
       // Main fit execution.
       if (args.json) {
-        const fitResult = await executeFit(args);
+        const fitResult = await executeFit(args, undefined, cli.datastore as DataStore);
         if (fitResult.result.type === 'error') {
           cli.setExitCode(fitResult.result.exitCode);
           process.stdout.write(JSON.stringify({ error: fitResult.result.message }, null, 2) + '\n');
@@ -179,7 +180,7 @@ function register(cli: ToolCliContext): void {
     .option('--json', 'Output structured JSON', false)
     .option('--debug', 'Enable debug mode for structured log output', false)
     .action(async (opts: ToolOptions) => {
-      const result = await openDashboard(opts.cwd);
+      const result = await openDashboard(opts.cwd, cli.datastore as DataStore);
       if (opts.json) {
         process.stdout.write(JSON.stringify(result, null, 2) + '\n');
         return;
@@ -233,7 +234,7 @@ async function runGateMode(args: CliArgs, cli: ToolCliContext): Promise<void> {
     return;
   }
   const baselinePath = args.baseline ?? DEFAULT_BASELINE_PATH;
-  const fitResult = await executeFit(args);
+  const fitResult = await executeFit(args, undefined, cli.datastore as DataStore);
   if (fitResult.result.type !== 'fit-done') {
     cli.logger.warn({
       evt: 'cli.gate.fit_failed',

@@ -3,12 +3,12 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync , mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
+
 import {
-  loadSessions,
-  getReportsDir,
+  SessionRepo,
   generateDashboardHtml,
   type CheckCatalogEntry,
   type GraphCatalog,
@@ -17,10 +17,13 @@ import {
 } from '@opensip-tools/contracts';
 import { logger, resolveProjectPaths } from '@opensip-tools/core';
 
+
 import { defaultRegistry } from '../framework/registry.js';
 import { defaultRecipeRegistry } from '../recipes/registry.js';
 
 import { ensureChecksLoaded, getDisplayName, getIcon } from './fit.js';
+
+import type { DataStore } from '@opensip-tools/datastore';
 
 // ---------------------------------------------------------------------------
 // openDashboard
@@ -116,10 +119,13 @@ function loadGraphCatalog(projectDir?: string): GraphCatalog | null {
   }
 }
 
-export async function openDashboard(projectDir?: string): Promise<DashboardResult> {
+export async function openDashboard(
+  projectDir?: string,
+  datastore?: DataStore,
+): Promise<DashboardResult> {
   await ensureChecksLoaded(projectDir);
 
-  const sessions = loadSessions(20);
+  const sessions = datastore ? [...new SessionRepo(datastore).list({ limit: 20 })] : [];
 
   const catalog: CheckCatalogEntry[] = defaultRegistry.list().map(check => {
     const namespace = defaultRegistry.getNamespace(check.config.slug);
@@ -150,7 +156,9 @@ export async function openDashboard(projectDir?: string): Promise<DashboardResul
   const editorProtocol = loadEditorProtocol(projectDir);
 
   const html = generateDashboardHtml(sessions, catalog, recipes, graphCatalog, editorProtocol);
-  const reportPath = join(getReportsDir(), 'latest.html');
+  const paths = resolveProjectPaths(projectDir ?? process.cwd());
+  mkdirSync(paths.reportsDir, { recursive: true });
+  const reportPath = join(paths.reportsDir, 'latest.html');
   writeFileSync(reportPath, html, 'utf8');
 
   // Try to open in browser

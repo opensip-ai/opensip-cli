@@ -30,6 +30,7 @@
   "dependencies": {
     "@opensip-tools/contracts": "workspace:*",
     "@opensip-tools/core": "workspace:*",
+    "@opensip-tools/datastore": "workspace:*",
     "@opensip-tools/fitness": "workspace:*",
     "@opensip-tools/lang-typescript": "workspace:*",
     "commander": "^13.1.0",

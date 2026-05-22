@@ -10,7 +10,7 @@
  * now sections in this unified report.
  */
 
-import { EXIT_CODES, saveSession } from '@opensip-tools/contracts';
+import { EXIT_CODES, SessionRepo } from '@opensip-tools/contracts';
 import {
   ConfigurationError,
   generatePrefixedId,
@@ -19,6 +19,7 @@ import {
   ToolError,
   ValidationError,
 } from '@opensip-tools/core';
+
 
 import { compareToBaseline, fingerprintSignal, saveBaseline } from '../gate.js';
 import { buildCliOutput, renderJson } from '../render/json.js';
@@ -36,6 +37,7 @@ import type { EntryPoint } from '../rules/_entry-points.js';
 import type { Catalog, Indexes } from '../types.js';
 import type { FindingOutput } from '@opensip-tools/contracts';
 import type { Signal, ToolCliContext } from '@opensip-tools/core';
+import type { DataStore } from '@opensip-tools/datastore';
 
 const ENTRY_POINTS_PREVIEW = 10;
 const FINDINGS_PREVIEW = 10;
@@ -153,7 +155,7 @@ export async function executeGraph(
       });
       logger.info({ evt: 'graph.render.table.complete', module: 'graph:render' });
     }
-    persistSession(opts, result.signals);
+    persistSession(opts, result.signals, cli.datastore as DataStore | undefined);
     cli.setExitCode(EXIT_CODES.SUCCESS);
     logger.info({
       evt: 'graph.cli.graph.complete',
@@ -457,10 +459,16 @@ function summarizeRules(
   return { clean, dirty };
 }
 
-function persistSession(opts: GraphCommandOptions, signals: readonly Signal[]): void {
+function persistSession(
+  opts: GraphCommandOptions,
+  signals: readonly Signal[],
+  datastore: DataStore | undefined,
+): void {
+  if (!datastore) return;
   try {
     const cliOutput = buildCliOutput(signals, 'graph');
-    saveSession({
+    const repo = new SessionRepo(datastore);
+    repo.save({
       id: generatePrefixedId('graph'),
       tool: 'graph',
       timestamp: cliOutput.timestamp,

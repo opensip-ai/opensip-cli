@@ -7,7 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import {
   EXIT_CODES,
-  saveSession,
+  SessionRepo,
   generateSessionId,
   type CliArgs,
   type CliOutput,
@@ -17,6 +17,7 @@ import {
   type ErrorResult,
 } from '@opensip-tools/contracts';
 import { logger, type CheckDisplayEntry } from '@opensip-tools/core';
+
 
 import { isCheck } from '../framework/check-types.js';
 import { defaultRegistry } from '../framework/registry.js';
@@ -35,6 +36,7 @@ import { loadTargetsConfig } from '../targets/index.js';
 import type { FitnessRecipeServiceCallbacks, CheckSummary } from '../recipes/service-types.js';
 import type { FitnessRecipeResult } from '../recipes/types.js';
 import type { SignalersConfig } from '../signalers/types.js';
+import type { DataStore } from '@opensip-tools/datastore';
 
 
 // ---------------------------------------------------------------------------
@@ -327,6 +329,7 @@ export function formatValidatedColumn(totalItems: number | undefined, itemType =
 export async function executeFit(
   args: CliArgs,
   onProgress?: (completed: number, total: number) => void,
+  datastore?: DataStore,
 ): Promise<{ result: FitDoneResult; output: CliOutput } | { result: ErrorResult; output?: undefined }> {
   logger.info({ evt: 'cli.checks.loading', module: 'cli:fit' });
   await ensureChecksLoaded(args.cwd);
@@ -523,22 +526,28 @@ export async function executeFit(
     durationMs,
   };
 
-  // Persist session for history and dashboard
-  try {
-    saveSession({
-      id: generateSessionId(),
-      tool: 'fit',
-      timestamp: output.timestamp,
-      cwd: args.cwd,
-      recipe: recipeName,
-      score,
-      passed: output.passed,
-      summary: output.summary,
-      checks: output.checks,
-      durationMs,
-    });
-  } catch {
-    // Best effort — don't fail the run if persistence fails
+  // Persist session for history and dashboard. v2: writes to SQLite via
+  // SessionRepo. The datastore is provided by the CLI bootstrap; if it
+  // wasn't passed (e.g. someone calling executeFit programmatically
+  // without one), we silently skip — same best-effort posture as v1.
+  if (datastore) {
+    try {
+      const repo = new SessionRepo(datastore);
+      repo.save({
+        id: generateSessionId(),
+        tool: 'fit',
+        timestamp: output.timestamp,
+        cwd: args.cwd,
+        recipe: recipeName,
+        score,
+        passed: output.passed,
+        summary: output.summary,
+        checks: output.checks,
+        durationMs,
+      });
+    } catch {
+      // Best effort — don't fail the run if persistence fails
+    }
   }
 
   // Build table rows

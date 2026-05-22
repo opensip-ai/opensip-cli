@@ -19,6 +19,7 @@ import { Spinner } from './Spinner.js';
 import { Summary } from './Summary.js';
 
 import type { FitDoneResult, ErrorResult, CliOutput , CliArgs } from '@opensip-tools/contracts';
+import type { DataStore } from '@opensip-tools/datastore';
 
 type FitState =
   | { phase: 'loading' }
@@ -28,9 +29,10 @@ type FitState =
 
 export interface FitViewProps {
   readonly args: CliArgs;
+  readonly datastore?: DataStore;
 }
 
-export function FitView({ args }: FitViewProps): React.ReactElement {
+export function FitView({ args, datastore }: FitViewProps): React.ReactElement {
   const { exit } = useApp();
   const [state, setState] = useState<FitState>({ phase: 'loading' });
 
@@ -53,7 +55,7 @@ export function FitView({ args }: FitViewProps): React.ReactElement {
       setState({ phase: 'running', completed: 0, total: 0, checkCount });
 
       // Phase 2: Execute
-      const fitResult = await executeFit(args, onProgress);
+      const fitResult = await executeFit(args, onProgress, datastore);
 
       if (cancelled) return;
 

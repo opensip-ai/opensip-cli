@@ -55,6 +55,7 @@ function makeFakeContext(program: Command): {
     setExitCode: (code: number) => {
       exitCodes.push(code);
     },
+    datastore: undefined,
   };
   return { ctx, rendered, exitCodes };
 }

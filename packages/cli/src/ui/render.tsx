@@ -16,6 +16,7 @@ import { ClockProvider } from './hooks/useClock.js';
 import { ThemeProvider } from './theme.js';
 
 import type { CommandResult , CliArgs } from '@opensip-tools/contracts';
+import type { DataStore } from '@opensip-tools/datastore';
 
 /** Render a static command result (non-fit commands) */
 export async function renderApp(result: CommandResult): Promise<void> {
@@ -33,13 +34,13 @@ export async function renderApp(result: CommandResult): Promise<void> {
 }
 
 /** Render the fit command with real-time spinner → results transition */
-export async function renderFitView(args: CliArgs): Promise<void> {
+export async function renderFitView(args: CliArgs, datastore?: DataStore): Promise<void> {
   const { render } = await import('ink');
 
   const app = render(
     <ThemeProvider>
       <ClockProvider>
-        <FitView args={args} />
+        <FitView args={args} datastore={datastore} />
       </ClockProvider>
     </ThemeProvider>,
   );
