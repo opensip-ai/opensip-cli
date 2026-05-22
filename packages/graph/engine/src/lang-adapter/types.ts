@@ -40,13 +40,6 @@ import type {
 // eslint-disable-next-line sonarjs/redundant-type-aliases -- doc-only alias used in interface signatures below
 export type ParsedProject = unknown;
 
-/**
- * Confidence labels match the catalog's CallConfidence type. Mirrored
- * here so adapter authors don't reach into types.ts for the resolver
- * pass; the same labels flow into CallEdge.confidence.
- */
-export type AdapterCallConfidence = 'high' | 'medium' | 'low';
-
 // ── method 1 ──────────────────────────────────────────────────────
 
 export interface DiscoverInput {

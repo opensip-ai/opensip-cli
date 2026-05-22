@@ -42,7 +42,7 @@ import { createInterface } from 'node:readline/promises'
 
 import { resolveProjectPaths } from '@opensip-tools/core'
 
-export type UninstallMode = 'user' | 'project'
+type UninstallMode = 'user' | 'project'
 
 export interface UninstallOptions {
   readonly yes?: boolean

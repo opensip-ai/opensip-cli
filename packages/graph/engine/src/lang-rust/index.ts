@@ -35,14 +35,6 @@ import { walkProject as rustWalkProject } from './walk.js';
 import type { RustParsedProject } from './parse.js';
 import type { GraphLanguageAdapter } from '../lang-adapter/types.js';
 
-export { discoverFiles } from './discover.js';
-export { parseProject } from './parse.js';
-export type { RustParsedFile, RustParsedProject } from './parse.js';
-export { walkProject } from './walk.js';
-export { resolveCallSites } from './resolve.js';
-export { cacheKey } from './cache-key.js';
-export { rustRuleHints } from './rule-hints.js';
-
 export const rustGraphAdapter: GraphLanguageAdapter<RustParsedProject> = {
   id: 'rust',
   fileExtensions: ['.rs'],

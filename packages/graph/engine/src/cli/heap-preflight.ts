@@ -65,7 +65,7 @@ export function decideHeapTargetMb(fileCount: number): number | null {
  * reflects whatever `--max-old-space-size` was set to at boot (including
  * the default).
  */
-export function currentHeapLimitMb(): number {
+function currentHeapLimitMb(): number {
   return Math.round(v8.getHeapStatistics().heap_size_limit / BYTES_PER_MB);
 }
 

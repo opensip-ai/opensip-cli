@@ -28,16 +28,6 @@ export function registerAdapter(adapter: GraphLanguageAdapter): void {
   adapters.set(adapter.id, adapter);
 }
 
-/** Look up an adapter by id. Returns undefined if not registered. */
-export function findAdapter(id: string): GraphLanguageAdapter | undefined {
-  return adapters.get(id);
-}
-
-/** List every registered adapter's id (for diagnostics + --help). */
-export function registeredAdapterIds(): readonly string[] {
-  return [...adapters.keys()].sort();
-}
-
 /**
  * Pick the adapter for the current run.
  *

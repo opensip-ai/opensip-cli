@@ -31,7 +31,6 @@
     "db:check": "drizzle-kit check"
   },
   "dependencies": {
-    "@opensip-tools/core": "workspace:*",
     "better-sqlite3": "^12.10.0",
     "drizzle-orm": "^0.45.2"
   },

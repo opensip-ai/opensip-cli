@@ -6,7 +6,7 @@
  * end-to-end against the fixture and returns the resulting catalog.
  */
 
-import { readFileSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { discoverFiles } from '../../lang-typescript/discover.js';
@@ -71,6 +71,3 @@ export function findOccurrence(
   return undefined;
 }
 
-export function readContent(filePath: string): string {
-  return readFileSync(filePath, 'utf8');
-}

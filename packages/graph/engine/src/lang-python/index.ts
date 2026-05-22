@@ -32,14 +32,6 @@ import { walkProject as pythonWalkProject } from './walk.js';
 import type { PythonParsedProject } from './parse.js';
 import type { GraphLanguageAdapter } from '../lang-adapter/types.js';
 
-export { discoverFiles } from './discover.js';
-export { parseProject } from './parse.js';
-export type { PythonParsedFile, PythonParsedProject } from './parse.js';
-export { walkProject } from './walk.js';
-export { resolveCallSites } from './resolve.js';
-export { cacheKey } from './cache-key.js';
-export { pythonRuleHints } from './rule-hints.js';
-
 export const pythonGraphAdapter: GraphLanguageAdapter<PythonParsedProject> = {
   id: 'python',
   fileExtensions: ['.py'],

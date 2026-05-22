@@ -49,38 +49,6 @@ import type { Catalog, CallEdge } from '../types.js';
 import type { CallSiteRecord as TsCallSiteRecord } from './walk.js';
 import type ts from 'typescript';
 
-// Re-exports kept for callers that still want direct access. The
-// orchestrator routes through the adapter; tests and plugins may
-// prefer the lower-level functions.
-export {
-  walkProgram,
-  dispatchVisitor,
-  isInlineCallable,
-} from './walk.js';
-export type {
-  CallSiteRecord,
-  WalkInput as LegacyWalkInput,
-  WalkOutput as LegacyWalkOutput,
-} from './walk.js';
-export { discoverFiles } from './discover.js';
-export type { DiscoveryInput, DiscoveryOutput } from './discover.js';
-export {
-  resolveEdges,
-  resolveEdgesFromRecords,
-} from './edges.js';
-export type {
-  EdgeResolutionInput,
-  EdgeResolutionOutput,
-  EdgeResolutionFromRecordsInput,
-} from './edges.js';
-export { buildInventory } from './inventory.js';
-export type { InventoryInput, InventoryOutput } from './inventory.js';
-export { normalizeProjectDir } from './normalize-project-dir.js';
-export type { EdgeResolver, ResolverContext } from './edge-resolvers/types.js';
-export type { InventoryVisitor, VisitorContext } from './inventory-visitors/types.js';
-export { parseProject } from './parse.js';
-export type { TypescriptParsedProject } from './parse.js';
-export { cacheKey } from './cache-key.js';
 
 // Test detection — promoted from walk.ts's inline regex into a hint.
 // Two simple anchored patterns instead of one alternation; avoids
