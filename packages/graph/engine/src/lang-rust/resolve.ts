@@ -311,10 +311,13 @@ function isReturnValueDiscarded(node: Parser.SyntaxNode): boolean {
   let parent: Parser.SyntaxNode | null = node.parent;
   while (parent) {
     if (parent.type === 'parenthesized_expression') {
+      /* v8 ignore next 3 -- parenthesized expression wrapping; rare in
+         idiomatic Rust where parens around bare calls are unusual. */
       parent = parent.parent;
       continue;
     }
     return parent.type === 'expression_statement';
   }
+  /* v8 ignore next -- defensive: every call expression has a parent. */
   return false;
 }

@@ -77,8 +77,9 @@ describe('buildSarifLog', () => {
       ],
     };
     const sarif = buildSarifLog(out);
-    const result = sarif.runs[0]?.results[0] as { locations?: { physicalLocation: { region?: unknown } }[] };
-    expect(result.locations?.[0]?.physicalLocation.region).toBeUndefined();
+    const runs = sarif.runs as { results: { locations?: { physicalLocation: { region?: unknown } }[] }[] }[];
+    const result = runs[0]?.results[0];
+    expect(result?.locations?.[0]?.physicalLocation.region).toBeUndefined();
   });
 
   it('creates one run per check with findings', () => {

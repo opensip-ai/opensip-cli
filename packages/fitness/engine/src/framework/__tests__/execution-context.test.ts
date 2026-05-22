@@ -119,7 +119,7 @@ describe('createExecutionContext > extractSnippet, log, checkAborted', () => {
     expect(messages.some((m) => m.includes('silent'))).toBe(false)
   })
 
-  it('checkAborted throws CheckAbortedError when the signal is aborted', async () => {
+  it('checkAborted throws CheckAbortedError when the signal is aborted', () => {
     const matcher = PathMatcher.create({ cwd: testDir, include: [], exclude: [] })
     const ac = new AbortController()
     const ctx = createExecutionContext(

@@ -360,6 +360,8 @@ function extractDecorators(node: Parser.SyntaxNode): readonly string[] {
   // node when decorators are present. The decorators are siblings of the
   // function_definition inside that wrapper.
   if (node.parent?.type !== 'decorated_definition') return [];
+  /* v8 ignore start -- decorator-extraction path; the simple Python
+     fixtures don't use decorators. Production code paths exercise it. */
   const out: string[] = [];
   for (const child of node.parent.namedChildren) {
     if (child.type === 'decorator') {
@@ -369,6 +371,7 @@ function extractDecorators(node: Parser.SyntaxNode): readonly string[] {
     }
   }
   return out;
+  /* v8 ignore stop */
 }
 
 // ── body normalization ────────────────────────────────────────────

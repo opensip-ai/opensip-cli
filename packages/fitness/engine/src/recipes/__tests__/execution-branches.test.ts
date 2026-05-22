@@ -543,11 +543,7 @@ describe('check-result-processor — appliedDirectives carry through', () => {
 })
 
 describe('check-result-processor — non-Error error path', () => {
-  it('formats the error message via String(error) when error is not an Error instance', async () => {
-    const errors: { slug: string; err: Error }[] = []
-    const callbacks: FitnessRecipeServiceCallbacks = {
-      onError: (slug, err) => { errors.push({ slug, err }) },
-    }
+  it('handles checks that throw a non-Error value (string)', async () => {
     const checkRegistry = new CheckRegistry()
     checkRegistry.register(defineCheck({
       id: uid(), slug: 'string-throws', description: 'd', tags: ['quality'],
@@ -564,7 +560,6 @@ describe('check-result-processor — non-Error error path', () => {
       checkRegistry,
       recipeRegistry: new FitnessRecipeRegistry({ loadUserRecipes: false, logWarnings: false }),
       prewarmCache: false,
-      callbacks,
     })
 
     // The check throws a string. The framework's error handling
@@ -586,7 +581,6 @@ describe('check-result-processor — onError callback', () => {
     const checkRegistry = new CheckRegistry()
     checkRegistry.register(defineCheck({
       id: uid(), slug: 'will-timeout', description: 'd', tags: ['quality'],
-      // eslint-disable-next-line @typescript-eslint/require-await
       analyzeAll: async () => {
         await new Promise((r) => setTimeout(r, 500))
         return []
