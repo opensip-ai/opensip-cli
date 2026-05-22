@@ -51,6 +51,7 @@ echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > "$NPMRC"
 # versions resolved by pnpm pack at pack time.
 PACKAGES=(
   core
+  datastore
   contracts
   lang-typescript lang-rust lang-python lang-go lang-java lang-cpp
   fitness simulation graph

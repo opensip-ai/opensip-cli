@@ -2,14 +2,15 @@
 
 Releases are tag-driven. Pushing a tag matching `v*` triggers
 `.github/workflows/release.yml`, which builds, tests, packs, and
-publishes all 18 `@opensip-tools/*` packages to npm via OIDC trusted
+publishes all 19 `@opensip-tools/*` packages to npm via OIDC trusted
 publishing — no `NPM_TOKEN` required.
 
-## The 18 packages
+## The 19 packages
 
 | Layer | Package | Path |
 |-------|---------|------|
 | Kernel | `@opensip-tools/core` | `packages/core` |
+| Persistence | `@opensip-tools/datastore` | `packages/datastore` |
 | Shared CLI | `@opensip-tools/contracts` | `packages/contracts` |
 | Languages | `@opensip-tools/lang-typescript` | `packages/languages/lang-typescript` |
 | Languages | `@opensip-tools/lang-rust` | `packages/languages/lang-rust` |
@@ -28,7 +29,7 @@ publishing — no `NPM_TOKEN` required.
 | Check packs | `@opensip-tools/checks-cpp` | `packages/fitness/checks-cpp` |
 | CLI | `@opensip-tools/cli` | `packages/cli` |
 
-All 18 share the same version. The release workflow publishes them in
+All 19 share the same version. The release workflow publishes them in
 dependency order; downstream packages reference upstream versions in
 their `dependencies`.
 
@@ -69,7 +70,7 @@ their `dependencies`.
 
 6. Verify on npm:
    ```bash
-   for p in core contracts cli fitness simulation \
+   for p in core datastore contracts cli fitness simulation graph \
             lang-typescript lang-rust lang-python lang-go lang-java lang-cpp \
             checks-typescript checks-universal checks-python checks-go checks-java checks-cpp; do
      printf '%-40s %s\n' "@opensip-tools/$p" "$(npm view "@opensip-tools/$p" version 2>/dev/null || echo MISSING)"
@@ -86,26 +87,27 @@ when downstream's `dependencies` field is resolved.
 Order:
 
 1. **`@opensip-tools/core`** — depends on nothing else workspace-internal.
-2. **`@opensip-tools/contracts`** — depends on core.
-3. **Language adapters** (lang-typescript first, then any order):
+2. **`@opensip-tools/datastore`** — depends on core. Bundles SQLite + Drizzle persistence.
+3. **`@opensip-tools/contracts`** — depends on core, datastore.
+4. **Language adapters** (lang-typescript first, then any order):
    `lang-typescript` → others. lang-typescript is published before the
    rest because it has more downstream consumers (every TS-AST check
    pack peer-depends on it transitively).
-4. **`@opensip-tools/fitness`** — depends on core, contracts, and
+5. **`@opensip-tools/fitness`** — depends on core, contracts, datastore, and
    lang-typescript.
-5. **`@opensip-tools/simulation`** — depends on core, contracts.
-6. **Check packs** (any order within this group):
+6. **`@opensip-tools/simulation`** — depends on core, contracts, datastore.
+7. **Check packs** (any order within this group):
    `checks-typescript`, `checks-universal`, `checks-python`,
    `checks-go`, `checks-java`, `checks-cpp` — all peer-depend on
    fitness.
-7. **`@opensip-tools/cli`** — depends on every tool, every check pack
-   the CLI loads by default, every language adapter, and contracts.
+8. **`@opensip-tools/cli`** — depends on every tool, every check pack
+   the CLI loads by default, every language adapter, contracts, and datastore.
    Always published last.
 
 ## Prerequisites (one-time setup)
 
 - **npm Trusted Publishers** must be configured per-package on
-  npmjs.com → package settings → Publishing access. Each of the 18
+  npmjs.com → package settings → Publishing access. Each of the 19
   packages needs an entry pointing to:
   - Organization: `opensip-ai`
   - Repository: `opensip-tools`
@@ -137,7 +139,7 @@ To unblock:
    NPM_TOKEN=npm_xxx ./tools/bootstrap-publish.sh
    ```
 
-   The script is **idempotent**. It iterates the 18 packages in
+   The script is **idempotent**. It iterates the 19 packages in
    dependency order, skips any whose current source version is already
    on npm, packs and publishes the rest using the token, and at the
    end prints a list of newly-created packages with direct links to

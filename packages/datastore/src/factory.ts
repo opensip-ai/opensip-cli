@@ -1,17 +1,20 @@
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
-import type { DataStore, DataStoreOpenOptions } from './data-store.js';
-import { DataStoreMigrationError } from './data-store.js';
+
 import { openMemoryBackend } from './backends/memory.js';
 import { openSqliteBackend } from './backends/sqlite.js';
+import { DataStoreMigrationError } from './data-store.js';
+
+import type { DataStore, DataStoreOpenOptions } from './data-store.js';
 
 function defaultMigrationsFolder(): string {
   return join(fileURLToPath(new URL('.', import.meta.url)), '..', 'migrations');
 }
 
-export class DataStoreFactory {
-  static open(opts: DataStoreOpenOptions & { migrationsFolder?: string }): DataStore {
+export const DataStoreFactory = {
+  open(opts: DataStoreOpenOptions & { migrationsFolder?: string }): DataStore {
     const datastore =
       opts.backend === 'memory'
         ? openMemoryBackend()
@@ -28,8 +31,8 @@ export class DataStoreFactory {
       throw new DataStoreMigrationError(recoveryHint, { cause: error });
     }
     return datastore;
-  }
-}
+  },
+};
 
 function requireSqlitePath(opts: DataStoreOpenOptions): string {
   if (!opts.path) {
