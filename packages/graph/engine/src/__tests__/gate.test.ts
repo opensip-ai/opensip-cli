@@ -1,15 +1,13 @@
 /**
- * Tests for gate baseline save / compare.
+ * Tests for gate baseline save / compare (v2 — SQLite-backed).
  */
 
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-
 import { createSignal } from '@opensip-tools/core';
+import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { compareToBaseline, fingerprintSignal, saveBaseline } from '../gate.js';
+import { GraphBaselineRepo } from '../persistence/baseline-repo.js';
 
 import type { Signal } from '@opensip-tools/core';
 
@@ -32,32 +30,31 @@ describe('gate fingerprintSignal', () => {
 
   it('treats missing line as 0', () => {
     const s = sig({ ruleId: 'r', message: 'm', filePath: 'src/a.ts' });
-    // Cast to write line=undefined
     const noLine: Signal = { ...s, line: undefined };
     expect(fingerprintSignal(noLine)).toBe('r|src/a.ts|0|m');
   });
 });
 
-describe('saveBaseline / compareToBaseline', () => {
-  let dir: string;
-  let baselinePath: string;
+describe('saveBaseline / compareToBaseline (SQLite-backed)', () => {
+  let datastore: DataStore;
+  let repo: GraphBaselineRepo;
 
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), 'graph-gate-'));
-    baselinePath = join(dir, 'cache', 'baseline.json');
+    datastore = DataStoreFactory.open({ backend: 'memory' });
+    repo = new GraphBaselineRepo(datastore);
   });
 
   afterEach(() => {
-    rmSync(dir, { recursive: true, force: true });
+    datastore.close();
   });
 
-  it('saves a baseline (creating parent dirs) and compareToBaseline reports clean when current matches', () => {
+  it('save then compare reports clean when current matches', () => {
     const signals = [
       sig({ ruleId: 'graph:orphan-subtree', message: 'foo', filePath: 'src/a.ts', line: 1 }),
       sig({ ruleId: 'graph:orphan-subtree', message: 'bar', filePath: 'src/b.ts', line: 2 }),
     ];
-    saveBaseline(signals, baselinePath);
-    const result = compareToBaseline(signals, baselinePath);
+    saveBaseline(signals, repo);
+    const result = compareToBaseline(signals, repo);
     expect(result.degraded).toBe(false);
     expect(result.newSignals).toHaveLength(0);
     expect(result.resolvedFingerprints).toHaveLength(0);
@@ -65,12 +62,12 @@ describe('saveBaseline / compareToBaseline', () => {
 
   it('flags new signals as degraded', () => {
     const original = [sig({ ruleId: 'graph:orphan-subtree', message: 'foo', filePath: 'src/a.ts', line: 1 })];
-    saveBaseline(original, baselinePath);
+    saveBaseline(original, repo);
     const drift = [
       ...original,
       sig({ ruleId: 'graph:orphan-subtree', message: 'newOne', filePath: 'src/c.ts', line: 3 }),
     ];
-    const result = compareToBaseline(drift, baselinePath);
+    const result = compareToBaseline(drift, repo);
     expect(result.degraded).toBe(true);
     expect(result.newSignals).toHaveLength(1);
     expect(result.newSignals[0]?.message).toBe('newOne');
@@ -81,33 +78,28 @@ describe('saveBaseline / compareToBaseline', () => {
       sig({ ruleId: 'r', message: 'a', filePath: 'src/a.ts', line: 1 }),
       sig({ ruleId: 'r', message: 'b', filePath: 'src/b.ts', line: 2 }),
     ];
-    saveBaseline(original, baselinePath);
+    saveBaseline(original, repo);
     const fewer = [original[0]] as readonly Signal[];
-    const result = compareToBaseline(fewer, baselinePath);
+    const result = compareToBaseline(fewer, repo);
     expect(result.degraded).toBe(false);
     expect(result.resolvedFingerprints).toHaveLength(1);
     expect(result.resolvedFingerprints[0]).toContain('|b');
   });
 
-  it('throws ValidationError when baseline is missing', () => {
-    expect(() => compareToBaseline([], join(dir, 'does-not-exist.json'))).toThrow(/Graph baseline not found/);
+  it('throws ValidationError when baseline does not exist', () => {
+    expect(() => compareToBaseline([], repo)).toThrow(/Graph baseline not found/);
   });
 
-  it('throws ValidationError when baseline JSON is malformed', () => {
-    writeFileSync(baselinePath.replace('cache/', ''), 'not-json', 'utf8');
-    const malformed = baselinePath.replace('cache/', '');
-    expect(() => compareToBaseline([], malformed)).toThrow(/malformed/);
-  });
-
-  it('writes the file at the chosen path with deterministic shape', () => {
-    const signals = [sig({ ruleId: 'graph:orphan-subtree', message: 'z', filePath: 'src/z.ts', line: 1 })];
-    saveBaseline(signals, baselinePath);
-    const raw = readFileSync(baselinePath, 'utf8');
-    const parsed = JSON.parse(raw) as { version: string; tool: string; fingerprints: string[] };
-    expect(parsed.version).toBe('1');
-    expect(parsed.tool).toBe('graph');
-    expect(parsed.fingerprints).toHaveLength(1);
-    expect(parsed.fingerprints[0]).toBe('graph:orphan-subtree|src/z.ts|1|z');
+  it('save replaces previous baseline atomically', () => {
+    saveBaseline(
+      [sig({ ruleId: 'r', message: 'old', filePath: 'src/x.ts' })],
+      repo,
+    );
+    const replacement = [sig({ ruleId: 'r', message: 'new', filePath: 'src/y.ts' })];
+    saveBaseline(replacement, repo);
+    const fps = repo.loadFingerprints();
+    expect(fps).toHaveLength(1);
+    expect(fps[0]).toContain('|new');
   });
 
   it('save then compare against an empty current set marks every baseline entry resolved', () => {
@@ -115,25 +107,24 @@ describe('saveBaseline / compareToBaseline', () => {
       sig({ ruleId: 'r', message: 'a', filePath: 'src/a.ts', line: 1 }),
       sig({ ruleId: 'r', message: 'b', filePath: 'src/b.ts', line: 2 }),
     ];
-    saveBaseline(signals, baselinePath);
-    const result = compareToBaseline([], baselinePath);
+    saveBaseline(signals, repo);
+    const result = compareToBaseline([], repo);
     expect(result.degraded).toBe(false);
     expect(result.resolvedFingerprints).toHaveLength(2);
   });
 
-  it('save with no signals produces an empty baseline; later regressions are detected', () => {
-    saveBaseline([], baselinePath);
-    const drift = [sig({ ruleId: 'r', message: 'a', filePath: 'src/a.ts', line: 1 })];
-    const result = compareToBaseline(drift, baselinePath);
+  it('save with no signals produces an empty-but-saved baseline (existence marker present)', () => {
+    saveBaseline([], repo);
+    expect(repo.exists()).toBe(true);
+    expect(repo.loadFingerprints()).toHaveLength(0);
+    // Subsequent regression is detected as "new"
+    const drift = [sig({ ruleId: 'r', message: 'a', filePath: 'src/a.ts' })];
+    const result = compareToBaseline(drift, repo);
     expect(result.degraded).toBe(true);
     expect(result.newSignals).toHaveLength(1);
   });
 
-  it('wraps filesystem errors from saveBaseline as SystemError', () => {
-    // Path under a file (not directory) -> ENOTDIR on mkdirSync
-    const filePath = join(dir, 'a-file');
-    writeFileSync(filePath, 'x', 'utf8');
-    const bad = join(filePath, 'nested', 'baseline.json');
-    expect(() => saveBaseline([], bad)).toThrow(/Failed to write graph baseline/);
+  it('exists() returns false on a fresh store (never saved)', () => {
+    expect(repo.exists()).toBe(false);
   });
 });

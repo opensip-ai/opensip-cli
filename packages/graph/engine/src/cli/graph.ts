@@ -15,13 +15,13 @@ import {
   ConfigurationError,
   generatePrefixedId,
   logger,
-  resolveProjectPaths,
   ToolError,
   ValidationError,
 } from '@opensip-tools/core';
 
 
 import { compareToBaseline, fingerprintSignal, saveBaseline } from '../gate.js';
+import { GraphBaselineRepo } from '../persistence/baseline-repo.js';
 import { buildCliOutput, renderJson } from '../render/json.js';
 import { renderSarif, reportToCloud } from '../render/sarif.js';
 import { inferEntryPoints } from '../rules/_entry-points.js';
@@ -526,16 +526,19 @@ async function runGateMode(
   signals: readonly Signal[],
   cli: ToolCliContext,
 ): Promise<void> {
-  const paths = resolveProjectPaths(opts.cwd);
-  const baselinePath = opts.baseline ?? paths.graphBaselinePath;
+  const datastore = cli.datastore as DataStore | undefined;
+  if (!datastore) {
+    throw new ConfigurationError('Graph gate mode requires a DataStore on ToolCliContext.');
+  }
+  const repo = new GraphBaselineRepo(datastore);
   if (opts.gateSave === true) {
-    saveBaseline(signals, baselinePath);
-    process.stdout.write(`Graph baseline saved to ${baselinePath} (${String(signals.length)} signals)\n`);
+    saveBaseline(signals, repo);
+    process.stdout.write(`Graph baseline saved (${String(signals.length)} signals)\n`);
     cli.setExitCode(EXIT_CODES.SUCCESS);
     return;
   }
   // gate-compare
-  const result = compareToBaseline(signals, baselinePath);
+  const result = compareToBaseline(signals, repo);
   if (result.degraded) {
     cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
     process.stdout.write(

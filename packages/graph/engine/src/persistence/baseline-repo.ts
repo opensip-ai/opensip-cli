@@ -1,9 +1,11 @@
 import { logger, type Signal } from '@opensip-tools/core';
-import type { DataStore } from '@opensip-tools/datastore';
+import { sql } from 'drizzle-orm';
 
 import { fingerprintSignal } from '../gate.js';
 
-import { graphBaselineSignals } from './schema.js';
+import { graphBaselineMeta, graphBaselineSignals } from './schema.js';
+
+import type { DataStore } from '@opensip-tools/datastore';
 
 export class GraphBaselineRepo {
   constructor(private readonly datastore: DataStore) {}
@@ -23,6 +25,16 @@ export class GraphBaselineRepo {
         if (rows.length > 0) {
           tx.insert(graphBaselineSignals).values(rows).run();
         }
+        // Upsert the existence marker. An empty baseline is a valid
+        // saved state; this row distinguishes "saved but no findings"
+        // from "never saved".
+        tx.insert(graphBaselineMeta)
+          .values({ id: 1, capturedAt })
+          .onConflictDoUpdate({
+            target: graphBaselineMeta.id,
+            set: { capturedAt: sql`excluded.captured_at` },
+          })
+          .run();
       });
       logger.info({
         evt: 'graph.baseline.save.complete',
@@ -66,18 +78,14 @@ export class GraphBaselineRepo {
     }
   }
 
-  /** True iff at least one fingerprint row is present. */
+  /** True iff a baseline has been saved (independent of whether the fingerprint set was empty). */
   exists(): boolean {
-    const row = this.datastore.db
-      .select({ fingerprint: graphBaselineSignals.fingerprint })
-      .from(graphBaselineSignals)
-      .limit(1)
-      .get();
+    const row = this.datastore.db.select().from(graphBaselineMeta).limit(1).get();
     if (!row) {
       logger.info({
         evt: 'graph.baseline.load.miss',
         module: 'graph:baseline-repo',
-        msg: 'No graph baseline rows present',
+        msg: 'No graph baseline marker present',
       });
     }
     return row !== undefined;

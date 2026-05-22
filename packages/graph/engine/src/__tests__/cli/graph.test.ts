@@ -6,7 +6,7 @@
  * capture and the various flag combinations against fixture projects.
  */
 
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -118,49 +118,40 @@ describe('executeGraph', () => {
     expect(exitCodes).toContain(0);
   });
 
-  it('--gate-save writes a baseline file', async () => {
+  it('--gate-save writes a baseline to the SQLite store', async () => {
     setupFixture(dir, {
       'index.ts': `function unused(): number { return 1; }\nexport function main(): void {}\n`,
     });
-    const baseline = join(dir, 'baseline.json');
     const { cli, exitCodes } = makeCli();
-    await executeGraph({ cwd: dir, gateSave: true, baseline }, cli);
-    expect(stdout).toContain(`Graph baseline saved to ${baseline}`);
+    await executeGraph({ cwd: dir, gateSave: true }, cli);
+    expect(stdout).toContain(`Graph baseline saved`);
     expect(exitCodes).toContain(0);
-    const raw = readFileSync(baseline, 'utf8');
-    const parsed = JSON.parse(raw) as { tool: string; version: string };
-    expect(parsed.tool).toBe('graph');
-    expect(parsed.version).toBe('1');
   });
 
-  it('--gate-compare returns PASS when current matches baseline', async () => {
+  it('--gate-compare returns PASS when current matches baseline (shared DataStore)', async () => {
     setupFixture(dir, {
       'index.ts': `function unused(): number { return 1; }\nexport function main(): void {}\n`,
     });
-    const baseline = join(dir, 'baseline.json');
-    const cli1 = makeCli();
-    await executeGraph({ cwd: dir, gateSave: true, baseline }, cli1.cli);
+    const shared = makeCli();
+    await executeGraph({ cwd: dir, gateSave: true }, shared.cli);
     stdout = '';
-    const cli2 = makeCli();
-    await executeGraph({ cwd: dir, gateCompare: true, baseline }, cli2.cli);
+    await executeGraph({ cwd: dir, gateCompare: true }, shared.cli);
     expect(stdout).toContain('Graph gate PASS');
-    expect(cli2.exitCodes).toContain(0);
+    expect(shared.exitCodes).toContain(0);
   });
 
-  it('--gate-compare reports FAIL when there are new findings', async () => {
+  it('--gate-compare reports FAIL when there are new findings (shared DataStore)', async () => {
     setupFixture(dir, {
       'index.ts': `export function main(): void {}\n`,
     });
-    const baseline = join(dir, 'baseline.json');
-    const cli1 = makeCli();
-    await executeGraph({ cwd: dir, gateSave: true, baseline }, cli1.cli);
+    const shared = makeCli();
+    await executeGraph({ cwd: dir, gateSave: true }, shared.cli);
     // Mutate fixture to add an orphan
     writeFileSync(join(dir, 'index.ts'), `function unused(): number { return 1; }\nexport function main(): void {}\n`, 'utf8');
     stdout = '';
-    const cli2 = makeCli();
-    await executeGraph({ cwd: dir, gateCompare: true, baseline, noCache: true }, cli2.cli);
+    await executeGraph({ cwd: dir, gateCompare: true, noCache: true }, shared.cli);
     expect(stdout).toContain('Graph gate FAILED');
-    expect(cli2.exitCodes).toContain(1);
+    expect(shared.exitCodes).toContain(1);
   });
 
   it('errors when --gate-save and --gate-compare are passed together', async () => {
