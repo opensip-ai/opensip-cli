@@ -1,8 +1,9 @@
 import { logger } from '@opensip-tools/core';
-import type { DataStore } from '@opensip-tools/datastore';
 import { sql } from 'drizzle-orm';
 
 import { fitBaseline } from './schema.js';
+
+import type { DataStore } from '@opensip-tools/datastore';
 
 export class FitBaselineRepo {
   constructor(private readonly datastore: DataStore) {}
@@ -40,7 +41,7 @@ export class FitBaselineRepo {
   }
 
   /** Load the SARIF baseline. Returns `null` if no row is present. */
-  load(): unknown | null {
+  load(): unknown {
     try {
       const row = this.datastore.db.select().from(fitBaseline).where(sql`id = 1`).get();
       if (!row) {

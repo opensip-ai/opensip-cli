@@ -27,8 +27,8 @@ import {
   renderGateCompareOutput,
   GateBaselineMissingError,
   GateBaselineInvalidError,
-  DEFAULT_BASELINE_PATH,
 } from './gate.js';
+import { FitBaselineRepo } from './persistence/baseline-repo.js';
 
 
 import type { CliArgs, FitOptions, ToolOptions } from '@opensip-tools/contracts';
@@ -86,7 +86,6 @@ function fitOptsToCliArgs(opts: FitOptions & { quiet?: boolean; open?: boolean }
     config: opts.config,
     gateSave: opts.gateSave === true,
     gateCompare: opts.gateCompare === true,
-    baseline: opts.baseline,
   };
 }
 
@@ -115,9 +114,8 @@ function register(cli: ToolCliContext): void {
     .option('-q, --quiet', 'Suppress banner / boxes; print only the pass-fail summary', false)
     .option('--open', 'Launch the HTML dashboard in your browser after the run completes', false)
     .option('--debug', 'Enable debug mode for structured log output', false)
-    .option('--gate-save', 'Architecture-gate: save current findings as baseline (mutually exclusive with --gate-compare)', false)
-    .option('--gate-compare', 'Architecture-gate: compare current findings against baseline; exit 1 on regression', false)
-    .option('--baseline <path>', 'Path to baseline file for --gate-save / --gate-compare (default: opensip-tools/.runtime/baseline.sarif)')
+    .option('--gate-save', 'Architecture-gate: save current findings as baseline in the project SQLite store (mutually exclusive with --gate-compare)', false)
+    .option('--gate-compare', 'Architecture-gate: compare current findings against the saved baseline; exit 1 on regression', false)
     .action(async (opts: FitOptions & { quiet?: boolean; open?: boolean }) => {
       const args = fitOptsToCliArgs(opts);
 
@@ -233,14 +231,14 @@ async function runGateMode(args: CliArgs, cli: ToolCliContext): Promise<void> {
     process.stderr.write('Error: --gate-save and --gate-compare are mutually exclusive.\n');
     return;
   }
-  const baselinePath = args.baseline ?? DEFAULT_BASELINE_PATH;
-  const fitResult = await executeFit(args, undefined, cli.datastore as DataStore);
+  const datastore = cli.datastore as DataStore;
+  const repo = new FitBaselineRepo(datastore);
+  const fitResult = await executeFit(args, undefined, datastore);
   if (fitResult.result.type !== 'fit-done') {
     cli.logger.warn({
       evt: 'cli.gate.fit_failed',
       module: 'cli:gate',
       mode: args.gateSave === true ? 'save' : 'compare',
-      baselinePath,
       reason: fitResult.result.message,
     });
     cli.setExitCode(fitResult.result.exitCode);
@@ -250,13 +248,13 @@ async function runGateMode(args: CliArgs, cli: ToolCliContext): Promise<void> {
   const output = fitResult.output!;
   try {
     if (args.gateSave === true) {
-      saveBaseline(output, baselinePath);
+      saveBaseline(output, repo);
       const findingCount = output.checks.reduce((n, c) => n + c.findings.length, 0);
-      process.stdout.write(`Baseline saved to ${baselinePath}\n`);
+      process.stdout.write(`Baseline saved (project SQLite store)\n`);
       process.stdout.write(`  ${output.checks.length} check(s), ${findingCount} finding(s)\n`);
       return;
     }
-    const result = compareToBaseline(output, baselinePath);
+    const result = compareToBaseline(output, repo);
     process.stdout.write(renderGateCompareOutput(result) + '\n');
     cli.setExitCode(result.degraded ? 1 : 0);
     return;
@@ -266,7 +264,6 @@ async function runGateMode(args: CliArgs, cli: ToolCliContext): Promise<void> {
         evt: 'cli.gate.baseline_error',
         module: 'cli:gate',
         mode: args.gateSave === true ? 'save' : 'compare',
-        baselinePath,
         errorType: error.name,
         reason: error.message,
       });
