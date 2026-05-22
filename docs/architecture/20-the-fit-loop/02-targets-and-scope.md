@@ -1,6 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-15
+last_verified: 2026-05-22
+release: v1.3.x
 title: "Targets and scope"
 audience: [contributors, plugin-authors]
 purpose: "How the framework decides which files a check runs against. Targets, scope, glob expansion, and the marketplace shape."
@@ -81,13 +82,12 @@ The framework filters the matched file list to files with these extensions. Laye
 
 ```yaml
 # opensip-tools.config.yml
-targets:
-  checkOverrides:
-    no-console-log: backend
-    no-todos: ['backend', 'frontend']
+checkOverrides:
+  no-console-log: backend
+  no-todos: ['backend', 'frontend']
 ```
 
-A user can pin a check to a specific target by slug, regardless of what the check declared. This is the escape hatch when a third-party check's scope doesn't match your project's reality. Lives in [`TargetsConfig.checkOverrides`](../../../packages/fitness/engine/src/targets/types.ts).
+A user can pin a check to a specific target by slug, regardless of what the check declared. This is the escape hatch when a third-party check's scope doesn't match your project's reality. `checkOverrides` is a top-level key alongside `targets:` and `globalExcludes:`. Lives in [`TargetsConfig.checkOverrides`](../../../packages/fitness/engine/src/targets/types.ts).
 
 ### 4. No declaration at all
 
@@ -121,40 +121,41 @@ The first is for execution; the second is for matching.
 
 ### Example: the `acme-api` targets
 
+`globalExcludes` is a top-level key alongside `targets:`; targets are a map of kebab-case name → definition (no separate `registry:` wrapper):
+
 ```yaml
+globalExcludes:
+  - '**/node_modules/**'
+  - '**/dist/**'
+  - '**/.next/**'
+
 targets:
-  globalExcludes:
-    - '**/node_modules/**'
-    - '**/dist/**'
-    - '**/.next/**'
+  backend:
+    description: TypeScript REST API
+    include: ['services/api/**/*.ts']
+    exclude: ['**/*.test.ts']
+    languages: ['typescript']
+    concerns: ['backend', 'server']
 
-  registry:
-    - name: backend
-      description: TypeScript REST API
-      include: ['services/api/**/*.ts']
-      exclude: ['**/*.test.ts']
-      languages: ['typescript']
-      concerns: ['backend', 'server']
+  pipelines:
+    description: Python ETL jobs
+    include: ['pipelines/etl/**/*.py']
+    exclude: ['**/*_test.py']
+    languages: ['python']
+    concerns: ['data-pipeline']
 
-    - name: pipelines
-      description: Python ETL jobs
-      include: ['pipelines/etl/**/*.py']
-      exclude: ['**/*_test.py']
-      languages: ['python']
-      concerns: ['data-pipeline']
+  infra:
+    description: AWS CDK stack
+    include: ['infra/**/*.ts']
+    exclude: ['infra/**/*.test.ts']
+    languages: ['typescript']
+    concerns: ['infrastructure']
 
-    - name: infra
-      description: AWS CDK stack
-      include: ['infra/**/*.ts']
-      exclude: ['infra/**/*.test.ts']
-      languages: ['typescript']
-      concerns: ['infrastructure']
-
-    - name: tests
-      description: All test files
-      include: ['**/*.test.ts', '**/*_test.py']
-      languages: ['typescript', 'python']
-      concerns: ['tests']
+  tests:
+    description: All test files
+    include: ['**/*.test.ts', '**/*_test.py']
+    languages: ['typescript', 'python']
+    concerns: ['tests']
 ```
 
 Now a check with `scope: { languages: ['typescript'], concerns: ['backend'] }` matches `backend` (overlap on `typescript`+`backend`). It does *not* match `infra` (different concern) or `tests` (different concern). It does *not* match `pipelines` (different language).
@@ -191,19 +192,18 @@ The `COMMON_IGNORE` set inside the resolver always includes `node_modules`, `dis
 
 ## Global excludes
 
-`TargetsConfig.globalExcludes` is the project-wide subtractor. Every target's resolved file list passes through it. Common entries:
+`globalExcludes` is the top-level project-wide subtractor (it sits at the root of `opensip-tools.config.yml`, not under `targets:`). Every target's resolved file list passes through it. Common entries:
 
 ```yaml
-targets:
-  globalExcludes:
-    - '**/node_modules/**'
-    - '**/dist/**'
-    - '**/build/**'
-    - '**/.next/**'
-    - '**/.turbo/**'
-    - '**/coverage/**'
-    - '**/__snapshots__/**'
-    - '**/*.generated.ts'
+globalExcludes:
+  - '**/node_modules/**'
+  - '**/dist/**'
+  - '**/build/**'
+  - '**/.next/**'
+  - '**/.turbo/**'
+  - '**/coverage/**'
+  - '**/__snapshots__/**'
+  - '**/*.generated.ts'
 ```
 
 Use this rather than repeating the same exclusions on every target. The historical `.fitnessignore` file from earlier versions has been retired — `globalExcludes` replaces it.

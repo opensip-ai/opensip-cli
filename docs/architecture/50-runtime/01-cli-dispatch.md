@@ -1,6 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-15
+last_verified: 2026-05-22
+release: v1.3.x
 title: "CLI dispatch"
 audience: [contributors]
 purpose: "How argv becomes a Tool action handler. The CLI bootstrap, registration order, the global flag set, error suggestions."
@@ -105,7 +106,7 @@ The `--help` text for the program lists every registered Tool's `commands[]`. Th
 
 When the binary is invoked without arguments (or with bare `--help`), the CLI prints a welcome banner: the version, a short description of what `opensip-tools` does, and a numbered list of common next-step commands. Source: [`packages/cli/src/welcome.ts`](../../../packages/cli/src/welcome.ts).
 
-The welcome screen is also where the update-notifier hook runs. If a newer version of `@opensip-tools/cli` is published, a small "update available" line is printed below the banner. The check is rate-limited (one per 24 hours, cached in `~/.opensip-tools/.update-cache`) and is skipped under CI environment detection. See [`packages/cli/src/update-notifier.ts`](../../../packages/cli/src/update-notifier.ts).
+The welcome screen is also where the update-notifier hook runs. If a newer version of `@opensip-tools/cli` is published, a small "update available" line is printed below the banner. The check is rate-limited (once per 24 hours; the `update-notifier` npm package owns its cache under `~/.config/configstore/`) and is skipped when stdout isn't a TTY, when `CI` is set, or when `OPENSIP_NO_UPDATE` / `NO_UPDATE_NOTIFIER` is set. See [`packages/cli/src/update-notifier.ts`](../../../packages/cli/src/update-notifier.ts).
 
 The banner does not appear when a command is invoked. It's strictly a no-argv affordance — running `opensip-tools fit` skips the welcome and goes straight to the run.
 
@@ -161,7 +162,7 @@ For `acme-api` running `opensip-tools fit --gate-compare` from CI on 2026-05-17:
    - `registerCliCommands()`: `init`, `configure`, `uninstall`, `plugin`, `completion`, `sessions` mounted.
 3. `argv = ['node', 'opensip-tools', 'fit', '--gate-compare']` — there's a subcommand, so the welcome banner is skipped.
 4. Update notifier fires (no-op — runs in background, won't block).
-5. `parseAsync()` runs. The `preAction` hook reads the `fit` command's `opts.debug` (false) and leaves the log level at `info`. A runId like `run_4kqj2x9p1f` is generated; the day-level log file `<project>/opensip-tools/.runtime/logs/2026-05-17.jsonl` is opened on first write. Commander dispatches to `fitnessTool`'s `fit` action handler with `--gate-compare = true`. The Tool runs `executeFit` and the gate diff. Exit code 1 (regression detected).
+5. `parseAsync()` runs. The `preAction` hook reads the `fit` command's `opts.debug` (false) and leaves the log level at `info`. A runId like `RUN_01HXYZG9V8K1J7P3M2N0RQS5T6W` is generated (uppercase prefix + ULID); the day-level log file `<project>/opensip-tools/.runtime/logs/2026-05-17.jsonl` is opened on first write. Commander dispatches to `fitnessTool`'s `fit` action handler with `--gate-compare = true`. The Tool runs `executeFit` and the gate diff. Exit code 1 (regression detected).
 
 The whole bootstrap is ~30ms on a developer laptop; the run itself is the bulk of the wall-clock time.
 

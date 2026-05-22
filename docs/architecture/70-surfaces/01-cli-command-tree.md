@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-18
-release: v1.3.0
+last_verified: 2026-05-22
+release: v1.3.x
 title: "CLI command tree"
 audience: [users, ci-integrators, contributors]
 purpose: "Lookup-shaped reference for every CLI command, its flags, and when to use each."
@@ -67,6 +67,7 @@ opensip-tools fit --gate-compare
 | `--exclude <slug>` | repeatable | `[]` | Exclude check by slug. Can be passed multiple times. |
 | `--list` | bool | `false` | List available checks instead of running. |
 | `--recipes` | bool | `false` | List available recipes instead of running. |
+| `--json` | bool | `false` | Emit `CliOutput` JSON on stdout instead of the table renderer. |
 | `--findings` | bool | `false` | Append a per-check finding listing after the table. |
 | `-v, --verbose` | bool | `false` | Inline finding details + findings summary. |
 | `--report-to <url>` | URL | — | POST findings to a URL (OpenSIP Cloud or compatible). |
@@ -78,10 +79,11 @@ opensip-tools fit --gate-compare
 | `--open` | bool | `false` | Launch dashboard after run. |
 | `--config <path>` | path | discovered | Override the `opensip-tools.config.yml` location (defaults to the project's config or the package.json pointer). |
 | `--cwd <path>` | path | `process.cwd()` | Target directory. |
+| `--debug` | bool | `false` | Enable debug-level logging. |
 
 **Mutual exclusion:** `--gate-save` and `--gate-compare` cannot be combined.
 
-**Exit codes:** 0 (passed), 1 (violations or regression), 2 (configuration error), 3 (`--check` slug not found), 4 (`--report-to` upload failure).
+**Exit codes:** 0 (passed), 1 (violations or regression), 2 (configuration error), 3 (`--check` slug not found via the error-suggestion mapping). Note: a `--report-to` upload failure on `fit` is reported in the run footer but does **not** change the exit code (only the `graph` tool exits 4 for upload failure).
 
 **See also:** [`20-the-fit-loop/04-output-gate-sarif.md`](../20-the-fit-loop/04-output-gate-sarif.md), [`60-subsystems/03-architecture-gate.md`](../60-subsystems/03-architecture-gate.md).
 
@@ -101,8 +103,11 @@ opensip-tools sim --kind <kind>
 |---|---|---|---|
 | `--recipe <name>` | string | built-in `default` | Run a named sim recipe. |
 | `--kind <kind>` | string | — | Filter scenarios by kind. One of `load`, `chaos`, `invariant`, `fix-evaluation`. |
+| `--cwd <path>` | path | `process.cwd()` | Target directory. |
+| `--json` | bool | `false` | Emit `SimDoneResult` JSON on stdout instead of the table renderer. |
 | `-q, --quiet` | bool | `false` | Suppress banner. |
 | `--open` | bool | `false` | Launch dashboard after run. |
+| `--debug` | bool | `false` | Enable debug-level logging. |
 
 **Exit codes:** 0 (all scenarios passed), 1 (any scenario failed), 2 (config/runtime error).
 
@@ -112,7 +117,7 @@ opensip-tools sim --kind <kind>
 
 ## `graph` — static call-graph + dead-end analysis
 
-Tool-owned: [`packages/graph/engine/src/tool.ts`](../../../packages/graph/engine/src/tool.ts). The pipeline architecture and cache invalidation are documented in [`40-the-graph-loop/01-stages-and-catalog.md`](../40-the-graph-loop/01-stages-and-catalog.md); the perf-plan history is in [`docs/plans/00-graph-performance-improvements.md`](../../plans/00-graph-performance-improvements.md).
+Tool-owned: [`packages/graph/engine/src/tool.ts`](../../../packages/graph/engine/src/tool.ts). The pipeline architecture and cache invalidation are documented in [`40-the-graph-loop/01-stages-and-catalog.md`](../40-the-graph-loop/01-stages-and-catalog.md); perf-plan history is recoverable from `git -P log -- packages/graph`.
 
 ```
 opensip-tools graph
@@ -139,6 +144,7 @@ opensip-tools graph --packages
 | `--package <name\|path>` | string | — | **TypeScript-only.** Scope the run to one workspace package (faster on monorepos; cross-package edges become unresolved). Searches `packages/**` for a basename match, or accepts an explicit directory path. Mutually exclusive with `--packages`. |
 | `--packages` | bool | `false` | **TypeScript-only.** Fan the run across every workspace package under `packages/**` with a `tsconfig.json`. One child process per package; concurrency capped at `cpus()-1`. Aggregates per-package findings. |
 | `--packages-concurrency <n>` | int | `cpus()-1` | Override `--packages` concurrency cap. |
+| `--debug` | bool | `false` | Enable debug-level logging. |
 
 **Adapter selection.** v1.3.0 ships three first-party adapters: `typescript`, `python`, `rust`. `pickAdapter(cwd)` chooses by file-extension dominance over the cwd, ignoring `node_modules/`, `.venv/`, `target/`, `dist/`, `build/`. Ties prefer TypeScript, then Python, then Rust. For Python and Rust projects, run `graph` from the project root — the `--package` and `--packages` scoping flags are TypeScript-only.
 
@@ -163,7 +169,14 @@ Tool-owned (fitness Tool registers it). Renders the most recent run as HTML and 
 ```
 opensip-tools dashboard
 opensip-tools dashboard --cwd <path>
+opensip-tools dashboard --json
 ```
+
+| Flag | Type | Default | Effect |
+|---|---|---|---|
+| `--cwd <path>` | path | `process.cwd()` | Project root. |
+| `--json` | bool | `false` | Emit a `{ type: 'dashboard', path, opened }` JSON envelope on stdout instead of the table renderer (the browser is still launched if `decideOpen` would normally open it; the JSON just adds a machine-readable result). |
+| `--debug` | bool | `false` | Enable debug-level logging. |
 
 The dashboard is a single self-contained HTML file at `<project>/opensip-tools/.runtime/reports/latest.html`. Each generation overwrites the previous file. The command launches the browser and exits; the file works without opensip-tools installed, so you can email it directly to a teammate.
 

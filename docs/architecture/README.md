@@ -1,6 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-16
+last_verified: 2026-05-22
+release: v1.3.x
 owner: opensip-tools
 indexable: true
 title: "opensip-tools Architecture"
@@ -23,7 +24,8 @@ These docs are written for engineers fluent in TypeScript and Node tooling. Voic
 |---|---|
 | **Brand new to opensip-tools** | 00 → 10 → 20 in order. ~10 docs, ~90 minutes. You'll have a working mental model. |
 | **Writing your first check or recipe** | 00 → 10 → 70 (`02-plugin-authoring`). The middle is unnecessary at first. |
-| **Adding a language adapter or check pack** | 60 (`01-language-adapters`, `02-check-packs`). Self-contained. |
+| **Adding a fitness language adapter or check pack** | 60 (`01-language-adapters`, `02-check-packs`). Self-contained. |
+| **Adding a graph language adapter** | 40 (`03-adding-a-language`). The contract test suite is the spec. |
 | **Wiring opensip-tools into CI** | 20 (`04-output-gate-sarif`) + 60 (`03-architecture-gate`). |
 | **Reviewing a PR that touches the kernel** | 90 (`02-layer-policy`) + 80 (`01-package-catalog`) for lookup. |
 | **Looking for a specific package, command, or config field** | 80 — that's what it's for. |
@@ -67,41 +69,42 @@ These docs are written for engineers fluent in TypeScript and Node tooling. Voic
 
 14. [**Stages and catalog**](./40-the-graph-loop/01-stages-and-catalog.md) — The six-stage pipeline (discover → inventory → edges → indexes → rules → render) and the catalog's on-disk shape.
 15. [**Rules and gating**](./40-the-graph-loop/02-rules-and-gating.md) — The five rules, entry-point inference, `--gate-save`/`--gate-compare`, SARIF output.
+16. [**Adding a language**](./40-the-graph-loop/03-adding-a-language.md) — Step-by-step guide for writing a new `GraphLanguageAdapter`.
 
 ### 50 — Runtime
 *How the system actually executes. Read after the loops for the mechanics behind the narrative.*
 
-16. [**CLI dispatch**](./50-runtime/01-cli-dispatch.md) — argv parsing, tool registration, command tree assembly.
-17. [**Plugin loader**](./50-runtime/02-plugin-loader.md) — Source-file auto-discovery, npm-package pinning, `plugin sync`.
-18. [**Session and persistence**](./50-runtime/03-session-and-persistence.md) — Runtime dir layout, sessions, reports, logs, cache, baseline.
+17. [**CLI dispatch**](./50-runtime/01-cli-dispatch.md) — argv parsing, tool registration, command tree assembly.
+18. [**Plugin loader**](./50-runtime/02-plugin-loader.md) — Source-file auto-discovery, npm-package pinning, `plugin sync`.
+19. [**Session and persistence**](./50-runtime/03-session-and-persistence.md) — Runtime dir layout, sessions, reports, logs, cache, baseline.
 
 ### 60 — Subsystems
 *Narrative deep-dives. Each spans multiple packages; each gets a single end-to-end story.*
 
-19. [**Language adapters**](./60-subsystems/01-language-adapters.md) — What an adapter is, the six bundled, authoring a new one.
-20. [**Check pack architecture**](./60-subsystems/02-check-packs.md) — Built-in packs, scope filters, parameterization, marketplace shape.
-21. [**Architecture gate**](./60-subsystems/03-architecture-gate.md) — Baseline workflow, drift detection, line-shift invariance, CI integration.
+20. [**Language adapters**](./60-subsystems/01-language-adapters.md) — What an adapter is, the six bundled, authoring a new one.
+21. [**Check pack architecture**](./60-subsystems/02-check-packs.md) — Built-in packs, scope filters, parameterization, marketplace shape.
+22. [**Architecture gate**](./60-subsystems/03-architecture-gate.md) — Baseline workflow, drift detection, line-shift invariance, CI integration.
 
 ### 70 — Surfaces
 *The edges of the system. What users and external systems touch.*
 
-22. [**CLI command tree**](./70-surfaces/01-cli-command-tree.md) — Every command, its flags, when to use each.
-23. [**Plugin authoring**](./70-surfaces/02-plugin-authoring.md) — Write your own check, recipe, scenario, or full Tool.
-24. [**Dashboard**](./70-surfaces/03-dashboard.md) — The HTML report: what it shows, when it opens, where it lives.
+23. [**CLI command tree**](./70-surfaces/01-cli-command-tree.md) — Every command, its flags, when to use each.
+24. [**Plugin authoring**](./70-surfaces/02-plugin-authoring.md) — Write your own check, recipe, scenario, or full Tool.
+25. [**Dashboard**](./70-surfaces/03-dashboard.md) — The HTML report: what it shows, when it opens, where it lives.
 
 ### 80 — Reference
 *Lookup-shaped. Not for sequential reading.*
 
-25. [**Package catalog**](./80-reference/01-package-catalog.md) — All 18 packages with one-line role and key exports. Grouped by layer.
-26. [**Configuration**](./80-reference/02-configuration.md) — `opensip-tools.config.yml` schema, every field, defaults.
-27. [**JSON output schema**](./80-reference/03-json-output-schema.md) — The `CliOutput` shape consumed by CI and dashboards.
+26. [**Package catalog**](./80-reference/01-package-catalog.md) — All 18 packages with one-line role and key exports. Grouped by layer.
+27. [**Configuration**](./80-reference/02-configuration.md) — `opensip-tools.config.yml` schema, every field, defaults.
+28. [**JSON output schema**](./80-reference/03-json-output-schema.md) — The `CliOutput` shape consumed by CI and dashboards.
 
 ### 90 — Conventions
 *Policy and style. For contributors.*
 
-28. [**Coding standards**](./90-conventions/01-coding-standards.md) — TS strictness, error handling, exit codes, ESLint posture.
-29. [**Layer policy**](./90-conventions/02-layer-policy.md) — Dependency-cruiser rules, allowed imports, why the kernel can't import a tool.
-30. [**Doc conventions**](./90-conventions/03-doc-conventions.md) — Voice, frontmatter, diagrams, verification trails.
+29. [**Coding standards**](./90-conventions/01-coding-standards.md) — TS strictness, error handling, exit codes, ESLint posture.
+30. [**Layer policy**](./90-conventions/02-layer-policy.md) — Dependency-cruiser rules, allowed imports, why the kernel can't import a tool.
+31. [**Doc conventions**](./90-conventions/03-doc-conventions.md) — Voice, frontmatter, diagrams, verification trails.
 
 ---
 
@@ -136,4 +139,4 @@ See [`./90-conventions/03-doc-conventions.md`](./90-conventions/03-doc-conventio
 
 ## Status
 
-Doc set authored 2026-05-15 against opensip-tools v1.0.0. The package count, the layer rules, the command surface, and the JSON output schema all reflect the v1 release.
+Doc set authored 2026-05-15 against opensip-tools v1.0.0; re-verified against v1.3.x at 2026-05-22 (third tool `graph` and language-pluggability layer added; broken plan links pruned; JSON output union widened to include `graph`). The package count, the layer rules, the command surface, and the JSON output schema all reflect the current release.

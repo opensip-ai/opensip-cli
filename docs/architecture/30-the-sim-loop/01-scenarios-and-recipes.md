@@ -1,6 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-15
+last_verified: 2026-05-22
+release: v1.3.x
 title: "Scenarios and recipes (sim)"
 audience: [contributors, plugin-authors]
 purpose: "What a sim scenario is, the four kinds, and how recipes compose them. The author-facing primitives in the simulation tool."
@@ -168,9 +169,9 @@ This shape — kind-specific authoring + shared runtime contract — is why the 
 A sim recipe is the same shape as a fit recipe: a named selection of scenarios + execution options + reporting options. Defined in [`packages/simulation/engine/src/recipes/types.ts`](../../../packages/simulation/engine/src/recipes/types.ts) and constructed via [`defineRecipe`](../../../packages/simulation/engine/src/recipes/define-recipe.ts).
 
 ```ts
-import { defineRecipe } from '@opensip-tools/simulation';
+import { defineSimulationRecipe } from '@opensip-tools/simulation';
 
-export default defineRecipe({
+export default defineSimulationRecipe({
   name: 'pre-deploy',
   displayName: 'Pre-deploy',
   description: 'Load + chaos suite before each deploy',
@@ -179,7 +180,9 @@ export default defineRecipe({
 });
 ```
 
-Selectors mirror fit's: `all`, `tags`, `pattern`, `explicit`. The `kind:` filter on the CLI (`opensip-tools sim --kind load`) layers on top — it intersects with the recipe's selector so you can run a recipe but only its load scenarios.
+(The fitness-side helper is named `defineRecipe`. Sim's helper is namespaced as `defineSimulationRecipe` so a project that imports both into one module doesn't have to alias.)
+
+Selectors are similar to fit's but with a slightly different set: `all`, `tags`, `kind`, `explicit` ([`packages/simulation/engine/src/recipes/types.ts`](../../../packages/simulation/engine/src/recipes/types.ts)). Sim swaps fit's `pattern` selector for a `kind` selector that filters by scenario kind (`load` / `chaos` / `invariant` / `fix-evaluation`). The `--kind` CLI flag layers a post-selector intersection on top — you can run a recipe and further narrow it to one kind.
 
 `sequential` mode is the typical shape for sim recipes — load scenarios contend for resources, so running them in parallel is rarely correct. `parallel` is available for invariant scenarios (which are usually pure) or fix-evaluation scenarios that fan out across independent inputs.
 

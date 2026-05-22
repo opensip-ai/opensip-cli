@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-18
-release: v1.3.0
+last_verified: 2026-05-22
+release: v1.3.x
 title: "Dashboard"
 audience: [users, contributors]
 purpose: "The HTML report — what it shows, when it opens, how it's generated, and where it lives."
@@ -53,7 +53,7 @@ The HTML file is always written. If any guard skips the browser launch, the user
 
 ## What it shows
 
-Five primary panels — Overview, Sessions, Checks catalog, Recipes, Code Paths — each with its own module under [`packages/contracts/src/persistence/dashboard/`](../../../packages/contracts/src/persistence/dashboard/), plus a top-level fit/sim tab switcher.
+Four top-level tabs (`Overview`, `Fitness`, `Simulation`, `Code Paths`). The Fitness and Simulation tabs each carry three subtabs (`Overview`, `Catalog`, `Recipes`) — the per-tool `Overview` subtab shows that tool's session list. Every panel module lives under [`packages/contracts/src/persistence/dashboard/`](../../../packages/contracts/src/persistence/dashboard/); the top-of-page tool-tab switcher is wired by [`tool-tabs.ts`](../../../packages/contracts/src/persistence/dashboard/tool-tabs.ts).
 
 ### Overview
 
@@ -66,15 +66,15 @@ The default landing panel. Shows:
 
 Source: [`packages/contracts/src/persistence/dashboard/overview.ts`](../../../packages/contracts/src/persistence/dashboard/overview.ts).
 
-### Sessions
+### Sessions list (per-tool Overview subtab)
 
 A list of every past run, sorted reverse-chronological. Click into one to see its full detail — every check that ran, every finding, every directive applied, every check that was skipped or errored.
 
 Per-run detail expands into a tree: check → file → finding. Each finding shows the rule id, severity, line, and (when present) the suggestion text.
 
-Source: [`packages/contracts/src/persistence/dashboard/sessions.ts`](../../../packages/contracts/src/persistence/dashboard/sessions.ts).
+Source: [`packages/contracts/src/persistence/dashboard/sessions.ts`](../../../packages/contracts/src/persistence/dashboard/sessions.ts). Rendered inside each per-tool tab's Overview subtab; the tab switcher is in [`tool-tabs.ts`](../../../packages/contracts/src/persistence/dashboard/tool-tabs.ts).
 
-### Checks catalog
+### Catalog (per-tool Catalog subtab)
 
 Every check that was registered for the current project, with per-check stats:
 
@@ -86,9 +86,9 @@ Filterable by tag, by source pack, by pass-rate. Useful for spotting the noisies
 
 Source: [`packages/contracts/src/persistence/dashboard/checks.ts`](../../../packages/contracts/src/persistence/dashboard/checks.ts).
 
-### Recipes
+### Recipes (per-tool Recipes subtab)
 
-The configured recipes, with per-recipe stats. Same shape as the checks catalog but a level up: how often each recipe has run, its pass rate, its average duration.
+The configured recipes, with per-recipe stats. Same shape as the catalog but a level up: how often each recipe has run, its pass rate, its average duration.
 
 Source: [`packages/contracts/src/persistence/dashboard/recipes.ts`](../../../packages/contracts/src/persistence/dashboard/recipes.ts).
 
@@ -108,7 +108,7 @@ The seven views (each with the same row-click → universal Function Card flow).
 - **Cycles / SCCs** — Tarjan's SCC over the call graph, every component of size ≥ 2. "Where's the tightest knot?"
 - **Search** — fuzzy match over `simpleName`, bound to the persistent search input at the top of the panel.
 
-The **Universal Function Card** is the cross-cutting drill-down: every clickable function name in any view opens the same overlay with name + location, body length, kind, params, return type, callers grouped by package, callees (resolved + external), an "Open in editor" deep link (or "Copy path" fallback), and a "Trace from entry" BFS.
+The **Universal Function Card** is the cross-cutting drill-down: every clickable function name in any view opens the same overlay with name + location, body length, kind, params, return type, callers grouped by package, callees (resolved + external), an "Open in editor" deep link (`vscode://` or `cursor://` — opt in via `dashboard.editor` in [`opensip-tools.config.yml`](../80-reference/02-configuration.md); falls back to "Copy path" when unset), and a "Trace from entry" BFS.
 
 Filter chips above the view tabs apply to every view: package multi-select, kind multi-select, and a production/test toggle (default: production-only).
 
@@ -116,7 +116,7 @@ Source: [`packages/contracts/src/persistence/dashboard/code-paths.ts`](../../../
 
 ### Tool tabs
 
-The dashboard supports both fit and sim runs. The top-of-page tab switcher (fit / sim) filters the panels by tool. Sim runs are sparser today; the panel shapes are the same.
+The dashboard supports both fit and sim runs. The top-of-page tab switcher (Overview / Fitness / Simulation / Code Paths) filters the panels by tool. Sim runs are sparser today; the panel shapes are the same. Source: [`tool-tabs.ts`](../../../packages/contracts/src/persistence/dashboard/tool-tabs.ts).
 
 ---
 
@@ -148,7 +148,7 @@ The cost: dynamic features (filtering, sorting, expand-collapse) are JS in the b
 <project>/opensip-tools/.runtime/reports/latest.html
 ```
 
-Single rolling file. Each generation overwrites the previous file — the dashboard is "show me the most recent state of the project", not a per-run archive. Per-run history lives in the session store (`.runtime/sessions/`); the Sessions panel reads every session record at panel-init time so historical runs are still browsable inside the HTML.
+Single rolling file. Each generation overwrites the previous file — the dashboard is "show me the most recent state of the project", not a per-run archive. Per-run history lives in the session store (`.runtime/sessions/`); the Sessions panel inlines the **most recent 20 sessions** (`loadSessions(20)` in [`packages/fitness/engine/src/cli/dashboard.ts`](../../../packages/fitness/engine/src/cli/dashboard.ts)) so historical runs are browsable inside the HTML up to that bound. The session store's auto-pruning cap (`MAX_SESSIONS = 100`) means the directory itself rarely holds much more than that.
 
 The HTML file is fully self-contained — no asset directory, no CDN, no fetches. Email a stakeholder the file and they can open it on their machine without opensip-tools installed. Useful for: post-incident reports, security review handoffs, compliance audits.
 
@@ -172,7 +172,7 @@ A few common mis-expectations, listed once:
 For `acme-api` after the nightly CI run:
 
 - The session record at `<project>/opensip-tools/.runtime/sessions/2026-05-17T03-15-22-123Z-fit-default.json` carries the full result.
-- The HTML report at `<project>/opensip-tools/.runtime/reports/latest.html` is regenerated. The Sessions panel inside the HTML reads every session record on load, so a developer opening it later sees the new run alongside historical ones.
+- The HTML report at `<project>/opensip-tools/.runtime/reports/latest.html` is regenerated. The Sessions panel inside the HTML inlines the most recent 20 session records, so a developer opening it later sees the new run alongside its 19 immediate predecessors.
 - A developer running `opensip-tools dashboard` locally opens the file in their browser. The Sessions panel shows the run; the Overview panel shows the score trend.
 
 In CI, `--open` is suppressed (no TTY), so no browser opens — but the HTML file is still written. Teams that want a per-run archive copy `latest.html` to a build-artifact path with a run-scoped filename before the next pipeline run overwrites it.

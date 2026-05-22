@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-18
-release: v1.3.0
+last_verified: 2026-05-22
+release: v1.3.x
 title: "JSON output schema"
 audience: [ci-integrators, plugin-authors]
 purpose: "The CliOutput shape (and the SimDoneResult shape). Every field, every type, every presence rule."
@@ -163,7 +163,7 @@ The line and column are **1-based** to match SARIF and most editor conventions. 
 | `durationMs` | number | yes | Scenario execution time. |
 | `error` | string | no | Error message if the scenario errored (e.g. agent provider unreachable). |
 
-> **Note:** per-kind details (load p99, invariant counterexample, chaos recovery time) are **not** in this top-level shape. They're in the session record on disk under `<project>/opensip-tools/.runtime/sessions/<run-id>.json`. The dashboard reads the session record for the deeper view.
+> **Note:** per-kind details (load p99, invariant counterexample, chaos recovery time) are **not** in this top-level shape. They're in the session record on disk under `<project>/opensip-tools/.runtime/sessions/{timestamp}-sim-{recipe?}.json`. The dashboard reads the session record for the deeper view.
 
 ---
 
@@ -190,7 +190,7 @@ The line and column are **1-based** to match SARIF and most editor conventions. 
 }
 ```
 
-Each rule appears as a `CheckOutput` whose `checkSlug` is the graph rule slug (`graph:orphan-subtree`, `graph:duplicated-function-body`, `graph:no-side-effect-path`, `graph:test-only-reachable`, `graph:always-throws-branch`). Findings carry the same `FindingOutput` shape; graph attaches a `partialFingerprints.bodyHash` in the SARIF output but the JSON envelope keeps the standard fields. See the renderer at [`packages/graph/engine/src/render/json.ts`](../../../packages/graph/engine/src/render/json.ts).
+Each rule appears as a `CheckOutput` whose `checkSlug` is the graph rule slug (`graph:orphan-subtree`, `graph:duplicated-function-body`, `graph:no-side-effect-path`, `graph:test-only-reachable`, `graph:always-throws-branch`). Findings carry the same `FindingOutput` shape, and graph's SARIF renderer is a thin wrapper over fitness's `buildSarifLog` (DEC-3 cross-tool import) — no graph-specific extensions today. See the renderer at [`packages/graph/engine/src/render/json.ts`](../../../packages/graph/engine/src/render/json.ts) and the SARIF wrapper at [`packages/graph/engine/src/render/sarif.ts`](../../../packages/graph/engine/src/render/sarif.ts).
 
 ---
 

@@ -1,6 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-15
+last_verified: 2026-05-22
+release: v1.3.x
 title: "Ignore directives"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "Inline source-level suppression — how `@fitness-ignore-next-line` and `@fitness-ignore-file` work, when to use them, and where they fit in the run."
@@ -147,7 +148,7 @@ A directive becomes a problem when:
 - **It's repeated more than ~3 times in one file.** That's a baseline shape. Move it to the file level (`@fitness-ignore-file`) or to the gate baseline.
 - **It's repeated more than ~10 times in the project.** That's a check shape. Either the check is wrong (the author should refine the rule) or the team's policy is wrong (the rule should be retired).
 
-The dashboard's "Ignored" tab surfaces directive density per check; a check with hundreds of suppressions across the repo deserves a second look.
+The dashboard's per-tool Catalog subtab and the CLI's `--findings` view both surface directive counts; a check with hundreds of suppressions across the repo deserves a second look. (There is no separate top-level "Ignored" tab today — the suppressions are inlined into the same panels that show findings.)
 
 ---
 
@@ -161,9 +162,9 @@ The `DirectiveEntry` shape ([`packages/fitness/engine/src/framework/directive-in
 - The kind (`'next-line'` | `'file'`).
 - Whether the directive matched any actual violation (i.e. did this directive *do* anything?).
 
-The CLI's `--findings` output groups violations by check and shows ignored counts. The dashboard does the same with a tab for "Ignored" so reviewers can audit suppressions. The JSON output's per-check entry carries `ignoredCount` (count) and the optional `appliedDirectives` array (the entries themselves, when verbose-equivalent output is requested).
+The CLI's `--findings` output groups violations by check and the table renderer surfaces an `ignored` count per row (see `TableRow.ignored` in [`packages/contracts/src/types.ts`](../../../packages/contracts/src/types.ts)). The dashboard reads the same session record. The contract-stable JSON output (`CheckOutput`) does **not** carry `ignoredCount` or `appliedDirectives` — those live in the internal session record on disk and in the table-render layer; CI consumers that need directive details should read the session JSON directly rather than the `--json` envelope.
 
-A directive that didn't match any violation (e.g. the targeted check no longer fires there) is *also* tracked. This is how you find stale suppressions: the directive exists in the source, and the framework reports zero violations matched it. A separate housekeeping pass can flag those for cleanup.
+A directive that didn't match any violation (e.g. the targeted check no longer fires there) is *also* tracked internally. This is how you find stale suppressions: the directive exists in the source, and the framework reports zero violations matched it. A separate housekeeping pass can flag those for cleanup.
 
 ---
 

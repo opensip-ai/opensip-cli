@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-18
-release: v1.3.0
+last_verified: 2026-05-22
+release: v1.3.x
 title: "Layer policy"
 audience: [contributors]
 purpose: "The dependency-cruiser rules that enforce the five-layer architecture and the tool-internal partitioning rules (graph stages, dashboard panels), rule by rule, with rationale."
@@ -176,7 +176,7 @@ Beyond the cross-package layer cake, two tools define their own internal-shape r
 
 ### Graph tool — the six-stage pipeline
 
-Eleven rules in `.dependency-cruiser.cjs` keep the graph tool's stages clean. Six predate v1.3.0 and pin the original cross-stage discipline; four landed in v1.3.0 (PRs 3–6 of plan 10) to enforce the language-pluggability layering; one is the `info`-severity allow-rule for the documented SARIF cross-tool edge.
+Eleven rules in `.dependency-cruiser.cjs` keep the graph tool's stages clean. Six predate v1.3.0 and pin the original cross-stage discipline; four landed in v1.3.0 to enforce the language-pluggability layering; one is the `info`-severity allow-rule for the documented SARIF cross-tool edge.
 
 - **`graph-no-cli`** — graph engine doesn't import the CLI.
 - **`graph-no-check-packs`** — graph never reaches into fitness check packs.

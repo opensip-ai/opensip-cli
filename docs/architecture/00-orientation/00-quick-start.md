@@ -1,6 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-15
+last_verified: 2026-05-22
+release: v1.3.x
 title: "Quick start"
 audience: [contributors, plugin-authors, ci-integrators, evaluators]
 purpose: "Four commands from zero to a passing fitness run. Hands-on before the conceptual material."
@@ -31,8 +32,8 @@ opensip-tools auto-detects your project's language(s) from filesystem markers an
 
 | Language | Detection marker | Language-specific checks | Universal checks |
 |---|---|---|---|
-| **TypeScript** / JS / TSX | `package.json`, `tsconfig.json` | 66 (TS-AST-driven) | ✓ |
-| **Python** | `pyproject.toml` | yes | ✓ |
+| **TypeScript** / JS / TSX | `tsconfig.json` (or `package.json` alone) | 66 (TS-AST-driven) | ✓ |
+| **Python** | `pyproject.toml`, `setup.py` | yes | ✓ |
 | **Java** | `pom.xml`, `build.gradle` | yes | ✓ |
 | **Go** | `go.mod` | yes | ✓ |
 | **C / C++** | `CMakeLists.txt` | yes (via clang-tidy) | ✓ |

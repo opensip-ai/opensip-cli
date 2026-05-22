@@ -1,6 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-15
+last_verified: 2026-05-22
+release: v1.3.x
 title: "Coding standards"
 audience: [contributors]
 purpose: "How code in this workspace is written. ESLint posture, error handling, exit codes, log style."
@@ -81,20 +82,23 @@ The `@fitness-ignore-file` directives are opensip-tools' own (eaten by the fitne
 [`packages/core/src/lib/errors.ts`](../../../packages/core/src/lib/errors.ts) defines the workspace's error hierarchy:
 
 ```ts
+interface ToolErrorOptions extends ErrorOptions { code?: string; [key: string]: unknown }
+
 class ToolError extends Error {
   readonly code: string;
-  readonly cause?: Error;
+  // `cause` is inherited from base `Error` via the options bag (ES2022).
+  constructor(message: string, code: string, options?: ToolErrorOptions);
 }
 
-class ValidationError extends ToolError { /* code defaults to 'VALIDATION.GENERAL' */ }
-class NotFoundError    extends ToolError { /* … */ }
-class SystemError      extends ToolError { /* … */ }
-class TimeoutError     extends ToolError { /* … */ }
-class NetworkError     extends ToolError { /* … */ }
-class ConfigurationError extends ToolError { /* … */ }
+class ValidationError    extends ToolError { /* default code: 'VALIDATION_ERROR' */ }
+class NotFoundError      extends ToolError { /* default code: 'NOT_FOUND' */ }
+class SystemError        extends ToolError { /* default code: 'SYSTEM_ERROR' */ }
+class TimeoutError       extends ToolError { /* default code: 'TIMEOUT'; second arg is `number | ToolErrorOptions` */ }
+class NetworkError       extends ToolError { /* default code: 'NETWORK_ERROR'; supports { statusCode } */ }
+class ConfigurationError extends ToolError { /* default code: 'CONFIGURATION_ERROR' */ }
 ```
 
-Plus the `Result<T, E>` pattern with `ok(value)` / `err(error)` / `tryCatchAsync(fn)`.
+Plus the `Result<T, E>` pattern with `ok(value)` / `err(error)` / `tryCatch(fn)` / `tryCatchAsync(fn)` exported from the same module.
 
 ### When to throw vs. return Result
 
@@ -104,7 +108,7 @@ Plus the `Result<T, E>` pattern with `ok(value)` / `err(error)` / `tryCatchAsync
 
 ### Error codes
 
-Code format: `DOMAIN.SUBDOMAIN.SPECIFIC` — e.g. `'CONFIG.MISSING'`, `'GATE.BASELINE.NOT_FOUND'`, `'PLUGIN.LOADER.IMPORT_FAILED'`. The dot-separated shape is greppable and the prefix is meaningful for filter rules.
+Each error subclass ships with a sensible default: `VALIDATION_ERROR`, `NOT_FOUND`, `SYSTEM_ERROR`, `TIMEOUT`, `NETWORK_ERROR`, `CONFIGURATION_ERROR`. Call sites that want a more specific code pass `{ code: '...' }` as the second argument, e.g. `new ValidationError('bad', { code: 'SCHEMA_FAIL' })`. Most production throws today use the defaults; the shape is in place for future scoped codes.
 
 Errors are mapped to user-facing suggestions by [`getErrorSuggestion`](../../../packages/contracts/src/exit-codes.ts):
 

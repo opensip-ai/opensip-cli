@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-18
-release: v1.3.0
+last_verified: 2026-05-22
+release: v1.3.x
 title: "Stages and catalog (graph)"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "How `graph` builds its picture of the codebase — the six-stage pipeline, the catalog format, and the content-keyed cache."
@@ -32,9 +32,6 @@ related-docs:
   - ./03-adding-a-language.md
   - ../10-mental-model/02-tool-plugin-model.md
   - ../60-subsystems/01-language-adapters.md
-  - ../../plans/00-graph-performance-improvements.md
-  - ../../plans/10-graph-language-pluggability.md
-  - ../../plans/11-graph-language-adapter-contract.md
 ---
 # Stages and catalog (graph)
 
@@ -92,9 +89,9 @@ The `graph` command is the static call-graph tool. Where `fit` answers "is the c
 
 Stages 0–2 are language-agnostic over the [`GraphLanguageAdapter`](../../../packages/graph/engine/src/lang-adapter/types.ts) contract; the orchestrator looks up an adapter via [`lang-adapter/registry.ts`](../../../packages/graph/engine/src/lang-adapter/registry.ts) and dispatches `discoverFiles` / `parseProject` / `walkProject` / `resolveCallSites` through it. Stage 3 (`buildIndexes`) lives in [`packages/graph/engine/src/pipeline/indexes.ts`](../../../packages/graph/engine/src/pipeline/indexes.ts); stages 4–5 live in [`packages/graph/engine/src/rules/`](../../../packages/graph/engine/src/rules/) and [`packages/graph/engine/src/render/`](../../../packages/graph/engine/src/render/). Stages communicate only through their typed outputs; a stage cannot import a sibling stage, cannot reach back to read its predecessor's intermediate state, cannot peek into the next stage's expectations. This isolation is the single most important property of the design — every other guarantee derives from it.
 
-> **History — Stage 1 + Stage 2 fused (Phase 4, 2026-05-17).** Originally these were two separate AST walks per file: Stage 1 emitted function occurrences; Stage 2 walked the same AST a second time to find and resolve call sites. The two walks descended in identical order and the only data flowing between them was each function-shape's bodyHash — which Stage 1 already computed. Phase 4 of [`docs/plans/00-graph-performance-improvements.md`](../../plans/00-graph-performance-improvements.md) fused the two passes into [`lang-typescript/walk.ts`](../../../packages/graph/engine/src/lang-typescript/walk.ts). Legacy `buildInventory` and `resolveEdges` entry points are retained for tests and external callers; they share the dispatch helpers from `walk.ts`. The orchestrator calls `walkProgram` once and feeds the resulting call-site records to `resolveEdgesFromRecords`.
+> **History — Stage 1 + Stage 2 fused (Phase 4, 2026-05-17).** Originally these were two separate AST walks per file: Stage 1 emitted function occurrences; Stage 2 walked the same AST a second time to find and resolve call sites. The two walks descended in identical order and the only data flowing between them was each function-shape's bodyHash — which Stage 1 already computed. Phase 4 of the graph perf work fused the two passes into [`lang-typescript/walk.ts`](../../../packages/graph/engine/src/lang-typescript/walk.ts). Legacy `buildInventory` and `resolveEdges` entry points are retained for tests and external callers; they share the dispatch helpers from `walk.ts`. The orchestrator calls `walkProgram` once and feeds the resulting call-site records to `resolveEdgesFromRecords`.
 >
-> **Adapter layer (PRs 3–6 of plan 10, v1.3.0).** Stages 0, 1, and 2 are adapter-driven: every file discovery, parse, walk, and call-site resolution call routes through the [`GraphLanguageAdapter`](../../../packages/graph/engine/src/lang-adapter/types.ts) contract. Three first-party adapters ship in v1.3.0 — TypeScript ([`lang-typescript/index.ts`](../../../packages/graph/engine/src/lang-typescript/index.ts)), Python ([`lang-python/index.ts`](../../../packages/graph/engine/src/lang-python/index.ts)), Rust ([`lang-rust/index.ts`](../../../packages/graph/engine/src/lang-rust/index.ts)) — registered by [`bootstrap.ts`](../../../packages/graph/engine/src/bootstrap.ts) at module load. `pickAdapter(cwd)` chooses one by file-extension dominance with a deterministic preference order (TS > Python > Rust on ties). Stages 3 (indexes), 4 (rules), and 5 (render) are unchanged — they consume the catalog and don't know which adapter built it. See [`03-adding-a-language.md`](./03-adding-a-language.md) for the contributor walkthrough.
+> **Adapter layer (v1.3.0).** Stages 0, 1, and 2 are adapter-driven: every file discovery, parse, walk, and call-site resolution call routes through the [`GraphLanguageAdapter`](../../../packages/graph/engine/src/lang-adapter/types.ts) contract. Three first-party adapters ship in v1.3.0 — TypeScript ([`lang-typescript/index.ts`](../../../packages/graph/engine/src/lang-typescript/index.ts)), Python ([`lang-python/index.ts`](../../../packages/graph/engine/src/lang-python/index.ts)), Rust ([`lang-rust/index.ts`](../../../packages/graph/engine/src/lang-rust/index.ts)) — registered by [`bootstrap.ts`](../../../packages/graph/engine/src/bootstrap.ts) at module load. `pickAdapter(cwd)` chooses one by file-extension dominance with a deterministic preference order (TS > Python > Rust on ties). Stages 3 (indexes), 4 (rules), and 5 (render) are unchanged — they consume the catalog and don't know which adapter built it. See [`03-adding-a-language.md`](./03-adding-a-language.md) for the contributor walkthrough.
 
 ### Stage 0 — Discover
 
@@ -134,7 +131,7 @@ interface FunctionOccurrence {
 }
 ```
 
-The TypeScript adapter's visitor logic lives in [`lang-typescript/inventory-visitors/`](../../../packages/graph/engine/src/lang-typescript/inventory-visitors/) — one file per node kind. The helpers that compute body hashes, synthesize names for anonymous functions, classify visibility, and extract decorators live alongside in [`lang-typescript/inventory-helpers/`](../../../packages/graph/engine/src/lang-typescript/inventory-helpers/). The shared dispatch table (`dispatchVisitor`, `isInlineCallable`) lives in [`lang-typescript/walk.ts`](../../../packages/graph/engine/src/lang-typescript/walk.ts) so the legacy `buildInventory` entry point and the unified walk share the same node-shape detection. The Python and Rust adapters keep a flatter layout (`walk.ts` / `resolve.ts` per adapter); see [`03-adding-a-language.md`](./03-adding-a-language.md) for the recommended layout. Shared edge-emission helpers (e.g. `appendEdge`) live at [`lang-adapter/edge-helpers.ts`](../../../packages/graph/engine/src/lang-adapter/edge-helpers.ts) — extracted in PR 6 of plan 10 because the duplicated-function-body rule legitimately fired across the three adapters' near-identical helpers.
+The TypeScript adapter's visitor logic lives in [`lang-typescript/inventory-visitors/`](../../../packages/graph/engine/src/lang-typescript/inventory-visitors/) — one file per node kind. The helpers that compute body hashes, synthesize names for anonymous functions, classify visibility, and extract decorators live alongside in [`lang-typescript/inventory-helpers/`](../../../packages/graph/engine/src/lang-typescript/inventory-helpers/). The shared dispatch table (`dispatchVisitor`, `isInlineCallable`) lives in [`lang-typescript/walk.ts`](../../../packages/graph/engine/src/lang-typescript/walk.ts) so the legacy `buildInventory` entry point and the unified walk share the same node-shape detection. The Python and Rust adapters keep a flatter layout (`walk.ts` / `resolve.ts` per adapter); see [`03-adding-a-language.md`](./03-adding-a-language.md) for the recommended layout. Shared edge-emission helpers (e.g. `appendEdge`) live at [`lang-adapter/edge-helpers.ts`](../../../packages/graph/engine/src/lang-adapter/edge-helpers.ts) — extracted during the v1.3.0 language-pluggability work because the duplicated-function-body rule legitimately fired across the three adapters' near-identical helpers.
 
 **Why inventory finishes building before resolvers run.** Resolvers look up callees by name and bodyHash in the catalog. The walk emits all occurrences first, then the orchestrator builds the initial catalog, then `adapter.resolveCallSites` dispatches over the call-site list. By the time any resolver runs, the catalog is frozen and complete, so every callee resolution is either "found in catalog" or "unresolved" — never "not yet in catalog." This invariant is codified as I-4 ("`resolveCallSites` does not mutate its input catalog") in the [adapter contract](../../../packages/graph/engine/src/lang-adapter/types.ts).
 
@@ -147,7 +144,7 @@ interface CallEdge {
   readonly column: number;
   readonly resolution: 'static' | 'method-dispatch' | 'jsx' | 'constructor' | 'unknown' | 'dynamic-string';
   readonly confidence: 'high' | 'medium' | 'low';
-  readonly text: string;              // verbatim call expression for debugging
+  readonly text: string;              // call expression text, truncated to ≤ 80 chars
   readonly discarded?: boolean;       // true if call appears as ExpressionStatement (return ignored)
 }
 ```
@@ -300,4 +297,4 @@ Both flags trade cross-package edge fidelity for speed and memory. Use `--no-cac
 
 - **[`02-rules-and-gating.md`](./02-rules-and-gating.md)** — the five rules that consume the catalog, the gate workflow, and the SARIF integration.
 - **[`70-surfaces/01-cli-command-tree.md#graph`](../70-surfaces/01-cli-command-tree.md)** — the CLI flag reference.
-- **[`../plans/00-graph-performance-improvements.md`](../../plans/00-graph-performance-improvements.md)** — the perf-plan history (waves 1-4): heap-sizing hint, freed Program, streamed write, sliced hashing, per-package scope, fused walk, parallel runner, transitive incremental rebuild.
+- **`git -P log -- packages/graph`** — the perf-plan history landed in waves: heap-sizing hint, freed Program, streamed write, sliced hashing, per-package scope, fused walk, parallel runner, transitive incremental rebuild. The original perf plan documents were removed once each wave shipped; the commit history is the source of truth.
