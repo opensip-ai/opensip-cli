@@ -47,24 +47,15 @@ export { EXIT_CODES, getErrorSuggestion } from './exit-codes.js';
 export type { ErrorSuggestion } from './exit-codes.js';
 
 // Session persistence
-export {
-  configurePersistencePaths,
-  saveSession,
-  loadSessions,
-  loadLatestSession,
-  countSessions,
-  clearAllSessions,
-  clearSessionsOlderThan,
-  getStoreDir,
-  getReportsDir,
-  generateSessionId,
-  sanitizeForFilename,
-} from './persistence/store.js';
+export { generateSessionId, sanitizeForFilename } from './persistence/store.js';
 export type {
   StoredSession,
   CheckCatalogEntry,
   RecipeCatalogEntry,
 } from './persistence/store.js';
+export { SessionRepo } from './persistence/session-repo.js';
+export type { SessionListOptions } from './persistence/session-repo.js';
+export { sessions, sessionChecks, sessionFindings } from './persistence/schema/sessions.js';
 
 // Dashboard HTML generator
 export { generateDashboardHtml } from './persistence/dashboard/index.js';
