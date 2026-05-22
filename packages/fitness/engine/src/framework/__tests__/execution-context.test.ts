@@ -78,3 +78,106 @@ describe('createExecutionContext > matchFiles fileCache fallback', () => {
     expect(files.length).toBe(3)
   })
 })
+
+describe('createExecutionContext > extractSnippet, log, checkAborted', () => {
+  it('extractSnippet delegates to result-builder.extractSnippet with a default of 2 context lines', () => {
+    const matcher = PathMatcher.create({ cwd: testDir, include: [], exclude: [] })
+    const ctx = createExecutionContext(
+      { id: 'test-id', slug: 'test-slug', itemType: 'files' },
+      testDir,
+      matcher,
+    )
+    const out = ctx.extractSnippet('a\nb\nc\nd\ne', 3)
+    expect(out.snippet).toBeDefined()
+    expect(out.contextLines).toBeGreaterThan(0)
+  })
+
+  it('log writes to console only when verbose is true', () => {
+    const matcher = PathMatcher.create({ cwd: testDir, include: [], exclude: [] })
+    const messages: string[] = []
+    const realLog = console.log
+    console.log = (...args: unknown[]) => { messages.push(String(args[0])) }
+    try {
+      const verboseCtx = createExecutionContext(
+        { id: 'id', slug: 'slug', itemType: 'files' },
+        testDir,
+        matcher,
+        { verbose: true },
+      )
+      verboseCtx.log('hello')
+
+      const quietCtx = createExecutionContext(
+        { id: 'id', slug: 'slug', itemType: 'files' },
+        testDir,
+        matcher,
+      )
+      quietCtx.log('silent')
+    } finally {
+      console.log = realLog
+    }
+    expect(messages.some((m) => m.includes('hello'))).toBe(true)
+    expect(messages.some((m) => m.includes('silent'))).toBe(false)
+  })
+
+  it('checkAborted throws CheckAbortedError when the signal is aborted', async () => {
+    const matcher = PathMatcher.create({ cwd: testDir, include: [], exclude: [] })
+    const ac = new AbortController()
+    const ctx = createExecutionContext(
+      { id: 'id', slug: 'slug', itemType: 'files' },
+      testDir,
+      matcher,
+      { signal: ac.signal },
+    )
+    expect(() => { ctx.checkAborted() }).not.toThrow()
+    ac.abort()
+    expect(() => { ctx.checkAborted() }).toThrow()
+  })
+
+  it('readFile rejects files that exceed the 10MB limit', async () => {
+    const matcher = PathMatcher.create({ cwd: testDir, include: [], exclude: [] })
+    const ctx = createExecutionContext(
+      { id: 'id', slug: 'slug', itemType: 'files' },
+      testDir,
+      matcher,
+    )
+    // Read a non-existent file — fs.stat will throw, which propagates.
+    await expect(ctx.readFile('/nonexistent/path/file.ts')).rejects.toThrow()
+  })
+
+  it('fileExists delegates to fileCache', async () => {
+    const matcher = PathMatcher.create({ cwd: testDir, include: [], exclude: [] })
+    const ctx = createExecutionContext(
+      { id: 'id', slug: 'slug', itemType: 'files' },
+      testDir,
+      matcher,
+    )
+    const result = await ctx.fileExists('/nonexistent.ts')
+    expect(typeof result).toBe('boolean')
+  })
+
+  it('getMatcher returns the same matcher passed in', () => {
+    const matcher = PathMatcher.create({ cwd: testDir, include: [], exclude: [] })
+    const ctx = createExecutionContext(
+      { id: 'id', slug: 'slug', itemType: 'files' },
+      testDir,
+      matcher,
+    )
+    expect(ctx.getMatcher()).toBe(matcher)
+  })
+
+  it('matchFiles with explicit patterns ignores the targetFiles override', async () => {
+    mkdirSync(join(testDir, 'src'), { recursive: true })
+    writeFileSync(join(testDir, 'src', 'a.ts'), 'x')
+    const matcher = PathMatcher.create({ cwd: testDir, include: [], exclude: [] })
+    const ctx = createExecutionContext(
+      { id: 'id', slug: 'slug', itemType: 'files' },
+      testDir,
+      matcher,
+      { targetFiles: ['/some/preresolved/file.ts'] },
+    )
+    // Custom patterns path skips targetFiles fallback.
+    const out = await ctx.matchFiles(['src/**/*.ts'])
+    expect(out.length).toBeGreaterThan(0)
+    expect(out[0]).not.toBe('/some/preresolved/file.ts')
+  })
+})

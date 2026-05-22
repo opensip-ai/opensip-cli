@@ -36,6 +36,7 @@ export class FitBaselineRepo {
         evt: 'fit.baseline.save.error',
         module: MODULE_NAME,
         msg: 'Failed to save fit baseline',
+        /* v8 ignore next -- SQLite always throws Error subclasses; the String(error) fallback is defensive */
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;
@@ -64,6 +65,7 @@ export class FitBaselineRepo {
         evt: 'fit.baseline.load.error',
         module: MODULE_NAME,
         msg: 'Failed to load fit baseline',
+        /* v8 ignore next -- SQLite always throws Error subclasses; the String(error) fallback is defensive */
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;
