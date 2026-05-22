@@ -35,6 +35,7 @@ export const resolveDirectCall: EdgeResolver<ts.CallExpression> = (node, ctx) =>
       return { to: [hash], resolution: 'static', confidence: 'high' };
     }
   }
+  /* v8 ignore next */
   return UNRESOLVED;
 };
 
@@ -43,9 +44,7 @@ function functionLikeFromDeclaration(d: ts.Declaration): ts.Node | null {
     ts.isFunctionDeclaration(d) ||
     ts.isArrowFunction(d) ||
     ts.isFunctionExpression(d) ||
-    /* v8 ignore next 4 -- direct-call seldom resolves to a method/
-       constructor/accessor declaration directly (those go through
-       property-access); these branches are defensive type guards. */
+    /* v8 ignore next 4 */
     ts.isMethodDeclaration(d) ||
     ts.isConstructorDeclaration(d) ||
     ts.isGetAccessor(d) ||
@@ -56,7 +55,6 @@ function functionLikeFromDeclaration(d: ts.Declaration): ts.Node | null {
   if (ts.isVariableDeclaration(d) && d.initializer && (ts.isArrowFunction(d.initializer) || ts.isFunctionExpression(d.initializer))) {
       return d.initializer;
     }
-  /* v8 ignore next -- declaration is none of the function-like shapes;
-     resolver returns UNRESOLVED via the caller. */
+  /* v8 ignore next */
   return null;
 }

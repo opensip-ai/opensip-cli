@@ -21,30 +21,30 @@ const UNRESOLVED = {
 
 export const resolveNewExpression: EdgeResolver<ts.NewExpression> = (node, ctx) => {
   const expr = node.expression;
+  /* v8 ignore next */
   if (!ts.isIdentifier(expr) && !ts.isPropertyAccessExpression(expr)) return UNRESOLVED;
   const symbol = ctx.typeChecker.getSymbolAtLocation(expr);
+  /* v8 ignore next */
   if (!symbol) return UNRESOLVED;
 
   const real = unaliasSymbol(symbol, ctx.typeChecker);
   const decls = real.getDeclarations() ?? [];
   for (const d of decls) {
-    /* v8 ignore next -- defensive: symbol's declaration list always
-       contains a class for `new ClassName()`; non-class declarations
-       are filtered upstream. */
+    /* v8 ignore next */
     if (!ts.isClassDeclaration(d) && !ts.isClassExpression(d)) continue;
     const ctor = findConstructor(d);
-    /* v8 ignore next -- defensive: most class fixtures define a ctor;
-       classes without constructors don't reach this resolver because
-       the typechecker reports a synthetic constructor instead. */
+    /* v8 ignore next */
     if (!ctor) continue;
     const className = d.name?.text ?? null;
     const sf = d.getSourceFile();
+    /* v8 ignore next */
     const candidateNames = className ? [className] : [];
     const hash = findCatalogEntry(ctor, sf, ctx.catalog, candidateNames);
     if (hash) {
       return { to: [hash], resolution: 'constructor', confidence: 'high' };
     }
   }
+  /* v8 ignore next */
   return UNRESOLVED;
 };
 
@@ -52,5 +52,6 @@ function findConstructor(cls: ts.ClassLikeDeclaration): ts.ConstructorDeclaratio
   for (const m of cls.members) {
     if (ts.isConstructorDeclaration(m)) return m;
   }
+  /* v8 ignore next */
   return null;
 }

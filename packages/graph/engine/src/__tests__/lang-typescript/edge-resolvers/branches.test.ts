@@ -15,7 +15,6 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { resolveByCatalogFallback } from '../../../lang-typescript/edge-resolvers/catalog-fallback.js';
-
 import { findOccurrence, runFixture, writeFixture } from '../../acceptance/_fixture-runner.js';
 
 import type { Catalog } from '../../../types.js';

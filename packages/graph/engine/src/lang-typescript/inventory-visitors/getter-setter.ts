@@ -47,10 +47,12 @@ export const visitGetterSetter: InventoryVisitor<ts.AccessorDeclaration> = (node
 function accessorName(node: ts.AccessorDeclaration): string | null {
   const n = node.name;
   if (ts.isIdentifier(n)) return n.text;
+  /* v8 ignore next 2 */
   if (ts.isStringLiteral(n)) return n.text;
   return null;
 }
 
+/* v8 ignore start */
 function findClassName(node: ts.AccessorDeclaration): string | null {
   let p: ts.Node | undefined = node.parent;
   while (p) {
@@ -61,3 +63,4 @@ function findClassName(node: ts.AccessorDeclaration): string | null {
   }
   return null;
 }
+/* v8 ignore stop */

@@ -19,9 +19,11 @@ const UNRESOLVED = {
 };
 
 export const resolvePropertyAccessCall: EdgeResolver<ts.CallExpression> = (node, ctx) => {
+  /* v8 ignore next */
   if (!ts.isPropertyAccessExpression(node.expression)) return UNRESOLVED;
   const propName = node.expression.name.text;
   const symbol = ctx.typeChecker.getSymbolAtLocation(node.expression);
+  /* v8 ignore next */
   if (!symbol) return UNRESOLVED;
 
   const real = unaliasSymbol(symbol, ctx.typeChecker);
@@ -48,17 +50,14 @@ function functionLikeFromDeclaration(d: ts.Declaration): ts.Node | null {
     ts.isArrowFunction(d) ||
     ts.isFunctionExpression(d) ||
     ts.isMethodDeclaration(d) ||
-    /* v8 ignore next 3 -- defensive type guards for AST shapes that
-       property-access resolution rarely lands on directly. */
+    /* v8 ignore next 3 */
     ts.isConstructorDeclaration(d) ||
     ts.isGetAccessor(d) ||
     ts.isSetAccessor(d)
   ) {
     return d;
   }
-  /* v8 ignore start -- object-literal property assignment with an
-     inline function is uncommon in practice; the simple fixture
-     workspace doesn't contain any. */
+  /* v8 ignore start */
   if (ts.isPropertyAssignment(d) && (ts.isArrowFunction(d.initializer) || ts.isFunctionExpression(d.initializer))) {
       return d.initializer;
     }

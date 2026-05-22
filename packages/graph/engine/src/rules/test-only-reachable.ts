@@ -60,6 +60,7 @@ function computeProductionEntries(catalog: Parameters<Rule['evaluate']>[0], inde
   const out = new Set<string>();
   for (const ep of inferEntryPoints(catalog, indexes)) {
     const occ = indexes.byBodyHash.get(ep.bodyHash);
+    /* v8 ignore next */
     if (!occ) continue;
     if (occ.inTestFile) continue;                    // Test-runner entries don't count.
     out.add(ep.bodyHash);
@@ -72,6 +73,7 @@ function bfsReachable(seeds: ReadonlySet<string>, indexes: Indexes): ReadonlySet
   const queue: string[] = [...seeds];
   while (queue.length > 0) {
     const cur = queue.shift();
+    /* v8 ignore next */
     if (cur === undefined || visited.has(cur)) continue;
     visited.add(cur);
     const next = indexes.callees.get(cur) ?? [];

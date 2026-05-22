@@ -83,8 +83,7 @@ function register(cli: ToolCliContext): void {
       // sizing — the user has already opted into a smaller working set.
       if (typeof opts.package !== 'string' || opts.package.length === 0) {
         const reExecing = await runHeapPreflight({ cwd: opts.cwd });
-        /* v8 ignore next -- reExec branch only fires in production
-           when the heap actually needs elevation; tested manually. */
+        /* v8 ignore next */
         if (reExecing) return;
       }
 
@@ -92,12 +91,10 @@ function register(cli: ToolCliContext): void {
         opts.json !== true
         && opts.gateSave !== true
         && opts.gateCompare !== true
-        /* v8 ignore next -- reportTo as an empty-string is defensive;
-           Commander emits string|undefined, never empty string. */
+        /* v8 ignore next */
         && (typeof opts.reportTo !== 'string' || opts.reportTo.length === 0)
         && opts.packages !== true
-        /* v8 ignore next -- package as an empty-string is defensive;
-           Commander emits string|undefined, never empty string. */
+        /* v8 ignore next */
         && (typeof opts.package !== 'string' || opts.package.length === 0);
 
       if (isInteractiveDefault) {

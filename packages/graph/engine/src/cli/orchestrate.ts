@@ -527,10 +527,7 @@ function expandClosureToFixpoint(input: ClosureInput): ClosureOutput {
     );
     if (!grew) break;
   }
-  /* v8 ignore next 3 -- defensive guard: the for(;;) loop runs at
-     least once, so `walked` is always assigned by the first iteration.
-     Reachable only if changedFilesAbs is empty, which the caller
-     filters out before reaching this function. */
+  /* v8 ignore next 3 */
   if (!walked) {
     throw new Error('incremental walk produced no result; closure was empty');
   }
@@ -551,9 +548,7 @@ function expandClosureOnce(
   const newDependents = findEdgeDependents(cachedCatalog, staleHashes, closureRel);
   if (newDependents.length === 0) return false;
 
-  /* v8 ignore start -- closure-grew path: a stale-hash dependent
-     graph chain is rare in unit fixtures (single-file edits dominate).
-     Tested manually against larger workspaces. */
+  /* v8 ignore start */
   let grew = false;
   for (const dep of newDependents) {
     if (closureRel.has(dep)) continue;

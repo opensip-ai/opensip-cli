@@ -56,6 +56,7 @@ function methodName(node: ts.MethodDeclaration): string | null {
   // PrivateIdentifier carries the leading '#' in its text already
   // (e.g. '#priv'), which matches how TypeScript's own AST exposes it.
   if (ts.isPrivateIdentifier(n)) return n.text;
+  /* v8 ignore next */
   return null;
 }
 

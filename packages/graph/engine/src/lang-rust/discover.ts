@@ -64,7 +64,7 @@ function normalizeProjectDir(projectDir: string): string {
   try {
     return realpathSync(abs);
   } catch {
-    /* v8 ignore next -- realpath fallback for symlink edge cases */
+    /* v8 ignore next */
     return abs;
   }
 }
@@ -91,7 +91,7 @@ function realpathOrPath(p: string): string {
   try {
     return realpathSync(p);
   } catch {
-    /* v8 ignore next -- realpath fallback for symlink edge cases */
+    /* v8 ignore next */
     return p;
   }
 }
@@ -112,7 +112,7 @@ function collectRustFiles(projectDirAbs: string): readonly string[] {
     try {
       real = realpathSync(m);
     } catch {
-      /* v8 ignore next -- realpath fallback for symlink edge cases */
+      /* v8 ignore next */
       // fall through with original
     }
     const key = real.split(sep).join('/');

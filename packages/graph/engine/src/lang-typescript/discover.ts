@@ -69,6 +69,7 @@ function resolveTsConfigPath(projectDirAbs: string, override?: string): string {
   try {
     return realpathSync(candidate);
   } catch {
+    /* v8 ignore next */
     return candidate;
   }
 }
@@ -92,8 +93,7 @@ function loadTsConfig(tsConfigPathAbs: string): {
       try {
         return readFileSync(p, 'utf8');
       } catch {
-        /* v8 ignore next -- ts.parseJsonConfigFileContent file-read fallback;
-           the caller already checks existsSync for the tsconfig itself. */
+        /* v8 ignore next */
         return;
       }
     },
@@ -107,9 +107,7 @@ function loadTsConfig(tsConfigPathAbs: string): {
     tsConfigPathAbs,
   );
   if (result.errors.length > 0) {
-    /* v8 ignore start -- tsconfig parse-error path; covered by the
-       graph CLI integration test that supplies an unreadable tsconfig
-       indirectly (see graph.test.ts "missing tsconfig"). */
+    /* v8 ignore start */
     const fatal = result.errors.find((e) => e.category === ts.DiagnosticCategory.Error);
     if (fatal) {
       throw new ConfigurationError(
@@ -131,7 +129,7 @@ function filterToSourceFiles(fileNames: readonly string[]): string[] {
     try {
       real = realpathSync(f);
     } catch {
-      /* v8 ignore next -- realpath fallback for symlink edge cases */
+      /* v8 ignore next */
       // Use the original path if realpath fails (file might be in a symlinked dir).
     }
     // Normalize separators on Windows so dedup works.

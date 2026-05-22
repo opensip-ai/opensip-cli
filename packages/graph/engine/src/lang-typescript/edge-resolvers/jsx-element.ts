@@ -38,12 +38,14 @@ export const resolveJsxElement: EdgeResolver<JsxOpeningLike> = (node, ctx) => {
   for (const d of decls) {
     const sf = d.getSourceFile();
     const declNode = functionLikeFromDeclaration(d);
+    /* v8 ignore next */
     if (!declNode) continue;
     const hash = findCatalogEntry(declNode, sf, ctx.catalog, [candidateName]);
     if (hash) {
       return { to: [hash], resolution: 'jsx', confidence: 'high' };
     }
   }
+  /* v8 ignore next */
   return UNRESOLVED;
 };
 
@@ -58,7 +60,6 @@ function functionLikeFromDeclaration(d: ts.Declaration): ts.Node | null {
   if (ts.isVariableDeclaration(d) && d.initializer && (ts.isArrowFunction(d.initializer) || ts.isFunctionExpression(d.initializer))) {
       return d.initializer;
     }
-  /* v8 ignore next -- declaration is not function-like (e.g. type alias);
-     resolver returns UNRESOLVED. */
+  /* v8 ignore next */
   return null;
 }

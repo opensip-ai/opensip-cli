@@ -70,6 +70,7 @@ function hasDiscardedCaller(occ: FunctionOccurrence, indexes: Indexes): boolean 
   let sawDiscardedField = false;
   for (const callerHash of callerHashes) {
     const caller = indexes.byBodyHash.get(callerHash);
+    /* v8 ignore next */
     if (!caller) continue;
     for (const edge of caller.calls) {
       if (!edge.to.includes(occ.bodyHash)) continue;

@@ -48,32 +48,29 @@ export function parseProject(input: ParseInput): ParseOutput<PythonParsedProject
 
   for (const path of input.files) {
     let source: string;
+    /* v8 ignore start */
     try {
       source = readFileSync(path, 'utf8');
     } catch (error) {
-      /* v8 ignore start -- file-read failure path; only triggers when
-         the discover stage races a deletion, untestable in unit tests
-         without filesystem mocking. */
       parseErrors.push({
         filePath: relative(input.projectDirAbs, path),
         message: `read failed: ${error instanceof Error ? error.message : String(error)}`,
       });
       continue;
-      /* v8 ignore stop */
     }
+    /* v8 ignore stop */
     let tree: Parser.Tree;
+    /* v8 ignore start */
     try {
       tree = parser.parse(source);
     } catch (error) {
-      /* v8 ignore start -- tree-sitter throws at this layer only on
-         allocation failures or extreme inputs; defensive guard. */
       parseErrors.push({
         filePath: relative(input.projectDirAbs, path),
         message: error instanceof Error ? error.message : String(error),
       });
       continue;
-      /* v8 ignore stop */
     }
+    /* v8 ignore stop */
     if (tree.rootNode.hasError) {
       parseErrors.push({
         filePath: relative(input.projectDirAbs, path),

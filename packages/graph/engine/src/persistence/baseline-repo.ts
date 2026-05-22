@@ -45,8 +45,7 @@ export class GraphBaselineRepo {
         count: rows.length,
       });
     } catch (error) {
-      /* v8 ignore start -- DB save-failure path; only triggers when
-         the SQLite/Drizzle layer rejects the write (e.g. disk full). */
+      /* v8 ignore start */
       logger.error({
         evt: 'graph.baseline.save.error',
         module: MODULE_NAME,
@@ -73,8 +72,7 @@ export class GraphBaselineRepo {
       });
       return rows.map((r) => r.fingerprint);
     } catch (error) {
-      /* v8 ignore start -- DB load-failure path; only triggers when
-         the SQLite/Drizzle layer rejects the read. */
+      /* v8 ignore start */
       logger.error({
         evt: 'graph.baseline.load.error',
         module: MODULE_NAME,

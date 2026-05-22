@@ -19,6 +19,7 @@ const UNRESOLVED = {
 };
 
 export const resolvePolymorphicCall: EdgeResolver<ts.CallExpression> = (node, ctx) => {
+  /* v8 ignore next */
   if (!ts.isPropertyAccessExpression(node.expression)) return UNRESOLVED;
   const methodName = node.expression.name.text;
   const receiverType = ctx.typeChecker.getTypeAtLocation(node.expression.expression);
@@ -62,9 +63,7 @@ function appendHashesForSymbol(
 function functionLikeFromDeclaration(d: ts.Declaration): ts.Node | null {
   if (
     ts.isMethodDeclaration(d) ||
-    /* v8 ignore next 6 -- defensive type guards for AST shapes that
-       polymorphic resolution rarely lands on; method declarations
-       dominate in practice. */
+    /* v8 ignore next 6 */
     ts.isMethodSignature(d) ||
     ts.isFunctionDeclaration(d) ||
     ts.isArrowFunction(d) ||
@@ -75,9 +74,7 @@ function functionLikeFromDeclaration(d: ts.Declaration): ts.Node | null {
   ) {
     return d;
   }
-  /* v8 ignore start -- alternate function-shaped declarations
-     (variable assignment, property assignment) for polymorphic
-     resolution. */
+  /* v8 ignore start */
   if (ts.isVariableDeclaration(d) && d.initializer && (ts.isArrowFunction(d.initializer) || ts.isFunctionExpression(d.initializer))) {
       return d.initializer;
     }

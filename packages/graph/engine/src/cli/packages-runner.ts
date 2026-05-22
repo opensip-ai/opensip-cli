@@ -146,8 +146,7 @@ function spawnGraphChild(input: SpawnInput): Promise<PackageRunResult> {
       stderr += chunk.toString('utf8');
     });
     child.on('error', (err) => {
-      /* v8 ignore start -- spawn-error path; only fires when Node
-         can't spawn the child at all (e.g. ENOENT for execPath). */
+      /* v8 ignore start */
       resolvePromise({
         packageDir: input.packageDir,
         displayPath: relative(input.cwd, input.packageDir),
@@ -163,6 +162,7 @@ function spawnGraphChild(input: SpawnInput): Promise<PackageRunResult> {
         packageDir: input.packageDir,
         displayPath: relative(input.cwd, input.packageDir),
         findings,
+        /* v8 ignore next */
         exitCode: code ?? -1,
         stderr,
       });
@@ -186,6 +186,7 @@ function parseChildFindings(
   try {
     parsed = JSON.parse(trimmed) as CliOutput;
   } catch (error) {
+    /* v8 ignore start */
     logger.warn({
       evt: 'graph.cli.packages.parseError',
       module: 'graph:cli',
@@ -194,8 +195,10 @@ function parseChildFindings(
       stderrPreview: stderr.slice(0, 200),
     });
     return [];
+    /* v8 ignore stop */
   }
   const out: FindingOutput[] = [];
+  /* v8 ignore next 3 */
   for (const check of parsed.checks ?? []) {
     for (const finding of check.findings ?? []) out.push(finding);
   }

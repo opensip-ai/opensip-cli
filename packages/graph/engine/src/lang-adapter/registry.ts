@@ -66,10 +66,7 @@ export function pickAdapter(cwd?: string): GraphLanguageAdapter {
   // the first id alphabetically.
   const ts = adapters.get('typescript');
   if (ts) return ts;
-  /* v8 ignore start -- alphabetical fallback when TypeScript is not
-     registered. Reachable in tests but the corruption guards (id ===
-     undefined, adapters.get(id) === undefined) only fire when the
-     registry is mutated mid-resolve. */
+  /* v8 ignore start */
   const ids = [...adapters.keys()].sort();
   const id = ids[0];
   if (!id) throw new ConfigurationError('graph: registry corrupted');
@@ -134,8 +131,7 @@ function collectTies(counts: ReadonlyMap<string, number>, target: number): reado
 function resolveTie(tied: readonly string[]): GraphLanguageAdapter | undefined {
   const preference = ['typescript', 'python', 'rust'];
   for (const pref of preference) if (tied.includes(pref)) return adapters.get(pref);
-  /* v8 ignore next 2 -- alphabetical fallback when no preferred adapter
-     is in the tie set; only reachable with custom non-builtin adapters. */
+  /* v8 ignore next 2 */
   const sorted = [...tied].sort();
   return adapters.get(sorted[0] ?? '');
 }

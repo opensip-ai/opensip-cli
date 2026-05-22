@@ -360,8 +360,7 @@ function extractDecorators(node: Parser.SyntaxNode): readonly string[] {
   // node when decorators are present. The decorators are siblings of the
   // function_definition inside that wrapper.
   if (node.parent?.type !== 'decorated_definition') return [];
-  /* v8 ignore start -- decorator-extraction path; the simple Python
-     fixtures don't use decorators. Production code paths exercise it. */
+  /* v8 ignore start */
   const out: string[] = [];
   for (const child of node.parent.namedChildren) {
     if (child.type === 'decorator') {
@@ -426,9 +425,7 @@ function stripPythonComments(text: string): string {
   return out;
 }
 
-/* v8 ignore start -- comment-stripping helpers; only fire when fixture
-   source has `#` comments or string literals. The simple Python
-   fixtures avoid both for clarity. */
+/* v8 ignore start */
 function skipToEndOfLine(text: string, start: number): number {
   let i = start;
   while (i < text.length && text[i] !== '\n') i++;

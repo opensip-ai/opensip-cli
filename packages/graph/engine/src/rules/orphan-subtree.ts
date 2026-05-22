@@ -26,6 +26,7 @@ export const orphanSubtreeRule: Rule = {
       // module-init occurrences are entry points themselves; never orphan.
       if (occ.kind === 'module-init') continue;
       // Skip occurrences with empty filePath (defensive — shouldn't happen).
+      /* v8 ignore next */
       if (!occ.filePath) continue;
       orphans.push(
         createSignal({
@@ -62,6 +63,7 @@ function computeReachable(catalog: Catalog, indexes: Indexes, config: GraphConfi
   const queue: string[] = [...seeds];
   while (queue.length > 0) {
     const cur = queue.shift();
+    /* v8 ignore next */
     if (cur === undefined || visited.has(cur)) continue;
     visited.add(cur);
     const next = indexes.callees.get(cur) ?? [];

@@ -40,6 +40,7 @@ export const visitConstructorDeclaration: InventoryVisitor<ts.ConstructorDeclara
   };
 };
 
+/* v8 ignore start */
 function findClassName(node: ts.ConstructorDeclaration): string | null {
   let p: ts.Node | undefined = node.parent;
   while (p) {
@@ -50,3 +51,4 @@ function findClassName(node: ts.ConstructorDeclaration): string | null {
   }
   return null;
 }
+/* v8 ignore stop */

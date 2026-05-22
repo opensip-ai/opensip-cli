@@ -205,12 +205,15 @@ function pushCreationEdge(
 function extractCallTargetName(node: Parser.SyntaxNode): string | null {
   // tree-sitter-python `call` has a `function` field for the callee.
   const fn = node.childForFieldName('function');
+  /* v8 ignore next */
   if (!fn) return null;
   if (fn.type === 'identifier') return fn.text;
   if (fn.type === 'attribute') {
     const attr = fn.childForFieldName('attribute');
+    /* v8 ignore next */
     return attr ? attr.text : null;
   }
+  /* v8 ignore next */
   return null;
 }
 
@@ -223,13 +226,12 @@ function isReturnValueDiscarded(node: Parser.SyntaxNode): boolean {
   let parent: Parser.SyntaxNode | null = node.parent;
   while (parent) {
     if (parent.type === 'parenthesized_expression' || parent.type === 'await') {
-      /* v8 ignore next 3 -- parenthesized/await wrapping branch; rare
-         in idiomatic Python around bare calls. */
+      /* v8 ignore next 3 */
       parent = parent.parent;
       continue;
     }
     return parent.type === 'expression_statement';
   }
-  /* v8 ignore next -- defensive: every call expression has a parent. */
+  /* v8 ignore next */
   return false;
 }

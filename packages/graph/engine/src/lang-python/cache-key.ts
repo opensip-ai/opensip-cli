@@ -48,8 +48,7 @@ function readConfig(configPathAbs: string | undefined): {
   try {
     content = readFileSync(configPathAbs, 'utf8');
   } catch {
-    /* v8 ignore next -- defensive: existsSync passed but read failed
-       (race between discover and cacheKey). */
+    /* v8 ignore next */
     return { pythonVersion: 'unknown', configHash: `unreadable:${configPathAbs}` };
   }
   const match = REQUIRES_PYTHON_RE.exec(content);

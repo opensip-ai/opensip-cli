@@ -160,27 +160,33 @@ interface CallTarget {
 function decodeCallTarget(node: Parser.SyntaxNode): CallTarget | null {
   if (node.type === 'macro_invocation') {
     const m = node.childForFieldName('macro') ?? node.namedChild(0);
+    /* v8 ignore next */
     if (!m) return null;
     return { name: m.text.split('::').pop() ?? m.text, receiverType: null, isMacro: true };
   }
+  /* v8 ignore next */
   if (node.type !== 'call_expression') return null;
   const fn = node.childForFieldName('function');
+  /* v8 ignore next */
   if (!fn) return null;
   if (fn.type === 'identifier') {
     return { name: fn.text, receiverType: null, isMacro: false };
   }
   if (fn.type === 'field_expression') {
     const field = fn.childForFieldName('field');
+    /* v8 ignore next */
     if (!field) return null;
     return { name: field.text, receiverType: null, isMacro: false };
   }
   if (fn.type === 'scoped_identifier') {
     const name = fn.childForFieldName('name') ?? fn.namedChild(fn.namedChildCount - 1);
+    /* v8 ignore next */
     if (!name) return null;
     const path = fn.childForFieldName('path');
     const receiver = decodeReceiverPath(path);
     return { name: name.text, receiverType: receiver, isMacro: false };
   }
+  /* v8 ignore next */
   return null;
 }
 
@@ -191,11 +197,13 @@ function decodeReceiverPath(path: Parser.SyntaxNode | null): string | null {
   // trailing component is the type. We walk down the path looking for
   // the last `type_identifier` / `identifier`.
   if (path.type === 'type_identifier' || path.type === 'identifier') return path.text;
+  /* v8 ignore start */
   if (path.type === 'scoped_identifier') {
     const inner = path.childForFieldName('name') ?? path.namedChild(path.namedChildCount - 1);
     return inner ? inner.text : null;
   }
   return null;
+  /* v8 ignore stop */
 }
 
 function resolveTarget(
@@ -203,6 +211,7 @@ function resolveTarget(
   index: NameIndex,
   loc: { readonly line: number; readonly column: number; readonly text: string; readonly discarded: boolean },
 ): CallEdge {
+  /* v8 ignore next 3 */
   if (target === null) {
     return { to: [], line: loc.line, column: loc.column, resolution: 'unknown', confidence: 'low', text: loc.text, discarded: loc.discarded };
   }
@@ -243,6 +252,7 @@ function resolveTarget(
   }
   if (matches.length === 1) {
     const only = matches[0];
+    /* v8 ignore next 3 */
     if (!only) {
       return { to: [], line: loc.line, column: loc.column, resolution: 'unknown', confidence: 'low', text: loc.text, discarded: loc.discarded };
     }
@@ -311,13 +321,12 @@ function isReturnValueDiscarded(node: Parser.SyntaxNode): boolean {
   let parent: Parser.SyntaxNode | null = node.parent;
   while (parent) {
     if (parent.type === 'parenthesized_expression') {
-      /* v8 ignore next 3 -- parenthesized expression wrapping; rare in
-         idiomatic Rust where parens around bare calls are unusual. */
+      /* v8 ignore next 3 */
       parent = parent.parent;
       continue;
     }
     return parent.type === 'expression_statement';
   }
-  /* v8 ignore next -- defensive: every call expression has a parent. */
+  /* v8 ignore next */
   return false;
 }

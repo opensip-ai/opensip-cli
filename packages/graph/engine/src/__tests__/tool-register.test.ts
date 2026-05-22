@@ -2,6 +2,10 @@
  * Tests for the Commander wiring inside graphTool.register().
  */
 
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { Command } from 'commander';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -80,9 +84,6 @@ describe('graphTool action handler — end-to-end via Commander', () => {
   // Use a tiny TS fixture so the run completes quickly.
 
   it('runs --json against a real fixture and exits with code 0', async () => {
-    const { mkdirSync, mkdtempSync, rmSync, writeFileSync } = await import('node:fs');
-    const { tmpdir } = await import('node:os');
-    const { join } = await import('node:path');
     const dir = mkdtempSync(join(tmpdir(), 'graph-tool-action-'));
     try {
       mkdirSync(dir, { recursive: true });
@@ -147,9 +148,6 @@ describe('graphTool action handler — end-to-end via Commander', () => {
   it('interactive default path delegates to cli.renderLive', async () => {
     // Default mode (no other flags) calls cli.renderLive. The fixture
     // is tiny so the heap preflight no-ops (file count < 1000).
-    const { mkdirSync, mkdtempSync, rmSync, writeFileSync } = await import('node:fs');
-    const { tmpdir } = await import('node:os');
-    const { join } = await import('node:path');
     const dir = mkdtempSync(join(tmpdir(), 'graph-tool-action-live-'));
     try {
       mkdirSync(dir, { recursive: true });

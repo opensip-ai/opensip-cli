@@ -42,10 +42,7 @@ export function parseProject(input: ParseInput): ParseOutput<TypescriptParsedPro
   for (const sf of program.getSourceFiles()) {
     const diagnostics = program.getSyntacticDiagnostics(sf);
     if (diagnostics.length === 0) continue;
-    /* v8 ignore start -- syntactic-diagnostic emission path; reachable
-       only when the input has unparseable syntax. The contract test
-       fixtures intentionally use valid TypeScript, so this branch
-       lights up only when someone hand-feeds broken source. */
+    /* v8 ignore start */
     const filePath = relative(input.projectDirAbs, sf.fileName);
     if (seenPaths.has(filePath)) continue;
     seenPaths.add(filePath);

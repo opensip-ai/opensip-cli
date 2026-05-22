@@ -79,8 +79,7 @@ export class CatalogRepo {
         functions: Object.keys(catalog.functions).length,
       });
     } catch (error) {
-      /* v8 ignore start -- DB write-failure path; only triggers when
-         the SQLite/Drizzle layer rejects the write. */
+      /* v8 ignore start */
       logger.error({
         evt: 'graph.catalog.write.error',
         module: MODULE_NAME,
@@ -126,8 +125,7 @@ export class CatalogRepo {
         functions: payload.functions,
       };
     } catch (error) {
-      /* v8 ignore start -- DB read-failure path; only triggers when
-         the SQLite/Drizzle layer rejects the read. */
+      /* v8 ignore start */
       logger.error({
         evt: 'graph.catalog.read.error',
         module: MODULE_NAME,
