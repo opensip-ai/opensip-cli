@@ -110,6 +110,7 @@ function findPackageByName(root: string, name: string, maxDepth: number): readon
     try {
       entries = readdirSync(dir);
     } catch {
+      /* v8 ignore next -- readdir error is rare; defensive guard. */
       return;
     }
     for (const entry of entries) {
@@ -158,6 +159,7 @@ export function discoverWorkspacePackages(cwd: string): readonly string[] {
     try {
       entries = readdirSync(dir);
     } catch {
+      /* v8 ignore next -- readdir error is rare; defensive guard. */
       return;
     }
     for (const entry of entries) {

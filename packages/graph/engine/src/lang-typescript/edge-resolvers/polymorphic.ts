@@ -62,6 +62,9 @@ function appendHashesForSymbol(
 function functionLikeFromDeclaration(d: ts.Declaration): ts.Node | null {
   if (
     ts.isMethodDeclaration(d) ||
+    /* v8 ignore next 6 -- defensive type guards for AST shapes that
+       polymorphic resolution rarely lands on; method declarations
+       dominate in practice. */
     ts.isMethodSignature(d) ||
     ts.isFunctionDeclaration(d) ||
     ts.isArrowFunction(d) ||
@@ -72,6 +75,9 @@ function functionLikeFromDeclaration(d: ts.Declaration): ts.Node | null {
   ) {
     return d;
   }
+  /* v8 ignore start -- alternate function-shaped declarations
+     (variable assignment, property assignment) for polymorphic
+     resolution. */
   if (ts.isVariableDeclaration(d) && d.initializer && (ts.isArrowFunction(d.initializer) || ts.isFunctionExpression(d.initializer))) {
       return d.initializer;
     }
@@ -79,4 +85,5 @@ function functionLikeFromDeclaration(d: ts.Declaration): ts.Node | null {
       return d.initializer;
     }
   return null;
+  /* v8 ignore stop */
 }

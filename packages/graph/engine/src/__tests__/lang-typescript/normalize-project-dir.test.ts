@@ -2,7 +2,7 @@
  * normalizeProjectDir tests (DRY-4).
  */
 
-import { mkdtempSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
+import { mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -37,5 +37,11 @@ describe('normalizeProjectDir (DRY-4)', () => {
 
   it('throws ConfigurationError on missing directory', () => {
     expect(() => normalizeProjectDir(`${realDir}-missing`)).toThrow(/does not exist/);
+  });
+
+  it('throws ConfigurationError when the path is a file, not a directory', () => {
+    const filePath = join(realDir, 'a-file.txt');
+    writeFileSync(filePath, 'not a dir', 'utf8');
+    expect(() => normalizeProjectDir(filePath)).toThrow(/not a directory/);
   });
 });

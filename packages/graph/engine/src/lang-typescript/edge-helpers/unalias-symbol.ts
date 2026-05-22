@@ -15,11 +15,15 @@ export function unaliasSymbol(symbol: ts.Symbol, checker: ts.TypeChecker): ts.Sy
     if ((current.flags & ts.SymbolFlags.Alias) === 0) return current;
     try {
       const next = checker.getAliasedSymbol(current);
+      /* v8 ignore next -- self-loop detection; defensive guard. */
       if (next === current) return current;
       current = next;
     } catch {
+      /* v8 ignore next -- getAliasedSymbol throws only on internal TS
+         compiler errors with broken references; defensive guard. */
       return current;
     }
   }
+  /* v8 ignore next -- iteration cap; realistic alias chains are 1-2 hops. */
   return current;
 }

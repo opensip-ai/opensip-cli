@@ -145,8 +145,13 @@ export async function runHeapPreflight(input: PreflightInput): Promise<boolean> 
     return false;
   }
 
+  /* v8 ignore start -- re-exec path requires spawning a real child
+     process and propagating its exit; covered by manual smoke testing,
+     not unit tests. The decision logic above (lines 94-146) is fully
+     covered. */
   await reExecWithHeap(targetMb, fileCount, currentMb);
   return true;
+  /* v8 ignore stop */
 }
 
 /**
@@ -155,6 +160,9 @@ export async function runHeapPreflight(input: PreflightInput): Promise<boolean> 
  * directly to the user's terminal; the parent waits and propagates
  * the child's exit code.
  */
+/* v8 ignore start -- spawn-and-wait path; only reached in production
+   when the heap actually needs elevation. Tested manually via the
+   smoke-test harness. */
 async function reExecWithHeap(
   targetMb: number,
   fileCount: number,
@@ -200,3 +208,4 @@ async function reExecWithHeap(
     });
   });
 }
+/* v8 ignore stop */

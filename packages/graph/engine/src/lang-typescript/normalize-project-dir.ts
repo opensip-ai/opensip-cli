@@ -30,6 +30,7 @@ export function normalizeProjectDir(input: string): string {
   try {
     return realpathSync(absolute);
   } catch {
+    /* v8 ignore next -- realpath fallback for symlink edge cases */
     return absolute;
   }
 }

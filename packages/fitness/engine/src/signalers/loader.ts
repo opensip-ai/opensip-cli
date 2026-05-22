@@ -51,6 +51,7 @@ function readConfigFile(filePath: string): string {
     return readFileSync(filePath, 'utf8')
   } catch (error) {
     if (error instanceof ValidationError || error instanceof SystemError) throw error
+    /* v8 ignore next -- node fs errors are always Error subclasses; the String(error) fallback is defensive */
     const message = error instanceof Error ? error.message : String(error)
     throw new ValidationError(
       `Failed to read config file ${filePath}: ${message}`,
@@ -58,6 +59,7 @@ function readConfigFile(filePath: string): string {
         operation: 'load',
         loader: 'signalers',
         filePath,
+        /* v8 ignore next -- same defensive Error-vs-non-Error guard */
         cause: error instanceof Error ? error : undefined,
       },
     )
@@ -69,10 +71,12 @@ function parseYaml(raw: string, filePath: string): unknown {
   try {
     return yaml.load(raw) ?? {}
   } catch (error) {
+    /* v8 ignore next -- js-yaml always throws Error subclasses; the String(error) fallback is defensive */
     const message = error instanceof Error ? error.message : String(error)
     throw new ValidationError(`${filePath} contains invalid YAML: ${message}`, {
       operation: 'load',
       loader: 'signalers',
+      /* v8 ignore next -- same defensive Error-vs-non-Error guard */
       cause: error instanceof Error ? error : undefined,
     })
   }

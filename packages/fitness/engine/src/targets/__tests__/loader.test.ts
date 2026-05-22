@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -172,5 +172,10 @@ plugins:
     const huge = 'x'.repeat(11 * 1024 * 1024); // 11 MB > 10 MB limit
     writeFileSync(join(testDir, 'opensip-tools.config.yml'), huge);
     expect(() => loadTargetsConfig(testDir)).toThrow(SystemError);
+  });
+
+  it('throws ValidationError when the resolved path is a directory (readFileSync EISDIR)', () => {
+    mkdirSync(join(testDir, 'opensip-tools.config.yml'), { recursive: true });
+    expect(() => loadTargetsConfig(testDir)).toThrow(ValidationError);
   });
 });

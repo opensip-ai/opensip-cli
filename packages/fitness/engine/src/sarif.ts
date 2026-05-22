@@ -155,6 +155,7 @@ export async function reportToCloud(output: CliOutput, url: string, apiKey?: str
 
   const sarifUrl = url.endsWith('/sarif') ? url : `${url}/sarif`;
   const cwd = process.cwd();
+  /* v8 ignore next -- process.cwd() always returns a non-empty string in our supported runtimes; the empty-cwd branch is defensive */
   const target = cwd ? `${sarifUrl}?cwd=${encodeURIComponent(cwd)}` : sarifUrl;
   const totalFindings = allRuns.reduce((n, r) => n + r.results.length, 0);
 
@@ -214,6 +215,7 @@ export async function reportToCloud(output: CliOutput, url: string, apiKey?: str
       logger.info({ evt: 'cli.report.chunk.done', module: MODULE_TAG, chunk: `${ci + 1}/${chunks.length}`, findings: chunkFindings });
     } catch (error) {
       // Network errors and timeouts are transient — continue with next chunk
+      /* v8 ignore next -- fetch errors are always Error subclasses; the String(error) fallback is defensive */
       const errMsg = error instanceof Error ? error.message : String(error);
       errors.push(errMsg);
       logger.info({ evt: 'cli.report.chunk.error', module: MODULE_TAG, chunk: `${ci + 1}/${chunks.length}`, error: errMsg });

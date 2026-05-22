@@ -146,6 +146,8 @@ function spawnGraphChild(input: SpawnInput): Promise<PackageRunResult> {
       stderr += chunk.toString('utf8');
     });
     child.on('error', (err) => {
+      /* v8 ignore start -- spawn-error path; only fires when Node
+         can't spawn the child at all (e.g. ENOENT for execPath). */
       resolvePromise({
         packageDir: input.packageDir,
         displayPath: relative(input.cwd, input.packageDir),
@@ -153,6 +155,7 @@ function spawnGraphChild(input: SpawnInput): Promise<PackageRunResult> {
         exitCode: -1,
         stderr: `failed to spawn child: ${err.message}`,
       });
+      /* v8 ignore stop */
     });
     child.on('close', (code) => {
       const findings = parseChildFindings(stdout, input.packageDir, stderr);

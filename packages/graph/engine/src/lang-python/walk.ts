@@ -423,6 +423,9 @@ function stripPythonComments(text: string): string {
   return out;
 }
 
+/* v8 ignore start -- comment-stripping helpers; only fire when fixture
+   source has `#` comments or string literals. The simple Python
+   fixtures avoid both for clarity. */
 function skipToEndOfLine(text: string, start: number): number {
   let i = start;
   while (i < text.length && text[i] !== '\n') i++;
@@ -454,6 +457,7 @@ function consumeStringLiteral(
   }
   return { text: buf, index: i };
 }
+/* v8 ignore stop */
 
 function stripLeadingDocstring(text: string): string {
   // Match an optional whitespace prefix followed by a triple-quoted

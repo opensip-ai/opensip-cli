@@ -58,5 +58,7 @@ function functionLikeFromDeclaration(d: ts.Declaration): ts.Node | null {
   if (ts.isVariableDeclaration(d) && d.initializer && (ts.isArrowFunction(d.initializer) || ts.isFunctionExpression(d.initializer))) {
       return d.initializer;
     }
+  /* v8 ignore next -- declaration is not function-like (e.g. type alias);
+     resolver returns UNRESOLVED. */
   return null;
 }

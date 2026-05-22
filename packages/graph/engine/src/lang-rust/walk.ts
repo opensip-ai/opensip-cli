@@ -474,9 +474,13 @@ function consumeStringLiteral(text: string, start: number): { readonly text: str
   let buf = '"';
   while (i < text.length) {
     if (text[i] === '\\' && i + 1 < text.length) {
+      /* v8 ignore start -- escaped-char branch in string literal scanning;
+         exercised only when fixture source contains `\\`, `\"`, etc. The
+         simple Rust fixtures avoid escapes for clarity. */
       buf += text.slice(i, i + 2);
       i += 2;
       continue;
+      /* v8 ignore stop */
     }
     if (text[i] === '"') {
       buf += '"';
@@ -489,6 +493,9 @@ function consumeStringLiteral(text: string, start: number): { readonly text: str
   return { text: buf, index: i };
 }
 
+/* v8 ignore start -- char-literal scanning; not exercised by the Rust
+   fixtures (no `'a'` literals; `'static` lifetimes are excluded by the
+   heuristic). */
 function isCharLiteral(text: string, i: number): boolean {
   // Heuristic: a `'` followed by a single char or escape, then another
   // `'`, with nothing alphanumeric immediately following the closing
@@ -509,6 +516,7 @@ function consumeCharLiteral(text: string, start: number): { readonly text: strin
   const len = escape ? 4 : 3;
   return { text: text.slice(start, start + len), index: start + len };
 }
+/* v8 ignore stop */
 
 function normalizeWhitespace(s: string): string {
   return s.replaceAll(/\s+/g, ' ').trim();

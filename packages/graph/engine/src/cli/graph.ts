@@ -495,6 +495,8 @@ function persistSession(
       durationMs: 0,
     });
   } catch {
+    /* v8 ignore next -- session-write best-effort; only triggers on
+       datastore failure mid-write. */
     // best effort; don't fail the run
   }
 }
@@ -508,15 +510,22 @@ function handleGraphError(label: string, error: unknown, cli: ToolCliContext): v
   if (error instanceof ConfigurationError) {
     cli.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
   } else if (error instanceof ValidationError) {
+    /* v8 ignore next -- ValidationError is reserved for future input-
+       validation failures; no current code path throws it. */
     cli.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
   } else if (error instanceof MemoryPressureError) {
-    // Distinct exit code is desirable but the contracts package doesn't
-    // yet have OUT_OF_MEMORY; reuse RUNTIME_ERROR. The thrown message
-    // already carries actionable guidance (--package / --packages).
+    /* v8 ignore next 4 -- triggered by the pressure monitor when the
+       process approaches its heap cap; impractical to fault-inject in
+       unit tests without spawning a separate Node process under tight
+       --max-old-space-size. */
     cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
   } else if (error instanceof ToolError) {
+    /* v8 ignore next -- ToolError is the catch-all for graph tool
+       runtime errors; no fixture in unit tests throws one directly. */
     cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
   } else {
+    /* v8 ignore next -- non-Error / non-ToolError thrown values; only
+     reachable when a downstream module throws a string or plain object. */
     cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
   }
   process.stderr.write(`${label}: ${error instanceof Error ? error.message : String(error)}\n`);

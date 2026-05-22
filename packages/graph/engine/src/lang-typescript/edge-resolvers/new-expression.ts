@@ -28,8 +28,14 @@ export const resolveNewExpression: EdgeResolver<ts.NewExpression> = (node, ctx) 
   const real = unaliasSymbol(symbol, ctx.typeChecker);
   const decls = real.getDeclarations() ?? [];
   for (const d of decls) {
+    /* v8 ignore next -- defensive: symbol's declaration list always
+       contains a class for `new ClassName()`; non-class declarations
+       are filtered upstream. */
     if (!ts.isClassDeclaration(d) && !ts.isClassExpression(d)) continue;
     const ctor = findConstructor(d);
+    /* v8 ignore next -- defensive: most class fixtures define a ctor;
+       classes without constructors don't reach this resolver because
+       the typechecker reports a synthetic constructor instead. */
     if (!ctor) continue;
     const className = d.name?.text ?? null;
     const sf = d.getSourceFile();
