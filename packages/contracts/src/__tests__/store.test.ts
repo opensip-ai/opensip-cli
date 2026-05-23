@@ -14,8 +14,10 @@ import {
   getStoreDir,
   loadLatestSession,
   loadSessions,
+  migrateLegacyStoredSession,
   sanitizeForFilename,
   saveSession,
+  type LegacyStoredSession,
   type StoredSession,
 } from '../persistence/store.js';
 
@@ -209,5 +211,145 @@ describe('generateSessionId', () => {
     const a = generateSessionId();
     const b = generateSessionId();
     expect(a).not.toBe(b);
+  });
+});
+
+function makeLegacy(overrides: Partial<LegacyStoredSession> = {}): LegacyStoredSession {
+  return {
+    id: 'legacy-1',
+    tool: 'fit',
+    timestamp: '2024-01-01T00:00:00.000Z',
+    cwd: '/proj',
+    score: 80,
+    passed: false,
+    summary: { total: 2, passed: 1, failed: 1, errors: 1, warnings: 1 },
+    checks: [
+      {
+        checkSlug: 'demo',
+        passed: false,
+        violationCount: 3,
+        findings: [
+          {
+            ruleId: 'demo',
+            message: 'first',
+            severity: 'info',
+            filePath: 'src/a.ts',
+            line: 10,
+            column: 4,
+            suggestion: 'do better',
+            category: 'style',
+          },
+          {
+            ruleId: 'demo',
+            message: 'second',
+            severity: 'critical',
+            filePath: 'src/b.ts',
+            line: 22,
+          },
+          {
+            ruleId: 'demo',
+            message: 'third',
+            severity: 'medium',
+          },
+        ],
+        durationMs: 12,
+        error: 'Timed out',
+      },
+    ],
+    durationMs: 100,
+    ...overrides,
+  };
+}
+
+describe('migrateLegacyStoredSession', () => {
+
+  it('coerces off-union severity ("info") to warning', () => {
+    const out = migrateLegacyStoredSession(makeLegacy());
+    expect(out.checks[0].findings[0].severity).toBe('warning');
+  });
+
+  it('coerces critical/high to error', () => {
+    const out = migrateLegacyStoredSession(makeLegacy());
+    expect(out.checks[0].findings[1].severity).toBe('error');
+  });
+
+  it('coerces medium/low to warning', () => {
+    const out = migrateLegacyStoredSession(makeLegacy());
+    expect(out.checks[0].findings[2].severity).toBe('warning');
+  });
+
+  it('preserves the canonical "error" / "warning" values unchanged', () => {
+    const legacy = makeLegacy({
+      checks: [
+        {
+          checkSlug: 'k',
+          passed: true,
+          findings: [
+            { ruleId: 'k', message: 'a', severity: 'error' },
+            { ruleId: 'k', message: 'b', severity: 'warning' },
+          ],
+          durationMs: 1,
+        },
+      ],
+    });
+    const out = migrateLegacyStoredSession(legacy);
+    expect(out.checks[0].findings.map((f) => f.severity)).toEqual(['error', 'warning']);
+  });
+
+  it('drops the obsolete category field but preserves the other finding fields', () => {
+    const out = migrateLegacyStoredSession(makeLegacy());
+    const f = out.checks[0].findings[0];
+    expect(f.ruleId).toBe('demo');
+    expect(f.message).toBe('first');
+    expect(f.filePath).toBe('src/a.ts');
+    expect(f.line).toBe(10);
+    expect(f.column).toBe(4);
+    expect(f.suggestion).toBe('do better');
+    // `category` is no longer part of the FindingOutput surface.
+    expect((f as unknown as Record<string, unknown>).category).toBeUndefined();
+  });
+
+  it('preserves the optional check-level error string', () => {
+    const out = migrateLegacyStoredSession(makeLegacy());
+    expect(out.checks[0].error).toBe('Timed out');
+  });
+
+  it('round-trips a legacy fixture loaded via loadSessions without throwing', () => {
+    // Hand-craft a legacy file directly on disk (severity "info" was a real
+    // value emitted by older writers before the union was tightened).
+    mkdirSync(sessionsDir, { recursive: true });
+    const legacy = makeLegacy();
+    writeFileSync(
+      join(sessionsDir, '2024-01-01T00-00-00-000Z-fit.json'),
+      JSON.stringify(legacy),
+    );
+
+    const sessions = loadSessions();
+    expect(sessions).toHaveLength(1);
+    const session = sessions[0];
+    expect(session.id).toBe('legacy-1');
+    expect(session.checks[0].findings[0].severity).toBe('warning');
+    // After migrate, the StoredSession surface is structurally typed.
+    const migrated: StoredSession = session;
+    expect(migrated.checks[0].findings[1].severity).toBe('error');
+  });
+
+  it('migrate is a no-op for sessions written under the active shape', () => {
+    const active: StoredSession = makeSession({
+      checks: [
+        {
+          checkSlug: 'k',
+          passed: true,
+          violationCount: 0,
+          findings: [
+            { ruleId: 'k', message: 'a', severity: 'error' },
+            { ruleId: 'k', message: 'b', severity: 'warning' },
+          ],
+          durationMs: 1,
+        },
+      ],
+    });
+    const migrated = migrateLegacyStoredSession(active);
+    expect(migrated.checks).toEqual(active.checks);
   });
 });

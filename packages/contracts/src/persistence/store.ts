@@ -20,9 +20,46 @@ import { basename, join } from 'node:path';
 
 import { logger } from '@opensip-tools/core';
 
+import type { CheckOutput, FindingOutput } from '../types.js';
 import type { ProjectPaths } from '@opensip-tools/core';
 
+/**
+ * Active session shape — written by current writers and consumed by
+ * dashboards, history views, and `clearSessionsOlderThan`.
+ *
+ * `checks` re-uses `CheckOutput`/`FindingOutput` from `types.ts` —
+ * historically StoredSession inlined these with `severity: string`,
+ * which silently weakened the union. Old session JSON written before
+ * the consolidation (severity `"info"`, etc.) is migrated on load
+ * via {@link migrateLegacyStoredSession}.
+ */
 export interface StoredSession {
+  readonly id: string;
+  readonly tool: 'fit' | 'sim' | 'graph';
+  readonly timestamp: string;
+  readonly cwd: string;
+  readonly recipe?: string;
+  readonly score: number;
+  readonly passed: boolean;
+  readonly summary: {
+    readonly total: number;
+    readonly passed: number;
+    readonly failed: number;
+    readonly errors: number;
+    readonly warnings: number;
+  };
+  readonly checks: readonly CheckOutput[];
+  readonly durationMs: number;
+}
+
+/**
+ * Permissive shape for session JSON written before the
+ * `severity: 'error' | 'warning'` consolidation. Accepts any string
+ * for `severity` (legacy writers occasionally wrote `'info'` / `'low'`
+ * / `'medium'` / `'high'` / `'critical'`) and tolerates the obsolete
+ * `category` field. Use only in deserialization paths.
+ */
+export interface LegacyStoredSession {
   readonly id: string;
   readonly tool: 'fit' | 'sim' | 'graph';
   readonly timestamp: string;
@@ -52,8 +89,64 @@ export interface StoredSession {
       readonly category?: string;
     }[];
     readonly durationMs: number;
+    readonly error?: string;
   }[];
   readonly durationMs: number;
+}
+
+/**
+ * Coerce a legacy severity string into the active union.
+ * Off-union values (`'info'`, `'low'`, `'medium'`, `'high'`, etc.)
+ * collapse to `'warning'` unless they map to error-class names
+ * (`'critical'`, `'high'`).
+ */
+function normalizeSeverity(severity: string): 'error' | 'warning' {
+  if (severity === 'error' || severity === 'critical' || severity === 'high') {
+    return 'error';
+  }
+  return 'warning';
+}
+
+/**
+ * Migrate a legacy session payload to the active `StoredSession`
+ * shape. Pure / synchronous / total — never throws on a
+ * structurally-shaped legacy payload.
+ *
+ * Used by `loadSessions` (and any other deserializer) to round-trip
+ * old files written before `StoredSession.checks[].findings[].severity`
+ * was tightened from `string` to `'error' | 'warning'`.
+ */
+export function migrateLegacyStoredSession(raw: LegacyStoredSession): StoredSession {
+  return {
+    id: raw.id,
+    tool: raw.tool,
+    timestamp: raw.timestamp,
+    cwd: raw.cwd,
+    recipe: raw.recipe,
+    score: raw.score,
+    passed: raw.passed,
+    summary: raw.summary,
+    durationMs: raw.durationMs,
+    checks: raw.checks.map((c): CheckOutput => {
+      const findings: FindingOutput[] = c.findings.map((f) => ({
+        ruleId: f.ruleId,
+        message: f.message,
+        severity: normalizeSeverity(f.severity),
+        filePath: f.filePath,
+        line: f.line,
+        column: f.column,
+        suggestion: f.suggestion,
+      }));
+      return {
+        checkSlug: c.checkSlug,
+        passed: c.passed,
+        violationCount: c.violationCount,
+        findings,
+        durationMs: c.durationMs,
+        error: c.error,
+      };
+    }),
+  };
 }
 
 /** Check catalog entry for dashboard display */
@@ -193,7 +286,10 @@ export function loadSessions(limit?: number): StoredSession[] {
   for (const file of toRead) {
     try {
       const raw = readFileSync(join(dir, file), 'utf8');
-      sessions.push(JSON.parse(raw) as StoredSession);
+      // Always parse via the legacy shape and run through migrate;
+      // current writes are a structural subset of LegacyStoredSession,
+      // so migrate is a no-op for them.
+      sessions.push(migrateLegacyStoredSession(JSON.parse(raw) as LegacyStoredSession));
     } catch {
       // Warn about corrupted files — don't crash
       logger.warn({ evt: 'cli.session.corrupted', module: 'cli:persistence', msg: `Skipping corrupted session file: ${file}`, file });

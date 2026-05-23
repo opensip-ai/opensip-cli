@@ -573,7 +573,9 @@ export async function executeFit(
     (failOnErrors > 0 && summary.totalErrors >= failOnErrors) ||
     (failOnWarnings > 0 && summary.totalWarnings >= failOnWarnings);
 
-  // Build findings if requested
+  // Build findings if requested. Reuses CheckOutput / FindingOutput
+  // from contracts — historically this block carried a third near-clone
+  // of the finding shape.
   let findings: FitDoneResult['findings'];
   if ((args.findings || args.verbose) && (summary.totalErrors + summary.totalWarnings) > 0) {
     findings = {
@@ -581,16 +583,19 @@ export async function executeFit(
         .filter(cr => cr.errorCount > 0 || cr.warningCount > 0 || cr.error)
         .map(cr => ({
           checkSlug: cr.checkSlug,
-          errorCount: cr.errorCount,
-          warningCount: cr.warningCount,
-          error: cr.error,
-          violations: cr.violations?.map(v => ({
-            severity: v.severity,
+          passed: cr.passed,
+          violationCount: cr.violationCount,
+          findings: (cr.violations ?? []).map(v => ({
+            ruleId: cr.checkSlug,
             message: v.message,
-            file: v.file,
+            severity: v.severity,
+            filePath: v.file,
             line: v.line,
+            column: v.column,
             suggestion: v.suggestion,
           })),
+          durationMs: cr.durationMs,
+          error: cr.error,
         })),
     };
   }

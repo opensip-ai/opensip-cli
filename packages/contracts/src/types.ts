@@ -115,6 +115,12 @@ export interface CheckOutput {
   readonly violationCount?: number;
   readonly findings: readonly FindingOutput[];
   readonly durationMs: number;
+  /**
+   * Optional check-level error string. Populated when the check itself
+   * threw (load error, runtime exception, timeout). Distinct from
+   * findings, which describe code-level violations the check detected.
+   */
+  readonly error?: string;
 }
 
 export interface FindingOutput {
@@ -180,19 +186,7 @@ export interface FitDoneResult {
   label: string;
   cwd: string;
   findings?: {
-    checks: {
-      checkSlug: string;
-      errorCount: number;
-      warningCount: number;
-      error?: string;
-      violations?: {
-        severity: 'error' | 'warning';
-        message: string;
-        file?: string;
-        line?: number;
-        suggestion?: string;
-      }[];
-    }[];
+    checks: readonly CheckOutput[];
   };
   reportStatus?: {
     url: string;

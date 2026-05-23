@@ -10,6 +10,7 @@
  * readable) or `opensip-tools dashboard` (HTML).
  */
 
+import { type CheckOutput } from '@opensip-tools/contracts';
 import { Text, Box } from 'ink';
 import React from 'react';
 
@@ -23,42 +24,42 @@ import { useTheme } from '../theme.js';
  */
 const DEFAULT_VIOLATIONS_PER_CHECK = 25;
 
-interface FindingViolation {
-  readonly severity: 'error' | 'warning';
-  readonly message: string;
-  readonly file?: string;
-  readonly line?: number;
-  readonly suggestion?: string;
-}
-
-export interface FindingCheck {
-  readonly checkSlug: string;
-  readonly errorCount: number;
-  readonly warningCount: number;
-  readonly error?: string;
-  readonly violations?: readonly FindingViolation[];
-}
-
 export interface FindingsProps {
-  readonly checks: readonly FindingCheck[];
+  readonly checks: readonly CheckOutput[];
   /** Override the per-check violation cap. Pass `Infinity` to show everything. */
   readonly maxViolationsPerCheck?: number;
+}
+
+interface CheckCounts {
+  errorCount: number;
+  warningCount: number;
+}
+
+function countByseverity(check: CheckOutput): CheckCounts {
+  let errorCount = 0;
+  let warningCount = 0;
+  for (const f of check.findings) {
+    if (f.severity === 'error') errorCount++;
+    else warningCount++;
+  }
+  return { errorCount, warningCount };
 }
 
 export function Findings({ checks, maxViolationsPerCheck = DEFAULT_VIOLATIONS_PER_CHECK }: FindingsProps): React.ReactElement {
   const theme = useTheme();
 
-  const total = checks.reduce(
-    (sum, c) => sum + c.errorCount + c.warningCount + (c.error ? 1 : 0),
-    0,
-  );
+  const total = checks.reduce((sum, c) => {
+    const { errorCount, warningCount } = countByseverity(c);
+    return sum + errorCount + warningCount + (c.error ? 1 : 0);
+  }, 0);
 
-  const relevant = checks.filter(
-    (c) => c.errorCount > 0 || c.warningCount > 0 || c.error,
-  );
+  const relevant = checks.filter((c) => {
+    const { errorCount, warningCount } = countByseverity(c);
+    return errorCount > 0 || warningCount > 0 || c.error;
+  });
 
   const anyTruncated = relevant.some(
-    (c) => (c.violations?.length ?? 0) > maxViolationsPerCheck,
+    (c) => c.findings.length > maxViolationsPerCheck,
   );
 
   return (
@@ -71,9 +72,10 @@ export function Findings({ checks, maxViolationsPerCheck = DEFAULT_VIOLATIONS_PE
       </Text>
       <Text> </Text>
       {relevant.map((check) => {
-        const count = check.errorCount + check.warningCount + (check.error ? 1 : 0);
-        const visible = check.violations?.slice(0, maxViolationsPerCheck) ?? [];
-        const hidden = Math.max(0, (check.violations?.length ?? 0) - visible.length);
+        const { errorCount, warningCount } = countByseverity(check);
+        const count = errorCount + warningCount + (check.error ? 1 : 0);
+        const visible = check.findings.slice(0, maxViolationsPerCheck);
+        const hidden = Math.max(0, check.findings.length - visible.length);
         return (
           <Box key={check.checkSlug} flexDirection="column" marginLeft={2}>
             <Text>
@@ -93,7 +95,7 @@ export function Findings({ checks, maxViolationsPerCheck = DEFAULT_VIOLATIONS_PE
 
             {visible.map((v, i) => {
               const lineSuffix = v.line ? `:${v.line}` : '';
-              const loc = v.file ? `${v.file}${lineSuffix}` : '';
+              const loc = v.filePath ? `${v.filePath}${lineSuffix}` : '';
               return (
                 <Box key={i} flexDirection="column">
                   <Text>

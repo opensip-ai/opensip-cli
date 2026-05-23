@@ -1,27 +1,31 @@
 /* eslint-disable unicorn/filename-case -- React component test files mirror PascalCase component filenames */
+import { type CheckOutput } from '@opensip-tools/contracts';
 import { render } from 'ink-testing-library';
 import React from 'react';
 import { describe, it, expect } from 'vitest';
 
-import { Findings, type FindingCheck } from '../../../ui/components/Findings.js';
+import { Findings } from '../../../ui/components/Findings.js';
 import { ThemeProvider } from '../../../ui/theme.js';
 
-const sampleChecks: FindingCheck[] = [
+const sampleChecks: CheckOutput[] = [
   {
     checkSlug: 'no-console-log',
-    errorCount: 1,
-    warningCount: 1,
-    violations: [
+    passed: false,
+    violationCount: 2,
+    durationMs: 5,
+    findings: [
       {
+        ruleId: 'no-console-log',
         severity: 'error',
         message: 'console.log found in production code',
-        file: 'src/index.ts',
+        filePath: 'src/index.ts',
         line: 42,
       },
       {
+        ruleId: 'no-console-log',
         severity: 'warning',
         message: 'console.warn may be acceptable but review usage',
-        file: 'src/utils.ts',
+        filePath: 'src/utils.ts',
         line: 10,
         suggestion: 'Use a proper logger instead',
       },
@@ -90,11 +94,13 @@ describe('Findings', () => {
   });
 
   it('renders check-level errors', () => {
-    const checks: FindingCheck[] = [
+    const checks: CheckOutput[] = [
       {
         checkSlug: 'broken-check',
-        errorCount: 0,
-        warningCount: 0,
+        passed: false,
+        violationCount: 0,
+        durationMs: 0,
+        findings: [],
         error: 'Timed out after 60s',
       },
     ];
@@ -111,8 +117,14 @@ describe('Findings', () => {
   });
 
   it('skips checks with no findings', () => {
-    const checks: FindingCheck[] = [
-      { checkSlug: 'clean-check', errorCount: 0, warningCount: 0 },
+    const checks: CheckOutput[] = [
+      {
+        checkSlug: 'clean-check',
+        passed: true,
+        violationCount: 0,
+        durationMs: 0,
+        findings: [],
+      },
       ...sampleChecks,
     ];
 

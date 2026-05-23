@@ -62,9 +62,11 @@ export {
 } from './persistence/store.js';
 export type {
   StoredSession,
+  LegacyStoredSession,
   CheckCatalogEntry,
   RecipeCatalogEntry,
 } from './persistence/store.js';
+export { migrateLegacyStoredSession } from './persistence/store.js';
 
 // Dashboard HTML generator
 export { generateDashboardHtml } from './persistence/dashboard/index.js';
