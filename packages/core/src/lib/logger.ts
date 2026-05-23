@@ -46,21 +46,23 @@ const MAX_LOG_AGE_DAYS = 7;
 
 /**
  * Concrete logger implementation. Production code uses the exported
- * `logger` singleton; tests can construct a fresh `LoggerImpl()` to
- * exercise the logger without polluting (or being polluted by) the
- * singleton's state.
+ * `logger` singleton (typed as the `Logger` interface so the
+ * configuration surface is hidden from generic call sites); tests
+ * (or tools that need an isolated logger) can construct a fresh
+ * `LoggerImpl()` to exercise the logger without polluting (or being
+ * polluted by) the singleton's state.
+ *
+ * @remarks Treat this class as advanced / discouraged for general
+ * production use — the `Logger` interface is the seam. Importing
+ * `LoggerImpl` is appropriate for tests and for tools that genuinely
+ * need an isolated logger; everywhere else the typed `logger`
+ * singleton is the right import.
  */
 export class LoggerImpl implements Logger {
   private currentLevel: LogLevel = 'warn';
   private silent = false;
   private debugMode = false;
   private runId: string | undefined;
-  // logDir kept for parity with the previous module-level state; it is
-  // currently only read inside initLogFile and pruneOldLogs which both
-  // accept a dir argument, but reserving the field documents intent
-  // (and lets a future "where is the active log dir?" getter land
-  // without re-plumbing the state).
-  private logDir: string | undefined;
   private logFilePath: string | undefined;
 
   debug(msgOrObj: string | Record<string, unknown>, data?: Record<string, unknown>): void {
@@ -109,7 +111,6 @@ export class LoggerImpl implements Logger {
    */
   initLogFile(dir: string): void {
     try {
-      this.logDir = dir;
       mkdirSync(dir, { recursive: true });
       const today = new Date().toISOString().slice(0, 10);
       this.logFilePath = join(dir, `${today}.jsonl`);
@@ -219,29 +220,36 @@ function pruneOldLogs(dir: string): void {
  * setter functions below; production callers import this constant
  * directly. Tests should construct a fresh `new LoggerImpl()` instead
  * of mutating the singleton's state.
+ *
+ * Typed as the `Logger` interface (not the concrete class) so generic
+ * call sites see only the four log-level methods. Configuration
+ * (`setDebugMode`, `setLogLevel`, `initLogFile`, …) is the CLI
+ * bootstrap's job and reaches the underlying instance through the
+ * helper functions below.
  */
-export const logger: LoggerImpl = new LoggerImpl();
+const _logger = new LoggerImpl();
+export const logger: Logger = _logger;
 
 export function setLogLevel(level: LogLevel): void {
-  logger.setLogLevel(level);
+  _logger.setLogLevel(level);
 }
 
 export function setSilent(value: boolean): void {
-  logger.setSilent(value);
+  _logger.setSilent(value);
 }
 
 export function setDebugMode(value: boolean): void {
-  logger.setDebugMode(value);
+  _logger.setDebugMode(value);
 }
 
 export function setRunId(id: string): void {
-  logger.setRunId(id);
+  _logger.setRunId(id);
 }
 
 export function getRunId(): string | undefined {
-  return logger.getRunId();
+  return _logger.getRunId();
 }
 
 export function initLogFile(dir: string): void {
-  logger.initLogFile(dir);
+  _logger.initLogFile(dir);
 }

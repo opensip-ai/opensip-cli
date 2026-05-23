@@ -6,12 +6,37 @@
 // ERROR CLASSES
 // =============================================================================
 
+/**
+ * Closed union of canonical error codes carried by `ToolError` and its
+ * subclasses. Open by intent at the consumer layer — callers may pass
+ * any string in `ToolErrorOptions.code` (subclass-specific subcodes
+ * like `'VALIDATION.RECIPE.DUPLICATE'` are common) — but the base
+ * default for each subclass is one of these literals, which means an
+ * `instanceof` check pairs naturally with an exhaustive switch on
+ * `code` for the no-override case.
+ */
+export type ToolErrorCode =
+  | 'VALIDATION_ERROR'
+  | 'NOT_FOUND'
+  | 'SYSTEM_ERROR'
+  | 'TIMEOUT'
+  | 'NETWORK_ERROR'
+  | 'CONFIGURATION_ERROR'
+  | 'UNKNOWN_LIVE_VIEW';
+
 export interface ToolErrorOptions extends ErrorOptions {
   code?: string;
   [key: string]: unknown;
 }
 
 export class ToolError extends Error {
+  /**
+   * Error code. Typed as a `string` super-set of `ToolErrorCode` because
+   * subclass call sites may opt into a more specific subcode via
+   * `ToolErrorOptions.code` (e.g. `'VALIDATION.RECIPE.DUPLICATE'`). For
+   * exhaustive-switch use cases, narrow with the `ToolErrorCode` union
+   * after an `instanceof` check.
+   */
   readonly code: string;
 
   constructor(message: string, code: string, options?: ToolErrorOptions) {

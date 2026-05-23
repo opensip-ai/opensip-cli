@@ -158,5 +158,17 @@ describe('RecipeRegistry', () => {
         expect((error as ValidationError).code).toBe('VALIDATION.TEST.CUSTOM');
       }
     });
+
+    it('rejects { allowOverwrite: true, throwOnDuplicate: true } as mutually exclusive', () => {
+      // The two flags advertise contradictory semantics; passing both
+      // is a programmer error and should throw rather than silently
+      // pick one (audit 2026-05-23 / N3).
+      expect(() =>
+        reg.register(stub('A', 'alpha'), {
+          allowOverwrite: true,
+          throwOnDuplicate: true,
+        }),
+      ).toThrow(ValidationError);
+    });
   });
 });

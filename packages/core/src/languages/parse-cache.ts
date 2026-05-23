@@ -26,7 +26,12 @@ import { defaultLanguageRegistry } from './registry.js'
 
 import type { LanguageAdapter } from './adapter.js'
 
-const AUTO_CLEAR_MS = 10 * 60 * 1000 // matches previous behavior
+// 10 minutes — the cache is regenerated on every fitness run, so 10
+// minutes of staleness is the worst case for a check author who edits
+// a source file between runs in a long-lived process. Short enough to
+// avoid serving a tree that no longer matches the file on disk; long
+// enough that consecutive runs in a watch loop hit the cache.
+const AUTO_CLEAR_MS = 10 * 60 * 1000
 
 /**
  * Per-instance parse cache. Each instance owns its own `Map` and

@@ -100,7 +100,7 @@ export function discoverPlugins(
     const pluginsDir = projectPaths.pluginsDir(domain)
     const nodeModulesDir = join(pluginsDir, 'node_modules')
     if (existsSync(nodeModulesDir)) {
-      plugins.push(...discoverNpmPackages(nodeModulesDir, pluginsDir, declared))
+      plugins.push(...discoverNpmPackages(nodeModulesDir, declared))
     }
   }
 
@@ -171,7 +171,6 @@ export function readProjectPluginsList(
 
 function discoverNpmPackages(
   nodeModulesDir: string,
-  pluginDir: string,
   declared: readonly string[],
 ): DiscoveredPlugin[] {
   const plugins: DiscoveredPlugin[] = []
@@ -206,9 +205,6 @@ function discoverNpmPackages(
     const plugin = tryDiscoverPackage(packageDir, name)
     if (plugin) plugins.push(plugin)
   }
-
-  // pluginDir reference kept for parity with prior log shape
-  void pluginDir
 
   return plugins
 }

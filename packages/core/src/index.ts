@@ -56,17 +56,23 @@ export type {
 // Lib — errors + Result pattern
 export { ToolError, ValidationError, NotFoundError, SystemError, TimeoutError, NetworkError, ConfigurationError } from './lib/errors.js';
 export { ok, err, tryCatchAsync, tryCatch } from './lib/errors.js';
-export type { Result, ToolErrorOptions } from './lib/errors.js';
+export type { Result, ToolErrorCode, ToolErrorOptions } from './lib/errors.js';
 
-// Lib — logger
+// Lib — logger.
+//
+// Production callers should import the typed `logger` singleton +
+// helper functions; `LoggerImpl` is exported for tests (and tools
+// that need an isolated logger) — advanced / discouraged for
+// general use, see the file-level docstring on lib/logger.ts.
 export { logger, LoggerImpl, setLogLevel, setSilent, setDebugMode, setRunId, getRunId, initLogFile } from './lib/logger.js';
 export type { Logger, LogLevel } from './lib/logger.js';
 
 // Lib — permissive YAML reader (returns undefined on missing/malformed
 // files). Used by plugin-discovery sites that need to peek at a single
 // field of opensip-tools.config.yml without dragging in a Zod schema.
-// Tools that need structured parse errors should keep their dedicated
-// loader (see fitness's targets/loader.ts).
+// Advanced / discouraged for general use — tools that need structured
+// parse errors should keep their dedicated loader (see fitness's
+// targets/loader.ts).
 export { readYamlFile } from './lib/yaml.js';
 
 // Lib — IDs

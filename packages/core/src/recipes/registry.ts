@@ -91,6 +91,17 @@ export class RecipeRegistry<T extends RecipeBase> {
    */
   register(recipe: T, options: RecipeRegisterOptions = {}): void {
     const { allowOverwrite = false, throwOnDuplicate = false } = options;
+    if (allowOverwrite && throwOnDuplicate) {
+      // The two flags advertise contradictory behaviours; honour the
+      // JSDoc claim of mutual exclusion at runtime so a defensive
+      // caller that sets both doesn't silently get the overwrite
+      // path with no diagnostic.
+      // @fitness-ignore-next-line result-pattern-consistency -- registration guard, throw is appropriate
+      throw new ValidationError(
+        `RecipeRegistry.register: 'allowOverwrite' and 'throwOnDuplicate' are mutually exclusive`,
+        { code: options.validationCode ?? this.validationCode },
+      );
+    }
     const incumbentById = this.byId.get(recipe.id);
     const incumbentByName = this.byName.get(recipe.name);
     const isDuplicate = incumbentById !== undefined || incumbentByName !== undefined;
