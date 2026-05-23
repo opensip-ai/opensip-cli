@@ -17,6 +17,8 @@ import { relative, sep } from 'node:path';
 import { logger } from '@opensip-tools/core';
 import ts from 'typescript';
 
+import { appendEdge } from '../lang-adapter/edge-helpers.js';
+
 import { findCatalogEntry } from './edge-helpers/find-catalog-entry.js';
 import { resolveByCatalogFallback } from './edge-resolvers/catalog-fallback.js';
 import { resolveDirectCall } from './edge-resolvers/direct-call.js';
@@ -37,6 +39,14 @@ import type {
 } from '../types.js';
 import type { ResolverContext } from './edge-resolvers/types.js';
 import type { CallSiteRecord } from './walk.js';
+
+interface MutableStats {
+  totalCallSites: number;
+  resolvedHigh: number;
+  resolvedMedium: number;
+  resolvedLow: number;
+  unresolved: number;
+}
 
 export interface EdgeResolutionInput {
   readonly catalog: Catalog;
@@ -69,12 +79,18 @@ export function resolveEdgesFromRecords(
   logger.info({ evt: 'graph.edges.start', module: 'graph:edges' });
   const checker = input.program.getTypeChecker();
   const callsByHash = new Map<string, CallEdge[]>();
-  const stats = { totalCallSites: 0, resolvedHigh: 0, resolvedMedium: 0, resolvedLow: 0, unresolved: 0 };
+  const stats: MutableStats = {
+    totalCallSites: 0,
+    resolvedHigh: 0,
+    resolvedMedium: 0,
+    resolvedLow: 0,
+    unresolved: 0,
+  };
 
   for (const r of input.callSites) {
     if (r.kind === 'creation') {
       if (r.childHash === undefined) continue;
-      pushCreationEdgeFromRecord(r.node, r.sourceFile, r.ownerHash, r.childHash, callsByHash, stats);
+      pushCreationEdge(r.node, r.sourceFile, r.ownerHash, r.childHash, callsByHash, stats);
       continue;
     }
     const ctx: ResolverContext = {
@@ -86,7 +102,7 @@ export function resolveEdgesFromRecords(
     };
     const verdict = computeVerdict(r.node, ctx);
     if (verdict === null) continue;
-    pushEdgeFromRecord(r.node, r.sourceFile, verdict, r.ownerHash, callsByHash, stats);
+    pushCallEdge(r.node, r.sourceFile, verdict, r.ownerHash, callsByHash, stats);
   }
 
   const newCatalog = rebuildCatalog(input.catalog, callsByHash);
@@ -104,13 +120,18 @@ export function resolveEdgesFromRecords(
   return { catalog: newCatalog, resolutionStats: stats };
 }
 
-function pushCreationEdgeFromRecord(
+/**
+ * Append a synthetic "creation" edge — emitted when a parent function
+ * owns an inline-callable child (arrow / method / accessor /
+ * constructor). Static, high-confidence by construction.
+ */
+function pushCreationEdge(
   node: ts.Node,
   sourceFile: ts.SourceFile,
   ownerHash: string,
   childHash: string,
   callsByHash: Map<string, CallEdge[]>,
-  stats: { totalCallSites: number; resolvedHigh: number; resolvedMedium: number; resolvedLow: number; unresolved: number },
+  stats: MutableStats,
 ): void {
   const start = node.getStart(sourceFile);
   const startLC = sourceFile.getLineAndCharacterOfPosition(start);
@@ -125,20 +146,22 @@ function pushCreationEdgeFromRecord(
     text: `[creates] ${truncated}`,
     discarded: false,
   };
-  const list = callsByHash.get(ownerHash);
-  if (list) list.push(edge);
-  else callsByHash.set(ownerHash, [edge]);
+  appendEdge(callsByHash, ownerHash, edge);
   stats.totalCallSites++;
   stats.resolvedHigh++;
 }
 
-function pushEdgeFromRecord(
+/**
+ * Append an ordinary call/new/jsx/value-reference edge from a resolver
+ * verdict. Bumps the per-confidence stat counter as a side effect.
+ */
+function pushCallEdge(
   node: ts.Node,
   sourceFile: ts.SourceFile,
   verdict: ResolverVerdict,
   ownerHash: string,
   callsByHash: Map<string, CallEdge[]>,
-  stats: { totalCallSites: number; resolvedHigh: number; resolvedMedium: number; resolvedLow: number; unresolved: number },
+  stats: MutableStats,
 ): void {
   stats.totalCallSites++;
   const start = node.getStart(sourceFile);
@@ -153,148 +176,100 @@ function pushEdgeFromRecord(
     text: text.length > 80 ? `${text.slice(0, 77)}...` : text,
     discarded: isReturnValueDiscarded(node),
   };
-  const list = callsByHash.get(ownerHash);
-  if (list) list.push(edge);
-  else callsByHash.set(ownerHash, [edge]);
+  appendEdge(callsByHash, ownerHash, edge);
   if (verdict.to.length === 0) stats.unresolved++;
   else if (verdict.confidence === 'high') stats.resolvedHigh++;
   else if (verdict.confidence === 'medium') stats.resolvedMedium++;
   else stats.resolvedLow++;
 }
 
+/**
+ * Legacy one-shot Stage 1+2 entry kept for tests and external callers
+ * that don't go through the orchestrator. Descends the AST to produce
+ * a flat `CallSiteRecord[]`, then delegates to
+ * `resolveEdgesFromRecords` — the same path the orchestrator uses.
+ *
+ * Production code should call `resolveEdgesFromRecords` directly with
+ * the records produced by `walkProgram`.
+ */
 export function resolveEdges(input: EdgeResolutionInput): EdgeResolutionOutput {
-  logger.info({ evt: 'graph.edges.start', module: 'graph:edges' });
-  const checker = input.program.getTypeChecker();
-
-  // We mutate the FunctionOccurrence.calls slot by replacing each
-  // entry; the catalog itself is rebuilt at the end so the returned
-  // shape is fresh.
   const fnByHash = buildHashIndex(input.catalog);
-  const callsByHash = new Map<string, CallEdge[]>();
-
-  const stats = { totalCallSites: 0, resolvedHigh: 0, resolvedMedium: 0, resolvedLow: 0, unresolved: 0 };
+  const callSites: CallSiteRecord[] = [];
 
   for (const sf of input.program.getSourceFiles()) {
     if (sf.isDeclarationFile) continue;
     const filePathProjectRel = relative(input.projectDirAbs, sf.fileName).split(sep).join('/');
     if (!hasFileInCatalog(input.catalog, filePathProjectRel)) continue;
-    walkFileForEdges({
-      sourceFile: sf,
-      filePathProjectRel,
-      catalog: input.catalog,
-      fnByHash,
-      callsByHash,
-      stats,
-      ctx: {
-        catalog: input.catalog,
-        program: input.program,
-        typeChecker: checker,
-        sourceFile: sf,
-        projectDirAbs: input.projectDirAbs,
-      },
-    });
+    collectCallSites(sf, filePathProjectRel, input.catalog, fnByHash, callSites);
   }
 
-  const newCatalog = rebuildCatalog(input.catalog, callsByHash);
-
-  logger.info({
-    evt: 'graph.edges.complete',
-    module: 'graph:edges',
-    totalCallSites: stats.totalCallSites,
-    resolvedHigh: stats.resolvedHigh,
-    resolvedMedium: stats.resolvedMedium,
-    resolvedLow: stats.resolvedLow,
-    unresolved: stats.unresolved,
+  return resolveEdgesFromRecords({
+    catalog: input.catalog,
+    program: input.program,
+    projectDirAbs: input.projectDirAbs,
+    callSites,
   });
-
-  return { catalog: newCatalog, resolutionStats: stats };
 }
 
-interface WalkArgs {
-  readonly sourceFile: ts.SourceFile;
-  readonly filePathProjectRel: string;
-  readonly catalog: Catalog;
-  readonly fnByHash: ReadonlyMap<string, FunctionOccurrence>;
-  readonly callsByHash: Map<string, CallEdge[]>;
-  readonly stats: { totalCallSites: number; resolvedHigh: number; resolvedMedium: number; resolvedLow: number; unresolved: number };
-  readonly ctx: ResolverContext;
-}
-
-function walkFileForEdges(args: WalkArgs): void {
-  // Module-init owns top-level call sites.
-  const moduleInitHash = lookupModuleInitHash(args.sourceFile, args.filePathProjectRel, args.catalog);
+/**
+ * Walk a single file's AST in the same order as `walkProgram`, pairing
+ * every resolver-candidate site (calls, new-expressions, JSX, value
+ * references, shorthand) and every inline-callable creation with its
+ * owning function's bodyHash. Pushes records onto the shared list so
+ * a downstream `resolveEdgesFromRecords` can drive resolver dispatch
+ * without re-walking.
+ */
+function collectCallSites(
+  sourceFile: ts.SourceFile,
+  filePathProjectRel: string,
+  catalog: Catalog,
+  fnByHash: ReadonlyMap<string, FunctionOccurrence>,
+  out: CallSiteRecord[],
+): void {
+  const moduleInitHash = lookupModuleInitHash(sourceFile, filePathProjectRel, catalog);
 
   function walk(node: ts.Node, ownerHash: string | null): void {
-    // If we're entering a function-shaped node, look up its hash; the
-    // calls inside this node belong to that owner.
-    const hash = isFunctionLike(node) ? hashOf(node, args.sourceFile, args.fnByHash) : null;
+    const hash = isFunctionLike(node) ? hashOf(node, sourceFile, fnByHash) : null;
     const childOwner = hash ?? ownerHash;
 
-    // Collect call sites whose ownership belongs to `ownerHash` only
-    // when this very node is the call expression / new / jsx.
-    if (ownerHash !== null) {
-      maybeCollectCallSite(node, ownerHash, args);
+    if (ownerHash !== null && isResolverCandidateNode(node)) {
+      out.push({ node, sourceFile, ownerHash, kind: 'call' });
     }
 
-    // Record a creation edge from the parent owner to this nested
-    // function ONLY for inline-callables: arrows, function
-    // expressions, and class members (methods / constructors /
-    // accessors). These are alive whenever their enclosing scope is
-    // alive — they are never "called by name." Function declarations
-    // are deliberately excluded; they need a real call edge to be
-    // considered reachable, which is what makes the orphan rule
-    // catch genuinely unused top-level functions.
     if (
       hash !== null &&
       ownerHash !== null &&
       hash !== ownerHash &&
       isInlineCallable(node)
     ) {
-      recordCreationEdge(node, ownerHash, hash, args);
+      out.push({
+        node,
+        sourceFile,
+        ownerHash,
+        kind: 'creation',
+        childHash: hash,
+      });
     }
 
     ts.forEachChild(node, (c) => { walk(c, childOwner); });
   }
 
-  // Descend from the source file. Module-init owns everything that's
-  // not inside a function-shaped node.
-  ts.forEachChild(args.sourceFile, (c) => { walk(c, moduleInitHash); });
+  ts.forEachChild(sourceFile, (c) => { walk(c, moduleInitHash); });
 }
 
-function recordCreationEdge(
-  node: ts.Node,
-  ownerHash: string,
-  childHash: string,
-  args: WalkArgs,
-): void {
-  const start = node.getStart(args.sourceFile);
-  const startLC = args.sourceFile.getLineAndCharacterOfPosition(start);
-  const text = node.getText(args.sourceFile);
-  const truncated = text.length > 70 ? `${text.slice(0, 67)}...` : text;
-  const edge: CallEdge = {
-    to: [childHash],
-    line: startLC.line + 1,
-    column: startLC.character,
-    resolution: 'static',
-    confidence: 'high',
-    text: `[creates] ${truncated}`,
-    discarded: false,
-  };
-  const list = args.callsByHash.get(ownerHash);
-  if (list) {
-    list.push(edge);
-  } else {
-    args.callsByHash.set(ownerHash, [edge]);
-  }
-  args.stats.totalCallSites++;
-  args.stats.resolvedHigh++;
-}
-
-function maybeCollectCallSite(node: ts.Node, ownerHash: string, args: WalkArgs): void {
-  const verdict = computeVerdict(node, args.ctx);
-  if (verdict === null) return;
-  args.stats.totalCallSites++;
-  pushEdge(node, verdict, ownerHash, args);
+/**
+ * Pre-filter mirroring `computeVerdict`'s acceptance set. Pushing
+ * non-candidates would still produce no edges (the resolver returns
+ * null), but skipping them up front keeps `resolveEdgesFromRecords`
+ * out of pointless dispatcher hops.
+ */
+function isResolverCandidateNode(node: ts.Node): boolean {
+  if (ts.isCallExpression(node)) return true;
+  if (ts.isNewExpression(node)) return true;
+  if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) return true;
+  if (ts.isShorthandPropertyAssignment(node)) return true;
+  if (ts.isIdentifier(node) && isValueReference(node)) return true;
+  return false;
 }
 
 /** Returns null if `node` is not a call/new/jsx/value-reference site. */
@@ -335,36 +310,6 @@ function dispatchCall(
     return resolveByCatalogFallback(node.expression.name.text, ctx.catalog);
   }
   return { to: [], resolution: 'unknown', confidence: 'low' };
-}
-
-function pushEdge(
-  node: ts.Node,
-  verdict: ResolverVerdict,
-  ownerHash: string,
-  args: WalkArgs,
-): void {
-  const start = node.getStart(args.sourceFile);
-  const startLC = args.sourceFile.getLineAndCharacterOfPosition(start);
-  const text = node.getText(args.sourceFile);
-  const edge: CallEdge = {
-    to: verdict.to,
-    line: startLC.line + 1,
-    column: startLC.character,
-    resolution: verdict.resolution,
-    confidence: verdict.confidence,
-    text: text.length > 80 ? `${text.slice(0, 77)}...` : text,
-    discarded: isReturnValueDiscarded(node),
-  };
-  const list = args.callsByHash.get(ownerHash);
-  if (list) {
-    list.push(edge);
-  } else {
-    args.callsByHash.set(ownerHash, [edge]);
-  }
-  if (verdict.to.length === 0) args.stats.unresolved++;
-  else if (verdict.confidence === 'high') args.stats.resolvedHigh++;
-  else if (verdict.confidence === 'medium') args.stats.resolvedMedium++;
-  else args.stats.resolvedLow++;
 }
 
 /**
