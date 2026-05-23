@@ -321,50 +321,41 @@ export function formatValidatedColumn(totalItems: number | undefined, itemType =
 }
 
 // ---------------------------------------------------------------------------
-// executeFit — main fit command (returns data, no console output)
+// executeFit helpers — each phase pulled out so the orchestration shell
+// below stays readable. Helpers return either their data shape or an
+// `ErrorResult` so the caller can short-circuit cleanly.
 // ---------------------------------------------------------------------------
 
-// eslint-disable-next-line sonarjs/cognitive-complexity -- top-level CLI command flow: validates args, resolves config, runs recipes, persists results — distinct phases that read better inline
-export async function executeFit(
+interface LoadedFitConfig {
+  signalersConfig: SignalersConfig;
+  targetsConfig: ReturnType<typeof loadTargetsConfig>['config'];
+  targetRegistry: ReturnType<typeof loadTargetsConfig>['registry'];
+}
+
+/**
+ * Resolve `signalersConfig` + `targetsConfig` from the project's
+ * opensip-tools.config.yml. Returns an `ErrorResult` instead of throwing
+ * so the caller maps it directly to the public failure shape — a
+ * missing/invalid config is a HARD error (otherwise file-based checks
+ * silently produce zero findings).
+ */
+function loadFitConfig(
   // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
   args: CliArgs,
-  onProgress?: (completed: number, total: number) => void,
-): Promise<{ result: FitDoneResult; output: CliOutput } | { result: ErrorResult; output?: undefined }> {
-  logger.info({ evt: 'cli.checks.loading', module: 'cli:fit' });
-  await ensureChecksLoaded(args.cwd);
-  logger.info({ evt: 'cli.checks.loaded', module: 'cli:fit', checkCount: defaultRegistry.listEnabled().length });
-
-  // Determine recipe: --check and --tags each create an ad-hoc recipe;
-  // otherwise use a named recipe. --check takes precedence over --recipe
-  // so "opensip-tools fit --check <slug>" runs just that slug.
-  const useAdHoc = args.check != null || args.tags != null;
-  const recipeName = useAdHoc ? undefined : (args.recipe ?? 'default');
-  if (recipeName && !defaultRecipeRegistry.has(recipeName)) {
-    return {
-      result: {
-        type: 'error',
-        message: `Unknown recipe '${recipeName}'.`,
-        suggestion: 'Run opensip-tools fit --recipes to see available recipes.',
-        exitCode: EXIT_CODES.CONFIGURATION_ERROR,
-      },
-    };
-  }
-
-  // -- Config resolution --
-  // Both loaders share the same project config file. A missing file is a
-  // HARD error: file-based checks would silently produce zero findings,
-  // making the scan look green when it actually never ran. The resolver
-  // throws with a message that enumerates every path it attempted.
-  let signalersConfig: SignalersConfig;
-  let targetsResult: ReturnType<typeof loadTargetsConfig>;
+): LoadedFitConfig | { error: ErrorResult } {
   try {
-    signalersConfig = loadSignalersConfig(args.cwd, args.config);
-    targetsResult = loadTargetsConfig(args.cwd, args.config);
+    const signalersConfig = loadSignalersConfig(args.cwd, args.config);
+    const targetsResult = loadTargetsConfig(args.cwd, args.config);
+    return {
+      signalersConfig,
+      targetsConfig: targetsResult.config,
+      targetRegistry: targetsResult.registry,
+    };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     logger.warn({ evt: 'cli.config.load_failed', module: 'cli:fit', message });
     return {
-      result: {
+      error: {
         type: 'error',
         message,
         suggestion: "Run 'opensip-tools init' to scaffold a config, or pass --config <path> to point at an existing one.",
@@ -372,128 +363,85 @@ export async function executeFit(
       },
     };
   }
+}
 
-  const disabledChecks = signalersConfig.fitness.disabledChecks;
-  const { registry: targetRegistry, config: targetsConfig } = targetsResult;
-  const configFound = true;
-
-  // Phase 9: validate that every language declared in the targets config
-  // has a registered LanguageAdapter. Warn loudly when a target asks for
-  // a language we don't know how to handle — silent acceptance would let
-  // users ship configs that scan files but produce wrong results.
-  {
-    const { defaultLanguageRegistry: langRegistry } = await import('@opensip-tools/core');
-    const knownLanguages = new Set<string>(langRegistry.list().flatMap((a) => [a.id, ...(a.aliases ?? [])]));
-    const unknownLanguages = new Set<string>()
-    for (const target of targetRegistry.getAll()) {
-      const langs = target.config.languages ?? []
-      for (const lang of langs) {
-        if (!knownLanguages.has(lang)) unknownLanguages.add(lang)
-      }
-    }
-    if (unknownLanguages.size > 0) {
-      const list = [...unknownLanguages].sort().join(', ')
-      const known = [...knownLanguages].filter((l) => !l.startsWith('rs') && !l.startsWith('py')).slice(0, 8).join(', ')
-      process.stderr.write(
-        `opensip-tools: target config declares unknown language(s): ${list}. ` +
-        `Known languages: ${[...knownLanguages].sort().join(', ')}. ` +
-        `Files in unknown languages will scan with no string/comment filtering.\n`,
-      );
-      logger.warn({
-        evt: 'cli.config.unknown_languages',
-        module: 'cli:fit',
-        unknown: [...unknownLanguages],
-        known: [...knownLanguages],
-      });
-      // Reference `known` to avoid unused-var lint without changing the user-facing message.
-      void known
+/**
+ * Warn loudly when the targets config declares languages with no
+ * registered adapter. Silent acceptance would let users ship configs
+ * that scan files but skip the language-aware string/comment filtering.
+ *
+ * Async only because the language registry is imported via dynamic
+ * import to keep the executeFit body free of fitness↔core import
+ * arrows beyond the kernel barrel.
+ */
+async function validateLanguagesAgainstAdapters(
+  targetRegistry: LoadedFitConfig['targetRegistry'],
+): Promise<void> {
+  const { defaultLanguageRegistry: langRegistry } = await import('@opensip-tools/core');
+  const knownLanguages = new Set<string>(langRegistry.list().flatMap((a) => [a.id, ...(a.aliases ?? [])]));
+  const unknownLanguages = new Set<string>();
+  for (const target of targetRegistry.getAll()) {
+    const langs = target.config.languages ?? [];
+    for (const lang of langs) {
+      if (!knownLanguages.has(lang)) unknownLanguages.add(lang);
     }
   }
+  if (unknownLanguages.size === 0) return;
 
-  const allChecks = defaultRegistry.listSlugs().map((key) => {
-    const check = defaultRegistry.getBySlug(key);
-    return { slug: check?.config.slug ?? key, scope: check?.config.checkScope };
+  const list = [...unknownLanguages].sort().join(', ');
+  process.stderr.write(
+    `opensip-tools: target config declares unknown language(s): ${list}. ` +
+    `Known languages: ${[...knownLanguages].sort().join(', ')}. ` +
+    `Files in unknown languages will scan with no string/comment filtering.\n`,
+  );
+  logger.warn({
+    evt: 'cli.config.unknown_languages',
+    module: 'cli:fit',
+    unknown: [...unknownLanguages],
+    known: [...knownLanguages],
   });
-  const scopeMap = buildScopeBasedFileMap(allChecks, targetRegistry, targetsConfig, args.cwd);
-  const checkTargetFiles = scopeMap.size > 0 ? scopeMap : undefined;
+}
 
-  const label = args.tags ? `tags: ${args.tags}` : `recipe ${recipeName ?? 'default'}`;
-
-  // -- Progress callbacks --
-  //
-  // Monotonic completed-count:
-  //
-  // The service fires onCheckStart(slug, displayIndex, total) when a check
-  // STARTS and onCheckComplete(slug, summary, displayIndex, total) when it
-  // FINISHES. Under parallel execution `displayIndex` is the check's
-  // position in the queue (1..total), not "how many have completed" — so
-  // the last started check's index hops above the current completion
-  // tally and then "resets" down when an earlier check finishes. The UI
-  // showed `147/148 → 121/148 → 78/148` because each event fired with a
-  // different in-flight check's queue position.
-  //
-  // The progress bar wants a monotonic counter. Track completed locally,
-  // increment only on onCheckComplete, ignore onCheckStart's index. The
-  // counter is strictly non-decreasing and always reflects "N of M
-  // checks done."
-  let completedCount = 0;
-  const callbacks: FitnessRecipeServiceCallbacks = {
-    onCheckStart(checkSlug: string, index: number, total: number) {
-      logger.debug({ evt: 'cli.check.start', module: 'cli:fit', checkSlug, index, total });
-      // Emit current completed count so the UI shows activity without
-      // moving the bar backward on start events.
-      onProgress?.(completedCount, total);
-    },
-    onCheckComplete(checkSlug: string, summary: CheckSummary, index: number, total: number) {
-      logger.debug({ evt: 'cli.check.complete', module: 'cli:fit', checkSlug, passed: summary.passed, errors: summary.errors, warnings: summary.warnings, durationMs: summary.durationMs });
-      completedCount++;
-      onProgress?.(completedCount, total);
-    },
-  };
-
-  // -- Execute via FitnessRecipeService --
-  // Forward globalExcludes from the project config so the matchFiles()
-  // fileCache fallback honors them. Without this, scope-empty checks
-  // (e.g. file-length-limit) scan every prewarmed file regardless of
-  // whether the project config told us to exclude it.
-  const service = new FitnessRecipeService({
-    cwd: args.cwd,
-    checkTargetFiles,
-    callbacks,
-    disabledChecks,
-    includeViolations: true,
-    globalExcludes: targetsConfig.globalExcludes,
-  });
-
-  let fitnessResult: FitnessRecipeResult;
-  try {
-    if (args.check) {
-      fitnessResult = await service.start(FitnessRecipeService.createAdHocRecipe({ check: args.check }));
-    } else if (args.tags) {
-      const tagFilters = args.tags.split(',').map(t => t.trim()).filter(Boolean);
-      fitnessResult = await service.start(FitnessRecipeService.createAdHocRecipe({ tagFilters }));
-    } else {
-      fitnessResult = await service.start(recipeName!);
-    }
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
+/**
+ * Decide which recipe to execute. `--check` and `--tags` each create an
+ * ad-hoc recipe (recipeName=undefined); otherwise look up a named
+ * recipe. Returns either the resolved name or `undefined` (ad-hoc), or
+ * an `ErrorResult` when the requested name doesn't exist.
+ */
+function selectRecipe(
+  // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
+  args: CliArgs,
+): { recipeName: string | undefined } | { error: ErrorResult } {
+  const useAdHoc = args.check != null || args.tags != null;
+  const recipeName = useAdHoc ? undefined : (args.recipe ?? 'default');
+  if (recipeName && !defaultRecipeRegistry.has(recipeName)) {
     return {
-      result: {
+      error: {
         type: 'error',
-        message: `Fitness run failed: ${msg}`,
-        exitCode: EXIT_CODES.RUNTIME_ERROR,
+        message: `Unknown recipe '${recipeName}'.`,
+        suggestion: 'Run opensip-tools fit --recipes to see available recipes.',
+        exitCode: EXIT_CODES.CONFIGURATION_ERROR,
       },
     };
   }
+  return { recipeName };
+}
 
-  // -- Format output from recipe result --
+/**
+ * Map a {@link FitnessRecipeResult} onto the shared {@link CliOutput}
+ * shape that the dashboard, JSON exporter, and SARIF builder all
+ * consume. The same finding shape is produced here and in
+ * {@link buildFitDoneResult} below so any change is paired.
+ */
+function buildCliOutput(
+  fitnessResult: FitnessRecipeResult,
+  recipeName: string | undefined,
+): CliOutput {
   const { summary, checkResults, durationMs } = fitnessResult;
   const score = summary.totalChecks > 0
     ? Math.round((summary.passedChecks / summary.totalChecks) * 100)
     : 0;
-
-  // Build structured output
-  const output: CliOutput = {
+  return {
     version: '1.0',
     tool: 'fit',
     timestamp: new Date().toISOString(),
@@ -524,26 +472,24 @@ export async function executeFit(
     })),
     durationMs,
   };
+}
 
-  // Persist session for history and dashboard
-  try {
-    saveSession({
-      id: generateSessionId(),
-      tool: 'fit',
-      timestamp: output.timestamp,
-      cwd: args.cwd,
-      recipe: recipeName,
-      score,
-      passed: output.passed,
-      summary: output.summary,
-      checks: output.checks,
-      durationMs,
-    });
-  } catch {
-    // Best effort — don't fail the run if persistence fails
-  }
+interface BuildFitDoneArgs {
+  // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
+  args: CliArgs;
+  fitnessResult: FitnessRecipeResult;
+  signalersConfig: SignalersConfig;
+  recipeName: string | undefined;
+}
 
-  // Build table rows
+/**
+ * Build the {@link FitDoneResult} the live renderer / JSON output / gate
+ * mode all consume. Computes the configured fail thresholds, the table
+ * rows, the optional grouped findings block, and the run label.
+ */
+function buildFitDoneResult({ args, fitnessResult, signalersConfig, recipeName }: BuildFitDoneArgs): FitDoneResult {
+  const { summary, checkResults, durationMs } = fitnessResult;
+
   const tableRows: TableRow[] = checkResults.map(cr => ({
     check: getCheckDisplayName(cr.checkSlug),
     status: rowStatus(cr),
@@ -555,7 +501,6 @@ export async function executeFit(
     durationMs: cr.durationMs,
   }));
 
-  // Build summary
   const summaryOpts: SummaryOptions = {
     passed: summary.passedChecks,
     failed: summary.failedChecks,
@@ -565,19 +510,16 @@ export async function executeFit(
     durationMs,
   };
 
-  // Determine exit code from config thresholds
+  // Determine exit code from config thresholds.
   // failOnErrors: fail if total errors >= this value (default: 1, 0 = never fail on errors)
   // failOnWarnings: fail if total warnings >= this value (default: 0 = never fail on warnings)
-  const failOnErrors = signalersConfig?.fitness.failOnErrors ?? 1;
-  const failOnWarnings = signalersConfig?.fitness.failOnWarnings ?? 0;
+  const failOnErrors = signalersConfig.fitness.failOnErrors ?? 1;
+  const failOnWarnings = signalersConfig.fitness.failOnWarnings ?? 0;
   const shouldFail =
     pluginLoadErrors.length > 0 ||
     (failOnErrors > 0 && summary.totalErrors >= failOnErrors) ||
     (failOnWarnings > 0 && summary.totalWarnings >= failOnWarnings);
 
-  // Build findings if requested. Reuses CheckOutput / FindingOutput
-  // from contracts — historically this block carried a third near-clone
-  // of the finding shape.
   let findings: FitDoneResult['findings'];
   if ((args.findings || args.verbose) && (summary.totalErrors + summary.totalWarnings) > 0) {
     findings = {
@@ -602,7 +544,9 @@ export async function executeFit(
     };
   }
 
-  const result: FitDoneResult = {
+  const label = args.tags ? `tags: ${args.tags}` : `recipe ${recipeName ?? 'default'}`;
+
+  return {
     type: 'fit-done',
     rows: tableRows,
     summary: summaryOpts,
@@ -610,10 +554,139 @@ export async function executeFit(
     cwd: args.cwd,
     findings,
     shouldFail,
-    configFound,
+    configFound: true,
   };
+}
 
-  logger.info({ evt: 'cli.fit.complete', module: 'cli:fit', score, passed: fitnessResult.success, totalChecks: summary.totalChecks, durationMs });
+/**
+ * Wire up CLI-side progress callbacks for the recipe service.
+ *
+ * Monotonic completed-count: the service fires `onCheckStart(slug,
+ * displayIndex, total)` when a check STARTS and
+ * `onCheckComplete(slug, summary, displayIndex, total)` when it
+ * FINISHES. Under parallel execution `displayIndex` is the check's
+ * position in the queue (1..total), not "how many have completed" — so
+ * the last-started check's index hops above the current completion
+ * tally and then "resets" down when an earlier check finishes (the UI
+ * showed `147/148 → 121/148 → 78/148`).
+ *
+ * The progress bar wants a monotonic counter. We track completed
+ * locally, increment only on `onCheckComplete`, and ignore
+ * `onCheckStart`'s index. The counter is strictly non-decreasing and
+ * always reflects "N of M checks done."
+ */
+function buildFitCallbacks(
+  onProgress?: (completed: number, total: number) => void,
+): FitnessRecipeServiceCallbacks {
+  let completedCount = 0;
+  return {
+    onCheckStart(checkSlug: string, index: number, total: number) {
+      logger.debug({ evt: 'cli.check.start', module: 'cli:fit', checkSlug, index, total });
+      onProgress?.(completedCount, total);
+    },
+    onCheckComplete(checkSlug: string, summary: CheckSummary, index: number, total: number) {
+      logger.debug({ evt: 'cli.check.complete', module: 'cli:fit', checkSlug, passed: summary.passed, errors: summary.errors, warnings: summary.warnings, durationMs: summary.durationMs });
+      completedCount++;
+      onProgress?.(completedCount, total);
+    },
+  };
+}
+
+/** Run the recipe (or ad-hoc selector built from `--check` / `--tags`). */
+async function runRecipeOrAdHoc(
+  service: FitnessRecipeService,
+  // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
+  args: CliArgs,
+  recipeName: string | undefined,
+): Promise<FitnessRecipeResult | { error: ErrorResult }> {
+  try {
+    if (args.check) {
+      return await service.start(FitnessRecipeService.createAdHocRecipe({ check: args.check }));
+    }
+    if (args.tags) {
+      const tagFilters = args.tags.split(',').map(t => t.trim()).filter(Boolean);
+      return await service.start(FitnessRecipeService.createAdHocRecipe({ tagFilters }));
+    }
+    return await service.start(recipeName!);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    return {
+      error: {
+        type: 'error',
+        message: `Fitness run failed: ${msg}`,
+        exitCode: EXIT_CODES.RUNTIME_ERROR,
+      },
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// executeFit — main fit command (returns data, no console output)
+// ---------------------------------------------------------------------------
+
+export async function executeFit(
+  // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
+  args: CliArgs,
+  onProgress?: (completed: number, total: number) => void,
+): Promise<{ result: FitDoneResult; output: CliOutput } | { result: ErrorResult; output?: undefined }> {
+  logger.info({ evt: 'cli.checks.loading', module: 'cli:fit' });
+  await ensureChecksLoaded(args.cwd);
+  logger.info({ evt: 'cli.checks.loaded', module: 'cli:fit', checkCount: defaultRegistry.listEnabled().length });
+
+  const recipePick = selectRecipe(args);
+  if ('error' in recipePick) return { result: recipePick.error };
+  const { recipeName } = recipePick;
+
+  const configResult = loadFitConfig(args);
+  if ('error' in configResult) return { result: configResult.error };
+  const { signalersConfig, targetsConfig, targetRegistry } = configResult;
+
+  await validateLanguagesAgainstAdapters(targetRegistry);
+
+  const allChecks = defaultRegistry.listSlugs().map((key) => {
+    const check = defaultRegistry.getBySlug(key);
+    return { slug: check?.config.slug ?? key, scope: check?.config.checkScope };
+  });
+  const scopeMap = buildScopeBasedFileMap(allChecks, targetRegistry, targetsConfig, args.cwd);
+  const checkTargetFiles = scopeMap.size > 0 ? scopeMap : undefined;
+
+  const service = new FitnessRecipeService({
+    cwd: args.cwd,
+    checkTargetFiles,
+    callbacks: buildFitCallbacks(onProgress),
+    disabledChecks: signalersConfig.fitness.disabledChecks,
+    includeViolations: true,
+    globalExcludes: targetsConfig.globalExcludes,
+  });
+
+  const fitResultOrError = await runRecipeOrAdHoc(service, args, recipeName);
+  if ('error' in fitResultOrError) return { result: fitResultOrError.error };
+  const fitnessResult = fitResultOrError;
+
+  const output = buildCliOutput(fitnessResult, recipeName);
+
+  // Persist session for history and dashboard. Best-effort — never fail
+  // the run when the on-disk store can't be written.
+  try {
+    saveSession({
+      id: generateSessionId(),
+      tool: 'fit',
+      timestamp: output.timestamp,
+      cwd: args.cwd,
+      recipe: recipeName,
+      score: output.score,
+      passed: output.passed,
+      summary: output.summary,
+      checks: output.checks,
+      durationMs: output.durationMs,
+    });
+  } catch {
+    // Best effort — don't fail the run if persistence fails
+  }
+
+  const result = buildFitDoneResult({ args, fitnessResult, signalersConfig, recipeName });
+
+  logger.info({ evt: 'cli.fit.complete', module: 'cli:fit', score: output.score, passed: fitnessResult.success, totalChecks: fitnessResult.summary.totalChecks, durationMs: fitnessResult.durationMs });
 
   return { result, output };
 }

@@ -120,7 +120,19 @@ function register(cli: ToolCliContext): void {
     });
   }
 
-  // -- fit ------------------------------------------------------------------
+  registerFitCommand(program, cli);
+  registerDashboardCommand(program, cli);
+  registerListCommand(program, cli);
+  registerRecipesCommand(program, cli);
+}
+
+// =============================================================================
+// SUBCOMMAND REGISTRARS — one per Commander subcommand. Keeps register()
+// a thin orchestrator and lets each subcommand's flags + dispatch live
+// next to its mode helpers.
+// =============================================================================
+
+function registerFitCommand(program: Command, cli: ToolCliContext): void {
   program
     .command(FIT.name)
     .description(FIT.description)
@@ -146,58 +158,27 @@ function register(cli: ToolCliContext): void {
     .action(async (opts: FitOptions & { quiet?: boolean; open?: boolean }) => {
       const args = fitOptsToCliArgs(opts);
 
-      // Architecture gate: --gate-save / --gate-compare. Headless,
-      // stdout-only, exit code is the gate decision.
       if (args.gateSave === true || args.gateCompare === true) {
         await runGateMode(args, cli);
         return;
       }
-
-      // --list
       if (args.list) {
-        const result = await listChecks(args.cwd);
-        if (args.json) { process.stdout.write(JSON.stringify(result, null, 2) + '\n'); return; }
-        await cli.render(result);
+        await runListMode(args, cli);
         return;
       }
-
-      // --recipes
       if (args.listRecipes) {
-        const result = await listRecipes(args.cwd);
-        if (args.json) { process.stdout.write(JSON.stringify(result, null, 2) + '\n'); return; }
-        await cli.render(result);
+        await runRecipesMode(args, cli);
         return;
       }
-
-      // Main fit execution.
       if (args.json) {
-        const fitResult = await executeFit(args);
-        if (fitResult.result.type === 'error') {
-          cli.setExitCode(fitResult.result.exitCode);
-          process.stdout.write(JSON.stringify({ error: fitResult.result.message }, null, 2) + '\n');
-        } else {
-          if (fitResult.result.type === 'fit-done' && fitResult.result.shouldFail) {
-            cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
-          }
-          process.stdout.write(JSON.stringify(fitResult.output, null, 2) + '\n');
-        }
+        await runJsonMode(args, cli);
         return;
       }
-
-      // Visual mode — Ink-rendered live results. The CLI supplies the
-      // renderer via cli.renderLive() so this file doesn't depend on
-      // the CLI package directly.
-      await cli.renderLive(FIT_LIVE_VIEW_KEY, args);
-
-      // --open: launch dashboard after the run when conditions allow.
-      await cli.maybeOpenDashboard({
-        openRequested: Boolean(opts.open),
-        jsonOutput: Boolean(args.json),
-        cwd: args.cwd,
-      });
+      await runLiveMode(args, cli, opts.open === true);
     });
+}
 
-  // -- dashboard ------------------------------------------------------------
+function registerDashboardCommand(program: Command, cli: ToolCliContext): void {
   program
     .command(DASHBOARD.name)
     .description(DASHBOARD.description)
@@ -212,8 +193,9 @@ function register(cli: ToolCliContext): void {
       }
       await cli.render(result);
     });
+}
 
-  // -- fit-list (alias: list-checks) ----------------------------------------
+function registerListCommand(program: Command, cli: ToolCliContext): void {
   const fitListCmd = program
     .command(FIT_LIST.name)
     .description(FIT_LIST.description);
@@ -226,8 +208,9 @@ function register(cli: ToolCliContext): void {
       if (opts.json) { process.stdout.write(JSON.stringify(result, null, 2) + '\n'); return; }
       await cli.render(result);
     });
+}
 
-  // -- fit-recipes (alias: list-recipes) ------------------------------------
+function registerRecipesCommand(program: Command, cli: ToolCliContext): void {
   const fitRecipesCmd = program
     .command(FIT_RECIPES.name)
     .description(FIT_RECIPES.description);
@@ -240,6 +223,64 @@ function register(cli: ToolCliContext): void {
       if (opts.json) { process.stdout.write(JSON.stringify(result, null, 2) + '\n'); return; }
       await cli.render(result);
     });
+}
+
+// =============================================================================
+// MODE HELPERS — one per dispatch branch in the `fit` action. Each is
+// callable independently for testing; the action picks one based on the
+// flag combination.
+// =============================================================================
+
+// eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
+async function runListMode(args: CliArgs, cli: ToolCliContext): Promise<void> {
+  const result = await listChecks(args.cwd);
+  if (args.json) { process.stdout.write(JSON.stringify(result, null, 2) + '\n'); return; }
+  await cli.render(result);
+}
+
+// eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
+async function runRecipesMode(args: CliArgs, cli: ToolCliContext): Promise<void> {
+  const result = await listRecipes(args.cwd);
+  if (args.json) { process.stdout.write(JSON.stringify(result, null, 2) + '\n'); return; }
+  await cli.render(result);
+}
+
+/**
+ * `--json` mode: run executeFit, write output (or error) to stdout, and
+ * propagate the configured fail threshold via the CLI's exit-code hook.
+ */
+// eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
+async function runJsonMode(args: CliArgs, cli: ToolCliContext): Promise<void> {
+  const fitResult = await executeFit(args);
+  if (fitResult.result.type === 'error') {
+    cli.setExitCode(fitResult.result.exitCode);
+    process.stdout.write(JSON.stringify({ error: fitResult.result.message }, null, 2) + '\n');
+    return;
+  }
+  if (fitResult.result.type === 'fit-done' && fitResult.result.shouldFail) {
+    cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
+  }
+  process.stdout.write(JSON.stringify(fitResult.output, null, 2) + '\n');
+}
+
+/**
+ * Visual mode — Ink-rendered live results. The CLI supplies the
+ * renderer via `cli.renderLive()` so this file doesn't depend on the
+ * CLI package directly. After the run, optionally launches the HTML
+ * dashboard.
+ */
+async function runLiveMode(
+  // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
+  args: CliArgs,
+  cli: ToolCliContext,
+  openRequested: boolean,
+): Promise<void> {
+  await cli.renderLive(FIT_LIVE_VIEW_KEY, args);
+  await cli.maybeOpenDashboard({
+    openRequested,
+    jsonOutput: Boolean(args.json),
+    cwd: args.cwd,
+  });
 }
 
 // =============================================================================
