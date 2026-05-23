@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-import { logger, setLogLevel, setSilent, setDebugMode, setRunId, getRunId, initLogFile } from '../../lib/logger.js';
+import { LoggerImpl, logger, setLogLevel, setSilent, setDebugMode, setRunId, getRunId, initLogFile } from '../../lib/logger.js';
 
 describe('logger', () => {
   const stderrCalls: string[] = [];
@@ -277,6 +277,59 @@ describe('logger', () => {
       // initLogFile not throwing whatever happens.
       expect(() => initLogFile(tempDir)).not.toThrow();
       expect(readdirSync(tempDir)).toContain(`${today}.jsonl`);
+    });
+  });
+
+  describe('LoggerImpl (fresh instance)', () => {
+    let tempDir: string;
+
+    beforeEach(() => {
+      tempDir = mkdtempSync(join(tmpdir(), 'opensip-logger-fresh-'));
+    });
+
+    afterEach(() => {
+      rmSync(tempDir, { recursive: true, force: true });
+    });
+
+    it('a fresh LoggerImpl has independent state from the singleton', () => {
+      const fresh = new LoggerImpl();
+      // Mutate the fresh instance only.
+      fresh.setDebugMode(true);
+      fresh.setRunId('FRESH_RUN');
+      fresh.initLogFile(tempDir);
+
+      // The singleton is untouched: runId is the empty string set by the
+      // outer beforeEach, never overwritten by the fresh instance.
+      expect(getRunId()).toBe('');
+      // The fresh instance round-trips its own runId.
+      expect(fresh.getRunId()).toBe('FRESH_RUN');
+
+      // The fresh instance writes to the supplied dir; the singleton writes
+      // nowhere because we never called initLogFile() on it in this case.
+      fresh.warn({ msg: 'fresh-only' });
+      const today = new Date().toISOString().slice(0, 10);
+      const filePath = join(tempDir, `${today}.jsonl`);
+      expect(existsSync(filePath)).toBe(true);
+      expect(readFileSync(filePath, 'utf8')).toContain('fresh-only');
+    });
+
+    it('fresh instances do not see each other\'s state', () => {
+      const a = new LoggerImpl();
+      const b = new LoggerImpl();
+      a.setRunId('a');
+      b.setRunId('b');
+      expect(a.getRunId()).toBe('a');
+      expect(b.getRunId()).toBe('b');
+    });
+
+    it('singleton helpers (setLogLevel, etc.) still target the singleton', () => {
+      // Sanity-check that the back-compat helpers continue to work.
+      setLogLevel('error');
+      setSilent(true);
+      setDebugMode(false);
+      setRunId('SINGLETON');
+      expect(logger).toBeInstanceOf(LoggerImpl);
+      expect(getRunId()).toBe('SINGLETON');
     });
   });
 });

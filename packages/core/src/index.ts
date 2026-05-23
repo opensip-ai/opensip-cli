@@ -59,8 +59,8 @@ export { ok, err, tryCatchAsync, tryCatch } from './lib/errors.js';
 export type { Result, ToolErrorOptions } from './lib/errors.js';
 
 // Lib — logger
-export { logger, setLogLevel, setSilent, setDebugMode, setRunId, getRunId, initLogFile } from './lib/logger.js';
-export type { Logger } from './lib/logger.js';
+export { logger, LoggerImpl, setLogLevel, setSilent, setDebugMode, setRunId, getRunId, initLogFile } from './lib/logger.js';
+export type { Logger, LogLevel } from './lib/logger.js';
 
 // Lib — permissive YAML reader (returns undefined on missing/malformed
 // files). Used by plugin-discovery sites that need to peek at a single

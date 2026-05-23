@@ -17,6 +17,16 @@
  * - stderr: when debug mode is enabled (Ink renders to stdout, logs to stderr)
  *
  * The setSilent(true) flag only suppresses stderr output, NOT file output.
+ *
+ * Two access patterns:
+ *
+ *   1. The exported `logger` singleton + `setLogLevel` / `setSilent` /
+ *      ... helper functions. Used by CLI bootstrap and any production
+ *      caller that wants the process-wide configuration.
+ *
+ *   2. The exported `LoggerImpl` class. Used by tests (or tools that
+ *      need an isolated logger) to construct a fresh instance whose
+ *      state is independent of the singleton.
  */
 
 import { appendFileSync, mkdirSync, readdirSync, unlinkSync } from 'node:fs';
@@ -29,23 +39,122 @@ export interface Logger {
   error(msgOrObj: string | Record<string, unknown>, data?: Record<string, unknown>): void;
 }
 
-type LogLevel = 'debug' | 'info' | 'warn' | 'error';
-
-let currentLevel: LogLevel = 'warn';
-let silent = false;
-let debugMode = false;
-let runId: string | undefined;
-let logDir: string | undefined;
-let logFilePath: string | undefined;
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 const LEVELS = { debug: 0, info: 1, warn: 2, error: 3 } as const;
 const MAX_LOG_AGE_DAYS = 7;
 
-function shouldLog(level: LogLevel): boolean {
-  return LEVELS[level] >= LEVELS[currentLevel];
+/**
+ * Concrete logger implementation. Production code uses the exported
+ * `logger` singleton; tests can construct a fresh `LoggerImpl()` to
+ * exercise the logger without polluting (or being polluted by) the
+ * singleton's state.
+ */
+export class LoggerImpl implements Logger {
+  private currentLevel: LogLevel = 'warn';
+  private silent = false;
+  private debugMode = false;
+  private runId: string | undefined;
+  // logDir kept for parity with the previous module-level state; it is
+  // currently only read inside initLogFile and pruneOldLogs which both
+  // accept a dir argument, but reserving the field documents intent
+  // (and lets a future "where is the active log dir?" getter land
+  // without re-plumbing the state).
+  private logDir: string | undefined;
+  private logFilePath: string | undefined;
+
+  debug(msgOrObj: string | Record<string, unknown>, data?: Record<string, unknown>): void {
+    this.log('debug', msgOrObj, data);
+  }
+  info(msgOrObj: string | Record<string, unknown>, data?: Record<string, unknown>): void {
+    this.log('info', msgOrObj, data);
+  }
+  warn(msgOrObj: string | Record<string, unknown>, data?: Record<string, unknown>): void {
+    this.log('warn', msgOrObj, data);
+  }
+  error(msgOrObj: string | Record<string, unknown>, data?: Record<string, unknown>): void {
+    this.log('error', msgOrObj, data);
+  }
+
+  setLogLevel(level: LogLevel): void {
+    this.currentLevel = level;
+  }
+
+  setSilent(value: boolean): void {
+    this.silent = value;
+  }
+
+  setDebugMode(value: boolean): void {
+    this.debugMode = value;
+    if (value) this.currentLevel = 'debug';
+  }
+
+  setRunId(id: string): void {
+    this.runId = id;
+  }
+
+  getRunId(): string | undefined {
+    return this.runId;
+  }
+
+  /**
+   * Initialize the log file for this instance.
+   *
+   * Writes to `<dir>/<YYYY-MM-DD>.jsonl`; the CLI bootstrap supplies
+   * the path from `resolveProjectPaths(cwd).logsDir`. Without a call
+   * to this function, file output is disabled (logs still hit stderr
+   * in debug mode).
+   *
+   * Prunes log files older than 7 days inside the chosen directory.
+   */
+  initLogFile(dir: string): void {
+    try {
+      this.logDir = dir;
+      mkdirSync(dir, { recursive: true });
+      const today = new Date().toISOString().slice(0, 10);
+      this.logFilePath = join(dir, `${today}.jsonl`);
+      pruneOldLogs(dir);
+    } catch {
+      // Best effort — don't crash if we can't create the log directory
+      this.logFilePath = undefined;
+    }
+  }
+
+  private shouldLog(level: LogLevel): boolean {
+    return LEVELS[level] >= LEVELS[this.currentLevel];
+  }
+
+  private shouldWriteToFile(level: LogLevel): boolean {
+    // Always write info+ to the log file regardless of silent mode.
+    // Silent mode suppresses stderr output (for Ink rendering), not file output.
+    // In debug mode, write everything (including debug) to file.
+    if (this.debugMode) return true;
+    return LEVELS[level] >= LEVELS.info;
+  }
+
+  private log(level: LogLevel, msgOrObj: string | Record<string, unknown>, data?: Record<string, unknown>): void {
+    if (!this.shouldLog(level) && !this.logFilePath) return;
+
+    const entry = formatEntry(level, msgOrObj, data, this.runId);
+
+    if (this.shouldWriteToFile(level)) {
+      writeToFile(this.logFilePath, entry);
+    }
+
+    // Write to stderr only when debugMode is on. setSilent(true) is called
+    // during preAction so Ink owns stdout; stderr is reserved for --debug.
+    if (this.shouldLog(level) && this.debugMode && !this.silent) {
+      writeToStderr(entry);
+    }
+  }
 }
 
-function formatEntry(level: LogLevel, msgOrObj: string | Record<string, unknown>, data?: Record<string, unknown>): Record<string, unknown> {
+function formatEntry(
+  level: LogLevel,
+  msgOrObj: string | Record<string, unknown>,
+  data: Record<string, unknown> | undefined,
+  runId: string | undefined,
+): Record<string, unknown> {
   const entry: Record<string, unknown> = {
     ts: new Date().toISOString(),
     level,
@@ -56,18 +165,14 @@ function formatEntry(level: LogLevel, msgOrObj: string | Record<string, unknown>
   if (typeof msgOrObj === 'string') {
     entry.msg = msgOrObj;
   } else {
-    // Spread structured fields (evt, msg, etc.)
     Object.assign(entry, msgOrObj);
   }
 
-  if (data) {
-    Object.assign(entry, data);
-  }
-
+  if (data) Object.assign(entry, data);
   return entry;
 }
 
-function writeToFile(entry: Record<string, unknown>): void {
+function writeToFile(logFilePath: string | undefined, entry: Record<string, unknown>): void {
   if (!logFilePath) return;
   try {
     appendFileSync(logFilePath, JSON.stringify(entry) + '\n');
@@ -77,8 +182,6 @@ function writeToFile(entry: Record<string, unknown>): void {
 }
 
 function writeToStderr(entry: Record<string, unknown>): void {
-  if (silent) return;
-  if (!debugMode) return;
   try {
     process.stderr.write(JSON.stringify(entry) + '\n');
   } catch {
@@ -86,96 +189,12 @@ function writeToStderr(entry: Record<string, unknown>): void {
   }
 }
 
-function shouldWriteToFile(level: LogLevel): boolean {
-  // Always write info+ to the log file regardless of silent mode.
-  // Silent mode suppresses stderr output (for Ink rendering), not file output.
-  // In debug mode, write everything (including debug) to file.
-  if (debugMode) return true;
-  return LEVELS[level] >= LEVELS.info;
-}
-
-function log(level: LogLevel, msgOrObj: string | Record<string, unknown>, data?: Record<string, unknown>): void {
-  if (!shouldLog(level) && !logFilePath) return;
-
-  const entry = formatEntry(level, msgOrObj, data);
-
-  // Write to file based on mode
-  if (shouldWriteToFile(level)) {
-    writeToFile(entry);
-  }
-
-  // Write to stderr only when debugMode is on. setSilent(true) is called
-  // during preAction so Ink owns stdout; stderr is reserved for --debug.
-  if (shouldLog(level)) {
-    writeToStderr(entry);
-  }
-}
-
-export const logger: Logger = {
-  debug(msgOrObj, data) { log('debug', msgOrObj, data); },
-  info(msgOrObj, data) { log('info', msgOrObj, data); },
-  warn(msgOrObj, data) { log('warn', msgOrObj, data); },
-  error(msgOrObj, data) { log('error', msgOrObj, data); },
-};
-
-export function setLogLevel(level: LogLevel): void {
-  currentLevel = level;
-}
-
-export function setSilent(value: boolean): void {
-  silent = value;
-}
-
-export function setDebugMode(value: boolean): void {
-  debugMode = value;
-  if (value) {
-    currentLevel = 'debug';
-  }
-}
-
-export function setRunId(id: string): void {
-  runId = id;
-}
-
-export function getRunId(): string | undefined {
-  return runId;
-}
-
-/**
- * Initialize the log file for this session.
- *
- * Writes to `<project>/opensip-tools/.runtime/logs/`; the CLI bootstrap
- * supplies the path from `resolveProjectPaths(cwd).logsDir`. Without
- * a call to this function, file output is disabled (logs still hit
- * stderr in debug mode).
- *
- * Opens a JSONL file for today's date. Prunes log files older than
- * 7 days inside the chosen directory.
- */
-export function initLogFile(dir: string): void {
-  try {
-    logDir = dir;
-    mkdirSync(logDir, { recursive: true });
-
-    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-    logFilePath = join(logDir, `${today}.jsonl`);
-
-    // Prune old log files
-    pruneOldLogs(logDir);
-  } catch {
-    // Best effort — don't crash if we can't create the log directory
-    logFilePath = undefined;
-  }
-}
-
 function pruneOldLogs(dir: string): void {
   try {
     const cutoff = Date.now() - MAX_LOG_AGE_DAYS * 24 * 60 * 60 * 1000;
     const files = readdirSync(dir);
-
     for (const file of files) {
       if (!file.endsWith('.jsonl')) continue;
-      // Extract date from filename: YYYY-MM-DD.jsonl
       const dateStr = file.replace('.jsonl', '');
       const fileDate = new Date(dateStr).getTime();
       if (!Number.isNaN(fileDate) && fileDate < cutoff) {
@@ -189,4 +208,40 @@ function pruneOldLogs(dir: string): void {
   } catch {
     // Best effort
   }
+}
+
+// =============================================================================
+// SINGLETON + COMPATIBILITY HELPERS
+// =============================================================================
+
+/**
+ * Process-wide logger singleton. CLI bootstrap configures it via the
+ * setter functions below; production callers import this constant
+ * directly. Tests should construct a fresh `new LoggerImpl()` instead
+ * of mutating the singleton's state.
+ */
+export const logger: LoggerImpl = new LoggerImpl();
+
+export function setLogLevel(level: LogLevel): void {
+  logger.setLogLevel(level);
+}
+
+export function setSilent(value: boolean): void {
+  logger.setSilent(value);
+}
+
+export function setDebugMode(value: boolean): void {
+  logger.setDebugMode(value);
+}
+
+export function setRunId(id: string): void {
+  logger.setRunId(id);
+}
+
+export function getRunId(): string | undefined {
+  return logger.getRunId();
+}
+
+export function initLogFile(dir: string): void {
+  logger.initLogFile(dir);
 }

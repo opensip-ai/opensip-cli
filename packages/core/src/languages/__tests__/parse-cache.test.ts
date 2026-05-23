@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import {
+  LanguageParseCache,
   clearParseCache,
   getParseTree,
   getParseTreeForFile,
@@ -115,5 +116,35 @@ describe('language-aware parse cache', () => {
     }
     const result = getParseTree(adapter, 'foo.x', 'invalid')
     expect(result).toBeNull()
+  })
+
+  describe('LanguageParseCache (fresh instance)', () => {
+    it('a fresh instance is isolated from the module-level default cache', () => {
+      // Production: module-level default cache via initParseCache().
+      initParseCache()
+      const adapter = makeAdapter('rust', ['.rs'])
+      const fromDefault = getParseTree(adapter, 'foo.rs', 'fn main() {}')
+      expect(fromDefault?.id).toBe(1)
+
+      // Fresh instance — its own Map, no cross-contamination.
+      const isolated = new LanguageParseCache()
+      const fromIsolated = isolated.getOrParse(adapter, 'foo.rs', 'fn main() {}')
+      expect(fromIsolated?.id).toBe(2)
+      expect(fromIsolated).not.toBe(fromDefault)
+      expect(isolated.size).toBe(1)
+      isolated.dispose()
+    })
+
+    it('dispose() clears the auto-clear timer and the cache', () => {
+      const cache = new LanguageParseCache()
+      cache.startAutoClear()
+      const adapter = makeAdapter('rust', ['.rs'])
+      cache.getOrParse(adapter, 'foo.rs', 'fn main() {}')
+      expect(cache.size).toBe(1)
+      cache.dispose()
+      expect(cache.size).toBe(0)
+      // Calling dispose twice is safe.
+      expect(() => cache.dispose()).not.toThrow()
+    })
   })
 })

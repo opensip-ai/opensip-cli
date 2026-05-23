@@ -5,6 +5,19 @@
  * Replaces the TS-hardcoded cache at framework/parse-cache.ts. Keyed by
  * (languageId, filePath, contentFingerprint). Parsing is delegated to the
  * LanguageAdapter resolved from defaultLanguageRegistry.
+ *
+ * Two access patterns:
+ *
+ *   1. The exported `initParseCache` / `clearParseCache` /
+ *      `getParseTree` helpers operate on a module-level
+ *      `defaultParseCache` instance. Production code (FitnessRecipe
+ *      service, individual checks) uses these.
+ *
+ *   2. The exported `LanguageParseCache` class is constructible by
+ *      tests (or tools that need an isolated cache). A test that
+ *      `new LanguageParseCache(); cache.dispose()` no longer leaves
+ *      the previous module-level setTimeout running, so the test
+ *      runner's exit cleanliness check passes.
  */
 
 import { logger } from '../lib/logger.js'
@@ -15,8 +28,30 @@ import type { LanguageAdapter } from './adapter.js'
 
 const AUTO_CLEAR_MS = 10 * 60 * 1000 // matches previous behavior
 
-class LanguageParseCache {
+/**
+ * Per-instance parse cache. Each instance owns its own `Map` and
+ * (optionally) an auto-clear timer that fires `AUTO_CLEAR_MS` after the
+ * cache is started.
+ */
+export class LanguageParseCache {
   private readonly cache = new Map<string, unknown>()
+  private autoClearTimer: ReturnType<typeof setTimeout> | null = null
+
+  /**
+   * Start the auto-clear timer. Calling this twice resets the timer.
+   * Production code goes through `initParseCache()` (which targets the
+   * module-level instance); tests call this directly on a fresh
+   * instance. The timer is `unref`'d so it doesn't keep the process
+   * alive; `dispose()` clears it deterministically.
+   */
+  startAutoClear(): void {
+    if (this.autoClearTimer) clearTimeout(this.autoClearTimer)
+    this.autoClearTimer = setTimeout(() => {
+      this.cache.clear()
+      this.autoClearTimer = null
+    }, AUTO_CLEAR_MS)
+    this.autoClearTimer.unref()
+  }
 
   getOrParse<TTree>(
     adapter: LanguageAdapter<TTree>,
@@ -42,35 +77,42 @@ class LanguageParseCache {
     this.cache.clear()
   }
 
+  /**
+   * Clear the cache and any pending auto-clear timer. Tests that
+   * construct a fresh `LanguageParseCache()` should call `dispose()`
+   * before the test exits so the runner doesn't see a lingering
+   * timer handle.
+   */
+  dispose(): void {
+    this.cache.clear()
+    if (this.autoClearTimer) {
+      clearTimeout(this.autoClearTimer)
+      this.autoClearTimer = null
+    }
+  }
+
   get size(): number {
     return this.cache.size
   }
 }
 
+// =============================================================================
+// MODULE-LEVEL DEFAULT INSTANCE + COMPATIBILITY HELPERS
+// =============================================================================
+
 let activeCache: LanguageParseCache | null = null
-let autoClearTimer: ReturnType<typeof setTimeout> | null = null
 
 /** Called by FitnessRecipeService.start() before check execution. */
 export function initParseCache(): void {
+  activeCache?.dispose()
   activeCache = new LanguageParseCache()
-  if (autoClearTimer) clearTimeout(autoClearTimer)
-  autoClearTimer = setTimeout(() => {
-    if (activeCache) {
-      activeCache.clear()
-      activeCache = null
-    }
-  }, AUTO_CLEAR_MS)
-  autoClearTimer.unref()
+  activeCache.startAutoClear()
 }
 
 /** Called by FitnessRecipeService after check execution completes. */
 export function clearParseCache(): void {
-  activeCache?.clear()
+  activeCache?.dispose()
   activeCache = null
-  if (autoClearTimer) {
-    clearTimeout(autoClearTimer)
-    autoClearTimer = null
-  }
 }
 
 /**
