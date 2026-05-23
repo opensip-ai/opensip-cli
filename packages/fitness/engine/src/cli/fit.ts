@@ -42,7 +42,29 @@ import type { SignalersConfig } from '../signalers/types.js';
 // Lazy-load fitness checks
 // ---------------------------------------------------------------------------
 
+// Lifecycle singletons. All five are written exactly once per process by
+// `ensureChecksLoaded()` (or by the CLI bootstrap, in `preLoadHook`'s case)
+// and read by the phase helpers downstream \u2014 `loadFitConfig`,
+// `buildCliOutput`, `buildFitDoneResult`, plus the public
+// `getPluginLoadErrors` / `getDisplayName` / `getIcon` accessors that
+// `FitView` and `dashboard.ts` consume.
+//
+// They are NOT threaded through a `FitContext` parameter today because two
+// external consumers (`FitView` in `@opensip-tools/cli`, `dashboard.ts` in
+// this package) reach for the accessors directly \u2014 wiring everything
+// through a context object would either break those imports or maintain a
+// dual access path. Audit 2026-05-23 F6 documents the trade-off; revisit
+// when multi-instance fitness in one process becomes a contract decision
+// (prior Finding #10).
+//
+// Invariant: each binding is set by `ensureChecksLoaded()` and read by the
+// phase helpers below; `executeFit`'s phase ordering is sequenced so the
+// readers always run after the setter completes.
+
+/** Whether `ensureChecksLoaded` has run to completion this process. */
 let checksLoaded = false;
+/** Plugin load failures from the most recent `ensureChecksLoaded` call \u2014
+ * read by `buildCliOutput` and `buildFitDoneResult` to fail the run. */
 let pluginLoadErrors: readonly string[] = [];
 
 /**
@@ -50,9 +72,18 @@ let pluginLoadErrors: readonly string[] = [];
  * FitPluginExports.checkDisplay field. Each package owns the slugs it
  * registers; on collision the last package loaded wins (no package is
  * privileged). Slugs without an entry fall back to kebab-to-title-case.
+ *
+ * Lifecycle singleton: populated by `loadDiscoveredCheckPackages` inside
+ * `ensureChecksLoaded`; read by `buildFitDoneResult` (via
+ * `getCheckDisplayName`) and by `dashboard.ts` (via the exported
+ * `getDisplayName` / `getIcon` accessors).
  */
 const mergedCheckDisplay = new Map<string, CheckDisplayEntry>();
+/** Lifecycle singleton, set by `rebuildDisplayLookups` after
+ * `ensureChecksLoaded`; read by `buildFitDoneResult`. */
 let getCheckDisplayName: (slug: string) => string = defaultDisplayName;
+/** Lifecycle singleton, set by `rebuildDisplayLookups` after
+ * `ensureChecksLoaded`; read via the exported `getIcon` accessor. */
 let getCheckIcon: (slug: string) => string = (_slug: string) => '\uD83D\uDD0D';
 
 function defaultDisplayName(slug: string): string {
@@ -96,6 +127,8 @@ export function getPluginLoadErrors(): readonly string[] {
  */
 export type PreLoadHook = (projectDir: string) => Promise<void>;
 
+/** Lifecycle singleton, set by `setPreLoadHook` (called from the CLI
+ * bootstrap); read by `ensureChecksLoaded` once per process. */
 let preLoadHook: PreLoadHook | undefined;
 
 /** Register a hook the CLI runs before fitness loads checks. */
@@ -407,6 +440,12 @@ async function validateLanguagesAgainstAdapters(
  * ad-hoc recipe (recipeName=undefined); otherwise look up a named
  * recipe. Returns either the resolved name or `undefined` (ad-hoc), or
  * an `ErrorResult` when the requested name doesn't exist.
+ *
+ * **Precondition:** must run *after* `ensureChecksLoaded` so that any
+ * user-defined recipes (loaded as `.mjs` plugins under
+ * `<cwd>/opensip-tools/fit/recipes/`) are present in
+ * `defaultRecipeRegistry` by the time the lookup runs. Inverting the two
+ * lines silently breaks recipe lookup for plugin-provided recipes.
  */
 function selectRecipe(
   // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
@@ -624,6 +663,28 @@ async function runRecipeOrAdHoc(
 // executeFit — main fit command (returns data, no console output)
 // ---------------------------------------------------------------------------
 
+/**
+ * Run a fitness session end-to-end. Sequences the phase helpers in this
+ * file in a fixed order:
+ *
+ *   1. `ensureChecksLoaded` — loads check packs and fit-domain plugins
+ *      (must run first; populates `defaultRegistry` and
+ *      `defaultRecipeRegistry` for downstream phases).
+ *   2. `loadFitConfig` — resolves `signalersConfig` + `targetsConfig`
+ *      from `opensip-tools.config.yml`. Sequenced before `selectRecipe`
+ *      so a missing/invalid config surfaces before recipe-name
+ *      validation — the config tells the user what recipes exist, so
+ *      the config error is the more useful message of the two.
+ *   3. `selectRecipe` — looks up the requested recipe in
+ *      `defaultRecipeRegistry` (populated by step 1). Has a hard
+ *      precondition on `ensureChecksLoaded`; see its JSDoc.
+ *   4. `validateLanguagesAgainstAdapters` — warns on unknown languages.
+ *   5. Build scope-based file map → run recipe → build outputs.
+ *
+ * The phase helpers read from module-singleton state set by step 1
+ * (see the lifecycle singletons block at the top of this file). The
+ * ordering here is the contract that lets those reads be safe.
+ */
 export async function executeFit(
   // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
   args: CliArgs,
@@ -633,13 +694,13 @@ export async function executeFit(
   await ensureChecksLoaded(args.cwd);
   logger.info({ evt: 'cli.checks.loaded', module: 'cli:fit', checkCount: defaultRegistry.listEnabled().length });
 
-  const recipePick = selectRecipe(args);
-  if ('error' in recipePick) return { result: recipePick.error };
-  const { recipeName } = recipePick;
-
   const configResult = loadFitConfig(args);
   if ('error' in configResult) return { result: configResult.error };
   const { signalersConfig, targetsConfig, targetRegistry } = configResult;
+
+  const recipePick = selectRecipe(args);
+  if ('error' in recipePick) return { result: recipePick.error };
+  const { recipeName } = recipePick;
 
   await validateLanguagesAgainstAdapters(targetRegistry);
 
