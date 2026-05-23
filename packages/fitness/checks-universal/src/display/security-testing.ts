@@ -11,6 +11,7 @@ export const SECURITY_DISPLAY = Object.freeze<Record<string, CheckDisplayEntry>>
   'auth-route-guard': ['🔐', 'Auth Route Guard'],
   'cors-configuration': ['🔒', 'CORS Configuration'],
   'csp-headers': ['🔒', 'CSP Headers'],
+  'dependency-vulnerability-audit': ['🔒', 'Dependency Vulnerability Audit'],
   'env-secret-exposure': ['🔐', 'Env Secret Exposure'],
   'hasura-production-config': ['🔒', 'Hasura Production Config'],
   'jwt-validation': ['🔐', 'JWT Validation'],

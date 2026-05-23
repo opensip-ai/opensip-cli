@@ -8,7 +8,6 @@ import type { CheckDisplayEntry } from './types.js'
 export const QUALITY_DISPLAY = Object.freeze<Record<string, CheckDisplayEntry>>({
   'async-state-pattern': ['⏳', 'Async State Pattern'],
   'dead-code': ['☠️', 'Dead Code'],
-  'dependency-security-audit': ['🔒', 'Dependency Security Audit'],
   'dependency-version-consistency': ['📦', 'Dependency Version Consistency'],
   'eslint-justifications': ['🔍', 'ESLint Justifications'],
   'expo-vector-icons': ['📱', 'Expo Vector Icons'],
@@ -26,7 +25,6 @@ export const QUALITY_DISPLAY = Object.freeze<Record<string, CheckDisplayEntry>>(
   'no-window-alert': ['🚫', 'No Window Alert'],
   'performance-anti-patterns': ['⚡', 'Performance Anti-Patterns'],
   'pino-serializer-coverage': ['📊', 'Pino Serializer Coverage'],
-  'security-scan-suite': ['🔒', 'Security Scan Suite'],
   'semgrep-justifications': ['🔍', 'Semgrep Justifications'],
   'typescript-directive-hygiene': ['📘', 'TypeScript Directive Hygiene'],
   'zod-openapi-sync': ['🔌', 'Zod OpenAPI Sync'],

@@ -656,10 +656,10 @@ describe('directive-audit suppression categories', () => {
 })
 
 // =============================================================================
-// security-scan-suite: smoke on a file with curated dangerous patterns
+// dependency-vulnerability-audit: smoke on a file with curated dangerous patterns
 // =============================================================================
 
-describe('security-scan-suite', () => {
+describe('dependency-vulnerability-audit', () => {
   let cwd: string
 
   beforeAll(() => {
@@ -677,7 +677,7 @@ describe('security-scan-suite', () => {
 
   afterAll(() => rmSync(cwd, { recursive: true, force: true }))
 
-  // security-scan-suite shells out (`sh -c '...pnpm audit...'`).
+  // dependency-vulnerability-audit shells out (`sh -c '...pnpm audit...'`).
   // pnpm audit walks the lockfile and queries the registry; on CI
   // this can take several seconds. Three success paths:
   //   1. audit completes — returns a CheckResult with violations.
@@ -689,7 +689,7 @@ describe('security-scan-suite', () => {
   // The check itself caps at 90 s via its own timeout config.
   it('runs without throwing on cookie/exec patterns', async () => {
     try {
-      const result = await findCheck('security-scan-suite').run(cwd, {
+      const result = await findCheck('dependency-vulnerability-audit').run(cwd, {
         targetFiles: [join(cwd, 'src/cookies.ts'), join(cwd, 'src/exec.ts')],
       })
       expect(result).toBeDefined()
