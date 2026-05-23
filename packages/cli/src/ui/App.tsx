@@ -27,6 +27,7 @@ import type {
   CommandResult,
   ConfigureDoneResult,
   SimDoneResult,
+  UninstallDoneResult,
 } from '@opensip-tools/contracts';
 
 export interface AppProps {
@@ -102,6 +103,10 @@ export function App({ result }: AppProps): React.ReactElement {
 
     case 'configure-done': {
       return <ConfigureDoneSummary result={result} />;
+    }
+
+    case 'uninstall-done': {
+      return <UninstallDoneSummary result={result} />;
     }
 
     case 'help': {
@@ -230,6 +235,68 @@ function ConfigureDoneSummary({ result }: Readonly<{ result: ConfigureDoneResult
       </Text>
     </Box>
   );
+}
+
+/**
+ * Inline summary for `opensip-tools uninstall` runs.
+ *
+ * Replaces the prior raw-stdout success line + next-step hint that
+ * bypassed the theme. Audit 2026-05-23 G5.
+ */
+function UninstallDoneSummary({ result }: Readonly<{ result: UninstallDoneResult }>): React.ReactElement {
+  const theme = useTheme();
+  const sizeText = formatBytes(result.sizeBytes);
+  const targetCount = result.targets.length;
+
+  if (result.action === 'empty') {
+    return (
+      <Box paddingLeft={2}>
+        <Text dimColor>Nothing to remove at {result.rootPath}.</Text>
+      </Box>
+    );
+  }
+
+  if (result.action === 'cancelled') {
+    return (
+      <Box paddingLeft={2}>
+        <Text dimColor>Cancelled. No changes made.</Text>
+      </Box>
+    );
+  }
+
+  if (result.action === 'dry-run') {
+    return (
+      <Box flexDirection="column" paddingLeft={2}>
+        <Text dimColor>
+          [dry-run] No changes made. Re-run without --dry-run to remove
+          {' '}{targetCount} target{targetCount === 1 ? '' : 's'} ({sizeText}).
+        </Text>
+      </Box>
+    );
+  }
+
+  // action === 'removed'
+  const hint = result.mode === 'user'
+    ? 'To remove the CLI itself: npm uninstall -g @opensip-tools/cli'
+    : 'To also remove user-level config: opensip-tools uninstall';
+  return (
+    <Box flexDirection="column" paddingLeft={2}>
+      <Text>
+        <Text color={theme.success}>{'✓'}</Text>
+        {' '}Removed {targetCount} target{targetCount === 1 ? '' : 's'}
+        {' '}<Text dimColor>({sizeText})</Text>
+      </Text>
+      <Text dimColor>  {hint}</Text>
+    </Box>
+  );
+}
+
+/** Mirror of `formatUninstallSize` so the renderer doesn't reach into commands/. */
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
 }
 
 /** Inline dashboard feedback component */

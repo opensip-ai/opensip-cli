@@ -180,8 +180,24 @@ export type CommandResult =
   | PluginResult
   | ClearDoneResult
   | ConfigureDoneResult
+  | UninstallDoneResult
   | HelpResult
   | ErrorResult;
+
+/** Outcome of an `opensip-tools uninstall` run. */
+export interface UninstallDoneResult {
+  type: 'uninstall-done';
+  /** Discriminator on the dispatch the run took. */
+  action: 'removed' | 'dry-run' | 'cancelled' | 'empty';
+  /** 'user' (default) or 'project' (`--project [path]`). */
+  mode: 'user' | 'project';
+  /** Targets considered for removal. Empty when `action === 'empty'`. */
+  targets: readonly { readonly path: string; readonly kind: 'file' | 'dir' }[];
+  /** Total bytes the targets occupied on disk (0 when nothing was found). */
+  sizeBytes: number;
+  /** Resolved root that was probed (user-level dir or project dir). */
+  rootPath: string;
+}
 
 export interface ClearDoneResult {
   type: 'clear-done';

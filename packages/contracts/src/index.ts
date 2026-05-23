@@ -36,6 +36,7 @@ export type {
   CommandResult,
   ClearDoneResult,
   ConfigureDoneResult,
+  UninstallDoneResult,
   FitDoneResult,
   SimDoneResult,
   ListChecksResult,

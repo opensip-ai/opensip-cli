@@ -52,12 +52,14 @@ describe('executeUninstall — user mode', () => {
       write: out.write,
     });
 
+    expect(result.type).toBe('uninstall-done');
     expect(result.mode).toBe('user');
+    expect(result.action).toBe('removed');
     expect(result.removed).toBe(true);
     expect(result.cancelled).toBe(false);
     expect(existsSync(rootDir)).toBe(false);
+    // The pre-prompt target list still surfaces through the write sink.
     expect(out.text()).toContain(rootDir);
-    expect(out.text()).toContain('npm uninstall -g @opensip-tools/cli');
   });
 
   it('dry-run does not remove anything', async () => {
@@ -68,10 +70,14 @@ describe('executeUninstall — user mode', () => {
       write: out.write,
     });
 
+    expect(result.action).toBe('dry-run');
     expect(result.removed).toBe(false);
     expect(result.dryRun).toBe(true);
     expect(existsSync(rootDir)).toBe(true);
-    expect(out.text()).toContain('[dry-run]');
+    // Targets list still surfaces pre-prompt; the [dry-run] outcome
+    // moved to the Ink renderer so the result discriminator is
+    // canonical here.
+    expect(out.text()).toContain(rootDir);
   });
 
   it('reports nothing to remove when root does not exist', async () => {
@@ -96,10 +102,13 @@ describe('executeUninstall — user mode', () => {
       prompt: () => Promise.resolve('n'),
     });
 
+    expect(result.action).toBe('cancelled');
     expect(result.cancelled).toBe(true);
     expect(result.removed).toBe(false);
     expect(existsSync(rootDir)).toBe(true);
-    expect(out.text()).toContain('Cancelled');
+    // Cancelled outcome is rendered by Ink; pre-prompt target list
+    // still surfaces via the write sink.
+    expect(out.text()).toContain(rootDir);
   });
 });
 
@@ -205,15 +214,17 @@ describe('executeUninstall — project mode', () => {
     expect(out.text()).toContain('user-authored content');
   });
 
-  it('prints next-step hint pointing at user-level uninstall', async () => {
-    const out = captureWrite();
-    await executeUninstall({
+  it('result mode discriminates between user and project uninstalls', async () => {
+    // The next-step hint moved to the Ink renderer (App.tsx); the
+    // structured result is what tests assert on now. The renderer keys
+    // off `mode` to pick between "npm uninstall -g …" (user) and
+    // "opensip-tools uninstall" (project).
+    const result = await executeUninstall({
       project: projectDir,
       yes: true,
-      write: out.write,
+      write: noop,
     });
-
-    expect(out.text()).toContain('opensip-tools uninstall');
-    expect(out.text()).not.toContain('npm uninstall -g');
+    expect(result.mode).toBe('project');
+    expect(result.action).toBe('removed');
   });
 });

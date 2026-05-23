@@ -26,6 +26,17 @@
  *   --project [path]   Remove project-local state instead of user-level.
  *   --yes              Skip confirmation prompt.
  *   --dry-run          Print what would be removed; take no action.
+ *
+ * Result-shape contract (audit 2026-05-23 G5)
+ * -------------------------------------------
+ * `executeUninstall` returns a discriminated `UninstallResult` whose
+ * `type === 'uninstall-done'` makes it a valid `CommandResult`. The
+ * trailing success / cancelled / dry-run / empty notice — previously
+ * raw-stdout writes that bypassed the theme — is rendered via Ink in
+ * `App.tsx`'s `case 'uninstall-done':` branch. The pre-confirmation
+ * target listing stays as a direct `write()` because it must appear
+ * BEFORE the readline confirmation prompt; same pattern as
+ * `configure.ts` printing the "current key" hint above the prompt.
  */
 
 import { existsSync, rmSync, statSync, readdirSync } from 'node:fs'
@@ -34,6 +45,8 @@ import { join, resolve } from 'node:path'
 import { createInterface } from 'node:readline/promises'
 
 import { resolveProjectPaths } from '@opensip-tools/core'
+
+import type { UninstallDoneResult } from '@opensip-tools/contracts'
 
 export type UninstallMode = 'user' | 'project'
 
@@ -62,12 +75,15 @@ interface Target {
   readonly sizeBytes: number
 }
 
-export interface UninstallResult {
-  readonly type: 'uninstall'
-  readonly mode: UninstallMode
+/**
+ * Result returned by `executeUninstall`. Extends the contract shape
+ * `UninstallDoneResult` with a few legacy convenience flags
+ * (`removed`, `cancelled`, `dryRun`) the existing test suite asserts
+ * against. The discriminator `action` is the canonical signal; the
+ * boolean flags are derivable but kept for back-compat.
+ */
+export interface UninstallResult extends UninstallDoneResult {
   readonly removed: boolean
-  readonly targets: readonly { readonly path: string; readonly kind: 'file' | 'dir' }[]
-  readonly sizeBytes: number
   readonly dryRun: boolean
   readonly cancelled: boolean
 }
@@ -157,44 +173,51 @@ function targetsForResult(targets: readonly Target[]): readonly { readonly path:
   return targets.map(t => ({ path: t.path, kind: t.kind }))
 }
 
-/** Render the "nothing to remove" message for the given mode. */
-function handleEmptyTargets(
-  mode: UninstallMode,
-  opts: UninstallOptions,
-  userRoot: string,
-  write: (s: string) => void,
-): UninstallResult {
-  const where = mode === 'user' ? userRoot : resolveProjectDir(opts)
-  const note = mode === 'project'
-    ? `\nNothing to remove — no opensip-tools state found at ${where}.\n\n`
-    : `\nNothing to remove — ${where} does not exist.\n\n`
-  write(note)
+/**
+ * Build the canonical "no-op" / "post-removal" result. Centralises the
+ * derived fields (`removed`, `dryRun`, `cancelled`) so the dispatch
+ * arms stay declarative.
+ */
+function buildResult(args: {
+  action: UninstallDoneResult['action'];
+  mode: UninstallMode;
+  targets: readonly Target[];
+  rootPath: string;
+}): UninstallResult {
+  const sizeBytes = args.targets.reduce((sum, t) => sum + t.sizeBytes, 0);
   return {
-    type: 'uninstall', mode, removed: false, targets: [], sizeBytes: 0,
-    dryRun: opts.dryRun ?? false, cancelled: false,
-  }
-}
-
-/** Print the per-mode trailing hint after a successful removal. */
-function printSuccessHint(mode: UninstallMode, write: (s: string) => void): void {
-  if (mode === 'user') {
-    write(`  To remove the CLI itself: npm uninstall -g @opensip-tools/cli\n\n`)
-  } else {
-    write(`  To also remove user-level config: opensip-tools uninstall\n\n`)
-  }
+    type: 'uninstall-done',
+    action: args.action,
+    mode: args.mode,
+    targets: targetsForResult(args.targets),
+    sizeBytes,
+    rootPath: args.rootPath,
+    removed: args.action === 'removed',
+    dryRun: args.action === 'dry-run',
+    cancelled: args.action === 'cancelled',
+  };
 }
 
 export async function executeUninstall(opts: UninstallOptions = {}): Promise<UninstallResult> {
   const mode: UninstallMode = opts.project === undefined ? 'user' : 'project'
   const userRoot = opts.rootDir ?? DEFAULT_USER_ROOT
+  const rootPath = mode === 'user' ? userRoot : resolveProjectDir(opts)
   const write = opts.write ?? ((s: string) => process.stdout.write(s))
 
   const targets = collectTargets(mode, userRoot, opts)
   if (targets.length === 0) {
-    return handleEmptyTargets(mode, opts, userRoot, write)
+    // Empty-target hint stays at the write layer because it serves the
+    // same UX role as the pre-prompt target listing — informational
+    // before any structured outcome surfaces. The structured
+    // `action: 'empty'` is what tests assert against.
+    const where = mode === 'user' ? userRoot : resolveProjectDir(opts)
+    const note = mode === 'project'
+      ? `\nNothing to remove — no opensip-tools state found at ${where}.\n\n`
+      : `\nNothing to remove — ${where} does not exist.\n\n`
+    write(note)
+    return buildResult({ action: 'empty', mode, targets: [], rootPath })
   }
 
-  const totalSize = targets.reduce((sum, t) => sum + t.sizeBytes, 0)
   printTargets(write, mode, targets)
 
   if (mode === 'project') {
@@ -203,22 +226,14 @@ export async function executeUninstall(opts: UninstallOptions = {}): Promise<Uni
   }
 
   if (opts.dryRun) {
-    write(`[dry-run] No changes made. Re-run without --dry-run to remove.\n\n`)
-    return {
-      type: 'uninstall', mode, removed: false, targets: targetsForResult(targets),
-      sizeBytes: totalSize, dryRun: true, cancelled: false,
-    }
+    return buildResult({ action: 'dry-run', mode, targets, rootPath })
   }
 
   if (!opts.yes) {
     const prompt = opts.prompt ?? defaultPrompt
     const ok = await confirm(prompt, `Proceed? [y/N] `)
     if (!ok) {
-      write(`Cancelled. No changes made.\n\n`)
-      return {
-        type: 'uninstall', mode, removed: false, targets: targetsForResult(targets),
-        sizeBytes: totalSize, dryRun: false, cancelled: true,
-      }
+      return buildResult({ action: 'cancelled', mode, targets, rootPath })
     }
   }
 
@@ -226,11 +241,5 @@ export async function executeUninstall(opts: UninstallOptions = {}): Promise<Uni
     rmSync(t.path, { recursive: true, force: true })
   }
 
-  write(`\n✓ Removed ${targets.length} target${targets.length === 1 ? '' : 's'} (${formatSize(totalSize)}).\n`)
-  printSuccessHint(mode, write)
-
-  return {
-    type: 'uninstall', mode, removed: true, targets: targetsForResult(targets),
-    sizeBytes: totalSize, dryRun: false, cancelled: false,
-  }
+  return buildResult({ action: 'removed', mode, targets, rootPath })
 }
