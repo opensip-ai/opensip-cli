@@ -259,5 +259,63 @@ describe('defineRegexListCheck', () => {
       expect(signals.length).toBe(1);
       expect(signals[0]?.metadata?.type).toBe('console-debug');
     });
+
+    it('skipFile predicate skips matching files entirely', async () => {
+      const check = defineRegexListCheck({
+        id: FIXED_ID,
+        slug: 'skip-file',
+        description: 'd',
+        tags: ['demo'],
+        fileTypes: ['ts'],
+        options: { skipFile: (p) => p.includes('/cli-output/') },
+        patterns: [
+          { id: PATTERN_ID_A, slug: 'foo', regex: /FOO/g, message: 'FOO', severity: 'error' },
+        ],
+      });
+      const inFile = await runOnContent(check, 'FOO\n', 'src/cli-output/foo.ts');
+      const outFile = await runOnContent(check, 'FOO\n', 'src/lib/foo.ts');
+      expect(inFile.length).toBe(0);
+      expect(outFile.length).toBe(1);
+    });
+
+    it('skipLine predicate skips matching lines', async () => {
+      const check = defineRegexListCheck({
+        id: FIXED_ID,
+        slug: 'skip-line',
+        description: 'd',
+        tags: ['demo'],
+        fileTypes: ['ts'],
+        options: { skipLine: (trimmed) => trimmed.startsWith('import ') },
+        patterns: [
+          { id: PATTERN_ID_A, slug: 'foo', regex: /FOO/g, message: 'FOO', severity: 'error' },
+        ],
+      });
+      const signals = await runOnContent(check, 'import { FOO } from "x"\nFOO\n');
+      // The import line is skipped; only the second line emits a violation.
+      expect(signals.length).toBe(1);
+      expect(signals[0]?.code?.line).toBe(2);
+    });
+
+    it('oneViolationPerLine emits at most one violation per line across all patterns', async () => {
+      const check = defineRegexListCheck({
+        id: FIXED_ID,
+        slug: 'one-per-line',
+        description: 'd',
+        tags: ['demo'],
+        fileTypes: ['ts'],
+        options: { oneViolationPerLine: true },
+        patterns: [
+          { id: PATTERN_ID_A, slug: 'foo', regex: /FOO/g, message: 'FOO', severity: 'error' },
+          { id: PATTERN_ID_B, slug: 'bar', regex: /BAR/g, message: 'BAR', severity: 'error' },
+        ],
+      });
+      // Line 1 has both FOO and BAR — only one violation should be
+      // emitted (the first matching pattern).
+      const signals = await runOnContent(check, 'FOO BAR FOO BAR\n');
+      expect(signals.length).toBe(1);
+      // Subsequent lines still each get up to one violation.
+      const multi = await runOnContent(check, 'FOO\nBAR\n');
+      expect(multi.length).toBe(2);
+    });
   });
 });

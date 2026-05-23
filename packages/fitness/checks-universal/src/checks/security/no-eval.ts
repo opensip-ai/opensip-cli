@@ -2,59 +2,14 @@
 // @fitness-ignore-file no-eval -- Fitness check definition references eval/Function/setTimeout/setInterval in string literals and regex patterns, not actual usage
 /**
  * @fileoverview Detect dangerous eval and dynamic code execution
+ *
+ * Migrated to defineRegexListCheck (Layer 4 Phase C6). The original
+ * `findEvalPattern` shape returned only the first matching pattern's
+ * exec result per line; that semantics is preserved via the helper's
+ * `oneViolationPerLine: true` option (combined with non-global regexes).
  */
 
-import { logger } from '@opensip-tools/core/logger'
-import { defineCheck, isCommentLine, type CheckViolation } from '@opensip-tools/fitness'
-
-// Patterns that indicate dangerous dynamic code execution
-const EVAL_PATTERNS = [
-  {
-    regex: /\beval\s*\(/g,
-    message: 'eval() usage detected - use JSON.parse or other safe alternatives',
-    suggestion:
-      'Replace eval() with safe alternatives: use JSON.parse() for JSON strings, use a proper expression parser for math, or restructure code to avoid dynamic evaluation entirely.',
-  },
-  {
-    regex: /\bnew\s+Function\s*\(/g,
-    message: 'new Function() usage detected - avoid dynamic code generation',
-    suggestion:
-      'Replace new Function() with precompiled functions or safe alternatives. For templating, use a template engine. For dynamic behavior, use configuration objects or the strategy pattern.',
-  },
-  {
-    regex: /setTimeout\s*\(\s*['"`][^'"`]+['"`]/g,
-    message: 'setTimeout with string argument detected - use function reference',
-    suggestion:
-      'Pass a function reference instead of a string: setTimeout(() => doSomething(), 1000) or setTimeout(doSomething, 1000). String arguments are evaluated like eval().',
-  },
-  {
-    regex: /setInterval\s*\(\s*['"`][^'"`]+['"`]/g,
-    message: 'setInterval with string argument detected - use function reference',
-    suggestion:
-      'Pass a function reference instead of a string: setInterval(() => doSomething(), 1000) or setInterval(doSomething, 1000). String arguments are evaluated like eval().',
-  },
-]
-
-/**
- * Find eval pattern match in a line
- * @returns The pattern and match, or null if no match
- */
-function findEvalPattern(
-  line: string,
-): { pattern: (typeof EVAL_PATTERNS)[0]; match: RegExpExecArray } | null {
-  logger.debug({
-    evt: 'fitness.checks.no_eval.find_eval_pattern',
-    msg: 'Searching for eval pattern in line',
-  })
-  for (const pattern of EVAL_PATTERNS) {
-    pattern.regex.lastIndex = 0
-    const match = pattern.regex.exec(line)
-    if (match) {
-      return { pattern, match }
-    }
-  }
-  return null
-}
+import { defineRegexListCheck } from '@opensip-tools/fitness'
 
 /**
  * Check: security/no-eval
@@ -62,7 +17,7 @@ function findEvalPattern(
  * Detects usage of eval(), new Function(), and similar dynamic code execution
  * patterns that can lead to code injection vulnerabilities.
  */
-export const noEval = defineCheck({
+export const noEval = defineRegexListCheck({
   id: '9f6d299f-8155-4719-b605-897e9dcb1fdb',
   slug: 'no-eval',
   scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
@@ -82,36 +37,47 @@ export const noEval = defineCheck({
 **Scope:** General best practice. Analyzes each file individually against the production preset.`,
   tags: ['security', 'injection', 'eval'],
   fileTypes: ['ts', 'tsx'],
-
-  analyze(content: string, filePath: string): CheckViolation[] {
-    logger.debug({
-      evt: 'fitness.checks.no_eval.analyze',
-      msg: 'Analyzing file for dangerous eval and dynamic code execution',
-    })
-    const violations: CheckViolation[] = []
-    const lines = content.split('\n')
-
-    for (const [lineNum, line_] of lines.entries()) {
-      const line = line_ ?? ''
-
-      // Skip comments and find eval patterns in non-comment lines
-      if (!isCommentLine(line)) {
-        const found = findEvalPattern(line)
-        if (found) {
-          const { pattern, match } = found
-          violations.push({
-            line: lineNum + 1,
-            column: match.index,
-            message: pattern.message,
-            severity: 'error',
-            suggestion: pattern.suggestion,
-            match: match[0],
-            filePath,
-          })
-        }
-      }
-    }
-
-    return violations
+  options: {
+    // Original site emitted at most one violation per line, returning
+    // the FIRST matching pattern via findEvalPattern().
+    oneViolationPerLine: true,
   },
+  patterns: [
+    {
+      id: 'a48c7e1a-2acb-4be6-9f97-71f95dee9eef',
+      slug: 'eval-call',
+      regex: /\beval\s*\(/,
+      message: 'eval() usage detected - use JSON.parse or other safe alternatives',
+      severity: 'error',
+      suggestion:
+        'Replace eval() with safe alternatives: use JSON.parse() for JSON strings, use a proper expression parser for math, or restructure code to avoid dynamic evaluation entirely.',
+    },
+    {
+      id: 'b2c0d1aa-9d24-4d9c-8e22-2c2b78c2c021',
+      slug: 'new-function',
+      regex: /\bnew\s+Function\s*\(/,
+      message: 'new Function() usage detected - avoid dynamic code generation',
+      severity: 'error',
+      suggestion:
+        'Replace new Function() with precompiled functions or safe alternatives. For templating, use a template engine. For dynamic behavior, use configuration objects or the strategy pattern.',
+    },
+    {
+      id: 'c3d1e2bb-ae34-4e0d-9f33-3d3c89d3d132',
+      slug: 'set-timeout-string',
+      regex: /setTimeout\s*\(\s*['"`][^'"`]+['"`]/,
+      message: 'setTimeout with string argument detected - use function reference',
+      severity: 'error',
+      suggestion:
+        'Pass a function reference instead of a string: setTimeout(() => doSomething(), 1000) or setTimeout(doSomething, 1000). String arguments are evaluated like eval().',
+    },
+    {
+      id: 'd4e2f3cc-bf45-4f1e-a044-4e4d9ae4e243',
+      slug: 'set-interval-string',
+      regex: /setInterval\s*\(\s*['"`][^'"`]+['"`]/,
+      message: 'setInterval with string argument detected - use function reference',
+      severity: 'error',
+      suggestion:
+        'Pass a function reference instead of a string: setInterval(() => doSomething(), 1000) or setInterval(doSomething, 1000). String arguments are evaluated like eval().',
+    },
+  ],
 })

@@ -93,6 +93,36 @@ export interface RegexListCheckOptions {
    * Default: `false`.
    */
   readonly skipTestFiles?: boolean
+  /**
+   * Custom file-path predicate. When provided AND it returns `true`,
+   * the file is skipped entirely. Used by sites with site-specific
+   * allowlists that the helper does not model (e.g. CLI-output paths
+   * like `/commands/`, `/display/`, `/bin/`).
+   *
+   * The predicate runs once per file before any line iteration.
+   */
+  readonly skipFile?: (filePath: string) => boolean
+  /**
+   * Additional per-line skip predicate evaluated AFTER comment/test
+   * filters but BEFORE pattern matching. Use for site-specific filters
+   * the helper doesn't model (e.g. `no-window-alert` skips lines
+   * starting with `import `).
+   */
+  readonly skipLine?: (trimmedLine: string, rawLine: string) => boolean
+  /**
+   * When `true`, after a violation is emitted on a line, skip remaining
+   * patterns for that line — at most one violation per line in total.
+   * Use for sites that historically emit one violation per line across
+   * all patterns (e.g. `no-window-alert`, `no-eval`).
+   *
+   * Note this short-circuits at the line level, NOT the pattern level:
+   * within a single pattern's match loop (relevant only for global
+   * regexes), multiple matches are still emitted before the next line
+   * starts. Combine with non-global regexes for true "one per line".
+   *
+   * Default: `false` (each matching pattern emits its own violation).
+   */
+  readonly oneViolationPerLine?: boolean
 }
 
 /**
@@ -143,9 +173,96 @@ export interface DefineRegexListCheckConfig {
  * @throws {ValidationError} via {@link defineCheck} when the synthesised
  *   config is invalid.
  */
+/**
+ * Match a single pattern against a single line, pushing one violation
+ * per match into `violations`. For global regexes this emits multiple
+ * violations per line; for non-global regexes it emits at most one.
+ *
+ * When `singleMatch` is true, only the first match is emitted (used for
+ * `oneViolationPerLine` semantics).
+ *
+ * Returns `true` if at least one violation was pushed.
+ */
+function matchPatternOnLine(
+  pattern: RegexListCheckPattern,
+  line: string,
+  lineNum: number,
+  violations: CheckViolation[],
+  singleMatch: boolean,
+): boolean {
+  // Reset lastIndex — pattern objects are reused across lines and files;
+  // failing to reset would skip matches at low positions on subsequent
+  // calls.
+  pattern.regex.lastIndex = 0
+  let pushed = false
+  let match = pattern.regex.exec(line)
+  while (match !== null) {
+    violations.push({
+      line: lineNum,
+      column: match.index,
+      message: pattern.message,
+      severity: pattern.severity ?? 'warning',
+      suggestion: pattern.suggestion,
+      match: match[0],
+      type: pattern.slug,
+    })
+    pushed = true
+    // Non-global regex: stop after the first match. Otherwise exec
+    // would loop forever (lastIndex stays at 0).
+    if (!pattern.regex.global) break
+    if (singleMatch) break
+    match = pattern.regex.exec(line)
+  }
+  return pushed
+}
+
+/**
+ * Process every line of `content` against the supplied pattern list,
+ * applying the configured skip predicates. Pulled out of the main
+ * factory function to keep cognitive complexity below the workspace
+ * threshold; pure logic.
+ */
+interface ProcessFileOptions {
+  readonly content: string
+  readonly patterns: readonly RegexListCheckPattern[]
+  readonly skipComments: boolean
+  readonly skipLine?: (trimmedLine: string, rawLine: string) => boolean
+  readonly oneViolationPerLine: boolean
+}
+
+function processFile(opts: ProcessFileOptions): CheckViolation[] {
+  const violations: CheckViolation[] = []
+  const lines = opts.content.split('\n')
+  for (const [i, line_] of lines.entries()) {
+    const line = line_ ?? ''
+    if (opts.skipComments && isCommentLine(line)) continue
+    if (opts.skipLine?.(line.trim(), line) === true) continue
+    processLine(line, i + 1, opts.patterns, opts.oneViolationPerLine, violations)
+  }
+  return violations
+}
+
+function processLine(
+  line: string,
+  lineNum: number,
+  patterns: readonly RegexListCheckPattern[],
+  oneViolationPerLine: boolean,
+  violations: CheckViolation[],
+): void {
+  let lineHasViolation = false
+  for (const pattern of patterns) {
+    if (oneViolationPerLine && lineHasViolation) break
+    const pushed = matchPatternOnLine(pattern, line, lineNum, violations, oneViolationPerLine)
+    if (pushed) lineHasViolation = true
+  }
+}
+
 export function defineRegexListCheck(config: DefineRegexListCheckConfig): Check {
   const skipComments = config.options?.skipCommentLines ?? true
   const skipTests = config.options?.skipTestFiles ?? false
+  const skipFile = config.options?.skipFile
+  const skipLine = config.options?.skipLine
+  const oneViolationPerLine = config.options?.oneViolationPerLine ?? false
   const patterns = config.patterns
 
   return defineCheck({
@@ -165,44 +282,14 @@ export function defineRegexListCheck(config: DefineRegexListCheckConfig): Check 
 
     analyze(content: string, filePath: string): CheckViolation[] {
       if (skipTests && isTestFile(filePath)) return []
-
-      const violations: CheckViolation[] = []
-      const lines = content.split('\n')
-
-      for (const [i, line_] of lines.entries()) {
-        const line = line_ ?? ''
-        if (skipComments && isCommentLine(line)) continue
-
-        const lineNum = i + 1
-        for (const pattern of patterns) {
-          // Reset lastIndex — pattern objects are reused across lines
-          // and files; failing to reset would skip matches at low
-          // positions on subsequent calls.
-          pattern.regex.lastIndex = 0
-
-          // exec-loop emits one violation per match for global regexes;
-          // for non-global regexes, exec always starts at position 0
-          // so the loop runs at most once.
-          let match = pattern.regex.exec(line)
-          while (match !== null) {
-            violations.push({
-              line: lineNum,
-              column: match.index,
-              message: pattern.message,
-              severity: pattern.severity ?? 'warning',
-              suggestion: pattern.suggestion,
-              match: match[0],
-              type: pattern.slug,
-            })
-            // Non-global regex: stop after the first match. Otherwise
-            // exec would loop forever (lastIndex stays at 0).
-            if (!pattern.regex.global) break
-            match = pattern.regex.exec(line)
-          }
-        }
-      }
-
-      return violations
+      if (skipFile?.(filePath) === true) return []
+      return processFile({
+        content,
+        patterns,
+        skipComments,
+        skipLine,
+        oneViolationPerLine,
+      })
     },
   })
 }
