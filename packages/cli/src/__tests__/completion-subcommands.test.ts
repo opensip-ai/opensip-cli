@@ -11,7 +11,7 @@
  * CLI-owned commands.
  */
 
-import { defaultToolRegistry, type ToolCliContext } from '@opensip-tools/core';
+import { defaultToolRegistry, type ToolCliContext, type LiveViewRenderer } from '@opensip-tools/core';
 import { Command } from 'commander';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -23,12 +23,21 @@ import { SUBCOMMANDS } from '../commands/completion.js';
 import { registerCliCommands } from '../commands/index.js';
 
 function makeStubContext(program: Command): ToolCliContext {
+  // Stub renderers for tools that hard-fail when their built-in
+  // renderer is missing (e.g. graph — Audit 2026-05-23 N-1). Keyed
+  // by tool id; production wiring lives in
+  // bootstrap/render-helpers.ts.
+  const stubRenderer: LiveViewRenderer = vi.fn(() => Promise.resolve());
+  const builtinLiveViews = new Map<string, LiveViewRenderer>();
+  for (const tool of defaultToolRegistry.list()) {
+    builtinLiveViews.set(tool.metadata.id, stubRenderer);
+  }
   return {
     program,
     render: vi.fn(() => Promise.resolve()),
     registerLiveView: vi.fn(),
     renderLive: vi.fn(() => Promise.resolve()),
-    builtinLiveViews: new Map(),
+    builtinLiveViews,
     maybeOpenDashboard: vi.fn(() => Promise.resolve()),
     logger: {
       debug: vi.fn(),
@@ -43,11 +52,11 @@ function makeStubContext(program: Command): ToolCliContext {
 describe('SUBCOMMANDS drift test', () => {
   it('matches the live Commander program (tool subcommands plus CLI-owned)', () => {
     const program = new Command('opensip-tools');
-    const ctx = makeStubContext(program);
     // Reset / re-populate the registry to mirror what bootstrapCli does.
     // Tool register() implementations are idempotent so re-mounting on a
     // fresh program is safe.
     registerFirstPartyTools(defaultToolRegistry);
+    const ctx = makeStubContext(program);
     mountAllToolCommands(defaultToolRegistry, ctx);
     registerCliCommands(program, {
       setExitCode: ctx.setExitCode,

@@ -193,20 +193,38 @@ function record(
  * Order matters only when predicates overlap — they don't here, so
  * the table reads top-to-bottom in the same order the legacy
  * if-ladder did.
+ *
+ * Each entry is built via {@link visitorEntry}, which carries the
+ * predicate's narrowed type into the visit callback. The cast
+ * (`node as N`) is sound by construction — the dispatcher only
+ * fires `visit` when `predicate(node)` returned true — but TS's
+ * flow analysis can't see through a separate predicate/callback
+ * pairing inside a literal, so the cast lives once inside the helper
+ * rather than at every entry. Audit 2026-05-23 M-2.
  */
 interface VisitorEntry {
   readonly predicate: (node: ts.Node) => boolean;
   readonly visit: (node: ts.Node, ctx: VisitorContext) => FunctionOccurrence | null;
 }
 
+function visitorEntry<N extends ts.Node>(
+  predicate: (node: ts.Node) => node is N,
+  visit: (node: N, ctx: VisitorContext) => FunctionOccurrence | null,
+): VisitorEntry {
+  return { predicate, visit: (n, c) => visit(n as N, c) };
+}
+
+const isAccessor = (n: ts.Node): n is ts.GetAccessorDeclaration | ts.SetAccessorDeclaration =>
+  ts.isGetAccessor(n) || ts.isSetAccessor(n);
+
 const VISITOR_TABLE: readonly VisitorEntry[] = [
-  { predicate: ts.isFunctionDeclaration, visit: (n, c) => visitFunctionDeclaration(n as ts.FunctionDeclaration, c) },
-  { predicate: ts.isArrowFunction, visit: (n, c) => visitArrowFunction(n as ts.ArrowFunction, c) },
-  { predicate: ts.isMethodDeclaration, visit: (n, c) => visitMethodDeclaration(n as ts.MethodDeclaration, c) },
-  { predicate: ts.isConstructorDeclaration, visit: (n, c) => visitConstructorDeclaration(n as ts.ConstructorDeclaration, c) },
-  { predicate: (n) => ts.isGetAccessor(n) || ts.isSetAccessor(n), visit: (n, c) => visitGetterSetter(n as ts.GetAccessorDeclaration | ts.SetAccessorDeclaration, c) },
-  { predicate: ts.isFunctionExpression, visit: (n, c) => visitFunctionExpression(n as ts.FunctionExpression, c) },
-  { predicate: ts.isClassStaticBlockDeclaration, visit: (n, c) => visitClassStaticBlock(n as ts.ClassStaticBlockDeclaration, c) },
+  visitorEntry(ts.isFunctionDeclaration, visitFunctionDeclaration),
+  visitorEntry(ts.isArrowFunction, visitArrowFunction),
+  visitorEntry(ts.isMethodDeclaration, visitMethodDeclaration),
+  visitorEntry(ts.isConstructorDeclaration, visitConstructorDeclaration),
+  visitorEntry(isAccessor, visitGetterSetter),
+  visitorEntry(ts.isFunctionExpression, visitFunctionExpression),
+  visitorEntry(ts.isClassStaticBlockDeclaration, visitClassStaticBlock),
 ];
 
 /**

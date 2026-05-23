@@ -10,12 +10,16 @@ import { graphTool } from '../tool.js';
 import type { ToolCliContext } from '@opensip-tools/core';
 
 function makeCli(program: Command): ToolCliContext {
+  // Provide a renderer for `graph` in `builtinLiveViews`. The tool's
+  // `register()` hard-fails when no renderer is found for its tool id
+  // (Audit 2026-05-23 N-1).
+  const stubRenderer = vi.fn(() => Promise.resolve());
   return {
     program,
     render: vi.fn(() => Promise.resolve()),
     registerLiveView: vi.fn(),
     renderLive: vi.fn(() => Promise.resolve()),
-    builtinLiveViews: new Map(),
+    builtinLiveViews: new Map([[graphTool.metadata.id, stubRenderer]]),
     maybeOpenDashboard: vi.fn(() => Promise.resolve()),
     logger: {
       info: vi.fn(),

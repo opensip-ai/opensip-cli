@@ -16,6 +16,60 @@
 
 import type { CallEdge } from '../types.js';
 
+// ── Edge-text truncation constants ────────────────────────────────
+//
+// `CallEdge.text` is contracted at "≤ 80 chars" (`types.ts:65-66`).
+// The producer-side promise was previously enforced by four files
+// each carrying their own magic numbers (80/77/70/67) — the 2026-05-23
+// audit (N-2) pulled them here so the contract literally lives next
+// to the helper that creates the edges.
+
+/** Maximum length of a `CallEdge.text` field. Per types.ts contract. */
+export const CALL_EDGE_TEXT_MAX = 80;
+
+/** Ellipsis appended to truncated edge text. */
+const CALL_EDGE_TRUNCATION_SUFFIX = '...';
+
+/** Maximum payload length when truncating: leaves room for the ellipsis. */
+const CALL_EDGE_TEXT_PAYLOAD_MAX = CALL_EDGE_TEXT_MAX - CALL_EDGE_TRUNCATION_SUFFIX.length;
+
+/** Prefix prepended to creation-edge text (`[creates] `). */
+export const CREATION_EDGE_PREFIX = '[creates] ';
+
+/**
+ * Maximum length of the inner source-text slice that gets prefixed
+ * with `[creates] ` to form a creation edge. The total edge text
+ * after prefixing is bounded by `CALL_EDGE_TEXT_MAX`.
+ */
+export const CREATION_EDGE_TEXT_MAX = CALL_EDGE_TEXT_MAX - CREATION_EDGE_PREFIX.length;
+
+const CREATION_EDGE_TEXT_PAYLOAD_MAX =
+  CREATION_EDGE_TEXT_MAX - CALL_EDGE_TRUNCATION_SUFFIX.length;
+
+/**
+ * Truncate raw call-site source text to fit within `CallEdge.text`'s
+ * 80-char contract. Long strings get sliced and ellipsized; short
+ * strings pass through unchanged. Single source of truth for the
+ * truncation contract — adapters call this instead of inlining the
+ * length math.
+ */
+export function truncateForCallEdge(text: string): string {
+  return text.length > CALL_EDGE_TEXT_MAX
+    ? `${text.slice(0, CALL_EDGE_TEXT_PAYLOAD_MAX)}${CALL_EDGE_TRUNCATION_SUFFIX}`
+    : text;
+}
+
+/**
+ * Truncate the inner source text used inside a creation edge so the
+ * `[creates] <text>` total stays within `CallEdge.text`'s 80-char
+ * contract. The prefix is added by `pushCreationEdge`.
+ */
+function truncateForCreationEdge(text: string): string {
+  return text.length > CREATION_EDGE_TEXT_MAX
+    ? `${text.slice(0, CREATION_EDGE_TEXT_PAYLOAD_MAX)}${CALL_EDGE_TRUNCATION_SUFFIX}`
+    : text;
+}
+
 /**
  * Append a CallEdge to the per-owner edge list, creating the list on
  * first append. Trivial — but small functions deserve a single home.
@@ -110,14 +164,14 @@ export function pushCreationEdge<NodeRef, FileRef>(
   position: (node: NodeRef, file: FileRef) => EdgePosition,
 ): void {
   const pos = position(node, file);
-  const truncated = pos.text.length > 70 ? `${pos.text.slice(0, 67)}...` : pos.text;
+  const truncated = truncateForCreationEdge(pos.text);
   const edge: CallEdge = {
     to: [childHash],
     line: pos.line,
     column: pos.column,
     resolution: 'static',
     confidence: 'high',
-    text: `[creates] ${truncated}`,
+    text: `${CREATION_EDGE_PREFIX}${truncated}`,
     discarded: false,
   };
   appendEdge(edgesByOwner, ownerHash, edge);

@@ -36,6 +36,7 @@ import {
   appendEdge,
   createMutableStats,
   pushCreationEdge,
+  truncateForCallEdge,
 } from '../lang-adapter/edge-helpers.js';
 
 import type { MutableStats } from '../lang-adapter/edge-helpers.js';
@@ -117,7 +118,7 @@ function pushCallEdge(
   stats.totalCallSites++;
   const target = extractCallTargetName(node);
   const pos = pythonPosition(node, file);
-  const truncated = pos.text.length > 80 ? `${pos.text.slice(0, 77)}...` : pos.text;
+  const truncated = truncateForCallEdge(pos.text);
   const discarded = isReturnValueDiscarded(node);
 
   const edge: CallEdge = buildPythonCallEdge(target, byName, {

@@ -21,6 +21,7 @@ import {
   appendEdge,
   createMutableStats,
   pushCreationEdge as pushSharedCreationEdge,
+  truncateForCallEdge,
   type MutableStats,
 } from '../lang-adapter/edge-helpers.js';
 
@@ -155,7 +156,7 @@ function pushCallEdge(
     column: pos.column,
     resolution: verdict.resolution,
     confidence: verdict.confidence,
-    text: pos.text.length > 80 ? `${pos.text.slice(0, 77)}...` : pos.text,
+    text: truncateForCallEdge(pos.text),
     discarded: isReturnValueDiscarded(node),
   };
   appendEdge(callsByHash, ownerHash, edge);
@@ -258,33 +259,47 @@ function isResolverCandidateNode(node: ts.Node): boolean {
  * additionally suppress empty (`to: []`) verdicts so we don't emit a
  * useless edge for unresolved value references — same semantics the
  * legacy if-ladder had.
+ *
+ * Each entry is built via {@link verdictEntry}, which carries the
+ * predicate's narrowed type into the resolve callback. The cast
+ * (`node as N`) is sound by construction — the dispatcher only fires
+ * `resolve` when `predicate(node)` returned true — but TS's flow
+ * analysis can't see through a separate predicate/callback pairing
+ * inside a literal, so the cast lives once inside the helper rather
+ * than at every entry. Audit 2026-05-23 M-2.
  */
 interface VerdictEntry {
   readonly predicate: (node: ts.Node) => boolean;
   readonly resolve: (node: ts.Node, ctx: ResolverContext) => ResolverVerdict | null;
 }
 
+function verdictEntry<N extends ts.Node>(
+  predicate: (node: ts.Node) => node is N,
+  resolve: (node: N, ctx: ResolverContext) => ResolverVerdict | null,
+): VerdictEntry {
+  return { predicate, resolve: (n, c) => resolve(n as N, c) };
+}
+
+const isJsxLikeOpening = (
+  n: ts.Node,
+): n is ts.JsxOpeningElement | ts.JsxSelfClosingElement =>
+  ts.isJsxOpeningElement(n) || ts.isJsxSelfClosingElement(n);
+
+const isValueRefIdentifier = (n: ts.Node): n is ts.Identifier =>
+  ts.isIdentifier(n) && isValueReference(n);
+
 const VERDICT_TABLE: readonly VerdictEntry[] = [
-  { predicate: ts.isCallExpression, resolve: (n, c) => dispatchCall(n as ts.CallExpression, c) },
-  { predicate: ts.isNewExpression, resolve: (n, c) => resolveNewExpression(n as ts.NewExpression, c) },
-  {
-    predicate: (n) => ts.isJsxOpeningElement(n) || ts.isJsxSelfClosingElement(n),
-    resolve: (n, c) => resolveJsxElement(n as ts.JsxOpeningElement | ts.JsxSelfClosingElement, c),
-  },
-  {
-    predicate: (n) => ts.isIdentifier(n) && isValueReference(n),
-    resolve: (n, c) => {
-      const v = resolveValueReference(n as ts.Identifier, c);
-      return v.to.length > 0 ? v : null;
-    },
-  },
-  {
-    predicate: ts.isShorthandPropertyAssignment,
-    resolve: (n, c) => {
-      const v = resolveShorthandAssignment(n as ts.ShorthandPropertyAssignment, c);
-      return v.to.length > 0 ? v : null;
-    },
-  },
+  verdictEntry(ts.isCallExpression, (n, c) => dispatchCall(n, c)),
+  verdictEntry(ts.isNewExpression, (n, c) => resolveNewExpression(n, c)),
+  verdictEntry(isJsxLikeOpening, (n, c) => resolveJsxElement(n, c)),
+  verdictEntry(isValueRefIdentifier, (n, c) => {
+    const v = resolveValueReference(n, c);
+    return v.to.length > 0 ? v : null;
+  }),
+  verdictEntry(ts.isShorthandPropertyAssignment, (n, c) => {
+    const v = resolveShorthandAssignment(n, c);
+    return v.to.length > 0 ? v : null;
+  }),
 ];
 
 /** Returns null if `node` is not a call/new/jsx/value-reference site. */

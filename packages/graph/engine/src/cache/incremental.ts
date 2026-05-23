@@ -36,6 +36,7 @@ import type {
   ParsedProject,
   WalkOutput,
 } from '../lang-adapter/types.js';
+import type { RebuildStage } from '../pipeline/stages.js';
 import type {
   Catalog,
   CallEdge,
@@ -49,9 +50,13 @@ import type {
  * stage. Threading it as a parameter lets `runIncremental` keep the
  * orchestrator's stage telemetry while staying ignorant of how it's
  * implemented.
+ *
+ * The accepted stage names are the rebuild subset of the pipeline's
+ * canonical `GraphStage`, derived via `Extract<>` in
+ * `../pipeline/stages.ts`. Audit 2026-05-23 N-3.
  */
 export type StageRunner = <T>(
-  stage: 'parse' | 'walk' | 'resolve',
+  stage: RebuildStage,
   fn: () => T,
   detailFn?: (result: T) => string | undefined,
 ) => T;

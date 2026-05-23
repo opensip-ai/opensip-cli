@@ -37,6 +37,7 @@ import type {
   DiscoverOutput,
   GraphLanguageAdapter,
 } from '../lang-adapter/types.js';
+import type { GraphStage } from '../pipeline/stages.js';
 import type {
   Catalog,
   CallEdge,
@@ -74,24 +75,12 @@ export interface RunGraphResult {
   readonly cacheHit: boolean;
 }
 
-/** Pipeline stage identity, in canonical order. */
-export type GraphStage =
-  | 'discover'
-  | 'parse'
-  | 'walk'
-  | 'resolve'
-  | 'index'
-  | 'rules';
-
-/** Canonical stage order — consumed by the live view to render the checklist. */
-export const GRAPH_STAGES: readonly GraphStage[] = [
-  'discover',
-  'parse',
-  'walk',
-  'resolve',
-  'index',
-  'rules',
-];
+// Re-export the shared stage vocabulary so external callers (Ink live
+// view, tests) keep their existing import surface — `GraphStage` /
+// `GRAPH_STAGES` are part of the orchestrator's public contract. The
+// canonical declaration moved to `../pipeline/stages.ts` so the
+// cache module can subset it without duplication.
+export { GRAPH_STAGES, type GraphStage } from '../pipeline/stages.js';
 
 /**
  * Structured progress event. `stage-cached` fires for parse/walk/resolve

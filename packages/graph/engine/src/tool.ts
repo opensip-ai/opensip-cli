@@ -16,7 +16,7 @@
  * the single `graph` invocation.
  */
 
-import { readPackageVersion } from '@opensip-tools/core';
+import { ConfigurationError, readPackageVersion } from '@opensip-tools/core';
 import { type Command } from 'commander';
 
 // Side-effect import: registers the first-party TypeScript adapter
@@ -41,20 +41,34 @@ const GRAPH_LIVE_VIEW_KEY = 'graph';
 function register(cli: ToolCliContext): void {
   const program = cli.program as Command;
 
+  // Contract guard: the live-view key the tool registers under MUST
+  // equal the tool's metadata id. They are equal today by convention;
+  // pinning the equality at register-time prevents silent drift if a
+  // future refactor renames one without the other. Audit 2026-05-23
+  // N-1.
+  if (GRAPH_LIVE_VIEW_KEY !== graphTool.metadata.id) {
+    throw new ConfigurationError(
+      `graph live-view key '${GRAPH_LIVE_VIEW_KEY}' must equal tool id '${graphTool.metadata.id}'`,
+    );
+  }
+
   // Contribute graph's live view to the CLI's renderer registry. The
   // renderer itself is owned by the CLI (Ink/React layer); the CLI
   // hands it back through `cli.builtinLiveViews` keyed by tool id, so
   // this package doesn't take a direct dep on CLI's UI module.
+  //
+  // Hard fail on miss: visual mode is graph's default UX path. A
+  // missing renderer is a configuration error, not a soft warning —
+  // the previous warn-on-miss let `UnknownLiveViewError` surface only
+  // on first interactive use, with no signal at boot. Audit 2026-05-23
+  // N-1 (option b).
   const graphRenderer = cli.builtinLiveViews.get(graphTool.metadata.id);
-  if (graphRenderer) {
-    cli.registerLiveView(GRAPH_LIVE_VIEW_KEY, graphRenderer);
-  } else {
-    cli.logger.warn({
-      evt: 'graph.live_view.missing_renderer',
-      module: 'graph:tool',
-      msg: `No bundled renderer for tool id '${graphTool.metadata.id}' — visual mode for graph will throw UnknownLiveViewError. Expected when running outside the bundled CLI.`,
-    });
+  if (!graphRenderer) {
+    throw new ConfigurationError(
+      `No bundled renderer for tool id '${graphTool.metadata.id}'. The CLI must register a live view for graph before tool registration.`,
+    );
   }
+  cli.registerLiveView(GRAPH_LIVE_VIEW_KEY, graphRenderer);
 
   program
     .command(GRAPH.name)
