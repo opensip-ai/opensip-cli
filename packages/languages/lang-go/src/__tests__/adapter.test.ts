@@ -91,3 +91,134 @@ describe('go stripComments', () => {
     expect(out).not.toContain('hi')
   })
 })
+
+// Edge-case regression tests (Wave 1 P0 — audit findings F4/F5).
+// These pin behavior that the current scanner already handles correctly so
+// future refactors of strip.ts cannot silently regress them.
+describe('go strip edge cases', () => {
+  describe('// inside raw string', () => {
+    it('does not treat // inside backticks as a comment, but strips trailing line comment', () => {
+      const src = 'x := `// not a comment`\ny := 1 // real comment'
+      const out = stripComments(src)
+      expect(out.length).toBe(src.length)
+      // Raw-string body is replaced by whitespace, including the // sequence
+      expect(out).not.toContain('// not a comment')
+      expect(out).not.toContain('not a comment')
+      // The trailing real comment text is also stripped
+      expect(out).not.toContain('real comment')
+      // Code structure outside the string/comment is preserved
+      expect(out).toContain('x :=')
+      expect(out).toContain('y := 1')
+      expect(out).toContain('`')
+    })
+
+    it('stripStrings alone does not interpret // inside raw string as a comment', () => {
+      const src = 'x := `// not a comment`'
+      const out = stripStrings(src)
+      expect(out.length).toBe(src.length)
+      expect(out).not.toContain('not a comment')
+      expect(out).toContain('x :=')
+      expect(out).toContain('`')
+    })
+  })
+
+  describe('unterminated literals (graceful handling)', () => {
+    it('does not crash on an unterminated raw string and preserves length', () => {
+      const src = 'x := `unfinished'
+      const out = stripStrings(src)
+      expect(out.length).toBe(src.length)
+      expect(out).not.toContain('unfinished')
+      expect(out).toContain('x :=')
+      expect(out).toContain('`')
+    })
+
+    it('does not crash on an unterminated block comment and preserves length', () => {
+      const src = 'x := 1 /* never closed'
+      const out = stripComments(src)
+      expect(out.length).toBe(src.length)
+      expect(out).not.toContain('never closed')
+      expect(out).toContain('x := 1')
+    })
+
+    it('does not crash on an unterminated interpreted string and preserves length', () => {
+      const src = 's := "unfinished'
+      const out = stripStrings(src)
+      expect(out.length).toBe(src.length)
+      expect(out).toContain('s :=')
+    })
+  })
+
+  describe('rune literals — pin current permissive behavior (audit F4)', () => {
+    // The audit notes the rune scanner is permissive: it accepts variable
+    // escape lengths rather than enforcing Go's exact rules (\uXXXX = 4 hex,
+    // \UXXXXXXXX = 8 hex). Today this is a non-issue because rune literals
+    // are preserved as code (not stripped) and surrounding code keeps the
+    // scanner aligned. These tests pin the current behavior so any future
+    // tightening of the scanner becomes a visible change.
+
+    it('preserves a single-char rune literal', () => {
+      const src = "r := 'a'"
+      const out = stripStrings(src)
+      expect(out).toBe(src)
+    })
+
+    it(String.raw`preserves a rune literal with a simple escape ('\n')`, () => {
+      const src = String.raw`r := '\n'`
+      const out = stripStrings(src)
+      expect(out).toBe(src)
+    })
+
+    it(String.raw`preserves a rune literal with a 4-hex Unicode escape ('\u0041')`, () => {
+      const src = String.raw`r := 'A'`
+      const out = stripStrings(src)
+      expect(out).toBe(src)
+    })
+
+    it(String.raw`preserves a rune literal with an 8-hex long Unicode escape ('\U0001F600')`, () => {
+      // F4 case: scanner is permissive about escape length; pin that the
+      // long-Unicode form still passes through unchanged today.
+      const src = String.raw`r := '\U0001F600'`
+      const out = stripStrings(src)
+      expect(out).toBe(src)
+    })
+
+    it('preserves multiple rune literals in sequence alongside strings', () => {
+      const src = String.raw`a := 'a'; b := '\n'; c := 'A'; s := "hello"`
+      const out = stripStrings(src)
+      expect(out.length).toBe(src.length)
+      // Rune literals survive verbatim
+      expect(out).toContain("'a'")
+      expect(out).toContain(String.raw`'\n'`)
+      expect(out).toContain(String.raw`'A'`)
+      // The interpreted string body is stripped
+      expect(out).not.toContain('hello')
+      expect(out).toContain('"')
+    })
+  })
+
+  describe('length preservation — explicit assert across edge cases', () => {
+    const cases: { name: string; src: string }[] = [
+      { name: '// inside raw string', src: 'x := `// not a comment`\ny := 1 // real' },
+      { name: 'unterminated raw string', src: 'x := `unfinished' },
+      { name: 'unterminated block comment', src: 'x := 1 /* never closed' },
+      { name: 'unterminated interpreted string', src: 's := "unfinished' },
+      { name: 'rune single char', src: "r := 'a'" },
+      { name: 'rune simple escape', src: String.raw`r := '\n'` },
+      { name: String.raw`rune \u escape`, src: String.raw`r := 'A'` },
+      { name: String.raw`rune \U escape`, src: String.raw`r := '\U0001F600'` },
+      {
+        name: 'mixed runes and string',
+        src: String.raw`a := 'a'; b := '\n'; c := 'A'; s := "hello"`,
+      },
+    ]
+
+    for (const { name, src } of cases) {
+      it(`stripStrings preserves length: ${name}`, () => {
+        expect(stripStrings(src).length).toBe(src.length)
+      })
+      it(`stripComments preserves length: ${name}`, () => {
+        expect(stripComments(src).length).toBe(src.length)
+      })
+    }
+  })
+})
