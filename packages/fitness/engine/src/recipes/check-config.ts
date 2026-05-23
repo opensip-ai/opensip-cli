@@ -16,7 +16,10 @@
  * extend the safe-lists with project-specific names.
  */
 
+import { logger } from '@opensip-tools/core'
+
 import type { RecipeCheckConfigMap } from './types.js'
+import type { ZodType } from 'zod'
 
 /**
  * Process-shared current-recipe config. Populated by the recipe service at
@@ -58,15 +61,47 @@ function slot(): GlobalSlot {
  * exists for the slug — checks that call this should treat the result as
  * "augmentation only" and merge with their own defaults.
  *
+ * Two signatures (audit 2026-05-23 F10):
+ *
+ *   1. **Without `schema`** — back-compat path. Returns the stored entry
+ *      cast to `T` without runtime validation. Existing call sites keep
+ *      this shape; the cast is unsafe but the trade-off is preserved
+ *      because no real misuse driver has surfaced.
+ *
+ *   2. **With `schema`** — validated path. The stored entry is parsed
+ *      against the supplied Zod schema; on failure a structured warning
+ *      is logged and the result is treated as "missing" (returns the
+ *      schema's default if it has one, otherwise an empty object cast).
+ *      New call sites should opt in to this signature so a malformed
+ *      recipe-config fails closed instead of crashing inside the check's
+ *      analyze callback with a misleading error.
+ *
  * @typeParam T - The shape the calling check expects. Each check declares
  *                its own config interface.
  */
-export function getCheckConfig<T extends Record<string, unknown>>(slug: string): T {
+export function getCheckConfig<T extends Record<string, unknown>>(slug: string): T
+export function getCheckConfig<T extends Record<string, unknown>>(slug: string, schema: ZodType<T>): T
+export function getCheckConfig<T extends Record<string, unknown>>(
+  slug: string,
+  schema?: ZodType<T>,
+): T {
   const current = slot()[GLOBAL_KEY]
   if (!current) return {} as T
   const entry = current[slug]
   if (!entry) return {} as T
-  return entry as T
+  if (!schema) return entry as T
+  const parsed = schema.safeParse(entry)
+  if (!parsed.success) {
+    logger.warn({
+      evt: 'fitness.check_config.invalid',
+      module: 'fitness:check-config',
+      checkSlug: slug,
+      issues: parsed.error.issues,
+      msg: `Recipe-supplied config for check '${slug}' failed schema validation; falling back to defaults.`,
+    })
+    return {} as T
+  }
+  return parsed.data
 }
 
 /**

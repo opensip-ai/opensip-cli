@@ -98,6 +98,16 @@ export async function runOneCheck(
     timeoutMs: checkTimeout,
   })
 
+  // Per-check abort controller. Invariant: the only abort pathway into
+  // this controller is the local `setTimeout` below — we do NOT propagate
+  // any external signal into it (the recipe service's own
+  // `abortController` is wired separately and observed by the scheduler,
+  // not by `check.run`). That single-source guarantee is what lets the
+  // post-retry `signal.aborted` check below be interpreted as a
+  // timeout. Adding any other abort source here without reworking the
+  // detection (e.g. tagged abort reasons via `controller.abort(reason)`)
+  // would silently misreport non-timeout aborts as timeouts.
+  // Pinned by `runOneCheck.test.ts` (audit 2026-05-23 F7).
   const checkAbortController = new AbortController()
   const startTime = Date.now()
   const timeoutId = setTimeout(() => checkAbortController.abort(), checkTimeout)

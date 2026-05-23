@@ -3,12 +3,30 @@
  * content from source code. Used by fitness checks to avoid false positives
  * from patterns appearing inside string literals or comments.
  *
- * These regex-based strippers are language-agnostic and used by checks that
- * scan Python/Go/Java/C++/universal text without needing a TS scanner. They
- * deliberately do NOT overlap with `filterContent` in
- * @opensip-tools/lang-typescript, which is a TS-aware position-preserving
- * scanner used by TS-specific checks. Both abstractions are kept because
- * the consumers (and their precision needs) differ.
+ * Canonical rationale for the two-stripper split
+ * ----------------------------------------------
+ * Fitness ships two complementary content-stripping families and this is
+ * the canonical place that explains why both exist (audit 2026-05-23 F9):
+ *
+ *   1. **This module** — regex-based, **language-agnostic**, no AST
+ *      dependency. Used by checks that scan Python/Go/Java/C++/universal
+ *      text where a real parser would be overkill (or unavailable). Trades
+ *      off precision: edge cases like nested template literals or escaped
+ *      quotes inside comments are best-effort.
+ *
+ *   2. **`filterContent` in `@opensip-tools/lang-typescript`** — uses the
+ *      real TypeScript scanner, position-preserving (string content is
+ *      replaced with whitespace of equal length so line/column numbers
+ *      survive). Cached. Used exclusively by TS-aware checks where the
+ *      precision matters.
+ *
+ * The dispatch boundary is `applyContentFilter` in
+ * `@opensip-tools/core/languages/content-filter-dispatch.ts` — checks
+ * declare a `contentFilter` mode (`'strip-strings'`,
+ * `'strip-strings-and-comments'`, `'raw'`) and the language adapter for
+ * the file's extension routes to the right family. New strippers plug in
+ * by implementing the `LanguageAdapter` contract; nothing in the check
+ * layer needs to change.
  */
 
 /**

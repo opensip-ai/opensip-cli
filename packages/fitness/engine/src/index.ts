@@ -37,12 +37,16 @@ export { fileCache, DEFAULT_PREWARM_PATTERNS } from './framework/file-cache.js';
 export { buildImportGraph, findStronglyConnectedComponents } from './framework/import-graph.js';
 export type { ImportGraph } from './framework/import-graph.js';
 export { isInsideStringLiteral, stripStringLiterals, stripStringsAndComments, stripStringsAndCommentsPreservingPositions } from './framework/strip-literals.js';
-// filterContent / clearFilterCache / FilteredContent moved to
-// @opensip-tools/lang-typescript (it's TS-aware string and comment
-// stripping; not a fitness concern). Likewise the `ts` namespace
-// re-export — fitness should not be the home for the TypeScript
-// compiler API. Importers should depend on @opensip-tools/lang-typescript
-// directly, or import `typescript` (`import * as ts from 'typescript'`).
+// The two-stripper split (this module's regex-based strippers vs.
+// `filterContent` in `@opensip-tools/lang-typescript`) is documented at
+// the top of `framework/strip-literals.ts`. Short version: regex
+// strippers are language-agnostic and good enough for universal/text
+// checks; `filterContent` is TS-aware, position-preserving, and used by
+// TS-specific checks. The dispatch boundary that picks one is
+// `applyContentFilter` in
+// `@opensip-tools/core/languages/content-filter-dispatch.ts`.
+// Importers wanting the TS-AST stripper depend on
+// `@opensip-tools/lang-typescript` directly.
 
 
 // Types — findings output

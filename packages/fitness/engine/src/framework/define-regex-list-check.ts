@@ -57,6 +57,14 @@ import type { Check } from './check-types.js'
  * Each entry has a stable UUID `id` and a kebab-case `slug` so the pattern
  * is individually addressable for documentation and developer tooling. The
  * `slug` is emitted on every produced violation as `type: pattern.slug`.
+ *
+ * @remarks Per-pattern attribution (e.g. an Aristotle SDO/SAX `provider`)
+ * is intentionally NOT modelled here. The `provider` on
+ * {@link DefineRegexListCheckConfig} is **check-level only** — every
+ * pattern in a single helper invocation shares the same provider. Splitting
+ * a pattern list into two helpers is the supported workaround when one
+ * subset needs distinct attribution. A per-pattern field will be added
+ * if/when a real driver appears (audit 2026-05-23 F1).
  */
 export interface RegexListCheckPattern {
   /** Stable UUID identifying this pattern. Purely descriptive. */
@@ -144,6 +152,12 @@ export interface DefineRegexListCheckConfig {
   readonly disabled?: boolean
   readonly timeout?: number
   readonly docs?: string
+  /**
+   * Aristotle SDO/SAX provider attribution applied to every pattern in
+   * this check. **Check-level only** — there is no per-pattern override.
+   * If two pattern subsets need distinct attribution, define them as two
+   * separate checks (audit 2026-05-23 F1).
+   */
   readonly provider?: string
   /** The list of regex patterns to scan each line against. */
   readonly patterns: readonly RegexListCheckPattern[]
@@ -169,6 +183,15 @@ export interface DefineRegexListCheckConfig {
  *
  * Optionally skip whole files when `options.skipTestFiles` is `true` and
  * {@link isTestFile} returns true for the file path.
+ *
+ * @remarks This helper synthesises only `defineCheck`'s **per-file
+ * `analyze` mode** — it processes one file at a time, with no awareness
+ * of cross-file state. Cross-file regex-list semantics (e.g. correlated
+ * patterns across `package.json` + `Dockerfile`) are out of scope; an
+ * `analyzeAll`-mode wrapper would be a separate helper. The factor-out
+ * point if/when one is needed is `processFile` (the per-file pure
+ * function) — call it from an `analyzeAll` callback that walks an
+ * accessor (audit 2026-05-23 F8).
  *
  * @throws {ValidationError} via {@link defineCheck} when the synthesised
  *   config is invalid.

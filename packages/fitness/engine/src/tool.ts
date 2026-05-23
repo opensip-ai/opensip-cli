@@ -10,6 +10,30 @@
  * The CLI no longer imports `executeFit`, `openDashboard`, etc.
  * directly — it just calls `fitnessTool.register(cli)`. Adding a new
  * subcommand to fitness is a local change; no CLI edit required.
+ *
+ * Two-key registration invariant
+ * ------------------------------
+ * Fitness contributes TWO distinct identifiers to the CLI's registries
+ * and the mismatch is intentional — do not collapse them:
+ *
+ *   - `metadata.id = 'fitness'` is the package-wide tool identifier.
+ *     Used as the key into `cli.builtinLiveViews` (the CLI ships one
+ *     bundled renderer per tool id) and as the conflict-detection key
+ *     in `defaultToolRegistry`.
+ *
+ *   - `FIT_LIVE_VIEW_KEY = 'fit'` is the live-view key. Used to call
+ *     `cli.registerLiveView('fit', renderer)` and consumed by
+ *     `cli.renderLive('fit', args)` in `runLiveMode`. The key matches
+ *     the `fit` subcommand name so the dispatcher's `renderLive(key)`
+ *     reads naturally next to the command that triggers it.
+ *
+ * Net effect: `register(cli)` looks up the bundled renderer under
+ * `'fitness'` and re-keys it to `'fit'` for the live-view dispatch.
+ * The indirection is by design (audit 2026-05-23 F4) and is also why
+ * `initialize()` below is a no-op — the live-view binding could
+ * conceptually move there, but doing so without addressing the prior
+ * Finding #10 (multi-instance fitness in one process) would only relocate
+ * the indirection. Left in `register()` until that contract decision lands.
  */
 
 
