@@ -179,6 +179,7 @@ export type CommandResult =
   | ExperimentalResult
   | PluginResult
   | ClearDoneResult
+  | ConfigureDoneResult
   | HelpResult
   | ErrorResult;
 
@@ -187,6 +188,17 @@ export interface ClearDoneResult {
   action: 'done' | 'cancelled' | 'empty';
   deletedCount: number;
   sessionCount: number;
+}
+
+/** Outcome of an `opensip-tools configure` interactive run. */
+export interface ConfigureDoneResult {
+  type: 'configure-done';
+  /** Where the global config landed on disk. */
+  configPath: string;
+  /** Discriminator: did the user supply a key, or bail at the prompt? */
+  action: 'saved' | 'cancelled';
+  /** When `action === 'saved'`, the masked-for-display key (`abcd…wxyz`). */
+  maskedKey?: string;
 }
 
 export interface FitDoneResult {

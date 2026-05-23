@@ -117,7 +117,7 @@ function registerSessions(program: Command, ctx: CliCommandsContext): void {
     { ctx, jsonFlag: (opts) => opts.json },
   );
 
-  sessionsCmd
+  const purgeCmd = sessionsCmd
     .command('purge')
     .description('Delete session data from opensip-tools/.runtime/sessions/')
     .option('--older-than <days>', 'Only delete sessions older than N days', (v: string) => {
@@ -126,25 +126,31 @@ function registerSessions(program: Command, ctx: CliCommandsContext): void {
       return n;
     })
     .option('-y, --yes', 'Skip confirmation prompt', false)
-    .action(async (opts: { olderThan?: number; yes: boolean }) => {
-      // Phase 6 will route this through mountResultCommand once
-      // executeClear returns a `clear-done` CommandResult.
-      await executeClear({ olderThan: opts.olderThan, yes: opts.yes });
-    });
+    .option('--json', JSON_DESC, false);
+
+  mountResultCommand<{ olderThan?: number; yes: boolean; json: boolean }>(
+    purgeCmd,
+    (opts) => executeClear({ olderThan: opts.olderThan, yes: opts.yes }),
+    { ctx, jsonFlag: (opts) => opts.json },
+  );
 }
 
 // =============================================================================
 // configure
 // =============================================================================
 
-function registerConfigure(program: Command, _ctx: CliCommandsContext): void {
-  program
+function registerConfigure(program: Command, ctx: CliCommandsContext): void {
+  const cmd = program
     .command('configure')
     .description('Set up OpenSIP Cloud API key')
-    .option('--debug', 'Enable debug mode for structured log output', false)
-    .action(async () => {
-      await executeConfigure();
-    });
+    .option('--json', JSON_DESC, false)
+    .option('--debug', 'Enable debug mode for structured log output', false);
+
+  mountResultCommand<{ json: boolean }>(
+    cmd,
+    () => executeConfigure(),
+    { ctx, jsonFlag: (opts) => opts.json },
+  );
 }
 
 // =============================================================================

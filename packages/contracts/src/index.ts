@@ -35,6 +35,7 @@ export type {
   SummaryOptions,
   CommandResult,
   ClearDoneResult,
+  ConfigureDoneResult,
   FitDoneResult,
   SimDoneResult,
   ListChecksResult,

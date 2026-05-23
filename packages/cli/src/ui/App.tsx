@@ -22,7 +22,12 @@ import { RunHeader } from './components/RunHeader.js';
 import { Summary } from './components/Summary.js';
 import { useTheme } from './theme.js';
 
-import type { CommandResult, SimDoneResult } from '@opensip-tools/contracts';
+import type {
+  ClearDoneResult,
+  CommandResult,
+  ConfigureDoneResult,
+  SimDoneResult,
+} from '@opensip-tools/contracts';
 
 export interface AppProps {
   readonly result: CommandResult;
@@ -92,21 +97,11 @@ export function App({ result }: AppProps): React.ReactElement {
     }
 
     case 'clear-done': {
-      return (
-        <Box flexDirection="column">
-          <Banner />
-          <Box paddingLeft={2} paddingTop={1}>
-            {result.action === 'empty' && <Text dimColor>No session data to clear.</Text>}
-            {result.action === 'cancelled' && <Text dimColor>Cancelled. No data was deleted.</Text>}
-            {result.action === 'done' && (
-              <Text>
-                <Text color={useTheme().success}>{'\u2713'}</Text>
-                {' '}{result.deletedCount} session{result.deletedCount === 1 ? '' : 's'} deleted.
-              </Text>
-            )}
-          </Box>
-        </Box>
-      );
+      return <ClearDoneSummary result={result} />;
+    }
+
+    case 'configure-done': {
+      return <ConfigureDoneSummary result={result} />;
     }
 
     case 'help': {
@@ -182,6 +177,57 @@ function SimDoneSummary({
           <Text dimColor>| Duration {dur}</Text>
         </Text>
       </Box>
+    </Box>
+  );
+}
+
+/**
+ * Inline summary for `opensip-tools sessions purge` runs.
+ *
+ * Phase 6 of the Layer 5 plan: this branch was previously dead because
+ * `clear.ts` wrote its banner via raw ANSI before returning. Now
+ * `executeClear` returns a structured `ClearDoneResult` and Ink owns
+ * the entire render — banner, success/cancel/empty messages, and the
+ * deletion count.
+ */
+function ClearDoneSummary({ result }: Readonly<{ result: ClearDoneResult }>): React.ReactElement {
+  const theme = useTheme();
+  return (
+    <Box flexDirection="column">
+      <Banner />
+      <Box paddingLeft={2} paddingTop={1}>
+        {result.action === 'empty' && <Text dimColor>No session data to clear.</Text>}
+        {result.action === 'cancelled' && <Text dimColor>Cancelled. No data was deleted.</Text>}
+        {result.action === 'done' && (
+          <Text>
+            <Text color={theme.success}>{'✓'}</Text>
+            {' '}{result.deletedCount} session{result.deletedCount === 1 ? '' : 's'} deleted.
+          </Text>
+        )}
+      </Box>
+    </Box>
+  );
+}
+
+/** Inline summary for `opensip-tools configure` runs. */
+function ConfigureDoneSummary({ result }: Readonly<{ result: ConfigureDoneResult }>): React.ReactElement {
+  const theme = useTheme();
+  if (result.action === 'cancelled') {
+    return (
+      <Box paddingLeft={2}>
+        <Text dimColor>No key provided. Configuration unchanged.</Text>
+      </Box>
+    );
+  }
+  return (
+    <Box flexDirection="column" paddingLeft={2}>
+      <Text>
+        <Text color={theme.success}>{'✓'}</Text>
+        {' '}API key saved to <Text bold>{result.configPath}</Text>
+      </Text>
+      <Text dimColor>
+        {'  '}You can now use --report-to to send results to OpenSIP Cloud.
+      </Text>
     </Box>
   );
 }

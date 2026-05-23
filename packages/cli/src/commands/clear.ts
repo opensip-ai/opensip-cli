@@ -1,26 +1,25 @@
 /**
  * clear command — clear session data from
- * <project>/opensip-tools/.runtime/sessions/.
+ * `<project>/opensip-tools/.runtime/sessions/`.
  *
- * Uses Node readline for interactive confirmation (not Ink),
- * since Ink's useInput requires raw mode which isn't always available.
+ * Uses Node `readline` for interactive confirmation (Ink's `useInput`
+ * raw-mode requirement is incompatible with prompts on every TTY).
+ * Banners and result lines route through the Ink renderer via the
+ * `clear-done` `CommandResult` shape — no raw ANSI escapes here.
  */
 
 import { createInterface } from 'node:readline';
 
-import { countSessions, clearAllSessions, clearSessionsOlderThan } from '@opensip-tools/contracts';
+import {
+  countSessions,
+  clearAllSessions,
+  clearSessionsOlderThan,
+  type ClearDoneResult,
+} from '@opensip-tools/contracts';
 
 export interface ClearOptions {
   olderThan?: number;
   yes: boolean;
-}
-
-export interface ClearResult {
-  type: 'clear';
-  action: 'done' | 'cancelled' | 'empty';
-  deletedCount: number;
-  sessionCount: number;
-  olderThan?: number;
 }
 
 function ask(question: string): Promise<string> {
@@ -33,50 +32,40 @@ function ask(question: string): Promise<string> {
   });
 }
 
-// ANSI helpers — module-scoped to avoid per-call closure allocation.
-const ansiBrand = (s: string): string => `\u001B[38;2;200;149;108m${s}\u001B[0m`;
-const ansiDim = (s: string): string => `\u001B[2m${s}\u001B[0m`;
-
-/** Print the banner using raw ANSI (avoids Ink dependency) */
-function printBanner(): void {
-  // Simplified banner header
-  console.log('');
-  console.log(`  ${ansiBrand('OpenSIP Tools')} ${ansiDim('— session management')}`);
-  console.log('');
-}
-
-export async function executeClear(opts: ClearOptions): Promise<ClearResult> {
-  printBanner();
-
+/**
+ * Prompt for confirmation (unless --yes), then delete sessions.
+ * Returns a `ClearDoneResult` that the renderer turns into the banner
+ * + status line. The rendering is `App.tsx`'s `case 'clear-done':`
+ * branch — this function is pure I/O for the prompt only.
+ */
+export async function executeClear(opts: ClearOptions): Promise<ClearDoneResult> {
   const sessionCount = countSessions();
-
   if (sessionCount === 0) {
-    console.log(`  ${'\u001B[2m'}No session data to clear.${'\u001B[0m'}\n`);
-    return { type: 'clear', action: 'empty', deletedCount: 0, sessionCount: 0 };
+    return { type: 'clear-done', action: 'empty', deletedCount: 0, sessionCount: 0 };
   }
 
-  // Describe what will happen
-  const dayWord = opts.olderThan === 1 ? 'day' : 'days';
-  const description = opts.olderThan
-    ? `This will delete session data older than ${opts.olderThan} ${dayWord} from opensip-tools/.runtime/sessions/.`
-    : 'This will delete ALL session data from opensip-tools/.runtime/sessions/.';
-
-  // Prompt for confirmation unless --yes
   if (!opts.yes) {
-    console.log(`  ${description}`);
-    console.log(`  ${'\u001B[2m'}${sessionCount} session file${sessionCount === 1 ? '' : 's'} currently stored.${'\u001B[0m'}`);
-    console.log(`  ${'\u001B[2m'}This includes run history and dashboard data.${'\u001B[0m'}\n`);
+    // Pre-prompt note. Stdout `process.stdout.write` is fine here:
+    // Ink can't own this since it conflicts with `readline.question()`,
+    // and there are no ANSI escapes — just plain text the user reads
+    // before answering. Ink renders the result message after.
+    const dayWord = opts.olderThan === 1 ? 'day' : 'days';
+    const description = opts.olderThan
+      ? `This will delete session data older than ${opts.olderThan} ${dayWord} from opensip-tools/.runtime/sessions/.`
+      : 'This will delete ALL session data from opensip-tools/.runtime/sessions/.';
+    process.stdout.write(`\n  ${description}\n`);
+    process.stdout.write(`  ${sessionCount} session file${sessionCount === 1 ? '' : 's'} currently stored.\n`);
+    process.stdout.write(`  This includes run history and dashboard data.\n\n`);
 
     const answer = await ask('  Continue? (y/n) ');
     if (answer !== 'y') {
-      console.log(`\n  ${'\u001B[2m'}Cancelled. No data was deleted.${'\u001B[0m'}\n`);
-      return { type: 'clear', action: 'cancelled', deletedCount: 0, sessionCount };
+      return { type: 'clear-done', action: 'cancelled', deletedCount: 0, sessionCount };
     }
   }
 
-  // Execute deletion
-  const deletedCount = opts.olderThan !== undefined && opts.olderThan > 0 ? clearSessionsOlderThan(opts.olderThan) : clearAllSessions();
+  const deletedCount = opts.olderThan !== undefined && opts.olderThan > 0
+    ? clearSessionsOlderThan(opts.olderThan)
+    : clearAllSessions();
 
-  console.log(`\n  ${'\u001B[32m'}\u2713${'\u001B[0m'} ${deletedCount} session${deletedCount === 1 ? '' : 's'} deleted.\n`);
-  return { type: 'clear', action: 'done', deletedCount, sessionCount, olderThan: opts.olderThan };
+  return { type: 'clear-done', action: 'done', deletedCount, sessionCount };
 }

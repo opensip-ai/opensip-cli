@@ -1,5 +1,9 @@
 /**
- * configure command — set up OpenSIP Cloud API key
+ * configure command — set up OpenSIP Cloud API key.
+ *
+ * Prompts via `readline` (Ink can't own a prompt loop without raw mode);
+ * banners and result lines route through Ink via the `configure-done`
+ * `CommandResult`. No `console.log` and no raw ANSI escapes here.
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';
@@ -8,6 +12,8 @@ import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
+
+import type { ConfigureDoneResult } from '@opensip-tools/contracts';
 
 // ---------------------------------------------------------------------------
 // Paths
@@ -68,28 +74,42 @@ function prompt(question: string): Promise<string> {
   });
 }
 
+function maskKey(key: string): string {
+  if (key.length <= 8) return key;
+  return `${key.slice(0, 4)}...${key.slice(-4)}`;
+}
+
 // ---------------------------------------------------------------------------
 // executeConfigure
 // ---------------------------------------------------------------------------
 
-export async function executeConfigure(): Promise<void> {
+/**
+ * Run the interactive configure flow. Returns a `ConfigureDoneResult`;
+ * the caller renders it through Ink, including any "current key" hint
+ * the user saw at the prompt.
+ */
+export async function executeConfigure(): Promise<ConfigureDoneResult> {
   const existing = readGlobalConfig();
 
   if (existing.apiKey) {
-    const masked = existing.apiKey.slice(0, 4) + '...' + existing.apiKey.slice(-4);
-    console.log(`Current API key: ${masked}`);
+    // Pre-prompt informational line. Plain text only — Ink renders the
+    // outcome line. We emit this here because the prompt and the
+    // current-key hint share the same readline session UX.
+    process.stdout.write(`Current API key: ${maskKey(existing.apiKey)}\n`);
   }
 
   const key = await prompt('Enter your OpenSIP Cloud API key: ');
-
   if (!key) {
-    console.log('No key provided. Configuration unchanged.');
-    return;
+    return { type: 'configure-done', action: 'cancelled', configPath: CONFIG_PATH };
   }
 
   existing.apiKey = key;
   writeGlobalConfig(existing);
 
-  console.log(`API key saved to ${CONFIG_PATH}`);
-  console.log('You can now use --report-to to send results to OpenSIP Cloud.');
+  return {
+    type: 'configure-done',
+    action: 'saved',
+    configPath: CONFIG_PATH,
+    maskedKey: maskKey(key),
+  };
 }
