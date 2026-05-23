@@ -16,20 +16,61 @@
  *
  * Catalogs from older runs that lack the `discarded` field on call
  * edges fall back to the legacy "any pure callee" check.
+ *
+ * Side-effect primitives are language-specific. The active adapter
+ * supplies `ruleHints.sideEffectPrimitives` (e.g. `print`, `os.system`
+ * for Python; `println!`, `panic!` for Rust). When the hint is
+ * absent — older adapters, third-party adapters that don't populate
+ * it, unit tests that don't pass hints — we fall back to a
+ * TypeScript-shaped textual regex so the rule never silently goes
+ * dark on a TS project. Per docs/architecture/40-the-graph-loop/
+ * 02-rules-and-gating.md fidelity matrix.
  */
 
 import { createSignal } from '@opensip-tools/core';
 
-import type { FunctionOccurrence, Indexes, Rule } from '../types.js';
+import type { FunctionOccurrence, Indexes, Rule, RuleHints } from '../types.js';
 import type { Signal } from '@opensip-tools/core';
 
-const SIDE_EFFECT_TEXTUAL = /\b(?:console|logger|fs\.|http\.|fetch|process\.exit|throw\s+new)\b/;
+const TYPESCRIPT_FALLBACK_REGEX =
+  /\b(?:console|logger|fs\.|http\.|fetch|process\.exit|throw\s+new)\b/;
+
+/**
+ * Detector for "the call text contains a side-effect primitive."
+ * Built once per rule invocation: when the adapter supplies
+ * `sideEffectPrimitives`, we precompile a Set<string> for substring
+ * matching at the start of the call text (after stripping common
+ * prefixes); otherwise we fall back to the legacy TS-shaped regex.
+ */
+type SideEffectDetector = (callText: string) => boolean;
+
+function buildSideEffectDetector(hints: RuleHints | undefined): SideEffectDetector {
+  const primitives = hints?.sideEffectPrimitives;
+  if (!primitives || primitives.length === 0) {
+    return (text) => TYPESCRIPT_FALLBACK_REGEX.test(text);
+  }
+  // Adapter-supplied primitives are textual prefixes a developer would
+  // write at the start of a call expression: "print", "os.system",
+  // "console.log", "println!". Match by substring presence — call text
+  // is already truncated to ≤80 chars by the inventory pipeline, so
+  // searching every primitive across every call text is O(P · 80) per
+  // call, cheap.
+  const primitiveSet = [...primitives];
+  return (text) => {
+    for (const p of primitiveSet) {
+      if (p.length === 0) continue;
+      if (text.includes(p)) return true;
+    }
+    return false;
+  };
+}
 
 export const noSideEffectPathRule: Rule = {
   slug: 'graph:no-side-effect-path',
   defaultSeverity: 'warning',
-  evaluate(_catalog, indexes, _config): readonly Signal[] {
-    const sideEffecting = computeSideEffecting(indexes);
+  evaluate(_catalog, indexes, _config, hints): readonly Signal[] {
+    const detector = buildSideEffectDetector(hints);
+    const sideEffecting = computeSideEffecting(indexes, detector);
     const signals: Signal[] = [];
     for (const occ of indexes.byBodyHash.values()) {
       if (!isPureCandidate(occ, sideEffecting)) continue;
@@ -96,17 +137,23 @@ function isPureCandidate(occ: FunctionOccurrence, sideEffecting: ReadonlySet<str
   return true;
 }
 
-function computeSideEffecting(indexes: Indexes): Set<string> {
+function computeSideEffecting(
+  indexes: Indexes,
+  detector: SideEffectDetector,
+): Set<string> {
   const set = new Set<string>();
   for (const occ of indexes.byBodyHash.values()) {
-    if (textualSideEffect(occ)) set.add(occ.bodyHash);
+    if (textualSideEffect(occ, detector)) set.add(occ.bodyHash);
   }
   return set;
 }
 
-function textualSideEffect(occ: FunctionOccurrence): boolean {
+function textualSideEffect(
+  occ: FunctionOccurrence,
+  detector: SideEffectDetector,
+): boolean {
   for (const edge of occ.calls) {
-    if (SIDE_EFFECT_TEXTUAL.test(edge.text)) return true;
+    if (detector(edge.text)) return true;
   }
   return false;
 }

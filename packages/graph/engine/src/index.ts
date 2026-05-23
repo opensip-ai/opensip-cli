@@ -30,6 +30,7 @@ export type {
   Param,
   Indexes,
   Rule,
+  RuleHints,
   GraphConfig,
   ResolutionStats,
   ResolverVerdict,

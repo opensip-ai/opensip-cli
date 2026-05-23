@@ -8,6 +8,16 @@
  * 'unknown' but text matches `throw new`) is likely an
  * always-throws helper masquerading as a real function.
  *
+ * Throw-statement syntax is language-specific. The active adapter
+ * supplies `ruleHints.throwSyntaxRegex`: TypeScript matches
+ * `throw new Error(...)`; Python matches `raise SomeError(...)`;
+ * Rust matches `panic!(...)`. When the hint is absent — older
+ * adapters, third-party adapters that don't populate it, unit tests
+ * that don't pass hints — we fall back to the TypeScript-shaped
+ * regex so the rule keeps firing on the language it was originally
+ * authored for. Per docs/architecture/40-the-graph-loop/
+ * 02-rules-and-gating.md fidelity matrix.
+ *
  * Rules that need full CFG (per-branch reachability) are deferred to
  * v0.3.
  */
@@ -17,19 +27,20 @@ import { createSignal } from '@opensip-tools/core';
 import type { Rule } from '../types.js';
 import type { Signal } from '@opensip-tools/core';
 
-const THROW_PATTERN = /^\s*throw\s+(?:new\s+)?[A-Z]\w*/;
+const TYPESCRIPT_FALLBACK_THROW_REGEX = /^\s*throw\s+(?:new\s+)?[A-Z]\w*/;
 
 export const alwaysThrowsBranchRule: Rule = {
   slug: 'graph:always-throws-branch',
   defaultSeverity: 'warning',
-  evaluate(_catalog, indexes, _config): readonly Signal[] {
+  evaluate(_catalog, indexes, _config, hints): readonly Signal[] {
+    const throwRegex = hints?.throwSyntaxRegex ?? TYPESCRIPT_FALLBACK_THROW_REGEX;
     const signals: Signal[] = [];
     for (const occ of indexes.byBodyHash.values()) {
       if (occ.kind === 'module-init') continue;
       if (occ.calls.length === 0) continue;
-      // All edges look like `throw new ...` shapes — every documented
-      // call site is a throw.
-      const everyCallIsThrow = occ.calls.every((e) => THROW_PATTERN.test(e.text));
+      // All edges look like throw shapes — every documented call site
+      // is a throw / raise / panic per the adapter's regex.
+      const everyCallIsThrow = occ.calls.every((e) => throwRegex.test(e.text));
       if (!everyCallIsThrow) continue;
       signals.push(
         createSignal({

@@ -1,4 +1,14 @@
+import type { RuleHints } from './lang-adapter/types.js';
 import type { Signal } from '@opensip-tools/core';
+
+/**
+ * Re-export of `RuleHints` so rule modules under `rules/` can consult
+ * adapter-supplied hints without importing from `lang-adapter/`. The
+ * dep-cruiser rule `graph-pipeline-no-lang-import` bans `rules/` from
+ * reaching into any `lang-*` directory; this re-export is the single
+ * sanctioned doorway between the contract layer and rule implementations.
+ */
+export type { RuleHints } from './lang-adapter/types.js';
 
 /**
  * @fileoverview Core type shapes for the graph tool's six-stage pipeline.
@@ -182,7 +192,19 @@ export interface ResolverVerdict {
   readonly confidence: CallConfidence;
 }
 
-/** A rule consumes frozen catalog/indexes/config and returns Signals. */
+/**
+ * A rule consumes frozen catalog/indexes/config and returns Signals.
+ *
+ * The fourth parameter `hints` carries the active language adapter's
+ * `RuleHints` (side-effect primitives, throw-syntax regex, test-file
+ * predicate, generated-file globs). It is optional so test code may
+ * still invoke `rule.evaluate(catalog, indexes, config)` without
+ * threading hints through. Rules that don't need hints can ignore it;
+ * rules that do consult hints MUST also implement a TypeScript-shaped
+ * fallback so the rule degrades gracefully when an adapter does not
+ * supply the relevant hint (per
+ * docs/architecture/40-the-graph-loop/02-rules-and-gating.md).
+ */
 export interface Rule {
   /** Rule slug, e.g. "graph:orphan-subtree". Must start with "graph:". */
   readonly slug: string;
@@ -191,5 +213,6 @@ export interface Rule {
     catalog: Catalog,
     indexes: Indexes,
     config: GraphConfig,
+    hints?: RuleHints,
   ) => readonly Signal[];
 }

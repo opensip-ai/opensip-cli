@@ -176,6 +176,14 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
       () => buildIndexes(catalog),
     );
 
+    // Pass the active adapter's ruleHints to every rule. Rules that
+    // don't consult them ignore the parameter; rules that do (e.g.
+    // no-side-effect-path, always-throws-branch) consult adapter-
+    // supplied side-effect primitives and throw-syntax shapes so
+    // Python/Rust/etc. projects get language-correct heuristics
+    // instead of TypeScript-shaped fallbacks. See docs/architecture/
+    // 40-the-graph-loop/02-rules-and-gating.md (fidelity matrix).
+    const hints = adapter.ruleHints;
     const signals: Signal[] = runStage(
       'rules',
       input.onProgress,
@@ -183,7 +191,7 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
       () => {
         const collected: Signal[] = [];
         for (const rule of ruleSet) {
-          const out = rule.evaluate(catalog, indexes, config);
+          const out = rule.evaluate(catalog, indexes, config, hints);
           collected.push(...out);
         }
         return collected;
