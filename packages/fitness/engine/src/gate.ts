@@ -23,6 +23,7 @@ import { logger } from '@opensip-tools/core';
 
 import { buildSarifLog } from './sarif.js';
 
+import type { SarifResult } from './sarif/types.js';
 import type { CliOutput } from '@opensip-tools/contracts';
 
 // ---------------------------------------------------------------------------
@@ -53,6 +54,26 @@ export interface GateCompareResult {
   /** True iff `added` is non-empty — the gate decision. */
   readonly degraded: boolean;
 }
+
+/**
+ * Strategy describing how a single violation is hashed into a stable
+ * identity for diffing. The default identity uses
+ * `(filePath, ruleId, message)`, which preserves the line-shift
+ * tolerance documented at the top of this file. A test (or downstream
+ * consumer) may pass a different strategy — e.g. `(filePath, ruleId)`
+ * to ignore message edits, or `(ruleId)` to count "any new violation
+ * of this rule" as a regression. Output of the strategy is opaque; the
+ * caller never inspects it.
+ */
+export type ViolationIdentity = (input: {
+  readonly filePath: string;
+  readonly ruleId: string;
+  readonly message: string;
+}) => string;
+
+/** Default identity: sha256 over (filePath, ruleId, message). */
+export const DEFAULT_VIOLATION_IDENTITY: ViolationIdentity = ({ filePath, ruleId, message }) =>
+  createHash('sha256').update(`${filePath}\n${ruleId}\n${message}`).digest('hex');
 
 /** Thrown when --gate-compare is invoked but the baseline file doesn't exist. */
 export class GateBaselineMissingError extends Error {
@@ -121,10 +142,19 @@ export function saveBaseline(output: CliOutput, baselinePath: string): void {
  * Compare current findings against a saved baseline. Returns a structured
  * diff of added / resolved / unchanged violations.
  *
+ * @param identity - Optional violation-identity strategy. Defaults to
+ *   `(filePath, ruleId, message)` — the historical semantics. Pass a
+ *   custom strategy to coarsen or refine the diffing behavior without
+ *   forking compareToBaseline.
+ *
  * @throws {GateBaselineMissingError} when the baseline file doesn't exist
  * @throws {GateBaselineInvalidError} when the baseline isn't valid SARIF
  */
-export function compareToBaseline(output: CliOutput, baselinePath: string): GateCompareResult {
+export function compareToBaseline(
+  output: CliOutput,
+  baselinePath: string,
+  identity: ViolationIdentity = DEFAULT_VIOLATION_IDENTITY,
+): GateCompareResult {
   if (!existsSync(baselinePath)) {
     throw new GateBaselineMissingError(baselinePath);
   }
@@ -138,8 +168,8 @@ export function compareToBaseline(output: CliOutput, baselinePath: string): Gate
     throw new GateBaselineInvalidError(baselinePath, `not valid JSON (${reason})`);
   }
 
-  const baselineViolations = extractViolationsFromSarif(baselineDoc, baselinePath);
-  const currentViolations = extractViolationsFromCliOutput(output);
+  const baselineViolations = extractViolationsFromSarif(baselineDoc, baselinePath, identity);
+  const currentViolations = extractViolationsFromCliOutput(output, identity);
 
   const baselineByHash = new Map(baselineViolations.map((v) => [v.hash, v]));
   const currentByHash = new Map(currentViolations.map((v) => [v.hash, v]));
@@ -240,17 +270,13 @@ export function renderGateCompareOutput(result: GateCompareResult): string {
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-function hashViolation(filePath: string, ruleId: string, message: string): string {
-  return createHash('sha256').update(`${filePath}\n${ruleId}\n${message}`).digest('hex');
-}
-
-function extractViolationsFromCliOutput(output: CliOutput): GateViolation[] {
+function extractViolationsFromCliOutput(output: CliOutput, identity: ViolationIdentity): GateViolation[] {
   const violations: GateViolation[] = [];
   for (const check of output.checks) {
     for (const f of check.findings) {
       const filePath = f.filePath ?? '';
       violations.push({
-        hash: hashViolation(filePath, f.ruleId, f.message),
+        hash: identity({ filePath, ruleId: f.ruleId, message: f.message }),
         ruleId: f.ruleId,
         message: f.message,
         filePath,
@@ -260,18 +286,6 @@ function extractViolationsFromCliOutput(output: CliOutput): GateViolation[] {
     }
   }
   return violations;
-}
-
-interface SarifResult {
-  ruleId?: string;
-  level?: string;
-  message?: { text?: string };
-  locations?: readonly {
-    physicalLocation?: {
-      artifactLocation?: { uri?: string };
-      region?: { startLine?: number };
-    };
-  }[];
 }
 
 interface SarifRun {
@@ -284,7 +298,11 @@ interface SarifDoc {
   runs?: readonly SarifRun[];
 }
 
-function extractViolationsFromSarif(doc: unknown, baselinePath: string): GateViolation[] {
+function extractViolationsFromSarif(
+  doc: unknown,
+  baselinePath: string,
+  identity: ViolationIdentity,
+): GateViolation[] {
   if (typeof doc !== 'object' || doc === null) {
     throw new GateBaselineInvalidError(baselinePath, 'top-level value is not an object');
   }
@@ -306,7 +324,7 @@ function extractViolationsFromSarif(doc: unknown, baselinePath: string): GateVio
       const line = loc?.region?.startLine;
       const severity = result.level === 'error' ? 'error' : 'warning';
       violations.push({
-        hash: hashViolation(filePath, ruleId, message),
+        hash: identity({ filePath, ruleId, message }),
         ruleId,
         message,
         filePath,

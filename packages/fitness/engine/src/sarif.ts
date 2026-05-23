@@ -1,5 +1,6 @@
 import { withRetry, logger } from '@opensip-tools/core';
 
+import type { SarifResult, SarifLocation, SarifFix } from './sarif/types.js';
 import type { CliOutput } from '@opensip-tools/contracts';
 
 const SARIF_SCHEMA = 'https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json';
@@ -21,7 +22,62 @@ export interface ReportResult {
 
 interface SarifRun {
   tool: { driver: { name: string; version: string; rules: { id: string }[] } };
-  results: Record<string, unknown>[];
+  results: SarifResult[];
+}
+
+/**
+ * Fluent builder for a single SARIF result. Replaces the inline
+ * Record-shaped construction in `buildSarifRuns`; keeps the producer
+ * type-aligned with the consumer (`gate.ts extractViolationsFromSarif`)
+ * by routing every result through the shared `SarifResult` interface.
+ */
+class SarifResultBuilder {
+  private readonly result: SarifResult;
+
+  constructor(ruleId: string, message: string) {
+    this.result = {
+      ruleId,
+      message: { text: message },
+    };
+  }
+
+  withSeverity(severity: 'error' | 'warning'): this {
+    this.result.level = severity === 'error' ? 'error' : 'warning';
+    return this;
+  }
+
+  /**
+   * Attach a physical location (file + optional region). SARIF
+   * `startLine`/`startColumn` are 1-based per spec § 3.30.6; values of
+   * 0 are invalid, and fitness signals without a line often carry
+   * `line=0` as a sentinel — those are skipped rather than emitted as
+   * invalid SARIF.
+   */
+  withLocation(filePath: string, line?: number, column?: number): this {
+    if (!filePath) return this;
+    const region: { startLine?: number; startColumn?: number } = {};
+    if (line != null && line > 0) region.startLine = line;
+    if (column != null && column > 0) region.startColumn = column;
+    const location: SarifLocation = {
+      physicalLocation: {
+        artifactLocation: { uri: filePath },
+        ...(Object.keys(region).length > 0 ? { region } : {}),
+      },
+    };
+    this.result.locations = [location];
+    return this;
+  }
+
+  withFix(suggestion: string): this {
+    if (!suggestion) return this;
+    const fix: SarifFix = { description: { text: suggestion } };
+    this.result.fixes = [fix];
+    return this;
+  }
+
+  build(): SarifResult {
+    return this.result;
+  }
 }
 
 /** Build a SARIF 2.1.0 log from CLI output — one run per check slug */
@@ -29,7 +85,6 @@ export function buildSarifLog(output: CliOutput): Record<string, unknown> {
   return wrapSarifLog(buildSarifRuns(output));
 }
 
-// eslint-disable-next-line sonarjs/cognitive-complexity -- SARIF builder: assembles rules + results per check; flatter shape would scatter the per-check loop
 function buildSarifRuns(output: CliOutput): SarifRun[] {
   const runs: SarifRun[] = [];
 
@@ -37,37 +92,15 @@ function buildSarifRuns(output: CliOutput): SarifRun[] {
     if (ch.findings.length === 0) continue;
 
     const ruleIds = new Set<string>();
-    const results: Record<string, unknown>[] = [];
+    const results: SarifResult[] = [];
 
     for (const f of ch.findings) {
       ruleIds.add(f.ruleId);
-
-      const result: Record<string, unknown> = {
-        ruleId: f.ruleId,
-        message: { text: f.message },
-        level: f.severity === 'error' ? 'error' : 'warning',
-      };
-
-      if (f.filePath) {
-        // SARIF startLine/startColumn are 1-based (per spec § 3.30.6). Values
-        // of 0 are invalid, and fitness signals without a line often carry
-        // line=0 as a sentinel — skip those fields rather than emit invalid SARIF.
-        const region: Record<string, number> = {};
-        if (f.line != null && f.line > 0) region.startLine = f.line;
-        if (f.column != null && f.column > 0) region.startColumn = f.column;
-        result.locations = [{
-          physicalLocation: {
-            artifactLocation: { uri: f.filePath },
-            ...(Object.keys(region).length > 0 ? { region } : {}),
-          },
-        }];
-      }
-
-      if (f.suggestion) {
-        result.fixes = [{ description: { text: f.suggestion } }];
-      }
-
-      results.push(result);
+      const builder = new SarifResultBuilder(f.ruleId, f.message)
+        .withSeverity(f.severity);
+      if (f.filePath) builder.withLocation(f.filePath, f.line, f.column);
+      if (f.suggestion) builder.withFix(f.suggestion);
+      results.push(builder.build());
     }
 
     runs.push({
@@ -120,7 +153,9 @@ export function chunkSarifRuns(runs: SarifRun[], maxFindings = MAX_FINDINGS_PER_
 
       for (let i = 0; i < run.results.length; i += maxFindings) {
         const slice = run.results.slice(i, i + maxFindings);
-        const ruleIds = new Set(slice.map((r) => r.ruleId as string));
+        const ruleIds = new Set(
+          slice.map((r) => r.ruleId).filter((id): id is string => typeof id === 'string'),
+        );
         chunks.push([{
           tool: {
             driver: {

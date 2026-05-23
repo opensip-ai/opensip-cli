@@ -23,7 +23,9 @@ import {
   GateBaselineMissingError,
   GateBaselineInvalidError,
   DEFAULT_BASELINE_PATH,
+  DEFAULT_VIOLATION_IDENTITY,
   type GateCompareResult,
+  type ViolationIdentity,
 } from '../gate.js';
 
 import type { CliOutput, FindingOutput } from '@opensip-tools/contracts';
@@ -533,5 +535,59 @@ describe('integration — save then compare round-trip', () => {
     expect(result.unchanged.length).toBe(1);
     expect(result.added.length).toBe(1);
     expect(result.added[0].filePath).toBe('b.ts');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Custom ViolationIdentity strategy
+// ---------------------------------------------------------------------------
+
+// Custom identity used by the test below. Keyed by (filePath, ruleId) only —
+// drops `message` from the comparison so wording edits don't register as
+// new/resolved violations. Defined at module scope to satisfy
+// unicorn/consistent-function-scoping.
+const identityIgnoringMessage: ViolationIdentity = ({ filePath, ruleId }) =>
+  `${filePath}::${ruleId}`;
+
+describe('compareToBaseline — custom violation-identity strategy', () => {
+  it('treats two same-rule same-file findings as identical when identity ignores message', () => {
+    const path = join(tmpDir, 'baseline.sarif');
+    saveBaseline(
+      makeOutput([makeFinding({ filePath: 'a.ts', message: 'old phrasing' })]),
+      path,
+    );
+
+    // The default identity would mark this as `added` (different message).
+    // The custom (filePath, ruleId) identity treats them as identical.
+    const result = compareToBaseline(
+      makeOutput([makeFinding({ filePath: 'a.ts', message: 'new phrasing' })]),
+      path,
+      identityIgnoringMessage,
+    );
+    expect(result.added.length).toBe(0);
+    expect(result.resolved.length).toBe(0);
+    expect(result.unchanged.length).toBe(1);
+    expect(result.degraded).toBe(false);
+  });
+
+  it('default identity preserves the (filePath, ruleId, message) semantics', () => {
+    const path = join(tmpDir, 'baseline.sarif');
+    saveBaseline(
+      makeOutput([makeFinding({ filePath: 'a.ts', message: 'old' })]),
+      path,
+    );
+
+    // Default identity sees a different message → that violation is
+    // resolved (the baseline message no longer present), and the new
+    // message counts as added.
+    const result = compareToBaseline(
+      makeOutput([makeFinding({ filePath: 'a.ts', message: 'new' })]),
+      path,
+      DEFAULT_VIOLATION_IDENTITY,
+    );
+    expect(result.added.length).toBe(1);
+    expect(result.resolved.length).toBe(1);
+    expect(result.unchanged.length).toBe(0);
+    expect(result.degraded).toBe(true);
   });
 });
