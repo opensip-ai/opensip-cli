@@ -23,10 +23,8 @@ import { createChaosScenarioRunner } from './executor.js'
 import type { RunnableScenario } from '../../framework/runnable-scenario.js'
 import type { ChaosConfig } from '../../types/base-types.js'
 import type {
-  CustomExecuteFn,
   PersonaConfig,
   ScenarioAssertion,
-  ScenarioExecutionOptions,
 } from '../../types/framework-types.js'
 
 
@@ -34,6 +32,11 @@ import type {
  * Author-facing configuration for a chaos scenario.
  *
  * The `kind` discriminator is set by the entry point.
+ *
+ * Chaos is a framework-driven kind — the runner always uses the shared
+ * `runLoadWindow` driver with explicit injection plus a recovery window.
+ * A custom-`execute` escape hatch would undermine the injection model and
+ * is intentionally omitted here.
  */
 export interface ChaosScenarioConfig {
   // Required metadata
@@ -54,12 +57,6 @@ export interface ChaosScenarioConfig {
   readonly recoveryAssertions: readonly ScenarioAssertion[]
   /** Recovery window in milliseconds after chaos lifts. */
   readonly recoveryWindow: number
-
-  // Optional customization
-  readonly execute?: CustomExecuteFn
-
-  // Execution options
-  readonly options?: ScenarioExecutionOptions
 }
 
 /**

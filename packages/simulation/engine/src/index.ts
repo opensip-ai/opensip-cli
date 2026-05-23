@@ -8,9 +8,6 @@
  *   - `defineChaosScenario`          ← base load + failure injection + recovery
  *   - `defineInvariantScenario`      ← seed → act → assert state
  *   - `defineFixEvaluationScenario`  ← run agent against signal → score predicate
- *
- * The legacy `defineScenario` is preserved as a one-release deprecation alias
- * that routes to `defineLoadScenario`.
  */
 
 // =============================================================================
@@ -130,17 +127,6 @@ export {
 } from './kinds/fix-evaluation/predicates/index.js'
 
 // =============================================================================
-// LEGACY ALIAS (DEPRECATED — one release notice)
-// =============================================================================
-
-export {
-  /** @deprecated Use `defineLoadScenario`. */
-  defineScenario,
-  /** @deprecated Use `defineLoadScenarioWithoutRegistration`. */
-  defineScenarioWithoutRegistration,
-} from './framework/define-scenario.js'
-
-// =============================================================================
 // TOOL PLUGIN — simulation as a Tool implementation
 // =============================================================================
 
@@ -148,8 +134,10 @@ export { simulationTool } from './tool.js'
 export { executeSim } from './cli/sim.js'
 
 // =============================================================================
-// SHARED INFRASTRUCTURE (assertions, personas, result-builder, exec engine)
+// SHARED INFRASTRUCTURE
 // =============================================================================
+// Authoring helpers (assertions, personas) and runtime utilities
+// (result builder, metric resolver, abort/sleep helpers) shared by every kind.
 
 export {
   ASSERTIONS,
@@ -182,27 +170,10 @@ export {
 
 export {
   ScenarioAbortedError,
-  type ScenarioMetadata,
-  type ExecutorScenarioConfig,
-  type ExecutorContext,
-  type ExecutorLogger,
-  type ExecutorResult,
-  type ScenarioExecutor,
-  type CreateScenarioOptions,
-  type ExecutorRunnableScenario,
-  type SimulationLoopOptions,
-  type SimulationLoopResult,
-  type StandardExecutorConfig,
-  type EmitSignalInput,
-  createScenario,
-  createStandardExecutor,
   scenarioAborted,
   validateAssertions,
   updateLatencyMetrics,
   sleepWithAbort,
-  runSimulationLoop,
-  createExecutorResult,
-  emitSimulationSignal,
 } from './framework/execution/execution-engine.js'
 
 // =============================================================================
@@ -240,7 +211,7 @@ export type {
 } from './recipes/types.js'
 
 // =============================================================================
-// LEGACY TYPES (load-shaped, retained for `defineScenario`)
+// CROSS-KIND TYPES (shared by every kind's define/executor/result modules)
 // =============================================================================
 
 export type {
@@ -250,14 +221,11 @@ export type {
   PersonaConfig,
   ScenarioExecutionContext,
   ScenarioLogger,
-  /** @deprecated Use the discriminated `ScenarioExecutorResult` instead — this name now points at the legacy load-shaped payload. */
-  LegacyLoadResultPayload,
   CustomExecuteFn,
-  ActionExecutorFn,
-  ScenarioExecutionOptions,
-  /** @deprecated Use the kind-specific config interfaces. */
-  ScenarioConfig,
   PersonaType,
+  /** @deprecated Held only for back-compat with the prior load-only `ScenarioResultBuilder` payload — prefer `ScenarioExecutorResult`. */
+  LegacyLoadResultPayload,
+  /** @deprecated Use the kind-specific runner result types. `ScenarioType` is no longer the architectural discriminator — `ScenarioKind` is. */
   ScenarioType,
   ChaosConfig,
   SimulationMetrics,

@@ -1,4 +1,3 @@
-/* eslint-disable sonarjs/deprecation -- this file exercises the deprecated `defineScenario` / `defineScenarioWithoutRegistration` aliases */
 /**
  * @fileoverview Edge-case tests for the four `defineXxxScenario` validators.
  *
@@ -12,9 +11,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { ASSERTIONS } from '../framework/assertions.js';
-import { defineScenario, defineScenarioWithoutRegistration } from '../framework/define-scenario.js';
 import { persona } from '../framework/personas.js';
-import { clearScenarioRegistry, getScenario, scenarioRegistry } from '../framework/registry.js';
+import { clearScenarioRegistry, getScenario } from '../framework/registry.js';
 import {
   defineChaosScenario,
   defineChaosScenarioWithoutRegistration,
@@ -778,86 +776,5 @@ describe('fix-evaluation kind — validation edges', () => {
         predicate: { all_of: [{ id: 'tests-pass' }, { id: 'no-tests-modified' }] },
       }),
     ).toThrow(/signal payload is required/);
-  });
-});
-
-// =============================================================================
-// LEGACY DEFINE-SCENARIO (back-compat alias)
-// =============================================================================
-
-describe('defineScenario (legacy alias) — extra coverage', () => {
-  it('defineScenarioWithoutRegistration projects legacy config and does not register', () => {
-    const scenario = defineScenarioWithoutRegistration({
-      id: 'legacy-noreg',
-      name: 'Legacy No Reg',
-      description: 'd',
-      type: 'happy-path',
-      tags: [],
-      personas: [persona('buyer', 1)],
-      duration: 1,
-      assertions: [ASSERTIONS.lowErrorRate()],
-    });
-    expect(scenario.kind).toBe('load');
-    expect(getScenario('legacy-noreg')).toBeUndefined();
-  });
-
-  it('defineScenario still emits the deprecation warning only once', () => {
-    const a = defineScenario({
-      id: 'legacy-warn-1',
-      name: 'Legacy Warn 1',
-      description: 'd',
-      type: 'happy-path',
-      tags: [],
-      personas: [persona('buyer', 1)],
-      duration: 1,
-      assertions: [ASSERTIONS.lowErrorRate()],
-    });
-    const b = defineScenario({
-      id: 'legacy-warn-2',
-      name: 'Legacy Warn 2',
-      description: 'd',
-      type: 'happy-path',
-      tags: [],
-      personas: [persona('buyer', 1)],
-      duration: 1,
-      assertions: [ASSERTIONS.lowErrorRate()],
-    });
-    expect(a.kind).toBe('load');
-    expect(b.kind).toBe('load');
-    expect(scenarioRegistry.has('legacy-warn-1')).toBe(true);
-    expect(scenarioRegistry.has('legacy-warn-2')).toBe(true);
-  });
-
-  it('defineScenario passes optional rampUp/targetRps through to the load runner', () => {
-    const scenario = defineScenario({
-      id: 'legacy-opts',
-      name: 'Legacy Opts',
-      description: 'd',
-      type: 'load',
-      tags: [],
-      personas: [persona('buyer', 1)],
-      duration: 5,
-      rampUp: 1,
-      targetRps: 10,
-      assertions: [ASSERTIONS.lowErrorRate()],
-      options: { persistReports: true, persistLogs: false },
-    });
-    expect(scenario.kind).toBe('load');
-  });
-
-  it('defineScenario with disabled chaosConfig is silently dropped (only enabled chaos throws)', () => {
-    expect(() =>
-      defineScenario({
-        id: 'legacy-disabled-chaos',
-        name: 'Legacy Disabled Chaos',
-        description: 'd',
-        type: 'load',
-        tags: [],
-        personas: [persona('buyer', 1)],
-        duration: 1,
-        chaosConfig: { enabled: false, probability: 0, types: [] },
-        assertions: [ASSERTIONS.lowErrorRate()],
-      }),
-    ).not.toThrow();
   });
 });

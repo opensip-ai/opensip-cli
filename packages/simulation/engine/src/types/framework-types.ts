@@ -1,5 +1,5 @@
 /**
- * @fileoverview Legacy type definitions for the Simulation Framework.
+ * @fileoverview Cross-kind type definitions for the Simulation Framework.
  *
  * Per Plan 01 Phase 0b.5, the framework now exposes four kind-specific entry
  * points (`defineLoadScenario`, `defineChaosScenario`, `defineInvariantScenario`,
@@ -7,18 +7,15 @@
  * `framework/scenario-executor-result.ts`; the cross-kind `RunnableScenario`
  * lives in `framework/runnable-scenario.ts`.
  *
- * The exports below preserve the legacy shapes so callers using `defineScenario`
- * (the deprecated alias for `defineLoadScenario`) continue to compile.
- *
- * @deprecated Prefer the new kind-specific types from `kinds/<kind>/define.ts`.
+ * The exports below are the small set of cross-kind shapes that each kind's
+ * `define`/`executor`/`result` modules consume — execution context + logger,
+ * persona config, assertion + failed-assertion shapes, the legacy load result
+ * payload (still produced by `ScenarioResultBuilder`), and the optional
+ * custom-`execute` hook.
  */
 
 import type {
-  
-  ScenarioType,
-  ChaosConfig,
   SimulationMetrics,
-  
   ScenarioAssertion as MutableScenarioAssertion,
 } from './base-types.js'
 import type { Signal } from '@opensip-tools/core'
@@ -27,8 +24,6 @@ import type { Signal } from '@opensip-tools/core'
 // =============================================================================
 // ASSERTION TYPES
 // =============================================================================
-
-
 
 /**
  * A scenario assertion definition (readonly variant for framework use).
@@ -109,67 +104,8 @@ export interface LegacyLoadResultPayload {
 // eslint-disable-next-line sonarjs/deprecation -- the legacy custom-execute hook returns the legacy payload by design
 export type CustomExecuteFn = (context: ScenarioExecutionContext) => Promise<LegacyLoadResultPayload>
 
-/**
- * Action executor function signature.
- */
-export type ActionExecutorFn = (action: string, context: ScenarioExecutionContext) => Promise<void>
-
-// =============================================================================
-// SCENARIO CONFIG
-// =============================================================================
-
-/**
- * Options for scenario execution.
- */
-export interface ScenarioExecutionOptions {
-  readonly persistReports?: boolean
-  readonly persistLogs?: boolean
-}
-
-/**
- * Full scenario configuration.
- * This is what scenario authors provide to defineScenario().
- */
-export interface ScenarioConfig {
-  // === Required Metadata ===
-  readonly id: string
-  readonly name: string
-  readonly description: string
-  readonly type: ScenarioType
-  readonly tags: readonly string[]
-
-  // === Simulation Configuration ===
-  readonly personas: readonly PersonaConfig[]
-  readonly duration: number
-  readonly rampUp?: number
-  readonly targetRps?: number
-
-  // === Assertions ===
-  readonly assertions: readonly ScenarioAssertion[]
-
-  // === Optional Customization ===
-  readonly execute?: CustomExecuteFn
-  readonly actionExecutor?: ActionExecutorFn
-  readonly chaosConfig?: ChaosConfig
-
-  // === Execution Options ===
-  readonly options?: ScenarioExecutionOptions
-}
-
-// =============================================================================
-// RUNNABLE SCENARIO
-// =============================================================================
-
-// `RunnableScenario` is now defined in `framework/runnable-scenario.ts` and
-// carries a `kind` discriminator. The legacy load-only interface that lived
-// here (with `type: ScenarioType` + `getConfig()`) was retired by Plan 01
-// Phase 0b.5 — there were no external consumers of `getConfig()`, and `type`
-// was redundant with the new `kind` discriminator.
-
 // =============================================================================
 // RE-EXPORTS
 // =============================================================================
 
-
-
-export {type ScenarioType, type AssertionOperator, type PersonaType, type ChaosConfig, type SimulationMetrics} from './base-types.js'
+export { type ScenarioType, type AssertionOperator, type PersonaType, type ChaosConfig, type SimulationMetrics } from './base-types.js'

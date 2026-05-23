@@ -23,7 +23,6 @@ import type {
   CustomExecuteFn,
   PersonaConfig,
   ScenarioAssertion,
-  ScenarioExecutionOptions,
 } from '../../types/framework-types.js'
 
 
@@ -51,9 +50,6 @@ export interface LoadScenarioConfig {
 
   // Optional customization
   readonly execute?: CustomExecuteFn
-
-  // Execution options
-  readonly options?: ScenarioExecutionOptions
 }
 
 /**
