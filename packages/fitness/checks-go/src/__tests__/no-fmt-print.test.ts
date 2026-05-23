@@ -7,6 +7,7 @@ describe('analyzeFmtPrint', () => {
     const violations = analyzeFmtPrint('fmt.Println("hi")')
     expect(violations.length).toBe(1)
     expect(violations[0]?.message).toContain('fmt.Println')
+    expect(violations[0]?.severity).toBe('warning')
     expect(violations[0]?.line).toBe(1)
   })
 
@@ -48,5 +49,23 @@ func main() {
     expect(violations[0]?.line).toBe(4)
     expect(violations[1]?.line).toBe(6)
     expect(violations[2]?.line).toBe(7)
+  })
+
+  it('flags multiple occurrences on a single line', () => {
+    const violations = analyzeFmtPrint('fmt.Print(a); fmt.Println(b)')
+    expect(violations.length).toBe(2)
+  })
+
+  it('does not flag fmt.Sprint or fmt.Errorf', () => {
+    expect(analyzeFmtPrint('fmt.Sprint(a)')).toHaveLength(0)
+    expect(analyzeFmtPrint('fmt.Errorf("e")')).toHaveLength(0)
+  })
+
+  it('does not flag method-style Print on other receivers', () => {
+    expect(analyzeFmtPrint('logger.Print(a)')).toHaveLength(0)
+  })
+
+  it('returns an empty list for content without fmt.Print*', () => {
+    expect(analyzeFmtPrint('package main\nfunc main() {}')).toEqual([])
   })
 })

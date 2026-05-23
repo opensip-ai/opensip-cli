@@ -11,7 +11,12 @@ except:
     const violations = analyzeBareExcept(src)
     expect(violations.length).toBe(1)
     expect(violations[0]?.message).toContain('Bare')
+    expect(violations[0]?.severity).toBe('warning')
     expect(violations[0]?.line).toBe(3)
+  })
+
+  it('returns an empty list for code without except clauses', () => {
+    expect(analyzeBareExcept('def foo(): return 1\n')).toEqual([])
   })
 
   it('does not flag `except Exception:`', () => {
