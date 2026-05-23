@@ -17,7 +17,12 @@ import { relative, sep } from 'node:path';
 import { logger } from '@opensip-tools/core';
 import ts from 'typescript';
 
-import { appendEdge } from '../lang-adapter/edge-helpers.js';
+import {
+  appendEdge,
+  createMutableStats,
+  pushCreationEdge as pushSharedCreationEdge,
+  type MutableStats,
+} from '../lang-adapter/edge-helpers.js';
 
 import { findCatalogEntry } from './edge-helpers/find-catalog-entry.js';
 import { resolveByCatalogFallback } from './edge-resolvers/catalog-fallback.js';
@@ -40,12 +45,18 @@ import type {
 import type { ResolverContext } from './edge-resolvers/types.js';
 import type { CallSiteRecord } from './walk.js';
 
-interface MutableStats {
-  totalCallSites: number;
-  resolvedHigh: number;
-  resolvedMedium: number;
-  resolvedLow: number;
-  unresolved: number;
+function tsPosition(node: ts.Node, sourceFile: ts.SourceFile): {
+  readonly line: number;
+  readonly column: number;
+  readonly text: string;
+} {
+  const start = node.getStart(sourceFile);
+  const startLC = sourceFile.getLineAndCharacterOfPosition(start);
+  return {
+    line: startLC.line + 1,
+    column: startLC.character,
+    text: sourceFile.text.slice(start, node.getEnd()),
+  };
 }
 
 export interface EdgeResolutionInput {
@@ -79,18 +90,20 @@ export function resolveEdgesFromRecords(
   logger.info({ evt: 'graph.edges.start', module: 'graph:edges' });
   const checker = input.program.getTypeChecker();
   const callsByHash = new Map<string, CallEdge[]>();
-  const stats: MutableStats = {
-    totalCallSites: 0,
-    resolvedHigh: 0,
-    resolvedMedium: 0,
-    resolvedLow: 0,
-    unresolved: 0,
-  };
+  const stats = createMutableStats();
 
   for (const r of input.callSites) {
     if (r.kind === 'creation') {
       if (r.childHash === undefined) continue;
-      pushCreationEdge(r.node, r.sourceFile, r.ownerHash, r.childHash, callsByHash, stats);
+      pushSharedCreationEdge(
+        r.node,
+        r.sourceFile,
+        r.ownerHash,
+        r.childHash,
+        callsByHash,
+        stats,
+        tsPosition,
+      );
       continue;
     }
     const ctx: ResolverContext = {
@@ -121,39 +134,10 @@ export function resolveEdgesFromRecords(
 }
 
 /**
- * Append a synthetic "creation" edge — emitted when a parent function
- * owns an inline-callable child (arrow / method / accessor /
- * constructor). Static, high-confidence by construction.
- */
-function pushCreationEdge(
-  node: ts.Node,
-  sourceFile: ts.SourceFile,
-  ownerHash: string,
-  childHash: string,
-  callsByHash: Map<string, CallEdge[]>,
-  stats: MutableStats,
-): void {
-  const start = node.getStart(sourceFile);
-  const startLC = sourceFile.getLineAndCharacterOfPosition(start);
-  const text = sourceFile.text.slice(start, node.getEnd());
-  const truncated = text.length > 70 ? `${text.slice(0, 67)}...` : text;
-  const edge: CallEdge = {
-    to: [childHash],
-    line: startLC.line + 1,
-    column: startLC.character,
-    resolution: 'static',
-    confidence: 'high',
-    text: `[creates] ${truncated}`,
-    discarded: false,
-  };
-  appendEdge(callsByHash, ownerHash, edge);
-  stats.totalCallSites++;
-  stats.resolvedHigh++;
-}
-
-/**
  * Append an ordinary call/new/jsx/value-reference edge from a resolver
- * verdict. Bumps the per-confidence stat counter as a side effect.
+ * verdict. Bumps `totalCallSites` directly (every call expression is
+ * a site, even unresolved-by-shape ones); delegates per-confidence
+ * classification to `stats.apply`.
  */
 function pushCallEdge(
   node: ts.Node,
@@ -164,23 +148,18 @@ function pushCallEdge(
   stats: MutableStats,
 ): void {
   stats.totalCallSites++;
-  const start = node.getStart(sourceFile);
-  const startLC = sourceFile.getLineAndCharacterOfPosition(start);
-  const text = sourceFile.text.slice(start, node.getEnd());
+  const pos = tsPosition(node, sourceFile);
   const edge: CallEdge = {
     to: verdict.to,
-    line: startLC.line + 1,
-    column: startLC.character,
+    line: pos.line,
+    column: pos.column,
     resolution: verdict.resolution,
     confidence: verdict.confidence,
-    text: text.length > 80 ? `${text.slice(0, 77)}...` : text,
+    text: pos.text.length > 80 ? `${pos.text.slice(0, 77)}...` : pos.text,
     discarded: isReturnValueDiscarded(node),
   };
   appendEdge(callsByHash, ownerHash, edge);
-  if (verdict.to.length === 0) stats.unresolved++;
-  else if (verdict.confidence === 'high') stats.resolvedHigh++;
-  else if (verdict.confidence === 'medium') stats.resolvedMedium++;
-  else stats.resolvedLow++;
+  stats.apply(edge);
 }
 
 /**
@@ -272,20 +251,46 @@ function isResolverCandidateNode(node: ts.Node): boolean {
   return false;
 }
 
+/**
+ * Resolver dispatch table — predicate-keyed pairs covering the five
+ * resolver-target shapes. Entries that hand off to a single resolver
+ * pass its verdict through verbatim. The identifier/shorthand entries
+ * additionally suppress empty (`to: []`) verdicts so we don't emit a
+ * useless edge for unresolved value references — same semantics the
+ * legacy if-ladder had.
+ */
+interface VerdictEntry {
+  readonly predicate: (node: ts.Node) => boolean;
+  readonly resolve: (node: ts.Node, ctx: ResolverContext) => ResolverVerdict | null;
+}
+
+const VERDICT_TABLE: readonly VerdictEntry[] = [
+  { predicate: ts.isCallExpression, resolve: (n, c) => dispatchCall(n as ts.CallExpression, c) },
+  { predicate: ts.isNewExpression, resolve: (n, c) => resolveNewExpression(n as ts.NewExpression, c) },
+  {
+    predicate: (n) => ts.isJsxOpeningElement(n) || ts.isJsxSelfClosingElement(n),
+    resolve: (n, c) => resolveJsxElement(n as ts.JsxOpeningElement | ts.JsxSelfClosingElement, c),
+  },
+  {
+    predicate: (n) => ts.isIdentifier(n) && isValueReference(n),
+    resolve: (n, c) => {
+      const v = resolveValueReference(n as ts.Identifier, c);
+      return v.to.length > 0 ? v : null;
+    },
+  },
+  {
+    predicate: ts.isShorthandPropertyAssignment,
+    resolve: (n, c) => {
+      const v = resolveShorthandAssignment(n as ts.ShorthandPropertyAssignment, c);
+      return v.to.length > 0 ? v : null;
+    },
+  },
+];
+
 /** Returns null if `node` is not a call/new/jsx/value-reference site. */
 function computeVerdict(node: ts.Node, ctx: ResolverContext): ResolverVerdict | null {
-  if (ts.isCallExpression(node)) return dispatchCall(node, ctx);
-  if (ts.isNewExpression(node)) return resolveNewExpression(node, ctx);
-  if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
-    return resolveJsxElement(node, ctx);
-  }
-  if (ts.isIdentifier(node) && isValueReference(node)) {
-    const v = resolveValueReference(node, ctx);
-    return v.to.length > 0 ? v : null;
-  }
-  if (ts.isShorthandPropertyAssignment(node)) {
-    const v = resolveShorthandAssignment(node, ctx);
-    return v.to.length > 0 ? v : null;
+  for (const entry of VERDICT_TABLE) {
+    if (entry.predicate(node)) return entry.resolve(node, ctx);
   }
   return null;
 }

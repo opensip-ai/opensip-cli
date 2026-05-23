@@ -32,39 +32,42 @@
 
 import { logger } from '@opensip-tools/core';
 
-import { appendEdge } from '../lang-adapter/edge-helpers.js';
+import {
+  appendEdge,
+  createMutableStats,
+  pushCreationEdge,
+} from '../lang-adapter/edge-helpers.js';
 
+import type { MutableStats } from '../lang-adapter/edge-helpers.js';
 import type { ResolveInput, ResolveOutput } from '../lang-adapter/types.js';
 import type { CallEdge, FunctionOccurrence, ResolutionStats } from '../types.js';
 import type { PythonParsedFile, PythonParsedProject } from './parse.js';
 import type Parser from 'tree-sitter';
 
-interface MutableStats {
-  totalCallSites: number;
-  resolvedHigh: number;
-  resolvedMedium: number;
-  resolvedLow: number;
-  unresolved: number;
+function pythonPosition(node: Parser.SyntaxNode, file: PythonParsedFile): {
+  readonly line: number;
+  readonly column: number;
+  readonly text: string;
+} {
+  return {
+    line: node.startPosition.row + 1,
+    column: node.startPosition.column,
+    text: file.source.slice(node.startIndex, node.endIndex),
+  };
 }
 
 export function resolveCallSites(input: ResolveInput<PythonParsedProject>): ResolveOutput {
   logger.info({ evt: 'graph.edges.start', module: 'graph:edges:python' });
   const byName = buildNameIndex(input.catalog.functions);
   const edgesByOwner = new Map<string, CallEdge[]>();
-  const stats: MutableStats = {
-    totalCallSites: 0,
-    resolvedHigh: 0,
-    resolvedMedium: 0,
-    resolvedLow: 0,
-    unresolved: 0,
-  };
+  const stats = createMutableStats();
 
   for (const r of input.callSites) {
     const node = r.nodeRef as Parser.SyntaxNode;
     const file = r.sourceFileRef as PythonParsedFile;
     if (r.kind === 'creation') {
       if (r.childHash === undefined) continue;
-      pushCreationEdge(node, file, r.ownerHash, r.childHash, edgesByOwner, stats);
+      pushCreationEdge(node, file, r.ownerHash, r.childHash, edgesByOwner, stats, pythonPosition);
       continue;
     }
     pushCallEdge(node, file, r.ownerHash, byName, edgesByOwner, stats);
@@ -113,88 +116,43 @@ function pushCallEdge(
 ): void {
   stats.totalCallSites++;
   const target = extractCallTargetName(node);
-  const startLine = node.startPosition.row + 1;
-  const startCol = node.startPosition.column;
-  const text = file.source.slice(node.startIndex, node.endIndex);
-  const truncated = text.length > 80 ? `${text.slice(0, 77)}...` : text;
+  const pos = pythonPosition(node, file);
+  const truncated = pos.text.length > 80 ? `${pos.text.slice(0, 77)}...` : pos.text;
   const discarded = isReturnValueDiscarded(node);
 
-  let edge: CallEdge;
-  if (target === null) {
-    edge = {
-      to: [],
-      line: startLine,
-      column: startCol,
-      resolution: 'unknown',
-      confidence: 'low',
-      text: truncated,
-      discarded,
-    };
-    stats.unresolved++;
-  } else {
-    const matches = byName.get(target);
-    if (!matches || matches.length === 0) {
-      edge = {
-        to: [],
-        line: startLine,
-        column: startCol,
-        resolution: 'unknown',
-        confidence: 'low',
-        text: truncated,
-        discarded,
-      };
-      stats.unresolved++;
-    } else if (matches.length === 1) {
-      edge = {
-        to: [...matches],
-        line: startLine,
-        column: startCol,
-        resolution: 'static',
-        confidence: 'medium',
-        text: truncated,
-        discarded,
-      };
-      stats.resolvedMedium++;
-    } else {
-      edge = {
-        to: [...matches],
-        line: startLine,
-        column: startCol,
-        resolution: 'method-dispatch',
-        confidence: 'low',
-        text: truncated,
-        discarded,
-      };
-      stats.resolvedLow++;
-    }
-  }
+  const edge: CallEdge = buildPythonCallEdge(target, byName, {
+    line: pos.line,
+    column: pos.column,
+    text: truncated,
+    discarded,
+  });
   appendEdge(edgesByOwner, ownerHash, edge);
+  stats.apply(edge);
 }
 
-function pushCreationEdge(
-  node: Parser.SyntaxNode,
-  file: PythonParsedFile,
-  ownerHash: string,
-  childHash: string,
-  edgesByOwner: Map<string, CallEdge[]>,
-  stats: MutableStats,
-): void {
-  const startLine = node.startPosition.row + 1;
-  const startCol = node.startPosition.column;
-  const text = file.source.slice(node.startIndex, node.endIndex);
-  const truncated = text.length > 70 ? `${text.slice(0, 67)}...` : text;
-  const edge: CallEdge = {
-    to: [childHash],
-    line: startLine,
-    column: startCol,
-    resolution: 'static',
-    confidence: 'high',
-    text: `[creates] ${truncated}`,
-    discarded: false,
-  };
-  appendEdge(edgesByOwner, ownerHash, edge);
-  stats.totalCallSites++;
-  stats.resolvedHigh++;
+interface CallEdgeLoc {
+  readonly line: number;
+  readonly column: number;
+  readonly text: string;
+  readonly discarded: boolean;
+}
+
+function buildPythonCallEdge(
+  target: string | null,
+  byName: ReadonlyMap<string, readonly string[]>,
+  loc: CallEdgeLoc,
+): CallEdge {
+  if (target === null) {
+    return { to: [], ...loc, resolution: 'unknown', confidence: 'low' };
+  }
+  const matches = byName.get(target);
+  if (!matches || matches.length === 0) {
+    return { to: [], ...loc, resolution: 'unknown', confidence: 'low' };
+  }
+  if (matches.length === 1) {
+    return { to: [...matches], ...loc, resolution: 'static', confidence: 'medium' };
+  }
+  return { to: [...matches], ...loc, resolution: 'method-dispatch', confidence: 'low' };
 }
 
 /**

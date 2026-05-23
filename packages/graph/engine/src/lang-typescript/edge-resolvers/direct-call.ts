@@ -7,6 +7,7 @@
 
 import ts from 'typescript';
 
+import { DeclShape, functionLikeFromDeclaration } from '../edge-helpers/declaration-to-node.js';
 import { findCatalogEntry } from '../edge-helpers/find-catalog-entry.js';
 import { unaliasSymbol } from '../edge-helpers/unalias-symbol.js';
 
@@ -18,6 +19,15 @@ const UNRESOLVED = {
   confidence: 'low' as const,
 };
 
+const ACCEPT =
+  DeclShape.FunctionDeclaration |
+  DeclShape.ArrowFunction |
+  DeclShape.FunctionExpression |
+  DeclShape.MethodDeclaration |
+  DeclShape.ConstructorDeclaration |
+  DeclShape.Accessor |
+  DeclShape.VariableInitializer;
+
 export const resolveDirectCall: EdgeResolver<ts.CallExpression> = (node, ctx) => {
   if (!ts.isIdentifier(node.expression)) return UNRESOLVED;
   const name = node.expression.text;
@@ -28,7 +38,7 @@ export const resolveDirectCall: EdgeResolver<ts.CallExpression> = (node, ctx) =>
   const decls = real.getDeclarations() ?? [];
   for (const d of decls) {
     const sf = d.getSourceFile();
-    const declNode = functionLikeFromDeclaration(d);
+    const declNode = functionLikeFromDeclaration(d, ACCEPT);
     if (!declNode) continue;
     const hash = findCatalogEntry(declNode, sf, ctx.catalog, [name]);
     if (hash) {
@@ -37,21 +47,3 @@ export const resolveDirectCall: EdgeResolver<ts.CallExpression> = (node, ctx) =>
   }
   return UNRESOLVED;
 };
-
-function functionLikeFromDeclaration(d: ts.Declaration): ts.Node | null {
-  if (
-    ts.isFunctionDeclaration(d) ||
-    ts.isArrowFunction(d) ||
-    ts.isFunctionExpression(d) ||
-    ts.isMethodDeclaration(d) ||
-    ts.isConstructorDeclaration(d) ||
-    ts.isGetAccessor(d) ||
-    ts.isSetAccessor(d)
-  ) {
-    return d;
-  }
-  if (ts.isVariableDeclaration(d) && d.initializer && (ts.isArrowFunction(d.initializer) || ts.isFunctionExpression(d.initializer))) {
-      return d.initializer;
-    }
-  return null;
-}

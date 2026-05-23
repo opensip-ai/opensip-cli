@@ -8,6 +8,7 @@
 
 import ts from 'typescript';
 
+import { DeclShape, functionLikeFromDeclaration } from '../edge-helpers/declaration-to-node.js';
 import { findCatalogEntry } from '../edge-helpers/find-catalog-entry.js';
 
 import type { EdgeResolver } from './types.js';
@@ -17,6 +18,17 @@ const UNRESOLVED = {
   resolution: 'unknown' as const,
   confidence: 'low' as const,
 };
+
+const ACCEPT =
+  DeclShape.MethodDeclaration |
+  DeclShape.MethodSignature |
+  DeclShape.FunctionDeclaration |
+  DeclShape.ArrowFunction |
+  DeclShape.FunctionExpression |
+  DeclShape.Accessor |
+  DeclShape.PropertyDeclaration |
+  DeclShape.VariableInitializer |
+  DeclShape.PropertyAssignmentInitializer;
 
 export const resolvePolymorphicCall: EdgeResolver<ts.CallExpression> = (node, ctx) => {
   if (!ts.isPropertyAccessExpression(node.expression)) return UNRESOLVED;
@@ -52,31 +64,9 @@ function appendHashesForSymbol(
 ): void {
   const decls = sym.getDeclarations() ?? [];
   for (const d of decls) {
-    const declNode = functionLikeFromDeclaration(d);
+    const declNode = functionLikeFromDeclaration(d, ACCEPT);
     if (!declNode) continue;
     const hash = findCatalogEntry(declNode, d.getSourceFile(), ctx.catalog, [methodName]);
     if (hash && !out.includes(hash)) out.push(hash);
   }
-}
-
-function functionLikeFromDeclaration(d: ts.Declaration): ts.Node | null {
-  if (
-    ts.isMethodDeclaration(d) ||
-    ts.isMethodSignature(d) ||
-    ts.isFunctionDeclaration(d) ||
-    ts.isArrowFunction(d) ||
-    ts.isFunctionExpression(d) ||
-    ts.isGetAccessor(d) ||
-    ts.isSetAccessor(d) ||
-    ts.isPropertyDeclaration(d)
-  ) {
-    return d;
-  }
-  if (ts.isVariableDeclaration(d) && d.initializer && (ts.isArrowFunction(d.initializer) || ts.isFunctionExpression(d.initializer))) {
-      return d.initializer;
-    }
-  if (ts.isPropertyAssignment(d) && (ts.isArrowFunction(d.initializer) || ts.isFunctionExpression(d.initializer))) {
-      return d.initializer;
-    }
-  return null;
 }

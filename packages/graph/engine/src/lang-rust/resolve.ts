@@ -42,20 +42,17 @@
 
 import { logger } from '@opensip-tools/core';
 
-import { appendEdge } from '../lang-adapter/edge-helpers.js';
+import {
+  appendEdge,
+  createMutableStats,
+  pushCreationEdge,
+} from '../lang-adapter/edge-helpers.js';
 
+import type { MutableStats } from '../lang-adapter/edge-helpers.js';
 import type { ResolveInput, ResolveOutput } from '../lang-adapter/types.js';
 import type { CallEdge, FunctionOccurrence, ResolutionStats } from '../types.js';
 import type { RustParsedFile, RustParsedProject } from './parse.js';
 import type Parser from 'tree-sitter';
-
-interface MutableStats {
-  totalCallSites: number;
-  resolvedHigh: number;
-  resolvedMedium: number;
-  resolvedLow: number;
-  unresolved: number;
-}
 
 interface NameIndex {
   /** All occurrences keyed by simple name (excludes module-init / arrow synthetics). */
@@ -64,24 +61,30 @@ interface NameIndex {
   readonly methods: ReadonlyMap<string, readonly FunctionOccurrence[]>;
 }
 
+function rustPosition(node: Parser.SyntaxNode, file: RustParsedFile): {
+  readonly line: number;
+  readonly column: number;
+  readonly text: string;
+} {
+  return {
+    line: node.startPosition.row + 1,
+    column: node.startPosition.column,
+    text: file.source.slice(node.startIndex, node.endIndex),
+  };
+}
+
 export function resolveCallSites(input: ResolveInput<RustParsedProject>): ResolveOutput {
   logger.info({ evt: 'graph.edges.start', module: 'graph:edges:rust' });
   const index = buildIndex(input.catalog.functions);
   const edgesByOwner = new Map<string, CallEdge[]>();
-  const stats: MutableStats = {
-    totalCallSites: 0,
-    resolvedHigh: 0,
-    resolvedMedium: 0,
-    resolvedLow: 0,
-    unresolved: 0,
-  };
+  const stats = createMutableStats();
 
   for (const r of input.callSites) {
     const node = r.nodeRef as Parser.SyntaxNode;
     const file = r.sourceFileRef as RustParsedFile;
     if (r.kind === 'creation') {
       if (r.childHash === undefined) continue;
-      pushCreationEdge(node, file, r.ownerHash, r.childHash, edgesByOwner, stats);
+      pushCreationEdge(node, file, r.ownerHash, r.childHash, edgesByOwner, stats, rustPosition);
       continue;
     }
     pushCallEdge(node, file, r.ownerHash, index, edgesByOwner, stats);
@@ -132,19 +135,17 @@ function pushCallEdge(
 ): void {
   stats.totalCallSites++;
   const target = decodeCallTarget(node);
-  const startLine = node.startPosition.row + 1;
-  const startCol = node.startPosition.column;
-  const text = file.source.slice(node.startIndex, node.endIndex);
-  const truncated = text.length > 80 ? `${text.slice(0, 77)}...` : text;
+  const pos = rustPosition(node, file);
+  const truncated = pos.text.length > 80 ? `${pos.text.slice(0, 77)}...` : pos.text;
   const discarded = isReturnValueDiscarded(node);
 
   const edge = resolveTarget(target, index, {
-    line: startLine,
-    column: startCol,
+    line: pos.line,
+    column: pos.column,
     text: truncated,
     discarded,
   });
-  applyStats(stats, edge);
+  stats.apply(edge);
   appendEdge(edgesByOwner, ownerHash, edge);
 }
 
@@ -265,42 +266,6 @@ function resolveTarget(
     text: loc.text,
     discarded: loc.discarded,
   };
-}
-
-function applyStats(stats: MutableStats, edge: CallEdge): void {
-  if (edge.to.length === 0) {
-    stats.unresolved++;
-    return;
-  }
-  if (edge.confidence === 'high') stats.resolvedHigh++;
-  else if (edge.confidence === 'medium') stats.resolvedMedium++;
-  else stats.resolvedLow++;
-}
-
-function pushCreationEdge(
-  node: Parser.SyntaxNode,
-  file: RustParsedFile,
-  ownerHash: string,
-  childHash: string,
-  edgesByOwner: Map<string, CallEdge[]>,
-  stats: MutableStats,
-): void {
-  const startLine = node.startPosition.row + 1;
-  const startCol = node.startPosition.column;
-  const text = file.source.slice(node.startIndex, node.endIndex);
-  const truncated = text.length > 70 ? `${text.slice(0, 67)}...` : text;
-  const edge: CallEdge = {
-    to: [childHash],
-    line: startLine,
-    column: startCol,
-    resolution: 'static',
-    confidence: 'high',
-    text: `[creates] ${truncated}`,
-    discarded: false,
-  };
-  appendEdge(edgesByOwner, ownerHash, edge);
-  stats.totalCallSites++;
-  stats.resolvedHigh++;
 }
 
 /**

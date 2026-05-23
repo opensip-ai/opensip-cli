@@ -11,6 +11,7 @@
 
 import ts from 'typescript';
 
+import { DeclShape, functionLikeFromDeclaration } from '../edge-helpers/declaration-to-node.js';
 import { findCatalogEntry } from '../edge-helpers/find-catalog-entry.js';
 import { unaliasSymbol } from '../edge-helpers/unalias-symbol.js';
 
@@ -21,6 +22,12 @@ const UNRESOLVED = {
   resolution: 'unknown' as const,
   confidence: 'low' as const,
 };
+
+const ACCEPT =
+  DeclShape.FunctionDeclaration |
+  DeclShape.ArrowFunction |
+  DeclShape.FunctionExpression |
+  DeclShape.VariableInitializer;
 
 type JsxOpeningLike = ts.JsxOpeningElement | ts.JsxSelfClosingElement;
 
@@ -37,7 +44,7 @@ export const resolveJsxElement: EdgeResolver<JsxOpeningLike> = (node, ctx) => {
   const candidateName = ts.isIdentifier(tagName) ? tagName.text : tagName.getText();
   for (const d of decls) {
     const sf = d.getSourceFile();
-    const declNode = functionLikeFromDeclaration(d);
+    const declNode = functionLikeFromDeclaration(d, ACCEPT);
     if (!declNode) continue;
     const hash = findCatalogEntry(declNode, sf, ctx.catalog, [candidateName]);
     if (hash) {
@@ -46,17 +53,3 @@ export const resolveJsxElement: EdgeResolver<JsxOpeningLike> = (node, ctx) => {
   }
   return UNRESOLVED;
 };
-
-function functionLikeFromDeclaration(d: ts.Declaration): ts.Node | null {
-  if (
-    ts.isFunctionDeclaration(d) ||
-    ts.isArrowFunction(d) ||
-    ts.isFunctionExpression(d)
-  ) {
-    return d;
-  }
-  if (ts.isVariableDeclaration(d) && d.initializer && (ts.isArrowFunction(d.initializer) || ts.isFunctionExpression(d.initializer))) {
-      return d.initializer;
-    }
-  return null;
-}

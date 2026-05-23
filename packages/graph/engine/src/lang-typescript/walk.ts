@@ -184,19 +184,40 @@ function record(
 }
 
 /**
+ * Visitor dispatch table — predicate-keyed pairs the walker iterates
+ * to map a function-shaped node to its Stage 1 inventory visitor.
+ * Adding a new function-shape (say, `import.meta` lazy modules) is a
+ * one-line append here, not a new branch in `dispatchVisitor`.
+ *
+ * Order matters only when predicates overlap — they don't here, so
+ * the table reads top-to-bottom in the same order the legacy
+ * if-ladder did.
+ */
+interface VisitorEntry {
+  readonly predicate: (node: ts.Node) => boolean;
+  readonly visit: (node: ts.Node, ctx: VisitorContext) => FunctionOccurrence | null;
+}
+
+const VISITOR_TABLE: readonly VisitorEntry[] = [
+  { predicate: ts.isFunctionDeclaration, visit: (n, c) => visitFunctionDeclaration(n as ts.FunctionDeclaration, c) },
+  { predicate: ts.isArrowFunction, visit: (n, c) => visitArrowFunction(n as ts.ArrowFunction, c) },
+  { predicate: ts.isMethodDeclaration, visit: (n, c) => visitMethodDeclaration(n as ts.MethodDeclaration, c) },
+  { predicate: ts.isConstructorDeclaration, visit: (n, c) => visitConstructorDeclaration(n as ts.ConstructorDeclaration, c) },
+  { predicate: (n) => ts.isGetAccessor(n) || ts.isSetAccessor(n), visit: (n, c) => visitGetterSetter(n as ts.GetAccessorDeclaration | ts.SetAccessorDeclaration, c) },
+  { predicate: ts.isFunctionExpression, visit: (n, c) => visitFunctionExpression(n as ts.FunctionExpression, c) },
+  { predicate: ts.isClassStaticBlockDeclaration, visit: (n, c) => visitClassStaticBlock(n as ts.ClassStaticBlockDeclaration, c) },
+];
+
+/**
  * Dispatch a node to the right Stage 1 inventory visitor and return
  * the function occurrence (or null if the node isn't function-shaped).
  * Exported so `inventory.ts:buildInventory` can share this dispatch
  * table when it walks files in isolation (tests, external callers).
  */
 export function dispatchVisitor(node: ts.Node, ctx: VisitorContext): FunctionOccurrence | null {
-  if (ts.isFunctionDeclaration(node)) return visitFunctionDeclaration(node, ctx);
-  if (ts.isArrowFunction(node)) return visitArrowFunction(node, ctx);
-  if (ts.isMethodDeclaration(node)) return visitMethodDeclaration(node, ctx);
-  if (ts.isConstructorDeclaration(node)) return visitConstructorDeclaration(node, ctx);
-  if (ts.isGetAccessor(node) || ts.isSetAccessor(node)) return visitGetterSetter(node, ctx);
-  if (ts.isFunctionExpression(node)) return visitFunctionExpression(node, ctx);
-  if (ts.isClassStaticBlockDeclaration(node)) return visitClassStaticBlock(node, ctx);
+  for (const entry of VISITOR_TABLE) {
+    if (entry.predicate(node)) return entry.visit(node, ctx);
+  }
   return null;
 }
 
