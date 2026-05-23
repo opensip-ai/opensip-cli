@@ -547,6 +547,11 @@ docs.
   the type — `*OptsToCliArgs` adapters in `fitness`, `simulation`,
   and the CLI's `init` command are doing real work and a rip-out is
   out of scope.
+- `packages/contracts/src/index.ts` — add a typed `CliProgram`
+  re-export so tool packages can drop their `as Command` casts:
+  `export type CliProgram = import('commander').Command`. Per the
+  consistency pass (Conflict 3), this is the right home for the
+  re-export; CLI plan Phase 2 then consumes it.
 - `docs/architecture/70-surfaces/02-plugin-authoring.md` (or
   equivalent contributor-facing surface doc) — add a "Don't extend
   `CliArgs`" call-out for Tool authors.

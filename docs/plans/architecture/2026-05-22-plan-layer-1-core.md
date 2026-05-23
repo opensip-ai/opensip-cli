@@ -480,6 +480,46 @@ unchanged so callers should not need edits. Watch out for any code
 that imports the *setter functions* — those remain exported from
 `logger.ts` as singleton-bound helpers.
 
+## Phase 8 — `Tool.renderLive` contract refresh
+
+**Goal:** Replace the leaky `renderLive(viewKey: string, args: unknown)` shape on `ToolCliContext` with a registration-style API that lets each Tool contribute its own live view at `register(cli)` time. Closes the architectural hole the CLI audit's F2 calls out: today the dispatcher hard-codes `viewKey === 'fit'` / `'graph'` despite claiming to be tool-agnostic.
+
+**Closes findings:** none in the core audit directly (this is an unblocker for CLI audit F2 / F3); promotes the contract surface the Tool plugin model already implies.
+
+**Files touched:**
+- `packages/core/src/tools/types.ts` — change `ToolCliContext` to add
+  `registerLiveView(key: string, render: LiveViewRenderer): void`.
+  `renderLive(key, args)` looks up the registry, throws a typed
+  `UnknownLiveViewError` if missing.
+- `packages/core/src/index.ts` — re-export `LiveViewRenderer` and
+  `UnknownLiveViewError`.
+- Sibling consumers update in **Layer 5 Phase 2** (CLI plan owns the
+  CLI-side wiring) and the per-tool `register()` calls update in the
+  tool packages alongside Layer 5 Phase 3.
+
+**Steps:**
+1. Define `LiveViewRenderer` (the existing render function shape, just
+   typed by `args` rather than `unknown`).
+2. Add `registerLiveView` to the `ToolCliContext` interface.
+3. Document the lookup-and-throw semantics on `renderLive`.
+4. Export `UnknownLiveViewError` as a typed throw shape (subclass of
+   `ToolError`).
+
+**Acceptance:**
+- `ToolCliContext.registerLiveView` is part of the public contract.
+- `renderLive` throws a typed error when called with an unregistered
+  key, instead of silently rendering nothing or falling back.
+- `pnpm typecheck && pnpm test && pnpm lint` clean (the CLI's
+  implementation will be updated in Layer 5 Phase 2 — until then,
+  expect a few new TypeScript errors flagging that the CLI hasn't
+  adopted the new shape yet; gate the merge of this phase on Phase 2's
+  follow-up).
+
+**Risk / dependencies:** This phase is the contract-only half. Layer 5
+Phase 2 (the CLI-side adoption) lands second; until both are merged,
+the CLI build will not pass. Land them in the same PR or as a tight
+two-PR pair.
+
 ## Phase 7 — `applyRegions` perf pass (optional, deferrable)
 
 **Goal:** Replace the `split('') / mutate / join('')` overlay in

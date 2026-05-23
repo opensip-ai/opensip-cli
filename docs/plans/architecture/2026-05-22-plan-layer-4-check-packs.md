@@ -81,7 +81,16 @@ entries, import-style drift, stale exemption pragmas).
 
 ## Group A — Correctness fixes (P0)
 
-### Phase A1 — Fix clang-tidy parser to capture file path and column
+### Phase A1 — Fix clang-tidy parser to capture file path and column ✅ closed by Wave 1
+
+**Status:** Shipped in Wave 1 — commit `efba14c`. Parser now
+captures `match[1]` (file path, resolved via `path.resolve(cwd,
+rawPath)` and converted to project-relative form when inside cwd) and
+`match[3]` (column). Mirrors the `parseSemgrepOutput` pattern. 4 new
+regression tests. See the consistency pass
+(`./2026-05-22-plan-consistency-pass.md`) Conflict 6. Stretch items
+(F2 YAML migration, F3 `note:` line handling) remain in the Deferred
+section below.
 
 **Closes:** checks-cpp F1.
 
@@ -113,7 +122,14 @@ fix that restores per-file grouping.
 
 ## Group B — Cohort-wide cleanups (small packs)
 
-### Phase B1 — Eliminate `metadata.version` drift across the four small packs
+### Phase B1 — Eliminate `metadata.version` drift across the four small packs ✅ closed by Wave 1
+
+**Status:** Shipped in Wave 1 — commit `364c0be`. All six check packs
+(checks-cpp, checks-go, checks-java, checks-python, checks-typescript,
+checks-universal) now call `readPackageVersion(import.meta.url)`
+(re-exported from `@opensip-tools/fitness`). One metadata test per
+pack pins the version against `package.json`. See the consistency pass
+(`./2026-05-22-plan-consistency-pass.md`) Conflict 5.
 
 **Closes:** checks-go F1, checks-python F1, checks-java F3, checks-cpp
 (implicit cohort drift; the cpp barrel carries the same stale literal),
@@ -535,9 +551,19 @@ helper rather than leaving inline copies.
   ships its own recipe directory or whether the example recipe in
   the workspace `opensip-tools/fit/recipes/` absorbs them).
 
-### Phase D5 — Standardize `typescript` import style and drop the `ts` re-export
+### Phase D5 — Standardize `typescript` import style (call-site sweep)
 
 **Closes:** checks-typescript F5.
+
+**Scope (clarified per consistency pass Conflict 9):** This phase is
+the **call-site sweep only**. The symbol relocation — moving
+`filterContent`/`clearFilterCache` to `lang-typescript`, dropping the
+`ts` re-export from fitness, deleting the
+`lang-no-fitness-except-typescript` dep-cruiser rule — is owned by
+**Layer 3 Phase D3**. Sequence: Layer 3 D3 lands first with a
+temporary `@deprecated` shim on the fitness `ts` re-export; this
+phase sweeps the call sites; the shim is removed in a follow-up
+commit.
 
 **Approach:** Pick `import * as ts from 'typescript'` (the dominant
 style — 47 files). Update the 6 outliers
@@ -547,21 +573,11 @@ style — 47 files). Update the 6 outliers
 `quality/patterns/stream-buffer-size-limits`) to drop the
 `ts`-from-fitness import and use the direct module import.
 
-Then drop the `ts` re-export from `@opensip-tools/fitness` (it
-shouldn't be there — it couples non-TS check packs to a compiler
-they don't use). If `lang-typescript/ast-utilities.ts` still
-re-exports `ts`, that is acceptable because `lang-typescript` is
-the canonical home for the TS compiler dependency in the layer.
-
-This phase is partially Layer 3 work (the fitness package change),
-but the call sites are Layer 4 — coordinate with the Layer 3 plan
-or land the Layer 4 sweep first and the fitness drop second.
-
 **Files:**
 
 - 6 outlier files in `packages/fitness/checks-typescript/src/checks/...`
-- `packages/fitness/engine/src/index.ts` (or wherever `ts` is
-  re-exported) — drop the re-export.
+- The fitness `ts` re-export drop is owned by Layer 3 Phase D3 — not
+  edited here.
 
 ### Phase D6 — Switch checks-typescript subpath imports to the `@opensip-tools/core` barrel
 

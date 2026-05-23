@@ -93,7 +93,19 @@ Group B and the deferred section.
 
 These are real bugs, ordered by user-visible impact.
 
-### Phase A1 — Fix lang-pack lexer correctness bugs
+### Phase A1 — Fix lang-pack lexer correctness bugs ✅ partially closed by Wave 1
+
+**Status:** Mostly shipped in Wave 1 — see commits `4254e72`
+(lang-java text-block escape, char-literal bound, branch-order
+comment), `b900843` (lang-python raw-string escape, empty-triple
+disambiguation pin), `d92bbb7` (lang-cpp `u8` prefix, char-literal
+bound, line continuation), `e6eb358` (lang-go regression tests for
+raw strings, unterminated literals, runes). Open items remaining
+under this phase: lang-python F4 (single-string newline-as-terminator
+test pin — minor) and lang-go F1/F3 (parse.ts `null`-return type
+honesty, also tracked under Phase B1 / Layer 1 Phase 3). See the
+consistency pass (`./2026-05-22-plan-consistency-pass.md`)
+Conflict 7 for the full table.
 
 **Goal:** Close the four lang-pack lexer correctness bugs that
 silently produce wrong tokenization on conforming source.
@@ -186,7 +198,14 @@ implications for lang-rust `['rs']` and lang-go `['golang']`.
   already-canonical inputs).
 - No test asserts the previous broken behavior.
 
-### Phase A3 — Wire graph `RuleHints` into rule evaluation
+### Phase A3 — Wire graph `RuleHints` into rule evaluation ✅ closed by Wave 1
+
+**Status:** Shipped in Wave 1 — commit `8010c2e`. Added an optional
+fourth `hints?: RuleHints` parameter to `Rule.evaluate`. Wired
+`no-side-effect-path` and `always-throws-branch` to consume the
+adapter's hints with TypeScript-shaped fallback. 13 new integration
+tests cover Python and Rust fixtures. See the consistency pass
+(`./2026-05-22-plan-consistency-pass.md`) Conflict 8.
 
 **Goal:** Close the contract-versus-implementation gap where every
 graph adapter declares populated `ruleHints` and zero rules consume
@@ -648,6 +667,58 @@ fitness #6 (gate hashing strategy hard-coded), fitness #7 (SARIF
 - Gate tests with the default identity pass unchanged; a new test
   exercises a custom identity (e.g. `(filePath, ruleId)` only).
 - SARIF tests assert the typed shape; chunker no longer casts.
+
+### Phase D6 — Introduce `defineRegexListCheck` Template helper
+
+**Goal:** Add a `defineRegexListCheck` Template helper to
+`@opensip-tools/fitness` so the ~13 sites in `checks-universal` (and a
+handful in `checks-typescript`) that reimplement the
+"for line; for pattern; if match push violation" loop can collapse
+into ~30-line declarative configs. The helper's per-pattern UUID +
+sub-slug shape mirrors the existing `no-console-log.ts` pattern, which
+becomes the helper's default. Layer 4 Phase C6 consumes this.
+
+**Closes findings:** none in the fitness audit directly (this is the
+Layer-3-side prerequisite for Layer 4's checks-universal F4 closure).
+
+**Files touched:**
+- `packages/fitness/engine/src/framework/define-regex-list-check.ts`
+  (new) — exports `defineRegexListCheck({ id, slug, description,
+  tags, scope, contentFilter, patterns, options })` returning a
+  `Check` via `defineCheck`.
+- `packages/fitness/engine/src/framework/__tests__/define-regex-list-check.test.ts`
+  (new) — unit tests for the per-pattern UUID + sub-slug emission,
+  comment-skip option, test-file-skip option, and `lastIndex` reset
+  semantics.
+- `packages/fitness/engine/src/index.ts` — export
+  `defineRegexListCheck` from the public barrel.
+
+**Steps:**
+1. Sketch the API by inspecting `no-console-log.ts`'s shape — that
+   check defines a `CONSOLE_PATTERNS` array with `{ id, slug, regex,
+   message, suggestion }` per pattern. Promote that shape to the
+   helper's `patterns` parameter.
+2. Wrap the existing `defineCheck` API. The helper's `analyze` callback
+   loops over lines, applies the optional `isCommentLine` /
+   `isTestFile` skip predicates, then loops over each pattern and emits
+   one violation per match (resetting `lastIndex` between matches —
+   the audit calls out that several existing sites get this wrong).
+3. Per-match violation shape: emit one violation with
+   `metadata.subSlug` set to the pattern's slug; the framework's
+   directive resolver should already handle sub-slug suppression
+   (verify; if not, that's a separate small fitness change).
+4. Add unit tests. Document the helper in the framework barrel JSDoc.
+
+**Acceptance:**
+- `defineRegexListCheck` is exported from `@opensip-tools/fitness`.
+- Unit tests cover per-pattern emission, skip predicates, and
+  `lastIndex` reset.
+- A migrated reference implementation (e.g. `no-window-alert.ts` or
+  another small site identified by Layer 4 Phase C6) compiles and
+  passes its existing tests after migration.
+
+**Risk / dependencies:** None for the helper itself. Layer 4 Phase C6
+consumes it; that adoption is owned by the Layer 4 plan.
 
 ### Phase D5 — Minor fitness consolidations
 

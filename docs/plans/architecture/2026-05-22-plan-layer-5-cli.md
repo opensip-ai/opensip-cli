@@ -45,17 +45,17 @@ dispatcher genuinely tool-agnostic.
 
 Two cross-layer dependencies drive ordering:
 
-1. **F2 + F3 require a Layer 3 contract change.** Both findings hinge
+1. **F2 + F3 require a Layer 1 contract change.** Both findings hinge
    on what `Tool.renderLive` looks like. Today `renderLive(viewKey:
-   string, args: unknown)` lives on `ToolCliContext` and dispatches on
-   string keys inside the CLI. Fixing this is not a CLI-only refactor —
-   tools have to opt in to whichever shape we pick. The Layer 3 plan
-   ("tools and lang") is the right place to decide between
-   (a) `ToolCliContext.registerLiveView(key, render)`, (b) tools return
-   a React node from a `Tool.renderLive` method, or (c) tools own their
-   own Ink view and the CLI just hands them stdout. The CLI plan files
-   that decision as an issue and waits — Phase 2 here cannot land before
-   Layer 3 chooses.
+   string, args: unknown)` lives on `ToolCliContext` (defined in
+   `@opensip-tools/core`) and dispatches on string keys inside the
+   CLI. Per the consistency pass
+   (`./2026-05-22-plan-consistency-pass.md`) Conflict 2, the contract
+   change is owned by **Layer 1 Phase 8** ("Tool.renderLive contract
+   refresh"). The recommended option is option (2) — replace
+   `renderLive(viewKey, args)` with
+   `ToolCliContext.registerLiveView(key, renderer)`. Phase 2 here
+   cannot land before Layer 1 Phase 8.
 2. **F4 overlaps Layer 2 finding #3.** The contracts audit calls out the
    same `getErrorSuggestion` ladder. The Layer 2 plan is rewriting it
    into a strategy-table (or typed-error) shape. Phase 3 here is the
@@ -148,17 +148,21 @@ re-validation in F7's prelude — partially)
 **Priority:** P0 — highest-leverage architectural finding. The
 "adding a tool requires zero CLI edits" claim is currently false
 because of the `viewKey === 'fit' / viewKey === 'graph'` switch.
-**Depends on:** Layer 3 plan must decide the new `Tool.renderLive`
-shape. This phase cannot land before that decision.
+**Depends on:** Layer 1 plan Phase 8 ("Tool.renderLive contract
+refresh"). Per the consistency pass
+(`./2026-05-22-plan-consistency-pass.md`) Conflict 2, the contract
+change lives in `@opensip-tools/core` (where `ToolCliContext` is
+defined), not in Layer 3. This phase cannot land before Layer 1
+Phase 8.
 
 **Goal:** Adding a fourth tool with a live view must require zero
 edits to `packages/cli/src/index.ts`. The `program: unknown` cast goes
 away or becomes a typed re-export. The `renderLive(viewKey: string,
 …)` switch goes away.
 
-**Coordination issue (file before this phase starts):** open a
-"`Tool.renderLive` contract shape" issue against the Layer 3 plan
-asking for a decision among the audit's three options:
+**Coordination (resolved by consistency pass):** Layer 1 Phase 8
+selects option (2) below as the canonical shape. The audit's three
+options are recorded here for context:
 
 1. **Lowest friction.** Keep `program: unknown` but ship a
    `commander/v13` peer-dep contract on every tool package and add
@@ -174,27 +178,30 @@ asking for a decision among the audit's three options:
    and the CLI just hands stdout to whatever the tool returns. Cleanest
    long-term shape; largest diff because every tool adopts.
 
-The Layer 3 plan owns the decision; the CLI plan implements whatever
-gets picked. Recommend (2) as the default — it's the smallest change
-that closes the architectural hole.
+Layer 1 Phase 8 picks option (2). The CLI plan implements the
+CLI-side adoption: removes the `viewKey` switch, replaces it with
+the registry lookup, calls `cli.registerLiveView('fit', ...)` for
+fitness and `'graph'` for graph from each tool's `register()`
+function. (Tool-side `register()` updates land alongside Layer 5
+Phase 3 / Layer 3 controller relocation.)
 
 **Implementation (assuming option 2):**
 
-- `packages/core/src/tools/types.ts` — adjust `ToolCliContext` to add
-  `registerLiveView(key: string, render: LiveViewRenderer): void`.
-  `renderLive(key, args)` looks up the registry instead of switching.
+- `packages/core/src/tools/types.ts` — owned by **Layer 1 Phase 8**.
+  Defines `registerLiveView(key, renderer)`, the `LiveViewRenderer`
+  type, and `UnknownLiveViewError`. This phase consumes those.
 - `packages/cli/src/cli-context.ts` (from Phase 1) — implement the
-  registry as a `Map<string, LiveViewRenderer>`. `renderLive` throws
-  a typed `UnknownLiveViewError` if the key is missing rather than
-  silently falling through to `renderApp` (closes the audit's "tool
-  that mistypes its `viewKey` gets a static render" gap).
+  registry as a `Map<string, LiveViewRenderer>`. `renderLive` calls
+  through it, throwing `UnknownLiveViewError` if the key is missing
+  rather than silently falling through to `renderApp` (closes the
+  audit's "tool that mistypes its `viewKey` gets a static render" gap).
 - Each tool's `register(cli)` calls
   `cli.registerLiveView('fit', renderFitLive)` /
   `'graph', renderGraphLive` etc. The CLI's `index.ts` and
   `cli-context.ts` no longer mention `'fit'` or `'graph'` by name.
-- `packages/contracts/src/index.ts` — re-export `type CliProgram =
-  import('commander').Command`. Tools update their casts:
-  `cli.program as CliProgram`. (Half of option 1, free.)
+- `packages/contracts/src/index.ts` — owned by **Layer 2 Phase 5**
+  (per consistency pass Conflict 3). Adds the `CliProgram` re-export.
+  Tools update their casts: `cli.program as CliProgram`.
 
 **Done when:**
 
