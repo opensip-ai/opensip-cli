@@ -1,9 +1,25 @@
 /**
  * Overview tab — cross-tool recent activity table.
  * Returns JS code as a string.
+ *
+ * The `toolBadgeStyles` and `tabMap` literals spliced into the emitted
+ * JS are derived from the `defineToolTab` registry rather than
+ * hard-coded — every registered tool tab contributes one entry to
+ * each map. Adding a new tool is a `defineToolTab` call; this
+ * function picks it up automatically. (F1/F8.)
  */
 
+import { listToolTabs } from './tool-tab-registry.js'
+import './tool-tabs-registrations.js'  // side-effect: registers fit/sim/graph
+
 export function dashboardOverviewJs(): string {
+  const toolTabs = listToolTabs()
+  const badgeStylesEntries = toolTabs
+    .map(t => `    ${JSON.stringify(t.tool)}: ${JSON.stringify(t.badgeStyle)},`)
+    .join('\n')
+  const tabMapEntries = toolTabs
+    .map(t => `${JSON.stringify(t.tool)}: ${JSON.stringify(t.id)}`)
+    .join(', ')
   return `
 // =======================================================
 // OVERVIEW TAB
@@ -23,12 +39,13 @@ function renderOverview() {
   table.appendChild(thead);
 
   const tbody = el('tbody');
+  // Derived from the defineToolTab registry — see tool-tab-registry.ts
+  // and tool-tabs-registrations.ts. New tools register descriptors;
+  // these maps update automatically.
   const toolBadgeStyles = {
-    fit: 'background:rgba(124,160,104,0.15);color:var(--accent-fitness)',
-    sim: 'background:rgba(155,138,165,0.15);color:var(--accent-sim)',
-    graph: 'background:rgba(196,154,108,0.15);color:var(--accent)',
+${badgeStylesEntries}
   };
-  const tabMap = { fit: 'fitness', sim: 'simulation', graph: 'code-paths' };
+  const tabMap = { ${tabMapEntries} };
 
   sessions.forEach(s => {
     const sc2 = s.score >= 90 ? 'color:var(--success)' : s.score >= 70 ? 'color:var(--warning)' : 'color:var(--error)';
