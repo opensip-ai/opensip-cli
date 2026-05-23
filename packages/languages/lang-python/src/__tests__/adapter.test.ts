@@ -103,7 +103,15 @@ describe('python stripStrings', () => {
     expect(out).toBe(src)
   })
 
-  describe('raw-string quote-escape handling (CPython semantics)', () => {
+  describe('tokenization semantics for backslash-quote (raw and non-raw alike)', () => {
+    // These cases are framed as raw-string tests because that is where
+    // the original bug surfaced (post-Wave-1, see strip.ts function
+    // header on `matchStringStart`). The underlying tokenization rule —
+    // backslash always pairs with the following character for the
+    // purpose of finding the string terminator — applies to non-raw
+    // strings too. The strip pass does not distinguish raw vs non-raw
+    // because it is region-bound, not value-extraction.
+    //
     // CPython rule for raw strings: backslash is ordinary EXCEPT when
     // followed by a quote — `\"` or `\'` keep both chars as part of
     // the string and the quote does NOT terminate the literal. Without

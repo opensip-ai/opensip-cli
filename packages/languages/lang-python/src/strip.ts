@@ -16,6 +16,17 @@
 //
 // Both strip functions preserve byte length: replacement is whitespace
 // (newlines preserved) so line/column positions remain stable.
+//
+// NOTE: this pack deliberately does NOT consume the C-family scanners
+// from `@opensip-tools/core/languages/strip-utils.ts`
+// (`scanRegularString`, `scanLineComment`, `scanBlockCommentNonNesting`,
+// `scanCharLiteral`). Python's quote rules are the family outlier —
+// strings open with either `'` or `"`, support eight ASCII prefix
+// forms, and use `#` line comments — and the C-family helpers'
+// signatures don't fit. If a second adopter (Ruby, Bash, Swift)
+// appears, the right move is to lift a parameterized
+// `scanQuotedString(quoteChar)` into core; with one consumer it stays
+// here.
 
 import { applyRegions, type Region } from '@opensip-tools/core'
 
