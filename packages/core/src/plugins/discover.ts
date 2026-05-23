@@ -21,22 +21,20 @@
  * assess is not yet implemented.
  */
 
-import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs'
-import { createRequire } from 'node:module'
+import { existsSync, readdirSync, realpathSync, statSync } from 'node:fs'
 import { join, basename, extname, sep } from 'node:path'
 
 import { resolveProjectConfigPath } from '../config-resolution.js'
 import { logger } from '../lib/logger.js'
 import { resolveProjectPaths } from '../lib/paths.js'
+import { readYamlFile } from '../lib/yaml.js'
+
+import { resolvePackageEntryPoint } from './package-entry.js'
 
 import type { DiscoveredPlugin, PluginDomain } from './types.js'
 
 /** Logger module tag used by every event in this file. */
 const MODULE_TAG = 'core:plugins'
-
-// Bridge ESM ↔ CJS to load js-yaml from this package's deps without
-// relying on a (nonexistent) global `require` in ESM context.
-const requireFromHere = createRequire(import.meta.url)
 
 /**
  * User-source subdirectories per fit/sim domain. Each entry walks
@@ -99,7 +97,7 @@ export function discoverPlugins(
   //    is the contract for npm plugins.
   const declared = readProjectPluginsList(projectDir, domain)
   if (declared && declared.length > 0) {
-    const pluginsDir = projectPaths.pluginsDir(domain as 'fit' | 'sim')
+    const pluginsDir = projectPaths.pluginsDir(domain)
     const nodeModulesDir = join(pluginsDir, 'node_modules')
     if (existsSync(nodeModulesDir)) {
       plugins.push(...discoverNpmPackages(nodeModulesDir, pluginsDir, declared))
@@ -155,23 +153,16 @@ export function readProjectPluginsList(
     // error when the caller asked for one).
     return undefined
   }
-  if (!existsSync(configPath)) return undefined
-  try {
-    // Parse YAML inline to avoid a circular dep between plugins/ and targets/.
-    // We only need the `plugins.<domain>` array; anything else is
-    // validated by the targets loader.
-    const raw = readFileSync(configPath, 'utf8')
-    const yaml = requireFromHere('js-yaml') as { load: (s: string) => unknown }
-    const doc = yaml.load(raw) as Record<string, unknown> | null
-    if (!doc || typeof doc !== 'object') return undefined
-    const plugins = doc.plugins
-    if (!plugins || typeof plugins !== 'object') return undefined
-    const list = (plugins as Record<string, unknown>)[domain]
-    if (!Array.isArray(list)) return undefined
-    return list.filter((v): v is string => typeof v === 'string')
-  } catch {
-    return undefined
-  }
+  // Parse YAML via the shared permissive helper to avoid a circular dep
+  // between plugins/ and targets/. We only need the `plugins.<domain>`
+  // array; anything else is validated by the targets loader.
+  const doc = readYamlFile(configPath)
+  if (!doc || typeof doc !== 'object') return undefined
+  const plugins = (doc as Record<string, unknown>).plugins
+  if (!plugins || typeof plugins !== 'object') return undefined
+  const list = (plugins as Record<string, unknown>)[domain]
+  if (!Array.isArray(list)) return undefined
+  return list.filter((v): v is string => typeof v === 'string')
 }
 
 // =============================================================================
@@ -222,55 +213,11 @@ function discoverNpmPackages(
   return plugins
 }
 
-// eslint-disable-next-line sonarjs/cognitive-complexity -- entry point resolution: walks exports map (string vs object vs nested condition) + main + default; each branch documents a real npm shape
 function tryDiscoverPackage(packageDir: string, name: string): DiscoveredPlugin | undefined {
   if (!safeIsDirectory(packageDir)) return undefined
 
-  const pkgJsonPath = join(packageDir, 'package.json')
-  if (!existsSync(pkgJsonPath)) return undefined
-
-  try {
-    const pkgJson = JSON.parse(readFileSync(pkgJsonPath, 'utf8')) as Record<string, unknown>
-    const packageName = (pkgJson.name as string) ?? name
-
-    // Determine entry point: exports['.'] > main > index.js
-    let entryPoint: string | undefined
-    const exports = pkgJson.exports as Record<string, unknown> | string | undefined
-    if (typeof exports === 'string') {
-      entryPoint = join(packageDir, exports)
-    } else if (exports && typeof exports === 'object' && '.' in exports) {
-      const dotExport = exports['.']
-      if (typeof dotExport === 'string') {
-        entryPoint = join(packageDir, dotExport)
-      } else if (dotExport && typeof dotExport === 'object') {
-        // Handle { '.': { import: './dist/index.js' } }
-        const imp = (dotExport as Record<string, unknown>).import ?? (dotExport as Record<string, unknown>).default
-        if (typeof imp === 'string') entryPoint = join(packageDir, imp)
-      }
-    }
-    if (!entryPoint && typeof pkgJson.main === 'string') {
-      entryPoint = join(packageDir, pkgJson.main)
-    }
-    entryPoint ??= join(packageDir, 'index.js')
-
-    if (!existsSync(entryPoint)) {
-      logger.debug({
-        evt: 'plugin.loader.discover.skip',
-        module: MODULE_TAG,
-        reason: 'entry point not found',
-        packageName,
-        entryPoint,
-      })
-      return undefined
-    }
-
-    return {
-      type: 'package',
-      entryPoint,
-      namespace: packageName,
-      source: packageName,
-    }
-  } catch {
+  const resolved = resolvePackageEntryPoint(packageDir, name)
+  if (!resolved) {
     logger.debug({
       evt: 'plugin.loader.discover.skip',
       module: MODULE_TAG,
@@ -278,6 +225,24 @@ function tryDiscoverPackage(packageDir: string, name: string): DiscoveredPlugin 
       name,
     })
     return undefined
+  }
+
+  if (!existsSync(resolved.entry)) {
+    logger.debug({
+      evt: 'plugin.loader.discover.skip',
+      module: MODULE_TAG,
+      reason: 'entry point not found',
+      packageName: resolved.name,
+      entryPoint: resolved.entry,
+    })
+    return undefined
+  }
+
+  return {
+    type: 'package',
+    entryPoint: resolved.entry,
+    namespace: resolved.name,
+    source: resolved.name,
   }
 }
 

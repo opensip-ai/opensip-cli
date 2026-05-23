@@ -28,6 +28,8 @@ import { dirname, join } from 'node:path';
 
 import { logger } from '../lib/logger.js';
 
+import { resolvePackageEntryPoint } from './package-entry.js';
+
 const TOOL_KIND = 'tool';
 
 export interface ToolPackageDiscoveryOptions {
@@ -141,37 +143,8 @@ export interface ToolPackageMetadata {
   readonly mainEntry: string;
 }
 
-// eslint-disable-next-line sonarjs/cognitive-complexity -- mirrors the npm exports-map resolution for the main entry; each branch corresponds to a documented npm shape
 export function readToolPackageMetadata(packageDir: string): ToolPackageMetadata | undefined {
-  const pkgPath = join(packageDir, 'package.json');
-  if (!existsSync(pkgPath)) return undefined;
-  try {
-    const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as {
-      name?: string;
-      main?: string;
-      exports?: Record<string, unknown> | string;
-    };
-    if (!pkg.name) return undefined;
-    let mainEntry: string | undefined;
-    const exports = pkg.exports;
-    if (typeof exports === 'string') {
-      mainEntry = exports;
-    } else if (exports && typeof exports === 'object' && '.' in exports) {
-      const dot = exports['.'];
-      if (typeof dot === 'string') {
-        mainEntry = dot;
-      } else if (dot && typeof dot === 'object') {
-        const obj = dot as Record<string, unknown>;
-        if (typeof obj.import === 'string') mainEntry = obj.import;
-        else if (typeof obj.default === 'string') mainEntry = obj.default;
-      }
-    }
-    if (!mainEntry && typeof pkg.main === 'string') {
-      mainEntry = pkg.main;
-    }
-    mainEntry ??= './index.js';
-    return { name: pkg.name, mainEntry: join(packageDir, mainEntry) };
-  } catch {
-    return undefined;
-  }
+  const resolved = resolvePackageEntryPoint(packageDir);
+  if (!resolved) return undefined;
+  return { name: resolved.name, mainEntry: resolved.entry };
 }

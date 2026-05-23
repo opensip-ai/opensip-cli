@@ -28,20 +28,12 @@
  * to be direct dependencies.
  */
 
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
-import { createRequire } from 'node:module'
+import { existsSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
-import { logger } from '@opensip-tools/core'
+import { logger, readYamlFile, resolvePackageEntryPoint } from '@opensip-tools/core'
 
 const CONFIG_FILENAME = 'opensip-tools.config.yml'
-
-// Bridge ESM ↔ CJS: createRequire bound to this module's URL gives us a
-// `require` that resolves js-yaml from this package's own deps. The bare
-// `require('js-yaml')` form fails in ESM because no global require is
-// present; using createRequire(import.meta.url) is the supported escape
-// hatch.
-const requireFromHere = createRequire(import.meta.url)
 
 const SCOPE = '@opensip-tools'
 const CHECKS_PREFIX = 'checks-'
@@ -184,59 +176,23 @@ export function readCheckPackagePreferences(projectDir: string): {
   readonly autoDiscoverChecks?: boolean
 } {
   const configPath = join(projectDir, CONFIG_FILENAME)
-  if (!existsSync(configPath)) return {}
-  try {
-    const raw = readFileSync(configPath, 'utf8')
-    const yaml = requireFromHere('js-yaml') as { load: (s: string) => unknown }
-    const doc = yaml.load(raw) as Record<string, unknown> | null
-    if (!doc || typeof doc !== 'object') return {}
-    const plugins = doc.plugins
-    if (!plugins || typeof plugins !== 'object') return {}
-    const p = plugins as Record<string, unknown>
-    const result: { checkPackages?: readonly string[]; autoDiscoverChecks?: boolean } = {}
-    if (Array.isArray(p.checkPackages)) {
-      result.checkPackages = p.checkPackages.filter((v): v is string => typeof v === 'string')
-    }
-    if (typeof p.autoDiscoverChecks === 'boolean') {
-      result.autoDiscoverChecks = p.autoDiscoverChecks
-    }
-    return result
-  } catch {
-    return {}
+  const doc = readYamlFile(configPath)
+  if (!doc || typeof doc !== 'object') return {}
+  const plugins = (doc as Record<string, unknown>).plugins
+  if (!plugins || typeof plugins !== 'object') return {}
+  const p = plugins as Record<string, unknown>
+  const result: { checkPackages?: readonly string[]; autoDiscoverChecks?: boolean } = {}
+  if (Array.isArray(p.checkPackages)) {
+    result.checkPackages = p.checkPackages.filter((v): v is string => typeof v === 'string')
   }
+  if (typeof p.autoDiscoverChecks === 'boolean') {
+    result.autoDiscoverChecks = p.autoDiscoverChecks
+  }
+  return result
 }
 
-// eslint-disable-next-line sonarjs/cognitive-complexity -- exports-map resolution: each branch corresponds to a documented npm exports shape (string, object with import/default/require)
 export function readCheckPackageMetadata(packageDir: string): CheckPackageMetadata | undefined {
-  const pkgPath = join(packageDir, 'package.json')
-  if (!existsSync(pkgPath)) return undefined
-  try {
-    const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as {
-      name?: string
-      main?: string
-      exports?: Record<string, unknown> | string
-    }
-    if (!pkg.name) return undefined
-    let mainEntry: string | undefined
-    const exports = pkg.exports
-    if (typeof exports === 'string') {
-      mainEntry = exports
-    } else if (exports && typeof exports === 'object' && '.' in exports) {
-      const dot = exports['.']
-      if (typeof dot === 'string') {
-        mainEntry = dot
-      } else if (dot && typeof dot === 'object') {
-        const obj = dot as Record<string, unknown>
-        if (typeof obj.import === 'string') mainEntry = obj.import
-        else if (typeof obj.default === 'string') mainEntry = obj.default
-      }
-    }
-    if (!mainEntry && typeof pkg.main === 'string') {
-      mainEntry = pkg.main
-    }
-    mainEntry ??= './index.js'
-    return { name: pkg.name, mainEntry: join(packageDir, mainEntry) }
-  } catch {
-    return undefined
-  }
+  const resolved = resolvePackageEntryPoint(packageDir)
+  if (!resolved) return undefined
+  return { name: resolved.name, mainEntry: resolved.entry }
 }

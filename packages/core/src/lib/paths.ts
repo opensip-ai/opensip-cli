@@ -68,7 +68,7 @@ export interface ProjectPaths {
   /** <project>/opensip-tools/.runtime/cache/graph/baseline.json — gate baseline. */
   readonly graphBaselinePath: string;
   /** <project>/opensip-tools/.runtime/plugins/<domain> — npm-installed plugins. */
-  readonly pluginsDir: (domain: PathDomain) => string;
+  readonly pluginsDir: (domain: PluginsPathDomain) => string;
 }
 
 /**
@@ -83,6 +83,17 @@ export interface ProjectPaths {
  * project-local rule plugins from `.runtime/plugins/graph/`.
  */
 export type PathDomain = 'fit' | 'sim' | 'graph';
+
+/**
+ * Domain set accepted by `pluginsDir`. Wider than `PathDomain` because
+ * `core/plugins/discover` calls it with a value typed `PluginDomain`
+ * (`'fit' | 'sim' | 'asm' | 'lang'`); `'asm'` and `'lang'` will not
+ * actually reach `pluginsDir` today (the discover function returns
+ * empty for them before constructing a path), but typing the union
+ * here removes a `as 'fit' | 'sim'` cast at the call site and keeps
+ * the type system honest if a third tool lands.
+ */
+export type PluginsPathDomain = PathDomain | 'asm' | 'lang';
 
 /** Resolve the project path layout for a given project directory. */
 export function resolveProjectPaths(projectDir: string): ProjectPaths {

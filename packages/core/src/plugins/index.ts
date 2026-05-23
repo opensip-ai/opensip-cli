@@ -11,6 +11,12 @@ export {
   readProjectPluginsList,
 } from './discover.js'
 export {
+  resolvePackageEntryPoint,
+} from './package-entry.js'
+export type {
+  PackageEntryResolution,
+} from './package-entry.js'
+export {
   discoverToolPackages,
   readToolPackageMetadata,
 } from './tool-package-discovery.js'

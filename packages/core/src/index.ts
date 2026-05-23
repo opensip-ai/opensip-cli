@@ -12,6 +12,7 @@ export { PROJECT_CONFIG_FILENAME, resolveProjectConfigPath } from './config-reso
 export {
   discoverPlugins,
   readProjectPluginsList,
+  resolvePackageEntryPoint,
   discoverToolPackages,
   readToolPackageMetadata,
 } from './plugins/index.js';
@@ -24,6 +25,7 @@ export type {
   PluginExports,
   PluginMetadata,
   CheckDisplayEntry,
+  PackageEntryResolution,
   ToolPackageDiscoveryOptions,
   DiscoveredToolPackage,
   ToolPackageMetadata,
@@ -60,6 +62,13 @@ export type { Result, ToolErrorOptions } from './lib/errors.js';
 export { logger, setLogLevel, setSilent, setDebugMode, setRunId, getRunId, initLogFile } from './lib/logger.js';
 export type { Logger } from './lib/logger.js';
 
+// Lib — permissive YAML reader (returns undefined on missing/malformed
+// files). Used by plugin-discovery sites that need to peek at a single
+// field of opensip-tools.config.yml without dragging in a Zod schema.
+// Tools that need structured parse errors should keep their dedicated
+// loader (see fitness's targets/loader.ts).
+export { readYamlFile } from './lib/yaml.js';
+
 // Lib — IDs
 export { generateId, generatePrefixedId, extractTimestamp, generateUUID } from './lib/ids.js';
 
@@ -75,4 +84,4 @@ export { readPackageVersion } from './lib/package-version.js';
 // ~/.opensip-tools/config.yml). Every consumer constructs paths through
 // this module so a layout change is a single-file edit.
 export { resolveProjectPaths, resolveUserPaths } from './lib/paths.js';
-export type { ProjectPaths, UserPaths, PathDomain } from './lib/paths.js';
+export type { ProjectPaths, UserPaths, PathDomain, PluginsPathDomain } from './lib/paths.js';
