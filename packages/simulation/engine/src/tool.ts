@@ -66,10 +66,10 @@ function register(cli: ToolCliContext): void {
         if (args.json) {
           if (result.type === 'error') {
             cli.setExitCode(result.exitCode);
-            process.stdout.write(JSON.stringify({ error: result.message }, null, 2) + '\n');
+            cli.emitJson({ error: result.message });
           } else {
             if (result.shouldFail === true) cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
-            process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+            cli.emitJson(result);
           }
           return;
         }

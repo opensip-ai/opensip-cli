@@ -171,6 +171,15 @@ export interface ToolCliContext {
    * `process.exitCode` directly so the CLI controls the final exit.
    */
   readonly setExitCode: (code: number) => void;
+  /**
+   * Emit a structured JSON value to the CLI's stdout. Centralises the
+   * `process.stdout.write(JSON.stringify(value, null, 2) + '\n')` call
+   * that every tool's `--json` mode would otherwise duplicate. The CLI
+   * owns the IO seam; tools call `emitJson` and the CLI decides how the
+   * value reaches the terminal (today: pretty-printed JSON to stdout;
+   * future: optional `--out <file>`, envelope wrappers, etc.).
+   */
+  readonly emitJson: (value: unknown) => void;
 }
 
 export interface Tool {

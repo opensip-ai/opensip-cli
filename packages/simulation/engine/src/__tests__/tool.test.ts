@@ -35,9 +35,11 @@ function makeFakeContext(program: Command): {
   ctx: ToolCliContext;
   rendered: unknown[];
   exitCodes: number[];
+  emitted: unknown[];
 } {
   const rendered: unknown[] = [];
   const exitCodes: number[] = [];
+  const emitted: unknown[] = [];
   const ctx: ToolCliContext = {
     program,
     render: vi.fn((result: unknown) => {
@@ -57,8 +59,11 @@ function makeFakeContext(program: Command): {
     setExitCode: (code: number) => {
       exitCodes.push(code);
     },
+    emitJson: (value: unknown) => {
+      emitted.push(value);
+    },
   };
-  return { ctx, rendered, exitCodes };
+  return { ctx, rendered, exitCodes, emitted };
 }
 
 describe('simulationTool metadata', () => {
@@ -117,53 +122,33 @@ describe('simulationTool.register', () => {
     expect(result.recipeName).toBe('default');
   });
 
-  it('writes JSON to stdout when --json is passed', async () => {
+  it('emits a JSON envelope through cli.emitJson when --json is passed', async () => {
     const program = new Command();
     program.exitOverride();
-    const { ctx } = makeFakeContext(program);
+    const { ctx, emitted } = makeFakeContext(program);
 
     simulationTool.register(ctx);
 
-    const writes: string[] = [];
-    const realWrite = process.stdout.write.bind(process.stdout);
-    process.stdout.write = (chunk: string | Uint8Array) => {
-      writes.push(typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString());
-      return true;
-    };
+    await program.parseAsync(['node', 'cli', 'sim', '--json'], { from: 'node' });
 
-    try {
-      await program.parseAsync(['node', 'cli', 'sim', '--json'], { from: 'node' });
-    } finally {
-      process.stdout.write = realWrite;
-    }
-
-    const out = writes.join('');
-    expect(out).toContain('"type"');
-    expect(out).toContain('"sim-done"');
+    expect(emitted).toHaveLength(1);
+    const payload = emitted[0] as { type?: string };
+    expect(payload.type).toBe('sim-done');
   });
 
   it('returns exit code 2 in JSON mode when the recipe is unknown', async () => {
     const program = new Command();
     program.exitOverride();
-    const { ctx, exitCodes } = makeFakeContext(program);
+    const { ctx, exitCodes, emitted } = makeFakeContext(program);
 
     simulationTool.register(ctx);
 
-    const writes: string[] = [];
-    const realWrite = process.stdout.write.bind(process.stdout);
-    process.stdout.write = (chunk: string | Uint8Array) => {
-      writes.push(typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString());
-      return true;
-    };
-
-    try {
-      await program.parseAsync(['node', 'cli', 'sim', '--json', '--recipe', 'nope'], { from: 'node' });
-    } finally {
-      process.stdout.write = realWrite;
-    }
+    await program.parseAsync(['node', 'cli', 'sim', '--json', '--recipe', 'nope'], { from: 'node' });
 
     expect(exitCodes).toContain(2);
-    expect(writes.join('')).toContain('Unknown sim recipe');
+    expect(emitted).toHaveLength(1);
+    const payload = emitted[0] as { error?: string };
+    expect(payload.error).toContain('Unknown sim recipe');
   });
 
   it('returns exit code 2 in non-JSON mode for unknown recipe', async () => {

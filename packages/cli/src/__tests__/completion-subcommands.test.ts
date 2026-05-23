@@ -46,6 +46,7 @@ function makeStubContext(program: Command): ToolCliContext {
       error: vi.fn(),
     },
     setExitCode: vi.fn(),
+    emitJson: vi.fn(),
   };
 }
 

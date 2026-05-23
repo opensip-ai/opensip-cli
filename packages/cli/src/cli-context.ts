@@ -125,6 +125,12 @@ export function buildToolCliContext(
       exitCode = code;
       process.exitCode = code;
     },
+    // Single IO seam for tool-emitted JSON. Every `--json` branch in a
+    // tool funnels through here so the CLI can later add envelope
+    // wrappers, file output, or piping without touching tool code.
+    emitJson: (value) => {
+      process.stdout.write(JSON.stringify(value, null, 2) + '\n');
+    },
   };
 
   return {

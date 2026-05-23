@@ -65,6 +65,7 @@ function makeCli(): CapturedCli {
       debug: vi.fn(),
     },
     setExitCode: (c: number) => { exitCodes.push(c); },
+    emitJson: vi.fn(),
   };
   return { cli, exitCodes };
 }

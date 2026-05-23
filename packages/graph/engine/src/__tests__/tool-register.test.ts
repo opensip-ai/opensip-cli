@@ -28,6 +28,7 @@ function makeCli(program: Command): ToolCliContext {
       debug: vi.fn(),
     },
     setExitCode: vi.fn(),
+    emitJson: vi.fn(),
   };
 }
 

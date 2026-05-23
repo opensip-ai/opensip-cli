@@ -188,7 +188,7 @@ function registerDashboardCommand(program: Command, cli: ToolCliContext): void {
     .action(async (opts: ToolOptions) => {
       const result = await openDashboard(opts.cwd);
       if (opts.json) {
-        process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+        cli.emitJson(result);
         return;
       }
       await cli.render(result);
@@ -205,7 +205,7 @@ function registerListCommand(program: Command, cli: ToolCliContext): void {
     .option('--json', 'Output structured JSON', false)
     .action(async (opts: ToolOptions) => {
       const result = await listChecks(opts.cwd);
-      if (opts.json) { process.stdout.write(JSON.stringify(result, null, 2) + '\n'); return; }
+      if (opts.json) { cli.emitJson(result); return; }
       await cli.render(result);
     });
 }
@@ -220,7 +220,7 @@ function registerRecipesCommand(program: Command, cli: ToolCliContext): void {
     .option('--json', 'Output structured JSON', false)
     .action(async (opts: ToolOptions) => {
       const result = await listRecipes(opts.cwd);
-      if (opts.json) { process.stdout.write(JSON.stringify(result, null, 2) + '\n'); return; }
+      if (opts.json) { cli.emitJson(result); return; }
       await cli.render(result);
     });
 }
@@ -234,14 +234,14 @@ function registerRecipesCommand(program: Command, cli: ToolCliContext): void {
 // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
 async function runListMode(args: CliArgs, cli: ToolCliContext): Promise<void> {
   const result = await listChecks(args.cwd);
-  if (args.json) { process.stdout.write(JSON.stringify(result, null, 2) + '\n'); return; }
+  if (args.json) { cli.emitJson(result); return; }
   await cli.render(result);
 }
 
 // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
 async function runRecipesMode(args: CliArgs, cli: ToolCliContext): Promise<void> {
   const result = await listRecipes(args.cwd);
-  if (args.json) { process.stdout.write(JSON.stringify(result, null, 2) + '\n'); return; }
+  if (args.json) { cli.emitJson(result); return; }
   await cli.render(result);
 }
 
@@ -254,13 +254,13 @@ async function runJsonMode(args: CliArgs, cli: ToolCliContext): Promise<void> {
   const fitResult = await executeFit(args);
   if (fitResult.result.type === 'error') {
     cli.setExitCode(fitResult.result.exitCode);
-    process.stdout.write(JSON.stringify({ error: fitResult.result.message }, null, 2) + '\n');
+    cli.emitJson({ error: fitResult.result.message });
     return;
   }
   if (fitResult.result.type === 'fit-done' && fitResult.result.shouldFail) {
     cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
   }
-  process.stdout.write(JSON.stringify(fitResult.output, null, 2) + '\n');
+  cli.emitJson(fitResult.output);
 }
 
 /**
