@@ -18,6 +18,16 @@ import { buildMinimalTextTree, type MinimalTextTree } from '@opensip-tools/core'
 
 export type RustTree = MinimalTextTree
 
-export function parseRust(content: string, filePath: string): RustTree | null {
+/**
+ * Build the Rust adapter's text-tree shim. The current MVP body
+ * delegates to `buildMinimalTextTree`, which never returns `null`; the
+ * empty-`filePath` case is accepted as a pass-through (the tree still
+ * carries `filePath: ''` for diagnostics; callers that want to reject
+ * empty paths should validate upstream). When tree-sitter integration
+ * lands, the return type will widen to `RustTree | null` and parse
+ * failures will become reachable; downstream consumers should then
+ * gate on the result.
+ */
+export function parseRust(content: string, filePath: string): RustTree {
   return buildMinimalTextTree(content, filePath)
 }

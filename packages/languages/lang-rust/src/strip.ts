@@ -6,7 +6,11 @@
 //   may span multiple lines (unlike Java/Go/C++), so we pass
 //   `allowMultiline: true` to core's shared scanner.
 // - Raw strings (r"...", r#"..."#, ..., r####"..."####)
-// - Byte strings (b"...") and byte-raw strings (br#"..."#)
+// - Byte strings (b"...") and byte-raw strings (br#"..."#) — note that
+//   byte-string content is treated as opaque bytes; this layer does NOT
+//   enforce the ASCII-only / valid-escape rules of `b"..."`. A future
+//   check that wants to flag invalid byte literals will have to layer
+//   that validation on top of the region scan.
 // - Char literals ('a', '\n', '\u{1234}') — preserved as-is, with the
 //   lifetime-vs-literal disambiguation done at the call site here.
 //
@@ -126,11 +130,15 @@ function scan(src: string): Scan {
         continue
       }
       // Look ahead to see if there's a closing quote within ~8 chars.
-      // (Same heuristic the previous inline scanner used.) The core's
-      // scanCharLiteral helper bails on overflow rather than reporting
-      // the "no close found" position, which loses the information we
-      // need to distinguish a lifetime from a literal. Keep this look-
-      // ahead inline.
+      // (Same heuristic the previous inline scanner used.) Core's
+      // scanCharLiteral helper *does* distinguish overflow from success
+      // (overflow returns `end === start + 1`, success returns
+      // `end > start + 1`), so a migration to that helper with a
+      // `result.end === i + 1` lifetime branch is feasible. We keep
+      // this look-ahead inline because it makes the lifetime branch
+      // decision local to the lexer state machine and the explicit
+      // `escape`/`foundClose` variables are easier to follow for the
+      // Rust-specific edge cases the test suite exercises.
       const maxScan = Math.min(i + 8, len)
       let foundClose = -1
       let escape = false
