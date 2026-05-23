@@ -14,11 +14,17 @@ import { logger } from '@opensip-tools/core';
 
 import { defaultSimulationRecipeRegistry } from '../recipes/registry.js';
 import { SimulationRecipeService } from '../recipes/service.js';
+import { SCENARIO_KINDS } from '../types/kind-types.js';
 
+import type { ScenarioKind } from '../types/kind-types.js';
 // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; executeSim consumes the CliArgs shape produced by toolOptsToCliArgs in sim's tool.ts until the rip-out
 import type { CliArgs, ErrorResult, SimDoneResult } from '@opensip-tools/contracts';
 
-const VALID_KINDS = new Set(['load', 'chaos', 'invariant', 'fix-evaluation']);
+const VALID_KINDS = new Set<ScenarioKind>(SCENARIO_KINDS);
+
+function isValidKind(value: string): value is ScenarioKind {
+  return (VALID_KINDS as Set<string>).has(value);
+}
 
 /**
  * Run sim and return a SimDoneResult (or an ErrorResult when the
@@ -49,8 +55,9 @@ export async function executeSim(
   const recipeResult = await service.runRecipe(recipe);
 
   let scenarios = recipeResult.scenarios;
-  if (args.kind && VALID_KINDS.has(args.kind)) {
-    scenarios = scenarios.filter((s) => s.kind === args.kind);
+  if (args.kind && isValidKind(args.kind)) {
+    const kindFilter = args.kind;
+    scenarios = scenarios.filter((s) => s.kind === kindFilter);
   }
 
   const passed = scenarios.filter((s) => s.passed).length;

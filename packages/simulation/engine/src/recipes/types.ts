@@ -7,6 +7,8 @@
  * one. Without a flag, the built-in `default` recipe applies.
  */
 
+import type { ScenarioKind } from '../types/kind-types.js';
+
 // =============================================================================
 // SCENARIO SELECTORS
 // =============================================================================
@@ -33,7 +35,7 @@ export interface TagsScenarioSelector {
 /** Selector that filters by scenario kind (load / chaos / invariant / fix-evaluation). */
 export interface KindScenarioSelector {
   readonly type: 'kind';
-  readonly kinds: readonly ('load' | 'chaos' | 'invariant' | 'fix-evaluation')[];
+  readonly kinds: readonly ScenarioKind[];
   readonly exclude?: readonly string[];
 }
 
