@@ -19,7 +19,7 @@ import {
   registerFirstPartyTools,
   mountAllToolCommands,
 } from '../bootstrap/register-tools.js';
-import { SUBCOMMANDS } from '../commands/completion.js';
+import { buildCompletionScript, SUBCOMMANDS } from '../commands/completion.js';
 import { registerCliCommands } from '../commands/index.js';
 
 function makeStubContext(program: Command): ToolCliContext {
@@ -85,5 +85,32 @@ describe('SUBCOMMANDS drift test', () => {
       if (sub === 'help') continue; // optional Commander built-in
       expect(completionList, `expected SUBCOMMANDS to include '${sub}'`).toContain(sub);
     }
+  });
+
+  it('emitted bash/zsh scripts list the live plugin subcommands (no install/add drift)', () => {
+    const program = new Command('opensip-tools');
+    registerFirstPartyTools(defaultToolRegistry);
+    const ctx = makeStubContext(program);
+    mountAllToolCommands(defaultToolRegistry, ctx);
+    registerCliCommands(program, {
+      setExitCode: ctx.setExitCode,
+      render: (result) => ctx.render(result),
+    });
+
+    const pluginCmd = program.commands.find((c) => c.name() === 'plugin');
+    expect(pluginCmd, 'plugin command should be registered').toBeDefined();
+    const liveSubs = (pluginCmd?.commands ?? []).map((c) => c.name()).sort();
+
+    // Bash/zsh completion arms should enumerate every live plugin
+    // sub-subcommand. The historical drift was `install` (canonical
+    // action is `add` post-F7).
+    const bash = buildCompletionScript('bash');
+    const zsh = buildCompletionScript('zsh');
+    for (const sub of liveSubs) {
+      expect(bash, `bash completion should list plugin '${sub}'`).toContain(sub);
+      expect(zsh, `zsh completion should list plugin '${sub}'`).toContain(sub);
+    }
+    expect(bash).not.toMatch(/plugin\)\s+COMPREPLY=\(\$\(compgen[^"]*"[^"]*\binstall\b/);
+    expect(zsh).not.toMatch(/plugin\)\s+_values 'plugin subcommand'[^;]*\binstall\b/);
   });
 });

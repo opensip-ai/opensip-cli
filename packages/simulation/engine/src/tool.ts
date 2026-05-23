@@ -6,15 +6,13 @@
  * surface, JSON/Ink dispatch, and dashboard auto-open hook.
  */
 
-import { EXIT_CODES } from '@opensip-tools/contracts';
+/* eslint-disable sonarjs/deprecation -- intentional adapter usage; sim's tool.ts bridges per-command ToolOptions to executeSim's legacy CliArgs shape via toolOptsToCliArgs */
+import { EXIT_CODES, type CliArgs, type CliProgram, type ToolOptions } from '@opensip-tools/contracts';
+/* eslint-enable sonarjs/deprecation */
 import { readPackageVersion } from '@opensip-tools/core';
-import { type Command } from 'commander';
 
 import { executeSim } from './cli/sim.js';
 
-
-// eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; sim's tool.ts bridges per-command ToolOptions to executeSim's legacy CliArgs shape via toolOptsToCliArgs
-import type { CliArgs, ToolOptions } from '@opensip-tools/contracts';
 import type { Tool, ToolCliContext, ToolCommandDescriptor } from '@opensip-tools/core';
 
 
@@ -44,7 +42,10 @@ function toolOptsToCliArgs(
 }
 
 function register(cli: ToolCliContext): void {
-  const program = cli.program as Command;
+  // `CliProgram` is contracts' alias for commander's `Command` —
+  // contracts already declares commander as an optional peer dep.
+  // Audit 2026-05-23 G6.
+  const program = cli.program as CliProgram;
 
   program
     .command(SIM.name)

@@ -109,7 +109,7 @@ _opensip_tools() {
     fit)       COMPREPLY=($(compgen -W "${fitFlags}" -- "\${cur}")) ;;
     sim)       COMPREPLY=($(compgen -W "${simFlags}" -- "\${cur}")) ;;
     uninstall) COMPREPLY=($(compgen -W "${uninstFlags}" -- "\${cur}")) ;;
-    plugin)    COMPREPLY=($(compgen -W "list install remove" -- "\${cur}")) ;;
+    plugin)    COMPREPLY=($(compgen -W "list add remove sync" -- "\${cur}")) ;;
     sessions)  COMPREPLY=($(compgen -W "list purge" -- "\${cur}")) ;;
     *)         COMPREPLY=($(compgen -W "${commonFlags}" -- "\${cur}")) ;;
   esac
@@ -147,7 +147,7 @@ _opensip_tools() {
     fit)       _values 'flag' ${fitFlags} ;;
     sim)       _values 'flag' ${simFlags} ;;
     uninstall) _values 'flag' ${uninstFlags} ;;
-    plugin)    _values 'plugin subcommand' list install remove ;;
+    plugin)    _values 'plugin subcommand' list add remove sync ;;
     sessions)  _values 'sessions subcommand' list purge ;;
     *)         _values 'flag' ${commonFlags} ;;
   esac

@@ -11,6 +11,30 @@
  * Called only when `process.argv.length <= 2`. When the user passes
  * `--help` or `--version`, commander owns the output and this is
  * never invoked.
+ *
+ * Theme bypass — load-bearing
+ * ---------------------------
+ * This module emits raw ANSI escape sequences directly to
+ * `process.stdout` rather than routing through Ink and `theme.ts`. The
+ * bypass is INTENTIONAL and is the F6 promise's documented exception:
+ *
+ *   - The welcome screen is the very first thing a zero-arg invocation
+ *     does. Loading Ink/React (~50 ms cold-start on a typical machine)
+ *     to print twelve lines of static help would be a regression on
+ *     `opensip-tools` (no args) → welcome.
+ *   - The render is fully static — no progress, no live updates, no
+ *     theme-driven palette decisions. The only colour roles in use are
+ *     bold, dim, and a single accent — all NO_COLOR / FORCE_COLOR
+ *     aware via `colorsEnabled()`.
+ *   - Theme drift risk is bounded: if a user customises `theme.ts`,
+ *     they will see their accent everywhere EXCEPT the welcome
+ *     screen. Acceptable — they typed nothing, so the screen is a
+ *     handshake, not user-facing output. Audit 2026-05-23 G4 picked
+ *     this option (b: tolerate the bypass, document it).
+ *
+ * If welcome ever grows dynamic content (recipe suggestions, recent-run
+ * peek, etc.) it should move to an Ink renderer + a `WelcomeResult`;
+ * delete this header at the same time.
  */
 
 export interface WelcomeOptions {

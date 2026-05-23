@@ -28,7 +28,7 @@ import {
 } from './bootstrap/index.js';
 import { buildToolCliContext, createLiveViewRegistry } from './cli-context.js';
 import { registerCliCommands } from './commands/index.js';
-import { handleParseError } from './error-handler.js';
+import { handleFatalBootstrapError, handleParseError } from './error-handler.js';
 import { maybeNotify } from './update-notifier.js';
 import { printWelcome } from './welcome.js';
 
@@ -69,10 +69,15 @@ async function main(): Promise<void> {
   );
 }
 
+// Top-level fatal handler. Errors that escape `main` predate Commander's
+// parse loop (bootstrap, registry registration, fs I/O during preflight)
+// and so don't reach the per-command catch in `parseAsync().catch(...)`.
+// Route them through the same error-handler seam so the exit code flows
+// through `process.exitCode` (not `process.exit(N)` — the latter skips
+// the pending stderr flush) and a `cli.bootstrap.failed` log line is
+// emitted for observability. Audit 2026-05-23 G1.
 try {
   await main();
 } catch (error) {
-  const message = error instanceof Error ? error.message : String(error);
-  process.stderr.write(`opensip-tools: fatal error: ${message}\n`);
-  process.exit(1);
+  handleFatalBootstrapError(error, logger);
 }

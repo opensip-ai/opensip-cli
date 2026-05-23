@@ -37,9 +37,16 @@
  */
 
 
-import { EXIT_CODES } from '@opensip-tools/contracts';
+/* eslint-disable sonarjs/deprecation -- intentional adapter usage; tool.ts bridges per-command FitOptions/ToolOptions to executeFit's legacy CliArgs shape via fitOptsToCliArgs / toolOptsToCliArgs */
+import {
+  EXIT_CODES,
+  type CliArgs,
+  type CliProgram,
+  type FitOptions,
+  type ToolOptions,
+} from '@opensip-tools/contracts';
+/* eslint-enable sonarjs/deprecation */
 import { readPackageVersion } from '@opensip-tools/core';
-import { type Command } from 'commander';
 
 import { openDashboard } from './cli/dashboard.js';
 import { executeFit } from './cli/fit.js';
@@ -54,9 +61,6 @@ import {
   DEFAULT_BASELINE_PATH,
 } from './gate.js';
 
-
-// eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; tool.ts bridges per-command FitOptions/ToolOptions to executeFit's legacy CliArgs shape via fitOptsToCliArgs / toolOptsToCliArgs
-import type { CliArgs, FitOptions, ToolOptions } from '@opensip-tools/contracts';
 import type {
   Tool,
   ToolCliContext,
@@ -126,8 +130,10 @@ function fitOptsToCliArgs(opts: FitOptions & { quiet?: boolean; open?: boolean }
 
 function register(cli: ToolCliContext): void {
   // Cast once — the contract intentionally types `program` loosely so
-  // tools aren't pinned to a specific Commander major.
-  const program = cli.program as Command;
+  // tools aren't pinned to a specific Commander major. `CliProgram` is
+  // contracts' alias for commander's `Command`; using it here keeps
+  // tool packages off a direct `commander` import. Audit 2026-05-23 G6.
+  const program = cli.program as CliProgram;
 
   // Contribute fitness's live view to the CLI's renderer registry. The
   // renderer itself is owned by the CLI (Ink/React layer); the CLI
@@ -156,7 +162,7 @@ function register(cli: ToolCliContext): void {
 // next to its mode helpers.
 // =============================================================================
 
-function registerFitCommand(program: Command, cli: ToolCliContext): void {
+function registerFitCommand(program: CliProgram, cli: ToolCliContext): void {
   program
     .command(FIT.name)
     .description(FIT.description)
@@ -202,7 +208,7 @@ function registerFitCommand(program: Command, cli: ToolCliContext): void {
     });
 }
 
-function registerDashboardCommand(program: Command, cli: ToolCliContext): void {
+function registerDashboardCommand(program: CliProgram, cli: ToolCliContext): void {
   program
     .command(DASHBOARD.name)
     .description(DASHBOARD.description)
@@ -219,7 +225,7 @@ function registerDashboardCommand(program: Command, cli: ToolCliContext): void {
     });
 }
 
-function registerListCommand(program: Command, cli: ToolCliContext): void {
+function registerListCommand(program: CliProgram, cli: ToolCliContext): void {
   const fitListCmd = program
     .command(FIT_LIST.name)
     .description(FIT_LIST.description);
@@ -234,7 +240,7 @@ function registerListCommand(program: Command, cli: ToolCliContext): void {
     });
 }
 
-function registerRecipesCommand(program: Command, cli: ToolCliContext): void {
+function registerRecipesCommand(program: CliProgram, cli: ToolCliContext): void {
   const fitRecipesCmd = program
     .command(FIT_RECIPES.name)
     .description(FIT_RECIPES.description);

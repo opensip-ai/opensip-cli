@@ -16,8 +16,8 @@
  * the single `graph` invocation.
  */
 
+import { type CliProgram } from '@opensip-tools/contracts';
 import { ConfigurationError, readPackageVersion } from '@opensip-tools/core';
-import { type Command } from 'commander';
 
 // Side-effect import: registers the first-party TypeScript adapter
 // at module load. PR 3 of docs/plans/10-graph-language-pluggability.md.
@@ -39,7 +39,10 @@ const GRAPH: ToolCommandDescriptor = {
 const GRAPH_LIVE_VIEW_KEY = 'graph';
 
 function register(cli: ToolCliContext): void {
-  const program = cli.program as Command;
+  // `CliProgram` is contracts' alias for commander's `Command` —
+  // contracts already declares commander as an optional peer dep.
+  // Audit 2026-05-23 G6.
+  const program = cli.program as CliProgram;
 
   // Contract guard: the live-view key the tool registers under MUST
   // equal the tool's metadata id. They are equal today by convention;

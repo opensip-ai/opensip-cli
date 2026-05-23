@@ -126,3 +126,33 @@ export async function handleParseError(
     exitCode: EXIT_CODES.RUNTIME_ERROR,
   });
 }
+
+/**
+ * Top-level fatal-error handler for failures BEFORE Commander's parse
+ * loop runs (bootstrap registration, dynamic plugin imports, preflight
+ * I/O). Sets `process.exitCode = 1` (not `process.exit(N)` — the latter
+ * skips the pending stderr flush, and any structured-logging hook on
+ * bootstrap failure has nowhere to attach), writes the error line to
+ * stderr, and emits a `cli.bootstrap.failed` log event so observability
+ * pipelines see the failure. Audit 2026-05-23 G1.
+ *
+ * Synchronous because every step here is sync — stderr write,
+ * structured-log call, exit-code set. The top-level caller doesn't
+ * need to `await` it (Node exits naturally with the configured
+ * `process.exitCode` after the event loop drains), but the call site
+ * is fine to `await` either way.
+ */
+export function handleFatalBootstrapError(
+  error: unknown,
+  log: { error: (entry: Record<string, unknown>) => void },
+): void {
+  const message = error instanceof Error ? error.message : String(error);
+  process.stderr.write(`opensip-tools: fatal error: ${message}\n`);
+  log.error({
+    evt: 'cli.bootstrap.failed',
+    module: 'cli:bootstrap',
+    error: message,
+    stack: error instanceof Error ? error.stack : undefined,
+  });
+  process.exitCode = EXIT_CODES.RUNTIME_ERROR;
+}
