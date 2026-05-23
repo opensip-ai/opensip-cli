@@ -5,6 +5,7 @@
  * scenarios, chaos injection, execution, and service contracts.
  */
 
+import type { ScenarioMetricKey } from '../framework/resolve-metric.js'
 import type { Signal } from '@opensip-tools/core'
 
 // =============================================================================
@@ -77,7 +78,7 @@ export type AssertionOperator = LessThanOperator | GreaterThanOperator | Equalit
 
 /** A metric assertion evaluated after a scenario run */
 export interface ScenarioAssertion {
-  metric: string
+  metric: ScenarioMetricKey
   operator: AssertionOperator
   value: number
   message: string

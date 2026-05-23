@@ -9,6 +9,7 @@
 import { ValidationError } from '@opensip-tools/core'
 
 import { evaluateAssertion } from './assertions.js'
+import { resolveMetric } from './resolve-metric.js'
 
 import type { SimulationMetrics } from '../types/base-types.js'
 import type {
@@ -20,25 +21,6 @@ import type {
 import type { Signal } from '@opensip-tools/core'
 
 
-
-// =============================================================================
-// METRIC MAPPING
-// =============================================================================
-
-const METRIC_FIELD_MAP: Record<string, keyof SimulationMetrics | null> = {
-  error_rate: null,
-  success_rate: null,
-  avg_latency_ms: 'avgLatencyMs',
-  p50_latency_ms: 'p50LatencyMs',
-  p95_latency_ms: 'p95LatencyMs',
-  p99_latency_ms: 'p99LatencyMs',
-  requests_per_second: null,
-  total_requests: 'totalRequests',
-  successful_requests: 'successfulRequests',
-  failed_requests: 'failedRequests',
-  errors_generated: 'errorsGenerated',
-  findings_generated: 'findingsGenerated',
-}
 
 // =============================================================================
 // RESULT BUILDER
@@ -179,40 +161,11 @@ export class ScenarioResultBuilder {
   // PRIVATE
   // ===========================================================================
 
-  private getMetricValue(metric: string): number {
+  private getMetricValue(metric: ScenarioAssertion['metric']): number {
     if (!this._metrics) {
       return 0
     }
-
-    const fieldName = METRIC_FIELD_MAP[metric]
-    if (fieldName) {
-      return this._metrics[fieldName]
-    }
-
-    switch (metric) {
-      case 'error_rate': {
-        return this._metrics.totalRequests > 0
-          ? this._metrics.failedRequests / this._metrics.totalRequests
-          : 0
-      }
-
-      case 'success_rate': {
-        return this._metrics.totalRequests > 0
-          ? this._metrics.successfulRequests / this._metrics.totalRequests
-          : 0
-      }
-
-      case 'requests_per_second': {
-        if (!this._duration || this._duration <= 0) {
-          return 0
-        }
-        return this._metrics.totalRequests / this._duration
-      }
-
-      default: {
-        return 0
-      }
-    }
+    return resolveMetric(metric, this._metrics, this._duration ?? undefined)
   }
 }
 

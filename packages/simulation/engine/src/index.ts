@@ -176,6 +176,11 @@ export {
 } from './framework/result-builder.js'
 
 export {
+  resolveMetric,
+  type ScenarioMetricKey,
+} from './framework/resolve-metric.js'
+
+export {
   ScenarioAbortedError,
   type ScenarioMetadata,
   type ExecutorScenarioConfig,
@@ -193,7 +198,6 @@ export {
   createStandardExecutor,
   scenarioAborted,
   validateAssertions,
-  getMetricValue,
   updateLatencyMetrics,
   sleepWithAbort,
   runSimulationLoop,

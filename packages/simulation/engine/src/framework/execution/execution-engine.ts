@@ -13,6 +13,7 @@ import { logger as coreLogger , createSignal } from '@opensip-tools/core'
 
 
 import { evaluateOperator } from '../assertions.js'
+import { resolveMetric } from '../resolve-metric.js'
 import { createEmptyMetrics } from '../result-builder.js'
 
 import { executeTickRequests } from './action-handlers.js'
@@ -149,7 +150,7 @@ export function validateAssertions(
   const failed: { assertion: ScenarioAssertion; actual: number }[] = []
 
   for (const assertion of assertions) {
-    const actual = getMetricValue(metrics, assertion.metric)
+    const actual = resolveMetric(assertion.metric, metrics)
     const passed = evaluateOperator(actual, assertion.operator, assertion.value)
 
     if (!passed) {
@@ -158,51 +159,6 @@ export function validateAssertions(
   }
 
   return { passed: failed.length === 0, failed }
-}
-
-/**
- * Get metric value by name.
- */
-export function getMetricValue(metrics: SimulationMetrics, metric: string): number {
-  switch (metric) {
-    case 'error_rate': {
-      return metrics.totalRequests > 0 ? metrics.failedRequests / metrics.totalRequests : 0
-    }
-    case 'success_rate': {
-      return metrics.totalRequests > 0 ? metrics.successfulRequests / metrics.totalRequests : 1
-    }
-    case 'recovery_rate': {
-      return metrics.errorsGenerated > 0 ? 1 - metrics.failedRequests / metrics.errorsGenerated : 1
-    }
-    case 'p50_latency':
-    case 'p50_latency_ms': {
-      return metrics.p50LatencyMs
-    }
-    case 'p95_latency':
-    case 'p95_latency_ms': {
-      return metrics.p95LatencyMs
-    }
-    case 'p99_latency':
-    case 'p99_latency_ms': {
-      return metrics.p99LatencyMs
-    }
-    case 'avg_latency':
-    case 'avg_latency_ms': {
-      return metrics.avgLatencyMs
-    }
-    case 'total_requests': {
-      return metrics.totalRequests
-    }
-    case 'failed_requests': {
-      return metrics.failedRequests
-    }
-    case 'findings_generated': {
-      return metrics.findingsGenerated
-    }
-    default: {
-      return 0
-    }
-  }
 }
 
 // =============================================================================

@@ -37,16 +37,16 @@ describe('ASSERTIONS factories', () => {
   });
 
   it('custom() builds an assertion with a user-supplied metric', () => {
-    const a = ASSERTIONS.custom('foo', 'gt', 42, 'foo must be > 42');
-    expect(a.metric).toBe('foo');
+    const a = ASSERTIONS.custom('total_requests', 'gt', 42, 'total_requests must be > 42');
+    expect(a.metric).toBe('total_requests');
     expect(a.operator).toBe('gt');
     expect(a.value).toBe(42);
-    expect(a.message).toBe('foo must be > 42');
+    expect(a.message).toBe('total_requests must be > 42');
   });
 
   it('custom() defaults the message when omitted', () => {
-    const a = ASSERTIONS.custom('latency_p50', 'lt', 100);
-    expect(a.message).toBe('latency_p50 lt 100');
+    const a = ASSERTIONS.custom('p50_latency_ms', 'lt', 100);
+    expect(a.message).toBe('p50_latency_ms lt 100');
   });
 });
 
@@ -75,7 +75,7 @@ describe('evaluateOperator', () => {
 
 describe('evaluateAssertion', () => {
   const make = (operator: ScenarioAssertion['operator'], value: number): ScenarioAssertion => ({
-    metric: 'm',
+    metric: 'error_rate',
     operator,
     value,
     message: 'x',
@@ -100,7 +100,7 @@ describe('evaluateAssertion', () => {
 
   it('returns false for unknown operator on the assertion', () => {
     const bad: ScenarioAssertion = {
-      metric: 'm',
+      metric: 'error_rate',
       operator: 'unknown' as ScenarioAssertion['operator'],
       value: 0,
       message: 'x',

@@ -6,6 +6,7 @@
  * Custom assertions allow escape hatch.
  */
 
+import type { ScenarioMetricKey } from './resolve-metric.js'
 import type { ScenarioAssertion, AssertionOperator } from '../types/framework-types.js'
 
 // =============================================================================
@@ -184,7 +185,7 @@ export const ASSERTIONS = {
    * ```
    */
   custom: (
-    metric: string,
+    metric: ScenarioMetricKey,
     operator: AssertionOperator,
     value: number,
     message?: string,

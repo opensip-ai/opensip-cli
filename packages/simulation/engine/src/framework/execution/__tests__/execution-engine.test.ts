@@ -8,10 +8,10 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { resolveMetric } from '../../resolve-metric.js';
 import { createEmptyMetrics } from '../../result-builder.js';
 import {
   ScenarioAbortedError,
-  getMetricValue,
   scenarioAborted,
   sleepWithAbort,
   updateLatencyMetrics,
@@ -64,12 +64,13 @@ describe('validateAssertions', () => {
   });
 });
 
-describe('getMetricValue', () => {
+describe('resolveMetric (via validateAssertions)', () => {
   it.each([
     ['error_rate', baseMetrics({ totalRequests: 100, failedRequests: 25 }), 0.25],
     ['error_rate', baseMetrics({ totalRequests: 0 }), 0],
     ['success_rate', baseMetrics({ totalRequests: 100, successfulRequests: 90 }), 0.9],
-    ['success_rate', baseMetrics({ totalRequests: 0 }), 1],
+    // Per resolve-metric.ts: success_rate is 0 when totalRequests === 0 (tightening choice).
+    ['success_rate', baseMetrics({ totalRequests: 0 }), 0],
     ['recovery_rate', baseMetrics({ errorsGenerated: 10, failedRequests: 2 }), 0.8],
     ['recovery_rate', baseMetrics({ errorsGenerated: 0 }), 1],
     ['p50_latency', baseMetrics({ p50LatencyMs: 40 }), 40],
@@ -80,9 +81,8 @@ describe('getMetricValue', () => {
     ['total_requests', baseMetrics({ totalRequests: 5 }), 5],
     ['failed_requests', baseMetrics({ failedRequests: 3 }), 3],
     ['findings_generated', baseMetrics({ findingsGenerated: 2 }), 2],
-    ['unknown', baseMetrics(), 0],
-  ])('getMetricValue(%s)', (metric, metrics, expected) => {
-    expect(getMetricValue(metrics, metric)).toBeCloseTo(expected);
+  ] as const)('resolveMetric(%s)', (metric, metrics, expected) => {
+    expect(resolveMetric(metric, metrics)).toBeCloseTo(expected);
   });
 });
 
