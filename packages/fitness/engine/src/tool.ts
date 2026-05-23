@@ -31,6 +31,7 @@ import {
 } from './gate.js';
 
 
+// eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; tool.ts bridges per-command FitOptions/ToolOptions to executeFit's legacy CliArgs shape via fitOptsToCliArgs / toolOptsToCliArgs
 import type { CliArgs, FitOptions, ToolOptions } from '@opensip-tools/contracts';
 import type {
   Tool,
@@ -73,6 +74,7 @@ const FIT_RECIPES: ToolCommandDescriptor = {
 // REGISTER — wires Commander subcommands onto the CLI's program.
 // =============================================================================
 
+// eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
 function fitOptsToCliArgs(opts: FitOptions & { quiet?: boolean; open?: boolean }): CliArgs {
   return {
     command: 'fit',
@@ -244,6 +246,7 @@ function register(cli: ToolCliContext): void {
 // GATE MODE — extracted helper used by `fit --gate-save` / `--gate-compare`.
 // =============================================================================
 
+// eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
 async function runGateMode(args: CliArgs, cli: ToolCliContext): Promise<void> {
   if (args.gateSave === true && args.gateCompare === true) {
     cli.logger.warn({

@@ -13,6 +13,7 @@ import { type Command } from 'commander';
 import { executeSim } from './cli/sim.js';
 
 
+// eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; sim's tool.ts bridges per-command ToolOptions to executeSim's legacy CliArgs shape via toolOptsToCliArgs
 import type { CliArgs, ToolOptions } from '@opensip-tools/contracts';
 import type { Tool, ToolCliContext, ToolCommandDescriptor } from '@opensip-tools/core';
 
@@ -25,6 +26,7 @@ const SIM: ToolCommandDescriptor = {
 function toolOptsToCliArgs(
   command: string,
   opts: ToolOptions & { recipe?: string; kind?: string },
+  // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
 ): CliArgs {
   return {
     command,

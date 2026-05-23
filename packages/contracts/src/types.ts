@@ -63,6 +63,16 @@ export interface ToolOptions {
 /**
  * Backwards-compatible alias — commands that previously accepted CliArgs
  * can accept this union instead. The shape covers all fields used by any command.
+ *
+ * @deprecated Do not extend this interface for new flags. Add new
+ * flags to the per-command options interface instead — `FitOptions`
+ * for the `fit` subcommand, `ToolOptions` for `sim`, `InitOptions` for
+ * `init`. The remaining call sites use `*OptsToCliArgs` adapter
+ * functions in fitness/simulation/cli to bridge the two shapes; over
+ * time those adapters fold away and the per-command types become the
+ * single source of truth. See
+ * `docs/architecture/70-surfaces/02-plugin-authoring.md` for the
+ * adapter pattern and the rationale.
  */
 export interface CliArgs {
   command: string;

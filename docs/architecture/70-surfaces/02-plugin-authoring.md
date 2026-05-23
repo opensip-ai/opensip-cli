@@ -317,7 +317,7 @@ A Tool contributes its own subcommand. Use this when you want something fundamen
 
 ```ts
 import type { Tool, ToolCliContext } from '@opensip-tools/core';
-import type { Command } from 'commander';
+import type { CliProgram } from '@opensip-tools/contracts';
 import { runAudit } from './audit.js';
 
 export const tool: Tool = {
@@ -328,7 +328,7 @@ export const tool: Tool = {
   },
   commands: [{ name: 'audit-sec', description: 'Run the security audit' }],
   register(cli: ToolCliContext) {
-    const program = cli.program as Command;
+    const program = cli.program as CliProgram;
     program
       .command('audit-sec')
       .description('Run the security audit')
@@ -364,6 +364,44 @@ The Tool contract is the seam. The CLI walks `defaultToolRegistry`, discovers yo
 A Tool that wants to reuse the fitness check registry (e.g. an `audit-fit` that runs a custom recipe) imports `@opensip-tools/fitness` and reuses `executeFit`, `defineRecipe`, etc. The fitness package re-exports these so a Tool author doesn't have to assemble a runner from scratch.
 
 A Tool that's structurally different (a benchmark runner, a custom report generator) doesn't need to import `@opensip-tools/fitness` at all — it can be entirely self-contained, with its own logic and its own output shape, as long as it produces a renderable `CommandResult` for the CLI's render layer to consume.
+
+---
+
+## Don't extend `CliArgs`
+
+`CliArgs` is the union shape that predates the per-command options
+interfaces. It still exists in `@opensip-tools/contracts` because the
+`*OptsToCliArgs` adapter functions in `@opensip-tools/fitness`,
+`@opensip-tools/simulation`, and the CLI's `init` command continue to
+bridge per-command options to the legacy executor signature
+(`executeFit(args: CliArgs, …)`, `executeSim(args: CliArgs)`,
+`executeInit(args: CliArgs & {…})`). It's marked `@deprecated`.
+
+If you're authoring a new flag for a built-in command, add it to the
+per-command interface instead:
+
+| Command | Options interface |
+|---|---|
+| `fit`     | `FitOptions` |
+| `sim`     | `ToolOptions` |
+| `init`    | `InitOptions` |
+| your tool | a new interface in your tool package, named after the command |
+
+The boundary types live in `@opensip-tools/contracts`. New flags
+should be additive on those interfaces, not on `CliArgs`. The
+adapters bridge the two shapes today; over time they fold away as the
+executors take per-command options directly.
+
+Read this as: "the CLI subcommand has its own options shape, and that
+shape is the source of truth. `CliArgs` is the union that exists for
+historical reasons."
+
+For your own Tool plugin, you don't need to touch `CliArgs` at all —
+your `register(cli)` defines its own Commander options and your
+action handler receives them as the first argument. Use a typed
+`CliProgram` (re-exported from `@opensip-tools/contracts`) if you
+want a lint-clean `cli.program as CliProgram` cast without taking a
+direct `commander` dependency in your package.
 
 ---
 

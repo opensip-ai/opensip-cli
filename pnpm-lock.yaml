@@ -136,6 +136,9 @@ importers:
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.15
+      commander:
+        specifier: ^13.1.0
+        version: 13.1.0
       jsdom:
         specifier: ^29.1.1
         version: 29.1.1

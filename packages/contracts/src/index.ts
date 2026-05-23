@@ -88,3 +88,24 @@ export type {
   GraphCallConfidence,
   GraphVisibility,
 } from './graph-catalog.js';
+
+// `commander` is a typecheck-only dependency for the CliProgram alias
+// below; bringing the type in via `import type` keeps the runtime
+// bundle free of a commander require.
+import type { Command } from 'commander';
+
+/**
+ * Type alias for Commander's `Command` class — re-exported here so
+ * tool packages can drop the `as Command` cast in their `register(cli)`
+ * implementations without growing a direct `commander` dependency.
+ *
+ * The alias is type-only: `commander` is a dev-dependency of
+ * `@opensip-tools/contracts` (used at typecheck time only) and the
+ * runtime bundle stays untouched.
+ *
+ * Tool packages that already depend on `commander` continue to import
+ * `Command` directly; this alias is the boundary type for plugins that
+ * want a typed `cli` parameter without taking a Commander dependency
+ * of their own.
+ */
+export type CliProgram = Command;

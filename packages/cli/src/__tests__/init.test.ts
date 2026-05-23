@@ -16,6 +16,7 @@ import {
   type SupportedLanguage,
 } from '../commands/init.js';
 
+// eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs is the bridge type for the legacy executeInit signature until the rip-out
 import type { CliArgs } from '@opensip-tools/contracts';
 
 let testDir: string;
@@ -29,6 +30,7 @@ afterEach(() => {
   rmSync(testDir, { recursive: true, force: true });
 });
 
+// eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs is the bridge type for the legacy executeInit signature until the rip-out
 function makeArgs(overrides: Partial<CliArgs & { language?: string; force?: boolean }> = {}): CliArgs & { language?: string; force?: boolean } {
   return {
     command: 'init',

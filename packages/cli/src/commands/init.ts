@@ -28,6 +28,7 @@ import { join } from 'node:path';
 
 import { resolveProjectPaths } from '@opensip-tools/core';
 
+// eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; init still consumes CliArgs through initOptsToCliArgs in `register()` until the per-command type rip-out
 import type { CliArgs, InitResult } from '@opensip-tools/contracts';
 
 // =============================================================================
@@ -494,6 +495,7 @@ function scaffoldExamples(paths: ReturnType<typeof resolveProjectPaths>, languag
  * Run init for the given args. Returns an InitResult — the caller
  * (CLI render layer) prints it.
  */
+// eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge type
 export function executeInit(args: CliArgs & { language?: string; force?: boolean }): InitResult {
   const cwd = args.cwd;
   const force = args.force === true;

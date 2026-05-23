@@ -4,6 +4,52 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Changed
+
+- **`@opensip-tools/dashboard` `generateDashboardHtml` is now an
+  options-object call.** The legacy positional signature
+  (`generateDashboardHtml(sessions, checkCatalog, recipeCatalog,
+  graphCatalog, editorProtocol)`) is gone; the new signature is
+  `generateDashboardHtml({ sessions, checkCatalog?, recipeCatalog?,
+  graphCatalog?, editorProtocol? })`. The new `DashboardInput` type
+  is re-exported from the package barrel so future tool-shaped data
+  extends the interface instead of growing positional parameters.
+
+- **Dashboard ranked views adopt a shared `defineRankedView` helper.**
+  The four ranked views (`hot`, `big`, `wide`, `untested`) now each
+  consist of ~30 lines of declarative config — the rank-and-render
+  skeleton lives in `code-paths/view-template.ts`. Rendered HTML is
+  byte-comparable to the previous form; no behavior change.
+
+- **Cross-tab navigation uses a `tabActivators` registry.** The
+  Overview tab no longer references `openCodePathsSession` by name;
+  it asks the registry via `activateTabForSession(s)`. New
+  session-aware tabs register their activators via
+  `registerTabActivator(key, fn)`.
+
+### Added
+
+- **`CliProgram` re-exported from `@opensip-tools/contracts`.** Tool
+  packages can drop `as Command` casts in `register(cli)` and accept
+  a typed `cli: CliProgram` parameter without taking a direct
+  `commander` dependency. The alias is type-only — the contracts
+  runtime bundle does not change.
+
+### Deprecated
+
+- **`CliArgs` from `@opensip-tools/contracts` is deprecated for new
+  flags.** The interface still works (the `*OptsToCliArgs` adapter
+  functions in `@opensip-tools/fitness`, `@opensip-tools/simulation`,
+  and the CLI's `init` command are doing real work and remain in
+  place), but new command flags should land on the per-command
+  options interfaces — `FitOptions`, `ToolOptions`, `InitOptions` —
+  rather than on `CliArgs`. The `@deprecated` JSDoc tag now surfaces
+  this in IDE tooltips. See
+  `docs/architecture/70-surfaces/02-plugin-authoring.md` for the
+  adapter pattern.
+
 ## [1.3.1] — 2026-05-18
 
 Maintenance release. Clears the `glob@11.1.0` deprecation warning that

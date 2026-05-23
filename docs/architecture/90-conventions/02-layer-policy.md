@@ -221,7 +221,7 @@ Six rules guard the dashboard's HTML-generator package against the failure modes
 
 - **`dashboard-no-graph-import`** — dashboard panels don't pull `@opensip-tools/graph` (the dashboard receives a serialized `GraphCatalog`; the graph engine's runtime never ships to the browser).
 - **`dashboard-code-paths-self-contained`** — the Code Paths panel's helpers may import only from `@opensip-tools/contracts` (for the `GraphCatalog` types), `@opensip-tools/core`, dashboard siblings, and Node built-ins. No other cross-package imports.
-- **`dashboard-views-disjoint`** — each Code Paths view stays in its own file; views can't import each other.
+- **`dashboard-views-disjoint`** — each Code Paths view stays in its own file; views can't import each other. The one exception is `view-template.ts`, the rank-and-render helper that the four ranked views (`hot`, `big`, `wide`, `untested`) consume; it has no view registration of its own and is exempted from both the `from` and `to` sides of the rule.
 - **`dashboard-algorithms-no-view-deps`** — Code Paths algorithms (Tarjan, BFS, etc.) don't import any view-specific code.
 - **`dashboard-no-side-stylesheets`** — only the central CSS module emits styles.
 - **`dashboard-no-ui-framework`** — no React, Vue, Svelte, or other UI-framework imports inside the dashboard. The dashboard is hand-written DOM; bundling a framework would balloon the static HTML.

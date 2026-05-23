@@ -7,8 +7,10 @@ import { defineLoadScenario } from '../../kinds/load/define.js';
 import { defaultSimulationRecipeRegistry } from '../../recipes/registry.js';
 import { executeSim } from '../sim.js';
 
+// eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; sim test fixtures still build CliArgs until executeSim's signature flips to ToolOptions
 import type { CliArgs } from '@opensip-tools/contracts';
 
+// eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
 const args = (overrides: Partial<CliArgs> = {}): CliArgs => ({
   command: 'sim',
   json: false,

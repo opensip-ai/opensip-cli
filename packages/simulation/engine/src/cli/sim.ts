@@ -15,6 +15,7 @@ import { logger } from '@opensip-tools/core';
 import { defaultSimulationRecipeRegistry } from '../recipes/registry.js';
 import { SimulationRecipeService } from '../recipes/service.js';
 
+// eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; executeSim consumes the CliArgs shape produced by toolOptsToCliArgs in sim's tool.ts until the rip-out
 import type { CliArgs, ErrorResult, SimDoneResult } from '@opensip-tools/contracts';
 
 const VALID_KINDS = new Set(['load', 'chaos', 'invariant', 'fix-evaluation']);
@@ -24,6 +25,7 @@ const VALID_KINDS = new Set(['load', 'chaos', 'invariant', 'fix-evaluation']);
  * recipe is missing). The caller decides what to print or render.
  */
 export async function executeSim(
+  // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
   args: CliArgs,
 ): Promise<{ result: SimDoneResult | ErrorResult }> {
   const recipeName = args.recipe ?? 'default';

@@ -15,6 +15,7 @@ import { GraphView } from './components/GraphView.js';
 import { ClockProvider } from './hooks/useClock.js';
 import { ThemeProvider } from './theme.js';
 
+// eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; renderFitView consumes the CliArgs shape produced by fit's *OptsToCliArgs adapter until the rip-out
 import type { CommandResult , CliArgs } from '@opensip-tools/contracts';
 
 /** Render a static command result (non-fit commands) */
@@ -33,6 +34,7 @@ export async function renderApp(result: CommandResult): Promise<void> {
 }
 
 /** Render the fit command with real-time spinner → results transition */
+// eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
 export async function renderFitView(args: CliArgs): Promise<void> {
   const { render } = await import('ink');
 

@@ -9,6 +9,7 @@ import {
   EXIT_CODES,
   saveSession,
   generateSessionId,
+  // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; fit's executeFit signature is fed via fitOptsToCliArgs until the rip-out
   type CliArgs,
   type CliOutput,
   type TableRow,
@@ -325,6 +326,7 @@ export function formatValidatedColumn(totalItems: number | undefined, itemType =
 
 // eslint-disable-next-line sonarjs/cognitive-complexity -- top-level CLI command flow: validates args, resolves config, runs recipes, persists results — distinct phases that read better inline
 export async function executeFit(
+  // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
   args: CliArgs,
   onProgress?: (completed: number, total: number) => void,
 ): Promise<{ result: FitDoneResult; output: CliOutput } | { result: ErrorResult; output?: undefined }> {

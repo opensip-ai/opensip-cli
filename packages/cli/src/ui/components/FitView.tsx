@@ -18,6 +18,7 @@ import { RunHeader } from './RunHeader.js';
 import { Spinner } from './Spinner.js';
 import { Summary } from './Summary.js';
 
+// eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; FitView consumes the CliArgs shape produced by fit's *OptsToCliArgs adapter until the rip-out
 import type { FitDoneResult, ErrorResult, CliOutput , CliArgs } from '@opensip-tools/contracts';
 
 type FitState =
@@ -27,6 +28,7 @@ type FitState =
   | { phase: 'error'; result: ErrorResult };
 
 export interface FitViewProps {
+  // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
   readonly args: CliArgs;
 }
 

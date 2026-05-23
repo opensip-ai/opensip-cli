@@ -142,6 +142,73 @@ The cost: dynamic features (filtering, sorting, expand-collapse) are JS in the b
 
 ---
 
+## Extending the dashboard
+
+The dashboard package exposes three contributor-facing seams. New
+data, new ranked views, and new session-aware deep-link tabs each go
+through one of them — none requires forking the generator or
+sprinkling globals.
+
+### `DashboardInput` — the input contract
+
+`generateDashboardHtml({ … })` accepts a single options object; the
+shape is the `DashboardInput` interface re-exported from
+`@opensip-tools/dashboard`. Today it carries `sessions`,
+`checkCatalog`, `recipeCatalog`, `graphCatalog`, and
+`editorProtocol`. Future tool-shaped data — alarm history,
+dependency graphs, simulation traces — extends the interface as new
+optional fields. Don't grow positional parameters; add a new
+optional field to `DashboardInput` and surface it in the generator's
+top-of-page `<script>` block via the existing
+`serializeOptionalBlob(id, value, kind)` helper (in
+[`packages/dashboard/src/generator.ts`](../../../packages/dashboard/src/generator.ts)).
+
+### `defineRankedView` — the rank-and-render skeleton
+
+The four ranked views in Code Paths (`hot`, `big`, `wide`,
+`untested`) share one rank-and-render skeleton: walk
+`indexes.byBodyHash.values()`, apply chip filters and an optional
+view-specific predicate, compute a numeric metric, sort
+descending, and hand the result to `renderFunctionRows`. That
+skeleton lives in
+[`code-paths/view-template.ts`](../../../packages/dashboard/src/code-paths/view-template.ts);
+each view file is ~30 lines of declarative config (`id`, `label`,
+`help`, `metric`, optional `predicate` / `preamble` / `rowExtras`,
+`columns`, `headingText`, `emptyMessage`).
+
+A new ranked view that fits this shape is one config and one
+registration in [`code-paths.ts`](../../../packages/dashboard/src/code-paths.ts).
+Bespoke views (Coupling, SCCs, Search) have different shapes and
+keep their own emitters.
+
+### `registerTabActivator` — session-aware tab navigation
+
+The Overview tab's row-click handler routes by `session.tool`. For
+tabs that need session-aware behavior (jumping to a specific row,
+selecting a subtab, scrolling into view), register an activator
+into the shared `tabActivators` map at module init:
+
+```js
+// inside dashboardCodePathsJs() or any future tab's emitter
+if (typeof registerTabActivator === 'function') {
+  registerTabActivator('graph', openCodePathsSession);
+}
+```
+
+The Overview row click then calls `activateTabForSession(session)`;
+if a matching activator exists, it runs and the default top-level
+tab switch is suppressed. `code-paths.ts` is the worked example.
+New session-aware tabs (`fit`, `sim` detail panels, etc.) plug in
+the same way — the registry decouples Overview from "tab X happens
+to be loaded into this page".
+
+The registry helpers (`registerTabActivator`,
+`activateTabForSession`) are declared in the shared JS emitted by
+[`shared.ts`](../../../packages/dashboard/src/shared.ts) and
+are available wherever any tab JS runs.
+
+---
+
 ## Where it lives
 
 ```
