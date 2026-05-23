@@ -20,7 +20,12 @@
 
 
 import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
-import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import {
+  findEnclosingFunctionBody,
+  getEnclosingFunctionName,
+  getSharedSourceFile,
+  isInsideConditionalBlock,
+} from '@opensip-tools/lang-typescript'
 import * as ts from 'typescript'
 
 /** The check ID constant to avoid duplication */
@@ -68,74 +73,8 @@ interface CheckNodeOptions {
 // =============================================================================
 // AST HELPER UTILITIES
 // =============================================================================
-
-/**
- * Walk up the AST from a node and find the nearest enclosing function-like declaration.
- * Returns the function body (Block) if found, or null.
- */
-function findEnclosingFunctionBody(node: ts.Node): ts.Block | null {
-  let current: ts.Node = node.parent
-  while (!ts.isSourceFile(current)) {
-    if (
-      ts.isFunctionDeclaration(current) ||
-      ts.isMethodDeclaration(current) ||
-      ts.isFunctionExpression(current) ||
-      ts.isArrowFunction(current) ||
-      ts.isConstructorDeclaration(current)
-    ) {
-      const body = current.body
-      if (body && ts.isBlock(body)) {
-        return body
-      }
-      return null
-    }
-    current = current.parent
-  }
-  return null
-}
-
-/**
- * Get the name of the enclosing function/method, or null if anonymous.
- */
-function getEnclosingFunctionName(node: ts.Node, sourceFile: ts.SourceFile): string | null {
-  let current: ts.Node = node.parent
-  while (!ts.isSourceFile(current)) {
-    if (ts.isMethodDeclaration(current)) {
-      return current.name.getText(sourceFile)
-    }
-    if (ts.isFunctionDeclaration(current) && current.name) {
-      return current.name.getText(sourceFile)
-    }
-    current = current.parent
-  }
-  return null
-}
-
-/**
- * Check whether a node is inside a conditional block (if, else, switch case, ternary).
- * Walks up the AST from the node to the enclosing function body.
- */
-function isInsideConditionalBlock(node: ts.Node): boolean {
-  let current: ts.Node = node.parent
-  while (!ts.isSourceFile(current)) {
-    // Stop at function boundaries
-    if (
-      ts.isFunctionDeclaration(current) ||
-      ts.isMethodDeclaration(current) ||
-      ts.isFunctionExpression(current) ||
-      ts.isArrowFunction(current) ||
-      ts.isConstructorDeclaration(current)
-    ) {
-      return false
-    }
-    if (ts.isIfStatement(current)) return true
-    if (ts.isSwitchStatement(current)) return true
-    if (ts.isCaseClause(current)) return true
-    if (ts.isConditionalExpression(current)) return true
-    current = current.parent
-  }
-  return false
-}
+// Function-scope helpers (findEnclosingFunctionBody, getEnclosingFunctionName,
+// isInsideConditionalBlock) are imported from @opensip-tools/lang-typescript.
 
 /**
  * Check whether a function body contains substantive statements beyond a single return.

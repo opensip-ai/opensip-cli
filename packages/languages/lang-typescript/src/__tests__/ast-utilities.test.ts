@@ -4,13 +4,20 @@ import {
   countUnescapedBackticks,
   findBinaryExpressions,
   findCallExpressions,
+  findEnclosingFunction,
+  findEnclosingFunctionBody,
+  findEnclosingScope,
   findTemplateLiterals,
   getColumn,
+  getEnclosingFunctionName,
   getIdentifierName,
   getLineNumber,
   getPropertyChain,
   getSharedSourceFile,
+  isAsync,
+  isInAsyncContext,
   isInComment,
+  isInsideConditionalBlock,
   isInStringLiteral,
   isLiteral,
   isPropertyAccess,
@@ -248,5 +255,190 @@ describe('countUnescapedBackticks', () => {
 
   it('returns 0 when there are none', () => {
     expect(countUnescapedBackticks('plain text')).toBe(0);
+  });
+});
+
+// =============================================================================
+// FUNCTION-SCOPE HELPERS (Phase D2)
+// =============================================================================
+
+/** Helper: find first descendant matching a predicate. */
+function find(root: ts.Node, pred: (n: ts.Node) => boolean): ts.Node | null {
+  let found: ts.Node | null = null;
+  walkNodes(root, (n) => {
+    if (!found && pred(n)) found = n;
+  });
+  return found;
+}
+
+describe('findEnclosingFunction', () => {
+  it('returns the nearest function declaration', () => {
+    const sf = parse('function outer() { function inner() { const x = 1; } }');
+    if (!sf) throw new Error('parse failed');
+    const decl = find(sf, (n) => ts.isVariableDeclaration(n) && n.name.getText(sf) === 'x');
+    if (!decl) throw new Error('decl not found');
+    const fn = findEnclosingFunction(decl);
+    expect(fn && ts.isFunctionDeclaration(fn) && fn.name?.text).toBe('inner');
+  });
+
+  it('returns null at module scope', () => {
+    const sf = parse('const x = 1;');
+    if (!sf) throw new Error('parse failed');
+    const decl = find(sf, ts.isVariableDeclaration);
+    if (!decl) throw new Error('decl not found');
+    expect(findEnclosingFunction(decl)).toBeNull();
+  });
+
+  it('returns the nearest method declaration', () => {
+    const sf = parse('class C { m() { const y = 2; } }');
+    if (!sf) throw new Error('parse failed');
+    const decl = find(sf, (n) => ts.isVariableDeclaration(n) && n.name.getText(sf) === 'y');
+    if (!decl) throw new Error('decl not found');
+    const fn = findEnclosingFunction(decl);
+    expect(fn && ts.isMethodDeclaration(fn)).toBe(true);
+  });
+});
+
+describe('findEnclosingFunctionBody', () => {
+  it('returns a Block when the function has a body block', () => {
+    const sf = parse('function f() { const x = 1; }');
+    if (!sf) throw new Error('parse failed');
+    const decl = find(sf, ts.isVariableDeclaration);
+    if (!decl) throw new Error('decl not found');
+    const body = findEnclosingFunctionBody(decl);
+    expect(body && ts.isBlock(body)).toBe(true);
+  });
+
+  it('returns null for arrow function with expression body', () => {
+    const sf = parse('const f = () => 1 + 1;');
+    if (!sf) throw new Error('parse failed');
+    const arrow = find(sf, ts.isArrowFunction);
+    if (!arrow || !ts.isArrowFunction(arrow)) throw new Error('arrow not found');
+    // The expression body itself is the BinaryExpression `1 + 1`
+    const body = findEnclosingFunctionBody(arrow.body);
+    expect(body).toBeNull();
+  });
+});
+
+describe('getEnclosingFunctionName', () => {
+  it('returns the method name', () => {
+    const sf = parse('class C { foo() { const x = 1; } }');
+    if (!sf) throw new Error('parse failed');
+    const decl = find(sf, ts.isVariableDeclaration);
+    if (!decl) throw new Error('decl not found');
+    expect(getEnclosingFunctionName(decl, sf)).toBe('foo');
+  });
+
+  it('returns the function declaration name', () => {
+    const sf = parse('function bar() { const x = 1; }');
+    if (!sf) throw new Error('parse failed');
+    const decl = find(sf, ts.isVariableDeclaration);
+    if (!decl) throw new Error('decl not found');
+    expect(getEnclosingFunctionName(decl, sf)).toBe('bar');
+  });
+
+  it('returns null when there is no named ancestor', () => {
+    const sf = parse('const x = 1;');
+    if (!sf) throw new Error('parse failed');
+    const decl = find(sf, ts.isVariableDeclaration);
+    if (!decl) throw new Error('decl not found');
+    expect(getEnclosingFunctionName(decl, sf)).toBeNull();
+  });
+});
+
+describe('findEnclosingScope', () => {
+  it('returns the SourceFile at module scope', () => {
+    const sf = parse('const x = 1;');
+    if (!sf) throw new Error('parse failed');
+    const decl = find(sf, ts.isVariableDeclaration);
+    if (!decl) throw new Error('decl not found');
+    expect(findEnclosingScope(decl)).toBe(sf);
+  });
+
+  it('returns the nearest function-like ancestor', () => {
+    const sf = parse('function f() { const x = 1; }');
+    if (!sf) throw new Error('parse failed');
+    const decl = find(sf, ts.isVariableDeclaration);
+    if (!decl) throw new Error('decl not found');
+    const scope = findEnclosingScope(decl);
+    expect(ts.isFunctionDeclaration(scope)).toBe(true);
+  });
+});
+
+describe('isAsync', () => {
+  it('returns true for async function', () => {
+    const sf = parse('async function f() {}');
+    if (!sf) throw new Error('parse failed');
+    const fn = find(sf, ts.isFunctionDeclaration);
+    if (!fn) throw new Error('fn not found');
+    expect(isAsync(fn)).toBe(true);
+  });
+
+  it('returns false for sync function', () => {
+    const sf = parse('function g() {}');
+    if (!sf) throw new Error('parse failed');
+    const fn = find(sf, ts.isFunctionDeclaration);
+    if (!fn) throw new Error('fn not found');
+    expect(isAsync(fn)).toBe(false);
+  });
+});
+
+describe('isInAsyncContext', () => {
+  it('returns true inside an async function', () => {
+    const sf = parse('async function f() { foo(); }');
+    if (!sf) throw new Error('parse failed');
+    const call = find(sf, ts.isCallExpression);
+    if (!call) throw new Error('call not found');
+    expect(isInAsyncContext(call)).toBe(true);
+  });
+
+  it('returns false inside a sync function', () => {
+    const sf = parse('function f() { foo(); }');
+    if (!sf) throw new Error('parse failed');
+    const call = find(sf, ts.isCallExpression);
+    if (!call) throw new Error('call not found');
+    expect(isInAsyncContext(call)).toBe(false);
+  });
+
+  it('returns false at module scope', () => {
+    const sf = parse('foo();');
+    if (!sf) throw new Error('parse failed');
+    const call = find(sf, ts.isCallExpression);
+    if (!call) throw new Error('call not found');
+    expect(isInAsyncContext(call)).toBe(false);
+  });
+});
+
+describe('isInsideConditionalBlock', () => {
+  it('returns true inside an if statement', () => {
+    const sf = parse('function f() { if (x) { return 1; } }');
+    if (!sf) throw new Error('parse failed');
+    const ret = find(sf, ts.isReturnStatement);
+    if (!ret) throw new Error('return not found');
+    expect(isInsideConditionalBlock(ret)).toBe(true);
+  });
+
+  it('returns true inside a switch case', () => {
+    const sf = parse('function f() { switch (x) { case 1: return 2; } }');
+    if (!sf) throw new Error('parse failed');
+    const ret = find(sf, ts.isReturnStatement);
+    if (!ret) throw new Error('return not found');
+    expect(isInsideConditionalBlock(ret)).toBe(true);
+  });
+
+  it('returns false at the top of a function body', () => {
+    const sf = parse('function f() { return 1; }');
+    if (!sf) throw new Error('parse failed');
+    const ret = find(sf, ts.isReturnStatement);
+    if (!ret) throw new Error('return not found');
+    expect(isInsideConditionalBlock(ret)).toBe(false);
+  });
+
+  it('does not cross function boundaries', () => {
+    const sf = parse('if (x) { function inner() { return 1; } }');
+    if (!sf) throw new Error('parse failed');
+    const ret = find(sf, ts.isReturnStatement);
+    if (!ret) throw new Error('return not found');
+    expect(isInsideConditionalBlock(ret)).toBe(false);
   });
 });

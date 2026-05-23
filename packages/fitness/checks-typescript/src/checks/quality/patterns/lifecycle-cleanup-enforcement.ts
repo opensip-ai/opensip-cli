@@ -9,7 +9,7 @@
 
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
-import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import { findEnclosingScope, getSharedSourceFile } from '@opensip-tools/lang-typescript'
 import * as ts from 'typescript'
 
 /**
@@ -57,31 +57,6 @@ interface ResourceCreation {
   readonly node: ts.VariableDeclaration
   /** The enclosing function or block scope */
   readonly scope: ts.Node
-}
-
-/**
- * Find the enclosing function or block scope of a node.
- * Walks up the AST to find the nearest function-like or source file boundary.
- * @param node - The AST node to find the scope for
- * @returns The enclosing scope node
- */
-function findEnclosingScope(node: ts.Node): ts.Node {
-  let current: ts.Node | undefined = node.parent
-  while (current) {
-    if (
-       
-      ts.isFunctionDeclaration(current) ||
-      ts.isFunctionExpression(current) ||
-      ts.isArrowFunction(current) ||
-      ts.isMethodDeclaration(current) ||
-      ts.isConstructorDeclaration(current) ||
-      ts.isSourceFile(current)
-    ) {
-      return current
-    }
-    current = current.parent
-  }
-  return node.getSourceFile()
 }
 
 /**

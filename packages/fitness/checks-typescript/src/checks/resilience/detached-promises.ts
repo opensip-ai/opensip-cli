@@ -7,7 +7,7 @@
  */
 
 import { defineCheck, getCheckConfig, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
-import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import { getSharedSourceFile, isInAsyncContext } from '@opensip-tools/lang-typescript'
 import * as ts from 'typescript'
 
 /**
@@ -554,28 +554,6 @@ function buildEffectiveSyncSets(): EffectiveSyncSets {
   for (const name of cfg.additionalSyncReceivers ?? []) recvs.add(name)
   const prefixes = [...KNOWN_SYNC_PREFIXES, ...(cfg.additionalSyncPrefixes ?? [])]
   return { syncFunctions: fns, syncReceivers: recvs, syncPrefixes: prefixes }
-}
-
-/**
- * Check if a node is inside an async function or method
- */
-function isInAsyncContext(node: ts.Node): boolean {
-  let current: ts.Node | undefined = node.parent
-
-  while (current) {
-    if (
-      ts.isFunctionDeclaration(current) ||
-      ts.isFunctionExpression(current) ||
-      ts.isArrowFunction(current)
-    ) {
-      return !!current.modifiers?.some((m) => m.kind === ts.SyntaxKind.AsyncKeyword)
-    }
-    if (ts.isMethodDeclaration(current)) {
-      return !!current.modifiers?.some((m) => m.kind === ts.SyntaxKind.AsyncKeyword)
-    }
-    current = current.parent
-  }
-  return false
 }
 
 /**

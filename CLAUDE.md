@@ -156,6 +156,14 @@ Adding a new check:
 4. Add a display entry to `src/display/<category>.ts` if you want a
    pretty name and icon (otherwise kebab-to-title-case fallback applies).
 
+For TS-AST checks, prefer the canonical AST helpers exported from
+`@opensip-tools/lang-typescript` over reinventing them inline:
+`getSharedSourceFile`, `walkNodes`, `findEnclosingFunction`,
+`findEnclosingFunctionBody`, `getEnclosingFunctionName`,
+`findEnclosingScope`, `isAsync`, `isInAsyncContext`,
+`isInsideConditionalBlock`, plus the various `find*` /
+`getPropertyChain` / `isInComment` helpers.
+
 ### Defining a Check
 
 Checks declare **scope** (languages + concerns) for file targeting. The

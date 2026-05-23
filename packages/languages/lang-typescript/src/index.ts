@@ -23,5 +23,13 @@ export {
   findTemplateLiterals,
   isInComment,
   countUnescapedBackticks,
+  // Function-scope helpers (Phase D2)
+  findEnclosingFunction,
+  findEnclosingFunctionBody,
+  getEnclosingFunctionName,
+  findEnclosingScope,
+  isAsync,
+  isInAsyncContext,
+  isInsideConditionalBlock,
   ts,
 } from './ast-utilities.js'

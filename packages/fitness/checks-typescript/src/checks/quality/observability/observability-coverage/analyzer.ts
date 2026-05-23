@@ -3,19 +3,11 @@
  * @fileoverview AST function extractor for observability coverage analysis
  */
 
-import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import { getSharedSourceFile, isAsync } from '@opensip-tools/lang-typescript'
 import * as ts from 'typescript'
 
 
 import type { FunctionInfo } from './types.js'
-
-/**
- * Check whether a node has the `async` modifier.
- */
-function isAsync(node: ts.Node): boolean {
-  const modifiers = ts.canHaveModifiers(node) ? ts.getModifiers(node) : undefined
-  return modifiers?.some((m) => m.kind === ts.SyntaxKind.AsyncKeyword) ?? false
-}
 
 /**
  * Recursively walk a subtree looking for a TryStatement.
