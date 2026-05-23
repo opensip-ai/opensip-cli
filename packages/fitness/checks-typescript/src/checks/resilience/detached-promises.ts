@@ -1,9 +1,18 @@
-// @fitness-ignore-file file-length-limits -- Fitness check with extensive sync function/receiver whitelists for false positive suppression
+// @fitness-ignore-file file-length-limits -- AST detection requires both an AST visitor pipeline and the merged sync-call constants kept in this file
 // @fitness-ignore-file unused-config-options -- Config options reserved for future use or environment-specific
 // @fitness-ignore-file canonical-result-usage -- References Result pattern in comments and regex patterns for detection, not actual Result usage
 /**
  * @fileoverview Detached promise detection — flags un-awaited promise-returning
  * calls inside async contexts.
+ *
+ * The defaults here cover **generic JS/TS sync APIs only** (Array, String,
+ * Object, Math, JSON, `console.*`, the Node `*Sync` family, timer
+ * scheduling, and EventEmitter). Framework-specific helpers (Fastify
+ * decorators, Pyroscope SDK, OTel propagation, DBOS `.init`, Vitest /
+ * Drizzle helpers, etc.) belong in a recipe's
+ * `checks.config['detached-promises']` block — see
+ * {@link DetachedPromisesConfig}. The check reads that block via
+ * `getCheckConfig` and merges it into the effective sync-call sets.
  */
 
 import { defineCheck, getCheckConfig, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
@@ -28,33 +37,12 @@ export interface DetachedPromisesConfig extends Record<string, unknown> {
 const DETACHED_PROMISES_SLUG = 'detached-promises'
 
 /**
- * Known synchronous functions that do NOT return promises.
- * These are commonly flagged as false positives.
+ * Known synchronous functions that do NOT return promises. Limited to
+ * generic JS / TS / Node defaults; framework-specific entries live in
+ * recipe config under `additionalSyncFunctions`.
  */
 const KNOWN_SYNC_FUNCTIONS = new Set([
-  // Correlation ID helpers (synchronous)
-  'ensureCorrelationIdFor',
-  'ensureCorrelationId',
-  'generateCorrelationId',
-  'getCorrelationId',
-  'setCorrelationId',
-  // Logger methods (synchronous - write to buffer)
-  'info',
-  'error',
-  'warn',
-  'debug',
-  'trace',
-  'fatal',
-  'child',
-  // CLI output helpers (synchronous)
-  'outputStep',
-  'output',
-  'outputSuccess',
-  'outputError',
-  'outputWarning',
-  'outputInfo',
-  'chalk',
-  // Node.js sync methods
+  // Node.js sync filesystem / process methods
   'execSync',
   'readFileSync',
   'writeFileSync',
@@ -68,91 +56,23 @@ const KNOWN_SYNC_FUNCTIONS = new Set([
   'copyFileSync',
   'renameSync',
   'accessSync',
-  // Registration/setup functions (synchronous)
-  'register',
-  'registerRoutes',
-  'registerManifestEndpoint',
-  'use',
-  'addHook',
-  'decorate',
-  'decorateRequest',
-  'decorateReply',
-  // Fastify/HTTP framework (synchronous — framework manages promise lifecycle)
-  'send',
-  'code',
-  'status',
-  'header',
-  'headers',
-  'type',
-  'redirect',
-  'route',
-  'put',
-  'patch',
-  'head',
-  'options',
-  'all',
-  'post',
-  // Type guards, assertions, and lifecycle guards (synchronous)
-  'assert',
-  'assertNever',
-  'invariant',
-  'ensureInitialized',
-  'ensureNotDisposed',
-  'validateIterations',
-  'checkHandlerLimit',
-  'enqueueUpdate',
-  // Error wrapping (synchronous)
-  'wrapError',
-  // Lifecycle/cleanup methods (synchronous)
-  'release',
-  'releaseLock',           // Web Streams ReadableStreamReader.releaseLock — sync, returns void
-  'reset',
-  'reject',
-  'resolve',
-  'abort',
-  'cancel',
-  'dispose',
-  'close',
-  'destroy',
-  'stop',
-  'pause',
-  'resume',
-  'cleanup',               // Common sync lifecycle — process-host CrashGuards.cleanup, etc.
-  'unref',                 // Node Timer/Immediate/Socket.unref — sync, returns the handle
-  'kill',                  // Node ChildProcess.kill — synchronous signal dispatch, returns boolean
-  // OpenTelemetry / context propagation helpers (generic OTel surface)
-  'inject',                // OTel TextMapPropagator.inject — sync header injection
-  'observe',               // OTel ObservableResult.observe (gauge callback) — sync record
-  // NOTE: opensip-specific OTel/error helpers — `attachDomainContext`,
-  // `attachProfileIdToSpan`, `sendError`, `finalizeError` — are NOT defaults.
-  // They live in opensip's recipe under `checks.config['detached-promises']
-  // .additionalSyncFunctions`. See packages/core/src/recipes/check-config.ts.
-  // Pyroscope per-profiler starters — sync, returns void (Pyroscope.default.startWallProfiling/startHeapProfiling)
-  'startWallProfiling',
-  'startHeapProfiling',
-  'startCpuProfiling',
-  // Timer clearing (synchronous)
+  // Timer clearing/scheduling helpers (sync side)
   'clearTimeout',
   'clearInterval',
   'clearImmediate',
-  // Middleware/iterator next (synchronous callback dispatch)
-  'next',
-  // Queue/state management (synchronous triggers)
-  'processQueue',
-  'initialize',
-  'markInitialized',
-  'updateTimerRef',
-  'setCorrelationContext',
-  'end',
-  // Metrics/stats recording (synchronous counters)
-  'recordError',
-  'recordDuration',
-  'recordRequest',
-  'increment',
-  'decrement',
-  'gauge',
-  'histogram',
-  // Array methods returning new arrays (synchronous)
+  // Console (synchronous)
+  'log',
+  'time',
+  'timeEnd',
+  // Promise resolution helpers (sync wrappers)
+  'reject',
+  'resolve',
+  // Builder / coercion terminators
+  'build',
+  'toJSON',
+  'toString',
+  'valueOf',
+  // Array methods (synchronous)
   'map',
   'filter',
   'reduce',
@@ -219,10 +139,10 @@ const KNOWN_SYNC_FUNCTIONS = new Set([
   'hasOwnProperty',
   'isPrototypeOf',
   'propertyIsEnumerable',
-  // JSON methods (synchronous)
+  // JSON methods
   'stringify',
   'parse',
-  // Math methods (synchronous)
+  // Math methods
   'floor',
   'ceil',
   'round',
@@ -234,65 +154,14 @@ const KNOWN_SYNC_FUNCTIONS = new Set([
   'sqrt',
   'sign',
   'trunc',
-  // Console methods (synchronous - but also flagged by other checks)
-  'log',
-  'time',
-  'timeEnd',
-  // Builder pattern terminators (synchronous returns)
-  'build',
-  'toJSON',
-  'toString',
-  'valueOf',
-  // Vitest/Jest test framework (synchronous)
-  'describe',
-  'it',
-  'test',
-  'expect',
-  'beforeAll',
-  'beforeEach',
-  'afterAll',
-  'afterEach',
-  'vi',
-  // Vitest/Jest assertion methods (synchronous)
-  'toBe',
-  'toEqual',
-  'toStrictEqual',
-  'toBeDefined',
-  'toBeUndefined',
-  'toBeNull',
-  'toBeTruthy',
-  'toBeFalsy',
-  'toContain',
-  'toContainEqual',
-  'toHaveLength',
-  'toHaveProperty',
-  'toHaveBeenCalled',
-  'toHaveBeenCalledTimes',
-  'toHaveBeenCalledWith',
-  'toHaveBeenLastCalledWith',
-  'toThrow',
-  'toThrowError',
-  'toMatch',
-  'toMatchObject',
-  'toMatchSnapshot',
-  'toMatchInlineSnapshot',
-  'toBeGreaterThan',
-  'toBeGreaterThanOrEqual',
-  'toBeLessThan',
-  'toBeLessThanOrEqual',
-  'toBeInstanceOf',
-  // Vitest/Jest mock methods (synchronous)
-  'mockResolvedValue',
-  'mockResolvedValueOnce',
-  'mockRejectedValue',
-  'mockRejectedValueOnce',
-  'mockReturnValue',
-  'mockReturnValueOnce',
-  'mockImplementation',
-  'mockImplementationOnce',
-  'mockClear',
-  'mockReset',
-  'mockRestore',
+  // Set/Map/WeakMap/WeakSet methods (synchronous)
+  'add',
+  'delete',
+  'has',
+  'clear',
+  'get',
+  'set',
+  'size',
   // EventEmitter methods (synchronous)
   'emit',
   'on',
@@ -307,14 +176,6 @@ const KNOWN_SYNC_FUNCTIONS = new Set([
   'listeners',
   'listenerCount',
   'rawListeners',
-  // Set/Map methods (synchronous)
-  'add',
-  'delete',
-  'has',
-  'clear',
-  'get',
-  'set',
-  'size',
   // Date methods (synchronous)
   'getTime',
   'getDate',
@@ -341,17 +202,15 @@ const KNOWN_SYNC_FUNCTIONS = new Set([
 ])
 
 /**
- * Known synchronous receiver patterns.
- * When the receiver (object before the dot) matches these, the call is likely sync.
+ * Known synchronous receiver identifiers — generic JS / Node namespaces.
+ * When the receiver (object before the dot) matches these, the call is
+ * likely synchronous. Framework-specific receivers (Fastify, Pyroscope,
+ * OTel propagation, Vitest, etc.) live in recipe config under
+ * `additionalSyncReceivers`.
  */
 const KNOWN_SYNC_RECEIVERS = new Set([
   // Logging/output (synchronous — write to buffer)
-  'logger',
-  'log',
   'console',
-  'chalk',
-  'cli',
-  'writer',
   // Node.js built-ins (synchronous APIs)
   'path',
   'fs',
@@ -375,39 +234,6 @@ const KNOWN_SYNC_RECEIVERS = new Set([
   'Reflect',
   'Proxy',
   'Intl',
-  // Built-in collection instances (synchronous)
-  'map',
-  'set',
-  'array',
-  // Database (Drizzle/better-sqlite3 is synchronous)
-  'db',
-  // Context/config/state (synchronous property access)
-  'ctx',
-  'context',
-  'config',
-  'options',
-  'opts',
-  'props',
-  'state',
-  'callbacks',
-  // Metrics/observability (synchronous counters)
-  'metrics',
-  'stats',
-  // OTel context propagation API — propagation.inject/extract are synchronous
-  'propagation',
-  // Pyroscope profiling SDK — Pyroscope.start/.default.startWallProfiling/.startHeapProfiling are all sync (returns void)
-  'Pyroscope',
-  // HTTP response objects (synchronous — framework handles promise)
-  'res',
-  'reply',
-  // Fastify instance (registration methods are synchronous)
-  'fastify',
-  'app',
-  'server',
-  // Test framework (synchronous)
-  'expect',
-  'vi',
-  'jest',
 ])
 
 /**
@@ -444,16 +270,13 @@ const FILE_SKIP_PATTERNS = [
 ]
 
 /**
- * Method name prefixes that indicate synchronous guard/assertion/validation calls.
- * Methods starting with these prefixes are overwhelmingly synchronous in practice
- * and should not be flagged as detached promises.
+ * Method-name prefixes that indicate synchronous calls. Limited to broadly
+ * applicable JS conventions — boolean predicates, property accessors and
+ * mutators, EventEmitter-style. Project-specific prefixes (e.g. `wire`,
+ * `enforce`, `init` for DBOS step `.init`) come from the recipe via
+ * `additionalSyncPrefixes`.
  */
 const KNOWN_SYNC_PREFIXES = [
-  // Guard/assertion/validation prefixes
-  'ensure',
-  'validate',
-  'check',
-  'assert',
   // Property accessors & mutators
   'set',
   'get',
@@ -462,30 +285,6 @@ const KNOWN_SYNC_PREFIXES = [
   'delete',
   'clear',
   'reset',
-  // Registration & lifecycle
-  'register',
-  'unregister',
-  'init',          // initX() / initialize() — DBOS step .init(deps), initConnection, initSipPipelineSteps, etc. are all synchronous wiring helpers
-  // In-memory upsert helpers (upsertProfile and similar mutate sync stores). DB upserts are typically called via
-  // explicit await on a Result-returning method, so the prefix-based whitelist here trades a small precision loss
-  // for ~10× FP reduction on these helper patterns.
-  'upsert',
-  // Event system
-  'emit',
-  'dispatch',
-  'publish',
-  'subscribe',
-  'unsubscribe',
-  'on',
-  'off',
-  'once',
-  // Logging (covers log, logError, logWarning, etc.)
-  'log',
-  'debug',
-  'info',
-  'warn',
-  'error',
-  'trace',
   // Boolean predicates
   'is',
   'has',
@@ -493,23 +292,12 @@ const KNOWN_SYNC_PREFIXES = [
   'should',
   'was',
   'will',
-  // Queue/state management
-  'enqueue',
-  'record',
-  'mark',
-  'wrap',
-  'build',
-  'apply',
-  'evict',
-  'invalidate',
-  'deliver',
-  'notify',
-  // Metric counter increments — incrementXxx is universally synchronous
-  'increment',
-  // Validation/floor enforcement — enforceXxx throws on violation, sync
-  'enforce',
-  // DI wiring helpers — wireXxx wires composition, sync
-  'wire',
+  // EventEmitter-style
+  'emit',
+  'on',
+  'off',
+  'once',
+  'dispatch',
 ]
 
 /**

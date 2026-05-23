@@ -14,9 +14,26 @@ import { createHash } from 'node:crypto'
 import { basename, dirname } from 'node:path'
 
 
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
+import { defineCheck, getCheckConfig, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
 import * as ts from 'typescript'
+
+/**
+ * Recipe-config shape for the duplicate-utility-functions check. Augments
+ * the built-in {@link DOMAIN_SPECIFIC_FUNCTIONS} list with project-specific
+ * names that are deliberately distinct implementations sharing a name.
+ *
+ * Project-specific functions like `getCurrentCorrelationId`, `formatDuration`,
+ * `getRemoteUrl`, `sanitizeForPrompt`, etc. belong in a recipe's
+ * `checks.config['duplicate-utility-functions'].additionalDomainSpecificFunctions`
+ * block, NOT in built-in defaults.
+ */
+export interface DuplicateUtilityFunctionsConfig extends Record<string, unknown> {
+  /** Function names that should be skipped (treated as domain-specific by design). */
+  additionalDomainSpecificFunctions?: readonly string[]
+}
+
+const DUPLICATE_UTILITY_FUNCTIONS_SLUG = 'duplicate-utility-functions'
 
 /**
  * Common utility function name patterns
@@ -50,234 +67,54 @@ const UTILITY_PATTERNS = [
 const MIN_FUNCTION_BODY_LENGTH = 50
 
 /**
- * Functions that are intentionally domain-specific and should NOT be flagged.
- * These have different implementations by design (configuration, factory, validation per domain).
+ * Functions that are intentionally domain-specific and should NOT be flagged
+ * as duplicates. Limited to genuinely generic identifiers — config / factory
+ * / logger / common type-guard names — that almost any TS codebase will hit.
+ *
+ * Project-specific names (e.g. opensip's `getCurrentCorrelationId`,
+ * `formatDuration`, `getRemoteUrl`, `sanitizeForPrompt`) belong in a recipe's
+ * `checks.config['duplicate-utility-functions'].additionalDomainSpecificFunctions`
+ * block. The check reads that list via {@link getCheckConfig} and merges it
+ * with these defaults.
  */
 const DOMAIN_SPECIFIC_FUNCTIONS = new Set([
-  // Config/factory pattern - each domain has its own configuration
+  // Config / factory pattern - each domain has its own configuration
   'getConfig',
   'getDefaultConfig',
   'getContainer',
   'getFactory',
-
-  // Domain-specific getters for singletons/managers
+  // Logger / shared singletons
   'getLogger',
-  'getContextManager',
-  'getPerformanceMonitor',
-  'getObservabilitySystem',
-  'getRecommendedProvider',
-
-  // Registry/scenario patterns - domain-specific registries
-  'getRegisteredScenarios',
-  'getAllRecipes',
-  'getScenario',
-  'getScenariosByTag',
-
-  // Validation functions that are domain-specific by design
-  'validateClaims',
-  'validateConfig',
-  'validateProvider',
-  'validateKey',
-  'validateAssertions',
-  'validateRequiredFields',
-  'validateOptionalFields',
-  'validateUserId',
-  'validateCurrencyCode',
-
-  // Domain-specific parsers/formatters
-  'parseArgs',
-  'parseToken',
-  'parseEnvInteger',
-
-  // Domain-specific helpers that have intentional differences
-  'getSuggestion',
-  'getSeverity',
-  'getContext',
-  'getDefaultLogDir',
-  'getProjectRoot',
-  'getIdPrefix',
-  'getErrorMessage',
-
-  // Security/crypto - intentionally different implementations
-  'isDisposable',
-  'isDangerousKey',
-
-  // Validation - different validation rules per domain/context
-  'isValidEmail',
-  'isValidUserId',
-  'validateEnvString',
-
-  // File utilities - different patterns per context
-  'isSourceFile',
-
-  // Currency/formatting - domain-specific formatting rules
-  'formatCurrency',
-
-  // Fitness check selectors - each selector type has its own validation logic
-  'validateCheckSelector',
-  'validateExcludeField',
-  'validateExplicitSelector',
-  'validatePatternSelector',
-  'validateCategorySelector',
-  'validateAllSelector',
-  'validateRecipe',
-  'validateUserRecipe',
-
-  // Schema/cache/config validation - domain-specific validation rules
-  'validateSchema',
-  'validateCacheConfig',
-  'validateCacheTTL',
-  'validateValueSize',
-  'validateCorrelationId',
-  'validateIdField',
-  'validatePersona',
-  'validateRampUp',
-
-  // Simulation/fingerprint validation - scenario-specific validation
-  'validateDuplicates',
-  'validateScenarioConfig',
-  'validateBucketParams',
-  'validateBucketsArrayParams',
-  'validateFingerprintsParams',
-  'validateRegressionParams',
-
-  // Tag validation - domain-specific tag/label rules
-  'validateTags',
-  'validateTagsAndLabels',
-
-  // Presentation/format functions - each module formats its own domain objects
-  // NOTE: formatDuration was removed from this list — it's a generic utility, not domain-specific
-  'formatZodError',
-  'formatResolutionInfo',
-  'formatCancelInfo',
-  'formatTicketBasicInfo',
-  'formatCodeSnippet',
-  'formatSingleFinding',
-  'formatFindingsList',
-  'formatAffectedFilesSummary',
-  'formatFitnessDetails',
-  'formatTicket',
-  'formatDate',
-  'formatTable',
-  'formatUserRecipeWarnings',
-  'formatTicketTitle',
-  'formatTicketStatus',
-  'formatTicketSeverity',
-  'formatTicketId',
-  'formatTicketAsMarkdown',
-  'formatTicketFitnessInfo',
-  'formatTicketListEntry',
-  'formatTicketTable',
-  'formatTicketList',
-
-  // Domain-specific getters - presentation/display helpers
-  'getCheckIcon',
-  'getCheckDisplayName',
-  'getScoreEmoji',
-
-  // User repository getters - different query strategies per lookup type
-  'getUserById',
-  'getUserByUsername',
-  'getUserByEmail',
-
-  // Config resolution getters - different resolution strategies
-  'getConfigValue',
-  'getConfigValueSync',
-  'getFullConfigSync',
-
-  // Source analysis getters
-  'getLineNumber',
-
-  // Type guards - domain-specific type narrowing
+  // Common predicates that have multiple legitimate definitions
   'isPlainObject',
   'isStringArray',
   'isCommentLine',
   'isTestFile',
-  'isValidModuleEntry',
-
-  // Normalization - domain-specific normalization rules
-  'normalizeMessage',
-  'normalizeCodeSnippet',
-
-  // Git/branch utilities - intentionally separate implementations
-  'getCurrentBranch',
-
-  // Cache utilities - domain-specific cache management
-  'hasCachedConfig',
-  'getCachedConfig',
-
-  // Dependency checking - domain-specific dependency analysis
-  'isDeclaredDependency',
-
-  // CLI-local timestamp formatters — each subcommand renders timestamps
-  // for a different input shape (Date / ISO string / number-of-ms /
-  // unknown) and uses subcommand-local color helpers. They share a name
-  // because "format the timestamp for display" is the user-facing intent;
-  // collapsing them into one function would force every caller to
-  // pre-coerce its input and would need a CLI-color injection scheme.
+  'isValidEmail',
+  // Common formatter / parser names that vary by input shape
+  'formatDate',
   'formatTimestamp',
-
-  // Severity-color mapping is consumer-specific — log severity level
-  // (numeric) vs. autonomy-mode (string) vs. ticket-status. Each maps a
-  // bounded enum to a color helper from createColorScheme.
-  'getLevelColor',
-
-  // Duration formatters operate on different units depending on the
-  // domain: foundation's canonical formatDuration takes ms, while
-  // CLI helpers like pipeline-stalled take minutes. They are not
-  // interchangeable; ms-input formatters are exported from
-  // @opensip/foundation/utils.
-  'formatDuration',
-
-  // Per-domain payload validators — audit corrections, SIP stream
-  // events, billing webhook deliveries each validate a different shape
-  // against a different schema with a different error type. The name
-  // is descriptive of the action ("validate the payload"); the schema
-  // and error type are domain-bound.
-  'validatePayload',
-
-  // getLogLevel is called by both the logger config schema (returns a
-  // ConfigLogLevel from env / config defaults) and the request-
-  // observability plugin (maps an HTTP status code to a pino level).
-  // Different inputs, different outputs.
-  'getLogLevel',
-
-  // Each prompt-injection sanitizer scopes to its package's prompt
-  // surface — assistant chat prompts truncate at 500 chars and strip
-  // markdown directives; observatory caps at MAX_NOTE_CONTENT_CHARS;
-  // enrichment + worker-runtime guard angle brackets at 10_000 chars.
-  // Different defaults + different escape sets per LLM context.
-  'sanitizeForPrompt',
-
-  // Foundation hosts two correlation-ID providers — request-context
-  // exposes the AsyncLocalStorage-backed accessor; error-factory
-  // exposes the singleton-CorrelationIdProvider accessor. Each backs
-  // a different layer (request-scoped vs. shared error factory
-  // composition) and reads from a different storage instance.
-  'getCurrentCorrelationId',
-
-  // sanitizeObject in foundation/serialization is a sync replacer-
-  // based recursion used by safe-stringify; sanitizeObject in
-  // input-sanitization/middleware is the async sanitization pipeline
-  // entry point that recurses into nested objects calling per-field
-  // sanitizers. Same name, completely different I/O contracts.
-  'sanitizeObject',
-
-  // getRemoteUrl in @opensip/github is a thin git CLI wrapper that
-  // returns Promise<string> (origin URL only); getRemoteUrl in
-  // @opensip/worker-runtime/git-worktree is the Result-wrapped
-  // operation-tracked variant that accepts an arbitrary remote name
-  // and timeout. Different signatures by design — the worker-runtime
-  // version is the safer one for pipeline use.
-  'getRemoteUrl',
-
-  // sanitizeField in @opensip/input-sanitization is the per-field
-  // step of the async sanitization middleware (takes a sanitizer +
-  // key + options bundle); sanitizeField in apiserver/routes/ingest
-  // is the signal-route-specific text helper (takes raw text + max-
-  // length + modifications array). Different parameter shapes.
-  'sanitizeField',
+  'parseArgs',
+  // Common validation entry points
+  'validateConfig',
+  'validateSchema',
+  // Common error-message helper
+  'getErrorMessage',
 ])
+
+/**
+ * Build the effective domain-specific set by merging built-in defaults with
+ * the recipe-provided augmentation for `duplicate-utility-functions`.
+ */
+function buildEffectiveDomainSpecificSet(): ReadonlySet<string> {
+  const cfg = getCheckConfig<DuplicateUtilityFunctionsConfig>(DUPLICATE_UTILITY_FUNCTIONS_SLUG)
+  if (!cfg.additionalDomainSpecificFunctions || cfg.additionalDomainSpecificFunctions.length === 0) {
+    return DOMAIN_SPECIFIC_FUNCTIONS
+  }
+  const merged = new Set(DOMAIN_SPECIFIC_FUNCTIONS)
+  for (const name of cfg.additionalDomainSpecificFunctions) merged.add(name)
+  return merged
+}
 
 interface FunctionInfo {
   name: string
@@ -436,10 +273,12 @@ function hashBody(body: string): string {
 }
 
 /**
- * Check if function name matches utility patterns
+ * Check if function name matches utility patterns. The `domainSpecific`
+ * argument is the effective allowlist (built-in defaults plus any
+ * recipe-supplied augmentation).
  */
-function isUtilityFunction(name: string): boolean {
-  if (DOMAIN_SPECIFIC_FUNCTIONS.has(name)) {
+function isUtilityFunction(name: string, domainSpecific: ReadonlySet<string>): boolean {
+  if (domainSpecific.has(name)) {
     return false
   }
   return UTILITY_PATTERNS.some((pattern) => pattern.test(name))
@@ -448,7 +287,11 @@ function isUtilityFunction(name: string): boolean {
 /**
  * Extract utility functions from a file with their body hashes
  */
-function extractUtilityFunctionsWithBody(filePath: string, content: string): FunctionInfo[] {
+function extractUtilityFunctionsWithBody(
+  filePath: string,
+  content: string,
+  domainSpecific: ReadonlySet<string>,
+): FunctionInfo[] {
   const functions: FunctionInfo[] = []
 
   try {
@@ -459,7 +302,7 @@ function extractUtilityFunctionsWithBody(filePath: string, content: string): Fun
       // Check function declarations
       if (ts.isFunctionDeclaration(node) && node.name && node.body) {
         const name = node.name.text
-        if (isUtilityFunction(name)) {
+        if (isUtilityFunction(name, domainSpecific)) {
           const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
           const body = node.body.getText(sourceFile)
           functions.push({
@@ -480,7 +323,7 @@ function extractUtilityFunctionsWithBody(filePath: string, content: string): Fun
         ts.isArrowFunction(node.initializer)
       ) {
         const name = node.name.text
-        if (isUtilityFunction(name)) {
+        if (isUtilityFunction(name, domainSpecific)) {
           const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
           const body = node.initializer.body.getText(sourceFile)
           functions.push({
@@ -547,14 +390,17 @@ function createSimilarViolation(name: string, uniqueImpls: FunctionInfo[]): Chec
   }
 }
 
-async function collectFunctionsFromFiles(files: FileAccessor): Promise<FunctionsByName> {
+async function collectFunctionsFromFiles(
+  files: FileAccessor,
+  domainSpecific: ReadonlySet<string>,
+): Promise<FunctionsByName> {
   const functionsByName: FunctionsByName = new Map()
 
   for (const filePath of files.paths) {
     try {
       // @fitness-ignore-next-line performance-anti-patterns -- sequential file reading to control memory; FileAccessor is lazy
       const content = await files.read(filePath)
-      const functions = extractUtilityFunctionsWithBody(filePath, content)
+      const functions = extractUtilityFunctionsWithBody(filePath, content, domainSpecific)
       const validFunctions = functions.filter((fn) => fn.bodyLength >= MIN_FUNCTION_BODY_LENGTH)
 
       for (const fn of validFunctions) {
@@ -656,7 +502,8 @@ export const duplicateUtilityFunctions = defineCheck({
   fileTypes: ['ts'],
 
   async analyzeAll(files: FileAccessor): Promise<CheckViolation[]> {
-    const functionsByName = await collectFunctionsFromFiles(files)
+    const domainSpecific = buildEffectiveDomainSpecificSet()
+    const functionsByName = await collectFunctionsFromFiles(files, domainSpecific)
     const violations: CheckViolation[] = []
 
     for (const [name, hashGroups] of functionsByName) {
