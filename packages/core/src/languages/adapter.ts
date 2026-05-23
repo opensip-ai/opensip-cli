@@ -22,7 +22,12 @@ export interface LanguageAdapter<TTree = unknown, TNode = unknown> {
   readonly id: string
   /** Lowercase extensions including the leading dot, e.g. ['.rs'] or ['.ts', '.tsx']. */
   readonly fileExtensions: readonly string[]
-  /** Optional aliases — e.g. ['rs'] for Rust. Matched against legacy scope strings. */
+  /**
+   * Optional aliases — e.g. `['rs']` for Rust, `['c']` for the cpp
+   * adapter. The registry indexes these alongside `id` and consults
+   * them through {@link LanguageRegistry.canonicalize}, so a target
+   * declared with `languages: ['c']` matches a check scoped to `cpp`.
+   */
   readonly aliases?: readonly string[]
 
   /** Parse a file's text into the adapter's native tree. Returns null on parse failure. */

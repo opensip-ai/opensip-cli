@@ -12,7 +12,7 @@
  * CheckViolation into a universal Signal via createSignal().
  */
 
-import { logger , SystemError , createSignal , applyContentFilter } from '@opensip-tools/core'
+import { logger , SystemError , createSignal , applyContentFilter , defaultLanguageRegistry } from '@opensip-tools/core'
 
 
 
@@ -218,6 +218,28 @@ async function executeCommandMode(
 export function defineCheck(config: UnifiedCheckConfig): Check {
   validateCheckConfig(config)
 
+  // Canonicalise scope languages through the kernel registry so a check
+  // declared with `scope: { languages: ['c'] }` is indexed under the
+  // canonical id `'cpp'`. Unknown languages pass through unchanged
+  // (with a debug log) — they may resolve later if a custom adapter
+  // ships, and dropping them here would silently break checks.
+  const canonicalLanguages = config.scope
+    ? config.scope.languages.map((lang) => {
+        const canonical = defaultLanguageRegistry.canonicalize(lang)
+        if (canonical === undefined) {
+          logger.debug({
+            evt: 'fitness.check.scope.unknown_language',
+            module: 'fitness:framework',
+            checkSlug: config.slug,
+            language: lang,
+            msg: `Check ${config.slug} declared scope language ${lang} which is not registered`,
+          })
+          return lang.toLowerCase()
+        }
+        return canonical
+      })
+    : undefined
+
   const check: Check = {
     config: {
       id: config.id,
@@ -234,7 +256,7 @@ export function defineCheck(config: UnifiedCheckConfig): Check {
       timeout: config.timeout,
       scansFiles: !isCommandConfig(config),
       fileTypes: config.fileTypes ? [...config.fileTypes] : undefined,
-      checkScope: config.scope ? { languages: [...config.scope.languages], concerns: [...config.scope.concerns] } : undefined,
+      checkScope: config.scope && canonicalLanguages ? { languages: canonicalLanguages, concerns: [...config.scope.concerns] } : undefined,
       // @fitness-ignore-next-line concurrency-safety -- async arrow delegates to executeUnifiedCheck which is async; needed for type compatibility
       execute: async (ctx) => executeUnifiedCheck(config, ctx),
     },

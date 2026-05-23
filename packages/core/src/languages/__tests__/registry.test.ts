@@ -140,4 +140,89 @@ describe('LanguageRegistry', () => {
     registry.register(fakeRust)
     expect(registry.forFile('Makefile')).toBeUndefined()
   })
+
+  describe('canonicalize / aliases', () => {
+    const fakeCpp: LanguageAdapter = {
+      id: 'cpp',
+      fileExtensions: ['.cpp', '.hpp'],
+      aliases: ['c', 'c++'],
+      parse: () => null,
+      stripStrings: (s) => s,
+      stripComments: (s) => s,
+    }
+
+    const fakeRustWithAlias: LanguageAdapter = {
+      ...fakeRust,
+      aliases: ['rs'],
+    }
+
+    it('canonicalize returns the same id for a registered canonical id', () => {
+      registry.register(fakeRust)
+      expect(registry.canonicalize('rust')).toBe('rust')
+    })
+
+    it('canonicalize returns the canonical id for a registered alias', () => {
+      registry.register(fakeRustWithAlias)
+      expect(registry.canonicalize('rs')).toBe('rust')
+    })
+
+    it('canonicalize is case-insensitive on inputs', () => {
+      registry.register(fakeCpp)
+      expect(registry.canonicalize('C')).toBe('cpp')
+      expect(registry.canonicalize('C++')).toBe('cpp')
+      expect(registry.canonicalize('CPP')).toBe('cpp')
+    })
+
+    it('canonicalize maps the cpp adapter aliases', () => {
+      registry.register(fakeCpp)
+      expect(registry.canonicalize('c')).toBe('cpp')
+      expect(registry.canonicalize('c++')).toBe('cpp')
+      expect(registry.canonicalize('cpp')).toBe('cpp')
+    })
+
+    it('canonicalize returns undefined for unknown languages', () => {
+      registry.register(fakeRust)
+      expect(registry.canonicalize('nope')).toBeUndefined()
+    })
+
+    it('alias collisions across adapters keep the incumbent', () => {
+      registry.register(fakeRustWithAlias)
+      const challenger: LanguageAdapter = {
+        id: 'r-script',
+        fileExtensions: ['.r'],
+        aliases: ['rs'],
+        parse: () => null,
+        stripStrings: (s) => s,
+        stripComments: (s) => s,
+      }
+      registry.register(challenger)
+      expect(registry.canonicalize('rs')).toBe('rust')
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ evt: 'lang.registry.alias.collision' }),
+      )
+    })
+
+    it('an alias colliding with a canonical id is ignored', () => {
+      registry.register(fakeRust) // canonical id 'rust'
+      const challenger: LanguageAdapter = {
+        id: 'rusty',
+        fileExtensions: ['.rusty'],
+        aliases: ['rust'],
+        parse: () => null,
+        stripStrings: (s) => s,
+        stripComments: (s) => s,
+      }
+      registry.register(challenger)
+      // 'rust' still resolves to the canonical adapter
+      expect(registry.canonicalize('rust')).toBe('rust')
+      expect(registry.get('rust')).toBe(fakeRust)
+    })
+
+    it('clear() resets the alias index', () => {
+      registry.register(fakeCpp)
+      expect(registry.canonicalize('c')).toBe('cpp')
+      registry.clear()
+      expect(registry.canonicalize('c')).toBeUndefined()
+    })
+  })
 })

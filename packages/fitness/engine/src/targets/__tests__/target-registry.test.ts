@@ -1,8 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { defaultLanguageRegistry } from '@opensip-tools/core';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { TargetRegistry } from '../target-registry.js';
 
 import type { Target } from '../types.js';
+import type { LanguageAdapter } from '@opensip-tools/core';
 
 const stub = (name: string, opts: { tags?: string[]; languages?: string[]; concerns?: string[] } = {}): Target => ({
   config: {
@@ -99,5 +101,92 @@ describe('TargetRegistry', () => {
     reg.clear();
     expect(reg.size).toBe(0);
     expect(reg.getAll()).toEqual([]);
+  });
+
+  describe('findByScope alias canonicalisation', () => {
+    // Register language adapters with the bundled aliases so the
+    // target registry's canonicalize call resolves them. The registry
+    // is the process-wide singleton — snapshot existing entries and
+    // restore on teardown so we don't pollute neighbouring tests.
+    let previousAdapters: readonly LanguageAdapter[];
+
+    const stubAdapter = (id: string, aliases: readonly string[] = []): LanguageAdapter => ({
+      id,
+      fileExtensions: [`.${id}`],
+      aliases,
+      parse: () => null,
+      stripStrings: (s) => s,
+      stripComments: (s) => s,
+    });
+
+    beforeEach(() => {
+      previousAdapters = defaultLanguageRegistry.list();
+      defaultLanguageRegistry.clear();
+      defaultLanguageRegistry.register(stubAdapter('cpp', ['c', 'c++']));
+      defaultLanguageRegistry.register(stubAdapter('rust', ['rs']));
+      defaultLanguageRegistry.register(stubAdapter('go', ['golang']));
+      defaultLanguageRegistry.register(stubAdapter('python', ['py']));
+    });
+
+    afterEach(() => {
+      defaultLanguageRegistry.clear();
+      for (const adapter of previousAdapters) {
+        defaultLanguageRegistry.register(adapter);
+      }
+    });
+
+    it('a target with languages: ["c"] matches a check scoped to cpp', () => {
+      const reg = new TargetRegistry();
+      reg.register(stub('c-target', { languages: ['c'] }));
+      expect(reg.findByScope(['cpp'], []).map((t) => t.config.name)).toEqual(['c-target']);
+    });
+
+    it('a target with languages: ["c++"] matches a check scoped to cpp', () => {
+      const reg = new TargetRegistry();
+      reg.register(stub('cpp-target', { languages: ['c++'] }));
+      expect(reg.findByScope(['cpp'], []).map((t) => t.config.name)).toEqual(['cpp-target']);
+    });
+
+    it('a target with languages: ["rs"] matches a check scoped to rust', () => {
+      const reg = new TargetRegistry();
+      reg.register(stub('rs-target', { languages: ['rs'] }));
+      expect(reg.findByScope(['rust'], []).map((t) => t.config.name)).toEqual(['rs-target']);
+    });
+
+    it('a target with languages: ["golang"] matches a check scoped to go', () => {
+      const reg = new TargetRegistry();
+      reg.register(stub('golang-target', { languages: ['golang'] }));
+      expect(reg.findByScope(['go'], []).map((t) => t.config.name)).toEqual(['golang-target']);
+    });
+
+    it('a target with languages: ["py"] matches a check scoped to python', () => {
+      const reg = new TargetRegistry();
+      reg.register(stub('py-target', { languages: ['py'] }));
+      expect(reg.findByScope(['python'], []).map((t) => t.config.name)).toEqual(['py-target']);
+    });
+
+    it('canonicalisation is symmetric — scope alias matches canonical target', () => {
+      const reg = new TargetRegistry();
+      reg.register(stub('cpp-target', { languages: ['cpp'] }));
+      expect(reg.findByScope(['c'], []).map((t) => t.config.name)).toEqual(['cpp-target']);
+      expect(reg.findByScope(['c++'], []).map((t) => t.config.name)).toEqual(['cpp-target']);
+    });
+
+    it('canonical inputs are unchanged (no behaviour change for callers using ids)', () => {
+      const reg = new TargetRegistry();
+      reg.register(stub('cpp-target', { languages: ['cpp'] }));
+      reg.register(stub('rust-target', { languages: ['rust'] }));
+      expect(reg.findByScope(['cpp'], []).map((t) => t.config.name)).toEqual(['cpp-target']);
+      expect(reg.findByScope(['rust'], []).map((t) => t.config.name)).toEqual(['rust-target']);
+    });
+
+    it('unknown languages fall through case-folded so they still match themselves', () => {
+      const reg = new TargetRegistry();
+      reg.register(stub('custom-target', { languages: ['ada'] }));
+      // 'ada' is not registered as id or alias — registry has no canonical
+      // form, so we compare lowercased copies and the target still matches.
+      expect(reg.findByScope(['ada'], []).map((t) => t.config.name)).toEqual(['custom-target']);
+      expect(reg.findByScope(['ADA'], []).map((t) => t.config.name)).toEqual(['custom-target']);
+    });
   });
 });

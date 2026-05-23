@@ -12,7 +12,19 @@
  * practical benefit and would complicate every call site that queries targets.
  */
 
+import { defaultLanguageRegistry } from '@opensip-tools/core'
+
 import type { Target } from './types.js'
+
+/**
+ * Map a language string (canonical id or alias) to its canonical adapter id.
+ * Falls back to a lowercased copy when the language isn't registered, so
+ * scope-matching still treats unknown ids as themselves rather than
+ * losing them entirely.
+ */
+function toCanonical(lang: string): string {
+  return defaultLanguageRegistry.canonicalize(lang) ?? lang.toLowerCase()
+}
 
 /** Registry for target definitions with lookup by name and tags. */
 export class TargetRegistry {
@@ -73,20 +85,27 @@ export class TargetRegistry {
    * - A target matches languages if the intersection is non-empty (or either side is empty/undefined)
    * - A target matches concerns if the intersection is non-empty (or either side is empty/undefined)
    *
+   * Language strings are canonicalised on both sides through
+   * {@link defaultLanguageRegistry.canonicalize}, so a target written
+   * with `languages: ['c']` matches a check scoped to `cpp`, and a
+   * target with `languages: ['rs']` matches `rust`-scoped checks.
+   *
    * @param languages - Languages the check is designed for
    * @param concerns - Semantic concerns the check targets
    * @returns Targets that match both dimensions
    */
   findByScope(languages: readonly string[], concerns: readonly string[]): readonly Target[] {
+    const scopeLangs = languages.map(toCanonical)
     return this.getAll().filter((target) => {
       const targetLangs = target.config.languages
       const targetConcerns = target.config.concerns
+      const targetLangsCanonical = targetLangs?.map(toCanonical)
 
       // Language matching: if either side has no languages, treat as "matches any"
       const languageMatch =
-        languages.length === 0 ||
-        !targetLangs || targetLangs.length === 0 ||
-        languages.some((lang) => targetLangs.includes(lang))
+        scopeLangs.length === 0 ||
+        !targetLangsCanonical || targetLangsCanonical.length === 0 ||
+        scopeLangs.some((lang) => targetLangsCanonical.includes(lang))
 
       // Concern matching: if either side has no concerns, treat as "matches any"
       const concernMatch =
