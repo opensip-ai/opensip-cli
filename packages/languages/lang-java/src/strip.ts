@@ -66,17 +66,32 @@ function scan(src: string): Scan {
         // Skip the line terminator (handle \r\n).
         j += src[j] === '\r' && src[j + 1] === '\n' ? 2 : 1;
         const contentStart = j
-        // Scan to closing """
+        // Scan to closing """ — track backslash escapes so a literal `\"""`
+        // inside the body does not prematurely close the text block (JLS §3.10.6
+        // honors the same escape sequences as regular string literals).
+        let bodyEscape = false
+        let closed = false
         while (j < len) {
+          if (bodyEscape) {
+            bodyEscape = false
+            j++
+            continue
+          }
+          if (src[j] === '\\') {
+            bodyEscape = true
+            j++
+            continue
+          }
           if (src[j] === '"' && src[j + 1] === '"' && src[j + 2] === '"') {
             const contentEnd = j
             stringRegions.push({ start: contentStart, end: contentEnd })
             i = j + 3
+            closed = true
             break
           }
           j++
         }
-        if (j >= len) {
+        if (!closed) {
           // Unterminated text block — record what we have
           stringRegions.push({ start: contentStart, end: len })
           i = len
@@ -95,11 +110,23 @@ function scan(src: string): Scan {
       continue
     }
 
-    // Char literal: '...' — preserve as code (single character, not a string)
+    // Char literal: '...' — preserve as code (single character, not a string).
+    // Cap the scan at ~8 chars (matches lang-cpp / lang-rust) so a stray
+    // apostrophe in malformed input cannot swallow lines of code looking for a
+    // closer. A valid Java char literal is at most a single unicode escape
+    // (e.g. `'A'` = 8 chars including quotes).
+    //
+    // NOTE: branch ordering is load-bearing — the `if (escape)` reset MUST
+    // run before the `ch === "'"` closer check. For `'\''` (escaped
+    // apostrophe — a common Java char literal), reordering would terminate
+    // at the second `'` and miscompile the literal. lang-cpp uses the same
+    // shape; see also F6 in the lang-java audit.
     if (c === "'") {
+      const maxScan = Math.min(i + 8, len)
       let j = i + 1
       let escape = false
-      while (j < len) {
+      let closed = false
+      while (j < maxScan) {
         const ch = src[j]
         if (escape) {
           escape = false
@@ -113,6 +140,7 @@ function scan(src: string): Scan {
         }
         if (ch === "'") {
           j++
+          closed = true
           break
         }
         if (ch === '\n') {
@@ -121,7 +149,14 @@ function scan(src: string): Scan {
         }
         j++
       }
-      i = j
+      if (closed) {
+        i = j
+      } else {
+        // Overflow / unterminated — treat the apostrophe as code rather than
+        // committing the consumed run as a "char literal" that would mask any
+        // strings or comments inside it.
+        i++
+      }
       continue
     }
 

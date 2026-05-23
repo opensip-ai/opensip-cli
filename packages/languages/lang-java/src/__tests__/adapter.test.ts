@@ -67,6 +67,59 @@ describe('java stripStrings', () => {
     expect(out.length).toBe(src.length)
     expect(out).not.toContain(String.raw`a\"b`)
   })
+
+  // F1: text-block scanner must honor backslash escapes per JLS §3.10.6.
+  // A literal `\"""` inside a text block is a backslash, an escaped quote,
+  // then two literal quotes — NOT a closing delimiter.
+  it('does not prematurely close a text block on an escaped triple quote', () => {
+    const src = 'String s = """\n  literal \\""" inside\n  """;\nint after = 1;'
+    const out = stripStrings(src)
+    expect(out.length).toBe(src.length)
+    // Body content should be stripped
+    expect(out).not.toContain('literal')
+    expect(out).not.toContain('inside')
+    // The trailing code outside the text block must NOT be stripped
+    expect(out).toContain('int after = 1;')
+  })
+
+  // F1: graceful end-of-source recovery when a text block is unterminated.
+  it('recovers from an unterminated text block at end of source', () => {
+    const src = 'String s = """\n unterminated'
+    const out = stripStrings(src)
+    expect(out.length).toBe(src.length)
+    expect(out).not.toContain('unterminated')
+    // Outer prefix is preserved
+    expect(out).toContain('String s =')
+    expect(out).toContain('"""')
+  })
+
+  // F2: stray apostrophe in malformed input must not swallow following code.
+  it('does not swallow code on a stray apostrophe (malformed input)', () => {
+    const src = "char c = 'a; int x = 1;"
+    const out = stripStrings(src)
+    expect(out.length).toBe(src.length)
+    // The trailing statement is real code and must survive intact
+    expect(out).toContain('int x = 1;')
+  })
+
+  // F2: a unicode-escape char literal (`'A'` = 8 chars including quotes)
+  // must still close inside the 8-char scan cap.
+  it('closes a unicode-escape char literal within the 8-char cap', () => {
+    const src = String.raw`char c = 'A'; int x = 1;`
+    const out = stripStrings(src)
+    expect(out).toBe(src)
+    expect(out).toContain('int x = 1;')
+  })
+
+  // F6: '\'' is the canonical case where the escape branch must run before
+  // the closing-quote branch. If the order is wrong, this test fails.
+  it(String.raw`parses an escaped-apostrophe char literal '\''`, () => {
+    const src = String.raw`char c = '\''; int x = 1;`
+    const out = stripStrings(src)
+    expect(out).toBe(src)
+    // Followup statement must not be eaten
+    expect(out).toContain('int x = 1;')
+  })
 })
 
 describe('java stripComments', () => {
