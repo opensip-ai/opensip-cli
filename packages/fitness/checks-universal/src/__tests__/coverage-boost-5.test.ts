@@ -134,10 +134,10 @@ describe('directive-audit pure-fitness file', () => {
 })
 
 // =============================================================================
-// no-test-only-skip: cover playwright variant
+// no-focused-tests / no-skipped-tests: cover concurrent + playwright variants
 // =============================================================================
 
-describe('no-test-only-skip variants', () => {
+describe('no-focused-tests / no-skipped-tests variants', () => {
   let cwd: string
 
   beforeAll(() => {
@@ -159,14 +159,14 @@ describe('no-test-only-skip variants', () => {
   afterAll(() => rmSync(cwd, { recursive: true, force: true }))
 
   it('flags .only as error', async () => {
-    const result = await findCheck('no-test-only-skip').run(cwd, {
+    const result = await findCheck('no-focused-tests').run(cwd, {
       targetFiles: [join(cwd, 'src/__tests__/with-only.test.ts')],
     })
     expect(result.signals.length).toBeGreaterThan(0)
   })
 
   it('flags .skip as warning', async () => {
-    const result = await findCheck('no-test-only-skip').run(cwd, {
+    const result = await findCheck('no-skipped-tests').run(cwd, {
       targetFiles: [join(cwd, 'src/__tests__/with-skip.test.ts')],
     })
     expect(result.signals.length).toBeGreaterThan(0)

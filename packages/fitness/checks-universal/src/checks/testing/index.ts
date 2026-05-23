@@ -1,7 +1,6 @@
 export * from './no-focused-tests.js'
 export * from './no-skipped-tests.js'
 export * from './no-stub-tests.js'
-export * from './no-test-only-skip.js'
 export * from './test-convention-consistency.js'
 export * from './test-file-naming.js'
 export * from './test-file-pairing.js'

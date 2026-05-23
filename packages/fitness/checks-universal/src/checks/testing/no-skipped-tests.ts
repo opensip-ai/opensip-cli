@@ -1,5 +1,4 @@
 // @fitness-ignore-file unused-config-options -- Config options reserved for future use or environment-specific
-// @fitness-ignore-file no-test-only-skip -- longDescription contains backtick-escaped .skip( patterns for documentation
 /**
  * @fileoverview Detects .skip in test files that prevent tests from running
  *
@@ -16,6 +15,10 @@ const SKIP_PATTERNS = [
   { pattern: /\bdescribe\.skip\s*\(/g, type: 'describe.skip' },
   { pattern: /\bit\.skip\s*\(/g, type: 'it.skip' },
   { pattern: /\btest\.skip\s*\(/g, type: 'test.skip' },
+  // Vitest/Jest concurrent-mode skipped tests
+  { pattern: /\b(?:test|it|describe)\.concurrent\.skip\s*\(/g, type: 'concurrent.skip' },
+  // Playwright-style skipped describe block
+  { pattern: /\btest\.describe\.skip\s*\(/g, type: 'test.describe.skip' },
   { pattern: /\bxit\s*\(/g, type: 'xit' },
   { pattern: /\bxdescribe\s*\(/g, type: 'xdescribe' },
   { pattern: /\bxtest\s*\(/g, type: 'xtest' },
@@ -31,7 +34,11 @@ function generateReplacement(matchText: string): string {
     evt: 'fitness.checks.no_skipped_tests.generate_replacement',
     msg: 'Generating replacement text for skipped test match',
   })
-  return matchText.replace('.skip', '').replace(/^x(it|describe|test)/, (_, p1) => p1 as string)
+  return matchText
+    .replace('.skip', '')
+    .replace('.concurrent.', '.')
+    .replace('..', '.')
+    .replace(/^x(it|describe|test)/, (_, p1) => p1 as string)
 }
 
 /**
@@ -94,6 +101,8 @@ export const noSkippedTests = defineCheck({
 - \`describe.skip(\` via \`/\\bdescribe\\.skip\\s*\\(/\`
 - \`it.skip(\` via \`/\\bit\\.skip\\s*\\(/\`
 - \`test.skip(\` via \`/\\btest\\.skip\\s*\\(/\`
+- Vitest/Jest \`(test|it|describe).concurrent.skip(\` via \`/\\b(?:test|it|describe)\\.concurrent\\.skip\\s*\\(/\`
+- Playwright \`test.describe.skip(\` via \`/\\btest\\.describe\\.skip\\s*\\(/\`
 - \`xit(\` (Jasmine-style skipped test) via \`/\\bxit\\s*\\(/\`
 - \`xdescribe(\` via \`/\\bxdescribe\\s*\\(/\`
 - \`xtest(\` via \`/\\bxtest\\s*\\(/\`

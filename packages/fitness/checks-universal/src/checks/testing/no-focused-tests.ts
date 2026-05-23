@@ -1,4 +1,3 @@
-// @fitness-ignore-file no-test-only-skip -- longDescription contains backtick-escaped .only( patterns for documentation
 /**
  * @fileoverview Detects .only in test files that would skip other tests
  *
@@ -23,6 +22,10 @@ const FOCUS_PATTERNS: FocusPattern[] = [
   { pattern: /\bdescribe\.only\s*\(/g, type: 'describe.only' },
   { pattern: /\bit\.only\s*\(/g, type: 'it.only' },
   { pattern: /\btest\.only\s*\(/g, type: 'test.only' },
+  // Vitest/Jest concurrent-mode focused tests
+  { pattern: /\b(?:test|it|describe)\.concurrent\.only\s*\(/g, type: 'concurrent.only' },
+  // Playwright-style focused describe block
+  { pattern: /\btest\.describe\.only\s*\(/g, type: 'test.describe.only' },
   { pattern: /\bfit\s*\(/g, type: 'fit' },
   { pattern: /\bfdescribe\s*\(/g, type: 'fdescribe' },
 ]
@@ -37,7 +40,11 @@ function generateReplacement(matchText: string): string {
     evt: 'fitness.checks.no_focused_tests.generate_replacement',
     msg: 'Generating replacement text for focused test match',
   })
-  return matchText.replace('.only', '').replace(/^f(it|describe)/, (_match: string, p1: string) => p1)
+  return matchText
+    .replace('.only', '')
+    .replace('.concurrent.', '.')
+    .replace('..', '.')
+    .replace(/^f(it|describe)/, (_match: string, p1: string) => p1)
 }
 
 /**
@@ -100,6 +107,8 @@ export const noFocusedTests = defineCheck({
 - \`describe.only(\` via \`/\\bdescribe\\.only\\s*\\(/\`
 - \`it.only(\` via \`/\\bit\\.only\\s*\\(/\`
 - \`test.only(\` via \`/\\btest\\.only\\s*\\(/\`
+- Vitest/Jest \`(test|it|describe).concurrent.only(\` via \`/\\b(?:test|it|describe)\\.concurrent\\.only\\s*\\(/\`
+- Playwright \`test.describe.only(\` via \`/\\btest\\.describe\\.only\\s*\\(/\`
 - \`fit(\` (Jasmine-style focused test) via \`/\\bfit\\s*\\(/\`
 - \`fdescribe(\` (Jasmine-style focused describe) via \`/\\bfdescribe\\s*\\(/\`
 - Skips comment lines

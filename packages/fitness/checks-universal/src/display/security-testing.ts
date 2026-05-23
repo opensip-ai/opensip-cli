@@ -28,7 +28,6 @@ export const TESTING_DISPLAY = Object.freeze<Record<string, CheckDisplayEntry>>(
   'no-focused-tests': ['🧪', 'No Focused Tests'],
   'no-skipped-tests': ['🧪', 'No Skipped Tests'],
   'no-stub-tests': ['🧪', 'No Stub Tests'],
-  'no-test-only-skip': ['🧪', 'No Test-Only Skip'],
   'test-convention-consistency': ['🧪', 'Test Convention Consistency'],
   'test-file-naming': ['🧪', 'Test File Naming'],
   'test-file-pairing': ['🧪', 'Test File Existence Check'],
