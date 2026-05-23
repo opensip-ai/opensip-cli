@@ -278,6 +278,12 @@ defaultToolRegistry.register(graphTool);
 // opensipTools.kind === 'tool'. Discovered relative to the CLI's own
 // install location so users get the bundled tools by default; a
 // project-local config can override later.
+//
+// The bundled-id skip below is **defense in depth**: as of Layer 1
+// Phase 1 the registry itself enforces first-writer-wins on duplicate
+// ids and logs a structured `tool.registry.duplicate` warning. Keeping
+// the explicit guard avoids a noisy warning when a third-party package
+// happens to ship under a built-in id.
 async function loadDiscoveredTools(): Promise<void> {
   const cliInstallDir = dirname(__dirname); // packages/cli/
   const discovered = discoverToolPackages({ projectDir: cliInstallDir });
@@ -290,7 +296,7 @@ async function loadDiscoveredTools(): Promise<void> {
         mod.tool.metadata.id !== simulationTool.metadata.id &&
         mod.tool.metadata.id !== graphTool.metadata.id
       ) {
-        defaultToolRegistry.register(mod.tool);
+        defaultToolRegistry.registerThirdParty(mod.tool, { sourcePackage: pkg.name });
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);

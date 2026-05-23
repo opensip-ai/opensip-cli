@@ -5,8 +5,12 @@ import { logger } from '../lib/logger.js'
 import type { LanguageAdapter } from './adapter.js'
 
 /**
- * Registry of language adapters. Mirrors the shape of CheckRegistry.
+ * Registry of language adapters. Mirrors the shape of `ToolRegistry`.
  * Language IDs are globally unique — no namespace dimension.
+ *
+ * **Duplicate-id policy: first writer wins.** Re-registering the same
+ * id keeps the existing entry and emits a structured warning. Same
+ * semantics as `ToolRegistry`.
  */
 export class LanguageRegistry {
   private readonly byId = new Map<string, LanguageAdapter>()
@@ -14,10 +18,11 @@ export class LanguageRegistry {
 
   register(adapter: LanguageAdapter): void {
     if (this.byId.has(adapter.id)) {
-      logger.debug({
+      logger.warn({
         evt: 'lang.registry.duplicate',
         module: 'core:languages',
         id: adapter.id,
+        msg: `Language id ${adapter.id} already registered — keeping incumbent`,
       })
       return
     }

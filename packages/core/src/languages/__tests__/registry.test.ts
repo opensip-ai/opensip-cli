@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
+import { logger } from '../../lib/logger.js'
 import { LanguageRegistry } from '../registry.js'
 
 import type { LanguageAdapter } from '../adapter.js'
@@ -22,9 +23,15 @@ const fakePython: LanguageAdapter = {
 
 describe('LanguageRegistry', () => {
   let registry: LanguageRegistry
+  let warnSpy: ReturnType<typeof vi.spyOn>
 
   beforeEach(() => {
     registry = new LanguageRegistry()
+    warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined)
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
   })
 
   it('register + get round-trip by ID', () => {
@@ -52,7 +59,7 @@ describe('LanguageRegistry', () => {
     expect(registry.forFile('foo.RS')).toBe(upperRust)
   })
 
-  it('registering a duplicate id is a no-op', () => {
+  it('registering a duplicate id preserves the first entry (first writer wins)', () => {
     registry.register(fakeRust)
     const rustClone: LanguageAdapter = {
       ...fakeRust,
@@ -64,6 +71,24 @@ describe('LanguageRegistry', () => {
     // The clone's extension was never registered
     expect(registry.forFile('foo.rust')).toBeUndefined()
     expect(registry.size).toBe(1)
+  })
+
+  it('registering a duplicate id emits a structured warning', () => {
+    registry.register(fakeRust)
+    registry.register({ ...fakeRust, fileExtensions: ['.rust'] })
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evt: 'lang.registry.duplicate',
+        module: 'core:languages',
+        id: 'rust',
+      }),
+    )
+  })
+
+  it('list() returns one entry per id even after a rejected duplicate', () => {
+    registry.register(fakeRust)
+    registry.register({ ...fakeRust, fileExtensions: ['.rust'] })
+    expect(registry.list()).toHaveLength(1)
   })
 
   it('two adapters claiming the same extension — incumbent wins', () => {
