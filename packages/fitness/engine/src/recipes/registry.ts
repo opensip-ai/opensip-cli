@@ -4,10 +4,13 @@
 /**
  * @fileoverview Fitness recipe registry
  *
- * Manages registration and lookup of fitness recipes (built-in and user-defined).
+ * Thin wrapper around the kernel's `RecipeRegistry<T>` (Layer 1 / core)
+ * that adds fitness-specific concerns: built-in recipe pre-registration
+ * with throw-on-duplicate semantics, override tracking, and display
+ * info enriched with `isBuiltIn` / `overridesBuiltIn` flags.
  */
 
-import { ValidationError } from '@opensip-tools/core'
+import { RecipeRegistry } from '@opensip-tools/core'
 
 import { builtInRecipes, isBuiltInRecipe } from './built-in-recipes.js'
 
@@ -40,13 +43,13 @@ export interface RecipeDisplayInfo {
 }
 
 /** Registry for fitness recipes, loading built-in and user-defined recipes */
-export class FitnessRecipeRegistry {
-  private readonly byId = new Map<string, FitnessRecipe>()
-  private readonly byName = new Map<string, FitnessRecipe>()
+export class FitnessRecipeRegistry extends RecipeRegistry<FitnessRecipe> {
   private _userRecipesLoadResult: UserFitnessRecipesResult | undefined
   private readonly _overriddenBuiltIns = new Set<string>()
 
   constructor(options: FitnessRecipeRegistryOptions = {}) {
+    super({ module: 'fitness:recipes', validationCode: 'VALIDATION.FITNESS.DUPLICATE_RECIPE' })
+
     const {
       basePath,
       loadUserRecipes: shouldLoadUserRecipes = true,
@@ -62,6 +65,9 @@ export class FitnessRecipeRegistry {
   }
 
   private registerBuiltInRecipes(): void {
+    // Built-in recipes ship valid; bypass the duplicate guard via direct
+    // map writes to preserve registration order semantics. allowOverwrite
+    // would also work but emits a duplicate-warn on a second load.
     for (const recipe of builtInRecipes) {
       this.byId.set(recipe.id, recipe)
       this.byName.set(recipe.name, recipe)
@@ -77,6 +83,21 @@ export class FitnessRecipeRegistry {
     this._userRecipesLoadResult = { recipes: [], warnings: [] }
   }
 
+  /**
+   * Register a fitness recipe. Throws on duplicate id/name unless
+   * `allowOverwrite: true` is passed — historical contract preserved
+   * by routing through the kernel registry's `throwOnDuplicate` flag.
+   */
+  override register(
+    recipe: FitnessRecipe,
+    options?: { allowOverwrite?: boolean },
+  ): void {
+    super.register(recipe, {
+      allowOverwrite: options?.allowOverwrite ?? false,
+      throwOnDuplicate: !(options?.allowOverwrite ?? false),
+    })
+  }
+
   /** Return the result of loading user-defined recipes, if attempted */
   getUserRecipesLoadResult(): UserFitnessRecipesResult | undefined {
     return this._userRecipesLoadResult
@@ -90,79 +111,6 @@ export class FitnessRecipeRegistry {
   /** Return the names of all built-in recipes overridden by user recipes */
   getOverriddenBuiltIns(): readonly string[] {
     return [...this._overriddenBuiltIns]
-  }
-
-  /** Look up a recipe by name or ID */
-  loadRecipe(nameOrId: string): FitnessRecipe | undefined {
-    return this.byName.get(nameOrId) ?? this.byId.get(nameOrId)
-  }
-
-  /** Retrieve a recipe by its name */
-  getByName(name: string): FitnessRecipe | undefined {
-    return this.byName.get(name)
-  }
-
-  /** Retrieve a recipe by its ID */
-  getById(id: string): FitnessRecipe | undefined {
-    return this.byId.get(id)
-  }
-
-  /** Check whether a recipe exists by name or ID */
-  has(nameOrId: string): boolean {
-    return this.byName.has(nameOrId) || this.byId.has(nameOrId)
-  }
-
-  /** Return all registered recipes */
-  getAllRecipes(): readonly FitnessRecipe[] {
-    return [...this.byId.values()]
-  }
-
-  /** Return all registered recipe names */
-  getNames(): readonly string[] {
-    return [...this.byName.keys()]
-  }
-
-  /** Return all recipes matching a given tag */
-  getByTag(tag: string): readonly FitnessRecipe[] {
-    return [...this.byId.values()].filter((r) => r.tags?.includes(tag))
-  }
-
-  /** Number of registered recipes */
-  get size(): number {
-    return this.byId.size
-  }
-
-  /** Register a recipe. Throws if already registered unless allowOverwrite is true. */
-  register(recipe: FitnessRecipe, options?: { allowOverwrite?: boolean }): void {
-    const allowOverwrite = options?.allowOverwrite ?? false
-    if (!allowOverwrite && (this.byId.has(recipe.id) || this.byName.has(recipe.name))) {
-      // @fitness-ignore-next-line result-pattern-consistency -- internal registration guard, throw is appropriate
-      throw new ValidationError(`Recipe '${recipe.name}' (${recipe.id}) already registered`, { code: 'VALIDATION.FITNESS.DUPLICATE_RECIPE' })
-    }
-    this.byId.set(recipe.id, recipe)
-    this.byName.set(recipe.name, recipe)
-  }
-
-  /** Register multiple recipes at once */
-  registerAll(recipes: readonly FitnessRecipe[], options?: { allowOverwrite?: boolean }): void {
-    for (const recipe of recipes) {
-      this.register(recipe, options)
-    }
-  }
-
-  /** Remove a recipe by ID. Returns true if the recipe was found and removed. */
-  remove(id: string): boolean {
-    const recipe = this.byId.get(id)
-    if (!recipe) return false
-    this.byId.delete(id)
-    this.byName.delete(recipe.name)
-    return true
-  }
-
-  /** Remove all registered recipes */
-  clear(): void {
-    this.byId.clear()
-    this.byName.clear()
   }
 
   /** Clear all recipes and re-register built-in recipes */

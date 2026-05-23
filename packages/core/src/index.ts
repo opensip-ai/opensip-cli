@@ -42,6 +42,14 @@ export type {
   ToolPluginExports,
 } from './tools/index.js';
 
+// Recipes — generic recipe registry shared by fitness + simulation.
+export { RecipeRegistry } from './recipes/registry.js';
+export type {
+  RecipeBase,
+  RecipeRegisterOptions,
+  RecipeRegistryOptions,
+} from './recipes/registry.js';
+
 // Lib — errors + Result pattern
 export { ToolError, ValidationError, NotFoundError, SystemError, TimeoutError, NetworkError, ConfigurationError } from './lib/errors.js';
 export { ok, err, tryCatchAsync, tryCatch } from './lib/errors.js';

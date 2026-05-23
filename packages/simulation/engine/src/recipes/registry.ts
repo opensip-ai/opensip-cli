@@ -1,9 +1,11 @@
 /**
- * @fileoverview Sim recipe registry — mirrors FitnessRecipeRegistry's
- * shape so user-facing concepts stay parallel.
+ * @fileoverview Sim recipe registry — thin wrapper around the kernel's
+ * `RecipeRegistry<T>` (Layer 1 / core) that adds simulation-specific
+ * concerns: built-in recipe pre-registration with throw-on-duplicate
+ * semantics, and display info with `isBuiltIn` / `isUserDefined` flags.
  */
 
-import { ValidationError } from '@opensip-tools/core';
+import { RecipeRegistry } from '@opensip-tools/core';
 
 import { builtInSimulationRecipes } from './built-in-recipes.js';
 
@@ -21,86 +23,34 @@ export interface SimulationRecipeDisplayInfo {
 
 const BUILT_IN_NAMES = new Set(builtInSimulationRecipes.map((r) => r.name));
 
-export class SimulationRecipeRegistry {
-  private readonly byId = new Map<string, SimulationRecipe>();
-  private readonly byName = new Map<string, SimulationRecipe>();
-
+export class SimulationRecipeRegistry extends RecipeRegistry<SimulationRecipe> {
   constructor() {
+    super({ module: 'simulation:recipes', validationCode: 'VALIDATION.SIMULATION.DUPLICATE_RECIPE' });
     this.registerBuiltInRecipes();
   }
 
   private registerBuiltInRecipes(): void {
+    // Built-in recipes ship valid; bypass the duplicate guard via direct
+    // map writes to preserve registration order semantics.
     for (const recipe of builtInSimulationRecipes) {
       this.byId.set(recipe.id, recipe);
       this.byName.set(recipe.name, recipe);
     }
   }
 
-  loadRecipe(nameOrId: string): SimulationRecipe | undefined {
-    return this.byName.get(nameOrId) ?? this.byId.get(nameOrId);
-  }
-
-  getByName(name: string): SimulationRecipe | undefined {
-    return this.byName.get(name);
-  }
-
-  getById(id: string): SimulationRecipe | undefined {
-    return this.byId.get(id);
-  }
-
-  has(nameOrId: string): boolean {
-    return this.byName.has(nameOrId) || this.byId.has(nameOrId);
-  }
-
-  getAllRecipes(): readonly SimulationRecipe[] {
-    return [...this.byId.values()];
-  }
-
-  getNames(): readonly string[] {
-    return [...this.byName.keys()];
-  }
-
-  get size(): number {
-    return this.byId.size;
-  }
-
   /**
-   * Register a recipe. By default refuses to overwrite an existing
-   * entry — callers that legitimately want to swap (e.g. user recipe
-   * overrides built-in `default`) pass `{ allowOverwrite: true }`.
+   * Register a simulation recipe. Throws on duplicate id/name unless
+   * `allowOverwrite: true` is passed — historical contract preserved
+   * by routing through the kernel registry's `throwOnDuplicate` flag.
    */
-  register(recipe: SimulationRecipe, options?: { allowOverwrite?: boolean }): void {
-    const allowOverwrite = options?.allowOverwrite ?? false;
-    if (!allowOverwrite && (this.byId.has(recipe.id) || this.byName.has(recipe.name))) {
-      throw new ValidationError(
-        `SimulationRecipe '${recipe.name}' (${recipe.id}) already registered`,
-        { code: 'VALIDATION.SIMULATION.DUPLICATE_RECIPE' },
-      );
-    }
-    this.byId.set(recipe.id, recipe);
-    this.byName.set(recipe.name, recipe);
-  }
-
-  registerAll(
-    recipes: readonly SimulationRecipe[],
+  override register(
+    recipe: SimulationRecipe,
     options?: { allowOverwrite?: boolean },
   ): void {
-    for (const recipe of recipes) {
-      this.register(recipe, options);
-    }
-  }
-
-  remove(id: string): boolean {
-    const recipe = this.byId.get(id);
-    if (!recipe) return false;
-    this.byId.delete(id);
-    this.byName.delete(recipe.name);
-    return true;
-  }
-
-  clear(): void {
-    this.byId.clear();
-    this.byName.clear();
+    super.register(recipe, {
+      allowOverwrite: options?.allowOverwrite ?? false,
+      throwOnDuplicate: !(options?.allowOverwrite ?? false),
+    });
   }
 
   reset(): void {
