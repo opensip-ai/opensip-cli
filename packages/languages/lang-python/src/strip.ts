@@ -6,7 +6,9 @@
 // - Triple-quoted strings ('''...''' and """...""") — multi-line
 // - String prefixes (case-insensitive): r, b, u, f, rb, br, rf, fr
 //   e.g. r'raw', b"bytes", f"hello {x}", rb'raw-bytes'
-// - Raw strings (prefix r/rb/br): backslash escapes are NOT honored
+// - Raw strings (prefix r/rb/br/rf/fr): backslash is an ordinary
+//   character EXCEPT before a quote (`\"` / `\'`), where it does NOT
+//   terminate the literal — matches CPython's tokenizer rule
 // - F-string expression interpolation is intentionally NOT preserved —
 //   the entire body is treated as string content. This is a documented
 //   MVP limitation; checks that need to see f-string expressions should
@@ -47,20 +49,27 @@ function isIdentChar(ch: string | undefined): boolean {
 
 /**
  * If position `i` looks like the start of a Python string literal
- * (optionally with prefix), return the index of the opening quote and
- * whether the string is raw. Otherwise return null.
+ * (optionally with prefix), return the index of the opening quote.
+ * Otherwise return null.
  *
  * The check is conservative: a prefix only counts if the character
  * BEFORE it isn't an identifier character, so identifiers like
  * `myvar = foo` or `bar` aren't mistaken for prefixes.
+ *
+ * Note: we deliberately do NOT distinguish raw from non-raw here.
+ * For *tokenization-bound* (which is all the strip pass needs), the
+ * two cases are identical: backslash always pairs with the next char.
+ * The raw/non-raw distinction only matters for value extraction —
+ * something the strip pass never does. See the scanner functions
+ * for the CPython-spec citation.
  */
 function matchStringStart(
   src: string,
   i: number,
-): { quoteIndex: number; isRaw: boolean } | null {
+): { quoteIndex: number } | null {
   const c = src[i]
   if (c === '"' || c === "'") {
-    return { quoteIndex: i, isRaw: false }
+    return { quoteIndex: i }
   }
   if (!isAsciiLetter(c)) return null
 
@@ -76,7 +85,7 @@ function matchStringStart(
     if (TWO_CHAR_PREFIXES.has(two)) {
       const after = src[i + 2]
       if (after === '"' || after === "'") {
-        return { quoteIndex: i + 2, isRaw: two.includes('r') }
+        return { quoteIndex: i + 2 }
       }
     }
   }
@@ -86,7 +95,7 @@ function matchStringStart(
   if (one && ONE_CHAR_PREFIXES.has(one)) {
     const after = src[i + 1]
     if (after === '"' || after === "'") {
-      return { quoteIndex: i + 1, isRaw: one === 'r' }
+      return { quoteIndex: i + 1 }
     }
   }
 
@@ -103,15 +112,22 @@ function scanTripleString(
   src: string,
   contentStart: number,
   quote: string,
-  isRaw: boolean,
 ): StringScanResult {
   const len = src.length
   let i = contentStart
   while (i < len) {
     const ch = src[i]
-    if (!isRaw && ch === '\\') {
-      // Escape consumes the next character (if present), preserving
-      // newlines for line tracking.
+    if (ch === '\\') {
+      // Backslash always pairs with the following character for
+      // tokenization purposes, in BOTH non-raw and raw strings. In
+      // non-raw, this is escape-sequence handling. In raw, escape
+      // sequences are not interpreted, but per CPython:
+      //   "Even in a raw literal, quotes can be escaped with a
+      //    backslash, but the backslash remains in the result."
+      // So `r"\""` is the 2-char string `\"`, terminated by the
+      // third `"`. We must therefore skip past `\<anything>` in raw
+      // mode too, otherwise the next quote is mis-read as terminator.
+      // Newlines are preserved because we never replace them.
       i += 2
       continue
     }
@@ -128,7 +144,6 @@ function scanSingleString(
   src: string,
   contentStart: number,
   quote: string,
-  isRaw: boolean,
 ): StringScanResult {
   const len = src.length
   let i = contentStart
@@ -141,9 +156,17 @@ function scanSingleString(
     if (ch === '\n') {
       return { contentStart, contentEnd: i, next: i }
     }
-    if (!isRaw && ch === '\\') {
-      // Escape consumes the next character. \\\n (line continuation)
-      // is fine — we just skip both chars.
+    if (ch === '\\') {
+      // Backslash always pairs with the following character for
+      // tokenization purposes, in BOTH non-raw and raw strings. In
+      // non-raw, this is escape-sequence handling (and `\\\n` is line
+      // continuation). In raw, escape sequences are not interpreted,
+      // but per CPython:
+      //   "Even in a raw literal, quotes can be escaped with a
+      //    backslash, but the backslash remains in the result."
+      // So `r"\""` is the 2-char string `\"`, terminated by the
+      // third `"`. We must therefore skip past `\<anything>` in raw
+      // mode too, otherwise the next quote is mis-read as terminator.
       i += 2
       continue
     }
@@ -176,17 +199,17 @@ function scan(src: string): Scan {
     // String literal (with optional prefix).
     const stringStart = matchStringStart(src, i)
     if (stringStart) {
-      const { quoteIndex, isRaw } = stringStart
+      const { quoteIndex } = stringStart
       const quote = src[quoteIndex]
       // Triple-quoted?
       if (src[quoteIndex + 1] === quote && src[quoteIndex + 2] === quote) {
         const contentStart = quoteIndex + 3
-        const result = scanTripleString(src, contentStart, quote, isRaw)
+        const result = scanTripleString(src, contentStart, quote)
         stringRegions.push({ start: result.contentStart, end: result.contentEnd })
         i = result.next
       } else {
         const contentStart = quoteIndex + 1
-        const result = scanSingleString(src, contentStart, quote, isRaw)
+        const result = scanSingleString(src, contentStart, quote)
         stringRegions.push({ start: result.contentStart, end: result.contentEnd })
         i = result.next
       }

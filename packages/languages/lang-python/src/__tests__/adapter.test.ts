@@ -102,6 +102,127 @@ describe('python stripStrings', () => {
     const out = stripStrings(src)
     expect(out).toBe(src)
   })
+
+  describe('raw-string quote-escape handling (CPython semantics)', () => {
+    // CPython rule for raw strings: backslash is ordinary EXCEPT when
+    // followed by a quote — `\"` or `\'` keep both chars as part of
+    // the string and the quote does NOT terminate the literal. Without
+    // this rule, the scanner would close on the wrong quote and leak
+    // string content into the surrounding code.
+
+    it(String.raw`r"\"" — backslash-quote does not terminate the literal`, () => {
+      // Source: x = r"\"" + "tail"
+      //                ^ this " is escaped (still part of raw string)
+      //                  the *next* " (the third) is the real terminator
+      const src = String.raw`x = r"\"" + "tail"`
+      const out = stripStrings(src)
+      expect(out.length).toBe(src.length)
+      // The literal "tail" must remain stripped properly — meaning
+      // the scanner correctly identified its open and close quotes.
+      expect(out).not.toContain('tail')
+      // Code surrounding the raw string is preserved.
+      expect(out).toContain('x = r"')
+      expect(out).toContain('+')
+      // The trailing close quote of "tail" survives.
+      expect(out.endsWith('"')).toBe(true)
+    })
+
+    it(String.raw`r'\'' — backslash-quote does not terminate (single-quoted)`, () => {
+      // Source: x = r'\'' + 'tail'
+      const src = String.raw`x = r'\'' + 'tail'`
+      const out = stripStrings(src)
+      expect(out.length).toBe(src.length)
+      expect(out).not.toContain('tail')
+      expect(out).toContain("x = r'")
+      expect(out).toContain('+')
+      expect(out.endsWith("'")).toBe(true)
+    })
+
+    it(String.raw`r"\\" — backslash-backslash: \ is ordinary, two \s are two chars`, () => {
+      // Source: x = r"\\" + "tail"
+      // In raw mode, `\\` is just two ordinary backslashes; the literal
+      // closes at the very next " after them.
+      const src = String.raw`x = r"\\" + "tail"`
+      const out = stripStrings(src)
+      expect(out.length).toBe(src.length)
+      expect(out).not.toContain('tail')
+      expect(out).toContain('x = r"')
+      expect(out).toContain('+')
+      // The two backslashes are inside the (stripped) string region;
+      // preserved as whitespace by applyRegions.
+      expect(out.endsWith('"')).toBe(true)
+    })
+
+    it(String.raw`r"\n" — backslash-n in raw string is ordinary text, no escape interpretation`, () => {
+      // Source: x = r"\n" + "tail"
+      // In raw mode, `\n` is just two ordinary chars (backslash and n);
+      // the literal is closed by the very next ".
+      const src = String.raw`x = r"\n" + "tail"`
+      const out = stripStrings(src)
+      expect(out.length).toBe(src.length)
+      expect(out).not.toContain('tail')
+      // 'n' inside the raw string body is stripped (replaced with
+      // whitespace by applyRegions). The standalone 'n' character
+      // should not appear in plain code positions.
+      expect(out).toContain('x = r"')
+      expect(out.endsWith('"')).toBe(true)
+    })
+
+    it(String.raw`rb"\"" — backslash-quote rule applies to all raw-prefix combos (rb)`, () => {
+      const src = String.raw`x = rb"\"" + "tail"`
+      const out = stripStrings(src)
+      expect(out.length).toBe(src.length)
+      expect(out).not.toContain('tail')
+      expect(out).toContain('x = rb"')
+      expect(out.endsWith('"')).toBe(true)
+    })
+
+    it('triple-raw r"""...""" with backslash-quote inside body', () => {
+      // Source: x = r"""\"""" + "tail"
+      //                 ^^   ^^^
+      //                 escaped quote, then closing triple, then "tail"
+      // Without the fix, the scanner would handle `\` as ordinary,
+      // see the next `"""` (which is actually `\"""` as the escape
+      // skip), and close prematurely — corrupting the rest of the pass.
+      const src = String.raw`x = r"""\"""" + "tail"`
+      const out = stripStrings(src)
+      expect(out.length).toBe(src.length)
+      expect(out).not.toContain('tail')
+      expect(out).toContain('x = r"""')
+      expect(out).toContain('+')
+      expect(out.endsWith('"')).toBe(true)
+    })
+  })
+
+  describe("disambiguation: empty triple-string vs paired empty strings", () => {
+    it('"""""" — six quotes form one empty triple-quoted string', () => {
+      // x = """""" — must be ONE empty triple, not three empty pairs.
+      // After stripping, surrounding code remains and length is preserved.
+      const src = 'x = """"""'
+      const out = stripStrings(src)
+      expect(out.length).toBe(src.length)
+      expect(out).toContain('x =')
+      // The opening and closing triple quotes are NOT part of the
+      // stripped region (only the content between them is). Since
+      // content is empty, output equals input.
+      expect(out).toBe(src)
+    })
+
+    it("'''''' — six single quotes form one empty triple-quoted string", () => {
+      const src = "x = ''''''"
+      const out = stripStrings(src)
+      expect(out.length).toBe(src.length)
+      expect(out).toBe(src)
+    })
+
+    it('"" "" — paired empty strings separated by whitespace are two literals', () => {
+      const src = 'x = "" ""'
+      const out = stripStrings(src)
+      expect(out.length).toBe(src.length)
+      // Both empty strings have nothing to strip; output equals input.
+      expect(out).toBe(src)
+    })
+  })
 })
 
 describe('python stripComments', () => {
