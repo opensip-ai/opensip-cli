@@ -32,7 +32,16 @@ import {
 
 
 import type { CliArgs, FitOptions, ToolOptions } from '@opensip-tools/contracts';
-import type { Tool, ToolCliContext, ToolCommandDescriptor } from '@opensip-tools/core';
+import type {
+  Tool,
+  ToolCliContext,
+  ToolCommandDescriptor,
+} from '@opensip-tools/core';
+
+// Live-view key fitness contributes to the CLI's renderer registry.
+// Owned by this package — the CLI dispatcher does NOT key off this
+// literal; each tool decides its own live-view name.
+const FIT_LIVE_VIEW_KEY = 'fit';
 
 // =============================================================================
 // COMMAND DESCRIPTORS — used by --help listings and conflict detection.
@@ -93,6 +102,21 @@ function register(cli: ToolCliContext): void {
   // Cast once — the contract intentionally types `program` loosely so
   // tools aren't pinned to a specific Commander major.
   const program = cli.program as Command;
+
+  // Contribute fitness's live view to the CLI's renderer registry. The
+  // renderer itself is owned by the CLI (Ink/React layer); the CLI
+  // hands it back through `cli.builtinLiveViews` keyed by tool id, so
+  // this package doesn't take a direct dep on CLI's UI module.
+  const fitRenderer = cli.builtinLiveViews.get(fitnessTool.metadata.id);
+  if (fitRenderer) {
+    cli.registerLiveView(FIT_LIVE_VIEW_KEY, fitRenderer);
+  } else {
+    cli.logger.warn({
+      evt: 'fitness.live_view.missing_renderer',
+      module: 'fitness:tool',
+      msg: `No bundled renderer for tool id '${fitnessTool.metadata.id}' — visual mode for fit will throw UnknownLiveViewError. Expected when running outside the bundled CLI.`,
+    });
+  }
 
   // -- fit ------------------------------------------------------------------
   program
@@ -161,7 +185,7 @@ function register(cli: ToolCliContext): void {
       // Visual mode — Ink-rendered live results. The CLI supplies the
       // renderer via cli.renderLive() so this file doesn't depend on
       // the CLI package directly.
-      await cli.renderLive('fit', args);
+      await cli.renderLive(FIT_LIVE_VIEW_KEY, args);
 
       // --open: launch dashboard after the run when conditions allow.
       await cli.maybeOpenDashboard({

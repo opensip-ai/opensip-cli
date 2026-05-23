@@ -33,8 +33,28 @@ const GRAPH: ToolCommandDescriptor = {
     'Run static call-graph analysis (rules, entry points, catalog summary in one report)',
 };
 
+// Live-view key graph contributes to the CLI's renderer registry. Owned
+// by this package — the CLI dispatcher does NOT key off this literal;
+// each tool decides its own live-view name.
+const GRAPH_LIVE_VIEW_KEY = 'graph';
+
 function register(cli: ToolCliContext): void {
   const program = cli.program as Command;
+
+  // Contribute graph's live view to the CLI's renderer registry. The
+  // renderer itself is owned by the CLI (Ink/React layer); the CLI
+  // hands it back through `cli.builtinLiveViews` keyed by tool id, so
+  // this package doesn't take a direct dep on CLI's UI module.
+  const graphRenderer = cli.builtinLiveViews.get(graphTool.metadata.id);
+  if (graphRenderer) {
+    cli.registerLiveView(GRAPH_LIVE_VIEW_KEY, graphRenderer);
+  } else {
+    cli.logger.warn({
+      evt: 'graph.live_view.missing_renderer',
+      module: 'graph:tool',
+      msg: `No bundled renderer for tool id '${graphTool.metadata.id}' — visual mode for graph will throw UnknownLiveViewError. Expected when running outside the bundled CLI.`,
+    });
+  }
 
   program
     .command(GRAPH.name)
@@ -95,7 +115,7 @@ function register(cli: ToolCliContext): void {
         && (typeof opts.package !== 'string' || opts.package.length === 0);
 
       if (isInteractiveDefault) {
-        await cli.renderLive('graph', {
+        await cli.renderLive(GRAPH_LIVE_VIEW_KEY, {
           cwd: opts.cwd,
           noCache: opts.cache === false,
         });

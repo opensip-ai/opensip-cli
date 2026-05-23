@@ -54,7 +54,9 @@ function makeCli(): CapturedCli {
   const cli: ToolCliContext = {
     program: {},
     render: vi.fn(() => Promise.resolve()),
+    registerLiveView: vi.fn(),
     renderLive: vi.fn(() => Promise.resolve()),
+    builtinLiveViews: new Map(),
     maybeOpenDashboard: vi.fn(() => Promise.resolve()),
     logger: {
       info: vi.fn(),

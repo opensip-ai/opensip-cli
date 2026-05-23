@@ -13,7 +13,9 @@ function makeCli(program: Command): ToolCliContext {
   return {
     program,
     render: vi.fn(() => Promise.resolve()),
+    registerLiveView: vi.fn(),
     renderLive: vi.fn(() => Promise.resolve()),
+    builtinLiveViews: new Map(),
     maybeOpenDashboard: vi.fn(() => Promise.resolve()),
     logger: {
       info: vi.fn(),

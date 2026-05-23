@@ -44,7 +44,9 @@ function makeFakeContext(program: Command): {
       rendered.push(result);
       return Promise.resolve();
     }),
+    registerLiveView: vi.fn(),
     renderLive: vi.fn(() => Promise.resolve()),
+    builtinLiveViews: new Map(),
     maybeOpenDashboard: vi.fn(() => Promise.resolve()),
     logger: {
       debug: vi.fn(),

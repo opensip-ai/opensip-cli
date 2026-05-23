@@ -28,7 +28,6 @@ import {
   EXIT_CODES,
   configurePersistencePaths,
   getErrorSuggestion,
-  type CliArgs,
   type CommandResult,
   type InitOptions,
 } from '@opensip-tools/contracts';
@@ -43,6 +42,7 @@ import {
   defaultToolRegistry,
   discoverToolPackages,
   resolveProjectPaths,
+  type LiveViewRenderer,
   type Tool,
   type ToolCliContext,
 } from '@opensip-tools/core';
@@ -72,6 +72,7 @@ defaultLanguageRegistry.register(javaAdapter);
 defaultLanguageRegistry.register(goAdapter);
 defaultLanguageRegistry.register(cppAdapter);
 
+import { createLiveViewRegistry } from './cli-context.js';
 import { printCompletionScript } from './commands/completion.js';
 import { executeConfigure, resolveApiKey } from './commands/configure.js';
 import { executeInit } from './commands/init.js';
@@ -166,22 +167,37 @@ async function renderResult(result: CommandResult): Promise<void> {
   await renderApp(result);
 }
 
-async function renderLive(viewKey: string, args: unknown): Promise<void> {
-  if (viewKey === 'fit') {
-    const { renderFitView } = await import('./ui/render.js');
-    await renderFitView(args as CliArgs);
-    return;
-  }
-  if (viewKey === 'graph') {
-    const { renderGraphView } = await import('./ui/render.js');
-    await renderGraphView(args as { cwd: string; noCache?: boolean });
-    return;
-  }
-  // Future tools that want a live view register their key here. Until
-  // then, fall back to the static renderApp so unknown view keys don't
-  // silently no-op.
-  await renderResult(args as CommandResult);
-}
+// Live-view registry — populated by each tool's register(cli) call via
+// ToolCliContext.registerLiveView(). renderLive(key, args) looks up the
+// registered renderer; an unregistered key throws
+// UnknownLiveViewError rather than silently falling back to a static
+// render (the latter masked bugs where a tool mistyped its view key).
+// Implementation factored into `cli-context.ts` so it can be unit-tested
+// in isolation from the Commander bootstrap.
+const liveViews = createLiveViewRegistry(logger);
+
+// Built-in renderer adapters for first-party tools. The Ink/React UI
+// components live in the CLI package (layered architecture forbids
+// fitness/graph from depending on CLI), so the CLI hands each
+// first-party tool its renderer through `ctx.builtinLiveViews`. Each
+// tool's `register(cli)` looks up its own id and calls
+// `cli.registerLiveView(viewKey, cli.builtinLiveViews.get(toolId))`
+// — the live-view key (`'fit'`, `'graph'`) is owned by the tool, not
+// the CLI dispatcher.
+const fitLiveRenderer: LiveViewRenderer = async (args) => {
+  const { renderFitView } = await import('./ui/render.js');
+  await renderFitView(args as Parameters<typeof renderFitView>[0]);
+};
+
+const graphLiveRenderer: LiveViewRenderer = async (args) => {
+  const { renderGraphView } = await import('./ui/render.js');
+  await renderGraphView(args as Parameters<typeof renderGraphView>[0]);
+};
+
+const builtinLiveViews: ReadonlyMap<string, LiveViewRenderer> = new Map([
+  [fitnessTool.metadata.id, fitLiveRenderer],
+  [graphTool.metadata.id, graphLiveRenderer],
+]);
 
 // =============================================================================
 // DASHBOARD AUTO-OPEN — used by tools that produce a session worth
@@ -253,7 +269,9 @@ function buildToolCliContext(): ToolCliContext {
   const ctx: ToolCliContext = {
     program,
     render: (result) => renderResult(result as CommandResult),
-    renderLive,
+    registerLiveView: liveViews.register,
+    renderLive: liveViews.render,
+    builtinLiveViews,
     maybeOpenDashboard,
     logger,
     setExitCode: (code) => {
