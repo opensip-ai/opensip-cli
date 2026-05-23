@@ -27,6 +27,14 @@
   "dependencies": {
     "@opensip-tools/core": "workspace:*"
   },
+  "peerDependencies": {
+    "commander": "^13.1.0"
+  },
+  "peerDependenciesMeta": {
+    "commander": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "commander": "^13.1.0",

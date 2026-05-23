@@ -333,6 +333,23 @@ export interface SyncEntry {
  * [key: string]: unknown }`) so consumers can switch on `action`
  * without `as { … }` casts and producer/consumer drift surfaces at
  * compile time.
+ *
+ * Two-level discriminator convention (intentional asymmetry with the
+ * rest of `CommandResult`): every variant shares `type: 'plugin'` and
+ * fans out on a second field, `action: 'list' | 'add' | 'remove' |
+ * 'sync'`. Other `CommandResult` variants discriminate on `type` alone
+ * (e.g. `'fit-done'`, `'sim-done'`, `'list-checks'`).
+ *
+ * This is deliberate: the four plugin operations form a tight cluster
+ * — they share UI surface (one `PluginFeedback` component), share
+ * routing (one `'plugin'` arm in `App.tsx`), and share semantics
+ * ("modify or report on the plugin registry"). Lifting them to four
+ * top-level variants would multiply switch arms across `App.tsx` and
+ * the `CommandResult` consumers without a corresponding gain in
+ * clarity. Future tools with a similar tight cluster of subcommands
+ * (e.g. `sessions list/purge`) MAY follow this pattern intentionally;
+ * tools with loosely-related subcommands SHOULD lift to top-level
+ * `type` literals.
  */
 export type PluginResult =
   | { type: 'plugin'; action: 'list'; plugins: readonly PluginInfo[]; totalCount: number }

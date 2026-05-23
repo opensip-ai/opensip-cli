@@ -71,11 +71,13 @@ export {
 } from './persistence/store.js';
 export type {
   StoredSession,
-  LegacyStoredSession,
   CheckCatalogEntry,
   RecipeCatalogEntry,
 } from './persistence/store.js';
-export { migrateLegacyStoredSession } from './persistence/store.js';
+// `LegacyStoredSession` and `migrateLegacyStoredSession` are intentionally
+// NOT re-exported here — they are an internal implementation detail of
+// `loadSessions`. Tests reach in via the relative path. Promote them to
+// the barrel only if a real external consumer materializes.
 
 // Graph catalog type surface. This is the contract surface between the
 // graph tool (which writes catalog.json) and the dashboard package
@@ -92,23 +94,26 @@ export type {
   GraphVisibility,
 } from './graph-catalog.js';
 
-// `commander` is a typecheck-only dependency for the CliProgram alias
-// below; bringing the type in via `import type` keeps the runtime
-// bundle free of a commander require.
+// `commander` is referenced here purely as a type — `import type` keeps
+// the runtime bundle (`dist/index.js`) free of any commander require.
+// The package declares `commander` as an OPTIONAL peer dependency
+// (see package.json `peerDependencies` + `peerDependenciesMeta`) so
+// consumers who want to use `CliProgram` get commander surfaced in
+// their dependency graph, while plugins that never touch `CliProgram`
+// pay no install cost.
 import type { Command } from 'commander';
 
 /**
  * Type alias for Commander's `Command` class — re-exported here so
  * tool packages can drop the `as Command` cast in their `register(cli)`
- * implementations without growing a direct `commander` dependency.
+ * implementations.
  *
- * The alias is type-only: `commander` is a dev-dependency of
- * `@opensip-tools/contracts` (used at typecheck time only) and the
- * runtime bundle stays untouched.
- *
- * Tool packages that already depend on `commander` continue to import
- * `Command` directly; this alias is the boundary type for plugins that
- * want a typed `cli` parameter without taking a Commander dependency
- * of their own.
+ * `commander` is an OPTIONAL peer dependency of
+ * `@opensip-tools/contracts`. Plugin authors who reference `CliProgram`
+ * (directly or via the `Tool` contract) need `commander` resolvable in
+ * their own `node_modules`; pnpm/npm will surface the peer requirement
+ * in install output. Plugins that never touch `CliProgram` can skip
+ * commander entirely. The alias erases at compile time — no runtime
+ * commander require lands in `dist/index.js`.
  */
 export type CliProgram = Command;
