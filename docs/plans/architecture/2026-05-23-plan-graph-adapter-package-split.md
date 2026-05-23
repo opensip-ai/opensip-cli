@@ -57,6 +57,11 @@ shippable, each leaving the build green.
 5. CLI behavior is byte-identical from the user's perspective —
    `opensip-tools graph` resolves the right adapter for the cwd and
    produces the same output.
+6. Adding a new language (Java, Go, C-family) becomes a drop-in
+   adapter-pack effort with zero engine changes. The `pickAdapter`
+   heuristic and the discovery walker are language-agnostic; the
+   bottleneck for "more languages" goes from "carve out engine
+   subdirectory" to "publish a new package."
 
 ## Non-goals
 
@@ -160,28 +165,28 @@ engine because every adapter pack consumes them:
   `b708d72`. Engine-internal; adapters never reference it directly.
 - **`rules/`** — language-agnostic; consumes the frozen catalog only.
 
-## Sequencing — three PRs
+## Sequencing — four PRs
 
 The split is sequenced so each PR ships green-build and the user-
 visible behavior never regresses. Each PR is reviewable on its own.
 
-### PR 1 — `graph-typescript` (the heaviest extraction)
+PR 1 ("graph-typescript extraction") was originally a single 11-step
+PR; review feedback split it into 1a (infrastructure, no file moves)
+and 1b (file move only). Each half is materially smaller and the
+separation lets the load-bearing infrastructure be reviewed without
+the noise of a 30-file move.
 
-Largest of the three because the TypeScript adapter is structurally
-richer: `edge-resolvers/`, `inventory-visitors/`, `inventory.ts`,
-`test-file.ts`, plus the `edges.ts` orchestrator. PR 1 also lands all
-the shared infrastructure (discovery module, CLI bootstrap hook,
-dep-cruiser deltas, doc updates), so PR 2 and PR 3 are pure
-file-moves.
+### PR 1a — Adapter discovery + contract surface promotion (infrastructure only)
+
+**No file moves. The engine still ships with `lang-typescript/`,
+`lang-python/`, `lang-rust/` subtrees in place after this PR.** What
+changes: the engine grows a discovery module + a public-barrel surface
+that adapter packs will consume; the CLI grows a bootstrap hook that
+will register discovered packs once they exist. With no packs yet
+discoverable, the bootstrap hook is a no-op until PR 1b.
 
 **Contents:**
-1. New package `packages/graph/graph-typescript/`. Move every file
-   under `packages/graph/engine/src/lang-typescript/` to its `src/`,
-   preserving the internal directory structure (`edge-helpers/`,
-   `edge-resolvers/`, `inventory-helpers/`, `inventory-visitors/`).
-   Includes `test-file.ts` (added in 919b41a as the canonical
-   `isTypescriptTestFile` predicate).
-2. New module `packages/graph/engine/src/plugins/graph-adapter-discovery.ts`
+1. New module `packages/graph/engine/src/plugins/graph-adapter-discovery.ts`
    — modeled byte-for-byte on
    `packages/fitness/engine/src/plugins/check-package-discovery.ts`.
    Three resolution rules:
@@ -190,59 +195,155 @@ file-moves.
    - Otherwise, walk ancestor `node_modules/@opensip-tools/`,
      return every directory matching `graph-<id>` (anchor on the
      hyphen so `graph` itself is not a match)
-3. New CLI bootstrap module
+2. New CLI bootstrap module
    `packages/cli/src/bootstrap/register-graph-adapters.ts`. Calls
    discovery, dynamically imports each pack, calls
    `registerAdapter(mod.adapter)`. Sits next to
    `register-language-adapters.ts` and `register-tools.ts`. Hooked
    into `bootstrap/index.ts` before `mountAllToolCommands`.
-4. **Promote contract surface from `engine/src/lang-adapter/`** into
-   the engine's public `index.ts`:
-   - Contract types: `GraphLanguageAdapter`, `DiscoverInput/Output`,
-     `ParseInput/Output`, `WalkInput/Output`, `ResolveInput/Output`,
-     `CallSiteRecord`, `AdapterCallConfidence`, `RuleHints`.
-   - Edge-helper utilities: `truncateForCallEdge`,
-     `CALL_EDGE_TEXT_MAX`, `CREATION_EDGE_PREFIX`,
-     `CREATION_EDGE_TEXT_MAX`, `MutableStats`.
-   These are the imports adapter packs need from
-   `@opensip-tools/graph`.
-5. Delete `packages/graph/engine/src/bootstrap.ts`. Remove its
-   `import './bootstrap.js'` from `tool.ts`.
-6. Move TS-specific types out of the engine's barrel:
+3. **Promote contract surface from `engine/src/lang-adapter/`** into
+   the engine's public `index.ts`. The set is intentionally minimal —
+   only what an external adapter pack must import to compile against
+   the contract. See §"Public API surface — per-symbol justification"
+   below for the full list and the rationale for each.
+4. Audit `packages/graph/engine/src/bootstrap.ts` and delete it iff its
+   contents are exclusively static imports of the three first-party
+   adapters. If the file does additional work (registry seeding,
+   stage installation, anything else), surface that work first under
+   a separate identifiable shape (utility module, test seam, etc.)
+   before the deletion. Update `tool.ts` to drop the
+   `import './bootstrap.js'` line.
+5. Verify the existing dep-cruiser rules from commit `b708d72`
+   (graph N-2 — edge-helper consolidation) remain accurate after the
+   barrel promotion. Specifically, walk `graph-rules-no-parser`'s
+   precise globs and confirm no row references a now-public symbol.
+   Document the result in the PR: "Rules verified intact" or "Rules
+   rewritten: <list>." This is a verification step, not necessarily
+   a code change.
+6. Test-fixture sweep: grep every stub `ToolCliContext` constructor
+   under `packages/`. Each must include the `emitJson` seam added in
+   commit `4448a63`. Most should already include it (the 2026-05-23
+   audit-remediation cli sweep landed it), but the new
+   `register-graph-adapters.ts` test will need a fresh stub. Confirm
+   by `git grep "emitJson" packages/**/*.test.ts` — every stub
+   `ToolCliContext` shape has the field.
+
+**Acceptance:**
+- `pnpm typecheck && pnpm test && pnpm lint` clean.
+- New `packages/graph/engine/src/plugins/graph-adapter-discovery.ts`
+  exists with unit tests parallel to fitness's check discovery tests.
+- Engine's public barrel exposes the promoted symbols (per the
+  per-symbol table below). `pnpm --filter=@opensip-tools/graph build`
+  produces a `dist/index.d.ts` that matches.
+- `register-graph-adapters.ts` runs at bootstrap, finds zero packs
+  matching `graph-*` (because none exist yet), logs zero
+  `cli.graph_adapter.load_failed` events, and exits cleanly. The
+  three first-party adapters continue to register via the existing
+  `bootstrap.ts` static-import path (or its successor; see step 4)
+  — behavior is unchanged in this PR.
+
+### PR 1b — Move `lang-typescript/` → `@opensip-tools/graph-typescript`
+
+Pure file move + the now-load-bearing discovery hook. The engine's
+`lang-typescript/` subtree disappears; the new package picks it up.
+
+**Contents:**
+1. New package `packages/graph/graph-typescript/`. Move every file
+   under `packages/graph/engine/src/lang-typescript/` to its `src/`,
+   preserving the internal directory structure (`edge-helpers/`,
+   `edge-resolvers/`, `inventory-helpers/`, `inventory-visitors/`).
+   Includes `test-file.ts` (added in 919b41a as the canonical
+   `isTypescriptTestFile` predicate). Use `git mv` to preserve blame.
+2. Move TS-specific types out of the engine's barrel:
    `EdgeResolver`, `ResolverContext`, `InventoryVisitor`,
    `VisitorContext` were re-exported from
    `packages/graph/engine/src/index.ts`. They now live in
    `@opensip-tools/graph-typescript`. Engine's barrel drops these
    four symbols.
-7. Add `@opensip-tools/graph-typescript` as a CLI dep in
+3. Add `@opensip-tools/graph-typescript` as a CLI dep in
    `packages/cli/package.json`. Remove `typescript` as a runtime
    dependency of `@opensip-tools/graph` (engine no longer needs it
    at runtime; `tsc` for build remains under `devDependencies`).
-8. Dep-cruiser updates (see §"Dep-cruiser deltas" below).
-9. Release workflow updates (see §"Release workflow" below).
-10. Doc updates (see §"Doc updates" below).
-11. Test updates: any test that imported `typescriptGraphAdapter`
-    from the engine now imports from `@opensip-tools/graph-typescript`.
-    Stub `ToolCliContext` fixtures must include the `emitJson` seam
-    added in commit `4448a63` — search-and-replace if any test
-    constructs a context for a graph-adapter pack.
+4. Dep-cruiser updates per §"Dep-cruiser deltas." With the directory
+   gone, the path-glob rules referencing `engine/src/lang-typescript/`
+   delete or rewrite as package-edge rules.
+5. Release workflow updates per §"Release workflow."
+6. Doc updates per §"Doc updates."
+7. Test updates: any test that imported `typescriptGraphAdapter`
+   from the engine now imports from `@opensip-tools/graph-typescript`.
+   Static-import-bootstrap path from PR 1a step 4 is replaced by the
+   discovery walker — `register-graph-adapters.ts` is now load-bearing.
 
 **Acceptance:**
-- `pnpm typecheck && pnpm test && pnpm lint` clean (lint includes
-  ESLint + dep-cruiser; both must be 0-error).
+- `pnpm typecheck && pnpm test && pnpm lint` clean.
 - `pnpm build && node packages/cli/dist/index.js graph` against this
   repo produces identical output to mainline.
-- Engine package's `dependencies` list contains no parser packages
-  (no `typescript`, no `tree-sitter*` at runtime).
-- Discovery module finds and registers all three adapters at startup
-  (verified via the absence of `cli.tool.load_failed` log lines and
-  the adapter registry containing the expected three ids).
+- Engine package's `dependencies` list contains no `typescript`
+  package at runtime.
+- Discovery module finds and registers `@opensip-tools/graph-typescript`
+  at startup (verified via the absence of `cli.graph_adapter.load_failed`
+  log lines and the adapter registry containing
+  `'typescript'`).
+- `git grep "engine/src/lang-typescript" .` returns no hits in source
+  or dep-cruiser rules.
+
+## Public API surface — per-symbol justification
+
+PR 1a promotes contract types and edge-helper utilities from
+`engine/src/lang-adapter/` into the engine's public barrel. Once
+exported, these become part of `@opensip-tools/graph`'s v-current
+public API; future-breaking changes incur a major. The table below
+justifies each symbol's promotion individually.
+
+**Required for an adapter pack to compile (must promote):**
+
+| Symbol                  | Why required                                                              |
+| ----------------------- | ------------------------------------------------------------------------- |
+| `GraphLanguageAdapter`  | The contract every adapter pack implements                                |
+| `DiscoverInput/Output`  | Method 1 input/output                                                     |
+| `ParseInput/Output`     | Method 2 input/output                                                     |
+| `WalkInput/Output`      | Method 3 input/output                                                     |
+| `ResolveInput/Output`   | Method 4 input/output                                                     |
+| `CallSiteRecord`        | Element type of `WalkOutput.callSites` and `ResolveInput.callSites`       |
+| `AdapterCallConfidence` | Field type on `CallSiteRecord` and `ResolvedEdge`                         |
+| `RuleHints`             | Optional field on `WalkOutput`; Method 5 (registerRules) consumes it      |
+
+These eight symbols are the contract. An adapter pack cannot import
+the type names alone, satisfy the interface, and avoid these. They
+must promote.
+
+**Required by adapter pack call sites (must promote):**
+
+| Symbol                  | Where adapter packs call it                                                |
+| ----------------------- | -------------------------------------------------------------------------- |
+| `truncateForCallEdge`   | Each adapter calls this in its resolver to set `CallEdge.text`             |
+| `CALL_EDGE_TEXT_MAX`    | Adapter-side cap consumers (a small number of test fixtures cite the constant; promote so adapter test code doesn't reach into engine internals) |
+| `CREATION_EDGE_PREFIX`  | Same shape — used in resolver test assertions                              |
+| `CREATION_EDGE_TEXT_MAX`| Same                                                                       |
+
+**Internal — keep private (do NOT promote):**
+
+| Symbol                  | Why kept internal                                                          |
+| ----------------------- | -------------------------------------------------------------------------- |
+| `MutableStats`          | This is a mutable accumulator the engine threads into and reads from. Adapter packs do not construct it; they receive it via `ResolveInput.stats` (already part of `ResolveInput`'s shape) and call its methods. The class itself stays inside the engine; the methods it exposes are reachable through `ResolveInput.stats` typing. Promoting `MutableStats` would expose the constructor, which the adapter contract does not require. |
+
+The audit's N-2 finding consolidated edge constants and helpers in
+`lang-adapter/edge-helpers.ts`. The promotion above keeps that
+consolidation but draws the public-API line at "what an adapter
+package must import to compile and pass its tests" — not at "every
+shared symbol becomes public." `MutableStats` is the principal
+example: shared infrastructure, not a contract surface.
+
+The set is locked at this list. If a future adapter author finds a
+case where another symbol is genuinely required, they propose the
+addition with the same per-symbol shape; the engine maintainer
+decides. This prevents accretion-by-default.
 
 ### PR 2 — `graph-python`
 
-Pure file move + package wiring. Smaller than PR 1 because the
-discovery, CLI bootstrap, dep-cruiser, and doc work all already
-landed.
+Pure file move + package wiring. Smaller than PR 1b because the
+discovery, CLI bootstrap, public-barrel surface, and most dep-cruiser
+work already landed.
 
 **Contents:**
 1. New package `packages/graph/graph-python/`. Move
@@ -258,7 +359,7 @@ landed.
 6. Update release workflow + RELEASING.md.
 
 **Acceptance:**
-- Same as PR 1 plus: a Python fixture (one of the existing graph
+- Same as PR 1b plus: a Python fixture (one of the existing graph
   adapter fixtures) renders the expected catalog.
 
 ### PR 3 — `graph-rust`
@@ -414,7 +515,16 @@ These are intentionally not in this plan:
 - Third-party adapter authoring guide.
 - Java/Go/C-family graph adapters (these will follow the same pattern when authored, but each is its own design effort).
 - Plugin hook for non-discovery adapter sources (e.g. consuming an adapter from a sibling workspace package outside `@opensip-tools/`).
-- Unifying tool-discovery (`opensipTools.kind === 'tool'`) and graph-adapter-discovery (`graph-*` prefix) under a single core "plugin discovery" module. They follow different shapes today and the duplication is small; collapse later if a third axis appears.
+- **Unifying the three discovery shapes under a single core "plugin
+  discovery" module.** After PR 3 lands, the codebase has three
+  discovery patterns: `opensipTools.kind === 'tool'` (tool packages),
+  `@opensip-tools/checks-*` prefix (check packs),
+  `@opensip-tools/graph-*` prefix (graph adapter packs). Three is the
+  threshold where unification starts to pay back. **Write the
+  unification plan as a follow-up the moment PR 3 merges**, while the
+  three patterns are fresh and the trade-offs (kind-based vs.
+  prefix-based, where the registration logic lives) are well
+  understood. Sketched as `2026-MM-DD-plan-unify-plugin-discovery.md`.
 
 ## Verification checklist
 
@@ -426,11 +536,12 @@ Before merging each PR:
   monorepo itself (TypeScript adapter resolves)
 - Manual run against a Python fixture (PR 2) and a Rust fixture (PR 3)
 - `git diff packages/graph/engine/package.json` shows parser deps
-  decreasing as the work progresses (PR 1: drops runtime `typescript`;
-  PR 2: drops `tree-sitter`, `tree-sitter-python`; PR 3: drops
-  `tree-sitter-rust`)
+  decreasing as the work progresses (PR 1a: no parser-dep change —
+  infrastructure only; PR 1b: drops runtime `typescript`; PR 2: drops
+  `tree-sitter`, `tree-sitter-python`; PR 3: drops `tree-sitter-rust`)
 - Release-workflow CI dry-run (the PR-checks job) packs all 22
-  packages cleanly
+  packages cleanly (PR 1a: still 19 packages — no new packs yet; PR 1b:
+  20; PR 2: 21; PR 3: 22)
 
 ## Appendix — alternatives considered
 
