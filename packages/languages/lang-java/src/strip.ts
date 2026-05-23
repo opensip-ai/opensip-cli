@@ -32,6 +32,13 @@ function scan(src: string): Scan {
   const len = src.length
   let i = 0
 
+  // INVARIANT: every iteration of the outer loop MUST advance `i`. Each
+  // branch either (a) sets `i = result.end` / `i = result.next` from a
+  // helper that always reports a strictly-increasing position, or
+  // (b) falls through to the `i++` at the bottom. A future branch that
+  // forgets to advance — or misuses `result.end` (note: scanCharLiteral
+  // returns `start + 1` on overflow, which IS still an advance) — would
+  // spin. Keep this invariant in mind when adding new token branches.
   while (i < len) {
     const c = src[i]
     const next = src[i + 1]

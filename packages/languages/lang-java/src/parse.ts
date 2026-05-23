@@ -18,6 +18,6 @@ import { buildMinimalTextTree, type MinimalTextTree } from '@opensip-tools/core'
 
 export type JavaTree = MinimalTextTree
 
-export function parseJava(content: string, filePath: string): JavaTree | null {
+export function parseJava(content: string, filePath: string): JavaTree {
   return buildMinimalTextTree(content, filePath)
 }

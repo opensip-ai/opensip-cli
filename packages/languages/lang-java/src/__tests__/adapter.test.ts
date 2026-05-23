@@ -93,6 +93,26 @@ describe('java stripStrings', () => {
     expect(out).toContain('"""')
   })
 
+  // N2: when `"""` is NOT followed by a line terminator, the text-block
+  // detection must fall through to the regular-string branch. Pin the
+  // happy path through that fall-through so a future change in
+  // scanRegularString's empty-string fast path does not silently break
+  // Java's not-a-text-block semantics.
+  it(String.raw`falls through to regular-string when """ has no following line terminator`, () => {
+    // `String s = """abc";` — the leading `""` is an empty regular
+    // string; the third `"` opens a new regular string with body `abc`,
+    // closing at the trailing `"`. Result: both string regions are
+    // stripped, and the surrounding code structure survives.
+    const src = 'String s = """abc";'
+    const out = stripStrings(src)
+    expect(out.length).toBe(src.length)
+    // The body content is stripped.
+    expect(out).not.toContain('abc')
+    // Outer code structure survives — no scanner spin.
+    expect(out).toContain('String s =')
+    expect(out).toContain(';')
+  })
+
   // F2: stray apostrophe in malformed input must not swallow following code.
   it('does not swallow code on a stray apostrophe (malformed input)', () => {
     const src = "char c = 'a; int x = 1;"
