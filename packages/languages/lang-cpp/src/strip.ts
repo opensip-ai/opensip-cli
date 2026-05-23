@@ -4,7 +4,17 @@
 // - Line comments (//) and block comments (NON-nesting)
 // - Regular strings ("...") with backslash escapes
 // - Raw strings (R"delim(...)delim", and prefixed forms u8R, uR, UR, LR)
-// - Char literals ('a', '\n', preserved as code)
+// - Char literals ('a', '\n', u8'a', u'a', U'a', L'a', preserved as code)
+// - Line splices in `//` line comments: a `\` immediately before `\n`
+//   continues the comment onto the next physical line (per C/C++ phase 2
+//   translation).
+//
+// NOTE: Broader preprocessor awareness (`#if 0` masking, macro splices in
+// non-comment contexts, full phase-2 line-splicing across all token types)
+// is intentionally OUT OF SCOPE for this strip primitive. We only honor
+// `\<newline>` inside `//` line comments, which is the most common case
+// where ignoring it produces visibly wrong output. See the lang-cpp
+// architecture audit (F3, deferred items).
 
 import { applyRegions, scanRegularString, type Region } from '@opensip-tools/core'
 
@@ -25,10 +35,17 @@ function scan(src: string): Scan {
     const next = src[i + 1]
 
     // Line comment: // ... \n
+    // Honor line splices: `\<newline>` continues the comment onto the next line.
     if (c === '/' && next === '/') {
       const start = i
       i += 2
-      while (i < len && src[i] !== '\n') i++
+      while (i < len) {
+        if (src[i] === '\n') {
+          if (src[i - 1] === '\\') { i++; continue }
+          break
+        }
+        i++
+      }
       commentRegions.push({ start, end: i })
       continue
     }
@@ -95,25 +112,26 @@ function scan(src: string): Scan {
     }
 
     // Char literal: '...' — preserve (don't strip)
-    if (c === "'" || (c === 'L' && next === "'") || (c === 'u' && next === "'") || (c === 'U' && next === "'")) {
-      const startQuote = c === "'" ? i : i + 1
-      // Look for matching '
-      let j = startQuote + 1
-      let escape = false
-      const maxScan = Math.min(startQuote + 8, len)
-      while (j < maxScan) {
-        if (escape) { escape = false; j++; continue }
-        if (src[j] === '\\') { escape = true; j++; continue }
-        if (src[j] === "'") {
-          i = j + 1
-          break
+    // Openers: ', L', u', U', u8' (C++17). Order matters: u8' must be
+    // checked before u' since 'u8' is a 2-char prefix.
+    {
+      const charPrefixLen = matchCharLiteralPrefix(src, i)
+      if (charPrefixLen >= 0) {
+        const startQuote = i + charPrefixLen
+        // Scan until unescaped closing ' or unescaped newline (unterminated).
+        let j = startQuote + 1
+        let escape = false
+        while (j < len) {
+          const ch = src[j]
+          if (escape) { escape = false; j++; continue }
+          if (ch === '\\') { escape = true; j++; continue }
+          if (ch === "'") { j++; break }
+          if (ch === '\n') { break }
+          j++
         }
-        j++
+        i = j
+        continue
       }
-      if (j >= maxScan) {
-        i++
-      }
-      continue
     }
 
     i++
@@ -135,6 +153,21 @@ function matchStringPrefix(src: string, i: number): number {
   if (src[i] === 'u' && src[i + 1] === '8') return 2
   if (src[i] === 'u' || src[i] === 'U' || src[i] === 'L') return 1
   return 0
+}
+
+/**
+ * Returns the length of the char-literal opener prefix at src[i..] (i.e. the
+ * number of chars before the opening `'`), or -1 if there is no char-literal
+ * opener at this position.
+ *
+ * Recognized openers: `'` (0), `L'` / `u'` / `U'` (1), `u8'` (2).
+ * Order matters: u8' must be checked before u'.
+ */
+function matchCharLiteralPrefix(src: string, i: number): number {
+  if (src[i] === "'") return 0
+  if (src[i] === 'u' && src[i + 1] === '8' && src[i + 2] === "'") return 2
+  if ((src[i] === 'L' || src[i] === 'u' || src[i] === 'U') && src[i + 1] === "'") return 1
+  return -1
 }
 
 export function stripStrings(content: string): string {
