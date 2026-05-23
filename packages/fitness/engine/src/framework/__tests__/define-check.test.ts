@@ -2,10 +2,13 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
+import { defaultLanguageRegistry } from '@opensip-tools/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { defineCheck } from '../define-check.js';
 import { fileCache } from '../file-cache.js';
+
+import type { LanguageAdapter } from '@opensip-tools/core';
 
 describe('defineCheck', () => {
   describe('analyze mode', () => {
@@ -114,6 +117,81 @@ describe('defineCheck', () => {
         analyze: () => [],
       });
       expect(c.config.checkScope).toBeUndefined();
+    });
+  });
+
+  // Cross-pack alias regression — closes Layer 1 Phase 2 / Layer 3
+  // plan Phase A2. A check declared with `scope: { languages: ['rs'] }`
+  // should be canonicalised to `'rust'` at intake so target-side
+  // matching (also canonicalised) finds it.
+  describe('scope canonicalisation through registry aliases', () => {
+    let previousAdapters: readonly LanguageAdapter[];
+
+    const stubAdapter = (id: string, aliases: readonly string[] = []): LanguageAdapter => ({
+      id,
+      fileExtensions: [`.${id}`],
+      aliases,
+      parse: () => null,
+      stripStrings: (s) => s,
+      stripComments: (s) => s,
+    });
+
+    beforeEach(() => {
+      previousAdapters = defaultLanguageRegistry.list();
+      defaultLanguageRegistry.clear();
+      defaultLanguageRegistry.register(stubAdapter('cpp', ['c', 'c++']));
+      defaultLanguageRegistry.register(stubAdapter('rust', ['rs']));
+      defaultLanguageRegistry.register(stubAdapter('go', ['golang']));
+      defaultLanguageRegistry.register(stubAdapter('python', ['py']));
+    });
+
+    afterEach(() => {
+      defaultLanguageRegistry.clear();
+      for (const adapter of previousAdapters) {
+        defaultLanguageRegistry.register(adapter);
+      }
+    });
+
+    it.each([
+      ['c', 'cpp'],
+      ['c++', 'cpp'],
+      ['rs', 'rust'],
+      ['golang', 'go'],
+      ['py', 'python'],
+    ])('canonicalises scope.languages: ["%s"] → "%s"', (alias, canonical) => {
+      const c = defineCheck({
+        id: '77777777-7777-4777-8777-777777777777',
+        slug: 'aliased',
+        description: 'd',
+        tags: ['demo'],
+        scope: { languages: [alias], concerns: ['backend'] },
+        analyze: () => [],
+      });
+      expect(c.config.checkScope?.languages).toEqual([canonical]);
+    });
+
+    it('leaves canonical ids unchanged', () => {
+      const c = defineCheck({
+        id: '88888888-8888-4888-8888-888888888888',
+        slug: 'canonical',
+        description: 'd',
+        tags: ['demo'],
+        scope: { languages: ['cpp', 'rust'], concerns: [] },
+        analyze: () => [],
+      });
+      expect(c.config.checkScope?.languages).toEqual(['cpp', 'rust']);
+    });
+
+    it('passes unknown languages through (case-folded) so checks still register', () => {
+      const c = defineCheck({
+        id: '99999999-9999-4999-8999-999999999999',
+        slug: 'unknown-lang',
+        description: 'd',
+        tags: ['demo'],
+        scope: { languages: ['Ada'], concerns: [] },
+        analyze: () => [],
+      });
+      expect(c.config.checkScope?.languages).toEqual(['ada']);
     });
   });
 
