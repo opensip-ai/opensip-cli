@@ -224,9 +224,6 @@ importers:
       '@opensip-tools/fitness':
         specifier: workspace:*
         version: link:../engine
-      '@opensip-tools/lang-java':
-        specifier: workspace:*
-        version: link:../../languages/lang-java
     devDependencies:
       '@types/node':
         specifier: ^22.0.0

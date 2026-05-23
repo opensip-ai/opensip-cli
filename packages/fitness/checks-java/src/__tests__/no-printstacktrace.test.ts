@@ -1,30 +1,22 @@
-import { stripComments, stripStrings } from '@opensip-tools/lang-java/strip'
 import { describe, expect, it } from 'vitest'
 
 import { analyzePrintStackTrace } from '../checks/no-printstacktrace.js'
 
+/**
+ * Pure-analyzer unit tests. The framework's `strip-strings-and-comments`
+ * content filter is applied BEFORE `analyze` is called, so this file's
+ * fixtures are deliberately comment-free and string-free — they exercise
+ * the analyzer directly, not the filter pipeline. End-to-end coverage of
+ * the comment/string false-positive handling lives in `run.test.ts`,
+ * which drives the full `noPrintStackTrace.run()` pipeline.
+ */
 describe('analyzePrintStackTrace', () => {
   it('flags e.printStackTrace()', () => {
     const violations = analyzePrintStackTrace('e.printStackTrace();')
     expect(violations.length).toBe(1)
     expect(violations[0]?.line).toBe(1)
+    expect(violations[0]?.severity).toBe('warning')
     expect(violations[0]?.message).toContain('logging framework')
-  })
-
-  it('does not flag the same literal text inside a string after stripping', () => {
-    // The content filter (strip-strings-and-comments) is applied by the
-    // framework before calling analyze. Simulate that here.
-    const src = 'String s = "e.printStackTrace()";'
-    const filtered = stripStrings(src)
-    const violations = analyzePrintStackTrace(filtered)
-    expect(violations.length).toBe(0)
-  })
-
-  it('does not flag occurrences inside comments after stripping', () => {
-    const src = '// see e.printStackTrace() for example\nint x = 1;'
-    const filtered = stripComments(src)
-    const violations = analyzePrintStackTrace(filtered)
-    expect(violations.length).toBe(0)
   })
 
   it('reports correct line numbers for multiple matches', () => {
@@ -43,6 +35,11 @@ describe('analyzePrintStackTrace', () => {
     expect(violations[1]?.line).toBe(5)
   })
 
+  it('flags multiple bare calls in a flat fixture', () => {
+    const src = 'a.printStackTrace();\nb.printStackTrace();'
+    expect(analyzePrintStackTrace(src)).toHaveLength(2)
+  })
+
   it('flags calls with whitespace inside the parens', () => {
     const violations = analyzePrintStackTrace('e.printStackTrace( );')
     expect(violations.length).toBe(1)
@@ -55,5 +52,9 @@ describe('analyzePrintStackTrace', () => {
       'e.printStackTrace(System.out);',
     )
     expect(violations.length).toBe(0)
+  })
+
+  it('returns an empty list when no .printStackTrace() is present', () => {
+    expect(analyzePrintStackTrace('class X {}')).toEqual([])
   })
 })
