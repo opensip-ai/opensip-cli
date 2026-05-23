@@ -28,12 +28,14 @@ import { printCompletionScript } from './completion.js';
 import { executeConfigure } from './configure.js';
 import { showHistory } from './history.js';
 import { executeInit } from './init.js';
-import { mountResultCommand } from './mount-result-command.js';
+import { mountResultCommand, mountResultCommandWithArg } from './mount-result-command.js';
 import { pluginAdd, pluginList, pluginRemove, pluginSync } from './plugin.js';
 import { executeUninstall } from './uninstall.js';
 
 /** Commander spec for the shared --cwd <path> option (de-duplication for sonarjs). */
 const CWD_OPTION_SPEC = '--cwd <path>';
+/** Help text for the shared --json flag — every CLI-owned subcommand uses this string verbatim. */
+const JSON_DESC = 'Output structured JSON';
 
 export interface CliCommandsContext {
   readonly setExitCode: (code: number) => void;
@@ -66,7 +68,7 @@ function registerInit(program: Command, ctx: CliCommandsContext): void {
     .option(CWD_OPTION_SPEC, 'Target directory', process.cwd())
     .option('--language <list>', 'Comma-separated language list (typescript|rust|python|go|java|cpp). Default: detect from filesystem markers.')
     .option('--force', 'Overwrite an existing config + example files', false)
-    .option('--json', 'Output structured JSON', false)
+    .option('--json', JSON_DESC, false)
     .option('--debug', 'Enable debug mode for structured log output', false);
 
   mountResultCommand<InitOptions>(
@@ -104,13 +106,16 @@ function registerSessions(program: Command, ctx: CliCommandsContext): void {
     .command('sessions')
     .description('Manage session data');
 
-  sessionsCmd
+  const listCmd = sessionsCmd
     .command('list')
     .description('List stored sessions')
-    .action(async () => {
-      const result = showHistory();
-      await ctx.render(result);
-    });
+    .option('--json', JSON_DESC, false);
+
+  mountResultCommand<{ json: boolean }>(
+    listCmd,
+    () => showHistory(),
+    { ctx, jsonFlag: (opts) => opts.json },
+  );
 
   sessionsCmd
     .command('purge')
@@ -122,6 +127,8 @@ function registerSessions(program: Command, ctx: CliCommandsContext): void {
     })
     .option('-y, --yes', 'Skip confirmation prompt', false)
     .action(async (opts: { olderThan?: number; yes: boolean }) => {
+      // Phase 6 will route this through mountResultCommand once
+      // executeClear returns a `clear-done` CommandResult.
       await executeClear({ olderThan: opts.olderThan, yes: opts.yes });
     });
 }
@@ -149,44 +156,56 @@ function registerPlugins(program: Command, ctx: CliCommandsContext): void {
     .command('plugin')
     .description('Manage project-local plugins (add, list, remove, sync)');
 
-  pluginCmd
+  const listCmd = pluginCmd
     .command('list')
     .description('List installed plugins')
     .option(CWD_OPTION_SPEC, 'Project root', process.cwd())
-    .action(async (opts: { cwd?: string }) => {
-      const result = await pluginList(opts.cwd ?? process.cwd());
-      await ctx.render(result);
-    });
+    .option('--json', JSON_DESC, false);
 
-  pluginCmd
+  mountResultCommand<{ cwd?: string; json: boolean }>(
+    listCmd,
+    (opts) => pluginList(opts.cwd ?? process.cwd()),
+    { ctx, jsonFlag: (opts) => opts.json },
+  );
+
+  const addCmd = pluginCmd
     .command('add <package>')
     .description('Install a plugin AND register it in opensip-tools.config.yml')
     .option('--domain <fit|sim>', 'Target domain (default: inferred from package name)')
     .option(CWD_OPTION_SPEC, 'Project root', process.cwd())
-    .action(async (packageName: string, opts: { domain?: string; cwd?: string }) => {
-      const result = await pluginAdd(packageName, opts.cwd ?? process.cwd(), opts.domain);
-      await ctx.render(result);
-    });
+    .option('--json', JSON_DESC, false);
 
-  pluginCmd
+  mountResultCommandWithArg<string, { domain?: string; cwd?: string; json: boolean }>(
+    addCmd,
+    (packageName, opts) => pluginAdd(packageName, opts.cwd ?? process.cwd(), opts.domain),
+    { ctx, jsonFlag: (opts) => opts.json },
+  );
+
+  const removeCmd = pluginCmd
     .command('remove <package>')
     .description('Uninstall a plugin AND remove it from opensip-tools.config.yml')
     .option('--domain <fit|sim>', 'Target domain (default: inferred from package name)')
     .option(CWD_OPTION_SPEC, 'Project root', process.cwd())
-    .action(async (packageName: string, opts: { domain?: string; cwd?: string }) => {
-      const result = await pluginRemove(packageName, opts.cwd ?? process.cwd(), opts.domain);
-      await ctx.render(result);
-    });
+    .option('--json', JSON_DESC, false);
 
-  pluginCmd
+  mountResultCommandWithArg<string, { domain?: string; cwd?: string; json: boolean }>(
+    removeCmd,
+    (packageName, opts) => pluginRemove(packageName, opts.cwd ?? process.cwd(), opts.domain),
+    { ctx, jsonFlag: (opts) => opts.json },
+  );
+
+  const syncCmd = pluginCmd
     .command('sync')
     .description('Install every plugin declared in opensip-tools.config.yml (post-clone bootstrap)')
     .option('--domain <fit|sim>', 'Sync only one domain')
     .option(CWD_OPTION_SPEC, 'Project root', process.cwd())
-    .action(async (opts: { domain?: string; cwd?: string }) => {
-      const result = await pluginSync(opts.cwd ?? process.cwd(), opts.domain);
-      await ctx.render(result);
-    });
+    .option('--json', JSON_DESC, false);
+
+  mountResultCommand<{ domain?: string; cwd?: string; json: boolean }>(
+    syncCmd,
+    (opts) => pluginSync(opts.cwd ?? process.cwd(), opts.domain),
+    { ctx, jsonFlag: (opts) => opts.json },
+  );
 }
 
 // =============================================================================

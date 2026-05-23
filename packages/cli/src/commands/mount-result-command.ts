@@ -13,16 +13,21 @@
  *   - Otherwise route the result through the renderer the dispatcher
  *     wired into the context.
  *
- * Phase 5 of the Layer 5 plan introduces this helper; Phase 6 removes
- * the last raw-ANSI bypasses (`clear`, `configure`) by routing them
- * through here.
+ * Two shapes are exposed:
+ *
+ *   - `mountResultCommand(cmd, handler)` — opts-only handler. Used by
+ *     `init`, `sessions list`, `plugin list`, `plugin sync`.
+ *   - `mountResultCommandWithArg(cmd, handler)` — single-positional-arg
+ *     handler. Used by `plugin add` / `plugin remove`.
+ *
+ * Phase 5 of the Layer 5 plan introduces this helper; Phase 6 routes
+ * `clear` and `configure` through it (eliminating the last raw-ANSI
+ * bypasses).
  */
 
 import type { CliCommandsContext } from './index.js';
 import type { CommandResult } from '@opensip-tools/contracts';
 import type { Command } from 'commander';
-
-
 
 export type CommandHandler<TOpts> = (opts: TOpts) => CommandResult | Promise<CommandResult>;
 
@@ -49,11 +54,40 @@ export function mountResultCommand<TOpts>(
 ): void {
   cmd.action(async (parsedOpts: TOpts) => {
     const result = await handler(parsedOpts);
-    const jsonOut = opts.jsonFlag?.(parsedOpts) ?? false;
-    if (jsonOut) {
-      process.stdout.write(JSON.stringify(result, null, 2) + '\n');
-      return;
-    }
-    await opts.ctx.render(result);
+    await emit(result, opts, parsedOpts);
   });
+}
+
+export type CommandHandlerWithArg<TArg, TOpts> = (
+  arg: TArg,
+  opts: TOpts,
+) => CommandResult | Promise<CommandResult>;
+
+/**
+ * Same as `mountResultCommand` but for commands that take exactly one
+ * positional argument (e.g. `plugin add <package>`). Commander passes
+ * the positional arg before the parsed opts.
+ */
+export function mountResultCommandWithArg<TArg, TOpts>(
+  cmd: Command,
+  handler: CommandHandlerWithArg<TArg, TOpts>,
+  opts: MountResultCommandOptions<TOpts>,
+): void {
+  cmd.action(async (arg: TArg, parsedOpts: TOpts) => {
+    const result = await handler(arg, parsedOpts);
+    await emit(result, opts, parsedOpts);
+  });
+}
+
+async function emit<TOpts>(
+  result: CommandResult,
+  opts: MountResultCommandOptions<TOpts>,
+  parsedOpts: TOpts,
+): Promise<void> {
+  const jsonOut = opts.jsonFlag?.(parsedOpts) ?? false;
+  if (jsonOut) {
+    process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+    return;
+  }
+  await opts.ctx.render(result);
 }
