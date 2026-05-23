@@ -95,6 +95,20 @@ const CliDefaultsSchema = z.object({
 })
 
 // =============================================================================
+// Dashboard
+// =============================================================================
+
+/**
+ * Dashboard-specific settings. Currently just the editor protocol used
+ * by the Code Paths panel to build vscode://, cursor://, etc. deep
+ * links. Lifted out of the dashboard's hand-rolled YAML walker so the
+ * value flows through the same schema as the rest of the config.
+ */
+const DashboardSchema = z.object({
+  editor: z.string().min(1).max(64).optional(),
+})
+
+// =============================================================================
 // Root Schema
 // =============================================================================
 
@@ -114,4 +128,5 @@ export const SignalersConfigSchema = z.object({
   fitness:    section(FitnessSchema),
   simulation: section(SimulationSchema),
   cli:        section(CliDefaultsSchema),
+  dashboard:  section(DashboardSchema),
 })

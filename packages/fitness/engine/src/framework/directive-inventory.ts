@@ -3,6 +3,8 @@
  * fitness-ignore directives.
  */
 
+import { stripCommentOpener } from './comment-openers.js'
+
 // =============================================================================
 // Types
 // =============================================================================
@@ -42,9 +44,12 @@ const WEAK_REASON_PATTERNS = Object.freeze<readonly RegExp[]>([
 
 /**
  * Parse a file-level or next-line directive from a comment line.
- * Accepts both `//` and `/*`-style comments for consistency with the
- * suppression parser in directive-parsing.ts — otherwise block-comment
- * directives suppress findings but vanish from inventory counts.
+ *
+ * Accepts every comment opener the suppression parser supports
+ * (`//`, `/*`, `<!--`, `#`) — sourced from the shared COMMENT_OPENERS
+ * table so the inventory and the suppressor stay in sync. Previously
+ * the inventory only recognized `// ` and `/* `, so block-comment
+ * directives suppressed findings but vanished from inventory counts.
  */
 export function parseDirectiveLine(line: string): {
   type: 'file' | 'next-line'
@@ -52,9 +57,10 @@ export function parseDirectiveLine(line: string): {
   reason: string | null
 } | null {
   const trimmed = line.trimStart()
-  if (!trimmed.startsWith('// ') && !trimmed.startsWith('/* ')) return null
+  const stripped = stripCommentOpener(trimmed)
+  if (stripped === null) return null
 
-  const afterComment = trimmed.slice(3).trimStart()
+  const afterComment = stripped.trimStart()
 
   if (afterComment.startsWith('@fitness-ignore-file ')) {
     const rest = afterComment.slice('@fitness-ignore-file '.length)
@@ -73,9 +79,9 @@ function parseDirectiveRest(
   rest: string,
   type: 'file' | 'next-line',
 ): { type: 'file' | 'next-line'; checkId: string; reason: string | null } | null {
-  // Strip trailing `*/` from block-comment directives (e.g. `foo */` → `foo`).
+  // Strip trailing block-comment terminators: `*/` (C-family) and `-->` (HTML).
   // eslint-disable-next-line sonarjs/slow-regex -- anchored at end-of-string, bounded \s* runs; no ReDoS exposure
-  const normalized = rest.replace(/\s*\*\/\s*$/, '').trimEnd()
+  const normalized = rest.replace(/\s*(?:\*\/|-->)\s*$/, '').trimEnd()
 
   const separatorIndex = normalized.indexOf(' -- ')
 

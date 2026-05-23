@@ -19,6 +19,7 @@ import { generateDashboardHtml } from '@opensip-tools/dashboard';
 
 import { defaultRegistry } from '../framework/registry.js';
 import { defaultRecipeRegistry } from '../recipes/registry.js';
+import { loadSignalersConfig } from '../signalers/index.js';
 
 import { ensureChecksLoaded, getDisplayName, getIcon } from './fit.js';
 
@@ -41,54 +42,23 @@ function classifyCheckSource(namespace: string | undefined): 'built-in' | 'commu
 }
 
 /**
- * Read the project's `dashboard.editor` value (if any) from
- * opensip-tools.config.yml. The Code Paths panel embeds it as a JS
- * constant so the Function Card can produce vscode://, cursor://, etc.
- * deep links.
+ * Read the project's `dashboard.editor` value (if any) via the shared
+ * signalers loader. The Code Paths panel embeds it as a JS constant so
+ * the Function Card can produce vscode://, cursor://, etc. deep links.
+ *
+ * Returns `null` when no config file exists or the value is unset —
+ * the dashboard renders without a deep-link editor protocol in that
+ * case (graceful degradation; the panel falls back to plain paths).
  */
 function loadEditorProtocol(projectDir?: string): string | null {
-  const candidates = [
-    join(projectDir ?? process.cwd(), 'opensip-tools.config.yml'),
-    join(projectDir ?? process.cwd(), 'opensip-tools.config.yaml'),
-  ];
-  for (const candidate of candidates) {
-    if (!existsSync(candidate)) continue;
-    try {
-      const raw = readFileSync(candidate, 'utf8');
-      const value = extractDashboardEditor(raw);
-      if (value) return value;
-    } catch {
-      // ignore — config absence is normal
-    }
+  try {
+    const config = loadSignalersConfig(projectDir ?? process.cwd());
+    return config.dashboard?.editor ?? null;
+  } catch {
+    // No config / parse error — dashboard runs ungoverned. The fitness
+    // run itself surfaces a config-load failure separately.
+    return null;
   }
-  return null;
-}
-
-/**
- * Linear-time line-walker that finds `dashboard.editor` in a YAML file
- * without pulling in js-yaml. Scans for a top-level `dashboard:` key,
- * then within its indented block looks for an `editor:` key.
- */
-function extractDashboardEditor(raw: string): string | null {
-  const lines = raw.split('\n');
-  let inDashboardBlock = false;
-  let dashboardIndent = -1;
-  for (const line of lines) {
-    if (line.trim().length === 0 || line.trim().startsWith('#')) continue;
-    const indent = line.length - line.trimStart().length;
-    if (!inDashboardBlock) {
-      if (/^dashboard\s*:\s*$/.test(line)) {
-        inDashboardBlock = true;
-        dashboardIndent = indent;
-      }
-      continue;
-    }
-    // Exited the dashboard block (dedent to or below the dashboard line).
-    if (indent <= dashboardIndent) break;
-    const m = /^\s*editor\s*:\s*['"]?([\w-]+)['"]?\s*$/.exec(line);
-    if (m?.[1]) return m[1];
-  }
-  return null;
 }
 
 /**

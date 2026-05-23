@@ -28,7 +28,7 @@ export { getLineNumber, extractSnippet, isAPIFile } from './framework/result-bui
 // live in @opensip-tools/lang-typescript. Only the narrow set fitness
 // still owns is re-exported from here.
 export {
-  getLineNumber as getASTLineNumber,
+  getASTLineNumber,
   isPropertyAccess,
 } from './framework/ast-utilities.js';
 export { execAbortable } from './framework/abortable-exec.js';

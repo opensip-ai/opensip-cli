@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 
 import { parseDirectiveLine } from '../directive-inventory.js'
+import { parseFileIgnoreDirective, parseIgnoreDirectives } from '../directive-parsing.js'
 
 describe('parseDirectiveLine', () => {
   describe('line comments (// form)', () => {
@@ -37,6 +38,30 @@ describe('parseDirectiveLine', () => {
     })
   })
 
+  describe('HTML comments (<!-- form)', () => {
+    it('parses single-line HTML directive with reason', () => {
+      const result = parseDirectiveLine('<!-- @fitness-ignore-file md-check -- doc fixture -->')
+      expect(result).toEqual({ type: 'file', checkId: 'md-check', reason: 'doc fixture' })
+    })
+
+    it('parses HTML directive without reason', () => {
+      const result = parseDirectiveLine('<!-- @fitness-ignore-next-line md-check -->')
+      expect(result).toEqual({ type: 'next-line', checkId: 'md-check', reason: null })
+    })
+  })
+
+  describe('hash comments (# form)', () => {
+    it('parses hash directive with reason', () => {
+      const result = parseDirectiveLine('# @fitness-ignore-file yaml-check -- ci config exempt')
+      expect(result).toEqual({ type: 'file', checkId: 'yaml-check', reason: 'ci config exempt' })
+    })
+
+    it('parses hash directive without reason', () => {
+      const result = parseDirectiveLine('# @fitness-ignore-next-line yaml-check')
+      expect(result).toEqual({ type: 'next-line', checkId: 'yaml-check', reason: null })
+    })
+  })
+
   describe('rejection cases', () => {
     it('rejects directive without comment marker', () => {
       expect(parseDirectiveLine('@fitness-ignore-file foo')).toBeNull()
@@ -49,5 +74,38 @@ describe('parseDirectiveLine', () => {
     it('rejects empty checkId', () => {
       expect(parseDirectiveLine('// @fitness-ignore-file ')).toBeNull()
     })
+  })
+})
+
+describe('inventory + suppression parity across comment styles', () => {
+  // Regression for the pre-D5 bug where HTML and hash directives
+  // suppressed findings (handled by directive-parsing.ts via the
+  // shared COMMENT_OPENERS table) but vanished from the inventory
+  // (handled by directive-inventory.ts via a stricter `// ` / `/* `
+  // check). Now both consume the shared table.
+  const cases: { name: string; line: string }[] = [
+    { name: 'line comment',  line: '// @fitness-ignore-file shared-fixture-check' },
+    { name: 'block comment', line: '/* @fitness-ignore-file shared-fixture-check */' },
+    { name: 'HTML comment',  line: '<!-- @fitness-ignore-file shared-fixture-check -->' },
+    { name: 'hash comment',  line: '# @fitness-ignore-file shared-fixture-check' },
+  ]
+
+  for (const { name, line } of cases) {
+    it(`${name}: file directive both suppresses AND surfaces in the inventory`, () => {
+      // (a) Suppresses: directive-parsing recognizes it.
+      expect(parseFileIgnoreDirective(line, 'shared-fixture-check')).toBe(true)
+      // (b) Surfaces: directive-inventory parses the same line.
+      const parsed = parseDirectiveLine(line)
+      expect(parsed).not.toBeNull()
+      expect(parsed?.type).toBe('file')
+      expect(parsed?.checkId).toBe('shared-fixture-check')
+    })
+  }
+
+  it('next-line directive: hash form surfaces in the inventory and suppresses', () => {
+    const line = '# @fitness-ignore-next-line shared-fixture-check'
+    expect(parseIgnoreDirectives(`${line}\nfoo()`, 'shared-fixture-check').size).toBe(1)
+    const parsed = parseDirectiveLine(line)
+    expect(parsed?.type).toBe('next-line')
   })
 })

@@ -11,9 +11,10 @@
  * helpers that fitness still exposes through its public barrel for
  * check authors:
  *
- *   - getLineNumber → re-exported as `getASTLineNumber` (deliberately
- *     distinct from result-builder's `getLineNumber` which takes a
- *     numeric offset, not a node).
+ *   - getASTLineNumber → 1-indexed line number for a TS node.
+ *     Deliberately distinct from result-builder's `getLineNumber`,
+ *     which takes `(content: string, index: number)` rather than a
+ *     node + source file. One name, one signature.
  *   - isPropertyAccess → property-name-aware wrapper around
  *     `ts.isPropertyAccessExpression`. Used by checks that want to
  *     match a specific member like `.method()`.
@@ -27,7 +28,7 @@ import * as ts from 'typescript'
 /**
  * Get the 1-indexed line number for a node.
  */
-export function getLineNumber(node: ts.Node, sourceFile: ts.SourceFile): number {
+export function getASTLineNumber(node: ts.Node, sourceFile: ts.SourceFile): number {
   const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
   return line + 1
 }

@@ -2,14 +2,14 @@ import * as ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 import {
-  getLineNumber,
+  getASTLineNumber,
   isPropertyAccess,
 } from '../ast-utilities.js';
 
 // Most TS compiler-API helpers (parseSource, walkNodes, getIdentifierName,
 // getPropertyChain, isLiteral, isInStringLiteral) are tested in their
 // canonical home at @opensip-tools/lang-typescript. fitness/engine keeps
-// only getLineNumber and isPropertyAccess — those are the helpers
+// only getASTLineNumber and isPropertyAccess — those are the helpers
 // exercised below. The setup inlines the TS compiler API rather than
 // depending on lang-typescript directly, since the two packages are
 // peers in the layered architecture.
@@ -25,13 +25,13 @@ function walk(root: ts.Node, visitor: (n: ts.Node) => void): void {
   ts.forEachChild(root, visit);
 }
 
-describe('getLineNumber', () => {
+describe('getASTLineNumber', () => {
   it('returns 1-based line numbers', () => {
     const sf = parse('\n\nconst x = 1;');
     let line = 0;
     walk(sf, (n) => {
       if (ts.isVariableDeclaration(n)) {
-        line = getLineNumber(n, sf);
+        line = getASTLineNumber(n, sf);
       }
     });
     expect(line).toBe(3);

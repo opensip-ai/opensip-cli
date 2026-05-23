@@ -15,6 +15,17 @@ import type { CheckRegistry } from '../framework/registry.js'
 
 /**
  * Resolve a CheckSelector to a list of check slugs from the registry.
+ *
+ * The `switch` over `selector.type` is intentional, not a string-keyed
+ * dispatch waiting to be tabularized. Each arm needs different fields
+ * from the discriminated union (e.g. `pattern` reads `include`/
+ * `exclude`; `tags` reads tag arrays; `all` only `exclude`), so the
+ * compiler-checked exhaustive switch is the type-safe shape: a
+ * `Record<CheckSelector['type'], (sel) => string[]>` would either
+ * widen the argument type or require per-arm narrowing inside the
+ * handlers, defeating the purpose. The `_exhaustive: never` default
+ * guarantees that adding a new selector type without a matching arm is
+ * a compile-time error.
  */
 export function resolveChecks(selector: CheckSelector, registry: CheckRegistry): readonly string[] {
   const allCheckSlugs = registry.listSlugs()
