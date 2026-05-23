@@ -42,11 +42,15 @@ export interface InitOptions {
    */
   language?: string;
   /**
-   * Overwrite an existing opensip-tools.config.yml or example files
-   * without prompting. Default false — the safe behavior is to refuse
-   * overwriting.
+   * Re-scaffold example files. Preserve any custom files in
+   * `opensip-tools/`. Mutually exclusive with `remove`.
    */
-  force: boolean;
+  keep?: boolean;
+  /**
+   * Delete `opensip-tools/` entirely, then scaffold fresh. Mutually
+   * exclusive with `keep`.
+   */
+  remove?: boolean;
 }
 
 /** Options for `sim` subcommand. */
@@ -263,23 +267,51 @@ export interface DashboardResult {
   opened: boolean;
 }
 
+/** Classification for a file present under `opensip-tools/` before init ran. */
+export interface PreExistingFile {
+  readonly path: string;
+  readonly classification: 'scaffolded' | 'custom' | 'stale-scaffolded';
+}
+
 export interface InitResult {
   type: 'init';
   created: boolean;
   path: string;
-  alreadyExists: boolean;
   cwd: string;
   configFilename: string;
+  /**
+   * The state of the working directory at init time. Useful for
+   * `--json` consumers and for the rendered output to show what
+   * happened. Absent when init bailed before classification (cwd
+   * missing, language unresolvable, mutex flag error).
+   */
+  state?: 'pristine' | 'fully-initialized' | 'partial-config-only' | 'partial-dir-only';
   /** Languages selected for this scaffold (post-detection or from --language). */
   languages?: readonly ('typescript' | 'rust' | 'python' | 'go' | 'java' | 'cpp')[];
   /**
    * Every file init created, in display order. Includes the config
    * file plus example check / recipe / scenario scaffolds. Empty
-   * when alreadyExists is true (nothing was written).
+   * when init refused to write anything.
    */
   createdFiles?: readonly string[];
   /** True when init appended `opensip-tools/.runtime/` to .gitignore. */
   gitignoreUpdated?: boolean;
+  /**
+   * Files that existed before init ran, classified. Empty (or absent)
+   * in state 'pristine'. Populated for the other states so the user
+   * can see what survived (`--keep`) or was removed (`--remove`).
+   */
+  preExistingFiles?: readonly PreExistingFile[];
+  /**
+   * When init refuses due to partial state (or fully-initialized state)
+   * and no flag was passed, surfaces what's there + a flag hint. Set
+   * together with `created: false`.
+   */
+  partialStateError?: {
+    readonly state: 'partial-config-only' | 'partial-dir-only' | 'fully-initialized';
+    readonly preExistingFiles: readonly PreExistingFile[];
+    readonly message: string;
+  };
   /**
    * When detection is ambiguous and --language wasn't passed, init
    * exits without writing anything and surfaces this error so the

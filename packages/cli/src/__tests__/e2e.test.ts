@@ -270,18 +270,20 @@ describe('CLI e2e', () => {
       expect(existsSync(join(tempDir, '.gitignore'))).toBe(true);
     });
 
-    it('reports already exists on second run', () => {
+    it('reports already-initialized state on second run', () => {
       tempDir = join(tmpdir(), `opensip-e2e-init2-${Date.now()}-${Math.random().toString(36).slice(2)}`);
       mkdirSync(tempDir, { recursive: true });
 
-      // First run creates the layout
+      // First run creates the layout.
       runIn(tempDir, 'init', '--language', 'typescript');
-      // Second run should refuse to overwrite (exit 0, alreadyExists in JSON)
+      // Second run refuses with exit 2 and surfaces a partialStateError
+      // pointing at --keep / --remove.
       const { stdout, exitCode } = runIn(tempDir, 'init', '--language', 'typescript', '--json');
-      expect(exitCode).toBe(0);
+      expect(exitCode).toBe(2);
       const output = JSON.parse(stdout);
-      expect(output.alreadyExists).toBe(true);
       expect(output.created).toBe(false);
+      expect(output.state).toBe('fully-initialized');
+      expect(output.partialStateError?.state).toBe('fully-initialized');
     });
 
     it('exits 2 with a prompt when language is ambiguous and --language not passed', () => {

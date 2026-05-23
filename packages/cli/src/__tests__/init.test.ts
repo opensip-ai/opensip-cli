@@ -3,7 +3,7 @@
  * gitignore append, ambiguous-language prompt.
  */
 
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -31,7 +31,7 @@ afterEach(() => {
 });
 
 // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs is the bridge type for the legacy executeInit signature until the rip-out
-function makeArgs(overrides: Partial<CliArgs & { language?: string; force?: boolean }> = {}): CliArgs & { language?: string; force?: boolean } {
+function makeArgs(overrides: Partial<CliArgs & { language?: string; keep?: boolean; remove?: boolean }> = {}): CliArgs & { language?: string; keep?: boolean; remove?: boolean } {
   return {
     command: 'init',
     json: false,
@@ -226,33 +226,165 @@ describe('executeInit (ambiguous language)', () => {
   });
 });
 
-describe('executeInit (alreadyExists)', () => {
+describe('executeInit (fully-initialized state)', () => {
   beforeEach(() => {
     writeFileSync(join(testDir, 'Cargo.toml'), '[package]\nname = "x"');
   });
 
-  it('refuses to overwrite without --force', () => {
+  it('refuses to overwrite without a flag', () => {
     executeInit(makeArgs());
     const before = readFileSync(join(testDir, 'opensip-tools.config.yml'), 'utf8');
 
     const second = executeInit(makeArgs());
     expect(second.created).toBe(false);
-    expect(second.alreadyExists).toBe(true);
+    expect(second.state).toBe('fully-initialized');
+    expect(second.partialStateError).toBeDefined();
+    expect(second.partialStateError?.state).toBe('fully-initialized');
 
     const after = readFileSync(join(testDir, 'opensip-tools.config.yml'), 'utf8');
     expect(after).toBe(before);
   });
 
-  it('overwrites when --force is passed', () => {
+  it('--remove blows away opensip-tools/ and rewrites everything', () => {
     executeInit(makeArgs());
     writeFileSync(join(testDir, 'opensip-tools.config.yml'), '# manually edited');
+    // Custom file in the dir — should be removed by --remove.
+    writeFileSync(join(testDir, 'opensip-tools', 'fit', 'checks', 'my-real-check.mjs'), '// custom');
 
-    const result = executeInit(makeArgs({ force: true }));
+    const result = executeInit(makeArgs({ remove: true }));
     expect(result.created).toBe(true);
+    expect(result.state).toBe('fully-initialized');
 
     const config = readFileSync(join(testDir, 'opensip-tools.config.yml'), 'utf8');
     expect(config).toContain('rust-source:');
     expect(config).not.toContain('manually edited');
+    // Custom file is gone.
+    expect(existsSync(join(testDir, 'opensip-tools', 'fit', 'checks', 'my-real-check.mjs'))).toBe(false);
+  });
+
+  it('--keep overwrites scaffolded files but preserves custom ones', () => {
+    executeInit(makeArgs());
+    writeFileSync(join(testDir, 'opensip-tools.config.yml'), '# manually edited');
+    // A user-authored file that --keep must preserve.
+    const customPath = join(testDir, 'opensip-tools', 'fit', 'checks', 'my-real-check.mjs');
+    writeFileSync(customPath, '// custom logic');
+    // A scaffolded file the user has tweaked — counts as 'custom' under
+    // hash-based detection because the bytes drifted, so --keep
+    // preserves it. (The audit calls this out as the safer outcome.)
+    const tweakedPath = join(testDir, 'opensip-tools', 'fit', 'checks', 'example-check.mjs');
+    writeFileSync(tweakedPath, '// I edited this');
+
+    const result = executeInit(makeArgs({ keep: true }));
+    expect(result.created).toBe(true);
+    expect(result.state).toBe('fully-initialized');
+
+    // Config rewritten (it's a function of language, not of user content).
+    const config = readFileSync(join(testDir, 'opensip-tools.config.yml'), 'utf8');
+    expect(config).not.toContain('manually edited');
+    // Custom file preserved.
+    expect(readFileSync(customPath, 'utf8')).toBe('// custom logic');
+    // Tweaked example also preserved (drifted bytes → custom).
+    expect(readFileSync(tweakedPath, 'utf8')).toBe('// I edited this');
+  });
+});
+
+describe('executeInit (partial-config-only state)', () => {
+  beforeEach(() => {
+    writeFileSync(join(testDir, 'Cargo.toml'), '[package]\nname = "x"');
+    // Create only the config (no opensip-tools/ dir).
+    writeFileSync(join(testDir, 'opensip-tools.config.yml'), '# stub');
+  });
+
+  it('refuses by default with a partial-state error', () => {
+    const result = executeInit(makeArgs());
+    expect(result.created).toBe(false);
+    expect(result.state).toBe('partial-config-only');
+    expect(result.partialStateError?.state).toBe('partial-config-only');
+    expect(result.partialStateError?.message).toContain('--keep');
+    expect(result.partialStateError?.message).toContain('--remove');
+  });
+
+  it('--keep scaffolds the missing dir', () => {
+    const result = executeInit(makeArgs({ keep: true }));
+    expect(result.created).toBe(true);
+    expect(existsSync(join(testDir, 'opensip-tools', 'fit', 'checks', 'example-check.mjs'))).toBe(true);
+  });
+
+  it('--remove scaffolds (no dir to remove)', () => {
+    const result = executeInit(makeArgs({ remove: true }));
+    expect(result.created).toBe(true);
+    expect(existsSync(join(testDir, 'opensip-tools', 'fit', 'checks', 'example-check.mjs'))).toBe(true);
+  });
+});
+
+describe('executeInit (partial-dir-only state)', () => {
+  beforeEach(() => {
+    writeFileSync(join(testDir, 'Cargo.toml'), '[package]\nname = "x"');
+    // Create only the dir + a custom file (no config).
+    mkdirSync(join(testDir, 'opensip-tools', 'fit', 'checks'), { recursive: true });
+    writeFileSync(join(testDir, 'opensip-tools', 'fit', 'checks', 'my-real-check.mjs'), '// custom');
+  });
+
+  it('refuses by default with a partial-state error listing the custom file', () => {
+    const result = executeInit(makeArgs());
+    expect(result.created).toBe(false);
+    expect(result.state).toBe('partial-dir-only');
+    expect(result.partialStateError?.state).toBe('partial-dir-only');
+    const customFile = result.partialStateError?.preExistingFiles.find(
+      (f) => f.path.endsWith('my-real-check.mjs'),
+    );
+    expect(customFile?.classification).toBe('custom');
+  });
+
+  it('--keep preserves the custom file and writes the YAML', () => {
+    const result = executeInit(makeArgs({ keep: true }));
+    expect(result.created).toBe(true);
+    expect(existsSync(join(testDir, 'opensip-tools.config.yml'))).toBe(true);
+    expect(readFileSync(join(testDir, 'opensip-tools', 'fit', 'checks', 'my-real-check.mjs'), 'utf8')).toBe('// custom');
+  });
+
+  it('--remove blows away the dir and writes the YAML', () => {
+    const result = executeInit(makeArgs({ remove: true }));
+    expect(result.created).toBe(true);
+    expect(existsSync(join(testDir, 'opensip-tools.config.yml'))).toBe(true);
+    expect(existsSync(join(testDir, 'opensip-tools', 'fit', 'checks', 'my-real-check.mjs'))).toBe(false);
+    // The fresh scaffolded example IS there.
+    expect(existsSync(join(testDir, 'opensip-tools', 'fit', 'checks', 'example-check.mjs'))).toBe(true);
+  });
+});
+
+describe('executeInit (polyglot drift)', () => {
+  it('classifies a stale-language scaffold and surfaces it under --keep', () => {
+    // Initial polyglot scaffold.
+    executeInit(makeArgs({ language: 'typescript,rust' }));
+    expect(existsSync(join(testDir, 'opensip-tools', 'fit', 'checks', 'example-check-rust.mjs'))).toBe(true);
+
+    // Re-init with only typescript + --keep. The rust example should be
+    // tagged stale-scaffolded and preserved (we don't remove it; user
+    // may have been working with it).
+    const result = executeInit(makeArgs({ language: 'typescript', keep: true }));
+    expect(result.created).toBe(true);
+    expect(result.state).toBe('fully-initialized');
+
+    const stale = result.preExistingFiles?.find(
+      (f) => f.path.endsWith('example-check-rust.mjs'),
+    );
+    expect(stale?.classification).toBe('stale-scaffolded');
+
+    // Still on disk.
+    expect(existsSync(join(testDir, 'opensip-tools', 'fit', 'checks', 'example-check-rust.mjs'))).toBe(true);
+  });
+});
+
+describe('executeInit (mutex flags)', () => {
+  beforeEach(() => {
+    writeFileSync(join(testDir, 'Cargo.toml'), '[package]\nname = "x"');
+  });
+
+  it('rejects --keep --remove together', () => {
+    const result = executeInit(makeArgs({ keep: true, remove: true }));
+    expect(result.created).toBe(false);
+    expect(result.partialStateError?.message).toContain('mutually exclusive');
   });
 });
 
@@ -282,11 +414,11 @@ describe('executeInit (.gitignore)', () => {
     expect(content).toContain('opensip-tools/.runtime/');
   });
 
-  it('does NOT duplicate the line on re-init with --force', () => {
+  it('does NOT duplicate the line on re-init with --remove', () => {
     executeInit(makeArgs());
     const first = readFileSync(join(testDir, '.gitignore'), 'utf8');
 
-    const result = executeInit(makeArgs({ force: true }));
+    const result = executeInit(makeArgs({ remove: true }));
     expect(result.gitignoreUpdated).toBe(false);
 
     const second = readFileSync(join(testDir, '.gitignore'), 'utf8');

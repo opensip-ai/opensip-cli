@@ -21,7 +21,8 @@ export function registerInit(program: Command, ctx: CliCommandsContext): void {
     .description('Scaffold opensip-tools.config.yml + example checks/scenarios for your project')
     .option(CWD_OPTION_SPEC, 'Target directory', process.cwd())
     .option('--language <list>', 'Comma-separated language list (typescript|rust|python|go|java|cpp). Default: detect from filesystem markers.')
-    .option('--force', 'Overwrite an existing config + example files', false)
+    .option('--keep', 'Re-scaffold example files. Preserve any custom files in opensip-tools/.', false)
+    .option('--remove', 'Delete opensip-tools/ entirely, then scaffold fresh.', false)
     .option('--json', JSON_DESC, false)
     .option('--debug', 'Enable debug mode for structured log output', false);
 
@@ -39,10 +40,15 @@ export function registerInit(program: Command, ctx: CliCommandsContext): void {
         exclude: [],
         findings: false,
         language: opts.language,
-        force: opts.force,
+        keep: opts.keep,
+        remove: opts.remove,
       };
       const result = executeInit(args);
-      if (result.ambiguousLanguageError) {
+      // Exit 2 for any non-success path that the user can act on:
+      // ambiguous-language detection, partial-state refusal, mutex flag
+      // error. The render layer surfaces the message; this just sets
+      // the exit code so scripts can branch on it.
+      if (result.ambiguousLanguageError || result.partialStateError) {
         ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
       }
       return result;

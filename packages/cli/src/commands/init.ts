@@ -21,15 +21,36 @@
  * go.mod, pom.xml/build.gradle, CMakeLists.txt, package.json+tsconfig).
  * When detection is ambiguous AND --language is missing, init exits
  * 2 with a helpful prompt — no partial scaffolding.
+ *
+ * Partial-state handling:
+ *
+ * After language resolution, init classifies the working directory
+ * into one of four states based on the presence of the config file
+ * and the `opensip-tools/` directory:
+ *
+ *   - 'pristine'             — neither present; scaffold everything.
+ *   - 'fully-initialized'    — both present; refuse without a flag.
+ *   - 'partial-config-only'  — config XOR dir; refuse without a flag.
+ *   - 'partial-dir-only'     — config XOR dir; refuse without a flag.
+ *
+ * Two flags express explicit user intent for the non-pristine states:
+ *
+ *   - `--keep`   — re-scaffold examples; preserve custom files.
+ *   - `--remove` — delete `opensip-tools/` entirely; scaffold fresh.
+ *
+ * The two flags are mutually exclusive. The legacy `--force` flag is
+ * gone; users who scripted it should migrate to `--remove`, the
+ * closest semantic match.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { createHash } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { join, relative } from 'node:path';
 
-import { resolveProjectPaths } from '@opensip-tools/core';
+import { resolveProjectPaths, type ProjectPaths } from '@opensip-tools/core';
 
 // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; init still consumes CliArgs through initOptsToCliArgs in `register()` until the per-command type rip-out
-import type { CliArgs, InitResult } from '@opensip-tools/contracts';
+import type { CliArgs, InitResult, PreExistingFile } from '@opensip-tools/contracts';
 
 // =============================================================================
 // LANGUAGE DETECTION
@@ -210,11 +231,17 @@ function generateConfig(languages: readonly SupportedLanguage[]): string {
 // =============================================================================
 
 // Stable UUIDs for the scaffolded example checks. Hard-coded (rather
-// than generated per-init) so the same project re-running `init --force`
-// keeps the same id, and so two projects on the same machine can run
-// the example simultaneously without spurious id collisions in shared
-// session storage. Per-language ids let the polyglot scaffold register
-// distinct checks. UUID v4 random bytes — produced once and pinned.
+// than generated per-init) so the same project re-running `init --keep`
+// or `init --remove` keeps the same id, and so two projects on the same
+// machine can run the example simultaneously without spurious id
+// collisions in shared session storage. Per-language ids let the
+// polyglot scaffold register distinct checks. UUID v4 random bytes —
+// produced once and pinned.
+//
+// These ids also drive stale-scaffolded detection: a file carrying
+// EXAMPLE_CHECK_IDS[<lang>] for a language NOT in the current detection
+// set is classified as 'stale-scaffolded' and surfaced (preserved) by
+// `--keep`.
 const EXAMPLE_CHECK_IDS: Record<SupportedLanguage, string> = {
   typescript: 'a3e1f8c4-9b2d-4f5a-8e6c-7d1a2b3c4d5e',
   rust:       'b4f2e9d5-8c3e-4a6b-9f7d-8e2b3c4d5e6f',
@@ -431,74 +458,422 @@ function resolveLanguages(cwd: string, languageFlag: string | undefined): Langua
   return { ok: true, languages: detected };
 }
 
-function writeIfMissing(filePath: string, content: string, force: boolean, createdFiles: string[]): void {
-  if (force || !existsSync(filePath)) {
-    writeFileSync(filePath, content, 'utf8');
-    createdFiles.push(filePath);
-  }
+// =============================================================================
+// WORKING-DIRECTORY CLASSIFICATION
+// =============================================================================
+
+type WorkingDirState = NonNullable<InitResult['state']>;
+
+/**
+ * Classify the working directory into one of four states based on the
+ * presence of the config file and the `opensip-tools/` directory.
+ *
+ * The dir-presence check ignores `opensip-tools/.runtime/` — that
+ * subtree is tool-managed (logs, sessions, caches, plugin installs)
+ * and the CLI's `preAction` hook creates `.runtime/logs/` before any
+ * subcommand runs. Treating a runtime-only dir as a "partial-dir"
+ * would misclassify a pristine project the moment the bootstrap hook
+ * touches the disk. User-authored content lives under
+ * `opensip-tools/{fit,sim}/`; only those count as "the dir is present".
+ */
+export function classifyWorkingDir(paths: ProjectPaths): WorkingDirState {
+  const hasConfig = existsSync(paths.configFile);
+  const hasDir = userSourceDirHasUserContent(paths);
+  if (!hasConfig && !hasDir) return 'pristine';
+  if (hasConfig && hasDir) return 'fully-initialized';
+  if (hasConfig) return 'partial-config-only';
+  return 'partial-dir-only';
 }
 
-function scaffoldFitChecks(paths: ReturnType<typeof resolveProjectPaths>, languages: SupportedLanguage[], force: boolean, createdFiles: string[]): void {
+function userSourceDirHasUserContent(paths: ProjectPaths): boolean {
+  if (!existsSync(paths.userSourceDir)) return false;
+  let entries: string[];
+  try {
+    entries = readdirSync(paths.userSourceDir);
+  } catch {
+    return false;
+  }
+  // Anything other than `.runtime/` (tool-managed) counts as user content.
+  return entries.some((name) => name !== '.runtime');
+}
+
+// =============================================================================
+// FILE CLASSIFICATION
+// =============================================================================
+
+/**
+ * Build the full set of scaffold templates that init would write for
+ * the given language set. Maps each absolute path to the byte-for-byte
+ * content the current init implementation would produce, so the file
+ * classifier can detect "scaffolded" files via SHA-256 content match.
+ */
+function buildScaffoldTemplates(
+  paths: ProjectPaths,
+  languages: readonly SupportedLanguage[],
+): Map<string, string> {
+  const templates = new Map<string, string>();
+  if (languages.length === 1) {
+    const lang = languages[0] ?? 'typescript';
+    templates.set(join(paths.fitChecksDir, 'example-check.mjs'), exampleCheckSource(lang));
+  } else {
+    for (const lang of languages) {
+      templates.set(join(paths.fitChecksDir, `example-check-${lang}.mjs`), exampleCheckSource(lang, lang));
+    }
+  }
+  const slugs = languages.length === 1
+    ? ['example-check']
+    : languages.map((lang) => `example-check-${lang}`);
+  templates.set(join(paths.fitRecipesDir, 'example-recipe.mjs'), exampleRecipeSource(slugs));
+  templates.set(join(paths.simScenariosDir, 'example-scenario.mjs'), exampleScenarioSource());
+  templates.set(join(paths.simRecipesDir, 'example-recipe.mjs'), exampleSimRecipeSource());
+  return templates;
+}
+
+function sha256(content: string): string {
+  return createHash('sha256').update(content).digest('hex');
+}
+
+/**
+ * Walk every file under `opensip-tools/` (excluding `.runtime/`, which
+ * is gitignored runtime state and not user-authored) and tag each one.
+ *
+ * Classification rules:
+ *
+ *   - 'scaffolded'        — content matches a current-template byte-for-byte.
+ *   - 'stale-scaffolded'  — file shape matches a previous-language scaffold:
+ *                           filename `example-check-<lang>.mjs` for <lang>
+ *                           NOT in the current detection set, OR the file
+ *                           carries a pinned EXAMPLE_CHECK_IDS UUID for a
+ *                           language not in the current set.
+ *   - 'custom'            — anything else (user-authored).
+ *
+ * The walk is bounded to the `opensip-tools/` subtree (kilobytes in
+ * practice). The `.runtime/` subdir is skipped so caches/logs/sessions
+ * don't pollute the file list.
+ *
+ * Note on hash-based scaffolded detection: a scaffolded file that has
+ * been line-ending normalized (CRLF↔LF) or stripped of a trailing
+ * newline by an editor will not byte-for-byte match the template. In
+ * that case it falls back to 'custom' or 'stale-scaffolded' (when the
+ * UUID still matches but content drifted). The UUID-based fallback
+ * catches the common "stale language" case; cosmetic drift on a
+ * current-language file is treated as custom — which is the safer
+ * outcome (won't silently overwrite).
+ */
+export function classifyFiles(
+  paths: ProjectPaths,
+  currentLanguages: readonly SupportedLanguage[],
+): PreExistingFile[] {
+  if (!existsSync(paths.userSourceDir)) return [];
+
+  const templates = buildScaffoldTemplates(paths, currentLanguages);
+  const templateHashes = new Map<string, string>();
+  for (const [absPath, body] of templates) {
+    templateHashes.set(absPath, sha256(body));
+  }
+  const currentLangSet = new Set<string>(currentLanguages);
+
+  const out: PreExistingFile[] = [];
+
+  // Walk the dir, skipping `.runtime/`.
+  const visit = (dir: string): void => {
+    let entries: string[];
+    try {
+      entries = readdirSync(dir);
+    } catch {
+      return;
+    }
+    for (const name of entries) {
+      const full = join(dir, name);
+      // Skip runtime state (gitignored, tool-managed).
+      if (full === paths.runtimeDir) continue;
+      let st;
+      try {
+        st = statSync(full);
+      } catch {
+        continue;
+      }
+      if (st.isDirectory()) {
+        visit(full);
+        continue;
+      }
+      if (!st.isFile()) continue;
+      out.push(classifyOneFile(full, templateHashes, currentLangSet));
+    }
+  };
+  visit(paths.userSourceDir);
+
+  // Stable order — relative path ascending — so callers can render a
+  // deterministic list and tests can assert without sort gymnastics.
+  out.sort((a, b) => a.path.localeCompare(b.path));
+  return out;
+}
+
+const STALE_FILENAME_PATTERN = /^example-check-([a-z+]+)\.mjs$/;
+
+function classifyOneFile(
+  absPath: string,
+  templateHashes: ReadonlyMap<string, string>,
+  currentLangSet: ReadonlySet<string>,
+): PreExistingFile {
+  let content: string;
+  try {
+    content = readFileSync(absPath, 'utf8');
+  } catch {
+    // Unreadable: surface as custom so we err on the side of preservation.
+    return { path: absPath, classification: 'custom' };
+  }
+
+  // 1) Content-hash match against current-template set.
+  const hash = sha256(content);
+  if (templateHashes.get(absPath) === hash) {
+    return { path: absPath, classification: 'scaffolded' };
+  }
+
+  // 2) Stale-by-filename: example-check-<lang>.mjs for <lang> not in
+  //    current set.
+  const basename = absPath.slice(absPath.lastIndexOf('/') + 1);
+  const filenameMatch = STALE_FILENAME_PATTERN.exec(basename);
+  if (filenameMatch) {
+    const fileLang = filenameMatch[1];
+    if (fileLang && !currentLangSet.has(fileLang) && fileLang in EXAMPLE_CHECK_IDS) {
+      return { path: absPath, classification: 'stale-scaffolded' };
+    }
+  }
+
+  // 3) Stale-by-pinned-UUID: any EXAMPLE_CHECK_IDS UUID for a language
+  //    not in the current set, embedded in the file.
+  for (const [lang, uuid] of Object.entries(EXAMPLE_CHECK_IDS)) {
+    if (currentLangSet.has(lang)) continue;
+    if (content.includes(uuid)) {
+      return { path: absPath, classification: 'stale-scaffolded' };
+    }
+  }
+
+  return { path: absPath, classification: 'custom' };
+}
+
+// =============================================================================
+// PARTIAL-STATE MESSAGE
+// =============================================================================
+
+function relativize(absPath: string, cwd: string): string {
+  const rel = relative(cwd, absPath);
+  return rel === '' ? absPath : rel;
+}
+
+export function buildPartialStateMessage(
+  state: WorkingDirState,
+  preExistingFiles: readonly PreExistingFile[],
+  cwd: string,
+): string {
+  const lines: string[] = [];
+  switch (state) {
+    case 'fully-initialized': {
+      lines.push('opensip-tools is already initialized in this directory.');
+      break;
+    }
+    case 'partial-config-only': {
+      lines.push('opensip-tools.config.yml exists but opensip-tools/ does not.');
+      break;
+    }
+    case 'partial-dir-only': {
+      lines.push('opensip-tools/ exists but opensip-tools.config.yml does not.');
+      break;
+    }
+    case 'pristine': {
+      // Should not happen in this code path — pristine never errors.
+      return 'Unexpected pristine state.';
+    }
+  }
+
+  if (preExistingFiles.length > 0) {
+    lines.push('', `Found ${String(preExistingFiles.length)} file(s) under opensip-tools/:`);
+    for (const f of preExistingFiles) {
+      lines.push(`  ${relativize(f.path, cwd)}  (${f.classification})`);
+    }
+  }
+
+  lines.push(
+    '',
+    'Choose one:',
+    '  opensip-tools init --keep    Re-scaffold examples; preserve custom files.',
+    '  opensip-tools init --remove  Delete opensip-tools/ and scaffold fresh.',
+  );
+  return lines.join('\n');
+}
+
+// =============================================================================
+// SCAFFOLDING
+// =============================================================================
+
+/**
+ * Write `content` to `filePath` according to the scaffold rules:
+ *   - keepCustom = false → always overwrite (or create) the file.
+ *   - keepCustom = true  → preserve any pre-existing file we classified
+ *                          as 'custom' or 'stale-scaffolded'; overwrite
+ *                          'scaffolded' files (and create missing ones).
+ */
+function writeScaffoldedFile(
+  filePath: string,
+  content: string,
+  keepCustom: boolean,
+  preExistingByPath: ReadonlyMap<string, PreExistingFile>,
+  createdFiles: string[],
+): void {
+  if (keepCustom) {
+    const existing = preExistingByPath.get(filePath);
+    // Preserve user content. Stale-scaffolded is also preserved — the
+    // user may have been working with it; we surface it but don't
+    // overwrite.
+    if (existing && (existing.classification === 'custom' || existing.classification === 'stale-scaffolded')) {
+      return;
+    }
+  }
+  writeFileSync(filePath, content, 'utf8');
+  createdFiles.push(filePath);
+}
+
+interface ScaffoldOptions {
+  /** When true, preserve files classified as 'custom' / 'stale-scaffolded'. */
+  readonly keepCustom: boolean;
+  /** Files that existed before scaffolding ran, indexed by absolute path. */
+  readonly preExistingByPath: ReadonlyMap<string, PreExistingFile>;
+}
+
+function scaffoldFitChecks(
+  paths: ProjectPaths,
+  languages: SupportedLanguage[],
+  options: ScaffoldOptions,
+  createdFiles: string[],
+): void {
   mkdirSync(paths.fitChecksDir, { recursive: true });
   if (languages.length === 1) {
-    writeIfMissing(
+    writeScaffoldedFile(
       join(paths.fitChecksDir, 'example-check.mjs'),
       exampleCheckSource(languages[0] ?? 'typescript'),
-      force,
+      options.keepCustom,
+      options.preExistingByPath,
       createdFiles,
     );
     return;
   }
   // Polyglot: one example per language so each is independently editable / deletable.
   for (const lang of languages) {
-    writeIfMissing(
+    writeScaffoldedFile(
       join(paths.fitChecksDir, `example-check-${lang}.mjs`),
       exampleCheckSource(lang, lang),
-      force,
+      options.keepCustom,
+      options.preExistingByPath,
       createdFiles,
     );
   }
 }
 
-function scaffoldExamples(paths: ReturnType<typeof resolveProjectPaths>, languages: SupportedLanguage[], force: boolean, createdFiles: string[]): void {
-  scaffoldFitChecks(paths, languages, force, createdFiles);
+function scaffoldExamples(
+  paths: ProjectPaths,
+  languages: SupportedLanguage[],
+  options: ScaffoldOptions,
+  createdFiles: string[],
+): void {
+  scaffoldFitChecks(paths, languages, options, createdFiles);
 
   mkdirSync(paths.fitRecipesDir, { recursive: true });
   const slugs = languages.length === 1
     ? ['example-check']
     : languages.map((lang) => `example-check-${lang}`);
-  writeIfMissing(
+  writeScaffoldedFile(
     join(paths.fitRecipesDir, 'example-recipe.mjs'),
     exampleRecipeSource(slugs),
-    force,
+    options.keepCustom,
+    options.preExistingByPath,
     createdFiles,
   );
 
   mkdirSync(paths.simScenariosDir, { recursive: true });
-  writeIfMissing(
+  writeScaffoldedFile(
     join(paths.simScenariosDir, 'example-scenario.mjs'),
     exampleScenarioSource(),
-    force,
+    options.keepCustom,
+    options.preExistingByPath,
     createdFiles,
   );
 
   mkdirSync(paths.simRecipesDir, { recursive: true });
-  writeIfMissing(
+  writeScaffoldedFile(
     join(paths.simRecipesDir, 'example-recipe.mjs'),
     exampleSimRecipeSource(),
-    force,
+    options.keepCustom,
+    options.preExistingByPath,
     createdFiles,
   );
 }
+
+interface ScaffoldRunInputs {
+  readonly paths: ProjectPaths;
+  readonly languages: SupportedLanguage[];
+  readonly cwd: string;
+  readonly state: WorkingDirState;
+  readonly preExistingFiles: readonly PreExistingFile[];
+  readonly removeFirst: boolean;
+  readonly keepCustom: boolean;
+}
+
+function runScaffold(
+  inputs: ScaffoldRunInputs,
+  baseResult: Pick<InitResult, 'type' | 'path' | 'cwd' | 'configFilename'>,
+): InitResult {
+  const { paths, languages, cwd, state, preExistingFiles, removeFirst, keepCustom } = inputs;
+
+  // --remove: blow away the user-source dir before scaffolding. The
+  // config file is always rewritten below regardless.
+  if (removeFirst && existsSync(paths.userSourceDir)) {
+    rmSync(paths.userSourceDir, { recursive: true, force: true });
+  }
+
+  const createdFiles: string[] = [];
+
+  // Always rewrite the config — its content is a function of the
+  // selected languages, and a re-init with new --language values must
+  // refresh it. (The legacy code rewrote it unconditionally on --force
+  // too; we keep that semantics.)
+  writeFileSync(paths.configFile, generateConfig(languages), 'utf8');
+  createdFiles.push(paths.configFile);
+
+  // After --remove the dir is gone, so nothing pre-existed; pass an
+  // empty map so writeScaffoldedFile creates everything fresh.
+  const preExistingByPath = removeFirst
+    ? new Map<string, PreExistingFile>()
+    : new Map<string, PreExistingFile>(preExistingFiles.map((f) => [f.path, f]));
+
+  scaffoldExamples(paths, languages, { keepCustom, preExistingByPath }, createdFiles);
+
+  const gitignoreUpdated = ensureGitignore(cwd);
+
+  return {
+    ...baseResult,
+    created: true,
+    state,
+    languages,
+    createdFiles,
+    gitignoreUpdated,
+    preExistingFiles: state === 'pristine' ? [] : preExistingFiles,
+  };
+}
+
+// =============================================================================
+// EXECUTE
+// =============================================================================
 
 /**
  * Run init for the given args. Returns an InitResult — the caller
  * (CLI render layer) prints it.
  */
 // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge type
-export function executeInit(args: CliArgs & { language?: string; force?: boolean }): InitResult {
+export function executeInit(args: CliArgs & { language?: string; keep?: boolean; remove?: boolean }): InitResult {
   const cwd = args.cwd;
-  const force = args.force === true;
+  const keep = args.keep === true;
+  const remove = args.remove === true;
   const paths = resolveProjectPaths(cwd);
   const baseResult = {
     type: 'init' as const,
@@ -507,36 +882,92 @@ export function executeInit(args: CliArgs & { language?: string; force?: boolean
     configFilename: 'opensip-tools.config.yml',
   };
 
+  // Mutex: --keep and --remove are mutually exclusive.
+  if (keep && remove) {
+    return {
+      ...baseResult,
+      created: false,
+      partialStateError: {
+        state: 'fully-initialized',
+        preExistingFiles: [],
+        message: '--keep and --remove are mutually exclusive. Pick one.',
+      },
+    };
+  }
+
   if (!existsSync(cwd)) {
-    return { ...baseResult, created: false, alreadyExists: false };
+    return { ...baseResult, created: false, state: 'pristine' };
   }
 
   const resolution = resolveLanguages(cwd, args.language);
   if (!resolution.ok) {
-    return { ...baseResult, created: false, alreadyExists: false, ambiguousLanguageError: resolution.error };
+    return { ...baseResult, created: false, ambiguousLanguageError: resolution.error };
   }
   const { languages } = resolution;
 
-  if (existsSync(paths.configFile) && !force) {
-    return { ...baseResult, created: false, alreadyExists: true, languages };
+  const state = classifyWorkingDir(paths);
+  const preExistingFiles = state === 'pristine' ? [] : classifyFiles(paths, languages);
+
+  // Pristine: scaffold and exit. No flag interaction needed.
+  if (state === 'pristine') {
+    return runScaffold(
+      {
+        paths,
+        languages,
+        cwd,
+        state,
+        preExistingFiles: [],
+        removeFirst: false,
+        keepCustom: false,
+      },
+      baseResult,
+    );
   }
 
-  // Write the config + scaffold the example tree.
-  const createdFiles: string[] = [];
-  writeFileSync(paths.configFile, generateConfig(languages), 'utf8');
-  createdFiles.push(paths.configFile);
+  // Non-pristine without an explicit flag: refuse with partial-state
+  // error.
+  if (!keep && !remove) {
+    return {
+      ...baseResult,
+      created: false,
+      state,
+      languages,
+      preExistingFiles,
+      partialStateError: {
+        state,
+        preExistingFiles,
+        message: buildPartialStateMessage(state, preExistingFiles, cwd),
+      },
+    };
+  }
 
-  scaffoldExamples(paths, languages, force, createdFiles);
+  // --remove: blow away the dir, then scaffold from zero.
+  if (remove) {
+    return runScaffold(
+      {
+        paths,
+        languages,
+        cwd,
+        state,
+        preExistingFiles,
+        removeFirst: true,
+        keepCustom: false,
+      },
+      baseResult,
+    );
+  }
 
-  // .gitignore — always best-effort, idempotent
-  const gitignoreUpdated = ensureGitignore(cwd);
-
-  return {
-    ...baseResult,
-    created: true,
-    alreadyExists: false,
-    languages,
-    createdFiles,
-    gitignoreUpdated,
-  };
+  // --keep: re-scaffold examples; preserve custom + stale-scaffolded files.
+  return runScaffold(
+    {
+      paths,
+      languages,
+      cwd,
+      state,
+      preExistingFiles,
+      removeFirst: false,
+      keepCustom: true,
+    },
+    baseResult,
+  );
 }

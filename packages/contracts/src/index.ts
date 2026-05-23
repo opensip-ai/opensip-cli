@@ -44,6 +44,7 @@ export type {
   HistoryResult,
   DashboardResult,
   InitResult,
+  PreExistingFile,
   ExperimentalResult,
   PluginResult,
   PluginInfo,
