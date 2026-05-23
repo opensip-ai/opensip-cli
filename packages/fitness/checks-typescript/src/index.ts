@@ -10,7 +10,7 @@
  * TS/Node ecosystem (drizzle-orm, typed-inject, React-specific, etc.).
  */
 
-import { collectCheckObjects } from '@opensip-tools/fitness'
+import { collectCheckObjects, readPackageVersion } from '@opensip-tools/fitness'
 
 import * as allChecks from './checks/index.js'
 import { CHECK_DISPLAY } from './display/index.js'
@@ -30,7 +30,7 @@ export const checkDisplay: Readonly<Record<string, CheckDisplayEntry>> = CHECK_D
 /** Plugin metadata */
 export const metadata = {
   name: '@opensip-tools/checks-typescript',
-  version: '1.0.0',
+  version: readPackageVersion(import.meta.url),
   description: 'TypeScript/Node.js fitness checks for opensip-tools',
 }
 

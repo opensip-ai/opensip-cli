@@ -3,6 +3,12 @@ export { defineCheck } from './framework/define-check.js';
 export { CheckRegistry, defaultRegistry } from './framework/registry.js';
 export { registerChecks } from './framework/register-helpers.js';
 
+// Re-exported kernel helpers — convenience for check packs that depend
+// only on @opensip-tools/fitness. `readPackageVersion` lets a pack's
+// barrel set `metadata.version` from its own package.json instead of
+// duplicating the literal.
+export { readPackageVersion } from '@opensip-tools/core';
+
 // Framework types — the real check API types
 export type { CheckViolation, CheckScope, FileAccessor, CheckConcern, CheckLanguage } from './framework/check-config.js';
 export type { Check, CheckConfig, ResolvedScope } from './framework/check-types.js';

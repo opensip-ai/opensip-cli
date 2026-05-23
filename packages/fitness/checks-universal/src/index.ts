@@ -10,7 +10,7 @@
  * They could apply to any codebase regardless of language.
  */
 
-import { collectCheckObjects } from '@opensip-tools/fitness'
+import { collectCheckObjects, readPackageVersion } from '@opensip-tools/fitness'
 
 import * as allChecks from './checks/index.js'
 import { CHECK_DISPLAY } from './display/index.js'
@@ -30,7 +30,7 @@ export const checkDisplay: Readonly<Record<string, CheckDisplayEntry>> = CHECK_D
 /** Plugin metadata */
 export const metadata = {
   name: '@opensip-tools/checks-universal',
-  version: '1.0.0',
+  version: readPackageVersion(import.meta.url),
   description: 'Cross-language fitness checks for opensip-tools',
 }
 
