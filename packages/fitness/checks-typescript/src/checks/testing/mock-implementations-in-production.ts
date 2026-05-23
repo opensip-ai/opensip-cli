@@ -6,7 +6,7 @@
  */
 
 import { logger } from '@opensip-tools/core/logger'
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
 import * as ts from 'typescript'
 
@@ -38,7 +38,7 @@ function shouldAnalyzeFile(filePath: string): boolean {
     msg: 'Checking if file should be analyzed for mock implementations',
   })
   // Skip test files and test directories (mocks are allowed in tests)
-  if (filePath.includes('.test.') || filePath.includes('.spec.') || filePath.includes('__tests__/')) {
+  if (isTestFile(filePath)) {
     return false
   }
 

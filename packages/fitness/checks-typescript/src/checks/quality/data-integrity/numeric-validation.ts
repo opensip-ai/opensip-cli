@@ -6,7 +6,7 @@
  */
 
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
 import * as ts from 'typescript'
 
@@ -356,7 +356,7 @@ function analyzeFile(content: string, filePath: string): CheckViolation[] {
   const violations: CheckViolation[] = []
 
   // Skip test files — test code doesn't need numeric validation guards
-  if (filePath.includes('.test.') || filePath.includes('__tests__')) {
+  if (isTestFile(filePath)) {
     return violations
   }
 

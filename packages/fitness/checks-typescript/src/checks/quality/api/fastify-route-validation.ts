@@ -9,7 +9,7 @@
  */
 
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
 import * as ts from 'typescript'
 
@@ -306,8 +306,7 @@ function analyzeFile(content: string, filePath: string): CheckViolation[] {
 function isRouteFile(file: string): boolean {
   return (
     file.includes('/routes/') &&
-    !file.includes('.test.') &&
-    !file.includes('.spec.') &&
+    !isTestFile(file) &&
     !file.endsWith('.d.ts')
   )
 }

@@ -3,7 +3,7 @@
  * use a wrapped HTTP client.
  */
 
-import { defineCheck, isCommentLine, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, isCommentLine, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
 
 /**
  * Pattern for detecting raw fetch() calls.
@@ -58,15 +58,7 @@ export const noRawFetch = defineCheck({
     // Skip test files — tests legitimately invoke `fetch(` directly to
     // exercise the wrapper, mock the global, or hit a localhost test
     // server. Routing those through the wrapper would defeat the test.
-    if (
-      filePath.endsWith('.test.ts') ||
-      filePath.endsWith('.test.tsx') ||
-      filePath.endsWith('.test.js') ||
-      filePath.endsWith('.test.jsx') ||
-      filePath.endsWith('.spec.ts') ||
-      filePath.endsWith('.spec.tsx') ||
-      filePath.includes('/__tests__/')
-    ) {
+    if (isTestFile(filePath)) {
       return violations
     }
 

@@ -9,7 +9,7 @@
  */
 
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
 import * as ts from 'typescript'
 
@@ -217,8 +217,7 @@ function analyzeStatementOrder(options: AnalyzeStatementOrderOptions): CheckViol
  * Check if file is a financial service file
  */
 function isFinancialFile(filePath: string): boolean {
-  if (filePath.includes('.test.') || filePath.includes('.spec.')) return false
-  if (filePath.includes('__tests__/')) return false
+  if (isTestFile(filePath)) return false
   return FINANCIAL_PATTERNS.some((p) => p.test(filePath))
 }
 

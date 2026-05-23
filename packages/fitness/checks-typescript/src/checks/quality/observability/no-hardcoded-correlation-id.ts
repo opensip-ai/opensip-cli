@@ -3,7 +3,7 @@
  * @fileoverview Detects hardcoded correlation ID values
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
 import { countUnescapedBackticks } from '@opensip-tools/lang-typescript'
 
 /**
@@ -70,7 +70,7 @@ export const noHardcodedCorrelationId = defineCheck({
   fileTypes: ['ts'],
 
   analyze(content: string, filePath: string): CheckViolation[] {
-    if (filePath.includes('.test.') || filePath.includes('.spec.') || filePath.includes('__tests__')) {
+    if (isTestFile(filePath)) {
       return []
     }
     if (filePath.includes('/fitness/src/checks/')) {

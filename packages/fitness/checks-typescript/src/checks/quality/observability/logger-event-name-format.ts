@@ -3,7 +3,7 @@
  * @fileoverview Validates logger event names follow the 3+ dot-separated segment convention
  */
 
-import { defineCheck, isInsideStringLiteral, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, isInsideStringLiteral, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
 import { countUnescapedBackticks } from '@opensip-tools/lang-typescript'
 
 /**
@@ -114,7 +114,7 @@ export const loggerEventNameFormat = defineCheck({
 
   analyze(content: string, filePath: string): CheckViolation[] {
     // Skip test files
-    if (filePath.includes('.test.') || filePath.includes('.spec.') || filePath.includes('__tests__')) {
+    if (isTestFile(filePath)) {
       return []
     }
 

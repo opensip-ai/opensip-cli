@@ -12,7 +12,7 @@
  */
 
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
 import * as ts from 'typescript'
 
@@ -324,9 +324,8 @@ function analyzeFile(content: string, filePath: string): CheckViolation[] {
 function isRouteFile(file: string): boolean {
   const hasRouteKeyword =
     file.includes('route') || file.includes('controller') || file.includes('endpoint')
-  const isTestFile = file.includes('.test.') || file.includes('.spec.')
   const isTypeFile = file.endsWith('.d.ts')
-  return hasRouteKeyword && !isTestFile && !isTypeFile
+  return hasRouteKeyword && !isTestFile(file) && !isTypeFile
 }
 
 export const fastifySchemaCoverage = defineCheck({

@@ -9,7 +9,7 @@
  * - ALTER TABLE with data loss risk (column type changes)
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
 
 interface DangerousPattern {
   pattern: RegExp
@@ -66,7 +66,7 @@ export const drizzleOrmMigrationGuardrails = defineCheck({
   analyze(content: string, filePath: string): CheckViolation[] {
     // Only check migration files and schema files
     if (!filePath.includes('/migrations/') && !filePath.includes('/schema')) return []
-    if (filePath.includes('.test.') || filePath.includes('__tests__')) return []
+    if (isTestFile(filePath)) return []
 
     const violations: CheckViolation[] = []
     const lines = content.split('\n')

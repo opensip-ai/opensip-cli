@@ -43,14 +43,17 @@ export interface IsTestFileOptions {
 }
 
 /**
- * Standard test file patterns used across the codebase
+ * Standard test file patterns used across the codebase. Matches
+ * .test.{ts,tsx,js,jsx,mts,cts} and .spec.{ts,tsx,js,jsx,mts,cts} so the
+ * helper subsumes inline 7-arm endsWith chains some checks were keeping
+ * for .test.js / .test.jsx coverage.
  */
 const TEST_FILE_PATTERNS = {
-  /** Files ending with .test.ts or .test.tsx */
-  testExtension: /\.test\.tsx?$/,
+  /** Files ending with .test.{ts,tsx,js,jsx,mts,cts} */
+  testExtension: /\.test\.(?:tsx?|jsx?|mts|cts)$/,
 
-  /** Files ending with .spec.ts or .spec.tsx */
-  specExtension: /\.spec\.tsx?$/,
+  /** Files ending with .spec.{ts,tsx,js,jsx,mts,cts} */
+  specExtension: /\.spec\.(?:tsx?|jsx?|mts|cts)$/,
 
   /** Files in __tests__ directory */
   testsDirectory: /__tests__[/\\]/,

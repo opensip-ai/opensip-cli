@@ -14,7 +14,7 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
+import { defineCheck, isTestFile, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
 
 const IMPORT_PATTERN = /import\s+(?:type\s+)?\{([^}]+)\}\s+from\s+['"]([^'"]+)['"]/g
 const NAMED_EXPORT_BLOCK = /export\s+(?:type\s+)?\{([^}]+)\}/g
@@ -192,7 +192,7 @@ export const missingTypeExports = defineCheck({
     for (const filePath of files.paths) {
       if (!filePath.endsWith('.ts') && !filePath.endsWith('.tsx')) continue
       if (filePath.includes('node_modules') || filePath.includes('/dist/')) continue
-      if (filePath.includes('.test.') || filePath.includes('__tests__')) continue
+      if (isTestFile(filePath)) continue
 
       const content = await files.read(filePath)
       if (!content) continue
