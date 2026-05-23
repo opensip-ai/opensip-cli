@@ -2,12 +2,11 @@
 // @fitness-ignore-file unused-config-options -- Config options reserved for future use or environment-specific
 // @fitness-ignore-file canonical-result-usage -- References Result pattern in comments and regex patterns for detection, not actual Result usage
 /**
- * @fileoverview Async pattern resilience checks
+ * @fileoverview Detached promise detection — flags un-awaited promise-returning
+ * calls inside async contexts.
  */
 
-
-import { defineCheck, getCheckConfig, type CheckViolation, getLineNumber } from '@opensip-tools/fitness'
-import { isCommentLine, isTestFile, stripStringsAndCommentsPreservingPositions } from '@opensip-tools/fitness'
+import { defineCheck, getCheckConfig, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
 import * as ts from 'typescript'
 
@@ -27,10 +26,6 @@ export interface DetachedPromisesConfig extends Record<string, unknown> {
 }
 
 const DETACHED_PROMISES_SLUG = 'detached-promises'
-
-// =============================================================================
-// DETACHED PROMISES (AST-based)
-// =============================================================================
 
 /**
  * Known synchronous functions that do NOT return promises.
@@ -566,7 +561,7 @@ function buildEffectiveSyncSets(): EffectiveSyncSets {
  */
 function isInAsyncContext(node: ts.Node): boolean {
   let current: ts.Node | undefined = node.parent
-   
+
   while (current) {
     if (
       ts.isFunctionDeclaration(current) ||
@@ -622,7 +617,7 @@ function isKnownSyncMethodCall(expr: ts.PropertyAccessExpression, sets: Effectiv
     // — the call's receiver is `Pyroscope.default` (PropertyAccess); the rightmost
     // segment is `default`, but the SDK identity is `Pyroscope`. Walk left to find it.
     let cursor: ts.Node = receiverExpr.expression
-     
+
     while (cursor && ts.isPropertyAccessExpression(cursor)) {
       cursor = cursor.expression
     }
@@ -707,7 +702,7 @@ function isFloatingExpression(node: ts.ExpressionStatement): boolean {
   const expr = node.expression
 
   // Check for void prefix: void doSomething()
-   
+
   if (expr.kind === ts.SyntaxKind.VoidExpression) {
     return false // Explicitly voided
   }
@@ -750,7 +745,7 @@ function hasAwaitedArgument(call: ts.CallExpression): boolean {
  */
 function isAwaitedExpression(node: ts.Expression): boolean {
   let current: ts.Expression = node
-   
+
   while (current) {
     if (ts.isAwaitExpression(current)) return true
     if (ts.isParenthesizedExpression(current)) {
@@ -773,7 +768,7 @@ function isAwaitedExpression(node: ts.Expression): boolean {
  */
 function containsAwaitedReceiver(call: ts.CallExpression): boolean {
   let current: ts.Expression = call.expression
-   
+
   while (current) {
     if (ts.isParenthesizedExpression(current)) {
       const inner = current.expression
@@ -814,11 +809,11 @@ function isDefinedAsSyncInSameFile(expr: ts.CallExpression): boolean {
 
   // Walk up to the enclosing class
   let current: ts.Node | undefined = expr.parent
-   
+
   while (current && !ts.isClassDeclaration(current) && !ts.isClassExpression(current)) {
     current = current.parent
   }
-   
+
   if (!current) return false
 
   // Look for a method with the same name in the class
@@ -943,324 +938,5 @@ export const detachedPromises = defineCheck({
     // Skip test files — detached promises in tests are low-risk
     if (isTestFile(filePath)) return []
     return analyzeFileForDetachedPromises(content, filePath)
-  },
-})
-
-// =============================================================================
-// NO UNBOUNDED CONCURRENCY
-// =============================================================================
-
-/**
- * Pattern indicating unbounded Promise.all usage.
- * Safe regex: uses word boundaries and explicit character classes, no nested quantifiers.
- */
-const UNBOUNDED_PROMISE_ALL_PATTERN = /Promise\.all\s*\(\s*[a-zA-Z_$][a-zA-Z0-9_$]*\.map\s*\(/g
-
-/**
- * Check if content contains bounded concurrency patterns.
- * @param {string} content - The content to check
- * @returns {boolean} True if bounded patterns found
- */
-function hasBoundedConcurrencyPattern(content: string): boolean {
-  const lowerContent = content.toLowerCase()
-  // Check simple string patterns first (faster)
-  if (lowerContent.includes('plimit')) return true
-  if (lowerContent.includes('p-limit')) return true
-  if (content.includes('Promise.allSettled')) return true
-  // Check regex patterns
-  if (/concurrency:\s*\d+/i.test(content)) return true
-  if (/\b(?:chunk|batch)\b/i.test(content)) return true
-  if (/\b(?:throttle|rateLimit)\b/i.test(content)) return true
-  return false
-}
-
-/**
- * Check: resilience/no-unbounded-concurrency
- *
- * Detects Promise.all with .map() that may spawn unbounded concurrent operations.
- */
-export const noUnboundedConcurrency = defineCheck({
-  id: 'fc2a0fee-8374-432b-a7ef-763aea867855',
-  slug: 'no-unbounded-concurrency',
-  description: 'Detect Promise.all with unbounded concurrency',
-  longDescription: `**Purpose:** Prevents unbounded parallel execution that can overwhelm downstream services or exhaust system resources.
-
-**Detects:**
-- \`Promise.all(items.map(\` pattern without nearby concurrency controls
-- Skips files containing bounded concurrency indicators: \`plimit\`, \`p-limit\`, \`Promise.allSettled\`, \`concurrency: N\`, \`chunk\`, \`batch\`, \`throttle\`, \`rateLimit\`
-
-**Why it matters:** Mapping an unbounded array into concurrent promises can spawn thousands of simultaneous operations, causing connection exhaustion or OOM.
-
-**Scope:** General best practice. Analyzes each file individually via regex.`,
-  tags: ['resilience', 'async', 'concurrency'],
-
-  analyze(content: string, filePath: string): CheckViolation[] {
-    const violations: CheckViolation[] = []
-
-    // Skip test files — bounded by fixture data, not external load. A
-    // partial mock of bounded-concurrency helpers that fans out via
-    // Promise.all is a deliberate test seam; the production callers it
-    // replaces ARE bounded.
-    if (isTestFile(filePath)) return violations
-
-    // Skip files that don't use Promise.all
-    if (!content.includes('Promise.all')) {
-      return violations
-    }
-
-    // Strip strings and comments before pattern-match scanning so
-    // doc-block prose describing the pattern (e.g. JSDoc that says
-    // "`Promise.all(arr.map(asyncFn))` fans out one promise per
-    // element") doesn't produce a false positive that's impossible to
-    // suppress without a pragma in user code. Use the position-
-    // preserving variant so match indexes still map onto the original
-    // source line numbers.
-    //
-    // Bounded-pattern detection (`hasBoundedConcurrencyPattern`)
-    // intentionally runs on the ORIGINAL content — comments often carry
-    // intent ("// Batch failed", "// chunked at 4 in flight") that
-    // operators expect to suppress the warning. Stripping them there
-    // would surface previously-passing files as new positives every
-    // time we tighten the regex, so keep the file-level escape hatch
-    // generous and only narrow the per-match scan.
-    const codeOnly = stripStringsAndCommentsPreservingPositions(content)
-    if (!codeOnly.includes('Promise.all')) {
-      return violations
-    }
-
-    // Check if file has bounded concurrency patterns (uses original content)
-    if (hasBoundedConcurrencyPattern(content)) {
-      return violations
-    }
-
-    UNBOUNDED_PROMISE_ALL_PATTERN.lastIndex = 0
-    let match
-    while ((match = UNBOUNDED_PROMISE_ALL_PATTERN.exec(codeOnly)) !== null) {
-      // @lazy-ok -- 'await' appears in suggestion string literal, not actual await
-      // Check context around match for bounded patterns. Use the
-      // ORIGINAL content here — adjacent comments like
-      // `// chunked, batch=N` or `// see batchWithConcurrency above`
-      // are deliberate hints that operators expect to suppress the
-      // warning. Same rationale as the file-level bounded check.
-      const start = Math.max(0, match.index - 200)
-      const end = Math.min(content.length, match.index + 200)
-      const context = content.slice(start, end)
-
-      if (!hasBoundedConcurrencyPattern(context)) {
-        const lineNumber = getLineNumber(content, match.index)
-        violations.push({
-          line: lineNumber,
-          column: 0,
-          message: 'Promise.all with .map() may spawn unbounded concurrent operations',
-          severity: 'warning',
-          suggestion:
-            'Use p-limit or batch processing to limit concurrency. Example: const limit = pLimit(10); await Promise.all(items.map(item => limit(() => process(item))))',
-          match: match[0],
-          type: 'unbounded-promise-all',
-          filePath,
-        })
-      }
-    }
-
-    return violations
-  },
-})
-
-// =============================================================================
-// NO RAW FETCH
-// =============================================================================
-
-/**
- * Pattern for detecting raw fetch() calls.
- *
- * Safe regex: bounded whitespace + a single negative lookbehind that
- * rejects any identifier-char or `.` immediately before `fetch`. The
- * lookbehind excludes both larger identifiers ending in `fetch`
- * (`prefetch`, `recordReconcilerPrefetch`, `MyClass.fetch`) AND any
- * dotted call (`this.fetch`, `cacheGit.fetch`, `httpClient.fetch`) in
- * one rule — there's no need for a separate `this.` exclusion.
- *
- * The previous form `(?<!this\.)fetch...` had no word-boundary on the
- * left, so anything ending in `fetch(` matched (false positives on
- * `prefetch(`, `recordReconcilerPrefetch(`, etc.).
- */
-const RAW_FETCH_PATTERN = /(?<![\w$.])fetch\s{0,10}\(/g
-
-/**
- * Check: resilience/no-raw-fetch
- *
- * Detects direct use of fetch() without retry/timeout wrapper.
- */
-export const noRawFetch = defineCheck({
-  id: 'cfeba2d8-0f62-4b64-b625-f5ba8a0f3b11',
-  slug: 'no-raw-fetch',
-  fileTypes: ['ts', 'tsx', 'js', 'jsx'],
-  description: 'Detect direct fetch() calls that should use wrapped HTTP clients',
-  longDescription: `**Purpose:** Enforces use of the platform HTTP client wrapper instead of raw \`fetch()\` calls.
-
-**Detects:**
-- Bare \`fetch(\` calls via regex \`(?<![\\w$.])fetch\\s{0,10}\\(\` (excludes any \`<ident>.fetch\` method call AND any larger identifier ending in \`fetch\`, e.g. \`prefetch\`)
-- Skips comment lines
-
-**Why it matters:** Raw \`fetch()\` lacks built-in retry, timeout, observability, and error normalization that the canonical HttpClient provides.
-
-**Scope:** Codebase-specific convention. Analyzes each file individually via regex.`,
-  tags: ['resilience', 'http', 'fetch'],
-
-  analyze(content: string, filePath: string): CheckViolation[] {
-    const violations: CheckViolation[] = []
-
-    // Quick check: skip files that don't contain fetch
-    if (!content.includes('fetch(')) {
-      return violations
-    }
-
-    // Skip the resilient fetch wrapper itself — this IS the raw fetch implementation
-    if (filePath.includes('resilient-fetch') || filePath.includes('resilient_fetch')) {
-      return violations
-    }
-
-    // Skip test files — tests legitimately invoke `fetch(` directly to
-    // exercise the wrapper, mock the global, or hit a localhost test
-    // server. Routing those through the wrapper would defeat the test.
-    if (
-      filePath.endsWith('.test.ts') ||
-      filePath.endsWith('.test.tsx') ||
-      filePath.endsWith('.test.js') ||
-      filePath.endsWith('.test.jsx') ||
-      filePath.endsWith('.spec.ts') ||
-      filePath.endsWith('.spec.tsx') ||
-      filePath.includes('/__tests__/')
-    ) {
-      return violations
-    }
-
-    // Skip fitness check definitions that reference fetch in string/regex patterns
-    if (filePath.includes('/fitness/src/checks/')) {
-      return violations
-    }
-
-    // Skip LLM adapter files — infrastructure boundary making direct API calls
-    if (filePath.includes('/llm/') || filePath.includes('/llm-adapter')) {
-      return violations
-    }
-
-    // Skip SSE/streaming implementations that require raw fetch for stream parsing
-    if (
-      content.includes('ReadableStream') ||
-      content.includes('text/event-stream') ||
-      content.includes('EventSource') ||
-      content.includes('getReader()')
-    ) {
-      return violations
-    }
-
-    const lines = content.split('\n')
-
-    for (const [lineNum, line_] of lines.entries()) {
-      const line = line_ ?? ''
-
-      // Skip comment lines
-      if (isCommentLine(line)) {
-        continue
-      }
-
-      RAW_FETCH_PATTERN.lastIndex = 0
-      let match
-      while ((match = RAW_FETCH_PATTERN.exec(line)) !== null) {
-        violations.push({
-          line: lineNum + 1,
-          column: match.index,
-          message: 'Raw fetch() usage detected',
-          severity: 'warning',
-          suggestion: 'Use a shared HTTP client wrapper with built-in retry, timeout, and error handling instead of raw fetch()',
-          match: match[0],
-          filePath,
-        })
-      }
-    }
-
-    return violations
-  },
-})
-
-// =============================================================================
-// AWAIT RESULT UNWRAP
-// =============================================================================
-
-/**
- * Pattern to detect async call followed by .unwrap().
- * Safe regex: uses explicit character classes, no nested quantifiers.
- */
-const ASYNC_CALL_UNWRAP_PATTERN = /\.[a-zA-Z_$][a-zA-Z0-9_$]*\([^)]*\)\s*\.unwrap\s*\(\)/
-
-/**
- * Check: resilience/await-result-unwrap
- *
- * Detects potential missing await before .unwrap() on async results.
- */
-export const awaitResultUnwrap = defineCheck({
-  id: 'f0cd1ad8-edea-42dc-b245-4f2a80bc56a0',
-  slug: 'await-result-unwrap',
-  disabled: true,
-  description: 'Detect potential missing await before .unwrap() on async results',
-  longDescription: `**Purpose:** Catches missing \`await\` before calling \`.unwrap()\` on async Result values, which would unwrap a Promise instead of the Result.
-
-**Detects:**
-- Lines containing \`.unwrap()\` without \`await\` keyword, where the preceding expression matches \`.methodName(args).unwrap()\`
-- Only flags files that also contain \`async\` or \`await\` keywords
-
-**Why it matters:** Calling \`.unwrap()\` on an unresolved Promise instead of a Result silently produces \`undefined\` or throws unexpectedly, bypassing the Result error-handling pattern.
-
-**Scope:** Codebase-specific convention (Result pattern). Analyzes each file individually via regex.`,
-  tags: ['resilience', 'async', 'result-pattern'],
-
-  analyze(content: string, filePath: string): CheckViolation[] {
-    const violations: CheckViolation[] = []
-
-    // Skip files that don't use unwrap
-    if (!content.includes('.unwrap(')) {
-      return violations
-    }
-
-    // Skip files that don't have async context
-    if (!content.includes('async ') && !content.includes('await ')) {
-      // @lazy-ok -- 'await' is in string literals, not actual await
-      return violations
-    }
-
-    const lines = content.split('\n')
-
-    // Pre-filter lines that have .unwrap() without await
-    const candidateLines = lines // @lazy-ok -- 'await' is in string comparisons, not actual await
-      .map((line, i) => ({ line, index: i }))
-      .filter(({ line }) => {
-        if (!line) return false
-        return line.includes('.unwrap()') && !line.includes('await')
-      })
-
-    // @fitness-ignore-next-line performance-anti-patterns -- 'await' appears in comments and string literals within this loop, not actual await expressions
-    for (const { line, index: i } of candidateLines) {
-      // Check if the line has an async call before unwrap
-      const asyncMatch = ASYNC_CALL_UNWRAP_PATTERN.exec(line)
-      if (!asyncMatch) {
-        continue
-      }
-
-      const lineNumber = i + 1
-      violations.push({
-        line: lineNumber,
-        column: line.indexOf('.unwrap'),
-        message: 'Potential missing await before .unwrap() on async result',
-        severity: 'warning',
-        suggestion:
-          'Add await if the Result is from an async function: `const result = await someAsyncFn(); result.unwrap();` or `(await someAsyncFn()).unwrap()`',
-        match: asyncMatch[0],
-        type: 'missing-await-unwrap',
-        filePath,
-      })
-    }
-
-    return violations
   },
 })

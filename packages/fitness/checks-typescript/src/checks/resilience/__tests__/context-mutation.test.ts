@@ -10,7 +10,7 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { analyzeContextMutation } from '../context-safety.js'
+import { analyzeContextMutation } from '../context-mutation.js'
 
 function analyze(src: string): readonly { line: number }[] {
   return analyzeContextMutation(src, 'test.ts')
