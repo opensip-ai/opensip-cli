@@ -53,6 +53,14 @@ export type {
   RecipeRegistryOptions,
 } from './recipes/registry.js';
 
+// Generic id+name+tag registry — the smaller "common ancestor" used by
+// the simulation scenario registry. Distinct from `RecipeRegistry<T>`
+// in that items only need id + name + optional tags (no displayName /
+// description), and the duplicate-policy is fixed (skip-on-same-id,
+// throw-on-name-collision).
+export { IdNameTagRegistry } from './lib/id-name-tag-registry.js';
+export type { Registerable } from './lib/id-name-tag-registry.js';
+
 // Lib — errors + Result pattern
 export { ToolError, ValidationError, NotFoundError, SystemError, TimeoutError, NetworkError, ConfigurationError } from './lib/errors.js';
 export { ok, err, tryCatchAsync, tryCatch } from './lib/errors.js';

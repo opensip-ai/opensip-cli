@@ -43,8 +43,6 @@ export {
   clearScenarioRegistry,
 } from './framework/registry.js'
 
-export { GenericRegistry, type Registerable } from './framework/generic-registry.js'
-
 // =============================================================================
 // LOAD KIND
 // =============================================================================

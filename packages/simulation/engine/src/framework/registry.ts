@@ -6,13 +6,13 @@
  * `--kind` filtering (the CLI surface) work uniformly across kinds.
  */
 
-import { GenericRegistry } from './generic-registry.js'
+import { IdNameTagRegistry } from '@opensip-tools/core'
 
 import type { RunnableScenario } from './runnable-scenario.js'
 import type { ScenarioKind } from '../types/kind-types.js'
 
 /** Singleton registry for scenarios across every kind. */
-export const scenarioRegistry = new GenericRegistry<RunnableScenario>('simulation.scenarios')
+export const scenarioRegistry = new IdNameTagRegistry<RunnableScenario>('simulation.scenarios')
 
 /** Get all registered scenarios. */
 export function getRegisteredScenarios(): Map<string, RunnableScenario> {
