@@ -188,6 +188,26 @@ module.exports = {
         ],
       },
     },
+    {
+      // Phase D6: check packs must not import from @opensip-tools/core
+      // sub-paths (e.g. /errors, /logger). The barrel is the supported
+      // surface. The single documented exception is the parse-cache module
+      // — language adapters and AST helpers route through that path
+      // because the cache is keyed by adapter and lives outside the
+      // barrel for layering reasons.
+      name: 'check-pack-no-core-subpath',
+      severity: 'error',
+      comment:
+        'Check packs must import @opensip-tools/core via the package barrel, ' +
+        'not via subpath (e.g. /errors, /logger). The only documented ' +
+        'exception is @opensip-tools/core/languages/parse-cache.js, which ' +
+        'language adapters consume by design.',
+      from: { path: '^packages/fitness/checks-' },
+      to: {
+        path: '^@opensip-tools/core/',
+        pathNot: '^@opensip-tools/core/languages/parse-cache(\\.js)?$',
+      },
+    },
 
     // -------------------------------------------------------------------
     // Layer enforcement — lang-* must not depend on cli/contracts/checks-*

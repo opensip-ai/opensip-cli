@@ -9,7 +9,7 @@
 
 import * as path from 'node:path'
 
-import { ValidationError } from '@opensip-tools/core/errors'
+import { ValidationError } from '@opensip-tools/core'
 import { defineCheck, isTestFile, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
 
 /**
