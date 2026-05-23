@@ -415,9 +415,18 @@ module.exports = {
       severity: 'error',
       comment:
         'MI-2: code-paths/view-*.ts files must not import each other. They ' +
-        'share state through views-registry, filterState, and indexes only.',
-      from: { path: '^packages/dashboard/src/code-paths/view-' },
-      to: { path: '^packages/dashboard/src/code-paths/view-' },
+        'share state through views-registry, filterState, and indexes only. ' +
+        'view-template.ts is the one exception — it is the rank-and-render ' +
+        'helper consumed by the four ranked views (hot/big/wide/untested) ' +
+        'and contains no view registration of its own.',
+      from: {
+        path: '^packages/dashboard/src/code-paths/view-',
+        pathNot: '^packages/dashboard/src/code-paths/view-template\\.ts$',
+      },
+      to: {
+        path: '^packages/dashboard/src/code-paths/view-',
+        pathNot: '^packages/dashboard/src/code-paths/view-template\\.ts$',
+      },
     },
     {
       name: 'dashboard-algorithms-no-view-deps',

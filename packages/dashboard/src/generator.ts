@@ -22,30 +22,80 @@ import type {
   GraphCatalog,
 } from '@opensip-tools/contracts'
 
+/**
+ * Inputs to the dashboard HTML generator.
+ *
+ * `sessions` is required; everything else has a sensible default
+ * (empty array / null) so a Tool that does not produce a catalog or
+ * recipes can call `generateDashboardHtml({ sessions })` and get a
+ * working dashboard.
+ *
+ * Future tool-shaped data — alarm history, dependency graphs, simulation
+ * traces — will land as new optional fields on this interface rather
+ * than as new positional parameters. That keeps the call site
+ * order-independent and the public API source-stable.
+ */
+export interface DashboardInput {
+  sessions: StoredSession[];
+  checkCatalog?: CheckCatalogEntry[];
+  recipeCatalog?: RecipeCatalogEntry[];
+  graphCatalog?: GraphCatalog | null;
+  editorProtocol?: string | null;
+}
+
 // Escape all < and > to prevent script injection in HTML <script> context
 function escapeForScriptContext(json: string): string {
   return json.replaceAll('<', String.raw`\u003c`).replaceAll('>', String.raw`\u003e`)
 }
 
-export function generateDashboardHtml(
-  sessions: StoredSession[],
-  checkCatalog: CheckCatalogEntry[] = [],
-  recipeCatalog: RecipeCatalogEntry[] = [],
-  graphCatalog: GraphCatalog | null = null,
-  editorProtocol: string | null = null,
+/**
+ * Serialize an optional value into either a `<script type="application/json">`
+ * blob (kind `'json'`) or a JS `const X = …;` literal (kind `'literal'`).
+ *
+ * Both call sites used to inline the same escape-then-stringify dance;
+ * folding them into one helper means the script-context escape is
+ * applied uniformly and the null-vs-supplied branching is in one place.
+ *
+ * - `'json'`: emits `<script type="application/json" id="<id>">…</script>`
+ *   when `value` is not null/undefined; emits the empty string otherwise.
+ * - `'literal'`: emits `const <id> = …;` always — `null` is rendered as
+ *   the JS literal `null`, anything else as `JSON.stringify(value)`.
+ */
+function serializeOptionalBlob(
+  id: string,
+  value: unknown,
+  kind: 'json' | 'literal',
 ): string {
+  switch (kind) {
+    case 'json': {
+      if (value === null || value === undefined) return '';
+      const escaped = escapeForScriptContext(JSON.stringify(value));
+      return `<script type="application/json" id="${id}">${escaped}</script>`;
+    }
+    case 'literal': {
+      const rendered = value === null || value === undefined
+        ? 'null'
+        : JSON.stringify(value);
+      return `const ${id} = ${rendered};`;
+    }
+  }
+}
+
+export function generateDashboardHtml(input: DashboardInput): string {
+  const {
+    sessions,
+    checkCatalog = [],
+    recipeCatalog = [],
+    graphCatalog = null,
+    editorProtocol = null,
+  } = input;
+
   const latest = sessions[0]
   const safeDataJson = escapeForScriptContext(JSON.stringify(sessions))
   const safeCatalogJson = escapeForScriptContext(JSON.stringify(checkCatalog))
   const safeRecipeJson = escapeForScriptContext(JSON.stringify(recipeCatalog))
-  const graphCatalogBlock = graphCatalog === null
-    ? ''
-    : `<script type="application/json" id="graph-catalog">${escapeForScriptContext(JSON.stringify(graphCatalog))}</script>`
-  const editorProtocolJs = `const EDITOR_PROTOCOL = ${
-    editorProtocol === null
-      ? 'null'
-      : JSON.stringify(editorProtocol)
-  };`
+  const graphCatalogBlock = serializeOptionalBlob('graph-catalog', graphCatalog, 'json')
+  const editorProtocolJs = serializeOptionalBlob('EDITOR_PROTOCOL', editorProtocol, 'literal')
 
   return `<!DOCTYPE html>
 <html lang="en">

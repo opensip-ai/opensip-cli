@@ -149,7 +149,13 @@ export async function openDashboard(projectDir?: string): Promise<DashboardResul
   const graphCatalog = loadGraphCatalog(projectDir);
   const editorProtocol = loadEditorProtocol(projectDir);
 
-  const html = generateDashboardHtml(sessions, catalog, recipes, graphCatalog, editorProtocol);
+  const html = generateDashboardHtml({
+    sessions,
+    checkCatalog: catalog,
+    recipeCatalog: recipes,
+    graphCatalog,
+    editorProtocol,
+  });
   const reportPath = join(getReportsDir(), 'latest.html');
   writeFileSync(reportPath, html, 'utf8');
 

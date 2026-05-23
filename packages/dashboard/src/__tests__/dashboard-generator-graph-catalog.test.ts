@@ -43,12 +43,12 @@ const minimalCatalog: GraphCatalog = {
 
 describe('generateDashboardHtml — graph catalog wiring', () => {
   it('emits no id="graph-catalog" block when graphCatalog is null', () => {
-    const html = generateDashboardHtml([], [], [], null);
+    const html = generateDashboardHtml({ sessions: [], graphCatalog: null });
     expect(html).not.toContain('id="graph-catalog"');
   });
 
   it('emits the graph-catalog blob and is parseable JSON when supplied', () => {
-    const html = generateDashboardHtml([], [], [], minimalCatalog);
+    const html = generateDashboardHtml({ sessions: [], graphCatalog: minimalCatalog });
     expect(html).toContain('id="graph-catalog"');
 
     // Pull out the blob and re-parse it.
@@ -63,17 +63,17 @@ describe('generateDashboardHtml — graph catalog wiring', () => {
   });
 
   it('embeds EDITOR_PROTOCOL = null when no editorProtocol is supplied', () => {
-    const html = generateDashboardHtml([], [], [], null);
+    const html = generateDashboardHtml({ sessions: [], graphCatalog: null });
     expect(html).toContain('const EDITOR_PROTOCOL = null;');
   });
 
   it('embeds EDITOR_PROTOCOL as a JS string constant when supplied', () => {
-    const html = generateDashboardHtml([], [], [], minimalCatalog, 'vscode');
+    const html = generateDashboardHtml({ sessions: [], graphCatalog: minimalCatalog, editorProtocol: 'vscode' });
     expect(html).toContain('const EDITOR_PROTOCOL = "vscode";');
   });
 
   it('embeds the seven view ids via the views[] registry', () => {
-    const html = generateDashboardHtml([], [], [], minimalCatalog);
+    const html = generateDashboardHtml({ sessions: [], graphCatalog: minimalCatalog });
     for (const id of ['hot', 'big', 'wide', 'coupling', 'untested', 'sccs', 'search']) {
       expect(html).toContain(`id: '${id}'`);
     }

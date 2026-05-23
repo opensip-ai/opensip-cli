@@ -33,13 +33,12 @@ function renderOverview() {
   sessions.forEach(s => {
     const sc2 = s.score >= 90 ? 'color:var(--success)' : s.score >= 70 ? 'color:var(--warning)' : 'color:var(--error)';
     const row = el('tr', {class:'clickable', onclick: () => {
-      // Graph rows route through the Code Paths panel's session-aware
-      // helper, which forces the Sessions subtab and selects the row
-      // matching this session id. Fit/sim rows just switch top-level tab.
-      if (s.tool === 'graph' && typeof openCodePathsSession === 'function') {
-        openCodePathsSession(s.id);
-        return;
-      }
+      // Tabs that need session-aware deep-linking (Code Paths today;
+      // future fit/sim detail views) register an activator into the
+      // shared tabActivators registry. If one matches this session's
+      // tool, hand off to it. Otherwise fall back to plain top-level
+      // tab switching by name.
+      if (activateTabForSession(s)) return;
       const tabName = tabMap[s.tool] || s.tool;
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));

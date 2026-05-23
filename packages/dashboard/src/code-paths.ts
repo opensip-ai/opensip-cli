@@ -190,6 +190,11 @@ function readViewIdFromHash() {
  * selecting the row matching the given session id. Used by the
  * Overview row-click handler so a graph row in Recent Activity opens
  * the same per-session detail view that fit/sim rows open.
+ *
+ * Registered into the shared tabActivators registry under the key
+ * 'graph' (the StoredSession.tool value for graph runs); the Overview
+ * row-click handler invokes it through activateTabForSession() rather
+ * than naming this function directly.
  */
 function openCodePathsSession(sessionId) {
   const tab = document.querySelector('.tab[data-tab="code-paths"]');
@@ -211,6 +216,10 @@ function openCodePathsSession(sessionId) {
   // Click the matching row to trigger the standard renderDetail flow.
   const row = sessionsPanel && sessionsPanel.querySelector('tr[data-session-id="' + sessionId + '"]');
   if (row) row.click();
+}
+
+if (typeof registerTabActivator === 'function') {
+  registerTabActivator('graph', openCodePathsSession);
 }
 `;
 }
