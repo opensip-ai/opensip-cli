@@ -252,20 +252,14 @@ export interface ScanCharLiteralResult {
 /** Options for `scanCharLiteral`. */
 export interface ScanCharLiteralOptions {
   /**
-   * The set of characters that may open this literal. Defaults to
-   * `["'"]`. Languages with multiple opener forms (e.g. C++17's `u8'`,
-   * `L'`, `u'`, `U'`) should slice the prefix off before calling and
-   * pass the apostrophe alone — this option is reserved for future
-   * languages whose char-literal opener differs from `'`.
-   */
-  readonly openChars?: readonly string[];
-  /**
    * Maximum number of source positions to scan from the opening
    * quote, inclusive of the close. Defaults to `8` — matches the
-   * lang-cpp / lang-java / lang-rust heuristic. A valid C/C++ char
-   * literal with a unicode escape (e.g. `'\u{1F600}'`) is at most
-   * 10 characters, but the scan-cap is intentionally permissive and
-   * recovers on overflow by treating the apostrophe as code.
+   * lang-java / lang-rust heuristic. lang-cpp overrides this to `12`
+   * to accommodate unicode escapes such as `'\u{1F600}'` (10 chars
+   * including quotes); other C-family adopters should override
+   * similarly when their language permits longer escape sequences.
+   * The scan-cap is permissive: on overflow it recovers by treating
+   * the apostrophe as code.
    */
   readonly maxScan?: number;
 }
