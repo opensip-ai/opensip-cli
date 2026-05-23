@@ -91,43 +91,34 @@ function renderCodePathsTab() {
     return;
   }
 
-  // Subtab bar (Sessions | Explore). Mirrors fit/sim's subtab pattern
-  // visually; built directly here because Code Paths' two-tab shape
-  // doesn't fit renderToolTab's three-tab Overview/Catalog/Recipes mold.
-  const subtabBar = el('div', { class: 'subtab-bar' });
-  const sessionsSub = el('div', { class: 'subtab active', 'data-subtab': 'sessions', text: 'Sessions' });
-  const exploreSub = el('div', { class: 'subtab', 'data-subtab': 'explore', text: 'Explore' });
-  subtabBar.appendChild(sessionsSub);
-  subtabBar.appendChild(exploreSub);
-  panel.appendChild(subtabBar);
-
-  const sessionsPanel = el('div', { class: 'subtab-panel active', id: 'panel-code-paths-sessions' });
-  const explorePanel = el('div', { class: 'subtab-panel', id: 'panel-code-paths-explore' });
-  panel.appendChild(sessionsPanel);
-  panel.appendChild(explorePanel);
-
-  subtabBar.addEventListener('click', e => {
-    const tab = e.target.closest('.subtab');
-    if (!tab) return;
-    subtabBar.querySelectorAll('.subtab').forEach(t => t.classList.remove('active'));
-    tab.classList.add('active');
-    sessionsPanel.classList.toggle('active', tab.dataset.subtab === 'sessions');
-    explorePanel.classList.toggle('active', tab.dataset.subtab === 'explore');
-  });
-
-  // Sessions subtab: shared session table (same UX as fit/sim).
-  if (graphSessions.length > 0) {
-    renderSessionTable(sessionsPanel, graphSessions, 'var(--accent)');
-  } else {
-    sessionsPanel.appendChild(el('div', { class: 'empty', text: 'No graph sessions yet.' }));
-  }
-
-  // Explore subtab: catalog views. Only meaningful with a catalog.
-  if (graphCatalog) {
-    renderCodePathsExplore(explorePanel);
-  } else {
-    explorePanel.appendChild(el('div', { class: 'empty', text: 'Catalog cache missing. Re-run opensip-tools graph to populate.' }));
-  }
+  // Code Paths uses the shared renderSubtabBar Strategy (F2). The
+  // two-subtab Sessions/Explore shape is a config; the DOM-and-click
+  // boilerplate now lives in subtab-bar.ts and is shared with
+  // renderToolTab's three-subtab shape.
+  renderSubtabBar(panel, [
+    {
+      id: 'sessions',
+      label: 'Sessions',
+      render: function(p) {
+        if (graphSessions.length > 0) {
+          renderSessionTable(p, graphSessions, 'var(--accent)');
+        } else {
+          p.appendChild(el('div', { class: 'empty', text: 'No graph sessions yet.' }));
+        }
+      },
+    },
+    {
+      id: 'explore',
+      label: 'Explore',
+      render: function(p) {
+        if (graphCatalog) {
+          renderCodePathsExplore(p);
+        } else {
+          p.appendChild(el('div', { class: 'empty', text: 'Catalog cache missing. Re-run opensip-tools graph to populate.' }));
+        }
+      },
+    },
+  ]);
 }
 
 function renderCodePathsExplore(host) {

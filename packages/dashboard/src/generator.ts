@@ -13,6 +13,7 @@ import { dashboardOverviewJs } from './overview.js'
 import { dashboardRecipesJs } from './recipes.js'
 import { dashboardSessionsJs } from './sessions.js'
 import { dashboardSharedJs } from './shared.js'
+import { dashboardSubtabBarJs } from './subtab-bar.js'
 import { listToolTabs } from './tool-tab-registry.js'
 import './tool-tabs-registrations.js'  // side-effect: registers fit/sim/graph
 import { dashboardToolTabsJs } from './tool-tabs.js'
@@ -155,6 +156,7 @@ const fitSessions = sessions.filter(s => s.tool === 'fit');
 const simSessions = sessions.filter(s => s.tool === 'sim');
 
 ${dashboardSharedJs()}
+${dashboardSubtabBarJs()}
 ${dashboardOverviewJs()}
 ${dashboardSessionsJs()}
 ${dashboardChecksJs()}
