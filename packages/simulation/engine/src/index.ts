@@ -221,10 +221,12 @@ export type {
   ScenarioLogger,
   CustomExecuteFn,
   PersonaType,
-  /** @deprecated Held only for back-compat with the prior load-only `ScenarioResultBuilder` payload — prefer `ScenarioExecutorResult`. */
-  LegacyLoadResultPayload,
-  /** @deprecated Use the kind-specific runner result types. `ScenarioType` is no longer the architectural discriminator — `ScenarioKind` is. */
-  ScenarioType,
   ChaosConfig,
   SimulationMetrics,
+  /**
+   * @deprecated Held only for back-compat with the prior load-only
+   * `ScenarioResultBuilder` payload. Prefer `ScenarioExecutorResult`
+   * (the discriminated union over kinds) for new code.
+   */
+  LegacyLoadResultPayload,
 } from './types/framework-types.js'

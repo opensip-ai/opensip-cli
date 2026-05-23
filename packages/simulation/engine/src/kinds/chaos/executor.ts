@@ -23,7 +23,7 @@ import type { ChaosAssertionVerdict, ChaosEvent } from './result.js'
 import type { TickOutcome } from '../../framework/execution/run-load-window.js'
 import type { RunnableScenario } from '../../framework/runnable-scenario.js'
 import type { ChaosScenarioExecutorResult } from '../../framework/scenario-executor-result.js'
-import type { SimulationMetrics } from '../../types/base-types.js'
+import type { ChaosType, SimulationMetrics } from '../../types/base-types.js'
 import type {
   ScenarioExecutionContext,
 } from '../../types/framework-types.js'
@@ -35,7 +35,7 @@ import type {
  */
 function buildInjectChaos(
   config: ChaosScenarioConfig,
-): () => TickOutcome {
+): () => TickOutcome<ChaosType> {
   return () => {
     if (!config.chaos.enabled || Math.random() >= config.chaos.probability) {
       return null
@@ -99,9 +99,12 @@ export function createChaosScenarioRunner(config: ChaosScenarioConfig): Runnable
           const steadyDurationMs = config.duration * 1000
           const recoveryDurationMs = config.recoveryWindow
 
-          // Steady-state window: chaos is active.
+          // Steady-state window: chaos is active. Parameterise on `ChaosType`
+          // so the events flowing back through the framework are typed as
+          // `LoadWindowEvent<ChaosType>` (structurally identical to
+          // `ChaosEvent`) — no runtime cast required.
           const injectChaos = buildInjectChaos(config)
-          const steady = await runLoadWindow(config, context, {
+          const steady = await runLoadWindow<ChaosType>(config, context, {
             windowMs: steadyDurationMs,
             injectChaos: ({ tickStartMs }) => {
               const outcome = injectChaos()
@@ -116,7 +119,7 @@ export function createChaosScenarioRunner(config: ChaosScenarioConfig): Runnable
             },
           })
           // Recovery window: no injectChaos hook — defaults to 95% success.
-          const recovery = await runLoadWindow(config, context, {
+          const recovery = await runLoadWindow<ChaosType>(config, context, {
             windowMs: recoveryDurationMs,
           })
 
@@ -136,21 +139,17 @@ export function createChaosScenarioRunner(config: ChaosScenarioConfig): Runnable
           const passed =
             steadyVerdict.failed.length === 0 && recoveryVerdict.failed.length === 0
 
-          // The `runLoadWindow` driver returns `LoadWindowEvent[]`; in
-          // practice the chaos executor only emits chaos-event outcomes
-          // whose payload IS a ChaosEvent. The structural compatibility
-          // is documented in run-load-window.ts.
           const chaosEvents: readonly ChaosEvent[] = Object.freeze([
             ...steady.events,
             ...recovery.events,
-          ] as ChaosEvent[])
+          ])
 
           return Object.freeze({
             kind: 'chaos' as const,
             scenarioId: config.id,
             passed,
             durationMs: Date.now() - startTime,
-            signals: Object.freeze([...steady.signals, ...recovery.signals]),
+            signals: Object.freeze([] as const),
             outcome: Object.freeze({
               steadyStateMetrics: steady.metrics,
               recoveryMetrics: recovery.metrics,

@@ -45,19 +45,6 @@ type ActionProbabilities = Record<string, number>;
 // SCENARIO TYPES
 // =============================================================================
 
-/**
- * Scenario execution type.
- * - `load` — Sustained load testing at constant RPS
- * - `load-test` — Ramp-up load testing with variable RPS profiles
- */
-export type ScenarioType =
-  | 'happy-path'
-  | 'edge-case'
-  | 'error-injection'
-  | 'load'
-  | 'load-test'
-  | 'chaos'
-
 /** Configuration for a persona within a scenario */
 export interface PersonaConfig {
   personaId: string
@@ -89,7 +76,7 @@ export interface ScenarioAssertion {
 // =============================================================================
 
 /** Types of chaos that can be injected during simulation */
-type ChaosType =
+export type ChaosType =
   | 'latency'
   | 'error'
   | 'timeout'

@@ -9,7 +9,7 @@
  *   - the chaos events that fired during the run
  */
 
-import type { SimulationMetrics } from '../../types/base-types.js'
+import type { ChaosType, SimulationMetrics } from '../../types/base-types.js'
 import type {
   ScenarioAssertion,
   FailedAssertion,
@@ -17,7 +17,7 @@ import type {
 
 /** A single chaos event recorded during the run, for diagnostics. */
 export interface ChaosEvent {
-  readonly type: 'latency' | 'error' | 'timeout' | 'rate-limit' | 'connection-drop' | 'data-corruption'
+  readonly type: ChaosType
   readonly atMs: number
   readonly target: string
 }

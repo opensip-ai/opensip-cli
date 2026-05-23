@@ -108,4 +108,4 @@ export type CustomExecuteFn = (context: ScenarioExecutionContext) => Promise<Leg
 // RE-EXPORTS
 // =============================================================================
 
-export { type ScenarioType, type AssertionOperator, type PersonaType, type ChaosConfig, type SimulationMetrics } from './base-types.js'
+export { type AssertionOperator, type PersonaType, type ChaosConfig, type SimulationMetrics } from './base-types.js'

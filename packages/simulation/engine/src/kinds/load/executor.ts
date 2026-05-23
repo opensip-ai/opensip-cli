@@ -50,7 +50,6 @@ function createStandardExecutor(
       .withMetrics(window.metrics)
       .withDuration(config.duration)
       .evaluateAssertions(config.assertions)
-      .addSignals(window.signals)
       .build()
 
     return Object.freeze({

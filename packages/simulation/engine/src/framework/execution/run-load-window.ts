@@ -16,16 +16,16 @@ import { LatencyTracker } from './latency-tracker.js'
 
 import type { SimulationMetrics } from '../../types/base-types.js'
 import type { PersonaConfig, ScenarioExecutionContext } from '../../types/framework-types.js'
-import type { Signal } from '@opensip-tools/core'
 
 /**
  * Diagnostic event the chaos kind emits when `injectChaos` returns a
- * `chaos-event` outcome. Structurally compatible with `LoadWindowEvent` in
- * `kinds/chaos/result.ts` — kept duplicated here so the framework layer
- * does not import from a kind subtree.
+ * `chaos-event` outcome. The `type` discriminator is left generic over a
+ * caller-supplied string-literal union — chaos parameterises this with its
+ * own `ChaosType` so the boundary is type-safe and no runtime cast is
+ * required when the framework hands events back to the kind.
  */
-export interface LoadWindowEvent {
-  readonly type: string
+export interface LoadWindowEvent<T extends string = string> {
+  readonly type: T
   readonly atMs: number
   readonly target: string
 }
@@ -53,10 +53,10 @@ export interface LoadWindowConfig {
  *                       payload.
  *   - `null`          — defer to the default 95%-success roll.
  */
-export type TickOutcome =
+export type TickOutcome<T extends string = string> =
   | { readonly kind: 'success' }
   | { readonly kind: 'failure' }
-  | { readonly kind: 'chaos-event'; readonly event: LoadWindowEvent }
+  | { readonly kind: 'chaos-event'; readonly event: LoadWindowEvent<T> }
   | null
 
 /**
@@ -64,26 +64,25 @@ export type TickOutcome =
  * issue. Receiving `tickStartMs` gives implementations a relative timestamp
  * for `LoadWindowEvent.atMs`.
  */
-export type InjectChaos = (args: {
+export type InjectChaos<T extends string = string> = (args: {
   readonly tickStartMs: number
-}) => TickOutcome
+}) => TickOutcome<T>
 
 /** Options passed to `runLoadWindow`. */
-export interface RunLoadWindowOptions {
+export interface RunLoadWindowOptions<T extends string = string> {
   /** Duration the window runs for, in milliseconds. */
   readonly windowMs: number
   /**
    * Optional per-request hook letting a kind override the default
    * 95%-success roll (chaos uses this to inject failures).
    */
-  readonly injectChaos?: InjectChaos
+  readonly injectChaos?: InjectChaos<T>
 }
 
 /** Aggregated outcome of a single load window. */
-export interface LoadWindowResult {
+export interface LoadWindowResult<T extends string = string> {
   readonly metrics: SimulationMetrics
-  readonly signals: readonly Signal[]
-  readonly events: readonly LoadWindowEvent[]
+  readonly events: readonly LoadWindowEvent<T>[]
 }
 
 // =============================================================================
@@ -106,10 +105,10 @@ function createMetrics(): SimulationMetrics {
   }
 }
 
-function applyOutcome(
+function applyOutcome<T extends string>(
   metrics: SimulationMetrics,
-  events: LoadWindowEvent[],
-  outcome: TickOutcome,
+  events: LoadWindowEvent<T>[],
+  outcome: TickOutcome<T>,
 ): void {
   if (outcome === null) {
     // Default 95% success rate.
@@ -153,22 +152,24 @@ function sleepTick(intervalMs: number, signal: AbortSignal): Promise<void> {
 
 /**
  * Run a single load-style window. Returns the aggregated metrics + any
- * signals / chaos events collected during the run.
+ * chaos events collected during the run.
  *
  * The default request outcome is the load kind's 95% success roll. A chaos
  * kind passes `injectChaos` to override per-tick outcomes and emit
- * `LoadWindowEvent`s.
+ * `LoadWindowEvent`s. The driver does not produce signals today —
+ * kind executors assemble their own signal lists in their result wrappers,
+ * so a `signals` slot here would always be empty (and previously caused
+ * `findingsGenerated` to silently always be 0).
  */
-export async function runLoadWindow(
+export async function runLoadWindow<T extends string = string>(
   config: LoadWindowConfig,
   context: ScenarioExecutionContext,
-  options: RunLoadWindowOptions,
-): Promise<LoadWindowResult> {
+  options: RunLoadWindowOptions<T>,
+): Promise<LoadWindowResult<T>> {
   const targetRps = config.targetRps ?? getEstimatedRps(config.personas)
   const metrics = createMetrics()
   const latencyTracker = new LatencyTracker()
-  const events: LoadWindowEvent[] = []
-  const signals: Signal[] = []
+  const events: LoadWindowEvent<T>[] = []
   const start = Date.now()
   const rampUpMs = (config.rampUp ?? 0) * 1000
 
@@ -200,8 +201,6 @@ export async function runLoadWindow(
   metrics.p50LatencyMs = snapshot.p50LatencyMs
   metrics.p95LatencyMs = snapshot.p95LatencyMs
   metrics.p99LatencyMs = snapshot.p99LatencyMs
-  metrics.findingsGenerated = signals.length
 
-  return { metrics, signals, events }
+  return { metrics, events }
 }
-
