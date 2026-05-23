@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { dashboardPathUtilsJs } from '../persistence/dashboard/code-paths/path-utils.js';
+import { dashboardPathUtilsJs } from '../code-paths/path-utils.js';
 
 function loadHelpers(): { packageOfPath: (p: string) => string; displayName: (s: string) => string } {
   // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source.

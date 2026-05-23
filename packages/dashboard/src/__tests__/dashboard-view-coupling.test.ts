@@ -7,17 +7,17 @@
 
 import { describe, expect, it, beforeEach } from 'vitest';
 
-import { dashboardEditorLinkJs } from '../persistence/dashboard/code-paths/editor-link.js';
-import { dashboardFiltersJs } from '../persistence/dashboard/code-paths/filters.js';
-import { dashboardFunctionCardJs } from '../persistence/dashboard/code-paths/function-card.js';
-import { dashboardFunctionRowJs } from '../persistence/dashboard/code-paths/function-row.js';
-import { dashboardIndexesJs } from '../persistence/dashboard/code-paths/indexes.js';
-import { dashboardPathUtilsJs } from '../persistence/dashboard/code-paths/path-utils.js';
-import { dashboardTraceJs } from '../persistence/dashboard/code-paths/trace.js';
-import { dashboardViewCouplingJs } from '../persistence/dashboard/code-paths/view-coupling.js';
-import { dashboardViewsRegistryJs } from '../persistence/dashboard/code-paths/views-registry.js';
+import { dashboardEditorLinkJs } from '../code-paths/editor-link.js';
+import { dashboardFiltersJs } from '../code-paths/filters.js';
+import { dashboardFunctionCardJs } from '../code-paths/function-card.js';
+import { dashboardFunctionRowJs } from '../code-paths/function-row.js';
+import { dashboardIndexesJs } from '../code-paths/indexes.js';
+import { dashboardPathUtilsJs } from '../code-paths/path-utils.js';
+import { dashboardTraceJs } from '../code-paths/trace.js';
+import { dashboardViewCouplingJs } from '../code-paths/view-coupling.js';
+import { dashboardViewsRegistryJs } from '../code-paths/views-registry.js';
 
-import type { GraphCatalog, GraphFunctionOccurrence } from '../persistence/dashboard/code-paths/types.js';
+import type { GraphCatalog, GraphFunctionOccurrence } from '@opensip-tools/contracts';
 
 interface Env {
   views: { id: string; render: (c: HTMLElement, cat: GraphCatalog, idx: unknown, fs: unknown) => void }[];

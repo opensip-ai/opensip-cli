@@ -8,9 +8,9 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { generateDashboardHtml } from '../persistence/dashboard/generator.js';
+import { generateDashboardHtml } from '../generator.js';
 
-import type { GraphCatalog } from '../persistence/dashboard/code-paths/types.js';
+import type { GraphCatalog } from '@opensip-tools/contracts';
 
 const minimalCatalog: GraphCatalog = {
   version: '2.0',

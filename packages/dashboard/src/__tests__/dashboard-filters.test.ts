@@ -9,10 +9,10 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { dashboardFiltersJs } from '../persistence/dashboard/code-paths/filters.js';
-import { dashboardPathUtilsJs } from '../persistence/dashboard/code-paths/path-utils.js';
+import { dashboardFiltersJs } from '../code-paths/filters.js';
+import { dashboardPathUtilsJs } from '../code-paths/path-utils.js';
 
-import type { GraphFunctionOccurrence } from '../persistence/dashboard/code-paths/types.js';
+import type { GraphFunctionOccurrence } from '@opensip-tools/contracts';
 
 interface FilterEnv {
   passesFilter: (occ: GraphFunctionOccurrence, fs: FilterState) => boolean;

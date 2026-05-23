@@ -10,14 +10,14 @@
 
 import { describe, expect, it, beforeEach } from 'vitest';
 
-import { dashboardEditorLinkJs } from '../persistence/dashboard/code-paths/editor-link.js';
-import { dashboardFiltersJs } from '../persistence/dashboard/code-paths/filters.js';
-import { dashboardFunctionCardJs } from '../persistence/dashboard/code-paths/function-card.js';
-import { dashboardIndexesJs } from '../persistence/dashboard/code-paths/indexes.js';
-import { dashboardPathUtilsJs } from '../persistence/dashboard/code-paths/path-utils.js';
-import { dashboardTraceJs } from '../persistence/dashboard/code-paths/trace.js';
+import { dashboardEditorLinkJs } from '../code-paths/editor-link.js';
+import { dashboardFiltersJs } from '../code-paths/filters.js';
+import { dashboardFunctionCardJs } from '../code-paths/function-card.js';
+import { dashboardIndexesJs } from '../code-paths/indexes.js';
+import { dashboardPathUtilsJs } from '../code-paths/path-utils.js';
+import { dashboardTraceJs } from '../code-paths/trace.js';
 
-import type { GraphCatalog, GraphFunctionOccurrence } from '../persistence/dashboard/code-paths/types.js';
+import type { GraphCatalog, GraphFunctionOccurrence } from '@opensip-tools/contracts';
 
 function makeOcc(over: Partial<GraphFunctionOccurrence> & { bodyHash: string; simpleName: string }): GraphFunctionOccurrence {
   return {

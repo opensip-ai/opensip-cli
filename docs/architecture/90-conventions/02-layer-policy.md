@@ -105,6 +105,7 @@ The rule's path-list is exhaustive — every package outside `packages/core/` is
       '^@opensip-tools/cli($|/)',
       '^@opensip-tools/fitness',
       '^@opensip-tools/simulation',
+      '^@opensip-tools/dashboard',
       '^@opensip-tools/lang-',
       '^@opensip-tools/checks-',
     ],
@@ -112,9 +113,31 @@ The rule's path-list is exhaustive — every package outside `packages/core/` is
 }
 ```
 
-`contracts` depends only on `core`. It can't reach up to a tool, the CLI, or check packs.
+`contracts` depends only on `core`. It can't reach up to a tool, the CLI, the dashboard, or check packs.
 
-The reasoning: contracts exists to define the contract surface (`CliOutput`, `CommandResult`, `EXIT_CODES`) that *every* Tool consumes. If it took a dep on one Tool, it'd be coupled to that Tool's lifecycle.
+The reasoning: contracts exists to define the contract surface (`CliOutput`, `CommandResult`, `EXIT_CODES`, `GraphCatalog`) that *every* Tool and the dashboard consume. If it took a dep on one Tool or on the dashboard, it'd be coupled to that consumer's lifecycle.
+
+### `dashboard-imports-only-core-contracts`
+
+```js
+{
+  from: { path: '^packages/dashboard/src/' },
+  to: {
+    path: [
+      '^@opensip-tools/cli($|/)',
+      '^@opensip-tools/fitness',
+      '^@opensip-tools/simulation',
+      '^@opensip-tools/graph',
+      '^@opensip-tools/lang-',
+      '^@opensip-tools/checks-',
+    ],
+  },
+}
+```
+
+`@opensip-tools/dashboard` is the self-contained HTML report renderer at Layer 3. It depends on `core` (logger, paths) and `contracts` (`StoredSession`, `CheckCatalogEntry`, `GraphCatalog` types). It must not depend on any tool engine, the CLI, language adapters, or check packs — so a Tool that doesn't render the report (e.g. a CI plugin emitting JSON) doesn't pull dashboard code into its dependency closure.
+
+`fitness` is the only first-party consumer; the import lives in `packages/fitness/engine/src/cli/dashboard.ts`. The edge runs upward at Layer 3 (fitness → dashboard), the same shape as `lang-typescript → fitness` and `graph → fitness/sarif` — peers consuming a sibling.
 
 ### `fitness-no-cli` and `simulation-no-cli`
 
@@ -194,10 +217,10 @@ These mirror the conceptual six-stage pipeline ([`../40-the-graph-loop/01-stages
 
 ### Dashboard — panel isolation
 
-Six rules guard the dashboard's HTML-generator package against the failure modes that broke earlier panel layouts:
+Six rules guard the dashboard's HTML-generator package against the failure modes that broke earlier panel layouts. After Wave 3 Chain C, all six target the new `^packages/dashboard/src/` paths (the subtree previously lived under `^packages/contracts/src/persistence/dashboard/`):
 
 - **`dashboard-no-graph-import`** — dashboard panels don't pull `@opensip-tools/graph` (the dashboard receives a serialized `GraphCatalog`; the graph engine's runtime never ships to the browser).
-- **`dashboard-code-paths-self-contained`** — the Code Paths panel's helpers don't import other panels.
+- **`dashboard-code-paths-self-contained`** — the Code Paths panel's helpers may import only from `@opensip-tools/contracts` (for the `GraphCatalog` types), `@opensip-tools/core`, dashboard siblings, and Node built-ins. No other cross-package imports.
 - **`dashboard-views-disjoint`** — each Code Paths view stays in its own file; views can't import each other.
 - **`dashboard-algorithms-no-view-deps`** — Code Paths algorithms (Tarjan, BFS, etc.) don't import any view-specific code.
 - **`dashboard-no-side-stylesheets`** — only the central CSS module emits styles.

@@ -1,6 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-15
+last_verified: 2026-05-22
+release: v1.3.x
 title: "What is opensip-tools"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "The product entry point — what problem opensip-tools solves, what it actually does, the philosophy, and what it deliberately is not."
@@ -22,7 +23,7 @@ You're joining the project, or you're about to depend on it. Before any package 
 
 > **What you'll understand after this:**
 > - The problem opensip-tools solves and why it deserves a tool, not a script.
-> - The two loops it runs today: `fit` and `sim`.
+> - The three loops it runs today: `fit`, `sim`, and `graph`.
 > - The philosophy — what "tool platform" means, why the CLI doesn't know what `fit` does.
 > - Who opensip-tools is for, and what it deliberately is not.
 > - Where to go next.
@@ -33,7 +34,7 @@ You're joining the project, or you're about to depend on it. Before any package 
 
 Every codebase wants a quality bar. The bar is rarely controversial — `no console.log in production`, `circular imports forbidden`, `cyclomatic complexity capped at 25`, `cross-layer imports forbidden by the modular monolith`. What's controversial is enforcement: every team ends up writing a different bag of bash scripts, ad-hoc Node programs, and `awk`-pipelines stitched into CI to enforce its own bar. They drift. They aren't shareable. They're invisible to the IDE. They die when the engineer who wrote them changes teams.
 
-The conventional answer is a giant linter — ESLint, Pylint, golangci-lint. Linters are great at small syntactic patterns. They're a poor fit for *architectural* checks: "no module under `packages/cli/` may import from `packages/fitness/checks-*`", "every `defineCheck` must declare a `category`", "the file `apps/dashboard/src/main.tsx` must exist". They're also language-locked: a polyglot repo wants the same gate model in TypeScript and Python and Go.
+The conventional answer is a giant linter — ESLint, Pylint, golangci-lint. Linters are great at small syntactic patterns. They're a poor fit for *architectural* checks: "no module under `packages/cli/` may import from `packages/fitness/checks-*`", "every `defineCheck` must declare at least one tag", "the file `apps/dashboard/src/main.tsx` must exist". They're also language-locked: a polyglot repo wants the same gate model in TypeScript and Python and Go.
 
 opensip-tools is the alternative: **a polyglot, plugin-driven check runner** that takes a quality bar and turns it into a deterministic exit code. The runner doesn't know what your checks check; it knows how to discover them, run them, score them, render them, and gate on them.
 
@@ -41,7 +42,7 @@ opensip-tools is the alternative: **a polyglot, plugin-driven check runner** tha
 
 ## What it actually does
 
-opensip-tools ships two first-party tools today, both invoked through the same CLI binary.
+opensip-tools ships three first-party tools today, all invoked through the same CLI binary.
 
 ### `fit` — fitness checks
 
@@ -61,6 +62,12 @@ The second loop, opt-in. A scenario is a Node `.mjs` module that simulates a wor
 
 `sim` is younger than `fit` and changes more aggressively. The architecture-level shape is the same (Tool, Recipe, Engine, Renderer); the API surface still moves between minor releases.
 
+### `graph` — static call-graph + dead-end analysis
+
+The third loop. Where `fit` answers "is the codebase clean?" with a regex/AST pass over each file in isolation, `graph` answers "what is reachable from where?" by building the project's static call graph. The six-stage pipeline (discover → parse + walk → resolve → indexes → rules → render) ships with five rules — `orphan-subtree`, `duplicated-function-body`, `no-side-effect-path`, `test-only-reachable`, `always-throws-branch` — and is language-pluggable: TypeScript (symbol-resolved), Python (tree-sitter), and Rust (tree-sitter) adapters ship in v1.3.0.
+
+`graph` has its own gate flow (`--gate-save` / `--gate-compare`) and renders into the dashboard's interactive Code Paths panel.
+
 ### Plus the surrounding plumbing
 
 - `init` — scaffold `opensip-tools.config.yml` and example checks/scenarios.
@@ -77,7 +84,7 @@ Every command lives in [`packages/cli/src/commands/`](https://github.com/opensip
 
 ## The big picture in three sentences
 
-opensip-tools is a CLI dispatcher whose job is to find Tools (`fit`, `sim`, anything you write), find recipes inside those Tools, run them, and render the result. Tools are decoupled from the CLI by a plugin contract; the CLI cannot tell `fit` from `sim` from `audit-sec` you wrote yesterday — they all implement the same `Tool` interface, mount their own subcommands, and consume a shared rendering layer. The platform is intentionally narrow: no daemon, no server, no database, no orchestration — just a 18-package TypeScript monorepo that produces one binary and runs end-to-end in under a second on a small project.
+opensip-tools is a CLI dispatcher whose job is to find Tools (`fit`, `sim`, `graph`, anything you write), find recipes inside those Tools, run them, and render the result. Tools are decoupled from the CLI by a plugin contract; the CLI cannot tell `fit` from `sim` from `graph` from `audit-sec` you wrote yesterday — they all implement the same `Tool` interface, mount their own subcommands, and consume a shared rendering layer. The platform is intentionally narrow: no daemon, no server, no database, no orchestration — just a 18-package TypeScript monorepo that produces one binary and runs end-to-end in under a second on a small project.
 
 ---
 
@@ -87,13 +94,13 @@ A few principles shape every design decision. They're load-bearing — most of t
 
 ### A platform, not a linter
 
-opensip-tools is a platform with two tools shipped today, designed for a third you haven't installed yet. The CLI ([`packages/cli/src/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/cli/src/index.ts)) is a generic dispatcher: it walks `defaultToolRegistry`, calls `Tool.register(cli)` on each entry, and lets each tool wire its own Commander commands. Adding a new tool is a plugin operation — install a package whose `package.json` declares `opensipTools.kind === 'tool'`, and the CLI picks it up.
+opensip-tools is a platform with three tools shipped today (`fit`, `sim`, `graph`), designed for a fourth you haven't installed yet. The CLI ([`packages/cli/src/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/cli/src/index.ts)) is a generic dispatcher: it walks `defaultToolRegistry`, calls `Tool.register(cli)` on each entry, and lets each tool wire its own Commander commands. Adding a new tool is a plugin operation — install a package whose `package.json` declares `opensipTools.kind === 'tool'`, and the CLI picks it up.
 
-This is not a hypothetical: it's why `fit` and `sim` ship in separate packages, depend on the same kernel ([`@opensip-tools/core`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/core/)), and have completely separate command surfaces. If `fit` ever wanted to know what `sim` was doing, it'd have to import it — which the layer policy forbids. They communicate through the CLI's render layer, not directly.
+This is not a hypothetical: it's why `fit`, `sim`, and `graph` ship in separate packages, depend on the same kernel ([`@opensip-tools/core`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/core/)), and have completely separate command surfaces. If `fit` ever wanted to know what `sim` was doing, it'd have to import it — which the layer policy forbids. They communicate through the CLI's render layer, not directly.
 
 ### Layered, not modular
 
-The 18 packages are organized as a strict dependency layer cake: `core` at the bottom, `contracts` above it, then `fitness/simulation/lang-*` as peers, then `checks-*` packs (which depend on the language packs), then `cli` at the top. The layer policy is enforced by [dependency-cruiser](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/.dependency-cruiser.cjs) at lint time — the build fails if a `core` module imports from `fitness`, or if `lang-typescript` imports from `cli`.
+The 19 packages are organized as a strict dependency layer cake: `core` at the bottom, `contracts` above it, then `fitness/simulation/graph/dashboard/lang-*` as peers, then `checks-*` packs (which depend on the language packs), then `cli` at the top. The layer policy is enforced by [dependency-cruiser](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/.dependency-cruiser.cjs) at lint time — the build fails if a `core` module imports from `fitness`, or if `lang-typescript` imports from `cli`.
 
 This shape is what makes the tool-plugin model possible: the kernel doesn't know what tools exist (`core` defines `Tool` and `ToolRegistry` but never imports a Tool implementation), and tools don't know what other tools exist. New tools slot in *between* layers without touching anyone else.
 
@@ -103,7 +110,7 @@ See [`../10-mental-model/03-modular-monolith.md`](/docs/opensip-tools/10-mental-
 
 opensip-tools runs on TypeScript, but the checks it runs apply to TypeScript, Rust, Python, Java, Go, and C/C++ code. The trick is the `LanguageAdapter` interface ([`packages/core/src/languages/adapter.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/core/src/languages/adapter.ts)): each language pack contributes one adapter that knows how to strip comments and string literals from that language's source. Checks operate on the *filtered* content, so a regex like `/console\.log/` doesn't match the literal string `"console.log"` inside a JS comment.
 
-The kernel ships zero adapters. The CLI binds the six bundled adapters at startup ([`packages/cli/src/index.ts:64-69`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/cli/src/index.ts)). A polyglot project gets every relevant pack; a single-language project still loads them all (cheap) and only invokes the relevant ones (per-file dispatch).
+The kernel ships zero adapters. The CLI binds the six bundled adapters at startup ([`packages/cli/src/index.ts:68-73`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/cli/src/index.ts)). A polyglot project gets every relevant pack; a single-language project still loads them all (cheap) and only invokes the relevant ones (per-file dispatch).
 
 ### The CLI is the only consumer
 
@@ -135,7 +142,7 @@ The target user is a senior engineer or staff engineer who configures the bar (`
 A few common confusions, listed once so you can disambiguate.
 
 - **opensip-tools is not a linter replacement.** ESLint, Ruff, and golangci-lint are still the right call for syntactic patterns inside one language. opensip-tools sits *above* linters: it ingests their output as signals, and it adds the architectural and cross-language checks linters can't express.
-- **opensip-tools is not a service.** There's no daemon, no API server, no database. It's a CLI binary that exits when its work is done. The optional [OpenSIP Cloud](https://opensip.ai) integration is a separate product — opensip-tools posts results there if you set an API key, but the cloud is not required and is not in this repo.
+- **opensip-tools is not a service.** There's no daemon, no API server, no database. It's a CLI binary that exits when its work is done. (The optional Code Paths panel inside the dashboard is a static HTML view rendered from `graph`'s catalog, not a service.) The optional [OpenSIP Cloud](https://opensip.ai) integration is a separate product — opensip-tools posts results there if you set an API key, but the cloud is not required and is not in this repo.
 - **opensip-tools is not opinionated about your bar.** It ships some default check packs (universal ones, plus per-language packs), but they're plugins. You can disable every default check and run only your own. The kernel has zero opinions about what `quality` means.
 - **opensip-tools is not an AI tool.** No model calls, no embeddings, no agentic anything. It's a plain old TypeScript CLI. (You can build an AI tool *on top of* the Tool plugin contract — that's exactly what the contract is for.)
 - **opensip-tools is not a CI runner.** It runs *under* CI. It doesn't replace GitHub Actions, GitLab CI, or Buildkite — it produces an exit code and a SARIF document those runners consume.

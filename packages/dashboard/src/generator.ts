@@ -15,8 +15,12 @@ import { dashboardSessionsJs } from './sessions.js'
 import { dashboardSharedJs } from './shared.js'
 import { dashboardToolTabsJs } from './tool-tabs.js'
 
-import type { StoredSession, CheckCatalogEntry, RecipeCatalogEntry } from '../store.js'
-import type { GraphCatalog } from './code-paths/types.js'
+import type {
+  StoredSession,
+  CheckCatalogEntry,
+  RecipeCatalogEntry,
+  GraphCatalog,
+} from '@opensip-tools/contracts'
 
 // Escape all < and > to prevent script injection in HTML <script> context
 function escapeForScriptContext(json: string): string {

@@ -7,15 +7,15 @@
 
 import { describe, expect, it, beforeEach } from 'vitest';
 
-import { dashboardFiltersJs } from '../persistence/dashboard/code-paths/filters.js';
-import { dashboardFunctionRowJs } from '../persistence/dashboard/code-paths/function-row.js';
-import { dashboardIndexesJs } from '../persistence/dashboard/code-paths/indexes.js';
-import { dashboardPathUtilsJs } from '../persistence/dashboard/code-paths/path-utils.js';
-import { dashboardSccJs } from '../persistence/dashboard/code-paths/scc.js';
-import { dashboardViewSccsJs } from '../persistence/dashboard/code-paths/view-sccs.js';
-import { dashboardViewsRegistryJs } from '../persistence/dashboard/code-paths/views-registry.js';
+import { dashboardFiltersJs } from '../code-paths/filters.js';
+import { dashboardFunctionRowJs } from '../code-paths/function-row.js';
+import { dashboardIndexesJs } from '../code-paths/indexes.js';
+import { dashboardPathUtilsJs } from '../code-paths/path-utils.js';
+import { dashboardSccJs } from '../code-paths/scc.js';
+import { dashboardViewSccsJs } from '../code-paths/view-sccs.js';
+import { dashboardViewsRegistryJs } from '../code-paths/views-registry.js';
 
-import type { GraphCatalog, GraphFunctionOccurrence } from '../persistence/dashboard/code-paths/types.js';
+import type { GraphCatalog, GraphFunctionOccurrence } from '@opensip-tools/contracts';
 
 interface Env {
   views: { id: string; render: (c: HTMLElement, cat: GraphCatalog, idx: unknown, fs: unknown) => void }[];

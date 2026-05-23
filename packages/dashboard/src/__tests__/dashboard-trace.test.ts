@@ -4,10 +4,10 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { dashboardIndexesJs } from '../persistence/dashboard/code-paths/indexes.js';
-import { dashboardTraceJs } from '../persistence/dashboard/code-paths/trace.js';
+import { dashboardIndexesJs } from '../code-paths/indexes.js';
+import { dashboardTraceJs } from '../code-paths/trace.js';
 
-import type { GraphCatalog, GraphFunctionOccurrence } from '../persistence/dashboard/code-paths/types.js';
+import type { GraphCatalog, GraphFunctionOccurrence } from '@opensip-tools/contracts';
 
 interface Env {
   buildIndexes: (cat: GraphCatalog | null) => {

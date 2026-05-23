@@ -100,7 +100,7 @@ This is not a hypothetical: it's why `fit`, `sim`, and `graph` ship in separate 
 
 ### Layered, not modular
 
-The 18 packages are organized as a strict dependency layer cake: `core` at the bottom, `contracts` above it, then `fitness/simulation/graph/lang-*` as peers, then `checks-*` packs (which depend on the language packs), then `cli` at the top. The layer policy is enforced by [dependency-cruiser](../../../.dependency-cruiser.cjs) at lint time — the build fails if a `core` module imports from `fitness`, or if `lang-typescript` imports from `cli`.
+The 19 packages are organized as a strict dependency layer cake: `core` at the bottom, `contracts` above it, then `fitness/simulation/graph/dashboard/lang-*` as peers, then `checks-*` packs (which depend on the language packs), then `cli` at the top. The layer policy is enforced by [dependency-cruiser](../../../.dependency-cruiser.cjs) at lint time — the build fails if a `core` module imports from `fitness`, or if `lang-typescript` imports from `cli`.
 
 This shape is what makes the tool-plugin model possible: the kernel doesn't know what tools exist (`core` defines `Tool` and `ToolRegistry` but never imports a Tool implementation), and tools don't know what other tools exist. New tools slot in *between* layers without touching anyone else.
 

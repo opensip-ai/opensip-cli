@@ -9,6 +9,7 @@
  *   3. @opensip-tools/lang-*         — language adapters (depend on core)
  *   3. @opensip-tools/fitness        — fitness engine + cli/* commands
  *   3. @opensip-tools/simulation     — simulation engine + cli/* commands
+ *   3. @opensip-tools/dashboard      — HTML report generator (depends on core + contracts)
  *   4. @opensip-tools/checks-*       — fitness check packs (depend on fitness)
  *   5. @opensip-tools/cli            — entry point (depends on every tool)
  *
@@ -19,6 +20,11 @@
  * paid down (Wave 3 Chain E / Phase D3): filterContent / clearFilterCache /
  * FilteredContent now live in @opensip-tools/lang-typescript, and the
  * `lang-no-fitness-except-typescript` exception has been deleted.
+ *
+ * Wave 3 Chain C extracted @opensip-tools/dashboard out of contracts so
+ * Tools that don't render the report no longer pull dashboard code into
+ * their dependency closure. The `dashboard-imports-only-core-contracts`
+ * rule pins the new package's dep allowlist.
  */
 
 /** @type {import('dependency-cruiser').IConfiguration} */
@@ -101,13 +107,39 @@ module.exports = {
       comment:
         'contracts holds the CliOutput / exit codes / persistence types used ' +
         'by every tool. It must not import from any tool, the cli entry ' +
-        'point, or language packs.',
+        'point, language packs, or dashboard.',
       from: { path: '^packages/contracts/src/' },
       to: {
         path: [
           '^@opensip-tools/cli($|/)',
           '^@opensip-tools/fitness',
           '^@opensip-tools/simulation',
+          '^@opensip-tools/dashboard',
+          '^@opensip-tools/lang-',
+          '^@opensip-tools/checks-',
+        ],
+      },
+    },
+
+    // -------------------------------------------------------------------
+    // Layer enforcement — dashboard depends only on core + contracts
+    // -------------------------------------------------------------------
+    {
+      name: 'dashboard-imports-only-core-contracts',
+      severity: 'error',
+      comment:
+        'dashboard renders the self-contained HTML report from session data ' +
+        'and a graph catalog. It depends on core (logger, paths) and ' +
+        'contracts (StoredSession / CheckCatalogEntry / GraphCatalog types). ' +
+        'It must not depend on any tool engine, the CLI, language adapters, ' +
+        'or check packs.',
+      from: { path: '^packages/dashboard/src/' },
+      to: {
+        path: [
+          '^@opensip-tools/cli($|/)',
+          '^@opensip-tools/fitness',
+          '^@opensip-tools/simulation',
+          '^@opensip-tools/graph',
           '^@opensip-tools/lang-',
           '^@opensip-tools/checks-',
         ],
@@ -351,10 +383,10 @@ module.exports = {
 
     // -------------------------------------------------------------------
     // graph dashboard v0.3 — Code Paths panel architectural invariants
-    // (§9.1 of docs/plans/graph-dashboard-v3-design.md). The panel is
-    // self-contained inside @opensip-tools/contracts; it consumes the
-    // graph catalog by JSON shape only. Each rule below codifies a
-    // single architectural-invariant claim from the design doc.
+    // (§9.1 of docs/plans/graph-dashboard-v3-design.md). The panel lives
+    // in @opensip-tools/dashboard; it consumes the graph catalog by JSON
+    // shape only. Each rule below codifies a single architectural-
+    // invariant claim from the design doc.
     // -------------------------------------------------------------------
     {
       name: 'dashboard-no-graph-import',
@@ -362,18 +394,19 @@ module.exports = {
       comment:
         'AI-3: dashboard code-paths must not import @opensip-tools/graph; ' +
         'consume the catalog by JSON shape only.',
-      from: { path: '^packages/contracts/src/persistence/dashboard/code-paths' },
+      from: { path: '^packages/dashboard/src/code-paths' },
       to: { path: '^@opensip-tools/graph(/|$)' },
     },
     {
       name: 'dashboard-code-paths-self-contained',
       severity: 'error',
       comment:
-        'MI-1: code-paths/* may import only from contracts itself, dashboard ' +
-        'siblings, and Node built-ins. No cross-package imports.',
-      from: { path: '^packages/contracts/src/persistence/dashboard/code-paths/' },
+        'MI-1: code-paths/* may import only from @opensip-tools/contracts ' +
+        '(for GraphCatalog types), @opensip-tools/core, dashboard siblings, ' +
+        'and Node built-ins. No other cross-package imports.',
+      from: { path: '^packages/dashboard/src/code-paths/' },
       to: {
-        path: '^@opensip-tools/(?!contracts(/|$))',
+        path: '^@opensip-tools/(?!(contracts|core|dashboard)(/|$))',
         pathNot: '^node:',
       },
     },
@@ -383,8 +416,8 @@ module.exports = {
       comment:
         'MI-2: code-paths/view-*.ts files must not import each other. They ' +
         'share state through views-registry, filterState, and indexes only.',
-      from: { path: '^packages/contracts/src/persistence/dashboard/code-paths/view-' },
-      to: { path: '^packages/contracts/src/persistence/dashboard/code-paths/view-' },
+      from: { path: '^packages/dashboard/src/code-paths/view-' },
+      to: { path: '^packages/dashboard/src/code-paths/view-' },
     },
     {
       name: 'dashboard-algorithms-no-view-deps',
@@ -392,24 +425,24 @@ module.exports = {
       comment:
         'MI-3: pure-algorithm modules (scc, search, trace) must not import ' +
         'view files or function-card.',
-      from: { path: '^packages/contracts/src/persistence/dashboard/code-paths/(scc|search|trace)\\.ts$' },
-      to: { path: '^packages/contracts/src/persistence/dashboard/code-paths/(view-|function-card\\.ts)' },
+      from: { path: '^packages/dashboard/src/code-paths/(scc|search|trace)\\.ts$' },
+      to: { path: '^packages/dashboard/src/code-paths/(view-|function-card\\.ts)' },
     },
     {
       name: 'dashboard-no-side-stylesheets',
       severity: 'error',
       comment:
         'AI-4: new CSS must extend dashboard/css.ts. No external .css imports ' +
-        'inside contracts.',
-      from: { path: '^packages/contracts/src/' },
+        'inside the dashboard package.',
+      from: { path: '^packages/dashboard/src/' },
       to: { path: '\\.css$' },
     },
     {
       name: 'dashboard-no-ui-framework',
       severity: 'error',
       comment:
-        'AI-2: contracts must not depend on any UI framework or visualization library.',
-      from: { path: '^packages/contracts/src/' },
+        'AI-2: dashboard must not depend on any UI framework or visualization library.',
+      from: { path: '^packages/dashboard/src/' },
       to: {
         path: '^(react|preact|vue|svelte|@?solidjs|d3|d3-.+|three|cytoscape|sigma|vis-network|@?angular)(/|$)',
       },

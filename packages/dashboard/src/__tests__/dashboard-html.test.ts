@@ -1,5 +1,6 @@
-import { generateDashboardHtml } from '@opensip-tools/contracts';
 import { describe, it, expect } from 'vitest';
+
+import { generateDashboardHtml } from '../generator.js';
 
 import type { StoredSession } from '@opensip-tools/contracts';
 

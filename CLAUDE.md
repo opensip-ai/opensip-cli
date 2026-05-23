@@ -25,7 +25,10 @@ opensip-tools/
 │   ├── contracts/               # @opensip-tools/contracts — contract types
 │   │                            #   between Tools and the runner: CliOutput,
 │   │                            #   CommandResult, exit codes, session
-│   │                            #   persistence, dashboard HTML generator
+│   │                            #   persistence, GraphCatalog type surface
+│   ├── dashboard/               # @opensip-tools/dashboard — self-contained
+│   │                            #   HTML report generator (generateDashboardHtml);
+│   │                            #   consumed by fitness's `dashboard` command
 │   ├── cli/                     # @opensip-tools/cli — generic tool dispatcher
 │   │
 │   ├── fitness/                 # fitness namespace
@@ -248,7 +251,7 @@ pnpm typecheck && pnpm test && pnpm lint
 
 ## Release Process
 
-Releases are tag-driven. See `RELEASING.md` — there are 17 packages
+Releases are tag-driven. See `RELEASING.md` — there are 19 packages
 to publish, in a specific dependency order, via OIDC trusted publishing.
 
 The release workflow has two non-obvious steps (npm 11 to a separate

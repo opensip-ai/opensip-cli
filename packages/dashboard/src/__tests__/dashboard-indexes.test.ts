@@ -8,9 +8,9 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { dashboardIndexesJs } from '../persistence/dashboard/code-paths/indexes.js';
+import { dashboardIndexesJs } from '../code-paths/indexes.js';
 
-import type { GraphCatalog, GraphFunctionOccurrence } from '../persistence/dashboard/code-paths/types.js';
+import type { GraphCatalog, GraphFunctionOccurrence } from '@opensip-tools/contracts';
 
 type BuildIndexesFn = (catalog: GraphCatalog | null) => {
   byBodyHash: Map<string, GraphFunctionOccurrence>;

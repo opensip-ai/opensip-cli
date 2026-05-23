@@ -1,6 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-15
+last_verified: 2026-05-22
+release: v1.3.x
 title: "Output, gate, SARIF"
 audience: [contributors, ci-integrators]
 purpose: "What happens to the violations a check produces — render layer, JSON output, SARIF, the gate, cloud reporting."
@@ -57,7 +58,7 @@ Every output path starts from the same shape — a `CliOutput` produced after th
 ```ts
 interface CliOutput {
   readonly version: '1.0';
-  readonly tool: 'fit' | 'sim';
+  readonly tool: 'fit' | 'sim' | 'graph';
   readonly timestamp: string;            // ISO 8601 — when the run started
   readonly recipe?: string;              // recipe name if --recipe was used
   readonly score: number;                // 0..100, deterministic
@@ -217,8 +218,8 @@ Per chunk:
 
 - The reporter computes a timeout: `min(300_000, 60_000 + chunkFindings * 100)` ms — 60s base plus 100ms per finding, capped at 5 minutes. The receiver does per-finding work (dedup, persistence, trace writes); the timeout scales with the workload.
 - It POSTs to `<url>/sarif?cwd=<cwd>` with `X-API-Key` if provided.
-- Retries on transient failures (HTTP 5xx, 429, network errors) with exponential backoff up to 3 attempts (`withRetry` from `@opensip-tools/core`).
-- On a non-transient failure (4xx), the reporter aborts remaining chunks — there's no point sending more.
+- The `fetch()` call is wrapped in `withRetry` from `@opensip-tools/core` — `maxAttempts: 3`, `initialDelayMs: 500`, `maxDelayMs: 5000`. This retries when `fetch()` *rejects* (network errors, AbortSignal timeouts).
+- HTTP-status handling is separate: a transient 5xx / 429 response aborts the chunk attempt and proceeds to the next chunk; a non-transient 4xx aborts all remaining chunks (no point sending more).
 
 The result is a `ReportResult` with `chunksTotal` / `chunksSucceeded`. Partial success is reported back to the user via the run's footer.
 

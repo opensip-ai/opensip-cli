@@ -1,10 +1,10 @@
 ---
 status: current
-last_verified: 2026-05-18
-release: v1.3.0
+last_verified: 2026-05-22
+release: v1.3.x
 title: "Layered package graph"
 audience: [contributors]
-purpose: "The 18-package monorepo, the five-layer dependency rule, why dependency-cruiser exists, and the trade-offs."
+purpose: "The 19-package monorepo, the five-layer dependency rule, why dependency-cruiser exists, and the trade-offs."
 source-files:
   - .dependency-cruiser.cjs
   - pnpm-workspace.yaml
@@ -20,12 +20,12 @@ related-docs:
 ---
 # Layered package graph
 
-Eighteen packages. Five layers. One enforced rule: dependencies flow up only.
+Nineteen packages. Five layers. One enforced rule: dependencies flow up only.
 
 This document is the conceptual map. For the lookup-shaped catalog of every package's role and exports, jump to [`80-reference/01-package-catalog.md`](/docs/opensip-tools/80-reference/01-package-catalog/). For the literal dep-cruiser rules, see [`90-conventions/02-layer-policy.md`](/docs/opensip-tools/90-conventions/02-layer-policy/).
 
 > **What you'll understand after this:**
-> - Why opensip-tools ships as 18 packages instead of one.
+> - Why opensip-tools ships as 19 packages instead of one.
 > - The five layers, in order, and what each one is for.
 > - How the layer rule is enforced (and what happens if you break it).
 > - The two documented exceptions and why they exist.
@@ -47,8 +47,8 @@ This document is the conceptual map. For the lookup-shaped catalog of every pack
 │           └──────────────────────────────────────────────────┘    │
 │                                  ▲                                 │
 │  Layer 3  ┌──────────┬───────────┴───────────┬───────────────┐    │
-│           │ fitness  │ simulation │ lang-cpp lang-go lang-…  │    │
-│           └──────────┴────────────┴──────────────────────────┘    │
+│           │ fitness  simulation  graph  dashboard  lang-… │     │
+│           └──────────┴────────────┴───────┴─────────────────┘    │
 │                                  ▲                                 │
 │  Layer 2  ┌──────────────────────┴───────────────────────────┐    │
 │           │            @opensip-tools/contracts             │    │
@@ -64,15 +64,15 @@ This document is the conceptual map. For the lookup-shaped catalog of every pack
 
 **Layer 1 — `@opensip-tools/core`.** The kernel. Ships types, errors, IDs, the logger, the path resolver, the language-adapter contract, the plugin discovery mechanics, and the Tool registry. No knowledge of fitness, simulation, or any other tool. No dependency on Commander, Ink, or any UI library.
 
-**Layer 2 — `@opensip-tools/contracts`.** The shared contract layer between Tools and the runner: the `CliOutput`/`CheckOutput`/`FindingOutput` shape every tool produces, the `CommandResult` discriminated union the renderer dispatches on, the exit-code constants, and the session persistence helpers (session writer, dashboard HTML generator). Depends on `core` only. Does not import any tool.
+**Layer 2 — `@opensip-tools/contracts`.** The shared contract layer between Tools and the runner: the `CliOutput`/`CheckOutput`/`FindingOutput` shape every tool produces, the `CommandResult` discriminated union the renderer dispatches on, the exit-code constants, the session persistence helpers (session writer), and the `GraphCatalog` type surface that the graph tool produces and the dashboard consumes. Depends on `core` only. Does not import any tool.
 
-**Layer 3 — `@opensip-tools/fitness`, `@opensip-tools/simulation`, `@opensip-tools/lang-*`.** Peer packages, all depending on `contracts` and `core`. Each tool engine (`fitness`, `simulation`) implements the `Tool` contract. Each language adapter (`lang-typescript`, `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp`) implements the `LanguageAdapter` contract.
+**Layer 3 — `@opensip-tools/fitness`, `@opensip-tools/simulation`, `@opensip-tools/graph`, `@opensip-tools/dashboard`, `@opensip-tools/lang-*`.** Peer packages, all depending on `contracts` and `core`. Each tool engine (`fitness`, `simulation`, `graph`) implements the `Tool` contract. The `dashboard` package is the self-contained HTML report renderer — it consumes session data and the `GraphCatalog` shape from `contracts` and produces a single static HTML string; it does not implement the `Tool` contract because it has no CLI-shaped command surface. Each language adapter (`lang-typescript`, `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp`) implements the `LanguageAdapter` contract. Note that `@opensip-tools/graph` carries its own internal `GraphLanguageAdapter` implementations (TypeScript, Python, Rust) under `packages/graph/engine/src/lang-*/` — those are unrelated siblings to the fitness lang packages at this layer; see [`60-subsystems/01-language-adapters.md`](/docs/opensip-tools/60-subsystems/01-language-adapters/).
 
 **Layer 4 — `@opensip-tools/checks-*`.** Six check packs: `checks-universal`, `checks-typescript`, `checks-python`, `checks-go`, `checks-java`, `checks-cpp`. Each pack depends on `fitness` (for `defineCheck`) and `core` (for `Signal`, errors, the language adapter type). Check packs do **not** depend on `cli` or `contracts` — they're the marketplace shape, designed to be installable from npm without dragging the CLI in.
 
 **Layer 5 — `@opensip-tools/cli`.** The composition root. Imports every first-party tool and language adapter, registers them, builds the Commander tree, runs the dispatcher. The only package that knows everything below it.
 
-That's it. Five layers, eighteen packages.
+That's it. Five layers, nineteen packages.
 
 ---
 
@@ -92,9 +92,10 @@ The layer rule — "dependencies flow up only" — is enforced by [dependency-cr
 // contracts imports only core.
 { name: 'contracts-imports-core-only', /* ... */ }
 
-// fitness / simulation cannot import cli (would create a cycle).
+// fitness / simulation / graph cannot import cli (would create a cycle).
 { name: 'fitness-no-cli',     from: { path: '^packages/fitness/' },    to: { path: '^@opensip-tools/cli($|/)' } }
 { name: 'simulation-no-cli',  from: { path: '^packages/simulation/' }, to: { path: '^@opensip-tools/cli($|/)' } }
+{ name: 'graph-no-cli',       from: { path: '^packages/graph/' },      to: { path: '^@opensip-tools/cli($|/)' } }
 
 // checks-* cannot reach into cli or contracts.
 { name: 'check-pack-no-cli', /* ... */ }
@@ -146,7 +147,7 @@ The trade-off: a *true* type-only cycle (which is a structural smell — usually
 
 ---
 
-## Why 18 packages and not 1
+## Why 19 packages and not 1
 
 A single mega-package was considered. It would compile faster, ship faster, and have a simpler `package.json`. We chose against it for three load-bearing reasons:
 
@@ -158,7 +159,7 @@ A check pack like `@opensip-tools/checks-python` has to be installable on its ow
 opensip-tools plugin add @opensip-tools/checks-python
 ```
 
-…and not pull in the JavaScript universe. With a single mega-package, every install pulls every check. With 18 packages, an install pulls only what's needed. (Today the bundled distribution still installs everything; tomorrow's tree-shaken or selectively-installed distribution doesn't have to.)
+…and not pull in the JavaScript universe. With a single mega-package, every install pulls every check. With 19 packages, an install pulls only what's needed. (Today the bundled distribution still installs everything; tomorrow's tree-shaken or selectively-installed distribution doesn't have to.)
 
 ### 2. The Tool contract's promise
 
@@ -166,15 +167,15 @@ The Tool contract says "any npm package can be a Tool." That promise only holds 
 
 ### 3. The layer rule needs to be visible
 
-A flat package can have any internal structure. With 18 packages, the layer is the directory structure: looking at `packages/` tells you the architecture in five seconds. If a contributor accidentally adds an upward edge, the build fails before the PR is even reviewed. The layer rule isn't aspiration — it's a wall.
+A flat package can have any internal structure. With 19 packages, the layer is the directory structure: looking at `packages/` tells you the architecture in five seconds. If a contributor accidentally adds an upward edge, the build fails before the PR is even reviewed. The layer rule isn't aspiration — it's a wall.
 
 ---
 
 ## What this shape costs
 
-Trade-offs are real. The 18-package layout is more expensive in three places:
+Trade-offs are real. The 19-package layout is more expensive in three places:
 
-- **More `package.json` files to maintain.** Version bumps span 17 files. We use `pnpm` workspace protocol (`workspace:*`) so internal deps are auto-linked, and a release script bumps all 17 in lockstep.
+- **More `package.json` files to maintain.** Version bumps span 19 publishable files (plus the private workspace-root `package.json` for tooling versions). We use `pnpm` workspace protocol (`workspace:*`) so internal deps are auto-linked, and a release script bumps all 19 in lockstep.
 - **More `tsconfig.json` files.** Each package has its own. Project references handle the build graph. The cost is configuration footprint, not build speed.
 - **A discovery cost when reading the codebase.** "Where does `Signal` live?" is one search now: `packages/core/src/types/signal.ts`. But "where does `defineCheck` live?" requires knowing the layer (`fitness`) and the framework subdir (`fitness/engine/src/framework/`). The package catalog ([`80-reference/01-package-catalog.md`](/docs/opensip-tools/80-reference/01-package-catalog/)) is the antidote.
 
@@ -195,14 +196,14 @@ Tracing the dependency arrows for the `no-console-log` check we followed in [`01
                                                        ▲
                                                        │ imports
                                                        │
-@opensip-tools/checks-typescript ─── imports ──────────┘
+@opensip-tools/checks-universal ─── imports ──────────┘
        │
-       │ exports `noConsoleLogCheck`
+       │ exports `noConsoleLog`
        ▼
    the CLI's loaded check registry, populated at startup
 ```
 
-The `cli` imports `fitness` to get the `fitnessTool` (Layer 5 → Layer 3). It also imports the bundled language adapters to register them (Layer 5 → Layer 3). It does **not** import `checks-typescript` directly — instead, the plugin loader walks `node_modules` at runtime and discovers any package whose name matches `@opensip-tools/checks-*`. The check pack imports `fitness` (for `defineCheck`) and `core` (for `Signal`), both lower layers. Every arrow points up.
+The `cli` imports `fitness` to get the `fitnessTool` (Layer 5 → Layer 3). It also imports the bundled language adapters to register them (Layer 5 → Layer 3). It does **not** import `checks-universal` directly — instead, the plugin loader walks `node_modules` at runtime and discovers any package whose name matches `@opensip-tools/checks-*`. The check pack imports `fitness` (for `defineCheck`) and `core` (for `Signal`), both lower layers. Every arrow points up.
 
 ---
 

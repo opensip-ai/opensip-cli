@@ -11,9 +11,9 @@
 
 import { describe, expect, it, beforeEach } from 'vitest';
 
-import { dashboardFiltersJs } from '../persistence/dashboard/code-paths/filters.js';
-import { dashboardPathUtilsJs } from '../persistence/dashboard/code-paths/path-utils.js';
-import { dashboardViewsRegistryJs } from '../persistence/dashboard/code-paths/views-registry.js';
+import { dashboardFiltersJs } from '../code-paths/filters.js';
+import { dashboardPathUtilsJs } from '../code-paths/path-utils.js';
+import { dashboardViewsRegistryJs } from '../code-paths/views-registry.js';
 
 interface Env {
   notifyViews: () => void;

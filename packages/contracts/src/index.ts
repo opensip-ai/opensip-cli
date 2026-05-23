@@ -5,7 +5,13 @@
  * depend on this package for:
  *   - CLI option / output / result types
  *   - Exit code constants and error suggestions
- *   - Session persistence (saveSession, loadSessions, dashboard generator)
+ *   - Session persistence (saveSession, loadSessions)
+ *
+ * Dashboard rendering moved to @opensip-tools/dashboard (Layer 3).
+ * contracts type-re-exports the GraphCatalog shape from there as part
+ * of the contract surface between the graph tool and the dashboard;
+ * that re-export is type-only (erased at compile time) so contracts
+ * keeps zero runtime dependency on dashboard.
  *
  * contracts depends only on @opensip-tools/core. Tools depend on
  * contracts. The CLI entry-point depends on contracts and on every
@@ -68,8 +74,10 @@ export type {
 } from './persistence/store.js';
 export { migrateLegacyStoredSession } from './persistence/store.js';
 
-// Dashboard HTML generator
-export { generateDashboardHtml } from './persistence/dashboard/index.js';
+// Graph catalog type surface. This is the contract surface between the
+// graph tool (which writes catalog.json) and the dashboard package
+// (which renders it). Lives in contracts because both producer and
+// consumer depend on the shape — contracts is the layer below both.
 export type {
   GraphCatalog,
   GraphFunctionOccurrence,
@@ -79,4 +87,4 @@ export type {
   GraphCallResolution,
   GraphCallConfidence,
   GraphVisibility,
-} from './persistence/dashboard/code-paths/types.js';
+} from './graph-catalog.js';

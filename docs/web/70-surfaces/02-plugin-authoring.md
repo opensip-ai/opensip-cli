@@ -1,6 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-15
+last_verified: 2026-05-22
+release: v1.3.x
 title: "Plugin authoring"
 audience: [plugin-authors]
 purpose: "Write your own check, recipe, scenario, check pack, or full Tool plugin. End-to-end."

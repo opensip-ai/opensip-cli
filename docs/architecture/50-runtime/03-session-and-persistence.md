@@ -9,7 +9,7 @@ source-files:
   - packages/core/src/lib/paths.ts
   - packages/core/src/lib/logger.ts
   - packages/contracts/src/persistence/store.ts
-  - packages/contracts/src/persistence/dashboard/
+  - packages/dashboard/src/
   - packages/fitness/engine/src/framework/parse-cache.ts
   - packages/fitness/engine/src/framework/file-cache.ts
 related-docs:
@@ -136,7 +136,7 @@ The `evt` field is the primary axis for filtering. Every event has a stable `evt
 
 The HTML dashboard writes a single self-contained file at `<project>/opensip-tools/.runtime/reports/latest.html` ([`packages/fitness/engine/src/cli/dashboard.ts:153`](../../../packages/fitness/engine/src/cli/dashboard.ts)). Each generation overwrites the previous file — the dashboard is "always show the most recent state", not a per-run archive.
 
-Dashboard JS, CSS, and panel modules live in [`packages/contracts/src/persistence/dashboard/`](../../../packages/contracts/src/persistence/dashboard/). The generator inlines all of them — JS via `<script type="module">`, CSS via `<style>`, session data via `<script type="application/json">` — so `latest.html` is one file you can email to a teammate. No CDN, no asset bundle, no server.
+Dashboard JS, CSS, and panel modules live in [`packages/dashboard/src/`](../../../packages/dashboard/src/). The generator inlines all of them — JS via `<script type="module">`, CSS via `<style>`, session data via `<script type="application/json">` — so `latest.html` is one file you can email to a teammate. No CDN, no asset bundle, no server.
 
 Per-run history lives in `sessions/`, not `reports/`. The dashboard inlines the most recent 20 session records (`loadSessions(20)` in [`packages/fitness/engine/src/cli/dashboard.ts`](../../../packages/fitness/engine/src/cli/dashboard.ts)) for its run-history view, but the HTML on disk is always the latest snapshot.
 

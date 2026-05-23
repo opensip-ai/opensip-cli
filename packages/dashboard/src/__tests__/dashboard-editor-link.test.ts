@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { dashboardEditorLinkJs } from '../persistence/dashboard/code-paths/editor-link.js';
+import { dashboardEditorLinkJs } from '../code-paths/editor-link.js';
 
 function loadEditorLink(protocol: string | null): (filePath: string, line: number) => string | null {
   const protoSrc = protocol === null

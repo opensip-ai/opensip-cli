@@ -1,6 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-15
+last_verified: 2026-05-22
+release: v1.3.x
 title: "Session and persistence"
 audience: [contributors]
 purpose: "What gets written to disk during and after a run. The runtime dir layout, session records, logs, reports, the cache."
@@ -8,7 +9,7 @@ source-files:
   - packages/core/src/lib/paths.ts
   - packages/core/src/lib/logger.ts
   - packages/contracts/src/persistence/store.ts
-  - packages/contracts/src/persistence/dashboard/
+  - packages/dashboard/src/
   - packages/fitness/engine/src/framework/parse-cache.ts
   - packages/fitness/engine/src/framework/file-cache.ts
 related-docs:
@@ -56,7 +57,7 @@ The dir is created lazily by whichever consumer needs a subpath first. `mkdirSyn
 
 ## Sessions
 
-A session is one record per `fit` or `sim` run. Stored at `<project>/opensip-tools/.runtime/sessions/<run-id>.json` (the persistence store uses a `{timestamp}-{tool}-{recipe}.json` filename internally; the run-id is embedded in the body).
+A session is one record per `fit`, `sim`, or `graph` run. Stored at `<project>/opensip-tools/.runtime/sessions/{timestamp}-{tool}-{recipe?}.json` ([`saveSession`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/contracts/src/persistence/store.ts) builds the filename; the body carries `id` (a UUID), `tool`, `timestamp`, and the rest of the `StoredSession` shape).
 
 ### Schema
 
@@ -121,7 +122,7 @@ The logger is in [`packages/core/src/lib/logger.ts`](https://github.com/opensip-
 
 Log levels are `error`, `warn`, `info`, `debug`. The default is `info`. `--debug` raises it to `debug`. `--quiet` does *not* affect log level — it suppresses the renderer's banner, not the structured logs.
 
-The log file persists until manually deleted. There's no rotation; that's the user's job. `sessions purge` deletes session records but leaves logs alone, by design — logs are useful for debugging *after* a session is no longer needed.
+Log files older than 7 days are auto-pruned every time `initLogFile(dir)` is called (i.e. on every CLI startup). Pruning is best-effort — a directory write that fails is logged and ignored. `sessions purge` deletes session records but leaves logs alone — logs are useful for debugging *after* a session is no longer needed, and the 7-day retention bounds the directory size automatically.
 
 ### Why JSON Lines
 
@@ -135,9 +136,9 @@ The `evt` field is the primary axis for filtering. Every event has a stable `evt
 
 The HTML dashboard writes a single self-contained file at `<project>/opensip-tools/.runtime/reports/latest.html` ([`packages/fitness/engine/src/cli/dashboard.ts:153`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/fitness/engine/src/cli/dashboard.ts)). Each generation overwrites the previous file — the dashboard is "always show the most recent state", not a per-run archive.
 
-Dashboard JS, CSS, and panel modules live in [`packages/contracts/src/persistence/dashboard/`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/contracts/src/persistence/dashboard/). The generator inlines all of them — JS via `<script type="module">`, CSS via `<style>`, session data via `<script type="application/json">` — so `latest.html` is one file you can email to a teammate. No CDN, no asset bundle, no server.
+Dashboard JS, CSS, and panel modules live in [`packages/dashboard/src/`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/dashboard/src/). The generator inlines all of them — JS via `<script type="module">`, CSS via `<style>`, session data via `<script type="application/json">` — so `latest.html` is one file you can email to a teammate. No CDN, no asset bundle, no server.
 
-Per-run history lives in `sessions/`, not `reports/`. The dashboard reads every session record to render its run-history view, but the HTML on disk is always the latest snapshot.
+Per-run history lives in `sessions/`, not `reports/`. The dashboard inlines the most recent 20 session records (`loadSessions(20)` in [`packages/fitness/engine/src/cli/dashboard.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/fitness/engine/src/cli/dashboard.ts)) for its run-history view, but the HTML on disk is always the latest snapshot.
 
 The dashboard auto-open hook is wired into the Tool action handler. After a run, if (a) `--open` was requested or auto-open is configured, (b) output isn't `--json`, and (c) stdout is a TTY, the CLI launches the user's default browser onto the report URL. Logic in [`packages/cli/src/open-dashboard.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/cli/src/open-dashboard.ts).
 
@@ -177,7 +178,7 @@ Some teams keep it in `.runtime/` (gitignored) and trust the gate to track regre
 
 Both are valid. The default path is in `.runtime/` because the most common workflow is "save once locally, compare against it on the next CI run on the same branch." Teams with a stable main-branch reference move it out.
 
-The `clear` command ([`packages/cli/src/commands/clear.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/cli/src/commands/clear.ts)) only deletes session JSON files under `.runtime/sessions/`. It does not touch reports, logs, cache, plugins, or the baseline — those have to be removed manually if you want them gone.
+`opensip-tools sessions purge` (implemented by [`packages/cli/src/commands/clear.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/cli/src/commands/clear.ts) — wired into the `sessions` Commander group, not exposed as its own top-level command) only deletes session JSON files under `.runtime/sessions/`. It does not touch reports, logs, cache, plugins, or the baseline — those have to be removed manually if you want them gone.
 
 ---
 

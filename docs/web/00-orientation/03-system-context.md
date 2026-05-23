@@ -1,6 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-15
+last_verified: 2026-05-22
+release: v1.3.x
 title: "System context"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "Where opensip-tools sits between you, your codebase, CI, and OpenSIP Cloud — and what it touches on disk."
@@ -39,6 +40,7 @@ opensip-tools is a CLI that runs against your project. This doc draws the box ar
    │  opensip-tools.config.yml ◀──┤                                    │
    │  opensip-tools/fit/  ◀──────┤                                     │
    │  opensip-tools/sim/  ◀──────┤                                     │
+   │  (graph reads source) ◀─────┤                                     │
    │                              │                                    │
    │                       ┌──────┴────────────────┐                   │
    │                       │  opensip-tools (bin)  │                   │
@@ -46,11 +48,12 @@ opensip-tools is a CLI that runs against your project. This doc draws the box ar
    │                          │         │                              │
    │                          │ writes  │ writes                       │
    │                          ▼         ▼                              │
-   │  opensip-tools/.runtime/sessions/   stdout (table | JSON | SARIF) │
-   │  opensip-tools/.runtime/reports/    stderr (logs)                 │
-   │  opensip-tools/.runtime/logs/       exit code (0 | 1 | 2)         │
+   │  opensip-tools/.runtime/sessions/    stdout (table | JSON | SARIF)│
+   │  opensip-tools/.runtime/reports/     stderr (logs)                │
+   │  opensip-tools/.runtime/logs/        exit code (0|1|2|3|4)        │
    │  opensip-tools/.runtime/cache/                                    │
-   │  opensip-tools/.runtime/baseline.sarif                            │
+   │  opensip-tools/.runtime/cache/graph/ (catalog.json + baseline.json│
+   │  opensip-tools/.runtime/baseline.sarif (fit gate)                 │
    └──────────────────────────────────────────────────────────────────┘
                           │                              │
                           │                              │
@@ -73,7 +76,7 @@ There are exactly four actors:
 
 1. **You.** The engineer running `opensip-tools fit` from a terminal. You read the rendered table, you see the exit code, you click the dashboard link.
 2. **CI.** GitHub Actions, GitLab CI, Buildkite, or whatever — runs `opensip-tools fit` non-interactively and consumes the exit code and (optionally) the SARIF or JSON output.
-3. **The dashboard browser.** When `--open` is passed (or auto-open conditions are met), the CLI launches the user's default browser onto the local HTML report at `<project>/opensip-tools/.runtime/reports/<run-id>/index.html`. No server, just a static file.
+3. **The dashboard browser.** When `--open` is passed (or auto-open conditions are met), the CLI launches the user's default browser onto the local HTML report at `<project>/opensip-tools/.runtime/reports/latest.html` (a single rolling file overwritten on each generation). No server, just a static file.
 4. **OpenSIP Cloud (optional).** If `~/.opensip-tools/config.yml` carries an API key, the CLI POSTs the run summary to [opensip.ai](https://opensip.ai) for centralized reporting. Without the key, this side is dead — the cloud is fully optional.
 
 There is no fifth actor. Specifically: no daemon, no database, no message queue, no scheduled job, no agent. opensip-tools runs to completion and exits.
@@ -104,14 +107,15 @@ Gitignored (`opensip-tools init` adds the entry to `.gitignore` for you):
 
 ```
 <project>/opensip-tools/.runtime/
-├── sessions/<run-id>.json        ← per-run record
-├── reports/<run-id>/index.html   ← rendered HTML report
-├── logs/<run-id>.jsonl           ← structured log stream
-├── cache/                        ← AST + glob caches (rebuilt automatically)
-├── baseline.sarif                ← gate baseline (the one you do commit if you commit any)
+├── sessions/{timestamp}-{tool}-{recipe?}.json   ← per-run records (max 100, oldest auto-pruned)
+├── reports/latest.html                          ← single rolling HTML report, overwritten each run
+├── logs/<YYYY-MM-DD>.jsonl                      ← one log file per local day, all runs append
+├── cache/                                       ← AST + glob caches (rebuilt automatically)
+│   └── graph/                                   ← graph catalog + baseline
+├── baseline.sarif                               ← fit gate baseline (the one you do commit if you commit any)
 └── plugins/
-    ├── fit/node_modules/         ← project-pinned fit plugins
-    └── sim/node_modules/         ← project-pinned sim plugins
+    ├── fit/node_modules/                        ← project-pinned fit plugins
+    └── sim/node_modules/                        ← project-pinned sim plugins
 ```
 
 The split rule is simple: anything you author lives in `opensip-tools/`; anything the tool generates lives in `opensip-tools/.runtime/`. The runtime dir is rebuildable from the source side, so wiping `.runtime/` is always safe.
@@ -140,10 +144,12 @@ opensip-tools follows the conventional Unix exit-code shape, defined in [`packag
 | Code | Meaning |
 |---|---|
 | `0` | All checks passed (or nothing ran successfully). |
-| `1` | At least one check failed — violations found. |
-| `2` | An unrecoverable error occurred (config invalid, plugin failed to load, etc.). |
+| `1` | At least one check failed — violations found, or `--gate-compare` detected a regression. |
+| `2` | An unrecoverable configuration error (config invalid, plugin failed to load, baseline missing). |
+| `3` | `--check <slug>` did not match any registered check. |
+| `4` | `--report-to` upload failed (network error or non-2xx). |
 
-CI integrations should treat `0` as green, `1` as red-but-actionable (display the violations), and `2` as red-and-broken (display the error and check the run logs).
+CI integrations should treat `0` as green, `1` as red-but-actionable (display the violations), and `2`/`3`/`4` as red-and-broken (display the error and check the run logs). Codes 3 and 4 are reserved for the specific failure modes described above; the broad mental model stays "0 green, 1 expected red, anything else unexpected."
 
 The `--gate-compare` flow uses the same exit codes: `0` if no new violations vs. baseline, `1` if any new violation, `2` if the baseline is missing or unreadable.
 
@@ -153,7 +159,7 @@ The `--gate-compare` flow uses the same exit codes: `0` if no new violations vs.
 
 `stdout` carries the human-readable output (tables) or the machine-readable output (JSON / SARIF), gated by `--json` and `--sarif`. **Mixing the two is forbidden:** if `--json` is set, every renderer emits JSON or nothing. This rule exists so CI tooling can `opensip-tools fit --json | jq …` without hitting interleaved table fragments.
 
-`stderr` carries logs — structured JSON lines tagged with `evt`, `module`, and a correlation id (`run_<base32>`). The same lines are mirrored to `<project>/opensip-tools/.runtime/logs/<run-id>.jsonl` so you can grep a session after the fact without scrollback gymnastics.
+`stderr` carries logs — structured JSON lines tagged with `evt`, `module`, and a correlation id (`runId`, format `RUN_<ulid>`). The same lines are mirrored to `<project>/opensip-tools/.runtime/logs/<YYYY-MM-DD>.jsonl` (one log file per local day, shared across runs); filter by `.runId` with `jq` to isolate one run.
 
 The exit code is your gate. The stdout shape is your data. The stderr stream is your debugger.
 
@@ -161,7 +167,7 @@ The exit code is your gate. The stdout shape is your data. The stderr stream is 
 
 ## What the binary needs to run
 
-A working Node 20+ runtime, a project root, and read access to the source files. That's it.
+A working Node.js 22+ runtime, a project root, and read access to the source files. That's it. (`packages/cli/package.json` declares `engines.node >= 22`.)
 
 Specifically, it does **not** need:
 

@@ -1,6 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-15
+last_verified: 2026-05-22
+release: v1.3.x
 title: "Vocabulary"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "The terms used everywhere in opensip-tools. Read this once before going deeper."
@@ -20,7 +21,7 @@ related-docs:
 ---
 # Vocabulary
 
-The codebase has eleven load-bearing terms. If you know what each of these is, you can read any source file in the repo without guessing. They're listed in a deliberate order — earlier terms support later ones.
+The codebase has twelve load-bearing terms. If you know what each of these is, you can read any source file in the repo without guessing. They're listed in a deliberate order — earlier terms support later ones.
 
 If you're skimming for one definition, [Ctrl-F]. If you're reading top-to-bottom, expect each entry to be ~3-6 sentences with a source pointer.
 
@@ -28,15 +29,15 @@ If you're skimming for one definition, [Ctrl-F]. If you're reading top-to-bottom
 
 ## Tool
 
-A **Tool** is a kernel-level plugin that contributes one or more CLI subcommands. `fit` is a Tool. `sim` is a Tool. Anything you write that mounts under the `opensip-tools` binary is a Tool.
+A **Tool** is a kernel-level plugin that contributes one or more CLI subcommands. `fit` is a Tool. `sim` is a Tool. `graph` is a Tool. Anything you write that mounts under the `opensip-tools` binary is a Tool.
 
 The contract lives in [`packages/core/src/tools/types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/core/src/tools/types.ts). Each Tool exports `metadata` (id, version, description), a `commands[]` array (just names + descriptions, used for `--help`), an optional `initialize()` hook, and a `register(cli)` method that wires its actual Commander commands. The CLI is a generic dispatcher — it walks `defaultToolRegistry` and asks each Tool to register itself.
 
-First-party Tools (`fit`, `sim`) are imported statically by the CLI. Third-party Tools are discovered by walking `node_modules` for any package whose `package.json` declares `opensipTools.kind === 'tool'`. See [`../10-mental-model/02-tool-plugin-model.md`](/docs/opensip-tools/10-mental-model/02-tool-plugin-model/).
+First-party Tools (`fit`, `sim`, `graph`) are imported statically by the CLI. Third-party Tools are discovered by walking `node_modules` for any package whose `package.json` declares `opensipTools.kind === 'tool'`. See [`../10-mental-model/02-tool-plugin-model.md`](/docs/opensip-tools/10-mental-model/02-tool-plugin-model/).
 
 ## Check
 
-A **check** is a single, named, deterministic rule. "No `console.log` in production code." "Cyclomatic complexity ≤ 25." "Every `defineCheck` declares a category." A check produces zero or more `Signal`s when run.
+A **check** is a single, named, deterministic rule. "No `console.log` in production code." "Cyclomatic complexity ≤ 25." "Every `defineCheck` declares at least one tag." A check produces zero or more `Signal`s when run.
 
 Checks are created with `defineCheck()` from [`packages/fitness/engine/src/framework/define-check.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/fitness/engine/src/framework/define-check.ts), which returns a `Check` object ([`packages/fitness/engine/src/framework/check-types.ts:45`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/fitness/engine/src/framework/check-types.ts)). A check's config carries an `id` (UUID, stable across renames), a `slug` (human-readable identifier), `tags`, a `description`, and one of three execution modes:
 
@@ -71,7 +72,7 @@ Scenarios are defined by tool packs analogous to check packs ([`packages/simulat
 
 A **signal** is the canonical violation record. Every check produces `Signal[]`. Every renderer (table, JSON, SARIF, dashboard) consumes `Signal[]`. The shape lives in [`packages/core/src/types/signal.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/core/src/types/signal.ts).
 
-A signal carries `id`, `source` (`'fitness'` for fit, `'simulation'` for sim), `provider`, `severity` (`critical | high | medium | low`), `category` (`security`, `quality`, `architecture`, `testing`, `resilience`, `documentation`, `warning`, `performance`, `error`), `ruleId` (`fit:no-console-log`), `message`, optional `suggestion`, `filePath`, optional `line`/`column`, and a free-form `metadata` map.
+A signal carries `id`, `source` (`'fitness'` for fit, `'simulation'` for sim, `'graph'` for graph; the field is typed `string` so plugins can use any namespace), `provider`, `severity` (`critical | high | medium | low`), `category` (`security`, `quality`, `architecture`, `testing`, `resilience`, `documentation`, `warning`, `performance`, `error`; also typed `SignalCategory | string` so plugins can extend), `ruleId` (`fit:no-console-log`, `graph:orphan-subtree`, etc.), `message`, optional `suggestion`, `filePath`, optional `line`/`column`, and a free-form `metadata` map.
 
 The kernel exports `createSignal(input)` from [`packages/core/src/types/signal.ts:53`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/core/src/types/signal.ts) — that's how every check produces signals.
 
@@ -118,9 +119,9 @@ The `opensip-tools plugin` command surface (`add`/`remove`/`list`/`sync`) manage
 
 ## Session
 
-A **session** is one run of `opensip-tools fit` (or `sim`). Each session writes a JSON artifact under `<project>/opensip-tools/.runtime/sessions/`, plus a structured log under `.runtime/logs/`, plus a rendered HTML report under `.runtime/reports/`.
+A **session** is one run of `opensip-tools fit`, `sim`, or `graph`. Each session writes a JSON artifact under `<project>/opensip-tools/.runtime/sessions/`, plus a structured log under `.runtime/logs/`, plus a rendered HTML report under `.runtime/reports/`.
 
-Sessions are addressed by a prefixed ID (`run_<base32>`). The CLI's `--run-id` flag and the logger's correlation field both use this id. The `sessions list` command browses past sessions; `sessions purge` deletes them.
+Each session record is keyed by a UUID (`session.id`, generated via `randomUUID()`); the on-disk filename is `{timestamp}-{tool}-{recipe?}.json` (timestamp-prefixed so newest sorts last). The logger uses a separate per-process correlation id of the form `RUN_<ulid>` (`generatePrefixedId('run')`); it appears in every log entry as `runId`. The `sessions list` command browses past sessions; `sessions purge` deletes them.
 
 The runtime dir is gitignored — sessions are local artifacts, not source. The path resolver lives in [`packages/core/src/lib/paths.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/core/src/lib/paths.ts).
 

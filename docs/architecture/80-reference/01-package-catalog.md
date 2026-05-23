@@ -35,7 +35,7 @@ The contract layer between Tools and the runner. Output shapes, exit codes, pers
 
 | Package | Path | Role | Key exports |
 |---|---|---|---|
-| `@opensip-tools/contracts` | `packages/contracts/` | Shared contract types — `CliOutput`/`CommandResult` shapes, exit codes, session persistence, dashboard generator | `CliOutput`, `CheckOutput`, `FindingOutput`, `CommandResult`, `EXIT_CODES`, `getErrorSuggestion`, `configurePersistencePaths`, `StoredSession`, `generateDashboardHtml`, `GraphCatalog` |
+| `@opensip-tools/contracts` | `packages/contracts/` | Shared contract types — `CliOutput`/`CommandResult` shapes, exit codes, session persistence, `GraphCatalog` type surface | `CliOutput`, `CheckOutput`, `FindingOutput`, `CommandResult`, `EXIT_CODES`, `getErrorSuggestion`, `configurePersistencePaths`, `StoredSession`, `GraphCatalog`, `GraphFunctionOccurrence` |
 
 ## Layer 3 — tools and language adapters
 
@@ -48,6 +48,12 @@ Peer packages at the same layer. Tools implement the `Tool` contract; language a
 | `@opensip-tools/fitness` | `packages/fitness/engine/` | Fitness check engine, `defineCheck`, `defineRecipe`, gate, SARIF builder | `defineCheck`, `defineRecipe`, `FitnessRecipeService`, `defaultRecipeRegistry`, `getCheckConfig`, `executeFit`, `loadSignalersConfig`, `fitnessTool`, `saveBaseline`, `compareToBaseline`, `buildSarifLog`, `reportToCloud`, `openDashboard` |
 | `@opensip-tools/simulation` | `packages/simulation/engine/` | Simulation engine, four scenario kinds | `defineLoadScenario`, `defineChaosScenario`, `defineInvariantScenario`, `defineFixEvaluationScenario`, `defineSimulationRecipe`, `simulationTool`, `defaultSimulationRecipeRegistry`, `SCENARIO_KINDS` |
 | `@opensip-tools/graph` | `packages/graph/engine/` | Static call-graph + dead-end analysis, six-stage staged pipeline (discover → inventory → edges → indexes → rules → render). Language-pluggable as of v1.3.0: ships TypeScript, Python, and Rust adapters as internal subdirs (`lang-typescript/`, `lang-python/`, `lang-rust/`), all implementing the `GraphLanguageAdapter` contract under `lang-adapter/`. Imports SARIF helpers from `@opensip-tools/fitness` (peer-layer dep, DEC-3) | Public barrel exports `graphTool`, `runGraph`, `GRAPH_STAGES`, `MemoryPressureError`, `HEAP_TARGETS`, plus type-only exports `Catalog`, `FunctionOccurrence`, `CallEdge`, `Indexes`, `Rule`, `Renderer`, etc. The `GraphLanguageAdapter` contract and the `registerAdapter` / `pickAdapter` registry are NOT in the public barrel today — first-party adapters live inside this package; third-party adapters that need them must import the source paths under the monorepo (or wait for a future barrel re-export). |
+
+### HTML dashboard
+
+| Package | Path | Role | Key exports |
+|---|---|---|---|
+| `@opensip-tools/dashboard` | `packages/dashboard/` | Self-contained HTML report generator — renders the four-tab dashboard (Overview, Fitness, Simulation, Code Paths) from session data, check/recipe catalogs, and an optional graph catalog into a single static HTML string with all CSS and JS inlined. Consumed by `fitness/cli/dashboard.ts` (which writes `latest.html`). Depends on core + contracts only | `generateDashboardHtml` |
 
 ### Language adapters
 
@@ -94,7 +100,7 @@ Imports every layer below. The published binary.
 
 Last verified at v1.3.x (workspace at v1.3.1) against:
 
-- `packages/` directory listing (18 publishable packages — 1 kernel + 1 contracts + 6 lang + 1 fitness + 1 simulation + 1 graph + 6 check packs + 1 cli). v1.3.0 added Python and Rust **graph** adapters as internal subdirs of `@opensip-tools/graph` (`lang-python/`, `lang-rust/`); the published-package count is unchanged. The fitness `lang-python` / `lang-rust` packages at Layer 3 are unrelated siblings — see [`60-subsystems/01-language-adapters.md`](../60-subsystems/01-language-adapters.md) for the `LanguageAdapter` vs. `GraphLanguageAdapter` distinction.
-- Each package's `package.json` `name`, `description`, and `version` field (all 18 currently `1.3.1`), read directly.
+- `packages/` directory listing (19 publishable packages — 1 kernel + 1 contracts + 6 lang + 1 fitness + 1 simulation + 1 graph + 1 dashboard + 6 check packs + 1 cli). v1.3.0 added Python and Rust **graph** adapters as internal subdirs of `@opensip-tools/graph` (`lang-python/`, `lang-rust/`); the v1.3.x dashboard extraction (Wave 3 Chain C) split `generateDashboardHtml` out of `@opensip-tools/contracts` into its own Layer 3 peer. The fitness `lang-python` / `lang-rust` packages at Layer 3 are unrelated siblings — see [`60-subsystems/01-language-adapters.md`](../60-subsystems/01-language-adapters.md) for the `LanguageAdapter` vs. `GraphLanguageAdapter` distinction.
+- Each package's `package.json` `name`, `description`, and `version` field (all 19 currently `1.3.1`), read directly.
 - The dep-cruiser config for layer rules.
 - The `@opensip-tools/graph` package barrel ([`packages/graph/engine/src/index.ts`](../../../packages/graph/engine/src/index.ts)) — the `GraphLanguageAdapter` contract and `registerAdapter` / `pickAdapter` registry are NOT re-exported from the barrel today; they live under `packages/graph/engine/src/lang-adapter/` and are accessible via deep monorepo paths only.

@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { dashboardSccJs } from '../persistence/dashboard/code-paths/scc.js';
+import { dashboardSccJs } from '../code-paths/scc.js';
 
 interface Indexes {
   byBodyHash: Map<string, unknown>;

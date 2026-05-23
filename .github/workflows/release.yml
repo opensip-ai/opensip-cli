@@ -74,6 +74,7 @@ jobs:
             core \
             contracts \
             lang-typescript lang-rust lang-python lang-go lang-java lang-cpp \
+            dashboard \
             fitness simulation graph \
             checks-universal checks-typescript checks-python checks-go checks-java checks-cpp \
             cli ; do
@@ -91,7 +92,7 @@ jobs:
 
       # Pack every workspace package into a tarball. `pnpm pack` resolves
       # workspace:* deps into concrete versions, which `npm publish` then
-      # uploads. We pack all 18 up front so the publish step can run
+      # uploads. We pack all 19 up front so the publish step can run
       # against a known-good set of tarballs in dependency order.
       - name: Pack all workspace packages (resolves workspace:*)
         run: |
@@ -107,6 +108,8 @@ jobs:
           pnpm --filter @opensip-tools/lang-go          pack --pack-destination /tmp/tarballs
           pnpm --filter @opensip-tools/lang-java        pack --pack-destination /tmp/tarballs
           pnpm --filter @opensip-tools/lang-cpp         pack --pack-destination /tmp/tarballs
+          # Layer 3 — dashboard (depends on core + contracts only; consumed by fitness)
+          pnpm --filter @opensip-tools/dashboard        pack --pack-destination /tmp/tarballs
           # Layer 3 — tools
           pnpm --filter @opensip-tools/fitness          pack --pack-destination /tmp/tarballs
           pnpm --filter @opensip-tools/simulation       pack --pack-destination /tmp/tarballs
@@ -161,7 +164,9 @@ jobs:
           publish_if_new lang-go
           publish_if_new lang-java
           publish_if_new lang-cpp
-          # Layer 3 — tools (depend on core, contracts, lang-typescript)
+          # Layer 3 — dashboard (depends on core + contracts only; published before fitness)
+          publish_if_new dashboard
+          # Layer 3 — tools (depend on core, contracts, lang-typescript, dashboard)
           publish_if_new fitness
           publish_if_new simulation
           publish_if_new graph

@@ -9,8 +9,8 @@
 
 import { describe, expect, it, beforeEach } from 'vitest';
 
-import { dashboardHelpDrawerJs } from '../persistence/dashboard/code-paths/help-drawer.js';
-import { dashboardViewsRegistryJs } from '../persistence/dashboard/code-paths/views-registry.js';
+import { dashboardHelpDrawerJs } from '../code-paths/help-drawer.js';
+import { dashboardViewsRegistryJs } from '../code-paths/views-registry.js';
 
 interface Env {
   openHelpDrawer: (id: string) => void;

@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-18
-release: v1.3.0
+last_verified: 2026-05-22
+release: v1.3.x
 title: "Rules and gating (graph)"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "The five graph rules, what each one detects, and how the save/compare gate flow integrates with CI."
@@ -21,7 +21,6 @@ related-docs:
   - ./03-adding-a-language.md
   - ../20-the-fit-loop/04-output-gate-sarif.md
   - ../70-surfaces/01-cli-command-tree.md
-  - ../../plans/10-graph-language-pluggability.md
 ---
 # Rules and gating (graph)
 
@@ -106,7 +105,7 @@ The five rules above don't know how the entry point list was built — they cons
 
 Rules don't know which adapter built the catalog — they consume `Catalog` + `Indexes` only — but each `CallEdge` carries a `confidence` field (`'high' | 'medium' | 'low'`) that reflects how the adapter resolved it. The TypeScript adapter uses the symbol table for direct calls and emits `'high'` confidence; the tree-sitter Python and Rust adapters resolve by name and emit `'medium'` (or `'low'` when multiple catalog entries share a simple name). The same rule on a Python catalog therefore produces a noisier output than on a TypeScript catalog — same logic, different input quality.
 
-The fidelity matrix from [plan 10 §6](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/docs/plans/10-graph-language-pluggability.md):
+The fidelity matrix:
 
 | Rule | TypeScript adapter | Tree-sitter adapter (Python, Rust) |
 |---|---|---|
@@ -191,4 +190,3 @@ Exit code 4 is reserved for `--report-to` upload failure (network error or non-2
 - **[`01-stages-and-catalog.md`](/docs/opensip-tools/40-the-graph-loop/01-stages-and-catalog/)** — the pipeline and catalog that feeds these rules.
 - **[`70-surfaces/01-cli-command-tree.md#graph`](/docs/opensip-tools/70-surfaces/01-cli-command-tree/)** — every flag, with exit-code semantics.
 - **[`70-surfaces/03-dashboard.md`](/docs/opensip-tools/70-surfaces/03-dashboard/)** — the interactive Code Paths view, which renders graph results alongside fit's.
-- **[`../plans/00-graph-performance-improvements.md`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/docs/plans/00-graph-performance-improvements.md)** — perf-plan history covering the rule and pipeline evolution since v1.1.

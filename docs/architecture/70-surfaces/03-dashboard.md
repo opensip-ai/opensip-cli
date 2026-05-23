@@ -6,13 +6,13 @@ title: "Dashboard"
 audience: [users, contributors]
 purpose: "The HTML report — what it shows, when it opens, how it's generated, and where it lives."
 source-files:
-  - packages/contracts/src/persistence/dashboard/generator.ts
-  - packages/contracts/src/persistence/dashboard/index.ts
-  - packages/contracts/src/persistence/dashboard/overview.ts
-  - packages/contracts/src/persistence/dashboard/checks.ts
-  - packages/contracts/src/persistence/dashboard/sessions.ts
-  - packages/contracts/src/persistence/dashboard/code-paths.ts
-  - packages/contracts/src/persistence/dashboard/code-paths/
+  - packages/dashboard/src/generator.ts
+  - packages/dashboard/src/index.ts
+  - packages/dashboard/src/overview.ts
+  - packages/dashboard/src/checks.ts
+  - packages/dashboard/src/sessions.ts
+  - packages/dashboard/src/code-paths.ts
+  - packages/dashboard/src/code-paths/
   - packages/cli/src/open-dashboard.ts
   - packages/fitness/engine/src/cli/dashboard.ts
 related-docs:
@@ -53,7 +53,7 @@ The HTML file is always written. If any guard skips the browser launch, the user
 
 ## What it shows
 
-Four top-level tabs (`Overview`, `Fitness`, `Simulation`, `Code Paths`). The Fitness and Simulation tabs each carry three subtabs (`Overview`, `Catalog`, `Recipes`) — the per-tool `Overview` subtab shows that tool's session list. Every panel module lives under [`packages/contracts/src/persistence/dashboard/`](../../../packages/contracts/src/persistence/dashboard/); the top-of-page tool-tab switcher is wired by [`tool-tabs.ts`](../../../packages/contracts/src/persistence/dashboard/tool-tabs.ts).
+Four top-level tabs (`Overview`, `Fitness`, `Simulation`, `Code Paths`). The Fitness and Simulation tabs each carry three subtabs (`Overview`, `Catalog`, `Recipes`) — the per-tool `Overview` subtab shows that tool's session list. Every panel module lives under [`packages/dashboard/src/`](../../../packages/dashboard/src/); the top-of-page tool-tab switcher is wired by [`tool-tabs.ts`](../../../packages/dashboard/src/tool-tabs.ts).
 
 ### Overview
 
@@ -64,7 +64,7 @@ The default landing panel. Shows:
 - The breakdown by category (security, quality, architecture, etc.).
 - Quick links into the other panels.
 
-Source: [`packages/contracts/src/persistence/dashboard/overview.ts`](../../../packages/contracts/src/persistence/dashboard/overview.ts).
+Source: [`packages/dashboard/src/overview.ts`](../../../packages/dashboard/src/overview.ts).
 
 ### Sessions list (per-tool Overview subtab)
 
@@ -72,7 +72,7 @@ A list of every past run, sorted reverse-chronological. Click into one to see it
 
 Per-run detail expands into a tree: check → file → finding. Each finding shows the rule id, severity, line, and (when present) the suggestion text.
 
-Source: [`packages/contracts/src/persistence/dashboard/sessions.ts`](../../../packages/contracts/src/persistence/dashboard/sessions.ts). Rendered inside each per-tool tab's Overview subtab; the tab switcher is in [`tool-tabs.ts`](../../../packages/contracts/src/persistence/dashboard/tool-tabs.ts).
+Source: [`packages/dashboard/src/sessions.ts`](../../../packages/dashboard/src/sessions.ts). Rendered inside each per-tool tab's Overview subtab; the tab switcher is in [`tool-tabs.ts`](../../../packages/dashboard/src/tool-tabs.ts).
 
 ### Catalog (per-tool Catalog subtab)
 
@@ -84,13 +84,13 @@ Every check that was registered for the current project, with per-check stats:
 
 Filterable by tag, by source pack, by pass-rate. Useful for spotting the noisiest checks (high failure rate) and the dormant ones (haven't run in weeks — maybe a recipe drift).
 
-Source: [`packages/contracts/src/persistence/dashboard/checks.ts`](../../../packages/contracts/src/persistence/dashboard/checks.ts).
+Source: [`packages/dashboard/src/checks.ts`](../../../packages/dashboard/src/checks.ts).
 
 ### Recipes (per-tool Recipes subtab)
 
 The configured recipes, with per-recipe stats. Same shape as the catalog but a level up: how often each recipe has run, its pass rate, its average duration.
 
-Source: [`packages/contracts/src/persistence/dashboard/recipes.ts`](../../../packages/contracts/src/persistence/dashboard/recipes.ts).
+Source: [`packages/dashboard/src/recipes.ts`](../../../packages/dashboard/src/recipes.ts).
 
 ### Code Paths panel
 
@@ -112,20 +112,20 @@ The **Universal Function Card** is the cross-cutting drill-down: every clickable
 
 Filter chips above the view tabs apply to every view: package multi-select, kind multi-select, and a production/test toggle (default: production-only).
 
-Source: [`packages/contracts/src/persistence/dashboard/code-paths.ts`](../../../packages/contracts/src/persistence/dashboard/code-paths.ts) and the per-view files under [`packages/contracts/src/persistence/dashboard/code-paths/`](../../../packages/contracts/src/persistence/dashboard/code-paths/).
+Source: [`packages/dashboard/src/code-paths.ts`](../../../packages/dashboard/src/code-paths.ts) and the per-view files under [`packages/dashboard/src/code-paths/`](../../../packages/dashboard/src/code-paths/).
 
 ### Tool tabs
 
-The dashboard supports both fit and sim runs. The top-of-page tab switcher (Overview / Fitness / Simulation / Code Paths) filters the panels by tool. Sim runs are sparser today; the panel shapes are the same. Source: [`tool-tabs.ts`](../../../packages/contracts/src/persistence/dashboard/tool-tabs.ts).
+The dashboard supports both fit and sim runs. The top-of-page tab switcher (Overview / Fitness / Simulation / Code Paths) filters the panels by tool. Sim runs are sparser today; the panel shapes are the same. Source: [`tool-tabs.ts`](../../../packages/dashboard/src/tool-tabs.ts).
 
 ---
 
 ## How it's generated
 
-Static HTML. The generator ([`packages/contracts/src/persistence/dashboard/generator.ts`](../../../packages/contracts/src/persistence/dashboard/generator.ts)) assembles:
+Static HTML. The generator ([`packages/dashboard/src/generator.ts`](../../../packages/dashboard/src/generator.ts)) assembles:
 
 1. The base HTML scaffold (head, body shell, the panel containers).
-2. The CSS, inlined via `<style>` (from [`css.ts`](../../../packages/contracts/src/persistence/dashboard/css.ts)).
+2. The CSS, inlined via `<style>` (from [`css.ts`](../../../packages/dashboard/src/css.ts)).
 3. Session and catalog data (checks, recipes), inlined directly into the panel `<script type="module">` blocks as `const sessions = …` / `const catalog = …` literals — there's no separate `<script type="application/json">` for these.
 4. The graph catalog (v0.3 Code Paths panel) when present, embedded as `<script type="application/json" id="graph-catalog">…</script>` and consumed by the Code Paths panel JS at init time. This one *does* use the `application/json` idiom because it's loaded across module boundaries.
 5. The JS panels, inlined via `<script type="module">…</script>` (from each panel's `dashboard*Js()` function).

@@ -9,13 +9,13 @@ import { join } from 'node:path';
 import {
   loadSessions,
   getReportsDir,
-  generateDashboardHtml,
   type CheckCatalogEntry,
   type GraphCatalog,
   type RecipeCatalogEntry,
   type DashboardResult,
 } from '@opensip-tools/contracts';
 import { logger, resolveProjectPaths } from '@opensip-tools/core';
+import { generateDashboardHtml } from '@opensip-tools/dashboard';
 
 import { defaultRegistry } from '../framework/registry.js';
 import { defaultRecipeRegistry } from '../recipes/registry.js';

@@ -1,6 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-15
+last_verified: 2026-05-22
+release: v1.3.x
 title: "Doc conventions"
 audience: [contributors]
 purpose: "Voice, frontmatter, diagrams, and verification trail conventions for the architecture doc set."
@@ -166,7 +167,7 @@ This is the "what would I need to re-check to keep this doc current?" answer. Wh
 
 ## When to write a new doc
 
-Most contributions don't need a new doc. The existing 31 cover the architecture; new shape is rare.
+Most contributions don't need a new doc. The existing 32 numbered docs (00–90) cover the architecture; new shape is rare.
 
 You probably need a new doc if:
 

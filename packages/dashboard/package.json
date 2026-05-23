@@ -1,12 +1,12 @@
 {
-  "name": "@opensip-tools/fitness",
+  "name": "@opensip-tools/dashboard",
   "version": "1.3.1",
   "license": "MIT",
-  "description": "Fitness checks engine for OpenSIP Tools",
+  "description": "Self-contained HTML dashboard generator for OpenSIP Tools — renders the fit/sim/graph report from session data and graph catalogs",
   "repository": {
     "type": "git",
     "url": "https://github.com/opensip-ai/opensip-tools.git",
-    "directory": "packages/fitness/engine"
+    "directory": "packages/dashboard"
   },
   "homepage": "https://github.com/opensip-ai/opensip-tools",
   "bugs": {
@@ -18,9 +18,6 @@
   "exports": {
     ".": "./dist/index.js"
   },
-  "opensipTools": {
-    "kind": "tool"
-  },
   "scripts": {
     "build": "tsc",
     "test": "vitest run --passWithNoTests",
@@ -29,19 +26,12 @@
   },
   "dependencies": {
     "@opensip-tools/contracts": "workspace:*",
-    "@opensip-tools/core": "workspace:*",
-    "@opensip-tools/dashboard": "workspace:*",
-    "commander": "^13.1.0",
-    "glob": "^13.0.0",
-    "js-yaml": "^4.1.0",
-    "minimatch": "^10.0.0",
-    "typescript": "~5.7.0",
-    "zod": "^3.24.0"
+    "@opensip-tools/core": "workspace:*"
   },
   "devDependencies": {
-    "@opensip-tools/lang-typescript": "workspace:*",
-    "@types/js-yaml": "^4.0.0",
     "@types/node": "^22.0.0",
+    "jsdom": "^29.1.1",
+    "typescript": "~5.7.0",
     "vitest": "^2.1.0"
   }
 }

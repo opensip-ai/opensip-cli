@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { dashboardSearchJs } from '../persistence/dashboard/code-paths/search.js';
+import { dashboardSearchJs } from '../code-paths/search.js';
 
 interface Match { name: string; score: number }
 

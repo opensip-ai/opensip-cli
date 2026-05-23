@@ -7,14 +7,14 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { dashboardFiltersJs } from '../persistence/dashboard/code-paths/filters.js';
-import { dashboardFunctionRowJs } from '../persistence/dashboard/code-paths/function-row.js';
-import { dashboardIndexesJs } from '../persistence/dashboard/code-paths/indexes.js';
-import { dashboardPathUtilsJs } from '../persistence/dashboard/code-paths/path-utils.js';
-import { dashboardViewWideJs } from '../persistence/dashboard/code-paths/view-wide.js';
-import { dashboardViewsRegistryJs } from '../persistence/dashboard/code-paths/views-registry.js';
+import { dashboardFiltersJs } from '../code-paths/filters.js';
+import { dashboardFunctionRowJs } from '../code-paths/function-row.js';
+import { dashboardIndexesJs } from '../code-paths/indexes.js';
+import { dashboardPathUtilsJs } from '../code-paths/path-utils.js';
+import { dashboardViewWideJs } from '../code-paths/view-wide.js';
+import { dashboardViewsRegistryJs } from '../code-paths/views-registry.js';
 
-import type { GraphCatalog, GraphFunctionOccurrence, GraphParam } from '../persistence/dashboard/code-paths/types.js';
+import type { GraphCatalog, GraphFunctionOccurrence, GraphParam } from '@opensip-tools/contracts';
 
 interface Env {
   views: { id: string; render: (c: HTMLElement, cat: GraphCatalog, idx: unknown, fs: unknown) => void }[];

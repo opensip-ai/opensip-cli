@@ -11,7 +11,7 @@
 
 import { describe, expect, it, beforeEach } from 'vitest';
 
-import { dashboardFunctionRowJs } from '../persistence/dashboard/code-paths/function-row.js';
+import { dashboardFunctionRowJs } from '../code-paths/function-row.js';
 
 type RenderFn = (
   container: HTMLElement,

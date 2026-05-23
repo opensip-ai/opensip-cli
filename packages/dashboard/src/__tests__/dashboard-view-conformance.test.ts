@@ -12,7 +12,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { dashboardCodePathsJs } from '../persistence/dashboard/code-paths.js';
+import { dashboardCodePathsJs } from '../code-paths.js';
 
 const expectedIds = new Set(['hot', 'big', 'wide', 'coupling', 'untested', 'sccs', 'search']);
 
