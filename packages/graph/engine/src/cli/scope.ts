@@ -80,6 +80,7 @@ export function resolvePackageScope(input: ScopeResolutionInput): ScopeResolutio
     );
   }
   const matched = matches[0];
+  /* v8 ignore next 5 */
   if (matched === undefined) {
     throw new ConfigurationError(
       `--package '${arg}': no matching package directory with a tsconfig.json under ${root}.`,
@@ -110,6 +111,7 @@ function findPackageByName(root: string, name: string, maxDepth: number): readon
     try {
       entries = readdirSync(dir);
     } catch {
+      /* v8 ignore next */
       return;
     }
     for (const entry of entries) {
@@ -158,6 +160,7 @@ export function discoverWorkspacePackages(cwd: string): readonly string[] {
     try {
       entries = readdirSync(dir);
     } catch {
+      /* v8 ignore next */
       return;
     }
     for (const entry of entries) {

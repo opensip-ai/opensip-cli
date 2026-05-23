@@ -27,6 +27,7 @@ export const visitClassStaticBlock: InventoryVisitor<ts.ClassStaticBlockDeclarat
   const enclosingClass = ctx.enclosingClass;
   const qualified = enclosingClass
     ? `${ctx.filePathProjectRel.replace(/\.tsx?$/, '')}.${enclosingClass}.<static-init>`
+    /* v8 ignore next */
     : `${ctx.filePathProjectRel.replace(/\.tsx?$/, '')}.<static-init>`;
   const digest = digestFunctionBody(node, ctx.sourceFile);
   return {

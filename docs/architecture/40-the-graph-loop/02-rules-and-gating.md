@@ -131,7 +131,7 @@ opensip-tools graph --gate-save
 opensip-tools graph --gate-compare
 ```
 
-By default the baseline lives at `<project>/opensip-tools/.runtime/cache/graph/baseline.json` (gitignored). Override with `--baseline <path>` if you want to commit it.
+v2: the baseline lives in the project's SQLite store (`<project>/opensip-tools/.runtime/datastore.sqlite`, gitignored), in the `graph_baseline_signals` table. There is exactly one baseline per project; the v1 `--baseline <path>` flag is gone (see [v2.0.0 CHANGELOG](../../../CHANGELOG.md)).
 
 ### Signal fingerprints
 
@@ -152,16 +152,13 @@ A line-shift-invariant fingerprint (the way fit's gate works) is on the v0.3 roa
 |---|---|---|
 | No new fingerprints | 0 | The diff is empty or only removes things. Safe to merge. |
 | One or more new fingerprints | 1 | Something new appeared. The CI gate fails. |
-| Baseline file missing | 2 | Configuration error — run `--gate-save` first. |
-| Baseline file malformed | 2 | Configuration error — corrupt baseline. |
+| Baseline missing | 2 | Configuration error — run `--gate-save` first. |
 
 This intentionally **allows fingerprint removal**. Cleaning up findings doesn't fail the gate; it just shrinks the baseline at the next save. Use the lifecycle: `--gate-compare` on every PR; periodically re-run `--gate-save` and commit the smaller baseline as the cleanup progresses.
 
 ### How this differs from `fit`'s gate
 
-`fit`'s gate (see [`20-the-fit-loop/04-output-gate-sarif.md`](../20-the-fit-loop/04-output-gate-sarif.md)) is fundamentally the same shape — save fingerprints, compare later, fail on new — but it uses a SARIF baseline, hashes findings on `(filePath, ruleId, message)` (no line number), and stores the baseline at `<project>/opensip-tools/.runtime/baseline.sarif`. Graph's gate uses a smaller JSON baseline at `<project>/opensip-tools/.runtime/cache/graph/baseline.json`, includes line numbers in the fingerprint, and lives parallel to the AST cache.
-
-Both gates atomic-write through a tmp + rename. They're independent — running one doesn't affect the other.
+`fit`'s gate (see [`20-the-fit-loop/04-output-gate-sarif.md`](../20-the-fit-loop/04-output-gate-sarif.md)) is fundamentally the same shape — save fingerprints, compare later, fail on new — but it uses a SARIF baseline and hashes findings on `(filePath, ruleId, message)` (no line number). Graph's gate uses a fingerprint-set baseline that includes line numbers. v2: both baselines live in the project's SQLite store (`fit_baseline` row and `graph_baseline_signals` rows respectively), atomic via SQLite transactions. They're independent — running one doesn't affect the other.
 
 ---
 

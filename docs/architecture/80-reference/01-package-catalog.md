@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-22
-release: v1.3.x
+last_verified: 2026-05-18
+release: v1.3.0
 title: "Package catalog"
 audience: [contributors, plugin-authors]
 purpose: "Flat reference of every package in the monorepo: name, path, layer, one-line role, key exports. Lookup-only; the conceptual layer narrative lives in 10-mental-model/03-modular-monolith.md."
@@ -29,13 +29,16 @@ Pure types, registries, errors, IDs, logger, paths. No tool-specific knowledge.
 |---|---|---|---|
 | `@opensip-tools/core` | `packages/core/` | Kernel — language adapters, plugin loader, errors, logger, IDs, retry, project config, Tool registry | `Tool`, `ToolRegistry`, `defaultToolRegistry`, `LanguageAdapter`, `defaultLanguageRegistry`, `Signal`, `createSignal`, `discoverPlugins`, `discoverToolPackages`, `resolveProjectPaths`, `resolveUserPaths`, `logger`, `ToolError`, `ValidationError` |
 
-## Layer 2 — shared contract types
+## Layer 2 — datastore and shared contract types
 
-The contract layer between Tools and the runner. Output shapes, exit codes, persistence helpers consumed by every tool. Imports `core` only.
+`@opensip-tools/datastore` is the SQLite + Drizzle persistence kernel; it sits between `core` and `contracts` and depends only on `core`. Tools own their domain schemas (sessions in contracts; baseline/catalog in graph; baseline in fitness). Adding a new tool means adding a new schema module — datastore is paradigm-agnostic infrastructure.
+
+`@opensip-tools/contracts` defines the contract layer between Tools and the runner. Output shapes, exit codes, persistence helpers, dashboard generator. Imports `core` and `datastore` only.
 
 | Package | Path | Role | Key exports |
 |---|---|---|---|
-| `@opensip-tools/contracts` | `packages/contracts/` | Shared contract types — `CliOutput`/`CommandResult` shapes, exit codes, session persistence, `GraphCatalog` type surface | `CliOutput`, `CheckOutput`, `FindingOutput`, `CommandResult`, `EXIT_CODES`, `getErrorSuggestion`, `configurePersistencePaths`, `StoredSession`, `GraphCatalog`, `GraphFunctionOccurrence` |
+| `@opensip-tools/datastore` | `packages/datastore/` | SQLite + Drizzle persistence kernel — `DataStore` interface, factory, in-memory + on-disk backends, workspace migration store under `migrations/` | `DataStore`, `DataStoreFactory`, `DataStoreOpenOptions`, `DataStoreMigrationError` |
+| `@opensip-tools/contracts` | `packages/contracts/` | Shared contract types — `CliOutput`/`CommandResult` shapes, exit codes, session persistence, dashboard generator | `CliOutput`, `CheckOutput`, `FindingOutput`, `CommandResult`, `EXIT_CODES`, `getErrorSuggestion`, `SessionRepo`, `StoredSession`, `generateDashboardHtml`, `GraphCatalog` |
 
 ## Layer 3 — tools and language adapters
 
@@ -47,13 +50,7 @@ Peer packages at the same layer. Tools implement the `Tool` contract; language a
 |---|---|---|---|
 | `@opensip-tools/fitness` | `packages/fitness/engine/` | Fitness check engine, `defineCheck`, `defineRecipe`, gate, SARIF builder | `defineCheck`, `defineRecipe`, `FitnessRecipeService`, `defaultRecipeRegistry`, `getCheckConfig`, `executeFit`, `loadSignalersConfig`, `fitnessTool`, `saveBaseline`, `compareToBaseline`, `buildSarifLog`, `reportToCloud`, `openDashboard` |
 | `@opensip-tools/simulation` | `packages/simulation/engine/` | Simulation engine, four scenario kinds | `defineLoadScenario`, `defineChaosScenario`, `defineInvariantScenario`, `defineFixEvaluationScenario`, `defineSimulationRecipe`, `simulationTool`, `defaultSimulationRecipeRegistry`, `SCENARIO_KINDS` |
-| `@opensip-tools/graph` | `packages/graph/engine/` | Static call-graph + dead-end analysis, six-stage staged pipeline (discover → inventory → edges → indexes → rules → render). Language-pluggable as of v1.3.0: ships TypeScript, Python, and Rust adapters as internal subdirs (`lang-typescript/`, `lang-python/`, `lang-rust/`), all implementing the `GraphLanguageAdapter` contract under `lang-adapter/`. Imports SARIF helpers from `@opensip-tools/fitness` (peer-layer dep, DEC-3) | Public barrel exports `graphTool`, `runGraph`, `GRAPH_STAGES`, `MemoryPressureError`, `HEAP_TARGETS`, plus type-only exports `Catalog`, `FunctionOccurrence`, `CallEdge`, `Indexes`, `Rule`, `Renderer`, etc. The `GraphLanguageAdapter` contract and the `registerAdapter` / `pickAdapter` registry are NOT in the public barrel today — first-party adapters live inside this package; third-party adapters that need them must import the source paths under the monorepo (or wait for a future barrel re-export). |
-
-### HTML dashboard
-
-| Package | Path | Role | Key exports |
-|---|---|---|---|
-| `@opensip-tools/dashboard` | `packages/dashboard/` | Self-contained HTML report generator — renders the four-tab dashboard (Overview, Fitness, Simulation, Code Paths) from session data, check/recipe catalogs, and an optional graph catalog into a single static HTML string with all CSS and JS inlined. Consumed by `fitness/cli/dashboard.ts` (which writes `latest.html`). Depends on core + contracts only | `generateDashboardHtml` |
+| `@opensip-tools/graph` | `packages/graph/engine/` | Static call-graph + dead-end analysis, six-stage staged pipeline (discover → inventory → edges → indexes → rules → render). Language-pluggable as of v1.3.0: ships TypeScript, Python, and Rust adapters as internal subdirs (`lang-typescript/`, `lang-python/`, `lang-rust/`), all implementing the `GraphLanguageAdapter` contract under `lang-adapter/`. Imports SARIF helpers from `@opensip-tools/fitness` (peer-layer dep, DEC-3) | `graphTool`, `Catalog`, `FunctionOccurrence`, `CallEdge`, `Indexes`, `Rule`, `Renderer`, `GraphLanguageAdapter`, `registerAdapter`, `pickAdapter` |
 
 ### Language adapters
 
@@ -98,9 +95,8 @@ Imports every layer below. The published binary.
 
 ## Verification trail
 
-Last verified at v1.3.x (workspace at v1.3.1) against:
+Last verified at v1.3.0 against:
 
-- `packages/` directory listing (19 publishable packages — 1 kernel + 1 contracts + 6 lang + 1 fitness + 1 simulation + 1 graph + 1 dashboard + 6 check packs + 1 cli). v1.3.0 added Python and Rust **graph** adapters as internal subdirs of `@opensip-tools/graph` (`lang-python/`, `lang-rust/`); the v1.3.x dashboard extraction (Wave 3 Chain C) split `generateDashboardHtml` out of `@opensip-tools/contracts` into its own Layer 3 peer. The fitness `lang-python` / `lang-rust` packages at Layer 3 are unrelated siblings — see [`60-subsystems/01-language-adapters.md`](../60-subsystems/01-language-adapters.md) for the `LanguageAdapter` vs. `GraphLanguageAdapter` distinction.
-- Each package's `package.json` `name`, `description`, and `version` field (all 19 currently `1.3.1`), read directly.
+- `packages/` directory listing (18 packages — 1 kernel + 1 contracts + 6 lang + 1 fitness + 1 simulation + 1 graph + 6 check packs + 1 cli). v1.3.0 added Python and Rust **graph** adapters as internal subdirs of `@opensip-tools/graph` (`lang-python/`, `lang-rust/`); the published-package count is unchanged. The fitness `lang-python` / `lang-rust` packages at Layer 3 are unrelated siblings — see [`60-subsystems/01-language-adapters.md`](../60-subsystems/01-language-adapters.md) for the `LanguageAdapter` vs. `GraphLanguageAdapter` distinction.
+- Each package's `package.json` `description` and `name` field, read directly.
 - The dep-cruiser config for layer rules.
-- The `@opensip-tools/graph` package barrel ([`packages/graph/engine/src/index.ts`](../../../packages/graph/engine/src/index.ts)) — the `GraphLanguageAdapter` contract and `registerAdapter` / `pickAdapter` registry are NOT re-exported from the barrel today; they live under `packages/graph/engine/src/lang-adapter/` and are accessible via deep monorepo paths only.

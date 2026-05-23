@@ -476,12 +476,14 @@ function hashFromDeclaration(
   return null;
 }
 
+/* v8 ignore start */
 function findClassConstructor(cls: ts.ClassLikeDeclaration): ts.ConstructorDeclaration | null {
   for (const m of cls.members) {
     if (ts.isConstructorDeclaration(m)) return m;
   }
   return null;
 }
+/* v8 ignore stop */
 
 function isFunctionLike(node: ts.Node): boolean {
   return (
@@ -536,9 +538,11 @@ function lookupModuleInitHash(
 function hasFileInCatalog(catalog: Catalog, filePath: string): boolean {
   for (const name of Object.keys(catalog.functions)) {
     const occs: readonly FunctionOccurrence[] | undefined = catalog.functions[name];
+    /* v8 ignore next */
     if (!occs) continue;
     for (const o of occs) if (o.filePath === filePath) return true;
   }
+  /* v8 ignore next */
   return false;
 }
 

@@ -12,7 +12,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach } from 'vitest';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 // __dirname = packages/cli/src/__tests__/ → CLI binary is at packages/cli/dist/index.js
@@ -63,6 +63,15 @@ function runIn(cwd: string, ...args: string[]): { stdout: string; exitCode: numb
 // ---------------------------------------------------------------------------
 
 describe('CLI e2e', () => {
+  // v2: each fixture's .runtime/datastore.sqlite is gitignored and may
+  // carry stale schema state from previous test runs (or from
+  // mid-migration development). Wipe before every test so migrations
+  // apply cleanly against a fresh DB. Cheap; tests already round-trip
+  // through the CLI's own writes.
+  beforeEach(() => {
+    rmSync(join(FIXTURE, 'opensip-tools', '.runtime'), { recursive: true, force: true });
+  });
+
   it('--help shows usage information', () => {
     const { stdout, exitCode } = run('--help');
     expect(exitCode).toBe(0);

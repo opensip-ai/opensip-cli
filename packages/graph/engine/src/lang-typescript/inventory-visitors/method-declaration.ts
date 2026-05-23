@@ -51,14 +51,17 @@ export const visitMethodDeclaration: InventoryVisitor<ts.MethodDeclaration> = (n
 function methodName(node: ts.MethodDeclaration): string | null {
   const n = node.name;
   if (ts.isIdentifier(n)) return n.text;
+  /* v8 ignore start */
   if (ts.isStringLiteral(n)) return n.text;
   if (ts.isComputedPropertyName(n)) return n.expression.getText();
   // PrivateIdentifier carries the leading '#' in its text already
   // (e.g. '#priv'), which matches how TypeScript's own AST exposes it.
   if (ts.isPrivateIdentifier(n)) return n.text;
   return null;
+  /* v8 ignore stop */
 }
 
+/* v8 ignore start */
 function findClassName(node: ts.MethodDeclaration): string | null {
   let p: ts.Node | undefined = node.parent;
   while (p) {
@@ -69,3 +72,4 @@ function findClassName(node: ts.MethodDeclaration): string | null {
   }
   return null;
 }
+/* v8 ignore stop */

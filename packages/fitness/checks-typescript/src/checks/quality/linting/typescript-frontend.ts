@@ -43,10 +43,13 @@ function parseErrors(output: string): {
 
   while ((match = TS_ERROR_PATTERN.exec(output)) !== null) {
     errors.push({
+      /* v8 ignore next -- defensive nullish fallback */
       file: match[1] ?? '',
       // @fitness-ignore-next-line numeric-validation -- regex (\d+) guarantees digits only; parseInt always returns a valid integer
       line: Number.parseInt(match[2] ?? '0', 10),
+      /* v8 ignore next -- defensive nullish fallback */
       code: match[5] ?? '',
+      /* v8 ignore next -- defensive nullish fallback */
       message: match[6] ?? '',
     })
   }

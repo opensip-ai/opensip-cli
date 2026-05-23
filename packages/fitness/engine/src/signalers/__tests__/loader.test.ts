@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -95,5 +95,34 @@ describe('loadSignalersConfig', () => {
     writeFileSync(join(testDir, 'opensip-tools.config.yml'), '');
     const cfg = loadSignalersConfig(testDir);
     expect(cfg.targets).toEqual({});
+  });
+
+  it('throws ValidationError when an explicit path points to a non-existent file', () => {
+    // resolveProjectConfigPath throws when --config points at a missing
+    // file. This validates that error path propagates cleanly.
+    expect(() =>
+      loadSignalersConfig(testDir, join(testDir, 'does-not-exist.yml')),
+    ).toThrow();
+  });
+
+  it('throws ValidationError when the resolved path is a directory (readFileSync EISDIR)', () => {
+    const dirAsConfig = join(testDir, 'opensip-tools.config.yml');
+    mkdirSync(dirAsConfig, { recursive: true });
+    expect(() => loadSignalersConfig(testDir)).toThrow();
+  });
+
+  it('treats explicit null section values as default empty objects', () => {
+    // Exercises the section() preprocess branch: v != null is preserved
+    // verbatim. Counterpart to "treats null YAML as empty object" — that
+    // test handles the nullish branch; this one covers the truthy branch.
+    writeFileSync(
+      join(testDir, 'opensip-tools.config.yml'),
+      `targets: {}
+fitness:
+  failOnErrors: 5
+`,
+    );
+    const cfg = loadSignalersConfig(testDir);
+    expect(cfg.fitness.failOnErrors).toBe(5);
   });
 });

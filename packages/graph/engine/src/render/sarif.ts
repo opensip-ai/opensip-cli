@@ -16,4 +16,4 @@ export function renderSarif(output: CliOutput): string {
   return JSON.stringify(buildSarifLog(output), null, 2);
 }
 
-export { chunkSarifRuns, reportToCloud } from '@opensip-tools/fitness';
+export { reportToCloud } from '@opensip-tools/fitness';

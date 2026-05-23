@@ -26,6 +26,7 @@ export const tsconfigExtendsValidation = defineCheck({
 
     for (const filePath of tsconfigPaths) {
       const content = await files.read(filePath)
+      /* v8 ignore next -- defensive guard */
       if (!content) continue
 
       let parsed: Record<string, unknown>

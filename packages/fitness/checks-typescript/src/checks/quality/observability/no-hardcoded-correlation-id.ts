@@ -20,6 +20,7 @@ function findHardcodedCorrelationIds(content: string, filePath: string): CheckVi
   let inTemplateLiteral = false
 
   for (const [i, line] of lines.entries()) {
+    /* v8 ignore next -- defensive guard */
     if (!line) continue
 
     const backtickCount = countUnescapedBackticks(line)

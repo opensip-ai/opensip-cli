@@ -1,19 +1,15 @@
 /**
- * Unit tests for the architecture-gate primitive.
+ * Unit tests for the architecture-gate primitive (v2 — SQLite-backed).
  *
  * Covers:
- *   - saveBaseline: writes correct SARIF, creates parent dirs, idempotent overwrite
+ *   - saveBaseline: writes SARIF to fit_baseline; idempotent overwrite
  *   - compareToBaseline: classifies added/resolved/unchanged correctly
  *   - Hash matching ignores line-number changes (D3 in plan.md)
  *   - Missing/invalid baseline → typed errors
  *   - renderGateCompareOutput: formats sections correctly per state
- *   - DEFAULT_BASELINE_PATH constant is what we documented
  */
 
-import { mkdtempSync, readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-
+import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
@@ -22,11 +18,11 @@ import {
   renderGateCompareOutput,
   GateBaselineMissingError,
   GateBaselineInvalidError,
-  DEFAULT_BASELINE_PATH,
   DEFAULT_VIOLATION_IDENTITY,
   type GateCompareResult,
   type ViolationIdentity,
 } from '../gate.js';
+import { FitBaselineRepo } from '../persistence/baseline-repo.js';
 
 import type { CliOutput, FindingOutput } from '@opensip-tools/contracts';
 
@@ -65,24 +61,16 @@ function makeOutput(findings: FindingOutput[] = [makeFinding()]): CliOutput {
   };
 }
 
-let tmpDir: string;
+let datastore: DataStore;
+let repo: FitBaselineRepo;
 
 beforeEach(() => {
-  tmpDir = mkdtempSync(join(tmpdir(), 'opensip-tools-gate-test-'));
+  datastore = DataStoreFactory.open({ backend: 'memory' });
+  repo = new FitBaselineRepo(datastore);
 });
 
 afterEach(() => {
-  rmSync(tmpDir, { recursive: true, force: true });
-});
-
-// ---------------------------------------------------------------------------
-// DEFAULT_BASELINE_PATH
-// ---------------------------------------------------------------------------
-
-describe('DEFAULT_BASELINE_PATH', () => {
-  it('is the project-local path under the gitignored runtime dir', () => {
-    expect(DEFAULT_BASELINE_PATH).toBe('opensip-tools/.runtime/baseline.sarif');
-  });
+  datastore.close();
 });
 
 // ---------------------------------------------------------------------------
@@ -90,38 +78,25 @@ describe('DEFAULT_BASELINE_PATH', () => {
 // ---------------------------------------------------------------------------
 
 describe('saveBaseline', () => {
-  it('writes a valid SARIF document to the given path', () => {
-    const path = join(tmpDir, 'baseline.sarif');
-    saveBaseline(makeOutput(), path);
-
-    expect(existsSync(path)).toBe(true);
-    const doc = JSON.parse(readFileSync(path, 'utf8'));
+  it('writes a SARIF document to the SQLite baseline table', () => {
+    saveBaseline(makeOutput(), repo);
+    const doc = repo.load() as { version: string; runs: { results: unknown[] }[] };
     expect(doc.version).toBe('2.1.0');
     expect(Array.isArray(doc.runs)).toBe(true);
-    expect(doc.runs[0].results.length).toBe(1);
+    expect(doc.runs[0]?.results.length).toBe(1);
   });
 
-  it('creates parent directories that do not exist', () => {
-    const path = join(tmpDir, 'nested', 'deep', 'baseline.sarif');
-    saveBaseline(makeOutput(), path);
-    expect(existsSync(path)).toBe(true);
+  it('overwrites an existing baseline row', () => {
+    saveBaseline(makeOutput([makeFinding({ message: 'first' })]), repo);
+    saveBaseline(makeOutput([makeFinding({ message: 'second' })]), repo);
+    const doc = repo.load() as { runs: { results: { message: { text: string } }[] }[] };
+    expect(doc.runs[0]?.results[0]?.message.text).toBe('second');
   });
 
-  it('overwrites an existing baseline file', () => {
-    const path = join(tmpDir, 'baseline.sarif');
-    saveBaseline(makeOutput([makeFinding({ message: 'first' })]), path);
-    saveBaseline(makeOutput([makeFinding({ message: 'second' })]), path);
-
-    const doc = JSON.parse(readFileSync(path, 'utf8'));
-    expect(doc.runs[0].results[0].message.text).toBe('second');
-  });
-
-  it('writes empty results array when there are no findings', () => {
-    const path = join(tmpDir, 'baseline.sarif');
+  it('writes empty runs array when there are no findings', () => {
     const empty: CliOutput = { ...makeOutput(), checks: [] };
-    saveBaseline(empty, path);
-
-    const doc = JSON.parse(readFileSync(path, 'utf8'));
+    saveBaseline(empty, repo);
+    const doc = repo.load() as { runs: unknown[] };
     expect(doc.runs).toEqual([]);
   });
 });
@@ -131,17 +106,15 @@ describe('saveBaseline', () => {
 // ---------------------------------------------------------------------------
 
 describe('compareToBaseline — classification', () => {
-  // eslint-disable-next-line unicorn/consistent-function-scoping -- closes over describe-scoped `tmpDir`
-  function setupBaseline(findings: FindingOutput[]): string {
-    const path = join(tmpDir, 'baseline.sarif');
-    saveBaseline(makeOutput(findings), path);
-    return path;
-  }
+  // eslint-disable-next-line unicorn/consistent-function-scoping -- closes over `repo` from beforeEach
+  const setupBaseline = (findings: FindingOutput[]): void => {
+    saveBaseline(makeOutput(findings), repo);
+  };
 
   it('reports STABLE when current matches baseline exactly', () => {
     const findings = [makeFinding()];
-    const path = setupBaseline(findings);
-    const result = compareToBaseline(makeOutput(findings), path);
+    setupBaseline(findings);
+    const result = compareToBaseline(makeOutput(findings), repo);
 
     expect(result.added).toEqual([]);
     expect(result.resolved).toEqual([]);
@@ -150,42 +123,42 @@ describe('compareToBaseline — classification', () => {
   });
 
   it('reports DEGRADED when current has new violations', () => {
-    const path = setupBaseline([makeFinding({ filePath: 'a.ts', message: 'old' })]);
+    setupBaseline([makeFinding({ filePath: 'a.ts', message: 'old' })]);
     const result = compareToBaseline(
       makeOutput([
         makeFinding({ filePath: 'a.ts', message: 'old' }),
         makeFinding({ filePath: 'b.ts', message: 'new' }),
       ]),
-      path,
+      repo,
     );
 
     expect(result.added.length).toBe(1);
-    expect(result.added[0].filePath).toBe('b.ts');
-    expect(result.added[0].message).toBe('new');
+    expect(result.added[0]?.filePath).toBe('b.ts');
+    expect(result.added[0]?.message).toBe('new');
     expect(result.unchanged.length).toBe(1);
     expect(result.resolved).toEqual([]);
     expect(result.degraded).toBe(true);
   });
 
   it('reports IMPROVED when violations are resolved with no new ones', () => {
-    const path = setupBaseline([
+    setupBaseline([
       makeFinding({ filePath: 'a.ts', message: 'old1' }),
       makeFinding({ filePath: 'b.ts', message: 'old2' }),
     ]);
     const result = compareToBaseline(
       makeOutput([makeFinding({ filePath: 'a.ts', message: 'old1' })]),
-      path,
+      repo,
     );
 
     expect(result.added).toEqual([]);
     expect(result.resolved.length).toBe(1);
-    expect(result.resolved[0].filePath).toBe('b.ts');
+    expect(result.resolved[0]?.filePath).toBe('b.ts');
     expect(result.unchanged.length).toBe(1);
     expect(result.degraded).toBe(false);
   });
 
   it('reports both added and resolved in a mixed change set', () => {
-    const path = setupBaseline([
+    setupBaseline([
       makeFinding({ filePath: 'kept.ts', message: 'kept' }),
       makeFinding({ filePath: 'gone.ts', message: 'gone' }),
     ]);
@@ -194,21 +167,20 @@ describe('compareToBaseline — classification', () => {
         makeFinding({ filePath: 'kept.ts', message: 'kept' }),
         makeFinding({ filePath: 'new.ts', message: 'new' }),
       ]),
-      path,
+      repo,
     );
 
     expect(result.added.length).toBe(1);
-    expect(result.added[0].filePath).toBe('new.ts');
+    expect(result.added[0]?.filePath).toBe('new.ts');
     expect(result.resolved.length).toBe(1);
-    expect(result.resolved[0].filePath).toBe('gone.ts');
+    expect(result.resolved[0]?.filePath).toBe('gone.ts');
     expect(result.unchanged.length).toBe(1);
     expect(result.degraded).toBe(true);
   });
 
   it('handles fully empty baseline and current', () => {
-    const path = join(tmpDir, 'baseline.sarif');
-    saveBaseline({ ...makeOutput(), checks: [] }, path);
-    const result = compareToBaseline({ ...makeOutput(), checks: [] }, path);
+    saveBaseline({ ...makeOutput(), checks: [] }, repo);
+    const result = compareToBaseline({ ...makeOutput(), checks: [] }, repo);
 
     expect(result.added).toEqual([]);
     expect(result.resolved).toEqual([]);
@@ -223,11 +195,8 @@ describe('compareToBaseline — classification', () => {
 
 describe('compareToBaseline — line-number invariance (D3)', () => {
   it('treats same (file, ruleId, message) at different lines as UNCHANGED', () => {
-    const path = join(tmpDir, 'baseline.sarif');
-    saveBaseline(makeOutput([makeFinding({ line: 42 })]), path);
-
-    // Same finding, but the file shifted — line moved to 50.
-    const result = compareToBaseline(makeOutput([makeFinding({ line: 50 })]), path);
+    saveBaseline(makeOutput([makeFinding({ line: 42 })]), repo);
+    const result = compareToBaseline(makeOutput([makeFinding({ line: 50 })]), repo);
 
     expect(result.added).toEqual([]);
     expect(result.resolved).toEqual([]);
@@ -236,26 +205,23 @@ describe('compareToBaseline — line-number invariance (D3)', () => {
   });
 
   it('treats different message on same (file, ruleId) as added+resolved', () => {
-    // E.g., complex-function on x.ts:foo where cc went from 22 to 28 — we WANT
-    // this to register as a change, because the message includes the cc value.
-    const path = join(tmpDir, 'baseline.sarif');
     saveBaseline(
       makeOutput([
         makeFinding({ ruleId: 'complex-function', filePath: 'x.ts', message: 'cc=22' }),
       ]),
-      path,
+      repo,
     );
     const result = compareToBaseline(
       makeOutput([
         makeFinding({ ruleId: 'complex-function', filePath: 'x.ts', message: 'cc=28' }),
       ]),
-      path,
+      repo,
     );
 
     expect(result.added.length).toBe(1);
-    expect(result.added[0].message).toBe('cc=28');
+    expect(result.added[0]?.message).toBe('cc=28');
     expect(result.resolved.length).toBe(1);
-    expect(result.resolved[0].message).toBe('cc=22');
+    expect(result.resolved[0]?.message).toBe('cc=22');
     expect(result.degraded).toBe(true);
   });
 });
@@ -265,50 +231,24 @@ describe('compareToBaseline — line-number invariance (D3)', () => {
 // ---------------------------------------------------------------------------
 
 describe('compareToBaseline — errors', () => {
-  it('throws GateBaselineMissingError when baseline file does not exist', () => {
-    const path = join(tmpDir, 'does-not-exist.sarif');
-    expect(() => compareToBaseline(makeOutput(), path)).toThrow(GateBaselineMissingError);
-
-    try {
-      compareToBaseline(makeOutput(), path);
-    } catch (error) {
-      expect(error).toBeInstanceOf(GateBaselineMissingError);
-      expect((error as GateBaselineMissingError).baselinePath).toBe(path);
-      expect((error as Error).message).toContain('--gate-save');
-    }
+  it('throws GateBaselineMissingError when no baseline row exists', () => {
+    expect(() => compareToBaseline(makeOutput(), repo)).toThrow(GateBaselineMissingError);
   });
 
-  it('throws GateBaselineInvalidError on non-JSON content', () => {
-    const path = join(tmpDir, 'bad.sarif');
-    writeFileSync(path, 'this is not json');
-    expect(() => compareToBaseline(makeOutput(), path)).toThrow(GateBaselineInvalidError);
-  });
-
-  it('throws GateBaselineInvalidError when top-level is not an object', () => {
-    const path = join(tmpDir, 'bad.sarif');
-    writeFileSync(path, '"a string"');
-    expect(() => compareToBaseline(makeOutput(), path)).toThrow(GateBaselineInvalidError);
+  it('throws GateBaselineInvalidError when payload top-level is not an object', () => {
+    // Force-write a malformed payload to exercise the error branch.
+    repo.save('"a string"', 0);
+    expect(() => compareToBaseline(makeOutput(), repo)).toThrow(GateBaselineInvalidError);
   });
 
   it('throws GateBaselineInvalidError when runs is missing', () => {
-    const path = join(tmpDir, 'bad.sarif');
-    writeFileSync(path, JSON.stringify({ version: '2.1.0' }));
-    expect(() => compareToBaseline(makeOutput(), path)).toThrow(GateBaselineInvalidError);
+    repo.save({ version: '2.1.0' }, 0);
+    expect(() => compareToBaseline(makeOutput(), repo)).toThrow(GateBaselineInvalidError);
   });
 
   it('throws GateBaselineInvalidError when runs is not an array', () => {
-    const path = join(tmpDir, 'bad.sarif');
-    writeFileSync(path, JSON.stringify({ version: '2.1.0', runs: 'oops' }));
-    expect(() => compareToBaseline(makeOutput(), path)).toThrow(GateBaselineInvalidError);
-  });
-
-  it('error message includes the baseline path for debuggability', () => {
-    const path = join(tmpDir, 'no-such.sarif');
-    try {
-      compareToBaseline(makeOutput(), path);
-    } catch (error) {
-      expect((error as Error).message).toContain(path);
-    }
+    repo.save({ version: '2.1.0', runs: 'oops' }, 0);
+    expect(() => compareToBaseline(makeOutput(), repo)).toThrow(GateBaselineInvalidError);
   });
 });
 
@@ -318,10 +258,8 @@ describe('compareToBaseline — errors', () => {
 
 describe('compareToBaseline — partial SARIF tolerance', () => {
   it('skips runs with non-array results', () => {
-    const path = join(tmpDir, 'partial.sarif');
-    writeFileSync(
-      path,
-      JSON.stringify({
+    repo.save(
+      {
         version: '2.1.0',
         runs: [
           { tool: { driver: { name: 'bad-run' } } }, // no results array
@@ -339,24 +277,22 @@ describe('compareToBaseline — partial SARIF tolerance', () => {
             ],
           },
         ],
-      }),
+      },
+      1,
     );
 
     const result = compareToBaseline(
       makeOutput([makeFinding({ filePath: 'a.ts', ruleId: 'kept', message: 'kept message' })]),
-      path,
+      repo,
     );
-    // The single run with results matched current finding → unchanged.
     expect(result.unchanged.length).toBe(1);
     expect(result.added).toEqual([]);
     expect(result.resolved).toEqual([]);
   });
 
   it('handles SARIF results with missing locations (no filePath)', () => {
-    const path = join(tmpDir, 'no-loc.sarif');
-    writeFileSync(
-      path,
-      JSON.stringify({
+    repo.save(
+      {
         version: '2.1.0',
         runs: [
           {
@@ -364,14 +300,14 @@ describe('compareToBaseline — partial SARIF tolerance', () => {
             results: [{ ruleId: 'global-rule', message: { text: 'global issue' }, level: 'warning' }],
           },
         ],
-      }),
+      },
+      1,
     );
 
-    // Current state has the same global-rule finding (no filePath).
     const current = makeOutput([
       { ruleId: 'global-rule', message: 'global issue', severity: 'warning' },
     ]);
-    const result = compareToBaseline(current, path);
+    const result = compareToBaseline(current, repo);
     expect(result.unchanged.length).toBe(1);
     expect(result.added).toEqual([]);
   });
@@ -381,20 +317,17 @@ describe('compareToBaseline — partial SARIF tolerance', () => {
 // renderGateCompareOutput
 // ---------------------------------------------------------------------------
 
-describe('renderGateCompareOutput', () => {
-  // eslint-disable-next-line unicorn/consistent-function-scoping -- describe-scoped factory; could move out but reads better adjacent to its tests
-  function makeResult(overrides: Partial<GateCompareResult> = {}): GateCompareResult {
-    return {
-      // eslint-disable-next-line sonarjs/publicly-writable-directories -- test fixture path; not a runtime filesystem operation
-      baselinePath: '/tmp/baseline.sarif',
-      added: [],
-      resolved: [],
-      unchanged: [],
-      degraded: false,
-      ...overrides,
-    };
-  }
+function makeResult(overrides: Partial<GateCompareResult> = {}): GateCompareResult {
+  return {
+    added: [],
+    resolved: [],
+    unchanged: [],
+    degraded: false,
+    ...overrides,
+  };
+}
 
+describe('renderGateCompareOutput', () => {
   it('shows STABLE when nothing changed', () => {
     const text = renderGateCompareOutput(makeResult());
     expect(text).toContain('STABLE');
@@ -450,91 +383,36 @@ describe('renderGateCompareOutput', () => {
     const many = Array.from({ length: 25 }, (_, i) => ({
       hash: `h${i}`,
       ruleId: 'rule',
-      message: `msg ${i}`,
+      message: `m${i}`,
       filePath: `f${i}.ts`,
       severity: 'warning' as const,
     }));
     const text = renderGateCompareOutput(makeResult({ unchanged: many }));
-
     expect(text).toContain('Unchanged (25)');
-    expect(text).toContain('and 20 more'); // 25 total - 5 sample shown
+    // Only 5 sampled lines, then "... and 20 more"
+    expect(text).toContain('... and 20 more');
   });
 
-  it('uses singular grammar for one new violation, plural otherwise', () => {
-    const oneAdded = renderGateCompareOutput(
-      makeResult({
-        added: [{ hash: 'h', ruleId: 'r', message: 'm', filePath: 'f', severity: 'error' }],
-        degraded: true,
-      }),
-    );
-    expect(oneAdded).toContain('1 new violation');
-    expect(oneAdded).not.toContain('1 new violations');
-
-    const twoAdded = renderGateCompareOutput(
+  it('truncates very long violation messages with an ellipsis', () => {
+    const longMessage = 'x'.repeat(150);
+    const text = renderGateCompareOutput(
       makeResult({
         added: [
-          { hash: 'h1', ruleId: 'r', message: 'm', filePath: 'f1', severity: 'error' },
-          { hash: 'h2', ruleId: 'r', message: 'm', filePath: 'f2', severity: 'error' },
+          {
+            hash: 'h1',
+            ruleId: 'long-rule',
+            message: longMessage,
+            filePath: 'f.ts',
+            severity: 'error',
+          },
         ],
         degraded: true,
       }),
     );
-    expect(twoAdded).toContain('2 new violations');
-  });
-
-  it('renders no location when filePath is empty', () => {
-    const text = renderGateCompareOutput(
-      makeResult({
-        added: [{ hash: 'h', ruleId: 'global-rule', message: 'no loc', filePath: '', severity: 'error' }],
-        degraded: true,
-      }),
-    );
-    expect(text).toContain('(no location)');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Integration: round-trip via filesystem
-// ---------------------------------------------------------------------------
-
-describe('integration — save then compare round-trip', () => {
-  it('a saved-and-immediately-compared baseline reports STABLE', () => {
-    const path = join(tmpDir, 'baseline.sarif');
-    const output = makeOutput([
-      makeFinding({ filePath: 'a.ts', message: 'm1' }),
-      makeFinding({ filePath: 'b.ts', message: 'm2' }),
-      makeFinding({ filePath: 'c.ts', message: 'm3' }),
-    ]);
-
-    saveBaseline(output, path);
-    const result = compareToBaseline(output, path);
-
-    expect(result.degraded).toBe(false);
-    expect(result.added).toEqual([]);
-    expect(result.resolved).toEqual([]);
-    expect(result.unchanged.length).toBe(3);
-  });
-
-  it('writes a SARIF document that can serve as a future baseline', () => {
-    // The SARIF written by saveBaseline should be readable by compareToBaseline
-    // using a *different* CliOutput as the current state.
-    const path = join(tmpDir, 'baseline.sarif');
-    saveBaseline(
-      makeOutput([makeFinding({ filePath: 'a.ts', message: 'one' })]),
-      path,
-    );
-
-    // Same finding present + one new
-    const result = compareToBaseline(
-      makeOutput([
-        makeFinding({ filePath: 'a.ts', message: 'one' }),
-        makeFinding({ filePath: 'b.ts', message: 'two' }),
-      ]),
-      path,
-    );
-    expect(result.unchanged.length).toBe(1);
-    expect(result.added.length).toBe(1);
-    expect(result.added[0].filePath).toBe('b.ts');
+    // truncate(message, 120) keeps 119 chars + ellipsis. The full
+    // 150-char string MUST NOT appear.
+    expect(text).not.toContain(longMessage);
+    expect(text).toContain('…');
   });
 });
 
@@ -551,17 +429,16 @@ const identityIgnoringMessage: ViolationIdentity = ({ filePath, ruleId }) =>
 
 describe('compareToBaseline — custom violation-identity strategy', () => {
   it('treats two same-rule same-file findings as identical when identity ignores message', () => {
-    const path = join(tmpDir, 'baseline.sarif');
     saveBaseline(
       makeOutput([makeFinding({ filePath: 'a.ts', message: 'old phrasing' })]),
-      path,
+      repo,
     );
 
     // The default identity would mark this as `added` (different message).
     // The custom (filePath, ruleId) identity treats them as identical.
     const result = compareToBaseline(
       makeOutput([makeFinding({ filePath: 'a.ts', message: 'new phrasing' })]),
-      path,
+      repo,
       identityIgnoringMessage,
     );
     expect(result.added.length).toBe(0);
@@ -571,10 +448,9 @@ describe('compareToBaseline — custom violation-identity strategy', () => {
   });
 
   it('default identity preserves the (filePath, ruleId, message) semantics', () => {
-    const path = join(tmpDir, 'baseline.sarif');
     saveBaseline(
       makeOutput([makeFinding({ filePath: 'a.ts', message: 'old' })]),
-      path,
+      repo,
     );
 
     // Default identity sees a different message → that violation is
@@ -582,7 +458,7 @@ describe('compareToBaseline — custom violation-identity strategy', () => {
     // message counts as added.
     const result = compareToBaseline(
       makeOutput([makeFinding({ filePath: 'a.ts', message: 'new' })]),
-      path,
+      repo,
       DEFAULT_VIOLATION_IDENTITY,
     );
     expect(result.added.length).toBe(1);

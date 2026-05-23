@@ -118,9 +118,9 @@ export {
   renderGateCompareOutput,
   GateBaselineMissingError,
   GateBaselineInvalidError,
-  DEFAULT_BASELINE_PATH,
 } from './gate.js';
 export type { GateCompareResult } from './gate.js';
+export { FitBaselineRepo } from './persistence/baseline-repo.js';
 export { buildSarifLog, chunkSarifRuns, reportToCloud } from './sarif.js';
 export type { ReportResult } from './sarif.js';
 

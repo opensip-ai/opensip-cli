@@ -180,6 +180,17 @@ export interface ToolCliContext {
    * future: optional `--out <file>`, envelope wrappers, etc.).
    */
   readonly emitJson: (value: unknown) => void;
+  /**
+   * Persistence layer (SQLite + Drizzle). Opened once per CLI invocation
+   * by the bootstrap and closed at process exit. Tools construct their
+   * domain repos against this handle (SessionRepo, BaselineRepo, etc.).
+   *
+   * Typed loosely (`unknown`) for the same reason `program` is — to keep
+   * core decoupled from datastore. Tools cast to `DataStore` from
+   * `@opensip-tools/datastore` at use time. The shape is structurally
+   * stable; mismatches surface at register() time, not at link/build time.
+   */
+  readonly datastore: unknown;
 }
 
 export interface Tool {

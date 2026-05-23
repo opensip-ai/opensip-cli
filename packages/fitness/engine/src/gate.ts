@@ -2,27 +2,28 @@
  * Architecture-gate primitive — pre/post-fix regression detection.
  *
  * Operations:
- *   - saveBaseline(output, path)         — persist current SARIF as the baseline
- *   - compareToBaseline(output, path)    — diff current SARIF against baseline
+ *   - saveBaseline(output, repo)         — persist current SARIF as the baseline
+ *   - compareToBaseline(output, repo)    — diff current SARIF against baseline
  *   - renderGateCompareOutput(result)    — pretty-print the diff for stdout
  *
  * Wired into the `fit` command via `--gate-save` and `--gate-compare` flags
  * (see commands/fit.ts and index.ts).
  *
- * The baseline is opensip-tools' own SARIF document (built via buildSarifLog),
- * persisted as a file. Diffs match by (filePath, ruleId, message) — line
- * numbers are intentionally NOT in the matching key so unrelated line shifts
+ * v2: the baseline lives in SQLite via `FitBaselineRepo`. v1's
+ * `--baseline <path>` flag is removed — there is now exactly one
+ * baseline per project, stored at `<project>/opensip-tools/.runtime/datastore.sqlite`.
+ * Diffs match by (filePath, ruleId, message) — line numbers are
+ * intentionally NOT in the matching key so unrelated line shifts
  * don't register as added/resolved violations.
  */
 
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname } from 'node:path';
 
 import { logger } from '@opensip-tools/core';
 
 import { buildSarifLog } from './sarif.js';
 
+import type { FitBaselineRepo } from './persistence/baseline-repo.js';
 import type { SarifResult } from './sarif/types.js';
 import type { CliOutput } from '@opensip-tools/contracts';
 
@@ -44,7 +45,6 @@ interface GateViolation {
 
 /** Result of comparing current state to a saved baseline. */
 export interface GateCompareResult {
-  readonly baselinePath: string;
   /** Violations present now but not in baseline. */
   readonly added: readonly GateViolation[];
   /** Violations present in baseline but not now. */
@@ -75,39 +75,24 @@ export type ViolationIdentity = (input: {
 export const DEFAULT_VIOLATION_IDENTITY: ViolationIdentity = ({ filePath, ruleId, message }) =>
   createHash('sha256').update(`${filePath}\n${ruleId}\n${message}`).digest('hex');
 
-/** Thrown when --gate-compare is invoked but the baseline file doesn't exist. */
+/** Thrown when --gate-compare is invoked but the baseline doesn't exist. */
 export class GateBaselineMissingError extends Error {
-  readonly baselinePath: string;
-  constructor(baselinePath: string) {
+  constructor() {
     super(
-      `Gate baseline not found at ${baselinePath}. ` +
-        `Run \`opensip-tools fit --gate-save\` first to create one, ` +
-        `or pass --baseline <path> if it lives elsewhere.`,
+      'Gate baseline not found in the project SQLite store. ' +
+        'Run `opensip-tools fit --gate-save` first to create one.',
     );
     this.name = 'GateBaselineMissingError';
-    this.baselinePath = baselinePath;
   }
 }
 
-/** Thrown when the baseline file exists but isn't a parseable SARIF document. */
+/** Thrown when the baseline payload exists but isn't a parseable SARIF document. */
 export class GateBaselineInvalidError extends Error {
-  readonly baselinePath: string;
-  constructor(baselinePath: string, reason: string) {
-    super(`Gate baseline at ${baselinePath} is invalid: ${reason}`);
+  constructor(reason: string) {
+    super(`Gate baseline is invalid: ${reason}`);
     this.name = 'GateBaselineInvalidError';
-    this.baselinePath = baselinePath;
   }
 }
-
-// ---------------------------------------------------------------------------
-// Default baseline path
-// ---------------------------------------------------------------------------
-
-/**
- * Default location for the baseline file when --baseline is not
- * specified. Lives under the per-project gitignored runtime dir.
- */
-export const DEFAULT_BASELINE_PATH = 'opensip-tools/.runtime/baseline.sarif';
 
 // ---------------------------------------------------------------------------
 // saveBaseline
@@ -115,20 +100,15 @@ export const DEFAULT_BASELINE_PATH = 'opensip-tools/.runtime/baseline.sarif';
 
 /**
  * Persist the current run's findings as a baseline SARIF document.
- * Creates parent directories as needed. Overwrites any existing baseline.
+ * Overwrites any existing baseline.
  */
-export function saveBaseline(output: CliOutput, baselinePath: string): void {
+export function saveBaseline(output: CliOutput, repo: FitBaselineRepo): void {
   const sarif = buildSarifLog(output);
-  const dir = dirname(baselinePath);
-  // mkdirSync with recursive: true is idempotent — no need to check existsSync first.
-  mkdirSync(dir, { recursive: true });
-  writeFileSync(baselinePath, JSON.stringify(sarif, null, 2), 'utf8');
-
   const findingCount = output.checks.reduce((n, c) => n + c.findings.length, 0);
+  repo.save(sarif, findingCount);
   logger.info({
     evt: 'cli.gate.save.complete',
     module: 'cli:gate',
-    baselinePath,
     findingCount,
     checkCount: output.checks.length,
   });
@@ -147,28 +127,20 @@ export function saveBaseline(output: CliOutput, baselinePath: string): void {
  *   custom strategy to coarsen or refine the diffing behavior without
  *   forking compareToBaseline.
  *
- * @throws {GateBaselineMissingError} when the baseline file doesn't exist
+ * @throws {GateBaselineMissingError} when the baseline doesn't exist
  * @throws {GateBaselineInvalidError} when the baseline isn't valid SARIF
  */
 export function compareToBaseline(
   output: CliOutput,
-  baselinePath: string,
+  repo: FitBaselineRepo,
   identity: ViolationIdentity = DEFAULT_VIOLATION_IDENTITY,
 ): GateCompareResult {
-  if (!existsSync(baselinePath)) {
-    throw new GateBaselineMissingError(baselinePath);
+  const baselineDoc = repo.load();
+  if (baselineDoc === null) {
+    throw new GateBaselineMissingError();
   }
 
-  const baselineRaw = readFileSync(baselinePath, 'utf8');
-  let baselineDoc: unknown;
-  try {
-    baselineDoc = JSON.parse(baselineRaw);
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
-    throw new GateBaselineInvalidError(baselinePath, `not valid JSON (${reason})`);
-  }
-
-  const baselineViolations = extractViolationsFromSarif(baselineDoc, baselinePath, identity);
+  const baselineViolations = extractViolationsFromSarif(baselineDoc, identity);
   const currentViolations = extractViolationsFromCliOutput(output, identity);
 
   const baselineByHash = new Map(baselineViolations.map((v) => [v.hash, v]));
@@ -192,7 +164,6 @@ export function compareToBaseline(
   }
 
   const result: GateCompareResult = {
-    baselinePath,
     added,
     resolved,
     unchanged,
@@ -202,7 +173,6 @@ export function compareToBaseline(
   logger.info({
     evt: 'cli.gate.compare.complete',
     module: 'cli:gate',
-    baselinePath,
     addedCount: added.length,
     resolvedCount: resolved.length,
     unchangedCount: unchanged.length,
@@ -221,7 +191,7 @@ export function compareToBaseline(
  */
 // eslint-disable-next-line sonarjs/cognitive-complexity -- multi-section diff renderer: added/removed/changed sections each shape output; flatter form would scatter formatting
 export function renderGateCompareOutput(result: GateCompareResult): string {
-  const lines: string[] = [ 'opensip-tools gate compare', ''];
+  const lines: string[] = ['opensip-tools gate compare', ''];
 
   if (result.added.length > 0) {
     lines.push(`Added (${result.added.length}):`);
@@ -300,15 +270,14 @@ interface SarifDoc {
 
 function extractViolationsFromSarif(
   doc: unknown,
-  baselinePath: string,
   identity: ViolationIdentity,
 ): GateViolation[] {
   if (typeof doc !== 'object' || doc === null) {
-    throw new GateBaselineInvalidError(baselinePath, 'top-level value is not an object');
+    throw new GateBaselineInvalidError('top-level value is not an object');
   }
   const sarif = doc as SarifDoc;
   if (sarif.runs === undefined || !Array.isArray(sarif.runs)) {
-    throw new GateBaselineInvalidError(baselinePath, 'missing or non-array `runs`');
+    throw new GateBaselineInvalidError('missing or non-array `runs`');
   }
 
   const runs: readonly SarifRun[] = sarif.runs;

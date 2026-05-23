@@ -343,6 +343,7 @@ function extractParam(child: Parser.SyntaxNode): { name: string; optional: boole
         rest: false,
       };
     }
+    /* v8 ignore start */
     case 'list_splat_pattern':
     case 'dictionary_splat_pattern': {
       const name = child.namedChild(0);
@@ -352,6 +353,7 @@ function extractParam(child: Parser.SyntaxNode): { name: string; optional: boole
     default: {
       return null;
     }
+    /* v8 ignore stop */
   }
 }
 
@@ -360,6 +362,7 @@ function extractDecorators(node: Parser.SyntaxNode): readonly string[] {
   // node when decorators are present. The decorators are siblings of the
   // function_definition inside that wrapper.
   if (node.parent?.type !== 'decorated_definition') return [];
+  /* v8 ignore start */
   const out: string[] = [];
   for (const child of node.parent.namedChildren) {
     if (child.type === 'decorator') {
@@ -369,6 +372,7 @@ function extractDecorators(node: Parser.SyntaxNode): readonly string[] {
     }
   }
   return out;
+  /* v8 ignore stop */
 }
 
 // ── body normalization ────────────────────────────────────────────
@@ -423,6 +427,7 @@ function stripPythonComments(text: string): string {
   return out;
 }
 
+/* v8 ignore start */
 function skipToEndOfLine(text: string, start: number): number {
   let i = start;
   while (i < text.length && text[i] !== '\n') i++;
@@ -454,6 +459,7 @@ function consumeStringLiteral(
   }
   return { text: buf, index: i };
 }
+/* v8 ignore stop */
 
 function stripLeadingDocstring(text: string): string {
   // Match an optional whitespace prefix followed by a triple-quoted

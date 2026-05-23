@@ -1,8 +1,8 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { ValidationError } from '@opensip-tools/core';
+import { ValidationError, SystemError } from '@opensip-tools/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { loadTargetsConfig } from '../loader.js';
@@ -166,5 +166,16 @@ plugins:
     );
     const { registry } = loadTargetsConfig(testDir, join(testDir, 'custom.yml'));
     expect(registry.has('custom')).toBe(true);
+  });
+
+  it('throws SystemError when config file exceeds the size limit', () => {
+    const huge = 'x'.repeat(11 * 1024 * 1024); // 11 MB > 10 MB limit
+    writeFileSync(join(testDir, 'opensip-tools.config.yml'), huge);
+    expect(() => loadTargetsConfig(testDir)).toThrow(SystemError);
+  });
+
+  it('throws ValidationError when the resolved path is a directory (readFileSync EISDIR)', () => {
+    mkdirSync(join(testDir, 'opensip-tools.config.yml'), { recursive: true });
+    expect(() => loadTargetsConfig(testDir)).toThrow(ValidationError);
   });
 });

@@ -180,6 +180,7 @@ export const piiExposureInLogs = defineCheck({
     }
 
     const sourceFile = parseSource(content, filePath)
+    /* v8 ignore next -- defensive guard */
     if (!sourceFile) return []
 
     const violations: CheckViolation[] = []

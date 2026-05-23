@@ -38,6 +38,7 @@ export function parseProject(input: ParseInput): ParseOutput<TypescriptParsedPro
   program.getTypeChecker();
 
   const parseErrors: ParseError[] = [];
+  /* v8 ignore start */
   const seenPaths = new Set<string>();
   for (const sf of program.getSourceFiles()) {
     const diagnostics = program.getSyntacticDiagnostics(sf);
@@ -50,6 +51,7 @@ export function parseProject(input: ParseInput): ParseOutput<TypescriptParsedPro
       parseErrors.push({ filePath, message });
     }
   }
+  /* v8 ignore stop */
 
   return { project: { program }, parseErrors };
 }

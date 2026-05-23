@@ -62,6 +62,7 @@ function makeFakeContext(program: Command): {
     emitJson: (value: unknown) => {
       emitted.push(value);
     },
+    datastore: undefined,
   };
   return { ctx, rendered, exitCodes, emitted };
 }

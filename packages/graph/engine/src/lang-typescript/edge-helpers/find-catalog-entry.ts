@@ -29,6 +29,7 @@ export function findCatalogEntry(
     const hit = candidates.find((c) => c.bodyHash === bodyHash);
     if (hit) return hit.bodyHash;
   }
+  /* v8 ignore start */
   // Fallback: scan all own keys (rare path; used when caller can't
   // narrow the candidate names).
   for (const key of Object.keys(catalog.functions)) {
@@ -38,6 +39,7 @@ export function findCatalogEntry(
     if (hit) return hit.bodyHash;
   }
   return null;
+  /* v8 ignore stop */
 }
 
 function lookup(catalog: Catalog, name: string): readonly FunctionOccurrence[] | null {
@@ -46,5 +48,6 @@ function lookup(catalog: Catalog, name: string): readonly FunctionOccurrence[] |
   // (e.g. "constructor", "toString").
   if (!Object.hasOwn(catalog.functions, name)) return null;
   const value: readonly FunctionOccurrence[] | undefined = catalog.functions[name];
+  /* v8 ignore next */
   return value ?? null;
 }

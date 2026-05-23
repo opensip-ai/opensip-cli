@@ -22,6 +22,7 @@ function analyzeFile(content: string, filePath: string): CheckViolation[] {
   const violations: CheckViolation[] = []
 
   const sourceFile = getSharedSourceFile(filePath, content)
+  /* v8 ignore next -- defensive guard */
   if (!sourceFile) return violations
 
   const visitNode = (node: ts.Node): void => {
@@ -81,6 +82,7 @@ export const openapiTypeSource = defineCheck({
   analyze(content, filePath) {
     try {
       return analyzeFile(content, filePath)
+    /* v8 ignore next 1 -- defensive catch: parse failures already handled */
     } catch {
       // @swallow-ok Skip unreadable files
       return []

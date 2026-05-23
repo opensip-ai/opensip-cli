@@ -1,7 +1,6 @@
 ---
 status: current
-last_verified: 2026-05-22
-release: v1.3.x
+last_verified: 2026-05-15
 title: "Plugin loader"
 audience: [contributors, plugin-authors]
 purpose: "How plugins are discovered, loaded, and registered. Source files, npm packages, project pinning, the sync command."
@@ -44,7 +43,7 @@ Different kinds, different lifetimes. Tools are global to the binary — once re
 
 ## Tool discovery (`opensipTools.kind === 'tool'`)
 
-[`packages/core/src/plugins/tool-package-discovery.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/core/src/plugins/tool-package-discovery.ts) implements the walk. The CLI passes its own install directory as the `projectDir` argument (`packages/cli/src/index.ts` — `cliInstallDir = dirname(__dirname)` inside `loadDiscoveredTools()`); the function then walks upward through that directory's ancestors, looking at each `node_modules/`. Anchoring discovery at the CLI's install location (rather than the user's cwd) is deliberate — third-party tool packages installed alongside `@opensip-tools/cli` are picked up regardless of where the user runs the binary from. For each `node_modules` entry (and one level into scoped directories like `@opensip-tools/`), inspect the `package.json`:
+[`packages/core/src/plugins/tool-package-discovery.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/core/src/plugins/tool-package-discovery.ts) implements the walk. The CLI passes its own install directory as the `projectDir` argument (`packages/cli/src/index.ts:277-278` — `cliInstallDir = dirname(__dirname)`); the function then walks upward through that directory's ancestors, looking at each `node_modules/`. Anchoring discovery at the CLI's install location (rather than the user's cwd) is deliberate — third-party tool packages installed alongside `@opensip-tools/cli` are picked up regardless of where the user runs the binary from. For each `node_modules` entry (and one level into scoped directories like `@opensip-tools/`), inspect the `package.json`:
 
 ```ts
 const isToolPackage = (pkgDir: string): boolean => {
@@ -65,9 +64,9 @@ Direct CLI deps (`@opensip-tools/fitness`, `@opensip-tools/simulation`) are *als
 
 ## Fit / sim plugin discovery
 
-The fitness and simulation engines each have their own discovery, layered over the project paths defined in [`packages/core/src/lib/paths.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/core/src/lib/paths.ts). The shape is the same for both; the difference is the subdirectory names (`fit/checks`, `fit/recipes` vs. `sim/scenarios`, `sim/recipes`).
+The fitness and simulation engines each have their own discovery, layered over the project paths defined in [`packages/core/src/lib/paths.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/core/src/lib/paths.ts). The shape is the same for both; the difference is the subdirectory names (`fit/checks`, `fit/recipes` vs. `sim/scenarios`, `sim/recipes`).
 
-[`packages/core/src/plugins/discover.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/core/src/plugins/discover.ts) walks two sources:
+[`packages/core/src/plugins/discover.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/core/src/plugins/discover.ts) walks two sources:
 
 ### 1. User-source files (always auto-loaded)
 
@@ -111,7 +110,7 @@ The explicit list is the contract for arbitrary-scope packs. A transitive devDep
 
 ### 3. `@opensip-tools/checks-*` auto-discovery (fit only)
 
-Beyond the project-pinned form, fitness has a second discovery path for any package whose name starts with `@opensip-tools/checks-`. The fitness engine walks `node_modules` (from `cwd` upward through ancestor `node_modules` directories, matching Node's resolution algorithm) and registers every package whose name matches that prefix. Source: [`packages/fitness/engine/src/plugins/check-package-discovery.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/fitness/engine/src/plugins/check-package-discovery.ts).
+Beyond the project-pinned form, fitness has a second discovery path for any package whose name starts with `@opensip-tools/checks-`. The fitness engine walks `node_modules` (from `cwd` upward through ancestor `node_modules` directories, matching Node's resolution algorithm) and registers every package whose name matches that prefix. Source: [`packages/fitness/engine/src/plugins/check-package-discovery.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/fitness/engine/src/plugins/check-package-discovery.ts).
 
 Resolution rules apply in order:
 
@@ -136,7 +135,7 @@ The name-prefix shape is what makes "install and use" frictionless for the bundl
 
 ## 4. Language adapter "discovery" — actually direct imports
 
-[`packages/cli/src/index.ts:68-73`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/cli/src/index.ts) registers the six bundled language adapters at module load time:
+[`packages/cli/src/index.ts:68-73`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/cli/src/index.ts) registers the six bundled language adapters at module load time:
 
 ```ts
 import { typescriptAdapter } from '@opensip-tools/lang-typescript';
@@ -155,13 +154,13 @@ This isn't discovery. It's a static side-effect import. Why?
 
 - Language adapters are needed *before* any Tool runs. A check that runs against a language with no registered adapter would treat every file as raw text — silent miss.
 - The six bundled adapters are part of the CLI's contract. A project that needs Rust support gets it without installing anything; same for the others.
-- A custom language adapter (say, `@my-co/lang-erlang`) would need a future plugin path to be added — today's CLI registers only the six bundled adapters. The `LangPluginExports` shape ([`packages/core/src/plugins/types.ts:29`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/core/src/plugins/types.ts)) exists as a forward-compatible export shape, but no discovery walker reads it yet.
+- A custom language adapter (say, `@my-co/lang-erlang`) would need a future plugin path to be added — today's CLI registers only the six bundled adapters. The `LangPluginExports` shape ([`packages/core/src/plugins/types.ts:29`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/core/src/plugins/types.ts)) exists as a forward-compatible export shape, but no discovery walker reads it yet.
 
 ---
 
 ## The `plugin` command surface
 
-CLI-owned commands for managing the npm-package plugin layout. Source: [`packages/cli/src/commands/plugin.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/cli/src/commands/plugin.ts).
+CLI-owned commands for managing the npm-package plugin layout. Source: [`packages/cli/src/commands/plugin.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/cli/src/commands/plugin.ts).
 
 ```bash
 opensip-tools plugin list                       # what's installed and what's loaded
@@ -178,7 +177,7 @@ Two operations in one command:
 1. `npm install <pkg>` into `<project>/opensip-tools/.runtime/plugins/<domain>/`. The runtime dir's `package.json` is the install host — its `dependencies` block tracks installed plugins.
 2. Append `<pkg>` to `plugins.<domain>:` in `opensip-tools.config.yml`. Idempotent — adding the same name twice is a no-op.
 
-The domain is inferred from the package name (`inferDomain` matches `/\bsim\b/` → `sim`, else `fit`) unless `--domain` is passed explicitly. Only `fit` and `sim` are accepted as `--domain` values; anything else is rejected so a caller can't drive path construction outside `opensip-tools/.runtime/`. The shell call to npm is wrapped in `execFileSync` (no shell, no metacharacter expansion) and the package spec is validated to refuse anything starting with `-` — npm would consume that as a flag, which would be an injection vector.
+The domain is inferred from the package name (`/sim/` matches → `sim`, else `fit`) unless `--domain` is passed explicitly. The shell call to npm is wrapped in `execFileSync` (no shell, no metacharacter expansion) and the package spec is validated to refuse anything starting with `-` — npm would consume that as a flag, which would be an injection vector.
 
 ### `plugin remove <pkg>`
 

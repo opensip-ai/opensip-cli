@@ -83,6 +83,24 @@ describe('lang plugin domain', () => {
     expect(result.error).toBeUndefined()
   })
 
+  it('warns and skips when adapters export is not an array', async () => {
+    const pluginFile = join(testDir, 'lang-non-array.mjs')
+    writeFileSync(pluginFile, `
+      export const adapters = { wrong: 'shape' };
+    `)
+
+    const plugin: DiscoveredPlugin = {
+      type: 'file',
+      entryPoint: pluginFile,
+      namespace: 'lang-non-array',
+      source: 'lang-non-array.mjs',
+    }
+
+    const result = await loadPlugin(plugin, 'lang')
+    expect(result.error).toBeUndefined()
+    expect(result.adaptersRegistered).toBe(0)
+  })
+
   it('skips invalid adapter entries', async () => {
     const pluginFile = join(testDir, 'lang-bad-item.mjs')
     writeFileSync(pluginFile, `

@@ -25,4 +25,10 @@ export const JSON_DESC = 'Output structured JSON';
 export interface CliCommandsContext {
   readonly setExitCode: (code: number) => void;
   readonly render: (result: CommandResult) => Promise<void>;
+  /**
+   * v2 persistence handle. Threaded from the CLI bootstrap. Loosely typed
+   * `unknown` to keep this module free of `@opensip-tools/datastore` at
+   * the type level; consumers cast to `DataStore` at use time.
+   */
+  readonly datastore: unknown;
 }

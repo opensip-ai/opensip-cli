@@ -8,11 +8,11 @@
  */
 
 import { spawnSync } from 'node:child_process'
-import { readFileSync, readdirSync } from 'node:fs'
+import { readFileSync, readdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 const CLI = join(__dirname, '../../dist/index.js')
@@ -38,6 +38,11 @@ function run(...args: string[]): { stdout: string; stderr: string; exitCode: num
 }
 
 describe('CLI multi-language', () => {
+  beforeEach(() => {
+    rmSync(join(FIXTURE, 'opensip-tools', '.runtime'), { recursive: true, force: true })
+    rmSync(join(UNKNOWN_FIXTURE, 'opensip-tools', '.runtime'), { recursive: true, force: true })
+  })
+
   it('lists language adapters for all six bundled languages', () => {
     // The CLI doesn't expose adapters via --list yet; verify by running
     // fit and checking it doesn't throw on any of the language targets.

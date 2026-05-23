@@ -137,9 +137,8 @@ opensip-tools graph --packages
 | `--cwd <path>` | string | `process.cwd()` | Target directory. Adapter is auto-detected by file-extension dominance (TypeScript looks for `tsconfig.json`; Python for `pyproject.toml`/`setup.py` with `**/*.py` fallback; Rust for `Cargo.toml` with `**/*.rs` fallback). |
 | `--json` | bool | `false` | Output a `CliOutput`-shaped JSON document instead of the unified terminal report. |
 | `--no-cache` | bool | `false` | Skip the catalog cache and force a full rebuild. |
-| `--gate-save` | bool | `false` | Save the current Signal set to `<project>/opensip-tools/.runtime/cache/graph/baseline.json`. Mutually exclusive with `--gate-compare`. |
-| `--gate-compare` | bool | `false` | Compare current Signals to the baseline; exit non-zero on regression. |
-| `--baseline <path>` | string | `<project>/opensip-tools/.runtime/cache/graph/baseline.json` | Override the baseline path for `--gate-save` / `--gate-compare`. |
+| `--gate-save` | bool | `false` | Save the current Signal fingerprint set to the project's SQLite store (`graph_baseline_signals` table). Mutually exclusive with `--gate-compare`. |
+| `--gate-compare` | bool | `false` | Compare current Signals to the saved baseline; exit non-zero on regression. |
 | `--report-to <url>` | string | — | POST findings to OpenSIP Cloud or a compatible SARIF endpoint. |
 | `--package <name\|path>` | string | — | **TypeScript-only.** Scope the run to one workspace package (faster on monorepos; cross-package edges become unresolved). Searches `packages/**` for a basename match, or accepts an explicit directory path. Mutually exclusive with `--packages`. |
 | `--packages` | bool | `false` | **TypeScript-only.** Fan the run across every workspace package under `packages/**` with a `tsconfig.json`. One child process per package; concurrency capped at `cpus()-1`. Aggregates per-package findings. |
@@ -152,7 +151,7 @@ opensip-tools graph --packages
 
 **Heap sizing:** for projects with > 1000 source files, `graph` emits a one-line stderr hint at startup recommending `NODE_OPTIONS=--max-old-space-size=8192` (or higher). On a 5476-file repo the default 4 GB heap is not enough for a global run. (Heap sizing is most acute for the TypeScript adapter, which holds a project-wide `ts.Program`; tree-sitter adapters parse lazily per file and use far less memory.)
 
-**Catalog file:** `<project>/opensip-tools/.runtime/cache/graph/catalog.json` — v3 format, content-keyed by `language` (adapter id), `cacheKey` (an opaque per-adapter invalidation string — TypeScript: `ts-${ts.version}-${tsconfigContentHash}`; Python and Rust use language-id-prefixed keys), and a per-file mtime+size fingerprint. The streamed write emits the catalog entry-by-entry (Phase 2, see perf plan) but produces byte-identical output to a `JSON.stringify` round-trip.
+**Catalog storage:** v2 stores the catalog in the project's SQLite database (`<project>/opensip-tools/.runtime/datastore.sqlite`, `graph_catalog` row). v3 wire-format remains: `language` (adapter id), `cacheKey` (an opaque per-adapter invalidation string — TypeScript: `ts-${ts.version}-${tsconfigContentHash}`; Python and Rust use language-id-prefixed keys), and a per-file mtime+size fingerprint. The reconstructed in-memory `Catalog` shape is unchanged from v1's `cache/read.ts` output.
 
 **Cache behavior:** three verdicts — `valid` (full cache hit), `incremental` (re-walk only the changed files plus their transitive edge-dependents), `invalid` (full rebuild). The incremental path makes single-file edits ~6× faster than a `--no-cache` rebuild while producing byte-identical output. See the cache section in the stages-and-catalog doc.
 

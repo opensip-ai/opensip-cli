@@ -181,9 +181,11 @@ class FileCache {
       clearTimeout(this._autoClearTimer)
     }
     this._autoClearTimer = setTimeout(() => {
+      /* v8 ignore start -- 10-minute auto-clear timer; not exercised in unit tests */
       if (this.cache.size > 0) {
         this.clear()
       }
+      /* v8 ignore stop */
     }, 10 * 60 * 1000) // 10 minutes
     // Unref so the timer doesn't keep the process alive
     this._autoClearTimer.unref()

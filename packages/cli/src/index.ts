@@ -47,13 +47,25 @@ async function main(): Promise<void> {
     projectDir: dirname(dirname(fileURLToPath(import.meta.url))),
   });
 
+  // v2 persistence: bootstrap opens the DataStore once per CLI invocation.
+  // TODO(merge): this should move into bootstrap/index.ts alongside other
+  // bootstrap concerns — left as a literal here to keep the merge focused.
+  const { DataStoreFactory } = await import('@opensip-tools/datastore');
+  const { resolveProjectPaths } = await import('@opensip-tools/core');
+  const projectPaths = resolveProjectPaths(process.cwd());
+  const datastore = DataStoreFactory.open({
+    backend: 'sqlite',
+    path: `${projectPaths.runtimeDir}/datastore.sqlite`,
+  });
+
   const { ctx } = buildToolCliContext({
     program, render: renderResult, liveViews: createLiveViewRegistry(logger),
     builtinLiveViews, maybeOpenDashboard, logger,
+    datastore,
   });
 
   mountAllToolCommands(defaultToolRegistry, ctx);
-  registerCliCommands(program, { setExitCode: ctx.setExitCode, render: renderResult });
+  registerCliCommands(program, { setExitCode: ctx.setExitCode, render: renderResult, datastore });
 
   // Bare `opensip-tools` → welcome screen. The update notifier runs
   // AFTER this short-circuit by design (don't nag on zero-arg runs);

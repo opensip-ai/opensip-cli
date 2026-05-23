@@ -88,6 +88,13 @@ export interface BuildToolCliContextOptions {
     cwd: string;
   }) => Promise<void>;
   readonly logger?: Logger;
+  /**
+   * v2 persistence handle. Threaded from `bootstrap/index.ts` (the
+   * DataStoreFactory.open call). Tools cast to `DataStore` from
+   * `@opensip-tools/datastore` at use time. Loosely typed `unknown` to
+   * keep the CLI decoupled from datastore at the type layer.
+   */
+  readonly datastore: unknown;
 }
 
 /**
@@ -131,6 +138,7 @@ export function buildToolCliContext(
     emitJson: (value) => {
       process.stdout.write(JSON.stringify(value, null, 2) + '\n');
     },
+    datastore: opts.datastore,
   };
 
   return {

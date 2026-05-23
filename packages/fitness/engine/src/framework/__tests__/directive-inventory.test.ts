@@ -74,8 +74,23 @@ describe('parseDirectiveLine', () => {
     it('rejects empty checkId', () => {
       expect(parseDirectiveLine('// @fitness-ignore-file ')).toBeNull()
     })
+
+    it('rejects empty checkId before the " -- " separator', () => {
+      // separatorIndex !== -1 path with empty checkId — exercises the
+      // post-separator validation branch.
+      expect(parseDirectiveLine('// @fitness-ignore-file  -- reason here')).toBeNull()
+    })
+
+    it('rejects checkId with embedded spaces before the " -- " separator', () => {
+      expect(parseDirectiveLine('// @fitness-ignore-file foo bar -- reason')).toBeNull()
+    })
   })
 })
+
+// `isWeakReason` and `extractGroup` were v2 internal helpers that
+// audit's D5 phase (comment-openers consolidation) refactored out of
+// the public surface. Their behavior is now exercised through
+// parseDirectiveLine and the directive parsers in `_directives/`.
 
 describe('inventory + suppression parity across comment styles', () => {
   // Regression for the pre-D5 bug where HTML and hash directives

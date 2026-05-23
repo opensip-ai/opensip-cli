@@ -20,6 +20,7 @@ export function classifyVisibility(node: ts.Node): Visibility {
 }
 
 function directVisibility(node: ts.Node): Visibility | null {
+  /* v8 ignore next */
   if (!ts.canHaveModifiers(node)) return null;
   const modifiers = ts.getModifiers(node);
   if (!modifiers) return null;

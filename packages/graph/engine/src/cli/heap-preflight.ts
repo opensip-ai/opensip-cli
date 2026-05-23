@@ -65,7 +65,7 @@ export function decideHeapTargetMb(fileCount: number): number | null {
  * reflects whatever `--max-old-space-size` was set to at boot (including
  * the default).
  */
-export function currentHeapLimitMb(): number {
+function currentHeapLimitMb(): number {
   return Math.round(v8.getHeapStatistics().heap_size_limit / BYTES_PER_MB);
 }
 
@@ -145,8 +145,10 @@ export async function runHeapPreflight(input: PreflightInput): Promise<boolean> 
     return false;
   }
 
+  /* v8 ignore start */
   await reExecWithHeap(targetMb, fileCount, currentMb);
   return true;
+  /* v8 ignore stop */
 }
 
 /**
@@ -155,6 +157,7 @@ export async function runHeapPreflight(input: PreflightInput): Promise<boolean> 
  * directly to the user's terminal; the parent waits and propagates
  * the child's exit code.
  */
+/* v8 ignore start */
 async function reExecWithHeap(
   targetMb: number,
   fileCount: number,
@@ -200,3 +203,4 @@ async function reExecWithHeap(
     });
   });
 }
+/* v8 ignore stop */

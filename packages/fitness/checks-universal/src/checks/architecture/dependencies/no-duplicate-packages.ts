@@ -92,11 +92,13 @@ function getPackageInfo(packageJsonPath: string, projectRoot: string): PackageIn
 }
 
 function matchesPattern(pkg: PackageInfo, patterns: RegExp[]): boolean {
+  /* v8 ignore next 4 -- defensive: callers always pass an array */
   // Validate array parameter
   if (!Array.isArray(patterns)) {
     return false
   }
 
+  /* v8 ignore next -- defensive: split + pop on a non-empty string never returns undefined */
   const namePart = pkg.name.split('/').pop() ?? pkg.name
   if (patterns.some((p) => p.test(namePart))) return true
   if (pkg.keywords) {
@@ -111,6 +113,7 @@ function matchesPattern(pkg: PackageInfo, patterns: RegExp[]): boolean {
 function deduplicateByNamePart(packages: PackageInfo[]): PackageInfo[] {
   const seen = new Map<string, PackageInfo>()
   for (const pkg of packages) {
+    /* v8 ignore next -- defensive: split + pop on a non-empty string never returns undefined */
     const namePart = pkg.name.split('/').pop() ?? pkg.name
     if (!seen.has(namePart)) {
       seen.set(namePart, pkg)
@@ -120,6 +123,7 @@ function deduplicateByNamePart(packages: PackageInfo[]): PackageInfo[] {
 }
 
 function detectDuplicates(packages: PackageInfo[]): DuplicateGroup[] {
+  /* v8 ignore next 4 -- defensive: callers always pass an array */
   // Validate array parameter
   if (!Array.isArray(packages)) {
     return []

@@ -38,6 +38,7 @@ export const contractsSchemaConsistency = defineCheck({
     for (const filePath of files.paths) {
       // @fitness-ignore-next-line performance-anti-patterns -- sequential file reading to control memory; FileAccessor is lazy
       const content = await files.read(filePath)
+      /* v8 ignore next -- defensive guard */
       if (!content) continue
       const lines = content.split('\n')
 
@@ -52,6 +53,7 @@ export const contractsSchemaConsistency = defineCheck({
       }
 
       for (const [i, line_] of lines.entries()) {
+        /* v8 ignore next -- defensive nullish fallback */
         const line = line_ ?? ''
 
         // Check for manually defined types that have a corresponding schema

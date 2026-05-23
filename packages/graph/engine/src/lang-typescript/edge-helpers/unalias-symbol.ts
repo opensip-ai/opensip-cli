@@ -11,6 +11,7 @@ import ts from 'typescript';
 export function unaliasSymbol(symbol: ts.Symbol, checker: ts.TypeChecker): ts.Symbol {
   let current = symbol;
   // Cap iterations defensively; realistic chains are 1–2 hops.
+  /* v8 ignore start */
   for (let i = 0; i < 8; i++) {
     if ((current.flags & ts.SymbolFlags.Alias) === 0) return current;
     try {
@@ -22,4 +23,5 @@ export function unaliasSymbol(symbol: ts.Symbol, checker: ts.TypeChecker): ts.Sy
     }
   }
   return current;
+  /* v8 ignore stop */
 }

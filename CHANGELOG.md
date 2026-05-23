@@ -4,51 +4,185 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [2.0.0] — Unreleased
+
+Persistence migration: every internal runtime artifact (sessions, graph
+catalog, graph + fitness baselines) moves from JSON files to SQLite
+behind a unified `DataStore` abstraction. The full plan and decision
+log live under [`docs/plans/persistence-migration/`](docs/plans/persistence-migration/).
+
+This release introduces one new package, swaps storage on three tools,
+and breaks compatibility with v1.x runtime layouts.
+
+### Breaking changes
+
+- **Runtime state migrates from JSON files to SQLite.** v2 ignores any
+  pre-existing files under `<project>/opensip-tools/.runtime/` and
+  initializes a fresh `<project>/opensip-tools/.runtime/datastore.sqlite`
+  on first run. Caches rebuild automatically; **session history from
+  v1.x is not preserved**. Users who need the old layout should pin to
+  v1.x.
+- **`--baseline <path>` flag removed from `opensip-tools fit`.** The
+  baseline is now a single SQLite-backed row per project; the flag has
+  no equivalent. Drop `--baseline path/to/file.sarif` from CI
+  invocations. The default location of the SARIF baseline (previously
+  `opensip-tools/.runtime/baseline.sarif`) is now embedded as a row in
+  the project's `datastore.sqlite`. Same for the graph baseline (was
+  `opensip-tools/.runtime/cache/graph/baseline.json`).
+- **`configurePersistencePaths` removed from
+  `@opensip-tools/contracts`.** This was an internal API used by the
+  CLI bootstrap and a small number of tests; replaced by passing a
+  `DataStore` through `ToolCliContext`. External consumers who reached
+  for it should switch to constructing a `SessionRepo` over the
+  context's `datastore` field.
+
+### Added
+
+- **`@opensip-tools/datastore` package** — paradigm-agnostic SQLite +
+  Drizzle persistence layer. Houses the `DataStore` interface, SQLite
+  + in-memory backends, factory, and the workspace-wide migration
+  store (`migrations/`). Tools own their domain schemas (sessions in
+  contracts; baseline/catalog in graph; baseline in fitness).
+- **`@opensip-tools/dashboard` package** — extracted from contracts
+  (see Changed). Holds `generateDashboardHtml`, the `DashboardInput`
+  options shape, the ranked-view template, and the tab activator
+  registry.
+- **`ToolCliContext.datastore`** — every tool plugin now receives a
+  per-process `DataStore` handle for its persistence work. Built-in
+  tools use it via the relevant repo class (`SessionRepo`,
+  `GraphBaselineRepo`, `CatalogRepo`, `FitBaselineRepo`).
+- **`ToolCliContext.registerLiveView`** — registration-style API for
+  tools to contribute a live view. Replaces the leaky
+  `renderLive(viewKey, args)` switch in the CLI dispatcher; the CLI
+  no longer hardcodes `'fit'`/`'graph'` view keys. `renderLive` throws
+  a typed `UnknownLiveViewError` on miss.
+- **`ToolCliContext.emitJson(value)`** — single seam for tools to
+  print JSON output. Removes six identical
+  `process.stdout.write(JSON.stringify(...))` sites across fitness,
+  simulation, and graph.
+- **`Logger` interface + `LoggerImpl` class re-exported from
+  `@opensip-tools/core`.** Tools can substitute their own logger in
+  tests; production code keeps the singleton via the existing
+  re-exports.
+- **`LanguageParseCache` re-exported from `@opensip-tools/core`.**
+  Public type, with a `dispose()` method for test isolation.
+- **`CliProgram` re-exported from `@opensip-tools/contracts`.** Tool
+  packages can drop `as Command` casts in `register(cli)` and accept
+  a typed `cli: CliProgram` parameter without taking a direct
+  `commander` dependency. The alias is type-only.
+- **`defineRegexListCheck` Template helper in `@opensip-tools/fitness`.**
+  Collapses the per-line, per-pattern violation-emit loop into a
+  declarative config. Adopted at five `checks-universal` sites
+  (`no-console-log`, `no-window-alert`, `no-eval`, `no-ai-attribution`,
+  `no-process-artifacts`).
+- **`opensip-tools init --keep` and `--remove`.** Two explicit flags
+  for the partial-state cases (config XOR `opensip-tools/` directory
+  present, or directory contents don't match a fresh-init scaffold).
+  Default refuses with a clear message; flags express user intent.
+  `InitResult.preExistingFiles[]` and `InitResult.partialStateError`
+  surface what's there.
+- **Automatic schema migrations.** `DataStoreFactory.open()` applies
+  any pending Drizzle migrations on every CLI invocation; users see no
+  extra step. Migrations are content-hashed and idempotent.
 
 ### Changed
 
-- **`@opensip-tools/dashboard` `generateDashboardHtml` is now an
-  options-object call.** The legacy positional signature
+- **`@opensip-tools/contracts`** gains `SessionRepo` and the sessions
+  schema. `StoredSession` shape is unchanged; layout shifts from
+  one-JSON-per-run files to `sessions` + `session_checks` +
+  `session_findings` rows.
+- **`@opensip-tools/graph`** loads/saves the call-graph catalog and
+  the gate baseline through `CatalogRepo` and `GraphBaselineRepo`.
+  Catalog write is whole-replace at end of pipeline; the cached read
+  shape is identical to v1's (`Catalog` value with the same fields),
+  so dashboard view derivations and rules are unchanged. Performance
+  is at parity; per-package incremental writes and view-targeted
+  queries land in a follow-up `graph-catalog-perf` plan.
+- **`@opensip-tools/fitness`** stores the SARIF gate baseline in
+  `fit_baseline` (single row). The hash-based diff algorithm
+  (`extractViolationsFromSarif`/`extractViolationsFromCliOutput`) is
+  unchanged; only the I/O moves. The fitness file-cache stays as v1's
+  in-process `Map<string, string>` — it is per-run only, not
+  persistent, so no migration applies.
+- **Dashboard renderer extracted to `@opensip-tools/dashboard`.**
+  The renderer subtree previously living under
+  `packages/contracts/src/persistence/dashboard/` moves to its own
+  workspace package at Layer 3. `contracts` no longer contains
+  dashboard runtime code; fitness imports `generateDashboardHtml` from
+  the new package. Workspace expands to 19+ packages.
+- **`generateDashboardHtml` is now an options-object call.** The
+  legacy positional signature
   (`generateDashboardHtml(sessions, checkCatalog, recipeCatalog,
   graphCatalog, editorProtocol)`) is gone; the new signature is
   `generateDashboardHtml({ sessions, checkCatalog?, recipeCatalog?,
-  graphCatalog?, editorProtocol? })`. The new `DashboardInput` type
-  is re-exported from the package barrel so future tool-shaped data
-  extends the interface instead of growing positional parameters.
-
+  graphCatalog?, editorProtocol? })`. `DashboardInput` is exported
+  from the package barrel so future tool-shaped data extends the
+  interface instead of growing positional parameters.
 - **Dashboard ranked views adopt a shared `defineRankedView` helper.**
   The four ranked views (`hot`, `big`, `wide`, `untested`) now each
   consist of ~30 lines of declarative config — the rank-and-render
   skeleton lives in `code-paths/view-template.ts`. Rendered HTML is
   byte-comparable to the previous form; no behavior change.
-
 - **Cross-tab navigation uses a `tabActivators` registry.** The
   Overview tab no longer references `openCodePathsSession` by name;
-  it asks the registry via `activateTabForSession(s)`. New
-  session-aware tabs register their activators via
-  `registerTabActivator(key, fn)`.
-
-### Added
-
-- **`CliProgram` re-exported from `@opensip-tools/contracts`.** Tool
-  packages can drop `as Command` casts in `register(cli)` and accept
-  a typed `cli: CliProgram` parameter without taking a direct
-  `commander` dependency. The alias is type-only — the contracts
-  runtime bundle does not change.
+  it asks the registry via `activateTabForSession(s)`. Session-aware
+  tabs register their activators via `registerTabActivator(key, fn)`.
+- **`opensip-tools init` flag rename.** `--force` is removed;
+  replaced by `--keep` (re-scaffold examples, preserve custom files)
+  and `--remove` (delete `opensip-tools/` entirely, then scaffold
+  fresh). Default refuses on partial state with a clear flag hint.
+  Migration: `--force` → `--remove` (closest semantic match — it
+  overwrote everything).
 
 ### Deprecated
 
 - **`CliArgs` from `@opensip-tools/contracts` is deprecated for new
-  flags.** The interface still works (the `*OptsToCliArgs` adapter
+  flags.** The interface still works (`*OptsToCliArgs` adapter
   functions in `@opensip-tools/fitness`, `@opensip-tools/simulation`,
-  and the CLI's `init` command are doing real work and remain in
-  place), but new command flags should land on the per-command
-  options interfaces — `FitOptions`, `ToolOptions`, `InitOptions` —
-  rather than on `CliArgs`. The `@deprecated` JSDoc tag now surfaces
-  this in IDE tooltips. See
+  and the CLI's `init` command remain in place), but new command flags
+  should land on the per-command options interfaces — `FitOptions`,
+  `ToolOptions`, `InitOptions` — rather than on `CliArgs`. The
+  `@deprecated` JSDoc tag now surfaces this in IDE tooltips. See
   `docs/architecture/70-surfaces/02-plugin-authoring.md` for the
   adapter pattern.
+
+### Removed
+
+- **`packages/graph/engine/src/cache/{read,write,normalize}.ts`** — the
+  streamed JSON catalog reader/writer. Replaced by `CatalogRepo`.
+- **`@opensip-tools/contracts` exports**: `configurePersistencePaths`,
+  `saveSession`, `loadSessions`, `loadLatestSession`, `countSessions`,
+  `clearAllSessions`, `clearSessionsOlderThan`, `getStoreDir`,
+  `getReportsDir`. Replaced by `SessionRepo`.
+- **`DEFAULT_BASELINE_PATH`** and the `--baseline <path>` flag from
+  fitness (see Breaking changes).
+- **Five umbrella `checks-universal` checks** consolidated in the
+  audit-remediation pass: `comment-quality`, `dependency-security-audit`
+  (renamed `dependency-vulnerability-audit`), `no-legacy-code`,
+  `no-test-only-skip`, and `todo-comments` (TS variant). Their content
+  was either split into focused single-concern checks
+  (`no-ai-attribution`, `no-process-artifacts`, `no-deprecated-tags`,
+  `no-compatibility-layer-names`, `no-temporary-workarounds`) or folded
+  into the cross-language equivalent (`no-todo-comments`,
+  `no-focused-tests`, `no-skipped-tests`).
+- **`async-patterns.ts` and `context-safety.ts`** in
+  `checks-typescript/resilience/` — split into one-check-per-file
+  (`detached-promises`, `no-unbounded-concurrency`, `no-raw-fetch`,
+  `await-result-unwrap`, `context-mutation`, `context-leakage`).
+- **`InitOptions.force`** replaced by `keep` and `remove` (see Added).
+
+### Upgrade path
+
+- **v1.x → v2.0.0**: re-run `opensip-tools fit --gate-save` to
+  re-establish the architecture-gate baseline; the rest is automatic.
+  Drop `--baseline <path>` from any CI invocations.
+- **v2.x → v2.y** (future minor releases): first run of the new
+  version applies any pending Drizzle migrations on top of the
+  existing `datastore.sqlite`. Users see no extra step. Downgrades
+  across schema changes are unsupported and produce a
+  `DataStoreMigrationError` on next run; recovery is to delete
+  `<project>/opensip-tools/.runtime/datastore.sqlite` (cache rebuilds;
+  session history lost).
 
 ## [1.3.1] — 2026-05-18
 

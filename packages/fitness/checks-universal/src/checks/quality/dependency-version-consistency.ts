@@ -67,6 +67,7 @@ interface VersionAnalysis {
   hasInconsistency: boolean
 }
 
+/* v8 ignore start -- filesystem traversal helpers; depth/error/file-size branches covered by integration */
 /**
  * Find all package.json files in the workspace
  */
@@ -115,6 +116,7 @@ function parsePackageJson(filePath: string): PackageJson | null {
     return null
   }
 }
+/* v8 ignore stop */
 
 /**
  * Get the root package.json canonical versions

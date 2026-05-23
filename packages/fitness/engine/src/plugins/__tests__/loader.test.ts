@@ -162,6 +162,74 @@ describe('loadPlugin', () => {
     expect(result.checksRegistered).toBe(1)
   })
 
+  it('warns and skips when checks export is not an array', async () => {
+    const pluginFile = join(testDir, 'non-array-checks.mjs')
+    writeFileSync(pluginFile, `
+      export const checks = { not: 'an-array' };
+    `)
+
+    const plugin: DiscoveredPlugin = {
+      type: 'file',
+      entryPoint: pluginFile,
+      namespace: 'non-array-checks',
+      source: 'non-array-checks.mjs',
+    }
+
+    const result = await loadPlugin(plugin)
+    // Loader warns and continues — no error, zero registrations.
+    expect(result.error).toBeUndefined()
+    expect(result.checksRegistered).toBe(0)
+  })
+
+  it('registers recipes alongside checks', async () => {
+    const pluginFile = join(testDir, 'with-recipes.mjs')
+    writeFileSync(pluginFile, `
+      export const recipes = [
+        {
+          id: 'URCP_plugin-test',
+          name: 'plugin-recipe-test',
+          displayName: 'Plugin Test',
+          description: 'recipe contributed by a plugin',
+          checks: { type: 'all', exclude: [] },
+          execution: { mode: 'parallel', stopOnFirstFailure: false, timeout: 30000 },
+          reporting: { format: 'table', verbose: false },
+        },
+      ];
+    `)
+
+    const plugin: DiscoveredPlugin = {
+      type: 'file',
+      entryPoint: pluginFile,
+      namespace: 'plugin-recipes',
+      source: 'with-recipes.mjs',
+    }
+
+    const result = await loadPlugin(plugin)
+    expect(result.error).toBeUndefined()
+    expect(result.recipesRegistered).toBeGreaterThanOrEqual(1)
+  })
+
+  it('warns on malformed recipe entries (missing id/name) without failing', async () => {
+    const pluginFile = join(testDir, 'malformed-recipes.mjs')
+    writeFileSync(pluginFile, `
+      export const recipes = [
+        { malformed: true },
+        null,
+      ];
+    `)
+
+    const plugin: DiscoveredPlugin = {
+      type: 'file',
+      entryPoint: pluginFile,
+      namespace: 'malformed-recipes',
+      source: 'malformed-recipes.mjs',
+    }
+
+    const result = await loadPlugin(plugin)
+    expect(result.error).toBeUndefined()
+    expect(result.recipesRegistered).toBe(0)
+  })
+
   it('deduplicates checks appearing in both array and named exports', async () => {
     const pluginFile = join(testDir, 'dedup-checks.mjs')
     writeFileSync(pluginFile, `

@@ -78,6 +78,7 @@ function findMarkdownReferences(
   const lines = content.split('\n')
 
   for (const [i, line] of lines.entries()) {
+    /* v8 ignore next -- defensive: lines.entries() never yields undefined */
     if (line === undefined) continue
 
     // Only check comment lines
@@ -93,6 +94,7 @@ function findMarkdownReferences(
       if (!reference || reference === '.md') continue
 
       // Skip well-known stable markdown file names (e.g., CLAUDE.md, README.md)
+      /* v8 ignore next -- defensive: split + pop on a non-empty string never returns undefined */
       const basename = reference.split('/').pop() ?? reference
       if (STABLE_REFERENCE_PATTERNS.some((pattern) => pattern.test(basename))) continue
 

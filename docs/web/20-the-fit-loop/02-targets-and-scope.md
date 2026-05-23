@@ -1,7 +1,6 @@
 ---
 status: current
-last_verified: 2026-05-22
-release: v1.3.x
+last_verified: 2026-05-15
 title: "Targets and scope"
 audience: [contributors, plugin-authors]
 purpose: "How the framework decides which files a check runs against. Targets, scope, glob expansion, and the marketplace shape."
@@ -82,12 +81,13 @@ The framework filters the matched file list to files with these extensions. Laye
 
 ```yaml
 # opensip-tools.config.yml
-checkOverrides:
-  no-console-log: backend
-  no-todos: ['backend', 'frontend']
+targets:
+  checkOverrides:
+    no-console-log: backend
+    no-todos: ['backend', 'frontend']
 ```
 
-A user can pin a check to a specific target by slug, regardless of what the check declared. This is the escape hatch when a third-party check's scope doesn't match your project's reality. `checkOverrides` is a top-level key alongside `targets:` and `globalExcludes:`. Lives in [`TargetsConfig.checkOverrides`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/fitness/engine/src/targets/types.ts).
+A user can pin a check to a specific target by slug, regardless of what the check declared. This is the escape hatch when a third-party check's scope doesn't match your project's reality. Lives in [`TargetsConfig.checkOverrides`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/fitness/engine/src/targets/types.ts).
 
 ### 4. No declaration at all
 
@@ -97,7 +97,7 @@ A check that declares neither `scope:` nor `fileTypes:` matches *every* file the
 
 ## Anatomy of a target
 
-The shape lives in [`packages/fitness/engine/src/targets/types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/fitness/engine/src/targets/types.ts):
+The shape lives in [`packages/fitness/engine/src/targets/types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/fitness/engine/src/targets/types.ts):
 
 ```ts
 interface TargetConfig {
@@ -121,41 +121,40 @@ The first is for execution; the second is for matching.
 
 ### Example: the `acme-api` targets
 
-`globalExcludes` is a top-level key alongside `targets:`; targets are a map of kebab-case name → definition (no separate `registry:` wrapper):
-
 ```yaml
-globalExcludes:
-  - '**/node_modules/**'
-  - '**/dist/**'
-  - '**/.next/**'
-
 targets:
-  backend:
-    description: TypeScript REST API
-    include: ['services/api/**/*.ts']
-    exclude: ['**/*.test.ts']
-    languages: ['typescript']
-    concerns: ['backend', 'server']
+  globalExcludes:
+    - '**/node_modules/**'
+    - '**/dist/**'
+    - '**/.next/**'
 
-  pipelines:
-    description: Python ETL jobs
-    include: ['pipelines/etl/**/*.py']
-    exclude: ['**/*_test.py']
-    languages: ['python']
-    concerns: ['data-pipeline']
+  registry:
+    - name: backend
+      description: TypeScript REST API
+      include: ['services/api/**/*.ts']
+      exclude: ['**/*.test.ts']
+      languages: ['typescript']
+      concerns: ['backend', 'server']
 
-  infra:
-    description: AWS CDK stack
-    include: ['infra/**/*.ts']
-    exclude: ['infra/**/*.test.ts']
-    languages: ['typescript']
-    concerns: ['infrastructure']
+    - name: pipelines
+      description: Python ETL jobs
+      include: ['pipelines/etl/**/*.py']
+      exclude: ['**/*_test.py']
+      languages: ['python']
+      concerns: ['data-pipeline']
 
-  tests:
-    description: All test files
-    include: ['**/*.test.ts', '**/*_test.py']
-    languages: ['typescript', 'python']
-    concerns: ['tests']
+    - name: infra
+      description: AWS CDK stack
+      include: ['infra/**/*.ts']
+      exclude: ['infra/**/*.test.ts']
+      languages: ['typescript']
+      concerns: ['infrastructure']
+
+    - name: tests
+      description: All test files
+      include: ['**/*.test.ts', '**/*_test.py']
+      languages: ['typescript', 'python']
+      concerns: ['tests']
 ```
 
 Now a check with `scope: { languages: ['typescript'], concerns: ['backend'] }` matches `backend` (overlap on `typescript`+`backend`). It does *not* match `infra` (different concern) or `tests` (different concern). It does *not* match `pipelines` (different language).
@@ -166,7 +165,7 @@ A universal check with `scope: { languages: [], concerns: [] }` matches all four
 
 ## How the resolution actually runs
 
-[`packages/fitness/engine/src/framework/scope-resolver.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/fitness/engine/src/framework/scope-resolver.ts) is where it happens. The flow:
+[`packages/fitness/engine/src/framework/scope-resolver.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/fitness/engine/src/framework/scope-resolver.ts) is where it happens. The flow:
 
 ```
 1. Load TargetsConfig from opensip-tools.config.yml.
@@ -192,18 +191,19 @@ The `COMMON_IGNORE` set inside the resolver always includes `node_modules`, `dis
 
 ## Global excludes
 
-`globalExcludes` is the top-level project-wide subtractor (it sits at the root of `opensip-tools.config.yml`, not under `targets:`). Every target's resolved file list passes through it. Common entries:
+`TargetsConfig.globalExcludes` is the project-wide subtractor. Every target's resolved file list passes through it. Common entries:
 
 ```yaml
-globalExcludes:
-  - '**/node_modules/**'
-  - '**/dist/**'
-  - '**/build/**'
-  - '**/.next/**'
-  - '**/.turbo/**'
-  - '**/coverage/**'
-  - '**/__snapshots__/**'
-  - '**/*.generated.ts'
+targets:
+  globalExcludes:
+    - '**/node_modules/**'
+    - '**/dist/**'
+    - '**/build/**'
+    - '**/.next/**'
+    - '**/.turbo/**'
+    - '**/coverage/**'
+    - '**/__snapshots__/**'
+    - '**/*.generated.ts'
 ```
 
 Use this rather than repeating the same exclusions on every target. The historical `.fitnessignore` file from earlier versions has been retired — `globalExcludes` replaces it.
@@ -212,7 +212,7 @@ Use this rather than repeating the same exclusions on every target. The historic
 
 ## The `PathMatcher`
 
-[`packages/fitness/engine/src/framework/path-matcher.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/fitness/engine/src/framework/path-matcher.ts) is the per-check matcher object. It compiles include/exclude globs once and answers `match(filePath)` queries with a single pass through the compiled `Minimatch` instances.
+[`packages/fitness/engine/src/framework/path-matcher.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/fitness/engine/src/framework/path-matcher.ts) is the per-check matcher object. It compiles include/exclude globs once and answers `match(filePath)` queries with a single pass through the compiled `Minimatch` instances.
 
 You won't usually instantiate one. The framework constructs it for each check inside `executeUnifiedCheck()` and exposes `ctx.matchFiles()` to the check. If you're writing an `analyzeAll`-mode check that needs additional filtering on top of the resolved file list, the matcher is available via `check.getMatcher(cwd)`.
 

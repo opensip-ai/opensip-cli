@@ -12,9 +12,6 @@
  */
 
 import {
-  configurePersistencePaths,
-} from '@opensip-tools/contracts';
-import {
   generatePrefixedId,
   initLogFile,
   logger,
@@ -44,7 +41,9 @@ export function installPreActionHook(program: Command): void {
 
     const projectPaths = resolveProjectPaths(cwd);
     initLogFile(projectPaths.logsDir);
-    configurePersistencePaths(projectPaths);
+    // v2: persistence is per-process via DataStoreFactory.open in
+    // bootstrap/index.ts; configurePersistencePaths(projectPaths) was
+    // removed in the v1→v2 migration.
 
     logger.info({
       evt: 'cli.start',

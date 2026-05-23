@@ -37,9 +37,11 @@ export const duplicatedFunctionBodyRule: Rule = {
     for (const group of groups) {
       if (group.length < 2) continue;
       const primary = group[0];
+      /* v8 ignore next */
       if (!primary) continue;
       for (let i = 1; i < group.length; i++) {
         const occ = group[i];
+        /* v8 ignore next */
         if (!occ) continue;
         signals.push(
           createSignal({
@@ -74,6 +76,7 @@ function groupByHash(
   const buckets = new Map<string, FunctionOccurrence[]>();
   for (const name of Object.keys(catalog.functions)) {
     const occs: readonly FunctionOccurrence[] | undefined = catalog.functions[name];
+    /* v8 ignore next */
     if (!occs) continue;
     for (const occ of occs) {
       if (!isInterestingForDup(occ, minLines, minBodySize)) continue;

@@ -36,6 +36,7 @@ function hashTsconfig(configPathAbs: string | undefined): string {
     const content = readFileSync(configPathAbs, 'utf8');
     return createHash('sha256').update(content).digest('hex').slice(0, 16);
   } catch {
+    /* v8 ignore next */
     return `unreadable:${configPathAbs}`;
   }
 }

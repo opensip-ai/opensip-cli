@@ -56,6 +56,32 @@ describe('buildSarifLog', () => {
     expect(Array.isArray(sarif.runs)).toBe(true);
   });
 
+  it('omits the region key when neither line nor column is set', () => {
+    const out: CliOutput = {
+      ...makeSampleOutput(),
+      checks: [
+        {
+          checkSlug: 'no-position',
+          passed: false,
+          durationMs: 1,
+          findings: [
+            {
+              ruleId: 'no-position',
+              message: 'file-level finding',
+              severity: 'warning',
+              filePath: 'src/x.ts',
+              // No line, no column → region object stays empty.
+            },
+          ],
+        },
+      ],
+    };
+    const sarif = buildSarifLog(out);
+    const runs = sarif.runs as { results: { locations?: { physicalLocation: { region?: unknown } }[] }[] }[];
+    const result = runs[0]?.results[0];
+    expect(result?.locations?.[0]?.physicalLocation.region).toBeUndefined();
+  });
+
   it('creates one run per check with findings', () => {
     const sarif = buildSarifLog(makeSampleOutput());
     const runs = sarif.runs as Record<string, unknown>[];

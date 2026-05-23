@@ -64,28 +64,20 @@ export { loadCliDefaults } from './cli-config.js';
 export type { CliDefaults } from './cli-config.js';
 
 // Session persistence
-export {
-  configurePersistencePaths,
-  saveSession,
-  loadSessions,
-  loadLatestSession,
-  countSessions,
-  clearAllSessions,
-  clearSessionsOlderThan,
-  getStoreDir,
-  getReportsDir,
-  generateSessionId,
-  sanitizeForFilename,
-} from './persistence/store.js';
+export { generateSessionId, sanitizeForFilename } from './persistence/store.js';
 export type {
   StoredSession,
   CheckCatalogEntry,
   RecipeCatalogEntry,
 } from './persistence/store.js';
-// `LegacyStoredSession` and `migrateLegacyStoredSession` are intentionally
-// NOT re-exported here — they are an internal implementation detail of
-// `loadSessions`. Tests reach in via the relative path. Promote them to
-// the barrel only if a real external consumer materializes.
+// v2 persistence: SessionRepo + sessions schema.
+// `LegacyStoredSession` and `migrateLegacyStoredSession` (if either survived
+// the v2 migration) are intentionally NOT re-exported here — they are
+// internal. Tests reach in via the relative path. Promote them to the
+// barrel only if a real external consumer materializes.
+export { SessionRepo } from './persistence/session-repo.js';
+export type { SessionListOptions } from './persistence/session-repo.js';
+export { sessions, sessionChecks, sessionFindings } from './persistence/schema/sessions.js';
 
 // Graph catalog type surface. This is the contract surface between the
 // graph tool (which writes catalog.json) and the dashboard package

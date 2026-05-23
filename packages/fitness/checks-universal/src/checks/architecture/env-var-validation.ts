@@ -142,6 +142,7 @@ function analyzeMatch(line: string, match: RegExpMatchArray): MatchAnalysis | nu
   return { envVarName, context, matchIndex }
 }
 
+/* v8 ignore start -- switch over issue types; only some cases fire in test fixtures */
 function createIssue(
   filePath: string,
   lineNumber: number,
@@ -195,6 +196,7 @@ function createIssue(
     }
   }
 }
+/* v8 ignore stop */
 
 function analyzeMatchForIssues(
   analysis: MatchAnalysis,

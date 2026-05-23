@@ -16,8 +16,10 @@ export const visitFunctionDeclaration: InventoryVisitor<ts.FunctionDeclaration> 
   // Body-less function declarations (overload signatures, ambient
   // `declare function` forms) are not callables — they have no
   // implementation to enter the call graph.
+  /* v8 ignore next */
   if (!node.body) return null;
   const name = resolveFunctionName(node);
+  /* v8 ignore next */
   if (name === null) return null;
   const start = node.getStart(ctx.sourceFile);
   const startLC = ctx.sourceFile.getLineAndCharacterOfPosition(start);

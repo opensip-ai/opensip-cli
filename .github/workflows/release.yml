@@ -72,6 +72,7 @@ jobs:
           new_count=0
           for pkg in \
             core \
+            datastore \
             contracts \
             lang-typescript lang-rust lang-python lang-go lang-java lang-cpp \
             dashboard \
@@ -99,6 +100,8 @@ jobs:
           mkdir -p /tmp/tarballs
           # Layer 1 — kernel
           pnpm --filter @opensip-tools/core             pack --pack-destination /tmp/tarballs
+          # Layer 2 — datastore (SQLite + Drizzle persistence)
+          pnpm --filter @opensip-tools/datastore        pack --pack-destination /tmp/tarballs
           # Layer 2 — shared CLI infra
           pnpm --filter @opensip-tools/contracts       pack --pack-destination /tmp/tarballs
           # Layer 3 — language adapters
@@ -155,6 +158,8 @@ jobs:
 
           # Layer 1 — kernel
           publish_if_new core
+          # Layer 2 — datastore (SQLite + Drizzle persistence)
+          publish_if_new datastore
           # Layer 2 — shared CLI infra
           publish_if_new contracts
           # Layer 3 — language adapters (lang-typescript first; downstream check packs depend on it)

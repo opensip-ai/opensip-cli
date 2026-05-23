@@ -130,10 +130,10 @@ See [`./90-conventions/03-doc-conventions.md`](/docs/opensip-tools/90-convention
 
 ## Relationship to other docs
 
-- **[`docs/coverage-status.md`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/docs/coverage-status.md)** — Test coverage snapshot.
-- **[`docs/json-output-schema.md`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/docs/json-output-schema.md)** — JSON output reference (mirrored into [`80-reference/03-json-output-schema.md`](/docs/opensip-tools/80-reference/03-json-output-schema/)).
-- **[`docs/release-smoke-test.md`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/docs/release-smoke-test.md)** — Release verification checklist.
-- **[`README.md`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/README.md)** — Marketing-shaped product README. Start *here* for architecture, not there.
+- **[`docs/coverage-status.md`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/docs/coverage-status.md)** — Test coverage snapshot.
+- **[`docs/json-output-schema.md`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/docs/json-output-schema.md)** — JSON output reference (mirrored into [`80-reference/03-json-output-schema.md`](/docs/opensip-tools/80-reference/03-json-output-schema/)).
+- **[`docs/release-smoke-test.md`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/docs/release-smoke-test.md)** — Release verification checklist.
+- **[`README.md`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/README.md)** — Marketing-shaped product README. Start *here* for architecture, not there.
 
 ---
 

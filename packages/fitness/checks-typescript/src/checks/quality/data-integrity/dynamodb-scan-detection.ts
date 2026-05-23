@@ -46,6 +46,7 @@ function analyzeFile(content: string, absolutePath: string): CheckViolation[] {
   }
 
   const sourceFile = getSharedSourceFile(absolutePath, content)
+    /* v8 ignore next -- defensive guard */
     if (!sourceFile) return []
 
   const visit = (node: ts.Node) => {

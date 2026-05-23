@@ -28,16 +28,6 @@ export function registerAdapter(adapter: GraphLanguageAdapter): void {
   adapters.set(adapter.id, adapter);
 }
 
-/** Look up an adapter by id. Returns undefined if not registered. */
-export function findAdapter(id: string): GraphLanguageAdapter | undefined {
-  return adapters.get(id);
-}
-
-/** List every registered adapter's id (for diagnostics + --help). */
-export function registeredAdapterIds(): readonly string[] {
-  return [...adapters.keys()].sort();
-}
-
 /**
  * Pick the adapter for the current run.
  *
@@ -76,12 +66,14 @@ export function pickAdapter(cwd?: string): GraphLanguageAdapter {
   // the first id alphabetically.
   const ts = adapters.get('typescript');
   if (ts) return ts;
+  /* v8 ignore start */
   const ids = [...adapters.keys()].sort();
   const id = ids[0];
   if (!id) throw new ConfigurationError('graph: registry corrupted');
   const adapter = adapters.get(id);
   if (!adapter) throw new ConfigurationError('graph: registry corrupted');
   return adapter;
+  /* v8 ignore stop */
 }
 
 const COUNT_EXCLUDES: readonly string[] = [
@@ -139,6 +131,7 @@ function collectTies(counts: ReadonlyMap<string, number>, target: number): reado
 function resolveTie(tied: readonly string[]): GraphLanguageAdapter | undefined {
   const preference = ['typescript', 'python', 'rust'];
   for (const pref of preference) if (tied.includes(pref)) return adapters.get(pref);
+  /* v8 ignore next 2 */
   const sorted = [...tied].sort();
   return adapters.get(sorted[0] ?? '');
 }

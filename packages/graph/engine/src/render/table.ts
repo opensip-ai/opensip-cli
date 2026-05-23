@@ -18,6 +18,7 @@ export const renderTable: Renderer = (signals, _context): string => {
   const sortedRules = [...byRule.keys()].sort();
   const lines = [`graph: ${String(signals.length)} finding(s).`];
   for (const ruleId of sortedRules) {
+    /* v8 ignore next */
     const findings = byRule.get(ruleId) ?? [];
     lines.push('', `[${ruleId}] ${String(findings.length)} finding(s)`);
     for (const f of findings) {

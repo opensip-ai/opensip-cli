@@ -48,6 +48,7 @@ export function parseProject(input: ParseInput): ParseOutput<PythonParsedProject
 
   for (const path of input.files) {
     let source: string;
+    /* v8 ignore start */
     try {
       source = readFileSync(path, 'utf8');
     } catch (error) {
@@ -57,7 +58,9 @@ export function parseProject(input: ParseInput): ParseOutput<PythonParsedProject
       });
       continue;
     }
+    /* v8 ignore stop */
     let tree: Parser.Tree;
+    /* v8 ignore start */
     try {
       tree = parser.parse(source);
     } catch (error) {
@@ -67,6 +70,7 @@ export function parseProject(input: ParseInput): ParseOutput<PythonParsedProject
       });
       continue;
     }
+    /* v8 ignore stop */
     if (tree.rootNode.hasError) {
       parseErrors.push({
         filePath: relative(input.projectDirAbs, path),

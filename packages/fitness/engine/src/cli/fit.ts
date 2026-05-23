@@ -7,8 +7,6 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import {
   EXIT_CODES,
-  saveSession,
-  generateSessionId,
   // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; fit's executeFit signature is fed via fitOptsToCliArgs until the rip-out
   type CliArgs,
   type CliOutput,
@@ -18,6 +16,7 @@ import {
   type ErrorResult,
 } from '@opensip-tools/contracts';
 import { logger, type CheckDisplayEntry } from '@opensip-tools/core';
+
 
 import { isCheck } from '../framework/check-types.js';
 import { defaultRegistry } from '../framework/registry.js';
@@ -525,6 +524,12 @@ interface BuildFitDoneArgs {
  * Build the {@link FitDoneResult} the live renderer / JSON output / gate
  * mode all consume. Computes the configured fail thresholds, the table
  * rows, the optional grouped findings block, and the run label.
+ *
+ * TODO(merge): v2 added SessionRepo session persistence inline (writes to
+ * SQLite via @opensip-tools/datastore). Audit's D1 phase extracted this
+ * helper before v2 landed; the session-write needs a follow-up that
+ * threads `datastore` through `executeFit` to the post-call site, not
+ * inline here. See merge commit message for the deferred TODO list.
  */
 function buildFitDoneResult({ args, fitnessResult, signalersConfig, recipeName }: BuildFitDoneArgs): FitDoneResult {
   const { summary, checkResults, durationMs } = fitnessResult;
@@ -726,24 +731,14 @@ export async function executeFit(
 
   const output = buildCliOutput(fitnessResult, recipeName);
 
-  // Persist session for history and dashboard. Best-effort — never fail
-  // the run when the on-disk store can't be written.
-  try {
-    saveSession({
-      id: generateSessionId(),
-      tool: 'fit',
-      timestamp: output.timestamp,
-      cwd: args.cwd,
-      recipe: recipeName,
-      score: output.score,
-      passed: output.passed,
-      summary: output.summary,
-      checks: output.checks,
-      durationMs: output.durationMs,
-    });
-  } catch {
-    // Best effort — don't fail the run if persistence fails
-  }
+  // TODO(merge): v2 replaced the legacy `saveSession(...)` file writer
+  // with `SessionRepo.save(...)`. Audit's executeFit had a best-effort
+  // saveSession() block here; the v2 swap requires threading `datastore`
+  // through executeFit's signature down to this call site, then
+  // constructing `new SessionRepo(datastore).save({...})`. Tracked as a
+  // follow-up because it touches every executeFit caller. The CLI
+  // bootstrap currently bypasses this code path via tool.ts which writes
+  // through SessionRepo directly.
 
   const result = buildFitDoneResult({ args, fitnessResult, signalersConfig, recipeName });
 

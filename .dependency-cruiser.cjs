@@ -5,13 +5,14 @@
  * Layer order (lower depends on higher only):
  *
  *   1. @opensip-tools/core           — kernel
- *   2. @opensip-tools/contracts      — shared contract types (CliOutput, exit codes, persistence)
- *   3. @opensip-tools/lang-*         — language adapters (depend on core)
- *   3. @opensip-tools/fitness        — fitness engine + cli/* commands
- *   3. @opensip-tools/simulation     — simulation engine + cli/* commands
- *   3. @opensip-tools/dashboard      — HTML report generator (depends on core + contracts)
- *   4. @opensip-tools/checks-*       — fitness check packs (depend on fitness)
- *   5. @opensip-tools/cli            — entry point (depends on every tool)
+ *   2. @opensip-tools/datastore      — SQLite + Drizzle persistence layer
+ *   3. @opensip-tools/contracts      — shared contract types (CliOutput, exit codes, persistence)
+ *   4. @opensip-tools/lang-*         — language adapters (depend on core)
+ *   4. @opensip-tools/fitness        — fitness engine + cli/* commands
+ *   4. @opensip-tools/simulation     — simulation engine + cli/* commands
+ *   4. @opensip-tools/dashboard      — HTML report generator (depends on core + contracts)
+ *   5. @opensip-tools/checks-*       — fitness check packs (depend on fitness)
+ *   6. @opensip-tools/cli            — entry point (depends on every tool)
  *
  * Forbidden edges enforce that dependencies flow from lower-numbered layers
  * upward only — a higher layer must never reach DOWN into a lower layer.
@@ -83,9 +84,33 @@ module.exports = {
       name: 'core-imports-nothing-workspace',
       severity: 'error',
       comment:
-        'core is the kernel. It must not depend on contracts, cli, fitness, ' +
-        'simulation, lang-*, or checks-*. Anything else inverts the layering.',
+        'core is the kernel. It must not depend on datastore, contracts, cli, ' +
+        'fitness, simulation, lang-*, or checks-*. Anything else inverts the layering.',
       from: { path: '^packages/core/src/' },
+      to: {
+        path: [
+          '^@opensip-tools/datastore',
+          '^@opensip-tools/contracts',
+          '^@opensip-tools/cli($|/)',
+          '^@opensip-tools/fitness',
+          '^@opensip-tools/simulation',
+          '^@opensip-tools/lang-',
+          '^@opensip-tools/checks-',
+        ],
+      },
+    },
+
+    // -------------------------------------------------------------------
+    // Layer enforcement — datastore depends only on core
+    // -------------------------------------------------------------------
+    {
+      name: 'datastore-imports-core-only',
+      severity: 'error',
+      comment:
+        'datastore is paradigm-agnostic infrastructure. It depends on core ' +
+        '(logger, errors) only. It must not import from contracts, cli, or any ' +
+        'tool/lang/checks pack — domain schemas live with their owning packages.',
+      from: { path: '^packages/datastore/src/' },
       to: {
         path: [
           '^@opensip-tools/contracts',
@@ -94,6 +119,7 @@ module.exports = {
           '^@opensip-tools/simulation',
           '^@opensip-tools/lang-',
           '^@opensip-tools/checks-',
+          '^@opensip-tools/graph',
         ],
       },
     },

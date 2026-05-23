@@ -17,6 +17,7 @@ import { ThemeProvider } from './theme.js';
 
 // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; renderFitView consumes the CliArgs shape produced by fit's *OptsToCliArgs adapter until the rip-out
 import type { CommandResult , CliArgs } from '@opensip-tools/contracts';
+import type { DataStore } from '@opensip-tools/datastore';
 
 /** Render a static command result (non-fit commands) */
 export async function renderApp(result: CommandResult): Promise<void> {
@@ -35,13 +36,13 @@ export async function renderApp(result: CommandResult): Promise<void> {
 
 /** Render the fit command with real-time spinner → results transition */
 // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
-export async function renderFitView(args: CliArgs): Promise<void> {
+export async function renderFitView(args: CliArgs, datastore?: DataStore): Promise<void> {
   const { render } = await import('ink');
 
   const app = render(
     <ThemeProvider>
       <ClockProvider>
-        <FitView args={args} />
+        <FitView args={args} datastore={datastore} />
       </ClockProvider>
     </ThemeProvider>,
   );
@@ -57,13 +58,13 @@ export interface GraphViewArgs {
 }
 
 /** Render the graph command with a live stage checklist. */
-export async function renderGraphView(args: GraphViewArgs): Promise<void> {
+export async function renderGraphView(args: GraphViewArgs, datastore?: DataStore): Promise<void> {
   const { render } = await import('ink');
 
   const app = render(
     <ThemeProvider>
       <ClockProvider>
-        <GraphView args={args} />
+        <GraphView args={args} datastore={datastore} />
       </ClockProvider>
     </ThemeProvider>,
   );

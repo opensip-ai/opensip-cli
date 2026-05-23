@@ -1,7 +1,6 @@
 ---
 status: current
-last_verified: 2026-05-22
-release: v1.3.x
+last_verified: 2026-05-15
 title: "Check pack architecture"
 audience: [contributors, plugin-authors]
 purpose: "How check packs are structured, the bundled six, scope filters, parameterization, and the marketplace shape."
@@ -70,7 +69,7 @@ There is **no `opensipTools.kind` marker** for check packs. Discovery is **name-
 
 See [`50-runtime/02-plugin-loader.md`](/docs/opensip-tools/50-runtime/02-plugin-loader/) for the resolution rules and how `plugins.autoDiscoverChecks: false` lets you opt out of auto-discovery entirely.
 
-The [`collectCheckObjects`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/fitness/engine/src/framework/check-types.ts) helper (re-exported from `@opensip-tools/fitness`) walks a barrel's exports recursively, narrowing each value to a `Check` via `isCheck` and deduplicating by reference. Each pack's `src/index.ts` calls it on `allChecks` (the re-export of `src/checks/index.ts`) so new checks are picked up by simply re-exporting them from the category barrel — no central registration list to update.
+The `collectChecks` helper in [`packages/fitness/checks-universal/src/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/fitness/checks-universal/src/index.ts) walks the package's own subdirectory exports and flattens them, deduplicating by check id. New checks are added by writing a new file under `src/checks/<category>/` — the barrel export picks them up automatically.
 
 ---
 
@@ -174,7 +173,7 @@ The recipe service projects the `config:` map into module-level state before exe
 
 ## The display map
 
-The `CHECK_DISPLAY` map ([`packages/fitness/checks-universal/src/display/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/fitness/checks-universal/src/display/index.ts) and analogues) maps a check slug to `[icon, displayName]`:
+The `CHECK_DISPLAY` map ([`packages/fitness/checks-universal/src/display/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/fitness/checks-universal/src/display/index.ts) and analogues) maps a check slug to `[icon, displayName]`:
 
 ```ts
 export const CHECK_DISPLAY: Record<string, CheckDisplayEntry> = {

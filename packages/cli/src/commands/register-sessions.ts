@@ -10,6 +10,7 @@ import { showHistory } from './history.js';
 import { mountResultCommand } from './mount-result-command.js';
 import { JSON_DESC, type CliCommandsContext } from './shared.js';
 
+import type { DataStore } from '@opensip-tools/datastore';
 import type { Command } from 'commander';
 
 export function registerSessions(program: Command, ctx: CliCommandsContext): void {
@@ -24,7 +25,7 @@ export function registerSessions(program: Command, ctx: CliCommandsContext): voi
 
   mountResultCommand<{ json: boolean }>(
     listCmd,
-    () => showHistory(),
+    () => showHistory(ctx.datastore as DataStore),
     { ctx, jsonFlag: (opts) => opts.json },
   );
 
@@ -41,7 +42,7 @@ export function registerSessions(program: Command, ctx: CliCommandsContext): voi
 
   mountResultCommand<{ olderThan?: number; yes: boolean; json: boolean }>(
     purgeCmd,
-    (opts) => executeClear({ olderThan: opts.olderThan, yes: opts.yes }),
+    (opts) => executeClear({ olderThan: opts.olderThan, yes: opts.yes, datastore: ctx.datastore as DataStore }),
     { ctx, jsonFlag: (opts) => opts.json },
   );
 }

@@ -172,6 +172,7 @@ function checkSubscriptionFields(
   disposeMethod: ts.MethodDeclaration,
 ): CheckViolation[] {
   const violations: CheckViolation[] = []
+  /* v8 ignore next -- defensive nullish fallback */
   const disposeBody = disposeMethod.body?.getText(ctx.sourceFile) ?? ''
 
   for (const member of node.members) {
@@ -231,6 +232,7 @@ function analyzeFile(absolutePath: string, content: string): CheckViolation[] {
   const violations: CheckViolation[] = []
 
   const sourceFile = getSharedSourceFile(absolutePath, content)
+    /* v8 ignore next -- defensive guard */
     if (!sourceFile) return []
 
   const ctx: ViolationContext = { absolutePath, content, sourceFile }

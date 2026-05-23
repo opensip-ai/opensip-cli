@@ -83,6 +83,7 @@ function analyzeFile(content: string, filePath: string): CheckViolation[] {
 
   try {
     const sourceFile = getSharedSourceFile(filePath, content)
+    /* v8 ignore next -- defensive guard */
     if (!sourceFile) return violations
 
     const visit = (node: ts.Node): void => {
@@ -91,6 +92,7 @@ function analyzeFile(content: string, filePath: string): CheckViolation[] {
         return
       }
 
+      /* v8 ignore next -- defensive AST/type guard */
       if (!ts.isIdentifier(node.name)) {
         ts.forEachChild(node, visit)
         return
@@ -136,6 +138,7 @@ function analyzeFile(content: string, filePath: string): CheckViolation[] {
     }
 
     visit(sourceFile)
+  /* v8 ignore next 1 -- defensive catch: parse failures already handled */
   } catch {
     // @swallow-ok Skip files that fail to parse
   }

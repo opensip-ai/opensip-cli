@@ -1,31 +1,38 @@
 ---
 status: current
-last_verified: 2026-05-22
-release: v1.3.x
+last_verified: 2026-05-21
 title: "Session and persistence"
 audience: [contributors]
-purpose: "What gets written to disk during and after a run. The runtime dir layout, session records, logs, reports, the cache."
+purpose: "What gets written to disk during and after a run. The runtime dir layout, the SQLite store, logs, reports."
 source-files:
   - packages/core/src/lib/paths.ts
   - packages/core/src/lib/logger.ts
+  - packages/datastore/src/data-store.ts
+  - packages/datastore/src/factory.ts
   - packages/contracts/src/persistence/store.ts
-  - packages/dashboard/src/
-  - packages/fitness/engine/src/framework/parse-cache.ts
-  - packages/fitness/engine/src/framework/file-cache.ts
+  - packages/contracts/src/persistence/session-repo.ts
+  - packages/contracts/src/persistence/schema/sessions.ts
+  - packages/graph/engine/src/persistence/baseline-repo.ts
+  - packages/graph/engine/src/persistence/catalog-repo.ts
+  - packages/graph/engine/src/persistence/schema.ts
+  - packages/fitness/engine/src/persistence/baseline-repo.ts
+  - packages/fitness/engine/src/persistence/schema.ts
 related-docs:
   - ../00-orientation/03-system-context.md
   - ./01-cli-dispatch.md
   - ./02-plugin-loader.md
+  - ../90-conventions/02-layer-policy.md
+  - ../../plans/persistence-migration/decisions.md
 ---
 # Session and persistence
 
-A run produces five kinds of on-disk artifacts: the session record, the structured log, the dashboard report, the cache, and (optionally) the gate baseline. All five live under one directory — `<project>/opensip-tools/.runtime/` — which is gitignored and rebuildable.
+A run produces three kinds of on-disk artifacts: the SQLite database, structured log files, and HTML dashboard reports. All three live under one directory — `<project>/opensip-tools/.runtime/` — which is gitignored and rebuildable.
 
 > **What you'll understand after this:**
-> - The five artifact kinds and where each one lives.
-> - Which artifacts persist across runs and which are run-scoped.
-> - The session record schema and how `sessions list` consumes it.
-> - The cache invalidation policy.
+> - The on-disk layout and what's stored where.
+> - Tool-produced data (sessions, catalog, baselines) → SQLite via `DataStore`.
+> - Logs and reports stay as files; rendering channels for external consumers.
+> - The schema-migration model and the upgrade / downgrade contract.
 
 ---
 
@@ -33,35 +40,43 @@ A run produces five kinds of on-disk artifacts: the session record, the structur
 
 ```
 <project>/opensip-tools/.runtime/
-├── sessions/<timestamp>-<tool>-<recipe>.json   ← per-run records (most-recent 100, older entries pruned)
+├── datastore.sqlite                            ← single SQLite store for tool-produced data
+├── datastore.sqlite-wal                        ← WAL journal (created when writes are in flight)
+├── datastore.sqlite-shm                        ← shared-memory page (companion to WAL)
 ├── reports/latest.html                         ← rewritten by every dashboard generation
 ├── logs/<YYYY-MM-DD>.jsonl                     ← one log file per local day, shared across runs
-├── cache/                                      ← AST + glob caches (durable, content-keyed)
-│   ├── ast/<file-hash>.json
-│   ├── glob/<pattern-hash>.json
-│   ├── prewarm/…
-│   └── graph/                                  ← graph tool catalog + baseline
-│       ├── catalog.json
-│       └── baseline.json
-├── plugins/                                    ← npm-installed project plugins
-│   ├── fit/node_modules/
-│   └── sim/node_modules/
-└── baseline.sarif                              ← fit gate baseline (default location)
+└── plugins/                                    ← npm-installed project plugins
+    ├── fit/node_modules/
+    └── sim/node_modules/
 ```
 
-Source of truth: [`packages/core/src/lib/paths.ts`](../../../packages/core/src/lib/paths.ts). Every consumer reads paths through `resolveProjectPaths(cwd)`.
+Source of truth: [`packages/core/src/lib/paths.ts`](../../../packages/core/src/lib/paths.ts). Every consumer reads paths through `resolveProjectPaths(cwd)`. The directory is created lazily by whichever consumer needs a subpath first; `mkdirSync(..., { recursive: true })` is the standard idiom.
 
-The dir is created lazily by whichever consumer needs a subpath first. `mkdirSync(..., { recursive: true })` is the standard idiom — there's no startup pass that pre-creates the layout.
+The WAL/SHM sidecar files are SQLite implementation details (Write-Ahead Log mode, enabled at open time so concurrent reads — e.g. from `graph --packages` child processes — don't block writes). They may be empty or absent after a clean shutdown depending on SQLite's WAL checkpoint timing; both states are normal.
+
+---
+
+## The DataStore
+
+[`packages/datastore`](../../../packages/datastore) hosts the persistence kernel: a `DataStore` interface, a SQLite-backed implementation, an in-memory implementation for tests, and the workspace-wide migration store under `migrations/`. The CLI bootstrap opens one `DataStore` per invocation in the `preAction` hook ([`packages/cli/src/index.ts`](../../../packages/cli/src/index.ts)) and closes it on `process.exit`. Every tool's command receives the handle via `ToolCliContext.datastore`.
+
+Schemas are owned by the package that produces the data — datastore is paradigm-agnostic infrastructure. Adding a new tool means adding a new schema module under that tool's `src/persistence/schema.ts` and registering it in [`packages/datastore/drizzle.config.ts`](../../../packages/datastore/drizzle.config.ts). Three packages register schemas today:
+
+| Owner | Schema file | Tables |
+|---|---|---|
+| `@opensip-tools/contracts` | `src/persistence/schema/sessions.ts` | `sessions`, `session_checks`, `session_findings` |
+| `@opensip-tools/graph` | `src/persistence/schema.ts` | `graph_baseline_signals`, `graph_baseline_meta`, `graph_catalog` |
+| `@opensip-tools/fitness` | `src/persistence/schema.ts` | `fit_baseline` |
+
+`__drizzle_migrations` is a fourth, internal table — Drizzle uses it to record which migrations have been applied.
+
+For the rationale behind picking SQLite + Drizzle (and the specific things rejected — Postgres, paradigm-bridging adapters, JSON-as-backend, data migration code), see the persistence-migration decisions log: [`../../plans/persistence-migration/decisions.md`](../../plans/persistence-migration/decisions.md).
 
 ---
 
 ## Sessions
 
-A session is one record per `fit`, `sim`, or `graph` run. Stored at `<project>/opensip-tools/.runtime/sessions/{timestamp}-{tool}-{recipe?}.json` ([`saveSession`](../../../packages/contracts/src/persistence/store.ts) builds the filename; the body carries `id` (a UUID), `tool`, `timestamp`, and the rest of the `StoredSession` shape).
-
-### Schema
-
-The shape lives in [`packages/contracts/src/persistence/store.ts`](../../../packages/contracts/src/persistence/store.ts):
+A session is one record per `fit`, `sim`, or `graph` run. Stored as a row in the `sessions` table, with a `session_checks` row per check and `session_findings` rows for each violation. The wire-shape is unchanged from v1 — the `StoredSession` interface in [`packages/contracts/src/persistence/store.ts`](../../../packages/contracts/src/persistence/store.ts) is what `SessionRepo` round-trips:
 
 ```ts
 interface StoredSession {
@@ -80,29 +95,43 @@ interface StoredSession {
 }
 ```
 
-It's `CliOutput` plus `id` and `cwd` and (per-finding) an optional `category`. The session is written *before* the renderer fires, so even a run that crashes during rendering leaves a session record on disk.
+The session is written via [`SessionRepo.save()`](../../../packages/contracts/src/persistence/session-repo.ts) inside a single transaction (sessions row + per-check rows + per-finding rows), so even a run that crashes mid-render leaves a complete or no record — never a partial one.
 
 ### The `sessions` command
 
 ```bash
-opensip-tools sessions list                       # list every stored session, newest first
-opensip-tools sessions purge                      # delete all (prompts for confirm)
-opensip-tools sessions purge --older-than 7       # only sessions older than N days
+opensip-tools sessions list                       # SELECT * FROM sessions ORDER BY timestamp DESC
+opensip-tools sessions purge                      # DELETE FROM sessions (prompts for confirm)
+opensip-tools sessions purge --older-than 7       # DELETE FROM sessions WHERE timestamp < cutoff
 opensip-tools sessions purge -y                   # skip the confirmation prompt
 ```
 
-`list` takes no flags. `purge` takes `--older-than <days>` and `-y/--yes`. The list output sorts by timestamp descending and shows id, tool, recipe, pass/fail, and finding count. The dashboard reads the same store to populate its run history.
+`purge` is **row-level data deletion**, not file removal. The FK cascade from `sessions` → `session_checks` → `session_findings` ensures that purging a session cleans up its dependents in one shot.
 
-### Why JSON, not SQLite
+The dashboard reads the same store to populate its run-history view.
 
-A flat directory of JSON files instead of a SQLite database, because:
+---
 
-- **Inspectable.** `cat sessions/run-xyz.json | jq .summary` works without tooling.
-- **Backup-friendly.** A user can copy the directory; there's no schema migration story.
-- **No native dependency.** SQLite would pull `better-sqlite3` or a similar binary into the install. The marketplace shape is "pure Node, install everywhere."
-- **Read patterns are list + lookup.** Both are fast against a sorted directory listing of ~hundreds of files. We're not running aggregate queries.
+## The graph catalog
 
-The session store auto-prunes: `MAX_SESSIONS = 100` is enforced inside the persistence module ([`packages/contracts/src/persistence/store.ts`](../../../packages/contracts/src/persistence/store.ts)). Once 100 entries are on disk, the oldest are silently dropped on each subsequent write — so the directory size is bounded without user intervention. `sessions purge` is the manual cleanup for an immediate wipe; `sessions purge --older-than <days>` trims by age. The dir is gitignored, so it doesn't grow the repo either way.
+`@opensip-tools/graph` builds a call-graph catalog (functions, occurrences, calls) and persists it via [`CatalogRepo`](../../../packages/graph/engine/src/persistence/catalog-repo.ts). v2 stores the whole catalog as a single SQLite row; metadata fields (language, cache key, files fingerprint) are lifted into typed columns so the orchestrator can fingerprint-mismatch without parsing the payload. The reconstructed `Catalog` shape is byte-identical to v1's, so dashboard view derivations and rules are unchanged.
+
+The `--packages` runner spawns one child process per workspace package. Each child opens its own `DataStore` against the shared `datastore.sqlite` file. WAL mode permits concurrent readers + one writer, so the parallelism is safe but serialized at the catalog write boundary — per-package incremental writes are deferred to a follow-up `graph-catalog-perf` plan.
+
+The `--no-cache` flag forces a cache miss; the existing fingerprint-based invalidation path runs even when `datastore.sqlite` is present and current.
+
+---
+
+## The gate baselines
+
+Two baselines live in the SQLite store:
+
+- **Fitness baseline** (`fit_baseline`) — the SARIF document produced by `opensip-tools fit --gate-save`. Single-row table; `--gate-compare` reads it and diffs against the current SARIF by `(filePath, ruleId, message)` hash.
+- **Graph baseline** (`graph_baseline_signals` + `graph_baseline_meta`) — the fingerprint set produced by `opensip-tools graph --gate-save`. The `meta` row marks "a baseline exists" so an empty-but-saved baseline (a clean codebase) reports `exists() === true`.
+
+### v1 → v2: the `--baseline <path>` flag is gone
+
+v1 wrote baselines as JSON/SARIF files (`baseline.sarif`, `cache/graph/baseline.json`) and let users override the path with `--baseline`. v2 stores exactly one baseline per project, in the SQLite database. **Drop `--baseline path/to/file.sarif` from CI invocations**; the flag has no equivalent. Teams that committed `baseline.sarif` to git for cross-CI-run gate comparisons should re-run `--gate-save` once the new code lands. See the v2.0.0 entry in [`CHANGELOG.md`](../../../CHANGELOG.md) for the full break.
 
 ---
 
@@ -115,88 +144,49 @@ Structured JSON Lines, one event per line. Written to two destinations simultane
 
 The logger is in [`packages/core/src/lib/logger.ts`](../../../packages/core/src/lib/logger.ts). Every log entry carries:
 
-- `evt` — the event name (`cli.fit.run.start`, `plugin.loader.discover`, etc.).
-- `module` — the module that emitted it (`cli:fit`, `core:plugins`, …).
+- `evt` — the event name (`cli.fit.run.start`, `session.save.complete`, etc.).
+- `module` — the module that emitted it (`cli:fit`, `contracts:session-repo`, …).
 - `runId` — the per-run correlation id.
 - Plus event-specific fields.
 
-Log levels are `error`, `warn`, `info`, `debug`. The default is `info`. `--debug` raises it to `debug`. `--quiet` does *not* affect log level — it suppresses the renderer's banner, not the structured logs.
+Persistence call sites emit structured events with stable `evt:` names: `session.save.complete` / `.list.complete` / `.purge.complete`, `graph.baseline.save.complete` / `.load.complete` / `.load.miss`, `graph.catalog.read.hit` / `.read.miss` / `.write.complete`, `fit.baseline.save.complete` / `.load.complete` / `.load.miss`. Observability did not regress with the storage swap.
 
-Log files older than 7 days are auto-pruned every time `initLogFile(dir)` is called (i.e. on every CLI startup). Pruning is best-effort — a directory write that fails is logged and ignored. `sessions purge` deletes session records but leaves logs alone — logs are useful for debugging *after* a session is no longer needed, and the 7-day retention bounds the directory size automatically.
-
-### Why JSON Lines
-
-Same reasons as the session store: greppable, parseable, no schema migration. `jq -s` aggregates a JSONL file when needed; `jq -c` filters streaming output.
-
-The `evt` field is the primary axis for filtering. Every event has a stable `evt` name (load-bearing — they appear in CI logs and dashboards). Adding a new event is a non-breaking change; renaming one is a breaking change for any external consumer who's grepping for it.
+The log file persists until manually deleted. There's no rotation; that's the user's job. `sessions purge` deletes session rows but leaves logs alone, by design.
 
 ---
 
 ## Reports
 
-The HTML dashboard writes a single self-contained file at `<project>/opensip-tools/.runtime/reports/latest.html` ([`packages/fitness/engine/src/cli/dashboard.ts:153`](../../../packages/fitness/engine/src/cli/dashboard.ts)). Each generation overwrites the previous file — the dashboard is "always show the most recent state", not a per-run archive.
+The HTML dashboard writes a single self-contained file at `<project>/opensip-tools/.runtime/reports/latest.html` ([`packages/fitness/engine/src/cli/dashboard.ts`](../../../packages/fitness/engine/src/cli/dashboard.ts)). Each generation overwrites the previous file — the dashboard is "always show the most recent state", not a per-run archive.
 
-Dashboard JS, CSS, and panel modules live in [`packages/dashboard/src/`](../../../packages/dashboard/src/). The generator inlines all of them — JS via `<script type="module">`, CSS via `<style>`, session data via `<script type="application/json">` — so `latest.html` is one file you can email to a teammate. No CDN, no asset bundle, no server.
+The generator pulls sessions via `SessionRepo.list({ limit: 20 })` and the graph catalog via `CatalogRepo.loadFullCatalog()`, then assembles the inlined HTML (JS via `<script type="module">`, CSS via `<style>`, session/catalog data via `<script type="application/json">`). The output is one self-contained file you can email — no CDN, no asset bundle, no server.
 
-Per-run history lives in `sessions/`, not `reports/`. The dashboard inlines the most recent 20 session records (`loadSessions(20)` in [`packages/fitness/engine/src/cli/dashboard.ts`](../../../packages/fitness/engine/src/cli/dashboard.ts)) for its run-history view, but the HTML on disk is always the latest snapshot.
-
-The dashboard auto-open hook is wired into the Tool action handler. After a run, if (a) `--open` was requested or auto-open is configured, (b) output isn't `--json`, and (c) stdout is a TTY, the CLI launches the user's default browser onto the report URL. Logic in [`packages/cli/src/open-dashboard.ts`](../../../packages/cli/src/open-dashboard.ts).
+The dashboard auto-open hook fires after a run if (a) `--open` was requested or auto-open is configured, (b) output isn't `--json`, and (c) stdout is a TTY.
 
 ---
 
-## The cache
+## Upgrade behavior
 
-Two caches live under `<project>/opensip-tools/.runtime/cache/`:
+`DataStoreFactory.open()` applies any pending Drizzle migrations on every CLI invocation. Migrations are content-hashed and idempotent. Users see no extra step; first run of a new opensip-tools version brings the schema up to date in milliseconds.
 
-### AST cache
-
-Per-file parsed AST representation, keyed by content hash. When a check parses a file (typescript adapter compiling, or any analyzer using `parseCache`), the result is cached. Subsequent reads of the same file (within the same run, or across runs as long as the file hasn't changed) skip the parse.
-
-Source: [`packages/fitness/engine/src/framework/parse-cache.ts`](../../../packages/fitness/engine/src/framework/parse-cache.ts).
-
-The cache is **content-addressed**, not path-addressed. Two files with identical content share a cache entry. Renaming a file doesn't invalidate.
-
-### Glob cache
-
-Pre-resolved glob results. The scope resolver pre-globs every target's include patterns once per run, but those results are also persisted across runs as long as the project tree hasn't changed. The cache key is a hash of the patterns + a digest of the directory listing.
-
-Source: [`packages/fitness/engine/src/framework/file-cache.ts`](../../../packages/fitness/engine/src/framework/file-cache.ts).
-
-### Invalidation
-
-The cache is **safe to delete at any time.** A wiped cache rebuilds on the next run; correctness doesn't depend on it. If you suspect cache corruption, `rm -rf opensip-tools/.runtime/cache/` is the answer — there's no `--clean` flag because the directory wipe is just as effective and more direct.
-
-The cache entries are not LRU-bounded today. Large polyglot repos with frequent code churn produce ~tens of MB of cache over weeks. If that becomes a problem, periodic wipes are the workaround; a built-in size cap is on the roadmap.
+If migration fails (corrupted DB, downgrade across schema changes), the CLI surfaces a `DataStoreMigrationError` with a recovery hint pointing at deleting `<project>/opensip-tools/.runtime/datastore.sqlite`. Cache rebuilds on next run; session history is lost. **Downgrades across schema changes are unsupported** — Drizzle has no down-migration concept.
 
 ---
 
-## The gate baseline
-
-`<project>/opensip-tools/.runtime/baseline.sarif` is the default baseline path for `--gate-save` / `--gate-compare`. The file is the only artifact in the runtime dir that some teams *do* commit to git — checking it in lets PR builds gate against a fixed reference.
-
-Some teams keep it in `.runtime/` (gitignored) and trust the gate to track regression deltas across sequential CI runs. Others move it to `<project>/opensip-tools/baseline.sarif` (outside `.runtime/`, committed) and use `--baseline opensip-tools/baseline.sarif` to point at it.
-
-Both are valid. The default path is in `.runtime/` because the most common workflow is "save once locally, compare against it on the next CI run on the same branch." Teams with a stable main-branch reference move it out.
-
-`opensip-tools sessions purge` (implemented by [`packages/cli/src/commands/clear.ts`](../../../packages/cli/src/commands/clear.ts) — wired into the `sessions` Commander group, not exposed as its own top-level command) only deletes session JSON files under `.runtime/sessions/`. It does not touch reports, logs, cache, plugins, or the baseline — those have to be removed manually if you want them gone.
-
----
-
-## What can be safely deleted
+## Lifecycle commands and what they touch
 
 A reference for "I want to free disk / I'm debugging."
 
-| Path | Safe to delete? | Effect |
-|---|---|---|
-| `sessions/<timestamp>-<tool>-<recipe>.json` | yes | History entry disappears. |
-| `logs/<YYYY-MM-DD>.jsonl` | yes | That day's log archive disappears. |
-| `reports/latest.html` | yes | Removed file is regenerated next time the dashboard runs. |
-| `cache/` (whole dir) | yes | Next run rebuilds. Slightly slower first run after. |
-| `plugins/<domain>/node_modules/` | yes | `plugin sync` reinstalls. |
-| `baseline.sarif` | careful | Next `--gate-compare` errors with `GateBaselineMissingError`. Re-save with `--gate-save`. |
-| The whole `.runtime/` dir | yes | Everything above. Authored content under `<project>/opensip-tools/{fit,sim}/` is untouched. |
+| Command | Touches |
+|---|---|
+| `opensip-tools sessions list` | `SELECT FROM sessions` |
+| `opensip-tools sessions purge --older-than N` | `DELETE FROM sessions WHERE timestamp < cutoff` (FK cascades to checks + findings) |
+| `opensip-tools fit --no-cache` / `graph --no-cache` | Forces cache miss; rebuilds full catalog/results, ignores any cached row |
+| `opensip-tools uninstall --project [path]` | Removes `<path>/opensip-tools/` recursively. **`datastore.sqlite` and its `-wal` / `-shm` sidecars are caught transitively.** On Windows, ensure no opensip-tools CLI process is active when running this — open file handles can block WAL/SHM removal. |
+| `opensip-tools uninstall` (no flag) | Removes `~/.opensip-tools/`. No DB there; user-global state is a single config file. |
+| Manual `rm <path>/opensip-tools/.runtime/datastore.sqlite*` | Wipes the project DB. Caches rebuild; session history is lost. |
 
-The whole `<project>/opensip-tools/` dir is also safe to delete; `opensip-tools init` will scaffold it fresh. You'll lose your custom checks and recipes if you didn't commit them.
+The whole `<project>/opensip-tools/` directory is also safe to delete; `opensip-tools init` will scaffold it fresh. You lose your custom checks and recipes if you didn't commit them.
 
 ---
 
@@ -205,3 +195,5 @@ The whole `<project>/opensip-tools/` dir is also safe to delete; `opensip-tools 
 - **[`../60-subsystems/03-architecture-gate.md`](../60-subsystems/03-architecture-gate.md)** — the gate's full behavior and the baseline format.
 - **[`../70-surfaces/03-dashboard.md`](../70-surfaces/03-dashboard.md)** — the HTML report's structure and the `dashboard` command.
 - **[`../80-reference/02-configuration.md`](../80-reference/02-configuration.md)** — `opensip-tools.config.yml` schema (the one bit of project state that's not in `.runtime/`).
+- **[`../90-conventions/02-layer-policy.md`](../90-conventions/02-layer-policy.md)** — where datastore sits in the workspace layering.
+- **[`../../plans/persistence-migration/decisions.md`](../../plans/persistence-migration/decisions.md)** — the rationale behind picking SQLite + Drizzle.

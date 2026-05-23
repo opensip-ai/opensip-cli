@@ -1,18 +1,18 @@
 ---
 status: current
-last_verified: 2026-05-22
-release: v1.3.x
+last_verified: 2026-05-18
+release: v1.3.0
 title: "Dashboard"
 audience: [users, contributors]
 purpose: "The HTML report — what it shows, when it opens, how it's generated, and where it lives."
 source-files:
-  - packages/dashboard/src/generator.ts
-  - packages/dashboard/src/index.ts
-  - packages/dashboard/src/overview.ts
-  - packages/dashboard/src/checks.ts
-  - packages/dashboard/src/sessions.ts
-  - packages/dashboard/src/code-paths.ts
-  - packages/dashboard/src/code-paths/
+  - packages/contracts/src/persistence/dashboard/generator.ts
+  - packages/contracts/src/persistence/dashboard/index.ts
+  - packages/contracts/src/persistence/dashboard/overview.ts
+  - packages/contracts/src/persistence/dashboard/checks.ts
+  - packages/contracts/src/persistence/dashboard/sessions.ts
+  - packages/contracts/src/persistence/dashboard/code-paths.ts
+  - packages/contracts/src/persistence/dashboard/code-paths/
   - packages/cli/src/open-dashboard.ts
   - packages/fitness/engine/src/cli/dashboard.ts
 related-docs:
@@ -39,7 +39,7 @@ Two triggers, both opt-in:
 1. **`--open` flag.** `opensip-tools fit --open` (or `sim --open`) runs the recipe, then launches the dashboard if conditions allow.
 2. **Explicit `dashboard` command.** `opensip-tools dashboard` opens the most recent run's report regardless of any pending fit run.
 
-The launcher's `decideOpen` ([`packages/cli/src/open-dashboard.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/cli/src/open-dashboard.ts)) returns `shouldOpen: true` only when **all** of these hold:
+The launcher's `decideOpen` ([`packages/cli/src/open-dashboard.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/cli/src/open-dashboard.ts)) returns `shouldOpen: true` only when **all** of these hold:
 
 - The user requested it (`--open` was passed).
 - Output isn't `--json` (machine-readable runs don't open browsers).
@@ -53,7 +53,7 @@ The HTML file is always written. If any guard skips the browser launch, the user
 
 ## What it shows
 
-Four top-level tabs (`Overview`, `Fitness`, `Simulation`, `Code Paths`). The Fitness and Simulation tabs each carry three subtabs (`Overview`, `Catalog`, `Recipes`) — the per-tool `Overview` subtab shows that tool's session list. Every panel module lives under [`packages/dashboard/src/`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/dashboard/src/); the top-of-page tool-tab switcher is wired by [`tool-tabs.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/dashboard/src/tool-tabs.ts).
+Five primary panels — Overview, Sessions, Checks catalog, Recipes, Code Paths — each with its own module under [`packages/contracts/src/persistence/dashboard/`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/contracts/src/persistence/dashboard/), plus a top-level fit/sim tab switcher.
 
 ### Overview
 
@@ -64,17 +64,17 @@ The default landing panel. Shows:
 - The breakdown by category (security, quality, architecture, etc.).
 - Quick links into the other panels.
 
-Source: [`packages/dashboard/src/overview.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/dashboard/src/overview.ts).
+Source: [`packages/contracts/src/persistence/dashboard/overview.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/contracts/src/persistence/dashboard/overview.ts).
 
-### Sessions list (per-tool Overview subtab)
+### Sessions
 
 A list of every past run, sorted reverse-chronological. Click into one to see its full detail — every check that ran, every finding, every directive applied, every check that was skipped or errored.
 
 Per-run detail expands into a tree: check → file → finding. Each finding shows the rule id, severity, line, and (when present) the suggestion text.
 
-Source: [`packages/dashboard/src/sessions.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/dashboard/src/sessions.ts). Rendered inside each per-tool tab's Overview subtab; the tab switcher is in [`tool-tabs.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/dashboard/src/tool-tabs.ts).
+Source: [`packages/contracts/src/persistence/dashboard/sessions.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/contracts/src/persistence/dashboard/sessions.ts).
 
-### Catalog (per-tool Catalog subtab)
+### Checks catalog
 
 Every check that was registered for the current project, with per-check stats:
 
@@ -84,13 +84,13 @@ Every check that was registered for the current project, with per-check stats:
 
 Filterable by tag, by source pack, by pass-rate. Useful for spotting the noisiest checks (high failure rate) and the dormant ones (haven't run in weeks — maybe a recipe drift).
 
-Source: [`packages/dashboard/src/checks.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/dashboard/src/checks.ts).
+Source: [`packages/contracts/src/persistence/dashboard/checks.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/contracts/src/persistence/dashboard/checks.ts).
 
-### Recipes (per-tool Recipes subtab)
+### Recipes
 
-The configured recipes, with per-recipe stats. Same shape as the catalog but a level up: how often each recipe has run, its pass rate, its average duration.
+The configured recipes, with per-recipe stats. Same shape as the checks catalog but a level up: how often each recipe has run, its pass rate, its average duration.
 
-Source: [`packages/dashboard/src/recipes.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/dashboard/src/recipes.ts).
+Source: [`packages/contracts/src/persistence/dashboard/recipes.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/contracts/src/persistence/dashboard/recipes.ts).
 
 ### Code Paths panel
 
@@ -108,24 +108,24 @@ The seven views (each with the same row-click → universal Function Card flow).
 - **Cycles / SCCs** — Tarjan's SCC over the call graph, every component of size ≥ 2. "Where's the tightest knot?"
 - **Search** — fuzzy match over `simpleName`, bound to the persistent search input at the top of the panel.
 
-The **Universal Function Card** is the cross-cutting drill-down: every clickable function name in any view opens the same overlay with name + location, body length, kind, params, return type, callers grouped by package, callees (resolved + external), an "Open in editor" deep link (`vscode://` or `cursor://` — opt in via `dashboard.editor` in [`opensip-tools.config.yml`](/docs/opensip-tools/80-reference/02-configuration/); falls back to "Copy path" when unset), and a "Trace from entry" BFS.
+The **Universal Function Card** is the cross-cutting drill-down: every clickable function name in any view opens the same overlay with name + location, body length, kind, params, return type, callers grouped by package, callees (resolved + external), an "Open in editor" deep link (or "Copy path" fallback), and a "Trace from entry" BFS.
 
 Filter chips above the view tabs apply to every view: package multi-select, kind multi-select, and a production/test toggle (default: production-only).
 
-Source: [`packages/dashboard/src/code-paths.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/dashboard/src/code-paths.ts) and the per-view files under [`packages/dashboard/src/code-paths/`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/dashboard/src/code-paths/).
+Source: [`packages/contracts/src/persistence/dashboard/code-paths.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/contracts/src/persistence/dashboard/code-paths.ts) and the per-view files under [`packages/contracts/src/persistence/dashboard/code-paths/`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/contracts/src/persistence/dashboard/code-paths/).
 
 ### Tool tabs
 
-The dashboard supports both fit and sim runs. The top-of-page tab switcher (Overview / Fitness / Simulation / Code Paths) filters the panels by tool. Sim runs are sparser today; the panel shapes are the same. Source: [`tool-tabs.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/dashboard/src/tool-tabs.ts).
+The dashboard supports both fit and sim runs. The top-of-page tab switcher (fit / sim) filters the panels by tool. Sim runs are sparser today; the panel shapes are the same.
 
 ---
 
 ## How it's generated
 
-Static HTML. The generator ([`packages/dashboard/src/generator.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/dashboard/src/generator.ts)) assembles:
+Static HTML. The generator ([`packages/contracts/src/persistence/dashboard/generator.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/contracts/src/persistence/dashboard/generator.ts)) assembles:
 
 1. The base HTML scaffold (head, body shell, the panel containers).
-2. The CSS, inlined via `<style>` (from [`css.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/dashboard/src/css.ts)).
+2. The CSS, inlined via `<style>` (from [`css.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/contracts/src/persistence/dashboard/css.ts)).
 3. Session and catalog data (checks, recipes), inlined directly into the panel `<script type="module">` blocks as `const sessions = …` / `const catalog = …` literals — there's no separate `<script type="application/json">` for these.
 4. The graph catalog (v0.3 Code Paths panel) when present, embedded as `<script type="application/json" id="graph-catalog">…</script>` and consumed by the Code Paths panel JS at init time. This one *does* use the `application/json` idiom because it's loaded across module boundaries.
 5. The JS panels, inlined via `<script type="module">…</script>` (from each panel's `dashboard*Js()` function).
@@ -148,7 +148,7 @@ The cost: dynamic features (filtering, sorting, expand-collapse) are JS in the b
 <project>/opensip-tools/.runtime/reports/latest.html
 ```
 
-Single rolling file. Each generation overwrites the previous file — the dashboard is "show me the most recent state of the project", not a per-run archive. Per-run history lives in the session store (`.runtime/sessions/`); the Sessions panel inlines the **most recent 20 sessions** (`loadSessions(20)` in [`packages/fitness/engine/src/cli/dashboard.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/fitness/engine/src/cli/dashboard.ts)) so historical runs are browsable inside the HTML up to that bound. The session store's auto-pruning cap (`MAX_SESSIONS = 100`) means the directory itself rarely holds much more than that.
+Single rolling file. Each generation overwrites the previous file — the dashboard is "show me the most recent state of the project", not a per-run archive. Per-run history lives in the session store (`.runtime/sessions/`); the Sessions panel reads every session record at panel-init time so historical runs are still browsable inside the HTML.
 
 The HTML file is fully self-contained — no asset directory, no CDN, no fetches. Email a stakeholder the file and they can open it on their machine without opensip-tools installed. Useful for: post-incident reports, security review handoffs, compliance audits.
 
@@ -172,7 +172,7 @@ A few common mis-expectations, listed once:
 For `acme-api` after the nightly CI run:
 
 - The session record at `<project>/opensip-tools/.runtime/sessions/2026-05-17T03-15-22-123Z-fit-default.json` carries the full result.
-- The HTML report at `<project>/opensip-tools/.runtime/reports/latest.html` is regenerated. The Sessions panel inside the HTML inlines the most recent 20 session records, so a developer opening it later sees the new run alongside its 19 immediate predecessors.
+- The HTML report at `<project>/opensip-tools/.runtime/reports/latest.html` is regenerated. The Sessions panel inside the HTML reads every session record on load, so a developer opening it later sees the new run alongside historical ones.
 - A developer running `opensip-tools dashboard` locally opens the file in their browser. The Sessions panel shows the run; the Overview panel shows the score trend.
 
 In CI, `--open` is suppressed (no TTY), so no browser opens — but the HTML file is still written. Teams that want a per-run archive copy `latest.html` to a build-artifact path with a run-scoped filename before the next pipeline run overwrites it.

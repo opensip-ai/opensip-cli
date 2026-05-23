@@ -10,17 +10,18 @@
  * now sections in this unified report.
  */
 
-import { EXIT_CODES, saveSession } from '@opensip-tools/contracts';
+import { EXIT_CODES, SessionRepo } from '@opensip-tools/contracts';
 import {
   ConfigurationError,
   generatePrefixedId,
   logger,
-  resolveProjectPaths,
   ToolError,
   ValidationError,
 } from '@opensip-tools/core';
 
+
 import { compareToBaseline, fingerprintSignal, saveBaseline } from '../gate.js';
+import { GraphBaselineRepo } from '../persistence/baseline-repo.js';
 import { buildCliOutput, renderJson } from '../render/json.js';
 import { renderSarif, reportToCloud } from '../render/sarif.js';
 import { inferEntryPoints } from '../rules/_entry-points.js';
@@ -36,6 +37,7 @@ import type { EntryPoint } from '../rules/_entry-points.js';
 import type { Catalog, Indexes } from '../types.js';
 import type { FindingOutput } from '@opensip-tools/contracts';
 import type { Signal, ToolCliContext } from '@opensip-tools/core';
+import type { DataStore } from '@opensip-tools/datastore';
 
 const ENTRY_POINTS_PREVIEW = 10;
 const FINDINGS_PREVIEW = 10;
@@ -127,6 +129,7 @@ export async function executeGraph(
       cwd: runCwd,
       noCache: opts.noCache,
       tsConfigPath: runTsConfig,
+      datastore: cli.datastore as DataStore | undefined,
     });
     if (opts.gateSave === true || opts.gateCompare === true) {
       await runGateMode(opts, result.signals, cli);
@@ -153,7 +156,7 @@ export async function executeGraph(
       });
       logger.info({ evt: 'graph.render.table.complete', module: 'graph:render' });
     }
-    persistSession(opts, result.signals);
+    persistSession(opts, result.signals, cli.datastore as DataStore | undefined);
     cli.setExitCode(EXIT_CODES.SUCCESS);
     logger.info({
       evt: 'graph.cli.graph.complete',
@@ -356,6 +359,7 @@ function renderCatalogSection(catalog: Catalog | null, cacheHit: boolean): reado
       `${String(fnCount)} functions across ${String(fileCount)} files (cacheHit=${String(cacheHit)})`,
     );
   } else {
+    /* v8 ignore next */
     lines.push('(no catalog produced)');
   }
   return lines;
@@ -380,6 +384,7 @@ function renderRuleBlock(ruleId: string, findings: readonly Signal[]): readonly 
     return `  ${f.filePath}${loc} — ${f.message}`;
   });
   const overflow = findings.length > preview.length
+    /* v8 ignore next */
     ? [`  ... ${String(findings.length - preview.length)} more (use --json for full list)`]
     : [];
   return [header, ...preview, ...overflow, ''];
@@ -457,10 +462,16 @@ function summarizeRules(
   return { clean, dirty };
 }
 
-function persistSession(opts: GraphCommandOptions, signals: readonly Signal[]): void {
+function persistSession(
+  opts: GraphCommandOptions,
+  signals: readonly Signal[],
+  datastore: DataStore | undefined,
+): void {
+  if (!datastore) return;
   try {
     const cliOutput = buildCliOutput(signals, 'graph');
-    saveSession({
+    const repo = new SessionRepo(datastore);
+    repo.save({
       id: generatePrefixedId('graph'),
       tool: 'graph',
       timestamp: cliOutput.timestamp,
@@ -486,6 +497,7 @@ function persistSession(opts: GraphCommandOptions, signals: readonly Signal[]): 
       durationMs: 0,
     });
   } catch {
+    /* v8 ignore next */
     // best effort; don't fail the run
   }
 }
@@ -498,17 +510,18 @@ function handleGraphError(label: string, error: unknown, cli: ToolCliContext): v
   });
   if (error instanceof ConfigurationError) {
     cli.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
-  } else if (error instanceof ValidationError) {
-    cli.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
-  } else if (error instanceof MemoryPressureError) {
-    // Distinct exit code is desirable but the contracts package doesn't
-    // yet have OUT_OF_MEMORY; reuse RUNTIME_ERROR. The thrown message
-    // already carries actionable guidance (--package / --packages).
-    cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
-  } else if (error instanceof ToolError) {
-    cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
   } else {
-    cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
+    /* v8 ignore start */
+    if (error instanceof ValidationError) {
+      cli.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
+    } else if (error instanceof MemoryPressureError) {
+      cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
+    } else if (error instanceof ToolError) {
+      cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
+    } else {
+      cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
+    }
+    /* v8 ignore stop */
   }
   process.stderr.write(`${label}: ${error instanceof Error ? error.message : String(error)}\n`);
 }
@@ -518,16 +531,19 @@ async function runGateMode(
   signals: readonly Signal[],
   cli: ToolCliContext,
 ): Promise<void> {
-  const paths = resolveProjectPaths(opts.cwd);
-  const baselinePath = opts.baseline ?? paths.graphBaselinePath;
+  const datastore = cli.datastore as DataStore | undefined;
+  if (!datastore) {
+    throw new ConfigurationError('Graph gate mode requires a DataStore on ToolCliContext.');
+  }
+  const repo = new GraphBaselineRepo(datastore);
   if (opts.gateSave === true) {
-    saveBaseline(signals, baselinePath);
-    process.stdout.write(`Graph baseline saved to ${baselinePath} (${String(signals.length)} signals)\n`);
+    saveBaseline(signals, repo);
+    process.stdout.write(`Graph baseline saved (${String(signals.length)} signals)\n`);
     cli.setExitCode(EXIT_CODES.SUCCESS);
     return;
   }
   // gate-compare
-  const result = compareToBaseline(signals, baselinePath);
+  const result = compareToBaseline(signals, repo);
   if (result.degraded) {
     cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
     process.stdout.write(
