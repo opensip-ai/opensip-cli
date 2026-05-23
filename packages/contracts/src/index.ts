@@ -45,6 +45,8 @@ export type {
   InitResult,
   ExperimentalResult,
   PluginResult,
+  PluginInfo,
+  SyncEntry,
   HelpResult,
   ErrorResult,
 } from './types.js';

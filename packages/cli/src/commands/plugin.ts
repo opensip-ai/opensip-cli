@@ -43,7 +43,7 @@ import {
   type PluginDomain,
 } from '@opensip-tools/core';
 
-import type { PluginResult } from '@opensip-tools/contracts';
+import type { PluginInfo, PluginResult, SyncEntry } from '@opensip-tools/contracts';
 
 // =============================================================================
 // VALIDATION HELPERS
@@ -232,7 +232,7 @@ export async function pluginList(cwd: string = process.cwd()): Promise<PluginRes
   const { discoverPlugins } = await import('@opensip-tools/core');
   const domains: PluginDomain[] = ['fit', 'sim'];
 
-  const plugins: { domain: string; namespace: string; pluginType: 'package' | 'file' }[] = [];
+  const plugins: PluginInfo[] = [];
 
   for (const domain of domains) {
     const found = discoverPlugins(domain, cwd);
@@ -445,7 +445,7 @@ export async function pluginSync(
       : syncDomains
   );
 
-  const synced: { domain: string; package: string; installed: boolean }[] = [];
+  const synced: SyncEntry[] = [];
   const errors: string[] = [];
 
   for (const domain of domains) {

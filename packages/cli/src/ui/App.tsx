@@ -15,7 +15,7 @@ import { Findings } from './components/Findings.js';
 import { HelpText } from './components/HelpText.js';
 import { HistoryTable } from './components/HistoryTable.js';
 import { InitFeedback } from './components/InitFeedback.js';
-import { PluginFeedback, type PluginAction } from './components/PluginFeedback.js';
+import { PluginFeedback } from './components/PluginFeedback.js';
 import { RecipeList } from './components/RecipeList.js';
 import { ResultsTable } from './components/ResultsTable.js';
 import { RunHeader } from './components/RunHeader.js';
@@ -93,7 +93,7 @@ export function App({ result }: AppProps): React.ReactElement {
     }
 
     case 'plugin': {
-      return <PluginFeedback action={toPluginAction(result)} />;
+      return <PluginFeedback action={result} />;
     }
 
     case 'clear-done': {
@@ -249,28 +249,3 @@ function DashboardFeedback({ path, opened }: Readonly<{ path: string; opened: bo
   );
 }
 
-/** Map PluginResult to the PluginAction shape expected by PluginFeedback */
-function toPluginAction(result: CommandResult & { type: 'plugin' }): PluginAction {
-  if (result.action === 'list') {
-    return {
-      type: 'list',
-      plugins: (result.plugins as { domain: string; namespace: string; pluginType: 'package' | 'file' }[]) ?? [],
-      totalCount: (result.totalCount as number) ?? 0,
-    };
-  }
-  if (result.action === 'install') {
-    return {
-      type: 'install',
-      packageName: (result.packageName as string) ?? '',
-      success: (result.success as boolean) ?? false,
-      error: result.error as string | undefined,
-    };
-  }
-  // remove
-  return {
-    type: 'remove',
-    packageName: (result.packageName as string) ?? '',
-    success: (result.success as boolean) ?? false,
-    error: result.error as string | undefined,
-  };
-}

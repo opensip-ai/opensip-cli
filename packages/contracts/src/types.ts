@@ -304,11 +304,47 @@ export interface SimDoneResult {
   shouldFail?: boolean;
 }
 
-export interface PluginResult {
-  type: 'plugin';
-  action: 'list' | 'install' | 'remove' | 'sync' | 'add';
-  [key: string]: unknown;
+/**
+ * Identity of a discovered plugin (exposed by `plugin list`).
+ * Mirrors the `DiscoveredPlugin` shape from core, but kept here as a
+ * separate contract type so the CLI ↔ plugin-result boundary is
+ * stable independently of core's internal representation.
+ */
+export interface PluginInfo {
+  readonly domain: string;
+  readonly namespace: string;
+  readonly pluginType: 'package' | 'file';
 }
+
+/**
+ * Per-package status from `plugin sync`. `installed: true` means the
+ * `npm install` succeeded; `false` means it failed (the message is
+ * carried in the surrounding `errors[]`).
+ */
+export interface SyncEntry {
+  readonly domain: string;
+  readonly package: string;
+  readonly installed: boolean;
+}
+
+/**
+ * Discriminated union — one variant per `plugin` subcommand. Replaces
+ * the previous open-dictionary shape (`{ type: 'plugin'; action: …;
+ * [key: string]: unknown }`) so consumers can switch on `action`
+ * without `as { … }` casts and producer/consumer drift surfaces at
+ * compile time.
+ */
+export type PluginResult =
+  | { type: 'plugin'; action: 'list'; plugins: readonly PluginInfo[]; totalCount: number }
+  | { type: 'plugin'; action: 'add'; packageName: string; success: boolean; error?: string }
+  | { type: 'plugin'; action: 'remove'; packageName: string; success: boolean; error?: string }
+  | {
+      type: 'plugin';
+      action: 'sync';
+      synced: readonly SyncEntry[];
+      success: boolean;
+      errors?: readonly string[];
+    };
 
 export interface HelpResult {
   type: 'help';
