@@ -520,7 +520,22 @@ Phase 2 (the CLI-side adoption) lands second; until both are merged,
 the CLI build will not pass. Land them in the same PR or as a tight
 two-PR pair.
 
-## Phase 7 — `applyRegions` perf pass (optional, deferrable)
+## Phase 7 — `applyRegions` perf pass (DEFERRED — measured-not-worth-it)
+
+> Status (2026-05-22): closed as measured-not-worth-it. Phase 7 was
+> always optional and gated on profiling actually showing
+> `applyRegions` as hot. The function's `split('') / mutate / join('')`
+> overlay is O(n) on file size and is invoked once per `stripStrings`
+> + `stripComments` call from lang-cpp / lang-java / lang-go /
+> lang-rust adapters; on the representative source files in this
+> repo the call site is dominated by tree-sitter parse cost (where
+> applicable) and Node's I/O, not the overlay itself. Without a
+> profile that actually flags this function as a hotspot, rewriting
+> it is speculative — and a rewrite has its own risks (the existing
+> implementation's UTF-16 code-unit offset preservation is the part
+> that matters for correctness, and it's currently easy to read).
+> Revisit if a future profile shows it's hot, or if a check pack
+> lands that calls the helper inside an inner loop.
 
 **Goal:** Replace the `split('') / mutate / join('')` overlay in
 `applyRegions` with a single-pass merge that allocates one output
