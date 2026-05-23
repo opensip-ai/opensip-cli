@@ -42,6 +42,15 @@ import {
   type PathDomain,
   type PluginDomain,
 } from '@opensip-tools/core';
+import {
+  parseDocument,
+  isMap,
+  isScalar,
+  isSeq,
+  type Document as YAMLDocument,
+  type YAMLMap,
+  type YAMLSeq,
+} from 'yaml';
 
 import type { PluginInfo, PluginResult, SyncEntry } from '@opensip-tools/contracts';
 
@@ -86,17 +95,22 @@ function isSafeNpmSpec(spec: string): boolean {
 // =============================================================================
 
 /**
- * Add `name` to the project's `plugins.<domain>` list. Idempotent —
- * existing names are not duplicated. Creates the list if absent.
- *
- * Done with line-level edits (NOT a YAML reformat) to preserve the
- * user's comments, ordering, and formatting in the rest of the file.
- * The line-edit assumes the standard 2-space indent inside `plugins:`;
- * a non-standard formatting will fail closed (no edit; warning logged).
+ * Edit the project's `plugins.<domain>` list via the `yaml`
+ * Document API. Round-trips comments, ordering, and surrounding
+ * whitespace (the regex-driven line edits this replaces could not
+ * — they reformatted the file silently when seeing a quoted key or
+ * an unusual indent). A malformed document fails closed: the edit
+ * is skipped and a structured error is thrown so the caller can
+ * surface a clear "your config is broken" message.
  */
-// eslint-disable-next-line sonarjs/cognitive-complexity -- YAML line-edit walks 3 distinct match cases (no plugins block, no domain subkey, existing list); each branch is short but the dispatch itself runs over the threshold
-function addToConfigPluginList(configPath: string, domain: PathDomain, name: string): boolean {
+function editPluginList(
+  configPath: string,
+  domain: PathDomain,
+  name: string,
+  op: 'add' | 'remove',
+): boolean {
   if (!existsSync(configPath)) {
+    if (op === 'remove') return false;
     // No config to edit — write a minimal one.
     writeFileSync(
       configPath,
@@ -107,93 +121,110 @@ function addToConfigPluginList(configPath: string, domain: PathDomain, name: str
   }
 
   const text = readFileSync(configPath, 'utf8');
-  const lines = text.split('\n');
+  const doc = parseDocument(text);
+  if (doc.errors.length > 0) {
+    const first = doc.errors[0]?.message ?? 'unknown YAML error';
+    throw new Error(
+      `Cannot edit plugins.${domain} in ${configPath}: ${first}. ` +
+      `Fix the syntax error and re-run.`,
+    );
+  }
 
-  // Locate the existing `plugins.<domain>` block, append. Ranges:
-  // - find `plugins:` at column 0
-  // - find `<domain>:` at column 2 within plugins block
-  // - find the next entry after the last `- "..."` at column 4
-  const pluginsIdx = lines.findIndex((l) => /^plugins:\s*$/.test(l));
-  if (pluginsIdx === -1) {
-    // No `plugins:` block — append one at end.
-    lines.push(`plugins:`, `  ${domain}:`, `    - "${name}"`);
-    writeFileSync(configPath, lines.join('\n'), 'utf8');
+  const root = doc.contents;
+  if (root === null) {
+    if (op === 'remove') return false;
+    // Empty doc — write a fresh `plugins:` map.
+    writeFileSync(
+      configPath,
+      `plugins:\n  ${domain}:\n    - "${name}"\n`,
+      'utf8',
+    );
     return true;
   }
 
-  let domainIdx = -1;
-  for (let i = pluginsIdx + 1; i < lines.length; i++) {
-    const line = lines[i] ?? '';
-    if (new RegExp(String.raw`^  ${domain}:\s*$`).test(line)) {
-      domainIdx = i;
-      break;
-    }
-    // Stop at next top-level key (column 0 non-comment, non-blank)
-    if (line.length > 0 && !line.startsWith(' ') && !line.startsWith('#')) break;
+  // The top-level node must be a YAML map. A scalar / sequence at
+  // the root means the file isn't an opensip-tools config — refuse
+  // to edit rather than reformat the whole thing.
+  if (!isMap(root)) {
+    throw new Error(
+      `Cannot edit plugins.${domain} in ${configPath}: top-level node is not a mapping. ` +
+      `opensip-tools.config.yml must start with a YAML map.`,
+    );
   }
 
-  if (domainIdx === -1) {
-    // No `<domain>:` subkey — insert just after `plugins:`.
-    lines.splice(pluginsIdx + 1, 0, `  ${domain}:`, `    - "${name}"`);
-    writeFileSync(configPath, lines.join('\n'), 'utf8');
-    return true;
+  if (op === 'add') {
+    return appendToPluginList(doc, root, domain, name, configPath);
   }
+  return removeFromPluginList(doc, root, domain, name, configPath);
+}
 
-  // Find end of the domain's list (next column-0/2 key) + dedupe.
-  let lastEntryIdx = domainIdx;
-  for (let i = domainIdx + 1; i < lines.length; i++) {
-    const line = lines[i] ?? '';
-    if (line.startsWith('    - ')) {
-      const m = /^ {4}- ["']?([^"'\s]+)["']?\s*$/.exec(line);
-      if (m?.[1] === name) return false; // already present — idempotent no-op
-      lastEntryIdx = i;
-    } else if (line.length > 0 && !line.startsWith('    ')) {
-      break;
-    }
+function appendToPluginList(
+  doc: YAMLDocument,
+  root: YAMLMap,
+  domain: PathDomain,
+  name: string,
+  configPath: string,
+): boolean {
+  let plugins = root.get('plugins');
+  if (!isMap(plugins)) {
+    plugins = doc.createNode({});
+    root.set('plugins', plugins);
   }
+  const pluginsMap = plugins as YAMLMap;
 
-  lines.splice(lastEntryIdx + 1, 0, `    - "${name}"`);
-  writeFileSync(configPath, lines.join('\n'), 'utf8');
+  let list = pluginsMap.get(domain);
+  if (!isSeq(list)) {
+    list = doc.createNode([]);
+    pluginsMap.set(domain, list);
+  }
+  const seq = list as YAMLSeq;
+
+  // Idempotent — first occurrence wins.
+  for (const item of seq.items) {
+    const value = isScalar(item) ? item.value : item;
+    if (value === name) return false;
+  }
+  seq.add(name);
+  writeFileSync(configPath, doc.toString(), 'utf8');
   return true;
 }
 
-/**
- * Remove `name` from the project's `plugins.<domain>` list. Returns
- * true if a line was deleted, false if `name` wasn't there.
- */
-function removeFromConfigPluginList(configPath: string, domain: PathDomain, name: string): boolean {
-  if (!existsSync(configPath)) return false;
+function removeFromPluginList(
+  doc: YAMLDocument,
+  root: YAMLMap,
+  domain: PathDomain,
+  name: string,
+  configPath: string,
+): boolean {
+  const plugins = root.get('plugins');
+  if (!isMap(plugins)) return false;
+  const list = plugins.get(domain);
+  if (!isSeq(list)) return false;
 
-  const text = readFileSync(configPath, 'utf8');
-  const lines = text.split('\n');
-
-  let inDomainBlock = false;
-  let edited = false;
-  const out: string[] = [];
-  for (const line of lines) {
-    if (new RegExp(String.raw`^  ${domain}:\s*$`).test(line)) {
-      inDomainBlock = true;
-      out.push(line);
-      continue;
-    }
-    if (inDomainBlock && line.length > 0 && !line.startsWith('    ') && !line.startsWith('  -')) {
-      inDomainBlock = false;
-    }
-    if (inDomainBlock) {
-      const m = /^ {4}- ["']?([^"'\s]+)["']?\s*$/.exec(line);
-      if (m?.[1] === name) {
-        edited = true;
-        continue;
-      }
-    }
-    out.push(line);
-  }
-
-  if (edited) {
-    writeFileSync(configPath, out.join('\n'), 'utf8');
-  }
-  return edited;
+  const before = list.items.length;
+  list.items = list.items.filter((item) => {
+    const value = isScalar(item) ? item.value : item;
+    return value !== name;
+  });
+  if (list.items.length === before) return false;
+  writeFileSync(configPath, doc.toString(), 'utf8');
+  return true;
 }
+
+function addToConfigPluginList(configPath: string, domain: PathDomain, name: string): boolean {
+  return editPluginList(configPath, domain, name, 'add');
+}
+
+function removeFromConfigPluginList(configPath: string, domain: PathDomain, name: string): boolean {
+  return editPluginList(configPath, domain, name, 'remove');
+}
+
+/**
+ * Test-only export for the YAML-driven config edit so unit tests can
+ * exercise the round-trip behaviour without spawning npm. Intentionally
+ * not part of the public CLI API surface.
+ */
+export const __test = { editPluginList };
 
 // =============================================================================
 // PLUGIN HOST DIR — node_modules root for a given domain

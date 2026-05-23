@@ -21,10 +21,17 @@
 
 export type Shell = 'bash' | 'zsh' | 'fish'
 
-/** Subcommands surfaced by completion. Keep in sync with `program` in index.ts. */
-const SUBCOMMANDS: readonly string[] = [
+/**
+ * Subcommands surfaced by completion. Kept in sync with the live
+ * Commander program at test time — see
+ * `__tests__/completion-subcommands.test.ts` (drift catch).
+ */
+export const SUBCOMMANDS: readonly string[] = [
   'fit',
+  'fit-list',
+  'fit-recipes',
   'sim',
+  'graph',
   'init',
   'dashboard',
   'plugin',
