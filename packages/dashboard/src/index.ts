@@ -11,9 +11,10 @@
  * between the graph tool (catalog producer) and this package
  * (consumer); both depend on contracts.
  *
- * This package depends on `@opensip-tools/core` and
- * `@opensip-tools/contracts`. It MUST NOT depend on any tool engine,
- * the CLI, or any UI framework.
+ * This package depends only on `@opensip-tools/contracts` for type
+ * shapes (sessions, catalog entries, graph catalog). It MUST NOT
+ * depend on `@opensip-tools/core`, any tool engine, the CLI, or any
+ * UI framework — its job is one pure transformation.
  */
 
 export { generateDashboardHtml } from './generator.js';

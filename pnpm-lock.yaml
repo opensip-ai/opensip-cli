@@ -176,9 +176,6 @@ importers:
       '@opensip-tools/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@opensip-tools/core':
-        specifier: workspace:*
-        version: link:../core
     devDependencies:
       '@types/node':
         specifier: ^22.0.0

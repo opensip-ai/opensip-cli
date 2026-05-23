@@ -25,8 +25,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@opensip-tools/contracts": "workspace:*",
-    "@opensip-tools/core": "workspace:*"
+    "@opensip-tools/contracts": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
