@@ -8,9 +8,13 @@
  * shared cross-kind registry.
  */
 
-import { ValidationError as CoreValidationError } from '@opensip-tools/core'
-
 import { scenarioRegistry } from '../../framework/registry.js'
+import {
+  throwValidationErrors,
+  validateScenarioMetadata,
+  validateScenarioUniqueness,
+  type ScenarioValidationError,
+} from '../../framework/validation.js'
 
 import { createLoadScenarioRunner } from './executor.js'
 
@@ -52,29 +56,18 @@ export interface LoadScenarioConfig {
   readonly options?: ScenarioExecutionOptions
 }
 
-/** Validation error with field name and message. */
-export interface LoadValidationError {
-  readonly field: string
-  readonly message: string
-}
-
-function validateIdField(config: LoadScenarioConfig, errors: LoadValidationError[]): void {
-  if (!config.id || config.id.trim() === '') {
-    errors.push({ field: 'id', message: 'id is required' })
-    return
-  }
-  if (!/^[a-z0-9-]+$/.test(config.id)) {
-    errors.push({
-      field: 'id',
-      message: 'id must be lowercase alphanumeric with hyphens',
-    })
-  }
-}
+/**
+ * Validation error with field name and message.
+ *
+ * @deprecated Use `ScenarioValidationError` from `framework/validation.ts`.
+ * Kept as a type alias for one release so external callers keep compiling.
+ */
+export type LoadValidationError = ScenarioValidationError
 
 function validatePersona(
   persona: PersonaConfig | undefined,
   index: number,
-  errors: LoadValidationError[],
+  errors: ScenarioValidationError[],
 ): void {
   if (!persona) return
 
@@ -94,7 +87,7 @@ function validatePersona(
 
 function collectPersonaValidationErrors(
   config: LoadScenarioConfig,
-  errors: LoadValidationError[],
+  errors: ScenarioValidationError[],
 ): void {
   if (config.personas.length === 0) {
     errors.push({ field: 'personas', message: 'at least one persona is required' })
@@ -106,7 +99,7 @@ function collectPersonaValidationErrors(
   }
 }
 
-function validateRampUp(config: LoadScenarioConfig, errors: LoadValidationError[]): void {
+function validateRampUp(config: LoadScenarioConfig, errors: ScenarioValidationError[]): void {
   if (config.rampUp === undefined) return
 
   if (typeof config.rampUp !== 'number' || config.rampUp < 0) {
@@ -121,19 +114,9 @@ function validateRampUp(config: LoadScenarioConfig, errors: LoadValidationError[
   }
 }
 
-function validateDuplicates(config: LoadScenarioConfig, errors: LoadValidationError[]): void {
-  if (config.id && scenarioRegistry.has(config.id)) {
-    errors.push({
-      field: 'id',
-      message: `scenario with id '${config.id}' is already registered`,
-    })
-  }
-  if (config.name && scenarioRegistry.has(config.name)) {
-    errors.push({
-      field: 'name',
-      message: `scenario with name '${config.name}' is already registered`,
-    })
-  }
+interface ValidateLoadOptions {
+  /** Test helper: skip the registry-uniqueness check. */
+  readonly skipRegistryCheck?: boolean
 }
 
 /**
@@ -141,19 +124,13 @@ function validateDuplicates(config: LoadScenarioConfig, errors: LoadValidationEr
  *
  * @throws {ValidationError} When the load scenario configuration is invalid
  */
-export function validateLoadScenarioConfig(config: LoadScenarioConfig): void {
-  const errors: LoadValidationError[] = []
+export function validateLoadScenarioConfig(
+  config: LoadScenarioConfig,
+  options: ValidateLoadOptions = {},
+): void {
+  const errors: ScenarioValidationError[] = []
 
-  validateIdField(config, errors)
-
-  if (!config.name || config.name.trim() === '') {
-    errors.push({ field: 'name', message: 'name is required' })
-  }
-
-  if (config.description.trim() === '') {
-    errors.push({ field: 'description', message: 'description is required' })
-  }
-
+  validateScenarioMetadata(config, errors)
   collectPersonaValidationErrors(config, errors)
 
   if (typeof config.duration !== 'number' || config.duration <= 0) {
@@ -166,16 +143,11 @@ export function validateLoadScenarioConfig(config: LoadScenarioConfig): void {
     errors.push({ field: 'assertions', message: 'at least one assertion is required' })
   }
 
-  validateDuplicates(config, errors)
+  validateScenarioUniqueness(config, errors, {
+    ...(options.skipRegistryCheck === undefined ? {} : { skipRegistryCheck: options.skipRegistryCheck }),
+  })
 
-  if (errors.length > 0) {
-    const messages = errors.map((e) => `  - ${e.field}: ${e.message}`).join('\n')
-    // @fitness-ignore-next-line result-pattern-consistency -- definition-time validation, throw is appropriate
-    throw new CoreValidationError(`Invalid load scenario configuration:\n${messages}`, {
-      code: 'VALIDATION.SCENARIO.INVALID_CONFIG',
-      metadata: { errors, kind: 'load' },
-    })
-  }
+  throwValidationErrors(errors, 'load')
 }
 
 /**
@@ -211,25 +183,14 @@ export function defineLoadScenario(config: LoadScenarioConfig): RunnableScenario
 /**
  * Define a load scenario without auto-registration (test helper).
  *
- * @throws {ValidationError} When the scenario configuration is invalid (missing id)
+ * Same validator as `defineLoadScenario`, just with the registry-uniqueness
+ * check disabled so tests can build many scenarios with the same id.
+ *
+ * @throws {ValidationError} When the scenario configuration is invalid
  */
 export function defineLoadScenarioWithoutRegistration(
   config: LoadScenarioConfig,
 ): RunnableScenario {
-  const errors: LoadValidationError[] = []
-
-  if (!config.id || config.id.trim() === '') {
-    errors.push({ field: 'id', message: 'id is required' })
-  }
-
-  if (errors.length > 0) {
-    const messages = errors.map((e) => `  - ${e.field}: ${e.message}`).join('\n')
-    // @fitness-ignore-next-line result-pattern-consistency -- definition-time validation, throw is appropriate
-    throw new CoreValidationError(`Invalid load scenario configuration:\n${messages}`, {
-      code: 'VALIDATION.SCENARIO.INVALID_CONFIG',
-      metadata: { errors, kind: 'load' },
-    })
-  }
-
+  validateLoadScenarioConfig(config, { skipRegistryCheck: true })
   return createLoadScenarioRunner(config)
 }

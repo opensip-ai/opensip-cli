@@ -16,9 +16,13 @@
  * abort handling, assertion collection.
  */
 
-import { ValidationError as CoreValidationError } from '@opensip-tools/core'
-
 import { scenarioRegistry } from '../../framework/registry.js'
+import {
+  throwValidationErrors,
+  validateScenarioMetadata,
+  validateScenarioUniqueness,
+  type ScenarioValidationError,
+} from '../../framework/validation.js'
 
 import { createInvariantScenarioRunner } from './executor.js'
 
@@ -45,25 +49,17 @@ export interface InvariantScenarioConfig {
   readonly deps?: Partial<InvariantContextDeps>
 }
 
-/** Validation error shape for invariant config. */
-export interface InvariantValidationError {
-  readonly field: string
-  readonly message: string
-}
+/**
+ * Validation error shape for invariant config.
+ *
+ * @deprecated Use `ScenarioValidationError` from `framework/validation.ts`.
+ */
+export type InvariantValidationError = ScenarioValidationError
 
-function validateRequired(
+function validateInvariantSpecific(
   config: InvariantScenarioConfig,
-  errors: InvariantValidationError[],
+  errors: ScenarioValidationError[],
 ): void {
-  if (!config.id || !/^[a-z0-9-]+$/.test(config.id)) {
-    errors.push({ field: 'id', message: 'id must be lowercase alphanumeric with hyphens' })
-  }
-  if (!config.name || config.name.trim() === '') {
-    errors.push({ field: 'name', message: 'name is required' })
-  }
-  if (!config.description || config.description.trim() === '') {
-    errors.push({ field: 'description', message: 'description is required' })
-  }
   if (!config.relatesToInvariant || config.relatesToInvariant.trim() === '') {
     errors.push({
       field: 'relatesToInvariant',
@@ -82,22 +78,9 @@ function validateRequired(
   }
 }
 
-function validateDuplicates(
-  config: InvariantScenarioConfig,
-  errors: InvariantValidationError[],
-): void {
-  if (config.id && scenarioRegistry.has(config.id)) {
-    errors.push({
-      field: 'id',
-      message: `scenario with id '${config.id}' is already registered`,
-    })
-  }
-  if (config.name && scenarioRegistry.has(config.name)) {
-    errors.push({
-      field: 'name',
-      message: `scenario with name '${config.name}' is already registered`,
-    })
-  }
+interface ValidateInvariantOptions {
+  /** Test helper: skip the registry-uniqueness check. */
+  readonly skipRegistryCheck?: boolean
 }
 
 /**
@@ -105,19 +88,18 @@ function validateDuplicates(
  *
  * @throws {ValidationError} When the invariant scenario configuration is invalid
  */
-export function validateInvariantScenarioConfig(config: InvariantScenarioConfig): void {
-  const errors: InvariantValidationError[] = []
-  validateRequired(config, errors)
-  validateDuplicates(config, errors)
+export function validateInvariantScenarioConfig(
+  config: InvariantScenarioConfig,
+  options: ValidateInvariantOptions = {},
+): void {
+  const errors: ScenarioValidationError[] = []
+  validateScenarioMetadata(config, errors)
+  validateInvariantSpecific(config, errors)
+  validateScenarioUniqueness(config, errors, {
+    ...(options.skipRegistryCheck === undefined ? {} : { skipRegistryCheck: options.skipRegistryCheck }),
+  })
 
-  if (errors.length > 0) {
-    const messages = errors.map((e) => `  - ${e.field}: ${e.message}`).join('\n')
-    // @fitness-ignore-next-line result-pattern-consistency -- definition-time validation, throw is appropriate
-    throw new CoreValidationError(`Invalid invariant scenario configuration:\n${messages}`, {
-      code: 'VALIDATION.SCENARIO.INVALID_CONFIG',
-      metadata: { errors, kind: 'invariant' },
-    })
-  }
+  throwValidationErrors(errors, 'invariant')
 }
 
 /**
@@ -135,17 +117,14 @@ export function defineInvariantScenario(config: InvariantScenarioConfig): Runnab
 /**
  * Define an invariant scenario without auto-registration (test helper).
  *
- * @throws {ValidationError} When the scenario configuration is invalid (missing id)
+ * Same validator as `defineInvariantScenario`, with the registry-uniqueness
+ * check disabled.
+ *
+ * @throws {ValidationError} When the scenario configuration is invalid
  */
 export function defineInvariantScenarioWithoutRegistration(
   config: InvariantScenarioConfig,
 ): RunnableScenario {
-  if (!config.id || config.id.trim() === '') {
-    // @fitness-ignore-next-line result-pattern-consistency -- definition-time validation, throw is appropriate
-    throw new CoreValidationError('Invalid invariant scenario configuration: id is required', {
-      code: 'VALIDATION.SCENARIO.INVALID_CONFIG',
-      metadata: { kind: 'invariant' },
-    })
-  }
+  validateInvariantScenarioConfig(config, { skipRegistryCheck: true })
   return createInvariantScenarioRunner(config)
 }

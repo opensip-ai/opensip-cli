@@ -74,25 +74,48 @@ The framework runs the personas at the configured RPS for the duration, collects
 ### `defineChaosScenario`
 
 ```ts
-import { defineChaosScenario } from '@opensip-tools/simulation';
+import { defineChaosScenario, ASSERTIONS, persona } from '@opensip-tools/simulation';
 
 export default defineChaosScenario({
-  id: '...',
+  id: 'kill-database-recovers-in-10s',
   name: 'kill-database-recovers-in-10s',
-  description: 'After killing the database for 5s, the API recovers within 10s',
+  description: 'After killing the database, the API recovers within 10s',
   tags: ['chaos', 'database'],
-  baseLoad: { /* a LoadScenarioConfig fragment */ },
-  injection: {
-    target: 'database',
-    fault: { kind: 'kill', duration: { value: 5, unit: 'seconds' } },
-    delayBeforeInjection: { value: 10, unit: 'seconds' },
+
+  // Base-load configuration is flattened onto the chaos config — same
+  // fields the load kind takes (personas, duration, rampUp, targetRps).
+  personas: [persona('buyer', 5)],
+  duration: 30,
+  rampUp: 5,
+  targetRps: 50,
+
+  // Failure injection contract.
+  chaos: {
+    enabled: true,
+    probability: 0.1,
+    types: [
+      {
+        type: 'error',
+        target: 'database',
+        probability: 0.5,
+        config: { type: 'error', statusCode: 500, message: 'db unavailable' },
+      },
+    ],
   },
-  recovery: { recoverWithin: { value: 10, unit: 'seconds' } },
-  assertions: [/* ... */],
+
+  // Two assertion sets — one for each phase the executor runs.
+  steadyStateAssertions: [ASSERTIONS.lowErrorRate(0.5)],
+  recoveryAssertions:    [ASSERTIONS.lowErrorRate(0.05)],
+  recoveryWindow: 10_000, // ms after chaos lifts
 });
 ```
 
-The chaos kind composes a load scenario with a failure injection. The executor runs the base load, injects the fault at the configured time, and measures whether the system recovers within the recovery window.
+The chaos kind composes a base load with explicit failure injection and a recovery contract. The executor runs the load loop for `duration` seconds with chaos active (per-tick injection at `chaos.probability`), then re-runs the loop for `recoveryWindow` ms with chaos off. Both phases delegate to the same `runLoadWindow` driver in `framework/execution/run-load-window.ts` — the load kind is the no-`injectChaos` default and chaos passes a callback that returns `chaos-event` outcomes. Steady-state assertions evaluate against the chaos-active window, recovery assertions against the post-chaos window. Pass/fail is the AND of both verdicts.
+
+> **Schema note.** This is the flattened shape implemented today (option (b) in the
+> Layer 3 audit). A future major may revisit option (a) — proper composition with a
+> `baseLoad: LoadScenarioConfig` field — when chaos scenarios start sharing larger
+> load fragments. Tracked in the Layer 3 plan as a deferred decision.
 
 ### `defineInvariantScenario`
 

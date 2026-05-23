@@ -10,9 +10,13 @@
  *   - `recoveryWindow` (ms) — how long after chaos lifts to evaluate recovery
  */
 
-import { ValidationError as CoreValidationError } from '@opensip-tools/core'
-
 import { scenarioRegistry } from '../../framework/registry.js'
+import {
+  throwValidationErrors,
+  validateScenarioMetadata,
+  validateScenarioUniqueness,
+  type ScenarioValidationError,
+} from '../../framework/validation.js'
 
 import { createChaosScenarioRunner } from './executor.js'
 
@@ -58,25 +62,17 @@ export interface ChaosScenarioConfig {
   readonly options?: ScenarioExecutionOptions
 }
 
-/** Validation error shape for chaos config. */
-export interface ChaosValidationError {
-  readonly field: string
-  readonly message: string
-}
+/**
+ * Validation error shape for chaos config.
+ *
+ * @deprecated Use `ScenarioValidationError` from `framework/validation.ts`.
+ */
+export type ChaosValidationError = ScenarioValidationError
 
-function validateRequired(
+function validatePersonasAndDuration(
   config: ChaosScenarioConfig,
-  errors: ChaosValidationError[],
+  errors: ScenarioValidationError[],
 ): void {
-  if (!config.id || !/^[a-z0-9-]+$/.test(config.id)) {
-    errors.push({ field: 'id', message: 'id must be lowercase alphanumeric with hyphens' })
-  }
-  if (!config.name || config.name.trim() === '') {
-    errors.push({ field: 'name', message: 'name is required' })
-  }
-  if (!config.description || config.description.trim() === '') {
-    errors.push({ field: 'description', message: 'description is required' })
-  }
   if (config.personas.length === 0) {
     errors.push({ field: 'personas', message: 'at least one persona is required' })
   }
@@ -85,7 +81,7 @@ function validateRequired(
   }
 }
 
-function validateChaos(config: ChaosScenarioConfig, errors: ChaosValidationError[]): void {
+function validateChaos(config: ChaosScenarioConfig, errors: ScenarioValidationError[]): void {
   if (!config.chaos) {
     errors.push({ field: 'chaos', message: 'chaos config is required for chaos scenarios' })
     return
@@ -110,7 +106,7 @@ function validateChaos(config: ChaosScenarioConfig, errors: ChaosValidationError
 
 function validateAssertions(
   config: ChaosScenarioConfig,
-  errors: ChaosValidationError[],
+  errors: ScenarioValidationError[],
 ): void {
   if (config.steadyStateAssertions.length === 0) {
     errors.push({
@@ -132,22 +128,9 @@ function validateAssertions(
   }
 }
 
-function validateDuplicates(
-  config: ChaosScenarioConfig,
-  errors: ChaosValidationError[],
-): void {
-  if (config.id && scenarioRegistry.has(config.id)) {
-    errors.push({
-      field: 'id',
-      message: `scenario with id '${config.id}' is already registered`,
-    })
-  }
-  if (config.name && scenarioRegistry.has(config.name)) {
-    errors.push({
-      field: 'name',
-      message: `scenario with name '${config.name}' is already registered`,
-    })
-  }
+interface ValidateChaosOptions {
+  /** Test helper: skip the registry-uniqueness check. */
+  readonly skipRegistryCheck?: boolean
 }
 
 /**
@@ -155,21 +138,20 @@ function validateDuplicates(
  *
  * @throws {ValidationError} When the chaos scenario configuration is invalid
  */
-export function validateChaosScenarioConfig(config: ChaosScenarioConfig): void {
-  const errors: ChaosValidationError[] = []
-  validateRequired(config, errors)
+export function validateChaosScenarioConfig(
+  config: ChaosScenarioConfig,
+  options: ValidateChaosOptions = {},
+): void {
+  const errors: ScenarioValidationError[] = []
+  validateScenarioMetadata(config, errors)
+  validatePersonasAndDuration(config, errors)
   validateChaos(config, errors)
   validateAssertions(config, errors)
-  validateDuplicates(config, errors)
+  validateScenarioUniqueness(config, errors, {
+    ...(options.skipRegistryCheck === undefined ? {} : { skipRegistryCheck: options.skipRegistryCheck }),
+  })
 
-  if (errors.length > 0) {
-    const messages = errors.map((e) => `  - ${e.field}: ${e.message}`).join('\n')
-    // @fitness-ignore-next-line result-pattern-consistency -- definition-time validation, throw is appropriate
-    throw new CoreValidationError(`Invalid chaos scenario configuration:\n${messages}`, {
-      code: 'VALIDATION.SCENARIO.INVALID_CONFIG',
-      metadata: { errors, kind: 'chaos' },
-    })
-  }
+  throwValidationErrors(errors, 'chaos')
 }
 
 /**
@@ -187,17 +169,14 @@ export function defineChaosScenario(config: ChaosScenarioConfig): RunnableScenar
 /**
  * Define a chaos scenario without auto-registration (test helper).
  *
- * @throws {ValidationError} When the scenario configuration is invalid (missing id)
+ * Same validator as `defineChaosScenario`, with the registry-uniqueness
+ * check disabled.
+ *
+ * @throws {ValidationError} When the scenario configuration is invalid
  */
 export function defineChaosScenarioWithoutRegistration(
   config: ChaosScenarioConfig,
 ): RunnableScenario {
-  if (!config.id || config.id.trim() === '') {
-    // @fitness-ignore-next-line result-pattern-consistency -- definition-time validation, throw is appropriate
-    throw new CoreValidationError('Invalid chaos scenario configuration: id is required', {
-      code: 'VALIDATION.SCENARIO.INVALID_CONFIG',
-      metadata: { kind: 'chaos' },
-    })
-  }
+  validateChaosScenarioConfig(config, { skipRegistryCheck: true })
   return createChaosScenarioRunner(config)
 }

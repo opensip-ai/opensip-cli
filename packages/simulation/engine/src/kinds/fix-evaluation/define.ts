@@ -12,10 +12,13 @@
  * gaming-defense check.
  */
 
-import { ValidationError as CoreValidationError } from '@opensip-tools/core'
-
-
 import { scenarioRegistry } from '../../framework/registry.js'
+import {
+  throwValidationErrors,
+  validateScenarioMetadata,
+  validateScenarioUniqueness,
+  type ScenarioValidationError,
+} from '../../framework/validation.js'
 
 
 import { createFixEvaluationScenarioRunner } from './executor.js'
@@ -97,29 +100,21 @@ export interface FixEvaluationScenarioConfig {
   readonly targets?: readonly string[]
 }
 
-/** Validation error shape for fix-evaluation config. */
-export interface FixEvaluationValidationError {
-  readonly field: string
-  readonly message: string
-}
+/**
+ * Validation error shape for fix-evaluation config.
+ *
+ * @deprecated Use `ScenarioValidationError` from `framework/validation.ts`.
+ */
+export type FixEvaluationValidationError = ScenarioValidationError
 
 // =============================================================================
 // VALIDATION
 // =============================================================================
 
-function validateRequired(
+function validateSignalPayload(
   config: FixEvaluationScenarioConfig,
-  errors: FixEvaluationValidationError[],
+  errors: ScenarioValidationError[],
 ): void {
-  if (!config.id || !/^[a-z0-9-]+$/.test(config.id)) {
-    errors.push({ field: 'id', message: 'id must be lowercase alphanumeric with hyphens' })
-  }
-  if (!config.name || config.name.trim() === '') {
-    errors.push({ field: 'name', message: 'name is required' })
-  }
-  if (!config.description || config.description.trim() === '') {
-    errors.push({ field: 'description', message: 'description is required' })
-  }
   if (!config.signal) {
     errors.push({ field: 'signal', message: 'signal payload is required' })
   }
@@ -127,7 +122,7 @@ function validateRequired(
 
 function validateJudgmentMode(
   config: FixEvaluationScenarioConfig,
-  errors: FixEvaluationValidationError[],
+  errors: ScenarioValidationError[],
 ): void {
   if (config.judgmentMode === 'predicate-match') {
     if (!config.predicate) {
@@ -154,7 +149,7 @@ function validateJudgmentMode(
 function validatePredicateTree(
   node: PredicateComposition | PredicateLeaf | undefined,
   pathTrace: string,
-  errors: FixEvaluationValidationError[],
+  errors: ScenarioValidationError[],
 ): void {
   if (!node) return
 
@@ -196,7 +191,7 @@ function validatePredicateTree(
 
 function validateGamingDefense(
   config: FixEvaluationScenarioConfig,
-  errors: FixEvaluationValidationError[],
+  errors: ScenarioValidationError[],
 ): void {
   if (config.judgmentMode !== 'predicate-match' || !config.predicate) {
     return
@@ -231,22 +226,9 @@ function validateGamingDefense(
   }
 }
 
-function validateDuplicates(
-  config: FixEvaluationScenarioConfig,
-  errors: FixEvaluationValidationError[],
-): void {
-  if (config.id && scenarioRegistry.has(config.id)) {
-    errors.push({
-      field: 'id',
-      message: `scenario with id '${config.id}' is already registered`,
-    })
-  }
-  if (config.name && scenarioRegistry.has(config.name)) {
-    errors.push({
-      field: 'name',
-      message: `scenario with name '${config.name}' is already registered`,
-    })
-  }
+interface ValidateFixEvaluationOptions {
+  /** Test helper: skip the registry-uniqueness check. */
+  readonly skipRegistryCheck?: boolean
 }
 
 /**
@@ -256,25 +238,19 @@ function validateDuplicates(
  */
 export function validateFixEvaluationScenarioConfig(
   config: FixEvaluationScenarioConfig,
+  options: ValidateFixEvaluationOptions = {},
 ): void {
-  const errors: FixEvaluationValidationError[] = []
-  validateRequired(config, errors)
+  const errors: ScenarioValidationError[] = []
+  validateScenarioMetadata(config, errors)
+  validateSignalPayload(config, errors)
   validateJudgmentMode(config, errors)
   validatePredicateTree(config.predicate, 'predicate', errors)
   validateGamingDefense(config, errors)
-  validateDuplicates(config, errors)
+  validateScenarioUniqueness(config, errors, {
+    ...(options.skipRegistryCheck === undefined ? {} : { skipRegistryCheck: options.skipRegistryCheck }),
+  })
 
-  if (errors.length > 0) {
-    const messages = errors.map((e) => `  - ${e.field}: ${e.message}`).join('\n')
-    // @fitness-ignore-next-line result-pattern-consistency -- definition-time validation, throw is appropriate
-    throw new CoreValidationError(
-      `Invalid fix-evaluation scenario configuration:\n${messages}`,
-      {
-        code: 'VALIDATION.SCENARIO.INVALID_CONFIG',
-        metadata: { errors, kind: 'fix-evaluation' },
-      },
-    )
-  }
+  throwValidationErrors(errors, 'fix-evaluation')
 }
 
 /**
@@ -294,20 +270,14 @@ export function defineFixEvaluationScenario(
 /**
  * Define a fix-evaluation scenario without auto-registration (test helper).
  *
- * @throws {ValidationError} When the scenario configuration is invalid (missing id)
+ * Same validator as `defineFixEvaluationScenario`, with the registry-
+ * uniqueness check disabled.
+ *
+ * @throws {ValidationError} When the scenario configuration is invalid
  */
 export function defineFixEvaluationScenarioWithoutRegistration(
   config: FixEvaluationScenarioConfig,
 ): RunnableScenario {
-  if (!config.id || config.id.trim() === '') {
-    // @fitness-ignore-next-line result-pattern-consistency -- definition-time validation, throw is appropriate
-    throw new CoreValidationError(
-      'Invalid fix-evaluation scenario configuration: id is required',
-      {
-        code: 'VALIDATION.SCENARIO.INVALID_CONFIG',
-        metadata: { kind: 'fix-evaluation' },
-      },
-    )
-  }
+  validateFixEvaluationScenarioConfig(config, { skipRegistryCheck: true })
   return createFixEvaluationScenarioRunner(config)
 }

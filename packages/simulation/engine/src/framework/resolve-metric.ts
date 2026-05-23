@@ -52,8 +52,8 @@
  * When `totalRequests === 0`, `successfulRequests / totalRequests` is `0/0`.
  * The two historical resolvers disagreed:
  *
- *   - `execution-engine.getMetricValue` returned `1` (no failures ⇒ pass).
- *   - `ScenarioResultBuilder.getMetricValue` returned `0` (no successes ⇒ fail).
+ *   - The execution-engine path returned `1` (no failures ⇒ pass).
+ *   - The result-builder path returned `0` (no successes ⇒ fail).
  *
  * We pick **`0`**, matching the result-builder's existing pinned behaviour
  * (see `result-builder.test.ts` "success_rate is 0 when no requests"). The

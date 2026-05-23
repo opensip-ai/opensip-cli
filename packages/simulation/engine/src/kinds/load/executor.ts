@@ -3,16 +3,14 @@
 /**
  * @fileoverview Load-kind executor.
  *
- * Extracted from the legacy `define-scenario.ts` `createStandardExecutor` +
- * `createRunnableScenario` helpers. Behavior is preserved verbatim — load
- * scenarios authored against the new `defineLoadScenario` entry point produce
- * the same metrics, assertion bookkeeping, and signal stream as before.
+ * Delegates to the shared `runLoadWindow` driver in
+ * `framework/execution/run-load-window.ts` — the load kind is the
+ * "default" version of the loop (no per-tick chaos injection).
  */
 
 import { ScenarioAbortedError } from '../../framework/execution/execution-engine.js'
-import { LatencyTracker } from '../../framework/execution/latency-tracker.js'
-import { getEstimatedRps } from '../../framework/personas.js'
-import { ScenarioResultBuilder, createEmptyMetrics } from '../../framework/result-builder.js'
+import { runLoadWindow } from '../../framework/execution/run-load-window.js'
+import { ScenarioResultBuilder } from '../../framework/result-builder.js'
 import { createScenarioLogger } from '../../framework/scenario-logger.js'
 
 import type { LoadScenarioConfig } from './define.js'
@@ -20,11 +18,9 @@ import type { RunnableScenario } from '../../framework/runnable-scenario.js'
 import type {
   LoadScenarioExecutorResult,
 } from '../../framework/scenario-executor-result.js'
-import type { SimulationMetrics } from '../../types/base-types.js'
 import type {
   ScenarioExecutionContext,
 } from '../../types/framework-types.js'
-import type { Signal } from '@opensip-tools/core'
 
 // =============================================================================
 // STANDARD EXECUTOR (mock simulation loop)
@@ -32,76 +28,29 @@ import type { Signal } from '@opensip-tools/core'
 
 /**
  * Build the standard self-contained executor for load scenarios without a
- * custom `execute` function. Runs a mock simulation loop with random latency
- * and a 95% success rate.
+ * custom `execute` function. Delegates the tick loop to `runLoadWindow`
+ * and wraps the result into the kind-specific envelope.
  */
-// @fitness-ignore-next-line file-length-limits -- Simulation executor: sequential phase orchestration (init, ramp, sustain, cooldown) requires contiguous control flow
 function createStandardExecutor(
   config: LoadScenarioConfig,
 ): (context: ScenarioExecutionContext) => Promise<LoadScenarioExecutorResult> {
   return async (context) => {
     const startTime = Date.now()
-    const targetRps = config.targetRps ?? getEstimatedRps(config.personas)
     context.logger.info('Starting standard load scenario execution', {
       duration: config.duration,
       personas: config.personas.length,
-      targetRps,
+      targetRps: config.targetRps,
     })
 
-    const metrics: SimulationMetrics = createEmptyMetrics()
-    const latencyTracker = new LatencyTracker()
-    const signals: Signal[] = []
-    const durationMs = config.duration * 1000
-    const rampUpMs = (config.rampUp ?? 0) * 1000
-    const tickIntervalMs = 100
-    const loopStart = Date.now()
-
-    while (Date.now() - loopStart < durationMs) {
-      if (context.abortSignal.aborted) break
-
-      const elapsed = Date.now() - loopStart
-      const rampUpProgress = rampUpMs > 0 ? Math.min(1, elapsed / rampUpMs) : 1
-      const currentRps = targetRps * rampUpProgress
-      const requestsThisTick = Math.floor(currentRps / (1000 / tickIntervalMs))
-
-      for (let i = 0; i < requestsThisTick; i++) {
-        if (context.abortSignal.aborted) break
-
-        // Simulate an action with random latency
-        const latency = Math.random() * 50 + 1
-        metrics.totalRequests++
-        latencyTracker.record(latency)
-
-        // 95% success rate by default
-        if (Math.random() < 0.95) {
-          metrics.successfulRequests++
-        } else {
-          metrics.failedRequests++
-          metrics.errorsGenerated++
-        }
-      }
-
-      await new Promise<void>((resolve) => {
-        const timeout = setTimeout(resolve, tickIntervalMs)
-        if (context.abortSignal.aborted) {
-          clearTimeout(timeout)
-          resolve()
-        }
-      })
-    }
-
-    const snapshot = latencyTracker.getLatencySnapshot()
-    metrics.avgLatencyMs = snapshot.avgLatencyMs
-    metrics.p50LatencyMs = snapshot.p50LatencyMs
-    metrics.p95LatencyMs = snapshot.p95LatencyMs
-    metrics.p99LatencyMs = snapshot.p99LatencyMs
-    metrics.findingsGenerated = signals.length
+    const window = await runLoadWindow(config, context, {
+      windowMs: config.duration * 1000,
+    })
 
     const built = ScenarioResultBuilder.create(config.id)
-      .withMetrics(metrics)
+      .withMetrics(window.metrics)
       .withDuration(config.duration)
       .evaluateAssertions(config.assertions)
-      .addSignals(signals)
+      .addSignals(window.signals)
       .build()
 
     return Object.freeze({

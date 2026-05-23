@@ -41,12 +41,15 @@ opensip-tools sim --recipe <name>
             → expand selector → scenario list                                │
             → for each scenario (in mode order):                             │
                  ┌─────────────────────────────────────────────────────┐    │
-                 │  dispatcher.execute(scenario, ctx)                  │    │
-                 │    switch (scenario.kind):                          │    │
-                 │      case 'load':           loadExecutor(ctx)       │    │
-                 │      case 'chaos':          chaosExecutor(ctx)      │    │
-                 │      case 'invariant':      invariantExecutor(ctx)  │    │
-                 │      case 'fix-evaluation': fixEvalExecutor(ctx)    │    │
+                 │  await scenario.run(ctx)   /* polymorphic */        │    │
+                 │                                                     │    │
+                 │  Extension points (not runtime dispatch — the       │    │
+                 │  RunnableScenario produced by define*Scenario       │    │
+                 │  already carries the kind-bound run() method):      │    │
+                 │      kind 'load'           → kinds/load/executor    │    │
+                 │      kind 'chaos'          → kinds/chaos/executor   │    │
+                 │      kind 'invariant'      → kinds/invariant/...    │    │
+                 │      kind 'fix-evaluation' → kinds/fix-evaluation   │    │
                  └─────────────────────────────────────────────────────┘    │
             → aggregate results into SimDoneResult                           │
        → render (Ink or JSON)                                                │
@@ -79,12 +82,12 @@ A load scenario that's interrupted (signal abort, timeout) returns whatever stat
 
 [`packages/simulation/engine/src/kinds/chaos/executor.ts`](../../../packages/simulation/engine/src/kinds/chaos/executor.ts)
 
-The chaos executor extends the load executor:
+The chaos executor delegates the tick loop to the same shared `runLoadWindow` driver the load kind uses ([`packages/simulation/engine/src/framework/execution/run-load-window.ts`](../../../packages/simulation/engine/src/framework/execution/run-load-window.ts)) and supplies an `injectChaos` callback per the Template Method pattern. The full sequence:
 
-1. Run the base load (same as load executor).
-2. While the load runs, inject faults from the `chaos` config — each `ChaosInjection` fires at the configured `probability` against requests matching its `target` pattern.
-3. Evaluate the `steadyStateAssertions` against the load metrics collected while chaos is active.
-4. After the chaos window ends, evaluate the `recoveryAssertions` over the next `recoveryWindow` milliseconds.
+1. Run the steady-state window via `runLoadWindow(config, ctx, { windowMs: duration*1000, injectChaos })`. The callback fires per-request: at `chaos.probability` it returns a `chaos-event` outcome (recording a `ChaosEvent`); otherwise it returns `null` and the loop falls through to the default 95% success roll.
+2. Run the recovery window via `runLoadWindow(config, ctx, { windowMs: recoveryWindow })` — no `injectChaos` hook means chaos is off and only the default success roll applies.
+3. Evaluate the `steadyStateAssertions` against the steady window's metrics.
+4. Evaluate the `recoveryAssertions` against the recovery window's metrics.
 
 The result type is `ChaosScenarioExecutorResult` — load metrics plus the steady-state and recovery verdicts. Pass/fail is the AND of every steady-state and recovery assertion.
 

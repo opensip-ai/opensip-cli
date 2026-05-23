@@ -1,10 +1,12 @@
 /**
  * @fileoverview Chaos-kind executor.
  *
- * Composes the load executor with explicit failure injection + a recovery
- * window. The current implementation runs the load engine for the configured
- * duration with chaos active, then continues for `recoveryWindow` ms with
- * chaos disabled to evaluate recovery assertions.
+ * Composes the shared `runLoadWindow` driver with explicit failure injection
+ * and a recovery window. The current implementation runs the loop for the
+ * configured duration with chaos active (`injectChaos` returns failures /
+ * `chaos-event` outcomes per the configured probability), then continues
+ * for `recoveryWindow` ms with chaos disabled to evaluate recovery
+ * assertions.
  *
  * This is the v1 shape — when Plan 01 Phase 9 (chaos scenarios) authors real
  * scenarios, the executor may grow phase-aware metric snapshots and event
@@ -12,93 +14,44 @@
  */
 
 import { ScenarioAbortedError } from '../../framework/execution/execution-engine.js'
-import { LatencyTracker } from '../../framework/execution/latency-tracker.js'
-import { getEstimatedRps } from '../../framework/personas.js'
-import { ScenarioResultBuilder, createEmptyMetrics } from '../../framework/result-builder.js'
+import { runLoadWindow } from '../../framework/execution/run-load-window.js'
+import { ScenarioResultBuilder } from '../../framework/result-builder.js'
 import { createScenarioLogger } from '../../framework/scenario-logger.js'
 
 import type { ChaosScenarioConfig } from './define.js'
 import type { ChaosAssertionVerdict, ChaosEvent } from './result.js'
+import type { TickOutcome } from '../../framework/execution/run-load-window.js'
 import type { RunnableScenario } from '../../framework/runnable-scenario.js'
 import type { ChaosScenarioExecutorResult } from '../../framework/scenario-executor-result.js'
 import type { SimulationMetrics } from '../../types/base-types.js'
 import type {
   ScenarioExecutionContext,
 } from '../../types/framework-types.js'
-import type { Signal } from '@opensip-tools/core'
 
 /**
- * Run a single load-style window producing aggregate metrics + signals.
- * Used twice by the chaos executor — once during the chaos-active window,
- * once during the recovery window.
+ * Per-tick injection callback for the chaos kind. Returns a `chaos-event`
+ * outcome at the configured probability (with the first injection's `type`
+ * + `target`); otherwise defers to the default 95% success roll.
  */
-// eslint-disable-next-line sonarjs/cognitive-complexity -- chaos load window driver: tracks request lifecycle (spawn/await/abort) and aggregates metrics inline
-async function runWindow(
+function buildInjectChaos(
   config: ChaosScenarioConfig,
-  context: ScenarioExecutionContext,
-  windowMs: number,
-  chaosActive: boolean,
-): Promise<{ metrics: SimulationMetrics; signals: Signal[]; events: ChaosEvent[] }> {
-  const targetRps = config.targetRps ?? getEstimatedRps(config.personas)
-  const metrics = createEmptyMetrics()
-  const latencyTracker = new LatencyTracker()
-  const events: ChaosEvent[] = []
-  const signals: Signal[] = []
-  const tickIntervalMs = 100
-  const start = Date.now()
-  const rampUpMs = (config.rampUp ?? 0) * 1000
-
-  while (Date.now() - start < windowMs) {
-    if (context.abortSignal.aborted) break
-    const elapsed = Date.now() - start
-    const rampUpProgress = rampUpMs > 0 ? Math.min(1, elapsed / rampUpMs) : 1
-    const currentRps = targetRps * rampUpProgress
-    const requestsThisTick = Math.floor(currentRps / (1000 / tickIntervalMs))
-
-    for (let i = 0; i < requestsThisTick; i++) {
-      if (context.abortSignal.aborted) break
-      const latency = Math.random() * 50 + 1
-      metrics.totalRequests++
-      latencyTracker.record(latency)
-
-      // While chaos is active, fire injection events at the configured probability
-      // and inflate the failure rate.
-      if (chaosActive && config.chaos.enabled && Math.random() < config.chaos.probability) {
-        metrics.failedRequests++
-        metrics.errorsGenerated++
-        const injection = config.chaos.types[0]
-        if (injection) {
-          events.push({
-            type: injection.type,
-            atMs: Date.now() - start,
-            target: injection.target,
-          })
-        }
-      } else if (Math.random() < 0.95) {
-        metrics.successfulRequests++
-      } else {
-        metrics.failedRequests++
-        metrics.errorsGenerated++
-      }
+): () => TickOutcome {
+  return () => {
+    if (!config.chaos.enabled || Math.random() >= config.chaos.probability) {
+      return null
     }
-
-    await new Promise<void>((resolve) => {
-      const timeout = setTimeout(resolve, tickIntervalMs)
-      if (context.abortSignal.aborted) {
-        clearTimeout(timeout)
-        resolve()
-      }
-    })
+    const injection = config.chaos.types[0]
+    if (!injection) {
+      // chaos active but no injection definitions — count as a generic failure.
+      return { kind: 'failure' }
+    }
+    const event: ChaosEvent = {
+      type: injection.type,
+      atMs: 0, // overwritten below by the loop's timing
+      target: injection.target,
+    }
+    return { kind: 'chaos-event', event }
   }
-
-  const snapshot = latencyTracker.getLatencySnapshot()
-  metrics.avgLatencyMs = snapshot.avgLatencyMs
-  metrics.p50LatencyMs = snapshot.p50LatencyMs
-  metrics.p95LatencyMs = snapshot.p95LatencyMs
-  metrics.p99LatencyMs = snapshot.p99LatencyMs
-  metrics.findingsGenerated = signals.length
-
-  return { metrics, signals, events }
 }
 
 function evaluateAssertionsForWindow(
@@ -146,8 +99,26 @@ export function createChaosScenarioRunner(config: ChaosScenarioConfig): Runnable
           const steadyDurationMs = config.duration * 1000
           const recoveryDurationMs = config.recoveryWindow
 
-          const steady = await runWindow(config, context, steadyDurationMs, true)
-          const recovery = await runWindow(config, context, recoveryDurationMs, false)
+          // Steady-state window: chaos is active.
+          const injectChaos = buildInjectChaos(config)
+          const steady = await runLoadWindow(config, context, {
+            windowMs: steadyDurationMs,
+            injectChaos: ({ tickStartMs }) => {
+              const outcome = injectChaos()
+              if (outcome?.kind === 'chaos-event') {
+                // Stamp the relative timestamp the framework supplies.
+                return {
+                  kind: 'chaos-event',
+                  event: { ...outcome.event, atMs: tickStartMs },
+                }
+              }
+              return outcome
+            },
+          })
+          // Recovery window: no injectChaos hook — defaults to 95% success.
+          const recovery = await runLoadWindow(config, context, {
+            windowMs: recoveryDurationMs,
+          })
 
           const steadyVerdict = evaluateAssertionsForWindow(
             config.id,
@@ -165,6 +136,15 @@ export function createChaosScenarioRunner(config: ChaosScenarioConfig): Runnable
           const passed =
             steadyVerdict.failed.length === 0 && recoveryVerdict.failed.length === 0
 
+          // The `runLoadWindow` driver returns `LoadWindowEvent[]`; in
+          // practice the chaos executor only emits chaos-event outcomes
+          // whose payload IS a ChaosEvent. The structural compatibility
+          // is documented in run-load-window.ts.
+          const chaosEvents: readonly ChaosEvent[] = Object.freeze([
+            ...steady.events,
+            ...recovery.events,
+          ] as ChaosEvent[])
+
           return Object.freeze({
             kind: 'chaos' as const,
             scenarioId: config.id,
@@ -176,7 +156,7 @@ export function createChaosScenarioRunner(config: ChaosScenarioConfig): Runnable
               recoveryMetrics: recovery.metrics,
               steadyStateAssertions: steadyVerdict,
               recoveryAssertions: recoveryVerdict,
-              chaosEvents: Object.freeze([...steady.events, ...recovery.events]),
+              chaosEvents,
               recoveryWindowMs: recoveryDurationMs,
             }),
           })

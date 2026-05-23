@@ -104,7 +104,7 @@ export class ScenarioResultBuilder {
     }
 
     for (const assertion of assertions) {
-      const actual = this.getMetricValue(assertion.metric)
+      const actual = this.resolveAssertionMetric(assertion.metric)
       if (evaluateAssertion(assertion, actual)) {
         this.assertionPassed(assertion)
       } else {
@@ -161,7 +161,7 @@ export class ScenarioResultBuilder {
   // PRIVATE
   // ===========================================================================
 
-  private getMetricValue(metric: ScenarioAssertion['metric']): number {
+  private resolveAssertionMetric(metric: ScenarioAssertion['metric']): number {
     if (!this._metrics) {
       return 0
     }
