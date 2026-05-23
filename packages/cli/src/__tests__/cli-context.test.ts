@@ -3,9 +3,10 @@ import {
   type LiveViewRenderer,
   type Logger,
 } from '@opensip-tools/core';
-import { describe, expect, it, vi } from 'vitest';
+import { Command } from 'commander';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { createLiveViewRegistry } from '../cli-context.js';
+import { buildToolCliContext, createLiveViewRegistry } from '../cli-context.js';
 
 function makeLogger(): {
   log: Logger;
@@ -81,5 +82,71 @@ describe('createLiveViewRegistry', () => {
     expect(a.has('view-x')).toBe(true);
     expect(b.has('view-x')).toBe(false);
     await expect(b.render('view-x', {})).rejects.toBeInstanceOf(UnknownLiveViewError);
+  });
+});
+
+function makeBuildOpts(): {
+  program: Command;
+  render: ReturnType<typeof vi.fn>;
+  liveViews: ReturnType<typeof createLiveViewRegistry>;
+  builtinLiveViews: ReadonlyMap<string, LiveViewRenderer>;
+  maybeOpenDashboard: ReturnType<typeof vi.fn>;
+  logger: Logger;
+} {
+  const { log } = makeLogger();
+  const liveViews = createLiveViewRegistry(log);
+  return {
+    program: new Command('test'),
+    render: vi.fn(() => Promise.resolve()),
+    liveViews,
+    builtinLiveViews: new Map(),
+    maybeOpenDashboard: vi.fn(() => Promise.resolve()),
+    logger: log,
+  };
+}
+
+describe('buildToolCliContext', () => {
+  // The factory mutates `process.exitCode` through `setExitCode` — keep
+  // each test isolated by snapshotting the exit code around it.
+  let savedExitCode: number | undefined;
+  beforeEach(() => {
+    savedExitCode = process.exitCode;
+    process.exitCode = 0;
+  });
+  afterEach(() => {
+    process.exitCode = savedExitCode;
+  });
+
+  it('setExitCode mutates the captured exit code (single write path)', () => {
+    const opts = makeBuildOpts();
+    const { ctx, getExitCode } = buildToolCliContext(opts);
+    expect(getExitCode()).toBeUndefined();
+    ctx.setExitCode(2);
+    expect(getExitCode()).toBe(2);
+    expect(process.exitCode).toBe(2);
+  });
+
+  it('render delegates to the injected renderer', async () => {
+    const opts = makeBuildOpts();
+    const { ctx } = buildToolCliContext(opts);
+    const result = { type: 'help' as const };
+    await ctx.render(result);
+    expect(opts.render).toHaveBeenCalledWith(result);
+  });
+
+  it('renderLive routes through the live-view registry', async () => {
+    const opts = makeBuildOpts();
+    const renderer = vi.fn<LiveViewRenderer>(() => Promise.resolve());
+    opts.liveViews.register('fake', renderer);
+    const { ctx } = buildToolCliContext(opts);
+
+    await ctx.renderLive('fake', { v: 1 });
+    expect(renderer).toHaveBeenCalledWith({ v: 1 });
+  });
+
+  it('renderLive throws UnknownLiveViewError for unregistered keys', async () => {
+    const opts = makeBuildOpts();
+    const { ctx } = buildToolCliContext(opts);
+    await expect(ctx.renderLive('missing', {})).rejects.toBeInstanceOf(UnknownLiveViewError);
   });
 });
