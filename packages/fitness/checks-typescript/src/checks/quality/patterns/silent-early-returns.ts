@@ -37,13 +37,20 @@ const SENTINEL_KINDS = new Set([ts.SyntaxKind.NullKeyword, ts.SyntaxKind.FalseKe
 // =============================================================================
 
 /**
- * Find the enclosing function for a node
+ * Find the enclosing function for a node.
+ *
+ * Intentionally narrower than `lang-typescript`'s `findEnclosingFunction` —
+ * skips past `ConstructorDeclaration` and `FunctionExpression` parents to
+ * find the next enclosing declaration/method/arrow whose name (if any) the
+ * downstream predicates (`isTypeGuard`, `isValidationOrParserFunction`) can
+ * inspect. Switching to the canonical helper would change behavior for
+ * `if (!x) return null` directly inside a constructor body.
  */
 function findFunction(
   node: ts.Node,
 ): FunctionLikeNode | null {
   let current = node.parent
-   
+
   while (current) {
     if (
       ts.isFunctionDeclaration(current) ||

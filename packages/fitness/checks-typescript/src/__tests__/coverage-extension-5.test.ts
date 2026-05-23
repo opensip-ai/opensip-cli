@@ -1,7 +1,7 @@
 /**
  * @fileoverview Final coverage push to >= 90%: targets the remaining gap
  * with focused tests across openapi-type-source, api-contract-validation,
- * array-validation, async-patterns, and other sub-90% checks.
+ * array-validation, detached-promises, and other sub-90% checks.
  */
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
@@ -131,7 +131,7 @@ describe('api-contract-validation — branch coverage', () => {
 })
 
 // ---------------------------------------------------------------------------
-// async-patterns / detached-promises - more branches
+// detached-promises - more branches
 // ---------------------------------------------------------------------------
 
 describe('detached-promises — extra branches', () => {

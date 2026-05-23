@@ -47,7 +47,7 @@ afterEach(() => {
 })
 
 // ---------------------------------------------------------------------------
-// context-leakage (the second check in context-safety.ts)
+// context-leakage (resilience/context-leakage)
 // ---------------------------------------------------------------------------
 
 describe('context-leakage — branch coverage', () => {
@@ -188,7 +188,7 @@ describe('context-leakage — branch coverage', () => {
 })
 
 // ---------------------------------------------------------------------------
-// detached-promises (resilience/async-patterns)
+// detached-promises (resilience/detached-promises)
 // ---------------------------------------------------------------------------
 
 describe('detached-promises — branch coverage', () => {
@@ -242,7 +242,7 @@ describe('detached-promises — branch coverage', () => {
 })
 
 // ---------------------------------------------------------------------------
-// no-unbounded-concurrency (resilience/async-patterns)
+// no-unbounded-concurrency (resilience/no-unbounded-concurrency)
 // ---------------------------------------------------------------------------
 
 describe('no-unbounded-concurrency — branch coverage', () => {

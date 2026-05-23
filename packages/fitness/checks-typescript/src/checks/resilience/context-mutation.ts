@@ -81,7 +81,7 @@ interface MutationDetector {
  */
 function findWordEndIndex(str: string): number {
   logger.debug({
-    evt: 'fitness.checks.context_safety.find_word_end_index',
+    evt: 'fitness.checks.context_mutation.find_word_end_index',
     msg: 'Finding end index of word characters in string',
   })
   let wordEnd = 0
@@ -107,7 +107,7 @@ function createAssignmentDetector(prefix: string): MutationDetector {
   return {
     test: (line: string): boolean => {
       logger.debug({
-        evt: 'fitness.checks.context_safety.assignment_detector_test',
+        evt: 'fitness.checks.context_mutation.assignment_detector_test',
         msg: 'Testing line for context assignment mutation',
       })
       const idx = line.indexOf(prefix)
@@ -160,7 +160,7 @@ function createContextArrayMutationDetector(method: string): MutationDetector {
   return {
     test: (line: string): boolean => {
       logger.debug({
-        evt: 'fitness.checks.context_safety.array_mutation_detector_test',
+        evt: 'fitness.checks.context_mutation.array_mutation_detector_test',
         msg: 'Testing line for context array mutation pattern',
       })
       // Must contain the method call
@@ -268,7 +268,7 @@ const SAFE_CONTEXT_PREFIXES = [
  */
 function isSafeMutation(line: string): boolean {
   logger.debug({
-    evt: 'fitness.checks.context_safety.is_safe_mutation',
+    evt: 'fitness.checks.context_mutation.is_safe_mutation',
     msg: 'Checking if line contains safe mutation patterns',
   })
   // Check for safe keywords
@@ -318,7 +318,7 @@ function isDefensiveMutation(lines: string[], index: number): boolean {
  */
 export function analyzeContextMutation(content: string, filePath: string): CheckViolation[] {
   logger.debug({
-    evt: 'fitness.checks.context_safety.context_mutation_check_analyze',
+    evt: 'fitness.checks.context_mutation.context_mutation_check_analyze',
     msg: 'Analyzing file for unsafe context mutations',
   })
   const violations: CheckViolation[] = []
@@ -336,8 +336,7 @@ export function analyzeContextMutation(content: string, filePath: string): Check
     const match = findMutationMatch(line)
     if (!match || match.isSafe) continue
 
-    // eslint-disable-next-line sonarjs/slow-regex -- bounded input: patternName is a short literal like 'ctx.*=' / 'context.*=' authored above in MUTATION_DETECTORS, not attacker input
-    const rootName = match.detector.patternName.replace(/\..*$/, '')
+    const rootName = match.detector.patternName.split('.')[0]
     if (locallyDeclared.has(rootName)) continue
 
     const isDefensive = isDefensiveMutation(lines, i)

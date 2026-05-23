@@ -370,7 +370,7 @@ export const contextLeakage = defineCheck({
     if (isSkippedPath(filePath)) return []
 
     logger.debug({
-      evt: 'fitness.checks.context_safety.context_leakage_analyze',
+      evt: 'fitness.checks.context_leakage.context_leakage_analyze',
       msg: 'Analyzing file for request context leakage (AST)',
     })
 

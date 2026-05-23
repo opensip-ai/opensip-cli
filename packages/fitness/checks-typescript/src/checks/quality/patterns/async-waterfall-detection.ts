@@ -15,7 +15,7 @@
 
 
 import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
-import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
+import { getSharedSourceFile, isAsync } from '@opensip-tools/lang-typescript'
 import * as ts from 'typescript'
 
 /**
@@ -56,7 +56,12 @@ const SLEEP_DELAY_NAMES = new Set(['sleep', 'delay', 'wait', 'setTimeout', 'paus
 const LOCK_ACQUIRE_NAMES = new Set(['acquire', 'lock', 'runExclusive', 'withLock'])
 
 /**
- * Check if a node is an async function (function, method, or arrow function)
+ * Check if a node is an async function (function, method, or arrow function).
+ *
+ * Defers the modifier inspection to `lang-typescript`'s canonical `isAsync`
+ * (modern `canHaveModifiers` + `getModifiers` API); the function-like guard
+ * stays inline so callers downstream still get the narrowed-via-control-flow
+ * type for `node` at the call site.
  */
 function isAsyncFunction(node: ts.Node): boolean {
   if (
@@ -65,7 +70,7 @@ function isAsyncFunction(node: ts.Node): boolean {
     ts.isArrowFunction(node) ||
     ts.isFunctionExpression(node)
   ) {
-    return node.modifiers?.some((m) => m.kind === ts.SyntaxKind.AsyncKeyword) ?? false
+    return isAsync(node)
   }
   return false
 }
