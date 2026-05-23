@@ -30,6 +30,7 @@ import { cacheKey as typescriptCacheKey } from './cache-key.js';
 import { discoverFiles as legacyDiscoverFiles } from './discover.js';
 import { resolveEdgesFromRecords } from './edges.js';
 import { parseProject as parseTypescriptProject } from './parse.js';
+import { isTypescriptTestFile } from './test-file.js';
 import { walkProgram } from './walk.js';
 
 import type { TypescriptParsedProject } from './parse.js';
@@ -81,16 +82,6 @@ export type { InventoryVisitor, VisitorContext } from './inventory-visitors/type
 export { parseProject } from './parse.js';
 export type { TypescriptParsedProject } from './parse.js';
 export { cacheKey } from './cache-key.js';
-
-// Test detection — promoted from walk.ts's inline regex into a hint.
-// Two simple anchored patterns instead of one alternation; avoids
-// catastrophic backtracking on pathological inputs.
-const TEST_TESTS_DIR_RE = /(?:^|\/)__tests__\//;
-const TEST_FILE_SUFFIX_RE = /\.test\.(?:ts|tsx|js|jsx)$|_test\.(?:ts|tsx|js|jsx)$/;
-
-function isTypescriptTestFile(filePathProjectRel: string): boolean {
-  return TEST_TESTS_DIR_RE.test(filePathProjectRel) || TEST_FILE_SUFFIX_RE.test(filePathProjectRel);
-}
 
 /**
  * Starter list of well-known side-effect primitives for the

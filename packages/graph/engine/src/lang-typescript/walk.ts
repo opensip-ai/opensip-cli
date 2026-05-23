@@ -35,6 +35,7 @@ import { visitFunctionExpression } from './inventory-visitors/function-expressio
 import { visitGetterSetter } from './inventory-visitors/getter-setter.js';
 import { visitMethodDeclaration } from './inventory-visitors/method-declaration.js';
 import { synthesizeModuleInit } from './inventory-visitors/module-init.js';
+import { isTypescriptTestFile } from './test-file.js';
 
 import type { FunctionOccurrence, ParseError } from '../types.js';
 import type { VisitorContext } from './inventory-visitors/types.js';
@@ -120,7 +121,7 @@ function walkFile(
     sourceFile,
     projectDirAbs,
     filePathProjectRel,
-    inTestFile: isTestFile(filePathProjectRel),
+    inTestFile: isTypescriptTestFile(filePathProjectRel),
     definedInGenerated: isGeneratedFile(filePathProjectRel),
     enclosingClass: null,
   };
@@ -211,8 +212,9 @@ const VISITOR_TABLE: readonly VisitorEntry[] = [
 /**
  * Dispatch a node to the right Stage 1 inventory visitor and return
  * the function occurrence (or null if the node isn't function-shaped).
- * Exported so `inventory.ts:buildInventory` can share this dispatch
- * table when it walks files in isolation (tests, external callers).
+ * Exported so external callers (and the public package barrel) can
+ * share this dispatch table when they need to classify a single node
+ * without driving the full walker.
  */
 export function dispatchVisitor(node: ts.Node, ctx: VisitorContext): FunctionOccurrence | null {
   for (const entry of VISITOR_TABLE) {
@@ -309,10 +311,6 @@ function isCallTargetIdentifier(node: ts.Identifier, parent: ts.Node): boolean {
 
 function normalizeForCompare(p: string): string {
   return p.split(sep).join('/');
-}
-
-function isTestFile(rel: string): boolean {
-  return /\.test\.tsx?$|__tests__\//.test(rel);
 }
 
 function isGeneratedFile(rel: string): boolean {
