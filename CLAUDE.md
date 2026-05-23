@@ -283,6 +283,15 @@ example`. Project layout is local: user-authored content under
 auto-discovers `.mjs` files by directory presence; npm packages
 must be explicitly listed in `plugins.<domain>` to load.
 
+Re-running `init` on a non-pristine project refuses with exit 2 by
+default. Two explicit flags express user intent:
+`--keep` re-scaffolds examples while preserving custom files, and
+`--remove` deletes `opensip-tools/` entirely before scaffolding
+fresh. The flags are mutually exclusive. The legacy `--force` flag
+is gone; users who scripted it should migrate to `--remove`. See
+`docs/architecture/70-surfaces/01-cli-command-tree.md#init---scaffold-the-project-layout`
+for the full state table.
+
 Future tool ideas (not implemented): `audit`, `lint`, `bench`. Any of
 these would slot in by writing a Tool implementation and shipping a
 package.

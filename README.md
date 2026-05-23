@@ -99,8 +99,15 @@ explicitly:
 ```bash
 opensip-tools init --language rust              # explicit single language
 opensip-tools init --language rust,typescript   # polyglot
-opensip-tools init --language typescript --force  # overwrite an existing config
+opensip-tools init --keep                       # re-init, preserve custom files
+opensip-tools init --remove                     # re-init, scrap opensip-tools/ first
 ```
+
+Re-running `init` on an already-initialized (or partially-initialized)
+project refuses with exit 2 by default — pick `--keep` (re-scaffold
+examples, preserve any custom files) or `--remove` (delete
+`opensip-tools/` entirely, then scaffold fresh). The two flags are
+mutually exclusive.
 
 After the smoke tests pass, edit (or delete) the example files and
 write your own. The plugin loader auto-discovers anything under
@@ -140,7 +147,8 @@ opensip-tools fit --gate-compare    # compare against baseline; exit 1 on regres
 ```bash
 opensip-tools init                  # detect language, scaffold opensip-tools/ layout
 opensip-tools init --language <l>   # override detection (comma-separated for polyglot)
-opensip-tools init --force          # overwrite an existing config
+opensip-tools init --keep           # re-init, preserve custom files (mutex with --remove)
+opensip-tools init --remove         # re-init, blow away opensip-tools/ first
 opensip-tools configure             # set up OpenSIP Cloud API key (interactive)
 opensip-tools dashboard             # HTML report — opens in browser
 opensip-tools sessions list         # run history

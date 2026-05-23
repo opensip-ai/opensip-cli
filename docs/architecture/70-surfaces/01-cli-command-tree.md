@@ -242,7 +242,8 @@ CLI-owned: [`packages/cli/src/commands/init.ts`](../../../packages/cli/src/comma
 ```
 opensip-tools init
 opensip-tools init --language <list>
-opensip-tools init --force
+opensip-tools init --keep
+opensip-tools init --remove
 ```
 
 Detects the project's primary language(s) from filesystem markers and writes:
@@ -260,10 +261,37 @@ Plus appends `opensip-tools/.runtime/` to `<cwd>/.gitignore`.
 | Flag | Effect |
 |---|---|
 | `--language <list>` | Comma-separated language list (`typescript,rust`). Overrides detection. |
-| `--force` | Overwrite existing `opensip-tools.config.yml` and example files. |
+| `--keep` | Re-scaffold examples; preserve any custom files in `opensip-tools/`. |
+| `--remove` | Delete `opensip-tools/` entirely, then scaffold fresh. |
 | `--cwd <path>` | Target directory (default: `process.cwd()`). |
 | `--json` | Emit a structured JSON result instead of the human-readable summary. |
 | `--debug` | Enable debug-level logging. |
+
+### Partial-state handling
+
+After parsing flags init classifies the working directory into one of four states:
+
+| State | `opensip-tools.config.yml` | `opensip-tools/` (excluding `.runtime/`) | Default | `--keep` | `--remove` |
+|---|---|---|---|---|---|
+| `pristine` | absent | absent | scaffold | scaffold | scaffold |
+| `fully-initialized` | present | present | exit 2, partial-state error | re-scaffold; preserve custom | `rm -rf opensip-tools/`; scaffold |
+| `partial-config-only` | present | absent | exit 2, partial-state error | scaffold the dir | scaffold the dir |
+| `partial-dir-only` | absent | present | exit 2, partial-state error | preserve custom; write YAML | `rm -rf opensip-tools/`; write YAML; scaffold |
+
+`--keep` and `--remove` are mutually exclusive. The legacy `--force`
+flag is removed; users who scripted it should migrate to `--remove`
+(closest semantic match — both blow away existing scaffolds).
+
+Each pre-existing file under `opensip-tools/` is classified as:
+
+- `scaffolded` — content matches a current-template byte-for-byte.
+- `stale-scaffolded` — was scaffolded for a language not in the current
+  detection set (e.g. `example-check-rust.mjs` after re-running with
+  `--language typescript`). Preserved by `--keep`.
+- `custom` — anything else (user-authored).
+
+The `InitResult` JSON shape carries `state`, `preExistingFiles[]`, and
+(on refusal) `partialStateError` so machine consumers can branch.
 
 Detection markers:
 
