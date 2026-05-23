@@ -23,8 +23,12 @@ export function dashboardToolTabsJs(): string {
  * @param catalogLabel - e.g., 'Checks', 'Scenarios', 'Assessments'
  * @param catalogData - check/scenario/assessment catalog entries (or empty)
  * @param renderCatalogFn - function(container, data) to render the catalog
+ * @param recipesData - recipe catalog entries (or empty array). Passed
+ *     in so each tool can carry its own recipe namespace once recipes
+ *     beyond fit are supported; today fit and sim share the global
+ *     recipeCatalog by passing it through.
  */
-function renderToolTab(panelId, toolSessions, accentColor, catalogLabel, catalogData, renderCatalogFn) {
+function renderToolTab(panelId, toolSessions, accentColor, catalogLabel, catalogData, renderCatalogFn, recipesData) {
   const panel = document.getElementById(panelId);
   renderSubtabBar(panel, [
     { id: 'overview', label: 'Overview', render: function(p) {
@@ -38,7 +42,7 @@ function renderToolTab(panelId, toolSessions, accentColor, catalogLabel, catalog
       }
     }},
     { id: 'recipes', label: 'Recipes', render: function(p) {
-      renderRecipesPanel(p, recipeCatalog);
+      renderRecipesPanel(p, recipesData);
     }},
   ]);
 }
@@ -54,7 +58,8 @@ function renderFitnessTab() {
     'var(--accent-fitness)',
     'Checks',
     checkCatalog,
-    function(container, data) { renderChecksCatalog(container, data); }
+    function(container, data) { renderChecksCatalog(container, data); },
+    recipeCatalog
   );
 }
 
@@ -65,7 +70,8 @@ function renderSimulationTab() {
     'var(--accent-sim)',
     'Scenarios',
     [],  // No scenarios yet
-    function(container, data) {}
+    function(container, data) {},
+    recipeCatalog
   );
 }
 

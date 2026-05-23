@@ -30,10 +30,23 @@ export interface RankedViewColumn {
   /** Header label (e.g. "Function", "Callers"). */
   label: string;
   /**
-   * JS source for the cell value. Receives the augmented occurrence
-   * `o` (the original `occ` plus a `__metric` field with the ranking
-   * value, plus any extras the view spliced into the row map). For
-   * example: `o => displayName(o.simpleName)`.
+   * JS source for the cell value, spliced VERBATIM into the emitted
+   * view body — there is no TS type-checking on this expression.
+   *
+   * Conventionally a single-arg arrow function `o => …`, where `o`
+   * is the augmented occurrence: the original `occ` (graph function
+   * descriptor) plus a `__metric` field carrying the ranking value
+   * plus any extras the view's `rowExtras` returned (e.g. `__thumb`
+   * in Wide). The expression closes over the in-page locals
+   * `displayName` and `packageOfPath` (declared by `dashboardPathUtilsJs`)
+   * and any helper the view's `preamble` declared.
+   *
+   * A typo here (`o => o.callerz`) compiles, lints, and ships — it
+   * will fail at runtime as an undefined property read, not a build
+   * error. Keep these expressions minimal and prefer pulling logic
+   * into `preamble`-declared helpers when complexity grows.
+   *
+   * Example: `o => displayName(o.simpleName)`.
    */
   value: string;
 }
@@ -56,28 +69,53 @@ export interface RankedViewConfig {
   /** Help-drawer copy. */
   help: RankedViewHelp;
   /**
-   * JS source for the metric expression. Closes over `occ` (the
-   * occurrence). Example: `(indexes.callers.get(occ.bodyHash) || []).length`.
+   * JS source for the metric expression, spliced VERBATIM into the
+   * emitted view body — there is no TS type-checking on this
+   * expression.
+   *
+   * Closes over `occ` (the graph function occurrence) and `indexes`
+   * (the in-page indexes built by `buildIndexes`). The expression is
+   * normally a non-negative number — `ranked.sort` uses `b.metric -
+   * a.metric` so larger values rank higher.
+   *
+   * Sentinel: returning `false` skips the row entirely (used by Hot
+   * and Wide to drop functions with zero callers / zero parameters
+   * rather than rank them at zero). Returning any other falsy value
+   * (`0`, `null`, `undefined`, `NaN`) does NOT skip — only literal
+   * `false`. New views that want a "drop if predicate doesn't match"
+   * filter should put it in `predicate` instead; the sentinel exists
+   * because Hot and Wide want different drop conditions per call,
+   * not a fixed predicate.
+   *
+   * Example: `(indexes.callers.get(occ.bodyHash) || []).length`.
    */
   metric: string;
   /**
-   * Optional JS source for a predicate expression. Closes over `occ`
-   * and `filterState`. Truthy = keep; falsy = skip. Defaults to
-   * `passesFilter(occ, filterState)`. When a predicate is supplied it
-   * REPLACES the default `passesFilter` call entirely — pass it as
-   * part of the predicate when you still want chip filtering.
+   * Optional JS source for a predicate expression, spliced VERBATIM
+   * into the emitted view body — there is no TS type-checking on
+   * this expression.
+   *
+   * Closes over `occ` and `filterState`. Truthy = keep; falsy = skip.
+   * Defaults to `passesFilter(occ, filterState)`. When a predicate
+   * is supplied it REPLACES the default `passesFilter` call entirely
+   * — include it in the predicate (e.g. `passesFilter(occ,
+   * filterState) && occ.calls.length === 0`) when you still want
+   * chip filtering.
    */
   predicate?: string;
   /**
    * Optional JS source emitting extra fields to splice into the row
-   * via `Object.assign`. Closes over `occ` and `metric`. Defaults to
-   * `{}`. Used by Wide to splice in a `__thumb` parameter list.
+   * via `Object.assign`, spliced VERBATIM into the emitted view body.
+   * Closes over `occ` and `metric`. Defaults to `{}`. Used by Wide
+   * to splice in a `__thumb` parameter list.
    */
   rowExtras?: string;
   /**
    * Optional JS source for additional helper declarations to emit
-   * inside the `render` body, before the metric loop. Used by Wide
-   * for the `paramThumb` helper.
+   * inside the `render` body, before the metric loop. Spliced
+   * VERBATIM. Used by Wide for the `paramThumb` helper. Helpers
+   * declared here are visible to `metric`, `predicate`, `rowExtras`,
+   * and the column `value` expressions.
    */
   preamble?: string;
   /** Columns rendered by `renderFunctionRows`. */

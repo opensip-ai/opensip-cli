@@ -36,6 +36,45 @@ import { dashboardViewUntestedJs } from './code-paths/view-untested.js';
 import { dashboardViewWideJs } from './code-paths/view-wide.js';
 import { dashboardViewsRegistryJs } from './code-paths/views-registry.js';
 
+/**
+ * Concatenation order is load-bearing — each emitter declares
+ * top-level names that later emitters reference. The order below is
+ * the topological sort; reordering will silently break the page with
+ * `<name> is not defined`. Free-identifier dependencies of each
+ * emitter, listed against the emitter that supplies them:
+ *
+ *  1. path-utils       — declares `displayName`, `packageOfPath`.
+ *  2. indexes          — declares `buildIndexes`. No external deps.
+ *  3. filters          — declares `filterState`, `passesFilter`,
+ *                        `renderFilterChips`. No external deps.
+ *  4. editor-link      — declares `editorLink`. Reads `EDITOR_PROTOCOL`
+ *                        (declared in generator.ts before the script
+ *                        block).
+ *  5. trace            — declares `findUpstreamTrace`. Uses `indexes`.
+ *  6. scc              — declares `findScc`. Uses `indexes`.
+ *  7. search           — declares `searchFunctions`. Uses `indexes`,
+ *                        `displayName`.
+ *  8. function-row     — declares `renderFunctionRows` and the empty
+ *                        states it uses. Calls `el`, `displayName`,
+ *                        `packageOfPath`, `passesFilter`.
+ *  9. function-card    — declares `openFunctionCard`, `closeFunctionCard`.
+ *                        Uses `editorLink`, `findUpstreamTrace`, `el`.
+ * 10. views-registry   — declares the singleton `views = []` array.
+ *                        Must come before any view emitter.
+ * 11. help-drawer      — declares `openHelpDrawer`. No external deps
+ *                        beyond `el`.
+ * 12-18. view-*        — push View descriptors into `views`. Each
+ *                        renderer closes over `el`, `passesFilter`,
+ *                        `displayName`, `packageOfPath`,
+ *                        `renderFunctionRows`, plus its own utilities.
+ * 19. panelOrchestrator — top-level `renderCodePathsTab`,
+ *                        `renderCodePathsExplore`, `openCodePathsSession`.
+ *                        Uses every name above plus `renderSubtabBar`
+ *                        (from shared/) and `registerTabActivator`.
+ *
+ * If the list grows past ~30 entries, replace this manual order with
+ * a `{ id, deps, emit }` topological sort.
+ */
 export function dashboardCodePathsJs(): string {
   return [
     dashboardPathUtilsJs(),
@@ -60,11 +99,41 @@ export function dashboardCodePathsJs(): string {
   ].join('\n');
 }
 
+/**
+ * Top-level orchestrator emitter for the Code Paths tab. Concerns,
+ * with the section delimiters that mark them in the emitted JS:
+ *
+ *   1. CATALOG STATE — singleton `graphCatalog` and `graphIndexes`.
+ *   2. CATALOG LOAD — `loadGraphCatalogFromBlob` reads the inline
+ *      `<script id="graph-catalog">` blob.
+ *   3. PANEL ENTRY — `renderCodePathsTab` mounts the Sessions /
+ *      Explore subtabs via `renderSubtabBar` (F2).
+ *   4. EXPLORE BODY — `renderCodePathsExplore` builds chips, view
+ *      tab bar, view containers, row-click delegation, escape
+ *      handler, and runs each view's initial render.
+ *   5. HASH ROUTE — `readViewIdFromHash` parses `#code-paths/<id>`
+ *      for deep-link initial view.
+ *   6. CROSS-TAB NAV — `openCodePathsSession` is the activator
+ *      Overview's row-click handler invokes via
+ *      `activateTabForSession` for graph sessions.
+ *   7. ACTIVATOR REGISTRATION — registers `openCodePathsSession`
+ *      under key `'graph'` in the shared `tabActivators` registry.
+ *
+ * The escape handler in EXPLORE BODY is attached to `document`; if
+ * `renderCodePathsTab` runs more than once (it does not today) the
+ * handler would leak.
+ */
 function panelOrchestratorJs(): string {
   return String.raw`
+// =======================================================
+// CODE PATHS — CATALOG STATE
+// =======================================================
 let graphCatalog = null;
 let graphIndexes = { byBodyHash: new Map(), bySimpleName: new Map(), callees: new Map(), callers: new Map() };
 
+// =======================================================
+// CODE PATHS — CATALOG LOAD
+// =======================================================
 function loadGraphCatalogFromBlob() {
   const blob = document.getElementById('graph-catalog');
   if (!blob || !blob.textContent) return null;
@@ -75,6 +144,9 @@ function loadGraphCatalogFromBlob() {
   }
 }
 
+// =======================================================
+// CODE PATHS — PANEL ENTRY (Sessions | Explore subtabs)
+// =======================================================
 function renderCodePathsTab() {
   const panel = document.getElementById('panel-code-paths');
   if (!panel) return;
@@ -121,6 +193,9 @@ function renderCodePathsTab() {
   ]);
 }
 
+// =======================================================
+// CODE PATHS — EXPLORE BODY (chips + view tab bar + view stack)
+// =======================================================
 function renderCodePathsExplore(host) {
   graphIndexes = buildIndexes(graphCatalog);
 
@@ -171,11 +246,17 @@ function renderCodePathsExplore(host) {
   if (initialId) activateView(initialId);
 }
 
+// =======================================================
+// CODE PATHS — HASH ROUTE (deep-link initial view)
+// =======================================================
 function readViewIdFromHash() {
   const m = /^#code-paths\/([a-z]+)/.exec(window.location.hash || '');
   return m ? m[1] : null;
 }
 
+// =======================================================
+// CODE PATHS — CROSS-TAB NAV (graph sessions deep-link)
+// =======================================================
 /**
  * Open the Code Paths tab on the Sessions subtab, scrolling to and
  * selecting the row matching the given session id. Used by the
@@ -209,6 +290,9 @@ function openCodePathsSession(sessionId) {
   if (row) row.click();
 }
 
+// =======================================================
+// CODE PATHS — ACTIVATOR REGISTRATION
+// =======================================================
 if (typeof registerTabActivator === 'function') {
   registerTabActivator('graph', openCodePathsSession);
 }
