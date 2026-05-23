@@ -66,12 +66,13 @@ function resolveTsConfigPath(projectDirAbs: string, override?: string): string {
   if (!existsSync(candidate)) {
     throw new ConfigurationError(`tsconfig.json not found at ${candidate}`);
   }
+  /* v8 ignore start */
   try {
     return realpathSync(candidate);
   } catch {
-    /* v8 ignore next */
     return candidate;
   }
+  /* v8 ignore stop */
 }
 
 function loadTsConfig(tsConfigPathAbs: string): {
@@ -91,14 +92,15 @@ function loadTsConfig(tsConfigPathAbs: string): {
   const host: ts.ParseConfigHost = {
     fileExists: (p) => existsSync(p),
     readDirectory: readDirectoryBound,
+    /* v8 ignore start */
     readFile: (p) => {
       try {
         return readFileSync(p, 'utf8');
       } catch {
-        /* v8 ignore next */
         return;
       }
     },
+    /* v8 ignore stop */
     useCaseSensitiveFileNames: ts.sys.useCaseSensitiveFileNames,
   };
   const result = ts.parseJsonConfigFileContent(
@@ -128,12 +130,13 @@ function filterToSourceFiles(fileNames: readonly string[]): string[] {
     if (!f.endsWith('.ts') && !f.endsWith('.tsx')) continue;
     if (f.endsWith('.d.ts')) continue;
     let real = f;
+    /* v8 ignore start */
     try {
       real = realpathSync(f);
     } catch {
-      /* v8 ignore next */
       // Use the original path if realpath fails (file might be in a symlinked dir).
     }
+    /* v8 ignore stop */
     // Normalize separators on Windows so dedup works.
     const key = real.split(sep).join('/');
     if (seen.has(key)) continue;

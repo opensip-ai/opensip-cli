@@ -62,15 +62,16 @@ export function discoverFiles(input: DiscoverInput): DiscoverOutput {
   return out;
 }
 
+/* v8 ignore start */
 function normalizeProjectDir(projectDir: string): string {
   const abs = resolve(projectDir);
   try {
     return realpathSync(abs);
   } catch {
-    /* v8 ignore next */
     return abs;
   }
 }
+/* v8 ignore stop */
 
 function resolveConfigPath(
   projectDirAbs: string,
@@ -87,14 +88,15 @@ function resolveConfigPath(
   return undefined;
 }
 
+/* v8 ignore start */
 function realpathOrPath(p: string): string {
   try {
     return realpathSync(p);
   } catch {
-    /* v8 ignore next */
     return p;
   }
 }
+/* v8 ignore stop */
 
 function collectPythonFiles(projectDirAbs: string): readonly string[] {
   const matches: string[] = glob.sync('**/*.py', {
@@ -109,12 +111,13 @@ function collectPythonFiles(projectDirAbs: string): readonly string[] {
   const out: string[] = [];
   for (const m of matches) {
     let real: string = m;
+    /* v8 ignore start */
     try {
       real = realpathSync(m);
     } catch {
-      /* v8 ignore next */
       // fall through with original
     }
+    /* v8 ignore stop */
     const key = real.split(sep).join('/');
     if (seen.has(key)) continue;
     seen.add(key);

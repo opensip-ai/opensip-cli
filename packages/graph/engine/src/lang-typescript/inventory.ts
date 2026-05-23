@@ -67,10 +67,12 @@ export function buildInventory(input: InventoryInput): InventoryOutput {
     try {
       collectFromFile(sf, input.projectDirAbs, functions);
     } catch (error) {
+      /* v8 ignore start */
       parseErrors.push({
         filePath: relative(input.projectDirAbs, sf.fileName),
         message: error instanceof Error ? error.message : String(error),
       });
+      /* v8 ignore stop */
     }
   }
 

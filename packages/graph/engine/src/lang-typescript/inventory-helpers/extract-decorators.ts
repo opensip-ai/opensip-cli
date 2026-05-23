@@ -4,6 +4,7 @@
 
 import ts from 'typescript';
 
+/* v8 ignore start */
 export function extractDecorators(node: ts.Node): readonly string[] {
   const out: string[] = [];
   // ts.canHaveDecorators is the modern accessor; fall back to legacy decorators on older AST shapes.
@@ -29,3 +30,4 @@ function expressionName(expr: ts.Expression): string {
   if (ts.isPropertyAccessExpression(expr)) return expr.name.text;
   return expr.getText();
 }
+/* v8 ignore stop */

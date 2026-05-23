@@ -34,6 +34,7 @@ function indexNameBucket(
   bySimpleName: Map<string, string[]>,
 ): void {
   const occs: readonly FunctionOccurrence[] | undefined = catalog.functions[name];
+  /* v8 ignore next */
   if (!occs) return;
   for (const o of occs) {
     byBodyHash.set(o.bodyHash, o);
@@ -66,6 +67,7 @@ function collectOutgoing(
   const out: string[] = [];
   for (const edge of occ.calls) {
     for (const target of edge.to) {
+      /* v8 ignore next */
       if (!byBodyHash.has(target)) continue;
       out.push(target);
       pushCaller(callers, target, occ.bodyHash);

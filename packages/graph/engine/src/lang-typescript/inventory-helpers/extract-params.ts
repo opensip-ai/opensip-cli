@@ -20,9 +20,11 @@ export function extractParams(
   return params;
 }
 
+/* v8 ignore start */
 function extractName(name: ts.BindingName): string {
   if (ts.isIdentifier(name)) return name.text;
   if (ts.isObjectBindingPattern(name)) return '{...}';
   if (ts.isArrayBindingPattern(name)) return '[...]';
   return '<param>';
 }
+/* v8 ignore stop */

@@ -174,6 +174,42 @@ describe('runGraph orchestrator', () => {
     expect(incrementalNames).toContain('fromBExtra');
   });
 
+  it('emits stage-start/stage-done progress events when onProgress is supplied', async () => {
+    setupFixture(dir, {
+      'index.ts': `export function x(): number { return 1; }\n`,
+    });
+    const events: { type: string; stage: string }[] = [];
+    await runGraph({
+      cwd: dir,
+      datastore,
+      onProgress: (e) => {
+        events.push({ type: e.type, stage: e.stage });
+      },
+    });
+    // Should see stage-start + stage-done for each stage on first run.
+    const stageStarts = events.filter((e) => e.type === 'stage-start');
+    const stageDone = events.filter((e) => e.type === 'stage-done');
+    expect(stageStarts.length).toBeGreaterThan(0);
+    expect(stageDone.length).toBeGreaterThan(0);
+  });
+
+  it('emits stage-cached progress events on cache hit', async () => {
+    setupFixture(dir, {
+      'index.ts': `export function x(): number { return 1; }\n`,
+    });
+    // Prime the cache.
+    await runGraph({ cwd: dir, datastore });
+    const events: string[] = [];
+    await runGraph({
+      cwd: dir,
+      datastore,
+      onProgress: (e) => {
+        events.push(e.type);
+      },
+    });
+    expect(events).toContain('stage-cached');
+  });
+
   it('cache write failure is non-fatal', async () => {
     setupFixture(dir, {
       'index.ts': `export function x(): number { return 1; }\n`,

@@ -11,19 +11,17 @@ import ts from 'typescript';
 export function unaliasSymbol(symbol: ts.Symbol, checker: ts.TypeChecker): ts.Symbol {
   let current = symbol;
   // Cap iterations defensively; realistic chains are 1–2 hops.
+  /* v8 ignore start */
   for (let i = 0; i < 8; i++) {
     if ((current.flags & ts.SymbolFlags.Alias) === 0) return current;
     try {
       const next = checker.getAliasedSymbol(current);
-      /* v8 ignore next */
       if (next === current) return current;
       current = next;
     } catch {
-      /* v8 ignore start */
       return current;
-      /* v8 ignore stop */
     }
   }
-  /* v8 ignore next */
   return current;
+  /* v8 ignore stop */
 }

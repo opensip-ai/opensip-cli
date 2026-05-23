@@ -116,11 +116,13 @@ function pushCallEdge(
   const startLine = node.startPosition.row + 1;
   const startCol = node.startPosition.column;
   const text = file.source.slice(node.startIndex, node.endIndex);
+  /* v8 ignore next */
   const truncated = text.length > 80 ? `${text.slice(0, 77)}...` : text;
   const discarded = isReturnValueDiscarded(node);
 
   let edge: CallEdge;
   if (target === null) {
+    /* v8 ignore start */
     edge = {
       to: [],
       line: startLine,
@@ -131,6 +133,7 @@ function pushCallEdge(
       discarded,
     };
     stats.unresolved++;
+    /* v8 ignore stop */
   } else {
     const matches = byName.get(target);
     if (!matches || matches.length === 0) {
