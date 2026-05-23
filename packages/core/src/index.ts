@@ -58,6 +58,7 @@ export type { Result, ToolErrorOptions } from './lib/errors.js';
 
 // Lib — logger
 export { logger, setLogLevel, setSilent, setDebugMode, setRunId, getRunId, initLogFile } from './lib/logger.js';
+export type { Logger } from './lib/logger.js';
 
 // Lib — IDs
 export { generateId, generatePrefixedId, extractTimestamp, generateUUID } from './lib/ids.js';

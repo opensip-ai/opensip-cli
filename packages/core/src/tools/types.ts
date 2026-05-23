@@ -26,7 +26,7 @@
 
 import { ToolError, type ToolErrorOptions } from '../lib/errors.js';
 
-import type { logger as coreLogger } from '../lib/logger.js';
+import type { Logger } from '../lib/logger.js';
 
 export interface ToolMetadata {
   /** Stable identifier — e.g. 'fitness', 'simulation'. */
@@ -152,7 +152,7 @@ export interface ToolCliContext {
     cwd: string;
   }) => Promise<void>;
   /** Shared structured logger. */
-  readonly logger: typeof coreLogger;
+  readonly logger: Logger;
   /**
    * Process exit-code setter — tools call this instead of mutating
    * `process.exitCode` directly so the CLI controls the final exit.

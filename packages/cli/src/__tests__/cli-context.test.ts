@@ -1,14 +1,14 @@
 import {
   UnknownLiveViewError,
   type LiveViewRenderer,
-  type logger as coreLogger,
+  type Logger,
 } from '@opensip-tools/core';
 import { describe, expect, it, vi } from 'vitest';
 
 import { createLiveViewRegistry } from '../cli-context.js';
 
 function makeLogger(): {
-  log: typeof coreLogger;
+  log: Logger;
   warns: unknown[];
   warnSpy: ReturnType<typeof vi.fn>;
 } {
@@ -16,7 +16,7 @@ function makeLogger(): {
   const warnSpy = vi.fn((entry: unknown) => {
     warns.push(entry);
   });
-  const log: typeof coreLogger = {
+  const log: Logger = {
     debug: vi.fn(),
     info: vi.fn(),
     warn: warnSpy,

@@ -14,7 +14,7 @@ import {
   UnknownLiveViewError,
   logger as defaultLogger,
   type LiveViewRenderer,
-  type logger as coreLogger,
+  type Logger,
 } from '@opensip-tools/core';
 
 export interface LiveViewRegistry {
@@ -33,7 +33,7 @@ export interface LiveViewRegistry {
  * CLI passes only `register` / `render` through to `ToolCliContext`.
  */
 export function createLiveViewRegistry(
-  log: typeof coreLogger = defaultLogger,
+  log: Logger = defaultLogger,
 ): LiveViewRegistry {
   const renderers = new Map<string, LiveViewRenderer>();
   return {
