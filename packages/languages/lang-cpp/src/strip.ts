@@ -30,7 +30,7 @@ interface Scan {
   readonly commentRegions: Region[]
 }
 
-// eslint-disable-next-line sonarjs/cognitive-complexity -- token-state-machine: cyclomatic complexity is inherent to lexer-style scanners; splitting hurts readability
+// eslint-disable-next-line sonarjs/cognitive-complexity -- C++ has the largest token-set among the C-family packs (line/block comments, raw strings with optional encoding prefix, regular strings with optional encoding prefix, char literals with five opener forms); splitting the dispatch into per-token helpers would force shared mutable state across them and hurt readability. Suppression measured: 37/15 cognitive-complexity at this writing.
 function scan(src: string): Scan {
   const stringRegions: Region[] = []
   const commentRegions: Region[] = []
@@ -141,8 +141,35 @@ function matchRawStringPrefix(src: string, i: number): number {
   return 0
 }
 
-/** Returns prefix length if src[i..] starts with a regular-string prefix (u8, u, U, L). 0 otherwise. */
+/**
+ * Identifier-character predicate for prefix-anchor guards. C/C++
+ * identifiers are `[A-Za-z0-9_]+`; if `prev` is one of those, then the
+ * candidate "prefix" character is actually the middle/end of an
+ * identifier (e.g. `abcL"foo"` — `L` is not a string prefix here), so
+ * the prefix matchers must reject.
+ */
+function isIdentChar(ch: string | undefined): boolean {
+  if (!ch) return false
+  const code = ch.codePointAt(0) ?? 0
+  return (
+    (code >= 0x41 && code <= 0x5A) ||
+    (code >= 0x61 && code <= 0x7A) ||
+    (code >= 0x30 && code <= 0x39) ||
+    ch === '_'
+  )
+}
+
+/**
+ * Returns prefix length if src[i..] starts with a regular-string prefix
+ * (u8, u, U, L). 0 otherwise.
+ *
+ * Anchored against identifier boundaries: a candidate prefix only counts
+ * if the character before `i` is not an identifier character (lang-cpp
+ * F12). Without this anchor, source like `abcL"foo"` would get the `L"`
+ * mis-recognized as a wide-string opener mid-identifier.
+ */
 function matchStringPrefix(src: string, i: number): number {
+  if (i > 0 && isIdentChar(src[i - 1])) return 0
   if (src[i] === 'u' && src[i + 1] === '8') return 2
   if (src[i] === 'u' || src[i] === 'U' || src[i] === 'L') return 1
   return 0
@@ -155,9 +182,16 @@ function matchStringPrefix(src: string, i: number): number {
  *
  * Recognized openers: `'` (0), `L'` / `u'` / `U'` (1), `u8'` (2).
  * Order matters: u8' must be checked before u'.
+ *
+ * Anchored against identifier boundaries (lang-cpp F12): a non-bare
+ * apostrophe candidate (i.e. one preceded by `L`/`u`/`U`/`u8`) only
+ * counts if the character before `i` is not an identifier character.
+ * The bare-apostrophe case (`src[i] === "'"`) is unaffected — `'` is
+ * never an identifier character.
  */
 function matchCharLiteralPrefix(src: string, i: number): number {
   if (src[i] === "'") return 0
+  if (i > 0 && isIdentChar(src[i - 1])) return -1
   if (src[i] === 'u' && src[i + 1] === '8' && src[i + 2] === "'") return 2
   if ((src[i] === 'L' || src[i] === 'u' || src[i] === 'U') && src[i + 1] === "'") return 1
   return -1

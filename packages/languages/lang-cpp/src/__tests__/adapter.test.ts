@@ -92,6 +92,35 @@ describe('cpp stripStrings', () => {
     expect(out).toContain('int x = 1;')
     expect(out).toContain(String.raw`'\u{1F600}'`)
   })
+
+  // F12: identifier-prefix collisions in matchStringPrefix /
+  // matchCharLiteralPrefix must be anchored against identifier boundaries.
+  // `abcL"foo"` is `abcL` (identifier) followed by `"foo"` (regular string);
+  // the `L` must NOT be treated as a wide-string prefix mid-identifier.
+  it('does not mis-treat `L` as a wide-string prefix mid-identifier', () => {
+    const src = 'auto x = abcL"foo";'
+    const out = stripStrings(src)
+    expect(out.length).toBe(src.length)
+    // `foo` is inside a regular string; stripped.
+    expect(out).not.toContain('foo')
+    // The `abcL` identifier survives as code.
+    expect(out).toContain('abcL')
+  })
+
+  it('does not mis-treat `L` as a char-literal prefix mid-identifier', () => {
+    // `nameL'a'` should be parsed as the identifier `nameL` followed by
+    // a bare apostrophe (malformed); the bare apostrophe falls through
+    // to the bare-`'` branch (charPrefixLen === 0). The output is
+    // byte-equivalent to the input today regardless of the anchor (char
+    // literals are preserved as code), but anchoring matters for any
+    // future check that asks "where are the char-literal regions?".
+    const src = "nameL'a' + 1;"
+    const out = stripStrings(src)
+    expect(out.length).toBe(src.length)
+    // The identifier survives, and the trailing `+ 1;` is still code.
+    expect(out).toContain('nameL')
+    expect(out).toContain('+ 1;')
+  })
 })
 
 describe('cpp stripComments line-continuation (F3)', () => {
