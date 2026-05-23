@@ -7,10 +7,8 @@ import { describe, expect, it } from 'vitest';
 import { metadata } from '../index.js';
 
 describe('@opensip-tools/checks-python metadata', () => {
-  it('exposes a semver-shaped version (not the stale hardcoded literal)', () => {
+  it('exposes a semver-shaped version', () => {
     expect(metadata.version).toMatch(/^\d+\.\d+\.\d+/);
-    // Guard against the previous stale hardcoded value.
-    expect(metadata.version).not.toBe('0.6.1');
   });
 
   it('matches the package.json version (single source of truth)', () => {

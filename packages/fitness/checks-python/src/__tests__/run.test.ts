@@ -2,9 +2,9 @@
  * @fileoverview Execute the check end-to-end so the closures inside the
  * `defineCheck({...})` config (specifically `analyze`) are invoked.
  *
- * The pure analyzer is exercised by analyze.test.ts and
- * no-bare-except.test.ts. This file's purpose is execution coverage
- * for the un-called closures declared inside the check definition.
+ * The pure analyzer is exercised by `no-bare-except.test.ts`. This
+ * file's purpose is execution coverage for the un-called closures
+ * declared inside the check definition.
  */
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
