@@ -4,25 +4,20 @@
  * The MVP Rust adapter does not ship a full AST parser. Tree-sitter
  * integration is deferred. `parse()` returns a minimal tree object
  * that exposes the source text and line offsets, enough for
- * text-pattern checks.
+ * text-pattern checks. Delegates to core's shared
+ * `buildMinimalTextTree` factory; the `RustTree` alias keeps the
+ * adapter generic-parameter name distinct so future per-language
+ * tree-sitter trees can grow independently.
  *
  * Future: replace with web-tree-sitter + tree-sitter-rust to produce a
- * real AST. The adapter contract is unchanged — only the TTree shape
- * grows.
+ * real AST. The adapter contract is unchanged — only the RustTree
+ * shape grows.
  */
 
-import { buildLineStarts } from '@opensip-tools/core'
+import { buildMinimalTextTree, type MinimalTextTree } from '@opensip-tools/core'
 
-export interface RustTree {
-  readonly source: string
-  readonly filePath: string
-  readonly lineStarts: readonly number[]
-}
+export type RustTree = MinimalTextTree
 
 export function parseRust(content: string, filePath: string): RustTree | null {
-  return {
-    source: content,
-    filePath,
-    lineStarts: buildLineStarts(content),
-  }
+  return buildMinimalTextTree(content, filePath)
 }

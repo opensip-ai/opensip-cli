@@ -9,7 +9,14 @@
 // Both strip functions preserve byte length: replacement is whitespace
 // (newlines preserved) so line/column positions remain stable.
 
-import { applyRegions, scanRegularString, type Region } from '@opensip-tools/core'
+import {
+  applyRegions,
+  scanBlockCommentNonNesting,
+  scanCharLiteral,
+  scanLineComment,
+  scanRegularString,
+  type Region,
+} from '@opensip-tools/core'
 
 interface Scan {
   readonly stringRegions: Region[]
@@ -30,8 +37,8 @@ function scan(src: string): Scan {
     // Line comment: // ... \n
     if (c === '/' && next === '/') {
       const start = i
-      i += 2
-      while (i < len && src[i] !== '\n') i++
+      const lc = scanLineComment(src, i)
+      i = lc.end
       commentRegions.push({ start, end: i })
       continue
     }
@@ -39,14 +46,8 @@ function scan(src: string): Scan {
     // Block comment: /* ... */ — Go block comments do NOT nest
     if (c === '/' && next === '*') {
       const start = i
-      i += 2
-      while (i < len) {
-        if (src[i] === '*' && src[i + 1] === '/') {
-          i += 2
-          break
-        }
-        i++
-      }
+      const bc = scanBlockCommentNonNesting(src, i)
+      i = bc.end
       commentRegions.push({ start, end: i })
       continue
     }
@@ -69,29 +70,15 @@ function scan(src: string): Scan {
       continue
     }
 
-    // Rune literal: '...' — preserve as code (don't strip)
+    // Rune literal: '...' — preserve as code (don't strip).
+    // Go runes have no fixed cap analogous to lang-java/lang-cpp; use a
+    // generous cap (12) to accommodate the longest valid form
+    // ('\U0001F600' = 12 chars including quotes). The shared helper's
+    // load-bearing branch order (escape before close-quote) is the same
+    // shape Go's previous inline scanner used.
     if (c === "'") {
-      let j = i + 1
-      let escape = false
-      while (j < len) {
-        if (escape) {
-          escape = false
-          j++
-          continue
-        }
-        if (src[j] === '\\') {
-          escape = true
-          j++
-          continue
-        }
-        if (src[j] === "'") {
-          j++
-          break
-        }
-        if (src[j] === '\n') break
-        j++
-      }
-      i = j
+      const result = scanCharLiteral(src, i, { maxScan: 12 })
+      i = result.end
       continue
     }
 

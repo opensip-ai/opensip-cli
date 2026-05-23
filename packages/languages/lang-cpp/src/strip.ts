@@ -16,7 +16,14 @@
 // where ignoring it produces visibly wrong output. See the lang-cpp
 // architecture audit (F3, deferred items).
 
-import { applyRegions, scanRegularString, type Region } from '@opensip-tools/core'
+import {
+  applyRegions,
+  scanBlockCommentNonNesting,
+  scanCharLiteral,
+  scanLineComment,
+  scanRegularString,
+  type Region,
+} from '@opensip-tools/core'
 
 interface Scan {
   readonly stringRegions: Region[]
@@ -38,14 +45,8 @@ function scan(src: string): Scan {
     // Honor line splices: `\<newline>` continues the comment onto the next line.
     if (c === '/' && next === '/') {
       const start = i
-      i += 2
-      while (i < len) {
-        if (src[i] === '\n') {
-          if (src[i - 1] === '\\') { i++; continue }
-          break
-        }
-        i++
-      }
+      const lc = scanLineComment(src, i, { allowLineContinuation: true })
+      i = lc.end
       commentRegions.push({ start, end: i })
       continue
     }
@@ -53,14 +54,8 @@ function scan(src: string): Scan {
     // Block comment: /* ... */ (no nesting in C/C++)
     if (c === '/' && next === '*') {
       const start = i
-      i += 2
-      while (i < len) {
-        if (src[i] === '*' && src[i + 1] === '/') {
-          i += 2
-          break
-        }
-        i++
-      }
+      const bc = scanBlockCommentNonNesting(src, i)
+      i = bc.end
       commentRegions.push({ start, end: i })
       continue
     }
@@ -118,18 +113,16 @@ function scan(src: string): Scan {
       const charPrefixLen = matchCharLiteralPrefix(src, i)
       if (charPrefixLen >= 0) {
         const startQuote = i + charPrefixLen
-        // Scan until unescaped closing ' or unescaped newline (unterminated).
-        let j = startQuote + 1
-        let escape = false
-        while (j < len) {
-          const ch = src[j]
-          if (escape) { escape = false; j++; continue }
-          if (ch === '\\') { escape = true; j++; continue }
-          if (ch === "'") { j++; break }
-          if (ch === '\n') { break }
-          j++
-        }
-        i = j
+        // Scan the body from the opening apostrophe via the shared helper.
+        // Use a generous cap (12) so unicode escapes like '\u{1F600}'
+        // (10 chars including quotes) close cleanly. Branch order is
+        // load-bearing — see core's scanCharLiteral docstring.
+        // Scan past the literal (or, on overflow/unterminated, past the
+        // opening apostrophe so we don't loop). The shared helper returns
+        // `start + 1` on overflow — that's already the bail-out we want
+        // when no closing quote is found within the cap.
+        const result = scanCharLiteral(src, startQuote, { maxScan: 12 })
+        i = result.end
         continue
       }
     }

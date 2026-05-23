@@ -2,15 +2,24 @@
 //
 // Hand-written lexer that recognizes:
 // - Line comments (//) and nested block comments (slash-star ... star-slash)
-// - Regular strings ("...") with escape handling
+// - Regular strings ("...") with escape handling — Rust regular strings
+//   may span multiple lines (unlike Java/Go/C++), so we pass
+//   `allowMultiline: true` to core's shared scanner.
 // - Raw strings (r"...", r#"..."#, ..., r####"..."####)
 // - Byte strings (b"...") and byte-raw strings (br#"..."#)
-// - Char literals ('a', '\n', '\u{1234}') — preserved as-is
+// - Char literals ('a', '\n', '\u{1234}') — preserved as-is, with the
+//   lifetime-vs-literal disambiguation done at the call site here.
 //
 // Both strip functions preserve byte length: replacement is whitespace
 // (newlines preserved) so line/column positions remain stable.
 
-import { applyRegions, type Region } from '@opensip-tools/core'
+import {
+  applyRegions,
+  scanBlockCommentNesting,
+  scanLineComment,
+  scanRegularString,
+  type Region,
+} from '@opensip-tools/core'
 
 interface Scan {
   readonly stringRegions: Region[]
@@ -31,8 +40,8 @@ function scan(src: string): Scan {
     // Line comment: // ... \n
     if (c === '/' && next === '/') {
       const start = i
-      i += 2
-      while (i < len && src[i] !== '\n') i++
+      const lc = scanLineComment(src, i)
+      i = lc.end
       commentRegions.push({ start, end: i })
       continue
     }
@@ -40,19 +49,8 @@ function scan(src: string): Scan {
     // Block comment: /* ... */ with nesting
     if (c === '/' && next === '*') {
       const start = i
-      let depth = 1
-      i += 2
-      while (i < len && depth > 0) {
-        if (src[i] === '/' && src[i + 1] === '*') {
-          depth++
-          i += 2
-        } else if (src[i] === '*' && src[i + 1] === '/') {
-          depth--
-          i += 2
-        } else {
-          i++
-        }
-      }
+      const bc = scanBlockCommentNesting(src, i)
+      i = bc.end
       commentRegions.push({ start, end: i })
       continue
     }
@@ -100,18 +98,18 @@ function scan(src: string): Scan {
       continue
     }
 
-    // Byte string: b"..."
+    // Byte string: b"..." — Rust strings may span multiple lines.
     if (c === 'b' && next === '"') {
       i++
-      const result = scanRegularString(src, i)
+      const result = scanRegularString(src, i, { allowMultiline: true })
       stringRegions.push({ start: i + 1, end: result.contentEnd })
       i = result.next
       continue
     }
 
-    // Regular string: "..."
+    // Regular string: "..." — Rust strings may span multiple lines.
     if (c === '"') {
-      const result = scanRegularString(src, i)
+      const result = scanRegularString(src, i, { allowMultiline: true })
       stringRegions.push({ start: i + 1, end: result.contentEnd })
       i = result.next
       continue
@@ -127,7 +125,12 @@ function scan(src: string): Scan {
         i++
         continue
       }
-      // Look ahead to see if there's a closing quote within ~6 chars
+      // Look ahead to see if there's a closing quote within ~8 chars.
+      // (Same heuristic the previous inline scanner used.) The core's
+      // scanCharLiteral helper bails on overflow rather than reporting
+      // the "no close found" position, which loses the information we
+      // need to distinguish a lifetime from a literal. Keep this look-
+      // ahead inline.
       const maxScan = Math.min(i + 8, len)
       let foundClose = -1
       let escape = false
@@ -159,42 +162,6 @@ function scan(src: string): Scan {
   }
 
   return { stringRegions, commentRegions }
-}
-
-interface RegStrResult {
-  readonly contentEnd: number
-  readonly next: number
-}
-
-// eslint-disable-next-line sonarjs/cognitive-complexity -- string scanner: state machine for escapes, quotes, and Rust raw strings
-function scanRegularString(src: string, openQuotePos: number): RegStrResult {
-  const len = src.length
-  let i = openQuotePos + 1
-  while (i < len) {
-    const ch = src[i]
-    if (ch === '\\') {
-      // Skip escape sequence — at minimum 2 chars (\n), more for \u{...} or \x##
-      if (src[i + 1] === 'x' || src[i + 1] === 'u') {
-        i += 2
-        // Skip the rest of the escape — for \u{...} skip until }, for \x## skip 2 chars
-        if (src[i - 1] === 'u' && src[i] === '{') {
-          while (i < len && src[i] !== '}') i++
-          if (i < len) i++
-        } else {
-          i += 2
-        }
-      } else {
-        i += 2
-      }
-      continue
-    }
-    if (ch === '"') {
-      return { contentEnd: i, next: i + 1 }
-    }
-    i++
-  }
-  // Unterminated — return EOF position
-  return { contentEnd: len, next: len }
 }
 
 /** Replace string literal content with whitespace; preserves length. */

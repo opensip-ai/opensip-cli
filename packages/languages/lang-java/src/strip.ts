@@ -11,7 +11,14 @@
 // Both strip functions preserve byte length: replacement is whitespace
 // (newlines preserved) so line/column positions remain stable.
 
-import { applyRegions, scanRegularString, type Region } from '@opensip-tools/core'
+import {
+  applyRegions,
+  scanBlockCommentNonNesting,
+  scanCharLiteral,
+  scanLineComment,
+  scanRegularString,
+  type Region,
+} from '@opensip-tools/core'
 
 interface Scan {
   readonly stringRegions: Region[]
@@ -32,8 +39,8 @@ function scan(src: string): Scan {
     // Line comment: // ... \n
     if (c === '/' && next === '/') {
       const start = i
-      i += 2
-      while (i < len && src[i] !== '\n') i++
+      const lc = scanLineComment(src, i)
+      i = lc.end
       commentRegions.push({ start, end: i })
       continue
     }
@@ -41,14 +48,8 @@ function scan(src: string): Scan {
     // Block comment: /* ... */ (Java block comments do NOT nest)
     if (c === '/' && next === '*') {
       const start = i
-      i += 2
-      while (i < len) {
-        if (src[i] === '*' && src[i + 1] === '/') {
-          i += 2
-          break
-        }
-        i++
-      }
+      const bc = scanBlockCommentNonNesting(src, i)
+      i = bc.end
       commentRegions.push({ start, end: i })
       continue
     }
@@ -111,52 +112,12 @@ function scan(src: string): Scan {
     }
 
     // Char literal: '...' — preserve as code (single character, not a string).
-    // Cap the scan at ~8 chars (matches lang-cpp / lang-rust) so a stray
-    // apostrophe in malformed input cannot swallow lines of code looking for a
-    // closer. A valid Java char literal is at most a single unicode escape
-    // (e.g. `'A'` = 8 chars including quotes).
-    //
-    // NOTE: branch ordering is load-bearing — the `if (escape)` reset MUST
-    // run before the `ch === "'"` closer check. For `'\''` (escaped
-    // apostrophe — a common Java char literal), reordering would terminate
-    // at the second `'` and miscompile the literal. lang-cpp uses the same
-    // shape; see also F6 in the lang-java audit.
+    // Use the shared scanCharLiteral helper from core (default 8-char cap
+    // matches the lang-cpp / lang-rust heuristic; branch order is
+    // load-bearing — see core's scanCharLiteral docstring and lang-java F6).
     if (c === "'") {
-      const maxScan = Math.min(i + 8, len)
-      let j = i + 1
-      let escape = false
-      let closed = false
-      while (j < maxScan) {
-        const ch = src[j]
-        if (escape) {
-          escape = false
-          j++
-          continue
-        }
-        if (ch === '\\') {
-          escape = true
-          j++
-          continue
-        }
-        if (ch === "'") {
-          j++
-          closed = true
-          break
-        }
-        if (ch === '\n') {
-          // Unterminated — bail out at the newline
-          break
-        }
-        j++
-      }
-      if (closed) {
-        i = j
-      } else {
-        // Overflow / unterminated — treat the apostrophe as code rather than
-        // committing the consumed run as a "char literal" that would mask any
-        // strings or comments inside it.
-        i++
-      }
+      const result = scanCharLiteral(src, i)
+      i = result.end
       continue
     }
 

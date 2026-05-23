@@ -2,27 +2,22 @@
  * @fileoverview Lightweight Go "parse" — returns content metadata.
  *
  * The MVP Go adapter does not ship a full AST parser. Tree-sitter
- * integration is deferred.
- * `parse()` returns a minimal tree object that exposes the source text
- * and line offsets, enough for text-pattern checks.
+ * integration is deferred. `parse()` returns a minimal tree object
+ * that exposes the source text and line offsets, enough for
+ * text-pattern checks. Delegates to core's shared
+ * `buildMinimalTextTree` factory; the `GoTree` alias keeps the
+ * adapter generic-parameter name distinct so future per-language
+ * tree-sitter trees can grow independently.
  *
  * Future: replace with web-tree-sitter + tree-sitter-go to produce a
- * real AST. The adapter contract is unchanged — only the TTree shape
+ * real AST. The adapter contract is unchanged — only the GoTree shape
  * grows.
  */
 
-import { buildLineStarts } from '@opensip-tools/core'
+import { buildMinimalTextTree, type MinimalTextTree } from '@opensip-tools/core'
 
-export interface GoTree {
-  readonly source: string
-  readonly filePath: string
-  readonly lineStarts: readonly number[]
-}
+export type GoTree = MinimalTextTree
 
 export function parseGo(content: string, filePath: string): GoTree | null {
-  return {
-    source: content,
-    filePath,
-    lineStarts: buildLineStarts(content),
-  }
+  return buildMinimalTextTree(content, filePath)
 }
