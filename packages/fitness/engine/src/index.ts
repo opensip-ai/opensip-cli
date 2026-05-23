@@ -1,5 +1,11 @@
 // Framework — check definition API
 export { defineCheck } from './framework/define-check.js';
+export { defineRegexListCheck } from './framework/define-regex-list-check.js';
+export type {
+  RegexListCheckPattern,
+  RegexListCheckOptions,
+  DefineRegexListCheckConfig,
+} from './framework/define-regex-list-check.js';
 export { CheckRegistry, defaultRegistry } from './framework/registry.js';
 export { registerChecks } from './framework/register-helpers.js';
 
