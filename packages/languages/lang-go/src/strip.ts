@@ -52,7 +52,13 @@ function scan(src: string): Scan {
       continue
     }
 
-    // Raw string: `...` — no escapes, can span lines
+    // Raw string: `...` — no escapes, can span lines.
+    //
+    // @todo Per the Go spec, carriage returns (\r) inside raw strings are
+    // discarded from the string value (see go/spec#raw_string_lit). We do
+    // not represent that here because the strip pass is region-bound, not
+    // value-extraction; a future `findStringLiterals` query API will need
+    // to apply the \r-discard rule when materializing literal values.
     if (c === '`') {
       const contentStart = i + 1
       let j = i + 1

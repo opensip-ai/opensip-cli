@@ -148,6 +148,37 @@ describe('go strip edge cases', () => {
     })
   })
 
+  describe('dispatch-order regressions (MISSED-1)', () => {
+    it('block comment with embedded `*/` does not nest — first `*/` terminates', () => {
+      // Go block comments are non-nesting (unlike Rust). Source:
+      //   /* a */ b */
+      // The first `*/` closes the comment; ` b */` is plain code.
+      const src = '/* a */ b */'
+      const out = stripComments(src)
+      expect(out.length).toBe(src.length)
+      // The text inside the comment is gone.
+      expect(out).not.toContain('a')
+      // The trailing `b */` survives as code.
+      expect(out).toContain('b')
+      expect(out).toContain('*/')
+    })
+
+    it('rune literal inside a raw string is treated as raw content, not as a rune', () => {
+      // Source: x := `'a'`
+      // The raw-string branch must win over the rune branch — the `'a'`
+      // must NOT be interpreted as a rune literal interrupting the
+      // raw-string scan.
+      const src = "x := `'a'`"
+      const out = stripStrings(src)
+      expect(out.length).toBe(src.length)
+      // The body is stripped (raw-string region).
+      expect(out).not.toContain("'a'")
+      // The opening/closing backticks survive.
+      expect(out).toContain('`')
+      expect(out).toContain('x :=')
+    })
+  })
+
   describe('rune literals — pin current permissive behavior (audit F4)', () => {
     // The audit notes the rune scanner is permissive: it accepts variable
     // escape lengths rather than enforcing Go's exact rules (\uXXXX = 4 hex,

@@ -18,6 +18,6 @@ import { buildMinimalTextTree, type MinimalTextTree } from '@opensip-tools/core'
 
 export type GoTree = MinimalTextTree
 
-export function parseGo(content: string, filePath: string): GoTree | null {
+export function parseGo(content: string, filePath: string): GoTree {
   return buildMinimalTextTree(content, filePath)
 }
