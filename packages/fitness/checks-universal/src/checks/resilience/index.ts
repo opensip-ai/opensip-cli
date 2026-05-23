@@ -1,7 +1,6 @@
 export * from './batch-operations.js'
 export * from './cache-ttl-validation.js'
 export * from './catch-clause-safety.js'
-export * from './config-validation-helpers.js'
 export * from './dangerous-config-defaults.js'
 export * from './error-code-registration.js'
 export * from './event-patterns.js'
