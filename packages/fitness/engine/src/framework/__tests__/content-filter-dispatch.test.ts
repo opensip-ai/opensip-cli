@@ -23,9 +23,9 @@ import { join } from 'node:path'
 
 
 import { defaultLanguageRegistry } from '@opensip-tools/core'
+import { filterContent } from '@opensip-tools/lang-typescript'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { filterContent } from '../content-filter.js'
 import { createFileAccessor } from '../file-accessor.js'
 
 import type { LanguageAdapter } from '@opensip-tools/core'

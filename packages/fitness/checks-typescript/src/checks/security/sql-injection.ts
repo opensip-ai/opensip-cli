@@ -6,8 +6,9 @@
  * text, error messages, and comments.
  */
 
-import { defineCheck, type CheckViolation, getASTLineNumber, ts } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation, getASTLineNumber } from '@opensip-tools/fitness'
 import { parseSource, walkNodes } from '@opensip-tools/lang-typescript'
+import * as ts from 'typescript'
 
 /**
  * SQL structural patterns indicating actual SQL statements (not casual English).

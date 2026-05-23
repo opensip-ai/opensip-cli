@@ -31,7 +31,6 @@
   },
   "dependencies": {
     "@opensip-tools/core": "workspace:*",
-    "@opensip-tools/fitness": "workspace:*",
     "typescript": "~5.7.0"
   },
   "devDependencies": {

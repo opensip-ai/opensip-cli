@@ -2,11 +2,11 @@
  * @fileoverview TypeScript string and comment stripping.
  *
  * Implements the LanguageAdapter contract methods stripStrings/stripComments
- * by re-using the rich filterContent implementation in core. Both functions
- * preserve byte length so line/column positions remain stable.
+ * by re-using the rich filterContent implementation in this package. Both
+ * functions preserve byte length so line/column positions remain stable.
  */
 
-import { filterContent } from '@opensip-tools/fitness'
+import { filterContent } from './filter.js'
 
 /**
  * Replace string literal content with whitespace of equal length.
@@ -22,9 +22,3 @@ export function stripStrings(content: string): string {
 export function stripComments(content: string): string {
   return filterContent(content).codeNoComments
 }
-
-// Re-export filterContent and the FilteredContent type for richer
-// position-aware needs. The clearFilterCache helper is also re-exported
-// for compatibility with any callers that managed it directly.
-export { filterContent, clearFilterCache } from '@opensip-tools/fitness'
-export type { FilteredContent } from '@opensip-tools/fitness'

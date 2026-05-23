@@ -15,13 +15,10 @@
  * Forbidden edges enforce that dependencies flow from lower-numbered layers
  * upward only — a higher layer must never reach DOWN into a lower layer.
  *
- * Documented exceptions:
- *
- *   - @opensip-tools/lang-typescript depends on @opensip-tools/fitness for
- *     `filterContent` / `clearFilterCache` / `FilteredContent`. Those moved
- *     out of core during P1; the lang adapter still re-exports them. Mild
- *     architectural smell but contained — see decisions D14 / P1 summary.
- *     Allowed by the `lang-typescript-fitness-exception` rule below.
+ * The previous lang-typescript → fitness back-edge for filterContent was
+ * paid down (Wave 3 Chain E / Phase D3): filterContent / clearFilterCache /
+ * FilteredContent now live in @opensip-tools/lang-typescript, and the
+ * `lang-no-fitness-except-typescript` exception has been deleted.
  */
 
 /** @type {import('dependency-cruiser').IConfiguration} */
@@ -162,11 +159,10 @@ module.exports = {
 
     // -------------------------------------------------------------------
     // Layer enforcement — lang-* must not depend on cli/contracts/checks-*
-    //
-    // Documented exception: lang-typescript depends on fitness for
-    // filterContent (the content-filter API moved out of core during P1).
-    // Allowed; flagged only if any OTHER lang pack starts importing from
-    // fitness.
+    // and must not reach UP into fitness/simulation. The previous
+    // `lang-no-fitness-except-typescript` exception was paid down by
+    // moving filterContent / clearFilterCache / FilteredContent into
+    // @opensip-tools/lang-typescript itself (Wave 3 Chain E / Phase D3).
     // -------------------------------------------------------------------
     {
       name: 'lang-no-cli-or-contracts',
@@ -184,17 +180,13 @@ module.exports = {
       },
     },
     {
-      name: 'lang-no-fitness-except-typescript',
+      name: 'lang-no-fitness',
       severity: 'error',
       comment:
-        'Language adapters live below fitness in the layer order. The single ' +
-        'documented exception is lang-typescript, which re-exports filterContent ' +
-        'from fitness for legacy compatibility (P1 D14 / D11 in the multi-language ' +
-        'decisions log). Any other lang pack importing fitness widens the smell.',
-      from: {
-        path: '^packages/languages/lang-',
-        pathNot: '^packages/languages/lang-typescript/',
-      },
+        'Language adapters live below fitness in the layer order and must not ' +
+        'reach up into it. (The historical lang-typescript exception for ' +
+        'filterContent was paid down by moving the symbol into lang-typescript.)',
+      from: { path: '^packages/languages/lang-' },
       to: { path: '^@opensip-tools/fitness' },
     },
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { clearFilterCache, filterContent } from '../content-filter.js'
+import { clearFilterCache, filterContent } from '../filter.js'
 
 describe('filterContent', () => {
   describe('string and comment masking', () => {

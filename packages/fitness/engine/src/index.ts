@@ -37,15 +37,12 @@ export { fileCache, DEFAULT_PREWARM_PATTERNS } from './framework/file-cache.js';
 export { buildImportGraph, findStronglyConnectedComponents } from './framework/import-graph.js';
 export type { ImportGraph } from './framework/import-graph.js';
 export { isInsideStringLiteral, stripStringLiterals, stripStringsAndComments, stripStringsAndCommentsPreservingPositions } from './framework/strip-literals.js';
-export { filterContent, clearFilterCache } from './framework/content-filter.js';
-export type { FilteredContent } from './framework/content-filter.js';
-// Re-export TypeScript compiler API for AST-based checks. The typescript module
-// uses `export =`, so `export * as ts from 'typescript'` is invalid; the
-// import-then-rename-export form works under esModuleInterop.
-/* eslint-disable unicorn/prefer-export-from -- `export * as ts from 'typescript'` is invalid (the module uses `export =`); the namespace import + named export is the only working shape */
-import * as _ts from 'typescript';
-export { _ts as ts };
-/* eslint-enable unicorn/prefer-export-from */
+// filterContent / clearFilterCache / FilteredContent moved to
+// @opensip-tools/lang-typescript (it's TS-aware string and comment
+// stripping; not a fitness concern). Likewise the `ts` namespace
+// re-export — fitness should not be the home for the TypeScript
+// compiler API. Importers should depend on @opensip-tools/lang-typescript
+// directly, or import `typescript` (`import * as ts from 'typescript'`).
 
 
 // Types — findings output

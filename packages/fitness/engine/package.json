@@ -38,6 +38,7 @@
     "zod": "^3.24.0"
   },
   "devDependencies": {
+    "@opensip-tools/lang-typescript": "workspace:*",
     "@types/js-yaml": "^4.0.0",
     "@types/node": "^22.0.0",
     "vitest": "^2.1.0"

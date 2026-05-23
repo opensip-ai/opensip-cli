@@ -285,6 +285,9 @@ importers:
         specifier: ^3.24.0
         version: 3.25.76
     devDependencies:
+      '@opensip-tools/lang-typescript':
+        specifier: workspace:*
+        version: link:../../languages/lang-typescript
       '@types/js-yaml':
         specifier: ^4.0.0
         version: 4.0.9
@@ -405,9 +408,6 @@ importers:
       '@opensip-tools/core':
         specifier: workspace:*
         version: link:../../core
-      '@opensip-tools/fitness':
-        specifier: workspace:*
-        version: link:../../fitness/engine
       typescript:
         specifier: ~5.7.0
         version: 5.7.3

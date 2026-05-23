@@ -10,8 +10,9 @@
  * @see Logging Standards
  */
 
-import { defineCheck, type CheckViolation, getASTLineNumber, ts } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation, getASTLineNumber } from '@opensip-tools/fitness'
 import { parseSource, walkNodes, getPropertyChain } from '@opensip-tools/lang-typescript'
+import * as ts from 'typescript'
 
 // PII field names that should never be logged directly
 const PII_FIELD_NAMES = new Set([

@@ -2,6 +2,13 @@
  * @fileoverview Shared utilities for stripping string literal and comment
  * content from source code. Used by fitness checks to avoid false positives
  * from patterns appearing inside string literals or comments.
+ *
+ * These regex-based strippers are language-agnostic and used by checks that
+ * scan Python/Go/Java/C++/universal text without needing a TS scanner. They
+ * deliberately do NOT overlap with `filterContent` in
+ * @opensip-tools/lang-typescript, which is a TS-aware position-preserving
+ * scanner used by TS-specific checks. Both abstractions are kept because
+ * the consumers (and their precision needs) differ.
  */
 
 /**

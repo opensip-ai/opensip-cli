@@ -229,9 +229,10 @@ cli (entry point — depends on every tool)
 - contracts must NOT import from cli, fitness, simulation, lang-*, or checks-*.
 - fitness / simulation must NOT import from cli (would create a cycle).
 - check packs must NOT import from cli or contracts.
-- lang-* packs must NOT import from cli, contracts, or each other.
-  - DOCUMENTED EXCEPTION: lang-typescript imports `filterContent` from
-    fitness for legacy compatibility (D14).
+- lang-* packs must NOT import from cli, contracts, fitness, simulation, or
+  each other. (The historical lang-typescript exception for `filterContent`
+  was paid down — the symbol now lives in `@opensip-tools/lang-typescript`
+  alongside the rest of the TS-aware string/comment stripping.)
 
 If you need to violate a rule, the right move is usually to refactor the
 shared piece into core. If that's wrong, surface it for discussion before
