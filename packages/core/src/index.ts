@@ -33,14 +33,13 @@ export type {
 // (discoverToolPackages and friends live under plugins/ and are
 // re-exported above; the Tool / Registry types are tool-shape, not
 // plugin-discovery-shape, hence the separate barrel.)
-export { ToolRegistry, defaultToolRegistry, UnknownLiveViewError } from './tools/index.js';
+export { ToolRegistry, defaultToolRegistry } from './tools/index.js';
 export type {
   Tool,
   ToolMetadata,
   ToolCommandDescriptor,
   ToolCliContext,
   ToolPluginExports,
-  LiveViewRenderer,
 } from './tools/index.js';
 
 // Recipes — generic recipe registry shared by fitness + simulation.

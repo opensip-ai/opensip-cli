@@ -11,7 +11,5 @@ export type {
   ToolCommandDescriptor,
   ToolCliContext,
   ToolPluginExports,
-  LiveViewRenderer,
 } from './types.js';
-export { UnknownLiveViewError } from './types.js';
 export { ToolRegistry, defaultToolRegistry } from './registry.js';

@@ -24,8 +24,6 @@
  * own the full option-parsing surface for its commands.
  */
 
-import { ToolError, type ToolErrorOptions } from '../lib/errors.js';
-
 import type { logger as coreLogger } from '../lib/logger.js';
 
 export interface ToolMetadata {
@@ -45,42 +43,6 @@ export interface ToolCommandDescriptor {
   readonly name: string;
   readonly description: string;
   readonly aliases?: readonly string[];
-}
-
-/**
- * Renderer signature for a tool-contributed live view. The CLI looks up
- * the registered renderer by key when a tool calls
- * `ToolCliContext.renderLive(key, args)` and invokes it with the tool's
- * args payload.
- *
- * Renderers are tool-specific. They typically wrap an Ink `render(...)`
- * call against a stateful component (FitView, GraphView) and resolve
- * once the underlying Ink app exits.
- *
- * The `args` parameter is `unknown` at the contract layer because each
- * tool defines its own args shape; tools narrow the type inside their
- * own renderer body via a runtime cast.
- */
-export type LiveViewRenderer = (args: unknown) => Promise<void>;
-
-/**
- * Thrown by `ToolCliContext.renderLive(key, args)` when no renderer has
- * been registered for `key`. A typed throw is preferable to silently
- * falling back to a static render — the latter masked bugs where a tool
- * mistyped its view key.
- */
-export class UnknownLiveViewError extends ToolError {
-  readonly viewKey: string;
-
-  constructor(viewKey: string, options?: ToolErrorOptions) {
-    super(
-      `No live view registered for key '${viewKey}'. The tool that owns '${viewKey}' must call cli.registerLiveView('${viewKey}', renderer) inside its register(cli) hook.`,
-      options?.code ?? 'UNKNOWN_LIVE_VIEW',
-      options,
-    );
-    this.name = 'UnknownLiveViewError';
-    this.viewKey = viewKey;
-  }
 }
 
 /**
@@ -104,29 +66,14 @@ export interface ToolCliContext {
   /** Render an Ink result (CommandResult shape from @opensip-tools/contracts). */
   readonly render: (result: unknown) => Promise<void>;
   /**
-   * Register a renderer for a live, stateful view keyed by `key`. Tools
-   * call this from their `register(cli)` hook to contribute their own
-   * Ink view (spinner → results transition); the CLI then dispatches
-   * to the registered renderer when `renderLive(key, args)` is invoked.
+   * Render a live, stateful Ink view (spinner → results transition).
+   * `viewKey` selects which view (e.g. 'fit'). Returns once the
+   * underlying Ink app exits. Used by the fit command's visual mode.
    *
-   * Registration is first-writer-wins, matching the policy used by
-   * `ToolRegistry.register`. A duplicate key triggers a structured
-   * `cli.live_view.duplicate` warning via the shared logger and the
-   * second call is silently ignored.
+   * `viewKey` is a string instead of a typed enum so new tools can
+   * register additional live views without touching the core type.
    */
-  readonly registerLiveView: (key: string, renderer: LiveViewRenderer) => void;
-  /**
-   * Render the live view registered under `key`, passing `args` through
-   * to the registered renderer. Returns once the underlying Ink app
-   * exits. Throws `UnknownLiveViewError` if no renderer has been
-   * registered for `key` (rather than silently falling back to a static
-   * render — the latter would mask bugs where a tool mistypes its view
-   * key).
-   *
-   * `key` is a string instead of a typed enum so new tools can
-   * contribute additional live views without touching the core type.
-   */
-  readonly renderLive: (key: string, args: unknown) => Promise<void>;
+  readonly renderLive: (viewKey: string, args: unknown) => Promise<void>;
   /**
    * Open the HTML dashboard in the user's browser when the run
    * conditions allow it (TTY, not JSON-mode, opt-in). Tools call this
