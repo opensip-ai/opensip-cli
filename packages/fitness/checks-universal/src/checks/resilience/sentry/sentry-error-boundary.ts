@@ -5,7 +5,7 @@
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
-import { hasSentryUsage } from './sentry-helpers.js'
+import { hasSentryUsage } from './_helpers/sentry.js'
 
 // Sentry error boundary patterns (component or HOC)
 const ERROR_BOUNDARY_PATTERNS = [

@@ -8,7 +8,7 @@
 import { logger } from '@opensip-tools/core/logger'
 import { defineCheck, type CheckViolation, getLineNumber } from '@opensip-tools/fitness'
 
-import { isDigit, isAlphanumericChar } from './config-validation-helpers.js'
+import { isDigit, isAlphanumericChar } from './_helpers/config-validation.js'
 
 // =============================================================================
 // TYPES

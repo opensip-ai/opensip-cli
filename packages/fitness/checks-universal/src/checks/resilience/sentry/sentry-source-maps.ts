@@ -5,7 +5,7 @@
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
-import { hasSentryUsage } from './sentry-helpers.js'
+import { hasSentryUsage } from './_helpers/sentry.js'
 
 // Sentry bundler plugins that handle source map upload
 const SOURCE_MAP_PLUGINS = [

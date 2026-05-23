@@ -14,9 +14,14 @@ describe('analyzeTodoComments', () => {
     const src = `// TODO first
 let x = 1;
 // FIXME second
-// HACK third`
+// XXX third`
     const violations = analyzeTodoComments(src)
     expect(violations.length).toBe(3)
+  })
+
+  it('does not flag HACK (owned by no-temporary-workarounds)', () => {
+    const violations = analyzeTodoComments('// HACK temporary fix')
+    expect(violations.length).toBe(0)
   })
 
   it('does not flag mixed-case Todo (boundary check)', () => {

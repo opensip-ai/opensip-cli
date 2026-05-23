@@ -9,7 +9,11 @@
  */
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
-const TODO_PATTERN = /\b(TODO|FIXME|XXX|HACK|OPTIMIZE)\b/g
+// HACK is intentionally excluded — `no-temporary-workarounds` owns HACK
+// (with qualifier needles like "temporary"/"workaround"). Including HACK
+// here as well caused duplicate findings on the same line; see the
+// 2026-05-23 checks-universal architecture audit, NF1.
+const TODO_PATTERN = /\b(TODO|FIXME|XXX|OPTIMIZE)\b/g
 
 /**
  * Pure analysis function. Exported so unit tests can exercise the
@@ -39,7 +43,7 @@ export function analyzeTodoComments(content: string): CheckViolation[] {
 export const noTodoComments = defineCheck({
   id: 'a1b2c3d4-9876-4321-aaaa-100000000001',
   slug: 'no-todo-comments',
-  description: 'TODO/FIXME/XXX/HACK/OPTIMIZE markers should not ship to production',
+  description: 'TODO/FIXME/XXX/OPTIMIZE markers should not ship to production',
   scope: { languages: [], concerns: [] },
   tags: ['quality', 'documentation'],
   // Use 'strip-strings' so the check sees comments but not string-literal

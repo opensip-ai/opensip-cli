@@ -11,7 +11,7 @@ import {
   isAlphanumericChar,
   skipWhitespace,
   parseDigits,
-} from './config-validation-helpers.js'
+} from './_helpers/config-validation.js'
 
 // =============================================================================
 // CONSTANTS

@@ -1,6 +1,17 @@
 // @fitness-ignore-file no-hardcoded-secrets -- Fitness check definition references secret patterns in longDescription as examples, not actual secrets
 /**
- * @fileoverview Detect hardcoded secrets in source code
+ * @fileoverview Detect hardcoded secrets in source code.
+ *
+ * Inline regex-list shape retained — migration to `defineRegexListCheck`
+ * deferred (Phase C6 / 2026-05-23 NF2). This site has site-specific
+ * post-match filters that the helper does not model:
+ *   1. `isInsideRegexLiteral` — skips matches inside `/.../` literals
+ *      to avoid false-firing on detection-pattern source itself.
+ *   2. `lineHasRedactionPlaceholder` — skips lines containing `***`,
+ *      `[REDACTED]`, `<REDACTED>`, or `X{4,}` redaction markers.
+ * Adding these as helper options would broaden its surface beyond
+ * what the other adopters need; keeping them inline here is the
+ * smaller change.
  */
 
 import { logger } from '@opensip-tools/core/logger'

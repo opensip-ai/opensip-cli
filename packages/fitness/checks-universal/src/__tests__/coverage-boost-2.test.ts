@@ -700,14 +700,14 @@ describe('no-todo-comments (cross-language)', () => {
 
   afterAll(() => rmSync(cwd, { recursive: true, force: true }))
 
-  it('flags all five debt-marker types', async () => {
+  it('flags TODO/FIXME/XXX/OPTIMIZE debt markers (HACK is owned by no-temporary-workarounds)', async () => {
     const result = await findCheck('no-todo-comments').run(cwd, {
       targetFiles: [join(cwd, 'src/has-todos.ts')],
     })
     const messages = result.signals.map((s) => s.message)
     expect(messages.some((m) => m.startsWith('TODO'))).toBe(true)
     expect(messages.some((m) => m.startsWith('FIXME'))).toBe(true)
-    expect(messages.some((m) => m.startsWith('HACK'))).toBe(true)
+    expect(messages.some((m) => m.startsWith('HACK'))).toBe(false)
     expect(messages.some((m) => m.startsWith('XXX'))).toBe(true)
     expect(messages.some((m) => m.startsWith('OPTIMIZE'))).toBe(true)
   })

@@ -6,7 +6,7 @@
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
-import { hasSentryInit, extractSentryInitBlock } from './sentry-helpers.js'
+import { hasSentryInit, extractSentryInitBlock } from './_helpers/sentry.js'
 
 // PII-sensitive Sentry API calls — setting user context, extras, or tags
 // that commonly carry personal data

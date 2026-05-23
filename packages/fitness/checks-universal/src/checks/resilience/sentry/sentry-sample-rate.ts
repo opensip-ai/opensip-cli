@@ -5,7 +5,7 @@
 
 import { defineCheck, type CheckViolation, getLineNumber } from '@opensip-tools/fitness'
 
-import { hasSentryInit, extractSentryInitBlock } from './sentry-helpers.js'
+import { hasSentryInit, extractSentryInitBlock } from './_helpers/sentry.js'
 
 function analyze(content: string, filePath: string): CheckViolation[] {
   if (!hasSentryInit(content)) return []

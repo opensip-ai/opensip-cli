@@ -1,6 +1,6 @@
 /**
  * @fileoverview Shared helpers for Sentry fitness checks
- * @module checks-builtin/checks/resilience/sentry/sentry-helpers
+ * @module checks-builtin/checks/resilience/sentry/_helpers/sentry
  */
 
 /**

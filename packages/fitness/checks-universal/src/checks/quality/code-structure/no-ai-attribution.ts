@@ -6,42 +6,28 @@
  * merit; AI-attribution leaks process metadata into shipped code.
  *
  * Extracted from the former `comment-quality` umbrella in Phase C1.
+ *
+ * Migrated to defineRegexListCheck (Phase C6 / 2026-05-23 NF2). The
+ * original site truncated each line to 500 chars before running the
+ * regex; that ReDoS guard is unnecessary here because every pattern
+ * already uses bounded quantifiers (`[^/]{0,200}`, `[^*]{0,200}`,
+ * `\s{1,5}`), so an unbounded line cannot produce catastrophic
+ * backtracking. The `oneViolationPerLine: true` option preserves the
+ * original "one finding per line, first matching pattern wins"
+ * semantics.
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
-
-/** Maximum line length for regex matching */
-const MAX_LINE_LENGTH = 500
-
-/**
- * Safely truncate a line for regex matching.
- */
-function safeLineForRegex(line: string): string {
-  return line.length > MAX_LINE_LENGTH ? line.slice(0, MAX_LINE_LENGTH) : line
-}
-
-// AI-generation metadata patterns (bounded quantifiers)
-const AI_GENERATED_BY_SINGLE_PATTERN =
-  /\/\/[^/]{0,200}\b(?:generated|created|written|assisted)\s{1,5}by\s{1,5}(?:ai|chatgpt|claude|copilot|gpt|llm|openai|anthropic|gemini|bard)\b/i
-const AI_TOOL_ACTION_SINGLE_PATTERN =
-  /\/\/[^/]{0,200}\b(?:ai|chatgpt|claude|copilot|gpt|llm)\s{1,5}(?:generated|created|wrote|suggested|assisted)\b/i
-const AI_GENERATED_BY_BLOCK_PATTERN =
-  /\/\*{1,5}[^*]{0,200}\b(?:generated|created|written|assisted)\s{1,5}by\s{1,5}(?:ai|chatgpt|claude|copilot|gpt|llm|openai|anthropic|gemini|bard)\b/i
-
-const PATTERNS: RegExp[] = [
-  AI_GENERATED_BY_SINGLE_PATTERN,
-  AI_TOOL_ACTION_SINGLE_PATTERN,
-  AI_GENERATED_BY_BLOCK_PATTERN,
-]
+import { defineRegexListCheck } from '@opensip-tools/fitness'
 
 const FIX_MESSAGE = 'Remove AI-generation metadata; comments must stand on their own merit'
+const VIOLATION_MESSAGE = `AI-attribution comment found. ${FIX_MESSAGE}`
 
 /**
  * Check: quality/no-ai-attribution
  *
  * Detects AI-attribution metadata in comments.
  */
-export const noAiAttribution = defineCheck({
+export const noAiAttribution = defineRegexListCheck({
   id: '5b9e7c8a-4f12-4c5d-93f1-1e2a3b4c5d6e',
   slug: 'no-ai-attribution',
   scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
@@ -56,33 +42,40 @@ export const noAiAttribution = defineCheck({
   tags: ['maintainability', 'code-quality', 'quality'],
   fileTypes: ['ts', 'tsx'],
   disabled: true,
-
-  analyze(content: string, filePath: string): CheckViolation[] {
-    if (!content.includes('//') && !content.includes('/*')) {
-      return []
-    }
-
-    const violations: CheckViolation[] = []
-    const lines = content.split('\n')
-
-    for (const [i, line] of lines.entries()) {
-      if (!line) continue
-      const safeLine = safeLineForRegex(line)
-      for (const pattern of PATTERNS) {
-        if (pattern.test(safeLine)) {
-          violations.push({
-            line: i + 1,
-            message: `AI-attribution comment found. ${FIX_MESSAGE}`,
-            severity: 'error',
-            suggestion: FIX_MESSAGE,
-            match: safeLine.trim().slice(0, 60),
-            filePath,
-          })
-          break // one finding per line
-        }
-      }
-    }
-
-    return violations
+  options: {
+    // Comments are exactly what this check targets — do NOT skip them.
+    skipCommentLines: false,
+    // Original site emitted at most one violation per line via `break`
+    // after the first matching pattern.
+    oneViolationPerLine: true,
   },
+  patterns: [
+    {
+      id: '7a0b1c2d-3e4f-5061-7283-94a5b6c7d8e9',
+      slug: 'ai-generated-by-single',
+      regex:
+        /\/\/[^/]{0,200}\b(?:generated|created|written|assisted)\s{1,5}by\s{1,5}(?:ai|chatgpt|claude|copilot|gpt|llm|openai|anthropic|gemini|bard)\b/i,
+      message: VIOLATION_MESSAGE,
+      severity: 'error',
+      suggestion: FIX_MESSAGE,
+    },
+    {
+      id: '8b1c2d3e-4f50-6172-8394-a5b6c7d8e9f0',
+      slug: 'ai-tool-action-single',
+      regex:
+        /\/\/[^/]{0,200}\b(?:ai|chatgpt|claude|copilot|gpt|llm)\s{1,5}(?:generated|created|wrote|suggested|assisted)\b/i,
+      message: VIOLATION_MESSAGE,
+      severity: 'error',
+      suggestion: FIX_MESSAGE,
+    },
+    {
+      id: '9c2d3e4f-5061-7283-94a5-b6c7d8e9f0a1',
+      slug: 'ai-generated-by-block',
+      regex:
+        /\/\*{1,5}[^*]{0,200}\b(?:generated|created|written|assisted)\s{1,5}by\s{1,5}(?:ai|chatgpt|claude|copilot|gpt|llm|openai|anthropic|gemini|bard)\b/i,
+      message: VIOLATION_MESSAGE,
+      severity: 'error',
+      suggestion: FIX_MESSAGE,
+    },
+  ],
 })
