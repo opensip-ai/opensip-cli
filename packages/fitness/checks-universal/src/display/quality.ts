@@ -7,7 +7,6 @@ import type { CheckDisplayEntry } from './types.js'
 /** Quality check display entries (UNIVERSAL only, sorted alphabetically by slug) */
 export const QUALITY_DISPLAY = Object.freeze<Record<string, CheckDisplayEntry>>({
   'async-state-pattern': ['⏳', 'Async State Pattern'],
-  'comment-quality': ['💬', 'Comment Quality'],
   'dead-code': ['☠️', 'Dead Code'],
   'dependency-security-audit': ['🔒', 'Dependency Security Audit'],
   'dependency-version-consistency': ['📦', 'Dependency Version Consistency'],
@@ -17,8 +16,10 @@ export const QUALITY_DISPLAY = Object.freeze<Record<string, CheckDisplayEntry>>(
   'graphql-offset-pagination': ['🔌', 'GraphQL Offset Pagination'],
   'image-optimization': ['🖼️', 'Image Optimization'],
   'navigation-typing': ['📱', 'Navigation Typing'],
+  'no-ai-attribution': ['🤖', 'No AI Attribution'],
   'no-console-log': ['🚫', 'No Console Log'],
   'no-legacy-code': ['🧹', 'No Legacy Code'],
+  'no-process-artifacts': ['🗓️', 'No Process Artifacts'],
   'no-markdown-references': ['📝', 'No Markdown References'],
   'no-non-null-assertions': ['🛡️', 'No Non-Null Assertions'],
   'no-raw-regex-on-code': ['🔍', 'No Raw Regex On Code'],
@@ -27,7 +28,6 @@ export const QUALITY_DISPLAY = Object.freeze<Record<string, CheckDisplayEntry>>(
   'pino-serializer-coverage': ['📊', 'Pino Serializer Coverage'],
   'security-scan-suite': ['🔒', 'Security Scan Suite'],
   'semgrep-justifications': ['🔍', 'Semgrep Justifications'],
-  'todo-comments': ['📝', 'TODO Comments'],
   'typescript-directive-hygiene': ['📘', 'TypeScript Directive Hygiene'],
   'zod-openapi-sync': ['🔌', 'Zod OpenAPI Sync'],
 })

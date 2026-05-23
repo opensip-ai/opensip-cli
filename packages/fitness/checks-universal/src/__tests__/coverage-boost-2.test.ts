@@ -678,7 +678,7 @@ describe('docker-best-practices', () => {
 // project-readme-existence — already 100%, but useful smoke test
 // =============================================================================
 
-describe('todo-comments (quality)', () => {
+describe('no-todo-comments (cross-language)', () => {
   let cwd: string
 
   beforeAll(() => {
@@ -701,7 +701,7 @@ describe('todo-comments (quality)', () => {
   afterAll(() => rmSync(cwd, { recursive: true, force: true }))
 
   it('flags all five debt-marker types', async () => {
-    const result = await findCheck('todo-comments').run(cwd, {
+    const result = await findCheck('no-todo-comments').run(cwd, {
       targetFiles: [join(cwd, 'src/has-todos.ts')],
     })
     const messages = result.signals.map((s) => s.message)
@@ -713,7 +713,7 @@ describe('todo-comments (quality)', () => {
   })
 
   it('does not fire on clean files', async () => {
-    const result = await findCheck('todo-comments').run(cwd, {
+    const result = await findCheck('no-todo-comments').run(cwd, {
       targetFiles: [join(cwd, 'src/clean.ts')],
     })
     expect(result.signals.length).toBe(0)
