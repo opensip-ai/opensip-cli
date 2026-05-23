@@ -6,10 +6,29 @@
  * config (if present) controls which lints fire — we don't override
  * it. Use `--checks=...` in the args if you want a fixed lint set.
  */
+import * as path from 'node:path'
+
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
 // eslint-disable-next-line sonarjs/slow-regex -- input is one bounded line of clang-tidy output; no real ReDoS exposure
 const CLANG_TIDY_LINE = /^(.+?):(\d+):(\d+):\s+(warning|error|note):\s+(.+?)(?:\s+\[([\w\-,.]+)\])?$/
+
+/**
+ * Resolve a captured clang-tidy file path against `cwd` and convert it
+ * to project-relative form when the resolved path falls inside `cwd`.
+ * Paths outside `cwd` (e.g. system headers under `/usr/include`) are
+ * left absolute so they remain unambiguous.
+ */
+function resolveFilePath(capturedPath: string, cwd: string): string {
+  const absolute = path.resolve(cwd, capturedPath)
+  const relative = path.relative(cwd, absolute)
+  // `path.relative` returns a `..`-prefixed path (or absolute on Windows
+  // when drives differ) when the resolved path is outside `cwd`.
+  if (relative === '' || relative.startsWith('..') || path.isAbsolute(relative)) {
+    return absolute
+  }
+  return relative
+}
 
 /**
  * Pure parser for clang-tidy stdout. Accepts the diagnostic format:
@@ -23,14 +42,16 @@ export function parseClangTidyOutput(
   _stderr: string,
   _exitCode: number,
   _files: readonly string[],
-  _cwd: string,
+  cwd: string,
 ): CheckViolation[] {
   const violations: CheckViolation[] = []
   const lines = stdout.split('\n')
   for (const line of lines) {
     const match = CLANG_TIDY_LINE.exec(line)
     if (!match) continue
+    const filePath = match[1]
     const lineStr = match[2]
+    const colStr = match[3]
     const severity = match[4]
     const message = match[5]
     const lintName = match[6]
@@ -39,6 +60,8 @@ export function parseClangTidyOutput(
       message: lintName ? `[${lintName}] ${message}` : message ?? 'clang-tidy diagnostic',
       severity: severity === 'error' ? 'error' : 'warning',
       line: lineStr ? Number.parseInt(lineStr, 10) : 1,
+      column: colStr ? Number.parseInt(colStr, 10) : undefined,
+      filePath: filePath ? resolveFilePath(filePath, cwd) : undefined,
       suggestion: 'See clang-tidy docs for the named lint',
     })
   }
