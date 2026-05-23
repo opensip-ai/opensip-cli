@@ -6,24 +6,36 @@
  * bootstrap module owns config-resolution end-to-end. Order is
  * load → merge → derive (silent/debug) so flag-driven log mode reflects
  * the merged opts (F10).
+ *
+ * The schema + loader live in `@opensip-tools/contracts`
+ * (`loadCliDefaults`) — the `cli:` block is tool-agnostic and a project
+ * shipping only `simulation` shouldn't need fitness installed just to
+ * read its own CLI defaults. Audit 2026-05-23 G2.
  */
 
+import { loadCliDefaults as loadCliDefaultsFromContracts } from '@opensip-tools/contracts';
 import { logger } from '@opensip-tools/core';
-import { loadSignalersConfig } from '@opensip-tools/fitness';
 
-import { resolveApiKey } from '../commands/configure.js';
+import { resolveApiKey } from './global-config.js';
 
-import type { SignalersConfig } from '@opensip-tools/fitness';
+import type { CliDefaults } from '@opensip-tools/contracts';
 
-export type CliDefaults = SignalersConfig['cli'];
+// Re-export the type at the same name the rest of the bootstrap path
+// already imports — internal bootstrap call sites stay stable.
+export type { CliDefaults } from '@opensip-tools/contracts';
 
 /**
  * Best-effort load of the `cli:` block. Falls back to `{}` when the
- * config is missing or malformed — config-presence is optional.
+ * config is missing or malformed — config-presence is optional. The
+ * underlying loader (in `@opensip-tools/contracts`) is already
+ * permissive on every failure path; the wrapper here exists so the
+ * absence path emits a structured debug log keyed against `cli:` (the
+ * contracts loader stays dependency-light and doesn't reach for the
+ * logger).
  */
 export function loadCliDefaults(cwd: string, explicitConfigPath?: string): CliDefaults {
   try {
-    return loadSignalersConfig(cwd, explicitConfigPath).cli;
+    return loadCliDefaultsFromContracts(cwd, explicitConfigPath);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     logger.debug({

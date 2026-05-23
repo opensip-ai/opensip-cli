@@ -14,6 +14,13 @@
  * Discovery is async (dynamic `import()` of each tool package). The
  * caller awaits before walking the registry to mount Commander
  * subcommands so `--help` listings see every tool's commands.
+ *
+ * Barrel surface: only the symbols `index.ts` actually consumes are
+ * re-exported from this barrel. Internal helpers (`mergeConfigDefaults`,
+ * `loadCliDefaults`, `registerFirstPartyTools`, `FIRST_PARTY_TOOLS`,
+ * `registerLanguageAdapters`, the global-config primitives) stay in
+ * their files; bootstrap siblings and tests import them directly. Audit
+ * 2026-05-23 M1.
  */
 
 import { registerLanguageAdapters } from './register-language-adapters.js';
@@ -24,15 +31,11 @@ import {
 
 import type { LanguageRegistry, ToolRegistry } from '@opensip-tools/core';
 
-export { registerLanguageAdapters } from './register-language-adapters.js';
-export {
-  FIRST_PARTY_TOOLS,
-  registerFirstPartyTools,
-  discoverAndRegisterToolPackages,
-  mountAllToolCommands,
-} from './register-tools.js';
-export { loadCliDefaults, mergeConfigDefaults, type CliDefaults } from './cli-defaults.js';
-export { renderResult, builtinLiveViews, maybeOpenDashboard } from './render-helpers.js';
+// Re-export only the symbols the CLI composition root (`index.ts`) consumes.
+export { mountAllToolCommands } from './register-tools.js';
+export { renderResult } from './render.js';
+export { builtinLiveViews } from './live-views.js';
+export { maybeOpenDashboard } from './dashboard.js';
 export { installPreActionHook } from './pre-action-hook.js';
 
 export interface BootstrapOptions {

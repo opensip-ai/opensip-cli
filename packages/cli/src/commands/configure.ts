@@ -4,61 +4,28 @@
  * Prompts via `readline` (Ink can't own a prompt loop without raw mode);
  * banners and result lines route through Ink via the `configure-done`
  * `CommandResult`. No `console.log` and no raw ANSI escapes here.
+ *
+ * The actual config I/O (read/write `~/.opensip-tools/config.yml`,
+ * resolve the API key from flag → env → config) lives in
+ * `bootstrap/global-config.ts` so the pre-action hook can call it
+ * without inverting the startup → command direction. This file is the
+ * prompt+UX wrapper around those primitives. Audit 2026-05-23 M3.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 
-import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
+import {
+  GLOBAL_CONFIG_PATH,
+  readGlobalConfig,
+  writeGlobalConfig,
+} from '../bootstrap/global-config.js';
 
 import type { ConfigureDoneResult } from '@opensip-tools/contracts';
 
-// ---------------------------------------------------------------------------
-// Paths
-// ---------------------------------------------------------------------------
-
-const OPENSIP_DIR = join(homedir(), '.opensip-tools');
-const CONFIG_PATH = join(OPENSIP_DIR, 'config.yml');
-
-// ---------------------------------------------------------------------------
-// Read existing global config
-// ---------------------------------------------------------------------------
-
-interface GlobalConfig {
-  apiKey?: string;
-  [key: string]: unknown;
-}
-
-function readGlobalConfig(): GlobalConfig {
-  if (!existsSync(CONFIG_PATH)) return {};
-  try {
-    const raw = readFileSync(CONFIG_PATH, 'utf8');
-    return (parseYaml(raw) as GlobalConfig) ?? {};
-  } catch {
-    return {};
-  }
-}
-
-function writeGlobalConfig(config: GlobalConfig): void {
-  if (!existsSync(OPENSIP_DIR)) {
-    mkdirSync(OPENSIP_DIR, { recursive: true });
-  }
-  writeFileSync(CONFIG_PATH, stringifyYaml(config), 'utf8');
-  chmodSync(CONFIG_PATH, 0o600);
-}
-
-// ---------------------------------------------------------------------------
-// Resolve API key from multiple sources (CLI flag > env > global config)
-// ---------------------------------------------------------------------------
-
-export function resolveApiKey(cliFlag?: string): string | undefined {
-  if (cliFlag) return cliFlag;
-  if (process.env.OPENSIP_API_KEY) return process.env.OPENSIP_API_KEY;
-  const config = readGlobalConfig();
-  return config.apiKey ?? undefined;
-}
+// Re-export `resolveApiKey` from the bootstrap module so existing
+// command-side imports (and tests) can continue to consume it through
+// the same name without reaching into bootstrap directly.
+export { resolveApiKey } from '../bootstrap/global-config.js';
 
 // ---------------------------------------------------------------------------
 // Interactive prompt
@@ -100,7 +67,7 @@ export async function executeConfigure(): Promise<ConfigureDoneResult> {
 
   const key = await prompt('Enter your OpenSIP Cloud API key: ');
   if (!key) {
-    return { type: 'configure-done', action: 'cancelled', configPath: CONFIG_PATH };
+    return { type: 'configure-done', action: 'cancelled', configPath: GLOBAL_CONFIG_PATH };
   }
 
   existing.apiKey = key;
@@ -109,7 +76,7 @@ export async function executeConfigure(): Promise<ConfigureDoneResult> {
   return {
     type: 'configure-done',
     action: 'saved',
-    configPath: CONFIG_PATH,
+    configPath: GLOBAL_CONFIG_PATH,
     maskedKey: maskKey(key),
   };
 }

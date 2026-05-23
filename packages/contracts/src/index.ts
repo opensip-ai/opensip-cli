@@ -55,6 +55,12 @@ export type {
 export { EXIT_CODES, getErrorSuggestion } from './exit-codes.js';
 export type { ErrorSuggestion } from './exit-codes.js';
 
+// CLI defaults loader (`cli:` block of opensip-tools.config.yml).
+// Lives in contracts because the CLI-pre-action seam is tool-agnostic;
+// see ./cli-config.ts for the rationale.
+export { loadCliDefaults } from './cli-config.js';
+export type { CliDefaults } from './cli-config.js';
+
 // Session persistence
 export {
   configurePersistencePaths,
