@@ -12,62 +12,155 @@ export interface ErrorSuggestion {
   exitCode: number;
 }
 
-export function getErrorSuggestion(err: unknown): ErrorSuggestion | null {
-  const message = err instanceof Error ? err.message : String(err);
+/**
+ * A suggestion-rule match result.
+ *
+ * `null` means "this rule did not match." A returned object signals a
+ * match; the optional `capture` carries an arm-specific string the
+ * suggest builder will format into the message (e.g. the missing check
+ * slug, or the verbatim error message for the unknown-recipe rule).
+ */
+interface SuggestionMatch {
+  capture: string | null;
+}
 
-  // Check not found
-  if (message.includes('Check not found:') || message.includes('not found')) {
-    const slug = (/Check not found: (.+)/.exec(message))?.[1] ?? (/not found: (.+)/.exec(message))?.[1];
-    return {
-      message: `Check '${slug ?? 'unknown'}' not found.`,
+interface SuggestionRule {
+  match: (message: string) => SuggestionMatch | null;
+  suggest: (capture: string | null) => ErrorSuggestion;
+}
+
+/**
+ * True when any of the supplied substrings appear in `message`.
+ *
+ * Wraps the substring checks the rule table needs without spreading
+ * `String#includes` ladders back through `getErrorSuggestion`. Each
+ * rule keeps its own readable list of substrings and the function
+ * body stays a pure data walk.
+ */
+function containsAny(haystack: string, needles: readonly string[]): boolean {
+  return needles.some((needle) => haystack.includes(needle));
+}
+
+/**
+ * Ordered list of suggestion rules. Walked top-down by
+ * `getErrorSuggestion`; first hit wins, so order is load-bearing.
+ *
+ * Adding a new error category is one tuple. Do NOT replace this with
+ * a Chain-of-Responsibility class — a flat array is the contract here.
+ *
+ * The over-broad bare `'config'` substring from the previous
+ * implementation has been narrowed into two explicit rules — one for
+ * `opensip-tools.config.yml` (file shape) and one for `YAML` (parse
+ * shape). The bare substring matched common English words like
+ * `'configurable'` and `'reconfigure'` and produced false positives.
+ */
+const SUGGESTION_RULES: readonly SuggestionRule[] = [
+  // Check not found — captures the slug from "Check not found: <slug>"
+  // or the bare "not found: <slug>" form.
+  {
+    match: (message) => {
+      const slugMatch =
+        /Check not found: (.+)/.exec(message) ?? /not found: (.+)/.exec(message);
+      if (slugMatch) {
+        return { capture: slugMatch[1] };
+      }
+      // Substring forms with no extractable slug still match the rule;
+      // the suggest builder substitutes "unknown".
+      if (containsAny(message, ['Check not found:', 'not found'])) {
+        return { capture: null };
+      }
+      return null;
+    },
+    suggest: (capture) => ({
+      message: `Check '${capture ?? 'unknown'}' not found.`,
       action: 'Run opensip-tools fit --list to see available checks.',
       exitCode: EXIT_CODES.CHECK_NOT_FOUND,
-    };
-  }
+    }),
+  },
 
-  // Recipe not found
-  if (message.includes('Unknown recipe')) {
-    return {
-      message: message,
+  // Recipe not found — captures the verbatim error message so the
+  // surfaced suggestion preserves the recipe name.
+  {
+    match: (message) =>
+      containsAny(message, ['Unknown recipe']) ? { capture: message } : null,
+    suggest: (capture) => ({
+      message: capture ?? 'Unknown recipe.',
       action: 'Run opensip-tools fit --recipes to see available recipes.',
       exitCode: EXIT_CODES.CONFIGURATION_ERROR,
-    };
-  }
+    }),
+  },
 
-  // Config file error
-  if (message.includes('opensip-tools.config.yml') || message.includes('YAML') || message.includes('config')) {
-    return {
+  // Config file error — opensip-tools.config.yml shape.
+  {
+    match: (message) =>
+      containsAny(message, ['opensip-tools.config.yml']) ? { capture: null } : null,
+    suggest: () => ({
       message: 'Configuration error.',
       action: 'Check opensip-tools.config.yml for syntax errors.',
       exitCode: EXIT_CODES.CONFIGURATION_ERROR,
-    };
-  }
+    }),
+  },
+
+  // Config file error — YAML parse shape (paired with the file rule above).
+  {
+    match: (message) =>
+      containsAny(message, ['YAML']) ? { capture: null } : null,
+    suggest: () => ({
+      message: 'Configuration error.',
+      action: 'Check opensip-tools.config.yml for syntax errors.',
+      exitCode: EXIT_CODES.CONFIGURATION_ERROR,
+    }),
+  },
 
   // Permission denied
-  if (message.includes('EACCES') || message.includes('permission denied')) {
-    return {
+  {
+    match: (message) =>
+      containsAny(message, ['EACCES', 'permission denied'])
+        ? { capture: null }
+        : null,
+    suggest: () => ({
       message: 'Permission denied reading files.',
       action: 'Check file permissions in the target directory.',
       exitCode: EXIT_CODES.RUNTIME_ERROR,
-    };
-  }
+    }),
+  },
 
-  // No files found
-  if (message.includes('No checks registered') || message.includes('No checks to run')) {
-    return {
+  // No checks available
+  {
+    match: (message) =>
+      containsAny(message, ['No checks registered', 'No checks to run'])
+        ? { capture: null }
+        : null,
+    suggest: () => ({
       message: 'No checks available to run.',
-      action: 'Install at least one @opensip-tools/checks-* package, or declare plugins.checkPackages in opensip-tools.config.yml.',
+      action:
+        'Install at least one @opensip-tools/checks-* package, or declare plugins.checkPackages in opensip-tools.config.yml.',
       exitCode: EXIT_CODES.RUNTIME_ERROR,
-    };
-  }
+    }),
+  },
 
   // Network error (report-to)
-  if (message.includes('fetch') || message.includes('ECONNREFUSED') || message.includes('network')) {
-    return {
+  {
+    match: (message) =>
+      containsAny(message, ['fetch', 'ECONNREFUSED', 'network'])
+        ? { capture: null }
+        : null,
+    suggest: () => ({
       message: 'Network error sending report.',
       action: 'Check the --report-to URL and your network connection.',
       exitCode: EXIT_CODES.REPORT_FAILED,
-    };
+    }),
+  },
+];
+
+export function getErrorSuggestion(err: unknown): ErrorSuggestion | null {
+  const message = err instanceof Error ? err.message : String(err);
+
+  for (const rule of SUGGESTION_RULES) {
+    const result = rule.match(message);
+    if (result !== null) {
+      return rule.suggest(result.capture);
+    }
   }
 
   return null;

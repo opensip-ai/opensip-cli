@@ -71,11 +71,14 @@ describe('error handling', () => {
       expect(suggestion!.exitCode).toBe(EXIT_CODES.CONFIGURATION_ERROR);
     });
 
-    it('detects config keyword errors', () => {
+    it('does not match the bare "config" substring (narrowed to opensip-tools.config.yml + YAML)', () => {
+      // Layer 2 Phase 1: the previous over-broad 'config' substring rule
+      // matched 'configurable', 'reconfigure', and bare 'Invalid config'
+      // messages. It has been narrowed into two explicit rules
+      // (opensip-tools.config.yml + YAML); inputs that previously
+      // matched by accident now fall through to the default null.
       const err = new Error('Invalid config value');
-      const suggestion = getErrorSuggestion(err);
-      expect(suggestion).not.toBeNull();
-      expect(suggestion!.exitCode).toBe(EXIT_CODES.CONFIGURATION_ERROR);
+      expect(getErrorSuggestion(err)).toBeNull();
     });
 
     it('detects EACCES permission denied errors', () => {
