@@ -34,8 +34,6 @@ export interface DetachedPromisesConfig extends Record<string, unknown> {
   additionalSyncPrefixes?: readonly string[]
 }
 
-const DETACHED_PROMISES_SLUG = 'detached-promises'
-
 /**
  * Known synchronous functions that do NOT return promises. Limited to
  * generic JS / TS / Node defaults; framework-specific entries live in
@@ -335,7 +333,7 @@ interface EffectiveSyncSets {
  * recipe-provided augmentation for `detached-promises`.
  */
 function buildEffectiveSyncSets(): EffectiveSyncSets {
-  const cfg = getCheckConfig<DetachedPromisesConfig>(DETACHED_PROMISES_SLUG)
+  const cfg = getCheckConfig<DetachedPromisesConfig>('detached-promises')
   const fns = new Set(KNOWN_SYNC_FUNCTIONS)
   for (const name of cfg.additionalSyncFunctions ?? []) fns.add(name)
   const recvs = new Set(KNOWN_SYNC_RECEIVERS)

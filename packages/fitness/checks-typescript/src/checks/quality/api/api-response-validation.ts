@@ -1,4 +1,3 @@
-// @fitness-ignore-file file-length-limits -- isDynamicReplyOnly uses exhaustive multi-pattern AST matching that resists decomposition without fragmenting the decision tree
 // @fitness-ignore-file correlation-id-coverage -- Fitness check implementation, not an API handler
 // @fitness-ignore-file duplicate-implementation-detection -- similar patterns across diagnostic modules
 // @fitness-ignore-file no-raw-regex-on-code -- fitness check: regex patterns analyze trusted codebase content, not user input

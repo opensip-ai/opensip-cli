@@ -1,5 +1,4 @@
 // @fitness-ignore-file correlation-id-coverage -- Fitness check implementation, not an API handler
-// @fitness-ignore-file file-length-limits -- Complex module with tightly coupled logic; splitting would fragment cohesive functionality
 // @fitness-ignore-file fastify-schema-coverage -- Fitness check definition file; references Fastify schema patterns for detection, not actual routes
 /**
  * @fileoverview Fastify Schema Coverage Check

@@ -33,8 +33,6 @@ export interface DuplicateUtilityFunctionsConfig extends Record<string, unknown>
   additionalDomainSpecificFunctions?: readonly string[]
 }
 
-const DUPLICATE_UTILITY_FUNCTIONS_SLUG = 'duplicate-utility-functions'
-
 /**
  * Common utility function name patterns
  */
@@ -107,7 +105,7 @@ const DOMAIN_SPECIFIC_FUNCTIONS = new Set([
  * the recipe-provided augmentation for `duplicate-utility-functions`.
  */
 function buildEffectiveDomainSpecificSet(): ReadonlySet<string> {
-  const cfg = getCheckConfig<DuplicateUtilityFunctionsConfig>(DUPLICATE_UTILITY_FUNCTIONS_SLUG)
+  const cfg = getCheckConfig<DuplicateUtilityFunctionsConfig>('duplicate-utility-functions')
   if (!cfg.additionalDomainSpecificFunctions || cfg.additionalDomainSpecificFunctions.length === 0) {
     return DOMAIN_SPECIFIC_FUNCTIONS
   }

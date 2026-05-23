@@ -1,4 +1,3 @@
-// @fitness-ignore-file file-length-limits -- Complex module with tightly coupled logic; refactoring would risk breaking changes
 /**
  * @fileoverview Detects mock, stub, or fake implementations in production code
  *

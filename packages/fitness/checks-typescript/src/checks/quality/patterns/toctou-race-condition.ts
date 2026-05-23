@@ -40,8 +40,6 @@ export interface TocTouConfig extends Record<string, unknown> {
   additionalSafeTOCTOUPaths?: readonly string[]
 }
 
-const TOCTOU_SLUG = 'toctou-race-condition'
-
 /** Patterns that indicate proper atomic update handling */
 const ATOMIC_PATTERNS = [
   /expectedVersion/i,
@@ -127,7 +125,7 @@ const SAFE_TOCTOU_PATHS = [
  * Compile recipe-provided string entries to case-insensitive RegExp values.
  */
 function buildEffectiveSafePaths(): readonly RegExp[] {
-  const cfg = getCheckConfig<TocTouConfig>(TOCTOU_SLUG)
+  const cfg = getCheckConfig<TocTouConfig>('toctou-race-condition')
   const extras = (cfg.additionalSafeTOCTOUPaths ?? []).map((src) => new RegExp(src, 'i'))
   return [...SAFE_TOCTOU_PATHS, ...extras]
 }

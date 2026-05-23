@@ -1,4 +1,3 @@
-// @fitness-ignore-file file-length-limits -- Complex module with tightly coupled logic; refactoring would risk breaking changes
 /**
  * @fileoverview A11y Semantic HTML Check
  *

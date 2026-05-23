@@ -1,4 +1,3 @@
-// @fitness-ignore-file file-length-limits -- Complex module with tightly coupled logic; refactoring would risk breaking changes
 // @fitness-ignore-file correlation-id-coverage -- Fitness check implementation, not an API handler
 // @fitness-ignore-file duplicate-utility-functions -- Check-specific helpers (getFunctionName, isHandlerFunction) use check-local types; extracting would couple independent checks
 /**

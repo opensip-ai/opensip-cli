@@ -28,9 +28,6 @@ import {
 } from '@opensip-tools/lang-typescript'
 import * as ts from 'typescript'
 
-/** The check ID constant to avoid duplication */
-const CHECK_SLUG = 'stubbed-implementation-detection'
-const CHECK_ID = '12218d58-5dea-4aba-ba7b-fc1822d03ec4'
 
 /** Placeholder comment patterns - using explicit RegExp constructors for safety */
 const PLACEHOLDER_PATTERNS: RegExp[] = [
@@ -347,8 +344,8 @@ function checkLineForPlaceholder(line: string, lineNum: number): CheckViolation 
  * Detects incomplete or placeholder implementations.
  */
 export const stubbedImplementationDetection = defineCheck({
-  id: CHECK_ID,
-  slug: CHECK_SLUG,
+  id: '12218d58-5dea-4aba-ba7b-fc1822d03ec4',
+  slug: 'stubbed-implementation-detection',
   scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
   contentFilter: 'raw',
   confidence: 'high',

@@ -22,8 +22,6 @@ export interface NullSafetyConfig extends Record<string, unknown> {
   additionalSafeNullPaths?: readonly string[]
 }
 
-const NULL_SAFETY_SLUG = 'null-safety'
-
 /**
  * Patterns that indicate the access is already protected
  */
@@ -572,7 +570,7 @@ const SAFE_NULL_PATHS: readonly RegExp[] = [
 
 /** Merge built-in defaults with the recipe-config slice. */
 function buildEffectiveSafePaths(): readonly RegExp[] {
-  const cfg = getCheckConfig<NullSafetyConfig>(NULL_SAFETY_SLUG)
+  const cfg = getCheckConfig<NullSafetyConfig>('null-safety')
   const extras = (cfg.additionalSafeNullPaths ?? []).map((src) => new RegExp(src, 'i'))
   return [...SAFE_NULL_PATHS, ...extras]
 }

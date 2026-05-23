@@ -24,8 +24,6 @@ export interface ThrowsDocConfig extends Record<string, unknown> {
   additionalSelfDocumentingSuffixes?: readonly string[]
 }
 
-const THROWS_DOC_SLUG = 'throws-documentation'
-
 // =============================================================================
 // TYPES
 // =============================================================================
@@ -271,7 +269,7 @@ const SELF_DOCUMENTING_SUFFIXES = [
  * defaults with the recipe config slice. Called per-file from the analyze entry.
  */
 function buildEffectiveSuffixes(): readonly string[] {
-  const cfg = getCheckConfig<ThrowsDocConfig>(THROWS_DOC_SLUG)
+  const cfg = getCheckConfig<ThrowsDocConfig>('throws-documentation')
   return [...SELF_DOCUMENTING_SUFFIXES, ...(cfg.additionalSelfDocumentingSuffixes ?? [])]
 }
 
