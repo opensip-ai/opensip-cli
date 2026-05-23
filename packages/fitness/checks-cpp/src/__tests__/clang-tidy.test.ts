@@ -62,6 +62,11 @@ describe('parseClangTidyOutput', () => {
     expect(parseClangTidyOutput('', '', 0, [], '/x')).toHaveLength(0)
   })
 
+  it('skips lines that do not match the expected diagnostic format', () => {
+    const out = 'random output\n2 warnings generated.\n'
+    expect(parseClangTidyOutput(out, '', 0, [], '/x')).toEqual([])
+  })
+
   it('returns multiple violations for multi-line output', () => {
     const out = [
       '/x/y.cpp:1:1: warning: a [check-a]',

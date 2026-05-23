@@ -18,6 +18,13 @@ const CLANG_TIDY_LINE = /^(.+?):(\d+):(\d+):\s+(warning|error|note):\s+(.+?)(?:\
  * to project-relative form when the resolved path falls inside `cwd`.
  * Paths outside `cwd` (e.g. system headers under `/usr/include`) are
  * left absolute so they remain unambiguous.
+ *
+ * Note on empty `cwd`: when called with `cwd === ''`, `path.resolve`
+ * falls back to `process.cwd()`. The production `command`-mode caller
+ * (`executeCommandMode` in `@opensip-tools/fitness`) always passes a
+ * non-empty cwd, so the production contract is well-defined; the
+ * pass-through is tolerated only as a convenience for tests and is
+ * not part of the public surface.
  */
 function resolveFilePath(capturedPath: string, cwd: string): string {
   const absolute = path.resolve(cwd, capturedPath)
@@ -34,8 +41,9 @@ function resolveFilePath(capturedPath: string, cwd: string): string {
  * Pure parser for clang-tidy stdout. Accepts the diagnostic format:
  *   path/to/file.cpp:LINE:COL: warning: <message> [check-name]
  * Returns one CheckViolation per warning/error line. `note:` lines
- * are attached to the prior diagnostic when possible (kept simple
- * for MVP — current implementation skips them).
+ * are dropped today; revisit when adopting `clang-tidy --export-fixes`,
+ * where notes are first-class children of diagnostics rather than
+ * standalone lines that need re-attachment.
  */
 export function parseClangTidyOutput(
   stdout: string,
