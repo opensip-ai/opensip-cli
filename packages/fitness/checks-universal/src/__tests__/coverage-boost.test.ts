@@ -926,10 +926,11 @@ describe('no-markdown-references', () => {
 })
 
 // =============================================================================
-// no-legacy-code
+// no-deprecated-tags / no-compatibility-layer-names / no-temporary-workarounds
+// (split from the former `no-legacy-code` umbrella in Phase C4)
 // =============================================================================
 
-describe('no-legacy-code', () => {
+describe('no-legacy-code split (deprecated-tags / compat-layers / workarounds)', () => {
   let cwd: string
   // eslint-disable-next-line sonarjs/no-unused-collection -- fixture setup helper; per-test targetFiles override at call sites
   const files: string[] = []
@@ -945,8 +946,6 @@ describe('no-legacy-code', () => {
         'class UserCompatibilityLayer {}',
         'function legacyWrapperFor(input: any) { return input; }',
         '// HACK: temporary workaround before launch — fix me',
-        'function shimFunction() {}',
-        '// backward compatibility for old client',
       ].join('\n')),
       writeFixture(cwd, 'src/clean.ts', 'export const x = 1;'),
       writeFixture(cwd, 'src/__tests__/skip.test.ts', [
@@ -958,23 +957,40 @@ describe('no-legacy-code', () => {
 
   afterAll(() => rmSync(cwd, { recursive: true, force: true }))
 
-  it('flags @deprecated, compatibility layers, and HACK workarounds', async () => {
-    const result = await findCheck('no-legacy-code').run(cwd, {
+  it('no-deprecated-tags flags @deprecated JSDoc tags', async () => {
+    const result = await findCheck('no-deprecated-tags').run(cwd, {
       targetFiles: [join(cwd, 'src/legacy.ts')],
     })
     const types = result.signals.map((s) => s.metadata.type)
     expect(types).toContain('deprecated-tag')
   })
 
+  it('no-compatibility-layer-names flags compatibility-layer/legacy-wrapper declarations', async () => {
+    const result = await findCheck('no-compatibility-layer-names').run(cwd, {
+      targetFiles: [join(cwd, 'src/legacy.ts')],
+    })
+    const types = result.signals.map((s) => s.metadata.type)
+    expect(types).toContain('compatibility-layer')
+    expect(types).toContain('legacy-code-path')
+  })
+
+  it('no-temporary-workarounds flags HACK workarounds', async () => {
+    const result = await findCheck('no-temporary-workarounds').run(cwd, {
+      targetFiles: [join(cwd, 'src/legacy.ts')],
+    })
+    const types = result.signals.map((s) => s.metadata.type)
+    expect(types).toContain('temporary-workaround')
+  })
+
   it('skips test files', async () => {
-    const result = await findCheck('no-legacy-code').run(cwd, {
+    const result = await findCheck('no-deprecated-tags').run(cwd, {
       targetFiles: [join(cwd, 'src/__tests__/skip.test.ts')],
     })
     expect(result.signals.length).toBe(0)
   })
 
   it('does not fire on clean code with no keywords', async () => {
-    const result = await findCheck('no-legacy-code').run(cwd, {
+    const result = await findCheck('no-deprecated-tags').run(cwd, {
       targetFiles: [join(cwd, 'src/clean.ts')],
     })
     expect(result.signals.length).toBe(0)
