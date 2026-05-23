@@ -8,6 +8,7 @@
  */
 
 import { logger } from '@opensip-tools/core'
+import { buildLineStarts } from '@opensip-tools/core/languages'
 import ts from 'typescript'
 
 
@@ -48,19 +49,13 @@ interface Region {
 // HELPERS
 // =============================================================================
 
-/** Build an array of byte offsets where each line starts. */
-function buildLineStarts(content: string): number[] {
-  const lineStarts: number[] = [0]
-  // eslint-disable-next-line unicorn/no-for-loop -- offset-bearing scan: stores UTF-16 indexes
-  for (let i = 0; i < content.length; i++) {
-    if (content[i] === '\n') lineStarts.push(i + 1)
-  }
-  return lineStarts
-}
-
 /**
  * Build a set of 1-based line numbers from a list of regions.
  * A line is included if any part of it falls within a region.
+ *
+ * Reuses `buildLineStarts` from `@opensip-tools/core/languages` so UTF-16
+ * surrogate-pair / BOM / CRLF handling stays in one place across language
+ * adapters.
  */
 function linesToSet(content: string, regions: readonly Region[]): ReadonlySet<number> {
   if (regions.length === 0) return new Set()
@@ -134,6 +129,19 @@ function replaceCharsInRange(chars: string[], start: number, end: number, string
 // embedders don't accumulate cached filter results across runs forever. The
 // timer resets each time filterContent runs, so an active session never
 // loses its cache.
+//
+// Why this cache lives separately from `core/languages/parse-cache.ts`:
+// parse-cache stores `ts.SourceFile` instances keyed by (adapter, filePath,
+// content-hash); this cache stores the post-scanner `FilteredContent` value
+// (raw + strings-stripped + comments-stripped strings + region predicates),
+// which is shaped specifically for the lang-typescript content-filter
+// pipeline and irrelevant to other adapters. The two caches have different
+// lifetimes (parse cache is per-adapter and clearable per registry entry;
+// this is a single per-process map) and different scopes (SourceFile trees
+// vs filtered string outputs). A future consolidation would route both
+// through a small `core/languages/cache.ts` registry — see audit F-M2.
+// Until then, embedders that want a clean slate must call BOTH
+// `clearParseCache()` and `clearFilterCache()`.
 const FILTER_CACHE_IDLE_TIMEOUT_MS = 10 * 60 * 1000
 const filterCache = new Map<string, FilteredContent>()
 let filterCacheIdleTimer: ReturnType<typeof setTimeout> | null = null
@@ -169,7 +177,30 @@ export function filterContent(content: string): FilteredContent {
     scheduleFilterCacheClear()
     return result
   } catch {
-    // Graceful degradation — return raw content if scanner fails
+    /*
+     * Silent degradation — by design.
+     *
+     * The TypeScript scanner is best-effort: it CAN throw on resource
+     * exhaustion, malformed input the scanner doesn't recognise, or
+     * unsupported character classes. When that happens, raising would
+     * terminate the entire fitness run because filterContent is called
+     * from every TS check that needs string/comment masking.
+     *
+     * The fallback returns raw content with stub `isInString` /
+     * `isInComment` predicates that always return `false`. This is the
+     * safest default: callers that pattern-match identifiers will see
+     * un-stripped source (so a banned-call reference inside a string or
+     * comment may produce a false positive), but they will never
+     * see a SILENT TRUNCATION of legitimate code (which is what would
+     * happen if the scanner desynced and we returned partially-stripped
+     * output).
+     *
+     * The audit (2026-05-23 F-M1) flagged this as a P3 — the trade-off
+     * is intentional but the only signal today is `logger.debug`. A
+     * future revision SHOULD widen `FilteredContent` with a
+     * `degraded: boolean` flag so callers can branch on it; until then,
+     * the debug log line below is the only operator-visible signal.
+     */
     logger.debug('Content filter fell back to raw content', { evt: 'fitness.content_filter.fallback', module: 'fitness:framework' })
     const fallback: FilteredContent = {
       code: content,

@@ -4,20 +4,13 @@ import {
   countUnescapedBackticks,
   findBinaryExpressions,
   findCallExpressions,
-  findEnclosingFunction,
-  findEnclosingFunctionBody,
-  findEnclosingScope,
   findTemplateLiterals,
   getColumn,
-  getEnclosingFunctionName,
   getIdentifierName,
   getLineNumber,
   getPropertyChain,
   getSharedSourceFile,
-  isAsync,
-  isInAsyncContext,
   isInComment,
-  isInsideConditionalBlock,
   isInStringLiteral,
   isLiteral,
   isPropertyAccess,
@@ -25,6 +18,15 @@ import {
   ts,
   walkNodes,
 } from '../ast-utilities.js';
+import {
+  findEnclosingFunction,
+  findEnclosingFunctionBody,
+  findEnclosingScope,
+  getEnclosingFunctionName,
+  isAsync,
+  isInAsyncContext,
+  isInsideConditionalBlock,
+} from '../function-scope.js';
 
 const parse = (content: string) => parseSource(content, 'x.ts');
 
