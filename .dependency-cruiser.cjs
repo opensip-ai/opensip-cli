@@ -292,14 +292,13 @@ module.exports = {
       name: 'graph-rules-no-parser',
       severity: 'error',
       comment:
-        'Rules consume frozen catalog/indexes only. They must not import the ' +
-        'TypeScript parser, any pipeline stage, or the lang-typescript adapter.',
+        'Rules consume frozen catalog/indexes only. They must not import any ' +
+        'pipeline stage or any lang-* adapter directory still living in the engine.',
       from: { path: '^packages/graph/engine/src/rules/' },
       to: {
         path: [
-          '^typescript$',
           '^packages/graph/engine/src/pipeline/',
-          '^packages/graph/engine/src/lang-typescript/',
+          '^packages/graph/engine/src/lang-',
         ],
       },
     },
@@ -313,50 +312,37 @@ module.exports = {
       to: {
         path: [
           '^packages/graph/engine/src/(pipeline|rules)/',
-          '^packages/graph/engine/src/lang-typescript/',
+          '^packages/graph/engine/src/lang-',
         ],
       },
     },
     {
+      // PR 1b of plan docs/plans/architecture/2026-05-23-plan-graph-adapter-package-split.md.
+      // The visitors/resolvers disjoint rules now police the relocated
+      // graph-typescript package. Path globs repath to the new home.
       name: 'graph-visitors-resolvers-disjoint',
       severity: 'error',
       comment:
         'Inventory visitors handle declarations; edge resolvers handle call ' +
         'sites. They share helpers but not each other.',
-      from: { path: '^packages/graph/engine/src/lang-typescript/inventory-visitors/' },
-      to: { path: '^packages/graph/engine/src/lang-typescript/edge-resolvers/' },
+      from: { path: '^packages/graph/graph-typescript/src/inventory-visitors/' },
+      to: { path: '^packages/graph/graph-typescript/src/edge-resolvers/' },
     },
     {
       name: 'graph-resolvers-visitors-disjoint',
       severity: 'error',
       comment:
         'Symmetric counterpart of graph-visitors-resolvers-disjoint.',
-      from: { path: '^packages/graph/engine/src/lang-typescript/edge-resolvers/' },
-      to: { path: '^packages/graph/engine/src/lang-typescript/inventory-visitors/' },
+      from: { path: '^packages/graph/graph-typescript/src/edge-resolvers/' },
+      to: { path: '^packages/graph/graph-typescript/src/inventory-visitors/' },
     },
     {
-      // PR 3 of plan docs/plans/10-graph-language-pluggability.md.
-      // After parseProject and cacheKey moved into the adapter, the
-      // engine has zero direct imports of `'typescript'` outside the
-      // lang-typescript subtree.
-      name: 'graph-no-typescript-import-outside-lang-typescript',
-      severity: 'error',
-      comment:
-        'Only the lang-typescript adapter subtree may import the TypeScript ' +
-        'compiler API. The engine itself routes through the GraphLanguageAdapter ' +
-        'contract from lang-adapter/.',
-      from: {
-        path: '^packages/graph/engine/src/',
-        pathNot: '^packages/graph/engine/src/lang-typescript/',
-      },
-      to: { path: '^typescript$' },
-    },
-    {
-      // PR 3 of plan docs/plans/10-graph-language-pluggability.md.
+      // PR 1b of plan docs/plans/architecture/2026-05-23-plan-graph-adapter-package-split.md.
       // pipeline/, cache/, rules/, render/ are language-agnostic.
-      // They MUST NOT reach into any lang-* adapter directory; instead
-      // they consume the catalog (built by the orchestrator from
-      // adapter outputs) and adapter-supplied hints via the contract.
+      // They MUST NOT reach into any lang-* adapter directory still
+      // living in the engine; instead they consume the catalog (built
+      // by the orchestrator from adapter outputs) and adapter-supplied
+      // hints via the contract.
       name: 'graph-pipeline-no-lang-import',
       severity: 'error',
       comment:
@@ -368,11 +354,10 @@ module.exports = {
       to: { path: '^packages/graph/engine/src/lang-' },
     },
     {
-      // PR 3 of plan docs/plans/10-graph-language-pluggability.md.
-      // The orchestrator routes through the lang-adapter registry,
-      // not a specific adapter. tool.ts and bootstrap.ts are the
-      // bootstrap points — they import first-party adapters to
-      // register them; no cli/* file may.
+      // PR 1b of plan docs/plans/architecture/2026-05-23-plan-graph-adapter-package-split.md.
+      // The orchestrator routes through the lang-adapter registry, not
+      // a specific adapter. bootstrap.ts and tool.ts are the in-engine
+      // bootstrap points; no cli/* file may import lang-* directly.
       name: 'graph-orchestrate-no-direct-lang-import',
       severity: 'error',
       comment:
@@ -386,21 +371,71 @@ module.exports = {
       },
       to: {
         path: [
-          '^packages/graph/engine/src/lang-typescript/',
           '^packages/graph/engine/src/lang-python/',
           '^packages/graph/engine/src/lang-rust/',
         ],
       },
     },
     {
-      // PR 5/6 of plan docs/plans/10-graph-language-pluggability.md.
-      // Only adapter subtrees may import tree-sitter and its grammars;
-      // the engine itself routes through the GraphLanguageAdapter
-      // contract.
+      // Engine MUST NOT depend on adapter packs. Adapters depend on
+      // the engine; the inverse would create an import cycle and
+      // defeat the package split. Test files reach for the adapter
+      // pack via @opensip-tools/graph-typescript at the test-file
+      // level only — engine production source is exempt because tests
+      // live in __tests__/ and devDeps don't satisfy this rule (engine
+      // does NOT declare graph-typescript as a dependency or devDep).
+      name: 'graph-engine-no-adapter-packs',
+      severity: 'error',
+      comment:
+        'The engine package must not depend on any @opensip-tools/graph-* ' +
+        'adapter pack. Adapters are downstream consumers; the engine ' +
+        'discovers them via the registry walker, not import edges.',
+      from: {
+        path: '^packages/graph/engine/src/',
+        pathNot: '^packages/graph/engine/src/__tests__/',
+      },
+      to: { path: '^@opensip-tools/graph-(?!engine)[a-z0-9-]+($|/)' },
+    },
+    {
+      // PR 1b. Adapter packs MUST NOT depend on each other. Each pack
+      // implements the contract for one language; cross-pack imports
+      // would couple parser ecosystems together.
+      name: 'graph-adapters-disjoint',
+      severity: 'error',
+      comment:
+        'Graph adapter packs (@opensip-tools/graph-*) must not depend on ' +
+        'each other. Each pack implements the contract for one language.',
+      from: { path: '^packages/graph/graph-typescript/' },
+      to: { path: '^@opensip-tools/graph-(python|rust)($|/)' },
+    },
+    {
+      // PR 1b. Adapter packs MUST NOT depend on the CLI.
+      name: 'graph-adapters-no-cli',
+      severity: 'error',
+      comment: 'Graph adapter packs must not depend on @opensip-tools/cli.',
+      from: { path: '^packages/graph/graph-typescript/' },
+      to: { path: '^@opensip-tools/cli($|/)' },
+    },
+    {
+      // PR 1b. Adapter packs MUST NOT depend on fitness or check packs.
+      name: 'graph-adapters-no-fitness-or-checks',
+      severity: 'error',
+      comment:
+        'Graph adapter packs must not depend on @opensip-tools/fitness or ' +
+        'any @opensip-tools/checks-* package — peer-layer isolation.',
+      from: { path: '^packages/graph/graph-typescript/' },
+      to: { path: '^@opensip-tools/(fitness|checks-)' },
+    },
+    {
+      // PR 5/6 of plan docs/plans/10-graph-language-pluggability.md,
+      // updated by PR 1b.
+      // Only adapter subtrees still in the engine (lang-python,
+      // lang-rust) may import tree-sitter and its grammars; the
+      // engine itself routes through the GraphLanguageAdapter contract.
       name: 'graph-no-tree-sitter-import-outside-lang-packs',
       severity: 'error',
       comment:
-        'Only language-adapter subtrees (lang-python, lang-rust, ...) ' +
+        'Only language-adapter subtrees (lang-python, lang-rust) ' +
         'may import tree-sitter or its grammars. The engine itself uses ' +
         'the GraphLanguageAdapter contract from lang-adapter/.',
       from: {

@@ -2,10 +2,10 @@
 
 Releases are tag-driven. Pushing a tag matching `v*` triggers
 `.github/workflows/release.yml`, which builds, tests, packs, and
-publishes all 19 `@opensip-tools/*` packages to npm via OIDC trusted
+publishes all 21 `@opensip-tools/*` packages to npm via OIDC trusted
 publishing — no `NPM_TOKEN` required.
 
-## The 19 packages
+## The 21 packages
 
 | Layer | Package | Path |
 |-------|---------|------|
@@ -21,6 +21,7 @@ publishing — no `NPM_TOKEN` required.
 | Tools | `@opensip-tools/fitness` | `packages/fitness/engine` |
 | Tools | `@opensip-tools/simulation` | `packages/simulation/engine` |
 | Tools | `@opensip-tools/graph` | `packages/graph/engine` |
+| Graph adapters | `@opensip-tools/graph-typescript` | `packages/graph/graph-typescript` |
 | Tools | `@opensip-tools/dashboard` | `packages/dashboard` |
 | Check packs | `@opensip-tools/checks-typescript` | `packages/fitness/checks-typescript` |
 | Check packs | `@opensip-tools/checks-universal` | `packages/fitness/checks-universal` |
@@ -30,7 +31,7 @@ publishing — no `NPM_TOKEN` required.
 | Check packs | `@opensip-tools/checks-cpp` | `packages/fitness/checks-cpp` |
 | CLI | `@opensip-tools/cli` | `packages/cli` |
 
-All 19 share the same version. The release workflow publishes them in
+All 21 share the same version. The release workflow publishes them in
 dependency order; downstream packages reference upstream versions in
 their `dependencies`.
 
@@ -102,18 +103,22 @@ Order:
 7. **`@opensip-tools/simulation`** — depends on core, contracts, datastore.
 8. **`@opensip-tools/graph`** — depends on core, contracts, plus the
    peer-layer SARIF edge into fitness.
-9. **Check packs** (any order within this group):
+9. **Graph adapter packs** — `@opensip-tools/graph-typescript` (PR 2/3
+   add graph-python and graph-rust). Each depends on the engine
+   (`@opensip-tools/graph`) plus its parser (typescript / tree-sitter-*).
+   Independent of each other; published in any order within the group.
+10. **Check packs** (any order within this group):
    `checks-typescript`, `checks-universal`, `checks-python`,
    `checks-go`, `checks-java`, `checks-cpp` — all peer-depend on
    fitness.
-10. **`@opensip-tools/cli`** — depends on every tool, every check pack
-   the CLI loads by default, every language adapter, contracts, and datastore.
-   Always published last.
+11. **`@opensip-tools/cli`** — depends on every tool, every check pack
+   and every graph adapter pack the CLI loads by default, every
+   language adapter, contracts, and datastore. Always published last.
 
 ## Prerequisites (one-time setup)
 
 - **npm Trusted Publishers** must be configured per-package on
-  npmjs.com → package settings → Publishing access. Each of the 19
+  npmjs.com → package settings → Publishing access. Each of the 21
   packages needs an entry pointing to:
   - Organization: `opensip-ai`
   - Repository: `opensip-tools`
@@ -145,7 +150,7 @@ To unblock:
    NPM_TOKEN=npm_xxx ./tools/bootstrap-publish.sh
    ```
 
-   The script is **idempotent**. It iterates the 19 packages in
+   The script is **idempotent**. It iterates the 21 packages in
    dependency order, skips any whose current source version is already
    on npm, packs and publishes the rest using the token, and at the
    end prints a list of newly-created packages with direct links to

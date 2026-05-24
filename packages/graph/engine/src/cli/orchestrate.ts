@@ -18,9 +18,11 @@ import { relative, sep } from 'node:path';
 import { logger } from '@opensip-tools/core';
 
 
-// Side-effect import: ensures default adapters are registered even
-// when callers reach `runGraph` without going through `tool.ts`
-// (e.g. orchestrator unit tests).
+// Side-effect import: ensures the in-engine first-party adapters
+// (python, rust) are registered even when callers reach `runGraph`
+// without going through `tool.ts` (e.g. orchestrator unit tests).
+// Adapters that have moved into their own packs (typescript, post-PR
+// 1b) register themselves at the test-file level.
 import '../bootstrap.js';
 
 import {

@@ -71,6 +71,9 @@ importers:
       '@opensip-tools/graph':
         specifier: workspace:*
         version: link:../graph/engine
+      '@opensip-tools/graph-typescript':
+        specifier: workspace:*
+        version: link:../graph/graph-typescript
       '@opensip-tools/lang-cpp':
         specifier: workspace:*
         version: link:../languages/lang-cpp
@@ -398,10 +401,35 @@ importers:
       tree-sitter-rust:
         specifier: 0.23.2
         version: 0.23.2(tree-sitter@0.22.4)
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.15
+      typescript:
+        specifier: ~5.7.0
+        version: 5.7.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.15)(jsdom@29.1.1)
+
+  packages/graph/graph-typescript:
+    dependencies:
+      '@opensip-tools/core':
+        specifier: workspace:*
+        version: link:../../core
+      '@opensip-tools/graph':
+        specifier: workspace:*
+        version: link:../engine
+      '@opensip-tools/lang-typescript':
+        specifier: workspace:*
+        version: link:../../languages/lang-typescript
       typescript:
         specifier: ~5.7.0
         version: 5.7.3
     devDependencies:
+      '@opensip-tools/datastore':
+        specifier: workspace:*
+        version: link:../../datastore
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.15

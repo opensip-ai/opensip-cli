@@ -34,6 +34,7 @@
     "@opensip-tools/datastore": "workspace:*",
     "@opensip-tools/fitness": "workspace:*",
     "@opensip-tools/graph": "workspace:*",
+    "@opensip-tools/graph-typescript": "workspace:*",
     "@opensip-tools/lang-cpp": "workspace:*",
     "@opensip-tools/lang-go": "workspace:*",
     "@opensip-tools/lang-java": "workspace:*",

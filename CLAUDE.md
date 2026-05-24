@@ -45,6 +45,13 @@ opensip-tools/
 │   ├── simulation/              # simulation namespace
 │   │   └── engine/              # @opensip-tools/simulation
 │   │
+│   ├── graph/                   # graph namespace
+│   │   ├── engine/              # @opensip-tools/graph — language-agnostic
+│   │   │                        #   graph kernel; depends on no parser
+│   │   └── graph-typescript/    # @opensip-tools/graph-typescript — TS adapter
+│   │                            #   (graph-python and graph-rust follow in
+│   │                            #   PR 2 / PR 3 of the adapter package split)
+│   │
 │   └── languages/               # language adapters
 │       ├── lang-typescript/
 │       ├── lang-rust/
@@ -259,7 +266,7 @@ pnpm typecheck && pnpm test && pnpm lint
 
 ## Release Process
 
-Releases are tag-driven. See `RELEASING.md` — there are 19 packages
+Releases are tag-driven. See `RELEASING.md` — there are 21 packages
 to publish, in a specific dependency order, via OIDC trusted publishing.
 
 The release workflow has two non-obvious steps (npm 11 to a separate
