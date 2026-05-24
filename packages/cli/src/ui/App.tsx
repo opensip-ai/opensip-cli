@@ -93,8 +93,11 @@ export function App({ result }: AppProps): React.ReactElement {
       return <SimDoneSummary result={result} />;
     }
 
-    case 'plugin': {
-      return <PluginFeedback action={result} />;
+    case 'plugin-list':
+    case 'plugin-add':
+    case 'plugin-remove':
+    case 'plugin-sync': {
+      return <PluginFeedback result={result} />;
     }
 
     case 'clear-done': {

@@ -277,8 +277,7 @@ export async function pluginList(cwd: string = process.cwd()): Promise<PluginRes
   }
 
   return {
-    type: 'plugin',
-    action: 'list',
+    type: 'plugin-list',
     plugins,
     totalCount: plugins.length,
   };
@@ -295,6 +294,10 @@ export async function pluginList(cwd: string = process.cwd()): Promise<PluginRes
  * "install" alone always incomplete. Single-step is the only sensible
  * default.
  */
+/* eslint-disable sonarjs/no-duplicate-string -- 'plugin-add' is the
+ * CommandResult discriminator literal; factoring it into a constant
+ * would defeat the type narrowing on the union arm.
+ */
 // eslint-disable-next-line @typescript-eslint/require-await -- async to keep the Promise<PluginResult> contract; npm install is synchronous via execFileSync
 export async function pluginAdd(
   packageName: string | undefined,
@@ -303,8 +306,7 @@ export async function pluginAdd(
 ): Promise<PluginResult> {
   if (!packageName) {
     return {
-      type: 'plugin',
-      action: 'add',
+      type: 'plugin-add',
       packageName: '',
       success: false,
       error: 'No package name provided. Usage: opensip-tools plugin add <package-name>',
@@ -312,8 +314,7 @@ export async function pluginAdd(
   }
   if (!isSafeNpmSpec(packageName)) {
     return {
-      type: 'plugin',
-      action: 'add',
+      type: 'plugin-add',
       packageName,
       success: false,
       error: `Invalid package spec '${packageName}' — must not start with '-' (would be interpreted as an npm flag)`,
@@ -322,8 +323,7 @@ export async function pluginAdd(
   const domain = resolveDomain(domainOverride, packageName);
   if (!domain) {
     return {
-      type: 'plugin',
-      action: 'add',
+      type: 'plugin-add',
       packageName,
       success: false,
       error: `Invalid --domain '${String(domainOverride)}' — expected one of: ${[...VALID_DOMAINS].join(', ')}`,
@@ -352,26 +352,29 @@ export async function pluginAdd(
     addToConfigPluginList(paths.configFile, domain, installedName);
 
     return {
-      type: 'plugin',
-      action: 'add',
+      type: 'plugin-add',
       packageName: installedName,
       success: true,
     };
   } catch (error) {
     return {
-      type: 'plugin',
-      action: 'add',
+      type: 'plugin-add',
       packageName,
       success: false,
       error: `Failed to add ${packageName}: ${error instanceof Error ? error.message : String(error)}`,
     };
   }
 }
+/* eslint-enable sonarjs/no-duplicate-string */
 
 // =============================================================================
 // COMMAND: plugin remove <package>
 // =============================================================================
 
+/* eslint-disable sonarjs/no-duplicate-string -- 'plugin-remove' is the
+ * CommandResult discriminator literal; factoring it into a constant
+ * would defeat the type narrowing on the union arm.
+ */
 // eslint-disable-next-line @typescript-eslint/require-await -- async to keep the Promise<PluginResult> contract; npm uninstall is synchronous via execFileSync
 export async function pluginRemove(
   packageName: string | undefined,
@@ -380,8 +383,7 @@ export async function pluginRemove(
 ): Promise<PluginResult> {
   if (!packageName) {
     return {
-      type: 'plugin',
-      action: 'remove',
+      type: 'plugin-remove',
       packageName: '',
       success: false,
       error: 'No package name provided. Usage: opensip-tools plugin remove <package-name>',
@@ -389,8 +391,7 @@ export async function pluginRemove(
   }
   if (!isSafeNpmSpec(packageName)) {
     return {
-      type: 'plugin',
-      action: 'remove',
+      type: 'plugin-remove',
       packageName,
       success: false,
       error: `Invalid package spec '${packageName}' — must not start with '-' (would be interpreted as an npm flag)`,
@@ -400,8 +401,7 @@ export async function pluginRemove(
   const domain = resolveDomain(domainOverride, packageName);
   if (!domain) {
     return {
-      type: 'plugin',
-      action: 'remove',
+      type: 'plugin-remove',
       packageName,
       success: false,
       error: `Invalid --domain '${String(domainOverride)}' — expected one of: ${[...VALID_DOMAINS].join(', ')}`,
@@ -413,8 +413,7 @@ export async function pluginRemove(
 
   if (!existsSync(join(dir, HOST_PACKAGE_JSON))) {
     return {
-      type: 'plugin',
-      action: 'remove',
+      type: 'plugin-remove',
       packageName,
       success: false,
       error: `No plugins installed in ${domain}/`,
@@ -425,21 +424,20 @@ export async function pluginRemove(
     execFileSync('npm', ['uninstall', packageName], { cwd: dir, stdio: 'inherit' });
     removeFromConfigPluginList(paths.configFile, domain, packageName);
     return {
-      type: 'plugin',
-      action: 'remove',
+      type: 'plugin-remove',
       packageName,
       success: true,
     };
   } catch {
     return {
-      type: 'plugin',
-      action: 'remove',
+      type: 'plugin-remove',
       packageName,
       success: false,
       error: `Failed to remove ${packageName}`,
     };
   }
 }
+/* eslint-enable sonarjs/no-duplicate-string */
 
 // =============================================================================
 // COMMAND: plugin sync (post-clone bootstrap)
@@ -503,8 +501,7 @@ export async function pluginSync(
   }
 
   return {
-    type: 'plugin',
-    action: 'sync',
+    type: 'plugin-sync',
     synced,
     ...(errors.length > 0 ? { errors } : {}),
     success: errors.length === 0,

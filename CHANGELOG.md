@@ -39,6 +39,11 @@ and breaks compatibility with v1.x runtime layouts.
   match the post-Phase-D1 single-concern file shape. Users with
   `--check context-mutation-check` in CI invocations or recipes must
   update to `--check context-mutation`. No alias.
+- **`PluginResult` discriminator lifted to `type`.** Plugin command
+  results now use `type: 'plugin-list' | 'plugin-add' | 'plugin-remove'
+  | 'plugin-sync'` directly, instead of `type: 'plugin'` with an inner
+  `action` field. External consumers of `--json` output that switch on
+  `result.type === 'plugin'` must update to one of the four new literals.
 
 ### Added
 

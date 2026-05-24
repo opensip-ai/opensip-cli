@@ -15,22 +15,22 @@ import { useTheme } from '../theme.js';
 import type { PluginInfo, PluginResult } from '@opensip-tools/contracts';
 
 export interface PluginFeedbackProps {
-  readonly action: PluginResult;
+  readonly result: PluginResult;
 }
 
-export function PluginFeedback({ action }: PluginFeedbackProps): React.ReactElement {
-  switch (action.action) {
-    case 'list': {
-      return <ListView plugins={action.plugins} totalCount={action.totalCount} />;
+export function PluginFeedback({ result }: PluginFeedbackProps): React.ReactElement {
+  switch (result.type) {
+    case 'plugin-list': {
+      return <ListView plugins={result.plugins} totalCount={result.totalCount} />;
     }
-    case 'add': {
-      return <SuccessOrFailureLine verb="Installed" failVerb="install" packageName={action.packageName} success={action.success} error={action.error} />;
+    case 'plugin-add': {
+      return <SuccessOrFailureLine verb="Installed" failVerb="install" packageName={result.packageName} success={result.success} error={result.error} />;
     }
-    case 'remove': {
-      return <SuccessOrFailureLine verb="Removed" failVerb="remove" packageName={action.packageName} success={action.success} error={action.error} />;
+    case 'plugin-remove': {
+      return <SuccessOrFailureLine verb="Removed" failVerb="remove" packageName={result.packageName} success={result.success} error={result.error} />;
     }
-    case 'sync': {
-      return <SyncView synced={action.synced} success={action.success} errors={action.errors} />;
+    case 'plugin-sync': {
+      return <SyncView synced={result.synced} success={result.success} errors={result.errors} />;
     }
   }
 }

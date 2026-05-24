@@ -373,36 +373,18 @@ export interface SyncEntry {
 }
 
 /**
- * Discriminated union — one variant per `plugin` subcommand. Replaces
- * the previous open-dictionary shape (`{ type: 'plugin'; action: …;
- * [key: string]: unknown }`) so consumers can switch on `action`
- * without `as { … }` casts and producer/consumer drift surfaces at
- * compile time.
- *
- * Two-level discriminator convention (intentional asymmetry with the
- * rest of `CommandResult`): every variant shares `type: 'plugin'` and
- * fans out on a second field, `action: 'list' | 'add' | 'remove' |
- * 'sync'`. Other `CommandResult` variants discriminate on `type` alone
- * (e.g. `'fit-done'`, `'sim-done'`, `'list-checks'`).
- *
- * This is deliberate: the four plugin operations form a tight cluster
- * — they share UI surface (one `PluginFeedback` component), share
- * routing (one `'plugin'` arm in `App.tsx`), and share semantics
- * ("modify or report on the plugin registry"). Lifting them to four
- * top-level variants would multiply switch arms across `App.tsx` and
- * the `CommandResult` consumers without a corresponding gain in
- * clarity. Future tools with a similar tight cluster of subcommands
- * (e.g. `sessions list/purge`) MAY follow this pattern intentionally;
- * tools with loosely-related subcommands SHOULD lift to top-level
- * `type` literals.
+ * Discriminated union — one variant per `plugin` subcommand. Each
+ * variant has its own top-level `type` literal, matching the rest of
+ * `CommandResult` (`'fit-done'`, `'sim-done'`, `'list-checks'`, …).
+ * Consumers switch on `result.type` directly; producer/consumer drift
+ * surfaces at compile time.
  */
 export type PluginResult =
-  | { type: 'plugin'; action: 'list'; plugins: readonly PluginInfo[]; totalCount: number }
-  | { type: 'plugin'; action: 'add'; packageName: string; success: boolean; error?: string }
-  | { type: 'plugin'; action: 'remove'; packageName: string; success: boolean; error?: string }
+  | { type: 'plugin-list'; plugins: readonly PluginInfo[]; totalCount: number }
+  | { type: 'plugin-add'; packageName: string; success: boolean; error?: string }
+  | { type: 'plugin-remove'; packageName: string; success: boolean; error?: string }
   | {
-      type: 'plugin';
-      action: 'sync';
+      type: 'plugin-sync';
       synced: readonly SyncEntry[];
       success: boolean;
       errors?: readonly string[];
