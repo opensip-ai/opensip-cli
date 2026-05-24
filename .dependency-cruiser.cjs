@@ -173,6 +173,36 @@ module.exports = {
     },
 
     // -------------------------------------------------------------------
+    // Layer enforcement — cli/ui imports only contract types
+    //
+    // Layer 5 Phase 3 (audit 2026-05-22 F3): tool controllers (state
+    // machine + executeFit/runGraph orchestration) moved out of
+    // `packages/cli/src/ui/components/` into the tool packages. The
+    // cli/ui layer is now a pure presentational layer driving static
+    // command-result rendering through `App.tsx`. Pinning the import
+    // boundary here prevents drift.
+    // -------------------------------------------------------------------
+    {
+      name: 'cli-ui-no-tools',
+      severity: 'error',
+      comment:
+        'cli/ui is the pure presentational layer for static CommandResult ' +
+        'rendering. It must not import any tool, language, or check-pack ' +
+        'package — tool-specific live views live in the tool packages and ' +
+        'register themselves via cli.registerLiveView. Audit 2026-05-22 F3.',
+      from: { path: '^packages/cli/src/ui/' },
+      to: {
+        path: [
+          '^@opensip-tools/fitness',
+          '^@opensip-tools/simulation',
+          '^@opensip-tools/graph',
+          '^@opensip-tools/lang-',
+          '^@opensip-tools/checks-',
+        ],
+      },
+    },
+
+    // -------------------------------------------------------------------
     // Layer enforcement — fitness / simulation must not import from the CLI
     // -------------------------------------------------------------------
     {

@@ -259,7 +259,10 @@ const SAMPLES: readonly SampleSpec[] = [
   { packageDir: 'packages/fitness/engine', relativePath: 'src/framework/define-check.ts' },
   { packageDir: 'packages/contracts', relativePath: 'src/types.ts' },
   { packageDir: 'packages/languages/lang-typescript', relativePath: 'src/ast-utilities.ts' },
-  { packageDir: 'packages/cli', relativePath: 'src/ui/components/FitView.tsx' },
+  // Layer 5 Phase 3 (audit 2026-05-22 F3) moved the FitView controller
+  // out of cli/ui into the fitness package as fit-runner.tsx; the new
+  // file is the JSX-rich sample that this differential test exercises.
+  { packageDir: 'packages/fitness/engine', relativePath: 'src/cli/fit-runner.tsx' },
 ];
 
 describe('Tier 2 — differential test against TS Compiler API on real workspace files', () => {
@@ -300,14 +303,15 @@ describe('Tier 2 — differential test against TS Compiler API on real workspace
   it('coverage sanity: the 5 sample files together expose a substantial number of callables', () => {
     // Make sure our chosen sample is non-trivial — i.e. we're actually
     // exercising graph's detection on real code, not just empty type files.
-    // Empirically observed counts on commit 470694e (this branch):
-    //   packages/cli/src/index.ts                                26
-    //   packages/fitness/engine/src/framework/define-check.ts    12
-    //   packages/contracts/src/types.ts                           0  (types-only)
-    //   packages/languages/lang-typescript/src/ast-utilities.ts  20
-    //   packages/cli/src/ui/components/FitView.tsx                8
-    //   --------------------------------------------------------------
-    //   Total:                                                   66
+    // Empirically observed callable counts on the post-Phase-3 layout
+    // (the FitView controller moved from cli/ui/components into
+    // fitness/cli/fit-runner.tsx). The exact totals are not pinned —
+    // see the sanity floor below — but the spread roughly mirrors:
+    //   packages/cli/src/index.ts                                ~26
+    //   packages/fitness/engine/src/framework/define-check.ts    ~12
+    //   packages/contracts/src/types.ts                            0  (types-only)
+    //   packages/languages/lang-typescript/src/ast-utilities.ts  ~20
+    //   packages/fitness/engine/src/cli/fit-runner.tsx           >0  (large JSX file)
     const perFile: Record<string, number> = {};
     let totalCallables = 0;
     for (const sample of SAMPLES) {

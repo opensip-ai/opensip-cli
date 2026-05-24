@@ -25,10 +25,12 @@ import { ConfigurationError, readPackageVersion } from '@opensip-tools/core';
 // register themselves via the CLI's discovery walker
 // (register-graph-adapters.ts). The historical engine-side bootstrap
 // is gone.
+import { renderGraphLive } from './cli/graph-runner.js';
 import { executeGraph } from './cli/graph.js';
 import { runHeapPreflight } from './cli/heap-preflight.js';
 
 import type { Tool, ToolCliContext, ToolCommandDescriptor } from '@opensip-tools/core';
+import type { DataStore } from '@opensip-tools/datastore';
 
 const GRAPH: ToolCommandDescriptor = {
   name: 'graph',
@@ -58,23 +60,19 @@ function register(cli: ToolCliContext): void {
     );
   }
 
-  // Contribute graph's live view to the CLI's renderer registry. The
-  // renderer itself is owned by the CLI (Ink/React layer); the CLI
-  // hands it back through `cli.builtinLiveViews` keyed by tool id, so
-  // this package doesn't take a direct dep on CLI's UI module.
-  //
-  // Hard fail on miss: visual mode is graph's default UX path. A
-  // missing renderer is a configuration error, not a soft warning —
-  // the previous warn-on-miss let `UnknownLiveViewError` surface only
-  // on first interactive use, with no signal at boot. Audit 2026-05-23
-  // N-1 (option b).
-  const graphRenderer = cli.builtinLiveViews.get(graphTool.metadata.id);
-  if (!graphRenderer) {
-    throw new ConfigurationError(
-      `No bundled renderer for tool id '${graphTool.metadata.id}'. The CLI must register a live view for graph before tool registration.`,
+  // Contribute graph's live view to the CLI's renderer registry.
+  // Layer 5 Phase 3 (audit 2026-05-23 F3): graph owns its own Ink/
+  // React renderer (`renderGraphLive` in `cli/graph-runner.tsx`) and
+  // registers it directly. The prior `cli.builtinLiveViews` self-
+  // lookup handshake is gone — adding a fourth tool with a live view
+  // requires zero CLI edits.
+  cli.registerLiveView(GRAPH_LIVE_VIEW_KEY, async (args) => {
+    await renderGraphLive(
+      args as { cwd: string; noCache?: boolean },
+      cli.datastore as DataStore | undefined,
+      { setExitCode: cli.setExitCode },
     );
-  }
-  cli.registerLiveView(GRAPH_LIVE_VIEW_KEY, graphRenderer);
+  });
 
   program
     .command(GRAPH.name)

@@ -81,7 +81,6 @@ export interface BuildToolCliContextOptions {
   readonly program: Command;
   readonly render: (result: CommandResult) => Promise<void>;
   readonly liveViews: LiveViewRegistry;
-  readonly builtinLiveViews: ReadonlyMap<string, LiveViewRenderer>;
   readonly maybeOpenDashboard: (opts: {
     openRequested: boolean;
     jsonOutput: boolean;
@@ -125,7 +124,6 @@ export function buildToolCliContext(
     render: (result) => opts.render(result as CommandResult),
     registerLiveView: opts.liveViews.register,
     renderLive: opts.liveViews.render,
-    builtinLiveViews: opts.builtinLiveViews,
     maybeOpenDashboard: opts.maybeOpenDashboard,
     logger: log,
     setExitCode: (code) => {

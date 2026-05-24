@@ -128,33 +128,6 @@ export interface ToolCliContext {
    */
   readonly renderLive: (key: string, args: unknown) => Promise<void>;
   /**
-   * Renderers the CLI bundles for first-party tools — keyed by
-   * `Tool.metadata.id`. Layered architecture forbids tool packages
-   * (fitness, graph) from importing CLI's Ink/React UI components
-   * directly, so the CLI hands each first-party tool its bundled
-   * renderer through this map. The tool's `register(cli)` looks up its
-   * own id, picks a view key, and calls
-   * `cli.registerLiveView(viewKey, cli.builtinLiveViews.get(toolId))`.
-   *
-   * Third-party tools that ship their own React/Ink renderer ignore
-   * this map and pass their own renderer to `registerLiveView`
-   * directly. The map is expected to be empty for them.
-   *
-   * @remarks Architecturally this is a Service-Locator-shaped seam in
-   * a kernel that otherwise uses Strategy / Registry where the
-   * collaborator is passed in directly. It is kept transitionally
-   * (audit 2026-05-23 / M2): the cleaner shape is to hand each tool
-   * its bundled renderer at register-time (e.g.
-   * `tool.register(cli, { renderer })`), which is deferred until the
-   * Layer 5 Phase 3 Tool-init-context refactor lands so the migration
-   * touches every first-party tool in one pass instead of per-tool
-   * here. Misalignment between a tool's id and the CLI's map key
-   * surfaces as `UnknownLiveViewError` at view-render time, plus a
-   * structured `*.live_view.missing_renderer` warning at register
-   * time (see `fitness/engine/src/tool.ts` for the pattern).
-   */
-  readonly builtinLiveViews: ReadonlyMap<string, LiveViewRenderer>;
-  /**
    * Open the HTML dashboard in the user's browser when the run
    * conditions allow it (TTY, not JSON-mode, opt-in). Tools call this
    * after a run to honor the user's --open flag.

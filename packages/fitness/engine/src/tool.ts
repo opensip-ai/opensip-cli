@@ -16,10 +16,8 @@
  * Fitness contributes TWO distinct identifiers to the CLI's registries
  * and the mismatch is intentional — do not collapse them:
  *
- *   - `metadata.id = 'fitness'` is the package-wide tool identifier.
- *     Used as the key into `cli.builtinLiveViews` (the CLI ships one
- *     bundled renderer per tool id) and as the conflict-detection key
- *     in `defaultToolRegistry`.
+ *   - `metadata.id = 'fitness'` is the package-wide tool identifier
+ *     (conflict-detection key in `defaultToolRegistry`).
  *
  *   - `FIT_LIVE_VIEW_KEY = 'fit'` is the live-view key. Used to call
  *     `cli.registerLiveView('fit', renderer)` and consumed by
@@ -27,13 +25,10 @@
  *     the `fit` subcommand name so the dispatcher's `renderLive(key)`
  *     reads naturally next to the command that triggers it.
  *
- * Net effect: `register(cli)` looks up the bundled renderer under
- * `'fitness'` and re-keys it to `'fit'` for the live-view dispatch.
- * The indirection is by design (audit 2026-05-23 F4) and is also why
- * `initialize()` below is a no-op — the live-view binding could
- * conceptually move there, but doing so without addressing the prior
- * Finding #10 (multi-instance fitness in one process) would only relocate
- * the indirection. Left in `register()` until that contract decision lands.
+ * Layer 5 Phase 3 (closes audit 2026-05-23 F3): fitness now ships its
+ * own Ink/React renderer (`renderFitLive` in `cli/fit-runner.tsx`)
+ * and registers it directly via `cli.registerLiveView`. The prior
+ * `cli.builtinLiveViews` self-lookup handshake is gone.
  */
 
 
@@ -49,6 +44,7 @@ import {
 import { readPackageVersion } from '@opensip-tools/core';
 
 import { openDashboard } from './cli/dashboard.js';
+import { renderFitLive } from './cli/fit-runner.js';
 import { executeFit } from './cli/fit.js';
 import { listChecks } from './cli/list-checks.js';
 import { listRecipes } from './cli/list-recipes.js';
@@ -135,20 +131,18 @@ function register(cli: ToolCliContext): void {
   // tool packages off a direct `commander` import. Audit 2026-05-23 G6.
   const program = cli.program as CliProgram;
 
-  // Contribute fitness's live view to the CLI's renderer registry. The
-  // renderer itself is owned by the CLI (Ink/React layer); the CLI
-  // hands it back through `cli.builtinLiveViews` keyed by tool id, so
-  // this package doesn't take a direct dep on CLI's UI module.
-  const fitRenderer = cli.builtinLiveViews.get(fitnessTool.metadata.id);
-  if (fitRenderer) {
-    cli.registerLiveView(FIT_LIVE_VIEW_KEY, fitRenderer);
-  } else {
-    cli.logger.warn({
-      evt: 'fitness.live_view.missing_renderer',
-      module: 'fitness:tool',
-      msg: `No bundled renderer for tool id '${fitnessTool.metadata.id}' — visual mode for fit will throw UnknownLiveViewError. Expected when running outside the bundled CLI.`,
+  // Contribute fitness's live view to the CLI's renderer registry.
+  // Layer 5 Phase 3 (audit 2026-05-23 F3): fitness owns its own
+  // Ink/React renderer (`renderFitLive` in `cli/fit-runner.tsx`) and
+  // registers it directly. The prior `cli.builtinLiveViews` self-
+  // lookup handshake is gone — adding a fourth tool with a live view
+  // requires zero CLI edits.
+  cli.registerLiveView(FIT_LIVE_VIEW_KEY, async (args) => {
+    // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
+    await renderFitLive(args as CliArgs, cli.datastore as DataStore | undefined, {
+      setExitCode: cli.setExitCode,
     });
-  }
+  });
 
   registerFitCommand(program, cli);
   registerDashboardCommand(program, cli);

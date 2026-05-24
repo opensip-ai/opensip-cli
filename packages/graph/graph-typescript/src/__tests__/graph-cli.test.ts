@@ -57,7 +57,6 @@ function makeCli(): CapturedCli {
     render: vi.fn(() => Promise.resolve()),
     registerLiveView: vi.fn(),
     renderLive: vi.fn(() => Promise.resolve()),
-    builtinLiveViews: new Map(),
     maybeOpenDashboard: vi.fn(() => Promise.resolve()),
     logger: {
       info: vi.fn(),
@@ -351,7 +350,6 @@ describe('executeGraph', () => {
       setExitCode: (c: number) => { exitCodes.push(c); },
       emitJson: vi.fn(),
       registerLiveView: vi.fn(),
-      builtinLiveViews: new Map(),
       datastore: undefined,
     };
     await executeGraph({ cwd: dir, gateSave: true }, cli);

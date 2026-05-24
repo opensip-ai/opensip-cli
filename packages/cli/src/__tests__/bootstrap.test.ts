@@ -31,7 +31,6 @@ function makeStubContext(): ToolCliContext {
     render: vi.fn(() => Promise.resolve()),
     registerLiveView: vi.fn(),
     renderLive: vi.fn(() => Promise.resolve()),
-    builtinLiveViews: new Map(),
     maybeOpenDashboard: vi.fn(() => Promise.resolve()),
     logger: {
       debug: vi.fn(),
@@ -41,6 +40,7 @@ function makeStubContext(): ToolCliContext {
     },
     setExitCode: vi.fn(),
     emitJson: vi.fn(),
+    datastore: undefined,
   };
 }
 

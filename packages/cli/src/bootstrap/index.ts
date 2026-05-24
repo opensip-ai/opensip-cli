@@ -48,7 +48,6 @@ import type { LanguageRegistry, ToolRegistry } from '@opensip-tools/core';
 // Re-export only the symbols the CLI composition root (`index.ts`) consumes.
 export { mountAllToolCommands } from './register-tools.js';
 export { renderResult } from './render.js';
-export { builtinLiveViews, createBuiltinLiveViews } from './live-views.js';
 export { maybeOpenDashboard } from './dashboard.js';
 export { installPreActionHook } from './pre-action-hook.js';
 

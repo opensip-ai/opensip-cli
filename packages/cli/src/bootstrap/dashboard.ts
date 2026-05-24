@@ -9,8 +9,10 @@
  * never loads it.
  *
  * Extracted from the prior `render-helpers.ts` so the pure renderer
- * (`render.ts`) and the first-party live-view map (`live-views.ts`) can
- * each evolve without dragging the others along. Audit 2026-05-23 M4.
+ * (`render.ts`) and this dashboard auto-open helper can each evolve
+ * without dragging the other along. Audit 2026-05-23 M4. The first-
+ * party live-view map (`live-views.ts`) was deleted in Layer 5 Phase 3
+ * (audit 2026-05-22 F3) — tool packages now own their own renderers.
  */
 
 import { decideOpen, launchBrowser } from '../open-dashboard.js';

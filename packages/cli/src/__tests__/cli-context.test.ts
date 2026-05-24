@@ -89,9 +89,9 @@ function makeBuildOpts(): {
   program: Command;
   render: ReturnType<typeof vi.fn>;
   liveViews: ReturnType<typeof createLiveViewRegistry>;
-  builtinLiveViews: ReadonlyMap<string, LiveViewRenderer>;
   maybeOpenDashboard: ReturnType<typeof vi.fn>;
   logger: Logger;
+  datastore: undefined;
 } {
   const { log } = makeLogger();
   const liveViews = createLiveViewRegistry(log);
@@ -99,9 +99,9 @@ function makeBuildOpts(): {
     program: new Command('test'),
     render: vi.fn(() => Promise.resolve()),
     liveViews,
-    builtinLiveViews: new Map(),
     maybeOpenDashboard: vi.fn(() => Promise.resolve()),
     logger: log,
+    datastore: undefined,
   };
 }
 

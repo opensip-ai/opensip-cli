@@ -21,16 +21,14 @@ import type { ToolCliContext } from '@opensip-tools/core';
 registerAdapter(typescriptGraphAdapter);
 
 function makeCli(program: Command): ToolCliContext {
-  // Provide a renderer for `graph` in `builtinLiveViews`. The tool's
-  // `register()` hard-fails when no renderer is found for its tool id
-  // (Audit 2026-05-23 N-1).
-  const stubRenderer = vi.fn(() => Promise.resolve());
+  // Layer 5 Phase 3 (audit 2026-05-23 F3): tools own their renderers.
+  // The graph tool registers `renderGraphLive` directly via
+  // `cli.registerLiveView` — no `builtinLiveViews` map lookup.
   return {
     program,
     render: vi.fn(() => Promise.resolve()),
     registerLiveView: vi.fn(),
     renderLive: vi.fn(() => Promise.resolve()),
-    builtinLiveViews: new Map([[graphTool.metadata.id, stubRenderer]]),
     maybeOpenDashboard: vi.fn(() => Promise.resolve()),
     logger: {
       info: vi.fn(),
@@ -143,7 +141,6 @@ describe('graphTool action handler — end-to-end via Commander', () => {
         setExitCode,
         emitJson: vi.fn(),
         registerLiveView: vi.fn(),
-        builtinLiveViews: new Map([[graphTool.metadata.id, (() => Promise.resolve()) as never]]),
         datastore: undefined,
       };
       graphTool.register(cli);
@@ -195,7 +192,6 @@ describe('graphTool action handler — end-to-end via Commander', () => {
         setExitCode: vi.fn(),
         emitJson: vi.fn(),
         registerLiveView: vi.fn(),
-        builtinLiveViews: new Map([[graphTool.metadata.id, (() => Promise.resolve()) as never]]),
         datastore: undefined,
       };
       graphTool.register(cli);

@@ -20,7 +20,6 @@ import { Command } from 'commander';
 
 import {
   bootstrapCli,
-  createBuiltinLiveViews,
   installPreActionHook,
   maybeOpenDashboard,
   mountAllToolCommands,
@@ -53,7 +52,6 @@ async function main(): Promise<void> {
 
   const { ctx } = buildToolCliContext({
     program, render: renderResult, liveViews: createLiveViewRegistry(logger),
-    builtinLiveViews: createBuiltinLiveViews(datastore),
     maybeOpenDashboard, logger,
     datastore,
   });

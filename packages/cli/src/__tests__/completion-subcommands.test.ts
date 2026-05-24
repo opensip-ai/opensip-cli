@@ -11,7 +11,7 @@
  * CLI-owned commands.
  */
 
-import { defaultToolRegistry, type ToolCliContext, type LiveViewRenderer } from '@opensip-tools/core';
+import { defaultToolRegistry, type ToolCliContext } from '@opensip-tools/core';
 import { Command } from 'commander';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -23,21 +23,14 @@ import { buildCompletionScript, SUBCOMMANDS } from '../commands/completion.js';
 import { registerCliCommands } from '../commands/index.js';
 
 function makeStubContext(program: Command): ToolCliContext {
-  // Stub renderers for tools that hard-fail when their built-in
-  // renderer is missing (e.g. graph — Audit 2026-05-23 N-1). Keyed
-  // by tool id; production wiring lives in
-  // bootstrap/render-helpers.ts.
-  const stubRenderer: LiveViewRenderer = vi.fn(() => Promise.resolve());
-  const builtinLiveViews = new Map<string, LiveViewRenderer>();
-  for (const tool of defaultToolRegistry.list()) {
-    builtinLiveViews.set(tool.metadata.id, stubRenderer);
-  }
+  // Layer 5 Phase 3 (audit 2026-05-23 F3): tools own their renderers
+  // and register them directly via `cli.registerLiveView`. The CLI no
+  // longer hands out bundled renderers via a `builtinLiveViews` map.
   return {
     program,
     render: vi.fn(() => Promise.resolve()),
     registerLiveView: vi.fn(),
     renderLive: vi.fn(() => Promise.resolve()),
-    builtinLiveViews,
     maybeOpenDashboard: vi.fn(() => Promise.resolve()),
     logger: {
       debug: vi.fn(),
@@ -47,6 +40,7 @@ function makeStubContext(program: Command): ToolCliContext {
     },
     setExitCode: vi.fn(),
     emitJson: vi.fn(),
+    datastore: undefined,
   };
 }
 
