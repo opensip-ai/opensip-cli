@@ -30,7 +30,7 @@ import { pythonRuleHints } from './rule-hints.js';
 import { walkProject as pythonWalkProject } from './walk.js';
 
 import type { PythonParsedProject } from './parse.js';
-import type { GraphLanguageAdapter } from '../lang-adapter/types.js';
+import type { GraphLanguageAdapter } from '@opensip-tools/graph';
 
 export const pythonGraphAdapter: GraphLanguageAdapter<PythonParsedProject> = {
   id: 'python',
@@ -43,3 +43,22 @@ export const pythonGraphAdapter: GraphLanguageAdapter<PythonParsedProject> = {
   cacheKey: pythonCacheKey,
   ruleHints: pythonRuleHints,
 };
+
+/**
+ * Discovery contract: external adapter packs export `adapter` (the
+ * GraphLanguageAdapter) and `metadata`. The CLI bootstrap calls
+ * `registerAdapter` with `adapter` after a successful `import()`.
+ */
+export const adapter = pythonGraphAdapter;
+export const metadata = {
+  id: pythonGraphAdapter.id,
+  displayName: pythonGraphAdapter.displayName,
+  fileExtensions: pythonGraphAdapter.fileExtensions,
+} as const;
+
+// Re-export the parsed-project type and the rule hints constant. Both
+// were transitionally exposed through the engine's barrel during PR
+// 1b; PR 2 drains the engine-side re-exports because graph-python is
+// now the canonical home.
+export type { PythonParsedProject } from './parse.js';
+export { pythonRuleHints } from './rule-hints.js';

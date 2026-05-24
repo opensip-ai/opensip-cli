@@ -363,17 +363,13 @@ module.exports = {
       comment:
         'cli/* (including the orchestrator) routes through ' +
         'lang-adapter/registry only, not a specific lang-* adapter. ' +
-        'bootstrap.ts and tool.ts are the documented exceptions for ' +
-        'first-party adapter registration; they live at the engine ' +
-        'root, not under cli/.',
+        'bootstrap.ts is the documented exception for first-party ' +
+        'adapter registration; it lives at the engine root, not under cli/.',
       from: {
         path: '^packages/graph/engine/src/cli/',
       },
       to: {
-        path: [
-          '^packages/graph/engine/src/lang-python/',
-          '^packages/graph/engine/src/lang-rust/',
-        ],
+        path: '^packages/graph/engine/src/lang-rust/',
       },
     },
     {
@@ -404,16 +400,22 @@ module.exports = {
       severity: 'error',
       comment:
         'Graph adapter packs (@opensip-tools/graph-*) must not depend on ' +
-        'each other. Each pack implements the contract for one language.',
-      from: { path: '^packages/graph/graph-typescript/' },
-      to: { path: '^@opensip-tools/graph-(python|rust)($|/)' },
+        'each other from production source. Each pack implements the ' +
+        'contract for one language. Test sources may consume sibling ' +
+        'adapter packs as devDeps (multi-adapter contract / registry / ' +
+        'pickAdapter coverage); production-source imports are forbidden.',
+      from: {
+        path: '^packages/graph/graph-(typescript|python|rust)/src/',
+        pathNot: '^packages/graph/graph-(typescript|python|rust)/src/__tests__/',
+      },
+      to: { path: '^@opensip-tools/graph-(typescript|python|rust)($|/)' },
     },
     {
       // PR 1b. Adapter packs MUST NOT depend on the CLI.
       name: 'graph-adapters-no-cli',
       severity: 'error',
       comment: 'Graph adapter packs must not depend on @opensip-tools/cli.',
-      from: { path: '^packages/graph/graph-typescript/' },
+      from: { path: '^packages/graph/graph-(typescript|python|rust)/' },
       to: { path: '^@opensip-tools/cli($|/)' },
     },
     {
@@ -423,7 +425,7 @@ module.exports = {
       comment:
         'Graph adapter packs must not depend on @opensip-tools/fitness or ' +
         'any @opensip-tools/checks-* package — peer-layer isolation.',
-      from: { path: '^packages/graph/graph-typescript/' },
+      from: { path: '^packages/graph/graph-(typescript|python|rust)/' },
       to: { path: '^@opensip-tools/(fitness|checks-)' },
     },
     {

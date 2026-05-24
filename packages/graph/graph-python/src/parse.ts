@@ -22,8 +22,7 @@ import { logger } from '@opensip-tools/core';
 import Parser from 'tree-sitter';
 import Python from 'tree-sitter-python';
 
-import type { ParseInput, ParseOutput } from '../lang-adapter/types.js';
-import type { ParseError } from '../types.js';
+import type { ParseInput, ParseOutput, ParseError } from '@opensip-tools/graph';
 
 export interface PythonParsedFile {
   readonly tree: Parser.Tree;

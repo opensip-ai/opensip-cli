@@ -11,7 +11,7 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { cacheKey } from '../../lang-python/cache-key.js';
+import { cacheKey } from '../cache-key.js';
 
 describe('lang-python cacheKey — branches', () => {
   let dir: string;

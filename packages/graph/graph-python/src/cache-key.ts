@@ -22,7 +22,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 
-import type { CacheKeyInput } from '../lang-adapter/types.js';
+import type { CacheKeyInput } from '@opensip-tools/graph';
 
 // Anchored to start-of-line; horizontal whitespace ([\t ]) and the
 // inner `[^"'\n]` keep matching linear. Using `\s` would cross

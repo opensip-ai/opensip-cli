@@ -15,10 +15,10 @@ import { ConfigurationError } from '@opensip-tools/core';
 import {
   _clearAdaptersForTesting,
   pickAdapter,
-  pythonGraphAdapter,
   registerAdapter,
   rustGraphAdapter,
 } from '@opensip-tools/graph';
+import { pythonGraphAdapter } from '@opensip-tools/graph-python';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 

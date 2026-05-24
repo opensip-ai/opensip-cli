@@ -38,9 +38,14 @@
 import { createHash } from 'node:crypto';
 import { relative, sep } from 'node:path';
 
-import type { CallSiteRecord, WalkInput, WalkOutput } from '../lang-adapter/types.js';
-import type { FunctionOccurrence, ParseError } from '../types.js';
 import type { PythonParsedFile, PythonParsedProject } from './parse.js';
+import type {
+  CallSiteRecord,
+  FunctionOccurrence,
+  ParseError,
+  WalkInput,
+  WalkOutput,
+} from '@opensip-tools/graph';
 import type Parser from 'tree-sitter';
 
 const TEST_PATH_RE = /(?:^|\/)tests?\//;

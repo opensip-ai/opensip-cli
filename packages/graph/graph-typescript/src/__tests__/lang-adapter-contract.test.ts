@@ -20,16 +20,18 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import {
-  pythonGraphAdapter,
   rustGraphAdapter,
   type CallSiteRecord,
   type Catalog,
   type FunctionOccurrence,
   type GraphLanguageAdapter,
-  type PythonParsedProject,
   type RustParsedProject,
   type WalkOutput,
 } from '@opensip-tools/graph';
+import {
+  pythonGraphAdapter,
+  type PythonParsedProject,
+} from '@opensip-tools/graph-python';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 

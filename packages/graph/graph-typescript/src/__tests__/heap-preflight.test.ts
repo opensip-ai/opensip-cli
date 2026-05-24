@@ -19,9 +19,9 @@ import {
   totalSystemMemoryMb,
   _clearAdaptersForTesting,
   registerAdapter,
-  pythonGraphAdapter,
   rustGraphAdapter,
 } from '@opensip-tools/graph';
+import { pythonGraphAdapter } from '@opensip-tools/graph-python';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 

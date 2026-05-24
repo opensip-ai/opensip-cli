@@ -21,11 +21,11 @@ import {
   alwaysThrowsBranchRule,
   buildIndexes,
   noSideEffectPathRule,
-  pythonRuleHints,
   rustRuleHints,
   type CallEdge,
   type FunctionOccurrence,
 } from '@opensip-tools/graph';
+import { pythonRuleHints } from '@opensip-tools/graph-python';
 import { describe, expect, it } from 'vitest';
 
 

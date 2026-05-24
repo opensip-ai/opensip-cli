@@ -2,10 +2,10 @@
 
 Releases are tag-driven. Pushing a tag matching `v*` triggers
 `.github/workflows/release.yml`, which builds, tests, packs, and
-publishes all 21 `@opensip-tools/*` packages to npm via OIDC trusted
+publishes all 22 `@opensip-tools/*` packages to npm via OIDC trusted
 publishing — no `NPM_TOKEN` required.
 
-## The 21 packages
+## The 22 packages
 
 | Layer | Package | Path |
 |-------|---------|------|
@@ -22,6 +22,7 @@ publishing — no `NPM_TOKEN` required.
 | Tools | `@opensip-tools/simulation` | `packages/simulation/engine` |
 | Tools | `@opensip-tools/graph` | `packages/graph/engine` |
 | Graph adapters | `@opensip-tools/graph-typescript` | `packages/graph/graph-typescript` |
+| Graph adapters | `@opensip-tools/graph-python` | `packages/graph/graph-python` |
 | Tools | `@opensip-tools/dashboard` | `packages/dashboard` |
 | Check packs | `@opensip-tools/checks-typescript` | `packages/fitness/checks-typescript` |
 | Check packs | `@opensip-tools/checks-universal` | `packages/fitness/checks-universal` |
@@ -31,7 +32,7 @@ publishing — no `NPM_TOKEN` required.
 | Check packs | `@opensip-tools/checks-cpp` | `packages/fitness/checks-cpp` |
 | CLI | `@opensip-tools/cli` | `packages/cli` |
 
-All 21 share the same version. The release workflow publishes them in
+All 22 share the same version. The release workflow publishes them in
 dependency order; downstream packages reference upstream versions in
 their `dependencies`.
 
@@ -150,7 +151,7 @@ To unblock:
    NPM_TOKEN=npm_xxx ./tools/bootstrap-publish.sh
    ```
 
-   The script is **idempotent**. It iterates the 21 packages in
+   The script is **idempotent**. It iterates the 22 packages in
    dependency order, skips any whose current source version is already
    on npm, packs and publishes the rest using the token, and at the
    end prints a list of newly-created packages with direct links to

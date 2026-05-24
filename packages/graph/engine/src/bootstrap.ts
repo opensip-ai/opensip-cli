@@ -17,8 +17,6 @@
  */
 
 import { registerAdapter } from './lang-adapter/registry.js';
-import { pythonGraphAdapter } from './lang-python/index.js';
 import { rustGraphAdapter } from './lang-rust/index.js';
 
-registerAdapter(pythonGraphAdapter);
 registerAdapter(rustGraphAdapter);

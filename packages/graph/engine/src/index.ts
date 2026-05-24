@@ -115,17 +115,18 @@ export type {
 
 // ── Transitional adapter exports ──────────────────────────────────
 //
-// `pythonGraphAdapter` and `rustGraphAdapter` are still in the engine
-// at PR 1b. They publish through this barrel so cross-package tests
-// (in @opensip-tools/graph-typescript) can exercise the registry
-// against three live adapters without deep-importing engine internals.
-// PR 2 / PR 3 relocate these adapters into their own packages, at
-// which point these exports drain from this barrel.
-export { pythonGraphAdapter } from './lang-python/index.js';
+// `rustGraphAdapter` is still in the engine at PR 2. It publishes
+// through this barrel so cross-package tests (in
+// @opensip-tools/graph-typescript) can exercise the registry against
+// the remaining live adapters without deep-importing engine internals.
+// PR 3 relocates Rust into its own package, at which point this
+// export drains from the barrel and the engine has zero adapter
+// surface.
+//
+// (pythonGraphAdapter / pythonRuleHints / PythonParsedProject left
+// the engine in PR 2; they now live in @opensip-tools/graph-python.)
 export { rustGraphAdapter } from './lang-rust/index.js';
-export type { PythonParsedProject } from './lang-python/parse.js';
 export type { RustParsedProject } from './lang-rust/parse.js';
-export { pythonRuleHints } from './lang-python/rule-hints.js';
 export { rustRuleHints } from './lang-rust/rule-hints.js';
 
 // Pipeline + rule helpers required by cross-package integration tests.

@@ -11,7 +11,7 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { parseProject } from '../../lang-python/parse.js';
+import { parseProject } from '../parse.js';
 
 describe('lang-python parse.ts — branches', () => {
   let dir: string;

@@ -13,7 +13,7 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { pythonGraphAdapter } from '../../lang-python/index.js';
+import { pythonGraphAdapter } from '../index.js';
 
 describe('lang-python walk.ts — comment-stripping branches', () => {
   let dir: string;
