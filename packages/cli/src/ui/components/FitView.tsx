@@ -7,7 +7,7 @@
 
 import { ensureChecksLoaded, getEnabledCheckCount, executeFit , reportToCloud } from '@opensip-tools/fitness';
 import { useApp, Box, Text } from 'ink';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 import { Banner } from './Banner.js';
 import { CloudReportStatus } from './CloudReportStatus.js';
@@ -34,14 +34,21 @@ export interface FitViewProps {
   readonly datastore?: DataStore;
 }
 
-// TODO(merge): the `datastore` prop and an `onProgress` callback are
-// both expected by v2's executeFit signature, but audit's D1 phase
-// dropped the extra params. Threading them back is a follow-up. For
-// now, the prop is unused; tests that exercise FitView still pass
-// because the rendered output doesn't depend on either.
-export function FitView({ args }: FitViewProps): React.ReactElement {
+export function FitView({ args, datastore }: FitViewProps): React.ReactElement {
   const { exit } = useApp();
   const [state, setState] = useState<FitState>({ phase: 'loading' });
+
+  // Progress-state machine: `executeFit` calls back with a monotonic
+  // (completed, total) pair via `buildFitCallbacks` in fit.ts. The
+  // useCallback identity is stable across renders so the underlying
+  // `useEffect` does not re-fire on each tick.
+  const onProgress = useCallback((completed: number, total: number) => {
+    setState((prev) =>
+      prev.phase === 'running'
+        ? { ...prev, completed, total }
+        : prev,
+    );
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -54,12 +61,11 @@ export function FitView({ args }: FitViewProps): React.ReactElement {
       if (cancelled) return;
       setState({ phase: 'running', completed: 0, total: 0, checkCount });
 
-      // Phase 2: Execute
-      // TODO(merge): executeFit signature needs to accept onProgress +
-      // datastore (audit's D1 phase decomposed it before v2's persistence
-      // wiring landed). For now drop the extras; the live progress and
-      // session persistence are tracked as merge follow-ups.
-      const fitResult = await executeFit(args);
+      // Phase 2: Execute. Pass `onProgress` so the spinner ticks live,
+      // and `datastore` so the run lands in the SQLite session history
+      // (the JSON path goes through tool.ts's runJsonMode and threads
+      // its own copy).
+      const fitResult = await executeFit(args, { onProgress, datastore });
 
       if (cancelled) return;
 

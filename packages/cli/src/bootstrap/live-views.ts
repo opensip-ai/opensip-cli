@@ -25,30 +25,54 @@
  * tool ids inline) so a `metadata.id` rename in either tool surfaces as
  * a TypeScript reference error rather than a silent
  * `UnknownLiveViewError` at first interactive use.
+ *
+ * Datastore threading: `createBuiltinLiveViews(datastore)` builds the
+ * map per-bootstrap so `renderFitView` / `renderGraphView` see the
+ * bootstrap-opened DataStore handle without each tool having to
+ * smuggle it through the (deliberately tool-agnostic) `args: unknown`
+ * channel of `LiveViewRenderer`. The legacy `builtinLiveViews` static
+ * export builds a map with no datastore — kept so existing tests that
+ * import the constant continue to pass; production wires through the
+ * factory.
  */
 
 import { fitnessTool } from '@opensip-tools/fitness';
 import { graphTool } from '@opensip-tools/graph';
 
 import type { LiveViewRenderer } from '@opensip-tools/core';
+import type { DataStore } from '@opensip-tools/datastore';
 
 /**
- * First-party live-view renderers, keyed by `Tool.metadata.id`. The
- * CLI hands this map to every tool through `ToolCliContext.builtinLiveViews`.
+ * Build the first-party live-view renderer map. Each renderer closes
+ * over the supplied `datastore` so persistence (FitView session writes,
+ * graph dashboard catalog hydration) reaches the SQLite handle opened
+ * by the bootstrap.
  */
-export const builtinLiveViews: ReadonlyMap<string, LiveViewRenderer> = new Map<string, LiveViewRenderer>([
-  [
-    fitnessTool.metadata.id,
-    async (args) => {
-      const { renderFitView } = await import('../ui/render.js');
-      await renderFitView(args as Parameters<typeof renderFitView>[0]);
-    },
-  ],
-  [
-    graphTool.metadata.id,
-    async (args) => {
-      const { renderGraphView } = await import('../ui/render.js');
-      await renderGraphView(args as Parameters<typeof renderGraphView>[0]);
-    },
-  ],
-]);
+export function createBuiltinLiveViews(
+  datastore?: DataStore,
+): ReadonlyMap<string, LiveViewRenderer> {
+  return new Map<string, LiveViewRenderer>([
+    [
+      fitnessTool.metadata.id,
+      async (args) => {
+        const { renderFitView } = await import('../ui/render.js');
+        await renderFitView(args as Parameters<typeof renderFitView>[0], datastore);
+      },
+    ],
+    [
+      graphTool.metadata.id,
+      async (args) => {
+        const { renderGraphView } = await import('../ui/render.js');
+        await renderGraphView(args as Parameters<typeof renderGraphView>[0], datastore);
+      },
+    ],
+  ]);
+}
+
+/**
+ * Legacy static map — no datastore captured. Retained for tests that
+ * import the constant; production code goes through
+ * `createBuiltinLiveViews(datastore)` from the bootstrap.
+ */
+export const builtinLiveViews: ReadonlyMap<string, LiveViewRenderer> =
+  createBuiltinLiveViews();

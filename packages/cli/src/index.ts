@@ -20,7 +20,7 @@ import { Command } from 'commander';
 
 import {
   bootstrapCli,
-  builtinLiveViews,
+  createBuiltinLiveViews,
   installPreActionHook,
   maybeOpenDashboard,
   mountAllToolCommands,
@@ -41,26 +41,20 @@ const program = new Command('opensip-tools')
 installPreActionHook(program);
 
 async function main(): Promise<void> {
-  await bootstrapCli({
+  // v2 persistence: bootstrap opens the project-local SQLite DataStore
+  // and returns it on the result; the composition root passes it into
+  // the ToolCliContext (every Tool's `cli.datastore`) and the CLI-only
+  // commands (sessions, configure, plugin).
+  const { datastore } = await bootstrapCli({
     langRegistry: defaultLanguageRegistry,
     toolRegistry: defaultToolRegistry,
     projectDir: dirname(dirname(fileURLToPath(import.meta.url))),
   });
 
-  // v2 persistence: bootstrap opens the DataStore once per CLI invocation.
-  // TODO(merge): this should move into bootstrap/index.ts alongside other
-  // bootstrap concerns — left as a literal here to keep the merge focused.
-  const { DataStoreFactory } = await import('@opensip-tools/datastore');
-  const { resolveProjectPaths } = await import('@opensip-tools/core');
-  const projectPaths = resolveProjectPaths(process.cwd());
-  const datastore = DataStoreFactory.open({
-    backend: 'sqlite',
-    path: `${projectPaths.runtimeDir}/datastore.sqlite`,
-  });
-
   const { ctx } = buildToolCliContext({
     program, render: renderResult, liveViews: createLiveViewRegistry(logger),
-    builtinLiveViews, maybeOpenDashboard, logger,
+    builtinLiveViews: createBuiltinLiveViews(datastore),
+    maybeOpenDashboard, logger,
     datastore,
   });
 

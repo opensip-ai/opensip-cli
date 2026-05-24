@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import {
   EXIT_CODES,
+  SessionRepo,
   // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; fit's executeFit signature is fed via fitOptsToCliArgs until the rip-out
   type CliArgs,
   type CliOutput,
@@ -15,7 +16,7 @@ import {
   type FitDoneResult,
   type ErrorResult,
 } from '@opensip-tools/contracts';
-import { logger, type CheckDisplayEntry } from '@opensip-tools/core';
+import { generatePrefixedId, logger, type CheckDisplayEntry } from '@opensip-tools/core';
 
 
 import { isCheck } from '../framework/check-types.js';
@@ -35,6 +36,7 @@ import { loadTargetsConfig } from '../targets/index.js';
 import type { FitnessRecipeServiceCallbacks, CheckSummary } from '../recipes/service-types.js';
 import type { FitnessRecipeResult } from '../recipes/types.js';
 import type { SignalersConfig } from '../signalers/types.js';
+import type { DataStore } from '@opensip-tools/datastore';
 
 
 // ---------------------------------------------------------------------------
@@ -525,11 +527,11 @@ interface BuildFitDoneArgs {
  * mode all consume. Computes the configured fail thresholds, the table
  * rows, the optional grouped findings block, and the run label.
  *
- * TODO(merge): v2 added SessionRepo session persistence inline (writes to
- * SQLite via @opensip-tools/datastore). Audit's D1 phase extracted this
- * helper before v2 landed; the session-write needs a follow-up that
- * threads `datastore` through `executeFit` to the post-call site, not
- * inline here. See merge commit message for the deferred TODO list.
+ * Pure builder: session persistence (SessionRepo.save) lives at the
+ * `executeFit` call site (post-call), not here. Threading `datastore`
+ * into `executeFit`'s opts in v2 made it unnecessary to push it into
+ * this builder, and keeping the function side-effect-free preserves the
+ * D1-phase decomposition. See `executeFit` for the persistence write.
  */
 function buildFitDoneResult({ args, fitnessResult, signalersConfig, recipeName }: BuildFitDoneArgs): FitDoneResult {
   const { summary, checkResults, durationMs } = fitnessResult;
@@ -690,10 +692,29 @@ async function runRecipeOrAdHoc(
  * (see the lifecycle singletons block at the top of this file). The
  * ordering here is the contract that lets those reads be safe.
  */
+/**
+ * Optional dependencies threaded through `executeFit`. Both fields are
+ * optional so test harnesses and the JSON/gate paths can call
+ * `executeFit(args)` exactly as before.
+ *
+ *   - `onProgress` — wired to `FitnessRecipeService` callbacks; FitView
+ *     drives the live progress bar from this callback.
+ *   - `datastore` — when supplied, the run is persisted via
+ *     `SessionRepo.save(...)` after `buildCliOutput`. Errors during the
+ *     save are best-effort: a failed write logs `cli.fit.session.save_failed`
+ *     and is swallowed so a SQLite hiccup never fails an otherwise
+ *     successful fitness run. Matches the legacy v1 `saveSession` semantics
+ *     (file-based) and the v2 graph-engine `persistSession` policy.
+ */
+export interface ExecuteFitOptions {
+  onProgress?: (completed: number, total: number) => void;
+  datastore?: DataStore;
+}
+
 export async function executeFit(
   // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
   args: CliArgs,
-  onProgress?: (completed: number, total: number) => void,
+  opts: ExecuteFitOptions = {},
 ): Promise<{ result: FitDoneResult; output: CliOutput } | { result: ErrorResult; output?: undefined }> {
   logger.info({ evt: 'cli.checks.loading', module: 'cli:fit' });
   await ensureChecksLoaded(args.cwd);
@@ -719,7 +740,7 @@ export async function executeFit(
   const service = new FitnessRecipeService({
     cwd: args.cwd,
     checkTargetFiles,
-    callbacks: buildFitCallbacks(onProgress),
+    callbacks: buildFitCallbacks(opts.onProgress),
     disabledChecks: signalersConfig.fitness.disabledChecks,
     includeViolations: true,
     globalExcludes: targetsConfig.globalExcludes,
@@ -731,18 +752,71 @@ export async function executeFit(
 
   const output = buildCliOutput(fitnessResult, recipeName);
 
-  // TODO(merge): v2 replaced the legacy `saveSession(...)` file writer
-  // with `SessionRepo.save(...)`. Audit's executeFit had a best-effort
-  // saveSession() block here; the v2 swap requires threading `datastore`
-  // through executeFit's signature down to this call site, then
-  // constructing `new SessionRepo(datastore).save({...})`. Tracked as a
-  // follow-up because it touches every executeFit caller. The CLI
-  // bootstrap currently bypasses this code path via tool.ts which writes
-  // through SessionRepo directly.
+  // v2 persistence: when bootstrap supplied a datastore, write the
+  // session via SessionRepo. Best-effort — a SQLite write failure never
+  // fails an otherwise-successful fitness run (mirrors v1's saveSession
+  // policy and graph's persistSession). `buildFitDoneResult` stays a
+  // pure builder; the side effect lives here so every executeFit caller
+  // (FitView, runJsonMode, runGateMode) gets the write for free as long
+  // as they pass `datastore` through.
+  if (opts.datastore) {
+    persistFitSession(opts.datastore, args, output);
+  }
 
   const result = buildFitDoneResult({ args, fitnessResult, signalersConfig, recipeName });
 
   logger.info({ evt: 'cli.fit.complete', module: 'cli:fit', score: output.score, passed: fitnessResult.success, totalChecks: fitnessResult.summary.totalChecks, durationMs: fitnessResult.durationMs });
 
   return { result, output };
+}
+
+/**
+ * Best-effort session persistence — invoked when `executeFit` is called
+ * with a `datastore` opt. Maps `CliOutput` directly onto the
+ * `StoredSession` shape that `SessionRepo` consumes. Errors are caught
+ * and logged so a write failure never fails the run; the same policy
+ * applied to v1's file-based `saveSession` path.
+ */
+function persistFitSession(
+  datastore: DataStore,
+  // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
+  args: CliArgs,
+  output: CliOutput,
+): void {
+  try {
+    const repo = new SessionRepo(datastore);
+    repo.save({
+      id: generatePrefixedId('fit'),
+      tool: 'fit',
+      timestamp: output.timestamp,
+      cwd: args.cwd,
+      recipe: output.recipe,
+      score: output.score,
+      passed: output.passed,
+      summary: output.summary,
+      checks: output.checks.map((c) => ({
+        checkSlug: c.checkSlug,
+        passed: c.passed,
+        violationCount: c.violationCount,
+        findings: c.findings.map((f) => ({
+          ruleId: f.ruleId,
+          message: f.message,
+          severity: f.severity,
+          filePath: f.filePath,
+          line: f.line,
+          column: f.column,
+          suggestion: f.suggestion,
+        })),
+        durationMs: c.durationMs,
+      })),
+      durationMs: output.durationMs,
+    });
+  } catch (error) {
+    logger.warn({
+      evt: 'cli.fit.session.save_failed',
+      module: 'cli:fit',
+      msg: 'Failed to persist fit session — continuing without history write',
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }

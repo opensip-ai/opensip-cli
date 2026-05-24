@@ -277,10 +277,14 @@ async function runRecipesMode(args: CliArgs, cli: ToolCliContext): Promise<void>
 /**
  * `--json` mode: run executeFit, write output (or error) to stdout, and
  * propagate the configured fail threshold via the CLI's exit-code hook.
+ *
+ * Threads `datastore` so a `--json` run lands in the SQLite session
+ * history alongside live-mode and gate-mode runs. No `onProgress`: JSON
+ * output is one-shot, no progress UI.
  */
 // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
 async function runJsonMode(args: CliArgs, cli: ToolCliContext): Promise<void> {
-  const fitResult = await executeFit(args);
+  const fitResult = await executeFit(args, { datastore: cli.datastore as DataStore | undefined });
   if (fitResult.result.type === 'error') {
     cli.setExitCode(fitResult.result.exitCode);
     cli.emitJson({ error: fitResult.result.message });
@@ -331,11 +335,11 @@ async function runGateMode(args: CliArgs, cli: ToolCliContext): Promise<void> {
   }
   const datastore = cli.datastore as DataStore;
   const repo = new FitBaselineRepo(datastore);
-  // TODO(merge): thread `datastore` through executeFit's signature so
-  // session persistence in fit.ts uses the v2 SessionRepo. Today
-  // executeFit only takes `args`; runGateMode is the caller closest to
-  // the bootstrap-supplied datastore.
-  const fitResult = await executeFit(args);
+  // Thread the bootstrap-supplied datastore through executeFit so its
+  // post-call SessionRepo.save uses the same handle the gate baseline
+  // is written against — gate-save / gate-compare runs land in the
+  // session history alongside live-mode runs.
+  const fitResult = await executeFit(args, { datastore });
   if (fitResult.result.type !== 'fit-done') {
     cli.logger.warn({
       evt: 'cli.gate.fit_failed',
