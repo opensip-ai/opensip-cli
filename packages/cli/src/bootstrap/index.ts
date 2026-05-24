@@ -23,6 +23,7 @@
  * 2026-05-23 M1.
  */
 
+import { discoverAndRegisterGraphAdapterPackages } from './register-graph-adapters.js';
 import { registerLanguageAdapters } from './register-language-adapters.js';
 import {
   registerFirstPartyTools,
@@ -47,7 +48,14 @@ export interface BootstrapOptions {
 
 /**
  * One-shot bootstrap: register language adapters, register the first-
- * party tools, then discover-and-register every third-party tool.
+ * party tools, discover-and-register every third-party tool, then
+ * discover-and-register every @opensip-tools/graph-* adapter pack.
+ *
+ * Graph adapter discovery runs BEFORE `mountAllToolCommands`: the
+ * graph tool's `register()` method assumes adapters are already
+ * available so its lang-adapter registry isn't empty when the first
+ * `pickAdapter()` lands during a real run. PR 1a of plan
+ * docs/plans/architecture/2026-05-23-plan-graph-adapter-package-split.md.
  */
 export async function bootstrapCli(opts: BootstrapOptions): Promise<void> {
   registerLanguageAdapters(opts.langRegistry);
@@ -55,4 +63,5 @@ export async function bootstrapCli(opts: BootstrapOptions): Promise<void> {
   await discoverAndRegisterToolPackages(opts.toolRegistry, {
     projectDir: opts.projectDir,
   });
+  await discoverAndRegisterGraphAdapterPackages({ projectDir: opts.projectDir });
 }
