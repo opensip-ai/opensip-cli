@@ -77,6 +77,7 @@ jobs:
             lang-typescript lang-rust lang-python lang-go lang-java lang-cpp \
             dashboard \
             fitness simulation graph \
+            graph-typescript graph-python graph-rust \
             checks-universal checks-typescript checks-python checks-go checks-java checks-cpp \
             cli ; do
             name="@opensip-tools/$pkg"
@@ -117,6 +118,10 @@ jobs:
           pnpm --filter @opensip-tools/fitness          pack --pack-destination /tmp/tarballs
           pnpm --filter @opensip-tools/simulation       pack --pack-destination /tmp/tarballs
           pnpm --filter @opensip-tools/graph            pack --pack-destination /tmp/tarballs
+          # Layer 3.5 — graph adapter packs (depend on graph engine)
+          pnpm --filter @opensip-tools/graph-typescript pack --pack-destination /tmp/tarballs
+          pnpm --filter @opensip-tools/graph-python    pack --pack-destination /tmp/tarballs
+          pnpm --filter @opensip-tools/graph-rust      pack --pack-destination /tmp/tarballs
           # Layer 4 — check packs
           pnpm --filter @opensip-tools/checks-universal  pack --pack-destination /tmp/tarballs
           pnpm --filter @opensip-tools/checks-typescript pack --pack-destination /tmp/tarballs
@@ -175,6 +180,10 @@ jobs:
           publish_if_new fitness
           publish_if_new simulation
           publish_if_new graph
+          # Layer 3.5 — graph adapter packs (depend on graph engine)
+          publish_if_new graph-typescript
+          publish_if_new graph-python
+          publish_if_new graph-rust
           # Layer 4 — check packs (depend on fitness)
           publish_if_new checks-universal
           publish_if_new checks-typescript

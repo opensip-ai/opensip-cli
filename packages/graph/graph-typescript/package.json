@@ -1,12 +1,12 @@
 {
-  "name": "@opensip-tools/graph",
+  "name": "@opensip-tools/graph-typescript",
   "version": "2.0.0",
   "license": "MIT",
-  "description": "Static call-graph + dead-end analysis (six-stage staged pipeline)",
+  "description": "TypeScript language adapter for the opensip-tools graph engine",
   "repository": {
     "type": "git",
     "url": "https://github.com/opensip-ai/opensip-tools.git",
-    "directory": "packages/graph/engine"
+    "directory": "packages/graph/graph-typescript"
   },
   "homepage": "https://github.com/opensip-ai/opensip-tools",
   "bugs": {
@@ -19,7 +19,7 @@
     ".": "./dist/index.js"
   },
   "opensipTools": {
-    "kind": "tool"
+    "kind": "graph-adapter"
   },
   "scripts": {
     "build": "tsc",
@@ -28,17 +28,17 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@opensip-tools/contracts": "workspace:*",
     "@opensip-tools/core": "workspace:*",
-    "@opensip-tools/datastore": "workspace:*",
-    "@opensip-tools/fitness": "workspace:*",
-    "commander": "^13.1.0",
-    "drizzle-orm": "^0.45.2",
-    "glob": "^13.0.0"
+    "@opensip-tools/graph": "workspace:*",
+    "@opensip-tools/lang-typescript": "workspace:*",
+    "typescript": "~5.7.0"
   },
   "devDependencies": {
+    "@opensip-tools/datastore": "workspace:*",
+    "@opensip-tools/graph-python": "workspace:*",
+    "@opensip-tools/graph-rust": "workspace:*",
     "@types/node": "^22.0.0",
-    "typescript": "~5.7.0",
+    "commander": "^13.1.0",
     "vitest": "^2.1.0"
   }
 }
