@@ -33,7 +33,7 @@ import { rustRuleHints } from './rule-hints.js';
 import { walkProject as rustWalkProject } from './walk.js';
 
 import type { RustParsedProject } from './parse.js';
-import type { GraphLanguageAdapter } from '../lang-adapter/types.js';
+import type { GraphLanguageAdapter } from '@opensip-tools/graph';
 
 export const rustGraphAdapter: GraphLanguageAdapter<RustParsedProject> = {
   id: 'rust',
@@ -46,3 +46,22 @@ export const rustGraphAdapter: GraphLanguageAdapter<RustParsedProject> = {
   cacheKey: rustCacheKey,
   ruleHints: rustRuleHints,
 };
+
+/**
+ * Discovery contract: external adapter packs export `adapter` (the
+ * GraphLanguageAdapter) and `metadata`. The CLI bootstrap calls
+ * `registerAdapter` with `adapter` after a successful `import()`.
+ */
+export const adapter = rustGraphAdapter;
+export const metadata = {
+  id: rustGraphAdapter.id,
+  displayName: rustGraphAdapter.displayName,
+  fileExtensions: rustGraphAdapter.fileExtensions,
+} as const;
+
+// Re-export the parsed-project type and the rule hints constant. PR 3
+// drains the engine-side re-exports because graph-rust is now the
+// canonical home; cross-package tests in graph-typescript import them
+// from here.
+export type { RustParsedProject } from './parse.js';
+export { rustRuleHints } from './rule-hints.js';

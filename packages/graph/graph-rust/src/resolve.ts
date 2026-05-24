@@ -41,18 +41,22 @@
  */
 
 import { logger } from '@opensip-tools/core';
-
 import {
   appendEdge,
   createMutableStats,
   pushCreationEdge,
   truncateForCallEdge,
-} from '../lang-adapter/edge-helpers.js';
+} from '@opensip-tools/graph';
 
-import type { MutableStats } from '../lang-adapter/edge-helpers.js';
-import type { ResolveInput, ResolveOutput } from '../lang-adapter/types.js';
-import type { CallEdge, FunctionOccurrence, ResolutionStats } from '../types.js';
 import type { RustParsedFile, RustParsedProject } from './parse.js';
+import type {
+  CallEdge,
+  FunctionOccurrence,
+  MutableStats,
+  ResolutionStats,
+  ResolveInput,
+  ResolveOutput,
+} from '@opensip-tools/graph';
 import type Parser from 'tree-sitter';
 
 interface NameIndex {

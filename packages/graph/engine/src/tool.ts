@@ -19,9 +19,12 @@
 import { type CliProgram } from '@opensip-tools/contracts';
 import { ConfigurationError, readPackageVersion } from '@opensip-tools/core';
 
-// Side-effect import: registers the first-party TypeScript adapter
-// at module load. PR 3 of docs/plans/10-graph-language-pluggability.md.
-import './bootstrap.js';
+// PR 3 of plan 2026-05-23-plan-graph-adapter-package-split.md: the
+// engine no longer hosts any adapter source. All three first-party
+// adapters (typescript, python, rust) live in their own packages and
+// register themselves via the CLI's discovery walker
+// (register-graph-adapters.ts). The historical engine-side bootstrap
+// is gone.
 import { executeGraph } from './cli/graph.js';
 import { runHeapPreflight } from './cli/heap-preflight.js';
 

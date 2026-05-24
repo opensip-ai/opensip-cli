@@ -1,12 +1,12 @@
 {
-  "name": "@opensip-tools/graph-typescript",
+  "name": "@opensip-tools/graph-rust",
   "version": "2.0.0",
   "license": "MIT",
-  "description": "TypeScript language adapter for the opensip-tools graph engine",
+  "description": "Rust language adapter for the opensip-tools graph engine",
   "repository": {
     "type": "git",
     "url": "https://github.com/opensip-ai/opensip-tools.git",
-    "directory": "packages/graph/graph-typescript"
+    "directory": "packages/graph/graph-rust"
   },
   "homepage": "https://github.com/opensip-ai/opensip-tools",
   "bugs": {
@@ -30,15 +30,12 @@
   "dependencies": {
     "@opensip-tools/core": "workspace:*",
     "@opensip-tools/graph": "workspace:*",
-    "@opensip-tools/lang-typescript": "workspace:*",
-    "typescript": "~5.7.0"
+    "glob": "^13.0.0",
+    "tree-sitter": "0.22.4",
+    "tree-sitter-rust": "0.23.2"
   },
   "devDependencies": {
-    "@opensip-tools/datastore": "workspace:*",
-    "@opensip-tools/graph-python": "workspace:*",
-    "@opensip-tools/graph-rust": "workspace:*",
     "@types/node": "^22.0.0",
-    "commander": "^13.1.0",
     "vitest": "^2.1.0"
   }
 }

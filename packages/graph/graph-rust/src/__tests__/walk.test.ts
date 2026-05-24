@@ -14,7 +14,7 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { rustGraphAdapter } from '../../lang-rust/index.js';
+import { rustGraphAdapter } from '../index.js';
 
 describe('lang-rust walk.ts — comment-stripping branches', () => {
   let dir: string;

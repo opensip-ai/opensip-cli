@@ -18,12 +18,12 @@ import { relative, sep } from 'node:path';
 import { logger } from '@opensip-tools/core';
 
 
-// Side-effect import: ensures the in-engine first-party adapters
-// (python, rust) are registered even when callers reach `runGraph`
-// without going through `tool.ts` (e.g. orchestrator unit tests).
-// Adapters that have moved into their own packs (typescript, post-PR
-// 1b) register themselves at the test-file level.
-import '../bootstrap.js';
+// PR 3 of plan 2026-05-23-plan-graph-adapter-package-split.md: the
+// engine no longer hosts any adapter source. All three first-party
+// adapters live in their own packages and register themselves via
+// the CLI's discovery walker. Tests that call runGraph() directly
+// (without going through the CLI) register adapters explicitly at
+// the test-file level.
 
 import {
   classifyCatalog,

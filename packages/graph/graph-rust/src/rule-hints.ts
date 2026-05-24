@@ -14,7 +14,7 @@
 
 import { isTestFile } from './walk.js';
 
-import type { RuleHints } from '../lang-adapter/types.js';
+import type { RuleHints } from '@opensip-tools/graph';
 
 const RUST_SIDE_EFFECT_PRIMITIVES: readonly string[] = [
   'println!',

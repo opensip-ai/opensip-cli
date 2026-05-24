@@ -26,7 +26,7 @@ import { resolve, sep } from 'node:path';
 import { logger } from '@opensip-tools/core';
 import { glob } from 'glob';
 
-import type { DiscoverInput, DiscoverOutput } from '../lang-adapter/types.js';
+import type { DiscoverInput, DiscoverOutput } from '@opensip-tools/graph';
 
 const EXCLUDED_DIR_GLOBS: readonly string[] = [
   '**/target/**',

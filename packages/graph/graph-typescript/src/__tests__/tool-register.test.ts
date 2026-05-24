@@ -6,12 +6,19 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { graphTool, registerAdapter } from '@opensip-tools/graph';
 import { Command } from 'commander';
 import { describe, expect, it, vi } from 'vitest';
 
-import { graphTool } from '../tool.js';
+
+import { typescriptGraphAdapter } from '../index.js';
 
 import type { ToolCliContext } from '@opensip-tools/core';
+
+// Ensure the typescript adapter is registered before any of these
+// graphTool.register() tests trigger pickAdapter() through the
+// runGraph()/heap-preflight code paths.
+registerAdapter(typescriptGraphAdapter);
 
 function makeCli(program: Command): ToolCliContext {
   // Provide a renderer for `graph` in `builtinLiveViews`. The tool's

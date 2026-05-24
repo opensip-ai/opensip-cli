@@ -74,6 +74,9 @@ importers:
       '@opensip-tools/graph-python':
         specifier: workspace:*
         version: link:../graph/graph-python
+      '@opensip-tools/graph-rust':
+        specifier: workspace:*
+        version: link:../graph/graph-rust
       '@opensip-tools/graph-typescript':
         specifier: workspace:*
         version: link:../graph/graph-typescript
@@ -383,9 +386,6 @@ importers:
       '@opensip-tools/fitness':
         specifier: workspace:*
         version: link:../../fitness/engine
-      '@opensip-tools/lang-typescript':
-        specifier: workspace:*
-        version: link:../../languages/lang-typescript
       commander:
         specifier: ^13.1.0
         version: 13.1.0
@@ -395,12 +395,6 @@ importers:
       glob:
         specifier: ^13.0.0
         version: 13.0.6
-      tree-sitter:
-        specifier: 0.22.4
-        version: 0.22.4
-      tree-sitter-rust:
-        specifier: 0.23.2
-        version: 0.23.2(tree-sitter@0.22.4)
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -437,6 +431,31 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.19.15)(jsdom@29.1.1)
 
+  packages/graph/graph-rust:
+    dependencies:
+      '@opensip-tools/core':
+        specifier: workspace:*
+        version: link:../../core
+      '@opensip-tools/graph':
+        specifier: workspace:*
+        version: link:../engine
+      glob:
+        specifier: ^13.0.0
+        version: 13.0.6
+      tree-sitter:
+        specifier: 0.22.4
+        version: 0.22.4
+      tree-sitter-rust:
+        specifier: 0.23.2
+        version: 0.23.2(tree-sitter@0.22.4)
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.15
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.15)(jsdom@29.1.1)
+
   packages/graph/graph-typescript:
     dependencies:
       '@opensip-tools/core':
@@ -458,9 +477,15 @@ importers:
       '@opensip-tools/graph-python':
         specifier: workspace:*
         version: link:../graph-python
+      '@opensip-tools/graph-rust':
+        specifier: workspace:*
+        version: link:../graph-rust
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.15
+      commander:
+        specifier: ^13.1.0
+        version: 13.1.0
       vitest:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.19.15)(jsdom@29.1.1)

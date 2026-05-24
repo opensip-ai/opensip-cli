@@ -20,8 +20,7 @@ import { logger } from '@opensip-tools/core';
 import Parser from 'tree-sitter';
 import Rust from 'tree-sitter-rust';
 
-import type { ParseInput, ParseOutput } from '../lang-adapter/types.js';
-import type { ParseError } from '../types.js';
+import type { ParseInput, ParseOutput, ParseError } from '@opensip-tools/graph';
 
 export interface RustParsedFile {
   readonly tree: Parser.Tree;

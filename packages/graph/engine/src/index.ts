@@ -113,21 +113,12 @@ export type {
   GraphAdapterPackageMetadata,
 } from './plugins/graph-adapter-discovery.js';
 
-// ── Transitional adapter exports ──────────────────────────────────
-//
-// `rustGraphAdapter` is still in the engine at PR 2. It publishes
-// through this barrel so cross-package tests (in
-// @opensip-tools/graph-typescript) can exercise the registry against
-// the remaining live adapters without deep-importing engine internals.
-// PR 3 relocates Rust into its own package, at which point this
-// export drains from the barrel and the engine has zero adapter
-// surface.
-//
-// (pythonGraphAdapter / pythonRuleHints / PythonParsedProject left
-// the engine in PR 2; they now live in @opensip-tools/graph-python.)
-export { rustGraphAdapter } from './lang-rust/index.js';
-export type { RustParsedProject } from './lang-rust/parse.js';
-export { rustRuleHints } from './lang-rust/rule-hints.js';
+// PR 3 of plan 2026-05-23-plan-graph-adapter-package-split.md: with
+// all three first-party adapters relocated into their own packages
+// (graph-typescript, graph-python, graph-rust), the engine no longer
+// re-exports any adapter, parsed-project type, or rule-hints
+// constant. Cross-package tests import directly from each adapter
+// pack.
 
 // Pipeline + rule helpers required by cross-package integration tests.
 // These belong to the engine; the public-barrel exposure is to support

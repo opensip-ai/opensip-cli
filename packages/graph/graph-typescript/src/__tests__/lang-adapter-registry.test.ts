@@ -16,9 +16,9 @@ import {
   _clearAdaptersForTesting,
   pickAdapter,
   registerAdapter,
-  rustGraphAdapter,
 } from '@opensip-tools/graph';
 import { pythonGraphAdapter } from '@opensip-tools/graph-python';
+import { rustGraphAdapter } from '@opensip-tools/graph-rust';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 
