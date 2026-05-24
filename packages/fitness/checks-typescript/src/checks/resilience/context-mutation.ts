@@ -1,5 +1,5 @@
 // @fitness-ignore-file unused-config-options -- Config options reserved for future use or environment-specific
-// @fitness-ignore-file context-mutation-check -- Local array/object mutations are safe within function scope; not shared context
+// @fitness-ignore-file context-mutation -- Local array/object mutations are safe within function scope; not shared context
 // @fitness-ignore-file silent-early-returns -- Guard clauses in pattern matching function return false for non-matching patterns
 /**
  * @fileoverview Context mutation safety check — flags direct mutation of
@@ -359,14 +359,14 @@ export function analyzeContextMutation(content: string, filePath: string): Check
 }
 
 /**
- * Check: resilience/context-mutation-check
+ * Check: resilience/context-mutation
  *
  * Detects potentially unsafe mutations of request/execution context objects.
  * Context should be immutable to prevent side effects across middleware.
  */
 export const contextMutationCheck = defineCheck({
   id: 'abed5b29-960b-486f-bb0d-5b9e1744241d',
-  slug: 'context-mutation-check',
+  slug: 'context-mutation',
   scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
   contentFilter: 'strip-strings',
 

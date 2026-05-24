@@ -35,6 +35,10 @@ and breaks compatibility with v1.x runtime layouts.
   `DataStore` through `ToolCliContext`. External consumers who reached
   for it should switch to constructing a `SessionRepo` over the
   context's `datastore` field.
+- **`context-mutation-check` slug renamed to `context-mutation`** to
+  match the post-Phase-D1 single-concern file shape. Users with
+  `--check context-mutation-check` in CI invocations or recipes must
+  update to `--check context-mutation`. No alias.
 
 ### Added
 

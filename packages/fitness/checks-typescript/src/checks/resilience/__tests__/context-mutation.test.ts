@@ -1,5 +1,5 @@
 /**
- * @fileoverview Regression tests for `context-mutation-check` FP fix.
+ * @fileoverview Regression tests for `context-mutation` FP fix.
  *
  * The 1.0.7 release added detection for locally-declared `ctx` /
  * `context` variables — when the file declares them via `const`/`let`/
@@ -16,7 +16,7 @@ function analyze(src: string): readonly { line: number }[] {
   return analyzeContextMutation(src, 'test.ts')
 }
 
-describe('context-mutation-check — FP regression suite (1.0.7)', () => {
+describe('context-mutation — FP regression suite (1.0.7)', () => {
   it('does NOT flag mutations on a locally-declared const ctx object', () => {
     const src = `
       function buildContext() {

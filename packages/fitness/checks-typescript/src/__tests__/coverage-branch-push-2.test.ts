@@ -1429,10 +1429,10 @@ describe('no-hardcoded-correlation-id — additional branches', () => {
 })
 
 // ---------------------------------------------------------------------------
-// context-mutation-check
+// context-mutation
 // ---------------------------------------------------------------------------
 
-describe('context-mutation-check — additional branches', () => {
+describe('context-mutation — additional branches', () => {
   it('mutation vs read-only context access', async () => {
     fx('src/svc/cm.ts', [
       'export function f1(ctx: any) {',
@@ -1445,7 +1445,7 @@ describe('context-mutation-check — additional branches', () => {
       '  return user',
       '}',
     ].join('\n'))
-    const result = await runCheck('context-mutation-check')
+    const result = await runCheck('context-mutation')
     expect(result).toBeDefined()
   })
 })
