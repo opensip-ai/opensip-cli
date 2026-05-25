@@ -9,13 +9,10 @@
  * edits — each tool ships its own renderer and registers it via
  * `cli.registerLiveView(key, renderer)`.
  *
- * The presentational primitives (banner, spinner, run header, etc.)
- * are inlined here using bare `Box`/`Text` from Ink. The cli/ui
- * components that previously lived alongside FitView stay in the CLI
- * package for use by the static-render path in App.tsx (the
- * `fit-done` CommandResult branch); duplicating the small visuals
- * here is the cost of breaking the cli/ui → fitness import edge
- * documented as F3 in docs/plans/architecture/2026-05-22-plan-layer-5-cli.md.
+ * Shared presentational primitives (Banner, RunHeader, Spinner, theme
+ * tokens) come from `@opensip-tools/cli-ui`. Tool-specific render
+ * pieces (results table, findings block, cloud-report status) stay
+ * inline here because they consume FitDoneResult-shaped data.
  *
  * Single exit-code write path: errors and shouldFail conditions route
  * through the supplied `setExitCode` callback (`ToolCliContext.setExitCode`)
@@ -24,6 +21,15 @@
  * gone.
  */
 
+import {
+  Banner,
+  ClockProvider,
+  ErrorMessage,
+  RunHeader,
+  Spinner,
+  ThemeProvider,
+  useTheme,
+} from '@opensip-tools/cli-ui';
 /* eslint-disable sonarjs/deprecation -- intentional adapter usage; fit-runner consumes the CliArgs shape produced by fit's *OptsToCliArgs adapter until the rip-out */
 import {
   type CheckOutput,
@@ -43,60 +49,14 @@ import { ensureChecksLoaded, executeFit, getEnabledCheckCount } from './fit.js';
 
 import type { DataStore } from '@opensip-tools/datastore';
 
-// ---------------------------------------------------------------------------
-// Theme — minimal palette, mirrors @opensip-tools/cli's defaults so the live
-// view looks the same as the static `cli.render(result)` path. Inlined
-// because lang/layer rules forbid tool packages from importing
-// @opensip-tools/cli; the tradeoff is documented at the top of this file.
-// ---------------------------------------------------------------------------
-
-interface Theme {
-  readonly brand: string;
-  readonly success: string;
-  readonly error: string;
-  readonly warning: string;
-  readonly info: string;
-  readonly muted: string;
-  readonly statusPass: string;
-  readonly statusFail: string;
-  readonly statusTimeout: string;
-}
-
-const THEME: Theme = {
-  brand: '#C8956C',
-  success: 'green',
-  error: 'red',
-  warning: 'yellow',
-  info: 'cyan',
-  muted: 'gray',
-  statusPass: 'green',
-  statusFail: 'red',
-  statusTimeout: 'yellow',
-};
-
-// ---------------------------------------------------------------------------
-// Spinner clock — an interval-driven tick state that drives the braille
-// frame rotation. Lifted from @opensip-tools/cli's ClockProvider/useSpinner
-// pair; inlined to keep the tool package self-contained.
-// ---------------------------------------------------------------------------
-
-const SPINNER_FRAMES = [
-  '⠋', '⠙', '⠹', '⠸',
-  '⠼', '⠴', '⠦', '⠧',
-  '⠇', '⠏',
-];
-const TICK_INTERVAL_MS = 80;
-
-function useTick(): number {
-  const [tick, setTick] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => {
-      setTick((prev) => prev + 1);
-    }, TICK_INTERVAL_MS);
-    return () => clearInterval(id);
-  }, []);
-  return tick;
-}
+// Theme constants used by tool-specific sub-components below. The shared
+// presentational primitives (Banner, RunHeader, Spinner, ErrorMessage)
+// pull their colors from cli-ui's ThemeProvider; the tool-specific
+// renderers (ResultsTable, SummaryLine, FindingsBlock, CloudReportStatus)
+// also use useTheme() to stay consistent.
+const FIT_TOOL_TITLE = 'Fitness Checks';
+const FIT_TOOL_DESCRIPTION =
+  'Scanning your codebase for quality, security, and architecture issues.';
 
 // ---------------------------------------------------------------------------
 // State machine
@@ -186,12 +146,14 @@ function FitRunner({ args, datastore, setExitCode }: FitRunnerProps): React.Reac
           {!args.quiet && <Banner />}
           {!args.quiet && (
             <RunHeader
+              tool={FIT_TOOL_TITLE}
+              description={FIT_TOOL_DESCRIPTION}
               cwd={args.cwd}
               metadata={[{ label: 'Recipe', value: recipe }]}
             />
           )}
           <Box paddingLeft={2}>
-            <SpinnerLine total={0} completed={0} label="Loading checks..." />
+            <Spinner total={0} completed={0} label="Loading checks..." />
           </Box>
         </Box>
       );
@@ -203,6 +165,8 @@ function FitRunner({ args, datastore, setExitCode }: FitRunnerProps): React.Reac
           {!args.quiet && <Banner />}
           {!args.quiet && (
             <RunHeader
+              tool={FIT_TOOL_TITLE}
+              description={FIT_TOOL_DESCRIPTION}
               cwd={args.cwd}
               metadata={[
                 { label: 'Recipe', value: recipe },
@@ -211,7 +175,7 @@ function FitRunner({ args, datastore, setExitCode }: FitRunnerProps): React.Reac
             />
           )}
           <Box paddingLeft={2}>
-            <SpinnerLine total={state.total} completed={state.completed} />
+            <Spinner total={state.total} completed={state.completed} label="Running checks..." />
           </Box>
         </Box>
       );
@@ -223,6 +187,8 @@ function FitRunner({ args, datastore, setExitCode }: FitRunnerProps): React.Reac
           {!args.quiet && <Banner />}
           {!args.quiet && (
             <RunHeader
+              tool={FIT_TOOL_TITLE}
+              description={FIT_TOOL_DESCRIPTION}
               cwd={args.cwd}
               metadata={[
                 { label: 'Recipe', value: recipe },
@@ -261,108 +227,21 @@ function FitRunner({ args, datastore, setExitCode }: FitRunnerProps): React.Reac
     }
 
     case 'error': {
-      return <ErrorLine message={state.result.message} suggestion={state.result.suggestion} />;
+      return <ErrorMessage message={state.result.message} suggestion={state.result.suggestion} />;
     }
   }
 }
 
 // ---------------------------------------------------------------------------
-// Inline visual primitives — kept simple so the runner stays self-contained.
-// Mirrors the cli/ui/components/* counterparts for visual parity; if either
-// drifts from the other, App.tsx's static render and the live runner here
-// diverge — accepted tradeoff documented at the top of this file.
+// Tool-specific render pieces — consume FitDoneResult-shaped data and use
+// the shared theme via useTheme(). Banner / RunHeader / Spinner / ErrorMessage
+// come from @opensip-tools/cli-ui (imported at the top).
 // ---------------------------------------------------------------------------
 
-const BANNER: readonly [string, string, string][] = [
-  ['   ░       ░             ',  '  ██████   ████████  █████████ ████  ███', ' ███████   █████ ████████ '],
-  ['    ░     ░              ',  ' ███░░░███░███░░░░██░███░░░░░░░░███  ███', '███░░░░███░░███ ░███░░░░██'],
-  ['   ░       ░             ',  '███   ░███░███   ░██░███       ░████ ███', '░███   ░░░ ░███ ░███   ░██'],
-  ['███████████████          ',  '███   ░███░████████░░██████    ░██░█████', '░░███████  ░███ ░████████░'],
-  ['███████████████  █████   ',  '███   ░███░███░░░░  ░███░░░    ░██ ░████', ' ░░░░░░███ ░███ ░███░░░░  '],
-  ['███████████████ ░░░░███  ',  '░███  ████░███      ░███       ░██  ░███', ' ███   ███ ░███ ░███      '],
-  ['███████████████  █████   ',  ' ░██████░  ████      █████████ ████  ███', '░░███████  █████ ████     '],
-  ['░█████████████░ ░░░      ',  '  ░░░░░░  ░░░░░     ░░░░░░░░░░░░░░  ░░░', ' ░░░░░░░  ░░░░░ ░░░░░     '],
-];
-const BANNER_SAUCER = ' ░███████████░';
-
-function Banner(): React.ReactElement {
-  return (
-    <Box flexDirection="column">
-      {BANNER.map(([cup, openPart, sipPart], i) => (
-        <Text key={i}>
-          {cup}
-          <Text color={THEME.brand}>{openPart}</Text>
-          {' '}
-          <Text bold>{sipPart}</Text>
-        </Text>
-      ))}
-      <Text>{BANNER_SAUCER}</Text>
-    </Box>
-  );
-}
-
-interface RunHeaderMeta {
-  readonly label: string;
-  readonly value: string;
-}
-
-function RunHeader({ cwd, metadata }: { readonly cwd: string; readonly metadata: readonly RunHeaderMeta[] }): React.ReactElement {
-  const separator = '─'.repeat(60);
-  const metaParts = [
-    ...metadata.map((m) => `${m.label}: ${m.value}`),
-    `Target: ${cwd}`,
-  ];
-  return (
-    <Box flexDirection="column" paddingLeft={2} paddingTop={1}>
-      <Text bold color={THEME.brand}>Fitness Checks</Text>
-      <Text dimColor>{metaParts.join('   ')}</Text>
-      <Text> </Text>
-      <Text dimColor>Scanning your codebase for quality, security, and architecture issues.</Text>
-      <Text> </Text>
-      <Text dimColor>{separator}</Text>
-    </Box>
-  );
-}
-
-interface SpinnerLineProps {
-  readonly total: number;
-  readonly completed: number;
-  readonly label?: string;
-}
-
-function SpinnerLine({ total, completed, label = 'Running checks...' }: SpinnerLineProps): React.ReactElement {
-  const tick = useTick();
-  const frame = SPINNER_FRAMES[tick % SPINNER_FRAMES.length];
-  const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
-  return (
-    <Text>
-      <Text color={THEME.brand}>{frame}</Text>
-      {' '}
-      {label}
-      {total > 0 ? <Text>  {completed}/{total} ({pct}%)</Text> : null}
-    </Text>
-  );
-}
-
-function ErrorLine({ message, suggestion }: { readonly message: string; readonly suggestion?: string }): React.ReactElement {
-  return (
-    <Box flexDirection="column" paddingLeft={2}>
-      <Text>
-        <Text color={THEME.error}>{'✗'}</Text>
-        {' '}
-        {message}
-      </Text>
-      {suggestion && (
-        <Text dimColor>{'    '}{suggestion}</Text>
-      )}
-    </Box>
-  );
-}
-
-function statusColor(status: TableRow['status']): string {
-  if (status === 'FAIL') return THEME.statusFail;
-  if (status === 'TIMEOUT') return THEME.statusTimeout;
-  return THEME.statusPass;
+function statusColor(theme: ReturnType<typeof useTheme>, status: TableRow['status']): string {
+  if (status === 'FAIL') return theme.statusFail;
+  if (status === 'TIMEOUT') return theme.statusTimeout;
+  return theme.statusPass;
 }
 
 function parseValidatedCount(validated: string): number {
@@ -371,19 +250,19 @@ function parseValidatedCount(validated: string): number {
   return match ? Number.parseInt(match[1], 10) : 0;
 }
 
-function ignoredColor(ignored: number, validated: string): string {
+function ignoredColor(theme: ReturnType<typeof useTheme>, ignored: number, validated: string): string {
   const total = parseValidatedCount(validated);
-  if (total === 0 || ignored === 0) return THEME.muted;
+  if (total === 0 || ignored === 0) return theme.muted;
   const pct = (ignored / total) * 100;
-  if (pct > 10) return THEME.error;
-  if (pct > 5) return THEME.warning;
-  return THEME.muted;
+  if (pct > 10) return theme.error;
+  if (pct > 5) return theme.warning;
+  return theme.muted;
 }
 
-function durationColor(ms: number): string {
-  if (ms >= 60_000) return THEME.error;
-  if (ms >= 30_000) return THEME.warning;
-  return THEME.success;
+function durationColor(theme: ReturnType<typeof useTheme>, ms: number): string {
+  if (ms >= 60_000) return theme.error;
+  if (ms >= 30_000) return theme.warning;
+  return theme.success;
 }
 
 function sortPriority(r: TableRow): number {
@@ -394,6 +273,7 @@ function sortPriority(r: TableRow): number {
 }
 
 function ResultsTable({ rows }: { readonly rows: readonly TableRow[] }): React.ReactElement | null {
+  const theme = useTheme();
   if (rows.length === 0) return null;
   const sorted = [...rows].sort((a, b) => sortPriority(a) - sortPriority(b));
   const maxCheckWidth = Math.max(40, ...sorted.map((r) => r.check.length));
@@ -424,17 +304,17 @@ function ResultsTable({ rows }: { readonly rows: readonly TableRow[] }): React.R
         <Text key={i}>
           {row.check.padEnd(maxCheckWidth)}
           {' | '}
-          <Text color={statusColor(row.status)}>{row.status.padEnd(widths.status)}</Text>
+          <Text color={statusColor(theme, row.status)}>{row.status.padEnd(widths.status)}</Text>
           {' | '}
-          <Text color={row.errors > 0 ? THEME.error : THEME.success}>{String(row.errors).padEnd(widths.errors)}</Text>
+          <Text color={row.errors > 0 ? theme.error : theme.success}>{String(row.errors).padEnd(widths.errors)}</Text>
           {' | '}
-          <Text color={row.warnings > 0 ? THEME.warning : THEME.muted}>{String(row.warnings).padEnd(widths.warnings)}</Text>
+          <Text color={row.warnings > 0 ? theme.warning : theme.muted}>{String(row.warnings).padEnd(widths.warnings)}</Text>
           {' | '}
           {row.validated.padEnd(widths.validated)}
           {' | '}
-          <Text color={ignoredColor(row.ignored, row.validated)}>{String(row.ignored).padEnd(widths.ignored)}</Text>
+          <Text color={ignoredColor(theme, row.ignored, row.validated)}>{String(row.ignored).padEnd(widths.ignored)}</Text>
           {' | '}
-          <Text color={durationColor(row.durationMs)}>{row.duration.padEnd(widths.duration)}</Text>
+          <Text color={durationColor(theme, row.durationMs)}>{row.duration.padEnd(widths.duration)}</Text>
         </Text>
       ))}
     </Box>
@@ -447,19 +327,20 @@ function formatDurationLine(ms: number): string {
 }
 
 function SummaryLine({ summary }: { readonly summary: FitDoneResult['summary'] }): React.ReactElement {
+  const theme = useTheme();
   const { passed, failed, totalErrors, totalWarnings, durationMs } = summary;
   return (
     <Box paddingTop={1}>
       <Text>
-        <Text color={THEME.success}>{passed} Passed</Text>
-        , <Text color={failed > 0 ? THEME.error : THEME.muted}>{failed} Failed</Text>
+        <Text color={theme.success}>{passed} Passed</Text>
+        , <Text color={failed > 0 ? theme.error : theme.muted}>{failed} Failed</Text>
         {' ('}
-        <Text color={totalErrors > 0 ? THEME.error : THEME.muted}>{totalErrors} Errors</Text>
-        , <Text color={totalWarnings > 0 ? THEME.warning : THEME.muted}>{totalWarnings} Warnings</Text>
+        <Text color={totalErrors > 0 ? theme.error : theme.muted}>{totalErrors} Errors</Text>
+        , <Text color={totalWarnings > 0 ? theme.warning : theme.muted}>{totalWarnings} Warnings</Text>
         {') '}
         <Text dimColor>|</Text>
         {' Duration '}
-        <Text color={THEME.info}>{formatDurationLine(durationMs)}</Text>
+        <Text color={theme.info}>{formatDurationLine(durationMs)}</Text>
       </Text>
     </Box>
   );
@@ -483,6 +364,7 @@ function countBySeverity(check: CheckOutput): CheckCounts {
 }
 
 function FindingsBlock({ checks }: { readonly checks: readonly CheckOutput[] }): React.ReactElement {
+  const theme = useTheme();
   const total = checks.reduce((sum, c) => {
     const { errorCount, warningCount } = countBySeverity(c);
     return sum + errorCount + warningCount + (c.error ? 1 : 0);
@@ -514,14 +396,14 @@ function FindingsBlock({ checks }: { readonly checks: readonly CheckOutput[] }):
         return (
           <Box key={check.checkSlug} flexDirection="column" marginLeft={2}>
             <Text>
-              <Text color={THEME.brand}>{check.checkSlug}</Text>
+              <Text color={theme.brand}>{check.checkSlug}</Text>
               {' '}
               <Text dimColor>({count})</Text>
             </Text>
             {check.error && (
               <Text>
                 {'      '}
-                <Text color={THEME.error}>error</Text>
+                <Text color={theme.error}>error</Text>
                 {'  '}
                 {check.error}
               </Text>
@@ -533,7 +415,7 @@ function FindingsBlock({ checks }: { readonly checks: readonly CheckOutput[] }):
                 <Box key={i} flexDirection="column">
                   <Text>
                     {'      '}
-                    <Text color={v.severity === 'error' ? THEME.error : THEME.warning}>
+                    <Text color={v.severity === 'error' ? theme.error : theme.warning}>
                       {v.severity === 'error' ? 'error' : 'warn'}
                     </Text>
                     {'  '}
@@ -569,6 +451,7 @@ function FindingsBlock({ checks }: { readonly checks: readonly CheckOutput[] }):
 type ReportStatusShape = NonNullable<FitDoneResult['reportStatus']>;
 
 function CloudReportStatusLine({ status }: { readonly status: ReportStatusShape }): React.ReactElement {
+  const theme = useTheme();
   const { url, findingCount, runCount, success, error, chunksTotal, chunksSucceeded } = status;
   const chunkDetail = chunksTotal != null && chunksTotal > 1
     ? ` (${chunksSucceeded ?? 0}/${chunksTotal} chunks)`
@@ -579,7 +462,7 @@ function CloudReportStatusLine({ status }: { readonly status: ReportStatusShape 
     return (
       <Box flexDirection="column" paddingLeft={2}>
         <Text>
-          <Text color={partial ? THEME.warning : THEME.error}>{partial ? '⚠' : '✗'}</Text>
+          <Text color={partial ? theme.warning : theme.error}>{partial ? '⚠' : '✗'}</Text>
           {' '}
           {partial ? 'Partially reported' : 'Failed to report'} to <Text dimColor>{url}</Text>{chunkDetail}
         </Text>
@@ -591,7 +474,7 @@ function CloudReportStatusLine({ status }: { readonly status: ReportStatusShape 
   return (
     <Box flexDirection="column" paddingLeft={2}>
       <Text>
-        <Text color={THEME.success}>{'✔'}</Text>
+        <Text color={theme.success}>{'✔'}</Text>
         {' '}
         Reported to <Text dimColor>{url}</Text>{chunkDetail}
       </Text>
@@ -627,7 +510,11 @@ export async function renderFitLive(
   options?: RenderFitLiveOptions,
 ): Promise<void> {
   const app = render(
-    <FitRunner args={args} datastore={datastore} setExitCode={options?.setExitCode} />,
+    <ThemeProvider>
+      <ClockProvider>
+        <FitRunner args={args} datastore={datastore} setExitCode={options?.setExitCode} />
+      </ClockProvider>
+    </ThemeProvider>,
   );
   await app.waitUntilExit();
   // Trailing newline so shell prompt starts on a new line.

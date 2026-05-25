@@ -9,12 +9,9 @@
  * edits — each tool ships its own renderer and registers it via
  * `cli.registerLiveView(key, renderer)`.
  *
- * The presentational primitives (banner, run header, stage checklist)
- * are inlined here using bare `Box`/`Text` from Ink. This file pays
- * the ~300-line cost of breaking the cli/ui → graph import edge that
- * previously forced cli/ui to be aware of `runGraph` and
- * `GraphProgressEvent`. Documented as F3 in
- * docs/plans/architecture/2026-05-22-plan-layer-5-cli.md.
+ * Shared presentational primitives (Banner, RunHeader, theme tokens)
+ * come from `@opensip-tools/cli-ui`. The stage-checklist component is
+ * graph-specific and stays here.
  *
  * Single exit-code write path: error outcomes route through the
  * supplied `setExitCode` callback (`ToolCliContext.setExitCode`) so the
@@ -22,6 +19,15 @@
  * `process.exitCode = 1` write that lived in GraphView is gone.
  */
 
+import {
+  Banner,
+  ClockProvider,
+  ErrorMessage,
+  RunHeader,
+  ThemeProvider,
+  useSpinner,
+  useTheme,
+} from '@opensip-tools/cli-ui';
 import { Box, Text, useApp, render } from 'ink';
 import React, { useCallback, useEffect, useState } from 'react';
 
@@ -31,44 +37,8 @@ import { GRAPH_STAGES, runGraph } from './orchestrate.js';
 import type { GraphProgressEvent, GraphStage, RunGraphResult } from './orchestrate.js';
 import type { DataStore } from '@opensip-tools/datastore';
 
-// ---------------------------------------------------------------------------
-// Theme — minimal palette, mirrors @opensip-tools/cli's defaults so the
-// live view looks the same as the static `cli.render(result)` path.
-// ---------------------------------------------------------------------------
-
-interface Theme {
-  readonly brand: string;
-  readonly success: string;
-  readonly error: string;
-}
-
-const THEME: Theme = {
-  brand: '#C8956C',
-  success: 'green',
-  error: 'red',
-};
-
-// ---------------------------------------------------------------------------
-// Spinner clock
-// ---------------------------------------------------------------------------
-
-const SPINNER_FRAMES = [
-  '⠋', '⠙', '⠹', '⠸',
-  '⠼', '⠴', '⠦', '⠧',
-  '⠇', '⠏',
-];
-const TICK_INTERVAL_MS = 80;
-
-function useTick(): number {
-  const [tick, setTick] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => {
-      setTick((prev) => prev + 1);
-    }, TICK_INTERVAL_MS);
-    return () => clearInterval(id);
-  }, []);
-  return tick;
-}
+const GRAPH_TOOL_TITLE = 'Code Graph';
+const GRAPH_TOOL_DESCRIPTION = 'Building call-graph from source';
 
 // ---------------------------------------------------------------------------
 // State machine
@@ -185,7 +155,7 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
   const header = (
     <>
       <Banner />
-      <RunHeader cwd={args.cwd} />
+      <RunHeader tool={GRAPH_TOOL_TITLE} description={GRAPH_TOOL_DESCRIPTION} cwd={args.cwd} />
     </>
   );
 
@@ -193,7 +163,7 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
     return (
       <Box flexDirection="column">
         {header}
-        <ErrorLine message={state.message} />
+        <ErrorMessage message={state.message} />
       </Box>
     );
   }
@@ -225,62 +195,9 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
 }
 
 // ---------------------------------------------------------------------------
-// Inline visual primitives
+// Stage-checklist — graph-specific visual. Banner/RunHeader/ErrorMessage
+// come from @opensip-tools/cli-ui (imported at the top).
 // ---------------------------------------------------------------------------
-
-const BANNER: readonly [string, string, string][] = [
-  ['   ░       ░             ',  '  ██████   ████████  █████████ ████  ███', ' ███████   █████ ████████ '],
-  ['    ░     ░              ',  ' ███░░░███░███░░░░██░███░░░░░░░░███  ███', '███░░░░███░░███ ░███░░░░██'],
-  ['   ░       ░             ',  '███   ░███░███   ░██░███       ░████ ███', '░███   ░░░ ░███ ░███   ░██'],
-  ['███████████████          ',  '███   ░███░████████░░██████    ░██░█████', '░░███████  ░███ ░████████░'],
-  ['███████████████  █████   ',  '███   ░███░███░░░░  ░███░░░    ░██ ░████', ' ░░░░░░███ ░███ ░███░░░░  '],
-  ['███████████████ ░░░░███  ',  '░███  ████░███      ░███       ░██  ░███', ' ███   ███ ░███ ░███      '],
-  ['███████████████  █████   ',  ' ░██████░  ████      █████████ ████  ███', '░░███████  █████ ████     '],
-  ['░█████████████░ ░░░      ',  '  ░░░░░░  ░░░░░     ░░░░░░░░░░░░░░  ░░░', ' ░░░░░░░  ░░░░░ ░░░░░     '],
-];
-const BANNER_SAUCER = ' ░███████████░';
-
-function Banner(): React.ReactElement {
-  return (
-    <Box flexDirection="column">
-      {BANNER.map(([cup, openPart, sipPart], i) => (
-        <Text key={i}>
-          {cup}
-          <Text color={THEME.brand}>{openPart}</Text>
-          {' '}
-          <Text bold>{sipPart}</Text>
-        </Text>
-      ))}
-      <Text>{BANNER_SAUCER}</Text>
-    </Box>
-  );
-}
-
-function RunHeader({ cwd }: { readonly cwd: string }): React.ReactElement {
-  const separator = '─'.repeat(60);
-  return (
-    <Box flexDirection="column" paddingLeft={2} paddingTop={1}>
-      <Text bold color={THEME.brand}>Code Graph</Text>
-      <Text dimColor>Target: {cwd}</Text>
-      <Text> </Text>
-      <Text dimColor>Building call-graph from source</Text>
-      <Text> </Text>
-      <Text dimColor>{separator}</Text>
-    </Box>
-  );
-}
-
-function ErrorLine({ message }: { readonly message: string }): React.ReactElement {
-  return (
-    <Box flexDirection="column" paddingLeft={2}>
-      <Text>
-        <Text color={THEME.error}>{'✗'}</Text>
-        {' '}
-        {message}
-      </Text>
-    </Box>
-  );
-}
 
 function StageChecklist({ stages }: { readonly stages: StageMap }): React.ReactElement {
   return (
@@ -298,6 +215,7 @@ interface StageLineProps {
 }
 
 function StageLine({ stage, status }: StageLineProps): React.ReactElement {
+  const theme = useTheme();
   const label = STAGE_LABELS[stage];
 
   if (status.kind === 'pending') {
@@ -311,7 +229,7 @@ function StageLine({ stage, status }: StageLineProps): React.ReactElement {
   if (status.kind === 'cached') {
     return (
       <Text>
-        <Text color={THEME.success}>✓</Text>{' '}
+        <Text color={theme.success}>✓</Text>{' '}
         <Text>{label}</Text>{'   '}
         <Text dimColor>(cached)</Text>
       </Text>
@@ -323,7 +241,7 @@ function StageLine({ stage, status }: StageLineProps): React.ReactElement {
     const detail = status.detail ? `${status.detail} (${dur})` : dur;
     return (
       <Text>
-        <Text color={THEME.success}>✓</Text>{' '}
+        <Text color={theme.success}>✓</Text>{' '}
         <Text>{label}</Text>{'   '}
         <Text dimColor>{detail}</Text>
       </Text>
@@ -340,8 +258,8 @@ interface RunningStageLineProps {
 }
 
 function RunningStageLine({ stage, startedAt, label }: RunningStageLineProps): React.ReactElement {
-  const tick = useTick();
-  const frame = SPINNER_FRAMES[tick % SPINNER_FRAMES.length];
+  const theme = useTheme();
+  const frame = useSpinner();
   // Re-render on each tick; derive wall-clock elapsed from Date.now() so it
   // stays accurate regardless of how many ticks have fired since startedAt.
   const elapsed = formatDuration(Date.now() - startedAt);
@@ -349,7 +267,7 @@ function RunningStageLine({ stage, startedAt, label }: RunningStageLineProps): R
   return (
     <Box flexDirection="column">
       <Text>
-        <Text color={THEME.brand}>{frame}</Text>{' '}
+        <Text color={theme.brand}>{frame}</Text>{' '}
         <Text bold>{label}</Text>
       </Text>
       <Text>
@@ -389,7 +307,11 @@ export async function renderGraphLive(
   options?: RenderGraphLiveOptions,
 ): Promise<void> {
   const app = render(
-    <GraphRunner args={args} datastore={datastore} setExitCode={options?.setExitCode} />,
+    <ThemeProvider>
+      <ClockProvider>
+        <GraphRunner args={args} datastore={datastore} setExitCode={options?.setExitCode} />
+      </ClockProvider>
+    </ThemeProvider>,
   );
   await app.waitUntilExit();
   process.stdout.write('\n');

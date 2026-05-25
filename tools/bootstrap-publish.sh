@@ -53,9 +53,11 @@ PACKAGES=(
   core
   datastore
   contracts
+  cli-ui
   lang-typescript lang-rust lang-python lang-go lang-java lang-cpp
   dashboard
   fitness simulation graph
+  graph-typescript graph-python graph-rust
   checks-universal checks-typescript checks-python checks-go checks-java checks-cpp
   cli
 )

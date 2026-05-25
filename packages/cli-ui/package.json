@@ -1,12 +1,12 @@
 {
-  "name": "@opensip-tools/dashboard",
+  "name": "@opensip-tools/cli-ui",
   "version": "2.0.0",
   "license": "MIT",
-  "description": "Self-contained HTML dashboard generator for OpenSIP Tools — renders the fit/sim/graph report from session data and graph catalogs",
+  "description": "Shared Ink/React presentational primitives for OpenSIP Tools CLI tools — banner, spinner, run header, theme. Used by every tool that ships an Ink live view.",
   "repository": {
     "type": "git",
     "url": "https://github.com/opensip-ai/opensip-tools.git",
-    "directory": "packages/dashboard"
+    "directory": "packages/cli-ui"
   },
   "homepage": "https://github.com/opensip-ai/opensip-tools",
   "bugs": {
@@ -25,11 +25,12 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@opensip-tools/contracts": "workspace:*"
+    "ink": "^5.2.1",
+    "react": "^18.3.1"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "jsdom": "^29.1.1",
+    "@types/react": "^18.3.28",
     "typescript": "~5.7.0",
     "vitest": "^2.1.0"
   }

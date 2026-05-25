@@ -5,13 +5,14 @@ Releases are tag-driven. Pushing a tag matching `v*` triggers
 publishes all 23 `@opensip-tools/*` packages to npm via OIDC trusted
 publishing — no `NPM_TOKEN` required.
 
-## The 23 packages
+## The 24 packages
 
 | Layer | Package | Path |
 |-------|---------|------|
 | Kernel | `@opensip-tools/core` | `packages/core` |
 | Persistence | `@opensip-tools/datastore` | `packages/datastore` |
 | Shared CLI | `@opensip-tools/contracts` | `packages/contracts` |
+| Shared CLI | `@opensip-tools/cli-ui` | `packages/cli-ui` |
 | Languages | `@opensip-tools/lang-typescript` | `packages/languages/lang-typescript` |
 | Languages | `@opensip-tools/lang-rust` | `packages/languages/lang-rust` |
 | Languages | `@opensip-tools/lang-python` | `packages/languages/lang-python` |
@@ -33,7 +34,7 @@ publishing — no `NPM_TOKEN` required.
 | Check packs | `@opensip-tools/checks-cpp` | `packages/fitness/checks-cpp` |
 | CLI | `@opensip-tools/cli` | `packages/cli` |
 
-All 23 share the same version. The release workflow publishes them in
+All 24 share the same version. The release workflow publishes them in
 dependency order; downstream packages reference upstream versions in
 their `dependencies`.
 
@@ -74,7 +75,8 @@ their `dependencies`.
 
 6. Verify on npm:
    ```bash
-   for p in core datastore contracts cli fitness simulation graph dashboard \
+   for p in core datastore contracts cli-ui cli fitness simulation graph dashboard \
+            graph-typescript graph-python graph-rust \
             lang-typescript lang-rust lang-python lang-go lang-java lang-cpp \
             checks-typescript checks-universal checks-python checks-go checks-java checks-cpp; do
      printf '%-40s %s\n' "@opensip-tools/$p" "$(npm view "@opensip-tools/$p" version 2>/dev/null || echo MISSING)"
@@ -93,29 +95,35 @@ Order:
 1. **`@opensip-tools/core`** — depends on nothing else workspace-internal.
 2. **`@opensip-tools/datastore`** — depends on core. Bundles SQLite + Drizzle persistence.
 3. **`@opensip-tools/contracts`** — depends on core, datastore.
-4. **Language adapters** (lang-typescript first, then any order):
+4. **`@opensip-tools/cli-ui`** — Ink/React presentational primitives (banner,
+   spinner, run header, theme). Leaf package, depends on no
+   workspace-internal package; consumed by every tool live view + the
+   CLI's static-render path.
+5. **Language adapters** (lang-typescript first, then any order):
    `lang-typescript` → others. lang-typescript is published before the
    rest because it has more downstream consumers (every TS-AST check
    pack peer-depends on it transitively).
-5. **`@opensip-tools/dashboard`** — depends on core + contracts only.
+6. **`@opensip-tools/dashboard`** — depends on core + contracts only.
    Published before `fitness` because fitness's `cli/dashboard.ts`
    imports `generateDashboardHtml` from it.
-6. **`@opensip-tools/fitness`** — depends on core, contracts,
-   datastore, lang-typescript, and dashboard.
-7. **`@opensip-tools/simulation`** — depends on core, contracts, datastore.
-8. **`@opensip-tools/graph`** — depends on core, contracts, plus the
-   peer-layer SARIF edge into fitness.
-9. **Graph adapter packs** — `@opensip-tools/graph-typescript` (PR 2/3
-   add graph-python and graph-rust). Each depends on the engine
-   (`@opensip-tools/graph`) plus its parser (typescript / tree-sitter-*).
-   Independent of each other; published in any order within the group.
-10. **Check packs** (any order within this group):
-   `checks-typescript`, `checks-universal`, `checks-python`,
-   `checks-go`, `checks-java`, `checks-cpp` — all peer-depend on
-   fitness.
-11. **`@opensip-tools/cli`** — depends on every tool, every check pack
-   and every graph adapter pack the CLI loads by default, every
-   language adapter, contracts, and datastore. Always published last.
+7. **`@opensip-tools/fitness`** — depends on core, contracts,
+   datastore, lang-typescript, dashboard, and cli-ui.
+8. **`@opensip-tools/simulation`** — depends on core, contracts, datastore.
+9. **`@opensip-tools/graph`** — depends on core, contracts, cli-ui,
+   plus the peer-layer SARIF edge into fitness.
+10. **Graph adapter packs** — `@opensip-tools/graph-typescript`,
+    `graph-python`, `graph-rust`. Each depends on the engine
+    (`@opensip-tools/graph`) plus its parser (typescript /
+    tree-sitter-*). Independent of each other; published in any order
+    within the group.
+11. **Check packs** (any order within this group):
+    `checks-typescript`, `checks-universal`, `checks-python`,
+    `checks-go`, `checks-java`, `checks-cpp` — all peer-depend on
+    fitness.
+12. **`@opensip-tools/cli`** — depends on every tool, every check pack
+    and every graph adapter pack the CLI loads by default, every
+    language adapter, contracts, datastore, and cli-ui. Always
+    published last.
 
 ## Prerequisites (one-time setup)
 
@@ -152,7 +160,7 @@ To unblock:
    NPM_TOKEN=npm_xxx ./tools/bootstrap-publish.sh
    ```
 
-   The script is **idempotent**. It iterates the 23 packages in
+   The script is **idempotent**. It iterates the 24 packages in
    dependency order, skips any whose current source version is already
    on npm, packs and publishes the rest using the token, and at the
    end prints a list of newly-created packages with direct links to

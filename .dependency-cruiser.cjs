@@ -11,6 +11,7 @@
  *   4. @opensip-tools/fitness        — fitness engine + cli/* commands
  *   4. @opensip-tools/simulation     — simulation engine + cli/* commands
  *   4. @opensip-tools/dashboard      — HTML report generator (depends on core + contracts)
+ *   4. @opensip-tools/cli-ui         — shared Ink/React presentational primitives (banner, spinner, header, theme)
  *   5. @opensip-tools/checks-*       — fitness check packs (depend on fitness)
  *   6. @opensip-tools/cli            — entry point (depends on every tool)
  *
@@ -170,6 +171,25 @@ module.exports = {
           '^@opensip-tools/checks-',
         ],
       },
+    },
+
+    // -------------------------------------------------------------------
+    // Layer enforcement — cli-ui has zero opensip-tools deps
+    //
+    // cli-ui is the shared Ink/React presentational layer (Banner, Spinner,
+    // RunHeader, theme) used by every tool's live view + the CLI's static
+    // render path. It must depend on nothing in the workspace — it's a
+    // leaf package, equivalent in shape to a third-party UI library.
+    // -------------------------------------------------------------------
+    {
+      name: 'cli-ui-no-workspace-deps',
+      severity: 'error',
+      comment:
+        'cli-ui is a leaf package — Ink/React primitives only. It must not ' +
+        'depend on any other @opensip-tools/* package. Other packages depend ' +
+        'on it to share visual primitives across the CLI and tool live views.',
+      from: { path: '^packages/cli-ui/src/' },
+      to: { path: '^@opensip-tools/' },
     },
 
     // -------------------------------------------------------------------

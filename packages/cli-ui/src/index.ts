@@ -1,0 +1,30 @@
+/**
+ * @opensip-tools/cli-ui — shared Ink/React presentational primitives for
+ * OpenSIP Tools CLI tools.
+ *
+ * Tools that ship an Ink live view (fitness, graph, future audit/lint/etc.)
+ * import from this package instead of duplicating banner/spinner/header
+ * code in their own runner files. The CLI's static-render path (App.tsx)
+ * imports the same primitives so the live view and the post-run summary
+ * look consistent.
+ *
+ * This package depends on `ink` and `react` only; no opensip-tools deps,
+ * no Node-runtime side-effects beyond the theme's terminal-capability
+ * detection. Safe to import from any Layer 3 tool package.
+ */
+
+export { Banner } from './banner.js';
+export { ErrorMessage, type ErrorMessageProps } from './error-message.js';
+export { RunHeader, type RunHeaderProps, type RunHeaderMeta } from './run-header.js';
+export { Spinner, type SpinnerProps, useSpinner, useStandaloneSpinner } from './spinner.js';
+export { ClockProvider, type ClockProviderProps, useClock, useTick } from './clock.js';
+export {
+  DEFAULT_THEME,
+  ThemeContext,
+  ThemeProvider,
+  type Theme,
+  type ThemeProviderProps,
+  type TerminalCapabilities,
+  detectTerminalCapabilities,
+  useTheme,
+} from './theme.js';
