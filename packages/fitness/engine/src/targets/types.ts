@@ -66,6 +66,16 @@ interface PluginsConfig {
    * Ignored when `checkPackages` is set (explicit list always wins).
    */
   readonly autoDiscoverChecks?: boolean
+  /**
+   * Additional npm scopes to include in check-package auto-discovery,
+   * on top of the platform default (`@opensip-tools`). Lets customers
+   * publish internal check packs under their own scope (e.g.
+   * `['@acme']` to discover `@acme/checks-*`) without listing each
+   * package individually under `checkPackages`. The platform scope is
+   * always scanned; entries here are additive. Ignored when
+   * `checkPackages` is set or `autoDiscoverChecks` is false.
+   */
+  readonly packageScopes?: readonly string[]
 }
 
 /**
