@@ -26,6 +26,10 @@ opensip-tools/
 │   │                            #   between Tools and the runner: CliOutput,
 │   │                            #   CommandResult, exit codes, session
 │   │                            #   persistence, GraphCatalog type surface
+│   ├── datastore/               # @opensip-tools/datastore — SQLite + Drizzle
+│   │                            #   persistence layer: DataStore interface,
+│   │                            #   sqlite/memory backends, factory, schema
+│   │                            #   migrations
 │   ├── dashboard/               # @opensip-tools/dashboard — self-contained
 │   │                            #   HTML report generator (generateDashboardHtml);
 │   │                            #   consumed by fitness's `dashboard` command

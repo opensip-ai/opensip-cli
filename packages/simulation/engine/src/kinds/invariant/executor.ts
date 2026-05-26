@@ -160,7 +160,10 @@ async function runPhase(
   abortSignal: AbortSignal,
 ): Promise<InvariantPhaseResult> {
   if (abortSignal.aborted) {
-    return { phase: phaseName, status: 'failed', durationMs: 0, error: 'aborted' }
+    // Match the abort contract used by the load/chaos kinds: throw
+    // ScenarioAbortedError so the outer scenario runner classifies the
+    // run as aborted, not as a normal phase failure.
+    throw new ScenarioAbortedError()
   }
   const start = Date.now()
   try {

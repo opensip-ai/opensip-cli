@@ -478,9 +478,12 @@ function buildCliOutput(
   recipeName: string | undefined,
 ): CliOutput {
   const { summary, checkResults, durationMs } = fitnessResult;
+  // Empty-recipe score is 100 to match service.buildResult's formula —
+  // gate baselines and the live renderer must agree on the same value
+  // or --gate-compare reports a phantom regression on the next run.
   const score = summary.totalChecks > 0
     ? Math.round((summary.passedChecks / summary.totalChecks) * 100)
-    : 0;
+    : 100;
   return {
     version: '1.0',
     tool: 'fit',
