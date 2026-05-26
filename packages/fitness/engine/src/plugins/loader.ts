@@ -1,14 +1,22 @@
 /**
- * @fileoverview Plugin loader — dynamic import and registration
+ * @fileoverview Fitness plugin loader — adapter over core's generic loader.
  *
- * Takes discovered plugins, imports them, validates their exports,
- * and registers checks/recipes with namespaces.
+ * Core owns the discovery, dynamic-import, error-wrap, and log machinery
+ * (see @opensip-tools/core's loadPlugin / loadAllPlugins). This file
+ * supplies the fitness-specific `registerExports` callback that knows
+ * how to interpret a `FitPluginExports`-shaped module: register
+ * language adapters (for the `lang` domain), checks (named or in a
+ * `checks` array), and recipes.
+ *
+ * Public API (`loadPlugin`, `loadAllPlugins`) is preserved so existing
+ * callers (fit.ts) don't change.
  */
 
-import { pathToFileURL } from 'node:url'
-
-import { logger, defaultLanguageRegistry, discoverPlugins } from '@opensip-tools/core'
-
+import {
+  defaultLanguageRegistry,
+  loadAllPlugins as coreLoadAllPlugins,
+  loadPlugin as coreLoadPlugin,
+} from '@opensip-tools/core'
 
 import { isCheck } from '../framework/check-types.js'
 import { defaultRegistry } from '../framework/registry.js'
@@ -22,250 +30,189 @@ import type {
   LoadedPlugin,
   PluginDomain,
   PluginLoadResult,
+  RegisterCounts,
+  RegisterCtx,
 } from '@opensip-tools/core'
 
-/** Logger module tag used by every event emitted from this loader. */
-const MODULE_TAG = 'core:plugins'
+/**
+ * Register a fitness-domain plugin's exports. Supports two authorship
+ * styles for checks:
+ *
+ *   1. `export const checks = [...]`           — array of Check instances
+ *   2. `export const myCheck = defineCheck(...)` — Check as a named export
+ *
+ * Both styles can coexist in the same module; checks are deduplicated
+ * by their stable id so a check appearing in both forms is registered
+ * exactly once. Recipes are registered from a `recipes` array.
+ */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- fit plugin registrar: two authorship styles for checks + recipe registration + default-export fallback; splitting fragments the warn/skip control flow
+function registerFitExports(
+  mod: Record<string, unknown>,
+  ctx: RegisterCtx,
+): RegisterCounts {
+  const fit = mod as FitPluginExports
+  const registeredIds = new Set<string>()
+  let checksRegistered = 0
+  let recipesRegistered = 0
+
+  // Style 1: explicit `checks` array
+  if (fit.checks !== undefined) {
+    if (Array.isArray(fit.checks)) {
+      for (const [index, check] of fit.checks.entries()) {
+        if (isCheck(check)) {
+          if (!registeredIds.has(check.config.id)) {
+            defaultRegistry.register(check, ctx.plugin.namespace)
+            registeredIds.add(check.config.id)
+            checksRegistered++
+          }
+        } else {
+          ctx.warn(
+            'plugin.loader.invalid_check_item',
+            `Plugin "${ctx.plugin.namespace}" checks[${index}] is not a valid Check object — skipping.`,
+            { index },
+          )
+        }
+      }
+    } else {
+      ctx.warn(
+        'plugin.loader.invalid_checks_export',
+        `Plugin "${ctx.plugin.namespace}" exports "checks" but it is not an array — skipping checks registration.`,
+      )
+    }
+  }
+
+  // Style 2: any named export that is a Check instance
+  for (const [exportName, value] of Object.entries(mod)) {
+    if (
+      exportName === 'default' ||
+      exportName === 'checks' ||
+      exportName === 'recipes' ||
+      exportName === 'metadata' ||
+      exportName === 'checkDisplay'
+    ) continue
+    if (isCheck(value) && !registeredIds.has(value.config.id)) {
+      defaultRegistry.register(value, ctx.plugin.namespace)
+      registeredIds.add(value.config.id)
+      checksRegistered++
+    }
+  }
+
+  // Default export: a single Check instance
+  const defaultExport = mod.default
+  if (isCheck(defaultExport) && !registeredIds.has(defaultExport.config.id)) {
+    defaultRegistry.register(defaultExport, ctx.plugin.namespace)
+    registeredIds.add(defaultExport.config.id)
+    checksRegistered++
+  }
+
+  // Recipes
+  if (fit.recipes !== undefined) {
+    const recipes: readonly FitnessRecipe[] = fit.recipes
+    for (const [index, recipe] of recipes.entries()) {
+      if (recipe && typeof recipe === 'object' && 'id' in recipe && 'name' in recipe) {
+        try {
+          defaultRecipeRegistry.register(recipe, { allowOverwrite: false })
+          recipesRegistered++
+        } catch {
+          // Duplicate recipe — skip silently
+        }
+      } else {
+        ctx.warn(
+          'plugin.loader.invalid_recipe_item',
+          `Plugin "${ctx.plugin.namespace}" recipes[${index}] is not a valid Recipe object (missing id or name) — skipping.`,
+          { index },
+        )
+      }
+    }
+  }
+
+  return { checksRegistered, recipesRegistered }
+}
 
 /**
- * Load a single discovered plugin.
- *
- * For `domain === 'lang'`, the module is expected to export an `adapters`
- * array of LanguageAdapter; each is registered with defaultLanguageRegistry.
- * For other domains, registers checks and recipes with defaultRegistry and
- * defaultRecipeRegistry respectively.
+ * Register a lang-domain plugin's exports. Pulls LanguageAdapter
+ * instances from `adapters` array, named exports, and the default
+ * export; deduplicates by adapter id.
  */
-// eslint-disable-next-line sonarjs/cognitive-complexity -- plugin loader dispatcher: handles three domains and lifecycle (validate, register, error-wrap) inline; splitting fragments error context
+function registerLangExports(
+  mod: Record<string, unknown>,
+  ctx: RegisterCtx,
+): RegisterCounts {
+  const lang = mod as LangPluginExports
+  const registeredAdapterIds = new Set<string>()
+  let adaptersRegistered = 0
+
+  const tryRegisterAdapter = (value: unknown, sourceLabel: string): void => {
+    if (!looksLikeLanguageAdapter(value)) return
+    const id = (value as { id: string }).id
+    if (registeredAdapterIds.has(id)) return
+    defaultLanguageRegistry.register(value as Parameters<typeof defaultLanguageRegistry.register>[0])
+    registeredAdapterIds.add(id)
+    adaptersRegistered++
+    ctx.debug('plugin.loader.adapter.registered', { source: sourceLabel, id })
+  }
+
+  if (lang.adapters !== undefined) {
+    if (Array.isArray(lang.adapters)) {
+      for (const [index, adapter] of lang.adapters.entries()) {
+        if (looksLikeLanguageAdapter(adapter)) {
+          tryRegisterAdapter(adapter, `adapters[${index}]`)
+        } else {
+          ctx.warn(
+            'plugin.loader.invalid_adapter_item',
+            `Plugin "${ctx.plugin.namespace}" adapters[${index}] is not a valid LanguageAdapter — skipping.`,
+            { index },
+          )
+        }
+      }
+    } else {
+      ctx.warn(
+        'plugin.loader.invalid_adapters_export',
+        `Plugin "${ctx.plugin.namespace}" exports "adapters" but it is not an array — skipping adapter registration.`,
+      )
+    }
+  }
+
+  // Named exports that look like LanguageAdapter
+  for (const [exportName, value] of Object.entries(mod)) {
+    if (
+      exportName === 'default' ||
+      exportName === 'adapters' ||
+      exportName === 'checks' ||
+      exportName === 'recipes' ||
+      exportName === 'metadata'
+    ) continue
+    tryRegisterAdapter(value, `named:${exportName}`)
+  }
+
+  // Default export: a single LanguageAdapter
+  tryRegisterAdapter(mod.default, 'default')
+
+  return { adaptersRegistered }
+}
+
+/**
+ * Public loadPlugin signature preserved for backward compat. Dispatches
+ * to the right registerExports callback based on domain.
+ */
 export async function loadPlugin(
   plugin: DiscoveredPlugin,
   domain: PluginDomain = 'fit',
 ): Promise<LoadedPlugin> {
-  try {
-    const moduleUrl = pathToFileURL(plugin.entryPoint).href
-    const mod = await import(moduleUrl) as FitPluginExports & LangPluginExports
+  const register = domain === 'lang' ? registerLangExports : registerFitExports
+  return coreLoadPlugin(plugin, register)
+}
 
-    let checksRegistered = 0
-    let recipesRegistered = 0
-    let adaptersRegistered = 0
-
-    // Lang domain: register language adapters from `adapters` array,
-    // named exports, and default export. Adapters are deduplicated by id.
-    if (domain === 'lang') {
-      const registeredAdapterIds = new Set<string>()
-
-      const tryRegisterAdapter = (value: unknown, sourceLabel: string): void => {
-        if (!looksLikeLanguageAdapter(value)) return
-        const id = (value as { id: string }).id
-        if (registeredAdapterIds.has(id)) return
-        defaultLanguageRegistry.register(value as Parameters<typeof defaultLanguageRegistry.register>[0])
-        registeredAdapterIds.add(id)
-        adaptersRegistered++
-        logger.debug({
-          evt: 'plugin.loader.adapter.registered',
-          module: MODULE_TAG,
-          namespace: plugin.namespace,
-          source: sourceLabel,
-          id,
-        })
-      }
-
-      if (mod.adapters !== undefined) {
-        if (Array.isArray(mod.adapters)) {
-          for (const [index, adapter] of mod.adapters.entries()) {
-            if (looksLikeLanguageAdapter(adapter)) {
-              tryRegisterAdapter(adapter, `adapters[${index}]`)
-            } else {
-              logger.warn({
-                evt: 'plugin.loader.invalid_adapter_item',
-                module: MODULE_TAG,
-                namespace: plugin.namespace,
-                source: plugin.source,
-                index,
-                msg: `Plugin "${plugin.namespace}" adapters[${index}] is not a valid LanguageAdapter — skipping.`,
-              })
-            }
-          }
-        } else {
-          logger.warn({
-            evt: 'plugin.loader.invalid_adapters_export',
-            module: MODULE_TAG,
-            namespace: plugin.namespace,
-            source: plugin.source,
-            msg: `Plugin "${plugin.namespace}" exports "adapters" but it is not an array — skipping adapter registration.`,
-          })
-        }
-      }
-
-      // Named exports that look like LanguageAdapter
-      for (const [exportName, value] of Object.entries(mod)) {
-        if (
-          exportName === 'default' ||
-          exportName === 'adapters' ||
-          exportName === 'checks' ||
-          exportName === 'recipes' ||
-          exportName === 'metadata'
-        ) continue
-        tryRegisterAdapter(value, `named:${exportName}`)
-      }
-
-      // Default export: a single LanguageAdapter
-      const defaultExport = (mod as { default?: unknown }).default
-      tryRegisterAdapter(defaultExport, 'default')
-    }
-
-    // Register checks with namespace (skipped for lang domain).
-    //
-    // Two authorship styles are supported:
-    //   1. `export const checks = [...]`  — array of Check instances
-    //   2. `export const myCheck = defineCheck({...})` — Check as a named export
-    //
-    // Style 2 enables single-file plugins that drop into ~/.opensip-tools/fit/
-    // to author one check per file without a redundant array wrapper.
-    // Both styles can coexist in the same module; checks are deduplicated by
-    // their stable id so a check appearing in both an array and a named
-    // export is registered exactly once.
-    if (domain !== 'lang') {
-      const registeredIds = new Set<string>()
-
-      // Style 1: explicit `checks` array
-      if (mod.checks !== undefined) {
-        if (Array.isArray(mod.checks)) {
-          for (const [index, check] of mod.checks.entries()) {
-            if (isCheck(check)) {
-              if (!registeredIds.has(check.config.id)) {
-                defaultRegistry.register(check, plugin.namespace)
-                registeredIds.add(check.config.id)
-                checksRegistered++
-              }
-            } else {
-              logger.warn({
-                evt: 'plugin.loader.invalid_check_item',
-                module: MODULE_TAG,
-                namespace: plugin.namespace,
-                source: plugin.source,
-                index,
-                msg: `Plugin "${plugin.namespace}" checks[${index}] is not a valid Check object — skipping.`,
-              })
-            }
-          }
-        } else {
-          logger.warn({
-            evt: 'plugin.loader.invalid_checks_export',
-            module: MODULE_TAG,
-            namespace: plugin.namespace,
-            source: plugin.source,
-            msg: `Plugin "${plugin.namespace}" exports "checks" but it is not an array — skipping checks registration.`,
-          })
-        }
-      }
-
-      // Style 2: any named export that is a Check instance
-      for (const [exportName, value] of Object.entries(mod)) {
-        if (exportName === 'default' || exportName === 'checks' || exportName === 'recipes' || exportName === 'metadata') continue
-        if (isCheck(value) && !registeredIds.has(value.config.id)) {
-            defaultRegistry.register(value, plugin.namespace)
-            registeredIds.add(value.config.id)
-            checksRegistered++
-          }
-      }
-
-      // Default export: a single Check instance
-      const defaultExport = (mod as { default?: unknown }).default
-      if (isCheck(defaultExport) && !registeredIds.has(defaultExport.config.id)) {
-          defaultRegistry.register(defaultExport, plugin.namespace)
-          registeredIds.add(defaultExport.config.id)
-          checksRegistered++
-        }
-    }
-
-    // Register recipes (skipped for lang domain)
-    if (domain !== 'lang' && mod.recipes !== undefined) {
-      const recipes: readonly FitnessRecipe[] = mod.recipes
-      for (const [index, recipe] of recipes.entries()) {
-        if (recipe && typeof recipe === 'object' && 'id' in recipe && 'name' in recipe) {
-          try {
-            defaultRecipeRegistry.register(recipe, { allowOverwrite: false })
-            recipesRegistered++
-          } catch {
-            // Duplicate recipe — skip silently
-          }
-        } else {
-          logger.warn({
-            evt: 'plugin.loader.invalid_recipe_item',
-            module: MODULE_TAG,
-            namespace: plugin.namespace,
-            source: plugin.source,
-            index,
-            msg: `Plugin "${plugin.namespace}" recipes[${index}] is not a valid Recipe object (missing id or name) — skipping.`,
-          })
-        }
-      }
-    }
-
-    // Warn only when nothing was registered. With named-export discovery,
-    // counting actual registrations is more accurate than checking which
-    // declared exports were present.
-    const nothingRegistered =
-      domain === 'lang'
-        ? adaptersRegistered === 0
-        : checksRegistered === 0 && recipesRegistered === 0
-
-    if (nothingRegistered) {
-      logger.warn({
-        evt: 'plugin.loader.no_exports',
-        module: MODULE_TAG,
-        namespace: plugin.namespace,
-        source: plugin.source,
-        domain,
-        msg:
-          domain === 'lang'
-            ? `Plugin "${plugin.namespace}" registered no language adapters — nothing to use.`
-            : `Plugin "${plugin.namespace}" registered no checks or recipes — nothing to run.`,
-      })
-    }
-
-    logger.info({
-      evt: 'plugin.loader.load.success',
-      module: MODULE_TAG,
-      namespace: plugin.namespace,
-      source: plugin.source,
-      domain,
-      checksRegistered,
-      recipesRegistered,
-      adaptersRegistered,
-    })
-
-    return {
-      namespace: plugin.namespace,
-      source: plugin.source,
-      type: plugin.type,
-      checksRegistered,
-      recipesRegistered,
-      adaptersRegistered,
-    }
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error)
-
-    logger.warn({
-      evt: 'plugin.loader.load.error',
-      module: MODULE_TAG,
-      namespace: plugin.namespace,
-      source: plugin.source,
-      error: errorMsg,
-      err: error instanceof Error ? error : undefined,
-      msg: `Plugin "${plugin.namespace}" failed to load: ${errorMsg}. Continuing without this plugin.`,
-    })
-
-    return {
-      namespace: plugin.namespace,
-      source: plugin.source,
-      type: plugin.type,
-      checksRegistered: 0,
-      recipesRegistered: 0,
-      adaptersRegistered: 0,
-      error: errorMsg,
-    }
-  }
+/**
+ * Public loadAllPlugins signature preserved for backward compat.
+ * Dispatches to the right callback based on domain.
+ */
+export async function loadAllPlugins(
+  domain: PluginDomain,
+  projectDir?: string,
+): Promise<PluginLoadResult> {
+  const register = domain === 'lang' ? registerLangExports : registerFitExports
+  return coreLoadAllPlugins(domain, projectDir, register)
 }
 
 /**
@@ -285,43 +232,4 @@ function looksLikeLanguageAdapter(value: unknown): boolean {
     typeof v.stripStrings === 'function' &&
     typeof v.stripComments === 'function'
   )
-}
-
-/**
- * Discover and load all plugins for a domain. Loads sequentially to
- * ensure deterministic registration order.
- *
- * Discovers loose `.mjs` files under
- * `<projectDir>/opensip-tools/<tool>/{checks,recipes,scenarios}/` plus
- * any npm-installed packages in
- * `<projectDir>/opensip-tools/.runtime/plugins/<domain>/node_modules/`
- * that are listed in `plugins.<domain>` in the project config.
- *
- * Without a `projectDir`, no plugins are loaded — there's no
- * user-global fallback.
- */
-export async function loadAllPlugins(
-  domain: PluginDomain,
-  projectDir?: string,
-): Promise<PluginLoadResult> {
-  const discovered = discoverPlugins(domain, projectDir)
-
-  const plugins: LoadedPlugin[] = []
-  const errors: string[] = []
-
-  for (const plugin of discovered) {
-    const result = await loadPlugin(plugin, domain)
-    plugins.push(result)
-    if (result.error) {
-      errors.push(`${result.source}: ${result.error}`)
-    }
-  }
-
-  return {
-    plugins,
-    totalChecks: plugins.reduce((sum, p) => sum + p.checksRegistered, 0),
-    totalRecipes: plugins.reduce((sum, p) => sum + p.recipesRegistered, 0),
-    totalAdapters: plugins.reduce((sum, p) => sum + (p.adaptersRegistered ?? 0), 0),
-    errors,
-  }
 }

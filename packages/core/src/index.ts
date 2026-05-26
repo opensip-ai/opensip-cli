@@ -15,6 +15,10 @@ export {
   resolvePackageEntryPoint,
   discoverToolPackages,
   readToolPackageMetadata,
+  loadPlugin,
+  loadAllPlugins,
+  resolveScopes,
+  VALID_NPM_SCOPE_REGEX,
 } from './plugins/index.js';
 export type {
   PluginDomain,
@@ -29,6 +33,9 @@ export type {
   ToolPackageDiscoveryOptions,
   DiscoveredToolPackage,
   ToolPackageMetadata,
+  RegisterCtx,
+  RegisterCounts,
+  RegisterExportsFn,
 } from './plugins/index.js';
 
 // Tools — kernel-level Tool plugin contract.

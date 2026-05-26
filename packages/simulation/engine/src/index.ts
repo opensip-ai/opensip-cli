@@ -129,7 +129,30 @@ export {
 // =============================================================================
 
 export { simulationTool } from './tool.js'
-export { executeSim } from './cli/sim.js'
+export {
+  executeSim,
+  ensureScenariosLoaded,
+  getPluginLoadErrors,
+  setPreLoadHook,
+} from './cli/sim.js'
+export type { PreLoadHook } from './cli/sim.js'
+
+// =============================================================================
+// PLUGIN DISCOVERY — sim plugin contract + @opensip-tools/scenarios-*
+// =============================================================================
+
+export type { SimPluginExports } from './plugins/types.js'
+export {
+  discoverScenarioPackages,
+  readScenarioPackageMetadata,
+  readScenarioPackagePreferences,
+} from './plugins/scenario-package-discovery.js'
+export type {
+  DiscoveredScenarioPackage,
+  ScenarioPackageDiscoveryOptions,
+  ScenarioPackageMetadata,
+} from './plugins/scenario-package-discovery.js'
+export { loadAllSimPlugins } from './plugins/loader.js'
 
 // =============================================================================
 // SHARED INFRASTRUCTURE

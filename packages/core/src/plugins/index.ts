@@ -2,8 +2,10 @@
  * @fileoverview Plugin system barrel export
  *
  * Public API for plugin discovery and the kernel-level plugin types.
- * Tool-specific loaders (e.g. fitness's loadAllPlugins, fitness's
- * check-package-discovery) live with the tool that owns them.
+ * The generic plugin loader lives here too — tools (fitness, sim) plug
+ * a domain-specific registerExports callback in. Tool-specific
+ * discovery helpers (check-package-discovery, scenario-package-
+ * discovery) still live with the tool that owns them.
  */
 
 export {
@@ -11,8 +13,21 @@ export {
   readProjectPluginsList,
 } from './discover.js'
 export {
+  loadPlugin,
+  loadAllPlugins,
+} from './loader.js'
+export type {
+  RegisterCtx,
+  RegisterCounts,
+  RegisterExportsFn,
+} from './loader.js'
+export {
   resolvePackageEntryPoint,
 } from './package-entry.js'
+export {
+  VALID_NPM_SCOPE_REGEX,
+  resolveScopes,
+} from './scope-validation.js'
 export type {
   PackageEntryResolution,
 } from './package-entry.js'
