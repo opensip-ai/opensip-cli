@@ -2,10 +2,10 @@
  * CheckList component — renders available fitness checks grouped by tag.
  */
 
+import { useTheme } from '@opensip-tools/cli-ui';
 import { Text, Box } from 'ink';
 import React from 'react';
 
-import { useTheme } from '../theme.js';
 
 interface CheckEntry {
   readonly slug: string;

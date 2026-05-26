@@ -2,10 +2,10 @@
  * ResultsTable component — renders the fitness check results table.
  */
 
+import { useTheme, type Theme } from '@opensip-tools/cli-ui';
 import { Text, Box } from 'ink';
 import React from 'react';
 
-import { useTheme, type Theme } from '../theme.js';
 
 import type { TableRow } from '@opensip-tools/contracts';
 

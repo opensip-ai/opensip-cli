@@ -10,11 +10,11 @@
  * readable) or `opensip-tools dashboard` (HTML).
  */
 
+import { useTheme } from '@opensip-tools/cli-ui';
 import { type CheckOutput } from '@opensip-tools/contracts';
 import { Text, Box } from 'ink';
 import React from 'react';
 
-import { useTheme } from '../theme.js';
 
 /**
  * Hard cap on how many violations a single check renders inline.

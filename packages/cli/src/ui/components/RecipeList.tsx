@@ -2,10 +2,10 @@
  * RecipeList component — renders available fitness recipes.
  */
 
+import { useTheme } from '@opensip-tools/cli-ui';
 import { Text, Box } from 'ink';
 import React from 'react';
 
-import { useTheme } from '../theme.js';
 
 interface RecipeEntry {
   readonly name: string;

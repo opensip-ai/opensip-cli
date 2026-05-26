@@ -2,10 +2,10 @@
  * CloudReportStatus component — renders the result of a cloud report upload.
  */
 
+import { useTheme } from '@opensip-tools/cli-ui';
 import { Text, Box } from 'ink';
 import React from 'react';
 
-import { useTheme } from '../theme.js';
 
 export interface CloudReportStatusProps {
   readonly url: string;

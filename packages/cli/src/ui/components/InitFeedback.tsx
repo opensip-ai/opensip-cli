@@ -9,10 +9,10 @@
  *   - fallback (creation failed)
  */
 
+import { useTheme } from '@opensip-tools/cli-ui';
 import { Text, Box } from 'ink';
 import React from 'react';
 
-import { useTheme } from '../theme.js';
 
 import type { PreExistingFile } from '@opensip-tools/contracts';
 

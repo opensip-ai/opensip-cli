@@ -1,10 +1,10 @@
 /* eslint-disable unicorn/filename-case -- React component test files mirror PascalCase component filenames */
+import { ThemeProvider } from '@opensip-tools/cli-ui';
 import { render } from 'ink-testing-library';
 import React from 'react';
 import { describe, it, expect } from 'vitest';
 
 import { Banner } from '../../../ui/components/Banner.js';
-import { ThemeProvider } from '../../../ui/theme.js';
 
 describe('Banner', () => {
   it('renders the ASCII art banner with block characters', () => {

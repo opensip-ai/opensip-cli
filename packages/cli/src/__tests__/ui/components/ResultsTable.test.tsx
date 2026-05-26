@@ -1,10 +1,10 @@
 /* eslint-disable unicorn/filename-case -- React component test files mirror PascalCase component filenames */
+import { ThemeProvider } from '@opensip-tools/cli-ui';
 import { render } from 'ink-testing-library';
 import React from 'react';
 import { describe, it, expect } from 'vitest';
 
 import { ResultsTable } from '../../../ui/components/ResultsTable.js';
-import { ThemeProvider } from '../../../ui/theme.js';
 
 import type { TableRow } from '@opensip-tools/contracts';
 

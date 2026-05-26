@@ -2,6 +2,7 @@
  * App — top-level Ink component that dispatches on CommandResult.type.
  */
 
+import { RunHeader , useTheme } from '@opensip-tools/cli-ui';
 import { Text, Box } from 'ink';
 import React from 'react';
 
@@ -18,9 +19,8 @@ import { InitFeedback } from './components/InitFeedback.js';
 import { PluginFeedback } from './components/PluginFeedback.js';
 import { RecipeList } from './components/RecipeList.js';
 import { ResultsTable } from './components/ResultsTable.js';
-import { RunHeader } from './components/RunHeader.js';
 import { Summary } from './components/Summary.js';
-import { useTheme } from './theme.js';
+
 
 import type {
   ClearDoneResult,

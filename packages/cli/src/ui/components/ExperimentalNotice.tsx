@@ -3,10 +3,10 @@
  * for the sim command.
  */
 
+import { useTheme } from '@opensip-tools/cli-ui';
 import { Text, Box } from 'ink';
 import React from 'react';
 
-import { useTheme } from '../theme.js';
 
 export interface ExperimentalNoticeProps {
   readonly tool: 'sim';

@@ -5,12 +5,12 @@
  * lived as raw ANSI prints inside the command implementations.
  */
 
+import { ThemeProvider } from '@opensip-tools/cli-ui';
 import { render } from 'ink-testing-library';
 import React from 'react';
 import { describe, it, expect } from 'vitest';
 
 import { App } from '../../ui/App.js';
-import { ThemeProvider } from '../../ui/theme.js';
 
 import type { ClearDoneResult, ConfigureDoneResult } from '@opensip-tools/contracts';
 

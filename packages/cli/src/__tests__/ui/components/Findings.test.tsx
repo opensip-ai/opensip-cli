@@ -1,11 +1,11 @@
 /* eslint-disable unicorn/filename-case -- React component test files mirror PascalCase component filenames */
+import { ThemeProvider } from '@opensip-tools/cli-ui';
 import { type CheckOutput } from '@opensip-tools/contracts';
 import { render } from 'ink-testing-library';
 import React from 'react';
 import { describe, it, expect } from 'vitest';
 
 import { Findings } from '../../../ui/components/Findings.js';
-import { ThemeProvider } from '../../../ui/theme.js';
 
 const sampleChecks: CheckOutput[] = [
   {

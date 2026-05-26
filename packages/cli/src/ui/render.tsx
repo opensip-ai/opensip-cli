@@ -8,10 +8,10 @@
  * any tool-specific component. Layer 5 Phase 3 (audit 2026-05-23 F3).
  */
 
+import { ThemeProvider } from '@opensip-tools/cli-ui';
 import React from 'react';
 
 import { App } from './App.js';
-import { ThemeProvider } from './theme.js';
 
 import type { CommandResult } from '@opensip-tools/contracts';
 
