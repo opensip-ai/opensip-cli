@@ -159,8 +159,11 @@ describe('CLI e2e', () => {
     });
 
     it('unknown recipe produces error JSON', () => {
+      // Regression for 2026-05-25 audit: recipe-not-found must route to
+      // CONFIGURATION_ERROR (2), not CHECK_NOT_FOUND (3). Asserting `=== 2`
+      // (vs. `not.toBe(0)`) closes the loop on that fix end-to-end.
       const { stdout, exitCode } = run('fit', '--json', '--recipe', 'nonexistent-recipe');
-      expect(exitCode).not.toBe(0);
+      expect(exitCode).toBe(2);
       const output = JSON.parse(stdout);
       expect(output.error).toBeDefined();
       expect(output.error).toContain('nonexistent-recipe');
