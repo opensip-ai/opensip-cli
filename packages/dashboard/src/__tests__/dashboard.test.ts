@@ -79,6 +79,42 @@ describe('generateDashboardHtml', () => {
     expect(html).toContain(String.raw`</script>`);
   });
 
+  // Regression for the 2026-05-25 audit fix on serializeOptionalBlob.
+  // The 'literal' arm (used for editorProtocol) previously called
+  // JSON.stringify without escapeForScriptContext; JSON.stringify does not
+  // escape `<`, so a caller-controlled editorProtocol containing the literal
+  // sequence `</script>` would close the inline <script> block. After the
+  // fix, both arms apply the same escape — `<` becomes `<`.
+  it('escapes </script> in editorProtocol literal so it cannot close the inline script block', () => {
+    const html = generateDashboardHtml({
+      sessions: [],
+      editorProtocol: '</script><img src=x onerror=alert(1)>',
+    });
+    // The escaped form must be present; the raw form must NOT appear inside
+    // the EDITOR_PROTOCOL constant assignment.
+    const literalLine = html.split('\n').find(line => line.startsWith('const EDITOR_PROTOCOL = '));
+    expect(literalLine).toBeDefined();
+    expect(literalLine ?? '').not.toContain('</script>');
+    // The escape function rewrites `<` to the JS Unicode escape `<`,
+    // which the HTML tokenizer does not match against `</script>`.
+    // (`String.raw`<`` is the 1-char `<` because the JS lexer processes
+    // Unicode escapes before String.raw sees them — a backslash literal
+    // is required for the 6-character on-disk sequence.)
+    // eslint-disable-next-line unicorn/prefer-string-raw -- see comment above
+    expect(literalLine ?? '').toContain('\\u003c');
+  });
+
+  // Regression for the 2026-05-25 audit fix on the <title> interpolation:
+  // session.score is typed `number` but originates from a SQLite column; a
+  // corrupted row carrying a non-numeric value would otherwise interpolate
+  // directly into the page title. coerceScoreForTitle falls back to 0 for
+  // anything non-finite.
+  it('renders score 0 in <title> when the session score is non-finite', () => {
+    const bad = makeSession({ score: Number.NaN });
+    const html = generateDashboardHtml({ sessions: [bad] });
+    expect(html).toMatch(/<title>OpenSIP Tools — Pass Rate: 0%<\/title>/);
+  });
+
   it('renders all three tab panels (overview, fitness, simulation)', () => {
     const html = generateDashboardHtml({ sessions: [] });
     expect(html).toContain('id="panel-overview"');

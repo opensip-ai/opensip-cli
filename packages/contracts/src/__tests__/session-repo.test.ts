@@ -1,6 +1,7 @@
 import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { sessions } from '../persistence/schema/sessions.js';
 import { SessionRepo } from '../persistence/session-repo.js';
 
 import type { StoredSession } from '../persistence/store.js';
@@ -179,5 +180,36 @@ describe('SessionRepo — error paths', () => {
   it('purge() rethrows after closing datastore', () => {
     datastore.close();
     expect(() => repo.purge(new Date())).toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Hydration guards — regression coverage for the 2026-05-25 audit fix that
+// replaced blind `as`-casts on row.tool / row.summary with runtime validation.
+// Both fields are stored as plain text (no SQLite CHECK constraint), so a
+// legacy or hand-edited row could carry a value outside the declared union.
+// The guards turn that silent corruption into an immediate, explicit throw.
+// ---------------------------------------------------------------------------
+
+describe('SessionRepo — hydration guards', () => {
+  it('throws on a session row whose tool value is outside the union', () => {
+    repo.save(makeSession({ id: 'tool-corrupt' }));
+    // Drizzle's `update` lets us poison the row without going through repo.save,
+    // which is the only way to simulate a hand-edited / legacy-schema row.
+    datastore.db.update(sessions).set({ tool: 'not-a-real-tool' }).run();
+    expect(() => repo.get('tool-corrupt')).toThrow(/unknown tool value/);
+    expect(() => repo.list()).toThrow(/unknown tool value/);
+  });
+
+  it('throws on a session row whose summary blob is missing required fields', () => {
+    repo.save(makeSession({ id: 'summary-corrupt' }));
+    // mode:'json' columns accept any JSON-serialisable value at the driver
+    // layer — drizzle types it as `unknown` precisely because no runtime
+    // schema is enforced.
+    datastore.db
+      .update(sessions)
+      .set({ summary: { total: 5, passed: 4 } })
+      .run();
+    expect(() => repo.get('summary-corrupt')).toThrow(/corrupted summary JSON/);
   });
 });

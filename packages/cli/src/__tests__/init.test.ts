@@ -224,6 +224,19 @@ describe('executeInit (ambiguous language)', () => {
     expect(result.created).toBe(false);
     expect(result.ambiguousLanguageError?.message).toContain("Unknown language 'cobol'");
   });
+
+  // Regression for the 2026-05-25 audit fix: previously a non-existent
+  // --cwd returned `{ created: false, state: 'pristine' }` with no error
+  // discriminant, so register-init mapped it to exit 0. The fix surfaces
+  // it as ambiguousLanguageError so the existing exit-2 path fires.
+  it('surfaces a structured error when --cwd does not exist on disk', () => {
+    const missing = join(testDir, 'definitely-does-not-exist');
+    const result = executeInit(makeArgs({ cwd: missing }));
+    expect(result.created).toBe(false);
+    expect(result.ambiguousLanguageError).toBeDefined();
+    expect(result.ambiguousLanguageError?.detected).toEqual([]);
+    expect(result.ambiguousLanguageError?.message).toContain(missing);
+  });
 });
 
 describe('executeInit (fully-initialized state)', () => {
