@@ -1,15 +1,15 @@
 // @fitness-ignore-file batch-operation-limits -- iterates bounded collections (config entries, registry items, or small analysis results)
 /**
- * @fileoverview Shared AST utilities for fitness checks (legacy surface).
+ * @fileoverview Shared AST utilities for fitness checks.
  *
- * Common TypeScript AST operations for source parsing, tree walking,
- * and node inspection. Used by AST-based fitness checks. Lives in
- * @opensip-tools/lang-typescript so the dependency on `typescript` is
- * isolated to the language pack.
+ * Common TypeScript AST operations for tree walking and node inspection.
+ * Used by AST-based fitness checks. Lives in @opensip-tools/lang-typescript
+ * so the dependency on `typescript` is isolated to the language pack.
  *
- * Function-scope helpers (findEnclosingFunction, isInAsyncContext, etc.)
- * live in `./function-scope.ts` and are re-exported through the package
- * barrel; do NOT add new function-scope helpers to this file.
+ * Source parsing lives in `./parse.ts` (TSX-aware). Function-scope helpers
+ * (findEnclosingFunction, isInAsyncContext, etc.) live in `./function-scope.ts`
+ * and are re-exported through the package barrel; do NOT add new
+ * function-scope helpers to this file.
  */
 
 import { getParseTree } from '@opensip-tools/core/languages/parse-cache.js'
@@ -19,26 +19,8 @@ import * as ts from 'typescript'
 import { typescriptAdapter } from './adapter.js'
 
 // =============================================================================
-// SOURCE PARSING
+// SOURCE PARSING (cached)
 // =============================================================================
-
-/**
- * Parse TypeScript/JavaScript source into an AST SourceFile.
- * Returns null on parse failure.
- *
- * Note: this is the TSX-blind shim retained for the legacy
- * `./ast-utilities` subpath. New callers SHOULD prefer `parseSource`
- * from `@opensip-tools/lang-typescript` (the package barrel), which uses
- * `ts.ScriptKind.TSX` so the same parse handles `.ts`, `.tsx`, `.js`,
- * and `.jsx`. Tracked for removal in audit prior-finding F2.
- */
-export function parseSource(content: string, filePath: string): ts.SourceFile | null {
-  try {
-    return ts.createSourceFile(filePath, content, ts.ScriptTarget.Latest, true)
-  } catch {
-    return null
-  }
-}
 
 /**
  * Cached parse — uses the language-aware parse cache via the registered

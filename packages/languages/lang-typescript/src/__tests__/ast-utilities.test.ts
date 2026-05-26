@@ -14,7 +14,6 @@ import {
   isInStringLiteral,
   isLiteral,
   isPropertyAccess,
-  parseSource,
   ts,
   walkNodes,
 } from '../ast-utilities.js';
@@ -27,6 +26,7 @@ import {
   isInAsyncContext,
   isInsideConditionalBlock,
 } from '../function-scope.js';
+import { parseSource } from '../parse.js';
 
 const parse = (content: string) => parseSource(content, 'x.ts');
 
