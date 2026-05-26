@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-05-22
+last_verified: 2026-05-26
 release: v1.3.x
 title: "Plugin authoring"
 audience: [plugin-authors]
@@ -152,6 +152,34 @@ Same shape for `defineChaosScenario`, `defineInvariantScenario`, `defineFixEvalu
 
 A check pack is a check directory promoted to its own npm package. Use this when you want to ship the same checks across multiple projects.
 
+### Where should this package live in your repo?
+
+opensip-tools reserves `<project>/opensip-tools/` for project-local extension content (`.mjs` files under `fit/checks/`, `fit/recipes/`, `sim/scenarios/`) and the tool-managed `.runtime/` directory. **Don't park workspace packages there** — those subtrees are owned by the tool and re-running `init` can re-scaffold them.
+
+When your pack outgrows a handful of `.mjs` files (shared helpers, tests, more than a dozen checks), promote it to a regular npm package:
+
+- **Monorepo** — place the package alongside your other internal packages (`packages/`, `libs/`, etc.) as a normal workspace member. The workspace link makes it resolvable via `node_modules/` for discovery.
+- **Single-package repo** — publish to your private npm registry (or a public scope you own).
+
+#### Naming and auto-discovery
+
+Use your **own** npm scope (e.g. `@acme`). Don't publish under `@opensip-tools/*` — that scope is owned by the platform; name-squatting on it risks colliding with first-party packs and breaks if you ever try to publish.
+
+The package name **under your scope** must start with `checks-` (e.g. `@acme/checks-internal`) for the scope-scan auto-discovery to pick it up. The prefix is the discovery anchor.
+
+To have your scope auto-discovered, add it to `opensip-tools.config.yml`:
+
+```yaml
+plugins:
+  # Any @acme/checks-* package installed in node_modules is auto-loaded.
+  packageScopes:
+    - "@acme"
+```
+
+The platform scope (`@opensip-tools`) is always scanned; entries here are additive. Alternative: pin individual packages under `plugins.checkPackages` and skip the scope entry. See the [Three paths](#discovery-three-paths) below for the trade-off.
+
+> Sim packs follow the same pattern in concept (`@acme/scenarios-*`), but package-level auto-discovery for scenarios is still in flight. Today, ship sim scenarios as project-local `.mjs` files (section 3) or list scenario packages explicitly under `plugins.sim`.
+
 ### Layout
 
 ```
@@ -188,10 +216,11 @@ A check pack is a check directory promoted to its own npm package. Use this when
 }
 ```
 
-**No `opensipTools.kind` marker for check packs** — discovery is name-based. Two paths:
+<a id="discovery-three-paths"></a>**No `opensipTools.kind` marker for check packs** — discovery is name-based. Three paths:
 
-- **Publish into `@opensip-tools/checks-*`** — auto-discovered by name prefix when installed in `node_modules`.
-- **Use any other scope** (e.g. `@my-co/checks-internal`) — the consumer must list it in `plugins.checkPackages:` (or `plugins.fit:`). `opensip-tools plugin add @my-co/checks-internal` does this in one step.
+- **`@opensip-tools/checks-*`** — auto-discovered. Reserved for first-party packs published by the opensip-tools project itself; don't use this scope for customer packs.
+- **Your own scope + `plugins.packageScopes`** — add e.g. `@my-co` to `plugins.packageScopes` in `opensip-tools.config.yml`, and any `@my-co/checks-*` package installed in `node_modules` is auto-discovered alongside the platform default. Best fit for monorepos where you want every internal check pack picked up without per-package config.
+- **Your own scope + explicit listing in `plugins.checkPackages`** — pin individual packages by name. `opensip-tools plugin add @my-co/checks-internal` does this in one step. Best fit when you want a deterministic, version-pinned set rather than scope-wide auto-discovery.
 
 Peer-depend on `@opensip-tools/fitness` and `@opensip-tools/core` — the consumer brings their own version.
 
