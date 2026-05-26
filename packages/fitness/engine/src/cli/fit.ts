@@ -62,8 +62,13 @@ import type { DataStore } from '@opensip-tools/datastore';
 // phase helpers below; `executeFit`'s phase ordering is sequenced so the
 // readers always run after the setter completes.
 
-/** Whether `ensureChecksLoaded` has run to completion this process. */
-let checksLoaded = false;
+/** Project directory for which `ensureChecksLoaded` has run to completion.
+ * Keyed on the directory so a second invocation against a different
+ * project (long-lived host, tests, programmatic API) re-loads plugins
+ * and check packages anchored at the new directory. `null` when no
+ * projectDir was supplied; `''` is reserved as the "loaded" sentinel
+ * for the no-project case. */
+let checksLoadedFor: string | null = null;
 /** Plugin load failures from the most recent `ensureChecksLoaded` call \u2014
  * read by `buildCliOutput` and `buildFitDoneResult` to fail the run. */
 let pluginLoadErrors: readonly string[] = [];
@@ -138,7 +143,8 @@ export function setPreLoadHook(hook: PreLoadHook | undefined): void {
 }
 
 export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
-  if (checksLoaded) return;
+  const key = projectDir ?? '';
+  if (checksLoadedFor === key) return;
 
   // 0. CLI-injected pre-load hook (auto-sync project plugins, etc).
   //    Skipped when no hook is registered (e.g. running fitness via the
@@ -202,7 +208,7 @@ export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
   }
 
   rebuildDisplayLookups();
-  checksLoaded = true;
+  checksLoadedFor = key;
 }
 
 /**

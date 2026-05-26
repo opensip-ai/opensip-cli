@@ -150,17 +150,20 @@ moves the deletion through another helper could silently break it.
 output, no spec-corner reliance.
 
 ### [F-9] `checksLoaded` module-level singleton never resets
-**Severity:** low (only bites long-lived hosts) · **Status:** deferred
-**Location:** `packages/fitness/engine/src/cli/fit.ts:140-141`
+**Severity:** low (only bites long-lived hosts) · **Status:** fixed
+**Location:** `packages/fitness/engine/src/cli/fit.ts:65-66, 140-205`
 
 A second `executeFit(...)` call in the same process — possible from a
 long-running daemon, programmatic API, or back-to-back test cases —
-skips plugin loading because the module-level `checksLoaded` flag
-stayed true. Today the CLI is one-shot per process, so this does not
-bite, but it will the moment we add any non-one-shot host.
+skipped plugin loading because the module-level `checksLoaded` flag
+stayed true. Today the CLI is one-shot per process, but a single
+`ensureChecksLoaded` against a different project root must re-discover
+the plugin set anchored at that root.
 
-**Action:** key the guard on `projectDir`, or expose a
-`resetChecksLoadedForTesting()` for the test harness.
+**Action taken:** replaced the boolean `checksLoaded` with a
+`checksLoadedFor: string | null` keyed on the project directory (empty
+string is the sentinel for "no projectDir"). A call with a different
+key re-runs the full plugin + check-package discovery.
 
 ### [F-10] `fileCache.clear()` ordering vs `abortController.abort()`
 **Severity:** low (no crash, wasted I/O) · **Status:** wontfix (needs
@@ -195,22 +198,45 @@ worked on POSIX (separator-replace was a no-op when sep was `/`), and
 on Windows. The `sep` import is retained — it's still used for the
 inverse normalization at line 507.
 
-### [F-12] `alwaysThrowsBranchRule` regex never matches call-edge text
-**Severity:** medium (rule never fires) · **Status:** deferred (needs
-fixture-based confirmation)
+### [F-12] `alwaysThrowsBranchRule` regex never matches real call-edge text
+**Severity:** medium (rule never fires on real code) · **Status:** deferred (needs walker change + new fixture)
 **Location:** `packages/graph/engine/src/rules/always-throws-branch.ts:43`
++ `packages/graph/graph-typescript/src/walk.ts:157-159`
++ `packages/graph/graph-typescript/src/edges.ts:53-59`
 
-`occ.calls.every((e) => throwRegex.test(e.text))` examines call-edge
-text, which is the call expression text (e.g. `new Error("msg")`).
-The regex requires the text to start with `throw`, but a
-`ThrowStatement` is recorded as a `NewExpression` call-site whose
-text does not begin with `throw`. The rule appears unable to fire on
-real TypeScript code.
+Confirmed defect after tracing the data path:
+1. `walk.ts:157-159` pushes a call-site record for any node where
+   `isResolverCandidate(node)` is true — that returns true for
+   `NewExpression` (line 275) but never branches on the parent
+   `ThrowStatement`. The `node` recorded is the `NewExpression`.
+2. `edges.ts:tsPosition` computes the edge text as
+   `sourceFile.text.slice(node.getStart(), node.getEnd())` — which is
+   exactly `new Error(...)` for a `throw new Error(...)` statement.
+   No `throw` prefix.
+3. `THROW_SYNTAX_REGEX = /\bthrow\s+(?:new\s+)?[A-Za-z_$]/` requires
+   the word "throw" somewhere in the text. It is never present.
+4. The fallback `TYPESCRIPT_FALLBACK_THROW_REGEX` is identical in
+   intent: requires `^\s*throw\s+`.
 
-**Action:** capture the enclosing `ThrowStatement` text at walk time,
-or change the predicate to match the new-expression shape directly.
-Deferred pending a graph-rule integration test that fixtures a throw
-and asserts the rule fires.
+The Python and Rust regexes (`\braise\b`, `\bpanic!\s*\(`) work for
+those languages only if the adapter records the enclosing `raise` /
+`panic!` text — same caveat applies, needs per-adapter audit. The
+integration test `rule-hints-integration.test.ts` constructs synthetic
+`CallEdge`s with text like `'throw new Error("hi")'` via the `edge`
+helper, which masks the walker's real output. The test passes; the
+rule never fires in production.
+
+**Action:** in `walk.ts`, when pushing a `'call'` record for a
+`NewExpression` (or `CallExpression`) whose parent is a
+`ThrowStatement`, record the throw statement's node instead so the
+text slice includes the `throw ` prefix. Add a new
+`rule-hints-integration` fixture that runs the actual walker against
+real source text and asserts the rule fires. Same shape for Python's
+`raise` and Rust's `panic!` if the symmetric defect is confirmed.
+Deferred this pass: the walker change has cascading risk on edge
+positions (line/column for every throw-shaped edge would change),
+and the right fix needs a dedicated PR with adapter-by-adapter
+tests.
 
 ### [F-13] `no-side-effect-path` false positive on unresolved edges
 **Severity:** medium · **Status:** deferred
@@ -243,20 +269,19 @@ boundary and either returned `null` or the wrong outer name.
 branch that returns the expression's name when present.
 
 ### [F-15] `walkNodes` does not visit the root node
-**Severity:** low (doc/behavior mismatch) · **Status:** deferred
+**Severity:** low (doc/behavior mismatch) · **Status:** fixed (doc only)
 **Location:** `packages/languages/lang-typescript/src/ast-utilities.ts:40-46`
 
 `walkNodes(root, visitor)` calls `ts.forEachChild(root, visit)` — the
-root is never passed to the visitor, contradicting the "all nodes in
-a SourceFile or subtree" JSDoc. All current callers pass a
-`SourceFile` as root and don't expect to see a `SourceFile` in the
-visitor, so this is invisible today, but a future caller passing a
-subtree root will silently miss it.
+root is never passed to the visitor, which contradicted the
+"all nodes in a SourceFile or subtree" JSDoc. Sixty+ TS checks rely
+on the current behavior, so changing it would risk a wide-blast
+regression.
 
-**Action:** prepend `visitor(root)` before the recursion, OR amend
-the JSDoc to "visits every descendant of `root`". Deferred — touching
-this without a check-fixture audit risks behavioral drift in 60+ TS
-checks. Track separately.
+**Action taken:** updated the JSDoc to accurately describe the
+current behavior — "walks every descendant of `root` (the root
+itself is not visited)" — and documented the wrap pattern for callers
+that need the root in their visitor. No behavior change.
 
 ### [F-16] `filterContent` Map keyed by raw source string
 **Severity:** low (heap pressure on large runs) · **Status:** deferred
@@ -332,18 +357,31 @@ public API. Not a defect; not dead code.
 
 ---
 
-## Summary of this pass
+## Summary across passes
 
-- **Fixed** (10): F-1, F-2, F-4, F-5, F-8, F-11, F-14, F-17, F-18, F-19.
-- **Deferred** (7): F-3, F-6, F-9, F-12, F-13, F-15, F-16.
+- **Fixed** (12): F-1, F-2, F-4, F-5, F-8, F-9, F-11, F-14, F-15, F-17, F-18, F-19.
+- **Deferred** (5): F-3, F-6, F-12, F-13, F-16.
 - **Wontfix on re-read** (3): F-7, F-10, F-20.
 
-Two of the fixed entries are critical (F-17 silently flipped pass/fail
-on every simulation run; F-18 broke the abort contract for the load
-loop). The rest are medium/low and span correctness, error handling,
-cross-platform, and doc-drift.
+The two critical fixes (F-17 inverted pass/fail on every sim run;
+F-18 broke abort propagation in the load loop) were the high-impact
+wins of this audit. F-9 (project-keyed plugin loading) tightens an
+invariant before the fitness engine grows a long-lived host. F-15
+was a docs-only correction after concluding the behavior change was
+too wide-blast for a one-shot audit.
 
-The deferred set is concentrated in fitness's parallel-execution path
-(F-6, F-9 — both need new test coverage before fixing) and graph rules
-(F-12, F-13 — need rule-fixture confirmation), plus three latent
-design issues (F-3, F-15, F-16) that are not active defects today.
+Remaining deferred items each need new test scaffolding before fixing:
+
+- F-3  schema generic — no current victim, latent design limitation.
+- F-6  parallel-execution Promise has no reject path — needs an abort/
+       reject test fixture in the recipe execution suite before
+       rewriting the driver.
+- F-12 always-throws rule's regex never matches real walker output —
+       fix lives in the per-adapter walker (record `ThrowStatement`
+       text not the inner `NewExpression`), needs a per-adapter
+       integration test that runs real source through the walker.
+- F-13 no-side-effect-path false positive on unresolved edges — needs
+       a fixture for the unresolved-`to` case before fixing the
+       fallback predicate.
+- F-16 filterContent cache memory — design issue, needs a signature
+       change touching every TS-AST check.
