@@ -1,0 +1,41 @@
+{
+  "name": "@opensip-tools/graph-go",
+  "version": "2.0.0",
+  "license": "MIT",
+  "description": "Go language adapter for the opensip-tools graph engine",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opensip-ai/opensip-tools.git",
+    "directory": "packages/graph/graph-go"
+  },
+  "homepage": "https://github.com/opensip-ai/opensip-tools",
+  "bugs": {
+    "url": "https://github.com/opensip-ai/opensip-tools/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "opensipTools": {
+    "kind": "graph-adapter"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@opensip-tools/core": "workspace:*",
+    "@opensip-tools/graph": "workspace:*",
+    "glob": "^13.0.0",
+    "tree-sitter": "0.22.4",
+    "tree-sitter-go": "0.23.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "vitest": "^2.1.0"
+  }
+}
