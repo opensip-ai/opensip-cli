@@ -67,13 +67,20 @@ interface PluginsConfig {
    */
   readonly autoDiscoverChecks?: boolean
   /**
-   * Additional npm scopes to include in check-package auto-discovery,
-   * on top of the platform default (`@opensip-tools`). Lets customers
-   * publish internal check packs under their own scope (e.g.
-   * `['@acme']` to discover `@acme/checks-*`) without listing each
-   * package individually under `checkPackages`. The platform scope is
-   * always scanned; entries here are additive. Ignored when
-   * `checkPackages` is set or `autoDiscoverChecks` is false.
+   * Additional npm scopes to include in package auto-discovery, on top
+   * of the platform default (`@opensip-tools`). Lets customers publish
+   * internal check packs and sim scenario packs under their own scope
+   * (e.g. `['@acme']` to discover `@acme/checks-*` and
+   * `@acme/scenarios-*`) without listing each package individually.
+   *
+   * Shared across check-package discovery (`@opensip-tools/fitness`)
+   * and scenario-package discovery (`@opensip-tools/simulation`) — one
+   * entry here picks up both kinds of pack under that scope. The
+   * platform scope is always scanned; entries here are additive.
+   *
+   * For check discovery: ignored when `checkPackages` is set or
+   * `autoDiscoverChecks` is false. For sim discovery: ignored when
+   * `scenarioPackages` is set or `autoDiscoverScenarios` is false.
    */
   readonly packageScopes?: readonly string[]
 }
