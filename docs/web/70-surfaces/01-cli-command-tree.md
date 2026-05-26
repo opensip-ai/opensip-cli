@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-18
-release: v1.3.0
+last_verified: 2026-05-22
+release: v1.3.x
 title: "CLI command tree"
 audience: [users, ci-integrators, contributors]
 purpose: "Lookup-shaped reference for every CLI command, its flags, and when to use each."
@@ -67,6 +67,7 @@ opensip-tools fit --gate-compare
 | `--exclude <slug>` | repeatable | `[]` | Exclude check by slug. Can be passed multiple times. |
 | `--list` | bool | `false` | List available checks instead of running. |
 | `--recipes` | bool | `false` | List available recipes instead of running. |
+| `--json` | bool | `false` | Emit `CliOutput` JSON on stdout instead of the table renderer. |
 | `--findings` | bool | `false` | Append a per-check finding listing after the table. |
 | `-v, --verbose` | bool | `false` | Inline finding details + findings summary. |
 | `--report-to <url>` | URL | — | POST findings to a URL (OpenSIP Cloud or compatible). |
@@ -78,10 +79,11 @@ opensip-tools fit --gate-compare
 | `--open` | bool | `false` | Launch dashboard after run. |
 | `--config <path>` | path | discovered | Override the `opensip-tools.config.yml` location (defaults to the project's config or the package.json pointer). |
 | `--cwd <path>` | path | `process.cwd()` | Target directory. |
+| `--debug` | bool | `false` | Enable debug-level logging. |
 
 **Mutual exclusion:** `--gate-save` and `--gate-compare` cannot be combined.
 
-**Exit codes:** 0 (passed), 1 (violations or regression), 2 (configuration error), 3 (`--check` slug not found), 4 (`--report-to` upload failure).
+**Exit codes:** 0 (passed), 1 (violations or regression), 2 (configuration error), 3 (`--check` slug not found via the error-suggestion mapping). Note: a `--report-to` upload failure on `fit` is reported in the run footer but does **not** change the exit code (only the `graph` tool exits 4 for upload failure).
 
 **See also:** [`20-the-fit-loop/04-output-gate-sarif.md`](/docs/opensip-tools/20-the-fit-loop/04-output-gate-sarif/), [`60-subsystems/03-architecture-gate.md`](/docs/opensip-tools/60-subsystems/03-architecture-gate/).
 
@@ -101,8 +103,11 @@ opensip-tools sim --kind <kind>
 |---|---|---|---|
 | `--recipe <name>` | string | built-in `default` | Run a named sim recipe. |
 | `--kind <kind>` | string | — | Filter scenarios by kind. One of `load`, `chaos`, `invariant`, `fix-evaluation`. |
+| `--cwd <path>` | path | `process.cwd()` | Target directory. |
+| `--json` | bool | `false` | Emit `SimDoneResult` JSON on stdout instead of the table renderer. |
 | `-q, --quiet` | bool | `false` | Suppress banner. |
 | `--open` | bool | `false` | Launch dashboard after run. |
+| `--debug` | bool | `false` | Enable debug-level logging. |
 
 **Exit codes:** 0 (all scenarios passed), 1 (any scenario failed), 2 (config/runtime error).
 
@@ -112,7 +117,7 @@ opensip-tools sim --kind <kind>
 
 ## `graph` — static call-graph + dead-end analysis
 
-Tool-owned: [`packages/graph/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/graph/engine/src/tool.ts). The pipeline architecture and cache invalidation are documented in [`40-the-graph-loop/01-stages-and-catalog.md`](/docs/opensip-tools/40-the-graph-loop/01-stages-and-catalog/); the perf-plan history is in [`docs/plans/00-graph-performance-improvements.md`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/docs/plans/00-graph-performance-improvements.md).
+Tool-owned: [`packages/graph/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/graph/engine/src/tool.ts). The pipeline architecture and cache invalidation are documented in [`40-the-graph-loop/01-stages-and-catalog.md`](/docs/opensip-tools/40-the-graph-loop/01-stages-and-catalog/); perf-plan history is recoverable from `git -P log -- packages/graph`.
 
 ```
 opensip-tools graph
@@ -138,6 +143,7 @@ opensip-tools graph --packages
 | `--package <name\|path>` | string | — | **TypeScript-only.** Scope the run to one workspace package (faster on monorepos; cross-package edges become unresolved). Searches `packages/**` for a basename match, or accepts an explicit directory path. Mutually exclusive with `--packages`. |
 | `--packages` | bool | `false` | **TypeScript-only.** Fan the run across every workspace package under `packages/**` with a `tsconfig.json`. One child process per package; concurrency capped at `cpus()-1`. Aggregates per-package findings. |
 | `--packages-concurrency <n>` | int | `cpus()-1` | Override `--packages` concurrency cap. |
+| `--debug` | bool | `false` | Enable debug-level logging. |
 
 **Adapter selection.** v1.3.0 ships three first-party adapters: `typescript`, `python`, `rust`. `pickAdapter(cwd)` chooses by file-extension dominance over the cwd, ignoring `node_modules/`, `.venv/`, `target/`, `dist/`, `build/`. Ties prefer TypeScript, then Python, then Rust. For Python and Rust projects, run `graph` from the project root — the `--package` and `--packages` scoping flags are TypeScript-only.
 
@@ -162,7 +168,14 @@ Tool-owned (fitness Tool registers it). Renders the most recent run as HTML and 
 ```
 opensip-tools dashboard
 opensip-tools dashboard --cwd <path>
+opensip-tools dashboard --json
 ```
+
+| Flag | Type | Default | Effect |
+|---|---|---|---|
+| `--cwd <path>` | path | `process.cwd()` | Project root. |
+| `--json` | bool | `false` | Emit a `{ type: 'dashboard', path, opened }` JSON envelope on stdout instead of the table renderer (the browser is still launched if `decideOpen` would normally open it; the JSON just adds a machine-readable result). |
+| `--debug` | bool | `false` | Enable debug-level logging. |
 
 The dashboard is a single self-contained HTML file at `<project>/opensip-tools/.runtime/reports/latest.html`. Each generation overwrites the previous file. The command launches the browser and exits; the file works without opensip-tools installed, so you can email it directly to a teammate.
 
@@ -228,7 +241,8 @@ CLI-owned: [`packages/cli/src/commands/init.ts`](https://github.com/opensip-ai/o
 ```
 opensip-tools init
 opensip-tools init --language <list>
-opensip-tools init --force
+opensip-tools init --keep
+opensip-tools init --remove
 ```
 
 Detects the project's primary language(s) from filesystem markers and writes:
@@ -246,10 +260,37 @@ Plus appends `opensip-tools/.runtime/` to `<cwd>/.gitignore`.
 | Flag | Effect |
 |---|---|
 | `--language <list>` | Comma-separated language list (`typescript,rust`). Overrides detection. |
-| `--force` | Overwrite existing `opensip-tools.config.yml` and example files. |
+| `--keep` | Re-scaffold examples; preserve any custom files in `opensip-tools/`. |
+| `--remove` | Delete `opensip-tools/` entirely, then scaffold fresh. |
 | `--cwd <path>` | Target directory (default: `process.cwd()`). |
 | `--json` | Emit a structured JSON result instead of the human-readable summary. |
 | `--debug` | Enable debug-level logging. |
+
+### Partial-state handling
+
+After parsing flags init classifies the working directory into one of four states:
+
+| State | `opensip-tools.config.yml` | `opensip-tools/` (excluding `.runtime/`) | Default | `--keep` | `--remove` |
+|---|---|---|---|---|---|
+| `pristine` | absent | absent | scaffold | scaffold | scaffold |
+| `fully-initialized` | present | present | exit 2, partial-state error | re-scaffold; preserve custom | `rm -rf opensip-tools/`; scaffold |
+| `partial-config-only` | present | absent | exit 2, partial-state error | scaffold the dir | scaffold the dir |
+| `partial-dir-only` | absent | present | exit 2, partial-state error | preserve custom; write YAML | `rm -rf opensip-tools/`; write YAML; scaffold |
+
+`--keep` and `--remove` are mutually exclusive. The legacy `--force`
+flag is removed; users who scripted it should migrate to `--remove`
+(closest semantic match — both blow away existing scaffolds).
+
+Each pre-existing file under `opensip-tools/` is classified as:
+
+- `scaffolded` — content matches a current-template byte-for-byte.
+- `stale-scaffolded` — was scaffolded for a language not in the current
+  detection set (e.g. `example-check-rust.mjs` after re-running with
+  `--language typescript`). Preserved by `--keep`.
+- `custom` — anything else (user-authored).
+
+The `InitResult` JSON shape carries `state`, `preExistingFiles[]`, and
+(on refusal) `partialStateError` so machine consumers can branch.
 
 Detection markers:
 

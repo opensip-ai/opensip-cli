@@ -74,22 +74,34 @@ The framework runs the personas at the configured RPS for the duration, collects
 ### `defineChaosScenario`
 
 ```ts
-import { defineChaosScenario, ASSERTIONS } from '@opensip-tools/simulation';
+import { defineChaosScenario, ASSERTIONS, persona } from '@opensip-tools/simulation';
 
 export default defineChaosScenario({
-  id: '...',
+  id: 'kill-database-recovers-in-10s',
   name: 'kill-database-recovers-in-10s',
-  description: 'After killing the database for 5s, the API recovers within 10s',
+  description: 'After killing the database, the API recovers within 10s',
   tags: ['chaos', 'database'],
 
-  // Flat load configuration — chaos composes the load loop directly
-  // rather than nesting a LoadScenarioConfig under `baseLoad`.
-  duration: 5_000, // ms — chaos-active window
-  arrivalProcess: { kind: 'poisson', rate: 50 },
-  personas: [/* ... */],
+  // Base-load configuration is flattened onto the chaos config — same
+  // fields the load kind takes (personas, duration, rampUp, targetRps).
+  personas: [persona('buyer', 5)],
+  duration: 30,
+  rampUp: 5,
+  targetRps: 50,
 
-  // Chaos injection — a per-tick callback or declarative fault.
-  chaos: { probability: 0.1, fault: { kind: 'database-kill' } },
+  // Failure injection contract.
+  chaos: {
+    enabled: true,
+    probability: 0.1,
+    types: [
+      {
+        type: 'error',
+        target: 'database',
+        probability: 0.5,
+        config: { type: 'error', statusCode: 500, message: 'db unavailable' },
+      },
+    ],
+  },
 
   // Two assertion sets — one for each phase the executor runs.
   steadyStateAssertions: [ASSERTIONS.lowErrorRate(0.5)],
@@ -98,7 +110,7 @@ export default defineChaosScenario({
 });
 ```
 
-The chaos kind composes a base load with explicit failure injection and a recovery contract. The executor runs the load loop for `duration` ms with chaos active (per-tick injection at `chaos.probability`), then re-runs the loop for `recoveryWindow` ms with chaos off. Both phases delegate to the same `runLoadWindow` driver in `framework/execution/run-load-window.ts` — the load kind is the no-`injectChaos` default and chaos passes a callback that returns `chaos-event` outcomes. Steady-state assertions evaluate against the chaos-active window, recovery assertions against the post-chaos window. Pass/fail is the AND of both verdicts.
+The chaos kind composes a base load with explicit failure injection and a recovery contract. The executor runs the load loop for `duration` seconds with chaos active (per-tick injection at `chaos.probability`), then re-runs the loop for `recoveryWindow` ms with chaos off. Both phases delegate to the same `runLoadWindow` driver in `framework/execution/run-load-window.ts` — the load kind is the no-`injectChaos` default and chaos passes a callback that returns `chaos-event` outcomes. Steady-state assertions evaluate against the chaos-active window, recovery assertions against the post-chaos window. Pass/fail is the AND of both verdicts.
 
 > **Schema note.** This is the flattened shape implemented today (option (b) in the
 > Layer 3 audit). A future major may revisit option (a) — proper composition with a
@@ -193,7 +205,7 @@ export default defineSimulationRecipe({
 
 (The fitness-side helper is named `defineRecipe`. Sim's helper is namespaced as `defineSimulationRecipe` so a project that imports both into one module doesn't have to alias.)
 
-Selectors are similar to fit's but with a slightly different set: `all`, `tags`, `kind`, `explicit` ([`packages/simulation/engine/src/recipes/types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/simulation/engine/src/recipes/types.ts)). Sim swaps fit's `pattern` selector for a `kind` selector that filters by scenario kind (`load` / `chaos` / `invariant` / `fix-evaluation`). The `--kind` CLI flag layers a post-selector intersection on top — you can run a recipe and further narrow it to one kind.
+Selectors are similar to fit's but with a slightly different set: `all`, `tags`, `kind`, `explicit` ([`packages/simulation/engine/src/recipes/types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/simulation/engine/src/recipes/types.ts)). Sim swaps fit's `pattern` selector for a `kind` selector that filters by scenario kind (`load` / `chaos` / `invariant` / `fix-evaluation`). The `--kind` CLI flag layers a post-selector intersection on top — you can run a recipe and further narrow it to one kind.
 
 `sequential` mode is the typical shape for sim recipes — load scenarios contend for resources, so running them in parallel is rarely correct. `parallel` is available for invariant scenarios (which are usually pure) or fix-evaluation scenarios that fan out across independent inputs.
 

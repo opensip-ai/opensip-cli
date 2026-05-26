@@ -162,7 +162,7 @@ The `DirectiveEntry` shape ([`packages/fitness/engine/src/framework/directive-in
 - The kind (`'next-line'` | `'file'`).
 - Whether the directive matched any actual violation (i.e. did this directive *do* anything?).
 
-The CLI's `--findings` output groups violations by check and the table renderer surfaces an `ignored` count per row (see `TableRow.ignored` in [`packages/contracts/src/types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v1.3.1/packages/contracts/src/types.ts)). The dashboard reads the same session record. The contract-stable JSON output (`CheckOutput`) does **not** carry `ignoredCount` or `appliedDirectives` — those live in the internal session record on disk and in the table-render layer; CI consumers that need directive details should read the session JSON directly rather than the `--json` envelope.
+The CLI's `--findings` output groups violations by check and the table renderer surfaces an `ignored` count per row (see `TableRow.ignored` in [`packages/contracts/src/types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/contracts/src/types.ts)). The dashboard reads the same session record. The contract-stable JSON output (`CheckOutput`) does **not** carry `ignoredCount` or `appliedDirectives` — those live in the internal session record on disk and in the table-render layer; CI consumers that need directive details should read the session JSON directly rather than the `--json` envelope.
 
 A directive that didn't match any violation (e.g. the targeted check no longer fires there) is *also* tracked internally. This is how you find stale suppressions: the directive exists in the source, and the framework reports zero violations matched it. A separate housekeeping pass can flag those for cleanup.
 

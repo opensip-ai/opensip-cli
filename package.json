@@ -27,7 +27,8 @@
     "sessions": "node packages/cli/dist/index.js sessions",
     "docs:build": "node tools/build-web-docs.mjs",
     "docs:check": "node tools/build-web-docs.mjs --check",
-    "verify-release": "node tools/verify-release.mjs"
+    "verify-release": "node tools/verify-release.mjs",
+    "prepare": "git config core.hooksPath .githooks 2>/dev/null || true"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

@@ -1,6 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-15
+last_verified: 2026-05-22
+release: v1.3.x
 title: "Contract surfaces"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "The system's public edges. Every contract opensip-tools makes with the outside world, and what changing each one would cost."
@@ -60,6 +61,13 @@ opensip-tools
 │   ├── --baseline <path>
 │   └── … (see fit-list, fit-recipes for catalogs)
 ├── sim                    (run simulation scenarios — experimental)
+├── graph                  (static call-graph + dead-end analysis)
+│   ├── --json
+│   ├── --no-cache
+│   ├── --gate-save
+│   ├── --gate-compare
+│   ├── --package <name|path>   (TypeScript-only)
+│   └── --packages              (TypeScript-only)
 ├── init                   (scaffold the project)
 ├── dashboard              (open the HTML report)
 ├── sessions
@@ -77,7 +85,7 @@ opensip-tools
 └── fit-recipes            (alias: list-recipes)
 ```
 
-Each command's flag list is owned by the Tool that registers it. `fit` flags live in [`packages/fitness/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/fitness/engine/src/tool.ts); `sim` flags in [`packages/simulation/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/simulation/engine/src/tool.ts); top-level commands like `init`, `plugin`, and `configure` live in [`packages/cli/src/commands/`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/cli/src/commands/).
+Each command's flag list is owned by the Tool that registers it. `fit` flags live in [`packages/fitness/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/fitness/engine/src/tool.ts); `sim` flags in [`packages/simulation/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/simulation/engine/src/tool.ts); `graph` flags in [`packages/graph/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/graph/engine/src/tool.ts); top-level commands like `init`, `plugin`, and `configure` live in [`packages/cli/src/commands/`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/cli/src/commands/).
 
 **Stability rule.** Removing a flag, removing a command, or changing a default value is a major-version change. Adding a flag with a safe default is a minor. Renaming a flag with an alias for the old name (the way `fit-list` aliases `list-checks`) is a minor; renaming without an alias is a major.
 
@@ -92,10 +100,12 @@ The integer the binary returns when it ends. Defined exactly once in [`packages/
 | `0` | `SUCCESS` | Run completed; no failing checks. |
 | `1` | `RUNTIME_ERROR` | Run completed; checks failed (violations found). |
 | `2` | `CONFIGURATION_ERROR` | Run could not start (config invalid, plugin failed to load, baseline missing). |
+| `3` | `CHECK_NOT_FOUND` | `--check <slug>` did not match any registered check. |
+| `4` | `REPORT_FAILED` | `--report-to` upload failed (network error or non-2xx). |
 
 CI integrations are the primary consumer. `opensip-tools fit && deploy` is an idiom; so is `opensip-tools fit --gate-compare || (echo "regression" && exit 1)`.
 
-**Stability rule.** Adding new codes is a major change (consumers are entitled to assume `0/1/2` is the universe). Re-purposing an existing code is a major change. The convention is "0 = green, 1 = red but expected, 2 = red and unexpected" — anything that breaks that mental model breaks consumers.
+**Stability rule.** Adding new codes is a minor change provided the additions stay above 2 (consumers that switch on `0/1/2` continue to work; codes 3 and 4 are reserved for the specialized failure modes documented above). Re-purposing or removing an existing code is a major change. The convention is "0 = green, 1 = red but expected, 2 = red and unexpected" — anything that breaks that mental model breaks consumers.
 
 ---
 
@@ -106,7 +116,7 @@ The structured stdout when `--json` is set. Shape lives at [`packages/contracts/
 ```ts
 interface CliOutput {
   readonly version: '1.0';
-  readonly tool: 'fit' | 'sim';
+  readonly tool: 'fit' | 'sim' | 'graph';
   readonly timestamp: string;            // ISO 8601
   readonly recipe?: string;
   readonly score: number;
@@ -232,7 +242,7 @@ It's worth being explicit about what isn't promised:
 - **Internal framework types.** `CheckConfig`, `FitnessRecipe`, `RecipeCheckResult`, `ExecutionContext`, `PathMatcher` — all internal. They live in `@opensip-tools/fitness`, but they're not re-exported as part of the marketplace shape. Check packs use `defineCheck`/`defineRecipe` (which *are* stable) and never touch these.
 - **Logger output format.** Logs are JSON Lines, but the field set is internal. Don't grep production logs for specific keys; treat them as opaque.
 - **Cache file format.** The AST cache, the glob cache, the prewarm cache — all rebuildable. They have on-disk shapes, but those shapes change without notice. Wiping `<project>/opensip-tools/.runtime/cache/` is always safe.
-- **Session record format.** Sessions are written to `<project>/opensip-tools/.runtime/sessions/<run-id>.json`, but the shape is internal. The `sessions list` command is the supported reader.
+- **Session record format.** Sessions are written to `<project>/opensip-tools/.runtime/sessions/{timestamp}-{tool}-{recipe?}.json`, but the shape is internal. The `sessions list` command is the supported reader.
 - **OpenSIP Cloud API.** The cloud is a separate product. Its API is its own contract, not opensip-tools'. The CLI POSTs `CliOutput` (which *is* stable), and the cloud is responsible for ingesting it.
 
 ---
@@ -254,7 +264,7 @@ You've now seen the four mental-model docs:
 
 1. [`01-fitness-loop.md`](/docs/opensip-tools/10-mental-model/01-fitness-loop/) — the spine, eight stages.
 2. [`02-tool-plugin-model.md`](/docs/opensip-tools/10-mental-model/02-tool-plugin-model/) — how the CLI doesn't know what `fit` does.
-3. [`03-modular-monolith.md`](/docs/opensip-tools/10-mental-model/03-modular-monolith/) — five layers, 18 packages.
+3. [`03-modular-monolith.md`](/docs/opensip-tools/10-mental-model/03-modular-monolith/) — five layers, 19 packages.
 4. This doc — the public edges.
 
 Time to go deeper. Section [`20-the-fit-loop/`](/docs/opensip-tools/20-the-fit-loop/) expands stages 4–8 of the loop with full code paths. Section [`30-the-sim-loop/`](/docs/opensip-tools/30-the-sim-loop/) does the same for `sim`. Sections 40+ cover runtime mechanics, subsystems, surfaces, reference, and conventions.

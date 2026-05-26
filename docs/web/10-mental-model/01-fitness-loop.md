@@ -1,6 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-15
+last_verified: 2026-05-22
+release: v1.3.x
 title: "The fitness loop"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "One check, end to end. Definition → loading → recipe selection → scope resolution → execution → signal → render → exit. The spine of the doc set."
@@ -31,7 +32,7 @@ This is the spine. Every other doc in the set is a deeper read on one stage of t
 > - What "the same check, run twice" actually means deterministically.
 > - Where the worked example (`acme-api`) lands at every stage.
 
-We trace one specific scenario: a single TypeScript check named `no-console-log` running inside `acme-api`. We follow it from the moment you type `opensip-tools fit` to the moment your shell prompt reappears.
+We trace one specific scenario: a single check named `no-console-log` (one of the `console-log` family of detectors in [`packages/fitness/checks-universal/src/checks/quality/code-structure/no-console-log.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/fitness/checks-universal/src/checks/quality/code-structure/no-console-log.ts)) running inside `acme-api`. We follow it from the moment you type `opensip-tools fit` to the moment your shell prompt reappears.
 
 ---
 
@@ -102,13 +103,13 @@ Source: [`packages/cli/src/index.ts`](https://github.com/opensip-ai/opensip-tool
 `opensip-tools fit` invokes the binary. The CLI's job at this stage is small:
 
 1. Parse global flags (`--debug`, `--quiet`).
-2. Set up the logger and assign a `runId` (`run_<base32>`).
+2. Set up the logger and assign a `runId` (`RUN_<ulid>`).
 3. Walk `defaultToolRegistry` and call `Tool.register(cli)` on every registered Tool. The fitness Tool sees `cli.program` and mounts its `fit`, `dashboard`, `fit-list`, `fit-recipes` Commander commands.
-4. Hand argv to Commander, which dispatches to `fitnessTool`'s `fit` action handler ([`packages/fitness/engine/src/tool.ts:118`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/fitness/engine/src/tool.ts)).
+4. Hand argv to Commander, which dispatches to `fitnessTool`'s `fit` action handler ([`packages/fitness/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/fitness/engine/src/tool.ts) — the `program.command(FIT.name).action(...)` block; the `dashboard`, `fit-list`, and `fit-recipes` action handlers live alongside it).
 
 The CLI does not know what `fit` does. It knows a Tool exists, it asked the Tool to register, the Tool put a handler on `program.command('fit')`, and Commander now owns the routing. Everything specific to fitness from this point on lives inside `@opensip-tools/fitness`.
 
-> **Where the example lands:** the binary is `opensip-tools`, argv is `['fit']` (defaults applied), the resolved Tool is `fitnessTool` with metadata `{ id: 'fitness', version: '1.0.0' }`.
+> **Where the example lands:** the binary is `opensip-tools`, argv is `['fit']` (defaults applied), the resolved Tool is `fitnessTool` with metadata `{ id: 'fitness', version: <pkg.version>, description: 'Run fitness checks against a codebase' }`. (Version is read at startup from `@opensip-tools/fitness/package.json`.)
 
 ---
 
@@ -129,7 +130,7 @@ If the config is missing, the CLI exits 2 with a pointer to `opensip-tools init`
 
 ## Stage 3 — Plugin load
 
-Source: [`packages/core/src/plugins/discover.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/core/src/plugins/discover.ts), [`packages/fitness/engine/src/plugins/`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/fitness/engine/src/plugins/), [`packages/cli/src/index.ts:64-69`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/cli/src/index.ts) (language-adapter registration).
+Source: [`packages/core/src/plugins/discover.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/core/src/plugins/discover.ts), [`packages/fitness/engine/src/plugins/`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/fitness/engine/src/plugins/), [`packages/cli/src/index.ts:68-73`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/cli/src/index.ts) (language-adapter registration).
 
 Three sources of checks get loaded, in order:
 
@@ -141,7 +142,7 @@ If `plugins.checkPackages:` is set in the config, **only** those packages are lo
 
 After this stage, the in-memory check registry has every available check addressable by id and slug.
 
-> **Where the example lands:** `acme-api` ends up with the universal pack, the typescript pack, the python pack, and three custom checks (`require-cdk-json-exists`, `no-print-outside-pipelines`, `infra-tag-required`). The `no-console-log` check we're tracing comes from `@opensip-tools/checks-typescript`.
+> **Where the example lands:** `acme-api` ends up with the universal pack, the typescript pack, the python pack, and three custom checks (`require-cdk-json-exists`, `no-print-outside-pipelines`, `infra-tag-required`). The `no-console-log` check we're tracing comes from `@opensip-tools/checks-universal` (it lives there because the regex shape is identical across JS/TS files and its strip behavior comes from the language adapter, not the pack).
 
 ---
 
@@ -189,10 +190,14 @@ Source: [`packages/fitness/engine/src/framework/define-check.ts`](https://github
 The recipe's execution mode (`parallel` or `sequential`) decides the dispatcher. Each check runs inside an `ExecutionContext` carrying:
 
 - `cwd` — the project root.
-- `signal` — an `AbortSignal` honored by long-running checks.
-- `readFile(path)` — cached, abort-aware file read.
-- `matchFiles()` — the resolved file list from Stage 5.
-- `log(msg)` — per-check logger sink.
+- `signal?` — an optional `AbortSignal`; long-running checks should call `checkAborted()` periodically to throw cooperatively.
+- `checkAborted()` — throws `CheckAbortedError` if the signal has fired.
+- `readFile(path)`, `fileExists(path)` — async file accessors.
+- `matchFiles(patterns?, { ignore? }?)` — the resolved file list from Stage 5 (with optional in-context narrowing).
+- `getMatcher()` — the per-check `PathMatcher` for ad-hoc filtering inside the analyzer.
+- `checkId`, `checkSlug` — the check's identifiers.
+- `log(msg)` — per-check logger sink (gated by `verbose`).
+- `extractSnippet(...)` — helper for building violation excerpts.
 
 The check's analysis mode determines what the framework does inside that context:
 
@@ -216,7 +221,7 @@ Every check returns a `CheckResult` carrying `Signal[]`. The recipe service aggr
 
 The `CliOutput` type ([`packages/contracts/src/types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/contracts/src/types.ts)) is the canonical envelope: version, tool, timestamp, score, passed flag, summary, durationMs, and a `checks[]` array each with its own findings. Anything that consumes the JSON output (CI, dashboard, the gate) reads `CliOutput`.
 
-The aggregation pass is also where the score is computed — currently a deterministic function of pass/fail and severity weights. The score is informational; the exit code is the gate.
+The aggregation pass is also where the score is computed — currently `Math.round((passedChecks / totalChecks) * 100)` (a simple pass-rate percent). The score is informational; the exit code is the gate.
 
 > **Where the example lands:** the run produces a `CliOutput` carrying ~80 checks and ~30 findings, two of which are our `no-console-log` violations.
 
@@ -232,7 +237,7 @@ The render layer is dispatched by output mode:
 - **`--sarif`** (or `--gate-save`/`--gate-compare`) — `buildSarifLog(output)`, then JSON-serialize.
 - **default (Ink)** — `cli.renderLive('fit', args)` mounts a live Ink view that transitions from spinner → results table → summary footer. The fitness Tool doesn't depend on Ink directly; it calls back through `ToolCliContext.renderLive`, which the CLI implements.
 
-After rendering, the dashboard auto-open runs if conditions allow: `--open` was passed (or the user opted into auto-open in their config), output isn't `--json`, and stdout is a TTY. The HTML report at `<project>/opensip-tools/.runtime/reports/<run-id>/index.html` opens in the user's default browser.
+After rendering, the dashboard auto-open runs if conditions allow: `--open` was passed (or the user opted into auto-open in their config), output isn't `--json`, and stdout is a TTY. The HTML report at `<project>/opensip-tools/.runtime/reports/latest.html` opens in the user's default browser (a single rolling file overwritten on each generation, not a per-run archive).
 
 The exit code is set by the fitness Tool via `cli.setExitCode(code)`:
 
@@ -242,7 +247,7 @@ The exit code is set by the fitness Tool via `cli.setExitCode(code)`:
 
 The CLI process exits when Node's event loop drains, which happens after Ink unmounts and the dashboard launcher returns.
 
-> **Where the example lands:** stdout shows a table with two failed checks (`no-console-log: 2 violations`, plus one other failure from a different check). The exit code is `1`. The dashboard does not auto-open because the example invocation was non-interactive (CI). The session record is written to `acme-api/opensip-tools/.runtime/sessions/run_<id>.json`.
+> **Where the example lands:** stdout shows a table with two failed checks (`no-console-log: 2 violations`, plus one other failure from a different check). The exit code is `1`. The dashboard does not auto-open because the example invocation was non-interactive (CI). The session record is written to `acme-api/opensip-tools/.runtime/sessions/{timestamp}-fit-default.json`.
 
 ---
 
