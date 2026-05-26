@@ -206,11 +206,13 @@ If you'd rather use your own scope (e.g. `@acme/checks-internal`) — for instan
 
 If you don't have a monorepo, publish your pack to your private npm registry under your own scope and install it as a regular devDependency. The `opensip-tools/` directory still hosts your `.runtime/` and any loose project-local `.mjs` files; the pack itself lives in `node_modules/` like any other dependency.
 
+#### Sim packs
+
+Sim packs follow the same recommended layout (`opensip-tools/packages/scenarios-<name>/`) and the same discovery rules: `@opensip-tools/scenarios-*` is auto-discovered by the default scope scan, and `plugins.packageScopes` is shared across check and sim discovery — adding `@acme` once picks up both `@acme/checks-*` and `@acme/scenarios-*`. The explicit-listing key for scenarios is `plugins.scenarioPackages`, parallel to `plugins.checkPackages`.
+
 #### Reference example
 
-The opensip codebase ([opensip-ai/opensip](https://github.com/opensip-ai/opensip)) follows this layout: its check pack lives at `opensip-tools/packages/checks-opensip/` and is auto-discovered via the `@opensip-tools/checks-opensip` name. Its sim pack at `opensip-tools/packages/scenarios-opensip/` uses the same layout.
-
-> Sim packs follow the same recommended layout (`opensip-tools/packages/scenarios-<name>/`), but package-level auto-discovery for scenarios is still in flight. Today, ship sim scenarios as project-local `.mjs` files (section 3); the workspace-package layout above will be picked up by `scenarios-*` discovery once that capability lands.
+The opensip codebase ([opensip-ai/opensip](https://github.com/opensip-ai/opensip)) follows this layout: its check pack lives at `opensip-tools/packages/checks-opensip/` (auto-discovered via `@opensip-tools/checks-opensip`), and its sim pack at `opensip-tools/packages/scenarios-opensip/` (auto-discovered via `@opensip-tools/scenarios-opensip`).
 
 ### Layout
 
