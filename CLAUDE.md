@@ -30,6 +30,11 @@ opensip-tools/
 │   │                            #   HTML report generator (generateDashboardHtml);
 │   │                            #   consumed by fitness's `dashboard` command
 │   ├── cli/                     # @opensip-tools/cli — generic tool dispatcher
+│   ├── cli-ui/                  # @opensip-tools/cli-ui — shared Ink/React
+│   │                            #   primitives (Banner, Spinner, RunHeader,
+│   │                            #   theme). Extracted from cli/ so tools that
+│   │                            #   ship a live view depend on the UI kit
+│   │                            #   without pulling in the dispatcher.
 │   │
 │   ├── fitness/                 # fitness namespace
 │   │   ├── engine/              # @opensip-tools/fitness — fitness engine,

@@ -49,7 +49,7 @@ export const pythonGraphAdapter: GraphLanguageAdapter<PythonParsedProject> = {
  * GraphLanguageAdapter) and `metadata`. The CLI bootstrap calls
  * `registerAdapter` with `adapter` after a successful `import()`.
  */
-export const adapter = pythonGraphAdapter;
+export { pythonGraphAdapter as adapter };
 export const metadata = {
   id: pythonGraphAdapter.id,
   displayName: pythonGraphAdapter.displayName,

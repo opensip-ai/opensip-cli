@@ -188,7 +188,7 @@ export const typescriptGraphAdapter: GraphLanguageAdapter<TypescriptParsedProjec
  * the CLI for diagnostics). The CLI bootstrap calls `registerAdapter`
  * with `adapter` after a successful `import()`.
  */
-export const adapter = typescriptGraphAdapter;
+export { typescriptGraphAdapter as adapter };
 export const metadata = {
   id: typescriptGraphAdapter.id,
   displayName: typescriptGraphAdapter.displayName,

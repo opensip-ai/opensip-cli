@@ -33,12 +33,13 @@ describe('rules registry conformance', () => {
     }
   });
 
-  it('all five v0.2 rules are registered', () => {
+  it('the built-in rule set is registered', () => {
     const slugs = rules.map((r) => r.slug);
     expect(slugs).toContain('graph:orphan-subtree');
     expect(slugs).toContain('graph:duplicated-function-body');
     expect(slugs).toContain('graph:no-side-effect-path');
     expect(slugs).toContain('graph:test-only-reachable');
     expect(slugs).toContain('graph:always-throws-branch');
+    expect(slugs).toContain('graph:high-blast-function');
   });
 });

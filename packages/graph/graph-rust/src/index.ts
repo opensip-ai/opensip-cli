@@ -52,7 +52,7 @@ export const rustGraphAdapter: GraphLanguageAdapter<RustParsedProject> = {
  * GraphLanguageAdapter) and `metadata`. The CLI bootstrap calls
  * `registerAdapter` with `adapter` after a successful `import()`.
  */
-export const adapter = rustGraphAdapter;
+export { rustGraphAdapter as adapter };
 export const metadata = {
   id: rustGraphAdapter.id,
   displayName: rustGraphAdapter.displayName,
