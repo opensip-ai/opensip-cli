@@ -310,6 +310,19 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.19.15)(jsdom@29.1.1)
 
+  packages/fitness/checks-rust:
+    dependencies:
+      '@opensip-tools/fitness':
+        specifier: workspace:*
+        version: link:../engine
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.15
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.15)(jsdom@29.1.1)
+
   packages/fitness/checks-typescript:
     dependencies:
       '@opensip-tools/core':

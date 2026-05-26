@@ -1,0 +1,23 @@
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+import { describe, expect, it } from 'vitest'
+
+import { metadata } from '../index.js'
+
+describe('@opensip-tools/checks-rust metadata', () => {
+  it('exposes a semver-shaped version', () => {
+    expect(metadata.version).toMatch(/^\d+\.\d+\.\d+/)
+  })
+
+  it('matches the package.json version (single source of truth)', () => {
+    const pkgPath = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'package.json')
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as { version: string }
+    expect(metadata.version).toBe(pkg.version)
+  })
+
+  it('declares the canonical package name', () => {
+    expect(metadata.name).toBe('@opensip-tools/checks-rust')
+  })
+})
