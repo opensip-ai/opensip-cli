@@ -154,31 +154,63 @@ A check pack is a check directory promoted to its own npm package. Use this when
 
 ### Where should this package live in your repo?
 
-opensip-tools reserves `<project>/opensip-tools/` for project-local extension content (`.mjs` files under `fit/checks/`, `fit/recipes/`, `sim/scenarios/`) and the tool-managed `.runtime/` directory. **Don't park workspace packages there** — those subtrees are owned by the tool and re-running `init` can re-scaffold them.
+The opensip-tools platform reserves three paths inside your repo's `opensip-tools/` directory:
 
-When your pack outgrows a handful of `.mjs` files (shared helpers, tests, more than a dozen checks), promote it to a regular npm package:
+- `opensip-tools/fit/{checks,recipes}/*.{js,mjs}` — project-local fitness checks and recipes (loose `.mjs` files, no npm package)
+- `opensip-tools/sim/{scenarios,recipes}/*.{js,mjs}` — project-local simulation scenarios and recipes
+- `opensip-tools/.runtime/` — tool-managed plugin install + session state (gitignored)
 
-- **Monorepo** — place the package alongside your other internal packages (`packages/`, `libs/`, etc.) as a normal workspace member. The workspace link makes it resolvable via `node_modules/` for discovery.
-- **Single-package repo** — publish to your private npm registry (or a public scope you own).
+For substantial coverage (more than a handful of `.mjs` files, shared helpers, tests), promote your pack to a real workspace npm package — but **don't put it inside the reserved paths above**. The recommended location is a sibling directory under `opensip-tools/`:
 
-#### Naming and auto-discovery
-
-Use your **own** npm scope (e.g. `@acme`). Don't publish under `@opensip-tools/*` — that scope is owned by the platform; name-squatting on it risks colliding with first-party packs and breaks if you ever try to publish.
-
-The package name **under your scope** must start with `checks-` (e.g. `@acme/checks-internal`) for the scope-scan auto-discovery to pick it up. The prefix is the discovery anchor.
-
-To have your scope auto-discovered, add it to `opensip-tools.config.yml`:
-
-```yaml
-plugins:
-  # Any @acme/checks-* package installed in node_modules is auto-loaded.
-  packageScopes:
-    - "@acme"
+```
+opensip-tools/packages/<name>/
 ```
 
-The platform scope (`@opensip-tools`) is always scanned; entries here are additive. Alternative: pin individual packages under `plugins.checkPackages` and skip the scope entry. See the [Three paths](#discovery-three-paths) below for the trade-off.
+This co-locates opensip-tools-related workspace packages with the rest of your opensip-tools setup. Three concrete benefits:
 
-> Sim packs follow the same pattern in concept (`@acme/scenarios-*`), but package-level auto-discovery for scenarios is still in flight. Today, ship sim scenarios as project-local `.mjs` files (section 3) or list scenario packages explicitly under `plugins.sim`.
+- **Predictable location for tool-managed flows.** Future opensip-tools commands that touch source (scaffold a new pack, upgrade a pack's deps in lockstep with a platform bump, lint a pack's structure) know where to look without scanning your whole workspace.
+- **Categorical separation.** A check pack is metadata *describing* your app, not app code. Co-locating it with your domain packages (`packages/`, `libs/`) mixes two different kinds of thing. Keeping it under `opensip-tools/packages/` mirrors how other tools handle their assets — `.github/workflows/`, `terraform/`, `prisma/`, `.devcontainer/`.
+- **One place to look.** A reviewer scanning your repo for "what's customized for opensip-tools?" has one directory to inspect.
+
+The platform doesn't load anything from `opensip-tools/packages/` directly — discovery still flows through `node_modules/<scope>/checks-*` (name-based, location-agnostic). The recommendation is about maintainability, not a platform requirement.
+
+#### Monorepo workspace setup
+
+Add `opensip-tools/packages/*` to your workspace globs:
+
+```yaml
+# pnpm-workspace.yaml
+packages:
+  - "apps/*"
+  - "packages/*"
+  - "services/*"
+  - "opensip-tools/packages/*"   # opensip-tools-related workspace packages
+```
+
+Then add the pack as a root devDependency so pnpm symlinks it into `node_modules/` where the discovery walker finds it:
+
+```json
+// package.json
+{
+  "devDependencies": {
+    "@opensip-tools/checks-<yourname>": "workspace:*"
+  }
+}
+```
+
+For a workspace-only pack (one you'll never publish to npm), naming it `@opensip-tools/checks-<name>` is the simplest path: pnpm links the workspace member into `node_modules/@opensip-tools/` and the default scope scan picks it up with no config entry. The `workspace:*` constraint is the signal that this pack is never going to npm — **don't publish under the `@opensip-tools/` scope**, it's owned by the platform.
+
+If you'd rather use your own scope (e.g. `@acme/checks-internal`) — for instance, because you want the option to publish later — name it that way and either add `@acme` to `plugins.packageScopes` for scope-wide auto-discovery, or pin the package under `plugins.checkPackages`. See the [Three paths](#discovery-three-paths) below for the trade-off.
+
+#### Single-package repo
+
+If you don't have a monorepo, publish your pack to your private npm registry under your own scope and install it as a regular devDependency. The `opensip-tools/` directory still hosts your `.runtime/` and any loose project-local `.mjs` files; the pack itself lives in `node_modules/` like any other dependency.
+
+#### Reference example
+
+The opensip codebase ([opensip-ai/opensip](https://github.com/opensip-ai/opensip)) follows this layout: its check pack lives at `opensip-tools/packages/checks-opensip/` and is auto-discovered via the `@opensip-tools/checks-opensip` name. Its sim pack at `opensip-tools/packages/scenarios-opensip/` uses the same layout.
+
+> Sim packs follow the same recommended layout (`opensip-tools/packages/scenarios-<name>/`), but package-level auto-discovery for scenarios is still in flight. Today, ship sim scenarios as project-local `.mjs` files (section 3); the workspace-package layout above will be picked up by `scenarios-*` discovery once that capability lands.
 
 ### Layout
 
@@ -218,7 +250,7 @@ The platform scope (`@opensip-tools`) is always scanned; entries here are additi
 
 <a id="discovery-three-paths"></a>**No `opensipTools.kind` marker for check packs** — discovery is name-based. Three paths:
 
-- **`@opensip-tools/checks-*`** — auto-discovered. Reserved for first-party packs published by the opensip-tools project itself; don't use this scope for customer packs.
+- **`@opensip-tools/checks-*`** — auto-discovered by the default scope scan. Used by first-party packs and by workspace-only customer packs that follow the [recommended layout](#where-should-this-package-live-in-your-repo). Don't *publish* under this scope — it's owned by the platform.
 - **Your own scope + `plugins.packageScopes`** — add e.g. `@my-co` to `plugins.packageScopes` in `opensip-tools.config.yml`, and any `@my-co/checks-*` package installed in `node_modules` is auto-discovered alongside the platform default. Best fit for monorepos where you want every internal check pack picked up without per-package config.
 - **Your own scope + explicit listing in `plugins.checkPackages`** — pin individual packages by name. `opensip-tools plugin add @my-co/checks-internal` does this in one step. Best fit when you want a deterministic, version-pinned set rather than scope-wide auto-discovery.
 
