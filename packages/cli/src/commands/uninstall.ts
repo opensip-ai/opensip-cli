@@ -440,9 +440,30 @@ export async function executeUninstall(opts: UninstallOptions = {}): Promise<Uni
     }
   }
 
+  performRemoval(toDelete, mode, purge, opts)
+
+  return buildResult({ action: 'removed', mode, targets: toDelete, rootPath })
+}
+
+/**
+ * Delete the resolved targets and, after --purge, tidy the now-empty
+ * `opensip-tools/` shell. Extracted so executeUninstall stays under the
+ * cognitive-complexity threshold.
+ */
+function performRemoval(
+  toDelete: readonly Target[],
+  mode: UninstallMode,
+  purge: boolean,
+  opts: UninstallOptions,
+): void {
   for (const t of toDelete) {
     rmSync(t.path, { recursive: true, force: true })
   }
-
-  return buildResult({ action: 'removed', mode, targets: toDelete, rootPath })
+  if (mode !== 'project' || !purge) return
+  // --purge removed children individually (each enumerated for display).
+  // Tidy the parent shell so --purge matches "removes EVERYTHING."
+  const paths = resolveProjectPaths(resolveProjectDir(opts))
+  if (existsSync(paths.userSourceDir)) {
+    try { rmSync(paths.userSourceDir, { recursive: true, force: true }) } catch { /* ignore */ }
+  }
 }
