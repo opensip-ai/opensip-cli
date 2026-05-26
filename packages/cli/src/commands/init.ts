@@ -47,7 +47,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { basename as pathBasename, join, relative } from 'node:path';
 
-import { resolveProjectPaths, type ProjectContext, type ProjectPaths } from '@opensip-tools/core';
+import { CLI_SUPPORTED_SCHEMA_VERSION, resolveProjectPaths, type ProjectContext, type ProjectPaths } from '@opensip-tools/core';
 
 // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; init still consumes CliArgs through initOptsToCliArgs in `register()` until the per-command type rip-out
 import type { CliArgs, InitResult, PreExistingFile } from '@opensip-tools/contracts';
@@ -214,6 +214,8 @@ function generateConfig(languages: readonly SupportedLanguage[]): string {
     '# check runs against.',
     '#',
     '# Docs: https://github.com/opensip-ai/opensip-tools#configuration',
+    '',
+    `schemaVersion: ${CLI_SUPPORTED_SCHEMA_VERSION}`,
     '',
     'globalExcludes:',
     '  - "**/node_modules/**"',

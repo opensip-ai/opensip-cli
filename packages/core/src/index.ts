@@ -107,3 +107,13 @@ export type { ProjectPaths, UserPaths, PathDomain, PluginsPathDomain } from './l
 // semantics.
 export { resolveProjectContext } from './lib/project-context.js';
 export type { ProjectContext, ResolveProjectContextInput } from './lib/project-context.js';
+
+// Lib — config schemaVersion. Permissive top-level field reader +
+// CLI/config compatibility classifier. Used by pre-action-hook for
+// upgrade-mismatch detection.
+export {
+  CLI_SUPPORTED_SCHEMA_VERSION,
+  readConfigSchemaVersion,
+  checkSchemaCompat,
+} from './lib/config-version.js';
+export type { SchemaCompat } from './lib/config-version.js';

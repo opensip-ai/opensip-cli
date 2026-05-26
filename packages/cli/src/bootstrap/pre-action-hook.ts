@@ -26,9 +26,11 @@ import { existsSync } from 'node:fs';
 
 import { formatProjectHeader } from '@opensip-tools/cli-ui';
 import {
+  checkSchemaCompat,
   generatePrefixedId,
   initLogFile,
   logger,
+  readConfigSchemaVersion,
   resolveProjectContext,
   resolveProjectPaths,
   setDebugMode,
@@ -79,6 +81,33 @@ const PROJECT_AGNOSTIC_COMMANDS: ReadonlySet<string> = new Set([
   'uninstall',
 ]);
 
+interface CliTooOldInput {
+  readonly root: string;
+  readonly configVersion: number;
+  readonly cliVersion: number;
+}
+
+/**
+ * Render the "your CLI is too old" message. Direction-correct: when the
+ * config schema is newer than the CLI knows about, the USER UPGRADES
+ * THE CLI — not "run migrate" (migrate goes the OTHER direction, taking
+ * an old config UP to the current CLI's version).
+ */
+function formatCliTooOldMessage(input: CliTooOldInput): string {
+  return [
+    `✗ This project's opensip-tools.config.yml uses a newer schema than your CLI supports.`,
+    ``,
+    `  Project:        ${input.root}`,
+    `  Config schema:  v${input.configVersion}`,
+    `  CLI supports:   v${input.cliVersion}`,
+    ``,
+    `  Update your CLI to continue:`,
+    `    npm install -g @opensip-tools/cli@latest`,
+    ``,
+    `  (Or, if installed locally to the project: pnpm up @opensip-tools/cli@latest)`,
+  ].join('\n');
+}
+
 function formatNoProjectFoundMessage(cwd: string, jsonOutput: boolean): string {
   if (jsonOutput) {
     return JSON.stringify({
@@ -96,6 +125,72 @@ function formatNoProjectFoundMessage(cwd: string, jsonOutput: boolean): string {
   ].join('\n');
 }
 
+
+const MODULE_TAG = 'cli:bootstrap';
+
+/**
+ * Schema-version bailout. Exits 2 with the "upgrade your CLI" message
+ * when the project config declares a schema newer than this CLI knows.
+ * Direction-correct: `migrate` would go the other way (old → new); when
+ * the CLI itself is behind, the user must upgrade it.
+ */
+function checkSchemaVersionAndBailout(project: ProjectContext, runId: string): void {
+  if (project.scope !== 'project' || project.configPath === undefined) return;
+  const configVersion = readConfigSchemaVersion(project.configPath);
+  const compat = checkSchemaCompat(configVersion);
+  if (compat.kind === 'cli-too-old') {
+    const msg = formatCliTooOldMessage({
+      root: project.projectRoot,
+      configVersion: compat.configVersion,
+      cliVersion: compat.cliVersion,
+    });
+    process.stderr.write(`${msg}\n`);
+    logger.warn({
+      evt: 'cli.config.schema.cli-too-old',
+      module: MODULE_TAG,
+      runId,
+      root: project.projectRoot,
+      configVersion: compat.configVersion,
+      cliVersion: compat.cliVersion,
+    });
+    process.exit(2);
+  }
+  if (compat.kind === 'older') {
+    logger.info({
+      evt: 'cli.config.schema.older',
+      module: MODULE_TAG,
+      runId,
+      root: project.projectRoot,
+      configVersion: compat.configVersion,
+      cliVersion: compat.cliVersion,
+    });
+  }
+}
+
+/**
+ * No-project-found bailout. Exits 2 with the actionable error message
+ * for project-scoped commands when discovery resolved scope === 'none'.
+ */
+function checkNoProjectAndBailout(
+  project: ProjectContext,
+  cwd: string,
+  cmdName: string,
+  jsonOutput: boolean,
+  runId: string,
+): void {
+  if (project.scope !== 'none' || PROJECT_AGNOSTIC_COMMANDS.has(cmdName)) return;
+  const msg = formatNoProjectFoundMessage(cwd, jsonOutput);
+  const stream = jsonOutput ? process.stdout : process.stderr;
+  stream.write(`${msg}\n`);
+  logger.warn({
+    evt: 'cli.no-project-found',
+    module: MODULE_TAG,
+    runId,
+    cwd,
+    command: cmdName,
+  });
+  process.exit(2);
+}
 
 /** Mount the bootstrap `preAction` hook on the supplied program. */
 export function installPreActionHook(program: Command): void {
@@ -132,23 +227,10 @@ export function installPreActionHook(program: Command): void {
     //    in uninstall.ts; we never use that name here.
     (opts as Record<string, unknown>).projectContext = project;
 
-    // 4. Bailout window — no-project error for project-scoped commands,
-    //    schema check (Phase 6.3), and phantom warn (Phase 7) wire here.
-    //    Each can process.exit(2) before any side-effect setup.
-
-    if (project.scope === 'none' && !PROJECT_AGNOSTIC_COMMANDS.has(actionCommand.name())) {
-      const msg = formatNoProjectFoundMessage(cwd, Boolean(opts.json));
-      const stream = opts.json ? process.stdout : process.stderr;
-      stream.write(`${msg}\n`);
-      logger.warn({
-        evt: 'cli.no-project-found',
-        module: 'cli:bootstrap',
-        runId,
-        cwd,
-        command: actionCommand.name(),
-      });
-      process.exit(2);
-    }
+    // 4. Bailout window — each may process.exit(2) before any side
+    //    effects. Phantom warn (Phase 7) also wires here.
+    checkSchemaVersionAndBailout(project, runId);
+    checkNoProjectAndBailout(project, cwd, actionCommand.name(), Boolean(opts.json), runId);
 
     // 5. Side-effect setup, gated on a real project being present.
     if (project.scope === 'project' && existsSync(project.projectRoot)) {
@@ -181,7 +263,7 @@ export function installPreActionHook(program: Command): void {
     // 7. Structured start log.
     logger.info({
       evt: 'cli.start',
-      module: 'cli:bootstrap',
+      module: MODULE_TAG,
       runId,
       command: actionCommand.name(),
       cwd,
@@ -192,7 +274,7 @@ export function installPreActionHook(program: Command): void {
     if (project.walkedUp > 0) {
       logger.info({
         evt: 'cli.project.discovered',
-        module: 'cli:bootstrap',
+        module: MODULE_TAG,
         runId,
         cwd,
         projectRoot: project.projectRoot,

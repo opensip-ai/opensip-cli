@@ -119,6 +119,11 @@ function section<T extends z.ZodTypeAny>(schema: T) {
 
 /** Root schema for opensip-tools.config.yml validation */
 export const SignalersConfigSchema = z.object({
+  // Top-level config schema version. The CLI checks this in pre-action-hook
+  // (via readConfigSchemaVersion + checkSchemaCompat in core) BEFORE this
+  // strict loader runs. Default 1 keeps existing configs (written before
+  // the field existed) valid.
+  schemaVersion: z.number().int().min(1).default(1),
   globalExcludes: z.array(z.string()).default([]),
   targets: z.record(
     z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'target name must be kebab-case'),
