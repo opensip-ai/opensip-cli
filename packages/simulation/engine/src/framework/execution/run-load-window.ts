@@ -24,7 +24,7 @@ import type { PersonaConfig, ScenarioExecutionContext } from '../../types/framew
  * own `ChaosType` so the boundary is type-safe and no runtime cast is
  * required when the framework hands events back to the kind.
  */
-export interface LoadWindowEvent<T extends string = string> {
+interface LoadWindowEvent<T extends string = string> {
   readonly type: T
   readonly atMs: number
   readonly target: string
@@ -64,7 +64,7 @@ export type TickOutcome<T extends string = string> =
  * issue. Receiving `tickStartMs` gives implementations a relative timestamp
  * for `LoadWindowEvent.atMs`.
  */
-export type InjectChaos<T extends string = string> = (args: {
+type InjectChaos<T extends string = string> = (args: {
   readonly tickStartMs: number
 }) => TickOutcome<T>
 

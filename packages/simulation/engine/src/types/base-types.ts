@@ -6,7 +6,6 @@
  */
 
 import type { ScenarioMetricKey } from '../framework/resolve-metric.js'
-import type { Signal } from '@opensip-tools/core'
 
 // =============================================================================
 // PERSONA TYPES
@@ -16,42 +15,9 @@ import type { Signal } from '@opensip-tools/core'
 // eslint-disable-next-line sonarjs/redundant-type-aliases -- semantic alias documents the persona-id dimension
 export type PersonaType = string
 
-/** Behavioral mode for a simulation persona */
-type PersonaBehavior = 'normal' | 'aggressive' | 'cautious' | 'erratic'
-
-/** A simulation persona with behavioral attributes and action probabilities */
-export interface Persona {
-  id: string
-  type: PersonaType
-  name: string
-  behavior: PersonaBehavior
-  attributes: PersonaAttributes
-  actionProbabilities: ActionProbabilities
-}
-
-/** Configurable attributes defining a persona's behavioral profile */
-interface PersonaAttributes {
-  trustScore: number // 0-100
-  activityLevel: 'low' | 'medium' | 'high'
-  preferredCategories: string[]
-  priceRange: { min: number; max: number }
-  responseTime: { min: number; max: number } // milliseconds
-}
-
-/** Map of action names to their probability weights */
-type ActionProbabilities = Record<string, number>;
-
 // =============================================================================
 // SCENARIO TYPES
 // =============================================================================
-
-/** Configuration for a persona within a scenario */
-export interface PersonaConfig {
-  personaId: string
-  count: number
-  spawnRate: number // per second
-  actions: string[] // action sequence or 'random'
-}
 
 /** Less-than comparison operators */
 type LessThanOperator = 'lt' | 'lte'
@@ -151,32 +117,6 @@ interface DataCorruptionChaosConfig {
 // =============================================================================
 // EXECUTION TYPES
 // =============================================================================
-
-/** Environment in which a simulation executes */
-type ExecutionMode = 'local' | 'docker' | 'ephemeral-aws' | 'staging'
-
-/** Run is waiting or actively executing */
-type ActiveRunStatus = 'pending' | 'running'
-/** Run has reached a terminal state */
-type TerminalRunStatus = 'completed' | 'failed' | 'cancelled'
-/** All simulation run statuses */
-/** All simulation run statuses */
-type SimulationRunStatus = ActiveRunStatus | TerminalRunStatus
-
-/** A single simulation execution with its metrics and signals */
-export interface SimulationRun {
-  id: string
-  recipeId?: string | undefined
-  scenarioId: string
-  targetId?: string | undefined
-  mode: ExecutionMode
-  status: SimulationRunStatus
-  startedAt?: string | undefined
-  completedAt?: string | undefined
-  metrics: SimulationMetrics
-  signals: Signal[]
-  error?: string | undefined
-}
 
 /** Aggregated performance metrics from a simulation run */
 export interface SimulationMetrics {

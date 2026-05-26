@@ -476,7 +476,7 @@ type WorkingDirState = NonNullable<InitResult['state']>;
  * touches the disk. User-authored content lives under
  * `opensip-tools/{fit,sim}/`; only those count as "the dir is present".
  */
-export function classifyWorkingDir(paths: ProjectPaths): WorkingDirState {
+function classifyWorkingDir(paths: ProjectPaths): WorkingDirState {
   const hasConfig = existsSync(paths.configFile);
   const hasDir = userSourceDirHasUserContent(paths);
   if (!hasConfig && !hasDir) return 'pristine';
@@ -560,7 +560,7 @@ function sha256(content: string): string {
  * current-language file is treated as custom — which is the safer
  * outcome (won't silently overwrite).
  */
-export function classifyFiles(
+function classifyFiles(
   paths: ProjectPaths,
   currentLanguages: readonly SupportedLanguage[],
 ): PreExistingFile[] {
@@ -662,7 +662,7 @@ function relativize(absPath: string, cwd: string): string {
   return rel === '' ? absPath : rel;
 }
 
-export function buildPartialStateMessage(
+function buildPartialStateMessage(
   state: WorkingDirState,
   preExistingFiles: readonly PreExistingFile[],
   cwd: string,
