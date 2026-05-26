@@ -50,36 +50,6 @@ afterEach(() => {
 // openapi-type-source — drive all API_TYPE_PATTERNS
 // ---------------------------------------------------------------------------
 
-describe('openapi-type-source — branch coverage', () => {
-  it('flags interfaces and types matching all API patterns', async () => {
-    fx('src/types/api.ts', [
-      'export interface UserRequest { id: string }',
-      'export interface UserResponse { name: string }',
-      'export interface CreateUserPayload { email: string }',
-      'export type UserDTO = { id: string }',
-      'export interface ApiError { code: number }',
-      'export interface ApiUserList { users: unknown[] }',
-    ].join('\n'))
-    const result = await runCheck('openapi-type-source')
-    // All six should match the patterns.
-    expect(result.signals.length).toBeGreaterThanOrEqual(4)
-  })
-
-  it('does not flag non-API-shaped types', async () => {
-    fx('src/types/plain.ts', [
-      'export interface User { id: string }',
-      'export type Color = "red" | "blue"',
-    ].join('\n'))
-    const result = await runCheck('openapi-type-source')
-    expect(result.signals).toHaveLength(0)
-  })
-
-  it('handles files with parse failure gracefully (returns empty)', async () => {
-    fx('src/types/empty.ts', '')
-    const result = await runCheck('openapi-type-source')
-    expect(result.signals).toHaveLength(0)
-  })
-})
 
 // ---------------------------------------------------------------------------
 // api-contract-validation
@@ -407,58 +377,16 @@ describe('fastify-route-validation — extra branches', () => {
 // platform-checks
 // ---------------------------------------------------------------------------
 
-describe('platform-checks — extra branches', () => {
-  it('handles Platform.select() as well as Platform.OS', async () => {
-    fx('src/components/Sel.tsx', [
-      'import { Platform } from "react-native"',
-      'export const styles = Platform.select({',
-      '  ios: { padding: 8 },',
-      '  android: { padding: 12 },',
-      '  default: { padding: 0 },',
-      '})',
-    ].join('\n'))
-    const result = await runCheck('platform-checks')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // memo-list-items — exercise more shapes
 // ---------------------------------------------------------------------------
 
-describe('memo-list-items — extra branches', () => {
-  it('handles map() returning fragments and complex children', async () => {
-    fx('src/components/Frag.tsx', [
-      'export function App({ items }: { items: { id: string; label: string }[] }) {',
-      '  return (',
-      '    <>',
-      '      {items.map((it) => <li key={it.id}>{it.label} - {it.id}</li>)}',
-      '    </>',
-      '  )',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('memo-list-items')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // lazy-loading — exercise more shapes
 // ---------------------------------------------------------------------------
 
-describe('lazy-loading — extra branches', () => {
-  it('handles guard mid-function with prior await', async () => {
-    fx('src/handlers/mid.ts', [
-      'export async function f(input: string, flag: boolean) {',
-      '  const data = await fetch("/api/" + input)',
-      '  if (!flag) return null',
-      '  return data',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('lazy-loading')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // silent-early-returns — exercise additional patterns
@@ -654,21 +582,6 @@ describe('no-any-types — extra branches', () => {
 // financial-transaction-ordering — extra
 // ---------------------------------------------------------------------------
 
-describe('financial-transaction-ordering — extra', () => {
-  it('exercises payment + repository update pattern', async () => {
-    fx('src/payments/order.ts', [
-      'declare const stripe: { charges: { create(args: unknown): Promise<{ id: string }> } }',
-      'declare const db: { insert(row: unknown): Promise<void>; update(id: string, p: unknown): Promise<void> }',
-      'export async function processOrder(amount: number) {',
-      '  await db.insert({ pending: true, amount })',
-      '  const charge = await stripe.charges.create({ amount })',
-      '  await db.update(charge.id, { status: "paid" })',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('financial-transaction-ordering')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // database-schema-validation

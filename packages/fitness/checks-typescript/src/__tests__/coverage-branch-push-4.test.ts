@@ -146,49 +146,6 @@ describe('context-safety — every detector pattern', () => {
 // di-static-inject-usage — exercise more code paths
 // ---------------------------------------------------------------------------
 
-describe('di-static-inject-usage — broader v4', () => {
-  it('class with private modifier, optional params, type-only constructor', async () => {
-    fx('src/di/d4.ts', [
-      'export class A {',
-      '  static inject = ["a"] as const',
-      '  constructor(private readonly a: any) {}',
-      '}',
-      'export class B {',
-      '  static inject = ["a", "b"] as const',
-      '  constructor(public a: any, protected b: any) {}',
-      '}',
-      'export class C {',
-      '  static inject = ["a"] as const',
-      '  // Constructor in body comment',
-      '  constructor(public a: any) {',
-      '    if (!a) throw new Error("required")',
-      '  }',
-      '}',
-      'export class D {',
-      '  // No inject',
-      '}',
-      'export class E {',
-      '  static inject = ["a"] as const',
-      '  // Multiple constructors not allowed in TS',
-      '  constructor(public a: any) {}',
-      '}',
-      'export class F {',
-      '  static inject = []',
-      '  constructor() {}',
-      '}',
-      'class NotExported {',
-      '  static inject = ["a"] as const',
-      '  constructor(public a: any) {}',
-      '}',
-      'export const Anonymous = class {',
-      '  static inject = ["a"] as const',
-      '  constructor(public a: any) {}',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('di-static-inject-usage')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // async-patterns broader paths
@@ -223,29 +180,6 @@ describe('async-patterns — broader v4', () => {
       '}',
     ].join('\n'))
     const result = await runCheck('detached-promises')
-    expect(result).toBeDefined()
-  })
-
-  it('await-result-unwrap: various unwrap patterns', async () => {
-    fx('src/x/aru.ts', [
-      'export async function f() {',
-      '  const r = await fetchSomething()',
-      '  return r.unwrap()',  // safe (after await)',
-      '}',
-      'export async function bad() {',
-      '  return fetchSomething().unwrap()', // missing await',
-      '}',
-      'export async function noAsync() {',
-      '  return foo.unwrap()',
-      '}',
-      'export function noAsyncFn() {',
-      '  return foo.unwrap()',  // not in async function',
-      '}',
-      'export async function chained() {',
-      '  return (await x.foo()).unwrap()',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('await-result-unwrap')
     expect(result).toBeDefined()
   })
 

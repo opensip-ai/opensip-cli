@@ -371,7 +371,7 @@ beforeAll(async () => {
       '}',
     ].join('\n')),
 
-    // --- React .map without memo (memo-list-items) ---
+    // --- React .map fixture ---
     fixture('src/components/ListWithoutMemo.tsx', [
       'export function UserList({ users }: { users: { id: string; name: string }[] }) {',
       '  return (',
@@ -422,7 +422,7 @@ beforeAll(async () => {
       '}',
     ].join('\n')),
 
-    // --- Lazy validation after expensive await (frontend/lazy-loading) ---
+    // --- Awaited fetch before validation fixture ---
     fixture('src/handlers/fail-fast-violation.ts', [
       'export async function validateAndFetch(userId: string) {',
       '  const user = await fetchFromDB(userId);',

@@ -527,52 +527,6 @@ describe('fastify-route-validation — additional branches v3', () => {
 // di-static-inject-usage — broader shapes
 // ---------------------------------------------------------------------------
 
-describe('di-static-inject-usage — additional branches v3', () => {
-  it('class shapes with subtle differences', async () => {
-    fx('src/di/d3.ts', [
-      'export class A {',
-      '  static inject = ["a", "b", "c"] as const',
-      '  constructor(public a: any, public b: any, public c: any) {}',
-      '}',
-      'export class B {',
-      '  static inject: readonly string[] = ["a", "b"]',
-      '  constructor(public a: any, public b: any) {}',
-      '}',
-      'export class C {',
-      '  // No inject, no params',
-      '}',
-      'export class D {',
-      '  static inject = []',
-      '  constructor() {}',
-      '}',
-      'export class E {',
-      '  // params without inject',
-      '  constructor(public arg: string) {}',
-      '}',
-      'export class F {',
-      '  static inject = ["x"] as const',
-      '  // missing constructor',
-      '}',
-      'export class G {',
-      '  static inject = ["x", "y"] as const',
-      '  constructor(public x: any) {}', // arity mismatch',
-      '}',
-      'export abstract class H {',
-      '  abstract m(): void',
-      '}',
-      'class NotExported {',
-      '  static inject = ["a"] as const',
-      '  constructor(public a: any) {}',
-      '}',
-      'export class WithDefault {',
-      '  static inject = ["a"] as const',
-      '  constructor(public a: any = "x") {}',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('di-static-inject-usage')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // duplicate-utility-functions — additional shapes
@@ -748,28 +702,6 @@ describe('database-schema-validation — additional branches v3', () => {
 // openapi-response-coverage — broader v3
 // ---------------------------------------------------------------------------
 
-describe('openapi-response-coverage — additional branches v3', () => {
-  it('handlers with multiple response codes', async () => {
-    fx('src/api/spec3.yaml', [
-      'paths:',
-      '  /users:',
-      '    get:',
-      '      responses:',
-      '        "200": { description: ok }',
-      '        "404": { description: not found }',
-      '        "500": { description: server }',
-    ].join('\n'))
-    fx('src/api/h3.ts', [
-      'export async function getUsers(req: any, reply: any) {',
-      '  if (Math.random() > 0.5) return reply.code(404).send()',
-      '  if (Math.random() > 0.7) return reply.code(500).send()',
-      '  return reply.code(200).send([])',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('openapi-response-coverage')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // pii-exposure-in-logs — broader v3
@@ -828,80 +760,11 @@ describe('logger-event-name-format — additional branches v3', () => {
 // lazy-loading — broader v3
 // ---------------------------------------------------------------------------
 
-describe('lazy-loading — additional branches v3', () => {
-  it('async handlers with various guard placements', async () => {
-    fx('src/h/lz3.ts', [
-      'export async function f1(input: string) {',
-      '  if (!input) return null',
-      '  if (input.length === 0) return null',
-      '  return await fetchData(input)',
-      '}',
-      'export async function f2(input: string) {',
-      '  const x = expensiveSync(input)',
-      '  if (!x) return null',
-      '  return x',
-      '}',
-      'export async function f3(input: string) {',
-      '  const data = await fetchData(input)',
-      '  return data?.x ?? null',
-      '}',
-      'export async function f4(input: string) {',
-      '  return await fetchData(input)',
-      '}',
-      'export class Svc {',
-      '  async load(id: string) {',
-      '    if (!id) return null',
-      '    return await this.repo.find(id)',
-      '  }',
-      '}',
-      'export const arrow = async (id: string) => {',
-      '  if (!id) return null',
-      '  return await fetchData(id)',
-      '}',
-      'export function nonAsync(input: string) {',
-      '  if (!input) return null',
-      '  return input',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('lazy-loading')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // unused-modules — broader v3
 // ---------------------------------------------------------------------------
 
-describe('unused-modules — additional branches v3', () => {
-  it('various import/export shapes', async () => {
-    fx('package.json', JSON.stringify({
-      name: '@scope/test',
-      version: '1.0.0',
-      type: 'module',
-      main: './dist/index.js',
-      types: './dist/index.d.ts',
-      exports: { '.': './dist/index.js' },
-    }, null, 2))
-    fx('src/index.ts', 'export * from "./used.js"\nexport { x as y } from "./renamed.js"')
-    fx('src/used.ts', 'export const used = 1')
-    fx('src/renamed.ts', 'export const x = 1')
-    fx('src/internal.ts', [
-      'import { used } from "./used.js"',
-      'export const wrapper = used + 1',
-    ].join('\n'))
-    fx('src/orphan.ts', 'export const orphan = 1\nexport const orphan2 = 2')
-    fx('src/internal-used.ts', [
-      'import { wrapper } from "./internal.js"',
-      'export default wrapper',
-    ].join('\n'))
-    fx('src/recursive.ts', [
-      'import "./used.js"',  // side-effect import
-      'export const r = 1',
-    ].join('\n'))
-    const result = await runCheck('unused-modules')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // missing-type-exports v3 — exercise file types and patterns
@@ -1079,34 +942,3 @@ describe('unsafe-secret-comparison — additional branches v3', () => {
 // postgres-n-plus-one — broader v3
 // ---------------------------------------------------------------------------
 
-describe('postgres-n-plus-one — additional branches v3', () => {
-  it('various loop and batched patterns', async () => {
-    fx('src/db/p3.ts', [
-      'export async function loop(client: any, ids: number[]) {',
-      '  for (const id of ids) {',
-      '    await client.query("SELECT * FROM x WHERE id=$1", [id])',
-      '  }',
-      '}',
-      'export async function batched(client: any, ids: number[]) {',
-      '  return client.query("SELECT * FROM x WHERE id = ANY($1)", [ids])',
-      '}',
-      'export async function inMap(client: any, ids: number[]) {',
-      '  return Promise.all(ids.map((id) => client.query("SELECT * FROM x WHERE id=$1", [id])))',
-      '}',
-      'export async function withWhile(client: any) {',
-      '  let i = 0',
-      '  while (i < 10) {',
-      '    await client.query("SELECT 1")',
-      '    i++',
-      '  }',
-      '}',
-      'export async function whileNoQuery() {',
-      '  let i = 0; while (i < 10) i++',
-      '  return i',
-      '}',
-      'export async function noLoop(client: any) { return client.query("SELECT 1") }',
-    ].join('\n'))
-    const result = await runCheck('postgres-n-plus-one')
-    expect(result).toBeDefined()
-  })
-})

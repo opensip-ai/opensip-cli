@@ -105,12 +105,9 @@ const frontendRecipe: FitnessRecipe = defineRecipe({
     type: 'pattern',
     include: [
       'quality/*-frontend',
-      'quality/accessible-*',
       'quality/navigation-*',
       'quality/theme-*',
       'quality/image-*',
-      'quality/lazy-*',
-      'quality/no-inline-functions',
       'quality/async-state-*',
       'quality/no-any-types',
       'quality/null-safety',

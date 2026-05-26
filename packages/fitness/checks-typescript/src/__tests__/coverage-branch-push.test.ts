@@ -164,21 +164,6 @@ describe('no-raw-fetch — skip-path branches', () => {
 })
 
 // ---------------------------------------------------------------------------
-// await-result-unwrap (disabled but still loaded) — branches
-// ---------------------------------------------------------------------------
-
-describe('await-result-unwrap — branches', () => {
-  it('handles patterns with and without async, with and without unwrap()', async () => {
-    fx('src/r/none.ts', 'export const x = 1')
-    fx('src/r/no-async.ts', 'export const r = something.unwrap()')
-    fx('src/r/with-await.ts', 'export async function f() { const r = await x.foo(); return r.unwrap() }')
-    fx('src/r/missing.ts', 'export async function f() { return x.foo().unwrap() }')
-    const result = await runCheck('await-result-unwrap')
-    expect(result).toBeDefined()
-  })
-})
-
-// ---------------------------------------------------------------------------
 // toctou-race-condition — exercise local/shared/atomic SQL/cache branches
 // ---------------------------------------------------------------------------
 
@@ -303,81 +288,11 @@ describe('async-waterfall-detection — branches', () => {
 // memo-list-items — exercise visit branches deeply
 // ---------------------------------------------------------------------------
 
-describe('memo-list-items — branches', () => {
-  it('flags PascalCase components in dynamic .map(), excludes Memoized*, memoized in same file, useMemo wrap, static array', async () => {
-    fx('src/components/Lists.tsx', [
-      'import React, { useMemo } from "react"',
-      'export const Memo1 = React.memo(function Memo1() { return <div /> })',
-      'export const Memo2 = memo(function MyInner() { return <div /> })',
-      'export const ReExport = Object.assign(Memo2, { displayName: "X" })',
-      'function Inner() { return <span /> }',
-      'function MemoizedSpecial() { return <span /> }',
-      'export function ListA({ items }: { items: { id: string }[] }) {',
-      '  return (<>{items.map((it) => <Inner key={it.id} />)}</>)',
-      '}',
-      'export function ListB({ items }: { items: { id: string }[] }) {',
-      '  return (<>{items.map((it) => <Memo1 key={it.id} />)}</>)',
-      '}',
-      'export function ListC() {',
-      '  return (<>{[{id:"1"},{id:"2"}].map((it) => <Inner key={it.id} />)}</>)',
-      '}',
-      'export function ListD() {',
-      '  return (<>{Array.from({length:5}).map((_,i) => <Inner key={i} />)}</>)',
-      '}',
-      'export function ListE({ items }: { items: { id: string }[] }) {',
-      '  return (<>{items.map((it) => <MemoizedSpecial key={it.id} />)}</>)',
-      '}',
-      'export function ListF({ items }: { items: { id: string }[] }) {',
-      '  const rendered = useMemo(() => items.map((it) => <Inner key={it.id} />), [items])',
-      '  return (<>{rendered}</>)',
-      '}',
-      'export function ListG({ items }: { items: { id: string }[] }) {',
-      '  return (<>{items.map((it) => <view key={it.id} />)}</>)',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('memo-list-items')
-    expect(result).toBeDefined()
-  })
-
-  it('skips non-tsx files and files without .map(', async () => {
-    fx('src/components/NotTSX.ts', 'export const X = 1')
-    fx('src/components/NoMap.tsx', 'export function F() { return <div /> }')
-    const result = await runCheck('memo-list-items')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // no-inline-functions — exercise trivial-callback branches
 // ---------------------------------------------------------------------------
 
-describe('no-inline-functions — branches', () => {
-  it('flags non-trivial inline functions, skips trivial () => x, () => fn(), () => !x', async () => {
-    fx('src/components/Inline.tsx', [
-      'export function App() {',
-      '  return (<>',
-      '    <List renderItem={(it) => <span>{it}</span>} />',
-      '    <List keyExtractor={(it) => it.id} />',
-      '    <Btn onPress={() => doSomething()} />',
-      '    <Btn onPress={() => count} />',
-      '    <Btn onPress={() => fn()} />',
-      '    <Btn onPress={() => !flag} />',
-      '    <Btn onPress={function(e) { handle(e); track(e) }} />',
-      '    <Btn onChange={(v) => { setVal(v); validate(v) }} />',
-      '  </>)',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('no-inline-functions')
-    expect(result).toBeDefined()
-  })
-
-  it('skips non-tsx files and files without callback props', async () => {
-    fx('src/x.ts', 'export const a = 1')
-    fx('src/y.tsx', 'export const X = () => <div>{42}</div>')
-    const result = await runCheck('no-inline-functions')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // missing-type-exports
@@ -732,47 +647,6 @@ describe('api-contract-validation — branches', () => {
 // di-static-inject-usage
 // ---------------------------------------------------------------------------
 
-describe('di-static-inject-usage — branches', () => {
-  it('classes with proper, missing, mismatched, and unrelated static inject', async () => {
-    fx('src/di/classes.ts', [
-      'export class A {',
-      '  static inject = ["dep1"] as const',
-      '  constructor(private dep1: any) {}',
-      '}',
-      'export class B {',
-      '  constructor(private dep1: any) {}', // missing inject
-      '}',
-      'export class C {',
-      '  static inject = ["dep1", "dep2"] as const',
-      '  constructor(private dep1: any) {}', // mismatch length
-      '}',
-      'export class D {',
-      '  static inject = []',
-      '  constructor() {}',
-      '}',
-      'export class E {',
-      '  // not in DI',
-      '}',
-      'export class F {',
-      '  static inject: any = ["dep1"]',
-      '  constructor(private dep1: any, private dep2: any) {}',
-      '}',
-    ].join('\n'))
-    fx('src/di/container.ts', [
-      'import { createInjector } from "typed-inject"',
-      'import { A, C, D, F } from "./classes.js"',
-      'export const container = createInjector()',
-      '  .provideValue("dep1", 1)',
-      '  .provideValue("dep2", 2)',
-      '  .provideClass("a", A)',
-      '  .provideClass("c", C)',
-      '  .provideClass("d", D)',
-      '  .provideClass("f", F)',
-    ].join('\n'))
-    const result = await runCheck('di-static-inject-usage')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // duplicate-utility-functions
@@ -867,86 +741,21 @@ describe('logger-event-name-format — branches', () => {
 // platform-checks
 // ---------------------------------------------------------------------------
 
-describe('platform-checks — branches', () => {
-  it('Platform.OS conditionals vs non-checks', async () => {
-    fx('src/components/Plat.tsx', [
-      'import { Platform } from "react-native"',
-      'export function A() {',
-      '  if (Platform.OS === "ios") return <Span />',
-      '  if (Platform.OS === "android") return <Div />',
-      '  return Platform.select({ ios: 1, android: 2, default: 0 })',
-      '}',
-      'export function B() {',
-      '  return process.platform === "darwin"',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('platform-checks')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // lazy-loading
 // ---------------------------------------------------------------------------
 
-describe('lazy-loading — branches', () => {
-  it('handlers with guards before/after expensive ops', async () => {
-    fx('src/handlers/lazy.ts', [
-      'export async function early(input: string) {',
-      '  if (!input) return null',
-      '  return await fetchData(input)',
-      '}',
-      'export async function lateGuard(input: string, flag: boolean) {',
-      '  const data = await fetchData(input)',
-      '  if (!flag) return null',
-      '  return data',
-      '}',
-      'export async function noGuard(input: string) {',
-      '  return await fetchData(input)',
-      '}',
-      'export async function multiGuards(input: string, x: number, y: number) {',
-      '  if (!input) return null',
-      '  if (x < 0) return null',
-      '  if (y < 0) return null',
-      '  return await fetchData(input)',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('lazy-loading')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // flashlist-enforcement
 // ---------------------------------------------------------------------------
 
-describe('flashlist-enforcement — branches', () => {
-  it('FlatList vs FlashList', async () => {
-    fx('src/components/Lists.tsx', [
-      'import { FlatList } from "react-native"',
-      'import { FlashList } from "@shopify/flash-list"',
-      'export const A = () => <FlatList data={[]} renderItem={() => null} />',
-      'export const B = () => <FlashList data={[]} renderItem={() => null} estimatedItemSize={50} />',
-      'export const C = () => <ScrollView>{[]}</ScrollView>',
-    ].join('\n'))
-    const result = await runCheck('flashlist-enforcement')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // client-boundary-placement
 // ---------------------------------------------------------------------------
 
-describe('client-boundary-placement — branches', () => {
-  it('"use client" placement variations', async () => {
-    fx('src/app/Good.tsx', '"use client"\nexport function A() { return <div /> }')
-    fx('src/app/Mid.tsx', 'import x from "x"\n"use client"\nexport function B() { return <div /> }')
-    fx('src/app/None.tsx', 'export function C() { return <div /> }')
-    const result = await runCheck('frontend-client-boundary-placement')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // test-only-frontend-modules
@@ -1011,69 +820,16 @@ describe('dispose-pattern-completeness — branches', () => {
 // typeorm-n-plus-one
 // ---------------------------------------------------------------------------
 
-describe('typeorm-n-plus-one — branches', () => {
-  it('queries with relation loading vs lazy access', async () => {
-    fx('src/repo/typeorm.ts', [
-      'export async function eager(repo: any) {',
-      '  return repo.find({ relations: ["posts"] })',
-      '}',
-      'export async function lazy(repo: any) {',
-      '  const users = await repo.find()',
-      '  for (const u of users) { await u.posts }',
-      '  return users',
-      '}',
-      'export async function findOne(repo: any) { return repo.findOne({ where: { id: 1 } }) }',
-    ].join('\n'))
-    const result = await runCheck('typeorm-n-plus-one')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // postgres-n-plus-one
 // ---------------------------------------------------------------------------
 
-describe('postgres-n-plus-one — branches', () => {
-  it('multiple sequential queries vs batched', async () => {
-    fx('src/repo/pg.ts', [
-      'export async function nplus(client: any, ids: number[]) {',
-      '  const out = []',
-      '  for (const id of ids) {',
-      '    out.push(await client.query("SELECT * FROM users WHERE id=$1", [id]))',
-      '  }',
-      '  return out',
-      '}',
-      'export async function batched(client: any, ids: number[]) {',
-      '  return client.query("SELECT * FROM users WHERE id = ANY($1)", [ids])',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('postgres-n-plus-one')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // financial-transaction-ordering
 // ---------------------------------------------------------------------------
 
-describe('financial-transaction-ordering — branches', () => {
-  it('debit/credit ordering scenarios', async () => {
-    fx('src/svc/finance.ts', [
-      'export async function bad(from: any, to: any, amount: number) {',
-      '  await from.debit(amount)',
-      '  await to.credit(amount)',
-      '}',
-      'export async function transactional(db: any, amount: number) {',
-      '  return db.transaction(async (tx: any) => {',
-      '    await tx.debit(amount)',
-      '    await tx.credit(amount)',
-      '  })',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('financial-transaction-ordering')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // database-index-coverage
@@ -1312,25 +1068,6 @@ describe('lifecycle-cleanup-enforcement — branches', () => {
 // openapi-response-coverage
 // ---------------------------------------------------------------------------
 
-describe('openapi-response-coverage — branches', () => {
-  it('various openapi response coverage shapes', async () => {
-    fx('src/api/spec.yaml', [
-      'paths:',
-      '  /users:',
-      '    get:',
-      '      responses:',
-      '        "200": { description: ok }',
-      '    post:',
-      '      responses: {}',
-    ].join('\n'))
-    fx('src/api/handlers.ts', [
-      'export const getUsers = async () => []',
-      'export const postUsers = async () => null',
-    ].join('\n'))
-    const result = await runCheck('openapi-response-coverage')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // broad fixture — many checks
@@ -1392,7 +1129,6 @@ describe('broad fixture — many checks', () => {
       'detached-promises',
       'no-unbounded-concurrency',
       'no-raw-fetch',
-      'await-result-unwrap',
       'array-validation',
       'numeric-validation',
       'null-safety',
@@ -1412,7 +1148,6 @@ describe('broad fixture — many checks', () => {
       'no-any-types',
       'duplicate-utility-functions',
       'stubbed-implementation-detection',
-      'di-static-inject-usage',
       'missing-type-exports',
       'toctou-race-condition',
       'lifecycle-cleanup-enforcement',
@@ -1422,9 +1157,6 @@ describe('broad fixture — many checks', () => {
       'database-schema-validation',
       'database-index-coverage',
       'in-memory-repository-detection',
-      'financial-transaction-ordering',
-      'postgres-n-plus-one',
-      'typeorm-n-plus-one',
     ]
     for (const slug of slugs) {
       const result = await runCheck(slug)

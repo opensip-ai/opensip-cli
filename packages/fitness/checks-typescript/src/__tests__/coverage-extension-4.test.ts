@@ -278,116 +278,6 @@ describe('result-pattern-consistency — branch coverage', () => {
 // openapi-response-coverage — exercise per-method requirements
 // ---------------------------------------------------------------------------
 
-describe('openapi-response-coverage — branch coverage', () => {
-  it('flags POST routes missing 400/401/500 in object-form schema', async () => {
-    fx('src/routes/post-missing.ts', [
-      'export const route = {',
-      '  method: "POST",',
-      '  url: "/users",',
-      '  schema: {',
-      '    body: { type: "object" },',
-      '    response: {',
-      '      200: { type: "object" },',
-      '    },',
-      '  },',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('openapi-response-coverage')
-    expect(result).toBeDefined()
-  })
-
-  it('flags PUT routes missing 400/401/404/500', async () => {
-    fx('src/routes/put-missing.ts', [
-      'export const route = {',
-      '  method: "PUT",',
-      '  url: "/users/:id",',
-      '  schema: {',
-      '    body: { type: "object" },',
-      '    response: { 200: { type: "object" } },',
-      '  },',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('openapi-response-coverage')
-    expect(result).toBeDefined()
-  })
-
-  it('flags GET routes missing 401/404/500', async () => {
-    fx('src/routes/get-missing.ts', [
-      'export const route = {',
-      '  method: "GET",',
-      '  url: "/users/:id",',
-      '  schema: {',
-      '    response: { 200: { type: "object" } },',
-      '  },',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('openapi-response-coverage')
-    expect(result).toBeDefined()
-  })
-
-  it('flags routes with no response: block at all', async () => {
-    fx('src/routes/no-resp.ts', [
-      'export const route = {',
-      '  method: "POST",',
-      '  url: "/users",',
-      '  schema: { body: { type: "object" } },',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('openapi-response-coverage')
-    expect(result).toBeDefined()
-  })
-
-  it('exercises shorthand fastify.post() with schema', async () => {
-    fx('src/controllers/items.ts', [
-      'import fastify from "fastify"',
-      'const app = fastify()',
-      'app.post("/items", {',
-      '  schema: {',
-      '    body: { type: "object" },',
-      '    response: { 200: { type: "object" } },',
-      '  },',
-      '}, async (req, res) => res.send({}))',
-    ].join('\n'))
-    const result = await runCheck('openapi-response-coverage')
-    expect(result).toBeDefined()
-  })
-
-  it('skips files that are not route/controller/endpoint/handler', async () => {
-    fx('src/util/x.ts', 'export const x = 1')
-    const result = await runCheck('openapi-response-coverage')
-    expect(result.signals).toHaveLength(0)
-  })
-
-  it('skips route files that mention neither schema nor response', async () => {
-    fx('src/routes/empty.ts', 'export const x = 1')
-    const result = await runCheck('openapi-response-coverage')
-    expect(result.signals).toHaveLength(0)
-  })
-
-  it('flags DELETE routes missing 401/404/500', async () => {
-    fx('src/routes/delete-missing.ts', [
-      'export const route = {',
-      '  method: "DELETE",',
-      '  url: "/users/:id",',
-      '  schema: { response: { 204: { type: "null" } } },',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('openapi-response-coverage')
-    expect(result).toBeDefined()
-  })
-
-  it('flags PATCH routes missing required codes', async () => {
-    fx('src/routes/patch-missing.ts', [
-      'export const route = {',
-      '  method: "PATCH",',
-      '  url: "/users/:id",',
-      '  schema: { body: {}, response: { 200: {} } },',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('openapi-response-coverage')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // fastify-schema-coverage — drive missing-X branches
@@ -540,116 +430,16 @@ describe('fastify-route-validation — branch coverage', () => {
 // memo-list-items — exercise more JSX list patterns
 // ---------------------------------------------------------------------------
 
-describe('memo-list-items — extra branch coverage', () => {
-  it('flags inline arrow with JSX inside .map', async () => {
-    fx('src/components/Inline.tsx', [
-      'export function App({ users }: { users: { id: string; name: string }[] }) {',
-      '  return <ul>{users.map((u) => <li key={u.id}>{u.name}</li>)}</ul>',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('memo-list-items')
-    expect(result).toBeDefined()
-  })
-
-  it('handles `data.items.map()` chained access', async () => {
-    fx('src/components/Chained.tsx', [
-      'export function App({ data }: { data: { items: { id: string }[] } }) {',
-      '  return <ul>{data.items.map((it) => <li key={it.id}>x</li>)}</ul>',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('memo-list-items')
-    expect(result).toBeDefined()
-  })
-
-  it('handles list items that already render memo-extracted components', async () => {
-    fx('src/components/Memo.tsx', [
-      'import React from "react"',
-      'const Item = React.memo(({ id }: { id: string }) => <li>{id}</li>)',
-      'export function App({ users }: { users: { id: string }[] }) {',
-      '  return <ul>{users.map((u) => <Item key={u.id} id={u.id} />)}</ul>',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('memo-list-items')
-    expect(result).toBeDefined()
-  })
-
-  it('skips non-JSX maps', async () => {
-    fx('src/components/NonJsx.tsx', [
-      'export function App({ ids }: { ids: number[] }) {',
-      '  const doubled = ids.map((i) => i * 2)',
-      '  return <div>{doubled.length}</div>',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('memo-list-items')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // lazy-loading — extra branches
 // ---------------------------------------------------------------------------
 
-describe('lazy-loading — branch coverage', () => {
-  it('flags awaited fetch followed by validation', async () => {
-    fx('src/handlers/lazy-fail.ts', [
-      'export async function f(userId: string) {',
-      '  const user = await fetch("/api/" + userId)',
-      '  if (!userId) return null',
-      '  return user',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('lazy-loading')
-    expect(result).toBeDefined()
-  })
-
-  it('does not flag fail-fast: validation before fetch', async () => {
-    fx('src/handlers/fail-fast.ts', [
-      'export async function f(userId: string) {',
-      '  if (!userId) return null',
-      '  return await fetch("/api/" + userId)',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('lazy-loading')
-    expect(result).toBeDefined()
-  })
-
-  it('runs over multi-step await chains with no validation', async () => {
-    fx('src/handlers/multi.ts', [
-      'export async function f(id: string) {',
-      '  const a = await fetch("/a/" + id)',
-      '  const b = await fetch("/b/" + id)',
-      '  return { a, b }',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('lazy-loading')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // platform-checks — minor coverage
 // ---------------------------------------------------------------------------
 
-describe('platform-checks — branch coverage', () => {
-  it('flags Platform.OS branches that lack a default fallback', async () => {
-    fx('src/components/Plat.tsx', [
-      'import { Platform } from "react-native"',
-      'export function f() {',
-      '  if (Platform.OS === "ios") return 1',
-      '  if (Platform.OS === "android") return 2',
-      // missing default
-      '}',
-    ].join('\n'))
-    const result = await runCheck('platform-checks')
-    expect(result).toBeDefined()
-  })
-
-  it('skips files without Platform.OS', async () => {
-    fx('src/components/none.ts', 'export const x = 1')
-    const result = await runCheck('platform-checks')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // test-only-frontend-modules

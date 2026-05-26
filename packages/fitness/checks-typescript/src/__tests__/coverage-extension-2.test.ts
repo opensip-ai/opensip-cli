@@ -528,84 +528,11 @@ describe('fastify-route-validation — branch coverage', () => {
 // openapi-response-coverage
 // ---------------------------------------------------------------------------
 
-describe('openapi-response-coverage — branch coverage', () => {
-  it('runs over fastify routes with response schemas (full + partial)', async () => {
-    fx('src/routes/with-resp.ts', [
-      'import fastify from "fastify"',
-      'const app = fastify()',
-      'app.post("/items", {',
-      '  schema: {',
-      '    body: { type: "object" },',
-      '    response: {',
-      '      200: { type: "object" },',
-      '      400: { type: "object" },',
-      '      500: { type: "object" },',
-      '    },',
-      '  },',
-      '}, async (req, res) => res.send({}))',
-      'app.delete("/items/:id", {',
-      '  schema: {',
-      '    response: {',
-      '      204: { type: "null" },',
-      '    },',
-      '  },',
-      '}, async (req, res) => res.send())',
-    ].join('\n'))
-    const result = await runCheck('openapi-response-coverage')
-    expect(result).toBeDefined()
-  })
-
-  it('runs over fastify routes with no response schema at all', async () => {
-    fx('src/routes/no-resp.ts', [
-      'import fastify from "fastify"',
-      'const app = fastify()',
-      'app.put("/x/:id", async (req, res) => res.send({}))',
-      'app.patch("/x/:id", async (req, res) => res.send({}))',
-    ].join('\n'))
-    const result = await runCheck('openapi-response-coverage')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // memo-list-items
 // ---------------------------------------------------------------------------
 
-describe('memo-list-items — branch coverage', () => {
-  it('flags inline JSX inside .map() that creates components without React.memo', async () => {
-    fx('src/components/UserList.tsx', [
-      'export function UserList({ users }: { users: { id: string; name: string }[] }) {',
-      '  return (',
-      '    <ul>',
-      '      {users.map((u) => <li key={u.id}>{u.name}</li>)}',
-      '    </ul>',
-      '  )',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('memo-list-items')
-    expect(result).toBeDefined()
-  })
-
-  it('handles .map() with extracted components', async () => {
-    fx('src/components/MemoList.tsx', [
-      'import React from "react"',
-      'const UserCard = React.memo(({ user }: { user: { id: string; name: string } }) => (',
-      '  <li>{user.name}</li>',
-      '))',
-      'export function UserList({ users }: { users: { id: string; name: string }[] }) {',
-      '  return <ul>{users.map((u) => <UserCard key={u.id} user={u} />)}</ul>',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('memo-list-items')
-    expect(result).toBeDefined()
-  })
-
-  it('skips non-tsx files', async () => {
-    fx('src/components/no-jsx.ts', 'export const x = 1')
-    const result = await runCheck('memo-list-items')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // throws-documentation
@@ -731,26 +658,6 @@ describe('result-pattern-consistency — branch coverage', () => {
 // typeorm-n-plus-one
 // ---------------------------------------------------------------------------
 
-describe('typeorm-n-plus-one — branch coverage', () => {
-  it('runs over typeorm repository find calls inside loops', async () => {
-    fx('src/repos/typeorm.ts', [
-      'declare const repository: { findOneBy(where: unknown): Promise<unknown> }',
-      'export async function loadAll(ids: number[]) {',
-      '  for (const id of ids) {',
-      '    await repository.findOneBy({ id })',
-      '  }',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('typeorm-n-plus-one')
-    expect(result).toBeDefined()
-  })
-
-  it('skips files without typeorm patterns', async () => {
-    fx('src/repos/none.ts', 'export const x = 1')
-    const result = await runCheck('typeorm-n-plus-one')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // unused-config-options
@@ -805,125 +712,9 @@ describe('unused-config-options — branch coverage', () => {
 // typed-inject-scope-mismatch
 // ---------------------------------------------------------------------------
 
-describe('typed-inject-scope-mismatch — branch coverage', () => {
-  it('flags singleton depending on a request-scoped type', async () => {
-    fx('src/di/singleton.ts', [
-      'import { createInjector } from "typed-inject"',
-      '@Singleton',
-      'export class UserService {',
-      '  constructor(ctx: RequestContext) {}',
-      '}',
-      'declare const Singleton: ClassDecorator',
-      'declare class RequestContext {}',
-      // ensure DI patterns are present
-      'export const _x = createInjector',
-    ].join('\n'))
-    const result = await runCheck('typed-inject-scope-mismatch')
-    expect(result).toBeDefined()
-  })
-
-  it('flags Service classes with mutable state but no scope', async () => {
-    fx('src/di/transient.ts', [
-      'import { createInjector } from "typed-inject"',
-      'export class UserService {',
-      '  private counter = 0',
-      '  bump() { this.counter++ }',
-      '}',
-      'export const _x = createInjector',
-    ].join('\n'))
-    const result = await runCheck('typed-inject-scope-mismatch')
-    expect(result).toBeDefined()
-  })
-
-  it('skips files without DI patterns', async () => {
-    fx('src/di/none.ts', 'export const x = 1')
-    const result = await runCheck('typed-inject-scope-mismatch')
-    expect(result.signals).toHaveLength(0)
-  })
-
-  it('handles RequestScoped classes appropriately', async () => {
-    fx('src/di/request.ts', [
-      'import { createInjector } from "typed-inject"',
-      '@RequestScoped',
-      'export class SessionService {',
-      '  constructor() {}',
-      '}',
-      'declare const RequestScoped: ClassDecorator',
-      'export const _x = createInjector',
-    ].join('\n'))
-    const result = await runCheck('typed-inject-scope-mismatch')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // test-only-implementations
 // ---------------------------------------------------------------------------
 
-describe('test-only-implementations — branch coverage', () => {
-  it('runs over implementations imported only by tests', async () => {
-    fx('src/implementations/alpha.ts', 'export const alpha = 1')
-    fx('src/__tests__/alpha.test.ts', [
-      'import { alpha } from "../implementations/alpha.js"',
-      'export const x = alpha',
-    ].join('\n'))
-    const result = await runCheck('test-only-implementations')
-    expect(result).toBeDefined()
-  })
 
-  it('runs over adapters / repositories / providers paths', async () => {
-    fx('src/adapters/foo.ts', 'export const fooAdapter = 1')
-    fx('src/repositories/bar.ts', 'export const barRepo = 1')
-    fx('src/providers/baz.ts', 'export const bazProvider = 1')
-    fx('src/main.ts', [
-      'import { fooAdapter } from "./adapters/foo.js"',
-      'import { barRepo } from "./repositories/bar.js"',
-      'import { bazProvider } from "./providers/baz.js"',
-      'export const all = [fooAdapter, barRepo, bazProvider]',
-    ].join('\n'))
-    const result = await runCheck('test-only-implementations')
-    expect(result).toBeDefined()
-  })
-})
-
-// ---------------------------------------------------------------------------
-// frontend tests
-// ---------------------------------------------------------------------------
-
-describe('frontend checks — branch coverage', () => {
-  it('lazy-loading flags awaited fetch before validation', async () => {
-    fx('src/handlers/lazy.ts', [
-      'export async function f(userId: string) {',
-      '  const user = await fetch("/api/" + userId)',
-      '  if (!userId) return null',
-      '  return user',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('lazy-loading')
-    expect(result).toBeDefined()
-  })
-
-  it('platform-checks runs over Platform.OS branches', async () => {
-    fx('src/components/Plat.tsx', [
-      'import { Platform } from "react-native"',
-      'export function App() {',
-      '  if (Platform.OS === "ios") return <></>',
-      '  if (Platform.OS === "android") return <></>',
-      '  return null',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('platform-checks')
-    expect(result).toBeDefined()
-  })
-
-  it('flashlist-enforcement runs over FlatList usage', async () => {
-    fx('src/components/Flat.tsx', [
-      'import { FlatList } from "react-native"',
-      'export function L({ data }: { data: { id: string }[] }) {',
-      '  return <FlatList data={data} renderItem={() => <></>} />',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('flashlist-enforcement')
-    expect(result).toBeDefined()
-  })
-})

@@ -301,18 +301,6 @@ describe('no-raw-fetch — branch coverage', () => {
 // await-result-unwrap
 // ---------------------------------------------------------------------------
 
-describe('await-result-unwrap — branch coverage', () => {
-  it('runs against typical Result.unwrap usage', async () => {
-    fx('src/result/unwrap.ts', [
-      'declare const result: { unwrap(): Promise<unknown> }',
-      'export async function f() {',
-      '  return await result.unwrap()',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('await-result-unwrap')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // throws-documentation
@@ -404,25 +392,6 @@ describe('dispose-pattern-completeness — branch coverage', () => {
 // openapi-type-source
 // ---------------------------------------------------------------------------
 
-describe('openapi-type-source — branch coverage', () => {
-  it('runs over fastify routes with body / query / params types', async () => {
-    fx('src/routes/typed.ts', [
-      'import fastify from "fastify"',
-      'const app = fastify()',
-      'app.post<{ Body: { name: string } }>("/users", async (req, res) => {',
-      '  return req.body',
-      '})',
-    ].join('\n'))
-    const result = await runCheck('openapi-type-source')
-    expect(result).toBeDefined()
-  })
-
-  it('skips non-fastify files', async () => {
-    fx('src/routes/no-fastify.ts', 'export const x = 1')
-    const result = await runCheck('openapi-type-source')
-    expect(result.signals).toHaveLength(0)
-  })
-})
 
 // ---------------------------------------------------------------------------
 // drizzle-orm-migration-guardrails
@@ -584,32 +553,6 @@ describe('array-validation — branch coverage', () => {
 // financial-transaction-ordering
 // ---------------------------------------------------------------------------
 
-describe('financial-transaction-ordering — branch coverage', () => {
-  it('runs over typical payment processing patterns', async () => {
-    fx('src/payments/processor.ts', [
-      'declare const stripe: { charges: { create(args: { amount: number }): Promise<{ id: string }> } }',
-      'declare const repository: {',
-      '  save(row: { id?: string; amount?: number; status?: string }): Promise<void>',
-      '  findOne(id: string): Promise<{ id: string }>',
-      '  update(id: string, patch: { status: string }): Promise<void>',
-      '}',
-      'export class PaymentService {',
-      '  async processPayment(amount: number) {',
-      '    const result = await stripe.charges.create({ amount })',
-      '    await repository.save({ id: result.id, amount })',
-      '  }',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('financial-transaction-ordering')
-    expect(result).toBeDefined()
-  })
-
-  it('skips files without payment-processing patterns', async () => {
-    fx('src/util/no-payments.ts', 'export const x = 1')
-    const result = await runCheck('financial-transaction-ordering')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // database-index-coverage

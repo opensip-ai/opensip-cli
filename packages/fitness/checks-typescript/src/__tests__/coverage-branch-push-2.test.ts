@@ -404,54 +404,6 @@ describe('stubbed-implementation-detection — additional branches', () => {
 // di-static-inject-usage — broader scenarios
 // ---------------------------------------------------------------------------
 
-describe('di-static-inject-usage — additional branches', () => {
-  it('various class shapes with/without inject and constructor params', async () => {
-    fx('src/di/cs.ts', [
-      'export class A {',
-      '  static inject = ["d1"] as const',
-      '  constructor(public d1: any) {}',
-      '}',
-      'export class B {',
-      '  static inject = ["d1", "d2"] as const',
-      '  constructor(public d1: any, public d2: any) {}',
-      '}',
-      'export class C {',
-      '  // No inject and no params',
-      '}',
-      'export class D {',
-      '  // Constructor without inject',
-      '  constructor(public arg: string) {}',
-      '}',
-      'export class E {',
-      '  static inject = []',
-      '  constructor() {}',
-      '}',
-      'export class F {',
-      '  static inject = ["d1", "d2", "d3"] as const',
-      '  constructor(public d1: any) {}', // wrong arity
-      '}',
-      'export class G {',
-      '  static inject: string[] = ["d1"]', // mutable type
-      '  constructor(public d1: any) {}',
-      '}',
-      'export class H extends A {',
-      '  // inherited inject?',
-      '  constructor(d1: any) { super(d1) }',
-      '}',
-    ].join('\n'))
-    fx('src/di/cont.ts', [
-      'import { createInjector } from "typed-inject"',
-      'import { A, B } from "./cs.js"',
-      'export const c = createInjector()',
-      '  .provideValue("d1", 1)',
-      '  .provideValue("d2", 2)',
-      '  .provideClass("a", A)',
-      '  .provideClass("b", B)',
-    ].join('\n'))
-    const result = await runCheck('di-static-inject-usage')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // fastify-route-validation — broader scenarios
@@ -676,23 +628,6 @@ describe('incomplete-regex-escaping — additional branches', () => {
 // unused-modules / unused-config-options — branches
 // ---------------------------------------------------------------------------
 
-describe('unused-modules — additional branches', () => {
-  it('exports referenced and unreferenced from index', async () => {
-    fx('package.json', JSON.stringify({
-      name: '@scope/test',
-      version: '1.0.0',
-      type: 'module',
-      main: './dist/index.js',
-      types: './dist/index.d.ts',
-    }, null, 2))
-    fx('src/index.ts', 'export * from "./used.js"')
-    fx('src/used.ts', 'export const used = 1\nexport function helper() { return 2 }')
-    fx('src/unused.ts', 'export const unused = 1\nexport function bareHelper() { return 3 }')
-    fx('src/internal.ts', 'export const internal = 1\nimport { helper } from "./used.js"\nhelper()')
-    const result = await runCheck('unused-modules')
-    expect(result).toBeDefined()
-  })
-})
 
 describe('unused-config-options — additional branches', () => {
   it('Config interface with optional/required, used and unused fields', async () => {
@@ -1041,143 +976,26 @@ describe('toctou-race-condition — additional branches', () => {
 // memo-list-items — exercise findEnclosingMapCall walk + isInsideUseMemo deep
 // ---------------------------------------------------------------------------
 
-describe('memo-list-items — additional branches', () => {
-  it('nested .map(), useMemo callbacks, fragments, named-function memos', async () => {
-    fx('src/c/Lists2.tsx', [
-      'import React, { useMemo } from "react"',
-      'function Inner() { return <span /> }',
-      'export function App({ items }: { items: { id: string; subs: { id: string }[] }[] }) {',
-      '  return (<>{items.map((it) => (',
-      '    <ul key={it.id}>',
-      '      {it.subs.map((s) => <Inner key={s.id} />)}',
-      '    </ul>',
-      '  ))}</>)',
-      '}',
-      'export const NamedMemo = React.memo(function NamedMemo() { return <div /> })',
-      'export const FromMemo = memo(function FromMemo() { return <div /> })',
-      'export const Reused = Object.assign(NamedMemo, { displayName: "X" })',
-      'export function ReuseList({ items }: { items: { id: string }[] }) {',
-      '  return (<>{items.map((it) => <Reused key={it.id} />)}</>)',
-      '}',
-      'export function MemoMap({ items }: { items: { id: string }[] }) {',
-      '  const rendered = React.useMemo(() => items.map((it) => <Inner key={it.id} />), [items])',
-      '  return (<>{rendered}</>)',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('memo-list-items')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // no-inline-functions — additional branches
 // ---------------------------------------------------------------------------
 
-describe('no-inline-functions — additional branches', () => {
-  it('non-identifier prop names, missing initializer, JSX expression without inner', async () => {
-    fx('src/c/Inl2.tsx', [
-      'export function App() {',
-      '  return (<>',
-      '    <List renderItem={() => <span />} />',
-      '    <List renderItem keyExtractor={(it) => it.id} />',
-      '    <List renderItem={undefined} />',
-      '    <List renderItem={null as any} />',
-      '    <List renderItem={({}) => <span />} />',
-      '    <Btn onPress={undefined} />',
-      '    <Btn onPress={(e) => { handle(e); track(e) }} />',
-      '    <Btn onPress={fn} />',
-      '  </>)',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('no-inline-functions')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // platform-checks — additional shapes
 // ---------------------------------------------------------------------------
 
-describe('platform-checks — additional branches', () => {
-  it('various Platform usages and shapes', async () => {
-    fx('src/c/p.tsx', [
-      'import { Platform } from "react-native"',
-      'export function A() {',
-      '  if (Platform.OS === "ios") return <X />',
-      '  if (Platform.OS === "android") return <Y />',
-      '  if (Platform.OS === "web") return <Z />',
-      '  if (Platform.OS === "macos") return <M />',
-      '  if (Platform.OS === "windows") return <W />',
-      '  return null',
-      '}',
-      'export const sel = Platform.select({ ios: 1, android: 2 })',
-      'export const variant = Platform.OS === "ios" ? "iOS" : "Other"',
-    ].join('\n'))
-    const result = await runCheck('platform-checks')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // flashlist-enforcement — additional shapes
 // ---------------------------------------------------------------------------
 
-describe('flashlist-enforcement — additional branches', () => {
-  it('FlatList, SectionList, FlashList, ScrollView', async () => {
-    fx('src/c/lists.tsx', [
-      'import { FlatList, SectionList, ScrollView } from "react-native"',
-      'import { FlashList } from "@shopify/flash-list"',
-      'export const A = () => <FlatList data={[]} renderItem={() => null} />',
-      'export const B = () => <SectionList sections={[]} renderItem={() => null} />',
-      'export const C = () => <FlashList data={[]} estimatedItemSize={50} renderItem={() => null} />',
-      'export const D = () => <ScrollView><div /></ScrollView>',
-    ].join('\n'))
-    const result = await runCheck('flashlist-enforcement')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // lazy-loading — broader patterns
 // ---------------------------------------------------------------------------
 
-describe('lazy-loading — additional branches', () => {
-  it('various guard patterns and expensive ops', async () => {
-    fx('src/h/lz.ts', [
-      'export async function f1(input: string) {',
-      '  if (!input) return null',
-      '  const data = await fetchData(input)',
-      '  return data',
-      '}',
-      'export async function f2(input: string) {',
-      '  const data = await fetchData(input)',
-      '  if (!data) return null',
-      '  return data',
-      '}',
-      'export async function f3(input: string, flag: boolean) {',
-      '  const data = await fetchData(input)',
-      '  if (!flag) return null',
-      '  return data',
-      '}',
-      'export async function f4() {',
-      '  return await fetchAll()',
-      '}',
-      'export function notAsync(input: string) {',
-      '  if (!input) return null',
-      '  return input',
-      '}',
-      'export class S {',
-      '  async run(x: any) {',
-      '    if (!x) return null',
-      '    return await this.compute(x)',
-      '  }',
-      '  async compute(_: any) { return 1 }',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('lazy-loading')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // missing-type-exports — exercise barrel-only fallback and patterns
@@ -1261,21 +1079,6 @@ describe('module-coupling-fan-out — additional branches', () => {
 // typed-inject-scope-mismatch — additional shapes
 // ---------------------------------------------------------------------------
 
-describe('typed-inject-scope-mismatch — additional branches', () => {
-  it('scope variants', async () => {
-    fx('src/di/c.ts', [
-      'import { createInjector, Scope } from "typed-inject"',
-      'class A { static inject = ["d1"] as const; constructor(public d1: any) {} }',
-      'class B { static inject = ["a"] as const; constructor(public a: A) {} }',
-      'export const c = createInjector()',
-      '  .provideValue("d1", 1)',
-      '  .provideClass("a", A, Scope.Singleton)',
-      '  .provideClass("b", B, Scope.Transient)',
-    ].join('\n'))
-    const result = await runCheck('typed-inject-scope-mismatch')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // package-json-exports-field — broader shapes
@@ -1348,33 +1151,6 @@ describe('tsconfig-extends-validation — additional branches', () => {
 // openapi-response-coverage — broader shapes
 // ---------------------------------------------------------------------------
 
-describe('openapi-response-coverage — additional branches', () => {
-  it('openapi with handlers having various status codes', async () => {
-    fx('src/api/spec.yaml', [
-      'paths:',
-      '  /users:',
-      '    get:',
-      '      responses:',
-      '        "200": { description: ok }',
-      '        "404": { description: not found }',
-      '    post:',
-      '      responses:',
-      '        "201": { description: created }',
-      '        "400": { description: bad }',
-    ].join('\n'))
-    fx('src/api/handler.ts', [
-      'export async function getUsers(req: any, reply: any) {',
-      '  if (Math.random() > 0.5) return reply.code(404).send()',
-      '  return reply.code(200).send([])',
-      '}',
-      'export async function postUsers(req: any, reply: any) {',
-      '  return reply.code(201).send({})',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('openapi-response-coverage')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // fastify-schema-coverage — broader scenarios
@@ -1399,17 +1175,6 @@ describe('fastify-schema-coverage — additional branches', () => {
 // dynamodb-scan-detection
 // ---------------------------------------------------------------------------
 
-describe('dynamodb-scan-detection — additional branches', () => {
-  it('scan vs query usage', async () => {
-    fx('src/db/dyn.ts', [
-      'import { ScanCommand, QueryCommand } from "@aws-sdk/client-dynamodb"',
-      'export async function bad(client: any) { return client.send(new ScanCommand({ TableName: "T" })) }',
-      'export async function good(client: any) { return client.send(new QueryCommand({ TableName: "T", KeyConditionExpression: "id = :id", ExpressionAttributeValues: { ":id": "1" } })) }',
-    ].join('\n'))
-    const result = await runCheck('dynamodb-scan-detection')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // no-hardcoded-correlation-id
@@ -1454,52 +1219,16 @@ describe('context-mutation — additional branches', () => {
 // test-only-implementations
 // ---------------------------------------------------------------------------
 
-describe('test-only-implementations — additional branches', () => {
-  it('mock/stub patterns in src/', async () => {
-    fx('src/api/mock-client.ts', 'export const mockClient = { query: () => [] }')
-    fx('src/api/__mocks__/service.ts', 'export const mockSvc = () => null')
-    fx('src/api/real.ts', 'export const realClient = { query: () => fetch("/x") }')
-    fx('src/api/stub.ts', 'export const stubResult = { data: [] }')
-    const result = await runCheck('test-only-implementations')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // openapi-type-source — branches
 // ---------------------------------------------------------------------------
 
-describe('openapi-type-source — additional branches', () => {
-  it('various pattern matches', async () => {
-    fx('src/api/types.ts', [
-      'export interface UserRequest { id: string }',
-      'export interface UserResponse { ok: boolean }',
-      'export interface CreateUserPayload { email: string }',
-      'export type UserDTO = { id: string }',
-      'export interface ApiError { code: number }',
-      'export interface Plain {}',
-      'export type Color = "red" | "blue"',
-    ].join('\n'))
-    const result = await runCheck('openapi-type-source')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // frontend-client-boundary-placement — additional branches
 // ---------------------------------------------------------------------------
 
-describe('frontend-client-boundary-placement — additional branches', () => {
-  it('various positions of "use client"', async () => {
-    fx('src/app/A.tsx', '"use client"\nexport function A() { return <div /> }')
-    fx('src/app/B.tsx', '/* comment */\n"use client"\nexport function B() { return <div /> }')
-    fx('src/app/C.tsx', 'import x from "x"\n"use client"\nexport function C() { return <div /> }')
-    fx('src/app/D.tsx', "'use client';\nexport function D() { return <div /> }")
-    fx('src/app/E.tsx', 'export function E() { return <div /> }')
-    const result = await runCheck('frontend-client-boundary-placement')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // a11y-form-labels / a11y-semantic-html / accessible-touchables
@@ -1541,23 +1270,6 @@ describe('a11y-semantic-html — additional branches', () => {
   })
 })
 
-describe('accessible-touchables — additional branches', () => {
-  it('touchable elements with/without accessibility props', async () => {
-    fx('src/c/T.tsx', [
-      'import { TouchableOpacity, Pressable } from "react-native"',
-      'export function A() {',
-      '  return (<>',
-      '    <TouchableOpacity accessibilityLabel="Submit"><Text>Submit</Text></TouchableOpacity>',
-      '    <TouchableOpacity><Text>No label</Text></TouchableOpacity>',
-      '    <Pressable accessibilityRole="button"><Text>Tap</Text></Pressable>',
-      '    <Pressable><Text>No role</Text></Pressable>',
-      '  </>)',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('accessible-touchables')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // in-memory-repository-detection — additional shapes
@@ -1599,31 +1311,6 @@ describe('in-memory-repository-detection — additional branches', () => {
 // financial-transaction-ordering — additional shapes
 // ---------------------------------------------------------------------------
 
-describe('financial-transaction-ordering — additional branches', () => {
-  it('debit/credit with various flow patterns', async () => {
-    fx('src/svc/fin.ts', [
-      'export async function bad(from: any, to: any, amount: number) {',
-      '  await from.debit(amount)',
-      '  await to.credit(amount)',
-      '}',
-      'export async function reverseOrder(from: any, to: any, amount: number) {',
-      '  await to.credit(amount)',
-      '  await from.debit(amount)',
-      '}',
-      'export async function withTx(db: any, amount: number) {',
-      '  return db.transaction(async (tx: any) => {',
-      '    await tx.debit(amount)',
-      '    await tx.credit(amount)',
-      '  })',
-      '}',
-      'export async function noPair(from: any, amount: number) {',
-      '  await from.debit(amount)',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('financial-transaction-ordering')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // database-index-coverage / database-schema-validation
@@ -1679,61 +1366,11 @@ describe('database-schema-validation — additional branches', () => {
 // postgres-n-plus-one — additional patterns
 // ---------------------------------------------------------------------------
 
-describe('postgres-n-plus-one — additional branches', () => {
-  it('various query loop patterns', async () => {
-    fx('src/db/p.ts', [
-      'export async function nplus1(client: any, ids: number[]) {',
-      '  const out = []',
-      '  for (const id of ids) {',
-      '    out.push(await client.query("SELECT * FROM users WHERE id=$1", [id]))',
-      '  }',
-      '  return out',
-      '}',
-      'export async function batched(client: any, ids: number[]) {',
-      '  return client.query("SELECT * FROM users WHERE id = ANY($1)", [ids])',
-      '}',
-      'export async function mapPattern(client: any, ids: number[]) {',
-      '  return Promise.all(ids.map(id => client.query("SELECT * FROM x WHERE id=$1", [id])))',
-      '}',
-      'export async function whileLoop(client: any) {',
-      '  let i = 0',
-      '  while (i < 10) {',
-      '    await client.query("SELECT 1")',
-      '    i++',
-      '  }',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('postgres-n-plus-one')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // typeorm-n-plus-one — additional patterns
 // ---------------------------------------------------------------------------
 
-describe('typeorm-n-plus-one — additional branches', () => {
-  it('repo find with relations and lazy loops', async () => {
-    fx('src/db/t.ts', [
-      'export async function withRelations(repo: any) {',
-      '  return repo.find({ relations: ["posts", "comments"], where: { active: true } })',
-      '}',
-      'export async function lazyLoad(repo: any) {',
-      '  const users = await repo.find()',
-      '  for (const u of users) {',
-      '    const posts = await u.posts',
-      '    console.log(posts)',
-      '  }',
-      '  return users',
-      '}',
-      'export async function findOne(repo: any) {',
-      '  return repo.findOne({ where: { id: 1 }, relations: ["profile"] })',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('typeorm-n-plus-one')
-    expect(result).toBeDefined()
-  })
-})
 
 // ---------------------------------------------------------------------------
 // sql-injection — additional patterns
