@@ -54,6 +54,7 @@ import { createInterface } from 'node:readline/promises'
 import { resolveProjectPaths } from '@opensip-tools/core'
 
 import type { UninstallDoneResult } from '@opensip-tools/contracts'
+import type { ProjectContext } from '@opensip-tools/core'
 
 type UninstallMode = 'user' | 'project'
 
@@ -69,6 +70,13 @@ export interface UninstallOptions {
   readonly rootDir?: string
   /** Override cwd resolution for `--project` with no arg (tests). */
   readonly cwd?: string
+  /**
+   * Resolved ProjectContext from pre-action-hook. Used as the primary
+   * source for `resolveProjectDir` when `--project` wasn't passed —
+   * without it, `uninstall` run from a subdir would target the wrong
+   * .runtime/.
+   */
+  readonly projectContext?: ProjectContext
   /** Override stdout (primarily for tests). */
   readonly write?: (s: string) => void
   /** Override the confirmation prompt (primarily for tests). */
@@ -140,7 +148,10 @@ function defaultPrompt(question: string): Promise<string> {
 /** Resolve the project directory for `--project [path]`. */
 function resolveProjectDir(opts: UninstallOptions): string {
   if (typeof opts.project === 'string') return resolve(opts.project)
-  return opts.cwd ?? process.cwd()
+  // Prefer the discovered project root (set by pre-action-hook). Falls
+  // back to literal cwd, then process.cwd(). Without the discovered
+  // root, `uninstall` from a subdir would target the wrong .runtime/.
+  return opts.projectContext?.projectRoot ?? opts.cwd ?? process.cwd()
 }
 
 /** Build the list of targets that currently exist for the given mode. */

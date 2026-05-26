@@ -13,6 +13,7 @@ import { mountResultCommand } from './mount-result-command.js';
 import { type CliCommandsContext } from './shared.js';
 import { executeUninstall } from './uninstall.js';
 
+import type { ProjectContext } from '@opensip-tools/core';
 import type { Command } from 'commander';
 
 interface UninstallCliOptions {
@@ -20,6 +21,7 @@ interface UninstallCliOptions {
   dryRun?: boolean;
   project?: string | boolean;
   json?: boolean;
+  projectContext?: ProjectContext;
 }
 
 export function registerUninstall(program: Command, ctx: CliCommandsContext): void {
@@ -39,7 +41,12 @@ export function registerUninstall(program: Command, ctx: CliCommandsContext): vo
       let project: string | true | undefined;
       if (opts.project === true) project = true;
       else if (typeof opts.project === 'string') project = opts.project;
-      return executeUninstall({ yes: opts.yes, dryRun: opts.dryRun, project });
+      return executeUninstall({
+        yes: opts.yes,
+        dryRun: opts.dryRun,
+        project,
+        projectContext: opts.projectContext,
+      });
     },
     { ctx, jsonFlag: (opts: UninstallCliOptions) => Boolean(opts.json) },
   );

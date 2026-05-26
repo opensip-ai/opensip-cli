@@ -8,7 +8,18 @@ import { mountResultCommand, mountResultCommandWithArg } from './mount-result-co
 import { pluginAdd, pluginList, pluginRemove, pluginSync } from './plugin.js';
 import { CWD_OPTION_SPEC, JSON_DESC, type CliCommandsContext } from './shared.js';
 
+import type { ProjectContext } from '@opensip-tools/core';
 import type { Command } from 'commander';
+
+interface CwdOpts {
+  readonly cwd?: string;
+  readonly projectContext?: ProjectContext;
+}
+
+/** Prefer the discovered project root; fall back to literal cwd; finally process.cwd(). */
+function effectiveCwd(opts: CwdOpts): string {
+  return opts.projectContext?.projectRoot ?? opts.cwd ?? process.cwd();
+}
 
 export function registerPlugins(program: Command, ctx: CliCommandsContext): void {
   const pluginCmd = program
@@ -21,9 +32,9 @@ export function registerPlugins(program: Command, ctx: CliCommandsContext): void
     .option(CWD_OPTION_SPEC, 'Project root', process.cwd())
     .option('--json', JSON_DESC, false);
 
-  mountResultCommand<{ cwd?: string; json: boolean }>(
+  mountResultCommand<{ cwd?: string; projectContext?: ProjectContext; json: boolean }>(
     listCmd,
-    (opts) => pluginList(opts.cwd ?? process.cwd()),
+    (opts) => pluginList(effectiveCwd(opts)),
     { ctx, jsonFlag: (opts) => opts.json },
   );
 
@@ -34,9 +45,9 @@ export function registerPlugins(program: Command, ctx: CliCommandsContext): void
     .option(CWD_OPTION_SPEC, 'Project root', process.cwd())
     .option('--json', JSON_DESC, false);
 
-  mountResultCommandWithArg<string, { domain?: string; cwd?: string; json: boolean }>(
+  mountResultCommandWithArg<string, { domain?: string; cwd?: string; projectContext?: ProjectContext; json: boolean }>(
     addCmd,
-    (packageName, opts) => pluginAdd(packageName, opts.cwd ?? process.cwd(), opts.domain),
+    (packageName, opts) => pluginAdd(packageName, effectiveCwd(opts), opts.domain),
     { ctx, jsonFlag: (opts) => opts.json },
   );
 
@@ -47,9 +58,9 @@ export function registerPlugins(program: Command, ctx: CliCommandsContext): void
     .option(CWD_OPTION_SPEC, 'Project root', process.cwd())
     .option('--json', JSON_DESC, false);
 
-  mountResultCommandWithArg<string, { domain?: string; cwd?: string; json: boolean }>(
+  mountResultCommandWithArg<string, { domain?: string; cwd?: string; projectContext?: ProjectContext; json: boolean }>(
     removeCmd,
-    (packageName, opts) => pluginRemove(packageName, opts.cwd ?? process.cwd(), opts.domain),
+    (packageName, opts) => pluginRemove(packageName, effectiveCwd(opts), opts.domain),
     { ctx, jsonFlag: (opts) => opts.json },
   );
 
@@ -60,9 +71,9 @@ export function registerPlugins(program: Command, ctx: CliCommandsContext): void
     .option(CWD_OPTION_SPEC, 'Project root', process.cwd())
     .option('--json', JSON_DESC, false);
 
-  mountResultCommand<{ domain?: string; cwd?: string; json: boolean }>(
+  mountResultCommand<{ domain?: string; cwd?: string; projectContext?: ProjectContext; json: boolean }>(
     syncCmd,
-    (opts) => pluginSync(opts.cwd ?? process.cwd(), opts.domain),
+    (opts) => pluginSync(effectiveCwd(opts), opts.domain),
     { ctx, jsonFlag: (opts) => opts.json },
   );
 }
