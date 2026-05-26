@@ -156,7 +156,10 @@ async function runSingle(
       scenarioId: scenario.id,
       scenarioName: scenario.name,
       kind: scenario.kind,
-      passed: true,
+      // Propagate the executor's pass/fail verdict (computed from
+      // assertions or kind-specific predicates). A scenario whose run
+      // completed without throwing can still have failing assertions.
+      passed: result.passed,
       durationMs: Date.now() - started,
       result,
     };

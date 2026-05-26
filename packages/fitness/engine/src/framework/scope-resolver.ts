@@ -39,12 +39,9 @@ function assembleTargetFiles(
   if (targetConfig.exclude.length > 0 || compiledGlobalExcludes.length > 0) {
     const compiledTargetExcludes = targetConfig.exclude.map((ex) => new Minimatch(ex, { dot: true }))
     const allExcludes = [...compiledTargetExcludes, ...compiledGlobalExcludes]
-    for (const filePath of files) {
-      const rel = relative(rootDir, filePath)
-      if (allExcludes.some((m) => m.match(rel))) {
-        files.delete(filePath)
-      }
-    }
+    return [...files]
+      .filter((filePath) => !allExcludes.some((m) => m.match(relative(rootDir, filePath))))
+      .sort()
   }
 
   return [...files].sort()

@@ -35,7 +35,10 @@ export function getSharedSourceFile(filePath: string, content: string): ts.Sourc
 // =============================================================================
 
 /**
- * Depth-first walk of all nodes in a SourceFile or subtree.
+ * Depth-first walk of every descendant of `root` (the root itself is
+ * not visited — pass a SourceFile to walk an entire file, or any
+ * non-SourceFile node to walk a subtree). If you need the root in the
+ * visit callback, wrap with: `visitor(root); walkNodes(root, visitor)`.
  */
 export function walkNodes(root: ts.Node, visitor: (node: ts.Node) => void): void {
   function visit(node: ts.Node): void {

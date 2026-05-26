@@ -16,12 +16,13 @@ export interface DataStoreOpenOptions {
 
 export class DataStoreMigrationError extends Error {
   readonly migrationFile: string | undefined;
-  readonly cause: unknown;
 
   constructor(message: string, options: { migrationFile?: string; cause?: unknown } = {}) {
-    super(message);
+    // Pass cause to super so it lands on the standard Error.cause slot
+    // (ES2022). Don't redeclare the field — that would shadow it with a
+    // writable class-field property and bypass native engine handling.
+    super(message, options.cause === undefined ? undefined : { cause: options.cause });
     this.name = 'DataStoreMigrationError';
     this.migrationFile = options.migrationFile;
-    this.cause = options.cause;
   }
 }

@@ -89,6 +89,12 @@ export function getEnclosingFunctionName(node: ts.Node, sourceFile: ts.SourceFil
     if (ts.isFunctionDeclaration(current) && current.name) {
       return current.name.getText(sourceFile)
     }
+    // Named function expression: `const x = function namedFn() { … }`
+    // — the name is part of the FunctionExpression, not its parent. Without
+    // this branch the walker would skip past namedFn to its outer scope.
+    if (ts.isFunctionExpression(current) && current.name) {
+      return current.name.getText(sourceFile)
+    }
     current = current.parent
   }
   return null

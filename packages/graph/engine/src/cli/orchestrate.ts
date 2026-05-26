@@ -13,7 +13,7 @@
  * future adapters slot in by calling `registerAdapter` at bootstrap.
  */
 
-import { relative, sep } from 'node:path';
+import { join, relative, sep } from 'node:path';
 
 import { logger } from '@opensip-tools/core';
 
@@ -556,7 +556,11 @@ function expandClosureOnce(
   for (const dep of newDependents) {
     if (closureRel.has(dep)) continue;
     closureRel.add(dep);
-    closureAbs.add(`${projectDirAbs}/${dep}`.split('/').join(sep));
+    // Use path.join so the result uses platform-native separators —
+    // string concat + replace would leave backslashes from projectDirAbs
+    // intact on Windows and produce a mixed-separator path that never
+    // matches discovery.files entries.
+    closureAbs.add(join(projectDirAbs, dep));
     grew = true;
   }
   if (grew) {

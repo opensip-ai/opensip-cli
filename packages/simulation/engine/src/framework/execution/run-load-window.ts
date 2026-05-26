@@ -142,11 +142,19 @@ function applyOutcome<T extends string>(
 
 function sleepTick(intervalMs: number, signal: AbortSignal): Promise<void> {
   return new Promise<void>((resolve) => {
-    const timeout = setTimeout(resolve, intervalMs)
     if (signal.aborted) {
+      resolve()
+      return
+    }
+    const timeout = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort)
+      resolve()
+    }, intervalMs)
+    const onAbort = (): void => {
       clearTimeout(timeout)
       resolve()
     }
+    signal.addEventListener('abort', onAbort, { once: true })
   })
 }
 
