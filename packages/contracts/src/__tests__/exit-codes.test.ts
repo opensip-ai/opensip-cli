@@ -42,9 +42,18 @@ describe('getErrorSuggestion', () => {
       expect: { exitCode: EXIT_CODES.CHECK_NOT_FOUND, messageContains: 'foo-check' },
     },
     {
-      name: 'check-not-found rule fires for bare "not found: <slug>"',
+      // The fitness engine throws `Recipe not found: <id>` (recipes/service.ts);
+      // this must route to CONFIGURATION_ERROR (the recipe name is wrong in
+      // config) and not CHECK_NOT_FOUND. The recipe-not-found rule sits
+      // ahead of the check-not-found rule precisely for this case.
+      name: 'recipe-not-found rule fires for "Recipe not found: <slug>"',
       input: 'Recipe not found: my-recipe',
-      expect: { exitCode: EXIT_CODES.CHECK_NOT_FOUND, messageContains: 'my-recipe' },
+      expect: { exitCode: EXIT_CODES.CONFIGURATION_ERROR, messageContains: 'my-recipe' },
+    },
+    {
+      name: 'check-not-found rule fires for bare "not found: <slug>"',
+      input: 'not found: foo-check',
+      expect: { exitCode: EXIT_CODES.CHECK_NOT_FOUND, messageContains: 'foo-check' },
     },
     {
       name: 'check-not-found rule falls back to "unknown" when slug missing',

@@ -55,8 +55,28 @@ function containsAny(haystack: string, needles: readonly string[]): boolean {
  * `'configurable'` and `'reconfigure'` and produced false positives.
  */
 const SUGGESTION_RULES: readonly SuggestionRule[] = [
+  // Recipe not found — must come BEFORE the check-not-found rule because
+  // the fitness engine throws `Recipe not found: <id>` and the broad
+  // `/not found: (.+)/` regex would otherwise mis-classify it as
+  // CHECK_NOT_FOUND (exit 3) instead of CONFIGURATION_ERROR (exit 2).
+  {
+    match: (message) => {
+      const recipeRegex = /Recipe not found: (.+)/;
+      const m = recipeRegex.exec(message);
+      if (m) return { capture: m[1] ?? null };
+      if (containsAny(message, ['Recipe not found:'])) return { capture: null };
+      return null;
+    },
+    suggest: (capture) => ({
+      message: `Recipe '${capture ?? 'unknown'}' not found.`,
+      action: 'Run opensip-tools fit --recipes to see available recipes.',
+      exitCode: EXIT_CODES.CONFIGURATION_ERROR,
+    }),
+  },
+
   // Check not found — captures the slug from "Check not found: <slug>"
-  // or the bare "not found: <slug>" form.
+  // or the bare "not found: <slug>" form. The recipe-not-found rule
+  // above runs first to avoid mis-routing the recipe variant.
   {
     match: (message) => {
       const slugMatch =

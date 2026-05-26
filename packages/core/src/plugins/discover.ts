@@ -223,6 +223,23 @@ function tryDiscoverPackage(packageDir: string, name: string): DiscoveredPlugin 
     return undefined
   }
 
+  // Containment check: the resolved entry must stay inside `packageDir`
+  // after symlink resolution. A malicious or accidentally-malformed
+  // `pkg.main` / `pkg.exports` such as `../../escape.js` would otherwise
+  // traverse out of node_modules and be dynamically imported. The earlier
+  // package-dir containment check (discoverNpmPackages) does not cover
+  // the entry-file path, so we re-check it here.
+  if (!isPathInside(resolved.entry, packageDir)) {
+    logger.warn({
+      evt: 'plugin.loader.discover.reject',
+      module: MODULE_TAG,
+      reason: 'entry point resolves outside package directory',
+      name,
+      entry: resolved.entry,
+    })
+    return undefined
+  }
+
   if (!existsSync(resolved.entry)) {
     logger.debug({
       evt: 'plugin.loader.discover.skip',

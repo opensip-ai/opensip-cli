@@ -21,6 +21,24 @@ interface SessionSummary {
   readonly warnings: number;
 }
 
+const VALID_TOOLS: ReadonlySet<StoredSession['tool']> = new Set(['fit', 'sim', 'graph']);
+
+function isValidTool(v: unknown): v is StoredSession['tool'] {
+  return typeof v === 'string' && (VALID_TOOLS as ReadonlySet<string>).has(v);
+}
+
+function isSessionSummary(v: unknown): v is SessionSummary {
+  if (typeof v !== 'object' || v === null) return false;
+  const s = v as Record<string, unknown>;
+  return (
+    typeof s.total === 'number' &&
+    typeof s.passed === 'number' &&
+    typeof s.failed === 'number' &&
+    typeof s.errors === 'number' &&
+    typeof s.warnings === 'number'
+  );
+}
+
 export class SessionRepo {
   constructor(private readonly datastore: DataStore) {}
 
@@ -176,43 +194,66 @@ export class SessionRepo {
   }
 
   private hydrateSession(row: typeof sessions.$inferSelect): StoredSession {
-    const checkRows = this.datastore.db
-      .select()
-      .from(sessionChecks)
-      .where(eq(sessionChecks.sessionId, row.id))
-      .all();
-    const checks = checkRows.map((check) => {
-      const findingRows = this.datastore.db
+    // Validate row.tool against the documented union — the SQLite column
+    // is plain text with no CHECK constraint, so a legacy or hand-edited
+    // row could carry a value outside the type. Casting blindly would
+    // silently misroute downstream consumers that branch on `tool`.
+    if (!isValidTool(row.tool)) {
+      throw new Error(
+        `Session ${row.id} has unknown tool value: ${JSON.stringify(row.tool)}`,
+      );
+    }
+    // Validate the JSON summary blob — drizzle returns it as `unknown` and
+    // an older writer (or a corrupted row) could be missing fields. Reading
+    // them as `undefined` where `number` is expected would corrupt history
+    // display and gate comparison silently.
+    if (!isSessionSummary(row.summary)) {
+      throw new Error(`Session ${row.id} has corrupted summary JSON`);
+    }
+    // Hydrate checks + findings inside a single read transaction so the
+    // multi-statement walk presents a consistent snapshot — otherwise a
+    // concurrent writer could insert or delete findings between the
+    // check-row fetch and the per-check finding fetch, producing phantom
+    // or missing findings for the same session.
+    const checks = this.datastore.transaction((tx) => {
+      const checkRows = tx
         .select()
-        .from(sessionFindings)
-        .where(eq(sessionFindings.sessionCheckId, check.id))
+        .from(sessionChecks)
+        .where(eq(sessionChecks.sessionId, row.id))
         .all();
-      return {
-        checkSlug: check.checkSlug,
-        passed: check.passed,
-        violationCount: check.violationCount ?? undefined,
-        findings: findingRows.map((f) => ({
-          ruleId: f.ruleId,
-          message: f.message,
-          severity: f.severity,
-          filePath: f.filePath ?? undefined,
-          line: f.line ?? undefined,
-          column: f.column ?? undefined,
-          suggestion: f.suggestion ?? undefined,
-          category: f.category ?? undefined,
-        })),
-        durationMs: check.durationMs,
-      };
+      return checkRows.map((check) => {
+        const findingRows = tx
+          .select()
+          .from(sessionFindings)
+          .where(eq(sessionFindings.sessionCheckId, check.id))
+          .all();
+        return {
+          checkSlug: check.checkSlug,
+          passed: check.passed,
+          violationCount: check.violationCount ?? undefined,
+          findings: findingRows.map((f) => ({
+            ruleId: f.ruleId,
+            message: f.message,
+            severity: f.severity,
+            filePath: f.filePath ?? undefined,
+            line: f.line ?? undefined,
+            column: f.column ?? undefined,
+            suggestion: f.suggestion ?? undefined,
+            category: f.category ?? undefined,
+          })),
+          durationMs: check.durationMs,
+        };
+      });
     });
     return {
       id: row.id,
-      tool: row.tool as StoredSession['tool'],
+      tool: row.tool,
       timestamp: new Date(row.timestamp).toISOString(),
       cwd: row.cwd,
       recipe: row.recipe ?? undefined,
       score: row.score,
       passed: row.passed,
-      summary: row.summary as SessionSummary,
+      summary: row.summary,
       checks,
       durationMs: row.durationMs,
     };

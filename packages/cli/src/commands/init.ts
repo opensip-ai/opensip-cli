@@ -45,7 +45,7 @@
 
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { basename as pathBasename, join, relative } from 'node:path';
 
 import { resolveProjectPaths, type ProjectPaths } from '@opensip-tools/core';
 
@@ -632,7 +632,12 @@ function classifyOneFile(
 
   // 2) Stale-by-filename: example-check-<lang>.mjs for <lang> not in
   //    current set.
-  const basename = absPath.slice(absPath.lastIndexOf('/') + 1);
+  // Use node:path basename so the separator extraction works on Windows.
+  // A hard-coded '/' would leave `basename` equal to the whole absolute
+  // Windows path (`lastIndexOf('/')` returns -1), and STALE_FILENAME_PATTERN
+  // would never match — silently misclassifying every stale-scaffolded
+  // file as 'custom' and breaking `--keep` semantics on Windows.
+  const basename = pathBasename(absPath);
   const filenameMatch = STALE_FILENAME_PATTERN.exec(basename);
   if (filenameMatch) {
     const fileLang = filenameMatch[1];
@@ -896,7 +901,19 @@ export function executeInit(args: CliArgs & { language?: string; keep?: boolean;
   }
 
   if (!existsSync(cwd)) {
-    return { ...baseResult, created: false, state: 'pristine' };
+    // A non-existent target directory is a user error, not a "pristine
+    // success". Surface it through `ambiguousLanguageError` (which the
+    // register-init layer already maps to CONFIGURATION_ERROR / exit 2)
+    // so `opensip-tools init --cwd /nonexistent` returns a nonzero exit
+    // code with a clear message instead of silently exiting 0.
+    return {
+      ...baseResult,
+      created: false,
+      ambiguousLanguageError: {
+        detected: [],
+        message: `Target directory does not exist: ${cwd}`,
+      },
+    };
   }
 
   const resolution = resolveLanguages(cwd, args.language);

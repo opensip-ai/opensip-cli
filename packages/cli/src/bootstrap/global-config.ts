@@ -15,7 +15,17 @@
  * configured".
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
+import {
+  closeSync,
+  existsSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  renameSync,
+  unlinkSync,
+  writeSync,
+} from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -53,14 +63,39 @@ export function readGlobalConfig(): GlobalConfig {
 
 /**
  * Persist the user-level global config. Creates the parent directory if
- * it doesn't exist, writes YAML, and tightens permissions to `0o600`.
+ * it doesn't exist, then writes via a same-directory temp file with mode
+ * `0o600` set at creation time and atomically renames into place.
+ *
+ * Why temp + rename instead of writeFile + chmod: writeFileSync would
+ * create the file using the process's umask (commonly 0o644), leaving a
+ * race window during which another local user could read the API key
+ * before chmodSync(..., 0o600) tightens permissions. openSync with mode
+ * 0o600 + O_EXCL ('wx') sets the permission atomically with the inode
+ * creation, and rename publishes the fully-written file in one step so
+ * readers never observe a partial file either.
  */
 export function writeGlobalConfig(config: GlobalConfig): void {
   if (!existsSync(OPENSIP_DIR)) {
     mkdirSync(OPENSIP_DIR, { recursive: true });
   }
-  writeFileSync(GLOBAL_CONFIG_PATH, stringifyYaml(config), 'utf8');
-  chmodSync(GLOBAL_CONFIG_PATH, 0o600);
+  const tmpPath = join(OPENSIP_DIR, `.config-${randomBytes(6).toString('hex')}.yml.tmp`);
+  const fd = openSync(tmpPath, 'wx', 0o600);
+  try {
+    writeSync(fd, stringifyYaml(config), 0, 'utf8');
+  } finally {
+    closeSync(fd);
+  }
+  try {
+    renameSync(tmpPath, GLOBAL_CONFIG_PATH);
+  } catch (error) {
+    // Clean up the temp file on rename failure so it doesn't linger.
+    try {
+      unlinkSync(tmpPath);
+    } catch {
+      // Swallow secondary failure — original error is the one that matters.
+    }
+    throw error;
+  }
 }
 
 /**

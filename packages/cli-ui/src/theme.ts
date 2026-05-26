@@ -57,8 +57,25 @@ export const DEFAULT_THEME: Theme = {
   colorsEnabled: true,
 };
 
+// In a no-color theme, all color tokens are zeroed out: Ink does not read
+// `colorsEnabled` itself, so handing it any non-empty color string (`'red'`,
+// `'#C8956C'`) would still emit ANSI escapes even with `NO_COLOR=1`. Empty
+// strings cause Ink's `<Text color={...}>` to no-op, honoring the NO_COLOR
+// convention without forcing every component to guard `theme.colorsEnabled`
+// at every call site.
 const NO_COLOR_THEME: Theme = {
-  ...DEFAULT_THEME,
+  brand: '',
+  success: '',
+  error: '',
+  warning: '',
+  info: '',
+  muted: '',
+  scoreHigh: '',
+  scoreMid: '',
+  scoreLow: '',
+  statusPass: '',
+  statusFail: '',
+  statusTimeout: '',
   colorsEnabled: false,
 };
 
@@ -84,19 +101,27 @@ export function detectTerminalCapabilities(): TerminalCapabilities {
     return { isTTY, supportsColor: false, supports256Color: false, supportsTrueColor: false };
   }
 
-  const supportsTrueColor =
+  const envSuggestsTrueColor =
     colorTerm === 'truecolor' ||
     colorTerm === '24bit' ||
     termProgram === 'iTerm.app' ||
     termProgram === 'WezTerm' ||
     termProgram === 'Hyper';
 
-  const supports256Color =
-    supportsTrueColor ||
+  const envSuggests256Color =
+    envSuggestsTrueColor ||
     term.includes('256color') ||
     termProgram === 'Apple_Terminal';
 
-  const supportsColor = isTTY && (supports256Color || term !== 'dumb');
+  // All capability flags MUST be gated on `isTTY`. When stdout is piped to a
+  // file or CI log, ANSI truecolor escapes still leak in if callers inspect
+  // `supports256Color` / `supportsTrueColor` to decide whether to emit hex
+  // color values — even though `supportsColor` itself is correctly false.
+  // Treating capability as a single coherent gate (`isTTY && env signal`)
+  // prevents the exported surface from contradicting itself.
+  const supportsTrueColor = isTTY && envSuggestsTrueColor;
+  const supports256Color = isTTY && envSuggests256Color;
+  const supportsColor = isTTY && (envSuggests256Color || term !== 'dumb');
 
   return { isTTY, supportsColor, supports256Color, supportsTrueColor };
 }
@@ -113,8 +138,18 @@ export interface ThemeProviderProps {
 }
 
 export function ThemeProvider({ theme, children }: ThemeProviderProps): React.ReactElement {
-  const caps = detectTerminalCapabilities();
-  const resolved = theme ?? (caps.supportsColor ? DEFAULT_THEME : NO_COLOR_THEME);
+  // Memoize the resolved theme so the context value reference is stable
+  // across re-renders. Ink's ClockProvider tick re-renders ThemeProvider
+  // on every frame; without useMemo, every render would re-read
+  // process.env, allocate a new `resolved` object, and force every
+  // `useTheme()` subscriber (Banner, Spinner, RunHeader, …) to re-render
+  // unnecessarily. Capability detection reads stable process state, so
+  // recomputing only when `theme` changes is correct.
+  const resolved = React.useMemo(() => {
+    if (theme) return theme;
+    const caps = detectTerminalCapabilities();
+    return caps.supportsColor ? DEFAULT_THEME : NO_COLOR_THEME;
+  }, [theme]);
 
   return React.createElement(ThemeContext.Provider, { value: resolved }, children);
 }

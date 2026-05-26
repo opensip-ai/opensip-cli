@@ -51,6 +51,15 @@ function escapeForScriptContext(json: string): string {
   return json.replaceAll('<', String.raw`\u003c`).replaceAll('>', String.raw`\u003e`)
 }
 
+// Coerce a session.score into a finite number safe for HTML interpolation
+// in the <title> tag. Returns 0 for non-finite values so the rendered
+// title remains well-formed even if a legacy or corrupted session row
+// somehow carries a non-numeric score.
+function coerceScoreForTitle(score: unknown): number {
+  const n = Number(score)
+  return Number.isFinite(n) ? n : 0
+}
+
 /**
  * Serialize an optional value into either a `<script type="application/json">`
  * blob (kind `'json'`) or a JS `const X = …;` literal (kind `'literal'`).
@@ -76,9 +85,12 @@ function serializeOptionalBlob(
       return `<script type="application/json" id="${id}">${escaped}</script>`;
     }
     case 'literal': {
+      // Apply the same script-context escape as the 'json' arm — without it,
+      // a value containing the literal sequence `</script>` would close the
+      // surrounding inline <script> block (JSON.stringify does not escape `<`).
       const rendered = value === null || value === undefined
         ? 'null'
-        : JSON.stringify(value);
+        : escapeForScriptContext(JSON.stringify(value));
       return `const ${id} = ${rendered};`;
     }
   }
@@ -94,6 +106,12 @@ export function generateDashboardHtml(input: DashboardInput): string {
   } = input;
 
   const latest = sessions[0]
+  // Coerce score to a finite number before interpolating into the <title>
+  // tag — `latest.score` is typed `number` but originates from a SQLite
+  // column and a corrupt or legacy row could carry an arbitrary value.
+  // Number(NaN-ish) on a string still yields NaN; we substitute 0 to keep
+  // the page title well-formed in the pathological case.
+  const latestScoreSafe = latest ? coerceScoreForTitle(latest.score) : 0
   const safeDataJson = escapeForScriptContext(JSON.stringify(sessions))
   const safeCatalogJson = escapeForScriptContext(JSON.stringify(checkCatalog))
   const safeRecipeJson = escapeForScriptContext(JSON.stringify(recipeCatalog))
@@ -121,7 +139,7 @@ export function generateDashboardHtml(input: DashboardInput): string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>OpenSIP Tools${latest ? ` — Pass Rate: ${latest.score}%` : ''}</title>
+<title>OpenSIP Tools${latest ? ` — Pass Rate: ${latestScoreSafe}%` : ''}</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M4 8h12a4 4 0 0 1 0 8h-1M4 8v8a4 4 0 0 0 4 4h4a4 4 0 0 0 4-4V8M4 8H2M6 4c0 1 .5 2 1 2.5M10 3c0 1.5.5 2.5 1 3M14 4c0 1 .5 2 1 2.5' stroke='%23c4956a' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&display=swap" rel="stylesheet">

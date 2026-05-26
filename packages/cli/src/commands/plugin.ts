@@ -339,11 +339,35 @@ export async function pluginAdd(
     // legitimately need install-time code execution. This blocks
     // supply-chain attacks where a malicious plugin runs arbitrary
     // code during `npm install`.
-    execFileSync('npm', ['install', '--ignore-scripts', packageName], { cwd: dir, stdio: 'inherit' });
+    // Route npm's stdout to stderr so JSON-mode renderers (which write
+    // structured output to the process stdout) are not contaminated by
+    // `npm warn ...` / `added N packages` lines. npm progress is still
+    // visible on the user's terminal because stderr is inherited.
+    execFileSync('npm', ['install', '--ignore-scripts', packageName], {
+      cwd: dir,
+      stdio: ['ignore', process.stderr, process.stderr],
+    });
 
     // Identify the package name as recorded in package.json (handles
     // local-path specs that don't carry a name in the spec itself).
-    const installedName = findInstalledName(dir, packageName, depsBefore) ?? packageName;
+    // For local-path specs (`/`, `./`, `file:`), the spec itself is NOT
+    // a valid name — writing it into the config-file plugin list would
+    // cause both discovery (which expects a real npm name) and a later
+    // `plugin remove <spec>` to mis-handle the entry. If we can't
+    // resolve the installed name, fail explicitly rather than persist
+    // a broken entry.
+    const resolvedName = findInstalledName(dir, packageName, depsBefore);
+    const isLocalPathSpec =
+      packageName.startsWith('/') || packageName.startsWith('.') || packageName.startsWith('file:');
+    if (!resolvedName && isLocalPathSpec) {
+      return {
+        type: 'plugin-add',
+        packageName,
+        success: false,
+        error: `Installed '${packageName}' but could not resolve the installed package name from package.json. The config was not updated; remove and retry.`,
+      };
+    }
+    const installedName = resolvedName ?? packageName;
 
     installMissingPeers(dir, packageName, depsBefore);
 
@@ -421,7 +445,10 @@ export async function pluginRemove(
   }
 
   try {
-    execFileSync('npm', ['uninstall', packageName], { cwd: dir, stdio: 'inherit' });
+    execFileSync('npm', ['uninstall', packageName], {
+      cwd: dir,
+      stdio: ['ignore', process.stderr, process.stderr],
+    });
     removeFromConfigPluginList(paths.configFile, domain, packageName);
     return {
       type: 'plugin-remove',
@@ -490,7 +517,10 @@ export async function pluginSync(
         continue;
       }
       try {
-        execFileSync('npm', ['install', '--ignore-scripts', spec], { cwd: dir, stdio: 'inherit' });
+        execFileSync('npm', ['install', '--ignore-scripts', spec], {
+          cwd: dir,
+          stdio: ['ignore', process.stderr, process.stderr],
+        });
         synced.push({ domain, package: spec, installed: true });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -533,7 +563,10 @@ function installMissingPeers(dir: string, requestedSpec: string, depsBefore: Set
     if (!isSafeNpmSpec(name)) continue;
     if (typeof range !== 'string' || !isSafeNpmSpec(range)) continue;
     try {
-      execFileSync('npm', ['install', '--ignore-scripts', '--no-save', `${name}@${range}`], { cwd: dir, stdio: 'inherit' });
+      execFileSync('npm', ['install', '--ignore-scripts', '--no-save', `${name}@${range}`], {
+        cwd: dir,
+        stdio: ['ignore', process.stderr, process.stderr],
+      });
     } catch {
       // Loader will surface unresolved imports; swallow here.
     }
