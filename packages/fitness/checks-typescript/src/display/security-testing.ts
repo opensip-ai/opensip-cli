@@ -6,6 +6,7 @@ import type { CheckDisplayEntry } from './types.js'
 
 /** Security check display entries (TS_AST only) */
 export const SECURITY_DISPLAY = Object.freeze<Record<string, CheckDisplayEntry>>({
+  'cli-realpath-validation': ['🛡️', 'CLI Realpath Validation'],
   'input-sanitization': ['🛡️', 'Input Sanitization'],
   'sql-injection': ['🔒', 'SQL Injection'],
   'unsafe-secret-comparison': ['🔐', 'Unsafe Secret Comparison'],
