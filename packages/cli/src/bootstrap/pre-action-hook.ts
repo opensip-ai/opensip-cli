@@ -27,6 +27,7 @@ import { existsSync } from 'node:fs';
 import { formatProjectHeader } from '@opensip-tools/cli-ui';
 import {
   checkSchemaCompat,
+  detectPhantomRuntimes,
   generatePrefixedId,
   initLogFile,
   logger,
@@ -192,6 +193,28 @@ function checkNoProjectAndBailout(
   process.exit(2);
 }
 
+/**
+ * Phantom-runtime warning. Detects orphaned opensip-tools/.runtime/
+ * subtrees between cwd and the discovered project root — fossils from
+ * pre-discovery runs that scaffolded under subdirs. Warns to stderr
+ * with a safe `rm -rf` hint; never auto-deletes. Suppressed for JSON
+ * output (would corrupt the stream's stderr peer in some tools).
+ */
+function warnAboutPhantomRuntimes(project: ProjectContext, jsonOutput: boolean): void {
+  if (jsonOutput) return;
+  if (project.scope !== 'project' || project.walkedUp === 0) return;
+  const phantoms = detectPhantomRuntimes(project.cwd, project.projectRoot);
+  for (const phantom of phantoms) {
+    process.stderr.write(
+      `ℹ Detected an orphaned opensip-tools/ at:\n` +
+      `    ${phantom}\n` +
+      `  Left over from running opensip-tools from this subdirectory\n` +
+      `  before project-root discovery was added. Safe to delete with:\n` +
+      `    rm -rf ${phantom}\n\n`
+    );
+  }
+}
+
 /** Mount the bootstrap `preAction` hook on the supplied program. */
 export function installPreActionHook(program: Command): void {
   program.hook('preAction', (_thisCommand, actionCommand) => {
@@ -228,9 +251,10 @@ export function installPreActionHook(program: Command): void {
     (opts as Record<string, unknown>).projectContext = project;
 
     // 4. Bailout window — each may process.exit(2) before any side
-    //    effects. Phantom warn (Phase 7) also wires here.
+    //    effects. Phantom warn is non-fatal; warns then continues.
     checkSchemaVersionAndBailout(project, runId);
     checkNoProjectAndBailout(project, cwd, actionCommand.name(), Boolean(opts.json), runId);
+    warnAboutPhantomRuntimes(project, opts.json === true);
 
     // 5. Side-effect setup, gated on a real project being present.
     if (project.scope === 'project' && existsSync(project.projectRoot)) {

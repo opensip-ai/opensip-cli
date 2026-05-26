@@ -117,3 +117,8 @@ export {
   checkSchemaCompat,
 } from './lib/config-version.js';
 export type { SchemaCompat } from './lib/config-version.js';
+
+// Lib — phantom-dir detector. Warns about orphaned opensip-tools/
+// subtrees left over from pre-discovery runs. Returns paths; callers
+// surface them; never auto-deletes.
+export { detectPhantomRuntimes } from './lib/phantom-detect.js';
