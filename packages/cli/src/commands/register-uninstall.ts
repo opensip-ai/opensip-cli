@@ -20,6 +20,7 @@ interface UninstallCliOptions {
   yes?: boolean;
   dryRun?: boolean;
   project?: string | boolean;
+  purge?: boolean;
   json?: boolean;
   projectContext?: ProjectContext;
 }
@@ -30,7 +31,8 @@ export function registerUninstall(program: Command, ctx: CliCommandsContext): vo
     .description('Remove user-level config at ~/.opensip-tools/ (cloud API key, defaults). Use --project to remove project-local state instead.')
     .option('-y, --yes', 'Skip confirmation prompt', false)
     .option('--dry-run', 'Print what would be removed; take no action', false)
-    .option('--project [path]', 'Remove project-local state (opensip-tools/ and opensip-tools.config.yml) at [path] (defaults to cwd)')
+    .option('--project [path]', 'Remove project-local runtime state at [path] (defaults to cwd). User content + config preserved unless --purge.')
+    .option('--purge', 'With --project, also remove user-authored content and opensip-tools.config.yml (DESTRUCTIVE)', false)
     .option('--json', 'Output structured JSON', false);
 
   mountResultCommand<UninstallCliOptions>(
@@ -45,6 +47,7 @@ export function registerUninstall(program: Command, ctx: CliCommandsContext): vo
         yes: opts.yes,
         dryRun: opts.dryRun,
         project,
+        purge: opts.purge,
         projectContext: opts.projectContext,
       });
     },

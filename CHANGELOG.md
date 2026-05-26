@@ -16,6 +16,50 @@ and breaks compatibility with v1.x runtime layouts.
 
 ### Breaking changes
 
+- **`opensip-tools uninstall --project` no longer destroys user-authored
+  content by default.** The new default removes only
+  `<project>/opensip-tools/.runtime/` (rebuildable state). User-authored
+  content under `opensip-tools/` (custom checks, recipes, scenarios) AND
+  `opensip-tools.config.yml` are preserved. To restore the previous
+  destructive behavior, pass `--purge`. Rationale: the previous default
+  was actively dangerous — the warning copy literally said "git history
+  is your safety net," which is hope, not a contract.
+- **`ToolCliContext.datastore` is now a getter that opens SQLite lazily
+  on first access (was an always-open handle).** Tool authors don't need
+  changes — `ctx.datastore` still reads as a property — but the
+  `BootstrapResult.datastore` field is gone and `bootstrapCli` returns
+  `void`. The CLI no longer materializes `.runtime/datastore.sqlite` until
+  a tool action body actually reads `cli.datastore`. Dry-runs, errors,
+  and commands that don't need persistence leave the filesystem clean.
+- **`ToolCliContext` gains a required `project: ProjectContext` field**
+  carrying the resolved project root, configPath, walkedUp count, and
+  scope. Tools that construct a ToolCliContext literal must provide it.
+  First-party tools (fitness, simulation, graph) are migrated; third-
+  party tool authors should read `cli.project.projectRoot` in action
+  bodies instead of `opts.cwd`.
+- **`ToolCliContext.maybeOpenDashboard` opts no longer accept `cwd`.**
+  The dashboard helper reads the project root from `ProjectContext`
+  directly. Callers passing `cwd` will fail to compile; remove the field.
+- **`opensip-tools` commands now discover the project root by walking up
+  from cwd.** Running `opensip-tools fit` from a subdirectory of an
+  initialized project operates on the parent project root, not the
+  subdirectory. This fixes a phantom-scaffold bug where commands run
+  from subdirs silently created a second `opensip-tools/.runtime/`
+  inside the subdir. `opensip-tools init` refuses with an actionable
+  three-option message when invoked from inside an existing project —
+  use `--cwd .` to override (rare; intended for monorepo packages with
+  independent analysis scope).
+- **`opensip-tools` errors with "No opensip-tools project found"
+  (exit 2) when project-scoped commands run with no config anywhere up
+  the ancestor chain.** Previously these would attempt to run and fail
+  later with a config-load error. Affected commands: `fit`, `sim`,
+  `graph`, `dashboard`, `sessions`, `plugin`. Project-agnostic commands
+  (`init`, `configure`, `completion`, `uninstall`) are unchanged.
+- **`RunHeader` prop renamed from `cwd` to `projectRoot` (cli-ui)** to
+  align with the resolved-root semantics. The visible string changed
+  from `Target: <cwd>` to `Project: <projectRoot>` (with an optional
+  `(found N levels up)` suffix). Third-party tools that import
+  `RunHeader` from `@opensip-tools/cli-ui` must rename the prop.
 - **Runtime state migrates from JSON files to SQLite.** v2 ignores any
   pre-existing files under `<project>/opensip-tools/.runtime/` and
   initializes a fresh `<project>/opensip-tools/.runtime/datastore.sqlite`
@@ -47,6 +91,24 @@ and breaks compatibility with v1.x runtime layouts.
 
 ### Added
 
+- **Project-root discovery** — `resolveProjectContext` in
+  `@opensip-tools/core` walks ancestors looking for
+  `opensip-tools.config.yml` (honoring `package.json#opensip-tools.configPath`
+  at each level). The resolved `ProjectContext` is threaded through
+  `ToolCliContext.project` and `opts.projectContext` so every command
+  operates on the right root regardless of which directory the user
+  invokes from.
+- **`opensip-tools uninstall --purge` flag** for the destructive uninstall
+  mode (removes user content + config alongside runtime).
+- **`ℹ Project: <root>` header** printed before every project-scoped,
+  human-readable command (or rendered by `RunHeader` for Ink-rendered
+  commands). Annotation `(found N levels up)` when discovery walked.
+  Suppressed for `--json`, `completion`, `--help`, `--version`,
+  user-scoped commands, and `uninstall --project` (whose printer owns
+  its own pre-prompt block).
+- **Strict `--config` errors** — `opensip-tools <cmd> --config /typo.yml`
+  now errors with the structured `ValidationError` instead of silently
+  walking up to find some other ancestor's config.
 - **`@opensip-tools/datastore` package** — paradigm-agnostic SQLite +
   Drizzle persistence layer. Houses the `DataStore` interface, SQLite
   + in-memory backends, factory, and the workspace-wide migration

@@ -115,14 +115,18 @@ describe('executeUninstall — user mode', () => {
 describe('executeUninstall — project mode', () => {
   let projectDir: string;
   let userSourceDir: string;
+  let runtimeDir: string;
   let configFile: string;
 
   beforeEach(() => {
     projectDir = makeTempDir();
     userSourceDir = join(projectDir, 'opensip-tools');
+    runtimeDir = join(userSourceDir, '.runtime');
     configFile = join(projectDir, 'opensip-tools.config.yml');
     mkdirSync(join(userSourceDir, 'fit', 'checks'), { recursive: true });
+    mkdirSync(join(runtimeDir, 'logs'), { recursive: true });
     writeFileSync(join(userSourceDir, 'fit', 'checks', 'custom.mjs'), '// custom check\n', 'utf8');
+    writeFileSync(join(runtimeDir, 'logs', 'run.jsonl'), '{}\n', 'utf8');
     writeFileSync(configFile, 'targets: []\n', 'utf8');
   });
 
@@ -130,50 +134,102 @@ describe('executeUninstall — project mode', () => {
     try { rmSync(projectDir, { recursive: true, force: true }); } catch { /* ignore */ }
   });
 
-  it('removes both opensip-tools/ and opensip-tools.config.yml when both exist', async () => {
-    const out = captureWrite();
-    const result = await executeUninstall({
-      project: projectDir,
-      yes: true,
-      write: out.write,
+  describe('default (no --purge): safe-by-default', () => {
+    it('removes ONLY .runtime/; preserves user content + config', async () => {
+      const out = captureWrite();
+      const result = await executeUninstall({
+        project: projectDir,
+        yes: true,
+        write: out.write,
+      });
+
+      expect(result.mode).toBe('project');
+      expect(result.removed).toBe(true);
+      // Only the runtime target was deleted.
+      expect(result.targets).toHaveLength(1);
+      expect(result.targets[0].path).toBe(runtimeDir);
+      expect(existsSync(runtimeDir)).toBe(false);
+      // User content + config preserved.
+      expect(existsSync(join(userSourceDir, 'fit', 'checks', 'custom.mjs'))).toBe(true);
+      expect(existsSync(configFile)).toBe(true);
+      // Project dir untouched.
+      expect(existsSync(projectDir)).toBe(true);
     });
 
-    expect(result.mode).toBe('project');
-    expect(result.removed).toBe(true);
-    expect(result.targets).toHaveLength(2);
-    expect(existsSync(userSourceDir)).toBe(false);
-    expect(existsSync(configFile)).toBe(false);
-    // Project dir itself must remain — we only touch our own state.
-    expect(existsSync(projectDir)).toBe(true);
-  });
-
-  it('removes only the dir when config file is absent', async () => {
-    rmSync(configFile);
-    const result = await executeUninstall({
-      project: projectDir,
-      yes: true,
-      write: noop,
+    it("prints the 'KEPT' section listing preserved user content", async () => {
+      const out = captureWrite();
+      await executeUninstall({
+        project: projectDir,
+        yes: true,
+        write: out.write,
+      });
+      const text = out.text();
+      expect(text).toContain('This will remove (rebuildable runtime state only)');
+      expect(text).toContain('These will be KEPT');
+      expect(text).toContain('opensip-tools.config.yml');
+      expect(text).toContain('--purge');
     });
 
-    expect(result.targets).toHaveLength(1);
-    expect(result.targets[0].path).toBe(userSourceDir);
-    expect(result.targets[0].kind).toBe('dir');
+    it('reports "empty" + KEPT section when .runtime/ is already absent', async () => {
+      rmSync(runtimeDir, { recursive: true, force: true });
+      const out = captureWrite();
+      const result = await executeUninstall({
+        project: projectDir,
+        yes: true,
+        write: out.write,
+      });
+      expect(result.action).toBe('empty');
+      expect(out.text()).toContain('Nothing to remove — runtime state is already absent');
+      expect(out.text()).toContain('These will be KEPT');
+    });
   });
 
-  it('removes only the config file when opensip-tools/ is absent', async () => {
-    rmSync(userSourceDir, { recursive: true, force: true });
-    const result = await executeUninstall({
-      project: projectDir,
-      yes: true,
-      write: noop,
+  describe('--purge: destructive', () => {
+    it('removes EVERYTHING when --purge is passed', async () => {
+      const out = captureWrite();
+      const result = await executeUninstall({
+        project: projectDir,
+        purge: true,
+        yes: true,
+        write: out.write,
+      });
+
+      expect(result.removed).toBe(true);
+      expect(existsSync(runtimeDir)).toBe(false);
+      expect(existsSync(join(userSourceDir, 'fit', 'checks', 'custom.mjs'))).toBe(false);
+      expect(existsSync(configFile)).toBe(false);
+      expect(existsSync(projectDir)).toBe(true);
     });
 
-    expect(result.targets).toHaveLength(1);
-    expect(result.targets[0].path).toBe(configFile);
-    expect(result.targets[0].kind).toBe('file');
+    it('prints the destructive warning + git-status hint', async () => {
+      const out = captureWrite();
+      await executeUninstall({
+        project: projectDir,
+        purge: true,
+        yes: true,
+        write: out.write,
+      });
+      const text = out.text();
+      expect(text).toContain('⚠ This removes EVERYTHING');
+      expect(text).toContain('git status');
+    });
+
+    it('removes only present buckets when some are absent (--purge)', async () => {
+      rmSync(configFile);
+      rmSync(runtimeDir, { recursive: true, force: true });
+      const result = await executeUninstall({
+        project: projectDir,
+        purge: true,
+        yes: true,
+        write: noop,
+      });
+      // Only the user-content entries remain.
+      expect(result.targets.length).toBeGreaterThan(0);
+      expect(result.targets.every((t) => t.path.startsWith(userSourceDir))).toBe(true);
+    });
   });
 
-  it('refuses to run when neither target exists at the resolved path', async () => {
+  it('refuses to run when no opensip-tools state exists at the resolved path', async () => {
     rmSync(userSourceDir, { recursive: true, force: true });
     rmSync(configFile);
     const out = captureWrite();
@@ -200,25 +256,12 @@ describe('executeUninstall — project mode', () => {
 
     expect(result.mode).toBe('project');
     expect(result.removed).toBe(true);
-    expect(existsSync(userSourceDir)).toBe(false);
-  });
-
-  it('warns about user-authored content in project mode', async () => {
-    const out = captureWrite();
-    await executeUninstall({
-      project: projectDir,
-      yes: true,
-      write: out.write,
-    });
-
-    expect(out.text()).toContain('user-authored content');
+    // Default mode still: only .runtime/ removed.
+    expect(existsSync(runtimeDir)).toBe(false);
+    expect(existsSync(join(userSourceDir, 'fit', 'checks', 'custom.mjs'))).toBe(true);
   });
 
   it('result mode discriminates between user and project uninstalls', async () => {
-    // The next-step hint moved to the Ink renderer (App.tsx); the
-    // structured result is what tests assert on now. The renderer keys
-    // off `mode` to pick between "npm uninstall -g …" (user) and
-    // "opensip-tools uninstall" (project).
     const result = await executeUninstall({
       project: projectDir,
       yes: true,

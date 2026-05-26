@@ -671,19 +671,26 @@ The running binary can't safely self-delete, so step 3 is always a separate
 - `--dry-run` — print every target path and total size, take no action.
 - `--yes` / `-y` — skip the `[y/N]` confirmation prompt (intended for scripts).
 
-Project-mode uninstall removes user-authored content (custom checks, recipes)
-alongside the gitignored `.runtime/` state — git history is the safety net.
-It refuses to run when neither `opensip-tools/` nor `opensip-tools.config.yml`
-exists at the resolved path, so an accidental `--project /unrelated/dir`
-is a no-op rather than a destructive accident.
+Project-mode uninstall removes only the rebuildable `.runtime/` state by
+default. Your authored content (custom checks, recipes, scenarios) and
+`opensip-tools.config.yml` are preserved.
+
+To remove everything — including authored content and the config — pass
+`--purge`. `--purge` is destructive: if your custom checks aren't committed
+to git, you'll lose them. We recommend running `git status` first.
+
+Both modes refuse to run when no opensip-tools state exists at the
+resolved path, so an accidental `--project /unrelated/dir` is a no-op
+rather than a destructive accident.
 
 ### Where state lives
 
-| Path | Tracked by git? | Removed by |
-|---|---|---|
-| `~/.opensip-tools/config.yml` | no — user-level | `opensip-tools uninstall` |
-| `<project>/opensip-tools.config.yml` | yes — project config | `opensip-tools uninstall --project` |
-| `<project>/opensip-tools/` (custom checks, recipes, `.runtime/` cache) | mixed — user-authored content tracked, `.runtime/` gitignored | `opensip-tools uninstall --project` |
+| Path | Tracked by git? | Removed by default | Removed by `--purge` |
+|---|---|---|---|
+| `~/.opensip-tools/config.yml` | no — user-level | `opensip-tools uninstall` (user mode) | — |
+| `<project>/opensip-tools.config.yml` | yes — project config | (kept) | `opensip-tools uninstall --project --purge` |
+| `<project>/opensip-tools/.runtime/` | no — runtime state | `opensip-tools uninstall --project` | `opensip-tools uninstall --project --purge` |
+| `<project>/opensip-tools/<user-content>/` (custom checks, recipes, scenarios) | yes — user-authored | (kept) | `opensip-tools uninstall --project --purge` |
 
 ## Observability
 

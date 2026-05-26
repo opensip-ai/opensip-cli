@@ -46,7 +46,7 @@
  * `configure.ts` printing the "current key" hint above the prompt.
  */
 
-import { existsSync, rmSync, statSync, readdirSync } from 'node:fs'
+import { existsSync, rmSync, statSync, readdirSync, type Dirent } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { createInterface } from 'node:readline/promises'
@@ -77,17 +77,40 @@ export interface UninstallOptions {
    * .runtime/.
    */
   readonly projectContext?: ProjectContext
+  /**
+   * When true, in project mode also remove user-authored content and the
+   * config file (DESTRUCTIVE). Default (false) only removes the
+   * rebuildable .runtime/ subtree, preserving custom checks/recipes/
+   * scenarios/config. `--purge` is the explicit opt-in for the old
+   * destructive behavior.
+   */
+  readonly purge?: boolean
   /** Override stdout (primarily for tests). */
   readonly write?: (s: string) => void
   /** Override the confirmation prompt (primarily for tests). */
   readonly prompt?: (question: string) => Promise<string>
 }
 
+/**
+ * Bucket classification per target:
+ *  - 'runtime'      — opensip-tools/.runtime/. Rebuildable. Removed by default.
+ *  - 'user-content' — anything else under opensip-tools/. User-authored.
+ *                     Preserved unless --purge.
+ *  - 'config'       — opensip-tools.config.yml. Preserved unless --purge.
+ *  - 'user-level'   — ~/.opensip-tools/ in user mode.
+ */
+type TargetBucket = 'runtime' | 'user-content' | 'config' | 'user-level'
+
 /** Discrete target to remove (a file or a directory). */
 interface Target {
   readonly path: string
   readonly kind: 'file' | 'dir'
   readonly sizeBytes: number
+  readonly bucket: TargetBucket
+  /** For user-content children: human label (e.g. 'fit/checks', 'notes'). */
+  readonly displayLabel?: string
+  /** For user-content child directories: count of files inside (recursive). */
+  readonly fileCount?: number
 }
 
 /**
@@ -154,36 +177,164 @@ function resolveProjectDir(opts: UninstallOptions): string {
   return opts.projectContext?.projectRoot ?? opts.cwd ?? process.cwd()
 }
 
-/** Build the list of targets that currently exist for the given mode. */
+/** Count files recursively under a directory; best-effort (unreadable subdirs skipped). */
+function countFilesRecursive(dir: string): number {
+  let count = 0
+  const walk = (d: string): void => {
+    try {
+      const entries = readdirSync(d, { withFileTypes: true })
+      for (const e of entries) {
+        const p = join(d, e.name)
+        if (e.isDirectory()) walk(p)
+        else if (e.isFile()) count++
+      }
+    } catch { /* unreadable subdir — best-effort */ }
+  }
+  walk(dir)
+  return count
+}
+
+/**
+ * Build the bucketed list of targets that currently exist for the given mode.
+ *
+ * Project mode:
+ *  - .runtime/                      → bucket 'runtime'
+ *  - everything else under opensip-tools/ (per top-level entry)
+ *                                   → bucket 'user-content' (one entry each)
+ *  - opensip-tools.config.yml       → bucket 'config'
+ *
+ * The user-content invariant is "everything under opensip-tools/ minus
+ * .runtime/" — NOT an enumeration of known subdirs like fit/ + sim/.
+ * Future tools and user-created folders (e.g. opensip-tools/notes/) are
+ * preserved automatically.
+ */
 function collectTargets(mode: UninstallMode, root: string, opts: UninstallOptions): Target[] {
   if (mode === 'user') {
     if (!existsSync(root)) return []
-    return [{ path: root, kind: 'dir', sizeBytes: dirSize(root) }]
+    return [{ path: root, kind: 'dir', sizeBytes: dirSize(root), bucket: 'user-level' }]
   }
+  return collectProjectTargets(opts)
+}
 
-  // Project mode: probe both the dir and the config file.
+function collectProjectTargets(opts: UninstallOptions): Target[] {
   const paths = resolveProjectPaths(resolveProjectDir(opts))
   const targets: Target[] = []
-
+  if (existsSync(paths.runtimeDir)) {
+    targets.push({
+      path: paths.runtimeDir,
+      kind: 'dir',
+      sizeBytes: dirSize(paths.runtimeDir),
+      bucket: 'runtime',
+    })
+  }
   if (existsSync(paths.userSourceDir)) {
-    targets.push({ path: paths.userSourceDir, kind: 'dir', sizeBytes: dirSize(paths.userSourceDir) })
+    targets.push(...collectUserContentTargets(paths.userSourceDir))
   }
   if (existsSync(paths.configFile)) {
-    targets.push({ path: paths.configFile, kind: 'file', sizeBytes: statSync(paths.configFile).size })
+    targets.push({
+      path: paths.configFile,
+      kind: 'file',
+      sizeBytes: statSync(paths.configFile).size,
+      bucket: 'config',
+    })
   }
-
   return targets
 }
 
-function printTargets(write: (s: string) => void, mode: UninstallMode, targets: readonly Target[]): void {
+/**
+ * Enumerate every top-level entry under opensip-tools/ EXCEPT .runtime/.
+ * Enumeration is for display; the invariant is "not .runtime/".
+ */
+function collectUserContentTargets(userSourceDir: string): Target[] {
+  const out: Target[] = []
+  let entries: Dirent[]
+  try {
+    entries = readdirSync(userSourceDir, { withFileTypes: true })
+  } catch {
+    return out
+  }
+  for (const entry of entries) {
+    if (entry.name === '.runtime') continue
+    const p = join(userSourceDir, entry.name)
+    const isDir = entry.isDirectory()
+    let sizeBytes = 0
+    try { sizeBytes = isDir ? dirSize(p) : statSync(p).size } catch { /* skip unreadable */ }
+    out.push({
+      path: p,
+      kind: isDir ? 'dir' : 'file',
+      sizeBytes,
+      bucket: 'user-content',
+      displayLabel: entry.name,
+      fileCount: isDir ? countFilesRecursive(p) : undefined,
+    })
+  }
+  return out
+}
+
+function formatKeepLine(t: Target): string {
+  if (t.bucket === 'config') return 'opensip-tools.config.yml'
+  if (t.displayLabel === undefined) return t.path
+  const slash = t.kind === 'dir' ? '/' : ''
+  let inner = ''
+  if (t.fileCount !== undefined) {
+    const plural = t.fileCount === 1 ? '' : 's'
+    inner = ` (${t.fileCount} file${plural})`
+  }
+  return `opensip-tools/${t.displayLabel}${slash}${inner}`
+}
+
+function printUserModeTargets(write: (s: string) => void, targets: readonly Target[]): void {
   const totalSize = targets.reduce((sum, t) => sum + t.sizeBytes, 0)
-  const label = mode === 'user' ? 'user-level state' : 'project-local state'
   write('\n')
-  write(`About to remove ${label} (${formatSize(totalSize)}):\n`)
+  write(`About to remove user-level state (${formatSize(totalSize)}):\n`)
   for (const t of targets) {
     write(`  - ${t.path}${t.kind === 'dir' ? '/' : ''} (${formatSize(t.sizeBytes)})\n`)
   }
   write('\n')
+}
+
+function printProjectDefault(
+  write: (s: string) => void,
+  toDelete: readonly Target[],
+  toKeep: readonly Target[],
+  projectRoot: string,
+): void {
+  write('\n')
+  write(`Project: ${projectRoot}\n\n`)
+  if (toDelete.length === 0) {
+    write('Nothing to remove — runtime state is already absent.\n\n')
+  } else {
+    write('This will remove (rebuildable runtime state only):\n')
+    for (const t of toDelete) {
+      write(`  - ${t.path}${t.kind === 'dir' ? '/' : ''}  (${formatSize(t.sizeBytes)})\n`)
+      if (t.bucket === 'runtime') {
+        write('    sessions database, cache, logs, baselines\n')
+      }
+    }
+    write('\n')
+  }
+  if (toKeep.length > 0) {
+    write('These will be KEPT (your authored content):\n')
+    for (const t of toKeep) {
+      write(`  ✓ ${formatKeepLine(t)}\n`)
+    }
+    write('\n  To also remove your authored content, re-run with --purge.\n\n')
+  }
+}
+
+function printProjectPurge(
+  write: (s: string) => void,
+  toDelete: readonly Target[],
+  projectRoot: string,
+): void {
+  write('\n')
+  write(`Project: ${projectRoot}\n\n`)
+  write('⚠ This removes EVERYTHING, including your authored content:\n\n')
+  for (const t of toDelete) {
+    write(`  - ${t.path}${t.kind === 'dir' ? '/' : ''}  (${formatSize(t.sizeBytes)})\n`)
+  }
+  write('\n  ⚠ If your custom checks are not committed to git, you will\n')
+  write('    lose them. We recommend running `git status` first.\n\n')
 }
 
 /** Project a `Target[]` into the result-shape `{path, kind}[]`. */
@@ -216,18 +367,48 @@ function buildResult(args: {
   };
 }
 
+/** Filter all-targets into (toDelete, toKeep) per mode + purge flag. */
+function filterTargetsForAction(
+  mode: UninstallMode,
+  purge: boolean,
+  allTargets: readonly Target[],
+): { toDelete: readonly Target[]; toKeep: readonly Target[] } {
+  if (mode === 'user' || purge) {
+    return { toDelete: allTargets, toKeep: [] }
+  }
+  return {
+    toDelete: allTargets.filter((t) => t.bucket === 'runtime'),
+    toKeep: allTargets.filter((t) => t.bucket !== 'runtime'),
+  }
+}
+
+/** Print the pre-prompt summary appropriate to mode + purge state. */
+function printPreambleForRun(
+  write: (s: string) => void,
+  mode: UninstallMode,
+  purge: boolean,
+  toDelete: readonly Target[],
+  toKeep: readonly Target[],
+  rootPath: string,
+): void {
+  if (mode === 'user') {
+    printUserModeTargets(write, toDelete)
+  } else if (purge) {
+    printProjectPurge(write, toDelete, rootPath)
+  } else {
+    printProjectDefault(write, toDelete, toKeep, rootPath)
+  }
+}
+
 export async function executeUninstall(opts: UninstallOptions = {}): Promise<UninstallResult> {
   const mode: UninstallMode = opts.project === undefined ? 'user' : 'project'
   const userRoot = opts.rootDir ?? DEFAULT_USER_ROOT
   const rootPath = mode === 'user' ? userRoot : resolveProjectDir(opts)
   const write = opts.write ?? ((s: string) => process.stdout.write(s))
+  const purge = opts.purge === true
 
-  const targets = collectTargets(mode, userRoot, opts)
-  if (targets.length === 0) {
-    // Empty-target hint stays at the write layer because it serves the
-    // same UX role as the pre-prompt target listing — informational
-    // before any structured outcome surfaces. The structured
-    // `action: 'empty'` is what tests assert against.
+  const allTargets = collectTargets(mode, userRoot, opts)
+  if (allTargets.length === 0) {
     const where = mode === 'user' ? userRoot : resolveProjectDir(opts)
     const note = mode === 'project'
       ? `\nNothing to remove — no opensip-tools state found at ${where}.\n\n`
@@ -236,28 +417,32 @@ export async function executeUninstall(opts: UninstallOptions = {}): Promise<Uni
     return buildResult({ action: 'empty', mode, targets: [], rootPath })
   }
 
-  printTargets(write, mode, targets)
+  const { toDelete, toKeep } = filterTargetsForAction(mode, purge, allTargets)
 
-  if (mode === 'project') {
-    write(`Note: this removes user-authored content (custom checks, recipes) along with runtime state.\n`)
-    write(`Git history is your safety net.\n\n`)
+  // Empty-after-filter (project default with no .runtime/ but existing
+  // user content). Print the KEPT block so the user sees what survived.
+  if (mode === 'project' && toDelete.length === 0) {
+    printProjectDefault(write, [], toKeep, rootPath)
+    return buildResult({ action: 'empty', mode, targets: [], rootPath })
   }
+
+  printPreambleForRun(write, mode, purge, toDelete, toKeep, rootPath)
 
   if (opts.dryRun) {
-    return buildResult({ action: 'dry-run', mode, targets, rootPath })
+    return buildResult({ action: 'dry-run', mode, targets: toDelete, rootPath })
   }
 
-  if (!opts.yes) {
+  if (opts.yes !== true) {
     const prompt = opts.prompt ?? defaultPrompt
     const ok = await confirm(prompt, `Proceed? [y/N] `)
     if (!ok) {
-      return buildResult({ action: 'cancelled', mode, targets, rootPath })
+      return buildResult({ action: 'cancelled', mode, targets: toDelete, rootPath })
     }
   }
 
-  for (const t of targets) {
+  for (const t of toDelete) {
     rmSync(t.path, { recursive: true, force: true })
   }
 
-  return buildResult({ action: 'removed', mode, targets, rootPath })
+  return buildResult({ action: 'removed', mode, targets: toDelete, rootPath })
 }
