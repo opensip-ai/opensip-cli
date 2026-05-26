@@ -24,6 +24,7 @@
 
 import { existsSync } from 'node:fs';
 
+import { formatProjectHeader } from '@opensip-tools/cli-ui';
 import {
   generatePrefixedId,
   initLogFile,
@@ -41,6 +42,23 @@ import { setProjectContextForRun } from '../cli-context.js';
 import { loadCliDefaults, mergeConfigDefaults } from './cli-defaults.js';
 
 import type { Command } from 'commander';
+
+/**
+ * Commands that DON'T emit the imperative Project: header. JSON output,
+ * shell-sourceable completion, help/version, user-scoped commands, and
+ * Ink-rendered tools (RunHeader takes over) are all suppressed.
+ */
+const PROJECT_HEADER_SUPPRESSED_COMMANDS: ReadonlySet<string> = new Set([
+  'completion',
+  'configure',
+]);
+
+const COMMANDS_WITH_INK_RUN_HEADER: ReadonlySet<string> = new Set([
+  'fit',
+  'sim',
+  'graph',
+  'dashboard',
+]);
 
 /**
  * Commands that operate WITHOUT requiring a project context. These don't
@@ -142,7 +160,23 @@ export function installPreActionHook(program: Command): void {
     // additionally checks scope === 'project' before opening SQLite.
     setProjectContextForRun(project);
 
-    // 6. Project: header (Phase 2.2 wires this in).
+    // 6. Imperative Project: header for non-Ink, project-scoped commands.
+    const cmdName = actionCommand.name();
+    const suppress =
+      PROJECT_HEADER_SUPPRESSED_COMMANDS.has(cmdName) ||
+      Boolean(opts.json) ||
+      project.scope !== 'project' ||
+      // Ink-rendered tools mount their own RunHeader with the Project line.
+      (COMMANDS_WITH_INK_RUN_HEADER.has(cmdName) && !opts.json) ||
+      // uninstall --project's printer (Phase 5) owns its pre-prompt block;
+      // uninstall --user is user-scoped.
+      cmdName === 'uninstall';
+    if (!suppress) {
+      process.stdout.write(formatProjectHeader({
+        root: project.projectRoot,
+        walkedUp: project.walkedUp,
+      }));
+    }
 
     // 7. Structured start log.
     logger.info({

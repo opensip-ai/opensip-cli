@@ -2,6 +2,12 @@
  * RunHeader — info header shown after the banner for each tool run. Displays
  * tool name, an optional description, metadata key-value pairs, and a
  * separator line. Used by every Ink live view + the static-render path.
+ *
+ * Renders the `Project: <root>` line as the canonical project-location
+ * marker for Ink-rendered commands. Non-Ink commands use the imperative
+ * `formatProjectHeader` printed by pre-action-hook. Together these
+ * cover every command path exactly once — no duplicate "Target:/Project:"
+ * lines.
  */
 
 import { Text, Box } from 'ink';
@@ -19,19 +25,33 @@ export interface RunHeaderProps {
   readonly tool: string;
   /** Optional description shown below the metadata row. */
   readonly description?: string;
-  /** Project root the tool is operating against. Surfaces as `Target: <cwd>`. */
-  readonly cwd: string;
-  /** Extra metadata pairs prepended before the cwd. */
+  /** Resolved project root the tool is operating against (from ctx.project.projectRoot). */
+  readonly projectRoot: string;
+  /** Ancestor steps walked from cwd to projectRoot; renders the "(found N levels up)" suffix when > 0. */
+  readonly walkedUp?: number;
+  /** Extra metadata pairs prepended before the project line. */
   readonly metadata?: readonly RunHeaderMeta[];
 }
 
-export function RunHeader({ tool, description, cwd, metadata = [] }: RunHeaderProps): React.ReactElement {
+function formatProjectLine(projectRoot: string, walkedUp: number): string {
+  if (walkedUp === 0) return `Project: ${projectRoot}`;
+  const noun = walkedUp === 1 ? 'level' : 'levels';
+  return `Project: ${projectRoot}  (found ${walkedUp} ${noun} up)`;
+}
+
+export function RunHeader({
+  tool,
+  description,
+  projectRoot,
+  walkedUp = 0,
+  metadata = [],
+}: RunHeaderProps): React.ReactElement {
   const theme = useTheme();
   const separator = '─'.repeat(60);
 
   const metaParts = [
     ...metadata.map((m) => `${m.label}: ${m.value}`),
-    `Target: ${cwd}`,
+    formatProjectLine(projectRoot, walkedUp),
   ];
 
   return (

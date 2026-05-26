@@ -148,7 +148,7 @@ function FitRunner({ args, datastore, setExitCode }: FitRunnerProps): React.Reac
             <RunHeader
               tool={FIT_TOOL_TITLE}
               description={FIT_TOOL_DESCRIPTION}
-              cwd={args.cwd}
+              projectRoot={args.cwd}
               metadata={[{ label: 'Recipe', value: recipe }]}
             />
           )}
@@ -167,7 +167,7 @@ function FitRunner({ args, datastore, setExitCode }: FitRunnerProps): React.Reac
             <RunHeader
               tool={FIT_TOOL_TITLE}
               description={FIT_TOOL_DESCRIPTION}
-              cwd={args.cwd}
+              projectRoot={args.cwd}
               metadata={[
                 { label: 'Recipe', value: recipe },
                 { label: 'Checks', value: String(state.checkCount) },
@@ -189,7 +189,7 @@ function FitRunner({ args, datastore, setExitCode }: FitRunnerProps): React.Reac
             <RunHeader
               tool={FIT_TOOL_TITLE}
               description={FIT_TOOL_DESCRIPTION}
-              cwd={args.cwd}
+              projectRoot={args.cwd}
               metadata={[
                 { label: 'Recipe', value: recipe },
                 { label: 'Checks', value: String(state.checkCount) },

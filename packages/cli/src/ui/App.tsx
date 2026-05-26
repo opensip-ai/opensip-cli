@@ -80,7 +80,7 @@ export function App({ result }: AppProps): React.ReactElement {
           <RunHeader
             tool={toolName}
             description={toolDesc}
-            cwd={result.cwd}
+            projectRoot={result.cwd}
           />
           <ExperimentalNotice tool={result.tool} cwd={result.cwd} />
         </Box>
@@ -144,7 +144,7 @@ function SimDoneSummary({
       <RunHeader
         tool="Simulation"
         description={`Recipe: ${result.recipeName}`}
-        cwd={result.cwd}
+        projectRoot={result.cwd}
       />
       <Box flexDirection="column" paddingLeft={2} paddingTop={1}>
         {result.scenarios.length === 0 ? (

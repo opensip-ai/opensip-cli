@@ -15,6 +15,7 @@
 
 export { Banner } from './banner.js';
 export { ErrorMessage, type ErrorMessageProps } from './error-message.js';
+export { formatProjectHeader, type ProjectHeaderInput } from './project-header.js';
 export { RunHeader, type RunHeaderProps, type RunHeaderMeta } from './run-header.js';
 export { Spinner, type SpinnerProps, useSpinner, useStandaloneSpinner } from './spinner.js';
 export { ClockProvider, type ClockProviderProps, useClock, useTick } from './clock.js';
