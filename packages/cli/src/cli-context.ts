@@ -17,20 +17,87 @@
  *     in exactly one place (here); commands and the catch handler all
  *     route through `ctx.setExitCode`.
  *
- * Factored out of `index.ts` so both pieces can be tested in isolation
- * without booting the full Commander program.
+ * Lazy holders: `project` and `datastore` are exposed via getters that
+ * read from module-level holders mutated by pre-action-hook. This makes
+ * datastore open lazy — `openSqliteBackend`'s `mkdirSync` only fires
+ * when a tool's action body genuinely reads `cli.datastore` for the
+ * first time. Dry-runs and error paths that never touch the datastore
+ * never materialise `.runtime/datastore.sqlite`.
  */
 
 import {
   UnknownLiveViewError,
   logger as defaultLogger,
+  resolveProjectPaths,
   type LiveViewRenderer,
   type Logger,
+  type ProjectContext,
   type ToolCliContext,
 } from '@opensip-tools/core';
+import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
 
 import type { CommandResult } from '@opensip-tools/contracts';
 import type { Command } from 'commander';
+
+// ---------------------------------------------------------------------------
+// Per-run holders. Mutated by pre-action-hook via the exported setters.
+// Module-level globals are fine for the single-process CLI; if an
+// in-process harness ever runs multiple invocations concurrently, a
+// per-invocation context bag is the right next step.
+// ---------------------------------------------------------------------------
+
+let currentProjectContext: ProjectContext | undefined;
+let datastoreCache: DataStore | undefined;
+
+/** Called by pre-action-hook once context is resolved for the run. */
+export function setProjectContextForRun(ctx: ProjectContext): void {
+  currentProjectContext = ctx;
+  datastoreCache = undefined;
+}
+
+/**
+ * Read the current project root. Convenience for non-tool bootstrap
+ * helpers (e.g. `maybeOpenDashboard`) that need the project root but
+ * don't carry a ToolCliContext. Throws if accessed before preAction
+ * resolves the context.
+ */
+export function getCurrentProjectRoot(): string {
+  if (!currentProjectContext) {
+    throw new Error('getCurrentProjectRoot() called before pre-action-hook resolved the context.');
+  }
+  return currentProjectContext.projectRoot;
+}
+
+/**
+ * Open (or return cached) project-local SQLite DataStore. Shared between
+ * `ToolCliContext.datastore` (tool action bodies) and CLI-only commands
+ * (`register-sessions.ts`, etc.) so both paths are equally lazy.
+ *
+ * Throws when called outside a project scope — callers must check
+ * `project.scope === 'project'` first or handle the throw as a
+ * "no project found" error.
+ */
+export function getOrOpenDatastore(log: Logger = defaultLogger): DataStore {
+  if (datastoreCache) return datastoreCache;
+  const project = currentProjectContext;
+  if (!project) {
+    throw new Error('Datastore accessed before pre-action-hook resolved the project context.');
+  }
+  if (project.scope !== 'project') {
+    throw new Error(
+      'Datastore accessed in a non-project context. The action body should have ' +
+        'errored earlier with "No opensip-tools project found" before touching this.',
+    );
+  }
+  const path = `${resolveProjectPaths(project.projectRoot).runtimeDir}/datastore.sqlite`;
+  datastoreCache = DataStoreFactory.open({ backend: 'sqlite', path });
+  log.info({
+    evt: 'cli.datastore.opened',
+    module: 'cli:context',
+    path,
+  });
+  return datastoreCache;
+}
 
 export interface LiveViewRegistry {
   readonly register: (key: string, renderer: LiveViewRenderer) => void;
@@ -38,15 +105,6 @@ export interface LiveViewRegistry {
   readonly has: (key: string) => boolean;
 }
 
-/**
- * Build a fresh live-view registry. Registration is first-writer-wins
- * (matches `ToolRegistry.register` policy) — a duplicate key triggers a
- * structured `cli.live_view.duplicate` warning via the supplied logger
- * and the second call is silently ignored.
- *
- * Returns an opaque handle so the underlying `Map` doesn't leak; the
- * CLI passes only `register` / `render` through to `ToolCliContext`.
- */
 export function createLiveViewRegistry(
   log: Logger = defaultLogger,
 ): LiveViewRegistry {
@@ -84,35 +142,15 @@ export interface BuildToolCliContextOptions {
   readonly maybeOpenDashboard: (opts: {
     openRequested: boolean;
     jsonOutput: boolean;
-    cwd: string;
   }) => Promise<void>;
   readonly logger?: Logger;
-  /**
-   * v2 persistence handle. Threaded from `bootstrap/index.ts` (the
-   * DataStoreFactory.open call). Tools cast to `DataStore` from
-   * `@opensip-tools/datastore` at use time. Loosely typed `unknown` to
-   * keep the CLI decoupled from datastore at the type layer.
-   */
-  readonly datastore: unknown;
 }
 
-/**
- * Handle returned by `buildToolCliContext`. The `ctx` shape is what the
- * dispatcher passes to `tool.register(cli)`. `getExitCode` is a debug
- * affordance — the catch handler reads it for structured logging when
- * a parse error rolls in. The caller still owns `process.exit`.
- */
 export interface ToolCliContextHandle {
   readonly ctx: ToolCliContext;
   readonly getExitCode: () => number | undefined;
 }
 
-/**
- * Build the `ToolCliContext` the dispatcher hands to each tool. The
- * exit code is captured in this closure; `setExitCode` is the single
- * `process.exitCode` mutator in the codebase. Tools, CLI commands, and
- * the catch handler all funnel through `ctx.setExitCode`.
- */
 export function buildToolCliContext(
   opts: BuildToolCliContextOptions,
 ): ToolCliContextHandle {
@@ -121,6 +159,16 @@ export function buildToolCliContext(
 
   const ctx: ToolCliContext = {
     program: opts.program,
+    get project(): ProjectContext {
+      if (!currentProjectContext) {
+        throw new Error(
+          'ToolCliContext.project accessed before pre-action-hook resolved it. ' +
+            'This indicates a bootstrap-order bug — tools should not access project ' +
+            'context during register(); only inside command action bodies.',
+        );
+      }
+      return currentProjectContext;
+    },
     render: (result) => opts.render(result as CommandResult),
     registerLiveView: opts.liveViews.register,
     renderLive: opts.liveViews.render,
@@ -130,13 +178,12 @@ export function buildToolCliContext(
       exitCode = code;
       process.exitCode = code;
     },
-    // Single IO seam for tool-emitted JSON. Every `--json` branch in a
-    // tool funnels through here so the CLI can later add envelope
-    // wrappers, file output, or piping without touching tool code.
     emitJson: (value) => {
       process.stdout.write(JSON.stringify(value, null, 2) + '\n');
     },
-    datastore: opts.datastore,
+    get datastore(): unknown {
+      return getOrOpenDatastore(log);
+    },
   };
 
   return {

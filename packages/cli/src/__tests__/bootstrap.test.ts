@@ -28,6 +28,14 @@ import {
 function makeStubContext(): ToolCliContext {
   return {
     program: {},
+    project: {
+      cwd: '/test',
+      cwdExplicit: false,
+      projectRoot: '/test',
+      configPath: undefined,
+      walkedUp: 0,
+      scope: 'none',
+    },
     render: vi.fn(() => Promise.resolve()),
     registerLiveView: vi.fn(),
     renderLive: vi.fn(() => Promise.resolve()),

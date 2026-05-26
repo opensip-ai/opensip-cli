@@ -33,9 +33,6 @@
  * 2026-05-23 M1.
  */
 
-import { resolveProjectPaths } from '@opensip-tools/core';
-import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
-
 import { discoverAndRegisterGraphAdapterPackages } from './register-graph-adapters.js';
 import { registerLanguageAdapters } from './register-language-adapters.js';
 import {
@@ -56,24 +53,15 @@ export interface BootstrapOptions {
   readonly toolRegistry: ToolRegistry;
   /** Project directory used by `discoverToolPackages`; usually the CLI install dir. */
   readonly projectDir: string;
-  /**
-   * Working directory the project-local SQLite DataStore is opened against.
-   * Defaults to `process.cwd()`. Override only in tests so unit suites can
-   * point at a temp project dir without polluting the user's tree.
-   */
-  readonly cwd?: string;
-}
-
-export interface BootstrapResult {
-  /** Project-local DataStore. Owned by the bootstrap; the caller closes it on shutdown if needed. */
-  readonly datastore: DataStore;
 }
 
 /**
  * One-shot bootstrap: register language adapters, register the first-
- * party tools, discover-and-register every third-party tool,
- * discover-and-register every @opensip-tools/graph-* adapter pack,
- * then open the project-local DataStore.
+ * party tools, and discover-and-register every third-party tool +
+ * @opensip-tools/graph-* adapter pack. Datastore is NOT opened here —
+ * it's a lazy getter on ToolCliContext (cli-context.ts), so dry-runs
+ * and error paths that never read `cli.datastore` don't materialise
+ * `.runtime/datastore.sqlite`.
  *
  * Graph adapter discovery runs BEFORE `mountAllToolCommands`: the
  * graph tool's `register()` method assumes adapters are already
@@ -81,19 +69,11 @@ export interface BootstrapResult {
  * `pickAdapter()` lands during a real run. PR 1a of plan
  * docs/plans/architecture/2026-05-23-plan-graph-adapter-package-split.md.
  */
-export async function bootstrapCli(opts: BootstrapOptions): Promise<BootstrapResult> {
+export async function bootstrapCli(opts: BootstrapOptions): Promise<void> {
   registerLanguageAdapters(opts.langRegistry);
   registerFirstPartyTools(opts.toolRegistry);
   await discoverAndRegisterToolPackages(opts.toolRegistry, {
     projectDir: opts.projectDir,
   });
   await discoverAndRegisterGraphAdapterPackages({ projectDir: opts.projectDir });
-
-  const projectPaths = resolveProjectPaths(opts.cwd ?? process.cwd());
-  const datastore = DataStoreFactory.open({
-    backend: 'sqlite',
-    path: `${projectPaths.runtimeDir}/datastore.sqlite`,
-  });
-
-  return { datastore };
 }

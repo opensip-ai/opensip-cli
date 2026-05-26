@@ -18,10 +18,12 @@ import type { CommandResult } from '@opensip-tools/contracts';
 function makeContext(): {
   setExitCode: ReturnType<typeof vi.fn>;
   render: (result: CommandResult) => Promise<void>;
+  datastore: () => unknown;
 } {
   return {
     setExitCode: vi.fn(),
     render: vi.fn(() => Promise.resolve()),
+    datastore: () => undefined,
   };
 }
 

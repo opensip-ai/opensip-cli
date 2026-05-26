@@ -25,7 +25,7 @@ import {
   mountAllToolCommands,
   renderResult,
 } from './bootstrap/index.js';
-import { buildToolCliContext, createLiveViewRegistry } from './cli-context.js';
+import { buildToolCliContext, createLiveViewRegistry, getOrOpenDatastore } from './cli-context.js';
 import { registerCliCommands } from './commands/index.js';
 import { handleFatalBootstrapError, handleParseError } from './error-handler.js';
 import { maybeNotify } from './update-notifier.js';
@@ -40,11 +40,10 @@ const program = new Command('opensip-tools')
 installPreActionHook(program);
 
 async function main(): Promise<void> {
-  // v2 persistence: bootstrap opens the project-local SQLite DataStore
-  // and returns it on the result; the composition root passes it into
-  // the ToolCliContext (every Tool's `cli.datastore`) and the CLI-only
-  // commands (sessions, configure, plugin).
-  const { datastore } = await bootstrapCli({
+  // v2 persistence: datastore is opened LAZILY in cli-context.ts on
+  // first access via getOrOpenDatastore. bootstrapCli just registers
+  // tools and adapters; no SQLite file is created here.
+  await bootstrapCli({
     langRegistry: defaultLanguageRegistry,
     toolRegistry: defaultToolRegistry,
     projectDir: dirname(dirname(fileURLToPath(import.meta.url))),
@@ -53,11 +52,14 @@ async function main(): Promise<void> {
   const { ctx } = buildToolCliContext({
     program, render: renderResult, liveViews: createLiveViewRegistry(logger),
     maybeOpenDashboard, logger,
-    datastore,
   });
 
   mountAllToolCommands(defaultToolRegistry, ctx);
-  registerCliCommands(program, { setExitCode: ctx.setExitCode, render: renderResult, datastore });
+  registerCliCommands(program, {
+    setExitCode: ctx.setExitCode,
+    render: renderResult,
+    datastore: () => getOrOpenDatastore(logger),
+  });
 
   // Bare `opensip-tools` → welcome screen. The update notifier runs
   // AFTER this short-circuit by design (don't nag on zero-arg runs);

@@ -91,7 +91,6 @@ function makeBuildOpts(): {
   liveViews: ReturnType<typeof createLiveViewRegistry>;
   maybeOpenDashboard: ReturnType<typeof vi.fn>;
   logger: Logger;
-  datastore: undefined;
 } {
   const { log } = makeLogger();
   const liveViews = createLiveViewRegistry(log);
@@ -101,7 +100,6 @@ function makeBuildOpts(): {
     liveViews,
     maybeOpenDashboard: vi.fn(() => Promise.resolve()),
     logger: log,
-    datastore: undefined,
   };
 }
 

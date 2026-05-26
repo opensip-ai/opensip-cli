@@ -26,9 +26,16 @@ export interface CliCommandsContext {
   readonly setExitCode: (code: number) => void;
   readonly render: (result: CommandResult) => Promise<void>;
   /**
-   * v2 persistence handle. Threaded from the CLI bootstrap. Loosely typed
-   * `unknown` to keep this module free of `@opensip-tools/datastore` at
-   * the type level; consumers cast to `DataStore` at use time.
+   * v2 persistence accessor (thunk). Calling this returns the project-local
+   * DataStore, opening it lazily on first access. Commands that don't read
+   * the datastore (dry-runs, list-style commands, completion) never trigger
+   * the SQLite open and therefore don't materialise `.runtime/`. Loosely
+   * typed `unknown` to keep this module free of `@opensip-tools/datastore`
+   * at the type level; consumers cast to `DataStore` at use time.
+   *
+   * Throws when called in a non-project context — CLI commands that need
+   * the datastore should already have errored on `project.scope === 'none'`
+   * before reaching this call.
    */
-  readonly datastore: unknown;
+  readonly datastore: () => unknown;
 }

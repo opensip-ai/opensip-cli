@@ -25,7 +25,7 @@ export function registerSessions(program: Command, ctx: CliCommandsContext): voi
 
   mountResultCommand<{ json: boolean }>(
     listCmd,
-    () => showHistory(ctx.datastore as DataStore),
+    () => showHistory(ctx.datastore() as DataStore),
     { ctx, jsonFlag: (opts) => opts.json },
   );
 
@@ -42,7 +42,7 @@ export function registerSessions(program: Command, ctx: CliCommandsContext): voi
 
   mountResultCommand<{ olderThan?: number; yes: boolean; json: boolean }>(
     purgeCmd,
-    (opts) => executeClear({ olderThan: opts.olderThan, yes: opts.yes, datastore: ctx.datastore as DataStore }),
+    (opts) => executeClear({ olderThan: opts.olderThan, yes: opts.yes, datastore: ctx.datastore() as DataStore }),
     { ctx, jsonFlag: (opts) => opts.json },
   );
 }

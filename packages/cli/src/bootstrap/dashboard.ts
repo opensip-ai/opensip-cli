@@ -17,15 +17,18 @@
 
 import { decideOpen, launchBrowser } from '../open-dashboard.js';
 
+import { getCurrentProjectRoot } from '../cli-context.js';
+
 /**
  * Open the HTML dashboard in the user's browser when the run conditions
  * allow it (TTY, not JSON-mode, not CI, opt-in via --open). Tools call
- * this through `ctx.maybeOpenDashboard` after a run.
+ * this through `ctx.maybeOpenDashboard` after a run. Project root comes
+ * from the resolved ProjectContext (Phase 1) rather than a caller-passed
+ * `cwd` — single source of truth for project location.
  */
 export async function maybeOpenDashboard(opts: {
   openRequested: boolean;
   jsonOutput: boolean;
-  cwd: string;
 }): Promise<void> {
   const decision = decideOpen({
     openRequested: opts.openRequested,
@@ -38,7 +41,7 @@ export async function maybeOpenDashboard(opts: {
   // generator; keep it off the cold-start path for `opensip-tools fit
   // --json`.
   const { openDashboard } = await import('@opensip-tools/fitness');
-  const dash = await openDashboard(opts.cwd);
+  const dash = await openDashboard(getCurrentProjectRoot());
   if (dash.type === 'dashboard' && dash.path) {
     await launchBrowser(dash.path);
   }

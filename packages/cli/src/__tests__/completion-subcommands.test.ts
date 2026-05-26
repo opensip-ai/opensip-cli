@@ -28,6 +28,14 @@ function makeStubContext(program: Command): ToolCliContext {
   // longer hands out bundled renderers via a `builtinLiveViews` map.
   return {
     program,
+    project: {
+      cwd: '/test',
+      cwdExplicit: false,
+      projectRoot: '/test',
+      configPath: undefined,
+      walkedUp: 0,
+      scope: 'none',
+    },
     render: vi.fn(() => Promise.resolve()),
     registerLiveView: vi.fn(),
     renderLive: vi.fn(() => Promise.resolve()),
@@ -56,6 +64,7 @@ describe('SUBCOMMANDS drift test', () => {
     registerCliCommands(program, {
       setExitCode: ctx.setExitCode,
       render: (result) => ctx.render(result),
+      datastore: () => undefined,
     });
 
     const live = program.commands.map((c) => c.name()).sort();
@@ -89,6 +98,7 @@ describe('SUBCOMMANDS drift test', () => {
     registerCliCommands(program, {
       setExitCode: ctx.setExitCode,
       render: (result) => ctx.render(result),
+      datastore: () => undefined,
     });
 
     const pluginCmd = program.commands.find((c) => c.name() === 'plugin');
