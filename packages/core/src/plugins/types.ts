@@ -75,6 +75,8 @@ export interface LoadedPlugin {
   readonly recipesRegistered: number
   /** Number of language adapters registered (only for 'lang' domain). */
   readonly adaptersRegistered?: number
+  /** Number of scenarios registered (only for 'sim' domain). */
+  readonly scenariosRegistered?: number
   readonly error?: string
 }
 
@@ -84,6 +86,7 @@ export interface PluginLoadResult {
   readonly totalChecks: number
   readonly totalRecipes: number
   readonly totalAdapters: number
+  readonly totalScenarios: number
   readonly errors: readonly string[]
 }
 
