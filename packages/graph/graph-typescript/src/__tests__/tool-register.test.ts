@@ -26,6 +26,14 @@ function makeCli(program: Command): ToolCliContext {
   // `cli.registerLiveView` — no `builtinLiveViews` map lookup.
   return {
     program,
+    project: {
+      cwd: '/test',
+      cwdExplicit: false,
+      projectRoot: '/test',
+      configPath: undefined,
+      walkedUp: 0,
+      scope: 'none',
+    },
     render: vi.fn(() => Promise.resolve()),
     registerLiveView: vi.fn(),
     renderLive: vi.fn(() => Promise.resolve()),
@@ -129,6 +137,14 @@ describe('graphTool action handler — end-to-end via Commander', () => {
       const setExitCode = vi.fn();
       const cli: ToolCliContext = {
         program,
+        project: {
+          cwd: '/test',
+          cwdExplicit: false,
+          projectRoot: '/test',
+          configPath: undefined,
+          walkedUp: 0,
+          scope: 'none',
+        },
         render: vi.fn(() => Promise.resolve()),
         renderLive: vi.fn(() => Promise.resolve()),
         maybeOpenDashboard: vi.fn(() => Promise.resolve()),
@@ -180,6 +196,14 @@ describe('graphTool action handler — end-to-end via Commander', () => {
       const renderLive = vi.fn(() => Promise.resolve());
       const cli: ToolCliContext = {
         program,
+        project: {
+          cwd: '/test',
+          cwdExplicit: false,
+          projectRoot: '/test',
+          configPath: undefined,
+          walkedUp: 0,
+          scope: 'none',
+        },
         render: vi.fn(() => Promise.resolve()),
         renderLive,
         maybeOpenDashboard: vi.fn(() => Promise.resolve()),

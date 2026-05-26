@@ -87,7 +87,6 @@ function register(cli: ToolCliContext): void {
         await cli.maybeOpenDashboard({
           openRequested: Boolean(opts.open),
           jsonOutput: Boolean(args.json),
-          cwd: args.cwd,
         });
       },
     );

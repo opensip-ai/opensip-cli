@@ -15,9 +15,9 @@
  * (audit 2026-05-22 F3) — tool packages now own their own renderers.
  */
 
+import { getCurrentProjectRoot } from '../cli-context.js';
 import { decideOpen, launchBrowser } from '../open-dashboard.js';
 
-import { getCurrentProjectRoot } from '../cli-context.js';
 
 /**
  * Open the HTML dashboard in the user's browser when the run conditions

@@ -42,6 +42,14 @@ function makeFakeContext(program: Command): {
   const emitted: unknown[] = [];
   const ctx: ToolCliContext = {
     program,
+    project: {
+      cwd: '/test',
+      cwdExplicit: false,
+      projectRoot: '/test',
+      configPath: undefined,
+      walkedUp: 0,
+      scope: 'none',
+    },
     render: vi.fn((result: unknown) => {
       rendered.push(result);
       return Promise.resolve();

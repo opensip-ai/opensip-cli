@@ -306,7 +306,6 @@ async function runLiveMode(
   await cli.maybeOpenDashboard({
     openRequested,
     jsonOutput: Boolean(args.json),
-    cwd: args.cwd,
   });
 }
 

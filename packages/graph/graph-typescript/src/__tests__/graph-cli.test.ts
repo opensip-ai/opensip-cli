@@ -54,6 +54,14 @@ function makeCli(): CapturedCli {
   const datastore = DataStoreFactory.open({ backend: 'memory' });
   const cli: ToolCliContext = {
     program: {},
+    project: {
+      cwd: '/test',
+      cwdExplicit: false,
+      projectRoot: '/test',
+      configPath: undefined,
+      walkedUp: 0,
+      scope: 'none',
+    },
     render: vi.fn(() => Promise.resolve()),
     registerLiveView: vi.fn(),
     renderLive: vi.fn(() => Promise.resolve()),
@@ -338,6 +346,14 @@ describe('executeGraph', () => {
     const exitCodes: number[] = [];
     const cli: ToolCliContext = {
       program: {},
+      project: {
+        cwd: '/test',
+        cwdExplicit: false,
+        projectRoot: '/test',
+        configPath: undefined,
+        walkedUp: 0,
+        scope: 'none',
+      },
       render: vi.fn(() => Promise.resolve()),
       renderLive: vi.fn(() => Promise.resolve()),
       maybeOpenDashboard: vi.fn(() => Promise.resolve()),

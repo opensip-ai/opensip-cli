@@ -42,6 +42,42 @@ import { loadCliDefaults, mergeConfigDefaults } from './cli-defaults.js';
 
 import type { Command } from 'commander';
 
+/**
+ * Commands that operate WITHOUT requiring a project context. These don't
+ * read project files or the datastore; running them from a directory
+ * with no opensip-tools project is legitimate.
+ *
+ * Everything else is project-scoped: when `project.scope === 'none'`,
+ * the hook emits the "No opensip-tools project found" error and exits 2.
+ *
+ * Note: `uninstall --user` is project-agnostic, but `uninstall --project`
+ * requires one. The check is per-command name here; uninstall's own
+ * mode-specific guarding lives in its action body.
+ */
+const PROJECT_AGNOSTIC_COMMANDS: ReadonlySet<string> = new Set([
+  'init',
+  'configure',
+  'completion',
+  'uninstall',
+]);
+
+function formatNoProjectFoundMessage(cwd: string, jsonOutput: boolean): string {
+  if (jsonOutput) {
+    return JSON.stringify({
+      error: 'No opensip-tools.config.yml found. Searched from ' + cwd + ' upward. To get started: opensip-tools init',
+    });
+  }
+  return [
+    '✗ No opensip-tools project found.',
+    '',
+    '  Searched from: ' + cwd,
+    '  Walked up to: /',
+    '',
+    '  To get started:',
+    '    opensip-tools init',
+  ].join('\n');
+}
+
 
 /** Mount the bootstrap `preAction` hook on the supplied program. */
 export function installPreActionHook(program: Command): void {
@@ -78,9 +114,23 @@ export function installPreActionHook(program: Command): void {
     //    in uninstall.ts; we never use that name here.
     (opts as Record<string, unknown>).projectContext = project;
 
-    // 4. Bailout window — schema check (Phase 6.3) and phantom warn
-    //    (Phase 7) wire themselves into this slot. Schema check may
-    //    process.exit(2) before any side-effect setup.
+    // 4. Bailout window — no-project error for project-scoped commands,
+    //    schema check (Phase 6.3), and phantom warn (Phase 7) wire here.
+    //    Each can process.exit(2) before any side-effect setup.
+
+    if (project.scope === 'none' && !PROJECT_AGNOSTIC_COMMANDS.has(actionCommand.name())) {
+      const msg = formatNoProjectFoundMessage(cwd, Boolean(opts.json));
+      const stream = opts.json ? process.stdout : process.stderr;
+      stream.write(`${msg}\n`);
+      logger.warn({
+        evt: 'cli.no-project-found',
+        module: 'cli:bootstrap',
+        runId,
+        cwd,
+        command: actionCommand.name(),
+      });
+      process.exit(2);
+    }
 
     // 5. Side-effect setup, gated on a real project being present.
     if (project.scope === 'project' && existsSync(project.projectRoot)) {
