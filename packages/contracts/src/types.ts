@@ -277,6 +277,17 @@ export interface InitResult {
   cwd: string;
   configFilename: string;
   /**
+   * Set when init refused because the user invoked it from inside an
+   * existing project without an explicit --cwd flag. Carries the
+   * discovered root path and the rendered message — the message is
+   * computed in init.ts so --json consumers get the same string the
+   * human-readable renderer prints.
+   */
+  insideExistingProject?: {
+    readonly discoveredRoot: string;
+    readonly message: string;
+  };
+  /**
    * The state of the working directory at init time. Useful for
    * `--json` consumers and for the rendered output to show what
    * happened. Absent when init bailed before classification (cwd

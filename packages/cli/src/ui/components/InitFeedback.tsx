@@ -35,11 +35,25 @@ export interface InitFeedbackProps {
     readonly detected: readonly string[];
     readonly message: string;
   };
+  readonly insideExistingProject?: {
+    readonly discoveredRoot: string;
+    readonly message: string;
+  };
 }
 
 export function InitFeedback(props: InitFeedbackProps): React.ReactElement {
   const theme = useTheme();
-  const { created, state, cwd, configFilename, languages, createdFiles, gitignoreUpdated, preExistingFiles, partialStateError, ambiguousLanguageError } = props;
+  const { created, state, cwd, configFilename, languages, createdFiles, gitignoreUpdated, preExistingFiles, partialStateError, ambiguousLanguageError, insideExistingProject } = props;
+
+  if (insideExistingProject) {
+    // The message is already formatted (newlines + bullets) in init.ts;
+    // render it verbatim so --json consumers and human output stay in sync.
+    return (
+      <Box flexDirection="column" paddingLeft={2}>
+        <Text>{insideExistingProject.message}</Text>
+      </Box>
+    );
+  }
 
   if (ambiguousLanguageError) {
     return (

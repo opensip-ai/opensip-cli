@@ -47,10 +47,35 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { basename as pathBasename, join, relative } from 'node:path';
 
-import { resolveProjectPaths, type ProjectPaths } from '@opensip-tools/core';
+import { resolveProjectPaths, type ProjectContext, type ProjectPaths } from '@opensip-tools/core';
 
 // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; init still consumes CliArgs through initOptsToCliArgs in `register()` until the per-command type rip-out
 import type { CliArgs, InitResult, PreExistingFile } from '@opensip-tools/contracts';
+
+/**
+ * Build the "✗ This directory is already inside an opensip-tools project"
+ * refusal message. Same string is embedded in the InitResult.insideExistingProject
+ * for --json consumers and rendered by InitFeedback for human-readable output.
+ */
+function formatInsideExistingProjectMessage(discoveredRoot: string): string {
+  return [
+    `✗ This directory is already inside an opensip-tools project:`,
+    `    ${discoveredRoot}`,
+    `    (config: opensip-tools.config.yml)`,
+    ``,
+    `  What did you want to do?`,
+    ``,
+    `    • Re-scaffold examples, keep your custom files:`,
+    `        opensip-tools init --keep --cwd ${discoveredRoot}`,
+    ``,
+    `    • Reset the existing project (delete everything, start over):`,
+    `        opensip-tools init --remove --cwd ${discoveredRoot}`,
+    ``,
+    `    • Create a NEW separate project here (rare — only for`,
+    `      truly independent sub-projects in a monorepo):`,
+    `        opensip-tools init --cwd .`,
+  ].join('\n');
+}
 
 // =============================================================================
 // LANGUAGE DETECTION
@@ -875,7 +900,7 @@ function runScaffold(
  * (CLI render layer) prints it.
  */
 // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge type
-export function executeInit(args: CliArgs & { language?: string; keep?: boolean; remove?: boolean }): InitResult {
+export function executeInit(args: CliArgs & { language?: string; keep?: boolean; remove?: boolean; projectContext?: ProjectContext; cwdExplicit?: boolean }): InitResult {
   const cwd = args.cwd;
   const keep = args.keep === true;
   const remove = args.remove === true;
@@ -886,6 +911,24 @@ export function executeInit(args: CliArgs & { language?: string; keep?: boolean;
     cwd,
     configFilename: 'opensip-tools.config.yml',
   };
+
+  // Discovery-aware refusal: if cwd sits inside an existing project and
+  // the user did NOT pass --cwd explicitly, offer the three corrective
+  // actions instead of silently scaffolding a phantom nested project.
+  const project = args.projectContext;
+  const cwdExplicit = args.cwdExplicit === true;
+  if (project?.scope === 'project' && project.projectRoot !== cwd && !cwdExplicit) {
+    const message = formatInsideExistingProjectMessage(project.projectRoot);
+    return {
+      ...baseResult,
+      path: '', // no scaffold target — we refused
+      created: false,
+      insideExistingProject: {
+        discoveredRoot: project.projectRoot,
+        message,
+      },
+    };
+  }
 
   // Mutex: --keep and --remove are mutually exclusive.
   if (keep && remove) {
