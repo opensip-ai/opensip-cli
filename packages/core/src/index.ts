@@ -99,3 +99,11 @@ export { readPackageVersion } from './lib/package-version.js';
 // this module so a layout change is a single-file edit.
 export { resolveProjectPaths, resolveUserPaths } from './lib/paths.js';
 export type { ProjectPaths, UserPaths, PathDomain, PluginsPathDomain } from './lib/paths.js';
+
+// Lib — project-context resolver. One-shot ancestor walk from cwd to
+// the nearest opensip-tools.config.yml. Returns a ProjectContext that
+// every downstream consumer (CLI bootstrap, tool action handlers,
+// uninstall/init/dashboard) reads from instead of re-deriving cwd
+// semantics.
+export { resolveProjectContext } from './lib/project-context.js';
+export type { ProjectContext, ResolveProjectContextInput } from './lib/project-context.js';
