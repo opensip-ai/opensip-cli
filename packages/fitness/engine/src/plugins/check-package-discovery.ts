@@ -1,6 +1,9 @@
 /**
- * @fileoverview Auto-discovery of @opensip-tools/checks-* packages
- * installed in node_modules.
+ * @fileoverview Auto-discovery of `<scope>/checks-*` packages installed
+ * in node_modules. The default scope is `@opensip-tools`; customers
+ * can opt in additional scopes via `plugins.packageScopes` so internal
+ * check packs published to their own scope (e.g. `@acme/checks-*`)
+ * are discovered without per-package explicit listing.
  *
  * Resolution rules (apply in order):
  *
@@ -13,8 +16,9 @@
  *      of dependency-based discovery (e.g. when running in an
  *      environment with unrelated @opensip-tools packages installed).
  *
- *   3. Otherwise (default), scan node_modules for any package whose
- *      name matches `@opensip-tools/checks-*` and return the list.
+ *   3. Otherwise (default), scan node_modules under each configured
+ *      scope (default scope plus any customer additions) for packages
+ *      whose name matches `<scope>/checks-*` and return the list.
  *
  * No package is privileged — what used to be `checks-builtin` is now
  * just one of many `@opensip-tools/checks-*` packages declared as
@@ -35,8 +39,13 @@ import { logger, readYamlFile, resolvePackageEntryPoint } from '@opensip-tools/c
 
 const CONFIG_FILENAME = 'opensip-tools.config.yml'
 
-const SCOPE = '@opensip-tools'
+const DEFAULT_SCOPE = '@opensip-tools'
 const CHECKS_PREFIX = 'checks-'
+
+// npm scope syntax: `@` followed by a kebab-case identifier. We anchor
+// strictly because scope strings end up in `path.join('node_modules', scope)`
+// — a stray `..` or `/` would scan the wrong directory.
+const VALID_SCOPE = /^@[a-z0-9][a-z0-9._-]*$/
 
 export interface CheckPackageDiscoveryOptions {
   /** Absolute path to the project root (where opensip-tools.config.yml lives). */
@@ -45,6 +54,16 @@ export interface CheckPackageDiscoveryOptions {
   readonly explicitPackages?: readonly string[]
   /** When false, auto-discovery is disabled. Default: true. */
   readonly autoDiscover?: boolean
+  /**
+   * Additional npm scopes to scan for check packs, on top of the
+   * platform default (`@opensip-tools`). Customers list their own
+   * scope here (e.g. `['@acme']`) to auto-discover internal packs
+   * published to a private registry or linked into the workspace.
+   * The default scope is always included; duplicates are deduplicated;
+   * invalid entries (not matching `@kebab-case`) are skipped with a
+   * warning.
+   */
+  readonly packageScopes?: readonly string[]
 }
 
 export interface DiscoveredCheckPackage {
@@ -63,7 +82,7 @@ export interface DiscoveredCheckPackage {
 export function discoverCheckPackages(
   options: CheckPackageDiscoveryOptions,
 ): DiscoveredCheckPackage[] {
-  const { projectDir, explicitPackages, autoDiscover = true } = options
+  const { projectDir, explicitPackages, autoDiscover = true, packageScopes = [] } = options
 
   // Rule 1: explicit list wins
   if (explicitPackages !== undefined) {
@@ -92,29 +111,61 @@ export function discoverCheckPackages(
     return []
   }
 
-  // Rule 3: auto-discover
-  return autoDiscoverChecks(projectDir)
+  // Rule 3: auto-discover under default + customer-configured scopes
+  return autoDiscoverChecks(projectDir, resolveScopes(packageScopes))
 }
 
 /**
- * Walk up the directory tree from `projectDir` looking for the first
- * `node_modules/@opensip-tools/` directory and return all `checks-*`
- * package directories found there. Mirrors Node's module resolution
- * (any ancestor node_modules counts), which handles pnpm hoisting and
- * monorepo layouts where the scope may live in the workspace root.
+ * Resolve the effective scope list: the platform default is always
+ * included; customer additions are appended after deduplication and
+ * format validation. Invalid scope strings are dropped with a warning
+ * rather than throwing — consistent with how this module handles
+ * unresolved explicit packages elsewhere.
+ */
+function resolveScopes(extra: readonly string[]): readonly string[] {
+  const out: string[] = [DEFAULT_SCOPE]
+  const seen = new Set<string>(out)
+  for (const scope of extra) {
+    if (!VALID_SCOPE.test(scope)) {
+      logger.warn({
+        evt: 'plugin.check_package.invalid_scope',
+        module: 'core:plugins',
+        scope,
+        msg: `plugins.packageScopes entry "${scope}" is not a valid npm scope (expected "@kebab-case") — skipping`,
+      })
+      continue
+    }
+    if (seen.has(scope)) continue
+    seen.add(scope)
+    out.push(scope)
+  }
+  return out
+}
+
+/**
+ * Walk up the directory tree from `projectDir` looking for
+ * `node_modules/<scope>/` directories under every configured scope,
+ * and return all `checks-*` package directories found across them.
+ * Mirrors Node's module resolution (any ancestor node_modules counts),
+ * which handles pnpm hoisting and monorepo layouts where the scope may
+ * live in the workspace root.
  */
 // eslint-disable-next-line sonarjs/cognitive-complexity -- ancestor-walk discovery: walks node_modules trees up the directory tree until the filesystem root
-function autoDiscoverChecks(projectDir: string): DiscoveredCheckPackage[] {
+function autoDiscoverChecks(
+  projectDir: string,
+  scopes: readonly string[],
+): DiscoveredCheckPackage[] {
   const seen = new Set<string>()
   const out: DiscoveredCheckPackage[] = []
   let dir = projectDir
   let prev = ''
   while (dir !== prev) {
-    const scopeDir = join(dir, 'node_modules', SCOPE)
-    if (existsSync(scopeDir)) {
+    for (const scope of scopes) {
+      const scopeDir = join(dir, 'node_modules', scope)
+      if (!existsSync(scopeDir)) continue
       for (const entry of safeReaddir(scopeDir)) {
         if (!entry.startsWith(CHECKS_PREFIX)) continue
-        const name = `${SCOPE}/${entry}`
+        const name = `${scope}/${entry}`
         if (seen.has(name)) continue
         const packageDir = join(scopeDir, entry)
         if (!hasPackageJson(packageDir)) continue
@@ -163,10 +214,10 @@ export interface CheckPackageMetadata {
 }
 
 /**
- * Read the `plugins.checkPackages` and `plugins.autoDiscoverChecks`
- * fields from the project's opensip-tools.config.yml without doing a
- * full schema parse. Returns the raw values so callers can apply the
- * resolution rules in `discoverCheckPackages()`.
+ * Read `plugins.checkPackages`, `plugins.autoDiscoverChecks`, and
+ * `plugins.packageScopes` from the project's opensip-tools.config.yml
+ * without doing a full schema parse. Returns the raw values so callers
+ * can apply the resolution rules in `discoverCheckPackages()`.
  *
  * Mirrors the inline-yaml-read pattern used by readProjectPluginsList()
  * — avoids a circular dep between plugins/ and targets/.
@@ -174,6 +225,7 @@ export interface CheckPackageMetadata {
 export function readCheckPackagePreferences(projectDir: string): {
   readonly checkPackages?: readonly string[]
   readonly autoDiscoverChecks?: boolean
+  readonly packageScopes?: readonly string[]
 } {
   const configPath = join(projectDir, CONFIG_FILENAME)
   const doc = readYamlFile(configPath)
@@ -181,12 +233,19 @@ export function readCheckPackagePreferences(projectDir: string): {
   const plugins = (doc as Record<string, unknown>).plugins
   if (!plugins || typeof plugins !== 'object') return {}
   const p = plugins as Record<string, unknown>
-  const result: { checkPackages?: readonly string[]; autoDiscoverChecks?: boolean } = {}
+  const result: {
+    checkPackages?: readonly string[]
+    autoDiscoverChecks?: boolean
+    packageScopes?: readonly string[]
+  } = {}
   if (Array.isArray(p.checkPackages)) {
     result.checkPackages = p.checkPackages.filter((v): v is string => typeof v === 'string')
   }
   if (typeof p.autoDiscoverChecks === 'boolean') {
     result.autoDiscoverChecks = p.autoDiscoverChecks
+  }
+  if (Array.isArray(p.packageScopes)) {
+    result.packageScopes = p.packageScopes.filter((v): v is string => typeof v === 'string')
   }
   return result
 }

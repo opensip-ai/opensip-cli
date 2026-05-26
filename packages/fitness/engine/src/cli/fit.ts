@@ -247,6 +247,7 @@ async function loadDiscoveredCheckPackages(projectDir: string): Promise<number> 
     projectDir,
     explicitPackages: prefs.checkPackages,
     autoDiscover: prefs.autoDiscoverChecks,
+    packageScopes: prefs.packageScopes,
   });
   let totalRegistered = 0;
   for (const pkg of discovered) {

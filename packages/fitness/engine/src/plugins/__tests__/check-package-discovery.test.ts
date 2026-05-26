@@ -82,6 +82,74 @@ describe('discoverCheckPackages — auto-discovery (default)', () => {
   })
 })
 
+describe('discoverCheckPackages — custom packageScopes', () => {
+  it('discovers checks under a customer-configured scope alongside the default', () => {
+    makeNodeModulesPackage(testDir, '@opensip-tools/checks-python')
+    makeNodeModulesPackage(testDir, '@acme/checks-internal')
+    const result = discoverCheckPackages({
+      projectDir: testDir,
+      packageScopes: ['@acme'],
+    })
+    expect(result.map((p) => p.name).sort()).toEqual([
+      '@acme/checks-internal',
+      '@opensip-tools/checks-python',
+    ])
+  })
+
+  it('always includes the default scope even when packageScopes is non-empty', () => {
+    // Customer adds their own scope; they don't lose @opensip-tools coverage.
+    makeNodeModulesPackage(testDir, '@opensip-tools/checks-go')
+    makeNodeModulesPackage(testDir, '@acme/checks-internal')
+    const result = discoverCheckPackages({
+      projectDir: testDir,
+      packageScopes: ['@acme'],
+    })
+    expect(result.map((p) => p.name)).toContain('@opensip-tools/checks-go')
+  })
+
+  it('dedupes when the customer redundantly lists the default scope', () => {
+    makeNodeModulesPackage(testDir, '@opensip-tools/checks-python')
+    const result = discoverCheckPackages({
+      projectDir: testDir,
+      packageScopes: ['@opensip-tools', '@opensip-tools'],
+    })
+    expect(result.map((p) => p.name)).toEqual(['@opensip-tools/checks-python'])
+  })
+
+  it('only picks up `checks-*` packages under the custom scope, not unrelated packages', () => {
+    makeNodeModulesPackage(testDir, '@acme/checks-internal')
+    makeNodeModulesPackage(testDir, '@acme/utils')
+    const result = discoverCheckPackages({
+      projectDir: testDir,
+      packageScopes: ['@acme'],
+    })
+    expect(result.map((p) => p.name)).toEqual(['@acme/checks-internal'])
+  })
+
+  it('skips invalid scope strings without throwing', () => {
+    // Path-traversal-shaped values would scan the wrong directory if joined
+    // naively; the validator rejects them. Discovery still returns the
+    // default-scope results so a typo doesn't take down the whole run.
+    makeNodeModulesPackage(testDir, '@opensip-tools/checks-python')
+    const result = discoverCheckPackages({
+      projectDir: testDir,
+      packageScopes: ['..', 'no-at-sign', '@', '@Bad-Caps'],
+    })
+    expect(result.map((p) => p.name)).toEqual(['@opensip-tools/checks-python'])
+  })
+
+  it('walks ancestor node_modules for custom scopes the same as the default', () => {
+    makeNodeModulesPackage(testDir, '@acme/checks-internal')
+    const nestedDir = join(testDir, 'apps', 'web')
+    mkdirSync(nestedDir, { recursive: true })
+    const result = discoverCheckPackages({
+      projectDir: nestedDir,
+      packageScopes: ['@acme'],
+    })
+    expect(result.map((p) => p.name)).toEqual(['@acme/checks-internal'])
+  })
+})
+
 describe('discoverCheckPackages — opt-out', () => {
   it('returns empty array when autoDiscover is false', () => {
     makeNodeModulesPackage(testDir, '@opensip-tools/checks-python')
@@ -180,6 +248,29 @@ fitness:
     const prefs = readCheckPackagePreferences(testDir)
     expect(prefs.checkPackages).toEqual(['@opensip-tools/checks-python'])
     expect(prefs.autoDiscoverChecks).toBe(false)
+  })
+
+  it('reads packageScopes from project config', () => {
+    writeFileSync(
+      join(testDir, 'opensip-tools.config.yml'),
+      `targets:
+  src:
+    description: x
+    languages: [typescript]
+    concerns: []
+    include: ["**/*.ts"]
+plugins:
+  packageScopes:
+    - "@acme"
+    - "@my-org"
+fitness:
+  failOnErrors: 1
+  failOnWarnings: 0
+  disabledChecks: []
+`,
+    )
+    const prefs = readCheckPackagePreferences(testDir)
+    expect(prefs.packageScopes).toEqual(['@acme', '@my-org'])
   })
 
   it('returns empty object when config has no plugins section', () => {
