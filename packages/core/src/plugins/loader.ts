@@ -90,7 +90,7 @@ export async function loadPlugin(
         namespace: plugin.namespace,
         source: plugin.source,
         msg,
-        ...(fields ?? {}),
+        ...fields,
       })
     },
     debug: (evt, fields) => {
@@ -99,7 +99,7 @@ export async function loadPlugin(
         module: MODULE_TAG,
         namespace: plugin.namespace,
         source: plugin.source,
-        ...(fields ?? {}),
+        ...fields,
       })
     },
   }
@@ -148,8 +148,8 @@ export async function loadPlugin(
       type: plugin.type,
       checksRegistered,
       recipesRegistered,
-      ...(counts.adaptersRegistered !== undefined ? { adaptersRegistered } : {}),
-      ...(counts.scenariosRegistered !== undefined ? { scenariosRegistered } : {}),
+      ...(counts.adaptersRegistered !== undefined && { adaptersRegistered }),
+      ...(counts.scenariosRegistered !== undefined && { scenariosRegistered }),
     }
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error)

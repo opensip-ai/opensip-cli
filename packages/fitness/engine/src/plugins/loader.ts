@@ -134,7 +134,6 @@ function registerFitExports(
  * instances from `adapters` array, named exports, and the default
  * export; deduplicates by adapter id.
  */
-// eslint-disable-next-line sonarjs/cognitive-complexity -- lang plugin registrar: three discovery surfaces (adapters array, named exports, default export) with dedupe and structured invalid-item warnings
 function registerLangExports(
   mod: Record<string, unknown>,
   ctx: RegisterCtx,

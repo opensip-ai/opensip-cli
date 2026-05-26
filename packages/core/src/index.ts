@@ -17,6 +17,8 @@ export {
   readToolPackageMetadata,
   loadPlugin,
   loadAllPlugins,
+  resolveScopes,
+  VALID_NPM_SCOPE_REGEX,
 } from './plugins/index.js';
 export type {
   PluginDomain,
