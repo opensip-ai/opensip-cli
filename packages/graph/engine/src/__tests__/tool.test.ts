@@ -4,9 +4,11 @@
  * Asserts:
  *  - graphTool.metadata.id === 'graph'
  *  - graphTool.metadata.version matches package.json
- *  - graphTool.commands lists exactly the single `graph` subcommand
- *    (orphans and entry-points were folded into the unified `graph`
- *    output — no longer separately registered)
+ *  - graphTool.commands lists the unified `graph` analysis subcommand
+ *    plus the two read-only catalog query commands (`graph-lookup`,
+ *    `graph-symbol-index`) added alongside the codeindex-parity work.
+ *    Orphans and entry-points were folded into the unified `graph`
+ *    output — they remain output sections, not separate commands.
  *  - graphTool does NOT import from @opensip-tools/cli (compile-time
  *    via TypeScript imports — if it did, package wouldn't build)
  */
@@ -33,9 +35,9 @@ describe('graphTool contract conformance (AC-2)', () => {
     expect(graphTool.metadata.version).toBe(pkg.version);
   });
 
-  it('commands lists only the unified graph subcommand', () => {
+  it('commands lists the unified graph subcommand plus the lookup/symbol-index queries', () => {
     const names = graphTool.commands.map((c) => c.name);
-    expect(names).toEqual(['graph']);
+    expect(names).toEqual(['graph', 'graph-lookup', 'graph-symbol-index']);
   });
 
   it('register is callable', () => {

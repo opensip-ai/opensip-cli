@@ -32,6 +32,8 @@ export const SUBCOMMANDS: readonly string[] = [
   'fit-recipes',
   'sim',
   'graph',
+  'graph-lookup',
+  'graph-symbol-index',
   'init',
   'dashboard',
   'plugin',

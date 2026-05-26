@@ -28,6 +28,8 @@ import { ConfigurationError, readPackageVersion } from '@opensip-tools/core';
 import { renderGraphLive } from './cli/graph-runner.js';
 import { executeGraph } from './cli/graph.js';
 import { runHeapPreflight } from './cli/heap-preflight.js';
+import { executeLookup } from './cli/lookup.js';
+import { executeSymbolIndex } from './cli/symbol-index.js';
 
 import type { Tool, ToolCliContext, ToolCommandDescriptor } from '@opensip-tools/core';
 import type { DataStore } from '@opensip-tools/datastore';
@@ -36,6 +38,16 @@ const GRAPH: ToolCommandDescriptor = {
   name: 'graph',
   description:
     'Run static call-graph analysis (rules, entry points, catalog summary in one report)',
+};
+
+const GRAPH_LOOKUP: ToolCommandDescriptor = {
+  name: 'graph-lookup',
+  description: 'Look up function occurrences by simple name from the persisted catalog',
+};
+
+const GRAPH_SYMBOL_INDEX: ToolCommandDescriptor = {
+  name: 'graph-symbol-index',
+  description: 'Emit a symbolindex.json artifact (name→file:line and file→names) from the persisted catalog',
 };
 
 // Live-view key graph contributes to the CLI's renderer registry. Owned
@@ -160,6 +172,24 @@ function register(cli: ToolCliContext): void {
         cli,
       );
     });
+
+  program
+    .command(GRAPH_LOOKUP.name)
+    .description(GRAPH_LOOKUP.description)
+    .argument('<name>', 'Function simple name to look up (e.g. "saveBaseline")')
+    .option('--json', 'Output structured JSON', false)
+    .action((name: string, opts: { json?: boolean }) => {
+      executeLookup({ name, json: opts.json }, cli);
+    });
+
+  program
+    .command(GRAPH_SYMBOL_INDEX.name)
+    .description(GRAPH_SYMBOL_INDEX.description)
+    .option('--cwd <path>', 'Target directory (out path resolves against this)', process.cwd())
+    .option('--out <path>', 'Output file path', 'symbolindex.json')
+    .action((opts: { cwd: string; out: string }) => {
+      executeSymbolIndex({ cwd: opts.cwd, out: opts.out }, cli);
+    });
 }
 
 export const graphTool: Tool = {
@@ -168,6 +198,6 @@ export const graphTool: Tool = {
     version: readPackageVersion(import.meta.url),
     description: 'Static call-graph + dead-end analysis',
   },
-  commands: [GRAPH],
+  commands: [GRAPH, GRAPH_LOOKUP, GRAPH_SYMBOL_INDEX],
   register,
 };

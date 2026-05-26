@@ -31,6 +31,7 @@ export type {
   CallEdge,
   Param,
   Indexes,
+  BlastScore,
   Rule,
   RuleHints,
   GraphConfig,

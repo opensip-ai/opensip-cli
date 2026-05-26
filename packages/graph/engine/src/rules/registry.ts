@@ -8,6 +8,7 @@
 
 import { alwaysThrowsBranchRule } from './always-throws-branch.js';
 import { duplicatedFunctionBodyRule } from './duplicated-function-body.js';
+import { highBlastFunctionRule } from './high-blast-function.js';
 import { noSideEffectPathRule } from './no-side-effect-path.js';
 import { orphanSubtreeRule } from './orphan-subtree.js';
 import { testOnlyReachableRule } from './test-only-reachable.js';
@@ -20,4 +21,5 @@ export const rules: readonly Rule[] = [
   noSideEffectPathRule,
   testOnlyReachableRule,
   alwaysThrowsBranchRule,
+  highBlastFunctionRule,
 ];
