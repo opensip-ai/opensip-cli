@@ -27,6 +27,7 @@
 import { ToolError, type ToolErrorOptions } from '../lib/errors.js';
 
 import type { Logger } from '../lib/logger.js';
+import type { ProjectContext } from '../lib/project-context.js';
 
 export interface ToolMetadata {
   /** Stable identifier — e.g. 'fitness', 'simulation'. */
@@ -101,6 +102,22 @@ export interface ToolCliContext {
    * to mount their subcommands.
    */
   readonly program: unknown;
+  /**
+   * Resolved project context for this CLI invocation. Computed once in
+   * pre-action-hook after `--cwd` parsing; threaded into every tool's
+   * action body via this field rather than each tool re-reading
+   * `opts.cwd`.
+   *
+   * When `project.scope === 'none'`, no opensip-tools project was found
+   * above cwd. Project-scoped commands should error in this case (with
+   * the "No opensip-tools project found" copy); `init` proceeds.
+   *
+   * Exposed via a getter on the implementation side — accessing it
+   * before pre-action-hook resolves throws to surface bootstrap-order
+   * bugs. Tools must only read this inside command action bodies, not
+   * during `register()`.
+   */
+  readonly project: ProjectContext;
   /** Render an Ink result (CommandResult shape from @opensip-tools/contracts). */
   readonly render: (result: unknown) => Promise<void>;
   /**
@@ -135,7 +152,6 @@ export interface ToolCliContext {
   readonly maybeOpenDashboard: (opts: {
     openRequested: boolean;
     jsonOutput: boolean;
-    cwd: string;
   }) => Promise<void>;
   /** Shared structured logger. */
   readonly logger: Logger;
