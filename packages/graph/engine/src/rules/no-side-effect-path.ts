@@ -105,9 +105,15 @@ export const noSideEffectPathRule: Rule = {
  * which we treat as "unknown" — fall back to the prior behavior
  * (always pass) so older catalogs aren't silently filtered out.
  */
-function hasDiscardedCaller(occ: FunctionOccurrence, indexes: Indexes): boolean {
+interface CallerScanResult {
+  readonly foundDiscarded: boolean;
+  readonly sawMatchingEdge: boolean;
+  readonly sawDiscardedField: boolean;
+}
+
+function scanCallerEdges(occ: FunctionOccurrence, indexes: Indexes): CallerScanResult {
   const callerHashes = indexes.callers.get(occ.bodyHash) ?? [];
-  if (callerHashes.length === 0) return false;
+  let sawMatchingEdge = false;
   let sawDiscardedField = false;
   for (const callerHash of callerHashes) {
     const caller = indexes.byBodyHash.get(callerHash);
@@ -115,14 +121,24 @@ function hasDiscardedCaller(occ: FunctionOccurrence, indexes: Indexes): boolean 
     if (!caller) continue;
     for (const edge of caller.calls) {
       if (!edge.to.includes(occ.bodyHash)) continue;
+      sawMatchingEdge = true;
       if (edge.discarded === undefined) continue;
       sawDiscardedField = true;
-      if (edge.discarded) return true;
+      if (edge.discarded) return { foundDiscarded: true, sawMatchingEdge, sawDiscardedField };
     }
   }
-  // No edge carried a `discarded` field — older catalog. Preserve the
-  // pre-refinement behavior so we don't drop legitimate signals.
-  return !sawDiscardedField;
+  return { foundDiscarded: false, sawMatchingEdge, sawDiscardedField };
+}
+
+function hasDiscardedCaller(occ: FunctionOccurrence, indexes: Indexes): boolean {
+  const scan = scanCallerEdges(occ, indexes);
+  if (scan.foundDiscarded) return true;
+  // Legacy fallback (`!sawDiscardedField`) only applies when we
+  // actually observed an edge that targets this occurrence — otherwise
+  // the index pointed at this occ but no caller edge resolved to it
+  // (stale index / unresolved catalog), and the right answer is "no
+  // discarded caller" not "assume yes".
+  return scan.sawMatchingEdge && !scan.sawDiscardedField;
 }
 
 /** Filters out occurrences we never want to flag — short, test-only, has unresolved edges, etc. */

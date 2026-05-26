@@ -239,20 +239,22 @@ and the right fix needs a dedicated PR with adapter-by-adapter
 tests.
 
 ### [F-13] `no-side-effect-path` false positive on unresolved edges
-**Severity:** medium · **Status:** deferred
-**Location:** `packages/graph/engine/src/rules/no-side-effect-path.ts:111-126`
+**Severity:** medium · **Status:** fixed
+**Location:** `packages/graph/engine/src/rules/no-side-effect-path.ts:108-128`
 
-`hasDiscardedCaller` loops `caller.calls`, skipping any edge whose
-`to` does not include `occ.bodyHash`. When the loop finds no matching
-edge, `sawDiscardedField` stays false and the function returns `true`
-— signalling a discarded-result caller that doesn't exist. Mixed
-incremental catalogs (cached `discarded` field + freshly-walked
-occurrences) and unresolved edges trigger this.
+`hasDiscardedCaller` looped `caller.calls`, skipping any edge whose
+`to` did not include `occ.bodyHash`. When the loop found no matching
+edge (stale index / unresolved catalog), `sawDiscardedField` stayed
+false and the function returned `!false = true`, signalling a
+discarded-result caller that did not exist. Mixed incremental
+catalogs and unresolved edges triggered this — produced false-positive
+no-side-effect-path signals.
 
-**Action:** add `sawMatchingEdge` tracking; return `false` when no
-edge actually matched, only fall back to the legacy `!sawDiscardedField`
-path when at least one matching edge was observed without the
-`discarded` field.
+**Action taken:** introduced a `sawMatchingEdge` boolean. The legacy
+fallback (`!sawDiscardedField`) only applies when at least one
+matching edge was actually observed; if no edge resolved to the
+occurrence, the function returns `false` directly. Existing graph
+suite (165 tests) continues to pass.
 
 ## Language adapters (`packages/languages/lang-*`)
 
@@ -359,8 +361,8 @@ public API. Not a defect; not dead code.
 
 ## Summary across passes
 
-- **Fixed** (12): F-1, F-2, F-4, F-5, F-8, F-9, F-11, F-14, F-15, F-17, F-18, F-19.
-- **Deferred** (5): F-3, F-6, F-12, F-13, F-16.
+- **Fixed** (13): F-1, F-2, F-4, F-5, F-8, F-9, F-11, F-13, F-14, F-15, F-17, F-18, F-19.
+- **Deferred** (4): F-3, F-6, F-12, F-16.
 - **Wontfix on re-read** (3): F-7, F-10, F-20.
 
 The two critical fixes (F-17 inverted pass/fail on every sim run;
@@ -370,18 +372,26 @@ invariant before the fitness engine grows a long-lived host. F-15
 was a docs-only correction after concluding the behavior change was
 too wide-blast for a one-shot audit.
 
-Remaining deferred items each need new test scaffolding before fixing:
+Remaining deferred items each need work that exceeds an in-audit
+patch — dedicated PR with test-first scaffolding:
 
 - F-3  schema generic — no current victim, latent design limitation.
+       Worth doing when a consumer (fitness session repo, simulation
+       state, graph catalog) is ready to bind a drizzle schema.
 - F-6  parallel-execution Promise has no reject path — needs an abort/
        reject test fixture in the recipe execution suite before
-       rewriting the driver.
+       rewriting the driver. No exploit path today because
+       `runOneCheck` is async-only and its `.finally` does only counter
+       arithmetic, but a future change to either could expose it.
 - F-12 always-throws rule's regex never matches real walker output —
        fix lives in the per-adapter walker (record `ThrowStatement`
-       text not the inner `NewExpression`), needs a per-adapter
-       integration test that runs real source through the walker.
-- F-13 no-side-effect-path false positive on unresolved edges — needs
-       a fixture for the unresolved-`to` case before fixing the
-       fallback predicate.
+       text not the inner `NewExpression`); the integration test
+       suite needs a fixture that drives real source text through the
+       walker (today's fixtures hand-construct `CallEdge`s with
+       fake text). The walker change is also wide-blast: edge
+       line/column positions would shift for every throw-shaped
+       edge. Best done as a dedicated PR per adapter.
 - F-16 filterContent cache memory — design issue, needs a signature
-       change touching every TS-AST check.
+       change to take `filePath` and key on a compact fingerprint,
+       touching every TS-AST check that calls stripStrings /
+       stripComments. Memory pressure only, no correctness defect.
