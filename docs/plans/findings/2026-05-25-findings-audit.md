@@ -125,21 +125,19 @@ because (a) the change is non-trivial and (b) it must be paired with
 an abort/cancel test that the current suite does not cover.
 
 ### [F-7] `void initParseCache()` / `void clearParseCache()` swallow init errors
-**Severity:** medium · **Status:** deferred (paired with F-6)
+**Severity:** n/a · **Status:** wontfix (not a defect — synchronous)
 **Location:** `packages/fitness/engine/src/recipes/service.ts:275`,
 same file `:176`
 
-The parse cache init returns a `Promise`; discarding it via `void`
-means a failure (e.g., temp-dir write error, filesystem permission)
-proceeds with a cold cache and no warning. The same pattern at the
-`finally` cleanup site silently drops cleanup errors.
-
-**Action:** `await initParseCache()` inside a try/catch that logs at
-`warn`; same for `clearParseCache()`. Deferred because the call sites
-are in the same execute path as F-6 and should be touched together.
+The audit sub-agent flagged these as Promise-discards. On re-read,
+`initParseCache` and `clearParseCache` in
+`@opensip-tools/core/languages/parse-cache.js` are **synchronous and
+return `void`**. The `void` prefix is just an explicit-discard
+annotation (often used to satisfy lint rules on bare expression
+statements), not a discarded Promise. No defect.
 
 ### [F-8] `scope-resolver.ts` mutates `Set` while iterating it
-**Severity:** low (per-spec safe, fragile) · **Status:** deferred
+**Severity:** low (per-spec safe, fragile) · **Status:** fixed
 **Location:** `packages/fitness/engine/src/framework/scope-resolver.ts:43-47`
 
 The forward-iteration delete-during-`for…of` pattern is defined
@@ -147,8 +145,9 @@ behavior for `Set` per ECMA-262, so this is not a correctness defect
 today. It is fragile: any refactor that converts the loop body or
 moves the deletion through another helper could silently break it.
 
-**Action:** replace with `Array.from(files).filter(...).sort()`. Low
-priority — defer to a follow-up cleanup pass.
+**Action taken:** replaced the mutation loop with
+`[...files].filter(...).sort()` — clearer semantics, equivalent
+output, no spec-corner reliance.
 
 ### [F-9] `checksLoaded` module-level singleton never resets
 **Severity:** low (only bites long-lived hosts) · **Status:** deferred
@@ -179,7 +178,7 @@ entry for the record; not a defect today.
 ## Graph packages (`packages/graph/*`)
 
 ### [F-11] `orchestrate.ts` incremental-closure path concat is Windows-broken
-**Severity:** medium (Windows only) · **Status:** deferred (no Windows CI)
+**Severity:** medium (Windows only) · **Status:** fixed
 **Location:** `packages/graph/engine/src/cli/orchestrate.ts:559`
 
 `closureAbs.add(`${projectDirAbs}/${dep}`.split('/').join(sep))`
@@ -189,9 +188,12 @@ through unchanged, yielding a mixed-separator path that never matches
 entries in `discovery.files`. Incremental closure silently produces an
 empty intersection and changed files are skipped.
 
-**Action:** replace with `path.join(projectDirAbs, dep)`. Deferred
-because the workspace has no Windows CI to validate the change and
-the touched code is on the orchestrator's hot path.
+**Action taken:** swapped the string-concat+split/join chain for
+`join(projectDirAbs, dep)` from `node:path`. The previous code already
+worked on POSIX (separator-replace was a no-op when sep was `/`), and
+`join` produces the same result on POSIX while doing the right thing
+on Windows. The `sep` import is retained — it's still used for the
+inverse normalization at line 507.
 
 ### [F-12] `alwaysThrowsBranchRule` regex never matches call-edge text
 **Severity:** medium (rule never fires) · **Status:** deferred (needs
@@ -318,26 +320,30 @@ abort check. The post-`await` block already re-throws when the signal
 fires mid-phase, so both abort paths are now consistent.
 
 ### [F-20] `updateLatencyMetrics` is dead code
-**Severity:** low · **Status:** deferred (delete in a follow-up)
+**Severity:** n/a · **Status:** wontfix (not dead — exported public API)
 **Location:** `packages/simulation/engine/src/framework/execution/execution-engine.ts:84`
 
-`run-load-window.ts` uses `LatencyTracker` exclusively and overwrites
-all latency fields from the snapshot; nothing calls
-`updateLatencyMetrics`. The function exists on the public surface
-and could mislead future contributors who pattern-match off it.
-
-**Action:** delete in a dedicated dead-code cleanup pass with `knip`
-verification.
+The audit sub-agent flagged this as unused by the load-window loop.
+On re-check it is **re-exported from `packages/simulation/engine/src/index.ts:173`**
+(the package's public barrel), has its own test suite in
+`__tests__/execution-engine.test.ts`, and appears in the package's
+`dist/index.d.ts`. Removing it would be a breaking change to the
+public API. Not a defect; not dead code.
 
 ---
 
 ## Summary of this pass
 
-- **Fixed** (8): F-1, F-2, F-4, F-5, F-14, F-17, F-18, F-19.
-- **Deferred** (10): F-3, F-6, F-7, F-8, F-9, F-11, F-12, F-13, F-15, F-16, F-20.
-- **Wontfix** (1): F-10 (not a defect on re-read).
+- **Fixed** (10): F-1, F-2, F-4, F-5, F-8, F-11, F-14, F-17, F-18, F-19.
+- **Deferred** (7): F-3, F-6, F-9, F-12, F-13, F-15, F-16.
+- **Wontfix on re-read** (3): F-7, F-10, F-20.
 
 Two of the fixed entries are critical (F-17 silently flipped pass/fail
 on every simulation run; F-18 broke the abort contract for the load
 loop). The rest are medium/low and span correctness, error handling,
-and doc-drift.
+cross-platform, and doc-drift.
+
+The deferred set is concentrated in fitness's parallel-execution path
+(F-6, F-9 — both need new test coverage before fixing) and graph rules
+(F-12, F-13 — need rule-fixture confirmation), plus three latent
+design issues (F-3, F-15, F-16) that are not active defects today.
