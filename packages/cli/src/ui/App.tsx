@@ -2,7 +2,7 @@
  * App — top-level Ink component that dispatches on CommandResult.type.
  */
 
-import { RunHeader , useTheme } from '@opensip-tools/cli-ui';
+import { RunHeader , useTheme , ErrorMessage } from '@opensip-tools/cli-ui';
 import { Text, Box } from 'ink';
 import React from 'react';
 
@@ -10,7 +10,6 @@ import React from 'react';
 import { Banner } from './components/Banner.js';
 import { CheckList } from './components/CheckList.js';
 import { CloudReportStatus } from './components/CloudReportStatus.js';
-import { ErrorMessage } from './components/ErrorMessage.js';
 import { ExperimentalNotice } from './components/ExperimentalNotice.js';
 import { Findings } from './components/Findings.js';
 import { HelpText } from './components/HelpText.js';

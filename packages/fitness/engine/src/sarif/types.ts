@@ -16,18 +16,18 @@
  */
 
 /** SARIF 2.1.0 region — character offsets within an artifact. */
-export interface SarifRegion {
+interface SarifRegion {
   startLine?: number
   startColumn?: number
 }
 
 /** SARIF 2.1.0 artifact location — file path within the run. */
-export interface SarifArtifactLocation {
+interface SarifArtifactLocation {
   uri?: string
 }
 
 /** SARIF 2.1.0 physical location — file + region. */
-export interface SarifPhysicalLocation {
+interface SarifPhysicalLocation {
   artifactLocation?: SarifArtifactLocation
   region?: SarifRegion
 }
@@ -38,7 +38,7 @@ export interface SarifLocation {
 }
 
 /** SARIF 2.1.0 message wrapper around the human-readable text. */
-export interface SarifMessage {
+interface SarifMessage {
   text?: string
 }
 

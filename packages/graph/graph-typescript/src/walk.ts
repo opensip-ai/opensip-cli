@@ -238,7 +238,7 @@ const VISITOR_TABLE: readonly VisitorEntry[] = [
  * share this dispatch table when they need to classify a single node
  * without driving the full walker.
  */
-export function dispatchVisitor(node: ts.Node, ctx: VisitorContext): FunctionOccurrence | null {
+function dispatchVisitor(node: ts.Node, ctx: VisitorContext): FunctionOccurrence | null {
   for (const entry of VISITOR_TABLE) {
     if (entry.predicate(node)) return entry.visit(node, ctx);
   }

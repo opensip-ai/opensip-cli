@@ -75,10 +75,3 @@ export function listToolTabs(): ToolTabDescriptor[] {
   return [...registry];
 }
 
-/**
- * Test-only: clear the registry so tests can register a fresh set
- * without bleed-through. Not exported from the package barrel.
- */
-export function _resetToolTabsForTests(): void {
-  registry.length = 0;
-}

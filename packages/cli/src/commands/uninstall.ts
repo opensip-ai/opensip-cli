@@ -55,7 +55,7 @@ import { resolveProjectPaths } from '@opensip-tools/core'
 
 import type { UninstallDoneResult } from '@opensip-tools/contracts'
 
-export type UninstallMode = 'user' | 'project'
+type UninstallMode = 'user' | 'project'
 
 export interface UninstallOptions {
   readonly yes?: boolean

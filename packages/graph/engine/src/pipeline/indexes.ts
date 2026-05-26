@@ -15,7 +15,7 @@ import type { BlastScore, Catalog, FunctionOccurrence, Indexes } from '../types.
  * — predictable O(N·k^d) cost, slight under-count for deep chains is
  * acceptable for a "what's risky to touch" heuristic.
  */
-export const BLAST_MAX_DEPTH = 5;
+const BLAST_MAX_DEPTH = 5;
 
 export function buildIndexes(catalog: Catalog): Indexes {
   const byBodyHash = new Map<string, FunctionOccurrence>();

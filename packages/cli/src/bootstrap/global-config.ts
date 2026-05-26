@@ -22,7 +22,7 @@ import { join } from 'node:path';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 
 /** User-level OpenSIP root directory. */
-export const OPENSIP_DIR = join(homedir(), '.opensip-tools');
+const OPENSIP_DIR = join(homedir(), '.opensip-tools');
 /** User-level config file path. */
 export const GLOBAL_CONFIG_PATH = join(OPENSIP_DIR, 'config.yml');
 

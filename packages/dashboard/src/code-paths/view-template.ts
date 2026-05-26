@@ -26,7 +26,7 @@
  * `view-*.ts` file from scratch.
  */
 
-export interface RankedViewColumn {
+interface RankedViewColumn {
   /** Header label (e.g. "Function", "Callers"). */
   label: string;
   /**
@@ -51,12 +51,12 @@ export interface RankedViewColumn {
   value: string;
 }
 
-export interface RankedViewHelpSection {
+interface RankedViewHelpSection {
   heading: string;
   body: string;
 }
 
-export interface RankedViewHelp {
+interface RankedViewHelp {
   title: string;
   sections: RankedViewHelpSection[];
 }

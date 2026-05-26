@@ -6,7 +6,7 @@
  * shape so the audit can sort and emit them uniformly.
  */
 
-export type DirectiveSource = 'typescript' | 'eslint' | 'fitness' | 'semgrep'
+type DirectiveSource = 'typescript' | 'eslint' | 'fitness' | 'semgrep'
 export type DirectiveScope = 'file' | 'next-line' | 'same-line'
 
 export interface DirectiveInfo {

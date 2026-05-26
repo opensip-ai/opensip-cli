@@ -20,7 +20,7 @@ import type { Signal } from '@opensip-tools/core';
  * support both 'medium' and 'high' so the policy can escalate the
  * worst offenders without flooding the report at uniform severity.
  */
-export type HighBlastVerdict = 'medium' | 'high' | null;
+type HighBlastVerdict = 'medium' | 'high' | null;
 
 /** Hybrid policy thresholds — tune these if the rule is too quiet or too noisy. */
 const HIGH_PERCENTILE = 0.01;   // top 1% of scores → 'high'

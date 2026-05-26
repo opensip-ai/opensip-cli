@@ -54,18 +54,6 @@ export function edge(
   };
 }
 
-export function staticCall(to: string, discarded?: boolean): CallEdge {
-  return {
-    to: [to],
-    line: 1,
-    column: 0,
-    resolution: 'static',
-    confidence: 'high',
-    text: 'fn()',
-    discarded,
-  };
-}
-
 export function makeCatalog(occs: readonly FunctionOccurrence[]): Catalog {
   const functions: Record<string, FunctionOccurrence[]> = {};
   for (const o of occs) {
