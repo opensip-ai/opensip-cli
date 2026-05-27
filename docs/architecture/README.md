@@ -91,20 +91,21 @@ These docs are written for engineers fluent in TypeScript and Node tooling. Voic
 23. [**CLI command tree**](./70-surfaces/01-cli-command-tree.md) — Every command, its flags, when to use each.
 24. [**Plugin authoring**](./70-surfaces/02-plugin-authoring.md) — Write your own check, recipe, scenario, or full Tool.
 25. [**Dashboard**](./70-surfaces/03-dashboard.md) — The HTML report: what it shows, when it opens, where it lives.
+26. [**Website integration**](./70-surfaces/04-website-integration.md) — How opensip.ai consumes `docs/web/`: proxy, route, manifest contract.
 
 ### 80 — Reference
 *Lookup-shaped. Not for sequential reading.*
 
-26. [**Package catalog**](./80-reference/01-package-catalog.md) — All 27 packages with one-line role and key exports. Grouped by layer.
-27. [**Configuration**](./80-reference/02-configuration.md) — `opensip-tools.config.yml` schema, every field, defaults.
-28. [**JSON output schema**](./80-reference/03-json-output-schema.md) — The `CliOutput` shape consumed by CI and dashboards.
+27. [**Package catalog**](./80-reference/01-package-catalog.md) — All 27 packages with one-line role and key exports. Grouped by layer.
+28. [**Configuration**](./80-reference/02-configuration.md) — `opensip-tools.config.yml` schema, every field, defaults.
+29. [**JSON output schema**](./80-reference/03-json-output-schema.md) — The `CliOutput` shape consumed by CI and dashboards.
 
 ### 90 — Conventions
 *Policy and style. For contributors.*
 
-29. [**Coding standards**](./90-conventions/01-coding-standards.md) — TS strictness, error handling, exit codes, ESLint posture.
-30. [**Layer policy**](./90-conventions/02-layer-policy.md) — Dependency-cruiser rules, allowed imports, why the kernel can't import a tool.
-31. [**Doc conventions**](./90-conventions/03-doc-conventions.md) — Voice, frontmatter, diagrams, verification trails.
+30. [**Coding standards**](./90-conventions/01-coding-standards.md) — TS strictness, error handling, exit codes, ESLint posture.
+31. [**Layer policy**](./90-conventions/02-layer-policy.md) — Dependency-cruiser rules, allowed imports, why the kernel can't import a tool.
+32. [**Doc conventions**](./90-conventions/03-doc-conventions.md) — Voice, frontmatter, diagrams, verification trails.
 
 ---
 
@@ -130,9 +131,6 @@ See [`./90-conventions/03-doc-conventions.md`](./90-conventions/03-doc-conventio
 
 ## Relationship to other docs
 
-- **[`docs/coverage-status.md`](../coverage-status.md)** — Test coverage snapshot.
-- **[`docs/json-output-schema.md`](../json-output-schema.md)** — JSON output reference (mirrored into [`80-reference/03-json-output-schema.md`](./80-reference/03-json-output-schema.md)).
-- **[`docs/release-smoke-test.md`](../release-smoke-test.md)** — Release verification checklist.
 - **[`README.md`](../../README.md)** — Marketing-shaped product README. Start *here* for architecture, not there.
 
 ---

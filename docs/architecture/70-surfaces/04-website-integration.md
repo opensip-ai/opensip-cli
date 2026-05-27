@@ -5,7 +5,7 @@ title: "Website integration — opensip.ai"
 audience: [website-maintainers]
 purpose: "How opensip.ai consumes docs/web/ from this repo: backend proxy, frontend route, manifest contract."
 related-docs:
-  - ../tools/build-web-docs.mjs
+  - ../../../tools/build-web-docs.mjs
 ---
 # Website integration — opensip.ai
 

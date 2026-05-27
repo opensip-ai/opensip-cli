@@ -273,6 +273,32 @@ pnpm typecheck && pnpm test && pnpm lint
 
 `pnpm lint` runs both ESLint and dependency-cruiser. Both must be 0-error.
 
+## Documentation
+
+The canonical architecture docs live in **`docs/architecture/`** (numbered
+Diátaxis-ish sections: `00-orientation`, `10-mental-model`, ..., `90-conventions`).
+That is the only tree you edit by hand.
+
+**`docs/web/` is generated output** — it mirrors `docs/architecture/`
+rewritten for the website at opensip.ai/docs/opensip-tools/. The website
+fetches markdown from this repo directly, so the build step pre-rewrites
+links and processes voice markers, then commits the result so PR reviewers
+see what will actually render.
+
+- **Generator:** `tools/build-web-docs.mjs`
+- **Scripts:** `pnpm docs:build` (write) · `pnpm docs:check` (CI staleness gate)
+- **What it does:** relative source-code links → pinned GitHub URLs;
+  sibling `.md` links → root-relative website paths; processes
+  `<!-- web:skip -->` / `<!-- web:only -->` markers (silent in repo view).
+
+**Rules:**
+- Never hand-edit anything under `docs/web/` — it gets overwritten.
+- After editing `docs/architecture/`, run `pnpm docs:build` and commit
+  the regenerated `docs/web/` in the same change.
+- Moves/renames inside `docs/architecture/` propagate to `docs/web/`
+  automatically — don't mirror them manually.
+- If CI's `pnpm docs:check` fails, the fix is `pnpm docs:build` + commit.
+
 ## Release Process
 
 Releases are tag-driven. See `RELEASING.md` — there are 23 packages

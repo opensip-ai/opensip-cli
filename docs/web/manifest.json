@@ -307,6 +307,16 @@
       "purpose": "The HTML report — what it shows, when it opens, how it's generated, and where it lives."
     },
     {
+      "file": "docs/web/70-surfaces/04-website-integration.md",
+      "path": "/docs/opensip-tools/70-surfaces/04-website-integration/",
+      "section": "70-surfaces",
+      "title": "Website integration — opensip.ai",
+      "audience": [
+        "website-maintainers"
+      ],
+      "purpose": "How opensip.ai consumes docs/web/ from this repo: backend proxy, frontend route, manifest contract."
+    },
+    {
       "file": "docs/web/80-reference/01-package-catalog.md",
       "path": "/docs/opensip-tools/80-reference/01-package-catalog/",
       "section": "80-reference",
@@ -443,7 +453,8 @@
       "pages": [
         "/docs/opensip-tools/70-surfaces/01-cli-command-tree/",
         "/docs/opensip-tools/70-surfaces/02-plugin-authoring/",
-        "/docs/opensip-tools/70-surfaces/03-dashboard/"
+        "/docs/opensip-tools/70-surfaces/03-dashboard/",
+        "/docs/opensip-tools/70-surfaces/04-website-integration/"
       ]
     },
     {

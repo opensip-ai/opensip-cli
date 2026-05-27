@@ -257,14 +257,3 @@ publish-only-if-the-exact-version-isn't-already-on-npm. So:
   is harmless — no consumers will have referenced it via lockfiles
   yet, and you can `npm deprecate` the orphan versions if you want
   them invisible.
-
-## Smoke testing a release locally (Verdaccio)
-
-The repo's `tools/oop-smoke/` sets up a local Verdaccio registry that
-mirrors the publish flow without touching npmjs.com. Run it before
-cutting a real release if you want to validate the tarball contents:
-
-```bash
-# Start Verdaccio, pack everything, publish to localhost, install in a
-# fresh consumer project, run the CLI. Full procedure: docs/release-smoke-test.md.
-```

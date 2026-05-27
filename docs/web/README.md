@@ -91,20 +91,21 @@ These docs are written for engineers fluent in TypeScript and Node tooling. Voic
 23. [**CLI command tree**](/docs/opensip-tools/70-surfaces/01-cli-command-tree/) — Every command, its flags, when to use each.
 24. [**Plugin authoring**](/docs/opensip-tools/70-surfaces/02-plugin-authoring/) — Write your own check, recipe, scenario, or full Tool.
 25. [**Dashboard**](/docs/opensip-tools/70-surfaces/03-dashboard/) — The HTML report: what it shows, when it opens, where it lives.
+26. [**Website integration**](/docs/opensip-tools/70-surfaces/04-website-integration/) — How opensip.ai consumes `docs/web/`: proxy, route, manifest contract.
 
 ### 80 — Reference
 *Lookup-shaped. Not for sequential reading.*
 
-26. [**Package catalog**](/docs/opensip-tools/80-reference/01-package-catalog/) — All 27 packages with one-line role and key exports. Grouped by layer.
-27. [**Configuration**](/docs/opensip-tools/80-reference/02-configuration/) — `opensip-tools.config.yml` schema, every field, defaults.
-28. [**JSON output schema**](/docs/opensip-tools/80-reference/03-json-output-schema/) — The `CliOutput` shape consumed by CI and dashboards.
+27. [**Package catalog**](/docs/opensip-tools/80-reference/01-package-catalog/) — All 27 packages with one-line role and key exports. Grouped by layer.
+28. [**Configuration**](/docs/opensip-tools/80-reference/02-configuration/) — `opensip-tools.config.yml` schema, every field, defaults.
+29. [**JSON output schema**](/docs/opensip-tools/80-reference/03-json-output-schema/) — The `CliOutput` shape consumed by CI and dashboards.
 
 ### 90 — Conventions
 *Policy and style. For contributors.*
 
-29. [**Coding standards**](/docs/opensip-tools/90-conventions/01-coding-standards/) — TS strictness, error handling, exit codes, ESLint posture.
-30. [**Layer policy**](/docs/opensip-tools/90-conventions/02-layer-policy/) — Dependency-cruiser rules, allowed imports, why the kernel can't import a tool.
-31. [**Doc conventions**](/docs/opensip-tools/90-conventions/03-doc-conventions/) — Voice, frontmatter, diagrams, verification trails.
+30. [**Coding standards**](/docs/opensip-tools/90-conventions/01-coding-standards/) — TS strictness, error handling, exit codes, ESLint posture.
+31. [**Layer policy**](/docs/opensip-tools/90-conventions/02-layer-policy/) — Dependency-cruiser rules, allowed imports, why the kernel can't import a tool.
+32. [**Doc conventions**](/docs/opensip-tools/90-conventions/03-doc-conventions/) — Voice, frontmatter, diagrams, verification trails.
 
 ---
 
@@ -130,9 +131,6 @@ See [`./90-conventions/03-doc-conventions.md`](/docs/opensip-tools/90-convention
 
 ## Relationship to other docs
 
-- **[`docs/coverage-status.md`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/docs/coverage-status.md)** — Test coverage snapshot.
-- **[`docs/json-output-schema.md`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/docs/json-output-schema.md)** — JSON output reference (mirrored into [`80-reference/03-json-output-schema.md`](/docs/opensip-tools/80-reference/03-json-output-schema/)).
-- **[`docs/release-smoke-test.md`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/docs/release-smoke-test.md)** — Release verification checklist.
 - **[`README.md`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/README.md)** — Marketing-shaped product README. Start *here* for architecture, not there.
 
 ---

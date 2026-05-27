@@ -7,7 +7,6 @@ audience: [ci-integrators, plugin-authors]
 purpose: "The CliOutput shape (and the SimDoneResult shape). Every field, every type, every presence rule."
 source-files:
   - packages/contracts/src/types.ts
-  - docs/json-output-schema.md
 related-docs:
   - ../10-mental-model/04-contract-surfaces.md
   - ../20-the-fit-loop/04-output-gate-sarif.md
