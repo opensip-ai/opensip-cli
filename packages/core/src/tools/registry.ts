@@ -8,35 +8,38 @@
  * **Duplicate-id policy: first writer wins.** Re-registering the same
  * id keeps the existing entry and emits a structured warning. This
  * matches `LanguageRegistry`'s policy and prevents third-party plugins
- * from accidentally clobbering first-party registrations. The CLI's
- * tool-discovery skip-by-id guard is now a defense-in-depth check
- * rather than the only protection.
+ * from accidentally clobbering first-party registrations.
+ *
+ * Implemented on top of the kernel's `Registry<T>` base. Tools don't
+ * naturally satisfy `Registerable` (no `name` field on metadata), so
+ * the registry wraps each Tool in a `{ id, name: id, tool }` envelope
+ * before storing it. `list()` / `get()` unwrap.
  */
 
-import { logger } from '../lib/logger.js';
+import { Registry, type Registerable } from '../lib/registry.js';
 
 import type { Tool } from './types.js';
 
+interface RegisterableTool extends Registerable {
+  readonly id: string;
+  readonly name: string;
+  readonly tool: Tool;
+}
+
 export class ToolRegistry {
-  private readonly tools = new Map<string, Tool>();
+  private readonly inner = new Registry<RegisterableTool>({
+    module: 'core:tools',
+    duplicatePolicy: 'warn-first-wins',
+    evtPrefix: 'tool.registry',
+  });
 
   /**
    * Register a tool. **First writer wins** — re-registering the same
    * id is a no-op and emits a `tool.registry.duplicate` warning.
-   * Identical semantics to `LanguageRegistry.register`.
    */
-  register(tool: Tool): void {
+  register(tool: Tool, opts: { sourcePackage?: string } = {}): void {
     const id = tool.metadata.id;
-    if (this.tools.has(id)) {
-      logger.warn({
-        evt: 'tool.registry.duplicate',
-        module: 'core:tools',
-        id,
-        msg: `Tool id ${id} already registered — keeping incumbent`,
-      });
-      return;
-    }
-    this.tools.set(id, tool);
+    this.inner.register({ id, name: id, tool }, { sourcePackage: opts.sourcePackage });
   }
 
   /**
@@ -45,32 +48,23 @@ export class ToolRegistry {
    * exposes the discovery source as a structured log field so warnings
    * point at the offending package. Use this in CLI bootstrap when
    * iterating discovered npm packages.
+   *
+   * @deprecated New code uses `register(tool, { sourcePackage })`.
    */
   registerThirdParty(tool: Tool, opts: { sourcePackage?: string } = {}): void {
-    const id = tool.metadata.id;
-    if (this.tools.has(id)) {
-      logger.warn({
-        evt: 'tool.registry.duplicate',
-        module: 'core:tools',
-        id,
-        sourcePackage: opts.sourcePackage,
-        msg: `Tool id ${id} already registered — third-party registration from ${opts.sourcePackage ?? '<unknown>'} ignored`,
-      });
-      return;
-    }
-    this.tools.set(id, tool);
+    this.register(tool, opts);
   }
 
   list(): readonly Tool[] {
-    return [...this.tools.values()];
+    return this.inner.getAll().map((r) => r.tool);
   }
 
   get(id: string): Tool | undefined {
-    return this.tools.get(id);
+    return this.inner.getById(id)?.tool;
   }
 
   clear(): void {
-    this.tools.clear();
+    this.inner.clear();
   }
 }
 
