@@ -12,11 +12,9 @@
  * gaming-defense check.
  */
 
-import { scenarioRegistry } from '../../framework/registry.js'
 import {
   throwValidationErrors,
   validateScenarioMetadata,
-  validateScenarioUniqueness,
   type ScenarioValidationError,
 } from '../../framework/validation.js'
 
@@ -226,19 +224,16 @@ function validateGamingDefense(
   }
 }
 
-interface ValidateFixEvaluationOptions {
-  /** Test helper: skip the registry-uniqueness check. */
-  readonly skipRegistryCheck?: boolean
-}
-
 /**
  * Validate a fix-evaluation scenario configuration. Throws on invalid input.
+ *
+ * Uniqueness against an existing scenario registry is checked at
+ * registration time, not here.
  *
  * @throws {ValidationError} When the fix-evaluation scenario configuration is invalid
  */
 export function validateFixEvaluationScenarioConfig(
   config: FixEvaluationScenarioConfig,
-  options: ValidateFixEvaluationOptions = {},
 ): void {
   const errors: ScenarioValidationError[] = []
   validateScenarioMetadata(config, errors)
@@ -246,15 +241,14 @@ export function validateFixEvaluationScenarioConfig(
   validateJudgmentMode(config, errors)
   validatePredicateTree(config.predicate, 'predicate', errors)
   validateGamingDefense(config, errors)
-  validateScenarioUniqueness(config, errors, {
-    ...(options.skipRegistryCheck === undefined ? {} : { skipRegistryCheck: options.skipRegistryCheck }),
-  })
 
   throwValidationErrors(errors, 'fix-evaluation')
 }
 
 /**
- * Define a fix-evaluation-kind simulation scenario with automatic registration.
+ * Define a fix-evaluation-kind simulation scenario. Returns the scenario;
+ * the caller (typically the simulation plugin loader) is responsible
+ * for registering it into `scope.registries.scenarios`.
  *
  * @throws {ValidationError} When the scenario configuration is invalid
  */
@@ -262,22 +256,5 @@ export function defineFixEvaluationScenario(
   config: FixEvaluationScenarioConfig,
 ): RunnableScenario {
   validateFixEvaluationScenarioConfig(config)
-  const scenario = createFixEvaluationScenarioRunner(config)
-  scenarioRegistry.register(scenario)
-  return scenario
-}
-
-/**
- * Define a fix-evaluation scenario without auto-registration (test helper).
- *
- * Same validator as `defineFixEvaluationScenario`, with the registry-
- * uniqueness check disabled.
- *
- * @throws {ValidationError} When the scenario configuration is invalid
- */
-export function defineFixEvaluationScenarioWithoutRegistration(
-  config: FixEvaluationScenarioConfig,
-): RunnableScenario {
-  validateFixEvaluationScenarioConfig(config, { skipRegistryCheck: true })
   return createFixEvaluationScenarioRunner(config)
 }

@@ -6,10 +6,9 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { ASSERTIONS } from '../framework/assertions.js'
 import { persona } from '../framework/personas.js'
-import { clearScenarioRegistry, getScenario } from '../framework/registry.js'
+import { clearScenarioRegistry, getScenario, scenarioRegistry } from '../framework/registry.js'
 import {
   defineLoadScenario,
-  defineLoadScenarioWithoutRegistration,
   validateLoadScenarioConfig,
 } from '../kinds/load/define.js'
 
@@ -34,8 +33,8 @@ describe('defineLoadScenario', () => {
     expect(typeof scenario.run).toBe('function')
   })
 
-  it('registers the scenario with the cross-kind registry', () => {
-    defineLoadScenario({
+  it('can be registered into the cross-kind registry by lookup-by-id and by-name', () => {
+    const scenario = defineLoadScenario({
       id: 'load-test-2',
       name: 'Load Test 2',
       description: 'Registry test.',
@@ -44,6 +43,7 @@ describe('defineLoadScenario', () => {
       duration: 1,
       assertions: [ASSERTIONS.lowErrorRate(0.5)],
     })
+    scenarioRegistry.register(scenario)
 
     expect(getScenario('load-test-2')).toBeDefined()
     expect(getScenario('Load Test 2')).toBeDefined()
@@ -88,9 +88,9 @@ describe('defineLoadScenario', () => {
   })
 })
 
-describe('defineLoadScenarioWithoutRegistration', () => {
-  it('does NOT register the scenario', () => {
-    const scenario = defineLoadScenarioWithoutRegistration({
+describe('defineLoadScenario — no auto-registration (Phase 6 contract)', () => {
+  it('does NOT register the scenario into the scenario registry', () => {
+    const scenario = defineLoadScenario({
       id: 'load-test-no-reg',
       name: 'Load Test No Reg',
       description: 'No-reg test.',
@@ -106,7 +106,7 @@ describe('defineLoadScenarioWithoutRegistration', () => {
 
   it('still requires an id', () => {
     expect(() => {
-      defineLoadScenarioWithoutRegistration({
+      defineLoadScenario({
         id: '',
         name: 'x',
         description: 'x',

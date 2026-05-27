@@ -15,8 +15,6 @@
 
 import { ValidationError as CoreValidationError } from '@opensip-tools/core'
 
-import { scenarioRegistry } from './registry.js'
-
 import type { ScenarioKind } from '../types/kind-types.js'
 
 // =============================================================================
@@ -92,35 +90,6 @@ export function validateScenarioMetadata(
   // description
   if (requireDescription && (!config.description || config.description.trim() === '')) {
     errors.push({ field: 'description', message: 'description is required' })
-  }
-}
-
-// =============================================================================
-// REGISTRY UNIQUENESS
-// =============================================================================
-
-/**
- * Confirm that no scenario with the same id (or name) is already
- * registered. Test helpers pass `skipRegistryCheck: true` to bypass.
- */
-export function validateScenarioUniqueness(
-  config: ScenarioMetadataInput,
-  errors: ScenarioValidationError[],
-  options: { readonly skipRegistryCheck?: boolean } = {},
-): void {
-  if (options.skipRegistryCheck) return
-
-  if (config.id && scenarioRegistry.has(config.id)) {
-    errors.push({
-      field: 'id',
-      message: `scenario with id '${config.id}' is already registered`,
-    })
-  }
-  if (config.name && scenarioRegistry.has(config.name)) {
-    errors.push({
-      field: 'name',
-      message: `scenario with name '${config.name}' is already registered`,
-    })
   }
 }
 

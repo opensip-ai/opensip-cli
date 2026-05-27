@@ -4,15 +4,14 @@
  * The load kind preserves the existing personas + ramp + sustain + assert
  * shape that the framework already supported. The author-facing config
  * interface is `LoadScenarioConfig` (no `kind` field — the entry point sets
- * it). Validation runs at definition time; the scenario is registered in the
- * shared cross-kind registry.
+ * it). Validation runs at definition time; registration is the caller's
+ * responsibility (the simulation plugin loader walks `module.scenarios`
+ * and registers them into `scope.registries.scenarios`).
  */
 
-import { scenarioRegistry } from '../../framework/registry.js'
 import {
   throwValidationErrors,
   validateScenarioMetadata,
-  validateScenarioUniqueness,
   type ScenarioValidationError,
 } from '../../framework/validation.js'
 
@@ -110,20 +109,17 @@ function validateRampUp(config: LoadScenarioConfig, errors: ScenarioValidationEr
   }
 }
 
-interface ValidateLoadOptions {
-  /** Test helper: skip the registry-uniqueness check. */
-  readonly skipRegistryCheck?: boolean
-}
-
 /**
  * Validate a load scenario configuration. Throws on invalid input.
  *
+ * Uniqueness against an existing scenario registry is checked at
+ * registration time (`scope.registries.scenarios.register(...)`), not
+ * here — `defineX` returns a scenario object without touching any
+ * registry.
+ *
  * @throws {ValidationError} When the load scenario configuration is invalid
  */
-export function validateLoadScenarioConfig(
-  config: LoadScenarioConfig,
-  options: ValidateLoadOptions = {},
-): void {
+export function validateLoadScenarioConfig(config: LoadScenarioConfig): void {
   const errors: ScenarioValidationError[] = []
 
   validateScenarioMetadata(config, errors)
@@ -138,10 +134,6 @@ export function validateLoadScenarioConfig(
   if (config.assertions.length === 0) {
     errors.push({ field: 'assertions', message: 'at least one assertion is required' })
   }
-
-  validateScenarioUniqueness(config, errors, {
-    ...(options.skipRegistryCheck === undefined ? {} : { skipRegistryCheck: options.skipRegistryCheck }),
-  })
 
   throwValidationErrors(errors, 'load')
 }
@@ -169,24 +161,5 @@ export function validateLoadScenarioConfig(
 export function defineLoadScenario(config: LoadScenarioConfig): RunnableScenario {
   validateLoadScenarioConfig(config)
 
-  const scenario = createLoadScenarioRunner(config)
-
-  scenarioRegistry.register(scenario)
-
-  return scenario
-}
-
-/**
- * Define a load scenario without auto-registration (test helper).
- *
- * Same validator as `defineLoadScenario`, just with the registry-uniqueness
- * check disabled so tests can build many scenarios with the same id.
- *
- * @throws {ValidationError} When the scenario configuration is invalid
- */
-export function defineLoadScenarioWithoutRegistration(
-  config: LoadScenarioConfig,
-): RunnableScenario {
-  validateLoadScenarioConfig(config, { skipRegistryCheck: true })
   return createLoadScenarioRunner(config)
 }
