@@ -7,7 +7,8 @@ export default defineConfig({
       exclude: [
         'src/**/*.test.ts',
         'src/**/__tests__/**',
-        // Pure barrel re-export with no runtime logic.
+        'src/**/__fixtures__/**',
+        // Pure barrel — re-exports only, no executable logic.
         'src/index.ts',
       ],
     },

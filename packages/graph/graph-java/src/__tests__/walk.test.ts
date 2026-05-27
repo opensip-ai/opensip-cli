@@ -196,4 +196,175 @@ describe('graph-java walk.ts', () => {
     // Two explicit_constructor_invocation nodes (super(1) and this()).
     expect(calls.length).toBeGreaterThanOrEqual(2);
   });
+
+  it('preserves escape sequences inside regular string literals', () => {
+    // `"\\\"hi\\\""` — an escaped quote inside a regular string. The
+    // string-literal scanner must consume `\"` as a two-char escape so
+    // the closing quote stays paired correctly.
+    writeFileSync(
+      join(dir, 'Esc.java'),
+      'package x;\nclass Esc { String m() { return ' + String.raw`"a\"b"` + '; } }\n',
+      'utf8',
+    );
+    const walk = run(dir);
+    expect(walk.occurrences.m).toBeDefined();
+  });
+
+  it('preserves escape sequences inside text blocks', () => {
+    // Text block containing an escaped `\n` and `\"`. The text-block
+    // scanner has its own escape branch (separate from the regular
+    // string scanner).
+    writeFileSync(
+      join(dir, 'TextEsc.java'),
+      'package x;\nclass TextEsc { String m() { return """\n      ' + String.raw`a\nb\"c` + '\n      """; } }\n',
+      'utf8',
+    );
+    const walk = run(dir);
+    expect(walk.occurrences.m).toBeDefined();
+  });
+
+  it('preserves char literals (both simple and escaped)', () => {
+    // `'x'` exercises the unescape path; `'\\n'` exercises the escape
+    // branch in consumeCharLiteral.
+    writeFileSync(
+      join(dir, 'Chars.java'),
+      "package x;\nclass Chars { char a() { return 'x'; } char b() { return '\\n'; } }\n",
+      'utf8',
+    );
+    const walk = run(dir);
+    expect(walk.occurrences.a).toBeDefined();
+    expect(walk.occurrences.b).toBeDefined();
+  });
+
+  it('strips Javadoc block comments (/** ... */)', () => {
+    writeFileSync(
+      join(dir, 'J.java'),
+      'package x;\nclass J {\n  /** Javadoc */\n  int m() { return 1; }\n}\n',
+      'utf8',
+    );
+    const walk = run(dir);
+    expect(walk.occurrences.m).toBeDefined();
+  });
+
+  it('walks a malformed type declaration without throwing', () => {
+    // Malformed input — tree-sitter still produces some tree shape; we
+    // care only that walkProject is total over the file set.
+    writeFileSync(
+      join(dir, 'Anon.java'),
+      'package x;\nclass class Bad {}\n',
+      'utf8',
+    );
+    const walk = run(dir);
+    expect(walk).toBeDefined();
+  });
+
+  it('detects @ParameterizedTest as a test annotation', () => {
+    writeFileSync(
+      join(dir, 'PT.java'),
+      `package x;\nclass PT {\n  @ParameterizedTest\n  public void paramTest() {}\n}\n`,
+      'utf8',
+    );
+    const walk = run(dir);
+    expect(walk.occurrences.paramTest?.[0]?.inTestFile).toBe(true);
+  });
+
+  it('classifies $Pb.java files as definedInGenerated', () => {
+    // The discovery layer excludes `target/`, `build/`, `out/`, etc. so
+    // generated-by-folder paths never reach walkProject. The
+    // `$Pb.java` suffix is the protobuf-Java codegen marker and is the
+    // only generated-detection path that bypasses the dir exclusions.
+    writeFileSync(
+      join(dir, 'Foo$Pb.java'),
+      'package x;\nclass Foo$Pb { void g() {} }\n',
+      'utf8',
+    );
+    const walk = run(dir);
+    expect(walk.occurrences.g?.[0]?.definedInGenerated).toBe(true);
+  });
+
+  it('extracts package name from `package` declaration', () => {
+    writeFileSync(
+      join(dir, 'A.java'),
+      'package foo.bar.baz;\nclass A { void m() {} }\n',
+      'utf8',
+    );
+    const walk = run(dir);
+    expect(walk.occurrences.m?.[0]?.qualifiedName).toBe('foo.bar.baz.A.m');
+  });
+
+  it('falls back to path-based qualifier when no package declaration', () => {
+    writeFileSync(
+      join(dir, 'NoPkg.java'),
+      'class NoPkg { void m() {} }\n',
+      'utf8',
+    );
+    const walk = run(dir);
+    // No `package` clause → qualifier derived from filename "NoPkg".
+    expect(walk.occurrences.m?.[0]?.qualifiedName).toBe('NoPkg.NoPkg.m');
+  });
+
+  it('extracts lambda single-parameter (identifier shape)', () => {
+    writeFileSync(
+      join(dir, 'L1.java'),
+      `package x;\nimport java.util.function.IntUnaryOperator;\nclass L1 { static IntUnaryOperator make() { return n -> n + 1; } }\n`,
+      'utf8',
+    );
+    const walk = run(dir);
+    const arrowName = Object.keys(walk.occurrences).find((n) => n.startsWith('<arrow:'));
+    expect(arrowName).toBeDefined();
+    const arrow = arrowName ? walk.occurrences[arrowName]?.[0] : undefined;
+    expect(arrow?.params.map((p) => p.name)).toEqual(['n']);
+  });
+
+  it('extracts lambda inferred parameters ((x, y) -> …)', () => {
+    writeFileSync(
+      join(dir, 'L2.java'),
+      `package x;\nimport java.util.function.BinaryOperator;\nclass L2 { static BinaryOperator<Integer> make() { return (a, b) -> a + b; } }\n`,
+      'utf8',
+    );
+    const walk = run(dir);
+    const arrowName = Object.keys(walk.occurrences).find((n) => n.startsWith('<arrow:'));
+    expect(arrowName).toBeDefined();
+    const arrow = arrowName ? walk.occurrences[arrowName]?.[0] : undefined;
+    expect(arrow?.params.map((p) => p.name)).toEqual(['a', 'b']);
+  });
+
+  it('extracts formal parameter names', () => {
+    writeFileSync(
+      join(dir, 'V.java'),
+      `package x;\nclass V { void f(String name, int n) {} }\n`,
+      'utf8',
+    );
+    const walk = run(dir);
+    const params = walk.occurrences.f?.[0]?.params;
+    expect(params?.map((p) => p.name)).toEqual(['name', 'n']);
+    expect(params?.every((p) => !p.rest)).toBe(true);
+  });
+
+  it('handles spread (varargs) parameter syntax without throwing', () => {
+    // tree-sitter-java may not surface `String... xs` as `spread_parameter`
+    // — extractParams handles both `formal_parameter` and `spread_parameter`,
+    // so this only verifies the walk completes.
+    writeFileSync(
+      join(dir, 'V2.java'),
+      `package x;\nclass V2 { void f(String... xs) {} }\n`,
+      'utf8',
+    );
+    const walk = run(dir);
+    expect(walk.occurrences.f).toBeDefined();
+  });
+
+  it('emits a synthetic <module-init> per file', () => {
+    writeFileSync(
+      join(dir, 'A.java'),
+      `package x;\nimport java.util.List;\nclass A { void m() {} }\n`,
+      'utf8',
+    );
+    const walk = run(dir);
+    const moduleInits = Object.keys(walk.occurrences).filter((n) => n.startsWith('<module-init:'));
+    expect(moduleInits.length).toBe(1);
+    const occ = walk.occurrences[moduleInits[0]]?.[0];
+    expect(occ?.kind).toBe('module-init');
+    expect(occ?.visibility).toBe('module-local');
+  });
 });
