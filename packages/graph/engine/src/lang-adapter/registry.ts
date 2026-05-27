@@ -153,9 +153,11 @@ function resolveTie(tied: readonly string[]): GraphLanguageAdapter | undefined {
 }
 
 /**
- * Test-only: clear every registered adapter. The graph tool's bootstrap
- * re-registers the TypeScript adapter on the next module load.
+ * Clear every registered adapter. Used by tests and by host applications
+ * that need to swap the adapter set at runtime (the registry is a
+ * process-global). The graph tool's bootstrap re-registers the
+ * TypeScript adapter on the next module load.
  */
-export function _clearAdaptersForTesting(): void {
+export function clearAdapterRegistry(): void {
   registry.clear();
 }

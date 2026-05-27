@@ -13,7 +13,7 @@ import { join } from 'node:path';
 
 import { ConfigurationError } from '@opensip-tools/core';
 import {
-  _clearAdaptersForTesting,
+  clearAdapterRegistry,
   pickAdapter,
   registerAdapter,
 } from '@opensip-tools/graph';
@@ -27,11 +27,11 @@ import { typescriptGraphAdapter } from '../index.js';
 
 describe('pickAdapter — registry-size shortcuts', () => {
   beforeEach(() => {
-    _clearAdaptersForTesting();
+    clearAdapterRegistry();
   });
 
   afterEach(() => {
-    _clearAdaptersForTesting();
+    clearAdapterRegistry();
   });
 
   it('throws when no adapter is registered', () => {
@@ -67,7 +67,7 @@ describe('pickAdapter — multi-adapter dominance heuristic', () => {
   let dir: string;
 
   beforeEach(() => {
-    _clearAdaptersForTesting();
+    clearAdapterRegistry();
     registerAdapter(typescriptGraphAdapter);
     registerAdapter(pythonGraphAdapter);
     registerAdapter(rustGraphAdapter);
@@ -76,7 +76,7 @@ describe('pickAdapter — multi-adapter dominance heuristic', () => {
 
   afterEach(() => {
     rmSync(dir, { recursive: true, force: true });
-    _clearAdaptersForTesting();
+    clearAdapterRegistry();
   });
 
   it('picks Python when only .py files are present', () => {

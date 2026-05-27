@@ -22,7 +22,7 @@ import {
   totalSystemMemoryMb,
 } from '../../cli/heap-preflight.js';
 import {
-  _clearAdaptersForTesting,
+  clearAdapterRegistry,
   registerAdapter,
 } from '../../lang-adapter/registry.js';
 
@@ -109,13 +109,13 @@ describe('runHeapPreflight', () => {
   let prevSentinel: string | undefined;
 
   beforeEach(() => {
-    _clearAdaptersForTesting();
+    clearAdapterRegistry();
     prevSentinel = process.env.OPENSIP_HEAP_ELEVATED;
     delete process.env.OPENSIP_HEAP_ELEVATED;
   });
 
   afterEach(() => {
-    _clearAdaptersForTesting();
+    clearAdapterRegistry();
     vi.restoreAllMocks();
     if (prevSentinel === undefined) {
       delete process.env.OPENSIP_HEAP_ELEVATED;

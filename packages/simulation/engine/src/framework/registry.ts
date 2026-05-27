@@ -50,7 +50,12 @@ export function getScenariosByKind(kind: ScenarioKind): RunnableScenario[] {
   return scenarioRegistry.getAll().filter((s) => s.kind === kind)
 }
 
-/** Clear the registry. Primarily for tests. */
+/**
+ * Clear the registry. Used by tests, by host applications that need
+ * to swap the scenario set at runtime, and by recipe-reset code paths.
+ * The simulation engine's plugin loader re-populates it on the next
+ * load cycle.
+ */
 export function clearScenarioRegistry(): void {
   scenarioRegistry.clear()
 }

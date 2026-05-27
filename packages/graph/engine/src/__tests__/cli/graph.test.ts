@@ -20,7 +20,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } fr
 import { buildUnifiedReportLines, executeGraph } from '../../cli/graph.js';
 import { saveBaseline } from '../../gate.js';
 import {
-  _clearAdaptersForTesting,
+  clearAdapterRegistry,
   registerAdapter,
 } from '../../lang-adapter/registry.js';
 import { GraphBaselineRepo } from '../../persistence/baseline-repo.js';
@@ -159,14 +159,14 @@ let stderrSpy: MockInstance<typeof process.stderr.write>;
 let projectDir: string;
 
 beforeEach(() => {
-  _clearAdaptersForTesting();
+  clearAdapterRegistry();
   projectDir = mkdtempSync(join(tmpdir(), 'graph-test-proj-'));
   stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
   stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
 });
 
 afterEach(() => {
-  _clearAdaptersForTesting();
+  clearAdapterRegistry();
   stdoutSpy.mockRestore();
   stderrSpy.mockRestore();
   rmSync(projectDir, { recursive: true, force: true });

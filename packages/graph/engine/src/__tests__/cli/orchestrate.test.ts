@@ -18,7 +18,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { runGraph } from '../../cli/orchestrate.js';
 import {
-  _clearAdaptersForTesting,
+  clearAdapterRegistry,
   registerAdapter,
 } from '../../lang-adapter/registry.js';
 import { CatalogRepo } from '../../persistence/catalog-repo.js';
@@ -108,13 +108,13 @@ describe('runGraph orchestrator', () => {
   let projectDir: string;
 
   beforeEach(() => {
-    _clearAdaptersForTesting();
+    clearAdapterRegistry();
     datastore = DataStoreFactory.open({ backend: 'memory' });
     projectDir = mkdtempSync(join(tmpdir(), 'orch-proj-'));
   });
 
   afterEach(() => {
-    _clearAdaptersForTesting();
+    clearAdapterRegistry();
     datastore.close();
     rmSync(projectDir, { recursive: true, force: true });
   });
@@ -288,13 +288,13 @@ describe('runGraph — incremental rebuild path', () => {
   let dir: string;
 
   beforeEach(() => {
-    _clearAdaptersForTesting();
+    clearAdapterRegistry();
     datastore = DataStoreFactory.open({ backend: 'memory' });
     dir = mkdtempSync(join(tmpdir(), 'orch-incr-'));
   });
 
   afterEach(() => {
-    _clearAdaptersForTesting();
+    clearAdapterRegistry();
     datastore.close();
     rmSync(dir, { recursive: true, force: true });
   });
@@ -322,7 +322,7 @@ describe('runGraph — incremental rebuild path', () => {
 
     writeFileSync(fileB, 'v2-changed');
 
-    _clearAdaptersForTesting();
+    clearAdapterRegistry();
     registerAdapter(
       fakeAdapter({
         projectDir: dir,
