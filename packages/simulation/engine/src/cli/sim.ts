@@ -162,7 +162,6 @@ export async function ensureScenariosLoaded(projectDir?: string): Promise<void> 
  * Errors loading any one package don't fail the others — they surface
  * to stderr the same way sim-domain plugin failures do.
  */
-// eslint-disable-next-line sonarjs/cognitive-complexity -- npm-package loading: per-package import + recipe-array iteration + structured failure surface; splitting fragments the error-handling pairs
 async function loadDiscoveredScenarioPackages(projectDir: string): Promise<void> {
   if (projectDir === '') return;
   const prefs = readScenarioPackagePreferences(projectDir);
