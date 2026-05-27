@@ -67,21 +67,20 @@ export type {
   RecipeRegistryOptions,
 } from './recipes/registry.js';
 
-// Generic id+name+tag registry — the smaller "common ancestor" used by
-// the simulation scenario registry. Distinct from `RecipeRegistry<T>`
-// in that items only need id + name + optional tags (no displayName /
-// description), and the duplicate-policy is fixed (skip-on-same-id,
-// throw-on-name-collision).
-export { IdNameTagRegistry } from './lib/id-name-tag-registry.js';
-export type { Registerable } from './lib/id-name-tag-registry.js';
-
 // Generic `Registry<T>` — the unified base for every registry in the
 // workspace. Replaces the ten registry classes catalogued in the
 // runscope+registry plan's Phase 0. See `lib/registry.ts` for the
 // full design rationale + the closed `DuplicatePolicy` union.
+//
+// `Registerable` is the minimum shape every registry item must
+// satisfy: `{ id, name, tags? }`. The historical `IdNameTagRegistry`
+// has been deleted; consumers use `Registry<T>` directly with
+// `duplicatePolicy: 'silent-skip'` + `nameCollisionMode: 'throw'`
+// for the same dual-key semantics.
 export { Registry } from './lib/registry.js';
 export type {
   DuplicatePolicy,
+  Registerable,
   RegistryOptions,
   RegisterCallOptions,
 } from './lib/registry.js';

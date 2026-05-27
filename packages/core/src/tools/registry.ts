@@ -49,7 +49,8 @@ export class ToolRegistry {
    * point at the offending package. Use this in CLI bootstrap when
    * iterating discovered npm packages.
    *
-   * @deprecated New code uses `register(tool, { sourcePackage })`.
+   * NEW CODE should use `register(tool, { sourcePackage })`. This
+   * method survives as a back-compat alias for one minor release.
    */
   registerThirdParty(tool: Tool, opts: { sourcePackage?: string } = {}): void {
     this.register(tool, opts);

@@ -27,8 +27,9 @@
  */
 
 import { ValidationError } from '../lib/errors.js';
-import type { Logger } from '../lib/logger.js';
 import { Registry, type Registerable } from '../lib/registry.js';
+
+import type { Logger } from '../lib/logger.js';
 
 /** Minimum shape any recipe must satisfy to live in a `RecipeRegistry`. */
 export interface RecipeBase extends Registerable {
@@ -73,21 +74,25 @@ export interface RecipeRegistryOptions {
 }
 
 /**
- * A Map-shaped proxy that routes writes through a `Registry<T>` while
- * keeping its own iterable snapshot. Exists ONLY to support the
- * temp `protected byId` / `byName` shim that `FitnessRecipeRegistry`
- * and `SimulationRecipeRegistry` need until Phase 3 removes their
- * direct map writes. `set(id, recipe)` registers via `inner` with
- * `{ internal: true }` (bypassing the duplicate guard); reads
- * delegate to the proxyMap's own state (kept in sync via `set`).
- * `clear()` resets both the proxyMap and the inner registry.
+ * A Map-shaped proxy that delegates reads to a `Registry<T>` and
+ * routes writes through `inner.register(item, { internal: true })`.
+ * Exists ONLY to support the temp `protected byId` / `byName` shim
+ * that `FitnessRecipeRegistry` and `SimulationRecipeRegistry` need
+ * until Phase 3 removes their direct map writes.
+ *
+ * Reads ALL delegate to the inner registry — so `listForDisplay()`
+ * reading via `[...this.byId.values()]` correctly sees both
+ * built-ins (added via `byId.set(...)`) AND user registrations
+ * (added via `register()` → `inner.register()`).
  */
 class RegistryMirrorMap<T extends RecipeBase> extends Map<string, T> {
   private readonly inner: Registry<T>;
+  private readonly indexBy: 'id' | 'name';
 
-  constructor(inner: Registry<T>) {
+  constructor(inner: Registry<T>, indexBy: 'id' | 'name') {
     super();
     this.inner = inner;
+    this.indexBy = indexBy;
   }
 
   override set(key: string, value: T): this {
@@ -95,15 +100,68 @@ class RegistryMirrorMap<T extends RecipeBase> extends Map<string, T> {
     // bypasses the duplicate guard so successive built-in seeds in
     // the subclass constructors don't trip the warn-first-wins policy.
     this.inner.register(value, { internal: true });
-    return super.set(key, value);
+    return this;
+  }
+
+  override get(key: string): T | undefined {
+    return this.indexBy === 'id' ? this.inner.getById(key) : this.inner.getByName(key);
+  }
+
+  override has(key: string): boolean {
+    const item = this.indexBy === 'id' ? this.inner.getById(key) : this.inner.getByName(key);
+    return item !== undefined;
+  }
+
+  override delete(key: string): boolean {
+    // Subclasses don't delete from these maps in production; Phase 3
+    // removes the shim entirely. The implementation routes through
+    // inner.remove for completeness.
+    if (this.indexBy === 'id') return this.inner.remove(key);
+    const item = this.inner.getByName(key);
+    if (!item) return false;
+    return this.inner.remove(item.id);
   }
 
   override clear(): void {
-    super.clear();
-    // Note: we DON'T clear the inner registry here. The subclasses'
-    // `reset()` method explicitly calls `this.clear()` on the
-    // RecipeRegistry (public API → `this.inner.clear()`), then
-    // re-seeds — so the inner cleanup happens at the right moment.
+    // Subclasses' `reset()` calls `this.clear()` on the RecipeRegistry
+    // (public API), which goes through `inner.clear()`. This map
+    // doesn't own storage; nothing to clear.
+  }
+
+  override get size(): number {
+    return this.inner.size;
+  }
+
+  override values(): MapIterator<T> {
+    return (this.inner.getAll() as T[])[Symbol.iterator]();
+  }
+
+  override keys(): MapIterator<string> {
+    const items = this.inner.getAll();
+    const keys = this.indexBy === 'id' ? items.map((i) => i.id) : items.map((i) => i.name);
+    return keys[Symbol.iterator]();
+  }
+
+  override entries(): MapIterator<[string, T]> {
+    const items = this.inner.getAll();
+    const entries: [string, T][] = items.map((i) => [
+      this.indexBy === 'id' ? i.id : i.name,
+      i,
+    ]);
+    return entries[Symbol.iterator]();
+  }
+
+  override [Symbol.iterator](): MapIterator<[string, T]> {
+    return this.entries();
+  }
+
+  override forEach(
+    callbackfn: (value: T, key: string, map: Map<string, T>) => void,
+    thisArg?: unknown,
+  ): void {
+    for (const [k, v] of this.entries()) {
+      callbackfn.call(thisArg, v, k, this);
+    }
   }
 }
 
@@ -119,14 +177,14 @@ export class RecipeRegistry<T extends RecipeBase> {
   private readonly validationCode: string;
 
   /**
-   * @deprecated TEMP SHIM (Phase 2 Task 2.3) — `FitnessRecipeRegistry`
-   * and `SimulationRecipeRegistry` write directly to these Maps in
+   * TEMP SHIM (Phase 2 Task 2.3) — `FitnessRecipeRegistry` and
+   * `SimulationRecipeRegistry` write directly to these Maps in
    * their built-in seed paths. Phase 3 Tasks 3.2 + 3.4 replace those
    * direct writes with `registerAll(builtIns, { internal: true })`
    * and remove this shim. Do NOT use in new code.
    */
   protected readonly byId: RegistryMirrorMap<T>;
-  /** @deprecated See {@link byId}. */
+  /** TEMP SHIM — see {@link byId}. */
   protected readonly byName: RegistryMirrorMap<T>;
 
   constructor(options: RecipeRegistryOptions = {}) {
@@ -140,9 +198,11 @@ export class RecipeRegistry<T extends RecipeBase> {
       logger: options.logger,
     });
     // Temp shim — wired so subclass writes (`this.byId.set(id, r)`)
-    // route through `inner.register(r, { internal: true })`.
-    this.byId = new RegistryMirrorMap<T>(this.inner);
-    this.byName = new RegistryMirrorMap<T>(this.inner);
+    // route through `inner.register(r, { internal: true })`. Reads
+    // delegate back to inner so user registrations via `register()`
+    // are visible through `this.byId.values()` too.
+    this.byId = new RegistryMirrorMap<T>(this.inner, 'id');
+    this.byName = new RegistryMirrorMap<T>(this.inner, 'name');
   }
 
   /**
@@ -246,20 +306,11 @@ export class RecipeRegistry<T extends RecipeBase> {
 
   /** Remove a recipe by id. Returns true if it existed. */
   remove(id: string): boolean {
-    const item = this.inner.getById(id);
-    if (!item) return false;
-    this.inner.remove(id);
-    // Also drop from the temp shim mirrors so subclass iteration stays
-    // consistent. Phase 3 removes the mirrors.
-    this.byId.delete(id);
-    this.byName.delete(item.name);
-    return true;
+    return this.inner.remove(id);
   }
 
   /** Drop every entry. */
   clear(): void {
     this.inner.clear();
-    this.byId.clear();
-    this.byName.clear();
   }
 }
