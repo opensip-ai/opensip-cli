@@ -238,6 +238,35 @@ or `pnpm --filter=@opensip-tools/<pkg> test`.
   `@typescript-eslint/consistent-type-imports` rule enforces inline
   `type` for mixed value+type imports.
 
+### Per-run state lives on `RunScope`
+
+- Per-CLI-invocation state (logger, parse cache, tool/language
+  registries, recipe-config slot, project context, lazy datastore
+  thunk) lives on `RunScope` (`@opensip-tools/core/lib/run-scope.ts`).
+  Never reintroduce module-level mutable state for these concerns.
+- Tools read `cli.scope.foo`. The legacy `defaultToolRegistry` and
+  `defaultLanguageRegistry` module-singleton exports do not exist
+  anymore — the CLI bootstrap constructs and populates a fresh
+  `ToolRegistry` / `LanguageRegistry` per invocation and passes them
+  into `new RunScope({ tools, languages })`.
+- Library functions deep in the call tree read the current scope via
+  `currentScope()` (AsyncLocalStorage). Inside `runWithScope(scope,
+  fn)`, every async descendant of `fn` sees the same scope. The
+  Commander preAction hook uses `enterScope` so the action body
+  invoked after the hook returns still resolves the same scope.
+- `getCheckConfig(slug)` reads from `currentScope()?.recipeCheckConfig`.
+  It does NOT read from `globalThis` and the `Symbol.for(globalThis)`
+  slot has been deleted.
+- Registration of tools, languages, scenarios, recipes, and checks is
+  ALWAYS explicit. `defineX(...)` returns a value; the caller
+  registers it via the plugin loader or by passing it into a
+  populated registry. No module-import side effects.
+- For tests, wrap any code that reads `currentScope()` in
+  `runWithScope(new RunScope({ languages: new LanguageRegistry(),
+  tools: new ToolRegistry(), ... }), () => ...)`. Several test helpers
+  (`packages/core/src/test-utils/with-scope.ts`,
+  `packages/fitness/.../__tests__/`) already wrap this pattern.
+
 ### Layering rules (enforced by dependency-cruiser)
 
 ```
@@ -260,6 +289,10 @@ cli (entry point — depends on every tool)
   each other. (The historical lang-typescript exception for `filterContent`
   was paid down — the symbol now lives in `@opensip-tools/lang-typescript`
   alongside the rest of the TS-aware string/comment stripping.)
+- `Registry<T>` (the shared base for all by-id/by-name registries) and
+  `RunScope` (per-invocation execution scope) live in `@opensip-tools/core`.
+  Tools own their own thin subclasses (e.g. `CheckRegistry`,
+  `TargetRegistry`); no per-tool registries leak back into the kernel.
 
 If you need to violate a rule, the right move is usually to refactor the
 shared piece into core. If that's wrong, surface it for discussion before
