@@ -8,6 +8,10 @@
  * that adds fitness-specific concerns: built-in recipe pre-registration
  * with throw-on-duplicate semantics, override tracking, and display
  * info enriched with `isBuiltIn` / `overridesBuiltIn` flags.
+ *
+ * Built-in seeding goes through `registerAll(builtIns, { internal: true })`
+ * — the LSP-clean replacement for the prior direct-map-write pattern
+ * (the canonical T2 violation the runscope+registry plan resolves).
  */
 
 import { RecipeRegistry } from '@opensip-tools/core'
@@ -65,13 +69,11 @@ export class FitnessRecipeRegistry extends RecipeRegistry<FitnessRecipe> {
   }
 
   private registerBuiltInRecipes(): void {
-    // Built-in recipes ship valid; bypass the duplicate guard via direct
-    // map writes to preserve registration order semantics. allowOverwrite
-    // would also work but emits a duplicate-warn on a second load.
-    for (const recipe of builtInRecipes) {
-      this.byId.set(recipe.id, recipe)
-      this.byName.set(recipe.name, recipe)
-    }
+    // Built-in recipes ship valid; `{ internal: true }` bypasses the
+    // duplicate guard at the seed site so successive registrations
+    // (or a reset()/re-seed) don't trip the warn-first-wins policy.
+    // Replaces the prior direct-map-write LSP violation.
+    this.registerAll(builtInRecipes, { internal: true })
   }
 
   private loadAndRegisterUserRecipes(
@@ -121,7 +123,7 @@ export class FitnessRecipeRegistry extends RecipeRegistry<FitnessRecipe> {
 
   /** Return display-friendly info for all registered recipes */
   listForDisplay(): readonly RecipeDisplayInfo[] {
-    return [...this.byId.values()].map((recipe) => {
+    return this.getAllRecipes().map((recipe) => {
       const isUserRecipe = recipe.id.startsWith('URCP_')
       return {
         name: recipe.name,
