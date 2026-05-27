@@ -16,6 +16,7 @@ import {
   defaultLanguageRegistry,
   loadAllPlugins as coreLoadAllPlugins,
   loadPlugin as coreLoadPlugin,
+  registerRecipesFromMod,
 } from '@opensip-tools/core'
 
 import { isCheck } from '../framework/check-types.js'
@@ -23,7 +24,6 @@ import { defaultRegistry } from '../framework/registry.js'
 import { defaultRecipeRegistry } from '../recipes/registry.js'
 
 import type { FitPluginExports } from './types.js'
-import type { FitnessRecipe } from '../recipes/types.js'
 import type {
   DiscoveredPlugin,
   LangPluginExports,
@@ -105,26 +105,18 @@ function registerFitExports(
     checksRegistered++
   }
 
-  // Recipes
-  if (fit.recipes !== undefined) {
-    const recipes: readonly FitnessRecipe[] = fit.recipes
-    for (const [index, recipe] of recipes.entries()) {
-      if (recipe && typeof recipe === 'object' && 'id' in recipe && 'name' in recipe) {
-        try {
-          defaultRecipeRegistry.register(recipe, { allowOverwrite: false })
-          recipesRegistered++
-        } catch {
-          // Duplicate recipe — skip silently
-        }
-      } else {
-        ctx.warn(
-          'plugin.loader.invalid_recipe_item',
-          `Plugin "${ctx.plugin.namespace}" recipes[${index}] is not a valid Recipe object (missing id or name) — skipping.`,
-          { index },
-        )
-      }
-    }
-  }
+  // Recipes — delegate to the shared helper. ctx.warn adapts to the
+  // helper's onWarn channel; the helper uses registry.has() to skip
+  // duplicates rather than the dead try/catch this block used to wrap.
+  const { recipesRegistered: helperRecipesRegistered } = registerRecipesFromMod(
+    fit,
+    defaultRecipeRegistry,
+    {
+      namespace: ctx.plugin.namespace,
+      onWarn: (evt, message, extra) => ctx.warn(evt, message, extra),
+    },
+  )
+  recipesRegistered += helperRecipesRegistered
 
   return { checksRegistered, recipesRegistered }
 }
