@@ -61,8 +61,6 @@ export interface ProjectPaths {
   readonly cacheDir: string;
   /** <project>/opensip-tools/.runtime/cache/graph — graph-tool catalog cache root. */
   readonly graphCacheDir: string;
-  /** <project>/opensip-tools/.runtime/cache/graph/catalog.json — legacy graph catalog file (v1; v2 uses CatalogRepo). */
-  readonly graphCatalogPath: string;
   /** <project>/opensip-tools/.runtime/plugins/<domain> — npm-installed plugins. */
   readonly pluginsDir: (domain: PluginsPathDomain) => string;
 }
@@ -111,7 +109,6 @@ export function resolveProjectPaths(projectDir: string): ProjectPaths {
     logsDir: join(runtimeDir, 'logs'),
     cacheDir,
     graphCacheDir,
-    graphCatalogPath: join(graphCacheDir, 'catalog.json'),
     pluginsDir: (domain) => join(runtimeDir, 'plugins', domain),
   };
 }
