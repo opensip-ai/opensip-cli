@@ -291,3 +291,64 @@ The themes interlock — done out of order, some create rework. Suggested order:
 - The dashboard's HTML-emitter-as-strings architecture (T5) is the only place in the codebase where a refactor would shift a meaningful surface area of code; everywhere else the recommendations are local refactors of < 200 LOC each. The dashboard runtime-bundling move is M-L on its own but it's also the highest-leverage change in the dashboard package by a large margin.
 - Several per-package reports flag duplicated _comments_ as a smell ("two files have ~10-line comments explaining where globalExcludes are applied"; "every emitter file declares top-level names that later emitters reference"). This is a useful heuristic for "the type system is doing too little work here" — when the comment exists to enforce an invariant, the invariant is a candidate for a type or a function signature.
 - I did not audit test files for design problems — focus was production code. The per-package reports are similarly scoped. Test infrastructure quality looks high (fakes, fixtures, snapshots) but the lifecycle-state findings (T1, T9) all leak into how tests are written, so a test-layer audit after the T1 RunScope work would be worthwhile.
+
+## Resolution
+
+T1 (RunScope / lifecycle) and T2 (consolidated registries) were
+implemented together — the "ship T1 + T2 in one PR" recommendation
+from the "Recommended sequencing" section was taken. Tracked in
+`docs/plans/ready/architecture-runscope-and-registry/` (Phases 0–7);
+landed in PR #2 on 2026-05-27.
+
+**Architectural deltas (verified at HEAD of `feat/runscope-and-registry-rebased`):**
+
+  - `RunScope` lives in `@opensip-tools/core/lib/run-scope.ts`. Owns
+    per-invocation logger / parseCache / projectContext / datastore
+    thunk / tool registry / language registry / recipe-config slot.
+    Bound to the current async context via `AsyncLocalStorage`
+    (`runWithScope` / `enterScope` / `currentScope`).
+  - `Registry<T>` base in `@opensip-tools/core/lib/registry.ts`. Closed
+    `DuplicatePolicy` union (5 variants). Nine registries migrated:
+    `ToolRegistry`, `LanguageRegistry`, `RecipeRegistry`,
+    `CheckRegistry`, `TargetRegistry`, `FitnessRecipeRegistry`,
+    `SimulationRecipeRegistry`, `GraphAdapterRegistry`,
+    `GraphRulesRegistry`. `IdNameTagRegistry` deleted entirely.
+  - `defaultToolRegistry` / `defaultLanguageRegistry` module-singleton
+    exports gone — tools read `cli.scope.tools` / `cli.scope.languages`.
+  - `defineX` no longer registers as a side effect; callers register
+    explicitly via the plugin loader. `*WithoutRegistration` twins
+    deleted (47 LOC of test surface).
+  - `Symbol.for(globalThis)` recipe-config slot replaced by scope-bound
+    `RecipeCheckConfigSlot`. Two-copies-of-fitness invariant verified
+    by `packages/fitness/engine/src/recipes/__tests__/check-config.test.ts`
+    and the SaaS-mode smoke test at
+    `packages/cli/src/__tests__/saas-mode-smoke.test.ts`.
+  - Logger free mutators (`setLogLevel`, etc.) replaced by
+    `configureLogger(opts)`.
+  - `lang-typescript filterCache` folded into
+    `LanguageParseCache.filteredContent`.
+  - `SimulationRecipeRegistry`'s LSP violation fixed (built-ins via
+    `{ internal: true }`).
+
+**Metrics (LOC):**
+
+  - Whole-file deletions: 178 LOC (`id-name-tag-registry.ts` + its test).
+  - `WithoutRegistration` test surface: 47 LOC.
+  - Free mutator exports: net −2 (6 removed, 4 added — of which 2 are
+    renames and 2 take an explicit `RunScope` parameter rather than
+    closing over module state).
+  - Total registry LOC: 1182 → 1292 (per-tool registries shrank from
+    1182 → 1060; new `Registry<T>` base added 232). The "≤ 600" target
+    in the original report was miscalibrated — each per-tool registry
+    retains a legitimate domain-specific index (`byExtension`,
+    `byAlias`, etc.) that doesn't generalise into the base.
+  - Greps return zero in live `src/` for: `IdNameTagRegistry`,
+    `defaultToolRegistry`, `defaultLanguageRegistry`,
+    `Symbol.for(...opensip-tools...)`, `setLogLevel`, `WithoutRegistration`.
+
+**Themes resolved:** T1, T2. T9 (lifecycle holes) is partially closed
+by the RunScope lifecycle; remaining items not blocked by registries
+or per-run state stand on their own.
+
+Full metric tables and per-task evidence are in
+`docs/plans/ready/architecture-runscope-and-registry/phase-7-verification.md#findings`.

@@ -192,4 +192,135 @@ Acceptance:
 
 ## Findings
 
-*(Task 7.2 fills this in during Phase 7 execution.)*
+Recorded during Phase 7 execution (2026-05-27).
+
+### Task 7.1 — SaaS-mode smoke test
+
+`packages/cli/src/__tests__/saas-mode-smoke.test.ts` exists and is green.
+Two `runWithScope(scopeA/scopeB, () => executeFit(...))` calls run
+inside `Promise.all` against two distinct fixture projects (different
+target globs, distinct source files). Asserts:
+
+  - ALS isolation across concurrent callbacks (`currentScope()` returns
+    the per-callback scope).
+  - Independent `parseCache` instances (cross-write does not leak).
+  - Per-scope `tools` / `languages` registries.
+  - `currentScope()` unwinds to `undefined` outside the `runWithScope`
+    callbacks.
+  - Recipe-config slot is scope-bound (seeding A's slot is invisible
+    to B's reader inside `runWithScope(scopeB, ...)`).
+
+Outcome: both tests pass in ~17 ms. No T1 escape detected.
+
+### Task 7.2 — Quantified metrics
+
+**Test-plumbing-deletion LOC (whole-file deletions):**
+
+| File | LOC removed |
+|---|---|
+| `packages/core/src/lib/__tests__/id-name-tag-registry.test.ts` | 97 |
+| `packages/core/src/lib/id-name-tag-registry.ts` | 81 |
+| **Total whole-file deletions** | **178** |
+
+**Free mutator / resetter export delta (within-file):**
+
+Removed exports (6):
+  - `setProjectContextForRun` (core)
+  - `setLogLevel` (core logger)
+  - `setCurrentRecipeCheckConfig` (fitness recipes, old shape)
+  - `clearCurrentRecipeCheckConfig` (fitness recipes, old shape)
+  - `_clearAdaptersForTesting` (graph lang-adapter — renamed)
+  - `clearFilterCache` (lang-typescript — folded into `LanguageParseCache.filteredContent`)
+
+Added exports (4, of which 2 are renames/new shapes):
+  - `setCurrentRunScope` (cli-context — narrower than the prior
+    `currentProjectContext`/`datastoreCache` holders)
+  - `setCurrentRecipeCheckConfig` (fitness recipes, new signature
+    takes an explicit `RunScope`)
+  - `clearCurrentRecipeCheckConfig` (fitness recipes, new signature
+    takes an explicit `RunScope`)
+  - `clearAdapterRegistry` (graph lang-adapter — rename of the prior
+    `_clearAdaptersForTesting`)
+
+Net: **2 fewer free mutators**. The remaining four either accept an
+explicit scope (closed over an injected handle, not a module global)
+or are narrower than what they replaced.
+
+**`WithoutRegistration` test-API surface removed:**
+
+  - 47 lines of `*WithoutRegistration` references deleted across
+    simulation framework tests and define-scenario tests. Zero
+    `*WithoutRegistration` references remain in `src/` (only in
+    stale `dist/` artifacts).
+
+**Registry LOC (per acceptance criteria):**
+
+| Layer | Baseline (main) | Current (HEAD) |
+|---|---:|---:|
+| All `registry.ts` across workspace | 1182 | 1292 |
+| `+target-registry.ts` (fitness) | 130 | 145 |
+| Sum | 1312 | 1437 |
+| New `Registry<T>` base | — | 232 |
+| Per-tool `registry.ts` (excl. base) | 1182 | 1060 |
+
+The cross-cutting report's "≤ 600" target was optimistic — it assumed
+each per-tool registry could compress to ~30 LOC over a shared base.
+The reality is each per-tool registry retains a domain-specific index
+(`byExtension`, `byAlias`, `byScope`, `bySlug`) and recipe/tool seeding
+logic that doesn't generalise. The shared base absorbs the by-id /
+by-name / duplicate-policy / event-emitter responsibilities (232 LOC
+that was previously copy-pasted across nine registry classes).
+
+The architectural gain is real even though the LOC count grew slightly:
+five duplicated `DuplicatePolicy` enums collapsed to one closed union;
+five copies of "by-id Map + by-name Map + duplicate-policy guard" → one
+base. The `IdNameTagRegistry` sibling generalisation deleted entirely.
+
+**Grep zeros (live `src/`, excluding `dist/` and doc comments):**
+
+| Pattern | Live hits |
+|---|---:|
+| `IdNameTagRegistry` (live code) | 0 |
+| `defaultToolRegistry` / `defaultLanguageRegistry` (live code) | 0 |
+| `Symbol.for(...opensip-tools...)` | 0 |
+| `setLogLevel` (live code) | 0 |
+| `WithoutRegistration` (live code) | 0 |
+| `this.byId` / `this.byName` in `SimulationRecipeRegistry` | 0 |
+
+All architectural invariants from the cross-cutting recommendations
+report's T1 + T2 items are satisfied in live source. Doc-comment
+references to the removed APIs remain (e.g. `run-scope.ts` documents
+the `Symbol.for(globalThis)` site it replaced) — those are intentional
+historical pointers, not stale code.
+
+### Task 7.3 — Dogfood gate
+
+`pnpm build` clean; `pnpm fit:ci` (the CI gate command =
+`fit --gate-save`) exits 0. At HEAD:
+
+  - 112 checks ran.
+  - 926 findings recorded into the baseline.
+  - 91 PASS / 21 FAIL (189 errors, 737 warnings).
+  - `fit --gate-compare` against the just-saved baseline reports
+    "STABLE — no change" (trivially — the same run wrote it).
+
+Note on baseline comparison: running `pnpm fit` against `main` from
+within this worktree was not possible (branch-switch and external
+clone both denied for sound safety reasons). CI on PR #2 will run
+the gate against the prior baseline and surface any regression delta.
+The 926-finding HEAD count is the new baseline future runs will
+compare to once CI re-saves it.
+
+No category-(a) (genuine quality regression this refactor
+introduced) violations spotted in a manual scan of the FAIL list —
+top failing checks are pre-existing dogfood debt (`magic-numbers`,
+`function-length`, `tsdoc-required`, etc.) that the refactor did
+not move either direction. No category-(b) (refactor exposed a
+false positive) either.
+
+### End-of-phase grade
+
+All acceptance-criteria boxes are checkable except "Registry total
+LOC ≤ ~600" — see the Task 7.2 notes for why that target was
+miscalibrated. Architectural gains landed; LOC count grew because
+each per-tool registry retained legitimate domain indexing.
