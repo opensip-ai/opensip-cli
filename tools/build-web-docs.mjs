@@ -195,6 +195,12 @@ const buildManifest = (results, releaseRef) => {
   }
   const nav = [...sectionMap.values()];
 
+  // Audience-tab grouping — derived from per-page `audience:` frontmatter.
+  // The website can use this to render audience-tabbed navigation as an
+  // alternative to the numeric section ladder. Each page can appear in
+  // multiple tabs; the ordering of tabs is stable + curated below.
+  const audienceTabs = buildAudienceTabs(pages);
+
   // No build timestamp on purpose — manifest is fully deterministic so
   // re-running the build never produces a spurious diff. The website
   // can derive "last updated" from the GitHub commit timestamp via API.
@@ -203,7 +209,58 @@ const buildManifest = (results, releaseRef) => {
     rawBase: `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${releaseRef}/`,
     pages,
     nav,
+    audienceTabs,
   };
+};
+
+// Audience tabs — derived nav grouping. Order + display titles are
+// curated; tags that don't appear here are silently grouped under
+// "Other" so a new tag added in frontmatter shows up without breaking
+// the build. The website is expected to render these as top-level tabs;
+// pages within a tab follow `pages` array order (i.e. filesystem order).
+const AUDIENCE_TAB_ORDER = [
+  { tag: 'getting-started', title: 'Start' },
+  { tag: 'plugin-authors',  title: 'Author plugins' },
+  { tag: 'ci-integrators',  title: 'Integrate with CI' },
+  { tag: 'contributors',    title: 'Contribute' },
+];
+
+const buildAudienceTabs = (pages) => {
+  const tabs = AUDIENCE_TAB_ORDER.map(({ tag, title }) => ({
+    audience: tag,
+    title,
+    pages: [],
+  }));
+  const otherPages = [];
+  const tabIndex = new Map(tabs.map((t, i) => [t.audience, i]));
+
+  for (const page of pages) {
+    const audience = Array.isArray(page.audience) ? page.audience : [];
+    if (audience.length === 0) {
+      // No frontmatter audience — surface under all tabs would be noisy;
+      // surface under "contributors" by convention (these are typically
+      // architecture or convention pages).
+      tabs[tabIndex.get('contributors')].pages.push(page.path);
+      continue;
+    }
+    let placed = false;
+    for (const a of audience) {
+      if (tabIndex.has(a)) {
+        tabs[tabIndex.get(a)].pages.push(page.path);
+        placed = true;
+      }
+    }
+    if (!placed) {
+      otherPages.push(page.path);
+    }
+  }
+
+  if (otherPages.length > 0) {
+    tabs.push({ audience: 'other', title: 'Other', pages: otherPages });
+  }
+
+  // Strip empty tabs — a tab with zero pages is noise in the website nav.
+  return tabs.filter((t) => t.pages.length > 0);
 };
 
 const parseFrontmatter = (text) => {

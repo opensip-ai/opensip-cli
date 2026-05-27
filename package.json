@@ -23,15 +23,19 @@
     "clean": "turbo run clean",
     "cli": "node packages/cli/dist/index.js",
     "fit": "node packages/cli/dist/index.js fit",
+    "fit:ci": "node packages/cli/dist/index.js fit --gate-save",
     "dashboard": "node packages/cli/dist/index.js dashboard",
     "sessions": "node packages/cli/dist/index.js sessions",
-    "docs:build": "node tools/build-web-docs.mjs",
+    "docs:build": "pnpm docs:build:checks-index && node tools/build-web-docs.mjs",
+    "docs:build:checks-index": "node tools/extract-checks-metadata.mjs | node tools/build-checks-index.mjs - > docs/architecture/70-reference/05-checks-index.md",
     "docs:check": "node tools/build-web-docs.mjs --check",
     "verify-release": "node tools/verify-release.mjs",
     "prepare": "git config core.hooksPath .githooks 2>/dev/null || true"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
+    "@opensip-tools/checks-typescript": "workspace:*",
+    "@opensip-tools/checks-universal": "workspace:*",
     "@vitest/coverage-v8": "^2.1.9",
     "dependency-cruiser": "^17.4.0",
     "eslint": "^9.39.4",
@@ -50,6 +54,7 @@
     "node": ">=22"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["better-sqlite3", "tree-sitter-go", "tree-sitter-java"]
+    "onlyBuiltDependencies": ["better-sqlite3", "tree-sitter-go", "tree-sitter-java"],
+    "injectWorkspacePackages": true
   }
 }

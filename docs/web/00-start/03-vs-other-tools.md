@@ -1,0 +1,101 @@
+---
+status: current
+last_verified: 2026-05-27
+release: v2.0.x
+title: "vs. other tools"
+audience: [getting-started]
+purpose: "Honest comparison: what opensip-tools does that ESLint, Semgrep, Sonarqube, and Snyk don't — and what it deliberately doesn't try to do."
+source-files:
+  - README.md
+related-docs:
+  - ./00-what-is-opensip-tools.md
+  - ./04-faq.md
+---
+# vs. other tools
+
+opensip-tools is not a replacement for ESLint, Semgrep, or Sonarqube — it complements them. This page lays out what's overlapping, what's distinct, and when each tool is the right call. No marketing — just the honest shape.
+
+## At a glance
+
+| | opensip-tools | ESLint / Ruff / golangci-lint | Semgrep | Sonarqube | Snyk |
+|---|---|---|---|---|---|
+| **Polyglot in one run** | ✓ TS, Python, Rust, Go, Java, C/C++ | ✗ (one per language) | ✓ | ✓ | ✓ (security focus) |
+| **User-authored architectural rules** | ✓ (`defineCheck` in 15 lines) | partial (custom rules per linter) | ✓ (Semgrep YAML) | partial (XPath-ish) | ✗ |
+| **Static call-graph rules** (orphan code, dead paths) | ✓ (5 built-in) | ✗ | partial | ✓ | ✗ |
+| **Load / chaos / invariant simulation** | ✓ (`sim`, experimental) | ✗ | ✗ | ✗ | ✗ |
+| **CI gate with baselines** | ✓ (`--gate-save` / `--gate-compare`) | partial (snapshot files) | ✓ | ✓ | ✓ |
+| **SARIF output for PR annotations** | ✓ | partial | ✓ | ✓ | ✓ |
+| **Runs offline (no SaaS required)** | ✓ | ✓ | ✓ | partial | ✗ |
+| **Free / open source** | ✓ MIT | ✓ | ✓ (OSS engine + paid cloud) | partial (Community Edition) | ✗ (commercial) |
+| **Per-project plugins via `.mjs` files** | ✓ | partial | ✗ | ✗ | ✗ |
+| **Marketplace of rules** | partial (npm packages) | ✓ (huge) | ✓ (large registry) | partial | partial |
+
+---
+
+## Should I use opensip-tools or X?
+
+### vs. ESLint, Ruff, golangci-lint, clang-tidy
+
+**Use linters for what they're good at:** language-specific syntactic patterns and stylistic preferences inside one file. `no-unused-vars`, `prefer-const`, formatting, AST-level idiom enforcement. These are exactly what linters were designed for.
+
+**Use opensip-tools above them**, for things linters can't express:
+
+- *Architectural rules* — "no module under `packages/cli/` may import from `packages/fitness/checks-*`". This is a project-shape rule, not a syntactic one.
+- *Cross-file constraints* — "every package directory must have a README.md and a tsconfig.json".
+- *Cross-language rules* — "no console.log in production code", but applied uniformly to TypeScript and Python and Rust.
+- *Things that need to look at multiple files at once* — duplicated function bodies, orphan call-graph subtrees, drift from a stored baseline.
+
+Linters and opensip-tools coexist. They answer different questions; you run both in CI.
+
+### vs. Semgrep
+
+This is the closest comparison — both are polyglot rule runners aimed above traditional linters. The differences:
+
+- **Rule format.** Semgrep rules are YAML pattern-matching expressions. opensip-tools checks are TypeScript/JS functions. Semgrep's YAML is more compact for syntactic patterns; opensip-tools's code is more flexible for arbitrary logic (multi-file analysis, custom data structures, fetching the package graph). If your rules are mostly "match this pattern with these variables", Semgrep is sharper. If your rules need to walk the call graph or check that a specific file exists, opensip-tools is sharper.
+- **Sim and graph loops.** opensip-tools also ships `sim` (load / chaos / invariant simulation) and `graph` (static call-graph rules). These don't have Semgrep equivalents. If you want one tool for "is the code clean" + "does it behave under load" + "what's reachable", opensip-tools covers all three.
+- **Hosting.** Semgrep's OSS engine is free; their cloud product (App / Pro) is paid and where most of the rule library lives. opensip-tools is fully open-source — no separate cloud product is required. The optional `--report-to` endpoint posts to OpenSIP Cloud for dashboards, but the CLI works fully offline.
+
+Many teams use both: Semgrep for the security-rule library, opensip-tools for project-shape and architecture rules.
+
+### vs. Sonarqube
+
+Sonarqube is the closest in *scope* — multi-language code quality with rule customization and baseline tracking — but the operating model is different:
+
+- **Sonarqube is a server.** You run an analyzer (sonar-scanner) that posts to a Sonarqube instance, and gates happen in the server. opensip-tools is a CLI that exits with a code. No server, no database (beyond a local SQLite file for sessions).
+- **Rules.** Sonarqube ships thousands of pre-built rules; customizing them requires the (paid) Developer Edition or higher. opensip-tools ships ~158 rules and assumes you'll author project-specific ones in 15-line files.
+- **Architecture rules.** Sonarqube has limited architecture-rule support (some via XPath in Java). opensip-tools is designed *around* architectural rules — that's the central use case.
+
+If you want a managed server with a UI for triage, Sonarqube fits. If you want a CLI that exits with an exit code and lives entirely in your repo, opensip-tools fits.
+
+### vs. Snyk
+
+Snyk is a security platform — vulnerability scanning, dependency CVE checks, secret detection, IaC misconfiguration. opensip-tools is not in that category. The categories overlap only in the "fail CI on bad code" gate model; the content is completely different.
+
+- Use Snyk for: CVE scanning, license compliance, container/IaC security.
+- Use opensip-tools for: code quality, architectural rules, project shape, static analysis findings.
+
+They coexist comfortably in the same CI pipeline.
+
+---
+
+## What opensip-tools deliberately isn't trying to be
+
+A short anti-claims list, since "what we don't do" is often more useful than "what we do":
+
+- **Not a linter replacement.** ESLint, Ruff, golangci-lint, and clang-tidy still belong in your toolchain.
+- **Not a service.** No daemon. No API server. The optional OpenSIP Cloud dashboard is a separate product that opensip-tools can post to, not require.
+- **Not opinionated about your bar.** The 158 built-in checks are a starting point. The point is *your* rules — the constraints that matter to your codebase.
+- **Not a CI runner.** It runs *under* GitHub Actions / GitLab CI / Buildkite. Produces an exit code and SARIF; doesn't replace your CI orchestrator.
+- **Not an AI tool.** No model calls, no embeddings, no agentic anything. (You can build an AI tool *on top of* the Tool plugin contract.)
+- **Not a security scanner.** Limited security checks (no-eval, no-hardcoded-secrets, sql-injection patterns) ship in `checks-universal`, but Snyk / Dependabot / GitHub Advanced Security are the right call for CVE-scale work.
+
+---
+
+## What's next
+
+| If you want to … | Go to … |
+|---|---|
+| See concrete code samples for each loop | [Show me each loop](/docs/opensip-tools/00-start/02-show-me-the-loops/) |
+| Common questions about adoption + edge cases | [FAQ](/docs/opensip-tools/00-start/04-faq/) |
+| Run the four-command smoke right now | [Quick start](/docs/opensip-tools/00-start/01-quick-start/) |
+| Browse the 158+ built-in checks | [Checks reference](/docs/opensip-tools/70-reference/05-checks-index/) |
