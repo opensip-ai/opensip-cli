@@ -91,6 +91,21 @@ and breaks compatibility with v1.x runtime layouts.
 
 ### Added
 
+- **`fit-baseline-export` and `graph-baseline-export` subcommands** read
+  the SQLite-backed gate baseline and write it to a file on disk. The
+  underlying baseline moved from `<runtime>/baseline.sarif` (fit) and
+  `<runtime>/cache/graph/baseline.json` (graph) into the SQLite
+  datastore in the v2 persistence migration; these subcommands let CI
+  flows (e.g. `gh code-scanning upload-sarif`) and git-tracked-baseline
+  workflows continue to consume the file shape without reading the
+  datastore directly. Usage:
+  ```
+  opensip-tools fit-baseline-export --out path/to/baseline.sarif
+  opensip-tools graph-baseline-export --out path/to/baseline.json
+  ```
+  Parent directories of `--out` are created if missing; the file is
+  overwritten if present. Exits 2 when no baseline has been captured
+  yet (run `--gate-save` first).
 - **Marker-based plugin discovery** — fit and sim packs can now declare
   `opensipTools.kind: "fit-pack"` (or `"sim-pack"`) in their `package.json`
   and be auto-discovered regardless of npm scope or name. Mirrors the
@@ -177,6 +192,15 @@ and breaks compatibility with v1.x runtime layouts.
 
 ### Changed
 
+- **Fitness dashboard reads the graph catalog from SQLite, not disk.**
+  `loadGraphCatalog` in `packages/fitness/engine/src/cli/dashboard.ts`
+  was still reading the legacy `<runtime>/cache/graph/catalog.json`
+  file, which the v2 graph migration stopped writing. The dashboard's
+  Code Paths panel rendered in a no-data state for every project on
+  v2 as a result. The fix queries the `graph_catalog` table directly
+  via raw SQL (importing `CatalogRepo` from `@opensip-tools/graph`
+  would create a build cycle since graph already depends on fitness
+  for SARIF helpers — DEC-3).
 - **`@opensip-tools/contracts`** gains `SessionRepo` and the sessions
   schema. `StoredSession` shape is unchanged; layout shifts from
   one-JSON-per-run files to `sessions` + `session_checks` +
@@ -246,6 +270,17 @@ and breaks compatibility with v1.x runtime layouts.
 
 ### Removed
 
+- **`ProjectPaths.baselinePath` and `graphBaselinePath`.** Orphaned after
+  the v2 persistence migration: fit's gate baseline lives in the
+  `fit_baseline` table (via `FitBaselineRepo`); graph's lives in
+  `graph_baseline_signals` + `graph_baseline_meta` (via
+  `GraphBaselineRepo`). No consumer reads from the legacy file paths,
+  so the path-resolver entries are gone. External consumers needing a
+  file artifact should use the new `fit-baseline-export` /
+  `graph-baseline-export` subcommands.
+- **`ProjectPaths.graphCatalogPath`.** Same shape — the catalog moved
+  to `graph_catalog` (via `CatalogRepo`), and the dashboard fix in
+  this release was the last consumer reading the legacy file path.
 - **`metadata` plugin export contract.** The `metadata?: PluginMetadata`
   field on `FitPluginExports` / `SimPluginExports` / `LangPluginExports`,
   and the `PluginMetadata` interface itself, were dead code — no consumer
