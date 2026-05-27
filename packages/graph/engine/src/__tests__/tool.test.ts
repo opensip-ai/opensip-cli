@@ -35,9 +35,9 @@ describe('graphTool contract conformance (AC-2)', () => {
     expect(graphTool.metadata.version).toBe(pkg.version);
   });
 
-  it('commands lists the unified graph subcommand plus the lookup/symbol-index queries', () => {
+  it('commands lists the unified graph subcommand plus the lookup/symbol-index/baseline-export queries', () => {
     const names = graphTool.commands.map((c) => c.name);
-    expect(names).toEqual(['graph', 'graph-lookup', 'graph-symbol-index']);
+    expect(names).toEqual(['graph', 'graph-lookup', 'graph-symbol-index', 'graph-baseline-export']);
   });
 
   it('register is callable', () => {

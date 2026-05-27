@@ -43,6 +43,7 @@ import {
 /* eslint-enable sonarjs/deprecation */
 import { readPackageVersion } from '@opensip-tools/core';
 
+import { exportFitBaseline } from './cli/baseline-export.js';
 import { openDashboard } from './cli/dashboard.js';
 import { renderFitLive } from './cli/fit-runner.js';
 import { executeFit } from './cli/fit.js';
@@ -93,6 +94,11 @@ const FIT_RECIPES: ToolCommandDescriptor = {
   name: 'fit-recipes',
   description: 'List available fitness recipes',
   aliases: ['list-recipes'],
+};
+
+const FIT_BASELINE_EXPORT: ToolCommandDescriptor = {
+  name: 'fit-baseline-export',
+  description: 'Export the fit gate baseline (SARIF) from the datastore to a file',
 };
 
 // =============================================================================
@@ -148,6 +154,7 @@ function register(cli: ToolCliContext): void {
   registerDashboardCommand(program, cli);
   registerListCommand(program, cli);
   registerRecipesCommand(program, cli);
+  registerBaselineExportCommand(program, cli);
 }
 
 // =============================================================================
@@ -245,6 +252,35 @@ function registerRecipesCommand(program: CliProgram, cli: ToolCliContext): void 
       const result = await listRecipes(opts.cwd);
       if (opts.json) { cli.emitJson(result); return; }
       await cli.render(result);
+    });
+}
+
+function registerBaselineExportCommand(program: CliProgram, cli: ToolCliContext): void {
+  program
+    .command(FIT_BASELINE_EXPORT.name)
+    .description(FIT_BASELINE_EXPORT.description)
+    .requiredOption('--out <path>', 'Output file path for the SARIF baseline')
+    .option('--cwd <path>', 'Target directory', process.cwd())
+    .option('--json', 'Output structured JSON', false)
+    .action((opts: ToolOptions & { out: string }) => {
+      const datastore = cli.datastore as DataStore;
+      const result = exportFitBaseline(datastore, opts.out);
+      if (result.type === 'error') {
+        cli.setExitCode(result.exitCode);
+        if (opts.json) {
+          cli.emitJson({ error: result.message });
+          return;
+        }
+        process.stderr.write(`Error: ${result.message}\n`);
+        return;
+      }
+      if (opts.json) {
+        cli.emitJson(result);
+        return;
+      }
+      process.stdout.write(
+        `Exported fit baseline to ${result.outPath} (${String(result.bytesWritten)} bytes)\n`,
+      );
     });
 }
 
@@ -384,7 +420,7 @@ export const fitnessTool: Tool = {
     version: readPackageVersion(import.meta.url),
     description: 'Run fitness checks against a codebase',
   },
-  commands: [FIT, DASHBOARD, FIT_LIST, FIT_RECIPES],
+  commands: [FIT, DASHBOARD, FIT_LIST, FIT_RECIPES, FIT_BASELINE_EXPORT],
   register,
   initialize: async (): Promise<void> => {
     // ensureChecksLoaded() is called inside the executeFit / listChecks
