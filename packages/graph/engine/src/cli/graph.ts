@@ -129,7 +129,7 @@ export async function executeGraph(
       cwd: runCwd,
       noCache: opts.noCache,
       tsConfigPath: runTsConfig,
-      datastore: cli.datastore as DataStore | undefined,
+      datastore: cli.scope.datastore() as DataStore | undefined,
     });
     if (opts.gateSave === true || opts.gateCompare === true) {
       await runGateMode(opts, result.signals, cli);
@@ -156,7 +156,7 @@ export async function executeGraph(
       });
       logger.info({ evt: 'graph.render.table.complete', module: 'graph:render' });
     }
-    persistSession(opts, result.signals, cli.datastore as DataStore | undefined);
+    persistSession(opts, result.signals, cli.scope.datastore() as DataStore | undefined);
     cli.setExitCode(EXIT_CODES.SUCCESS);
     logger.info({
       evt: 'graph.cli.graph.complete',
@@ -531,7 +531,7 @@ async function runGateMode(
   signals: readonly Signal[],
   cli: ToolCliContext,
 ): Promise<void> {
-  const datastore = cli.datastore as DataStore | undefined;
+  const datastore = cli.scope.datastore() as DataStore | undefined;
   if (!datastore) {
     throw new ConfigurationError('Graph gate mode requires a DataStore on ToolCliContext.');
   }

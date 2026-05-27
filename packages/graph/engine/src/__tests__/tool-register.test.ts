@@ -131,6 +131,7 @@ function makeMockCli(datastore?: DataStore): MockCliBag {
     setExitCode,
     emitJson,
     datastore,
+    scope: { datastore: () => datastore },
   } as unknown as ToolCliContext;
   return { cli, program, setExitCode, emitJson, registerLiveView, renderLive };
 }

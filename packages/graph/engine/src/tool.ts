@@ -87,7 +87,7 @@ function register(cli: ToolCliContext): void {
   cli.registerLiveView(GRAPH_LIVE_VIEW_KEY, async (args) => {
     await renderGraphLive(
       args as { cwd: string; noCache?: boolean },
-      cli.datastore as DataStore | undefined,
+      cli.scope.datastore() as DataStore | undefined,
       { setExitCode: cli.setExitCode },
     );
   });
@@ -204,7 +204,7 @@ function register(cli: ToolCliContext): void {
     .option('--cwd <path>', 'Target directory', process.cwd())
     .option('--json', 'Output structured JSON', false)
     .action((opts: { cwd: string; out: string; json?: boolean }) => {
-      const datastore = cli.datastore as DataStore;
+      const datastore = cli.scope.datastore() as DataStore;
       const result = exportGraphBaseline(datastore, opts.out);
       if (result.type === 'error') {
         cli.setExitCode(result.exitCode);

@@ -30,9 +30,9 @@ describe('RunScope — construction', () => {
     scope.dispose();
   });
 
-  it('default datastore thunk throws (programmer-error catch-all)', () => {
+  it('default datastore thunk returns undefined (no-store semantics, matching prior cli.datastore contract)', () => {
     const scope = new RunScope();
-    expect(() => scope.datastore()).toThrow(/datastore accessed without/);
+    expect(scope.datastore()).toBeUndefined();
     scope.dispose();
   });
 });

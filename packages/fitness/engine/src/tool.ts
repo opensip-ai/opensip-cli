@@ -153,7 +153,7 @@ function register(cli: ToolCliContext): void {
   // requires zero CLI edits.
   cli.registerLiveView(FIT_LIVE_VIEW_KEY, async (args) => {
     // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
-    await renderFitLive(args as CliArgs, cli.datastore as DataStore | undefined, {
+    await renderFitLive(args as CliArgs, cli.scope.datastore() as DataStore | undefined, {
       setExitCode: cli.setExitCode,
     });
   });
@@ -224,7 +224,7 @@ function registerDashboardCommand(program: CliProgram, cli: ToolCliContext): voi
     .option(JSON_FLAG, JSON_DESC, false)
     .option('--debug', 'Enable debug mode for structured log output', false)
     .action(async (opts: ToolOptions) => {
-      const result = await openDashboard(opts.cwd, cli.datastore as DataStore);
+      const result = await openDashboard(opts.cwd, cli.scope.datastore() as DataStore);
       if (opts.json) {
         cli.emitJson(result);
         return;
@@ -271,7 +271,7 @@ function registerBaselineExportCommand(program: CliProgram, cli: ToolCliContext)
     .option(CWD_FLAG, CWD_DESC, process.cwd())
     .option(JSON_FLAG, JSON_DESC, false)
     .action((opts: ToolOptions & { out: string }) => {
-      const datastore = cli.datastore as DataStore;
+      const datastore = cli.scope.datastore() as DataStore;
       const result = exportFitBaseline(datastore, opts.out);
       if (result.type === 'error') {
         cli.setExitCode(result.exitCode);
@@ -322,7 +322,7 @@ async function runRecipesMode(args: CliArgs, cli: ToolCliContext): Promise<void>
  */
 // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
 async function runJsonMode(args: CliArgs, cli: ToolCliContext): Promise<void> {
-  const fitResult = await executeFit(args, { datastore: cli.datastore as DataStore | undefined });
+  const fitResult = await executeFit(args, { datastore: cli.scope.datastore() as DataStore | undefined });
   if (fitResult.result.type === 'error') {
     cli.setExitCode(fitResult.result.exitCode);
     cli.emitJson({ error: fitResult.result.message });
@@ -386,7 +386,7 @@ async function runGateMode(args: CliArgs, cli: ToolCliContext): Promise<void> {
     process.stderr.write('Error: --gate-save and --gate-compare are mutually exclusive.\n');
     return;
   }
-  const datastore = cli.datastore as DataStore;
+  const datastore = cli.scope.datastore() as DataStore;
   const repo = new FitBaselineRepo(datastore);
   // Thread the bootstrap-supplied datastore through executeFit so its
   // post-call SessionRepo.save uses the same handle the gate baseline

@@ -28,7 +28,7 @@ export interface LookupCommandOptions {
 export function executeLookup(opts: LookupCommandOptions, cli: ToolCliContext): void {
   logger.info({ evt: 'graph.cli.lookup.start', module: 'graph:cli', name: opts.name });
   try {
-    const datastore = cli.datastore as DataStore | undefined;
+    const datastore = cli.scope.datastore() as DataStore | undefined;
     if (!datastore) {
       throw new ConfigurationError('graph lookup requires a DataStore on ToolCliContext.');
     }

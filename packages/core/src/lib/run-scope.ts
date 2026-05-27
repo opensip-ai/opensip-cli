@@ -59,7 +59,13 @@ class DefaultRecipeCheckConfigSlot implements RecipeCheckConfigSlot {
   }
 }
 
-/** Opaque accessor that lazily opens the datastore on first read. */
+/**
+ * Opaque accessor that lazily opens the datastore on first read.
+ *
+ * Returns `undefined` when no datastore is configured for this scope
+ * (matches the prior `cli.datastore` contract — tools cast to
+ * `DataStore | undefined` and handle the no-store case explicitly).
+ */
 export type DataStoreThunk = () => unknown;
 
 export interface RunScopeOptions {
@@ -100,11 +106,8 @@ export class RunScope {
     this.parseCache = opts.parseCache ?? new LanguageParseCache();
     this.recipeCheckConfig = new DefaultRecipeCheckConfigSlot();
     this.projectContext = opts.projectContext;
-    this.datastore =
-      opts.datastore ??
-      (() => {
-        throw new Error('RunScope.datastore accessed without a configured thunk.');
-      });
+    // eslint-disable-next-line unicorn/no-useless-undefined -- explicit no-store sentinel matches the prior `cli.datastore` contract (tools cast to `DataStore | undefined`).
+    this.datastore = opts.datastore ?? (() => undefined);
     this.tools = opts.tools ?? defaultToolRegistry;
     this.languages = opts.languages ?? defaultLanguageRegistry;
   }

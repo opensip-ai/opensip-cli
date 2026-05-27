@@ -94,7 +94,11 @@ interface MockCli {
 function mockCli(datastore: DataStore | undefined): MockCli {
   const setExitCode = vi.fn();
   return {
-    cli: { datastore, setExitCode } as unknown as ToolCliContext,
+    cli: {
+      datastore,
+      setExitCode,
+      scope: { datastore: () => datastore },
+    } as unknown as ToolCliContext,
     setExitCode,
   };
 }
