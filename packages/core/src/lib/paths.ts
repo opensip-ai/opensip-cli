@@ -13,7 +13,7 @@
  *       sessions/                               ← run history
  *       reports/                                ← dashboard HTML
  *       logs/                                   ← structured JSONL logs
- *       baseline.sarif                          ← architecture-gate baseline
+ *       datastore.sqlite                        ← sessions, baselines, catalog
  *       cache/                                  ← AST + prewarm caches
  *       plugins/<fit|sim>/node_modules/         ← npm-installed plugins
  *
@@ -59,14 +59,8 @@ export interface ProjectPaths {
   readonly logsDir: string;
   /** <project>/opensip-tools/.runtime/cache */
   readonly cacheDir: string;
-  /** <project>/opensip-tools/.runtime/baseline.sarif (default gate baseline). */
-  readonly baselinePath: string;
   /** <project>/opensip-tools/.runtime/cache/graph — graph-tool catalog cache root. */
   readonly graphCacheDir: string;
-  /** <project>/opensip-tools/.runtime/cache/graph/catalog.json — staged catalog. */
-  readonly graphCatalogPath: string;
-  /** <project>/opensip-tools/.runtime/cache/graph/baseline.json — gate baseline. */
-  readonly graphBaselinePath: string;
   /** <project>/opensip-tools/.runtime/plugins/<domain> — npm-installed plugins. */
   readonly pluginsDir: (domain: PluginsPathDomain) => string;
 }
@@ -114,10 +108,7 @@ export function resolveProjectPaths(projectDir: string): ProjectPaths {
     reportsDir: join(runtimeDir, 'reports'),
     logsDir: join(runtimeDir, 'logs'),
     cacheDir,
-    baselinePath: join(runtimeDir, 'baseline.sarif'),
     graphCacheDir,
-    graphCatalogPath: join(graphCacheDir, 'catalog.json'),
-    graphBaselinePath: join(graphCacheDir, 'baseline.json'),
     pluginsDir: (domain) => join(runtimeDir, 'plugins', domain),
   };
 }

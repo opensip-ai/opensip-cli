@@ -25,6 +25,7 @@ import { ConfigurationError, readPackageVersion } from '@opensip-tools/core';
 // register themselves via the CLI's discovery walker
 // (register-graph-adapters.ts). The historical engine-side bootstrap
 // is gone.
+import { exportGraphBaseline } from './cli/baseline-export.js';
 import { renderGraphLive } from './cli/graph-runner.js';
 import { executeGraph } from './cli/graph.js';
 import { runHeapPreflight } from './cli/heap-preflight.js';
@@ -48,6 +49,11 @@ const GRAPH_LOOKUP: ToolCommandDescriptor = {
 const GRAPH_SYMBOL_INDEX: ToolCommandDescriptor = {
   name: 'graph-symbol-index',
   description: 'Emit a symbolindex.json artifact (name→file:line and file→names) from the persisted catalog',
+};
+
+const GRAPH_BASELINE_EXPORT: ToolCommandDescriptor = {
+  name: 'graph-baseline-export',
+  description: 'Export the graph gate baseline (JSON) from the datastore to a file',
 };
 
 // Live-view key graph contributes to the CLI's renderer registry. Owned
@@ -190,6 +196,34 @@ function register(cli: ToolCliContext): void {
     .action((opts: { cwd: string; out: string }) => {
       executeSymbolIndex({ cwd: opts.cwd, out: opts.out }, cli);
     });
+
+  program
+    .command(GRAPH_BASELINE_EXPORT.name)
+    .description(GRAPH_BASELINE_EXPORT.description)
+    .requiredOption('--out <path>', 'Output file path for the JSON baseline')
+    .option('--cwd <path>', 'Target directory', process.cwd())
+    .option('--json', 'Output structured JSON', false)
+    .action((opts: { cwd: string; out: string; json?: boolean }) => {
+      const datastore = cli.datastore as DataStore;
+      const result = exportGraphBaseline(datastore, opts.out);
+      if (result.type === 'error') {
+        cli.setExitCode(result.exitCode);
+        if (opts.json === true) {
+          cli.emitJson({ error: result.message });
+          return;
+        }
+        process.stderr.write(`Error: ${result.message}\n`);
+        return;
+      }
+      if (opts.json === true) {
+        cli.emitJson(result);
+        return;
+      }
+      process.stdout.write(
+        `Exported graph baseline to ${result.outPath} ` +
+          `(${String(result.fingerprintCount)} fingerprint(s), ${String(result.bytesWritten)} bytes)\n`,
+      );
+    });
 }
 
 export const graphTool: Tool = {
@@ -198,6 +232,6 @@ export const graphTool: Tool = {
     version: readPackageVersion(import.meta.url),
     description: 'Static call-graph + dead-end analysis',
   },
-  commands: [GRAPH, GRAPH_LOOKUP, GRAPH_SYMBOL_INDEX],
+  commands: [GRAPH, GRAPH_LOOKUP, GRAPH_SYMBOL_INDEX, GRAPH_BASELINE_EXPORT],
   register,
 };
