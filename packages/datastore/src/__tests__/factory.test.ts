@@ -77,6 +77,65 @@ describe('DataStoreFactory.open — migration error path', () => {
   });
 });
 
+describe('DataStoreFactory.open — migrate failure on healthy backend', () => {
+  it('closes the backend and throws DataStoreMigrationError when migration folder is invalid', () => {
+    expect(() =>
+      DataStoreFactory.open({
+        backend: 'memory',
+        migrationsFolder: '/nonexistent/path/that/does/not/exist',
+      }),
+    ).toThrow(DataStoreMigrationError);
+  });
+
+  it('migration failure on SQLite backend includes recovery hint with path', () => {
+    const path = join(tmp, 'good.sqlite');
+    try {
+      DataStoreFactory.open({
+        backend: 'sqlite',
+        path,
+        migrationsFolder: '/nonexistent/migrations',
+      });
+      throw new Error('expected throw');
+    } catch (error) {
+      expect(error).toBeInstanceOf(DataStoreMigrationError);
+      expect((error as Error).message).toContain('good.sqlite');
+      expect((error as Error).message).toContain('Delete');
+    }
+  });
+
+  it('migration failure on memory backend returns the in-memory message', () => {
+    try {
+      DataStoreFactory.open({
+        backend: 'memory',
+        migrationsFolder: '/no/such/dir',
+      });
+      throw new Error('expected throw');
+    } catch (error) {
+      expect(error).toBeInstanceOf(DataStoreMigrationError);
+      expect((error as Error).message).toContain('in-memory backend');
+    }
+  });
+});
+
+describe('DataStoreMigrationError', () => {
+  it('preserves cause via the standard ES2022 Error.cause slot', () => {
+    const root = new Error('underlying');
+    const e = new DataStoreMigrationError('outer', { cause: root });
+    expect(e.cause).toBe(root);
+    expect(e.name).toBe('DataStoreMigrationError');
+  });
+
+  it('omits cause when not supplied', () => {
+    const e = new DataStoreMigrationError('outer');
+    expect(e.cause).toBeUndefined();
+  });
+
+  it('stores migrationFile when supplied', () => {
+    const e = new DataStoreMigrationError('outer', { migrationFile: '0001_init.sql' });
+    expect(e.migrationFile).toBe('0001_init.sql');
+  });
+});
+
 describe('DataStore.transaction', () => {
   it('passes a tx handle through and returns its return value', () => {
     const ds = DataStoreFactory.open({ backend: 'memory' });

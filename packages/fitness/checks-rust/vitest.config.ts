@@ -4,7 +4,12 @@ export default defineConfig({
     include: ['src/**/*.test.ts'],
     coverage: {
       include: ['src/**'],
-      exclude: ['src/**/*.test.ts', 'src/**/__tests__/**'],
+      exclude: [
+        'src/**/*.test.ts',
+        'src/**/__tests__/**',
+        // Pure barrel re-export with no runtime logic.
+        'src/index.ts',
+      ],
     },
   },
 });

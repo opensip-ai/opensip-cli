@@ -144,4 +144,120 @@ describe('graph-go walk.ts', () => {
     const calls = walk.callSites.filter((c) => c.kind === 'call');
     expect(calls.length).toBeGreaterThanOrEqual(1);
   });
+
+  it('preserves escape sequences inside interpreted string literals', () => {
+    // `"\\\""` — an escaped quote. The interpreted-string scanner has
+    // an escape branch (`\\` + next char).
+    writeFileSync(
+      join(dir, 'main.go'),
+      String.raw`package main` + '\nfunc esc() string { return ' + String.raw`"a\"b"` + ' }\n',
+      'utf8',
+    );
+    const walk = run(dir);
+    expect(walk.occurrences.esc).toBeDefined();
+  });
+
+  it('preserves rune literals — simple and escaped', () => {
+    // `'a'` exercises the unescape path; `'\\n'` exercises the escape
+    // branch in consumeRuneLiteral.
+    writeFileSync(
+      join(dir, 'main.go'),
+      "package main\nfunc a() rune { return 'a' }\nfunc b() rune { return '\\n' }\n",
+      'utf8',
+    );
+    const walk = run(dir);
+    expect(walk.occurrences.a).toBeDefined();
+    expect(walk.occurrences.b).toBeDefined();
+  });
+
+  it('classifies *_generated.go files as definedInGenerated', () => {
+    writeFileSync(
+      join(dir, 'foo_generated.go'),
+      `package main\nfunc Gen() {}\n`,
+      'utf8',
+    );
+    const walk = run(dir);
+    expect(walk.occurrences.Gen?.[0]?.definedInGenerated).toBe(true);
+  });
+
+  it('classifies *.gen.go files as definedInGenerated', () => {
+    writeFileSync(
+      join(dir, 'queries.gen.go'),
+      `package main\nfunc GenQ() {}\n`,
+      'utf8',
+    );
+    const walk = run(dir);
+    expect(walk.occurrences.GenQ?.[0]?.definedInGenerated).toBe(true);
+  });
+
+  it('classifies .pb.go files as definedInGenerated', () => {
+    writeFileSync(
+      join(dir, 'proto.pb.go'),
+      `package main\nfunc ProtoFunc() {}\n`,
+      'utf8',
+    );
+    const walk = run(dir);
+    expect(walk.occurrences.ProtoFunc?.[0]?.definedInGenerated).toBe(true);
+  });
+
+  it('emits a synthetic <module-init> per file', () => {
+    writeFileSync(
+      join(dir, 'main.go'),
+      `package main\nimport "fmt"\nvar greeting = "hi"\nfunc m() { fmt.Println(greeting) }\n`,
+      'utf8',
+    );
+    const walk = run(dir);
+    const moduleInits = Object.keys(walk.occurrences).filter((n) => n.startsWith('<module-init:'));
+    expect(moduleInits.length).toBe(1);
+    const occ = walk.occurrences[moduleInits[0]]?.[0];
+    expect(occ?.kind).toBe('module-init');
+    expect(occ?.visibility).toBe('module-local');
+  });
+
+  it('emits multi-name parameter declaration (`func f(a, b int)`)', () => {
+    writeFileSync(
+      join(dir, 'main.go'),
+      `package main\nfunc add(a, b int) int { return a + b }\n`,
+      'utf8',
+    );
+    const walk = run(dir);
+    const params = walk.occurrences.add?.[0]?.params;
+    expect(params?.map((p) => p.name)).toEqual(['a', 'b']);
+  });
+
+  it('emits variadic parameter as rest=true', () => {
+    writeFileSync(
+      join(dir, 'main.go'),
+      `package main\nfunc sum(xs ...int) int { return 0 }\n`,
+      'utf8',
+    );
+    const walk = run(dir);
+    const params = walk.occurrences.sum?.[0]?.params;
+    expect(params?.[0]?.rest).toBe(true);
+  });
+
+  it('strips // line comments and /* */ block comments inside function bodies', () => {
+    // Body contains both `//` line and `/* */` block comments to
+    // exercise stripGoComments' line+block branches during body
+    // normalization.
+    writeFileSync(
+      join(dir, 'main.go'),
+      `package main\nfunc withComments() int {\n    // explanation\n    /* block */\n    return 1\n}\n`,
+      'utf8',
+    );
+    const walk = run(dir);
+    expect(walk.occurrences.withComments).toBeDefined();
+  });
+
+  it('handles generic receiver types (Foo[T])', () => {
+    writeFileSync(
+      join(dir, 'main.go'),
+      `package main\ntype Box[T any] struct { v T }\nfunc (b Box[T]) Get() T { return b.v }\n`,
+      'utf8',
+    );
+    const walk = run(dir);
+    const get = walk.occurrences.Get?.[0];
+    expect(get?.kind).toBe('method');
+    expect(get?.enclosingClass).toBe('Box');
+  });
 });

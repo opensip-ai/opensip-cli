@@ -10,6 +10,8 @@ export default defineConfig({
         'src/**/__tests__/**',
         'src/**/index.ts',
         'src/types.ts',
+        // Pure type / interface declarations — no runtime code.
+        'src/graph-catalog.ts',
       ],
     },
   },

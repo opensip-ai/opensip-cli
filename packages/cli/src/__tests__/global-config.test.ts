@@ -86,3 +86,65 @@ describe('writeGlobalConfig', () => {
     expect(readGlobalConfig().apiKey).toBe('sk-second');
   });
 });
+
+describe('readGlobalConfig (missing / malformed paths)', () => {
+  it('returns {} when the config file does not exist', async () => {
+    const { readGlobalConfig } = await loadModule();
+    expect(readGlobalConfig()).toEqual({});
+  });
+
+  it('returns {} when the YAML content is malformed', async () => {
+    const { writeFileSync, mkdirSync } = await import('node:fs');
+    const opensipDir = join(HOME, '.opensip-tools');
+    mkdirSync(opensipDir, { recursive: true });
+    writeFileSync(join(opensipDir, 'config.yml'), '\t: not valid : :');
+    const { readGlobalConfig } = await loadModule();
+    expect(readGlobalConfig()).toEqual({});
+  });
+
+  it('returns {} when the YAML parses to null/empty', async () => {
+    const { writeFileSync, mkdirSync } = await import('node:fs');
+    const opensipDir = join(HOME, '.opensip-tools');
+    mkdirSync(opensipDir, { recursive: true });
+    writeFileSync(join(opensipDir, 'config.yml'), '');
+    const { readGlobalConfig } = await loadModule();
+    expect(readGlobalConfig()).toEqual({});
+  });
+});
+
+describe('resolveApiKey', () => {
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    delete process.env.OPENSIP_API_KEY;
+  });
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+  });
+
+  it('returns the CLI flag value at highest precedence', async () => {
+    const { resolveApiKey, writeGlobalConfig } = await loadModule();
+    writeGlobalConfig({ apiKey: 'sk-from-config' });
+    process.env.OPENSIP_API_KEY = 'sk-from-env';
+    expect(resolveApiKey('sk-from-flag')).toBe('sk-from-flag');
+  });
+
+  it('returns the env var when no flag is supplied', async () => {
+    const { resolveApiKey, writeGlobalConfig } = await loadModule();
+    writeGlobalConfig({ apiKey: 'sk-from-config' });
+    process.env.OPENSIP_API_KEY = 'sk-from-env';
+    expect(resolveApiKey()).toBe('sk-from-env');
+  });
+
+  it('falls back to the saved config value', async () => {
+    const { resolveApiKey, writeGlobalConfig } = await loadModule();
+    writeGlobalConfig({ apiKey: 'sk-from-config' });
+    expect(resolveApiKey()).toBe('sk-from-config');
+  });
+
+  it('returns undefined when no key is configured anywhere', async () => {
+    const { resolveApiKey } = await loadModule();
+    expect(resolveApiKey()).toBeUndefined();
+  });
+});

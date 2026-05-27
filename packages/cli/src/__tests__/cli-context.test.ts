@@ -147,4 +147,84 @@ describe('buildToolCliContext', () => {
     const { ctx } = buildToolCliContext(opts);
     await expect(ctx.renderLive('missing', {})).rejects.toBeInstanceOf(UnknownLiveViewError);
   });
+
+  it('emitJson writes JSON-encoded output to stdout', () => {
+    const opts = makeBuildOpts();
+    const { ctx } = buildToolCliContext(opts);
+    const out: string[] = [];
+    const spy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
+      out.push(String(chunk));
+      return true;
+    });
+    try {
+      ctx.emitJson({ foo: 'bar' });
+    } finally {
+      spy.mockRestore();
+    }
+    expect(out).toHaveLength(1);
+    expect(out[0]).toContain('"foo": "bar"');
+    expect(out[0]).toMatch(/\n$/);
+  });
+
+  it('project getter throws when accessed before pre-action-hook resolves it', async () => {
+    // Reset module state: the holders are module-level and may have
+    // been set by a prior test. Reset via dynamic import.
+    vi.resetModules();
+    const mod = await import('../cli-context.js');
+    const ctx = mod.buildToolCliContext({
+      program: new Command('test'),
+      render: vi.fn(() => Promise.resolve()),
+      liveViews: mod.createLiveViewRegistry(),
+      maybeOpenDashboard: vi.fn(() => Promise.resolve()),
+    }).ctx;
+    expect(() => ctx.project).toThrow(/pre-action-hook/);
+  });
+
+  it('uses defaultLogger when no logger is supplied', () => {
+    const { ctx } = buildToolCliContext({
+      program: new Command('test'),
+      render: vi.fn(() => Promise.resolve()),
+      liveViews: createLiveViewRegistry(),
+      maybeOpenDashboard: vi.fn(() => Promise.resolve()),
+    });
+    expect(ctx.logger).toBeDefined();
+  });
+});
+
+describe('getCurrentProjectRoot / setProjectContextForRun', () => {
+  it('throws when called before context is set', async () => {
+    vi.resetModules();
+    const mod = await import('../cli-context.js');
+    expect(() => mod.getCurrentProjectRoot()).toThrow(/pre-action-hook/);
+  });
+
+  it('returns the configured project root once set', async () => {
+    vi.resetModules();
+    const mod = await import('../cli-context.js');
+    mod.setProjectContextForRun({
+      scope: 'project',
+      projectRoot: '/path/to/proj',
+      walkedUp: 0,
+    });
+    expect(mod.getCurrentProjectRoot()).toBe('/path/to/proj');
+  });
+});
+
+describe('getOrOpenDatastore', () => {
+  it('throws when called before project context is set', async () => {
+    vi.resetModules();
+    const mod = await import('../cli-context.js');
+    expect(() => mod.getOrOpenDatastore()).toThrow(/pre-action-hook/);
+  });
+
+  it('throws when called in a non-project context (user scope)', async () => {
+    vi.resetModules();
+    const mod = await import('../cli-context.js');
+    mod.setProjectContextForRun({
+      scope: 'user',
+      projectRoot: '/anywhere',
+      walkedUp: 0,
+    } as never);
+    expect(() => mod.getOrOpenDatastore()).toThrow(/non-project context/);
+  });
 });
