@@ -34,12 +34,29 @@ import type { LanguageAdapter } from './adapter.js'
 const AUTO_CLEAR_MS = 10 * 60 * 1000
 
 /**
- * Per-instance parse cache. Each instance owns its own `Map` and
- * (optionally) an auto-clear timer that fires `AUTO_CLEAR_MS` after the
- * cache is started.
+ * Per-instance parse cache. Each instance owns its own parse-tree
+ * `Map`, a sibling `filteredContent` `Map` (for language-specific
+ * filtered-content caching keyed by raw content), and (optionally) an
+ * auto-clear timer that fires `AUTO_CLEAR_MS` after the cache is
+ * started.
+ *
+ * The two maps live together because they share the same lifecycle —
+ * a fresh run starts both at empty, a `dispose()` clears both, and the
+ * auto-clear timer drops both. The maps use different keys (parse-tree
+ * map is keyed by adapter+filePath+fingerprint; filtered-content map
+ * is keyed by raw content) because the two upstream call paths use
+ * different identities.
  */
 export class LanguageParseCache {
   private readonly cache = new Map<string, unknown>()
+  /**
+   * Language-specific filtered-content cache. Keyed by raw content
+   * string (no adapter or file path prefix) because the
+   * `filterContent(content)` API in `@opensip-tools/lang-typescript`
+   * is content-only. Phase 6 Task 6.4 moved this off a separate
+   * module-level Map; the merge is by lifecycle, not by key shape.
+   */
+  readonly filteredContent = new Map<string, unknown>()
   private autoClearTimer: ReturnType<typeof setTimeout> | null = null
 
   /**
@@ -53,6 +70,7 @@ export class LanguageParseCache {
     if (this.autoClearTimer) clearTimeout(this.autoClearTimer)
     this.autoClearTimer = setTimeout(() => {
       this.cache.clear()
+      this.filteredContent.clear()
       this.autoClearTimer = null
     }, AUTO_CLEAR_MS)
     this.autoClearTimer.unref()
@@ -80,6 +98,7 @@ export class LanguageParseCache {
 
   clear(): void {
     this.cache.clear()
+    this.filteredContent.clear()
   }
 
   /**
@@ -90,6 +109,7 @@ export class LanguageParseCache {
    */
   dispose(): void {
     this.cache.clear()
+    this.filteredContent.clear()
     if (this.autoClearTimer) {
       clearTimeout(this.autoClearTimer)
       this.autoClearTimer = null
