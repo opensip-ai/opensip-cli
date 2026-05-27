@@ -22,7 +22,7 @@
 import { pathToFileURL } from 'node:url';
 
 import { EXIT_CODES } from '@opensip-tools/contracts';
-import { logger } from '@opensip-tools/core';
+import { discoverPackagesByMarker, logger, registerRecipesFromMod } from '@opensip-tools/core';
 
 import { scenarioRegistry } from '../framework/registry.js';
 import { loadAllSimPlugins } from '../plugins/loader.js';
@@ -36,7 +36,6 @@ import { SimulationRecipeService } from '../recipes/service.js';
 import { SCENARIO_KINDS } from '../types/kind-types.js';
 
 import type { SimPluginExports } from '../plugins/types.js';
-import type { SimulationRecipe } from '../recipes/types.js';
 import type { ScenarioKind } from '../types/kind-types.js';
 // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; executeSim consumes the CliArgs shape produced by toolOptsToCliArgs in sim's tool.ts until the rip-out
 import type { CliArgs, ErrorResult, SimDoneResult } from '@opensip-tools/contracts';
@@ -173,7 +172,19 @@ async function loadDiscoveredScenarioPackages(projectDir: string): Promise<void>
     autoDiscover: prefs.autoDiscoverScenarios,
     packageScopes: prefs.packageScopes,
   });
-  for (const pkg of discovered) {
+  // Marker-based discovery runs in parallel with the name-pattern walk.
+  // Customers who declare opensipTools.kind: "sim-pack" in package.json
+  // are discovered regardless of npm scope. Dedupe by package name;
+  // first occurrence (name-pattern walk) wins.
+  const markerDiscovered = discoverPackagesByMarker({ projectDir, kind: 'sim-pack' });
+  const seenNames = new Set(discovered.map((p) => p.name));
+  const allPacks: readonly { name: string; packageDir: string }[] = [
+    ...discovered,
+    ...markerDiscovered
+      .filter((p) => !seenNames.has(p.name))
+      .map((p) => ({ name: p.name, packageDir: p.packageDir })),
+  ];
+  for (const pkg of allPacks) {
     const meta = readScenarioPackageMetadata(pkg.packageDir);
     if (!meta) {
       process.stderr.write(`opensip-tools: scenario package ${pkg.name} has no readable package.json — skipping\n`);
@@ -185,21 +196,21 @@ async function loadDiscoveredScenarioPackages(projectDir: string): Promise<void>
       const mod = (await import(moduleUrl)) as SimPluginExports;
       // Scenarios self-registered on import — measure the delta.
       const scenariosRegistered = scenarioRegistry.size - sizeBefore;
-      // Register any explicit recipes the package ships.
-      let recipesRegistered = 0;
-      if (Array.isArray(mod.recipes)) {
-        const recipes: readonly SimulationRecipe[] = mod.recipes;
-        for (const recipe of recipes) {
-          if (recipe && typeof recipe === 'object' && 'id' in recipe && 'name' in recipe) {
-            try {
-              defaultSimulationRecipeRegistry.register(recipe, { allowOverwrite: false });
-              recipesRegistered++;
-            } catch {
-              // Duplicate recipe — skip silently
-            }
-          }
-        }
-      }
+      // Register any explicit recipes via the shared helper. The helper
+      // emits the same plugin.recipe.invalid_item warning loader.ts now
+      // emits — replaces the previous silent-drop on malformed recipes.
+      const { recipesRegistered } = registerRecipesFromMod(mod, defaultSimulationRecipeRegistry, {
+        namespace: pkg.name,
+        onWarn: (evt, message, extra) => {
+          logger.warn({
+            evt,
+            module: 'cli:sim',
+            name: pkg.name,
+            msg: message,
+            ...extra,
+          });
+        },
+      });
       logger.info({
         evt: 'cli.scenario_package.loaded',
         module: 'cli:sim',

@@ -25,7 +25,7 @@ You can extend opensip-tools five ways, listed in increasing order of effort and
 1. **Add a project-local check** — drop a `.mjs` file under `<project>/opensip-tools/fit/checks/`.
 2. **Add a project-local recipe** — drop a `.mjs` file under `<project>/opensip-tools/fit/recipes/`.
 3. **Add a project-local sim scenario** — under `<project>/opensip-tools/sim/scenarios/`.
-4. **Ship a check pack** — npm package whose name starts with `@opensip-tools/checks-*` (auto-discovered) or is pinned in `plugins.checkPackages:`.
+4. **Ship a check pack or sim pack** — npm package declaring `opensipTools.kind: "fit-pack"` (or `"sim-pack"`) in `package.json`. Free choice of npm scope and name.
 5. **Ship a full Tool** — npm package with `opensipTools.kind === 'tool'`.
 
 This doc walks each shape with full code.
@@ -156,63 +156,67 @@ A check pack is a check directory promoted to its own npm package. Use this when
 
 The opensip-tools platform reserves three paths inside your repo's `opensip-tools/` directory:
 
-- `opensip-tools/fit/{checks,recipes}/*.{js,mjs}` — project-local fitness checks and recipes (loose `.mjs` files, no npm package)
-- `opensip-tools/sim/{scenarios,recipes}/*.{js,mjs}` — project-local simulation scenarios and recipes
-- `opensip-tools/.runtime/` — tool-managed plugin install + session state (gitignored)
+- `opensip-tools/fit/` — project-local fitness checks + recipes. Starts as loose `.mjs` files under `checks/` and `recipes/` (what `init` scaffolds). Can graduate to a workspace npm package — the directory *itself* becomes the package — when coverage grows. See [Graduation path](#graduation-path) below.
+- `opensip-tools/sim/` — same shape for simulation scenarios + recipes.
+- `opensip-tools/.runtime/` — tool-managed plugin install + session state (gitignored).
 
-For substantial coverage (more than a handful of `.mjs` files, shared helpers, tests), promote your pack to a real workspace npm package — but **don't put it inside the reserved paths above**. The recommended location is a sibling directory under `opensip-tools/`:
+The platform doesn't load anything from these paths *directly* — discovery flows through `node_modules/` walking. When `opensip-tools/fit/` is a workspace package, your workspace's symlink puts it in `node_modules/` where the marker walker finds it. The directory layout is a *recommended convention*, not a platform requirement.
 
-```
-opensip-tools/packages/<name>/
-```
+#### Marker-based discovery (recommended)
 
-This co-locates opensip-tools-related workspace packages with the rest of your opensip-tools setup. Three concrete benefits:
-
-- **Predictable location for tool-managed flows.** Future opensip-tools commands that touch source (scaffold a new pack, upgrade a pack's deps in lockstep with a platform bump, lint a pack's structure) know where to look without scanning your whole workspace.
-- **Categorical separation.** A check pack is metadata *describing* your app, not app code. Co-locating it with your domain packages (`packages/`, `libs/`) mixes two different kinds of thing. Keeping it under `opensip-tools/packages/` mirrors how other tools handle their assets — `.github/workflows/`, `terraform/`, `prisma/`, `.devcontainer/`.
-- **One place to look.** A reviewer scanning your repo for "what's customized for opensip-tools?" has one directory to inspect.
-
-The platform doesn't load anything from `opensip-tools/packages/` directly — discovery still flows through `node_modules/<scope>/checks-*` (name-based, location-agnostic). The recommendation is about maintainability, not a platform requirement.
-
-#### Monorepo workspace setup
-
-Add `opensip-tools/packages/*` to your workspace globs:
-
-```yaml
-# pnpm-workspace.yaml
-packages:
-  - "apps/*"
-  - "packages/*"
-  - "services/*"
-  - "opensip-tools/packages/*"   # opensip-tools-related workspace packages
-```
-
-Then add the pack as a root devDependency so pnpm symlinks it into `node_modules/` where the discovery walker finds it:
+Tag your pack's `package.json` with `opensipTools.kind`:
 
 ```json
-// package.json
 {
-  "devDependencies": {
-    "@opensip-tools/checks-<yourname>": "workspace:*"
-  }
+  "name": "@your-scope/fit",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "opensipTools": { "kind": "fit-pack" }
 }
 ```
 
-For a workspace-only pack (one you'll never publish to npm), naming it `@opensip-tools/checks-<name>` is the simplest path: pnpm links the workspace member into `node_modules/@opensip-tools/` and the default scope scan picks it up with no config entry. The `workspace:*` constraint is the signal that this pack is never going to npm — **don't publish under the `@opensip-tools/` scope**, it's owned by the platform.
+Discovery is name-pattern-independent — your pack can use any npm scope you own (`@acme/fit`, `@my-internal-org/checks-platform`, anything). The marker is what makes the platform find it. Same pattern for sim packs with `"kind": "sim-pack"`.
 
-If you'd rather use your own scope (e.g. `@acme/checks-internal`) — for instance, because you want the option to publish later — name it that way and either add `@acme` to `plugins.packageScopes` for scope-wide auto-discovery, or pin the package under `plugins.checkPackages`. See the [Three paths](#discovery-three-paths) below for the trade-off.
+#### Graduation path
+
+When a pack outgrows a handful of `.mjs` files (shared helpers, tests, more than a dozen checks/scenarios), graduate `opensip-tools/<domain>/` from loose files to a workspace npm package:
+
+1. Add a `package.json` declaring the marker, name, and entry point.
+2. Add a `tsconfig.json` and switch the example files to TypeScript (or keep `.mjs` — both work; the runtime loads whatever the package's `main` resolves to).
+3. Add an `index.ts` (or `index.js`) re-exporting `checks` and `recipes` from the per-file modules.
+4. Add `opensip-tools/*` to your workspace globs so pnpm/npm symlinks the package into `node_modules/`:
+
+   ```yaml
+   # pnpm-workspace.yaml
+   packages:
+     - "apps/*"
+     - "packages/*"
+     - "opensip-tools/*"   # opensip-tools-related workspace packages
+   ```
+
+5. Add the pack as a root devDependency so the workspace symlink lands in `node_modules/`:
+
+   ```json
+   // root package.json
+   {
+     "devDependencies": {
+       "@your-scope/fit": "workspace:*"
+     }
+   }
+   ```
+
+6. `pnpm install`. Marker-based discovery picks up the workspace symlink on the next `opensip-tools fit` run.
+
+For a TS-based pack you also need to build (`pnpm -F @your-scope/fit build`) so the `main` field resolves to real JS. The runtime doesn't currently load TypeScript directly; it loads the entry point your `package.json#main` points at.
 
 #### Single-package repo
 
-If you don't have a monorepo, publish your pack to your private npm registry under your own scope and install it as a regular devDependency. The `opensip-tools/` directory still hosts your `.runtime/` and any loose project-local `.mjs` files; the pack itself lives in `node_modules/` like any other dependency.
-
-#### Sim packs
-
-Sim packs follow the same recommended layout (`opensip-tools/packages/scenarios-<name>/`) and the same discovery rules: `@opensip-tools/scenarios-*` is auto-discovered by the default scope scan, and `plugins.packageScopes` is shared across check and sim discovery — adding `@acme` once picks up both `@acme/checks-*` and `@acme/scenarios-*`. The explicit-listing key for scenarios is `plugins.scenarioPackages`, parallel to `plugins.checkPackages`.
+If you don't have a monorepo, publish your pack to a private npm registry under your own scope and install it as a regular devDependency. The marker still drives discovery — no `packageScopes` config entry needed.
 
 #### Reference example
 
-The opensip codebase ([opensip-ai/opensip](https://github.com/opensip-ai/opensip)) follows this layout: its check pack lives at `opensip-tools/packages/checks-opensip/` (auto-discovered via `@opensip-tools/checks-opensip`), and its sim pack at `opensip-tools/packages/scenarios-opensip/` (auto-discovered via `@opensip-tools/scenarios-opensip`).
+The opensip codebase follows this layout: `opensip-tools/fit/` is a workspace package named `@opensip/fit` with `opensipTools.kind: "fit-pack"` in its `package.json`. Discovery picks it up via the marker; no `plugins.checkPackages` entry, no `plugins.packageScopes` entry. Same shape for `opensip-tools/sim/` as `@opensip/sim`.
 
 ### Graduating from loose `.mjs` to a workspace pack
 
@@ -288,14 +292,16 @@ Either is a working reference to pattern after when graduating your own pack.
 
 ```
 @my-co/checks-internal/
-├── package.json
+├── package.json                # declares opensipTools.kind: "fit-pack"
 ├── tsconfig.json
 ├── src/
-│   ├── index.ts                # exports: checks, checkDisplay, metadata
+│   ├── index.ts                # exports: checks, recipes, checkDisplay
 │   ├── checks/
 │   │   ├── no-fixme.ts
 │   │   ├── infra-must-have-tags.ts
 │   │   └── …
+│   ├── recipes/
+│   │   └── quick-smoke.ts
 │   └── display.ts
 ├── dist/                       # built artifact
 └── README.md
@@ -309,9 +315,10 @@ Either is a working reference to pattern after when graduating your own pack.
   "version": "0.1.0",
   "main": "dist/index.js",
   "type": "module",
+  "opensipTools": { "kind": "fit-pack" },
   "peerDependencies": {
-    "@opensip-tools/fitness": "^1.0.0",
-    "@opensip-tools/core": "^1.0.0"
+    "@opensip-tools/fitness": "^2.0.0",
+    "@opensip-tools/core": "^2.0.0"
   },
   "scripts": {
     "build": "tsc"
@@ -320,11 +327,14 @@ Either is a working reference to pattern after when graduating your own pack.
 }
 ```
 
-<a id="discovery-three-paths"></a>**No `opensipTools.kind` marker for check packs** — discovery is name-based. Three paths:
+The `opensipTools.kind` marker is what makes discovery work. For sim packs, use `"kind": "sim-pack"`.
 
-- **`@opensip-tools/checks-*`** — auto-discovered by the default scope scan. Used by first-party packs and by workspace-only customer packs that follow the [recommended layout](#where-should-this-package-live-in-your-repo). Don't *publish* under this scope — it's owned by the platform.
-- **Your own scope + `plugins.packageScopes`** — add e.g. `@my-co` to `plugins.packageScopes` in `opensip-tools.config.yml`, and any `@my-co/checks-*` package installed in `node_modules` is auto-discovered alongside the platform default. Best fit for monorepos where you want every internal check pack picked up without per-package config.
-- **Your own scope + explicit listing in `plugins.checkPackages`** — pin individual packages by name. `opensip-tools plugin add @my-co/checks-internal` does this in one step. Best fit when you want a deterministic, version-pinned set rather than scope-wide auto-discovery.
+<a id="discovery-four-paths"></a>**Four discovery paths**, in recommendation order:
+
+- **Marker (recommended)** — declare `opensipTools.kind: "fit-pack"` (or `"sim-pack"`) in your pack's `package.json`. Free choice of scope and name. No config entry. Sim packs use `"sim-pack"`.
+- **`@opensip-tools/checks-*` name pattern** — auto-discovered by the platform's default scope scan. Reserved for first-party packs published by the opensip-tools project. **Don't publish customer packs under this scope** — it's owned by the platform and a future first-party pack may collide.
+- **`plugins.packageScopes` (compat)** — soft-deprecated. Useful for legacy third-party packs that follow `@scope/checks-*` naming without declaring the marker. New packs should use the marker pattern; `packageScopes` exists to keep older packs working without rewriting them. Same key is shared with `@scope/scenarios-*` for sim.
+- **`plugins.checkPackages` explicit listing** — pin individual packages by name. `opensip-tools plugin add @scope/pack` does this in one step. Best fit when you want a deterministic, version-pinned set rather than scope-wide auto-discovery. Parallel key for sim is `plugins.scenarioPackages`.
 
 Peer-depend on `@opensip-tools/fitness` and `@opensip-tools/core` — the consumer brings their own version.
 
@@ -332,25 +342,23 @@ Peer-depend on `@opensip-tools/fitness` and `@opensip-tools/core` — the consum
 
 ```ts
 import type { CheckDisplayEntry } from '@opensip-tools/core';
-import type { Check } from '@opensip-tools/fitness';
-import { isCheck } from '@opensip-tools/fitness';
+import type { Check, FitnessRecipe } from '@opensip-tools/fitness';
 
 import { noFixme } from './checks/no-fixme.js';
 import { infraMustHaveTags } from './checks/infra-must-have-tags.js';
+import { quickSmoke } from './recipes/quick-smoke.js';
 
 export const checks: readonly Check[] = [noFixme, infraMustHaveTags];
+
+export const recipes: readonly FitnessRecipe[] = [quickSmoke];
 
 export const checkDisplay: Readonly<Record<string, CheckDisplayEntry>> = {
   'no-fixme-comments': ['📝', 'No FIXME comments'],
   'infra-must-have-tags': ['🏷️', 'Infrastructure tags required'],
 };
-
-export const metadata = {
-  name: '@my-co/checks-internal',
-  version: '0.1.0',
-  description: 'Internal checks for the my-co monorepo',
-};
 ```
+
+Pack metadata (name, version, description) is read from `package.json` by the platform — don't duplicate those fields as a runtime export.
 
 ### `src/checks/no-fixme.ts`
 

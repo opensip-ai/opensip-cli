@@ -1,16 +1,16 @@
 /**
  * @opensip-tools/checks-universal — Cross-language fitness checks for opensip-tools
  *
- * This package follows the plugin contract: exports `checks` array, `checkDisplay`
- * map, and `metadata`. The CLI auto-discovers it via the same code path used for
- * every other `@opensip-tools/checks-*` package.
+ * This package follows the plugin contract: exports `checks` array and a
+ * `checkDisplay` map. The CLI auto-discovers it via the same code path
+ * used for every other `@opensip-tools/checks-*` package.
  *
  * Scope: checks that operate on raw text, regex, file globs, or
  * language-agnostic config (Docker, .env, READMEs, generic file structure).
  * They could apply to any codebase regardless of language.
  */
 
-import { collectCheckObjects, readPackageVersion } from '@opensip-tools/fitness'
+import { collectCheckObjects } from '@opensip-tools/fitness'
 
 import * as allChecks from './checks/index.js'
 import { CHECK_DISPLAY } from './display/index.js'
@@ -26,13 +26,6 @@ export const checks: readonly Check[] = collectCheckObjects(allChecks)
  * display registry. Part of the FitPluginExports contract.
  */
 export const checkDisplay: Readonly<Record<string, CheckDisplayEntry>> = CHECK_DISPLAY
-
-/** Plugin metadata */
-export const metadata = {
-  name: '@opensip-tools/checks-universal',
-  version: readPackageVersion(import.meta.url),
-  description: 'Cross-language fitness checks for opensip-tools',
-}
 
 // Display helpers (legacy export — prefer the `checkDisplay` plugin contract field)
 export { getCheckDisplayName, getCheckIcon, CHECK_DISPLAY } from './display/index.js'

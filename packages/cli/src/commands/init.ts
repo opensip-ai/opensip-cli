@@ -12,6 +12,17 @@
  * tool-generated state (sessions, logs, dashboards, baselines, plugin
  * installs) stays untracked.
  *
+ * Promotion path: when a customer's pack outgrows a handful of .mjs
+ * files (shared helpers, tests, more than a dozen checks/scenarios),
+ * `opensip-tools/<domain>/` can graduate to a real workspace npm
+ * package — `package.json` with `opensipTools.kind: "fit-pack"` or
+ * `"sim-pack"`, `tsconfig.json`, `index.ts` re-exporting checks/recipes.
+ * Marker-based discovery picks up the workspace package automatically
+ * regardless of npm scope. The init scaffold stays loose-`.mjs` to
+ * preserve the fast first-touch experience; graduation is a manual
+ * step the customer takes when their coverage becomes substantial.
+ * See docs/architecture/70-surfaces/02-plugin-authoring.md.
+ *
  * Language selection drives:
  *   - which `targets:` entry shape goes into the YAML config
  *   - the `scope.languages` field on the example check

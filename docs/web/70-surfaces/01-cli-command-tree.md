@@ -257,6 +257,8 @@ Detects the project's primary language(s) from filesystem markers and writes:
 
 Plus appends `opensip-tools/.runtime/` to `<cwd>/.gitignore`.
 
+The scaffold output is loose `.mjs` files — the lightest-weight starting point. When a pack outgrows loose files (substantial helpers, tests, more than a dozen checks/scenarios), the customer graduates `opensip-tools/<domain>/` to a workspace npm package by adding a `package.json` with `opensipTools.kind: "fit-pack"` (or `"sim-pack"`) and an `index.ts`. Marker-based discovery picks up the workspace package automatically. See [`02-plugin-authoring.md`](/docs/opensip-tools/70-surfaces/02-plugin-authoring/) for the graduation path.
+
 | Flag | Effect |
 |---|---|
 | `--language <list>` | Comma-separated language list (`typescript,rust`). Overrides detection. |

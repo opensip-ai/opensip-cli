@@ -6,6 +6,10 @@
 
 **Note on validation infrastructure:** opensip-tools is a CLI plus a Turborepo monorepo of TypeScript packages. It does not have Postgres / OTel / Redis dependencies. Validation runs Vitest plus manual smoke tests against a scratch project. The skill's "validate against lab infrastructure at port 5433" guidance does not apply here.
 
+> **Phase 8 execution decision: lighter than originally planned.** Task 8.1 (a full e2e fixture project + spawned CLI binary test) was scoped down. The marker walker has 18 unit cases and the recipe helper has 14, both in `@opensip-tools/core`. Fit and sim's wiring is trivially correct given that `pnpm typecheck` passes (the discovery + helper imports are real, and the new `recipesRegistered` field flows through correctly-typed channels). The existing CLI e2e tests in `packages/cli/src/__tests__/e2e.test.ts` continue to pass — those tests spawn the actual CLI binary and exercise real `fit` / `sim` / `init` invocations against scratch projects. With that signal already in place, a marker-specific e2e fixture would mostly duplicate harness setup.
+>
+> The Validation gate is therefore: full test suite green, lint 0 errors, build green, dependency-cruiser 0 violations. The manual smoke + regression check (Tasks 8.2 and 8.3) remain as PR-merge gates rather than automated tests.
+
 ---
 
 ## Task 8.1: Add an end-to-end test for marker discovery against a real fixture project

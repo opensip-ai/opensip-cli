@@ -40,6 +40,22 @@ export type {
   DiscoveredToolPackage,
   ToolPackageMetadata,
 } from './tool-package-discovery.js'
+export {
+  discoverPackagesByMarker,
+  isMarkerKind,
+} from './marker-discovery.js'
+export type {
+  MarkerKind,
+  MarkerDiscoveryOptions,
+  DiscoveredMarkerPackage,
+} from './marker-discovery.js'
+export {
+  registerRecipesFromMod,
+} from './recipe-loader.js'
+export type {
+  RegisterRecipesOptions,
+  RegisterRecipesResult,
+} from './recipe-loader.js'
 export type {
   PluginDomain,
   DiscoveredPlugin,
@@ -47,6 +63,5 @@ export type {
   PluginLoadResult,
   LangPluginExports,
   PluginExports,
-  PluginMetadata,
   CheckDisplayEntry,
 } from './types.js'

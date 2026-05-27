@@ -1,8 +1,39 @@
 # Phase 5: Init rewrite
 
-**Goal:** Replace `init`'s loose-`.mjs`-files scaffold with a full per-domain workspace-package skeleton (`opensip-tools/fit/` and `opensip-tools/sim/` each become real `@<scope>/fit` / `@<scope>/sim` packages with `package.json`, `tsconfig.json`, `vitest.config.ts`, `index.ts`, example check/scenario, example recipe, README). Update workspace globs at the repo root. Revise the state classifier.
+> **Decision update (during execution): option (B) chosen.** The original goal — scaffold a full per-domain workspace-package skeleton on `init` — was abandoned mid-execution after surfacing a UX gap: workspace symlinks don't trigger `prepare` scripts, so a TS-package scaffold would require a manual `pnpm -F <pack> build` between `pnpm install` and the first `opensip-tools fit` run. Three-command first-touch instead of the promised two.
+>
+> Option (B) keeps init's current loose-`.mjs` scaffold and documents the graduation path: when a pack outgrows loose files, the customer manually promotes `opensip-tools/<domain>/` to a workspace npm package with a `package.json` declaring `opensipTools.kind`. Marker-based discovery (Phase 0) picks up either shape; the runtime tolerates both.
+>
+> Phase 5 collapses to a small init.ts docstring update pointing at the promotion path; the detailed pack-skeleton guidance moves to Phase 6's doc rewrite.
+
+**Goal (revised):** Light-touch update to init.ts's file-header docstring mentioning the loose-`.mjs` → workspace-pack promotion path. The detailed task plan below remains for historical context.
 
 **Depends on:** Phase 2 (so init doesn't scaffold the killed `metadata` field).
+
+---
+
+## Task 5.0 (executed): docstring update for promotion path
+
+**Files:** [size: XS]
+- Modify: `packages/cli/src/commands/init.ts` (file-header docstring only)
+
+**Context:** init's file-header at lines 1-13 describes what files get scaffolded. With option (B) the scaffold output is unchanged but the customer now has a documented graduation path. Add a paragraph to the docstring pointing at it.
+
+**Steps:** Add a short paragraph after the gitignore description explaining the promotion path and pointing at `docs/architecture/70-surfaces/02-plugin-authoring.md`.
+
+**Wiring:** None — pure doc.
+
+**Verification:** `pnpm typecheck`
+
+**Commit:** `docs(init): note loose-mjs → workspace-pack promotion path (Phase 5, option B)`
+
+---
+
+## Historical task plan (not executed)
+
+The original Phase 5 plan called for a substantial scaffold rewrite. Retained below for design context.
+
+---
 
 ---
 

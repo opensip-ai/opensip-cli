@@ -16,7 +16,13 @@ import {
   type FitDoneResult,
   type ErrorResult,
 } from '@opensip-tools/contracts';
-import { generatePrefixedId, logger, type CheckDisplayEntry } from '@opensip-tools/core';
+import {
+  discoverPackagesByMarker,
+  generatePrefixedId,
+  logger,
+  registerRecipesFromMod,
+  type CheckDisplayEntry,
+} from '@opensip-tools/core';
 
 
 import { isCheck } from '../framework/check-types.js';
@@ -249,8 +255,21 @@ async function loadDiscoveredCheckPackages(projectDir: string): Promise<number> 
     autoDiscover: prefs.autoDiscoverChecks,
     packageScopes: prefs.packageScopes,
   });
+  // Marker-based discovery runs in parallel with the name-pattern walk.
+  // Customers who declare opensipTools.kind: "fit-pack" in package.json get
+  // discovered regardless of npm scope. Dedupe by package name; first
+  // occurrence (name-pattern walk) wins so existing customers' telemetry
+  // doesn't shift over to a different code path silently.
+  const markerDiscovered = discoverPackagesByMarker({ projectDir, kind: 'fit-pack' });
+  const seenNames = new Set(discovered.map((p) => p.name));
+  const allPacks: readonly { name: string; packageDir: string }[] = [
+    ...discovered,
+    ...markerDiscovered
+      .filter((p) => !seenNames.has(p.name))
+      .map((p) => ({ name: p.name, packageDir: p.packageDir })),
+  ];
   let totalRegistered = 0;
-  for (const pkg of discovered) {
+  for (const pkg of allPacks) {
     const meta = readCheckPackageMetadata(pkg.packageDir);
     if (!meta) {
       process.stderr.write(`opensip-tools: check package ${pkg.name} has no readable package.json — skipping\n`);
@@ -261,6 +280,7 @@ async function loadDiscoveredCheckPackages(projectDir: string): Promise<number> 
       const mod = (await import(moduleUrl)) as {
         checks?: unknown;
         checkDisplay?: unknown;
+        recipes?: unknown;
       };
       const checks = mod.checks;
       if (!Array.isArray(checks)) {
@@ -276,11 +296,24 @@ async function loadDiscoveredCheckPackages(projectDir: string): Promise<number> 
       }
       totalRegistered += registered;
       mergeCheckDisplay(pkg.name, mod.checkDisplay);
+      const { recipesRegistered } = registerRecipesFromMod(mod, defaultRecipeRegistry, {
+        namespace: pkg.name,
+        onWarn: (evt, message, extra) => {
+          logger.warn({
+            evt,
+            module: 'cli:fit',
+            name: pkg.name,
+            msg: message,
+            ...extra,
+          });
+        },
+      });
       logger.info({
         evt: 'cli.check_package.loaded',
         module: 'cli:fit',
         name: pkg.name,
         checksRegistered: registered,
+        recipesRegistered,
       });
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
