@@ -11,19 +11,14 @@
  * tools, so the service stays per-package.
  *
  * Implemented on top of the kernel's unified `Registry<T>` base.
- * `RecipeRegistry<T>` provides the `allowOverwrite + throwOnDuplicate`
- * flag pair as a per-call modulation layer on top of the configured
- * `'warn-first-wins'` default — preserving the historical surface so
- * Phase 2 can migrate without touching consumers. The flag pair is
- * retired in a follow-up once the consumers are simplified.
+ * `RecipeRegistry<T>` exposes the historical `allowOverwrite +
+ * throwOnDuplicate` flag-pair surface and routes per-call to the
+ * appropriate `inner.register(...)` invocation.
  *
- * **Temporary `protected byId`/`byName` shim:** Phase 0 Task 0.1's
- * audit revealed that BOTH `FitnessRecipeRegistry` and
- * `SimulationRecipeRegistry` write directly to these maps in their
- * `registerBuiltInRecipes` methods (the canonical LSP violation that
- * motivated the union refactor). The shim survives Phase 2 and is
- * removed in Phase 3 Task 3.4 once both subclasses switch to
- * `registerAll(builtIns, { internal: true })`.
+ * The temp `protected byId`/`byName` shim that Phase 2 introduced is
+ * gone — both subclasses (`FitnessRecipeRegistry`,
+ * `SimulationRecipeRegistry`) now seed built-ins via
+ * `registerAll(builtIns, { internal: true })` (LSP-clean).
  */
 
 import { ValidationError } from '../lib/errors.js';
@@ -58,8 +53,8 @@ export interface RecipeRegisterOptions {
   readonly validationCode?: string;
   /**
    * Bypass the duplicate guard for this call. Used by built-in
-   * seeding paths in `FitnessRecipeRegistry` / `SimulationRecipeRegistry`
-   * after Phase 3 lands; not part of the public surface for user code.
+   * seeding paths in `FitnessRecipeRegistry` / `SimulationRecipeRegistry`;
+   * not part of the public surface for user code.
    */
   readonly internal?: boolean;
 }
@@ -74,98 +69,6 @@ export interface RecipeRegistryOptions {
 }
 
 /**
- * A Map-shaped proxy that delegates reads to a `Registry<T>` and
- * routes writes through `inner.register(item, { internal: true })`.
- * Exists ONLY to support the temp `protected byId` / `byName` shim
- * that `FitnessRecipeRegistry` and `SimulationRecipeRegistry` need
- * until Phase 3 removes their direct map writes.
- *
- * Reads ALL delegate to the inner registry — so `listForDisplay()`
- * reading via `[...this.byId.values()]` correctly sees both
- * built-ins (added via `byId.set(...)`) AND user registrations
- * (added via `register()` → `inner.register()`).
- */
-class RegistryMirrorMap<T extends RecipeBase> extends Map<string, T> {
-  private readonly inner: Registry<T>;
-  private readonly indexBy: 'id' | 'name';
-
-  constructor(inner: Registry<T>, indexBy: 'id' | 'name') {
-    super();
-    this.inner = inner;
-    this.indexBy = indexBy;
-  }
-
-  override set(key: string, value: T): this {
-    // Route the write through the inner registry; { internal: true }
-    // bypasses the duplicate guard so successive built-in seeds in
-    // the subclass constructors don't trip the warn-first-wins policy.
-    this.inner.register(value, { internal: true });
-    return this;
-  }
-
-  override get(key: string): T | undefined {
-    return this.indexBy === 'id' ? this.inner.getById(key) : this.inner.getByName(key);
-  }
-
-  override has(key: string): boolean {
-    const item = this.indexBy === 'id' ? this.inner.getById(key) : this.inner.getByName(key);
-    return item !== undefined;
-  }
-
-  override delete(key: string): boolean {
-    // Subclasses don't delete from these maps in production; Phase 3
-    // removes the shim entirely. The implementation routes through
-    // inner.remove for completeness.
-    if (this.indexBy === 'id') return this.inner.remove(key);
-    const item = this.inner.getByName(key);
-    if (!item) return false;
-    return this.inner.remove(item.id);
-  }
-
-  override clear(): void {
-    // Subclasses' `reset()` calls `this.clear()` on the RecipeRegistry
-    // (public API), which goes through `inner.clear()`. This map
-    // doesn't own storage; nothing to clear.
-  }
-
-  override get size(): number {
-    return this.inner.size;
-  }
-
-  override values(): MapIterator<T> {
-    return (this.inner.getAll() as T[])[Symbol.iterator]();
-  }
-
-  override keys(): MapIterator<string> {
-    const items = this.inner.getAll();
-    const keys = this.indexBy === 'id' ? items.map((i) => i.id) : items.map((i) => i.name);
-    return keys[Symbol.iterator]();
-  }
-
-  override entries(): MapIterator<[string, T]> {
-    const items = this.inner.getAll();
-    const entries: [string, T][] = items.map((i) => [
-      this.indexBy === 'id' ? i.id : i.name,
-      i,
-    ]);
-    return entries[Symbol.iterator]();
-  }
-
-  override [Symbol.iterator](): MapIterator<[string, T]> {
-    return this.entries();
-  }
-
-  override forEach(
-    callbackfn: (value: T, key: string, map: Map<string, T>) => void,
-    thisArg?: unknown,
-  ): void {
-    for (const [k, v] of this.entries()) {
-      callbackfn.call(thisArg, v, k, this);
-    }
-  }
-}
-
-/**
  * Process-wide policy: duplicate id/name with `allowOverwrite: false`
  * keeps the first entry and emits a warning. Use `register(.., {
  * throwOnDuplicate: true })` to opt into the historical fitness/sim
@@ -175,17 +78,6 @@ export class RecipeRegistry<T extends RecipeBase> {
   protected readonly inner: Registry<T>;
   private readonly module: string;
   private readonly validationCode: string;
-
-  /**
-   * TEMP SHIM (Phase 2 Task 2.3) — `FitnessRecipeRegistry` and
-   * `SimulationRecipeRegistry` write directly to these Maps in
-   * their built-in seed paths. Phase 3 Tasks 3.2 + 3.4 replace those
-   * direct writes with `registerAll(builtIns, { internal: true })`
-   * and remove this shim. Do NOT use in new code.
-   */
-  protected readonly byId: RegistryMirrorMap<T>;
-  /** TEMP SHIM — see {@link byId}. */
-  protected readonly byName: RegistryMirrorMap<T>;
 
   constructor(options: RecipeRegistryOptions = {}) {
     this.module = options.module ?? 'core:recipes';
@@ -197,12 +89,6 @@ export class RecipeRegistry<T extends RecipeBase> {
       validationCode: this.validationCode,
       logger: options.logger,
     });
-    // Temp shim — wired so subclass writes (`this.byId.set(id, r)`)
-    // route through `inner.register(r, { internal: true })`. Reads
-    // delegate back to inner so user registrations via `register()`
-    // are visible through `this.byId.values()` too.
-    this.byId = new RegistryMirrorMap<T>(this.inner, 'id');
-    this.byName = new RegistryMirrorMap<T>(this.inner, 'name');
   }
 
   /**
@@ -212,6 +98,8 @@ export class RecipeRegistry<T extends RecipeBase> {
    * - `{ allowOverwrite: true }`: replaces the existing entry.
    * - `{ throwOnDuplicate: true }`: throws a `ValidationError` instead of warning.
    *   Mutually exclusive with `allowOverwrite`.
+   * - `{ internal: true }`: bypasses the duplicate guard. Used for
+   *   built-in seeding in subclasses.
    */
   register(recipe: T, options: RecipeRegisterOptions = {}): void {
     const { allowOverwrite = false, throwOnDuplicate = false, internal = false } = options;

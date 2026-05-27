@@ -3,6 +3,10 @@
  * `RecipeRegistry<T>` (Layer 1 / core) that adds simulation-specific
  * concerns: built-in recipe pre-registration with throw-on-duplicate
  * semantics, and display info with `isBuiltIn` / `isUserDefined` flags.
+ *
+ * Built-in seeding goes through `registerAll(builtIns, { internal: true })`
+ * — the LSP-clean replacement for the prior direct-map-write pattern
+ * (the canonical T2 violation the runscope+registry plan resolves).
  */
 
 import { RecipeRegistry } from '@opensip-tools/core';
@@ -26,16 +30,9 @@ const BUILT_IN_NAMES = new Set(builtInSimulationRecipes.map((r) => r.name));
 export class SimulationRecipeRegistry extends RecipeRegistry<SimulationRecipe> {
   constructor() {
     super({ module: 'simulation:recipes', validationCode: 'VALIDATION.SIMULATION.DUPLICATE_RECIPE' });
-    this.registerBuiltInRecipes();
-  }
-
-  private registerBuiltInRecipes(): void {
-    // Built-in recipes ship valid; bypass the duplicate guard via direct
-    // map writes to preserve registration order semantics.
-    for (const recipe of builtInSimulationRecipes) {
-      this.byId.set(recipe.id, recipe);
-      this.byName.set(recipe.name, recipe);
-    }
+    // Built-ins bypass the duplicate guard via { internal: true } —
+    // replaces the prior direct map writes (the LSP violation).
+    this.registerAll(builtInSimulationRecipes, { internal: true });
   }
 
   /**
@@ -55,11 +52,11 @@ export class SimulationRecipeRegistry extends RecipeRegistry<SimulationRecipe> {
 
   reset(): void {
     this.clear();
-    this.registerBuiltInRecipes();
+    this.registerAll(builtInSimulationRecipes, { internal: true });
   }
 
   listForDisplay(): readonly SimulationRecipeDisplayInfo[] {
-    return [...this.byId.values()].map((recipe) => {
+    return this.getAllRecipes().map((recipe) => {
       const isUser = recipe.id.startsWith('URCP_');
       return {
         name: recipe.name,
