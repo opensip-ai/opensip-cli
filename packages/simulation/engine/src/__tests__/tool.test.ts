@@ -12,6 +12,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { RunScope } from '@opensip-tools/core';
 import { Command } from 'commander';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -40,16 +41,18 @@ function makeFakeContext(program: Command): {
   const rendered: unknown[] = [];
   const exitCodes: number[] = [];
   const emitted: unknown[] = [];
+  const project = {
+    cwd: '/test',
+    cwdExplicit: false,
+    projectRoot: '/test',
+    configPath: undefined,
+    walkedUp: 0,
+    scope: 'none' as const,
+  };
   const ctx: ToolCliContext = {
     program,
-    project: {
-      cwd: '/test',
-      cwdExplicit: false,
-      projectRoot: '/test',
-      configPath: undefined,
-      walkedUp: 0,
-      scope: 'none',
-    },
+    scope: new RunScope({ projectContext: project }),
+    project,
     render: vi.fn((result: unknown) => {
       rendered.push(result);
       return Promise.resolve();

@@ -10,6 +10,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { RunScope } from '@opensip-tools/core';
 import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
 import { executeGraph, registerAdapter } from '@opensip-tools/graph';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
@@ -52,16 +53,18 @@ interface CapturedCli {
 function makeCli(): CapturedCli {
   const exitCodes: number[] = [];
   const datastore = DataStoreFactory.open({ backend: 'memory' });
+  const project = {
+    cwd: '/test',
+    cwdExplicit: false,
+    projectRoot: '/test',
+    configPath: undefined,
+    walkedUp: 0,
+    scope: 'none' as const,
+  };
   const cli: ToolCliContext = {
     program: {},
-    project: {
-      cwd: '/test',
-      cwdExplicit: false,
-      projectRoot: '/test',
-      configPath: undefined,
-      walkedUp: 0,
-      scope: 'none',
-    },
+    scope: new RunScope({ projectContext: project, datastore: () => datastore }),
+    project,
     render: vi.fn(() => Promise.resolve()),
     registerLiveView: vi.fn(),
     renderLive: vi.fn(() => Promise.resolve()),
@@ -344,16 +347,18 @@ describe('executeGraph', () => {
     setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });
     // Build a CLI without a datastore
     const exitCodes: number[] = [];
+    const projectNoStore = {
+      cwd: '/test',
+      cwdExplicit: false,
+      projectRoot: '/test',
+      configPath: undefined,
+      walkedUp: 0,
+      scope: 'none' as const,
+    };
     const cli: ToolCliContext = {
       program: {},
-      project: {
-        cwd: '/test',
-        cwdExplicit: false,
-        projectRoot: '/test',
-        configPath: undefined,
-        walkedUp: 0,
-        scope: 'none',
-      },
+      scope: new RunScope({ projectContext: projectNoStore }),
+      project: projectNoStore,
       render: vi.fn(() => Promise.resolve()),
       renderLive: vi.fn(() => Promise.resolve()),
       maybeOpenDashboard: vi.fn(() => Promise.resolve()),

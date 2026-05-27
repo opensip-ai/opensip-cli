@@ -26,6 +26,7 @@
  */
 
 import {
+  RunScope,
   UnknownLiveViewError,
   logger as defaultLogger,
   resolveProjectPaths,
@@ -159,6 +160,29 @@ export function buildToolCliContext(
 
   const ctx: ToolCliContext = {
     program: opts.program,
+    get scope(): RunScope {
+      // Construct a fresh RunScope view per access. The scope is a
+      // value type holding the current projectContext + a thunk for
+      // the lazy datastore open. Reading it inside a command action
+      // body sees the current state set by pre-action-hook.
+      //
+      // Phase 5 leaves the underlying `currentProjectContext` holder
+      // in place; Phase 6 / a follow-up plan retires the holder by
+      // moving scope construction into pre-action-hook and threading
+      // it via Commander's actionCommand state.
+      if (!currentProjectContext) {
+        throw new Error(
+          'ToolCliContext.scope accessed before pre-action-hook resolved the project context. ' +
+            'This indicates a bootstrap-order bug — tools should not access scope ' +
+            'during register(); only inside command action bodies.',
+        );
+      }
+      return new RunScope({
+        logger: log,
+        projectContext: currentProjectContext,
+        datastore: () => getOrOpenDatastore(log),
+      });
+    },
     get project(): ProjectContext {
       if (!currentProjectContext) {
         throw new Error(

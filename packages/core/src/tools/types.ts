@@ -28,6 +28,7 @@ import { ToolError, type ToolErrorOptions } from '../lib/errors.js';
 
 import type { Logger } from '../lib/logger.js';
 import type { ProjectContext } from '../lib/project-context.js';
+import type { RunScope } from '../lib/run-scope.js';
 
 export interface ToolMetadata {
   /** Stable identifier — e.g. 'fitness', 'simulation'. */
@@ -102,6 +103,19 @@ export interface ToolCliContext {
    * to mount their subcommands.
    */
   readonly program: unknown;
+  /**
+   * Per-run resources (logger, parseCache, registries, datastore,
+   * recipeCheckConfig, projectContext). Constructed once per CLI
+   * invocation by the bootstrap; tools should prefer `cli.scope.foo`
+   * over reaching into any module-level singleton (e.g. don't import
+   * `defaultToolRegistry` — use `cli.scope.tools` instead).
+   *
+   * For back-compat during the Phase 5 migration, `cli.project`,
+   * `cli.logger`, and `cli.datastore` continue to work as alias
+   * accessors that read from `scope`. New code should use `scope`
+   * directly.
+   */
+  readonly scope: RunScope;
   /**
    * Resolved project context for this CLI invocation. Computed once in
    * pre-action-hook after `--cwd` parsing; threaded into every tool's

@@ -6,6 +6,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { RunScope } from '@opensip-tools/core';
 import { graphTool, registerAdapter } from '@opensip-tools/graph';
 import { Command } from 'commander';
 import { describe, expect, it, vi } from 'vitest';
@@ -24,16 +25,18 @@ function makeCli(program: Command): ToolCliContext {
   // Layer 5 Phase 3 (audit 2026-05-23 F3): tools own their renderers.
   // The graph tool registers `renderGraphLive` directly via
   // `cli.registerLiveView` — no `builtinLiveViews` map lookup.
+  const project = {
+    cwd: '/test',
+    cwdExplicit: false,
+    projectRoot: '/test',
+    configPath: undefined,
+    walkedUp: 0,
+    scope: 'none' as const,
+  };
   return {
     program,
-    project: {
-      cwd: '/test',
-      cwdExplicit: false,
-      projectRoot: '/test',
-      configPath: undefined,
-      walkedUp: 0,
-      scope: 'none',
-    },
+    scope: new RunScope({ projectContext: project }),
+    project,
     render: vi.fn(() => Promise.resolve()),
     registerLiveView: vi.fn(),
     renderLive: vi.fn(() => Promise.resolve()),
@@ -135,16 +138,18 @@ describe('graphTool action handler — end-to-end via Commander', () => {
       const program = new Command();
       program.exitOverride();
       const setExitCode = vi.fn();
+      const project = {
+        cwd: '/test',
+        cwdExplicit: false,
+        projectRoot: '/test',
+        configPath: undefined,
+        walkedUp: 0,
+        scope: 'none' as const,
+      };
       const cli: ToolCliContext = {
         program,
-        project: {
-          cwd: '/test',
-          cwdExplicit: false,
-          projectRoot: '/test',
-          configPath: undefined,
-          walkedUp: 0,
-          scope: 'none',
-        },
+        scope: new RunScope({ projectContext: project }),
+        project,
         render: vi.fn(() => Promise.resolve()),
         renderLive: vi.fn(() => Promise.resolve()),
         maybeOpenDashboard: vi.fn(() => Promise.resolve()),
@@ -194,16 +199,18 @@ describe('graphTool action handler — end-to-end via Commander', () => {
       const program = new Command();
       program.exitOverride();
       const renderLive = vi.fn(() => Promise.resolve());
+      const project2 = {
+        cwd: '/test',
+        cwdExplicit: false,
+        projectRoot: '/test',
+        configPath: undefined,
+        walkedUp: 0,
+        scope: 'none' as const,
+      };
       const cli: ToolCliContext = {
         program,
-        project: {
-          cwd: '/test',
-          cwdExplicit: false,
-          projectRoot: '/test',
-          configPath: undefined,
-          walkedUp: 0,
-          scope: 'none',
-        },
+        scope: new RunScope({ projectContext: project2 }),
+        project: project2,
         render: vi.fn(() => Promise.resolve()),
         renderLive,
         maybeOpenDashboard: vi.fn(() => Promise.resolve()),
