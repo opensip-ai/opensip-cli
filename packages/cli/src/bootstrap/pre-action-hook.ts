@@ -39,7 +39,11 @@ import {
   type ProjectContext,
 } from '@opensip-tools/core';
 
-import { getCurrentRegistriesForScope, getOrOpenDatastore, setProjectContextForRun } from '../cli-context.js';
+import {
+  buildDatastoreThunk,
+  getCurrentRegistriesForScope,
+  setCurrentRunScope,
+} from '../cli-context.js';
 
 import { loadCliDefaults, mergeConfigDefaults } from './cli-defaults.js';
 
@@ -273,30 +277,28 @@ export function installPreActionHook(program: Command): void {
       // untouched (configureLogger only writes fields present in the bag).
       configureLogger({ logDir: projectPaths.logsDir });
     }
-    // Always register the context with cli-context so the getter on
-    // ToolCliContext.project can return it. The datastore getter
-    // additionally checks scope === 'project' before opening SQLite.
-    setProjectContextForRun(project);
 
-    // Enter the per-run AsyncLocalStorage scope so library functions
-    // deep in the call tree (currentScope() readers) see the bound
-    // language/tool registries + project context. enterWith propagates
-    // forward through the same async chain, so the action body invoked
-    // after this hook sees the same scope without needing a callback
-    // wrapper around the action — which Commander does not expose.
-    // (Phase 5 deferred Task 5.2 — close-out.)
+    // Build the per-run RunScope and enter it via AsyncLocalStorage so
+    // library functions deep in the call tree (currentScope() readers)
+    // see the bound logger/registries/project + a lazy datastore thunk.
+    // enterWith propagates forward through the same async chain, so the
+    // action body invoked after this hook sees the same scope without
+    // needing a callback wrapper — which Commander does not expose.
+    // (Phase 5 deferred Task 5.2 / T1 Item D close-out.)
     const { languages, tools } = getCurrentRegistriesForScope();
-    enterScope(
-      new RunScope({
-        logger,
-        projectContext: project,
-        languages,
-        tools,
-        // Lazy datastore — same thunk as `ToolCliContext.scope.datastore`.
-        // SQLite is materialised only on first access.
-        datastore: () => getOrOpenDatastore(logger),
-      }),
-    );
+    const scope = new RunScope({
+      logger,
+      projectContext: project,
+      languages,
+      tools,
+      // Closure-based lazy datastore. SQLite is materialised only on
+      // first access. The thunk captures `project` so non-action paths
+      // (post-action handlers, error printers) that read via
+      // `getOrOpenDatastore()` find the same instance.
+      datastore: buildDatastoreThunk(project, logger),
+    });
+    enterScope(scope);
+    setCurrentRunScope(scope);
 
     // 6. Imperative Project: header for non-Ink, project-scoped commands.
     const cmdName = actionCommand.name();

@@ -191,40 +191,52 @@ describe('buildToolCliContext', () => {
   });
 });
 
-describe('getCurrentProjectRoot / setProjectContextForRun', () => {
-  it('throws when called before context is set', async () => {
+describe('getCurrentProjectRoot / setCurrentRunScope', () => {
+  it('throws when called before scope is set', async () => {
     vi.resetModules();
     const mod = await import('../cli-context.js');
-    expect(() => mod.getCurrentProjectRoot()).toThrow(/pre-action-hook/);
+    expect(() => mod.getCurrentProjectRoot()).toThrow(/pre-action-hook|action body/);
   });
 
-  it('returns the configured project root once set', async () => {
+  it('returns the configured project root once the run scope is set', async () => {
     vi.resetModules();
     const mod = await import('../cli-context.js');
-    mod.setProjectContextForRun({
-      scope: 'project',
-      projectRoot: '/path/to/proj',
-      walkedUp: 0,
-    });
+    const { RunScope } = await import('@opensip-tools/core');
+    mod.setCurrentRunScope(
+      new RunScope({
+        projectContext: {
+          scope: 'project',
+          projectRoot: '/path/to/proj',
+          walkedUp: 0,
+        } as never,
+      }),
+    );
     expect(mod.getCurrentProjectRoot()).toBe('/path/to/proj');
   });
 });
 
 describe('getOrOpenDatastore', () => {
-  it('throws when called before project context is set', async () => {
+  it('throws when called before scope is set', async () => {
     vi.resetModules();
     const mod = await import('../cli-context.js');
-    expect(() => mod.getOrOpenDatastore()).toThrow(/pre-action-hook/);
+    expect(() => mod.getOrOpenDatastore()).toThrow(/pre-action-hook|action body/);
   });
 
   it('throws when called in a non-project context (user scope)', async () => {
     vi.resetModules();
     const mod = await import('../cli-context.js');
-    mod.setProjectContextForRun({
+    const { RunScope } = await import('@opensip-tools/core');
+    const project = {
       scope: 'user',
       projectRoot: '/anywhere',
       walkedUp: 0,
-    } as never);
+    } as never;
+    mod.setCurrentRunScope(
+      new RunScope({
+        projectContext: project,
+        datastore: mod.buildDatastoreThunk(project),
+      }),
+    );
     expect(() => mod.getOrOpenDatastore()).toThrow(/non-project context/);
   });
 });
