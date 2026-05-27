@@ -200,7 +200,7 @@ When a run fails before producing a result (config invalid, plugin failed to loa
 
 ```ts
 {
-  "error": "Gate baseline not found at opensip-tools/.runtime/baseline.sarif. Run `opensip-tools fit --gate-save` first to create one, or pass --baseline <path> if it lives elsewhere."
+  "error": "Gate baseline not found in the project SQLite store. Run `opensip-tools fit --gate-save` first to create one."
 }
 ```
 

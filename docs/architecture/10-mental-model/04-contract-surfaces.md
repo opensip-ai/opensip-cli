@@ -56,9 +56,8 @@ opensip-tools
 │   ├── --tags <list>
 │   ├── --json
 │   ├── --findings
-│   ├── --gate-save
+│   ├── --gate-save        (writes baseline row into .runtime/datastore.sqlite)
 │   ├── --gate-compare
-│   ├── --baseline <path>
 │   └── … (see fit-list, fit-recipes for catalogs)
 ├── sim                    (run simulation scenarios — experimental)
 ├── graph                  (static call-graph + dead-end analysis)
