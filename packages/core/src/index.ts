@@ -75,6 +75,17 @@ export type {
 export { IdNameTagRegistry } from './lib/id-name-tag-registry.js';
 export type { Registerable } from './lib/id-name-tag-registry.js';
 
+// Generic `Registry<T>` — the unified base for every registry in the
+// workspace. Replaces the ten registry classes catalogued in the
+// runscope+registry plan's Phase 0. See `lib/registry.ts` for the
+// full design rationale + the closed `DuplicatePolicy` union.
+export { Registry } from './lib/registry.js';
+export type {
+  DuplicatePolicy,
+  RegistryOptions,
+  RegisterCallOptions,
+} from './lib/registry.js';
+
 // Lib — errors + Result pattern
 export { ToolError, ValidationError, NotFoundError, SystemError, TimeoutError, NetworkError, ConfigurationError } from './lib/errors.js';
 export { ok, err, tryCatchAsync, tryCatch } from './lib/errors.js';
