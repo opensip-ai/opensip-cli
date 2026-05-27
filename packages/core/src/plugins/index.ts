@@ -40,6 +40,15 @@ export type {
   DiscoveredToolPackage,
   ToolPackageMetadata,
 } from './tool-package-discovery.js'
+export {
+  discoverPackagesByMarker,
+  isMarkerKind,
+} from './marker-discovery.js'
+export type {
+  MarkerKind,
+  MarkerDiscoveryOptions,
+  DiscoveredMarkerPackage,
+} from './marker-discovery.js'
 export type {
   PluginDomain,
   DiscoveredPlugin,
