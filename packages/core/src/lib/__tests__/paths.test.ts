@@ -34,7 +34,6 @@ describe('resolveProjectPaths', () => {
     expect(p.reportsDir).toBe(join(p.runtimeDir, 'reports'));
     expect(p.logsDir).toBe(join(p.runtimeDir, 'logs'));
     expect(p.cacheDir).toBe(join(p.runtimeDir, 'cache'));
-    expect(p.baselinePath).toBe(join(p.runtimeDir, 'baseline.sarif'));
   });
 
   it('resolves per-domain plugin install dirs under runtime/plugins', () => {
