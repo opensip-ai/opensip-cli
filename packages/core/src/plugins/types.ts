@@ -28,7 +28,6 @@ export type CheckDisplayEntry = readonly [icon: string, displayName: string]
 /** What a language plugin package/file exports */
 export interface LangPluginExports {
   readonly adapters?: readonly LanguageAdapter[]
-  readonly metadata?: PluginMetadata
 }
 
 /**
@@ -37,15 +36,6 @@ export interface LangPluginExports {
  * compatibility. Each tool owns its own export-shape interface.
  */
 export type PluginExports = LangPluginExports | Record<string, unknown>
-
-/** Optional plugin metadata */
-export interface PluginMetadata {
-  readonly name: string
-  readonly version?: string
-  readonly author?: string
-  readonly description?: string
-  readonly homepage?: string
-}
 
 // =============================================================================
 // DISCOVERY TYPES

@@ -63,6 +63,5 @@ export type {
   PluginLoadResult,
   LangPluginExports,
   PluginExports,
-  PluginMetadata,
   CheckDisplayEntry,
 } from './types.js'

@@ -16,10 +16,8 @@
  */
 
 import type { SimulationRecipe } from '../recipes/types.js'
-import type { PluginMetadata } from '@opensip-tools/core'
 
 /** What a sim plugin package/file exports. */
 export interface SimPluginExports {
   readonly recipes?: readonly SimulationRecipe[]
-  readonly metadata?: PluginMetadata
 }

@@ -30,7 +30,6 @@ export type {
   PluginLoadResult,
   LangPluginExports,
   PluginExports,
-  PluginMetadata,
   CheckDisplayEntry,
   PackageEntryResolution,
   ToolPackageDiscoveryOptions,

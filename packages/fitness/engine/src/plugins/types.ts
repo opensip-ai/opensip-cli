@@ -9,13 +9,12 @@
 
 import type { Check } from '../framework/check-types.js'
 import type { FitnessRecipe } from '../recipes/types.js'
-import type { CheckDisplayEntry, PluginMetadata } from '@opensip-tools/core'
+import type { CheckDisplayEntry } from '@opensip-tools/core'
 
 /** What a fitness plugin package/file exports */
 export interface FitPluginExports {
   readonly checks?: readonly Check[]
   readonly recipes?: readonly FitnessRecipe[]
-  readonly metadata?: PluginMetadata
   /**
    * Optional display map: check slug → [icon, displayName].
    * The CLI merges these from every loaded check package and uses
