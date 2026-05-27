@@ -8,8 +8,11 @@
  * (`decideHeapTargetMb`, `systemHasMemoryFor`, `totalSystemMemoryMb`).
  */
 
+import os from 'node:os';
+import v8 from 'node:v8';
+
 import { ConfigurationError } from '@opensip-tools/core';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   decideHeapTargetMb,
@@ -113,6 +116,7 @@ describe('runHeapPreflight', () => {
 
   afterEach(() => {
     _clearAdaptersForTesting();
+    vi.restoreAllMocks();
     if (prevSentinel === undefined) {
       delete process.env.OPENSIP_HEAP_ELEVATED;
     } else {
@@ -136,21 +140,31 @@ describe('runHeapPreflight', () => {
   });
 
   it('returns false when the current heap cap is already above the target', async () => {
-    // Use a tiny file count → target=8192. Most CI machines run below
-    // that already; pin the behavior by making the threshold check
-    // explicit instead of leaving it to chance.
+    // 1500 files → target = 8192 MB. Force currentHeapLimitMb to land
+    // above target by stubbing v8.getHeapStatistics; otherwise the test
+    // falls through to the re-exec branch and spawns a real Node
+    // process. heap_size_limit is in bytes — 10 GB > 8192 MB.
     registerAdapter(adapterWithFileCount(1500));
-    // If the current heap is already >= 8192 MB, runHeapPreflight returns false.
-    // If the system can't fit the elevated heap, also returns false (insufficient branch).
-    // Both branches arrive at the same return value (false).
-    const result = await runHeapPreflight({ cwd: '/tmp' });
-    expect(result).toBe(false);
+    vi.spyOn(v8, 'getHeapStatistics').mockReturnValue({
+      heap_size_limit: 10 * 1024 * 1024 * 1024,
+    } as ReturnType<typeof v8.getHeapStatistics>);
+    expect(await runHeapPreflight({ cwd: '/tmp' })).toBe(false);
+  });
+
+  it('returns false when system RAM is insufficient for the target heap', async () => {
+    // 1500 files → target = 8192 MB, needs ~10240 MB total (target +
+    // OS_HEADROOM_MB). Pin currentHeap below target so the
+    // already-elevated branch can't short-circuit, then stub
+    // os.totalmem to 4 GB so systemHasMemoryFor() returns false.
+    registerAdapter(adapterWithFileCount(1500));
+    vi.spyOn(v8, 'getHeapStatistics').mockReturnValue({
+      heap_size_limit: 1024 * 1024 * 1024, // 1 GB — well below 8192 MB target
+    } as ReturnType<typeof v8.getHeapStatistics>);
+    vi.spyOn(os, 'totalmem').mockReturnValue(4 * 1024 * 1024 * 1024);
+    expect(await runHeapPreflight({ cwd: '/tmp' })).toBe(false);
   });
 
   // The "elevate via re-exec" branch is intentionally not covered:
   // running it would fork the test process. The re-exec body is
-  // wrapped in `/* v8 ignore start *\/` upstream for this reason. The
-  // insufficient-RAM branch requires mocking os.totalmem which is
-  // fragile under vitest workers; skipping it leaves a small uncovered
-  // strip that's documented and acceptable.
+  // wrapped in `/* v8 ignore start */` upstream for this reason.
 });
