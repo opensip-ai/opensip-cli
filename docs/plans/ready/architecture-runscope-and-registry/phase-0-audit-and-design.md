@@ -443,3 +443,45 @@ AsyncLocalStorage (`AsyncLocalStorage<RunScope>` exported from `@opensip-tools/c
 - `ToolTabRegistry` (dashboard) — kept as-is. Append-only, registration-order-sensitive, no `name` field, no duplicate semantics. Phase 3.8 ships as documentation only.
 - `lang-typescript filterCache` constructor seam — fold into `LanguageParseCache` adds a `filteredContent: Map<string, string>` field (Phase 6 Task 6.4). No standalone `FilterCache` class.
 - `FileCache` lifecycle is NOT on RunScope. The 10-min timer stays for now; Phase 4 Task 4.1's "explicit start/stop" suggestion is deferred — `FileCache` is per-fitness, not per-RunScope, and a follow-up plan can address it without blocking T1.
+
+### D7. Tool-specific RunScope subscopes use module augmentation (post-Phase 7 follow-up)
+
+The flat-vs-grouped question for adding tool-specific registries to `RunScope` (e.g., simulation scenarios, graph adapters) is settled in favor of **grouped + TypeScript module augmentation**.
+
+**Layout:**
+
+- **Kernel concerns stay flat** at the top level of `RunScope` in `core/lib/run-scope.ts`: `logger`, `parseCache`, `recipeCheckConfig`, `projectContext`, `datastore`, `tools`, `languages`, `runId` (added by deferred Item 2).
+- **Tool-specific concerns nest under the tool's name**: `scope.simulation.{scenarios, recipes}`, `scope.graph.{adapters, rules}`, future `scope.fitness.{checks, targets, recipes}` if those move to RunScope.
+- **Each tool's namespace is added via TypeScript module augmentation** in the tool's own `types.ts`:
+
+  ```typescript
+  // packages/simulation/engine/src/types.ts
+  declare module '@opensip-tools/core' {
+    interface RunScope {
+      readonly simulation?: {
+        readonly scenarios: Registry<RunnableScenario>;
+        readonly recipes: RecipeRegistry<SimulationRecipe>;
+      };
+    }
+  }
+  ```
+
+  Core's `run-scope.ts` declares only the kernel fields. Each tool extends the interface from its own package — same pattern as express's `Request` augmentation.
+
+**Why grouped:** preserves the layering rule (`core ← contracts ← {lang-*, fitness, simulation, graph}`). A flat layout (`scope.scenarios: Registry<RunnableScenario>` at the top level of `RunScope`) would force core to either (a) import simulation-shaped types — breaking the layer rule — or (b) type those fields as `unknown` and re-cast everywhere, which is the cross-cutting **T3** anti-pattern the audit flagged.
+
+**Why module augmentation over an opaque slot:**
+
+- Type safety preserved — `scope.simulation.scenarios` has the right type at use sites, no `unknown` cast.
+- Scales gracefully — a fourth tool (e.g. future `audit`) declares its own augmentation without editing core.
+- Mirrors the plugin discovery contract — packages declare `opensipTools.kind: 'sim-pack'` / `'graph-adapter'`; the RunScope namespace alignment reinforces that.
+
+**Accepted tradeoffs:**
+
+- Tool subscopes are optional (`scope.simulation?: { ... }`) because not every run loads every tool. A graph-only run carries no `scope.simulation`. Consumers null-check or assert.
+- "Where does `scope.simulation` come from?" is mildly mysterious to readers unfamiliar with module augmentation. Mitigated by a comment in `core/lib/run-scope.ts` pointing at the augmentation pattern + JSDoc on each tool's augmentation in its `types.ts`.
+
+**Impact on deferred items:**
+
+- **Deferred Item 1** (`scenarioRegistry` + graph `lang-adapter` → RunScope) implements `scope.simulation = { scenarios, recipes }` and `scope.graph = { adapters, rules }` per this pattern.
+- **Deferred Item 2** (`runId` → RunScope) is kernel-level (every invocation has one) — stays flat at `scope.runId`.
