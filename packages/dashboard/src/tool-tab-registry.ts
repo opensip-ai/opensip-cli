@@ -15,6 +15,14 @@
  * The Overview tab is intentionally NOT in this registry — it is a
  * cross-tool aggregate by design and lives outside the per-tool
  * abstraction.
+ *
+ * **Why not Registry<T>?** Per the runscope+registry plan's Phase 0
+ * Task 0.1 decision (D6), `ToolTabRegistry` deliberately stays an
+ * append-only `ToolTabDescriptor[]` — it has no `id+name+tags` shape,
+ * no duplicate-handling semantics, and is registration-order-sensitive
+ * (tab-bar order matters). The kernel's `Registry<T>` would add no
+ * value here. The cross-cutting T2 audit explicitly noted that this
+ * registry has "a different shape and may stay separate."
  */
 
 /**
