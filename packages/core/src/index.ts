@@ -85,6 +85,18 @@ export type {
   RegisterCallOptions,
 } from './lib/registry.js';
 
+// RunScope — per-invocation execution scope. Owns the lifecycle of
+// every singleton the codebase previously hung on module-level state
+// (logger, caches, registries, recipe-config slot, project context,
+// datastore thunk). See `lib/run-scope.ts` for the AsyncLocalStorage
+// seam and the two-copies-of-fitness hazard resolution.
+export { RunScope, runWithScope, runWithScopeSync, currentScope } from './lib/run-scope.js';
+export type {
+  RunScopeOptions,
+  RecipeCheckConfigSlot,
+  DataStoreThunk,
+} from './lib/run-scope.js';
+
 // Lib — errors + Result pattern
 export { ToolError, ValidationError, NotFoundError, SystemError, TimeoutError, NetworkError, ConfigurationError } from './lib/errors.js';
 export { ok, err, tryCatchAsync, tryCatch } from './lib/errors.js';
