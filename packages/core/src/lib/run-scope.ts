@@ -21,12 +21,15 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 
 import { LanguageParseCache } from '../languages/parse-cache.js';
-import { defaultLanguageRegistry, LanguageRegistry } from '../languages/registry.js';
-import { defaultToolRegistry, ToolRegistry } from '../tools/registry.js';
+import { defaultLanguageRegistry } from '../languages/registry.js';
+import { defaultToolRegistry } from '../tools/registry.js';
 
-import { logger as defaultLogger, type Logger } from './logger.js';
+import { logger as defaultLogger } from './logger.js';
 
+import type { Logger } from './logger.js';
 import type { ProjectContext } from './project-context.js';
+import type { LanguageRegistry } from '../languages/registry.js';
+import type { ToolRegistry } from '../tools/registry.js';
 
 /** Opaque slot for per-run recipe configuration (replaces globalThis Symbol). */
 export interface RecipeCheckConfigSlot {
