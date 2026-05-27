@@ -193,7 +193,12 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
       () => {
         const collected: Signal[] = [];
         for (const rule of ruleSet) {
-          const out = rule.evaluate(catalog, indexes, config);
+          // Thread the active adapter's RuleHints so non-TypeScript
+          // languages get their own side-effect primitives, throw
+          // syntax, generated-file globs, and isTestFile predicate.
+          // Without this, rules that consult `hints` silently fall
+          // back to TypeScript-shaped regex on every other language.
+          const out = rule.evaluate(catalog, indexes, config, adapter.ruleHints);
           collected.push(...out);
         }
         return collected;

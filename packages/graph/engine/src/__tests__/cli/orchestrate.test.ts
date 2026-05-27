@@ -28,6 +28,7 @@ import type {
   GraphLanguageAdapter,
   ParseOutput,
   ResolveOutput,
+  RuleHints,
   WalkOutput,
 } from '../../lang-adapter/types.js';
 import type { FunctionOccurrence, Rule } from '../../types.js';
@@ -40,6 +41,7 @@ interface FakeAdapterInput {
   readonly files?: readonly string[];
   readonly compilerOptions?: unknown;
   readonly configPathAbs?: string;
+  readonly ruleHints?: RuleHints;
 }
 
 function fakeAdapter(input: FakeAdapterInput): GraphLanguageAdapter {
@@ -74,6 +76,7 @@ function fakeAdapter(input: FakeAdapterInput): GraphLanguageAdapter {
       },
     }),
     cacheKey: () => cacheKey,
+    ruleHints: input.ruleHints,
   };
 }
 
@@ -247,6 +250,36 @@ describe('runGraph orchestrator', () => {
     registerAdapter(fakeAdapter({ projectDir }));
     await runGraph({ cwd: projectDir, noCache: true, rules: [], datastore });
     expect(new CatalogRepo(datastore).hasAnyCatalog()).toBe(false);
+  });
+
+  // Guards a real correctness regression: prior to the fix the
+  // orchestrator called `rule.evaluate(catalog, indexes, config)` and
+  // dropped the fourth argument, so every non-TypeScript adapter's
+  // ruleHints (sideEffectPrimitives, throwSyntaxRegex, isTestFile,
+  // generatedFilePatterns) silently fell back to TS-shaped regex.
+  it("threads the active adapter's ruleHints into every rule's evaluate call", async () => {
+    const hints: RuleHints = {
+      sideEffectPrimitives: ['builtins.print', 'sys.exit'],
+      throwSyntaxRegex: /^\s*raise\s+\w+/,
+      generatedFilePatterns: ['**/_pb2.py'],
+      isTestFile: (p) => p.startsWith('tests/'),
+    };
+    registerAdapter(fakeAdapter({ projectDir, ruleHints: hints }));
+
+    const seenHints: (RuleHints | undefined)[] = [];
+    const capturingRule: Rule = {
+      slug: 'graph:test-hints-capture',
+      defaultSeverity: 'warning',
+      evaluate: (_catalog, _indexes, _config, h) => {
+        seenHints.push(h);
+        return [];
+      },
+    };
+
+    await runGraph({ cwd: projectDir, rules: [capturingRule], datastore });
+
+    expect(seenHints).toHaveLength(1);
+    expect(seenHints[0]).toBe(hints);
   });
 });
 
