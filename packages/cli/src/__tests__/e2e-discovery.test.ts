@@ -200,8 +200,9 @@ describe('no-side-effects', () => {
   it('schemaVersion: 99 bailout does NOT open SQLite or initialise logs', () => {
     writeFileSync(join(testDir, 'opensip-tools.config.yml'), 'schemaVersion: 99\ntargets: {}\n', 'utf8');
     runCli(['fit-list'], testDir);
-    // pre-action-hook exits 2 BEFORE the side-effect block (initLogFile,
-    // setProjectContextForRun). No .runtime/ tree at all.
+    // pre-action-hook exits 2 BEFORE the side-effect block
+    // (configureLogger({ logDir }) + setProjectContextForRun). No
+    // .runtime/ tree at all.
     expect(existsSync(join(testDir, 'opensip-tools', '.runtime'))).toBe(false);
   });
 });

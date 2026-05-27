@@ -108,7 +108,7 @@ export type { Result, ToolErrorCode, ToolErrorOptions } from './lib/errors.js';
 // helper functions; `LoggerImpl` is exported for tests (and tools
 // that need an isolated logger) — advanced / discouraged for
 // general use, see the file-level docstring on lib/logger.ts.
-export { logger, LoggerImpl, setSilent, setDebugMode, setRunId, getRunId, initLogFile } from './lib/logger.js';
+export { logger, LoggerImpl, configureLogger, getRunId } from './lib/logger.js';
 export type { Logger, LogLevel, LoggerOptions } from './lib/logger.js';
 
 // Lib — permissive YAML reader (returns undefined on missing/malformed
