@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-22
-release: v1.3.x
+last_verified: 2026-05-26
+release: v2.0.x
 title: "Dashboard"
 audience: [users, contributors]
 purpose: "The HTML report — what it shows, when it opens, how it's generated, and where it lives."
@@ -96,7 +96,7 @@ Source: [`packages/dashboard/src/recipes.ts`](../../../packages/dashboard/src/re
 
 The Code Paths panel is the dashboard's interactive call-graph explorer. It's powered by the catalog produced by `opensip-tools graph` and surfaces seven curated views, each answering a real developer question with a clear next step. The pipeline that builds the underlying catalog is documented in [`40-the-graph-loop/01-stages-and-catalog.md`](../40-the-graph-loop/01-stages-and-catalog.md).
 
-The panel is language-agnostic — it consumes the generic v3 `Catalog` shape and works against TypeScript, Python, and Rust catalogs alike. Per-edge `confidence` is carried on `GraphCallEdge` and is available to views; today it's read but not surfaced as a UI badge, so reachability views on tree-sitter catalogs will look the same as TypeScript ones even though the underlying edges are lower-fidelity. See the per-rule fidelity table in [`02-rules-and-gating.md`](../40-the-graph-loop/02-rules-and-gating.md) for what this means in practice.
+The panel is language-agnostic — it consumes the generic v3 `Catalog` shape and works against TypeScript, Python, Rust, Go, and Java catalogs alike. Per-edge `confidence` is carried on `GraphCallEdge` and is available to views; today it's read but not surfaced as a UI badge, so reachability views on tree-sitter catalogs will look the same as TypeScript ones even though the underlying edges are lower-fidelity. See the per-rule fidelity table in [`02-rules-and-gating.md`](../40-the-graph-loop/02-rules-and-gating.md) for what this means in practice.
 
 The seven views (each with the same row-click → universal Function Card flow). The non-Search views are paginated at 10 rows per page rather than capped — every function in the catalog (after filter chips apply) is reachable by paging through the table:
 

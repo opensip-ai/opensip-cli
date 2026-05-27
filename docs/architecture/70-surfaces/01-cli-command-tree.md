@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-05-22
-release: v1.3.x
+release: v2.0.x
 title: "CLI command tree"
 audience: [users, ci-integrators, contributors]
 purpose: "Lookup-shaped reference for every CLI command, its flags, and when to use each."
@@ -72,9 +72,8 @@ opensip-tools fit --gate-compare
 | `-v, --verbose` | bool | `false` | Inline finding details + findings summary. |
 | `--report-to <url>` | URL | — | POST findings to a URL (OpenSIP Cloud or compatible). |
 | `--api-key <key>` | string | — | API key for `--report-to`. |
-| `--gate-save` | bool | `false` | Save current findings as architecture baseline. |
+| `--gate-save` | bool | `false` | Save current findings as architecture baseline. The baseline is stored as a row in the project's SQLite store (`fit_baseline` table at `opensip-tools/.runtime/datastore.sqlite`). |
 | `--gate-compare` | bool | `false` | Compare current findings against baseline; exit 1 on regression. |
-| `--baseline <path>` | path | `opensip-tools/.runtime/baseline.sarif` | Baseline file location for `--gate-save`/`--gate-compare`. |
 | `-q, --quiet` | bool | `false` | Suppress banner. |
 | `--open` | bool | `false` | Launch dashboard after run. |
 | `--config <path>` | path | discovered | Override the `opensip-tools.config.yml` location (defaults to the project's config or the package.json pointer). |
@@ -134,7 +133,7 @@ opensip-tools graph --packages
 
 | Flag | Type | Default | Effect |
 |---|---|---|---|
-| `--cwd <path>` | string | `process.cwd()` | Target directory. Adapter is auto-detected by file-extension dominance (TypeScript looks for `tsconfig.json`; Python for `pyproject.toml`/`setup.py` with `**/*.py` fallback; Rust for `Cargo.toml` with `**/*.rs` fallback). |
+| `--cwd <path>` | string | `process.cwd()` | Target directory. Adapter is auto-detected by file-extension dominance (TypeScript: `tsconfig.json`; Python: `pyproject.toml`/`setup.py` + `**/*.py` fallback; Rust: `Cargo.toml` + `**/*.rs` fallback; Go: `go.mod` + `**/*.go` fallback; Java: Maven/Gradle config + `**/*.java` fallback). |
 | `--json` | bool | `false` | Output a `CliOutput`-shaped JSON document instead of the unified terminal report. |
 | `--no-cache` | bool | `false` | Skip the catalog cache and force a full rebuild. |
 | `--gate-save` | bool | `false` | Save the current Signal fingerprint set to the project's SQLite store (`graph_baseline_signals` table). Mutually exclusive with `--gate-compare`. |
@@ -145,7 +144,7 @@ opensip-tools graph --packages
 | `--packages-concurrency <n>` | int | `cpus()-1` | Override `--packages` concurrency cap. |
 | `--debug` | bool | `false` | Enable debug-level logging. |
 
-**Adapter selection.** v1.3.0 ships three first-party adapters: `typescript`, `python`, `rust`. `pickAdapter(cwd)` chooses by file-extension dominance over the cwd, ignoring `node_modules/`, `.venv/`, `target/`, `dist/`, `build/`. Ties prefer TypeScript, then Python, then Rust. For Python and Rust projects, run `graph` from the project root — the `--package` and `--packages` scoping flags are TypeScript-only.
+**Adapter selection.** v2.0.0 ships five first-party adapters: `typescript`, `python`, `rust`, `go`, `java`. Each is its own publishable npm package marked with `opensipTools.kind: "graph-adapter"`. `pickAdapter(cwd)` chooses by file-extension dominance over the cwd, ignoring `node_modules/`, `.venv/`, `target/`, `dist/`, `build/`. Ties resolve by a deterministic preference list. The `--package` and `--packages` scoping flags are TypeScript-only; for projects in other languages, run `graph` from the project root.
 
 **Exit codes:** 0 (success / gate clean), 1 (runtime error / gate regression / any `--packages` child failed), 2 (configuration error), 4 (`--report-to` upload failed).
 

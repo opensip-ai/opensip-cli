@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-22
-release: v1.3.x
+last_verified: 2026-05-26
+release: v2.0.x
 title: "Recipes and checks"
 audience: [contributors, plugin-authors]
 purpose: "What a recipe is, what a check is, and how they compose. The two primary author-facing primitives in fit."

@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-05-22
-release: v1.3.x
+release: v2.0.x
 title: "Ignore directives"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "Inline source-level suppression — how `@fitness-ignore-next-line` and `@fitness-ignore-file` work, when to use them, and where they fit in the run."
@@ -132,13 +132,11 @@ Directives are line-local. They're explicit. They're greppable. They survive rev
 The check fires on dozens of legitimate sites because the rule landed late or because the team's view changed. Use the gate baseline (`--gate-save`) instead. The baseline grandfathers existing violations and only fails on new ones.
 
 ```bash
-opensip-tools fit --gate-save                # capture today's reality
-git add opensip-tools/.runtime/baseline.sarif
-git commit
-opensip-tools fit --gate-compare              # CI gate from now on
+opensip-tools fit --gate-save                # capture today's reality into .runtime/datastore.sqlite
+opensip-tools fit --gate-compare             # CI gate from now on
 ```
 
-See [`60-subsystems/03-architecture-gate.md`](../60-subsystems/03-architecture-gate.md) for the full baseline workflow.
+In v2 the baseline lives in `<project>/opensip-tools/.runtime/datastore.sqlite` (gitignored). For CI to share a baseline across runs, upload that file as a workflow artifact on main-branch builds and download it before `--gate-compare` on PR builds — see [`60-subsystems/03-architecture-gate.md#ci-integration-patterns`](../60-subsystems/03-architecture-gate.md#ci-integration-patterns).
 
 ### When NOT to directive
 

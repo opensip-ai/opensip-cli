@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-22
-release: v1.3.x
+last_verified: 2026-05-26
+release: v2.0.x
 title: "Doc conventions"
 audience: [contributors]
 purpose: "Voice, frontmatter, diagrams, and verification trail conventions for the architecture doc set."

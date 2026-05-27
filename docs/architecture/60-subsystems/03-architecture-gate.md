@@ -1,13 +1,14 @@
 ---
 status: current
-last_verified: 2026-05-22
-release: v1.3.x
+last_verified: 2026-05-26
+release: v2.0.x
 title: "Architecture gate"
 audience: [contributors, ci-integrators]
 purpose: "The baseline-and-compare workflow. Identity hash, line-shift invariance, partial-SARIF tolerance, CI integration patterns."
 source-files:
   - packages/fitness/engine/src/gate.ts
   - packages/fitness/engine/src/sarif.ts
+  - packages/fitness/engine/src/persistence/baseline-repo.ts
   - packages/fitness/engine/src/__tests__/gate.test.ts
   - packages/fitness/engine/src/tool.ts
 related-docs:
@@ -30,14 +31,15 @@ The gate is opensip-tools' answer to "we have legacy violations and we need to s
 ## The two modes
 
 ```bash
-opensip-tools fit --gate-save                # capture today's reality
+opensip-tools fit --gate-save                 # capture today's reality
 opensip-tools fit --gate-compare              # CI gate from now on
-opensip-tools fit --gate-compare --baseline path     # custom location
 ```
 
-`--gate-save` runs the configured recipe, then writes the resulting findings as a SARIF document to the baseline path. The default path is `<project>/opensip-tools/.runtime/baseline.sarif` ([`packages/fitness/engine/src/gate.ts:89`](../../../packages/fitness/engine/src/gate.ts)). Override with `--baseline <path>`.
+`--gate-save` runs the configured recipe and writes the resulting findings as a SARIF document into the project's SQLite store (`fit_baseline` table at `<project>/opensip-tools/.runtime/datastore.sqlite`, via [`FitBaselineRepo`](../../../packages/fitness/engine/src/persistence/baseline-repo.ts)). There is **exactly one baseline per project**.
 
-`--gate-compare` runs the same recipe, parses the saved baseline, computes the diff, and prints a structured report:
+> **v1 → v2 break.** v1 wrote baselines as SARIF *files* (`baseline.sarif`) and let users override the path with `--baseline <path>`. **The `--baseline` flag is gone in v2.** Teams that committed `baseline.sarif` to git for cross-CI gate comparisons should re-run `--gate-save` once on v2, then adopt one of the artifact-based CI patterns below. See [`50-runtime/03-session-and-persistence.md`](../50-runtime/03-session-and-persistence.md) for the schema layout.
+
+`--gate-compare` runs the same recipe, reads the saved baseline from the SQLite store, computes the diff, and prints a structured report:
 
 ```
 opensip-tools fit --gate-compare
@@ -91,12 +93,13 @@ The line-shift invariance is exercised by [`packages/fitness/engine/src/__tests_
 
 ## What `compareToBaseline` actually does
 
-[`packages/fitness/engine/src/gate.ts:127`](../../../packages/fitness/engine/src/gate.ts):
+[`packages/fitness/engine/src/gate.ts`](../../../packages/fitness/engine/src/gate.ts):
 
 ```ts
-export function compareToBaseline(output: CliOutput, baselinePath: string): GateCompareResult {
-  // 1. Throw GateBaselineMissingError if baselinePath doesn't exist.
-  // 2. Read + parse the SARIF document. Throw GateBaselineInvalidError on bad input.
+export function compareToBaseline(output: CliOutput, repo: FitBaselineRepo): GateCompareResult {
+  // 1. Throw GateBaselineMissingError if repo.load() returns null.
+  // 2. Parse the SARIF document held in the fit_baseline row.
+  //    Throw GateBaselineInvalidError on bad input.
   // 3. Extract baseline violations from SARIF runs[].results[].
   // 4. Extract current violations from output.checks[].findings[].
   // 5. Hash both lists into Maps keyed by hash.
@@ -104,7 +107,7 @@ export function compareToBaseline(output: CliOutput, baselinePath: string): Gate
   //      added       = current.keys() - baseline.keys()
   //      resolved    = baseline.keys() - current.keys()
   //      unchanged   = current.keys() ∩ baseline.keys()
-  // 7. Return { baselinePath, added, resolved, unchanged, degraded: added.length > 0 }
+  // 7. Return { added, resolved, unchanged, degraded: added.length > 0 }
 }
 ```
 
@@ -157,48 +160,51 @@ This is why ignore directives are compatible with the gate: a directive suppress
 
 ## CI integration patterns
 
-Three shapes that work in practice:
+In v2 the baseline lives in `<project>/opensip-tools/.runtime/datastore.sqlite`, which is gitignored. To get a shared baseline across CI runs the SQLite store (or just its baseline payload) has to travel with the workflow. Two shapes that work in practice:
 
-### Pattern 1 — committed baseline, branch comparison
+### Pattern 1 — rolling baseline via CI artifact
 
-The team commits `<project>/opensip-tools/baseline.sarif` to git. PRs fail if they introduce a regression vs. main's baseline.
-
-```yaml
-# .github/workflows/ci.yml
-- run: opensip-tools fit --gate-compare --baseline opensip-tools/baseline.sarif
-```
-
-After a tech-debt sprint that resolves violations, regenerate the baseline and commit it:
-
-```bash
-opensip-tools fit --gate-save --baseline opensip-tools/baseline.sarif
-git add opensip-tools/baseline.sarif
-git commit -m "chore: regenerate baseline after debt cleanup"
-```
-
-This is the strict shape — every PR must not regress, but the baseline can shrink in dedicated commits.
-
-### Pattern 2 — branch-comparison with rolling baseline
-
-CI saves a baseline on every main-branch run; PRs compare against the most recent main baseline (cached as a CI artifact, fetched at the start of each PR run).
+CI runs `--gate-save` on every main-branch build and uploads `<project>/opensip-tools/.runtime/datastore.sqlite` as a workflow artifact. PR runs download the most recent main artifact before invoking `--gate-compare`.
 
 ```yaml
-on:
-  pull_request:
+# .github/workflows/main.yml (build a fresh baseline on main)
+on: { push: { branches: [main] } }
 jobs:
-  fit:
+  baseline:
     steps:
-      - run: download-main-baseline opensip-tools/baseline.sarif
-      - run: opensip-tools fit --gate-compare --baseline opensip-tools/baseline.sarif
+      - uses: actions/checkout@v4
+      - run: pnpm install --frozen-lockfile
+      - run: opensip-tools fit --gate-save
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fit-baseline
+          path: opensip-tools/.runtime/datastore.sqlite
+          retention-days: 30
+
+# .github/workflows/pr.yml (gate every PR against the latest main baseline)
+on: { pull_request: {} }
+jobs:
+  gate:
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow: main.yml
+          name: fit-baseline
+          path: opensip-tools/.runtime/
+      - run: pnpm install --frozen-lockfile
+      - run: opensip-tools fit --gate-compare
 ```
 
-Less strict — PRs are graded against a moving target, but the moving target only goes down (since main never adds violations, by construction).
+PRs are graded against a moving target, but the target only goes down (main never adds violations, by construction). This is the closest equivalent to v1's "committed baseline" workflow.
 
-### Pattern 3 — local-only baseline
+### Pattern 2 — local-only baseline
 
-The baseline lives in `.runtime/` (gitignored). Each developer's machine has a different baseline, regenerated as they work on long-lived branches. CI doesn't gate at all — `--gate-compare` is purely a local affordance.
+The baseline lives in `.runtime/datastore.sqlite` (gitignored). Each developer's machine has its own baseline, regenerated as they work on long-lived branches. CI doesn't gate at all — `--gate-compare` is purely a local affordance.
 
 This is the loosest shape. Useful for early adoption, where the team isn't yet ready to enforce the gate in CI but wants the regression-detection workflow as a personal tool.
+
+> **Why no "committed baseline" pattern in v2?** Because the v2 baseline is a row in a SQLite database with WAL sidecars, committing it to git would mean committing a binary blob that diffs poorly and races on WAL writes. The artifact pattern above is the supported substitute. Teams that strongly need a text-shaped baseline in git can hand-export the SARIF payload from the `fit_baseline` row, but the CLI does not offer a built-in export today.
 
 ---
 
@@ -217,11 +223,10 @@ A few patterns the gate isn't a fit for:
 
 For `acme-api`:
 
-- They committed `<project>/opensip-tools/baseline.sarif` to git on day one when they had 142 pre-existing violations across the universal/typescript/python check packs.
-- CI's PR job runs `opensip-tools fit --gate-compare --baseline opensip-tools/baseline.sarif`.
+- Day one: CI's main-branch workflow runs `opensip-tools fit --gate-save` after merging the initial setup. The save records 142 pre-existing violations across the universal/typescript/python check packs as the baseline row in `.runtime/datastore.sqlite`, and CI uploads the SQLite file as the `fit-baseline` artifact.
+- PR workflow: each PR job downloads the latest `fit-baseline` artifact into `opensip-tools/.runtime/`, then runs `opensip-tools fit --gate-compare`.
 - A PR that introduces one new `console.log` produces an `Added (1)` line and exits 1. The PR fails until the `console.log` is removed (or marked with `// @fitness-ignore-next-line no-console-log`).
-- A PR that resolves four violations produces `Resolved (4)` and exits 0. The team merges.
-- Periodically, after debt-cleanup PRs land, an engineer runs `opensip-tools fit --gate-save --baseline opensip-tools/baseline.sarif` locally to regenerate the baseline. The baseline shrinks. The PR shrinking the baseline is reviewed; the new baseline is committed.
+- A PR that resolves four violations produces `Resolved (4)` and exits 0. The team merges; the next main-branch build re-runs `--gate-save` and the artifact rolls forward with the lower count.
 
 Today's count: 78 violations in the baseline. The 64-violation gap from day one's 142 is nine months of gradual improvement, gated all the way.
 

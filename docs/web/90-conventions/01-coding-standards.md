@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-22
-release: v1.3.x
+last_verified: 2026-05-26
+release: v2.0.x
 title: "Coding standards"
 audience: [contributors]
 purpose: "How code in this workspace is written. ESLint posture, error handling, exit codes, log style."

@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-05-22
-release: v1.3.x
+release: v2.0.x
 title: "Output, gate, SARIF"
 audience: [contributors, ci-integrators]
 purpose: "What happens to the violations a check produces — render layer, JSON output, SARIF, the gate, cloud reporting."
@@ -149,12 +149,11 @@ The `version: '1.0'` discriminator is part of the contract. New optional fields 
 ```bash
 opensip-tools fit --gate-save                     # capture today's reality
 opensip-tools fit --gate-compare                  # CI gate from now on
-opensip-tools fit --gate-compare --baseline path  # custom baseline location
 ```
 
-The gate is the regression-detection workflow. `--gate-save` writes the current run's findings to a SARIF baseline file. `--gate-compare` runs the same checks, compares the new findings to the baseline, and exits 1 if any *new* finding appears.
+The gate is the regression-detection workflow. `--gate-save` writes the current run's findings as a SARIF document into the project's SQLite store (`fit_baseline` table at `<project>/opensip-tools/.runtime/datastore.sqlite`). `--gate-compare` runs the same checks, reads the saved baseline back out, computes the diff, and exits 1 if any *new* finding appears. There is exactly one baseline per project.
 
-The default baseline path is `<project>/opensip-tools/.runtime/baseline.sarif` ([`packages/fitness/engine/src/gate.ts:89`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/fitness/engine/src/gate.ts)). Override with `--baseline <path>` if you want it elsewhere — e.g. checked into git outside `.runtime/`.
+> **v1 → v2 break.** The `--baseline <path>` flag is gone. v1 stored baselines as SARIF files; v2 stores them in SQLite. See [`60-subsystems/03-architecture-gate.md#ci-integration-patterns`](/docs/opensip-tools/60-subsystems/03-architecture-gate/#ci-integration-patterns) for the artifact-based CI workflow that replaces the v1 "committed baseline" pattern.
 
 The full gate behavior — diff classification, line-shift invariance, partial-SARIF tolerance — is documented in [`60-subsystems/03-architecture-gate.md`](/docs/opensip-tools/60-subsystems/03-architecture-gate/). The short version:
 
@@ -263,14 +262,14 @@ This permissiveness exists for a real reason: teams sometimes hand-edit baseline
 
 ## Where the example lands
 
-For `acme-api`'s nightly CI job:
+For `acme-api`'s PR CI job (after the workflow downloads the `fit-baseline` artifact built by the main-branch job into `opensip-tools/.runtime/`):
 
 ```bash
-opensip-tools fit --gate-compare --baseline opensip-tools/baseline.sarif
+opensip-tools fit --gate-compare
 ```
 
 1. `executeFit(args)` runs the default recipe, producing a `CliOutput` with 80 checks and (today) 30 findings.
-2. The gate reads `opensip-tools/baseline.sarif` (29 findings from last week's commit).
+2. The gate loads the SARIF payload from the `fit_baseline` row in `.runtime/datastore.sqlite` (29 findings from last week's main build).
 3. `extractViolationsFromSarif` and `extractViolationsFromCliOutput` both produce hashed violation lists.
 4. The diff: 1 new finding (`no-console-log` at `services/api/src/routes/payments.ts:88` — a `console.log` slipped in), 0 resolved, 29 unchanged.
 5. Output: `✗ DEGRADED — 1 new violation`. Exit code 1. The PR fails.

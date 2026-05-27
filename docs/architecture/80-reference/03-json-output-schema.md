@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-22
-release: v1.3.x
+last_verified: 2026-05-26
+release: v2.0.x
 title: "JSON output schema"
 audience: [ci-integrators, plugin-authors]
 purpose: "The CliOutput shape (and the SimDoneResult shape). Every field, every type, every presence rule."
