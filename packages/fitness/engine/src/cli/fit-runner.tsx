@@ -40,7 +40,7 @@ import {
   type TableRow,
 } from '@opensip-tools/contracts';
 /* eslint-enable sonarjs/deprecation */
-import { Box, Text, useApp, render } from 'ink';
+import { Box, Static, Text, useApp, render } from 'ink';
 import React, { useCallback, useEffect, useState } from 'react';
 
 import { reportToCloud } from '../sarif.js';
@@ -139,69 +139,81 @@ function FitRunner({ args, datastore, setExitCode }: FitRunnerProps): React.Reac
 
   const recipe = args.tags ? `tags: ${args.tags}` : (args.recipe ?? 'default');
 
+  // Banner + RunHeader both live in <Static> so Ink writes them once above the
+  // dynamic redraw region and never touches those bytes again. The dynamic
+  // region contains ONLY the things that actually change between frames
+  // (spinner during loading/running; summary block during done) — small,
+  // stable-width content that Ink can redraw without its line-clear heuristic
+  // miscounting and producing overdraw.
+  //
+  // Static is incremental: items added in later renders are appended below
+  // existing static content. We start with just the banner (we don't know
+  // checkCount yet during loading), and append the header once checkCount is
+  // known. RunHeader's metadata only changes once (when loading→running), and
+  // after that it's stable for the rest of the run — perfect Static fit.
+  const checkCount = state.phase === 'running' || state.phase === 'done' ? state.checkCount : null;
+  const staticItems = computeStaticItems(args.quiet === true, checkCount);
+
+  const renderStaticItem = (item: 'banner' | 'header'): React.ReactElement => {
+    if (item === 'banner') return <Banner key={item} />;
+    const metadata = [
+      { label: 'Recipe', value: recipe },
+      { label: 'Checks', value: String(checkCount) },
+    ];
+    return (
+      <RunHeader
+        key={item}
+        tool={FIT_TOOL_TITLE}
+        description={FIT_TOOL_DESCRIPTION}
+        projectRoot={args.cwd}
+        metadata={metadata}
+      />
+    );
+  };
+
+  const staticHeader = (
+    <Static items={staticItems}>
+      {renderStaticItem}
+    </Static>
+  );
+
   switch (state.phase) {
     case 'loading': {
       return (
-        <Box flexDirection="column">
-          {!args.quiet && <Banner />}
-          {!args.quiet && (
-            <RunHeader
-              tool={FIT_TOOL_TITLE}
-              description={FIT_TOOL_DESCRIPTION}
-              projectRoot={args.cwd}
-              metadata={[{ label: 'Recipe', value: recipe }]}
-            />
-          )}
-          <Box paddingLeft={2}>
+        <>
+          {staticHeader}
+          <Box paddingLeft={2} paddingTop={1}>
             <Spinner total={0} completed={0} label="Loading checks..." />
           </Box>
-        </Box>
+        </>
       );
     }
 
     case 'running': {
       return (
-        <Box flexDirection="column">
-          {!args.quiet && <Banner />}
-          {!args.quiet && (
-            <RunHeader
-              tool={FIT_TOOL_TITLE}
-              description={FIT_TOOL_DESCRIPTION}
-              projectRoot={args.cwd}
-              metadata={[
-                { label: 'Recipe', value: recipe },
-                { label: 'Checks', value: String(state.checkCount) },
-              ]}
-            />
-          )}
+        <>
+          {staticHeader}
           <Box paddingLeft={2}>
             <Spinner total={state.total} completed={state.completed} label="Running checks..." />
           </Box>
-        </Box>
+        </>
       );
     }
 
     case 'done': {
       return (
-        <Box flexDirection="column">
-          {!args.quiet && <Banner />}
-          {!args.quiet && (
-            <RunHeader
-              tool={FIT_TOOL_TITLE}
-              description={FIT_TOOL_DESCRIPTION}
-              projectRoot={args.cwd}
-              metadata={[
-                { label: 'Recipe', value: recipe },
-                { label: 'Checks', value: String(state.checkCount) },
-              ]}
-            />
-          )}
+        <>
+          {staticHeader}
+          <Box flexDirection="column">
           {!args.quiet && (args.verbose === true || args.findings === true) && (
             <Box paddingTop={1} flexDirection="column">
               <ResultsTable rows={state.result.rows} />
             </Box>
           )}
           <SummaryLine summary={state.result.summary} />
+          {!args.quiet && state.result.warnings && state.result.warnings.length > 0 && (
+            <WarningsBlock warnings={state.result.warnings} />
+          )}
           {!args.quiet && state.result.findings && (
             <FindingsBlock checks={state.result.findings.checks} />
           )}
@@ -222,7 +234,8 @@ function FitRunner({ args, datastore, setExitCode }: FitRunnerProps): React.Reac
               </Text>
             </Box>
           )}
-        </Box>
+          </Box>
+        </>
       );
     }
 
@@ -361,6 +374,41 @@ function countBySeverity(check: CheckOutput): CheckCounts {
     else warningCount++;
   }
   return { errorCount, warningCount };
+}
+
+/**
+ * Compute the Static items list for the current frame. Items are append-only:
+ * `'banner'` is present once the run starts; `'header'` joins once checkCount
+ * is known (after loading). In quiet mode, the list stays empty so the Static
+ * tree renders nothing.
+ */
+function computeStaticItems(quiet: boolean, checkCount: number | null): ('banner' | 'header')[] {
+  if (quiet) return [];
+  if (checkCount === null) return ['banner'];
+  return ['banner', 'header'];
+}
+
+/**
+ * WarningsBlock — renders non-fatal user-facing warnings collected during
+ * the run (plugin load failures, unknown languages in config, missing
+ * check packages, etc.).
+ *
+ * These come through `FitDoneResult.warnings` rather than direct stderr
+ * writes — emitting them during an active Ink render desyncs the renderer's
+ * frame tracking. Rendering them here through Ink keeps the live view's
+ * frame contract intact.
+ */
+function WarningsBlock({ warnings }: { readonly warnings: readonly string[] }): React.ReactElement {
+  const theme = useTheme();
+  return (
+    <Box flexDirection="column" paddingLeft={2} paddingTop={1}>
+      {warnings.map((msg, i) => (
+        <Text key={i} color={theme.warning}>
+          {'! '}{msg}
+        </Text>
+      ))}
+    </Box>
+  );
 }
 
 function FindingsBlock({ checks }: { readonly checks: readonly CheckOutput[] }): React.ReactElement {

@@ -240,6 +240,17 @@ export interface FitDoneResult {
   shouldFail?: boolean;
   /** Whether an opensip-tools.config.yml was found in the target directory */
   configFound?: boolean;
+  /**
+   * User-facing non-fatal warnings collected during the run (plugin load
+   * failures, unknown languages in config, missing check packages, etc.).
+   *
+   * These flow through the result rather than direct stderr writes because
+   * the live-view renderer (Ink) owns the screen and any ambient stderr
+   * write during render desyncs Ink's cursor tracking. Renderers display
+   * these in the summary; non-Ink paths (--json, gate modes) surface them
+   * at their own boundary.
+   */
+  warnings?: readonly string[];
 }
 
 export interface ListChecksResult {

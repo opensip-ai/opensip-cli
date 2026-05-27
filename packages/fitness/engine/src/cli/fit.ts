@@ -80,6 +80,27 @@ let checksLoadedFor: string | null = null;
 let pluginLoadErrors: readonly string[] = [];
 
 /**
+ * Non-fatal user-facing warnings collected during the most recent
+ * `ensureChecksLoaded` call (missing check package metadata, packages
+ * without a `checks` array, package load failures, plugin load errors,
+ * zero-packages-loaded).
+ *
+ * Replaces direct `process.stderr.write` calls that broke Ink's live-view
+ * frame tracking when emitted mid-render. `executeFit` reads these via
+ * `getLoadWarnings()` and surfaces them through `FitDoneResult.warnings`,
+ * which the renderer displays in the summary block and the JSON/gate
+ * paths emit at their own boundary.
+ */
+let loadWarnings: string[] = [];
+
+/** Warnings collected during the most recent ensureChecksLoaded() call.
+ * Returned alongside plugin errors and run-time validation warnings via
+ * executeFit's result so the live renderer and JSON output both see them. */
+export function getLoadWarnings(): readonly string[] {
+  return loadWarnings;
+}
+
+/**
  * Merged display map contributed by every loaded check package via the
  * FitPluginExports.checkDisplay field. Each package owns the slugs it
  * registers; on collision the last package loaded wins (no package is
@@ -152,6 +173,10 @@ export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
   const key = projectDir ?? '';
   if (checksLoadedFor === key) return;
 
+  // Reset per-run warning buffer. Singleton lifetime mirrors checksLoadedFor —
+  // a fresh load (new projectDir or first call) starts with no warnings.
+  loadWarnings = [];
+
   // 0. CLI-injected pre-load hook (auto-sync project plugins, etc).
   //    Skipped when no hook is registered (e.g. running fitness via the
   //    Tool API outside the CLI).
@@ -171,12 +196,11 @@ export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
   const pluginResult = await loadAllPlugins('fit', projectDir);
   pluginLoadErrors = pluginResult.errors;
   if (pluginResult.errors.length > 0) {
-    // Surface plugin load errors to the user. The logger is silenced in
-    // normal CLI runs, so a structured-log-only failure was invisible
-    // before. Print one line per failure to stderr — short, actionable,
-    // and doesn't clobber stdout (which carries results + --json).
+    // Plugin load errors go to loadWarnings (rendered via the result) and
+    // logger.warn (structured logs). Direct stderr writes are forbidden
+    // during live-view runs — they desync Ink's frame tracking.
     for (const err of pluginResult.errors) {
-      process.stderr.write(`opensip-tools: plugin failed to load — ${err}\n`);
+      loadWarnings.push(`plugin failed to load — ${err}`);
       logger.warn({ evt: 'cli.plugin.warning', module: 'cli:fit', message: err });
     }
   }
@@ -195,17 +219,18 @@ export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
   //    dir) we fall back to the CLI's own install dir so the bundled
   //    deps still resolve.
   const discoveryAnchor = projectDir ?? cliInstallDir();
-  const checksRegistered = await loadDiscoveredCheckPackages(discoveryAnchor);
+  const { totalRegistered: checksRegistered, warnings: packWarnings } = await loadDiscoveredCheckPackages(discoveryAnchor);
+  for (const w of packWarnings) loadWarnings.push(w);
 
   // 4. No-checks-loaded guard. Silent zero-checks would let a misconfig
   //    or missing dep produce a green run that scanned nothing — the
   //    exact failure mode the CLI exists to prevent. Warn loudly.
   if (checksRegistered === 0) {
     const msg =
-      'opensip-tools: no check packages were loaded. ' +
+      'no check packages were loaded. ' +
       'Install at least one @opensip-tools/checks-* package, ' +
-      'or declare plugins.checkPackages in opensip-tools.config.yml.\n';
-    process.stderr.write(msg);
+      'or declare plugins.checkPackages in opensip-tools.config.yml.';
+    loadWarnings.push(msg);
     logger.warn({
       evt: 'cli.check_packages.empty',
       module: 'cli:fit',
@@ -247,7 +272,7 @@ function cliInstallDir(): string {
  * anything (a silent green run scanning nothing is the failure mode
  * we want to make impossible).
  */
-export async function loadDiscoveredCheckPackages(projectDir: string): Promise<number> {
+export async function loadDiscoveredCheckPackages(projectDir: string): Promise<LoadDiscoveredResult> {
   const prefs = readCheckPackagePreferences(projectDir);
   const discovered = discoverCheckPackages({
     projectDir,
@@ -269,10 +294,11 @@ export async function loadDiscoveredCheckPackages(projectDir: string): Promise<n
       .map((p) => ({ name: p.name, packageDir: p.packageDir })),
   ];
   let totalRegistered = 0;
+  const warnings: string[] = [];
   for (const pkg of allPacks) {
     const meta = readCheckPackageMetadata(pkg.packageDir);
     if (!meta) {
-      process.stderr.write(`opensip-tools: check package ${pkg.name} has no readable package.json — skipping\n`);
+      warnings.push(`check package ${pkg.name} has no readable package.json — skipping`);
       continue;
     }
     try {
@@ -284,7 +310,7 @@ export async function loadDiscoveredCheckPackages(projectDir: string): Promise<n
       };
       const checks = mod.checks;
       if (!Array.isArray(checks)) {
-        process.stderr.write(`opensip-tools: check package ${pkg.name} does not export a "checks" array — skipping\n`);
+        warnings.push(`check package ${pkg.name} does not export a "checks" array — skipping`);
         continue;
       }
       let registered = 0;
@@ -317,7 +343,7 @@ export async function loadDiscoveredCheckPackages(projectDir: string): Promise<n
       });
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
-      process.stderr.write(`opensip-tools: failed to load check package ${pkg.name}: ${msg}\n`);
+      warnings.push(`failed to load check package ${pkg.name}: ${msg}`);
       logger.warn({
         evt: 'cli.check_package.load_failed',
         module: 'cli:fit',
@@ -326,7 +352,18 @@ export async function loadDiscoveredCheckPackages(projectDir: string): Promise<n
       });
     }
   }
-  return totalRegistered;
+  return { totalRegistered, warnings };
+}
+
+/**
+ * Return shape of `loadDiscoveredCheckPackages`. Warnings are returned
+ * (rather than written to a module singleton) so direct callers and tests
+ * can read them without depending on `ensureChecksLoaded` having run.
+ * `ensureChecksLoaded` merges these into the run-wide `loadWarnings` buffer.
+ */
+export interface LoadDiscoveredResult {
+  readonly totalRegistered: number;
+  readonly warnings: readonly string[];
 }
 
 /**
@@ -444,13 +481,18 @@ function loadFitConfig(
  * registered adapter. Silent acceptance would let users ship configs
  * that scan files but skip the language-aware string/comment filtering.
  *
+ * Returns warning strings (one per unknown-language batch) rather than
+ * writing to stderr — stderr writes during the Ink live view desync the
+ * renderer's frame tracking. `executeFit` collects these and threads
+ * them into `FitDoneResult.warnings`.
+ *
  * Async only because the language registry is imported via dynamic
  * import to keep the executeFit body free of fitness↔core import
  * arrows beyond the kernel barrel.
  */
 async function validateLanguagesAgainstAdapters(
   targetRegistry: LoadedFitConfig['targetRegistry'],
-): Promise<void> {
+): Promise<readonly string[]> {
   const { defaultLanguageRegistry: langRegistry } = await import('@opensip-tools/core');
   const knownLanguages = new Set<string>(langRegistry.list().flatMap((a) => [a.id, ...(a.aliases ?? [])]));
   const unknownLanguages = new Set<string>();
@@ -460,20 +502,20 @@ async function validateLanguagesAgainstAdapters(
       if (!knownLanguages.has(lang)) unknownLanguages.add(lang);
     }
   }
-  if (unknownLanguages.size === 0) return;
+  if (unknownLanguages.size === 0) return [];
 
   const list = [...unknownLanguages].sort().join(', ');
-  process.stderr.write(
-    `opensip-tools: target config declares unknown language(s): ${list}. ` +
-    `Known languages: ${[...knownLanguages].sort().join(', ')}. ` +
-    `Files in unknown languages will scan with no string/comment filtering.\n`,
-  );
   logger.warn({
     evt: 'cli.config.unknown_languages',
     module: 'cli:fit',
     unknown: [...unknownLanguages],
     known: [...knownLanguages],
   });
+  return [
+    `target config declares unknown language(s): ${list}. ` +
+    `Known languages: ${[...knownLanguages].sort().join(', ')}. ` +
+    `Files in unknown languages will scan with no string/comment filtering.`,
+  ];
 }
 
 /**
@@ -563,6 +605,7 @@ interface BuildFitDoneArgs {
   fitnessResult: FitnessRecipeResult;
   signalersConfig: SignalersConfig;
   recipeName: string | undefined;
+  warnings?: readonly string[];
 }
 
 /**
@@ -576,7 +619,7 @@ interface BuildFitDoneArgs {
  * this builder, and keeping the function side-effect-free preserves the
  * D1-phase decomposition. See `executeFit` for the persistence write.
  */
-function buildFitDoneResult({ args, fitnessResult, signalersConfig, recipeName }: BuildFitDoneArgs): FitDoneResult {
+function buildFitDoneResult({ args, fitnessResult, signalersConfig, recipeName, warnings }: BuildFitDoneArgs): FitDoneResult {
   const { summary, checkResults, durationMs } = fitnessResult;
 
   const tableRows: TableRow[] = checkResults.map(cr => ({
@@ -644,6 +687,7 @@ function buildFitDoneResult({ args, fitnessResult, signalersConfig, recipeName }
     findings,
     shouldFail,
     configFound: true,
+    warnings: warnings && warnings.length > 0 ? warnings : undefined,
   };
 }
 
@@ -771,7 +815,7 @@ export async function executeFit(
   if ('error' in recipePick) return { result: recipePick.error };
   const { recipeName } = recipePick;
 
-  await validateLanguagesAgainstAdapters(targetRegistry);
+  const validationWarnings = await validateLanguagesAgainstAdapters(targetRegistry);
 
   const allChecks = defaultRegistry.listSlugs().map((key) => {
     const check = defaultRegistry.getBySlug(key);
@@ -806,7 +850,13 @@ export async function executeFit(
     persistFitSession(opts.datastore, args, output);
   }
 
-  const result = buildFitDoneResult({ args, fitnessResult, signalersConfig, recipeName });
+  // Collect warnings from check loading (ensureChecksLoaded → loadWarnings)
+  // and from config validation (validateLanguagesAgainstAdapters). Both flow
+  // through the result rather than direct stderr writes so the live renderer
+  // can surface them without breaking Ink's frame tracking.
+  const warnings = [...getLoadWarnings(), ...validationWarnings];
+
+  const result = buildFitDoneResult({ args, fitnessResult, signalersConfig, recipeName, warnings });
 
   logger.info({ evt: 'cli.fit.complete', module: 'cli:fit', score: output.score, passed: fitnessResult.success, totalChecks: fitnessResult.summary.totalChecks, durationMs: fitnessResult.durationMs });
 

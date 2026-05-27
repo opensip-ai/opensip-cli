@@ -106,7 +106,7 @@ describe('loadDiscoveredCheckPackages', () => {
       marker: 'fit-pack',
     });
 
-    const registered = await loadDiscoveredCheckPackages(testDir);
+    const { totalRegistered: registered } = await loadDiscoveredCheckPackages(testDir);
 
     expect(registered).toBe(1);
     expect(defaultRegistry.getBySlug(checkSlug)).toBeDefined();
@@ -120,7 +120,7 @@ describe('loadDiscoveredCheckPackages', () => {
       // No marker — discovery is via the legacy scope+name walk.
     });
 
-    const registered = await loadDiscoveredCheckPackages(testDir);
+    const { totalRegistered: registered } = await loadDiscoveredCheckPackages(testDir);
 
     expect(registered).toBe(1);
     expect(defaultRegistry.getBySlug(checkSlug)).toBeDefined();
@@ -137,7 +137,7 @@ describe('loadDiscoveredCheckPackages', () => {
       marker: 'fit-pack',
     });
 
-    const registered = await loadDiscoveredCheckPackages(testDir);
+    const { totalRegistered: registered } = await loadDiscoveredCheckPackages(testDir);
 
     expect(registered).toBe(1);
     expect(defaultRegistry.getBySlug(checkSlug)).toBeDefined();
@@ -152,7 +152,7 @@ describe('loadDiscoveredCheckPackages', () => {
       recipesFragment: 'undefined',
     });
 
-    const registered = await loadDiscoveredCheckPackages(testDir);
+    const { totalRegistered: registered } = await loadDiscoveredCheckPackages(testDir);
 
     expect(registered).toBe(1);
     expect(defaultRegistry.getBySlug(checkSlug)).toBeDefined();
@@ -173,7 +173,7 @@ describe('loadDiscoveredCheckPackages', () => {
       recipesFragment: malformedFragment,
     });
 
-    const registered = await loadDiscoveredCheckPackages(testDir);
+    const { totalRegistered: registered } = await loadDiscoveredCheckPackages(testDir);
 
     expect(registered).toBe(1);
     expect(defaultRegistry.getBySlug(checkSlug)).toBeDefined();
@@ -183,7 +183,7 @@ describe('loadDiscoveredCheckPackages', () => {
     expect(defaultRecipeRegistry.has('missing-name')).toBe(false);
   });
 
-  it('skips a marker-discovered pack that fails to export a `checks` array (logs to stderr)', async () => {
+  it('skips a marker-discovered pack that fails to export a `checks` array (records a load warning)', async () => {
     writeFixturePack({
       packageDir: join(testDir, 'node_modules', '@acme', 'fit-broken'),
       packageName: '@acme/fit-broken',
@@ -191,11 +191,13 @@ describe('loadDiscoveredCheckPackages', () => {
       omitChecks: true,
     });
 
-    const registered = await loadDiscoveredCheckPackages(testDir);
+    const { totalRegistered, warnings } = await loadDiscoveredCheckPackages(testDir);
 
-    expect(registered).toBe(0);
-    const stderrCalls = stderrSpy.mock.calls.map((c) => String(c[0]));
-    expect(stderrCalls.some((m) => m.includes('@acme/fit-broken') && m.includes('checks'))).toBe(true);
+    expect(totalRegistered).toBe(0);
+    // Warning now returned from loadDiscoveredCheckPackages rather than written
+    // to stderr — direct stderr writes during the Ink live view desync the
+    // renderer; warnings flow through FitDoneResult.warnings instead.
+    expect(warnings.some((m) => m.includes('@acme/fit-broken') && m.includes('checks'))).toBe(true);
   });
 
   it('ignores a sim-pack marker when discovering fit-packs', async () => {
@@ -205,13 +207,13 @@ describe('loadDiscoveredCheckPackages', () => {
       marker: 'sim-pack',
     });
 
-    const registered = await loadDiscoveredCheckPackages(testDir);
+    const { totalRegistered: registered } = await loadDiscoveredCheckPackages(testDir);
 
     expect(registered).toBe(0);
   });
 
   it('returns 0 when no packages are discoverable', async () => {
-    const registered = await loadDiscoveredCheckPackages(testDir);
+    const { totalRegistered: registered } = await loadDiscoveredCheckPackages(testDir);
     expect(registered).toBe(0);
   });
 });

@@ -332,6 +332,22 @@ async function runJsonMode(args: CliArgs, cli: ToolCliContext): Promise<void> {
     cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
   }
   cli.emitJson(fitResult.output);
+  // Warnings collected during the run go to stderr so JSON consumers still
+  // see them without contaminating the structured stdout payload.
+  emitWarningsToStderr(fitResult.result);
+}
+
+/**
+ * Emit any non-fatal warnings collected during the run to stderr. Safe to
+ * call from non-Ink paths (JSON, gate modes) because Ink is not managing
+ * the screen there. The live renderer surfaces these through Ink in the
+ * summary block instead.
+ */
+function emitWarningsToStderr(result: { warnings?: readonly string[] }): void {
+  if (!result.warnings || result.warnings.length === 0) return;
+  for (const msg of result.warnings) {
+    process.stderr.write(`opensip-tools: ${msg}\n`);
+  }
 }
 
 /**
@@ -389,6 +405,9 @@ async function runGateMode(args: CliArgs, cli: ToolCliContext): Promise<void> {
     return;
   }
   const output = fitResult.output!;
+  // Surface non-fatal warnings before the gate output so the user sees them
+  // alongside the run summary. Safe here because gate mode is non-Ink.
+  emitWarningsToStderr(fitResult.result);
   try {
     if (args.gateSave === true) {
       saveBaseline(output, repo);

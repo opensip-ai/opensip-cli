@@ -86,7 +86,7 @@ targets:
 
   configs:
     description: Configuration files
-    languages: [json, typescript, yaml]
+    languages: [typescript]
     concerns: [config]
     include:
       - "**/tsconfig.json"
