@@ -247,7 +247,7 @@ function cliInstallDir(): string {
  * anything (a silent green run scanning nothing is the failure mode
  * we want to make impossible).
  */
-async function loadDiscoveredCheckPackages(projectDir: string): Promise<number> {
+export async function loadDiscoveredCheckPackages(projectDir: string): Promise<number> {
   const prefs = readCheckPackagePreferences(projectDir);
   const discovered = discoverCheckPackages({
     projectDir,

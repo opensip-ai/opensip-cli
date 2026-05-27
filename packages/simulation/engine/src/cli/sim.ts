@@ -162,7 +162,7 @@ export async function ensureScenariosLoaded(projectDir?: string): Promise<void> 
  * Errors loading any one package don't fail the others — they surface
  * to stderr the same way sim-domain plugin failures do.
  */
-async function loadDiscoveredScenarioPackages(projectDir: string): Promise<void> {
+export async function loadDiscoveredScenarioPackages(projectDir: string): Promise<void> {
   if (projectDir === '') return;
   const prefs = readScenarioPackagePreferences(projectDir);
   const discovered = discoverScenarioPackages({
