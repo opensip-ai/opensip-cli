@@ -1,5 +1,19 @@
 # Dogfood: candidate fitness checks from `opensip-ai/opensip/opensip-tools`
 
+> **Superseded** by [`../plan.md`](../plan.md). Preserved here for historical
+> context. At the time of supersession (2026-05-27), **three of the five
+> "strong portability" candidates listed below were already ported** to
+> opensip-tools: `arch-cli-realpath-validation` →
+> `checks-typescript/security/cli-realpath-validation`,
+> `arch-callback-invocation-safe` →
+> `checks-typescript/resilience/callback-invocation-safe`, and
+> `quality-log-event-name-shape` →
+> `checks-typescript/quality/observability/logger-event-name-format`.
+> Only `testing-no-focused-tests` and `quality-no-console-log` remained
+> unported; both are scoped into the superseding plan. Source path quoted
+> below (`fit/src/checks/`) was also incorrect — actual path is
+> `fit/checks/` (no `src/`).
+
 Source: `/Users/sb/Documents/Code/opensip-ai/opensip/opensip-tools/fit/src/checks/`
 
 That repo's `fit/src/checks/` contains 319 check source files across six
