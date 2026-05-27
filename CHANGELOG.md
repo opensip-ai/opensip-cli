@@ -91,6 +91,25 @@ and breaks compatibility with v1.x runtime layouts.
 
 ### Added
 
+- **Marker-based plugin discovery** — fit and sim packs can now declare
+  `opensipTools.kind: "fit-pack"` (or `"sim-pack"`) in their `package.json`
+  and be auto-discovered regardless of npm scope or name. Mirrors the
+  existing tool-plugin marker pattern (`kind: "tool"`). The generic
+  walker lives in `@opensip-tools/core` as `discoverPackagesByMarker`,
+  parameterized by the kind value; fit's `loadDiscoveredCheckPackages`
+  and sim's `loadDiscoveredScenarioPackages` call it alongside their
+  existing name-pattern walks, deduping by package name. Existing
+  `@opensip-tools/checks-*` / `@opensip-tools/scenarios-*` discovery
+  continues working unchanged.
+- **Fit auto-discovery now loads `mod.recipes`** from discovered check
+  packs — previously dropped silently. The `cli.check_package.loaded`
+  log event carries a new `recipesRegistered` field. Sim's equivalent
+  already loaded recipes; this brings the two domains into symmetry.
+- **Shared `registerRecipesFromMod` helper in core** — single
+  implementation of the "iterate `mod.recipes`, shape-check, register"
+  pattern previously near-duplicated across three sites (fitness plugin
+  loader, fit CLI, sim CLI). Emits `plugin.recipe.invalid_item` warnings
+  on malformed recipes (previously: sim silently dropped them).
 - **Project-root discovery** — `resolveProjectContext` in
   `@opensip-tools/core` walks ancestors looking for
   `opensip-tools.config.yml` (honoring `package.json#opensip-tools.configPath`
@@ -207,6 +226,14 @@ and breaks compatibility with v1.x runtime layouts.
 
 ### Deprecated
 
+- **`plugins.packageScopes` soft-deprecated in docs.** The mechanism
+  itself stays in code (existing customers using it continue to work
+  unchanged), but the plugin-authoring doc now recommends the marker
+  pattern (`opensipTools.kind: "fit-pack"` / `"sim-pack"`) for new
+  packs. `packageScopes` is now framed as a compatibility shim for
+  legacy third-party packs that follow `@scope/checks-*` naming
+  conventions without declaring the marker. See
+  [`docs/architecture/70-surfaces/02-plugin-authoring.md`](docs/architecture/70-surfaces/02-plugin-authoring.md).
 - **`CliArgs` from `@opensip-tools/contracts` is deprecated for new
   flags.** The interface still works (`*OptsToCliArgs` adapter
   functions in `@opensip-tools/fitness`, `@opensip-tools/simulation`,
@@ -219,6 +246,18 @@ and breaks compatibility with v1.x runtime layouts.
 
 ### Removed
 
+- **`metadata` plugin export contract.** The `metadata?: PluginMetadata`
+  field on `FitPluginExports` / `SimPluginExports` / `LangPluginExports`,
+  and the `PluginMetadata` interface itself, were dead code — no consumer
+  site read them, and every field (`name`, `version`, `description`,
+  etc.) duplicated `package.json` which is already read separately via
+  `readCheckPackageMetadata`. Removed wholesale; first-party check packs
+  (`@opensip-tools/checks-typescript`, `-universal`, `-python`, `-go`,
+  `-java`, `-cpp`, `-rust`) had their `export const metadata` blocks
+  removed. Third-party packs still exporting `metadata` continue to work
+  (the field is silently ignored at load time); they can remove it at
+  their leisure. If a future pack-catalog UX needs richer metadata, it
+  will get a purpose-built design.
 - **`packages/graph/engine/src/cache/{read,write,normalize}.ts`** — the
   streamed JSON catalog reader/writer. Replaced by `CatalogRepo`.
 - **`@opensip-tools/contracts` exports**: `configurePersistencePaths`,
