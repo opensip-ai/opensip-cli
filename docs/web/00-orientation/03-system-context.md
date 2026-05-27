@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-22
-release: v1.3.x
+last_verified: 2026-05-26
+release: v2.0.x
 title: "System context"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "Where opensip-tools sits between you, your codebase, CI, and OpenSIP Cloud — and what it touches on disk."
@@ -48,12 +48,12 @@ opensip-tools is a CLI that runs against your project. This doc draws the box ar
    │                          │         │                              │
    │                          │ writes  │ writes                       │
    │                          ▼         ▼                              │
-   │  opensip-tools/.runtime/sessions/    stdout (table | JSON | SARIF)│
-   │  opensip-tools/.runtime/reports/     stderr (logs)                │
-   │  opensip-tools/.runtime/logs/        exit code (0|1|2|3|4)        │
-   │  opensip-tools/.runtime/cache/                                    │
-   │  opensip-tools/.runtime/cache/graph/ (catalog.json + baseline.json│
-   │  opensip-tools/.runtime/baseline.sarif (fit gate)                 │
+   │  opensip-tools/.runtime/datastore.sqlite                          │
+   │      (sessions + fit baseline + graph catalog/baseline rows)      │
+   │  opensip-tools/.runtime/reports/latest.html  stdout (table|JSON|SARIF)│
+   │  opensip-tools/.runtime/logs/<YYYY-MM-DD>.jsonl                    │
+   │                                              stderr (logs)        │
+   │                                              exit code (0|1|2|3|4)│
    └──────────────────────────────────────────────────────────────────┘
                           │                              │
                           │                              │
@@ -107,20 +107,21 @@ Gitignored (`opensip-tools init` adds the entry to `.gitignore` for you):
 
 ```
 <project>/opensip-tools/.runtime/
-├── sessions/{timestamp}-{tool}-{recipe?}.json   ← per-run records (max 100, oldest auto-pruned)
-├── reports/latest.html                          ← single rolling HTML report, overwritten each run
-├── logs/<YYYY-MM-DD>.jsonl                      ← one log file per local day, all runs append
-├── cache/                                       ← AST + glob caches (rebuilt automatically)
-│   └── graph/                                   ← graph catalog + baseline
-├── baseline.sarif                               ← fit gate baseline (the one you do commit if you commit any)
+├── datastore.sqlite                              ← single SQLite store for tool-produced data
+│       │                                            (sessions, session_checks, session_findings,
+│       │                                             fit_baseline, graph_catalog,
+│       │                                             graph_baseline_signals, graph_baseline_meta)
+│       └── datastore.sqlite-wal / .sqlite-shm    ← WAL sidecar files (auto-managed by SQLite)
+├── reports/latest.html                           ← single rolling HTML report, overwritten each run
+├── logs/<YYYY-MM-DD>.jsonl                       ← one log file per local day, all runs append
 └── plugins/
-    ├── fit/node_modules/                        ← project-pinned fit plugins
-    └── sim/node_modules/                        ← project-pinned sim plugins
+    ├── fit/node_modules/                         ← project-pinned fit plugins (plugin add/sync)
+    └── sim/node_modules/                         ← project-pinned sim plugins
 ```
 
-The split rule is simple: anything you author lives in `opensip-tools/`; anything the tool generates lives in `opensip-tools/.runtime/`. The runtime dir is rebuildable from the source side, so wiping `.runtime/` is always safe.
+The split rule is simple: anything you author lives in `opensip-tools/`; anything the tool generates lives in `opensip-tools/.runtime/`. The runtime dir is rebuildable from the source side, so wiping `.runtime/` is always safe — caches rebuild and session history is lost.
 
-The one exception is the gate baseline. Some teams commit `<project>/opensip-tools/.runtime/baseline.sarif` to git so PR builds can compare against a stable reference. Others move it to a path *outside* `.runtime/` (passed via `--baseline`). Both work.
+**v2.0.0 change:** the fit gate baseline (formerly `baseline.sarif`) and the graph catalog/baseline (formerly `cache/graph/`) now live as rows in the SQLite store, not as separate files. The `--baseline <path>` flag is gone; teams that committed a SARIF baseline file for cross-CI gate comparisons should re-run `fit --gate-save` once on the new version to populate the SQLite store. See [`50-runtime/03-session-and-persistence.md`](/docs/opensip-tools/50-runtime/03-session-and-persistence/) for the full schema layout.
 
 ### User-level (`~/.opensip-tools/`)
 

@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-22
-release: v1.3.x
+last_verified: 2026-05-26
+release: v2.0.x
 title: "What is opensip-tools"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "The product entry point — what problem opensip-tools solves, what it actually does, the philosophy, and what it deliberately is not."

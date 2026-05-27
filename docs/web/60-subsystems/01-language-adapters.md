@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-22
-release: v1.3.x
+last_verified: 2026-05-26
+release: v2.0.x
 title: "Language adapters (fitness)"
 audience: [contributors, plugin-authors]
 purpose: "What the fitness LanguageAdapter is, the six bundled adapters, and how to author a new one."
@@ -24,9 +24,9 @@ related-docs:
 > **Two adapter contracts, one ambiguous word.** opensip-tools has two distinct language-adapter interfaces, used by different subsystems:
 >
 > - **`LanguageAdapter`** (this doc) lives in [`@opensip-tools/core`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/core/src/languages/adapter.ts). Used by the **fitness** engine. Three required methods (`parse`, `stripStrings`, `stripComments`) plus an optional query API. Lets fitness checks operate on filtered (comment- and string-stripped) source. Implemented by the six `@opensip-tools/lang-*` packages.
-> - **`GraphLanguageAdapter`** (separate, [`@opensip-tools/graph`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/graph/engine/src/lang-adapter/types.ts)) is used by the **graph** engine. Six methods (`discoverFiles`, `parseProject`, `walkProject`, `resolveCallSites`, `cacheKey`, optional `ruleHints`). Lets graph build call catalogs across languages. Implemented by `lang-typescript`, `lang-python`, `lang-rust` adapters that live *inside* `packages/graph/engine/src/lang-*/`.
+> - **`GraphLanguageAdapter`** (separate, [`@opensip-tools/graph`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/graph/engine/src/lang-adapter/types.ts)) is used by the **graph** engine. Six methods (`discoverFiles`, `parseProject`, `walkProject`, `resolveCallSites`, `cacheKey`, optional `ruleHints`). Lets graph build call catalogs across languages. Implemented by the **five publishable `@opensip-tools/graph-*` packages** under `packages/graph/graph-{typescript,python,rust,go,java}/`, each marked with `opensipTools.kind: "graph-adapter"`.
 >
-> They are siblings, not the same thing. A given language has one of each (e.g. TypeScript has both a fitness `typescriptAdapter` and a graph `typescriptGraphAdapter`). For graph adapters, see [`40-the-graph-loop/03-adding-a-language.md`](/docs/opensip-tools/40-the-graph-loop/03-adding-a-language/). The rest of this doc covers the fitness `LanguageAdapter` only.
+> They are siblings, not the same thing. A given language has one of each (e.g. TypeScript has both a fitness `typescriptAdapter` shipped by `@opensip-tools/lang-typescript` and a graph `typescriptGraphAdapter` shipped by `@opensip-tools/graph-typescript`). For graph adapters, see [`40-the-graph-loop/03-adding-a-language.md`](/docs/opensip-tools/40-the-graph-loop/03-adding-a-language/). The rest of this doc covers the fitness `LanguageAdapter` only.
 
 A check is a regex over `console.log`. The naive run flags `// console.log("debug")` (a comment) and `"console.log"` (a string literal). A `LanguageAdapter` is what makes the regex correct — it strips comments and string literals before the check sees the content.
 

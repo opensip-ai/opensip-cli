@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-05-22
-release: v1.3.x
+release: v2.0.x
 title: "Configuration"
 audience: [users, ci-integrators, plugin-authors]
 purpose: "The opensip-tools.config.yml schema, every field, defaults, and where each is read."
@@ -195,28 +195,36 @@ CLI flags always override config — passing `--no-json` overrides a `cli.json: 
 ```yaml
 plugins:
   fit:
-    - '@opensip-tools/checks-universal'
-    - '@opensip-tools/checks-typescript'
-    - '@opensip-tools/checks-python'
-    - '@my-org/checks-internal'
-
+    - '@my-org/checks-internal'             # arbitrary-scope pack pinned into .runtime/plugins/fit/
   sim:
-    - '@my-org/sim-scenarios'
+    - '@my-org/sim-scenarios'               # arbitrary-scope sim pack
 
-  checkPackages:                  # explicit override — no auto-discovery
+  # Scope-based auto-discovery: scan node_modules for <scope>/checks-* and
+  # <scope>/scenarios-*. The default scope (@opensip-tools) is always scanned;
+  # entries here are additive.
+  packageScopes:
+    - '@acme'                               # picks up @acme/checks-* AND @acme/scenarios-*
+
+  checkPackages:                            # explicit override — disables scope auto-discovery
     - '@opensip-tools/checks-universal'
+    - '@my-org/fitness-checks'              # arbitrary scope must be listed here
+
+  autoDiscoverChecks: true                  # default; set false to disable scope scan entirely
 ```
 
-Project-pinned plugin lists. When present, **only** these packages are loaded — auto-discovery in `node_modules` is disabled for the listed domain. The `plugin add/remove/sync` commands manage these lists.
+Plugin lists and discovery preferences. Three complementary discovery paths are layered:
 
 | Field | Effect |
 |---|---|
-| `plugins.fit` | Fitness check packs to load. |
-| `plugins.sim` | Simulation scenario packs. |
-| `plugins.checkPackages` | When set, **strict** — only these packages load, even excluding the bundled defaults. |
-| `plugins.autoDiscoverChecks` | When `false`, disables `node_modules` walk for fit checks. Default `true`. Ignored when `checkPackages` is set. |
+| `plugins.fit` | Arbitrary-scope fitness packs pinned into `.runtime/plugins/fit/`. Managed by `plugin add/remove/sync`. |
+| `plugins.sim` | Arbitrary-scope simulation packs pinned into `.runtime/plugins/sim/`. |
+| `plugins.packageScopes` | Additional npm scopes to scan for `<scope>/checks-*` and `<scope>/scenarios-*` packages. The default scope (`@opensip-tools`) is always scanned. Invalid entries (not matching `@kebab-case`) are skipped with a warning. |
+| `plugins.checkPackages` | When set, **strict** — only these packages load via the name-pattern path, even excluding the bundled defaults. Marker-based discovery (`opensipTools.kind: "fit-pack"`) still runs alongside. |
+| `plugins.autoDiscoverChecks` | When `false`, disables the `node_modules` scope scan for fit checks. Default `true`. Ignored when `checkPackages` is set. |
 
-See [`50-runtime/02-plugin-loader.md`](/docs/opensip-tools/50-runtime/02-plugin-loader/) for the loader semantics.
+Marker-based discovery — packages declaring `opensipTools.kind: "fit-pack"` or `"sim-pack"` in `package.json` — is always on and **not configurable from `opensip-tools.config.yml`**. The marker is the publication-scope-independent path; the YAML config governs only the name-pattern and explicit-pin paths.
+
+See [`50-runtime/02-plugin-loader.md`](/docs/opensip-tools/50-runtime/02-plugin-loader/) for the loader semantics and the resolution order across the three paths.
 
 ---
 

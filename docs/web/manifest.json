@@ -207,7 +207,7 @@
         "contributors",
         "plugin-authors"
       ],
-      "purpose": "Step-by-step guide for writing a new GraphLanguageAdapter — Go, Java, C/C++, or anything else — without touching the engine."
+      "purpose": "Step-by-step guide for writing a new GraphLanguageAdapter — C/C++, or anything else — without touching the engine."
     },
     {
       "file": "docs/web/50-runtime/01-cli-dispatch.md",
