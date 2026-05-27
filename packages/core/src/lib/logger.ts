@@ -11,18 +11,20 @@
  *
  * Destinations:
  * - File: <project>/opensip-tools/.runtime/logs/{YYYY-MM-DD}.jsonl
- *   The CLI bootstrap supplies this path via initLogFile(). Without
- *   initLogFile(), file output is disabled — user-global state
+ *   The CLI bootstrap supplies this path via configureLogger({ logDir }).
+ *   Without that, file output is disabled — user-global state
  *   (`~/.opensip-tools/`) is reserved for config.yml only.
  * - stderr: when debug mode is enabled (Ink renders to stdout, logs to stderr)
  *
- * The setSilent(true) flag only suppresses stderr output, NOT file output.
+ * The `silent: true` option only suppresses stderr output, NOT file output.
  *
  * Two access patterns:
  *
- *   1. The exported `logger` singleton + `setLogLevel` / `setSilent` /
- *      ... helper functions. Used by CLI bootstrap and any production
- *      caller that wants the process-wide configuration.
+ *   1. The exported `logger` singleton + `configureLogger(opts)`. Used
+ *      by the CLI bootstrap and any production caller that wants the
+ *      process-wide configuration. The four prior free mutators
+ *      (`setSilent`, `setDebugMode`, `setRunId`, `initLogFile`) were
+ *      collapsed into `configureLogger` in T1 deferred Item C.
  *
  *   2. The exported `LoggerImpl` class. Used by tests (or tools that
  *      need an isolated logger) to construct a fresh instance whose
@@ -58,12 +60,58 @@ const MAX_LOG_AGE_DAYS = 7;
  * need an isolated logger; everywhere else the typed `logger`
  * singleton is the right import.
  */
+/**
+ * Construction-time options for `LoggerImpl`. Also the shape accepted
+ * by `configureLogger(opts)`, the single bootstrap-time configuration
+ * seam that replaced the four free mutators (`setSilent`,
+ * `setDebugMode`, `setRunId`, `initLogFile`) — T1 deferred Item C.
+ */
+export interface LoggerOptions {
+  /** Initial log level. Defaults to `'warn'`. */
+  readonly level?: LogLevel;
+  /** Suppress stderr output (file output still occurs). Defaults to `false`. */
+  readonly silent?: boolean;
+  /** Enable debug-level output to stderr. Defaults to `false`. */
+  readonly debugMode?: boolean;
+  /** Correlation id for the current CLI invocation. */
+  readonly runId?: string;
+  /**
+   * Directory the daily `.jsonl` log file is written to. When provided,
+   * the logger initialises the file path and prunes logs older than
+   * 7 days. Best-effort; failures are swallowed.
+   */
+  readonly logDir?: string;
+}
+
 export class LoggerImpl implements Logger {
-  private currentLevel: LogLevel = 'warn';
+  private currentLevel: LogLevel;
   private silent = false;
   private debugMode = false;
   private runId: string | undefined;
   private logFilePath: string | undefined;
+
+  constructor(opts: LoggerOptions = {}) {
+    this.currentLevel = opts.level ?? 'warn';
+    this.applyOptions(opts);
+  }
+
+  /**
+   * Apply a `LoggerOptions` bag to this instance. Used by the singleton
+   * via `configureLogger(opts)` — the bootstrap-time configuration seam
+   * that collapsed the four prior free mutators into one shot. Each
+   * field is independent: an `applyOptions({ silent: true })` leaves
+   * `debugMode` and `runId` alone.
+   */
+  applyOptions(opts: LoggerOptions): void {
+    if (opts.level !== undefined) this.currentLevel = opts.level;
+    if (opts.silent !== undefined) this.silent = opts.silent;
+    if (opts.debugMode !== undefined) {
+      this.debugMode = opts.debugMode;
+      if (opts.debugMode) this.currentLevel = 'debug';
+    }
+    if (opts.runId !== undefined) this.runId = opts.runId;
+    if (opts.logDir !== undefined) this.initLogFile(opts.logDir);
+  }
 
   debug(msgOrObj: string | Record<string, unknown>, data?: Record<string, unknown>): void {
     this.log('debug', msgOrObj, data);
@@ -78,19 +126,26 @@ export class LoggerImpl implements Logger {
     this.log('error', msgOrObj, data);
   }
 
-  setLogLevel(level: LogLevel): void {
-    this.currentLevel = level;
-  }
-
+  /**
+   * Suppress stderr output. File output still occurs. Used by the CLI
+   * to silence the logger during Ink renders (Ink owns stdout; stderr
+   * is reserved for `--debug` traces). Tests use this on fresh
+   * `new LoggerImpl()` instances to verify the silent-mode contract.
+   */
   setSilent(value: boolean): void {
     this.silent = value;
   }
 
+  /**
+   * Enable debug-level output to stderr. Sets the current level to
+   * `'debug'` when enabled. Disabling does NOT restore a prior level.
+   */
   setDebugMode(value: boolean): void {
     this.debugMode = value;
     if (value) this.currentLevel = 'debug';
   }
 
+  /** Set the correlation id stamped on each log entry. */
   setRunId(id: string): void {
     this.runId = id;
   }
@@ -108,6 +163,11 @@ export class LoggerImpl implements Logger {
    * in debug mode).
    *
    * Prunes log files older than 7 days inside the chosen directory.
+   *
+   * @internal — production callers route through `configureLogger`'s
+   * `logDir` option. The method is `private` from a domain-design
+   * standpoint but TypeScript can't mark it `private` because the
+   * constructor calls it via `applyOptions`.
    */
   initLogFile(dir: string): void {
     try {
@@ -216,40 +276,37 @@ function pruneOldLogs(dir: string): void {
 // =============================================================================
 
 /**
- * Process-wide logger singleton. CLI bootstrap configures it via the
- * setter functions below; production callers import this constant
- * directly. Tests should construct a fresh `new LoggerImpl()` instead
- * of mutating the singleton's state.
+ * Process-wide logger singleton. CLI bootstrap configures it via
+ * `configureLogger(opts)` once at startup; production callers import
+ * this constant directly. Tests should construct a fresh
+ * `new LoggerImpl({...})` instead of mutating the singleton's state.
  *
  * Typed as the `Logger` interface (not the concrete class) so generic
  * call sites see only the four log-level methods. Configuration
- * (`setDebugMode`, `setLogLevel`, `initLogFile`, …) is the CLI
- * bootstrap's job and reaches the underlying instance through the
- * helper functions below.
+ * reaches the underlying instance through `configureLogger`, which is
+ * the only seam — the four free mutators (`setSilent`, `setDebugMode`,
+ * `setRunId`, `initLogFile`) that previously existed are gone
+ * (T1 deferred Item C).
  */
 const _logger = new LoggerImpl();
 export const logger: Logger = _logger;
 
-export function setLogLevel(level: LogLevel): void {
-  _logger.setLogLevel(level);
+/**
+ * One-shot configuration for the process-wide `logger` singleton.
+ * Replaces the four free mutators that previously each mutated one
+ * field. The CLI's pre-action-hook calls this once with all relevant
+ * options after flags are parsed and the project context is resolved.
+ *
+ * SaaS hosts that run multiple invocations concurrently should NOT use
+ * this — they construct per-invocation `new LoggerImpl({...})` and
+ * wire it into the `RunScope.logger` field so each run has its own
+ * file path and runId.
+ */
+export function configureLogger(opts: LoggerOptions): void {
+  _logger.applyOptions(opts);
 }
 
-export function setSilent(value: boolean): void {
-  _logger.setSilent(value);
-}
-
-export function setDebugMode(value: boolean): void {
-  _logger.setDebugMode(value);
-}
-
-export function setRunId(id: string): void {
-  _logger.setRunId(id);
-}
-
+/** Read the current correlation id. */
 export function getRunId(): string | undefined {
   return _logger.getRunId();
-}
-
-export function initLogFile(dir: string): void {
-  _logger.initLogFile(dir);
 }

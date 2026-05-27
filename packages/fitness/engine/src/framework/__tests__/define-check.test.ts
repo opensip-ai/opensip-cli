@@ -2,13 +2,22 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { defaultLanguageRegistry } from '@opensip-tools/core';
+import { LanguageRegistry, RunScope, runWithScopeSync } from '@opensip-tools/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { defineCheck } from '../define-check.js';
 import { fileCache } from '../file-cache.js';
 
 import type { LanguageAdapter } from '@opensip-tools/core';
+
+const stubAdapter = (id: string, aliases: readonly string[] = []): LanguageAdapter => ({
+  id,
+  fileExtensions: [`.${id}`],
+  aliases,
+  parse: () => null,
+  stripStrings: (s) => s,
+  stripComments: (s) => s,
+});
 
 describe('defineCheck', () => {
   describe('analyze mode', () => {
@@ -123,33 +132,18 @@ describe('defineCheck', () => {
   // Cross-pack alias regression — closes Layer 1 Phase 2 / Layer 3
   // plan Phase A2. A check declared with `scope: { languages: ['rs'] }`
   // should be canonicalised to `'rust'` at intake so target-side
-  // matching (also canonicalised) finds it.
+  // matching (also canonicalised) finds it. `stubAdapter` is at module
+  // scope above.
   describe('scope canonicalisation through registry aliases', () => {
-    let previousAdapters: readonly LanguageAdapter[];
-
-    const stubAdapter = (id: string, aliases: readonly string[] = []): LanguageAdapter => ({
-      id,
-      fileExtensions: [`.${id}`],
-      aliases,
-      parse: () => null,
-      stripStrings: (s) => s,
-      stripComments: (s) => s,
-    });
+    let testScope: RunScope;
 
     beforeEach(() => {
-      previousAdapters = defaultLanguageRegistry.list();
-      defaultLanguageRegistry.clear();
-      defaultLanguageRegistry.register(stubAdapter('cpp', ['c', 'c++']));
-      defaultLanguageRegistry.register(stubAdapter('rust', ['rs']));
-      defaultLanguageRegistry.register(stubAdapter('go', ['golang']));
-      defaultLanguageRegistry.register(stubAdapter('python', ['py']));
-    });
-
-    afterEach(() => {
-      defaultLanguageRegistry.clear();
-      for (const adapter of previousAdapters) {
-        defaultLanguageRegistry.register(adapter);
-      }
+      const reg = new LanguageRegistry();
+      reg.register(stubAdapter('cpp', ['c', 'c++']));
+      reg.register(stubAdapter('rust', ['rs']));
+      reg.register(stubAdapter('go', ['golang']));
+      reg.register(stubAdapter('python', ['py']));
+      testScope = new RunScope({ languages: reg });
     });
 
     it.each([
@@ -159,39 +153,59 @@ describe('defineCheck', () => {
       ['golang', 'go'],
       ['py', 'python'],
     ])('canonicalises scope.languages: ["%s"] → "%s"', (alias, canonical) => {
-      const c = defineCheck({
-        id: '77777777-7777-4777-8777-777777777777',
-        slug: 'aliased',
-        description: 'd',
-        tags: ['demo'],
-        scope: { languages: [alias], concerns: ['backend'] },
-        analyze: () => [],
-      });
+      const c = runWithScopeSync(testScope, () =>
+        defineCheck({
+          id: '77777777-7777-4777-8777-777777777777',
+          slug: 'aliased',
+          description: 'd',
+          tags: ['demo'],
+          scope: { languages: [alias], concerns: ['backend'] },
+          analyze: () => [],
+        }),
+      );
       expect(c.config.checkScope?.languages).toEqual([canonical]);
     });
 
     it('leaves canonical ids unchanged', () => {
-      const c = defineCheck({
-        id: '88888888-8888-4888-8888-888888888888',
-        slug: 'canonical',
-        description: 'd',
-        tags: ['demo'],
-        scope: { languages: ['cpp', 'rust'], concerns: [] },
-        analyze: () => [],
-      });
+      const c = runWithScopeSync(testScope, () =>
+        defineCheck({
+          id: '88888888-8888-4888-8888-888888888888',
+          slug: 'canonical',
+          description: 'd',
+          tags: ['demo'],
+          scope: { languages: ['cpp', 'rust'], concerns: [] },
+          analyze: () => [],
+        }),
+      );
       expect(c.config.checkScope?.languages).toEqual(['cpp', 'rust']);
     });
 
     it('passes unknown languages through (case-folded) so checks still register', () => {
+      const c = runWithScopeSync(testScope, () =>
+        defineCheck({
+          id: '99999999-9999-4999-8999-999999999999',
+          slug: 'unknown-lang',
+          description: 'd',
+          tags: ['demo'],
+          scope: { languages: ['Ada'], concerns: [] },
+          analyze: () => [],
+        }),
+      );
+      expect(c.config.checkScope?.languages).toEqual(['ada']);
+    });
+
+    it('falls back to lowercase when no scope is bound at defineCheck time', () => {
+      // No runWithScope wrapper — defineCheck should not throw, just lowercase.
       const c = defineCheck({
-        id: '99999999-9999-4999-8999-999999999999',
-        slug: 'unknown-lang',
+        id: '77777777-aaaa-4777-8777-aaaaaaaaaaaa',
+        slug: 'no-scope',
         description: 'd',
         tags: ['demo'],
-        scope: { languages: ['Ada'], concerns: [] },
+        scope: { languages: ['RS'], concerns: [] },
         analyze: () => [],
       });
-      expect(c.config.checkScope?.languages).toEqual(['ada']);
+      // Lowercase the alias since no registry is available to canonicalise it.
+      expect(c.config.checkScope?.languages).toEqual(['rs']);
     });
   });
 

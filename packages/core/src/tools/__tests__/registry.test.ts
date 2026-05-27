@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 import { logger } from '../../lib/logger.js';
-import { ToolRegistry, defaultToolRegistry } from '../registry.js';
+import { ToolRegistry } from '../registry.js';
 
 import type { Tool } from '../types.js';
 
@@ -108,8 +108,3 @@ describe('ToolRegistry', () => {
   });
 });
 
-describe('defaultToolRegistry', () => {
-  it('is a ToolRegistry singleton', () => {
-    expect(defaultToolRegistry).toBeInstanceOf(ToolRegistry);
-  });
-});

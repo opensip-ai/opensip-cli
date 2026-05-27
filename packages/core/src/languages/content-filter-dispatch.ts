@@ -11,7 +11,7 @@
  * knowing which language a file is in.
  */
 
-import { defaultLanguageRegistry } from './registry.js'
+import { currentScope } from '../lib/run-scope.js'
 
 /**
  * Content filter modes a check can request:
@@ -40,7 +40,12 @@ export function applyContentFilter(
   mode: ContentFilterMode,
 ): string {
   if (mode === 'none' || mode === 'raw') return content
-  const adapter = defaultLanguageRegistry.forFile(filePath)
+  // No scope (e.g. a unit test that calls `check.run` directly without
+  // going through the engine's recipe service) — fall back to raw,
+  // matching the prior "no adapter → raw" semantics. The engine itself
+  // wraps real runs in `runWithScope` so production code resolves the
+  // adapter normally.
+  const adapter = currentScope()?.languages.forFile(filePath)
   if (!adapter) {
     // No adapter — file is in a language we don't recognize. The check
     // author asked for stripped content, but we have no way to strip

@@ -289,6 +289,9 @@ importers:
         specifier: workspace:*
         version: link:../engine
     devDependencies:
+      '@opensip-tools/core':
+        specifier: workspace:*
+        version: link:../../core
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.15
@@ -302,6 +305,9 @@ importers:
         specifier: workspace:*
         version: link:../engine
     devDependencies:
+      '@opensip-tools/core':
+        specifier: workspace:*
+        version: link:../../core
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.15
@@ -315,6 +321,9 @@ importers:
         specifier: workspace:*
         version: link:../engine
     devDependencies:
+      '@opensip-tools/core':
+        specifier: workspace:*
+        version: link:../../core
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.15
@@ -328,6 +337,9 @@ importers:
         specifier: workspace:*
         version: link:../engine
     devDependencies:
+      '@opensip-tools/core':
+        specifier: workspace:*
+        version: link:../../core
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.15

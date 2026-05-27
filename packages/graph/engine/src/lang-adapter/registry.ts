@@ -2,22 +2,37 @@
  * Graph language-adapter registry.
  *
  * Lands in PR 3 of plan docs/plans/10-graph-language-pluggability.md.
- * The registry is a process-global Map<string, GraphLanguageAdapter>.
  * Adapters register themselves at module load (typically via the
  * graph tool's `tool.ts` registering the first-party TypeScript
  * adapter).
+ *
+ * Built on the kernel's unified `Registry<T>` with
+ * `duplicatePolicy: 'overwrite'` — re-registering an adapter with the
+ * same `id` overwrites the incumbent. That's intentional: a host
+ * application can swap an adapter in tests, and the file's prior
+ * incarnation documented this contract explicitly.
  *
  * Future PRs may auto-detect the right adapter from project files;
  * for now `pickAdapter()` returns the only registered adapter so the
  * orchestrator behaves identically to today.
  */
 
-import { ConfigurationError } from '@opensip-tools/core';
+import { ConfigurationError, Registry, type Registerable } from '@opensip-tools/core';
 import { globSync } from 'glob';
 
 import type { GraphLanguageAdapter } from './types.js';
 
-const adapters = new Map<string, GraphLanguageAdapter>();
+interface RegisterableAdapter extends Registerable {
+  readonly id: string;
+  readonly name: string;
+  readonly adapter: GraphLanguageAdapter;
+}
+
+const registry = new Registry<RegisterableAdapter>({
+  module: 'graph:lang-adapter',
+  duplicatePolicy: 'overwrite',
+  evtPrefix: 'graph.lang_adapter.registry',
+});
 
 /**
  * Register an adapter by its `id`. Re-registering an adapter with
@@ -25,7 +40,7 @@ const adapters = new Map<string, GraphLanguageAdapter>();
  * can swap an adapter in tests.
  */
 export function registerAdapter(adapter: GraphLanguageAdapter): void {
-  adapters.set(adapter.id, adapter);
+  registry.register({ id: adapter.id, name: adapter.id, adapter });
 }
 
 /**
@@ -46,17 +61,17 @@ export function registerAdapter(adapter: GraphLanguageAdapter): void {
  * do without inspecting tool config.
  */
 export function pickAdapter(cwd?: string): GraphLanguageAdapter {
-  if (adapters.size === 0) {
+  if (registry.size === 0) {
     throw new ConfigurationError(
       'graph: no language adapter registered. The TypeScript adapter ' +
         'registers itself when @opensip-tools/graph loads; check that the ' +
         'graph tool was installed correctly.',
     );
   }
-  if (adapters.size === 1) {
-    const only = [...adapters.values()][0];
+  if (registry.size === 1) {
+    const only = registry.getAll()[0];
     if (!only) throw new ConfigurationError('graph: registry corrupted');
-    return only;
+    return only.adapter;
   }
   if (cwd !== undefined && cwd.length > 0) {
     const dominant = pickByFileDominance(cwd);
@@ -64,15 +79,15 @@ export function pickAdapter(cwd?: string): GraphLanguageAdapter {
   }
   // Deterministic fallback: prefer TypeScript when present; otherwise
   // the first id alphabetically.
-  const ts = adapters.get('typescript');
-  if (ts) return ts;
+  const ts = registry.getById('typescript');
+  if (ts) return ts.adapter;
   /* v8 ignore start */
-  const ids = [...adapters.keys()].sort();
+  const ids = registry.getAll().map((r) => r.id).sort();
   const id = ids[0];
   if (!id) throw new ConfigurationError('graph: registry corrupted');
-  const adapter = adapters.get(id);
-  if (!adapter) throw new ConfigurationError('graph: registry corrupted');
-  return adapter;
+  const entry = registry.getById(id);
+  if (!entry) throw new ConfigurationError('graph: registry corrupted');
+  return entry.adapter;
   /* v8 ignore stop */
 }
 
@@ -92,12 +107,13 @@ function pickByFileDominance(cwd: string): GraphLanguageAdapter | undefined {
   if (!best) return undefined;
   const tied = collectTies(counts, best.count);
   if (tied.length > 1) return resolveTie(tied);
-  return adapters.get(best.id);
+  return registry.getById(best.id)?.adapter;
 }
 
 function countFilesPerAdapter(cwd: string): Map<string, number> {
   const counts = new Map<string, number>();
-  for (const adapter of adapters.values()) {
+  for (const entry of registry.getAll()) {
+    const adapter = entry.adapter;
     if (adapter.fileExtensions.length === 0) continue;
     let total = 0;
     for (const ext of adapter.fileExtensions) {
@@ -130,16 +146,18 @@ function collectTies(counts: ReadonlyMap<string, number>, target: number): reado
 
 function resolveTie(tied: readonly string[]): GraphLanguageAdapter | undefined {
   const preference = ['typescript', 'python', 'rust'];
-  for (const pref of preference) if (tied.includes(pref)) return adapters.get(pref);
+  for (const pref of preference) if (tied.includes(pref)) return registry.getById(pref)?.adapter;
   /* v8 ignore next 2 */
   const sorted = [...tied].sort();
-  return adapters.get(sorted[0] ?? '');
+  return registry.getById(sorted[0] ?? '')?.adapter;
 }
 
 /**
- * Test-only: clear every registered adapter. The graph tool's bootstrap
- * re-registers the TypeScript adapter on the next module load.
+ * Clear every registered adapter. Used by tests and by host applications
+ * that need to swap the adapter set at runtime (the registry is a
+ * process-global). The graph tool's bootstrap re-registers the
+ * TypeScript adapter on the next module load.
  */
-export function _clearAdaptersForTesting(): void {
-  adapters.clear();
+export function clearAdapterRegistry(): void {
+  registry.clear();
 }

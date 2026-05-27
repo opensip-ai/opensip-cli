@@ -12,7 +12,7 @@
  * CheckViolation into a universal Signal via createSignal().
  */
 
-import { logger , SystemError , createSignal , applyContentFilter , defaultLanguageRegistry } from '@opensip-tools/core'
+import { logger , SystemError , createSignal , applyContentFilter , currentScope } from '@opensip-tools/core'
 
 
 
@@ -220,21 +220,27 @@ async function executeCommandMode(
 export function defineCheck(config: UnifiedCheckConfig): Check {
   validateCheckConfig(config)
 
-  // Canonicalise scope languages through the kernel registry so a check
-  // declared with `scope: { languages: ['c'] }` is indexed under the
-  // canonical id `'cpp'`. Unknown languages pass through unchanged
-  // (with a debug log) — they may resolve later if a custom adapter
-  // ships, and dropping them here would silently break checks.
+  // Canonicalise scope languages through the current scope's language
+  // registry so a check declared with `scope: { languages: ['c'] }` is
+  // indexed under the canonical id `'cpp'`. Unknown languages pass
+  // through unchanged (with a debug log) — they may resolve later if a
+  // custom adapter ships, and dropping them here would silently break
+  // checks. When `defineCheck` runs at module-load time before a scope
+  // is bound (the typical case for top-level `export const x =
+  // defineCheck(...)`), we cannot canonicalise — just lowercase. The
+  // engine canonicalises again at scope-match time, so any miss here
+  // is recovered there.
+  const scope = currentScope()
   const canonicalLanguages = config.scope
     ? config.scope.languages.map((lang) => {
-        const canonical = defaultLanguageRegistry.canonicalize(lang)
+        const canonical = scope?.languages.canonicalize(lang)
         if (canonical === undefined) {
           logger.debug({
             evt: 'fitness.check.scope.unknown_language',
             module: 'fitness:framework',
             checkSlug: config.slug,
             language: lang,
-            msg: `Check ${config.slug} declared scope language ${lang} which is not registered`,
+            msg: `Check ${config.slug} declared scope language ${lang} which is not registered (or no scope at definition time)`,
           })
           return lang.toLowerCase()
         }

@@ -3,10 +3,11 @@
  *
  * Each test here targets a real-world failure or behavior, not just
  * raw line coverage. Concretely:
- *   - core's IdNameTagRegistry name-collision guard prevents inconsistent
- *     dual-key state when two different ids share a name — without the
- *     throw, the last writer wins on `byName` while both ids remain in
- *     `byId`.
+ *   - core's Registry<T> name-collision guard (with nameCollisionMode:
+ *     'throw') prevents inconsistent dual-key state when two different
+ *     ids share a name — without the throw, the last writer wins on
+ *     `byName` while both ids remain in `byId`. This is the contract
+ *     the simulation scenario registry depends on.
  *   - LatencyTracker's reset() must clear the running sum, otherwise a
  *     subsequent record() would carry stale state.
  *   - renderScenarioResultView's exhaustiveness branch fires when an
@@ -16,7 +17,7 @@
  *     time so that misconfigured corpora fail fast.
  */
 
-import { IdNameTagRegistry, type Registerable, ValidationError } from '@opensip-tools/core';
+import { Registry, type Registerable, ValidationError } from '@opensip-tools/core';
 import { describe, expect, it } from 'vitest';
 
 import { registerPredicate } from '../../kinds/fix-evaluation/predicates/index.js';
@@ -26,7 +27,8 @@ import { renderScenarioResultView } from '../result-renderers.js';
 import type { ScenarioExecutorResult } from '../scenario-executor-result.js';
 
 // ---------------------------------------------------------------------------
-// IdNameTagRegistry — name collision + size + clear
+// Registry<T> with silent-skip + nameCollisionMode='throw' (the
+// shape simulation scenario registry uses)
 // ---------------------------------------------------------------------------
 
 interface TestItem extends Registerable {
@@ -35,23 +37,32 @@ interface TestItem extends Registerable {
   readonly tags?: readonly string[];
 }
 
-describe('IdNameTagRegistry — coverage edges', () => {
+function makeScenarioRegistry(): Registry<TestItem> {
+  return new Registry<TestItem>({
+    module: 'test',
+    duplicatePolicy: 'silent-skip',
+    evtPrefix: 'test.registry',
+    nameCollisionMode: 'throw',
+  });
+}
+
+describe('Registry<T> with silent-skip + nameCollisionMode=throw — coverage edges', () => {
   it('throws ValidationError on a name collision (two different ids, same name)', () => {
-    const reg = new IdNameTagRegistry<TestItem>('test');
+    const reg = makeScenarioRegistry();
     reg.register({ id: 'a', name: 'shared' });
 
     expect(() => reg.register({ id: 'b', name: 'shared' })).toThrow(ValidationError);
   });
 
   it('skips silent duplicate when same id is registered twice', () => {
-    const reg = new IdNameTagRegistry<TestItem>('test');
+    const reg = makeScenarioRegistry();
     reg.register({ id: 'a', name: 'one' });
     reg.register({ id: 'a', name: 'one' }); // skipped silently
     expect(reg.size).toBe(1);
   });
 
   it('size() reflects current entries', () => {
-    const reg = new IdNameTagRegistry<TestItem>('test');
+    const reg = makeScenarioRegistry();
     expect(reg.size).toBe(0);
     reg.register({ id: 'a', name: 'one' });
     reg.register({ id: 'b', name: 'two' });
@@ -59,7 +70,7 @@ describe('IdNameTagRegistry — coverage edges', () => {
   });
 
   it('clear() empties both byId and byName indices', () => {
-    const reg = new IdNameTagRegistry<TestItem>('test');
+    const reg = makeScenarioRegistry();
     reg.register({ id: 'a', name: 'one' });
     reg.register({ id: 'b', name: 'two', tags: ['x'] });
     reg.clear();
@@ -70,7 +81,7 @@ describe('IdNameTagRegistry — coverage edges', () => {
   });
 
   it('getByTag returns matching items', () => {
-    const reg = new IdNameTagRegistry<TestItem>('test');
+    const reg = makeScenarioRegistry();
     reg.register({ id: 'a', name: 'one', tags: ['x', 'shared'] });
     reg.register({ id: 'b', name: 'two', tags: ['shared'] });
     reg.register({ id: 'c', name: 'three' });

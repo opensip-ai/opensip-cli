@@ -10,11 +10,9 @@
  *   - `recoveryWindow` (ms) — how long after chaos lifts to evaluate recovery
  */
 
-import { scenarioRegistry } from '../../framework/registry.js'
 import {
   throwValidationErrors,
   validateScenarioMetadata,
-  validateScenarioUniqueness,
   type ScenarioValidationError,
 } from '../../framework/validation.js'
 
@@ -125,55 +123,32 @@ function validateAssertions(
   }
 }
 
-interface ValidateChaosOptions {
-  /** Test helper: skip the registry-uniqueness check. */
-  readonly skipRegistryCheck?: boolean
-}
-
 /**
  * Validate a chaos scenario configuration. Throws on invalid input.
  *
+ * Uniqueness against an existing scenario registry is checked at
+ * registration time, not here.
+ *
  * @throws {ValidationError} When the chaos scenario configuration is invalid
  */
-export function validateChaosScenarioConfig(
-  config: ChaosScenarioConfig,
-  options: ValidateChaosOptions = {},
-): void {
+export function validateChaosScenarioConfig(config: ChaosScenarioConfig): void {
   const errors: ScenarioValidationError[] = []
   validateScenarioMetadata(config, errors)
   validatePersonasAndDuration(config, errors)
   validateChaos(config, errors)
   validateAssertions(config, errors)
-  validateScenarioUniqueness(config, errors, {
-    ...(options.skipRegistryCheck === undefined ? {} : { skipRegistryCheck: options.skipRegistryCheck }),
-  })
 
   throwValidationErrors(errors, 'chaos')
 }
 
 /**
- * Define a chaos-kind simulation scenario with automatic registration.
+ * Define a chaos-kind simulation scenario. Returns the scenario; the
+ * caller (typically the simulation plugin loader) is responsible for
+ * registering it into `scope.registries.scenarios`.
  *
  * @throws {ValidationError} When the scenario configuration is invalid
  */
 export function defineChaosScenario(config: ChaosScenarioConfig): RunnableScenario {
   validateChaosScenarioConfig(config)
-  const scenario = createChaosScenarioRunner(config)
-  scenarioRegistry.register(scenario)
-  return scenario
-}
-
-/**
- * Define a chaos scenario without auto-registration (test helper).
- *
- * Same validator as `defineChaosScenario`, with the registry-uniqueness
- * check disabled.
- *
- * @throws {ValidationError} When the scenario configuration is invalid
- */
-export function defineChaosScenarioWithoutRegistration(
-  config: ChaosScenarioConfig,
-): RunnableScenario {
-  validateChaosScenarioConfig(config, { skipRegistryCheck: true })
   return createChaosScenarioRunner(config)
 }

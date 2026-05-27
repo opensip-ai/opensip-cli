@@ -1,8 +1,16 @@
 /**
  * @fileoverview Tests for the per-check recipe-config helper.
+ *
+ * As of Phase 6 Task 6.2, the slot moved off `Symbol.for(globalThis)`
+ * onto the current `RunScope`. Both copies of `@opensip-tools/fitness`
+ * (the CLI's bundled copy + the plugin pack's resolved copy) read
+ * from the same `AsyncLocalStorage` instance exported from
+ * `@opensip-tools/core` — so the slot identity is bound to core,
+ * not to whichever fitness happens to load first.
  */
 
-import { describe, it, expect, afterEach } from 'vitest'
+import { RunScope, runWithScopeSync } from '@opensip-tools/core'
+import { describe, it, expect } from 'vitest'
 
 import {
   getCheckConfig,
@@ -15,59 +23,83 @@ interface SampleConfig extends Record<string, unknown> {
 }
 
 describe('getCheckConfig', () => {
-  afterEach(() => {
-    clearCurrentRecipeCheckConfig()
-  })
-
-  it('returns an empty object when no recipe config is set', () => {
+  it('returns an empty object when no scope is active', () => {
     const cfg = getCheckConfig<SampleConfig>('any-slug')
     expect(cfg).toEqual({})
   })
 
-  it('returns an empty object for a slug not present in the recipe config', () => {
-    setCurrentRecipeCheckConfig({
-      'other-check': { additionalEntries: ['x'] },
+  it('returns an empty object when the scope has no recipe config set', () => {
+    const scope = new RunScope()
+    runWithScopeSync(scope, () => {
+      const cfg = getCheckConfig<SampleConfig>('any-slug')
+      expect(cfg).toEqual({})
     })
-    const cfg = getCheckConfig<SampleConfig>('missing')
-    expect(cfg).toEqual({})
+  })
+
+  it('returns an empty object for a slug not present in the recipe config', () => {
+    const scope = new RunScope()
+    runWithScopeSync(scope, () => {
+      setCurrentRecipeCheckConfig(scope, {
+        'other-check': { additionalEntries: ['x'] },
+      })
+      const cfg = getCheckConfig<SampleConfig>('missing')
+      expect(cfg).toEqual({})
+    })
   })
 
   it('returns the recipe-config slice for the matching slug', () => {
-    setCurrentRecipeCheckConfig({
-      'sample-check': { additionalEntries: ['a', 'b'] },
+    const scope = new RunScope()
+    runWithScopeSync(scope, () => {
+      setCurrentRecipeCheckConfig(scope, {
+        'sample-check': { additionalEntries: ['a', 'b'] },
+      })
+      const cfg = getCheckConfig<SampleConfig>('sample-check')
+      expect(cfg.additionalEntries).toEqual(['a', 'b'])
     })
-    const cfg = getCheckConfig<SampleConfig>('sample-check')
-    expect(cfg.additionalEntries).toEqual(['a', 'b'])
   })
 
   it('returns an empty object after clearCurrentRecipeCheckConfig is called', () => {
-    setCurrentRecipeCheckConfig({
-      'sample-check': { additionalEntries: ['a', 'b'] },
+    const scope = new RunScope()
+    runWithScopeSync(scope, () => {
+      setCurrentRecipeCheckConfig(scope, {
+        'sample-check': { additionalEntries: ['a', 'b'] },
+      })
+      clearCurrentRecipeCheckConfig(scope)
+      const cfg = getCheckConfig<SampleConfig>('sample-check')
+      expect(cfg).toEqual({})
     })
-    clearCurrentRecipeCheckConfig()
-    const cfg = getCheckConfig<SampleConfig>('sample-check')
-    expect(cfg).toEqual({})
   })
 
-  it('shares state with a separately-loaded copy of this module (multi-instance contract)', () => {
-    // Regression test for the multi-instance bug fixed in 1.0.9. The
-    // runtime frequently has TWO copies of `@opensip-tools/fitness`:
-    // the CLI's bundled copy (running the recipe service) and the
-    // plugin pack's resolved copy (running the check). Each copy has
-    // its own module-scope state; the prior `let currentRecipeCheckConfig`
-    // implementation made cross-copy state invisible. The fix moves
-    // the slot onto a `Symbol.for(...)` keyed `globalThis` entry so
-    // every copy reads + writes the same slot.
+  it('two-copies-of-fitness smoke test: separately-imported getCheckConfig sees the same scope-bound config', async () => {
+    // Regression coverage for the cross-cutting T1 finding. The runtime
+    // frequently has TWO copies of `@opensip-tools/fitness`:
     //
-    // Simulating "two copies" within one test: stash a value, look it
-    // up under the same well-known symbol from a separate import path
-    // (here: globalThis directly), and confirm the values match.
-    setCurrentRecipeCheckConfig({
-      'sample-check': { additionalEntries: ['cross-copy'] },
+    //   1. The CLI's bundled copy (running the recipe service).
+    //   2. The plugin pack's resolved copy (running the check, calling
+    //      `getCheckConfig(slug)`).
+    //
+    // The previous design used `Symbol.for(globalThis)` to make both
+    // copies share a slot. The current design routes through
+    // `currentScope()` from `@opensip-tools/core` — both fitness copies
+    // import the same `AsyncLocalStorage` instance from core, so the
+    // slot identity is bound to core (one resolved copy) rather than to
+    // whichever fitness happens to be loaded first.
+    //
+    // We can't easily load two real copies in a unit test, but we can
+    // simulate the contract by dynamically importing the module via a
+    // separate path and confirming the dynamic import's `getCheckConfig`
+    // sees the scope set by the static import's `setCurrentRecipeCheckConfig`.
+    const dynamicImport = await import('../check-config.js')
+    const scope = new RunScope()
+    runWithScopeSync(scope, () => {
+      setCurrentRecipeCheckConfig(scope, {
+        'sample-check': { additionalEntries: ['cross-copy'] },
+      })
+      const fromDynamic = dynamicImport.getCheckConfig<SampleConfig>('sample-check')
+      expect(fromDynamic.additionalEntries).toEqual(['cross-copy'])
+      // Belt-and-suspenders: the same imported handle agrees too.
+      const fromStatic = getCheckConfig<SampleConfig>('sample-check')
+      expect(fromStatic.additionalEntries).toEqual(['cross-copy'])
     })
-    const KEY = Symbol.for('@opensip-tools/fitness/currentRecipeCheckConfig')
-    const slot = (globalThis as unknown as Record<symbol, unknown>)[KEY]
-    expect(slot).toBeDefined()
-    expect((slot as { 'sample-check': { additionalEntries: string[] } })['sample-check'].additionalEntries).toEqual(['cross-copy'])
   })
 })

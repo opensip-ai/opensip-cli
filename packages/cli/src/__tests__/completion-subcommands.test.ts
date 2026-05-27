@@ -7,11 +7,11 @@
  * The shell-completion script can't introspect the live registry at
  * sourcing time (the user's shell sources it once), so we keep a
  * static list and assert at test time that it matches the live
- * Commander program built from `defaultToolRegistry.list()` plus the
+ * Commander program built from the registered tools plus the
  * CLI-owned commands.
  */
 
-import { defaultToolRegistry, type ToolCliContext } from '@opensip-tools/core';
+import { ToolRegistry, type ToolCliContext } from '@opensip-tools/core';
 import { Command } from 'commander';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -55,12 +55,12 @@ function makeStubContext(program: Command): ToolCliContext {
 describe('SUBCOMMANDS drift test', () => {
   it('matches the live Commander program (tool subcommands plus CLI-owned)', () => {
     const program = new Command('opensip-tools');
-    // Reset / re-populate the registry to mirror what bootstrapCli does.
-    // Tool register() implementations are idempotent so re-mounting on a
-    // fresh program is safe.
-    registerFirstPartyTools(defaultToolRegistry);
+    // Fresh per-test ToolRegistry — the previously-exported
+    // `defaultToolRegistry` module singleton was removed in T1 cleanup.
+    const registry = new ToolRegistry();
+    registerFirstPartyTools(registry);
     const ctx = makeStubContext(program);
-    mountAllToolCommands(defaultToolRegistry, ctx);
+    mountAllToolCommands(registry, ctx);
     registerCliCommands(program, {
       setExitCode: ctx.setExitCode,
       render: (result) => ctx.render(result),
@@ -92,9 +92,10 @@ describe('SUBCOMMANDS drift test', () => {
 
   it('emitted bash/zsh scripts list the live plugin subcommands (no install/add drift)', () => {
     const program = new Command('opensip-tools');
-    registerFirstPartyTools(defaultToolRegistry);
+    const registry = new ToolRegistry();
+    registerFirstPartyTools(registry);
     const ctx = makeStubContext(program);
-    mountAllToolCommands(defaultToolRegistry, ctx);
+    mountAllToolCommands(registry, ctx);
     registerCliCommands(program, {
       setExitCode: ctx.setExitCode,
       render: (result) => ctx.render(result),

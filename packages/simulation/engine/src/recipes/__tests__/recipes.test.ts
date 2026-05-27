@@ -246,7 +246,7 @@ describe('SimulationRecipeRegistry', () => {
 // =============================================================================
 
 function defineThreeScenarios(): void {
-  defineLoadScenario({
+  scenarioRegistry.register(defineLoadScenario({
     id: 'load-a',
     name: 'load-a',
     description: 'load',
@@ -254,8 +254,8 @@ function defineThreeScenarios(): void {
     personas: [persona('user', 1)],
     duration: 1,
     assertions: [ASSERTIONS.lowErrorRate(1)],
-  });
-  defineLoadScenario({
+  }));
+  scenarioRegistry.register(defineLoadScenario({
     id: 'load-b',
     name: 'load-b',
     description: 'load',
@@ -263,8 +263,8 @@ function defineThreeScenarios(): void {
     personas: [persona('user', 1)],
     duration: 1,
     assertions: [ASSERTIONS.lowErrorRate(1)],
-  });
-  defineChaosScenario({
+  }));
+  scenarioRegistry.register(defineChaosScenario({
     id: 'chaos-a',
     name: 'chaos-a',
     description: 'chaos',
@@ -286,7 +286,7 @@ function defineThreeScenarios(): void {
     steadyStateAssertions: [ASSERTIONS.lowErrorRate(1)],
     recoveryAssertions: [ASSERTIONS.lowErrorRate(0.5)],
     recoveryWindow: 100,
-  });
+  }));
 }
 
 describe('SimulationRecipeService — selector resolution', () => {

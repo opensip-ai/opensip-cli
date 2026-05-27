@@ -1,11 +1,12 @@
+import { RunScope, runWithScopeSync } from '@opensip-tools/core'
 import { describe, expect, it } from 'vitest'
 
-import { clearFilterCache, filterContent } from '../filter.js'
+import { filterContent } from '../filter.js'
 
 describe('filterContent', () => {
   describe('string and comment masking', () => {
     it('replaces string-literal content with spaces but preserves length', () => {
-      clearFilterCache()
+
       const src = `const x = 'hello'`
       const { code } = filterContent(src)
       expect(code.length).toBe(src.length)
@@ -13,7 +14,7 @@ describe('filterContent', () => {
     })
 
     it('preserves comment content verbatim (comments tracked, not masked)', () => {
-      clearFilterCache()
+
       const src = `const x = 1 // loadConfig() mentioned here\nconst y = 2`
       const { code } = filterContent(src)
       // Line comments are left intact — directives live in comments
@@ -23,14 +24,14 @@ describe('filterContent', () => {
 
   describe('template literals', () => {
     it('masks simple template body text', () => {
-      clearFilterCache()
+
       const src = `const x = \`hello world\``
       const { code } = filterContent(src)
       expect(code).toBe(`const x = \`           \``)
     })
 
     it('masks template-head and template-tail text, preserves expressions', () => {
-      clearFilterCache()
+
       const src = `const x = \`pre \${value} post\``
       const { code } = filterContent(src)
       // Expression `value` is code — preserved. Text around `${ ... }` is masked.
@@ -49,7 +50,7 @@ describe('filterContent', () => {
     // check that scanned the affected file. Fix replaced the boolean with a
     // depth counter; this test keeps it fixed.
     it('handles nested templates inside ${} expressions — code below is preserved', () => {
-      clearFilterCache()
+
       const src = [
         'const lines = items.map(f => `- ${sanitize(f)}`).join("\\n")',
         'const after = loadConfig(process.cwd())',
@@ -64,7 +65,7 @@ describe('filterContent', () => {
     })
 
     it('handles doubly-nested templates', () => {
-      clearFilterCache()
+
       const src = [
         'const s = `a ${`b ${c}`} d`',
         'const survives = loadConfig(process.cwd())',
@@ -79,7 +80,7 @@ describe('filterContent', () => {
 
   describe('codeNoComments — strings AND comments masked', () => {
     it('masks line comments while preserving line/column offsets', () => {
-      clearFilterCache()
+
       const src = `const x = 1 // calls getDatabase() somewhere\nconst y = 2`
       const { code, codeNoComments } = filterContent(src)
       // `code` (strings-only) leaves the line comment intact
@@ -95,7 +96,7 @@ describe('filterContent', () => {
     })
 
     it('masks block / JSDoc comments across multiple lines', () => {
-      clearFilterCache()
+
       const src = [
         '/**',
         ' * Replace getDatabase() with the constructor StoreDeps.',
@@ -114,7 +115,7 @@ describe('filterContent', () => {
     })
 
     it('masks both strings and comments in the same content', () => {
-      clearFilterCache()
+
       const src = `const url = 'https://api.example.com' // call openai.messages.create() here`
       const { codeNoComments } = filterContent(src)
       expect(codeNoComments).not.toContain('https')
@@ -126,7 +127,7 @@ describe('filterContent', () => {
       // Regression guard: codeNoComments is a sibling field, not a replacement.
       // `code` must continue to leave comments intact (some checks scan
       // comments for `@deprecated` / `@fitness-ignore` directives).
-      clearFilterCache()
+
       const src = `const x = 1 // @deprecated — use Y instead`
       const { code, codeNoComments } = filterContent(src)
       expect(code).toContain('@deprecated')
@@ -136,69 +137,79 @@ describe('filterContent', () => {
 
   describe('isInString / isInComment range queries', () => {
     it('isInString reports true for positions inside a string literal', () => {
-      clearFilterCache()
+
       const src = `const x = 'hello'`
       const { isInString } = filterContent(src)
       expect(isInString(1, 12)).toBe(true)
     })
 
     it('isInString reports false for positions outside any string', () => {
-      clearFilterCache()
+
       const src = `const x = 'hello'`
       const { isInString } = filterContent(src)
       expect(isInString(1, 0)).toBe(false)
     })
 
     it('isInString returns false for an out-of-range line', () => {
-      clearFilterCache()
+
       const src = `const x = 'a'`
       const { isInString } = filterContent(src)
       expect(isInString(99, 0)).toBe(false)
     })
 
     it('isInString returns false when there are no strings', () => {
-      clearFilterCache()
+
       const { isInString } = filterContent('const x = 1')
       expect(isInString(1, 5)).toBe(false)
     })
 
     it('isInComment reports true for positions inside a line comment', () => {
-      clearFilterCache()
+
       const src = `const x = 1 // hello`
       const { isInComment } = filterContent(src)
       expect(isInComment(1, 15)).toBe(true)
     })
 
     it('isInComment reports false outside any comment', () => {
-      clearFilterCache()
+
       const src = `const x = 1 // hello`
       const { isInComment } = filterContent(src)
       expect(isInComment(1, 2)).toBe(false)
     })
   })
 
-  describe('cache behavior', () => {
-    it('returns the same FilteredContent instance for repeated calls with identical content', () => {
-      clearFilterCache()
-      const src = `const x = 'cached'`
-      const first = filterContent(src)
-      const second = filterContent(src)
-      expect(second).toBe(first)
+  describe('cache behavior — scope-bound (Phase 6 Task 6.4)', () => {
+    it('returns the same FilteredContent instance for repeated calls with identical content inside a scope', () => {
+      const scope = new RunScope()
+      runWithScopeSync(scope, () => {
+        const src = `const x = 'cached'`
+        const first = filterContent(src)
+        const second = filterContent(src)
+        expect(second).toBe(first)
+      })
     })
 
-    it('clearFilterCache forces a re-parse', () => {
-      clearFilterCache()
+    it('a fresh scope re-parses (cache is per-scope)', () => {
       const src = `const x = 'cleared'`
+      const first = runWithScopeSync(new RunScope(), () => filterContent(src))
+      const second = runWithScopeSync(new RunScope(), () => filterContent(src))
+      // Two different scopes have independent caches; the FilteredContent
+      // values are distinct identities though structurally equivalent.
+      expect(second).not.toBe(first)
+    })
+
+    it('outside a scope, filterContent bypasses the cache (each call re-parses)', () => {
+      const src = `const x = 'no-scope'`
       const first = filterContent(src)
-      clearFilterCache()
       const second = filterContent(src)
+      // No scope -> no shared cache -> each call returns a fresh instance.
       expect(second).not.toBe(first)
     })
   })
 
   describe('template middle (multi-substitution)', () => {
     it('masks text between substitutions in a multi-${ } template', () => {
-      clearFilterCache()
+
       const src = 'const x = `pre ${a} mid ${b} post`'
       const { code } = filterContent(src)
       expect(code).not.toContain(' mid ')

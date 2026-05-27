@@ -82,7 +82,7 @@ export type {
   ParsedProject,
 } from './lang-adapter/types.js';
 export type { CallConfidence as AdapterCallConfidence } from './types.js';
-export { registerAdapter, pickAdapter, _clearAdaptersForTesting } from './lang-adapter/registry.js';
+export { registerAdapter, pickAdapter, clearAdapterRegistry } from './lang-adapter/registry.js';
 export {
   truncateForCallEdge,
   CALL_EDGE_TEXT_MAX,

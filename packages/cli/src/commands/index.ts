@@ -15,7 +15,7 @@
  * orchestrator that wires them onto the supplied Commander program.
  *
  * Tool-owned subcommands (`fit`, `sim`, `graph`, …) are mounted
- * separately by walking `defaultToolRegistry` and calling each tool's
+ * separately by walking the CLI-managed tool registry and calling each tool's
  * `register(cli)`.
  */
 

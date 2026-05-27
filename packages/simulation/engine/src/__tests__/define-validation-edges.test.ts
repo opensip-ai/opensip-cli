@@ -3,31 +3,32 @@
  *
  * The "happy path" tests for each kind live in their dedicated test file.
  * This file fills coverage gaps:
- *   - Name-collision detection in `validateDuplicates`
- *   - The `*ScenarioWithoutRegistration` happy paths (no auto-registration)
+ *   - Name-collision detection at registration time
  *   - Each kind's full set of required-field validation paths
+ *
+ * As of Phase 6 Task 6.1, `defineX` no longer auto-registers — it
+ * returns the scenario object only. Uniqueness against an existing
+ * scenario registry is checked at registration time
+ * (`scenarioRegistry.register(scenario)`), not at definition time.
  */
 
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { ASSERTIONS } from '../framework/assertions.js';
 import { persona } from '../framework/personas.js';
-import { clearScenarioRegistry, getScenario } from '../framework/registry.js';
+import { clearScenarioRegistry, scenarioRegistry } from '../framework/registry.js';
 import {
   defineChaosScenario,
-  defineChaosScenarioWithoutRegistration,
   validateChaosScenarioConfig,
 } from '../kinds/chaos/define.js';
 import {
   defineFixEvaluationScenario,
-  defineFixEvaluationScenarioWithoutRegistration,
   validateFixEvaluationScenarioConfig,
   type FixEvaluationScenarioConfig,
 } from '../kinds/fix-evaluation/define.js';
 import { resetPredicateRegistryToBaseline } from '../kinds/fix-evaluation/predicates/index.js';
 import {
   defineInvariantScenario,
-  defineInvariantScenarioWithoutRegistration,
   validateInvariantScenarioConfig,
 } from '../kinds/invariant/define.js';
 import {
@@ -87,32 +88,8 @@ afterEach(() => {
 // =============================================================================
 
 describe('load kind — validation edges', () => {
-  it('rejects when the same id is already registered', () => {
-    defineLoadScenario({
-      id: 'dup-load',
-      name: 'Dup Load',
-      description: 'first',
-      tags: [],
-      personas: [persona('buyer', 1)],
-      duration: 1,
-      assertions: [ASSERTIONS.lowErrorRate()],
-    });
-
-    expect(() =>
-      validateLoadScenarioConfig({
-        id: 'dup-load',
-        name: 'Other Name',
-        description: 'second',
-        tags: [],
-        personas: [persona('buyer', 1)],
-        duration: 1,
-        assertions: [ASSERTIONS.lowErrorRate()],
-      }),
-    ).toThrow(/already registered/);
-  });
-
-  it('rejects when the same name is already registered', () => {
-    defineLoadScenario({
+  it('registry rejects a name-collision (different id, same name)', () => {
+    const first = defineLoadScenario({
       id: 'name-load-1',
       name: 'Shared Name',
       description: 'first',
@@ -121,18 +98,34 @@ describe('load kind — validation edges', () => {
       duration: 1,
       assertions: [ASSERTIONS.lowErrorRate()],
     });
+    scenarioRegistry.register(first);
 
-    expect(() =>
-      validateLoadScenarioConfig({
-        id: 'name-load-2',
-        name: 'Shared Name',
-        description: 'second',
-        tags: [],
-        personas: [persona('buyer', 1)],
-        duration: 1,
-        assertions: [ASSERTIONS.lowErrorRate()],
-      }),
-    ).toThrow(/already registered/);
+    const second = defineLoadScenario({
+      id: 'name-load-2',
+      name: 'Shared Name',
+      description: 'second',
+      tags: [],
+      personas: [persona('buyer', 1)],
+      duration: 1,
+      assertions: [ASSERTIONS.lowErrorRate()],
+    });
+    expect(() => scenarioRegistry.register(second)).toThrow(/name collision/);
+  });
+
+  it('registry silent-skips a duplicate id (same id, same scenario)', () => {
+    const scenario = defineLoadScenario({
+      id: 'dup-load',
+      name: 'Dup Load',
+      description: 'first',
+      tags: [],
+      personas: [persona('buyer', 1)],
+      duration: 1,
+      assertions: [ASSERTIONS.lowErrorRate()],
+    });
+    scenarioRegistry.register(scenario);
+    // Re-registering with the same id is a no-op under the
+    // silent-skip duplicate policy.
+    expect(() => scenarioRegistry.register(scenario)).not.toThrow();
   });
 
   it('rejects when rampUp exceeds duration', () => {
@@ -241,38 +234,8 @@ describe('load kind — validation edges', () => {
 // =============================================================================
 
 describe('chaos kind — validation edges', () => {
-  it('rejects when the same id is already registered (validateDuplicates)', () => {
-    defineChaosScenario({
-      id: 'dup-chaos',
-      name: 'Dup Chaos',
-      description: 'first',
-      tags: [],
-      personas: [persona('buyer', 1)],
-      duration: 1,
-      chaos: baseChaos,
-      steadyStateAssertions: [ASSERTIONS.lowErrorRate(1)],
-      recoveryAssertions: [ASSERTIONS.lowErrorRate(1)],
-      recoveryWindow: 100,
-    });
-
-    expect(() =>
-      validateChaosScenarioConfig({
-        id: 'dup-chaos',
-        name: 'Other Name',
-        description: 'second',
-        tags: [],
-        personas: [persona('buyer', 1)],
-        duration: 1,
-        chaos: baseChaos,
-        steadyStateAssertions: [ASSERTIONS.lowErrorRate(1)],
-        recoveryAssertions: [ASSERTIONS.lowErrorRate(1)],
-        recoveryWindow: 100,
-      }),
-    ).toThrow(/already registered/);
-  });
-
-  it('rejects when the same name is already registered (validateDuplicates)', () => {
-    defineChaosScenario({
+  it('registry rejects a name-collision for chaos scenarios', () => {
+    const first = defineChaosScenario({
       id: 'chaos-n-1',
       name: 'Shared Chaos Name',
       description: 'first',
@@ -284,25 +247,25 @@ describe('chaos kind — validation edges', () => {
       recoveryAssertions: [ASSERTIONS.lowErrorRate(1)],
       recoveryWindow: 100,
     });
+    scenarioRegistry.register(first);
 
-    expect(() =>
-      validateChaosScenarioConfig({
-        id: 'chaos-n-2',
-        name: 'Shared Chaos Name',
-        description: 'second',
-        tags: [],
-        personas: [persona('buyer', 1)],
-        duration: 1,
-        chaos: baseChaos,
-        steadyStateAssertions: [ASSERTIONS.lowErrorRate(1)],
-        recoveryAssertions: [ASSERTIONS.lowErrorRate(1)],
-        recoveryWindow: 100,
-      }),
-    ).toThrow(/already registered/);
+    const second = defineChaosScenario({
+      id: 'chaos-n-2',
+      name: 'Shared Chaos Name',
+      description: 'second',
+      tags: [],
+      personas: [persona('buyer', 1)],
+      duration: 1,
+      chaos: baseChaos,
+      steadyStateAssertions: [ASSERTIONS.lowErrorRate(1)],
+      recoveryAssertions: [ASSERTIONS.lowErrorRate(1)],
+      recoveryWindow: 100,
+    });
+    expect(() => scenarioRegistry.register(second)).toThrow(/name collision/);
   });
 
-  it('defineChaosScenarioWithoutRegistration does NOT register the scenario', () => {
-    const scenario = defineChaosScenarioWithoutRegistration({
+  it('defineChaosScenario does not auto-register (Phase 6 contract)', () => {
+    const scenario = defineChaosScenario({
       id: 'chaos-noreg',
       name: 'Chaos No Reg',
       description: 'd',
@@ -315,12 +278,12 @@ describe('chaos kind — validation edges', () => {
       recoveryWindow: 100,
     });
     expect(scenario.kind).toBe('chaos');
-    expect(getScenario('chaos-noreg')).toBeUndefined();
+    expect(scenarioRegistry.get('chaos-noreg')).toBeUndefined();
   });
 
-  it('defineChaosScenarioWithoutRegistration still requires an id', () => {
+  it('defineChaosScenario still requires an id', () => {
     expect(() =>
-      defineChaosScenarioWithoutRegistration({
+      defineChaosScenario({
         id: '',
         name: 'x',
         description: 'd',
@@ -446,34 +409,8 @@ describe('chaos kind — validation edges', () => {
 // =============================================================================
 
 describe('invariant kind — validation edges', () => {
-  it('rejects duplicate id (validateDuplicates branch)', () => {
-    defineInvariantScenario({
-      id: 'dup-inv',
-      name: 'Dup Inv',
-      description: 'd',
-      tags: [],
-      relatesToInvariant: 'doc.md#a',
-      setup: noopAsync,
-      act: noopAsync,
-      assert: noopAsync,
-    });
-
-    expect(() =>
-      validateInvariantScenarioConfig({
-        id: 'dup-inv',
-        name: 'Different Name',
-        description: 'd',
-        tags: [],
-        relatesToInvariant: 'doc.md#a',
-        setup: noopAsync,
-        act: noopAsync,
-        assert: noopAsync,
-      }),
-    ).toThrow(/already registered/);
-  });
-
-  it('rejects duplicate name (validateDuplicates branch)', () => {
-    defineInvariantScenario({
+  it('registry rejects a name-collision for invariant scenarios', () => {
+    const first = defineInvariantScenario({
       id: 'inv-n-1',
       name: 'Shared Inv Name',
       description: 'd',
@@ -483,23 +420,23 @@ describe('invariant kind — validation edges', () => {
       act: noopAsync,
       assert: noopAsync,
     });
+    scenarioRegistry.register(first);
 
-    expect(() =>
-      validateInvariantScenarioConfig({
-        id: 'inv-n-2',
-        name: 'Shared Inv Name',
-        description: 'd',
-        tags: [],
-        relatesToInvariant: 'doc.md#a',
-        setup: noopAsync,
-        act: noopAsync,
-        assert: noopAsync,
-      }),
-    ).toThrow(/already registered/);
+    const second = defineInvariantScenario({
+      id: 'inv-n-2',
+      name: 'Shared Inv Name',
+      description: 'd',
+      tags: [],
+      relatesToInvariant: 'doc.md#a',
+      setup: noopAsync,
+      act: noopAsync,
+      assert: noopAsync,
+    });
+    expect(() => scenarioRegistry.register(second)).toThrow(/name collision/);
   });
 
-  it('defineInvariantScenarioWithoutRegistration produces a runner that does not register', () => {
-    const scenario = defineInvariantScenarioWithoutRegistration({
+  it('defineInvariantScenario does not auto-register (Phase 6 contract)', () => {
+    const scenario = defineInvariantScenario({
       id: 'inv-noreg',
       name: 'Inv No Reg',
       description: 'd',
@@ -510,12 +447,12 @@ describe('invariant kind — validation edges', () => {
       assert: noopAsync,
     });
     expect(scenario.kind).toBe('invariant');
-    expect(getScenario('inv-noreg')).toBeUndefined();
+    expect(scenarioRegistry.get('inv-noreg')).toBeUndefined();
   });
 
-  it('defineInvariantScenarioWithoutRegistration still requires id', () => {
+  it('defineInvariantScenario still requires id', () => {
     expect(() =>
-      defineInvariantScenarioWithoutRegistration({
+      defineInvariantScenario({
         id: '',
         name: 'x',
         description: 'd',
@@ -612,56 +549,38 @@ describe('invariant kind — validation edges', () => {
 // =============================================================================
 
 describe('fix-evaluation kind — validation edges', () => {
-  it('rejects duplicate id', () => {
-    defineFixEvaluationScenario({
-      ...baseFixEvalConfig,
-      id: 'dup-fe',
-      name: 'Dup FE',
-      predicate: { all_of: [{ id: 'tests-pass' }, { id: 'no-tests-modified' }] },
-    });
-
-    expect(() =>
-      validateFixEvaluationScenarioConfig({
-        ...baseFixEvalConfig,
-        id: 'dup-fe',
-        name: 'Different Name',
-        predicate: { all_of: [{ id: 'tests-pass' }, { id: 'no-tests-modified' }] },
-      }),
-    ).toThrow(/already registered/);
-  });
-
-  it('rejects duplicate name', () => {
-    defineFixEvaluationScenario({
+  it('registry rejects a name-collision for fix-evaluation scenarios', () => {
+    const first = defineFixEvaluationScenario({
       ...baseFixEvalConfig,
       id: 'fe-n-1',
       name: 'Shared FE Name',
       predicate: { all_of: [{ id: 'tests-pass' }, { id: 'no-tests-modified' }] },
     });
+    scenarioRegistry.register(first);
 
-    expect(() =>
-      validateFixEvaluationScenarioConfig({
-        ...baseFixEvalConfig,
-        id: 'fe-n-2',
-        name: 'Shared FE Name',
-        predicate: { all_of: [{ id: 'tests-pass' }, { id: 'no-tests-modified' }] },
-      }),
-    ).toThrow(/already registered/);
+    const second = defineFixEvaluationScenario({
+      ...baseFixEvalConfig,
+      id: 'fe-n-2',
+      name: 'Shared FE Name',
+      predicate: { all_of: [{ id: 'tests-pass' }, { id: 'no-tests-modified' }] },
+    });
+    expect(() => scenarioRegistry.register(second)).toThrow(/name collision/);
   });
 
-  it('defineFixEvaluationScenarioWithoutRegistration does not register', () => {
-    const scenario = defineFixEvaluationScenarioWithoutRegistration({
+  it('defineFixEvaluationScenario does not auto-register (Phase 6 contract)', () => {
+    const scenario = defineFixEvaluationScenario({
       ...baseFixEvalConfig,
       id: 'fe-noreg',
       name: 'FE No Reg',
       predicate: { all_of: [{ id: 'tests-pass' }, { id: 'no-tests-modified' }] },
     });
     expect(scenario.kind).toBe('fix-evaluation');
-    expect(getScenario('fe-noreg')).toBeUndefined();
+    expect(scenarioRegistry.get('fe-noreg')).toBeUndefined();
   });
 
-  it('defineFixEvaluationScenarioWithoutRegistration still requires id', () => {
+  it('defineFixEvaluationScenario still requires id', () => {
     expect(() =>
-      defineFixEvaluationScenarioWithoutRegistration({
+      defineFixEvaluationScenario({
         ...baseFixEvalConfig,
         id: '',
         name: 'x',

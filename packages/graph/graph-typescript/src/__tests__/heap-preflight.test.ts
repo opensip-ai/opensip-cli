@@ -17,7 +17,7 @@ import {
   runHeapPreflight,
   systemHasMemoryFor,
   totalSystemMemoryMb,
-  _clearAdaptersForTesting,
+  clearAdapterRegistry,
   registerAdapter,
 } from '@opensip-tools/graph';
 import { pythonGraphAdapter } from '@opensip-tools/graph-python';
@@ -85,9 +85,9 @@ describe('runHeapPreflight', () => {
     // Ensure at least one .ts file exists so the tsconfig is not empty.
     writeFileSync(join(dir, 'index.ts'), 'export const x = 1;\n', 'utf8');
     originalSentinel = process.env.OPENSIP_HEAP_ELEVATED;
-    // Sibling lang-adapter-registry tests call _clearAdaptersForTesting;
+    // Sibling lang-adapter-registry tests call clearAdapterRegistry;
     // restore the default set so pickAdapter doesn't blow up here.
-    _clearAdaptersForTesting();
+    clearAdapterRegistry();
     registerAdapter(typescriptGraphAdapter);
     registerAdapter(pythonGraphAdapter);
     registerAdapter(rustGraphAdapter);

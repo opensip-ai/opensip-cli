@@ -65,7 +65,7 @@ export function executeSymbolIndex(
 ): void {
   logger.info({ evt: 'graph.cli.symbol-index.start', module: 'graph:cli' });
   try {
-    const datastore = cli.datastore as DataStore | undefined;
+    const datastore = cli.scope.datastore() as DataStore | undefined;
     if (!datastore) {
       throw new ConfigurationError(
         'graph symbol-index requires a DataStore on ToolCliContext.',

@@ -1,38 +1,48 @@
 import { extname } from 'node:path'
 
 import { logger } from '../lib/logger.js'
+import { Registry, type Registerable } from '../lib/registry.js'
 
 import type { LanguageAdapter } from './adapter.js'
 
 /**
- * Registry of language adapters. Mirrors the shape of `ToolRegistry`.
- * Language IDs are globally unique — no namespace dimension.
+ * Registry of language adapters. Mirrors the shape of `ToolRegistry`:
+ * a thin wrapper around the kernel's `Registry<T>` base with two
+ * domain-specific indices alongside (`byExtension`, `aliasIndex`) and
+ * a `canonicalize` helper.
  *
  * **Duplicate-id policy: first writer wins.** Re-registering the same
- * id keeps the existing entry and emits a structured warning. Same
- * semantics as `ToolRegistry`.
+ * id keeps the existing entry and emits a structured warning.
+ *
+ * `LanguageAdapter` has no `name` field — the inner registry stores
+ * `{ id, name: id, adapter }` envelopes (same pattern as ToolRegistry).
  */
+interface RegisterableLanguageAdapter extends Registerable {
+  readonly id: string
+  readonly name: string
+  readonly adapter: LanguageAdapter
+}
+
 export class LanguageRegistry {
-  private readonly byId = new Map<string, LanguageAdapter>()
+  private readonly inner = new Registry<RegisterableLanguageAdapter>({
+    module: 'core:languages',
+    duplicatePolicy: 'warn-first-wins',
+    evtPrefix: 'lang.registry',
+  })
   private readonly byExtension = new Map<string, LanguageAdapter>()
   /**
-   * Alias → canonical id index. Populated alongside `byId` during
-   * `register`. Lets `canonicalize` map an alias like `'c'` or `'rs'`
-   * back to the registered adapter id (`'cpp'`, `'rust'`).
+   * Alias → canonical id index. Populated alongside the inner registry
+   * during `register`. Lets `canonicalize` map an alias like `'c'` or
+   * `'rs'` back to the registered adapter id (`'cpp'`, `'rust'`).
    */
   private readonly aliasIndex = new Map<string, string>()
 
   register(adapter: LanguageAdapter): void {
-    if (this.byId.has(adapter.id)) {
-      logger.warn({
-        evt: 'lang.registry.duplicate',
-        module: 'core:languages',
-        id: adapter.id,
-        msg: `Language id ${adapter.id} already registered — keeping incumbent`,
-      })
-      return
-    }
-    this.byId.set(adapter.id, adapter)
+    const isDuplicate = this.inner.getById(adapter.id) !== undefined
+    // Inner registry emits the structured warn event on duplicate;
+    // it returns silently after the warn (warn-first-wins policy).
+    this.inner.register({ id: adapter.id, name: adapter.id, adapter })
+    if (isDuplicate) return
     this.indexExtensions(adapter)
     this.indexAliases(adapter)
   }
@@ -63,7 +73,7 @@ export class LanguageRegistry {
       // An alias that collides with another adapter's canonical id is
       // ignored — the canonical id always wins. Same for an alias
       // already claimed by a previously-registered adapter.
-      if (this.byId.has(normalized) && normalized !== adapter.id) {
+      if (this.inner.getById(normalized) && normalized !== adapter.id) {
         logger.warn({
           evt: 'lang.registry.alias.collision',
           module: 'core:languages',
@@ -91,7 +101,7 @@ export class LanguageRegistry {
   }
 
   get(id: string): LanguageAdapter | undefined {
-    return this.byId.get(id)
+    return this.inner.getById(id)?.adapter
   }
 
   forFile(filePath: string): LanguageAdapter | undefined {
@@ -114,28 +124,25 @@ export class LanguageRegistry {
    */
   canonicalize(idOrAlias: string): string | undefined {
     const normalized = idOrAlias.toLowerCase()
-    if (this.byId.has(normalized)) return normalized
+    if (this.inner.getById(normalized)) return normalized
     return this.aliasIndex.get(normalized)
   }
 
   list(): readonly LanguageAdapter[] {
-    return [...this.byId.values()]
+    return this.inner.getAll().map((r) => r.adapter)
   }
 
   has(id: string): boolean {
-    return this.byId.has(id)
+    return this.inner.getById(id) !== undefined
   }
 
   get size(): number {
-    return this.byId.size
+    return this.inner.size
   }
 
   clear(): void {
-    this.byId.clear()
+    this.inner.clear()
     this.byExtension.clear()
     this.aliasIndex.clear()
   }
 }
-
-/** Default global registry — language packs register here on load. */
-export const defaultLanguageRegistry = new LanguageRegistry()

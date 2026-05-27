@@ -4,15 +4,27 @@
  * Replaces the legacy load-only registry from `define-scenario.ts`. All four
  * `defineXxxScenario` entry points register here. Tag-based filtering and
  * `--kind` filtering (the CLI surface) work uniformly across kinds.
+ *
+ * Built on the kernel's unified `Registry<T>` with
+ * `duplicatePolicy: 'silent-skip'` (re-importing the same scenario is a
+ * no-op) + `nameCollisionMode: 'throw'` (two different scenario ids
+ * sharing a name would corrupt the dual-key state). This is the same
+ * shape the legacy `IdNameTagRegistry` provided (which has been deleted).
  */
 
-import { IdNameTagRegistry } from '@opensip-tools/core'
+import { Registry } from '@opensip-tools/core'
 
 import type { RunnableScenario } from './runnable-scenario.js'
 import type { ScenarioKind } from '../types/kind-types.js'
 
 /** Singleton registry for scenarios across every kind. */
-export const scenarioRegistry = new IdNameTagRegistry<RunnableScenario>('simulation.scenarios')
+export const scenarioRegistry = new Registry<RunnableScenario>({
+  module: 'simulation:scenarios',
+  duplicatePolicy: 'silent-skip',
+  evtPrefix: 'scenario.registry',
+  nameCollisionMode: 'throw',
+  validationCode: 'VALIDATION.REGISTRY.NAME_COLLISION',
+})
 
 /** Get all registered scenarios. */
 export function getRegisteredScenarios(): Map<string, RunnableScenario> {
@@ -29,7 +41,7 @@ export function getScenario(idOrName: string): RunnableScenario | undefined {
 }
 
 /** Get scenarios filtered by tag (any kind). */
-export function getScenariosByTag(tag: string): RunnableScenario[] {
+export function getScenariosByTag(tag: string): readonly RunnableScenario[] {
   return scenarioRegistry.getByTag(tag)
 }
 
@@ -38,7 +50,12 @@ export function getScenariosByKind(kind: ScenarioKind): RunnableScenario[] {
   return scenarioRegistry.getAll().filter((s) => s.kind === kind)
 }
 
-/** Clear the registry. Primarily for tests. */
+/**
+ * Clear the registry. Used by tests, by host applications that need
+ * to swap the scenario set at runtime, and by recipe-reset code paths.
+ * The simulation engine's plugin loader re-populates it on the next
+ * load cycle.
+ */
 export function clearScenarioRegistry(): void {
   scenarioRegistry.clear()
 }

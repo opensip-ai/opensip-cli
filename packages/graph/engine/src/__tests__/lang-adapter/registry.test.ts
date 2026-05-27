@@ -16,7 +16,7 @@ import { ConfigurationError } from '@opensip-tools/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
-  _clearAdaptersForTesting,
+  clearAdapterRegistry,
   pickAdapter,
   registerAdapter,
 } from '../../lang-adapter/registry.js';
@@ -60,11 +60,11 @@ function fakeAdapter(id: string, exts: readonly string[]): GraphLanguageAdapter 
 
 describe('registerAdapter / pickAdapter', () => {
   beforeEach(() => {
-    _clearAdaptersForTesting();
+    clearAdapterRegistry();
   });
 
   afterEach(() => {
-    _clearAdaptersForTesting();
+    clearAdapterRegistry();
   });
 
   it('throws ConfigurationError when no adapters are registered', () => {
@@ -91,12 +91,12 @@ describe('pickAdapter — multi-adapter dominance', () => {
   let dir: string;
 
   beforeEach(() => {
-    _clearAdaptersForTesting();
+    clearAdapterRegistry();
     dir = mkdtempSync(join(tmpdir(), 'graph-registry-'));
   });
 
   afterEach(() => {
-    _clearAdaptersForTesting();
+    clearAdapterRegistry();
     rmSync(dir, { recursive: true, force: true });
   });
 

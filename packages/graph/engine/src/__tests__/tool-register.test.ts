@@ -15,7 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } fr
 
 import { saveBaseline } from '../gate.js';
 import {
-  _clearAdaptersForTesting,
+  clearAdapterRegistry,
   registerAdapter,
 } from '../lang-adapter/registry.js';
 import { GraphBaselineRepo } from '../persistence/baseline-repo.js';
@@ -131,6 +131,7 @@ function makeMockCli(datastore?: DataStore): MockCliBag {
     setExitCode,
     emitJson,
     datastore,
+    scope: { datastore: () => datastore },
   } as unknown as ToolCliContext;
   return { cli, program, setExitCode, emitJson, registerLiveView, renderLive };
 }
@@ -140,14 +141,14 @@ let stderrSpy: MockInstance<typeof process.stderr.write>;
 let workDir: string;
 
 beforeEach(() => {
-  _clearAdaptersForTesting();
+  clearAdapterRegistry();
   stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
   stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
   workDir = mkdtempSync(join(tmpdir(), 'tool-reg-'));
 });
 
 afterEach(() => {
-  _clearAdaptersForTesting();
+  clearAdapterRegistry();
   stdoutSpy.mockRestore();
   stderrSpy.mockRestore();
   rmSync(workDir, { recursive: true, force: true });

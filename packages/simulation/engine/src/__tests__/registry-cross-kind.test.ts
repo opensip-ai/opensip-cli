@@ -13,6 +13,7 @@ import {
   getRegisteredScenarios,
   getScenariosByKind,
   getScenariosByTag,
+  scenarioRegistry,
 } from '../framework/registry.js'
 import { renderScenarioResultView } from '../framework/result-renderers.js'
 import { defineChaosScenario } from '../kinds/chaos/define.js'
@@ -30,75 +31,83 @@ afterEach(() => {
 })
 
 function defineOneOfEachKind(): void {
-  defineLoadScenario({
-    id: 'cross-load',
-    name: 'cross load',
-    description: 'load',
-    tags: ['shared-tag', 'load-only'],
-    personas: [persona('buyer', 1)],
-    duration: 1,
-    assertions: [ASSERTIONS.lowErrorRate(1)],
-  })
+  scenarioRegistry.register(
+    defineLoadScenario({
+      id: 'cross-load',
+      name: 'cross load',
+      description: 'load',
+      tags: ['shared-tag', 'load-only'],
+      personas: [persona('buyer', 1)],
+      duration: 1,
+      assertions: [ASSERTIONS.lowErrorRate(1)],
+    }),
+  )
 
-  defineChaosScenario({
-    id: 'cross-chaos',
-    name: 'cross chaos',
-    description: 'chaos',
-    tags: ['shared-tag', 'chaos-only'],
-    personas: [persona('buyer', 1)],
-    duration: 1,
-    chaos: {
-      enabled: true,
-      probability: 0.1,
-      types: [
-        {
-          type: 'error',
-          target: '*',
-          probability: 0.5,
-          config: { type: 'error', statusCode: 500, message: 'x' },
-        },
-      ],
-    },
-    steadyStateAssertions: [ASSERTIONS.lowErrorRate(1)],
-    recoveryAssertions: [ASSERTIONS.lowErrorRate(1)],
-    recoveryWindow: 100,
-  })
+  scenarioRegistry.register(
+    defineChaosScenario({
+      id: 'cross-chaos',
+      name: 'cross chaos',
+      description: 'chaos',
+      tags: ['shared-tag', 'chaos-only'],
+      personas: [persona('buyer', 1)],
+      duration: 1,
+      chaos: {
+        enabled: true,
+        probability: 0.1,
+        types: [
+          {
+            type: 'error',
+            target: '*',
+            probability: 0.5,
+            config: { type: 'error', statusCode: 500, message: 'x' },
+          },
+        ],
+      },
+      steadyStateAssertions: [ASSERTIONS.lowErrorRate(1)],
+      recoveryAssertions: [ASSERTIONS.lowErrorRate(1)],
+      recoveryWindow: 100,
+    }),
+  )
 
-  defineInvariantScenario({
-    id: 'cross-invariant',
-    name: 'cross invariant',
-    description: 'invariant',
-    tags: ['shared-tag', 'invariant-only'],
-    relatesToInvariant: 'doc.md#anchor',
-    setup: async () => {},
-    act: async () => {},
-    assert: async () => {},
-  })
+  scenarioRegistry.register(
+    defineInvariantScenario({
+      id: 'cross-invariant',
+      name: 'cross invariant',
+      description: 'invariant',
+      tags: ['shared-tag', 'invariant-only'],
+      relatesToInvariant: 'doc.md#anchor',
+      setup: async () => {},
+      act: async () => {},
+      assert: async () => {},
+    }),
+  )
 
-  defineFixEvaluationScenario({
-    id: 'cross-fix-eval',
-    name: 'cross fix eval',
-    description: 'fix-evaluation',
-    tags: ['shared-tag', 'fix-eval-only'],
-    category: 'security',
-    score: 3,
-    criteriaMet: ['code-file'],
-    source: 'simulation',
-    severity: 'high',
-    expectedDifficulty: 'trivial',
-    signalIntent: 'actionable',
-    judgmentMode: 'predicate-match',
-    provenance: 'real-world-inspired',
-    expectedOutcome: 'success',
-    signal: {
+  scenarioRegistry.register(
+    defineFixEvaluationScenario({
+      id: 'cross-fix-eval',
+      name: 'cross fix eval',
+      description: 'fix-evaluation',
+      tags: ['shared-tag', 'fix-eval-only'],
+      category: 'security',
+      score: 3,
+      criteriaMet: ['code-file'],
       source: 'simulation',
       severity: 'high',
-      category: 'security',
-      ruleId: 'corpus:test',
-      message: 'test',
-    },
-    predicate: { all_of: [{ id: 'tests-pass' }, { id: 'no-tests-modified' }] },
-  })
+      expectedDifficulty: 'trivial',
+      signalIntent: 'actionable',
+      judgmentMode: 'predicate-match',
+      provenance: 'real-world-inspired',
+      expectedOutcome: 'success',
+      signal: {
+        source: 'simulation',
+        severity: 'high',
+        category: 'security',
+        ruleId: 'corpus:test',
+        message: 'test',
+      },
+      predicate: { all_of: [{ id: 'tests-pass' }, { id: 'no-tests-modified' }] },
+    }),
+  )
 }
 
 describe('cross-kind registry', () => {

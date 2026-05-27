@@ -7,7 +7,7 @@
  * preserving line/column positions for accurate violation reporting.
  */
 
-import { logger } from '@opensip-tools/core'
+import { logger, currentScope } from '@opensip-tools/core'
 import { buildLineStarts } from '@opensip-tools/core/languages'
 import ts from 'typescript'
 
@@ -130,53 +130,33 @@ function replaceCharsInRange(chars: string[], start: number, end: number, string
 // timer resets each time filterContent runs, so an active session never
 // loses its cache.
 //
-// Why this cache lives separately from `core/languages/parse-cache.ts`:
-// parse-cache stores `ts.SourceFile` instances keyed by (adapter, filePath,
-// content-hash); this cache stores the post-scanner `FilteredContent` value
-// (raw + strings-stripped + comments-stripped strings + region predicates),
-// which is shaped specifically for the lang-typescript content-filter
-// pipeline and irrelevant to other adapters. The two caches have different
-// lifetimes (parse cache is per-adapter and clearable per registry entry;
-// this is a single per-process map) and different scopes (SourceFile trees
-// vs filtered string outputs). A future consolidation would route both
-// through a small `core/languages/cache.ts` registry — see audit F-M2.
-// Until then, embedders that want a clean slate must call BOTH
-// `clearParseCache()` and `clearFilterCache()`.
-const FILTER_CACHE_IDLE_TIMEOUT_MS = 10 * 60 * 1000
-const filterCache = new Map<string, FilteredContent>()
-let filterCacheIdleTimer: ReturnType<typeof setTimeout> | null = null
-
-function scheduleFilterCacheClear(): void {
-  if (filterCacheIdleTimer) clearTimeout(filterCacheIdleTimer)
-  filterCacheIdleTimer = setTimeout(() => {
-    /* v8 ignore start -- timer body fires after 10-min idle period; not exercised in unit tests */
-    filterCache.clear()
-    filterCacheIdleTimer = null
-    /* v8 ignore stop */
-  }, FILTER_CACHE_IDLE_TIMEOUT_MS)
-  filterCacheIdleTimer.unref()
-}
-
-/** Clear the filter cache (call between runs or on memory pressure) */
-export function clearFilterCache(): void {
-  filterCache.clear()
-  if (filterCacheIdleTimer) {
-    clearTimeout(filterCacheIdleTimer)
-    filterCacheIdleTimer = null
-  }
-}
+// Filter-content caching now rides on the current `RunScope`'s
+// `parseCache.filteredContent` Map (Phase 6 Task 6.4). The previous
+// design kept a separate module-level `filterCache` Map + 10-min
+// idle timer, which had three failure modes: (1) two tests in the
+// same process couldn't isolate state without a `clearFilterCache()`
+// call; (2) the timer kept the process alive in environments where
+// it wasn't `unref`'d correctly; (3) lifetime drift vs the parse
+// cache meant a `clearParseCache()` call left stale filter entries.
+// Folding into `RunScope` means the test/run lifecycle owns both
+// caches together — one `scope.dispose()` clears them both.
+//
+// Calling `filterContent(content)` outside any `runWithScope` (e.g.
+// a direct unit test of the filter) just bypasses the cache; the
+// filtered output is computed every call. That's a documented
+// fallback, not a hot-path concern, because production paths always
+// run inside a scope established by the CLI's pre-action-hook.
 
 export function filterContent(content: string): FilteredContent {
-  const cached = filterCache.get(content)
-  if (cached) {
-    scheduleFilterCacheClear()
-    return cached
+  const scope = currentScope()
+  if (scope) {
+    const cached = scope.parseCache.filteredContent.get(content) as FilteredContent | undefined
+    if (cached) return cached
   }
 
   try {
     const result = filterContentImpl(content)
-    filterCache.set(content, result)
-    scheduleFilterCacheClear()
+    if (scope) scope.parseCache.filteredContent.set(content, result)
     return result
   /* v8 ignore start -- defensive: TypeScript scanner is robust and recovers from malformed input rather than throwing; this fallback exists for theoretical scanner exceptions */
   } catch {
@@ -213,7 +193,7 @@ export function filterContent(content: string): FilteredContent {
       isInString: () => false,
       isInComment: () => false,
     }
-    filterCache.set(content, fallback)
+    if (scope) scope.parseCache.filteredContent.set(content, fallback)
     return fallback
   }
   /* v8 ignore stop */

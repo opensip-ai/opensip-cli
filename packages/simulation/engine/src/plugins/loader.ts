@@ -5,52 +5,32 @@
  * Core owns the discovery, dynamic-import, error-wrap, and log
  * machinery. This file supplies the sim-specific `registerExports`
  * callback that knows how to interpret a `SimPluginExports`-shaped
- * module:
- *
- *   - Scenarios self-register into `scenarioRegistry` at module
- *     import time (each `defineLoadScenario({...})`, `defineChaosScenario`,
- *     etc. call registers as a side effect of construction). The
- *     loader doesn't need to look at any exported `scenarios` array —
- *     core's `import()` runs first, scenarios are already in the
- *     registry by the time the callback fires.
- *
- *   - Recipes do not self-register, so a `recipes: SimulationRecipe[]`
- *     array on the module is registered explicitly into
- *     `defaultSimulationRecipeRegistry`. Mirrors fitness's recipe
- *     registration path.
- *
- * Per-plugin scenario counts come from snapshotting `scenarioRegistry.size`
- * around each `coreLoadPlugin` call rather than inside the callback —
- * because core imports before invoking the callback, the inside-callback
- * delta is always zero. The outside-snapshot pattern is the price of
- * the side-effect registration design we picked.
+ * module: both `scenarios: RunnableScenario[]` and
+ * `recipes: SimulationRecipe[]` are explicit arrays — the loader walks
+ * each and registers items into the simulation registries. There is no
+ * import-side-effect channel.
  *
  * Public API: `loadAllSimPlugins(projectDir)` — the sim equivalent of
  * fitness's `loadAllPlugins('fit', projectDir)`.
  */
 
-import { discoverPlugins, loadPlugin as coreLoadPlugin } from '@opensip-tools/core'
+import { loadAllPlugins } from '@opensip-tools/core'
 
 import { scenarioRegistry } from '../framework/registry.js'
 import { defaultSimulationRecipeRegistry } from '../recipes/registry.js'
 
 import type { SimPluginExports } from './types.js'
+import type { RunnableScenario } from '../framework/runnable-scenario.js'
 import type { SimulationRecipe } from '../recipes/types.js'
 import type {
-  LoadedPlugin,
   PluginLoadResult,
   RegisterCounts,
   RegisterCtx,
 } from '@opensip-tools/core'
 
-/**
- * Register a sim plugin's recipes. Scenarios are NOT handled here —
- * they self-register on import (which has already happened by the time
- * core invokes this callback). The caller measures the scenario-count
- * delta outside this function; we return only `recipesRegistered`.
- */
 /** Register one recipe; returns true if newly registered. Duplicate
- *  recipes silently skip, matching fitness's behavior. */
+ *  recipes throw — caught here and reported as not-newly-registered,
+ *  matching the prior behavior of silently skipping duplicates. */
 function tryRegisterRecipe(recipe: SimulationRecipe): boolean {
   try {
     defaultSimulationRecipeRegistry.register(recipe, { allowOverwrite: false })
@@ -60,27 +40,68 @@ function tryRegisterRecipe(recipe: SimulationRecipe): boolean {
   }
 }
 
+/** Register one scenario; returns true if newly registered. Duplicate
+ *  scenarios (same id) silently skip via the registry's
+ *  `duplicatePolicy: 'silent-skip'`. A name-collision with a different
+ *  id throws — surfaced to the caller as `false`. */
+function tryRegisterScenario(scenario: RunnableScenario): boolean {
+  const before = scenarioRegistry.size
+  try {
+    scenarioRegistry.register(scenario)
+  } catch {
+    return false
+  }
+  return scenarioRegistry.size > before
+}
+
 function isValidRecipe(value: unknown): value is SimulationRecipe {
   return value !== null && typeof value === 'object' && 'id' in value && 'name' in value
 }
 
-function registerSimExports(mod: Record<string, unknown>, ctx: RegisterCtx): RegisterCounts {
-  const recipesField = (mod as SimPluginExports).recipes
-  let recipesRegistered = 0
+function isValidScenario(value: unknown): value is RunnableScenario {
+  return value !== null && typeof value === 'object' && 'id' in value && 'kind' in value && 'run' in value
+}
 
-  if (recipesField === undefined) {
-    // scenariosRegistered intentionally omitted — measured outside.
-    return { recipesRegistered }
+function registerScenariosArray(
+  scenariosField: unknown,
+  ctx: RegisterCtx,
+): number {
+  if (scenariosField === undefined) return 0
+  if (!Array.isArray(scenariosField)) {
+    ctx.warn(
+      'plugin.loader.invalid_scenarios_export',
+      `Plugin "${ctx.plugin.namespace}" exports "scenarios" but it is not an array — skipping scenario registration.`,
+    )
+    return 0
   }
+  let scenariosRegistered = 0
+  for (const [index, scenario] of scenariosField.entries()) {
+    if (!isValidScenario(scenario)) {
+      ctx.warn(
+        'plugin.loader.invalid_scenario_item',
+        `Plugin "${ctx.plugin.namespace}" scenarios[${index}] is not a valid RunnableScenario (missing id, kind, or run) — skipping.`,
+        { index },
+      )
+      continue
+    }
+    if (tryRegisterScenario(scenario)) scenariosRegistered++
+  }
+  return scenariosRegistered
+}
 
+function registerRecipesArray(
+  recipesField: unknown,
+  ctx: RegisterCtx,
+): number {
+  if (recipesField === undefined) return 0
   if (!Array.isArray(recipesField)) {
     ctx.warn(
       'plugin.loader.invalid_recipes_export',
       `Plugin "${ctx.plugin.namespace}" exports "recipes" but it is not an array — skipping recipe registration.`,
     )
-    return { recipesRegistered }
+    return 0
   }
-
+  let recipesRegistered = 0
   for (const [index, recipe] of recipesField.entries()) {
     if (!isValidRecipe(recipe)) {
       ctx.warn(
@@ -92,8 +113,14 @@ function registerSimExports(mod: Record<string, unknown>, ctx: RegisterCtx): Reg
     }
     if (tryRegisterRecipe(recipe)) recipesRegistered++
   }
+  return recipesRegistered
+}
 
-  return { recipesRegistered }
+function registerSimExports(mod: Record<string, unknown>, ctx: RegisterCtx): RegisterCounts {
+  const exports = mod as SimPluginExports
+  const scenariosRegistered = registerScenariosArray(exports.scenarios, ctx)
+  const recipesRegistered = registerRecipesArray(exports.recipes, ctx)
+  return { scenariosRegistered, recipesRegistered }
 }
 
 /**
@@ -102,43 +129,7 @@ function registerSimExports(mod: Record<string, unknown>, ctx: RegisterCtx): Reg
  *
  * Without `projectDir`, no plugins are discovered — there is no
  * user-global fallback, by design.
- *
- * Re-implements the outer loop from core's `loadAllPlugins` so we can
- * snapshot `scenarioRegistry.size` around each per-plugin import.
- * Core's `loadAllPlugins` runs the import inside `coreLoadPlugin`
- * before invoking our callback, so the only place we can observe the
- * size delta is around the `coreLoadPlugin` call itself.
  */
 export async function loadAllSimPlugins(projectDir?: string): Promise<PluginLoadResult> {
-  const discovered = discoverPlugins('sim', projectDir)
-
-  const plugins: LoadedPlugin[] = []
-  const errors: string[] = []
-
-  for (const plugin of discovered) {
-    const sizeBefore = scenarioRegistry.size
-    const result = await coreLoadPlugin(plugin, registerSimExports)
-    const scenariosRegistered = scenarioRegistry.size - sizeBefore
-
-    // Inject the externally-measured scenario count. core's loadPlugin
-    // doesn't know about scenarios, so it returned 0 for that field —
-    // we patch it here before rolling up totals.
-    const patched: LoadedPlugin = {
-      ...result,
-      scenariosRegistered,
-    }
-    plugins.push(patched)
-    if (patched.error) {
-      errors.push(`${patched.source}: ${patched.error}`)
-    }
-  }
-
-  return {
-    plugins,
-    totalChecks: plugins.reduce((sum, p) => sum + p.checksRegistered, 0),
-    totalRecipes: plugins.reduce((sum, p) => sum + p.recipesRegistered, 0),
-    totalAdapters: plugins.reduce((sum, p) => sum + (p.adaptersRegistered ?? 0), 0),
-    totalScenarios: plugins.reduce((sum, p) => sum + (p.scenariosRegistered ?? 0), 0),
-    errors,
-  }
+  return loadAllPlugins('sim', projectDir, registerSimExports)
 }

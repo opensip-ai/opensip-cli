@@ -24,7 +24,8 @@
     "./plugins": "./dist/plugins/index.js",
     "./plugins/*": "./dist/plugins/*",
     "./languages": "./dist/languages/index.js",
-    "./languages/*": "./dist/languages/*"
+    "./languages/*": "./dist/languages/*",
+    "./test-utils/with-scope.js": "./dist/test-utils/with-scope.js"
   },
   "scripts": {
     "build": "tsc",

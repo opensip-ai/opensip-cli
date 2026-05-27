@@ -28,6 +28,7 @@
     "@opensip-tools/fitness": "workspace:*"
   },
   "devDependencies": {
+    "@opensip-tools/core": "workspace:*",
     "@types/node": "^22.0.0",
     "vitest": "^2.1.0"
   }

@@ -153,8 +153,8 @@ describe('loadDiscoveredScenarioPackages', () => {
     expect(defaultSimulationRecipeRegistry.has(recipeId)).toBe(true);
     // Dedupe assertion: the scenario was registered exactly once. If
     // both walker paths loaded the module, the second import attempt
-    // would either re-run the side-effect (causing an
-    // IdNameTagRegistry name-collision throw) or be cached by Node.
+    // would either re-run the side-effect (causing a Registry<T>
+    // nameCollisionMode='throw' violation) or be cached by Node.
     // Either way, scenarioRegistry.getAll() should contain a single
     // entry for this fixture's id.
     const matches = scenarioRegistry.getAll().filter((s) => s.id === scenarioId);

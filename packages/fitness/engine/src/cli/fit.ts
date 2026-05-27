@@ -486,14 +486,22 @@ function loadFitConfig(
  * renderer's frame tracking. `executeFit` collects these and threads
  * them into `FitDoneResult.warnings`.
  *
- * Async only because the language registry is imported via dynamic
- * import to keep the executeFit body free of fitness↔core import
- * arrows beyond the kernel barrel.
+ * Async only because `currentScope` is imported via dynamic import to
+ * keep the executeFit body free of fitness↔core import arrows beyond
+ * the kernel barrel. The scope is bound by the CLI pre-action-hook.
  */
 async function validateLanguagesAgainstAdapters(
   targetRegistry: LoadedFitConfig['targetRegistry'],
 ): Promise<readonly string[]> {
-  const { defaultLanguageRegistry: langRegistry } = await import('@opensip-tools/core');
+  const { currentScope } = await import('@opensip-tools/core');
+  const scope = currentScope();
+  if (!scope) {
+    throw new Error(
+      'validateLanguagesAgainstAdapters() called outside runWithScope. ' +
+        'fit pipeline must run inside a RunScope so language adapters resolve via cli.scope.languages.',
+    );
+  }
+  const langRegistry = scope.languages;
   const knownLanguages = new Set<string>(langRegistry.list().flatMap((a) => [a.id, ...(a.aliases ?? [])]));
   const unknownLanguages = new Set<string>();
   for (const target of targetRegistry.getAll()) {

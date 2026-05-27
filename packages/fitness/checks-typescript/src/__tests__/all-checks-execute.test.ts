@@ -13,10 +13,13 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
+import { RunScope, runWithScope } from '@opensip-tools/core';
 import { fileCache } from '@opensip-tools/fitness';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { checks } from '../index.js';
+
+const testScope = new RunScope();
 
 let cwd: string;
 let allFixturePaths: string[] = [];
@@ -895,7 +898,9 @@ describe('checks-typescript — every check runs to completion', () => {
   it.each(checks.map((c) => [c.config.slug, c]))(
     '%s runs and returns a CheckResult',
     async (_slug, check) => {
-      const result = await check.run(cwd, { targetFiles: allFixturePaths });
+      const result = await runWithScope(testScope, () =>
+        check.run(cwd, { targetFiles: allFixturePaths }),
+      );
       expect(result).toBeDefined();
       expect(result.signals).toBeDefined();
       expect(Array.isArray(result.signals)).toBe(true);

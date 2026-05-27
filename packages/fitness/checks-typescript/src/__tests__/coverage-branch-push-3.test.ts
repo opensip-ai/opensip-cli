@@ -8,6 +8,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 
+import { RunScope, runWithScope } from '@opensip-tools/core'
 import {
   fileCache,
   setCurrentRecipeCheckConfig,
@@ -19,6 +20,7 @@ import { checks } from '../index.js'
 
 let cwd: string
 let written: string[] = []
+let testScope: RunScope
 
 function fx(rel: string, content: string): string {
   const abs = join(cwd, rel)
@@ -43,11 +45,12 @@ async function runCheck(slug: string) {
 beforeEach(() => {
   cwd = mkdtempSync(join(tmpdir(), 'opensip-cov-bp3-'))
   written = []
+  testScope = new RunScope()
 })
 
 afterEach(() => {
   fileCache.clear()
-  clearCurrentRecipeCheckConfig()
+  clearCurrentRecipeCheckConfig(testScope)
   rmSync(cwd, { recursive: true, force: true })
 })
 
@@ -57,26 +60,28 @@ afterEach(() => {
 
 describe('detached-promises — with recipe config', () => {
   it('uses additionalSyncFunctions, additionalSyncReceivers, additionalSyncPrefixes', async () => {
-    setCurrentRecipeCheckConfig({
-      'detached-promises': {
-        additionalSyncFunctions: ['mySpecialSync', 'anotherSync'],
-        additionalSyncReceivers: ['cliWriter', 'projectLogger'],
-        additionalSyncPrefixes: ['register', 'configure'],
-      },
+    await runWithScope(testScope, async () => {
+      setCurrentRecipeCheckConfig(testScope, {
+        'detached-promises': {
+          additionalSyncFunctions: ['mySpecialSync', 'anotherSync'],
+          additionalSyncReceivers: ['cliWriter', 'projectLogger'],
+          additionalSyncPrefixes: ['register', 'configure'],
+        },
+      })
+      fx('src/x/c.ts', [
+        'export async function f() {',
+        '  mySpecialSync()',
+        '  anotherSync()',
+        '  cliWriter.print("hi")',
+        '  projectLogger.info("there")',
+        '  registerHandler()',
+        '  configureRoute()',
+        '  unknownCall()',
+        '}',
+      ].join('\n'))
+      const result = await runCheck('detached-promises')
+      expect(result).toBeDefined()
     })
-    fx('src/x/c.ts', [
-      'export async function f() {',
-      '  mySpecialSync()',
-      '  anotherSync()',
-      '  cliWriter.print("hi")',
-      '  projectLogger.info("there")',
-      '  registerHandler()',
-      '  configureRoute()',
-      '  unknownCall()',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('detached-promises')
-    expect(result).toBeDefined()
   })
 })
 
@@ -86,25 +91,27 @@ describe('detached-promises — with recipe config', () => {
 
 describe('toctou-race-condition — with recipe config', () => {
   it('uses additionalSafeTOCTOUPaths', async () => {
-    setCurrentRecipeCheckConfig({
-      'toctou-race-condition': {
-        additionalSafeTOCTOUPaths: ['/chain-walker/', '/audit-logs/'],
-      },
+    await runWithScope(testScope, async () => {
+      setCurrentRecipeCheckConfig(testScope, {
+        'toctou-race-condition': {
+          additionalSafeTOCTOUPaths: ['/chain-walker/', '/audit-logs/'],
+        },
+      })
+      fx('src/chain-walker/walker.ts', [
+        'export function walk(repo: any) {',
+        '  const x = repo.find()',
+        '  repo.set(1)',
+        '}',
+      ].join('\n'))
+      fx('src/audit-logs/log.ts', [
+        'export function log(repo: any) {',
+        '  const x = repo.find()',
+        '  repo.set(1)',
+        '}',
+      ].join('\n'))
+      const result = await runCheck('toctou-race-condition')
+      expect(result).toBeDefined()
     })
-    fx('src/chain-walker/walker.ts', [
-      'export function walk(repo: any) {',
-      '  const x = repo.find()',
-      '  repo.set(1)',
-      '}',
-    ].join('\n'))
-    fx('src/audit-logs/log.ts', [
-      'export function log(repo: any) {',
-      '  const x = repo.find()',
-      '  repo.set(1)',
-      '}',
-    ].join('\n'))
-    const result = await runCheck('toctou-race-condition')
-    expect(result).toBeDefined()
   })
 })
 
@@ -114,20 +121,22 @@ describe('toctou-race-condition — with recipe config', () => {
 
 describe('throws-documentation — with recipe config', () => {
   it('uses additionalSelfDocumentingSuffixes', async () => {
-    setCurrentRecipeCheckConfig({
-      'throws-documentation': {
-        additionalSelfDocumentingSuffixes: ['CompositionError', 'TransitionError'],
-      },
+    await runWithScope(testScope, async () => {
+      setCurrentRecipeCheckConfig(testScope, {
+        'throws-documentation': {
+          additionalSelfDocumentingSuffixes: ['CompositionError', 'TransitionError'],
+        },
+      })
+      fx('src/x/t.ts', [
+        'class CompositionError extends Error {}',
+        'class TransitionError extends Error {}',
+        'export function a() { throw new CompositionError() }',
+        'export function b() { throw new TransitionError() }',
+        'export function c() { throw new Error("plain") }', // not self-documenting
+      ].join('\n'))
+      const result = await runCheck('throws-documentation')
+      expect(result).toBeDefined()
     })
-    fx('src/x/t.ts', [
-      'class CompositionError extends Error {}',
-      'class TransitionError extends Error {}',
-      'export function a() { throw new CompositionError() }',
-      'export function b() { throw new TransitionError() }',
-      'export function c() { throw new Error("plain") }', // not self-documenting
-    ].join('\n'))
-    const result = await runCheck('throws-documentation')
-    expect(result).toBeDefined()
   })
 })
 

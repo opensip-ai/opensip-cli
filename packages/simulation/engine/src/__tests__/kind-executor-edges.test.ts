@@ -20,11 +20,11 @@ import { ScenarioAbortedError } from '../framework/execution/scenario-aborted-er
 import { persona } from '../framework/personas.js';
 import { clearScenarioRegistry } from '../framework/registry.js';
 import { renderScenarioResultView } from '../framework/result-renderers.js';
-import { defineChaosScenarioWithoutRegistration } from '../kinds/chaos/define.js';
-import { defineFixEvaluationScenarioWithoutRegistration } from '../kinds/fix-evaluation/define.js';
+import { defineChaosScenario } from '../kinds/chaos/define.js';
+import { defineFixEvaluationScenario } from '../kinds/fix-evaluation/define.js';
 import { resetPredicateRegistryToBaseline } from '../kinds/fix-evaluation/predicates/index.js';
-import { defineInvariantScenarioWithoutRegistration } from '../kinds/invariant/define.js';
-import { defineLoadScenarioWithoutRegistration } from '../kinds/load/define.js';
+import { defineInvariantScenario } from '../kinds/invariant/define.js';
+import { defineLoadScenario } from '../kinds/load/define.js';
 
 import type { ChaosConfig } from '../types/base-types.js';
 
@@ -55,7 +55,7 @@ afterEach(() => {
 describe('load executor — custom execute branch', () => {
   it('routes through createCustomExecutor when execute is supplied', async () => {
     let invoked = 0;
-    const scenario = defineLoadScenarioWithoutRegistration({
+    const scenario = defineLoadScenario({
       id: 'load-custom-exec',
       name: 'Load Custom',
       description: 'd',
@@ -92,7 +92,7 @@ describe('load executor — custom execute branch', () => {
 
   it('returns gracefully when load executor aborts mid-run (loop breaks)', async () => {
     const ac = new AbortController();
-    const scenario = defineLoadScenarioWithoutRegistration({
+    const scenario = defineLoadScenario({
       id: 'load-abort-mid',
       name: 'Load Abort Mid',
       description: 'd',
@@ -110,7 +110,7 @@ describe('load executor — custom execute branch', () => {
   });
 
   it('re-throws non-abort errors from a custom load execute function', async () => {
-    const scenario = defineLoadScenarioWithoutRegistration({
+    const scenario = defineLoadScenario({
       id: 'load-throws',
       name: 'Load Throws',
       description: 'd',
@@ -129,7 +129,7 @@ describe('load executor — custom execute branch', () => {
 
   it('converts custom load execute throw into ScenarioAbortedError when signal is aborted', async () => {
     const ac = new AbortController();
-    const scenario = defineLoadScenarioWithoutRegistration({
+    const scenario = defineLoadScenario({
       id: 'load-abort-then-throw',
       name: 'Load Abort Then Throw',
       description: 'd',
@@ -156,7 +156,7 @@ describe('chaos executor — abort and error edges', () => {
   it('throws ScenarioAbortedError when called with a pre-aborted signal', async () => {
     const ac = new AbortController();
     ac.abort();
-    const scenario = defineChaosScenarioWithoutRegistration({
+    const scenario = defineChaosScenario({
       id: 'chaos-pre-abort',
       name: 'Chaos Pre Abort',
       description: 'd',
@@ -174,7 +174,7 @@ describe('chaos executor — abort and error edges', () => {
 
   it('chaos executor finishes even when aborted mid-run (loop breaks)', async () => {
     const ac = new AbortController();
-    const scenario = defineChaosScenarioWithoutRegistration({
+    const scenario = defineChaosScenario({
       id: 'chaos-abort-mid',
       name: 'Chaos Abort Mid',
       description: 'd',
@@ -201,7 +201,7 @@ describe('invariant executor — phase failure cascades', () => {
   it('skips act and assert when setup fails', async () => {
     let actRan = false;
     let assertRan = false;
-    const scenario = defineInvariantScenarioWithoutRegistration({
+    const scenario = defineInvariantScenario({
       id: 'inv-setup-fails',
       name: 'Inv Setup Fails',
       description: 'd',
@@ -235,7 +235,7 @@ describe('invariant executor — phase failure cascades', () => {
   });
 
   it('coerces a non-Error phase throw into a string message', async () => {
-    const scenario = defineInvariantScenarioWithoutRegistration({
+    const scenario = defineInvariantScenario({
       id: 'inv-string-throw',
       name: 'Inv String Throw',
       description: 'd',
@@ -259,7 +259,7 @@ describe('invariant executor — phase failure cascades', () => {
   it('returns failed phase entries without phase execution when signal is pre-aborted (executor throws first)', async () => {
     const ac = new AbortController();
     ac.abort();
-    const scenario = defineInvariantScenarioWithoutRegistration({
+    const scenario = defineInvariantScenario({
       id: 'inv-pre-aborted',
       name: 'Inv Pre Aborted',
       description: 'd',
@@ -274,7 +274,7 @@ describe('invariant executor — phase failure cascades', () => {
   });
 
   it('passes user-supplied test deps through into the InvariantContext', async () => {
-    const scenario = defineInvariantScenarioWithoutRegistration({
+    const scenario = defineInvariantScenario({
       id: 'inv-fake-deps',
       name: 'Inv Fake Deps',
       description: 'd',
@@ -303,7 +303,7 @@ describe('invariant executor — phase failure cascades', () => {
   });
 
   it('uses ctx.expectStage / ctx.expectOutcome / ctx.expectWorkflowStatus / ctx.expectAuditEntry recorders', async () => {
-    const scenario = defineInvariantScenarioWithoutRegistration({
+    const scenario = defineInvariantScenario({
       id: 'inv-expect-helpers',
       name: 'Inv Expect Helpers',
       description: 'd',
@@ -337,7 +337,7 @@ describe('invariant executor — phase failure cascades', () => {
   });
 
   it('records assertions with details from assertEquals and recordAssertion', async () => {
-    const scenario = defineInvariantScenarioWithoutRegistration({
+    const scenario = defineInvariantScenario({
       id: 'inv-record',
       name: 'Inv Record',
       description: 'd',
@@ -371,7 +371,7 @@ describe('fix-evaluation executor — abort and leaf verdicts', () => {
   it('rejects with ScenarioAbortedError when called with a pre-aborted signal', async () => {
     const ac = new AbortController();
     ac.abort();
-    const scenario = defineFixEvaluationScenarioWithoutRegistration({
+    const scenario = defineFixEvaluationScenario({
       id: 'fe-abort',
       name: 'FE Abort',
       description: 'd',
@@ -400,7 +400,7 @@ describe('fix-evaluation executor — abort and leaf verdicts', () => {
   });
 
   it('produces verdict=undefined when predicate is omitted (judgmentMode != predicate-match)', async () => {
-    const scenario = defineFixEvaluationScenarioWithoutRegistration({
+    const scenario = defineFixEvaluationScenario({
       id: 'fe-no-pred',
       name: 'FE No Pred',
       description: 'd',
@@ -435,7 +435,7 @@ describe('fix-evaluation executor — abort and leaf verdicts', () => {
   });
 
   it('produces a leaf verdict for a single-leaf predicate (composite branch not taken)', async () => {
-    const scenario = defineFixEvaluationScenarioWithoutRegistration({
+    const scenario = defineFixEvaluationScenario({
       id: 'fe-leaf',
       name: 'FE Leaf',
       description: 'd',

@@ -48,7 +48,7 @@ describe('executeSim', () => {
   });
 
   it('returns SimDoneResult with per-scenario outcomes', async () => {
-    defineLoadScenario({
+    scenarioRegistry.register(defineLoadScenario({
       id: 'load-a',
       name: 'load-a',
       description: 'load a',
@@ -56,7 +56,7 @@ describe('executeSim', () => {
       personas: [persona('user', 1)],
       duration: 1,
       assertions: [ASSERTIONS.lowErrorRate(1)],
-    });
+    }));
     const { result } = await executeSim(args());
     expect(result.type).toBe('sim-done');
     if (result.type === 'sim-done') {
@@ -66,7 +66,7 @@ describe('executeSim', () => {
   });
 
   it('honors the --kind filter when set to a valid kind', async () => {
-    defineLoadScenario({
+    scenarioRegistry.register(defineLoadScenario({
       id: 'load-only',
       name: 'load-only',
       description: 'load',
@@ -74,7 +74,7 @@ describe('executeSim', () => {
       personas: [persona('user', 1)],
       duration: 1,
       assertions: [ASSERTIONS.lowErrorRate(1)],
-    });
+    }));
     const { result } = await executeSim(args({ kind: 'load' }));
     expect(result.type).toBe('sim-done');
     if (result.type === 'sim-done') {
@@ -83,7 +83,7 @@ describe('executeSim', () => {
   });
 
   it('--kind filter eliminates scenarios of other kinds', async () => {
-    defineLoadScenario({
+    scenarioRegistry.register(defineLoadScenario({
       id: 'load-x',
       name: 'load-x',
       description: 'load',
@@ -91,7 +91,7 @@ describe('executeSim', () => {
       personas: [persona('user', 1)],
       duration: 1,
       assertions: [ASSERTIONS.lowErrorRate(1)],
-    });
+    }));
     const { result } = await executeSim(args({ kind: 'chaos' }));
     expect(result.type).toBe('sim-done');
     if (result.type === 'sim-done') {
@@ -101,7 +101,7 @@ describe('executeSim', () => {
   });
 
   it('ignores unknown --kind values (passes everything through)', async () => {
-    defineLoadScenario({
+    scenarioRegistry.register(defineLoadScenario({
       id: 'pass-through',
       name: 'pass-through',
       description: 'load',
@@ -109,7 +109,7 @@ describe('executeSim', () => {
       personas: [persona('user', 1)],
       duration: 1,
       assertions: [ASSERTIONS.lowErrorRate(1)],
-    });
+    }));
     const { result } = await executeSim(args({ kind: 'fake-kind' }));
     expect(result.type).toBe('sim-done');
     if (result.type === 'sim-done') {

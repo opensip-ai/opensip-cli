@@ -16,11 +16,9 @@
  * abort handling, assertion collection.
  */
 
-import { scenarioRegistry } from '../../framework/registry.js'
 import {
   throwValidationErrors,
   validateScenarioMetadata,
-  validateScenarioUniqueness,
   type ScenarioValidationError,
 } from '../../framework/validation.js'
 
@@ -78,53 +76,30 @@ function validateInvariantSpecific(
   }
 }
 
-interface ValidateInvariantOptions {
-  /** Test helper: skip the registry-uniqueness check. */
-  readonly skipRegistryCheck?: boolean
-}
-
 /**
  * Validate an invariant scenario configuration. Throws on invalid input.
  *
+ * Uniqueness against an existing scenario registry is checked at
+ * registration time, not here.
+ *
  * @throws {ValidationError} When the invariant scenario configuration is invalid
  */
-export function validateInvariantScenarioConfig(
-  config: InvariantScenarioConfig,
-  options: ValidateInvariantOptions = {},
-): void {
+export function validateInvariantScenarioConfig(config: InvariantScenarioConfig): void {
   const errors: ScenarioValidationError[] = []
   validateScenarioMetadata(config, errors)
   validateInvariantSpecific(config, errors)
-  validateScenarioUniqueness(config, errors, {
-    ...(options.skipRegistryCheck === undefined ? {} : { skipRegistryCheck: options.skipRegistryCheck }),
-  })
 
   throwValidationErrors(errors, 'invariant')
 }
 
 /**
- * Define an invariant-kind simulation scenario with automatic registration.
+ * Define an invariant-kind simulation scenario. Returns the scenario;
+ * the caller (typically the simulation plugin loader) is responsible
+ * for registering it into `scope.registries.scenarios`.
  *
  * @throws {ValidationError} When the scenario configuration is invalid
  */
 export function defineInvariantScenario(config: InvariantScenarioConfig): RunnableScenario {
   validateInvariantScenarioConfig(config)
-  const scenario = createInvariantScenarioRunner(config)
-  scenarioRegistry.register(scenario)
-  return scenario
-}
-
-/**
- * Define an invariant scenario without auto-registration (test helper).
- *
- * Same validator as `defineInvariantScenario`, with the registry-uniqueness
- * check disabled.
- *
- * @throws {ValidationError} When the scenario configuration is invalid
- */
-export function defineInvariantScenarioWithoutRegistration(
-  config: InvariantScenarioConfig,
-): RunnableScenario {
-  validateInvariantScenarioConfig(config, { skipRegistryCheck: true })
   return createInvariantScenarioRunner(config)
 }

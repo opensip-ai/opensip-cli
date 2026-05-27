@@ -49,7 +49,7 @@ export type {
 // (discoverToolPackages and friends live under plugins/ and are
 // re-exported above; the Tool / Registry types are tool-shape, not
 // plugin-discovery-shape, hence the separate barrel.)
-export { ToolRegistry, defaultToolRegistry, UnknownLiveViewError } from './tools/index.js';
+export { ToolRegistry, UnknownLiveViewError } from './tools/index.js';
 export type {
   Tool,
   ToolMetadata,
@@ -67,13 +67,35 @@ export type {
   RecipeRegistryOptions,
 } from './recipes/registry.js';
 
-// Generic id+name+tag registry — the smaller "common ancestor" used by
-// the simulation scenario registry. Distinct from `RecipeRegistry<T>`
-// in that items only need id + name + optional tags (no displayName /
-// description), and the duplicate-policy is fixed (skip-on-same-id,
-// throw-on-name-collision).
-export { IdNameTagRegistry } from './lib/id-name-tag-registry.js';
-export type { Registerable } from './lib/id-name-tag-registry.js';
+// Generic `Registry<T>` — the unified base for every registry in the
+// workspace. Replaces the ten registry classes catalogued in the
+// runscope+registry plan's Phase 0. See `lib/registry.ts` for the
+// full design rationale + the closed `DuplicatePolicy` union.
+//
+// `Registerable` is the minimum shape every registry item must
+// satisfy: `{ id, name, tags? }`. The historical `IdNameTagRegistry`
+// has been deleted; consumers use `Registry<T>` directly with
+// `duplicatePolicy: 'silent-skip'` + `nameCollisionMode: 'throw'`
+// for the same dual-key semantics.
+export { Registry } from './lib/registry.js';
+export type {
+  DuplicatePolicy,
+  Registerable,
+  RegistryOptions,
+  RegisterCallOptions,
+} from './lib/registry.js';
+
+// RunScope — per-invocation execution scope. Owns the lifecycle of
+// every singleton the codebase previously hung on module-level state
+// (logger, caches, registries, recipe-config slot, project context,
+// datastore thunk). See `lib/run-scope.ts` for the AsyncLocalStorage
+// seam and the two-copies-of-fitness hazard resolution.
+export { RunScope, runWithScope, runWithScopeSync, enterScope, currentScope } from './lib/run-scope.js';
+export type {
+  RunScopeOptions,
+  RecipeCheckConfigSlot,
+  DataStoreThunk,
+} from './lib/run-scope.js';
 
 // Lib — errors + Result pattern
 export { ToolError, ValidationError, NotFoundError, SystemError, TimeoutError, NetworkError, ConfigurationError } from './lib/errors.js';
@@ -86,8 +108,8 @@ export type { Result, ToolErrorCode, ToolErrorOptions } from './lib/errors.js';
 // helper functions; `LoggerImpl` is exported for tests (and tools
 // that need an isolated logger) — advanced / discouraged for
 // general use, see the file-level docstring on lib/logger.ts.
-export { logger, LoggerImpl, setLogLevel, setSilent, setDebugMode, setRunId, getRunId, initLogFile } from './lib/logger.js';
-export type { Logger, LogLevel } from './lib/logger.js';
+export { logger, LoggerImpl, configureLogger, getRunId } from './lib/logger.js';
+export type { Logger, LogLevel, LoggerOptions } from './lib/logger.js';
 
 // Lib — permissive YAML reader (returns undefined on missing/malformed
 // files). Used by plugin-discovery sites that need to peek at a single

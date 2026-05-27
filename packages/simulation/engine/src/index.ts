@@ -49,7 +49,6 @@ export {
 
 export {
   defineLoadScenario,
-  defineLoadScenarioWithoutRegistration,
   validateLoadScenarioConfig,
   type LoadScenarioConfig,
   type LoadValidationError,
@@ -62,7 +61,6 @@ export type { LoadOutcome } from './kinds/load/result.js'
 
 export {
   defineChaosScenario,
-  defineChaosScenarioWithoutRegistration,
   validateChaosScenarioConfig,
   type ChaosScenarioConfig,
   type ChaosValidationError,
@@ -75,7 +73,6 @@ export type { ChaosOutcome, ChaosEvent, ChaosAssertionVerdict } from './kinds/ch
 
 export {
   defineInvariantScenario,
-  defineInvariantScenarioWithoutRegistration,
   validateInvariantScenarioConfig,
   type InvariantScenarioConfig,
   type InvariantValidationError,
@@ -97,7 +94,6 @@ export type {
 
 export {
   defineFixEvaluationScenario,
-  defineFixEvaluationScenarioWithoutRegistration,
   validateFixEvaluationScenarioConfig,
   type FixEvaluationScenarioConfig,
   type FixEvaluationValidationError,

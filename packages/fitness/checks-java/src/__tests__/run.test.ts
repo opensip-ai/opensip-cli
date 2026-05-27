@@ -19,9 +19,17 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { LanguageRegistry, RunScope, runWithScope } from '@opensip-tools/core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { noPrintStackTrace } from '../checks/no-printstacktrace.js';
+
+// applyContentFilter resolves the file's adapter via `currentScope()?.languages`
+// (the previously-exported `defaultLanguageRegistry` was removed). When no
+// adapter is registered for the extension, applyContentFilter returns raw
+// content — the prior behaviour. Wrap the test body in an empty scope so
+// the dispatch reaches that no-adapter branch instead of throwing.
+const emptyScope = new RunScope({ languages: new LanguageRegistry() });
 
 let cwd: string;
 let target: string;
@@ -50,7 +58,9 @@ afterAll(() => {
 
 describe('noPrintStackTrace.run() execution coverage', () => {
   it('runs end-to-end against a Java fixture with a printStackTrace call', async () => {
-    const result = await noPrintStackTrace.run(cwd, { targetFiles: [target] });
+    const result = await runWithScope(emptyScope, () =>
+      noPrintStackTrace.run(cwd, { targetFiles: [target] }),
+    );
 
     expect(result).toBeDefined();
     expect(Array.isArray(result.signals)).toBe(true);

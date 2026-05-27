@@ -13,7 +13,7 @@
  *   2. read opts; resolve project context (pure; may throw on strict --config)
  *   3. expose context on opts.projectContext (collision-free name)
  *   4. bailout window — schema check (Phase 6.3), phantom warn (Phase 7)
- *   5. side-effect setup — initLogFile + setProjectContextForRun
+ *   5. side-effect setup — configureLogger({ logDir }) + setProjectContextForRun
  *      gated on project.scope === 'project' && existsSync(projectRoot)
  *   6. Project: header (Phase 2.2)
  *   7. cli.start log line
@@ -26,21 +26,24 @@ import { existsSync } from 'node:fs';
 
 import { formatProjectHeader } from '@opensip-tools/cli-ui';
 import {
+  RunScope,
   checkSchemaCompat,
+  configureLogger,
   detectPhantomRuntimes,
+  enterScope,
   generatePrefixedId,
-  initLogFile,
   logger,
   readConfigSchemaVersion,
   resolveProjectContext,
   resolveProjectPaths,
-  setDebugMode,
-  setRunId,
-  setSilent,
   type ProjectContext,
 } from '@opensip-tools/core';
 
-import { setProjectContextForRun } from '../cli-context.js';
+import {
+  buildDatastoreThunk,
+  getCurrentRegistriesForScope,
+  setCurrentRunScope,
+} from '../cli-context.js';
 
 import { loadCliDefaults, mergeConfigDefaults } from './cli-defaults.js';
 
@@ -219,7 +222,6 @@ function warnAboutPhantomRuntimes(project: ProjectContext, jsonOutput: boolean):
 export function installPreActionHook(program: Command): void {
   program.hook('preAction', (_thisCommand, actionCommand) => {
     const runId = generatePrefixedId('run');
-    setRunId(runId);
 
     const opts = actionCommand.opts();
     const cwd = (opts.cwd as string) ?? process.cwd();
@@ -227,8 +229,19 @@ export function installPreActionHook(program: Command): void {
 
     mergeConfigDefaults(opts, loadCliDefaults(cwd, opts.config as string | undefined));
 
-    setSilent(true);
-    if (opts.debug) setDebugMode(true);
+    // Single bootstrap-time configuration of the process-wide logger
+    // singleton. Replaces the four prior free mutators (`setSilent`,
+    // `setDebugMode`, `setRunId`, `initLogFile`). `logDir` is wired in
+    // below once the project context is resolved — at that point the
+    // logsDir is known and we apply a second `configureLogger` to fill
+    // it in. The two-call sequence is intentional: silencing stderr
+    // before the project-resolve step is what makes Ink renders clean
+    // even when the project is missing.
+    configureLogger({
+      silent: true,
+      debugMode: Boolean(opts.debug),
+      runId,
+    });
 
     // 2. Resolve the project context — pure, no side effects.
     //    Strict --config: throws ValidationError when explicit path misses.
@@ -259,12 +272,33 @@ export function installPreActionHook(program: Command): void {
     // 5. Side-effect setup, gated on a real project being present.
     if (project.scope === 'project' && existsSync(project.projectRoot)) {
       const projectPaths = resolveProjectPaths(project.projectRoot);
-      initLogFile(projectPaths.logsDir);
+      // Second configureLogger call — fills in the project-scoped logDir
+      // now that the project context is resolved. Leaves silent/debugMode/runId
+      // untouched (configureLogger only writes fields present in the bag).
+      configureLogger({ logDir: projectPaths.logsDir });
     }
-    // Always register the context with cli-context so the getter on
-    // ToolCliContext.project can return it. The datastore getter
-    // additionally checks scope === 'project' before opening SQLite.
-    setProjectContextForRun(project);
+
+    // Build the per-run RunScope and enter it via AsyncLocalStorage so
+    // library functions deep in the call tree (currentScope() readers)
+    // see the bound logger/registries/project + a lazy datastore thunk.
+    // enterWith propagates forward through the same async chain, so the
+    // action body invoked after this hook sees the same scope without
+    // needing a callback wrapper — which Commander does not expose.
+    // (Phase 5 deferred Task 5.2 / T1 Item D close-out.)
+    const { languages, tools } = getCurrentRegistriesForScope();
+    const scope = new RunScope({
+      logger,
+      projectContext: project,
+      languages,
+      tools,
+      // Closure-based lazy datastore. SQLite is materialised only on
+      // first access. The thunk captures `project` so non-action paths
+      // (post-action handlers, error printers) that read via
+      // `getOrOpenDatastore()` find the same instance.
+      datastore: buildDatastoreThunk(project, logger),
+    });
+    enterScope(scope);
+    setCurrentRunScope(scope);
 
     // 6. Imperative Project: header for non-Ink, project-scoped commands.
     const cmdName = actionCommand.name();

@@ -4,17 +4,32 @@
  * Supports namespaced slugs: checks are stored as `namespace:slug` when
  * a namespace is provided. Bare slug lookups resolve via a reverse index,
  * with a warning logged on ambiguity.
+ *
+ * Built on the kernel's unified `Registry<T>` with
+ * `duplicatePolicy: 'silent-skip'` — re-importing the same check is a
+ * no-op (the historical behaviour the file's previous incarnation
+ * documented). The `bareSlugIndex` (slug → list of namespaced keys)
+ * lives alongside the base because it's a domain-specific lookup
+ * structure not in the base's shape.
  */
 
-import { NotFoundError , logger } from '@opensip-tools/core';
+import { NotFoundError, Registry, logger , type Registerable } from '@opensip-tools/core';
 
 import type { Check } from './check-types.js';
 
-
+interface RegisterableCheck extends Registerable {
+  readonly id: string;       // key: `namespace:slug` or bare slug
+  readonly name: string;     // same as id (Check has no separate name)
+  readonly check: Check;
+  readonly tags?: readonly string[];
+}
 
 export class CheckRegistry {
-  /** Primary store: key is `namespace:slug` or bare `slug` */
-  private readonly checks = new Map<string, Check>();
+  private readonly inner = new Registry<RegisterableCheck>({
+    module: 'fitness:checks',
+    duplicatePolicy: 'silent-skip',
+    evtPrefix: 'check.registry',
+  });
   /** Reverse index: bare slug → list of namespaced keys */
   private readonly bareSlugIndex = new Map<string, string[]>();
 
@@ -22,12 +37,14 @@ export class CheckRegistry {
     const bareSlug = check.config.slug;
     const key = namespace ? `${namespace}:${bareSlug}` : bareSlug;
 
-    if (this.checks.has(key)) {
-      // Silently skip duplicate — same check imported multiple times
+    if (this.inner.has(key)) {
+      // Silently skip duplicate — same check imported multiple times.
+      // Inner's silent-skip policy would do this anyway; we short-circuit
+      // here to avoid the redundant index update.
       return;
     }
 
-    this.checks.set(key, check);
+    this.inner.register({ id: key, name: key, check, tags: check.config.tags });
 
     // Update bare slug index
     const existing = this.bareSlugIndex.get(bareSlug) ?? [];
@@ -48,7 +65,7 @@ export class CheckRegistry {
   }
 
   list(): Check[] {
-    return [...this.checks.values()];
+    return this.inner.getAll().map((r) => r.check);
   }
 
   /** Get the namespace a check was registered under. Returns undefined for bare slugs. */
@@ -75,17 +92,17 @@ export class CheckRegistry {
 
   /** Return all registered keys (namespaced where applicable). */
   listSlugs(): string[] {
-    return [...this.checks.keys()];
+    return this.inner.getAll().map((r) => r.id);
   }
 
   /** Return all checks with a given bare slug across all namespaces. */
   listByBareSlug(bareSlug: string): Check[] {
     const keys = this.bareSlugIndex.get(bareSlug) ?? [];
-    return keys.map(k => this.checks.get(k)).filter((c): c is Check => c !== undefined);
+    return keys.map(k => this.inner.getById(k)?.check).filter((c): c is Check => c !== undefined);
   }
 
   get size(): number {
-    return this.checks.size;
+    return this.inner.size;
   }
 
   /**
@@ -95,8 +112,8 @@ export class CheckRegistry {
    */
   private resolve(slug: string): Check | undefined {
     // Exact match (namespaced or bare)
-    const exact = this.checks.get(slug);
-    if (exact) return exact;
+    const exact = this.inner.getById(slug);
+    if (exact) return exact.check;
 
     // If it contains ':', it was a namespaced lookup that didn't match
     if (slug.includes(':')) return undefined;
@@ -115,11 +132,11 @@ export class CheckRegistry {
       });
     }
 
-    return this.checks.get(candidates[0]);
+    return this.inner.getById(candidates[0])?.check;
   }
 }
 
 /** Default global registry — checks auto-register here on import */
 export const defaultRegistry = new CheckRegistry();
 
-export {type Check} from './check-types.js';
+export { type Check } from './check-types.js';
