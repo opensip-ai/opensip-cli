@@ -1,125 +1,33 @@
-// @fitness-ignore-file toctou-race-condition -- synchronous Map.get/set in single-threaded Node.js runtime; no async gap between read and write
 /**
- * @fileoverview Language-aware parse cache.
+ * @fileoverview Language-aware parse cache — module-level helpers.
  *
- * Replaces the TS-hardcoded cache at framework/parse-cache.ts. Keyed by
- * (languageId, filePath, contentFingerprint). Parsing is delegated to the
- * LanguageAdapter resolved from defaultLanguageRegistry.
+ * The `LanguageParseCache` class definition lives in `parse-cache-class.ts`
+ * so `RunScope` (which holds a default `LanguageParseCache` field) and
+ * this module (which reads `currentScope()`) don't form an import cycle.
+ * The helpers in this file operate on a module-level default instance.
  *
  * Two access patterns:
  *
- *   1. The exported `initParseCache` / `clearParseCache` /
- *      `getParseTree` helpers operate on a module-level
- *      `defaultParseCache` instance. Production code (FitnessRecipe
- *      service, individual checks) uses these.
+ *   1. The exported `initParseCache` / `clearParseCache` / `getParseTree`
+ *      helpers operate on a module-level `defaultParseCache` instance.
+ *      Production code (FitnessRecipe service, individual checks) uses
+ *      these.
  *
- *   2. The exported `LanguageParseCache` class is constructible by
- *      tests (or tools that need an isolated cache). A test that
- *      `new LanguageParseCache(); cache.dispose()` no longer leaves
- *      the previous module-level setTimeout running, so the test
- *      runner's exit cleanliness check passes.
+ *   2. The exported `LanguageParseCache` class is constructible by tests
+ *      (or tools that need an isolated cache). A test that
+ *      `new LanguageParseCache(); cache.dispose()` no longer leaves the
+ *      module-level setTimeout running, so the test runner's exit
+ *      cleanliness check passes.
  */
 
 import { logger } from '../lib/logger.js'
+import { currentScope } from '../lib/run-scope.js'
 
-import { defaultLanguageRegistry } from './registry.js'
+import { LanguageParseCache } from './parse-cache-class.js'
 
 import type { LanguageAdapter } from './adapter.js'
 
-// 10 minutes — the cache is regenerated on every fitness run, so 10
-// minutes of staleness is the worst case for a check author who edits
-// a source file between runs in a long-lived process. Short enough to
-// avoid serving a tree that no longer matches the file on disk; long
-// enough that consecutive runs in a watch loop hit the cache.
-const AUTO_CLEAR_MS = 10 * 60 * 1000
-
-/**
- * Per-instance parse cache. Each instance owns its own parse-tree
- * `Map`, a sibling `filteredContent` `Map` (for language-specific
- * filtered-content caching keyed by raw content), and (optionally) an
- * auto-clear timer that fires `AUTO_CLEAR_MS` after the cache is
- * started.
- *
- * The two maps live together because they share the same lifecycle —
- * a fresh run starts both at empty, a `dispose()` clears both, and the
- * auto-clear timer drops both. The maps use different keys (parse-tree
- * map is keyed by adapter+filePath+fingerprint; filtered-content map
- * is keyed by raw content) because the two upstream call paths use
- * different identities.
- */
-export class LanguageParseCache {
-  private readonly cache = new Map<string, unknown>()
-  /**
-   * Language-specific filtered-content cache. Keyed by raw content
-   * string (no adapter or file path prefix) because the
-   * `filterContent(content)` API in `@opensip-tools/lang-typescript`
-   * is content-only. Phase 6 Task 6.4 moved this off a separate
-   * module-level Map; the merge is by lifecycle, not by key shape.
-   */
-  readonly filteredContent = new Map<string, unknown>()
-  private autoClearTimer: ReturnType<typeof setTimeout> | null = null
-
-  /**
-   * Start the auto-clear timer. Calling this twice resets the timer.
-   * Production code goes through `initParseCache()` (which targets the
-   * module-level instance); tests call this directly on a fresh
-   * instance. The timer is `unref`'d so it doesn't keep the process
-   * alive; `dispose()` clears it deterministically.
-   */
-  startAutoClear(): void {
-    if (this.autoClearTimer) clearTimeout(this.autoClearTimer)
-    this.autoClearTimer = setTimeout(() => {
-      this.cache.clear()
-      this.filteredContent.clear()
-      this.autoClearTimer = null
-    }, AUTO_CLEAR_MS)
-    this.autoClearTimer.unref()
-  }
-
-  getOrParse<TTree>(
-    adapter: LanguageAdapter<TTree>,
-    filePath: string,
-    content: string,
-  ): TTree | null {
-    // Cache key uses a fast content fingerprint to differentiate between raw
-    // content and code-only filtered content. content.length alone is insufficient
-    // because filterContent preserves length (replaces chars with same-length spaces).
-    // Using the first 64 chars + length provides practical uniqueness.
-    const fingerprint = content.slice(0, 64).replaceAll(/\s/g, '') + ':' + content.length
-    const key = `${adapter.id}:${filePath}:${fingerprint}`
-    const cached = this.cache.get(key) as TTree | undefined
-    if (cached !== undefined) return cached
-
-    const tree = adapter.parse(content, filePath)
-    if (tree === null) return null
-    this.cache.set(key, tree)
-    return tree
-  }
-
-  clear(): void {
-    this.cache.clear()
-    this.filteredContent.clear()
-  }
-
-  /**
-   * Clear the cache and any pending auto-clear timer. Tests that
-   * construct a fresh `LanguageParseCache()` should call `dispose()`
-   * before the test exits so the runner doesn't see a lingering
-   * timer handle.
-   */
-  dispose(): void {
-    this.cache.clear()
-    this.filteredContent.clear()
-    if (this.autoClearTimer) {
-      clearTimeout(this.autoClearTimer)
-      this.autoClearTimer = null
-    }
-  }
-
-  get size(): number {
-    return this.cache.size
-  }
-}
+export { LanguageParseCache } from './parse-cache-class.js'
 
 // =============================================================================
 // MODULE-LEVEL DEFAULT INSTANCE + COMPATIBILITY HELPERS
@@ -160,11 +68,21 @@ export function getParseTree<TTree>(
 }
 
 /**
- * Convenience: resolve the adapter for the file via the global registry,
- * then parse. Returns null when no adapter is registered for the extension.
+ * Convenience: resolve the adapter for the file via the current scope's
+ * language registry, then parse. Returns null when no adapter is
+ * registered for the extension. Throws when called outside runWithScope —
+ * engine work must run inside a RunScope so adapters resolve via
+ * cli.scope.languages.
  */
 export function getParseTreeForFile(filePath: string, content: string): unknown {
-  const adapter = defaultLanguageRegistry.forFile(filePath)
+  const scope = currentScope()
+  if (!scope) {
+    throw new Error(
+      'getParseTreeForFile() called outside runWithScope. ' +
+        'Engine work must run inside a RunScope so language adapters resolve via cli.scope.languages.',
+    )
+  }
+  const adapter = scope.languages.forFile(filePath)
   if (!adapter) {
     logger.debug({
       evt: 'lang.parse.no-adapter',

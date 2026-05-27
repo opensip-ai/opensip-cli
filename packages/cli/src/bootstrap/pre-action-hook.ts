@@ -26,8 +26,10 @@ import { existsSync } from 'node:fs';
 
 import { formatProjectHeader } from '@opensip-tools/cli-ui';
 import {
+  RunScope,
   checkSchemaCompat,
   detectPhantomRuntimes,
+  enterScope,
   generatePrefixedId,
   initLogFile,
   logger,
@@ -40,7 +42,7 @@ import {
   type ProjectContext,
 } from '@opensip-tools/core';
 
-import { setProjectContextForRun } from '../cli-context.js';
+import { getCurrentRegistriesForScope, getOrOpenDatastore, setProjectContextForRun } from '../cli-context.js';
 
 import { loadCliDefaults, mergeConfigDefaults } from './cli-defaults.js';
 
@@ -265,6 +267,26 @@ export function installPreActionHook(program: Command): void {
     // ToolCliContext.project can return it. The datastore getter
     // additionally checks scope === 'project' before opening SQLite.
     setProjectContextForRun(project);
+
+    // Enter the per-run AsyncLocalStorage scope so library functions
+    // deep in the call tree (currentScope() readers) see the bound
+    // language/tool registries + project context. enterWith propagates
+    // forward through the same async chain, so the action body invoked
+    // after this hook sees the same scope without needing a callback
+    // wrapper around the action — which Commander does not expose.
+    // (Phase 5 deferred Task 5.2 — close-out.)
+    const { languages, tools } = getCurrentRegistriesForScope();
+    enterScope(
+      new RunScope({
+        logger,
+        projectContext: project,
+        languages,
+        tools,
+        // Lazy datastore — same thunk as `ToolCliContext.scope.datastore`.
+        // SQLite is materialised only on first access.
+        datastore: () => getOrOpenDatastore(logger),
+      }),
+    );
 
     // 6. Imperative Project: header for non-Ink, project-scoped commands.
     const cmdName = actionCommand.name();

@@ -28,12 +28,15 @@
 import {
   RunScope,
   UnknownLiveViewError,
+  currentScope,
   logger as defaultLogger,
   resolveProjectPaths,
+  type LanguageRegistry,
   type LiveViewRenderer,
   type Logger,
   type ProjectContext,
   type ToolCliContext,
+  type ToolRegistry,
 } from '@opensip-tools/core';
 import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
 
@@ -49,11 +52,47 @@ import type { Command } from 'commander';
 
 let currentProjectContext: ProjectContext | undefined;
 let datastoreCache: DataStore | undefined;
+let currentLanguageRegistry: LanguageRegistry | undefined;
+let currentToolRegistry: ToolRegistry | undefined;
 
 /** Called by pre-action-hook once context is resolved for the run. */
 export function setProjectContextForRun(ctx: ProjectContext): void {
   currentProjectContext = ctx;
   datastoreCache = undefined;
+}
+
+/**
+ * Called by `main()` after constructing the per-invocation registries so
+ * the `ToolCliContext.scope` getter wires them into the per-run scope
+ * value. Replaces the previously-exported `defaultLanguageRegistry` /
+ * `defaultToolRegistry` module globals.
+ */
+export function setCliRegistriesForRun(opts: {
+  readonly languages: LanguageRegistry;
+  readonly tools: ToolRegistry;
+}): void {
+  currentLanguageRegistry = opts.languages;
+  currentToolRegistry = opts.tools;
+}
+
+/**
+ * Read the per-run registries set by `setCliRegistriesForRun`. Throws
+ * when the registries have not been set — that indicates a bootstrap
+ * ordering bug (the CLI composition root must call
+ * `setCliRegistriesForRun` before any preAction hook fires).
+ */
+export function getCurrentRegistriesForScope(): {
+  readonly languages: LanguageRegistry;
+  readonly tools: ToolRegistry;
+} {
+  if (!currentLanguageRegistry || !currentToolRegistry) {
+    throw new Error(
+      'getCurrentRegistriesForScope() called before setCliRegistriesForRun(). ' +
+        'main() must construct LanguageRegistry/ToolRegistry and call ' +
+        'setCliRegistriesForRun before any preAction hook runs.',
+    );
+  }
+  return { languages: currentLanguageRegistry, tools: currentToolRegistry };
 }
 
 /**
@@ -161,15 +200,17 @@ export function buildToolCliContext(
   const ctx: ToolCliContext = {
     program: opts.program,
     get scope(): RunScope {
-      // Construct a fresh RunScope view per access. The scope is a
-      // value type holding the current projectContext + a thunk for
-      // the lazy datastore open. Reading it inside a command action
-      // body sees the current state set by pre-action-hook.
-      //
-      // Phase 5 leaves the underlying `currentProjectContext` holder
-      // in place; Phase 6 / a follow-up plan retires the holder by
-      // moving scope construction into pre-action-hook and threading
-      // it via Commander's actionCommand state.
+      // The pre-action-hook constructs a RunScope and calls `enterScope`
+      // (AsyncLocalStorage.enterWith) so the scope is bound for the
+      // entire dynamic extent of the action body. `cli.scope` returns
+      // that entered scope so tools and `currentScope()` readers agree
+      // on identity.
+      const bound = currentScope();
+      if (bound) return bound;
+      // Fallback path: the rare reader that accesses `cli.scope` before
+      // the action body actually runs (e.g. a tool's `register(cli)`
+      // method touching scope during command registration). Construct a
+      // fresh scope view from the per-run holders.
       if (!currentProjectContext) {
         throw new Error(
           'ToolCliContext.scope accessed before pre-action-hook resolved the project context. ' +
@@ -177,10 +218,19 @@ export function buildToolCliContext(
             'during register(); only inside command action bodies.',
         );
       }
+      if (!currentLanguageRegistry || !currentToolRegistry) {
+        throw new Error(
+          'ToolCliContext.scope accessed before setCliRegistriesForRun(). ' +
+            'main() must construct LanguageRegistry/ToolRegistry and call ' +
+            'setCliRegistriesForRun before any tool action runs.',
+        );
+      }
       return new RunScope({
         logger: log,
         projectContext: currentProjectContext,
         datastore: () => getOrOpenDatastore(log),
+        languages: currentLanguageRegistry,
+        tools: currentToolRegistry,
       });
     },
     get project(): ProjectContext {

@@ -11,10 +11,18 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 
+import { RunScope, runWithScope } from '@opensip-tools/core'
 import { fileCache } from '@opensip-tools/fitness'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { checks } from '../index.js'
+
+// Engine reads `currentScope()?.languages` to dispatch the per-check
+// contentFilter. An empty scope makes applyContentFilter fall through
+// to its no-adapter "return raw" branch — matching the prior default-
+// registry behaviour when no TS adapter was registered in the test
+// process.
+const testScope = new RunScope()
 
 let cwd: string
 let written: string[] = []
@@ -36,7 +44,7 @@ function findCheck(slug: string) {
 async function runCheck(slug: string) {
   const check = findCheck(slug)
   await fileCache.prewarm(cwd, ['**/*'])
-  return check.run(cwd, { targetFiles: written })
+  return runWithScope(testScope, () => check.run(cwd, { targetFiles: written }))
 }
 
 beforeEach(() => {

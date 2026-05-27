@@ -22,9 +22,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 
-import { defaultLanguageRegistry } from '@opensip-tools/core'
+import { LanguageRegistry, RunScope, runWithScope } from '@opensip-tools/core'
 import { filterContent } from '@opensip-tools/lang-typescript'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 
 import { createFileAccessor } from '../file-accessor.js'
 
@@ -44,13 +44,17 @@ const inProcessTypescriptAdapter: LanguageAdapter = {
   stripComments: (s) => filterContent(s).codeNoComments,
 }
 
+let scope: RunScope
+
 beforeAll(() => {
-  defaultLanguageRegistry.register(inProcessTypescriptAdapter)
+  const reg = new LanguageRegistry()
+  reg.register(inProcessTypescriptAdapter)
+  scope = new RunScope({ languages: reg })
 })
 
-afterAll(() => {
-  defaultLanguageRegistry.clear()
-})
+function inScope<T>(fn: () => Promise<T>): Promise<T> {
+  return runWithScope(scope, fn)
+}
 
 async function writeTempFile(content: string): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'cf-dispatch-'))
@@ -62,65 +66,76 @@ async function writeTempFile(content: string): Promise<string> {
 describe('FileAccessor contentFilter dispatch', () => {
   describe('strip-strings — strings blanked, comments preserved', () => {
     it('preserves line-comment text so rules can scan markers', async () => {
-      const filePath = await writeTempFile(
-        `const a = 1\n// @swallow-ok intentional fallthrough\nconst b = 2`,
-      )
-      const accessor = createFileAccessor([filePath], { contentFilter: 'strip-strings' })
-      const content = await accessor.read(filePath)
+      await inScope(async () => {
+        const filePath = await writeTempFile(
+          `const a = 1\n// @swallow-ok intentional fallthrough\nconst b = 2`,
+        )
+        const accessor = createFileAccessor([filePath], { contentFilter: 'strip-strings' })
+        const content = await accessor.read(filePath)
 
-      expect(content).toContain('@swallow-ok')
-      expect(content).toContain('const a = 1')
-      expect(content).toContain('const b = 2')
+        expect(content).toContain('@swallow-ok')
+        expect(content).toContain('const a = 1')
+        expect(content).toContain('const b = 2')
+      })
     })
 
     it('preserves block-comment text including JSDoc directives', async () => {
-      const filePath = await writeTempFile(
-        `/** @deprecated use Y instead */\nexport function legacy() {}`,
-      )
-      const accessor = createFileAccessor([filePath], { contentFilter: 'strip-strings' })
-      const content = await accessor.read(filePath)
+      await inScope(async () => {
+        const filePath = await writeTempFile(
+          `/** @deprecated use Y instead */\nexport function legacy() {}`,
+        )
+        const accessor = createFileAccessor([filePath], { contentFilter: 'strip-strings' })
+        const content = await accessor.read(filePath)
 
-      expect(content).toContain('@deprecated')
-      expect(content).toContain('export function legacy')
+        expect(content).toContain('@deprecated')
+        expect(content).toContain('export function legacy')
+      })
     })
 
     it('blanks string-literal contents', async () => {
-      const filePath = await writeTempFile(`const url = 'phrase_in_string'`)
-      const accessor = createFileAccessor([filePath], { contentFilter: 'strip-strings' })
-      const content = await accessor.read(filePath)
+      await inScope(async () => {
+        const filePath = await writeTempFile(`const url = 'phrase_in_string'`)
+        const accessor = createFileAccessor([filePath], { contentFilter: 'strip-strings' })
+        const content = await accessor.read(filePath)
 
-      expect(content).not.toContain('phrase_in_string')
-      expect(content).toContain('const url = ')
+        expect(content).not.toContain('phrase_in_string')
+        expect(content).toContain('const url = ')
+      })
     })
   })
 
   describe('strip-strings-and-comments — both blanked', () => {
     it('blanks comment text so rules don\'t false-fire on prose', async () => {
-      const filePath = await writeTempFile(
-        `const a = 1\n// forbidden_phrase_in_comment\nconst b = 2`,
-      )
-      const accessor = createFileAccessor([filePath], { contentFilter: 'strip-strings-and-comments' })
-      const content = await accessor.read(filePath)
+      await inScope(async () => {
+        const filePath = await writeTempFile(
+          `const a = 1\n// forbidden_phrase_in_comment\nconst b = 2`,
+        )
+        const accessor = createFileAccessor([filePath], { contentFilter: 'strip-strings-and-comments' })
+        const content = await accessor.read(filePath)
 
-      expect(content).not.toContain('forbidden_phrase_in_comment')
-      expect(content).toContain('const a = 1')
-      expect(content).toContain('const b = 2')
+        expect(content).not.toContain('forbidden_phrase_in_comment')
+        expect(content).toContain('const a = 1')
+        expect(content).toContain('const b = 2')
+      })
     })
 
     it('blanks both strings and comments in the same content', async () => {
-      const filePath = await writeTempFile(
-        `const url = 'phrase_in_string' // phrase_in_comment`,
-      )
-      const accessor = createFileAccessor([filePath], { contentFilter: 'strip-strings-and-comments' })
-      const content = await accessor.read(filePath)
+      await inScope(async () => {
+        const filePath = await writeTempFile(
+          `const url = 'phrase_in_string' // phrase_in_comment`,
+        )
+        const accessor = createFileAccessor([filePath], { contentFilter: 'strip-strings-and-comments' })
+        const content = await accessor.read(filePath)
 
-      expect(content).not.toContain('phrase_in_string')
-      expect(content).not.toContain('phrase_in_comment')
+        expect(content).not.toContain('phrase_in_string')
+        expect(content).not.toContain('phrase_in_comment')
+      })
     })
   })
 
   describe('default (raw) — no filter applied', () => {
     it('preserves both strings and comments verbatim', async () => {
+      // raw passthrough doesn't need a scope; applyContentFilter short-circuits.
       const src = `const url = 'phrase'\n// also phrase`
       const filePath = await writeTempFile(src)
       const accessor = createFileAccessor([filePath]) // no contentFilter → raw passthrough

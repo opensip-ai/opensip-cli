@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import {
-  defaultToolRegistry,
+  ToolRegistry as ToolRegistryClass,
   type Tool,
   type ToolCliContext,
   type ToolRegistry,
@@ -146,13 +146,13 @@ describe('mountAllToolCommands', () => {
 
 describe('discoverAndRegisterToolPackages', () => {
   it('does not throw when there are no third-party tool packages on disk', async () => {
-    // Reset the registry to a clean state because the test runs in
-    // process with other tests that may have populated it.
-    defaultToolRegistry.clear();
+    // Per-test fresh ToolRegistry (the previously-exported
+    // `defaultToolRegistry` module singleton was removed in T1 cleanup).
+    const registry = new ToolRegistryClass();
     const empty = mkdtempSync(join(tmpdir(), 'opensip-discover-test-'));
     try {
       await expect(
-        discoverAndRegisterToolPackages(defaultToolRegistry, { projectDir: empty }),
+        discoverAndRegisterToolPackages(registry, { projectDir: empty }),
       ).resolves.toBeUndefined();
     } finally {
       rmSync(empty, { recursive: true, force: true });

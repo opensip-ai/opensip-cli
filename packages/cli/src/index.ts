@@ -11,8 +11,8 @@ import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
-  defaultLanguageRegistry,
-  defaultToolRegistry,
+  LanguageRegistry,
+  ToolRegistry,
   logger,
   readPackageVersion,
 } from '@opensip-tools/core';
@@ -25,7 +25,7 @@ import {
   mountAllToolCommands,
   renderResult,
 } from './bootstrap/index.js';
-import { buildToolCliContext, createLiveViewRegistry, getOrOpenDatastore } from './cli-context.js';
+import { buildToolCliContext, createLiveViewRegistry, getOrOpenDatastore, setCliRegistriesForRun } from './cli-context.js';
 import { registerCliCommands } from './commands/index.js';
 import { handleFatalBootstrapError, handleParseError } from './error-handler.js';
 import { maybeNotify } from './update-notifier.js';
@@ -40,12 +40,22 @@ const program = new Command('opensip-tools')
 installPreActionHook(program);
 
 async function main(): Promise<void> {
+  // Fresh registries per CLI invocation — the previously-exported
+  // `defaultLanguageRegistry` / `defaultToolRegistry` module globals are
+  // gone (Phase 5 deferred Task 5.4). Tools read these via
+  // `cli.scope.languages` / `cli.scope.tools`; bootstrap populates them
+  // here and `setCliRegistriesForRun` makes them visible to the
+  // `ToolCliContext.scope` getter via cli-context's per-run holders.
+  const langRegistry = new LanguageRegistry();
+  const toolRegistry = new ToolRegistry();
+  setCliRegistriesForRun({ languages: langRegistry, tools: toolRegistry });
+
   // v2 persistence: datastore is opened LAZILY in cli-context.ts on
   // first access via getOrOpenDatastore. bootstrapCli just registers
   // tools and adapters; no SQLite file is created here.
   await bootstrapCli({
-    langRegistry: defaultLanguageRegistry,
-    toolRegistry: defaultToolRegistry,
+    langRegistry,
+    toolRegistry,
     projectDir: dirname(dirname(fileURLToPath(import.meta.url))),
   });
 
@@ -54,7 +64,7 @@ async function main(): Promise<void> {
     maybeOpenDashboard, logger,
   });
 
-  mountAllToolCommands(defaultToolRegistry, ctx);
+  mountAllToolCommands(toolRegistry, ctx);
   registerCliCommands(program, {
     setExitCode: ctx.setExitCode,
     render: renderResult,

@@ -107,8 +107,9 @@ export interface ToolCliContext {
    * Per-run resources (logger, parseCache, registries, datastore,
    * recipeCheckConfig, projectContext). Constructed once per CLI
    * invocation by the bootstrap; tools should prefer `cli.scope.foo`
-   * over reaching into any module-level singleton (e.g. don't import
-   * `defaultToolRegistry` — use `cli.scope.tools` instead).
+   * over reaching into any module-level singleton (the previously-
+   * exported `defaultToolRegistry`/`defaultLanguageRegistry` are gone —
+   * use `cli.scope.tools` / `cli.scope.languages` instead).
    *
    * For back-compat during the Phase 5 migration, `cli.project`,
    * `cli.logger`, and `cli.datastore` continue to work as alias

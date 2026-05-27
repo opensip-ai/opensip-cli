@@ -6,17 +6,13 @@
  * parse otherwise. Both branches are exercised here.
  */
 
-import { defaultLanguageRegistry } from '@opensip-tools/core'
+import { LanguageRegistry, RunScope, runWithScopeSync } from '@opensip-tools/core'
 import ts from 'typescript'
-import { afterEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 import { getSharedSourceFile } from '../parse-cache.js'
 
 import type { LanguageAdapter } from '@opensip-tools/core'
-
-afterEach(() => {
-  defaultLanguageRegistry.clear()
-})
 
 describe('getSharedSourceFile — fallback (no adapter registered)', () => {
   it('returns a TypeScript SourceFile for valid TS content', () => {
@@ -39,7 +35,7 @@ describe('getSharedSourceFile — fallback (no adapter registered)', () => {
 })
 
 describe('getSharedSourceFile — adapter-backed cache hit', () => {
-  it('routes through getParseTree when a TypeScript adapter is registered', () => {
+  it('routes through getParseTree when a TypeScript adapter is registered in the scope', () => {
     let parseCount = 0
     const tsAdapter: LanguageAdapter<ts.SourceFile> = {
       id: 'typescript',
@@ -51,9 +47,11 @@ describe('getSharedSourceFile — adapter-backed cache hit', () => {
       stripStrings: (s) => s,
       stripComments: (s) => s,
     }
-    defaultLanguageRegistry.register(tsAdapter)
+    const reg = new LanguageRegistry()
+    reg.register(tsAdapter)
+    const scope = new RunScope({ languages: reg })
 
-    const sf = getSharedSourceFile('virt.ts', 'const x = 1')
+    const sf = runWithScopeSync(scope, () => getSharedSourceFile('virt.ts', 'const x = 1'))
     expect(sf).not.toBeNull()
     expect(sf?.fileName).toBe('virt.ts')
     expect(parseCount).toBeGreaterThanOrEqual(1)

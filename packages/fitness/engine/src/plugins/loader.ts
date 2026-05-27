@@ -13,7 +13,7 @@
  */
 
 import {
-  defaultLanguageRegistry,
+  currentScope,
   loadAllPlugins as coreLoadAllPlugins,
   loadPlugin as coreLoadPlugin,
   registerRecipesFromMod,
@@ -138,7 +138,14 @@ function registerLangExports(
     if (!looksLikeLanguageAdapter(value)) return
     const id = (value as { id: string }).id
     if (registeredAdapterIds.has(id)) return
-    defaultLanguageRegistry.register(value as Parameters<typeof defaultLanguageRegistry.register>[0])
+    const scope = currentScope()
+    if (!scope) {
+      throw new Error(
+        'fitness plugin loader: language adapter registration attempted outside runWithScope. ' +
+          'Plugin loading must run inside a RunScope so adapters land in cli.scope.languages.',
+      )
+    }
+    scope.languages.register(value as Parameters<typeof scope.languages.register>[0])
     registeredAdapterIds.add(id)
     adaptersRegistered++
     ctx.debug('plugin.loader.adapter.registered', { source: sourceLabel, id })

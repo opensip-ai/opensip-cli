@@ -14,4 +14,4 @@ export type {
   LiveViewRenderer,
 } from './types.js';
 export { UnknownLiveViewError } from './types.js';
-export { ToolRegistry, defaultToolRegistry } from './registry.js';
+export { ToolRegistry } from './registry.js';

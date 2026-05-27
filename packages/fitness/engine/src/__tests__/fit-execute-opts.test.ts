@@ -19,6 +19,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { SessionRepo } from '@opensip-tools/contracts';
+import { LanguageRegistry, RunScope, runWithScope } from '@opensip-tools/core';
 import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -74,9 +75,15 @@ function makeArgs(cwd: string): CliArgs {
   };
 }
 
+function withFitScope<T>(fn: () => Promise<T>): Promise<T> {
+  // executeFit reads `currentScope()?.languages` — wrap each call in a
+  // fresh scope so the validation step finds an (empty) registry.
+  return runWithScope(new RunScope({ languages: new LanguageRegistry() }), fn);
+}
+
 describe('executeFit — opts threading (v2 persistence)', () => {
   it('persists a session via SessionRepo when datastore is supplied', async () => {
-    const fitResult = await executeFit(makeArgs(projectDir), { datastore });
+    const fitResult = await withFitScope(() => executeFit(makeArgs(projectDir), { datastore }));
     // Sanity — executeFit shouldn't error on a minimal project.
     expect(fitResult.result.type).not.toBe('error');
 
@@ -87,7 +94,7 @@ describe('executeFit — opts threading (v2 persistence)', () => {
   });
 
   it('does not write a session when datastore is omitted', async () => {
-    const fitResult = await executeFit(makeArgs(projectDir));
+    const fitResult = await withFitScope(() => executeFit(makeArgs(projectDir)));
     expect(fitResult.result.type).not.toBe('error');
 
     // The shared datastore in this test was opened via beforeEach but
@@ -98,11 +105,13 @@ describe('executeFit — opts threading (v2 persistence)', () => {
 
   it('invokes onProgress when supplied', async () => {
     const calls: { completed: number; total: number }[] = [];
-    const fitResult = await executeFit(makeArgs(projectDir), {
-      onProgress: (completed, total) => {
-        calls.push({ completed, total });
-      },
-    });
+    const fitResult = await withFitScope(() =>
+      executeFit(makeArgs(projectDir), {
+        onProgress: (completed, total) => {
+          calls.push({ completed, total });
+        },
+      }),
+    );
     expect(fitResult.result.type).not.toBe('error');
     // Even with zero registered checks the recipe service may yield no
     // tick, so the contract is "accepts the callback without throwing".

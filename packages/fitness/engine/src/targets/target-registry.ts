@@ -15,7 +15,7 @@
  * practical benefit and would complicate every call site that queries targets.
  */
 
-import { Registry, defaultLanguageRegistry, type Registerable } from '@opensip-tools/core'
+import { Registry, currentScope, type Registerable } from '@opensip-tools/core'
 
 import type { Target } from './types.js'
 
@@ -23,10 +23,12 @@ import type { Target } from './types.js'
  * Map a language string (canonical id or alias) to its canonical adapter id.
  * Falls back to a lowercased copy when the language isn't registered, so
  * scope-matching still treats unknown ids as themselves rather than
- * losing them entirely.
+ * losing them entirely. Falls back to lowercase also when no scope is
+ * bound (test contexts that don't wire a scope) — preserves prior behaviour
+ * of treating unknown adapters as themselves.
  */
 function toCanonical(lang: string): string {
-  return defaultLanguageRegistry.canonicalize(lang) ?? lang.toLowerCase()
+  return currentScope()?.languages.canonicalize(lang) ?? lang.toLowerCase()
 }
 
 interface RegisterableTarget extends Registerable {
@@ -100,7 +102,7 @@ export class TargetRegistry {
    * - A target matches concerns if the intersection is non-empty (or either side is empty/undefined)
    *
    * Language strings are canonicalised on both sides through
-   * {@link defaultLanguageRegistry.canonicalize}, so a target written
+   * the scope's `languages.canonicalize`, so a target written
    * with `languages: ['c']` matches a check scoped to `cpp`, and a
    * target with `languages: ['rs']` matches `rust`-scoped checks.
    *

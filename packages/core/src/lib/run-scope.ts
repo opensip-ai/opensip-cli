@@ -20,16 +20,14 @@
 
 import { AsyncLocalStorage } from 'node:async_hooks';
 
-import { LanguageParseCache } from '../languages/parse-cache.js';
-import { defaultLanguageRegistry } from '../languages/registry.js';
-import { defaultToolRegistry } from '../tools/registry.js';
+import { LanguageParseCache } from '../languages/parse-cache-class.js';
+import { LanguageRegistry } from '../languages/registry.js';
+import { ToolRegistry } from '../tools/registry.js';
 
 import { logger as defaultLogger } from './logger.js';
 
 import type { Logger } from './logger.js';
 import type { ProjectContext } from './project-context.js';
-import type { LanguageRegistry } from '../languages/registry.js';
-import type { ToolRegistry } from '../tools/registry.js';
 
 /** Opaque slot for per-run recipe configuration (replaces globalThis Symbol). */
 export interface RecipeCheckConfigSlot {
@@ -84,13 +82,15 @@ export interface RunScopeOptions {
  * `ToolCliContext.scope` (Phase 5). Tools read `cli.scope.foo`
  * instead of reaching into module globals (the T1 invariant).
  *
- * Defaults preserve back-compat: when no overrides are provided, the
- * scope wires up the existing `defaultLogger`, a fresh
- * `LanguageParseCache`, `defaultToolRegistry`, and
- * `defaultLanguageRegistry`. This lets the CLI bootstrap migrate
- * incrementally: construct a scope, the tools that haven't been
- * updated yet still see the same module-global registries through
- * the scope's defaults.
+ * Defaults: when no overrides are provided, the scope wires up the
+ * default `Logger`, a fresh `LanguageParseCache`, and FRESH empty
+ * `ToolRegistry` / `LanguageRegistry` instances. The CLI bootstrap
+ * constructs and populates one pair per run and passes them in via
+ * `RunScopeOptions` so language adapters and tool plugins land where
+ * `currentScope()?.languages` / `.tools` will find them. Tests that
+ * exercise registry-aware code paths must either construct a populated
+ * registry and pass it in, or register fixtures into `scope.languages`
+ * inside the test body's `runWithScope` block.
  */
 export class RunScope {
   readonly logger: Logger;
@@ -108,8 +108,8 @@ export class RunScope {
     this.projectContext = opts.projectContext;
     // eslint-disable-next-line unicorn/no-useless-undefined -- explicit no-store sentinel matches the prior `cli.datastore` contract (tools cast to `DataStore | undefined`).
     this.datastore = opts.datastore ?? (() => undefined);
-    this.tools = opts.tools ?? defaultToolRegistry;
-    this.languages = opts.languages ?? defaultLanguageRegistry;
+    this.tools = opts.tools ?? new ToolRegistry();
+    this.languages = opts.languages ?? new LanguageRegistry();
   }
 
   /** Release per-run resources (caches, recipe-config slot). */
@@ -144,6 +144,20 @@ export function runWithScope<T>(scope: RunScope, fn: () => Promise<T>): Promise<
 /** Synchronous variant of `runWithScope`. */
 export function runWithScopeSync<T>(scope: RunScope, fn: () => T): T {
   return scopeStorage.run(scope, fn);
+}
+
+/**
+ * Set `scope` as the current scope for the rest of the calling async
+ * context — without needing a callback wrapper. Backed by
+ * `AsyncLocalStorage.enterWith`. Use this in Commander's `preAction`
+ * hook where the action body runs after the hook returns but in the
+ * same async chain: `enterWith` propagates the scope forward without
+ * needing to wrap the action invocation, which Commander does not let
+ * us do directly. Throws on misuse: an existing scope must NOT be
+ * replaced silently (call `runWithScope` for nested scopes).
+ */
+export function enterScope(scope: RunScope): void {
+  scopeStorage.enterWith(scope);
 }
 
 /** Read the current scope. Returns undefined when called outside a runWithScope. */

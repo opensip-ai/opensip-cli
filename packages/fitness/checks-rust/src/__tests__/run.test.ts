@@ -10,9 +10,16 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+import { LanguageRegistry, RunScope, runWithScope } from '@opensip-tools/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { noDbgMacro } from '../checks/no-dbg-macro.js'
+
+// applyContentFilter resolves the file's adapter via `currentScope()?.languages`
+// (default registry global was removed in T1 cleanup). With no adapter
+// registered for `.rs`, applyContentFilter falls through to raw content.
+// Wrap the call in an empty scope so dispatch reaches that no-adapter branch.
+const emptyScope = new RunScope({ languages: new LanguageRegistry() })
 
 let cwd: string
 let target: string
@@ -35,7 +42,9 @@ afterAll(() => {
 
 describe('noDbgMacro.run() execution coverage', () => {
   it('runs end-to-end against a Rust fixture with a dbg!() call', async () => {
-    const result = await noDbgMacro.run(cwd, { targetFiles: [target] })
+    const result = await runWithScope(emptyScope, () =>
+      noDbgMacro.run(cwd, { targetFiles: [target] }),
+    )
 
     expect(result).toBeDefined()
     expect(Array.isArray(result.signals)).toBe(true)

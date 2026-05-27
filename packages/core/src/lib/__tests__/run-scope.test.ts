@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 
 import { LanguageParseCache } from '../../languages/parse-cache.js';
-import { defaultLanguageRegistry } from '../../languages/registry.js';
-import { defaultToolRegistry } from '../../tools/registry.js';
+import { LanguageRegistry } from '../../languages/registry.js';
+import { ToolRegistry } from '../../tools/registry.js';
 import { logger as defaultLogger } from '../logger.js';
 import { RunScope, runWithScope, runWithScopeSync, currentScope } from '../run-scope.js';
 
@@ -11,8 +11,11 @@ describe('RunScope — construction', () => {
     const scope = new RunScope();
     expect(scope.logger).toBe(defaultLogger);
     expect(scope.parseCache).toBeInstanceOf(LanguageParseCache);
-    expect(scope.tools).toBe(defaultToolRegistry);
-    expect(scope.languages).toBe(defaultLanguageRegistry);
+    // Fresh empty registries by default — module-level singletons removed in T1 cleanup.
+    expect(scope.tools).toBeInstanceOf(ToolRegistry);
+    expect(scope.languages).toBeInstanceOf(LanguageRegistry);
+    expect(scope.tools.list()).toHaveLength(0);
+    expect(scope.languages.list()).toHaveLength(0);
     expect(scope.projectContext).toBeUndefined();
     expect(scope.recipeCheckConfig).toBeDefined();
     scope.dispose();

@@ -146,6 +146,3 @@ export class LanguageRegistry {
     this.aliasIndex.clear()
   }
 }
-
-/** Default global registry — language packs register here on load. */
-export const defaultLanguageRegistry = new LanguageRegistry()

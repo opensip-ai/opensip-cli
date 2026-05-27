@@ -68,6 +68,3 @@ export class ToolRegistry {
     this.inner.clear();
   }
 }
-
-/** Process-wide tool registry. The CLI uses this. */
-export const defaultToolRegistry = new ToolRegistry();

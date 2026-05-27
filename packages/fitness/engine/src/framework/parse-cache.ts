@@ -13,7 +13,7 @@
  */
 
 
-import { getParseTree, defaultLanguageRegistry } from '@opensip-tools/core'
+import { getParseTree, currentScope } from '@opensip-tools/core'
 import ts from 'typescript'
 
 /**
@@ -24,7 +24,7 @@ import ts from 'typescript'
  * should import getSharedSourceFile from @opensip-tools/lang-typescript.
  */
 export function getSharedSourceFile(filePath: string, content: string): ts.SourceFile | null {
-  const adapter = defaultLanguageRegistry.get('typescript')
+  const adapter = currentScope()?.languages.get('typescript')
   if (adapter) {
     return getParseTree(adapter, filePath, content) as ts.SourceFile | null
   }

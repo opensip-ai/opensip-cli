@@ -17,7 +17,7 @@
  * and the mismatch is intentional — do not collapse them:
  *
  *   - `metadata.id = 'fitness'` is the package-wide tool identifier
- *     (conflict-detection key in `defaultToolRegistry`).
+ *     (conflict-detection key in the CLI-managed tool registry).
  *
  *   - `FIT_LIVE_VIEW_KEY = 'fit'` is the live-view key. Used to call
  *     `cli.registerLiveView('fit', renderer)` and consumed by

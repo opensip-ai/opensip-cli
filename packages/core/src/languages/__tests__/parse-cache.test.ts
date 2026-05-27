@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
+import { RunScope, runWithScopeSync } from '../../lib/run-scope.js'
 import {
   LanguageParseCache,
   clearParseCache,
@@ -7,7 +8,7 @@ import {
   getParseTreeForFile,
   initParseCache,
 } from '../parse-cache.js'
-import { defaultLanguageRegistry } from '../registry.js'
+import { LanguageRegistry } from '../registry.js'
 
 import type { LanguageAdapter } from '../adapter.js'
 
@@ -30,14 +31,15 @@ function makeAdapter(id: string, exts: readonly string[]): LanguageAdapter<FakeT
 }
 
 describe('language-aware parse cache', () => {
+  let testRegistry: LanguageRegistry
+
   beforeEach(() => {
     nextId = 0
-    defaultLanguageRegistry.clear()
+    testRegistry = new LanguageRegistry()
     clearParseCache()
   })
 
   afterEach(() => {
-    defaultLanguageRegistry.clear()
     clearParseCache()
   })
 
@@ -82,17 +84,26 @@ describe('language-aware parse cache', () => {
 
   it('getParseTreeForFile returns null when no adapter claims the extension', () => {
     initParseCache()
-    const result = getParseTreeForFile('foo.unknown', 'content')
+    const scope = new RunScope({ languages: testRegistry })
+    const result = runWithScopeSync(scope, () => getParseTreeForFile('foo.unknown', 'content'))
     expect(result).toBeNull()
   })
 
   it('getParseTreeForFile resolves the adapter and parses', () => {
     initParseCache()
     const adapter = makeAdapter('rust', ['.rs'])
-    defaultLanguageRegistry.register(adapter)
-    const result = getParseTreeForFile('foo.rs', 'fn main() {}') as FakeTree | null
+    testRegistry.register(adapter)
+    const scope = new RunScope({ languages: testRegistry })
+    const result = runWithScopeSync(scope, () =>
+      getParseTreeForFile('foo.rs', 'fn main() {}'),
+    ) as FakeTree | null
     expect(result).not.toBeNull()
     expect(result?.content).toBe('fn main() {}')
+  })
+
+  it('getParseTreeForFile throws when called outside runWithScope', () => {
+    initParseCache()
+    expect(() => getParseTreeForFile('foo.rs', 'fn main() {}')).toThrow(/outside runWithScope/)
   })
 
   it('clearParseCache zeros the cache', () => {

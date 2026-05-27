@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { defaultLanguageRegistry } from '@opensip-tools/core'
+import { LanguageRegistry, RunScope, runWithScope } from '@opensip-tools/core'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { loadAllPlugins, loadPlugin } from '../loader.js'
@@ -10,16 +10,22 @@ import { loadAllPlugins, loadPlugin } from '../loader.js'
 import type { DiscoveredPlugin } from '@opensip-tools/core'
 
 let testDir: string
+let langRegistry: LanguageRegistry
+let scope: RunScope
 
 beforeEach(() => {
   testDir = mkdtempSync(join(tmpdir(), 'opensip-lang-domain-'))
-  defaultLanguageRegistry.clear()
+  langRegistry = new LanguageRegistry()
+  scope = new RunScope({ languages: langRegistry })
 })
 
 afterEach(() => {
   rmSync(testDir, { recursive: true, force: true })
-  defaultLanguageRegistry.clear()
 })
+
+function inScope<T>(fn: () => Promise<T>): Promise<T> {
+  return runWithScope(scope, fn)
+}
 
 describe('lang plugin domain', () => {
   it('registers adapters from a lang plugin', async () => {
@@ -41,11 +47,11 @@ describe('lang plugin domain', () => {
       source: 'lang-fake.mjs',
     }
 
-    const result = await loadPlugin(plugin, 'lang')
+    const result = await inScope(() => loadPlugin(plugin, 'lang'))
     expect(result.error).toBeUndefined()
     expect(result.adaptersRegistered).toBe(1)
-    expect(defaultLanguageRegistry.get('fake-rust')).toBeDefined()
-    expect(defaultLanguageRegistry.forFile('demo.fakers')?.id).toBe('fake-rust')
+    expect(langRegistry.get('fake-rust')).toBeDefined()
+    expect(langRegistry.forFile('demo.fakers')?.id).toBe('fake-rust')
   })
 
   it('does not register checks when loading in lang domain', async () => {
@@ -62,7 +68,7 @@ describe('lang plugin domain', () => {
       source: 'lang-with-checks.mjs',
     }
 
-    const result = await loadPlugin(plugin, 'lang')
+    const result = await inScope(() => loadPlugin(plugin, 'lang'))
     expect(result.checksRegistered).toBe(0)
     expect(result.adaptersRegistered).toBe(0)
   })
@@ -78,7 +84,7 @@ describe('lang plugin domain', () => {
       source: 'lang-empty.mjs',
     }
 
-    const result = await loadPlugin(plugin, 'lang')
+    const result = await inScope(() => loadPlugin(plugin, 'lang'))
     expect(result.adaptersRegistered).toBe(0)
     expect(result.error).toBeUndefined()
   })
@@ -96,7 +102,7 @@ describe('lang plugin domain', () => {
       source: 'lang-non-array.mjs',
     }
 
-    const result = await loadPlugin(plugin, 'lang')
+    const result = await inScope(() => loadPlugin(plugin, 'lang'))
     expect(result.error).toBeUndefined()
     expect(result.adaptersRegistered).toBe(0)
   })
@@ -118,9 +124,9 @@ describe('lang plugin domain', () => {
       source: 'lang-bad-item.mjs',
     }
 
-    const result = await loadPlugin(plugin, 'lang')
+    const result = await inScope(() => loadPlugin(plugin, 'lang'))
     expect(result.adaptersRegistered).toBe(1)
-    expect(defaultLanguageRegistry.get('good')).toBeDefined()
+    expect(langRegistry.get('good')).toBeDefined()
   })
 
   it('registers adapters exported as named exports (no array wrapper)', async () => {
@@ -142,10 +148,10 @@ describe('lang plugin domain', () => {
       source: 'lang-named-export.mjs',
     }
 
-    const result = await loadPlugin(plugin, 'lang')
+    const result = await inScope(() => loadPlugin(plugin, 'lang'))
     expect(result.error).toBeUndefined()
     expect(result.adaptersRegistered).toBe(1)
-    expect(defaultLanguageRegistry.get('fake-lang-named')).toBeDefined()
+    expect(langRegistry.get('fake-lang-named')).toBeDefined()
   })
 
   it('registers an adapter from default export', async () => {
@@ -167,10 +173,10 @@ describe('lang plugin domain', () => {
       source: 'lang-default.mjs',
     }
 
-    const result = await loadPlugin(plugin, 'lang')
+    const result = await inScope(() => loadPlugin(plugin, 'lang'))
     expect(result.error).toBeUndefined()
     expect(result.adaptersRegistered).toBe(1)
-    expect(defaultLanguageRegistry.get('fake-lang-default')).toBeDefined()
+    expect(langRegistry.get('fake-lang-default')).toBeDefined()
   })
 
   it('deduplicates adapters appearing in both array and named export', async () => {
@@ -193,7 +199,7 @@ describe('lang plugin domain', () => {
       source: 'lang-dedup.mjs',
     }
 
-    const result = await loadPlugin(plugin, 'lang')
+    const result = await inScope(() => loadPlugin(plugin, 'lang'))
     expect(result.error).toBeUndefined()
     expect(result.adaptersRegistered).toBe(1)
   })
@@ -206,7 +212,7 @@ describe('lang plugin domain', () => {
     // discovers nothing rather than reading from a stray directory.
     const baseDir = mkdtempSync(join(tmpdir(), 'opensip-lang-base-'))
     try {
-      const result = await loadAllPlugins('lang', baseDir)
+      const result = await inScope(() => loadAllPlugins('lang', baseDir))
       expect(result.totalAdapters).toBe(0)
       expect(result.plugins).toHaveLength(0)
     } finally {
