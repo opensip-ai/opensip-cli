@@ -58,12 +58,26 @@ const MAX_LOG_AGE_DAYS = 7;
  * need an isolated logger; everywhere else the typed `logger`
  * singleton is the right import.
  */
+/**
+ * Construction-time options for `LoggerImpl`. Replaces the prior
+ * `setLogLevel(level)` free mutator — callers that need a non-default
+ * level construct a fresh logger with `new LoggerImpl({ level })`.
+ */
+export interface LoggerOptions {
+  /** Initial log level. Defaults to `'warn'`. */
+  readonly level?: LogLevel;
+}
+
 export class LoggerImpl implements Logger {
-  private currentLevel: LogLevel = 'warn';
+  private currentLevel: LogLevel;
   private silent = false;
   private debugMode = false;
   private runId: string | undefined;
   private logFilePath: string | undefined;
+
+  constructor(opts: LoggerOptions = {}) {
+    this.currentLevel = opts.level ?? 'warn';
+  }
 
   debug(msgOrObj: string | Record<string, unknown>, data?: Record<string, unknown>): void {
     this.log('debug', msgOrObj, data);
@@ -76,10 +90,6 @@ export class LoggerImpl implements Logger {
   }
   error(msgOrObj: string | Record<string, unknown>, data?: Record<string, unknown>): void {
     this.log('error', msgOrObj, data);
-  }
-
-  setLogLevel(level: LogLevel): void {
-    this.currentLevel = level;
   }
 
   setSilent(value: boolean): void {
@@ -229,10 +239,6 @@ function pruneOldLogs(dir: string): void {
  */
 const _logger = new LoggerImpl();
 export const logger: Logger = _logger;
-
-export function setLogLevel(level: LogLevel): void {
-  _logger.setLogLevel(level);
-}
 
 export function setSilent(value: boolean): void {
   _logger.setSilent(value);
