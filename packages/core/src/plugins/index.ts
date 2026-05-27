@@ -49,6 +49,13 @@ export type {
   MarkerDiscoveryOptions,
   DiscoveredMarkerPackage,
 } from './marker-discovery.js'
+export {
+  registerRecipesFromMod,
+} from './recipe-loader.js'
+export type {
+  RegisterRecipesOptions,
+  RegisterRecipesResult,
+} from './recipe-loader.js'
 export type {
   PluginDomain,
   DiscoveredPlugin,
