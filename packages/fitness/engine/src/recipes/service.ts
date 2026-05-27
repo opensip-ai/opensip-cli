@@ -7,7 +7,7 @@
  * coordinates parallel/sequential execution, and builds results.
  */
 
-import { logger , NotFoundError, SystemError , generateId , initParseCache, clearParseCache } from '@opensip-tools/core'
+import { logger , NotFoundError, SystemError , generateId , initParseCache, clearParseCache, RunScope, currentScope, runWithScope } from '@opensip-tools/core'
 
 import { fileCache, DEFAULT_PREWARM_PATTERNS } from '../framework/file-cache.js'
 import { defaultRegistry, type Check, type CheckRegistry } from '../framework/registry.js'
@@ -109,6 +109,23 @@ export class FitnessRecipeService {
   }
 
   private async executeRecipe(recipe: FitnessRecipe): Promise<FitnessRecipeResult> {
+    // Two paths: if we're already inside a `runWithScope`, project the
+    // recipe-config slot onto the existing scope and run inline. Otherwise
+    // construct an ad-hoc scope and enter `runWithScope` so the dynamic
+    // extent of the recipe-execution body (including every check's
+    // `getCheckConfig(slug)` lookup) sees the recipe's per-check config.
+    const existing = currentScope()
+    if (existing) {
+      return this.executeRecipeInScope(recipe, existing)
+    }
+    const adhoc = new RunScope()
+    return runWithScope(adhoc, () => this.executeRecipeInScope(recipe, adhoc))
+  }
+
+  private async executeRecipeInScope(
+    recipe: FitnessRecipe,
+    recipeScope: RunScope,
+  ): Promise<FitnessRecipeResult> {
     const sessionId = this.generateSessionId()
     this.activeSession = this.createSession(sessionId, recipe)
 
@@ -116,10 +133,10 @@ export class FitnessRecipeService {
 
     logger.info('Starting recipe session', { evt: 'fitness.recipe.session.start', module: MODULE_FITNESS_RECIPES, sessionId, recipeName: recipe.name })
 
-    // Project the recipe's per-check config into module-level state so that
-    // individual checks can read their slice via getCheckConfig<T>(slug).
-    // Cleared in the `finally` below.
-    setCurrentRecipeCheckConfig(recipe.checks.config)
+    // Project the recipe's per-check config into the current scope's
+    // recipe-config slot so individual checks can read their slice via
+    // getCheckConfig<T>(slug). Cleared in the `finally` below.
+    setCurrentRecipeCheckConfig(recipeScope, recipe.checks.config)
 
     try {
       const cwd = this.config.cwd ?? process.cwd()
@@ -172,7 +189,7 @@ export class FitnessRecipeService {
       }
       throw error
     } finally {
-      clearCurrentRecipeCheckConfig()
+      clearCurrentRecipeCheckConfig(recipeScope)
       void clearParseCache()
       fileCache.clear()
       this.abortController?.abort()
