@@ -232,5 +232,5 @@ The adapter doesn't know any of this. It just receives a path + content and retu
 
 ## What's next
 
-- **[`02-check-packs.md`](./02-check-packs.md)** — how check packs build on adapters: scope filters, parameterization, the marketplace shape.
+- **[`04-check-pack-architecture.md`](./04-check-pack-architecture.md)** — how check packs build on adapters: scope filters, parameterization, the marketplace shape.
 - **[`../70-reference/02-package-catalog.md`](../70-reference/02-package-catalog.md)** — every adapter package, key exports, where to find them.

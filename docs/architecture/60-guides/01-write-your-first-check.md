@@ -148,8 +148,8 @@ export const recipes = [{
 `checks: { type: 'tags', include: ['quality'] }` picks every check tagged `quality` — including your new `no-fixme-comments` check and any built-in checks with that tag. Other selectors:
 
 - `{ type: 'all' }` — every enabled check
-- `{ type: 'explicit', checkIds: ['no-fixme-comments', …] }` — exact list
-- `{ type: 'kind', kind: 'security' }` — every check with kind: security in its config
+- `{ type: 'pattern', include: ['no-*'] }` — slug glob
+- `{ type: 'explicit', checkIds: ['no-fixme-comments', …] }` — exact slug list
 
 Run the recipe:
 

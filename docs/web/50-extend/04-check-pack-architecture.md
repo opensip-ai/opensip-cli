@@ -28,7 +28,7 @@ A check pack is an npm package that contributes one or more `Check` objects. Sev
 
 > **What you'll understand after this:**
 > - The `FitPluginExports` shape every pack implements.
-> - The six bundled packs and what each contains.
+> - The seven bundled packs and what each contains.
 > - How scope filters keep checks from running on the wrong files.
 > - The pattern for parameterizing a check from the recipe layer.
 > - The author's pattern for shipping a third-party pack.
@@ -82,8 +82,8 @@ The [`collectCheckObjects`](https://github.com/opensip-ai/opensip-tools/blob/v2.
 
 | Pack | Path | Scope |
 |---|---|---|
-| `@opensip-tools/checks-universal` | `packages/fitness/checks-universal/` | Cross-language checks (text/regex/file shape), e.g. file-length, TODO scanners, security secret detection. ~92 checks. |
-| `@opensip-tools/checks-typescript` | `packages/fitness/checks-typescript/` | TypeScript-specific: complex-function via AST, dead-code detection, dependency rules, react/hook patterns. ~66 checks. |
+| `@opensip-tools/checks-universal` | `packages/fitness/checks-universal/` | Cross-language checks (text/regex/file shape), e.g. file-length, TODO scanners, security secret detection. ~90 checks. |
+| `@opensip-tools/checks-typescript` | `packages/fitness/checks-typescript/` | TypeScript-specific: complex-function via AST, dead-code detection, dependency rules, react/hook patterns. ~50 checks. |
 | `@opensip-tools/checks-python` | `packages/fitness/checks-python/` | Python-specific. Today ships `no-bare-except`. |
 | `@opensip-tools/checks-java` | `packages/fitness/checks-java/` | Java-specific. Today ships `no-printstacktrace`. |
 | `@opensip-tools/checks-go` | `packages/fitness/checks-go/` | Go-specific. Today ships `no-fmt-print`. |
@@ -277,6 +277,6 @@ The dashboard groups by category (universal pack's display map provides the icon
 
 ## What's next
 
-- **[`03-architecture-gate.md`](/docs/opensip-tools/50-extend/03-architecture-gate/)** — the regression-detection workflow built on top of check output.
+- **[`../10-concepts/05-architecture-gate.md`](/docs/opensip-tools/10-concepts/05-architecture-gate/)** — the regression-detection workflow built on top of check output.
 - **[`../50-extend/01-plugin-authoring.md`](/docs/opensip-tools/50-extend/01-plugin-authoring/)** — full walkthrough of authoring a pack from scratch.
 - **[`../70-reference/02-package-catalog.md`](/docs/opensip-tools/70-reference/02-package-catalog/)** — every pack's package, key exports, layer.

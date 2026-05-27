@@ -63,13 +63,13 @@ The five rules below are registered in [`rules/registry.ts`](https://github.com/
 
 The rule does a forward BFS from the entry-point seeds (computed by [`_entry-points.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/graph/engine/src/rules/_entry-points.ts), plus `config.entryPointHashes`) across `indexes.callees`. Any `FunctionOccurrence` not visited is flagged. This is *transitive* reachability, not a direct in-degree check — an entire chain of mutually-recursive helpers that nobody outside the chain calls is a single connected orphan subtree.
 
-**False-positive shape**: anything graph can't see is an unrecognized "entry point" until the inference learns about it. Today the inference recognizes `module-init`, `name-match` (`main`/`run`/`start`/`register`/`init`/`bootstrap`/`initialize`), and `no-callers-exported`. Pre-`v0.3` it does *not* recognize `bin`-field entries from `package.json`, framework route handlers, or hand-registered scenario/check entry points — those need to be added to the heuristic chain or declared via config.
+**False-positive shape**: anything graph can't see is an unrecognized entry point. Today the inference recognizes `module-init`, `name-match` (`main`/`run`/`start`/`register`/`init`/`bootstrap`/`initialize`), and `no-callers-exported`. It does not recognize `bin`-field entries from `package.json`, framework route handlers, or hand-registered scenario/check entry points unless they are declared via config.
 
 ### `graph:duplicated-function-body`
 
 [`rules/duplicated-function-body.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/graph/engine/src/rules/duplicated-function-body.ts) — group catalog entries by `bodyHash`; report any group with more than one occurrence (above a minimum-line threshold to skip trivial bodies like `return null`).
 
-**False-positive shape**: the rule matches function bodies *textually* and does not currently resolve called identifiers through lexical scope. A codebase using a wrapper-and-delegate convention (every check has an `analyze(content, filePath)` that delegates to a local `analyzeFile()`) produces a wave of false matches because every wrapper looks identical. The 2026-05-17 mitigation was a `minDuplicateBodySize` threshold (default 200 normalised chars) that suppresses thin-wrapper bodies; the deeper "two functions whose bodies textually match but whose called identifiers resolve to different declarations are not duplicates" invariant remains unenforced. Cross-package duplications (where lexical scope can't fool the rule) are the high-signal subset.
+**False-positive shape**: the rule matches function bodies *textually* and does not currently resolve called identifiers through lexical scope. Thin wrapper functions are suppressed by a `minDuplicateBodySize` threshold (default 200 normalized characters), but two larger functions with identical text and different lexical bindings can still look like duplicates. Cross-package duplications are the high-signal subset.
 
 ### `graph:no-side-effect-path`
 
@@ -85,9 +85,9 @@ This is the rule for catching "production helper that's only exercised by tests"
 
 ### `graph:always-throws-branch`
 
-[`rules/always-throws-branch.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/graph/engine/src/rules/always-throws-branch.ts) — flag functions whose every recorded outbound call looks like a `throw new Error(...)` shape. v0.2 ships a textual heuristic: each `CallEdge.text` is matched against `/^\s*throw\s+(?:new\s+)?[A-Z]\w*/`; if every call edge from the function matches, the function is treated as an always-throws helper masquerading as a real function.
+[`rules/always-throws-branch.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/graph/engine/src/rules/always-throws-branch.ts) — flag functions whose every recorded outbound call looks like a `throw new Error(...)` shape. The current implementation uses a textual heuristic: each `CallEdge.text` is matched against `/^\s*throw\s+(?:new\s+)?[A-Z]\w*/`; if every call edge from the function matches, the function is treated as an always-throws helper masquerading as a real function.
 
-True per-branch CFG analysis (every path through every if/else / switch case / try-catch arm ends in a throw) is deferred to v0.3 — the source comment in `always-throws-branch.ts` records the deferral. Until then, the heuristic catches the common shape (a function whose body is a precondition wall) at the cost of missing functions that throw under most but not all branches.
+This catches the common case — a function whose body is a precondition wall — but it is not full control-flow analysis. Functions that throw under most, but not all, branches may be missed.
 
 ### Entry-point inference
 
@@ -135,14 +135,14 @@ v2: the baseline lives in the project's SQLite store (`<project>/opensip-tools/.
 
 ### Signal fingerprints
 
-A fingerprint is a string identity for a finding, used to diff against the baseline. The shape is `${ruleId}|${filePath}|${line}|${message}` — see [`fingerprintSignal` in `gate.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/graph/engine/src/gate.ts). The line number is included, so fingerprints **do** change when a finding moves up or down the file. This is intentional for v0.2 (a smaller, simpler baseline); the trade-off is documented below.
+A fingerprint is a string identity for a finding, used to diff against the baseline. The shape is `${ruleId}|${filePath}|${line}|${message}` — see [`fingerprintSignal` in `gate.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/graph/engine/src/gate.ts). The line number is included, so fingerprints **do** change when a finding moves up or down the file.
 
 Two properties matter:
 
 1. **Stable across re-runs of the same source.** Re-running graph against an unchanged file produces the same fingerprint set; the gate is silent.
 2. **Sensitive to position and message.** Renames, line shifts, and message tweaks all generate new fingerprints. Run `--gate-save` after any cleanup pass that moves findings around to avoid spurious "new finding" reports on the next compare.
 
-A line-shift-invariant fingerprint (the way fit's gate works) is on the v0.3 roadmap — for now, treat the graph baseline as a snapshot to be re-saved after refactors.
+Treat the graph baseline as a snapshot to be re-saved after refactors that move findings around.
 
 ### Compare semantics
 
@@ -176,7 +176,7 @@ The SARIF mapping in [`render/sarif.ts`](https://github.com/opensip-ai/opensip-t
 | Function occurrence | `result.locations[0].physicalLocation.{artifactLocation,region}` |
 | Severity | `result.level` (`error` \| `warning`) |
 
-The graph SARIF reuses fitness's `buildSarifLog` (DEC-3) and emits the standard SARIF 2.1.0 fields. A `partialFingerprints` augmentation that would let GitHub's code-scanning UI dedupe across runs is on the roadmap; today the SARIF carries `ruleId` + location only.
+The graph SARIF reuses fitness's `buildSarifLog` (DEC-3) and emits the standard SARIF 2.1.0 fields. Today the SARIF carries `ruleId` + location only; fingerprinting remains part of the graph gate's SQLite baseline.
 
 Exit code 4 is reserved for `--report-to` upload failure (network error or non-2xx response). This separates "the gate said no" (exit 1) from "we couldn't tell the gate anything" (exit 4) — both fail the build but mean different things.
 

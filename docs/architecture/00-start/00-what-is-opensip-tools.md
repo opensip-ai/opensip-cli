@@ -49,7 +49,7 @@ Exit code is `0` when nothing broke the bar, non-zero when something did. That's
 ## What it does well
 
 - **Architectural rules.** "No module under `packages/cli/` may import from `packages/fitness/checks-*`." Linters can't say this; opensip-tools can, in 15 lines.
-- **Cross-language gates in one runner.** A polyglot repo gets one CI step, not six. 158+ checks ship in the box; 92 are language-agnostic, the rest target a specific language.
+- **Cross-language gates in one runner.** A polyglot repo gets one CI step, not six. 145+ checks ship in the box; 90 are language-agnostic, the rest target a specific language.
 - **CI surfacing.** Outputs SARIF for GitHub PR annotations. Baselines for "fail only on *new* violations" so you can adopt incrementally without rewriting the codebase first.
 
 ## What it deliberately isn't

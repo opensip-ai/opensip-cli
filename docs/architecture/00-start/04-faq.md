@@ -68,7 +68,7 @@ Use the **baseline gate flow.** Run `opensip-tools fit --gate-save` once to capt
 
 ### What languages does it support?
 
-`fit` runs against TypeScript / JavaScript, Python, Rust, Go, Java, and C/C++. Language detection is automatic (looks for `tsconfig.json`, `Cargo.toml`, `pyproject.toml`, `go.mod`, `pom.xml`, `CMakeLists.txt`). 92 of the 158+ built-in checks are language-agnostic; the rest target a specific language pack.
+`fit` runs against TypeScript / JavaScript, Python, Rust, Go, Java, and C/C++. Language detection is automatic (looks for `tsconfig.json`, `Cargo.toml`, `pyproject.toml`, `go.mod`, `pom.xml`, `CMakeLists.txt`). 90 of the 145+ built-in checks are language-agnostic; the rest target a specific language pack.
 
 `graph` ships five language adapters in v2.0: TypeScript, Python, Rust, Go, Java.
 
@@ -126,4 +126,4 @@ v2.0 swaps internal runtime persistence from JSON files to SQLite. **v2 ignores 
 | See how opensip-tools compares to alternatives | [vs. other tools](./03-vs-other-tools.md) |
 | See concrete code samples | [Show me each loop](./02-show-me-the-loops.md) |
 | Run the four-command smoke | [Quick start](./01-quick-start.md) |
-| Browse all 158+ built-in checks | [Checks reference](../70-reference/05-checks-index.md) |
+| Browse all 145+ built-in checks | [Checks reference](../70-reference/05-checks-index.md) |

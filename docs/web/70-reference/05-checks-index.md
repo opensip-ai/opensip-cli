@@ -233,7 +233,7 @@ TypeScript/JavaScript projects; uses TS-AST analysis.
 
 ---
 
-## Python  *(1 checks)*
+## Python  *(1 check)*
 
 Python projects.
 
@@ -245,7 +245,7 @@ Python projects.
 
 ---
 
-## Go  *(1 checks)*
+## Go  *(1 check)*
 
 Go projects.
 
@@ -257,7 +257,7 @@ Go projects.
 
 ---
 
-## Java  *(1 checks)*
+## Java  *(1 check)*
 
 Java projects.
 
@@ -269,7 +269,7 @@ Java projects.
 
 ---
 
-## C / C++  *(1 checks)*
+## C / C++  *(1 check)*
 
 C/C++ projects.
 
@@ -281,7 +281,7 @@ C/C++ projects.
 
 ---
 
-## Rust  *(1 checks)*
+## Rust  *(1 check)*
 
 Rust projects.
 

@@ -99,7 +99,7 @@ The bundled `ChaosType` set ([`packages/simulation/engine/src/types/base-types.t
 
 The invariant executor drives a workflow-integration lifecycle, not a property-based test loop:
 
-1. Build an `InvariantContext` backed by the configured drivers (`deps`). Defaults are throw-on-call stubs (Phase 7 wires real ones); tests inject fakes via `deps`.
+1. Build an `InvariantContext` backed by the configured drivers (`deps`). Defaults are throw-on-call stubs; tests inject fakes via `deps`.
 2. Run `setup(ctx)` — seed tenants, register fakes, configure the world.
 3. Run `act(ctx)` — emit signals, dispatch agents, advance reconcilers.
 4. Run `assert(ctx)` — call `ctx.expectStage`, `ctx.expectOutcome`, `assertEquals`, `assertThat`, etc. Each assertion is recorded into `state.assertions`.

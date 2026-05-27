@@ -13,8 +13,8 @@ source-files:
   - packages/contracts/src/exit-codes.ts
   - knip.json
 related-docs:
-  - ./02-layer-policy.md
-  - ./03-doc-conventions.md
+  - ./05-layer-policy.md
+  - ./06-doc-conventions.md
   - ../70-reference/02-package-catalog.md
 ---
 # Coding standards
@@ -258,6 +258,6 @@ Naming: `*.test.ts` for unit tests, `*.integration.test.ts` for cross-package in
 
 ## What's next
 
-- **[`02-layer-policy.md`](/docs/opensip-tools/80-internals/02-layer-policy/)** — the dep-cruiser config, rule by rule, with rationale.
-- **[`03-doc-conventions.md`](/docs/opensip-tools/80-internals/03-doc-conventions/)** — voice, frontmatter, and verification trails for documentation.
+- **[`05-layer-policy.md`](/docs/opensip-tools/80-internals/05-layer-policy/)** — the dep-cruiser config, rule by rule, with rationale.
+- **[`06-doc-conventions.md`](/docs/opensip-tools/80-internals/06-doc-conventions/)** — voice, frontmatter, and verification trails for documentation.
 - **[`../70-reference/02-package-catalog.md`](/docs/opensip-tools/70-reference/02-package-catalog/)** — the workspace package list these standards apply to.

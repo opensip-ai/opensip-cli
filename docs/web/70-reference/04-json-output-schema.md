@@ -240,5 +240,5 @@ For SARIF (the gate's native shape), use `--gate-save` / `--gate-compare`. The S
 
 ## What's next
 
-- **[`02-configuration.md`](/docs/opensip-tools/70-reference/02-configuration/)** — `opensip-tools.config.yml` schema (the *input* shape).
+- **[`03-configuration.md`](/docs/opensip-tools/70-reference/03-configuration/)** — `opensip-tools.config.yml` schema (the *input* shape).
 - **[`../10-concepts/04-contract-surfaces.md`](/docs/opensip-tools/10-concepts/04-contract-surfaces/)** — every contract surface, with stability tiers.

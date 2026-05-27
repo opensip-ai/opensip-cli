@@ -4,19 +4,19 @@ last_verified: 2026-05-26
 release: v2.0.0
 title: "Layer policy"
 audience: [contributors]
-purpose: "The dependency-cruiser rules that enforce the six-layer architecture and the tool-internal partitioning rules (graph stages, dashboard panels), rule by rule, with rationale."
+purpose: "The dependency-cruiser rules that enforce the five-layer package graph and the tool-internal partitioning rules (graph stages, dashboard panels), rule by rule, with rationale."
 source-files:
   - .dependency-cruiser.cjs
   - pnpm-workspace.yaml
 related-docs:
   - ../10-concepts/03-modular-monolith.md
-  - ./01-coding-standards.md
+  - ./04-coding-standards.md
   - ../70-reference/02-package-catalog.md
   - ../80-internals/03-session-and-persistence.md
 ---
 # Layer policy
 
-The six-layer architecture (kernel → datastore → contracts → tools/lang/ → checks → cli) is enforced by [dependency-cruiser](https://github.com/sverweij/dependency-cruiser). Build fails on any forbidden edge. This doc walks every rule and the reasoning.
+The five-layer package graph (core → datastore/contracts → tools/libraries/adapters → checks → cli) is enforced by [dependency-cruiser](https://github.com/sverweij/dependency-cruiser). Build fails on any forbidden edge. This doc walks every rule and the reasoning.
 
 For the conceptual layer narrative, see [`../10-concepts/03-modular-monolith.md`](../10-concepts/03-modular-monolith.md).
 
@@ -294,6 +294,6 @@ These are review concerns. The layer rules pin the load-bearing constraint; the 
 
 ## What's next
 
-- **[`01-coding-standards.md`](./01-coding-standards.md)** — TypeScript and ESLint conventions inside the layered packages.
+- **[`04-coding-standards.md`](./04-coding-standards.md)** — TypeScript and ESLint conventions inside the layered packages.
 - **[`../10-concepts/03-modular-monolith.md`](../10-concepts/03-modular-monolith.md)** — the conceptual narrative behind these rules.
 - **[`../70-reference/02-package-catalog.md`](../70-reference/02-package-catalog.md)** — the package list, organized by layer.

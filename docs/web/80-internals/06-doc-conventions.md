@@ -7,8 +7,8 @@ audience: [contributors]
 purpose: "Voice, frontmatter, diagrams, and verification trail conventions for the architecture doc set."
 related-docs:
   - ../README.md
-  - ./01-coding-standards.md
-  - ./02-layer-policy.md
+  - ./04-coding-standards.md
+  - ./05-layer-policy.md
 ---
 # Doc conventions
 
@@ -93,7 +93,7 @@ How the worked example (`acme-api`) interacts with this doc's topic.
 
 ## What's next
 
-- [`./neighbor.md`](./neighbor.md) — what the next doc covers.
+- `./NN-neighbor.md` — what the next doc covers.
 ```
 
 The "What you'll understand after this" callout is the doc's promise to the reader. It's specific (not "you'll understand this topic better"); it's bulleted; it lives near the top. Three to five bullets is typical.
@@ -125,7 +125,7 @@ No binary images unless unavoidable. They diff poorly, can't be searched, and br
 
 ## Cross-linking
 
-Use `[**Title**](/docs/opensip-tools/80-internals/path/)` for prominent cross-links and `[`identifier`](/docs/opensip-tools/80-internals/path/)` for in-line code references.
+Use Markdown links for prominent cross-links and inline code links for source-file references. Prefer real relative targets such as `[**Layer policy**](/docs/opensip-tools/80-internals/05-layer-policy/)` or ``[`packages/core/src/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/core/src/index.ts)``.
 
 Always link forward and back. A doc that depends on another doc's concept links to that doc; the linked-from doc, when relevant, links back to the dependent.
 
@@ -167,7 +167,7 @@ This is the "what would I need to re-check to keep this doc current?" answer. Wh
 
 ## When to write a new doc
 
-Most contributions don't need a new doc. The existing 32 numbered docs (00–90) cover the architecture; new shape is rare.
+Most contributions don't need a new doc. The existing numbered docs (00–80) cover the architecture; new shape is rare.
 
 You probably need a new doc if:
 
@@ -180,7 +180,7 @@ You probably don't need a new doc if:
 - The change is a new flag, a new field, or a new check pack.
 - The change fits cleanly into an existing doc's scope.
 
-Reference (80) and conventions (90) docs are exceptions — those grow with the system, and a new entry typically slots in as a new section rather than a new doc.
+Reference (70) and internals (80) docs are exceptions — those grow with the system, and a new entry typically slots in as a new section rather than a new doc.
 
 ---
 
@@ -201,7 +201,7 @@ Mark it `status: deprecated` rather than deleting. The frontmatter `status: depr
 Add a redirect note at the top:
 
 ```markdown
-> **Deprecated.** This doc has been replaced by [`../foo/bar.md`](../foo/bar.md). Kept for historical context.
+> **Deprecated.** This doc has been replaced by `../foo/bar.md`. Kept for historical context.
 ```
 
 Delete only when no inbound link references the doc. The README's reading order is the source of truth for "active" docs.
@@ -211,5 +211,5 @@ Delete only when no inbound link references the doc. The README's reading order 
 ## What's next
 
 - **[`../README.md`](/docs/opensip-tools/)** — the doc set's table of contents.
-- **[`01-coding-standards.md`](/docs/opensip-tools/80-internals/01-coding-standards/)** — code conventions (the parallel to this doc, for source).
-- **[`02-layer-policy.md`](/docs/opensip-tools/80-internals/02-layer-policy/)** — the dep-cruiser rules.
+- **[`04-coding-standards.md`](/docs/opensip-tools/80-internals/04-coding-standards/)** — code conventions (the parallel to this doc, for source).
+- **[`05-layer-policy.md`](/docs/opensip-tools/80-internals/05-layer-policy/)** — the dep-cruiser rules.

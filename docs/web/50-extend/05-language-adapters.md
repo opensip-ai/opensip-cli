@@ -232,5 +232,5 @@ The adapter doesn't know any of this. It just receives a path + content and retu
 
 ## What's next
 
-- **[`02-check-packs.md`](/docs/opensip-tools/50-extend/02-check-packs/)** — how check packs build on adapters: scope filters, parameterization, the marketplace shape.
+- **[`04-check-pack-architecture.md`](/docs/opensip-tools/50-extend/04-check-pack-architecture/)** — how check packs build on adapters: scope filters, parameterization, the marketplace shape.
 - **[`../70-reference/02-package-catalog.md`](/docs/opensip-tools/70-reference/02-package-catalog/)** — every adapter package, key exports, where to find them.

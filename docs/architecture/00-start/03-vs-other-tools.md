@@ -98,4 +98,4 @@ A short anti-claims list, since "what we don't do" is often more useful than "wh
 | See concrete code samples for each loop | [Show me each loop](./02-show-me-the-loops.md) |
 | Common questions about adoption + edge cases | [FAQ](./04-faq.md) |
 | Run the four-command smoke right now | [Quick start](./01-quick-start.md) |
-| Browse the 158+ built-in checks | [Checks reference](../70-reference/05-checks-index.md) |
+| Browse the 145+ built-in checks | [Checks reference](../70-reference/05-checks-index.md) |

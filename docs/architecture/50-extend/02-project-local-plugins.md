@@ -64,7 +64,7 @@ The id is a UUID v4. Generate one with `node -e "console.log(crypto.randomUUID()
 | `scope` | Almost always. Tells the framework what kind of code this check is for. |
 | `contentFilter` | Set to `'strip-strings-and-comments'` for regex-shaped checks; default `'raw'` is for text scanners. |
 
-For walking the TypeScript AST instead of regex, see [Ban an API pattern](../60-guides/02-ban-an-api-pattern.md) for the AST shape, and [`@opensip-tools/lang-typescript`](../../../packages/lang-typescript/src/index.ts) for the helper exports.
+For walking the TypeScript AST instead of regex, see [Ban an API pattern](../60-guides/02-ban-an-api-pattern.md) for the AST shape, and [`@opensip-tools/lang-typescript`](../../../packages/languages/lang-typescript/src/index.ts) for the helper exports.
 
 ## A project-local recipe
 

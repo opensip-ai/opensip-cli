@@ -7,7 +7,7 @@ audience: [contributors, plugin-authors, ci-integrators]
 purpose: "How `graph` builds its picture of the codebase — the six-stage pipeline, the catalog format, and the content-keyed cache."
 source-files:
   - packages/graph/engine/src/tool.ts
-  - packages/graph/engine/src/bootstrap.ts
+  - packages/cli/src/bootstrap/register-graph-adapters.ts
   - packages/graph/engine/src/lang-adapter/types.ts
   - packages/graph/engine/src/lang-adapter/registry.ts
   - packages/graph/graph-typescript/src/discover.ts
@@ -37,9 +37,9 @@ related-docs:
 ---
 # Stages and catalog (graph)
 
-The `graph` command is the static call-graph tool. Where `fit` answers "is the codebase clean?" with a regex-and-AST pass over each file in isolation, and `sim` answers "does it behave correctly under stress?" with a runtime simulation, `graph` answers a different shape of question: **"what is reachable from where?"** Orphans, side-effect chains, duplicated bodies, test-only reachable code — all are questions about the *shape* of the call graph, not the contents of any single file.
+The `graph` command is the static call-graph tool. Where `fit` answers "is the codebase clean?" and `sim` answers "does it behave correctly under stress?", `graph` asks: **"what is reachable from where?"** Orphans, side-effect chains, duplicated bodies, and test-only reachable code are all questions about the call graph, not any single file.
 
-> **Naming.** The CLI command, package (`@opensip-tools/graph`), and source directory (`packages/graph/`) are all named `graph` because the engine builds the project's call graph. The dashboard surfaces this data under a tab called **Code Paths** — the user-facing word for the questions you can ask of that graph. Marketing copy, the website, and end-user docs say "Code Paths"; CLI-facing developer docs and code identifiers say "graph". Each layer uses the word that fits its audience: `graph` is precise and short for typing, "Code Paths" describes what the user is doing when they look at it. The catalog is persisted in the project-local SQLite store at `<project>/opensip-tools/.runtime/datastore.sqlite` (not the v1 `cache/graph/` JSON file) — see [Catalog in SQLite](#the-catalog-in-sqlite) below.
+> **Naming.** CLI-facing docs and code use `graph`; the dashboard labels the same data **Code Paths**. The catalog lives in the project-local SQLite store at `<project>/opensip-tools/.runtime/datastore.sqlite` — see [Catalog in SQLite](#the-catalog-in-sqlite) below.
 
 > **What you'll understand after this:**
 > - The six-stage pipeline graph uses to build its picture of the codebase.
@@ -89,11 +89,11 @@ The `graph` command is the static call-graph tool. Where `fit` answers "is the c
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-Stages 0–2 are language-agnostic over the [`GraphLanguageAdapter`](../../../packages/graph/engine/src/lang-adapter/types.ts) contract; the orchestrator looks up an adapter via [`lang-adapter/registry.ts`](../../../packages/graph/engine/src/lang-adapter/registry.ts) and dispatches `discoverFiles` / `parseProject` / `walkProject` / `resolveCallSites` through it. Stage 3 (`buildIndexes`) lives in [`packages/graph/engine/src/pipeline/indexes.ts`](../../../packages/graph/engine/src/pipeline/indexes.ts); stages 4–5 live in [`packages/graph/engine/src/rules/`](../../../packages/graph/engine/src/rules/) and [`packages/graph/engine/src/render/`](../../../packages/graph/engine/src/render/). Stages communicate only through their typed outputs; a stage cannot import a sibling stage, cannot reach back to read its predecessor's intermediate state, cannot peek into the next stage's expectations. This isolation is the single most important property of the design — every other guarantee derives from it.
+Stages 0–2 are language-agnostic over the [`GraphLanguageAdapter`](../../../packages/graph/engine/src/lang-adapter/types.ts) contract. The orchestrator looks up an adapter via [`lang-adapter/registry.ts`](../../../packages/graph/engine/src/lang-adapter/registry.ts), then dispatches `discoverFiles`, `parseProject`, `walkProject`, and `resolveCallSites` through it. Stage 3 (`buildIndexes`) lives in [`packages/graph/engine/src/pipeline/indexes.ts`](../../../packages/graph/engine/src/pipeline/indexes.ts); stages 4–5 live in [`packages/graph/engine/src/rules/`](../../../packages/graph/engine/src/rules/) and [`packages/graph/engine/src/render/`](../../../packages/graph/engine/src/render/).
 
-> **History — Stage 1 + Stage 2 fused (Phase 4, 2026-05-17).** Originally these were two separate AST walks per file: Stage 1 emitted function occurrences; Stage 2 walked the same AST a second time to find and resolve call sites. The two walks descended in identical order and the only data flowing between them was each function-shape's bodyHash — which Stage 1 already computed. Phase 4 of the graph perf work fused the two passes into [`graph-typescript/walk.ts`](../../../packages/graph/graph-typescript/src/walk.ts). Legacy `buildInventory` and `resolveEdges` entry points are retained for tests and external callers; they share the dispatch helpers from `walk.ts`. The orchestrator calls `walkProgram` once and feeds the resulting call-site records to `resolveEdgesFromRecords`.
->
-> **Adapter layer.** Stages 0, 1, and 2 are adapter-driven: every file discovery, parse, walk, and call-site resolution call routes through the [`GraphLanguageAdapter`](../../../packages/graph/engine/src/lang-adapter/types.ts) contract. **Five first-party adapters ship in v2.0.0** — each as its own publishable npm package marked with `opensipTools.kind: "graph-adapter"`: TypeScript ([`@opensip-tools/graph-typescript`](../../../packages/graph/graph-typescript/src/index.ts)), Python ([`@opensip-tools/graph-python`](../../../packages/graph/graph-python/src/index.ts)), Rust ([`@opensip-tools/graph-rust`](../../../packages/graph/graph-rust/src/index.ts)), Go ([`@opensip-tools/graph-go`](../../../packages/graph/graph-go/src/index.ts)), and Java ([`@opensip-tools/graph-java`](../../../packages/graph/graph-java/src/index.ts)). They're registered into the engine's adapter registry at module load by [`bootstrap.ts`](../../../packages/graph/engine/src/bootstrap.ts). `pickAdapter(cwd)` chooses one by file-extension dominance with a deterministic preference order on ties. Stages 3 (indexes), 4 (rules), and 5 (render) are unchanged — they consume the catalog and don't know which adapter built it. See [`03-adding-a-language.md`](./03-adding-a-language.md) for the contributor walkthrough.
+The stage boundaries are deliberately narrow: each stage communicates through typed outputs instead of reaching into a neighbor's intermediate state. That isolation is the main design guarantee.
+
+> **Adapter layer.** Five first-party adapters ship in v2.0.0 — each as its own publishable npm package marked with `opensipTools.kind: "graph-adapter"`: TypeScript ([`@opensip-tools/graph-typescript`](../../../packages/graph/graph-typescript/src/index.ts)), Python ([`@opensip-tools/graph-python`](../../../packages/graph/graph-python/src/index.ts)), Rust ([`@opensip-tools/graph-rust`](../../../packages/graph/graph-rust/src/index.ts)), Go ([`@opensip-tools/graph-go`](../../../packages/graph/graph-go/src/index.ts)), and Java ([`@opensip-tools/graph-java`](../../../packages/graph/graph-java/src/index.ts)). The CLI discovery path ([`register-graph-adapters.ts`](../../../packages/cli/src/bootstrap/register-graph-adapters.ts)) imports each adapter package and registers its `adapter` export. `pickAdapter(cwd)` chooses by file-extension dominance with a deterministic preference order on ties. Stages 3, 4, and 5 consume the catalog without knowing which adapter built it.
 
 ### Stage 0 — Discover
 
@@ -196,7 +196,7 @@ Entry-point inference is its own module: [`rules/_entry-points.ts`](../../../pac
 | `name-match` | Functions named `main`, `run`, `start`, `register`, `init`, `bootstrap`, `initialize`. |
 | `no-callers-exported` | Exported functions with no in-project callers (assumed to be a library API). |
 
-`bin-entry` (functions reachable from a `bin` field in a `package.json`) and `tool-registration` (functions a Tool's `register()` calls into) are deferred — they exist in the design but produce too many heuristic edges to ship in v0.2.
+`bin-entry` functions from `package.json` and Tool-registration entry points are not recognized today; declare those through config if a rule needs to treat them as roots.
 
 The two rules that consume entry-points only see the resulting `EntryPoint[]` — they don't know how it was built. That decoupling means we can refine the inference (or replace it with project-config-driven declarations) without touching any rule.
 
@@ -288,7 +288,7 @@ Performance: editing a single file in opensip-tools self-graph drops rebuild tim
 
 ### `--package` and `--packages`
 
-Two scoping flags from Wave 1 + Wave 3 of the perf plan. **Both are TypeScript-only today** — they assume `tsconfig.json` discovery and the workspace-package shape that the TypeScript adapter expects. For Python and Rust projects, run `graph` from the project root.
+Two scoping flags narrow expensive graph runs. **Both are TypeScript-only today** because they assume `tsconfig.json` discovery and the workspace-package shape that the TypeScript adapter expects. For Python and Rust projects, run `graph` from the project root.
 
 - **`graph --package <name|path>`** scopes a run to one workspace package's tsconfig. Cross-package call sites become unresolved (lower fidelity, much faster). Resolves a basename via [`cli/scope.ts`](../../../packages/graph/engine/src/cli/scope.ts) by searching `<cwd>/packages/**` for a directory with a `tsconfig.json`; an explicit path is also accepted.
 - **`graph --packages`** fans the run out across every workspace package under `<cwd>/packages/**`. One child process per package, concurrency capped at `cpus()-1`. Each child has its own Node heap, so the per-package memory ceiling scales naturally. Implementation: [`cli/packages-runner.ts`](../../../packages/graph/engine/src/cli/packages-runner.ts).

@@ -46,7 +46,7 @@ opensip-tools sim recognizes four kinds today, each with its own author-facing e
 
 Each kind has its own `define.ts`, `executor.ts`, and `result.ts` under [`packages/simulation/engine/src/kinds/<kind>/`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/simulation/engine/src/kinds/). They share a common runtime contract (`RunnableScenario`, `ScenarioExecutorResult`) so the engine can execute any kind through the same dispatcher.
 
-The legacy `defineScenario` ([`packages/simulation/engine/src/framework/define-scenario.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/simulation/engine/src/framework/define-scenario.ts)) is a deprecated alias that routes to `defineLoadScenario`. New code uses the kind-specific entry points.
+The old generic `defineScenario` alias has been removed. New code uses the kind-specific entry points.
 
 ### `defineLoadScenario`
 
@@ -110,12 +110,7 @@ export default defineChaosScenario({
 });
 ```
 
-The chaos kind composes a base load with explicit failure injection and a recovery contract. The executor runs the load loop for `duration` seconds with chaos active (per-tick injection at `chaos.probability`), then re-runs the loop for `recoveryWindow` ms with chaos off. Both phases delegate to the same `runLoadWindow` driver in `framework/execution/run-load-window.ts` — the load kind is the no-`injectChaos` default and chaos passes a callback that returns `chaos-event` outcomes. Steady-state assertions evaluate against the chaos-active window, recovery assertions against the post-chaos window. Pass/fail is the AND of both verdicts.
-
-> **Schema note.** This is the flattened shape implemented today (option (b) in the
-> Layer 3 audit). A future major may revisit option (a) — proper composition with a
-> `baseLoad: LoadScenarioConfig` field — when chaos scenarios start sharing larger
-> load fragments. Tracked in the Layer 3 plan as a deferred decision.
+The chaos kind composes a base load with explicit failure injection and a recovery contract. The executor runs the load window with chaos active, then runs a recovery window with chaos off. Steady-state assertions evaluate against the chaos-active window; recovery assertions evaluate against the post-chaos window. Pass/fail is the AND of both verdicts.
 
 ### `defineInvariantScenario`
 
@@ -143,7 +138,7 @@ export default defineInvariantScenario({
 });
 ```
 
-The invariant kind drives a workflow-integration lifecycle: `setup`/`act`/`assert` callbacks all receive `InvariantContext` (none takes or returns state). Setup seeds tenants and wires drivers; act emits signals, runs reconciler ticks, dispatches agents; assert calls `ctx.expectStage` / `ctx.expectOutcome` / `ctx.expectAuditEntry` / `assertEquals` / `assertThat` to record assertions. Pass/fail is the AND of every recorded assertion holding AND every phase finishing in `pass`. The default driver implementations throw NOT_IMPLEMENTED — Phase 7 wires real drivers; tests pass fakes via `deps`.
+The invariant kind drives a workflow-integration lifecycle. `setup`, `act`, and `assert` all receive an `InvariantContext`; none takes or returns state. Setup seeds tenants and wires drivers, act emits signals and advances the workflow, and assert records expectations through helpers like `ctx.expectStage`, `ctx.expectOutcome`, and `assertEquals`. Pass/fail is the AND of every recorded assertion holding and every phase finishing in `pass`. Default drivers throw `NOT_IMPLEMENTED`; tests pass fakes via `deps`.
 
 ### `defineFixEvaluationScenario`
 
@@ -183,7 +178,7 @@ RunnableScenario { kind: 'fix-evaluation', run(signal) } ─► fixEvalExecutor 
 
 The result types are kind-specific (a load result has `p99LatencyMs` and percentiles; an invariant result has per-phase status logs and the assertion records the assert phase produced). The recipe layer projects each kind's result into a common `ScenarioResult` shape so the renderer doesn't need to know the kind.
 
-This shape — kind-specific authoring + shared runtime contract — is why the simulation engine can be one package today and four+ packages tomorrow without a rewrite. A new scenario kind is a new directory under `kinds/`, a new entry point exported from `index.ts`, and an updated dispatcher.
+Kind-specific authoring plus a shared runtime contract keeps the engine extensible: adding a scenario kind means adding a directory under `kinds/`, exporting a new entry point from `index.ts`, and updating the dispatcher.
 
 ---
 

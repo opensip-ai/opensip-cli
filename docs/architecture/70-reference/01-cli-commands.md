@@ -178,7 +178,7 @@ opensip-tools dashboard --json
 
 The dashboard is a single self-contained HTML file at `<project>/opensip-tools/.runtime/reports/latest.html`. Each generation overwrites the previous file. The command launches the browser and exits; the file works without opensip-tools installed, so you can email it directly to a teammate.
 
-**See also:** [`70-reference/06-dashboard.md`](./03-dashboard.md), [`80-internals/03-session-and-persistence.md`](../80-internals/03-session-and-persistence.md).
+**See also:** [`70-reference/06-dashboard.md`](./06-dashboard.md), [`80-internals/03-session-and-persistence.md`](../80-internals/03-session-and-persistence.md).
 
 ---
 
@@ -256,7 +256,7 @@ Detects the project's primary language(s) from filesystem markers and writes:
 
 Plus appends `opensip-tools/.runtime/` to `<cwd>/.gitignore`.
 
-The scaffold output is loose `.mjs` files — the lightest-weight starting point. When a pack outgrows loose files (substantial helpers, tests, more than a dozen checks/scenarios), the customer graduates `opensip-tools/<domain>/` to a workspace npm package by adding a `package.json` with `opensipTools.kind: "fit-pack"` (or `"sim-pack"`) and an `index.ts`. Marker-based discovery picks up the workspace package automatically. See [`02-plugin-authoring.md`](./02-plugin-authoring.md) for the graduation path.
+The scaffold output is loose `.mjs` files — the lightest-weight starting point. When a pack outgrows loose files (substantial helpers, tests, more than a dozen checks/scenarios), the customer graduates `opensip-tools/<domain>/` to a workspace npm package by adding a `package.json` with `opensipTools.kind: "fit-pack"` (or `"sim-pack"`) and an `index.ts`. Marker-based discovery picks up the workspace package automatically. See [`50-extend/01-plugin-authoring.md`](../50-extend/01-plugin-authoring.md) for the graduation path.
 
 | Flag | Effect |
 |---|---|
@@ -433,6 +433,6 @@ State contract enforced by code: `~/.opensip-tools/` holds `config.yml` only. Pe
 
 ## What's next
 
-- **[`02-plugin-authoring.md`](./02-plugin-authoring.md)** — write a check, recipe, scenario, or full Tool plugin.
-- **[`03-dashboard.md`](./03-dashboard.md)** — the HTML report's structure and lifecycle.
+- **[`../50-extend/01-plugin-authoring.md`](../50-extend/01-plugin-authoring.md)** — write a check, recipe, scenario, or full Tool plugin.
+- **[`06-dashboard.md`](./06-dashboard.md)** — the HTML report's structure and lifecycle.
 - **[`../70-reference/03-configuration.md`](../70-reference/03-configuration.md)** — every field of `opensip-tools.config.yml`.

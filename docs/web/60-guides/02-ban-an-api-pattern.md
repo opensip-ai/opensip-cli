@@ -7,7 +7,7 @@ audience: [plugin-authors, getting-started]
 purpose: "Task-led: write a check that flags every use of a specific API — covering the regex shape, the AST shape, and the trade-offs between them."
 source-files:
   - packages/fitness/engine/src/framework/define-check.ts
-  - packages/lang-typescript/src/index.ts
+  - packages/languages/lang-typescript/src/index.ts
 related-docs:
   - ./01-write-your-first-check.md
   - ../50-extend/01-plugin-authoring.md

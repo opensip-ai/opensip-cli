@@ -14,8 +14,8 @@ source-files:
   - packages/graph/graph-rust/src/index.ts
   - packages/graph/graph-go/src/index.ts
   - packages/graph/graph-java/src/index.ts
-  - packages/graph/engine/src/bootstrap.ts
-  - packages/graph/engine/src/__tests__/lang-adapter-contract.test.ts
+  - packages/cli/src/bootstrap/register-graph-adapters.ts
+  - packages/graph/graph-typescript/src/__tests__/lang-adapter-contract.test.ts
 related-docs:
   - ./01-stages-and-catalog.md
   - ./02-rules-and-gating.md
@@ -99,13 +99,13 @@ packages/graph/graph-<id>/
 
 This mirrors `graph-python/`, `graph-rust/`, `graph-go/`, and `graph-java/` — the recommended template for tree-sitter adapters. The TypeScript adapter has a deeper subdir layout (`inventory-visitors/`, `edge-resolvers/`, `inventory-helpers/`) because its symbol-resolved walk is genuinely more complex; for a tree-sitter adapter the flat layout is plenty. Adapters that prefer one big file or a different breakdown are fine — the contract doesn't care, only the public `index.ts` export matters.
 
-**Third-party graph adapters** are supported via the same `opensipTools.kind: "graph-adapter"` marker the first-party packages use. The marker walker (see [`80-internals/02-plugin-loader.md`](../80-internals/02-plugin-loader.md)) discovers any installed package declaring that kind and the engine's bootstrap registers the adapter on load. Promoting the adapter contract types (`GraphLanguageAdapter`, `registerAdapter`, `pickAdapter`) to the public `@opensip-tools/graph` barrel for third-party consumption is on the roadmap; until then, third-party adapters either contribute as first-party PRs or import the types via deep paths.
+**Third-party graph adapters** are supported via the same `opensipTools.kind: "graph-adapter"` marker the first-party packages use. The marker walker (see [`80-internals/02-plugin-loader.md`](../80-internals/02-plugin-loader.md)) discovers any installed package declaring that kind and registers its `adapter` export. The adapter contract types (`GraphLanguageAdapter`, `registerAdapter`, `pickAdapter`) are exported from `@opensip-tools/graph`.
 
 ---
 
 ## 4. The contract test suite
 
-Every adapter MUST pass the contract test suite at [`packages/graph/engine/src/__tests__/lang-adapter-contract.test.ts`](../../../packages/graph/engine/src/__tests__/lang-adapter-contract.test.ts). It validates the nine behavioral invariants documented on the `GraphLanguageAdapter` interface:
+Every adapter MUST pass the shared contract test suite at [`packages/graph/graph-typescript/src/__tests__/lang-adapter-contract.test.ts`](../../../packages/graph/graph-typescript/src/__tests__/lang-adapter-contract.test.ts). It validates the nine behavioral invariants documented on the `GraphLanguageAdapter` interface:
 
 | Invariant | What the test checks |
 |---|---|
@@ -152,30 +152,42 @@ When you ship a new adapter, add a row to this table in your PR.
 
 ## 6. Registration
 
-For first-party adapters in this repo, add one line to [`packages/graph/engine/src/bootstrap.ts`](../../../packages/graph/engine/src/bootstrap.ts) (which today registers the five first-party adapters via their published package names):
+First-party and third-party adapters use the same registration path: ship a package whose `package.json` declares `opensipTools.kind: "graph-adapter"` and whose main entry exports `adapter`.
 
-```ts
-import { registerAdapter } from './lang-adapter/registry.js';
-import { typescriptGraphAdapter } from '@opensip-tools/graph-typescript';
-import { pythonGraphAdapter } from '@opensip-tools/graph-python';
-import { rustGraphAdapter } from '@opensip-tools/graph-rust';
-import { goGraphAdapter } from '@opensip-tools/graph-go';
-import { javaGraphAdapter } from '@opensip-tools/graph-java';
-import { cppGraphAdapter } from '@opensip-tools/graph-cpp'; // ← new
-
-registerAdapter(typescriptGraphAdapter);
-registerAdapter(pythonGraphAdapter);
-registerAdapter(rustGraphAdapter);
-registerAdapter(goGraphAdapter);
-registerAdapter(javaGraphAdapter);
-registerAdapter(cppGraphAdapter); // ← new
+```json
+{
+  "name": "@opensip-tools/graph-cpp",
+  "main": "dist/index.js",
+  "opensipTools": { "kind": "graph-adapter" },
+  "peerDependencies": {
+    "@opensip-tools/graph": "^2.0.0",
+    "@opensip-tools/core": "^2.0.0"
+  }
+}
 ```
 
-`bootstrap.ts` is imported as a side-effect module from both `tool.ts` (the Tool plugin entry) and `cli/orchestrate.ts` (so direct `runGraph()` callers in tests don't need to register manually). A new adapter is live the moment it's registered there.
+```ts
+// packages/graph/graph-cpp/src/index.ts
+import type { GraphLanguageAdapter } from '@opensip-tools/graph';
+
+export const cppGraphAdapter: GraphLanguageAdapter<CppParsedProject> = {
+  id: 'cpp',
+  displayName: 'C/C++',
+  fileExtensions: ['.c', '.cc', '.cpp', '.h', '.hpp'],
+  discoverFiles,
+  parseProject,
+  walkProject,
+  resolveCallSites,
+  cacheKey,
+  ruleHints,
+};
+
+export const adapter = cppGraphAdapter;
+```
+
+The CLI bootstrap discovery path ([`packages/cli/src/bootstrap/register-graph-adapters.ts`](../../../packages/cli/src/bootstrap/register-graph-adapters.ts)) imports discovered packages and calls `registerAdapter(adapter)`. A new adapter is live once it is installed or present in the workspace.
 
 Once two or more adapters are registered, [`pickAdapter(cwd)`](../../../packages/graph/engine/src/lang-adapter/registry.ts) chooses by file-extension dominance with a deterministic preference list. Add your language to the preference list in `resolveTie` if you ship a new first-party adapter.
-
-For third-party adapters: declare `opensipTools.kind: "graph-adapter"` in your package's `package.json`. The marker walker (see [`80-internals/02-plugin-loader.md`](../80-internals/02-plugin-loader.md)) discovers any installed package declaring that kind and registers it through the same `registerAdapter` seam. The adapter contract types (`GraphLanguageAdapter`, `registerAdapter`, `pickAdapter`) are exported via deep monorepo paths today; promoting them to the public `@opensip-tools/graph` barrel for third-party consumption is on the roadmap.
 
 ---
 
@@ -183,11 +195,11 @@ For third-party adapters: declare `opensipTools.kind: "graph-adapter"` in your p
 
 When you open the PR for a new adapter, verify each of these:
 
-- [ ] Contract test suite passes against the new adapter (a `describe` block in `__tests__/lang-adapter-contract.test.ts` referencing your fixture project).
+- [ ] Contract test suite passes against the new adapter (a `describe` block in the shared `lang-adapter-contract.test.ts` referencing your fixture project).
 - [ ] Per-rule fidelity entry added to the table in §5 of this doc.
 - [ ] Adapter ships with at least one fixture project under `__tests__/fixtures/<id>/` that exercises file discovery, parsing, occurrence emission, and call resolution.
 - [ ] README and CLI `--help` mention the new language.
-- [ ] dep-cruiser layer rules pass — `pipeline/`, `cache/`, `rules/`, `render/` and `cli/*` (except `bootstrap.ts` and `tool.ts`) MUST NOT import your `@opensip-tools/graph-<id>` package.
+- [ ] dep-cruiser layer rules pass — graph engine internals (`pipeline/`, `cache/`, `rules/`, `render/`, `cli/`) MUST NOT import your `@opensip-tools/graph-<id>` package directly. Registration goes through package discovery.
 - [ ] `pnpm typecheck`, `pnpm test`, `pnpm lint` all clean.
 - [ ] If your `cacheKey` prefix is novel (it must be), document it in your `cache-key.ts`'s docstring so the next adapter author doesn't accidentally collide.
 

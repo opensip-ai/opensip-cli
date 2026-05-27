@@ -232,7 +232,7 @@ interface FitnessRecipeDefinition {
 | `all` | The default recipe. "Every check we know about, minus exclusions." |
 | `tags` | Most production recipes. "Run the checks tagged `security` and `quality`." |
 | `pattern` | Slug patterns. "Run every check matching `fit:no-*`." |
-| `explicit` | Locked-down recipes. "Exactly these IDs, no more." |
+| `explicit` | Locked-down recipes. "Exactly these slugs, no more." |
 
 A check is included if (a) the selector matches it and (b) it isn't `disabled` (unless its slug is in `includeDisabled`).
 

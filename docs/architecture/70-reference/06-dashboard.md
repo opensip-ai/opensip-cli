@@ -17,7 +17,7 @@ source-files:
   - packages/fitness/engine/src/cli/dashboard.ts
 related-docs:
   - ../80-internals/03-session-and-persistence.md
-  - ./01-cli-command-tree.md
+  - ./01-cli-commands.md
   - ../40-graph/01-stages-and-catalog.md
 ---
 # Dashboard
@@ -249,4 +249,4 @@ In CI, `--open` is suppressed (no TTY), so no browser opens — but the HTML fil
 ## What's next
 
 - **[`../80-internals/03-session-and-persistence.md`](../80-internals/03-session-and-persistence.md)** — the session and report file lifecycle.
-- **[`./01-cli-command-tree.md`](./01-cli-command-tree.md)** — `dashboard`, `--open`, and `sessions list/purge` flags.
+- **[`./01-cli-commands.md`](./01-cli-commands.md)** — `dashboard`, `--open`, and `sessions list/purge` flags.

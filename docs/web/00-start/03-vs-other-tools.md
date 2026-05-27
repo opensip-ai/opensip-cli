@@ -98,4 +98,4 @@ A short anti-claims list, since "what we don't do" is often more useful than "wh
 | See concrete code samples for each loop | [Show me each loop](/docs/opensip-tools/00-start/02-show-me-the-loops/) |
 | Common questions about adoption + edge cases | [FAQ](/docs/opensip-tools/00-start/04-faq/) |
 | Run the four-command smoke right now | [Quick start](/docs/opensip-tools/00-start/01-quick-start/) |
-| Browse the 158+ built-in checks | [Checks reference](/docs/opensip-tools/70-reference/05-checks-index/) |
+| Browse the 145+ built-in checks | [Checks reference](/docs/opensip-tools/70-reference/05-checks-index/) |

@@ -1,6 +1,7 @@
 ---
 status: current
 last_verified: 2026-05-15
+release: v2.0.x
 title: "Website integration — opensip.ai"
 audience: [contributors]
 purpose: "How opensip.ai consumes docs/web/ from this repo: backend proxy, frontend route, manifest contract."

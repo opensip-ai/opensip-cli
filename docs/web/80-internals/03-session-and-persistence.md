@@ -1,6 +1,7 @@
 ---
 status: current
 last_verified: 2026-05-21
+release: v2.0.x
 title: "Session and persistence"
 audience: [contributors]
 purpose: "What gets written to disk during and after a run. The runtime dir layout, the SQLite store, logs, reports."
@@ -22,7 +23,6 @@ related-docs:
   - ./01-cli-dispatch.md
   - ./02-plugin-loader.md
   - ../80-internals/05-layer-policy.md
-  - ../../plans/persistence-migration/decisions.md
 ---
 # Session and persistence
 
@@ -70,7 +70,7 @@ Schemas are owned by the package that produces the data — datastore is paradig
 
 `__drizzle_migrations` is a fourth, internal table — Drizzle uses it to record which migrations have been applied.
 
-For the rationale behind picking SQLite + Drizzle (and the specific things rejected — Postgres, paradigm-bridging adapters, JSON-as-backend, data migration code), see the persistence-migration decisions log: [`../../plans/persistence-migration/decisions.md`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/docs/plans/persistence-migration/decisions.md).
+SQLite + Drizzle were chosen because the runtime store is local, project-scoped, transactional, and small enough to rebuild if a user needs to delete it. A remote database, JSON-as-backend, or a broader persistence abstraction would add operational weight without improving the CLI's local-first behavior.
 
 ---
 
@@ -196,4 +196,3 @@ The whole `<project>/opensip-tools/` directory is also safe to delete; `opensip-
 - **[`../70-reference/06-dashboard.md`](/docs/opensip-tools/70-reference/06-dashboard/)** — the HTML report's structure and the `dashboard` command.
 - **[`../70-reference/03-configuration.md`](/docs/opensip-tools/70-reference/03-configuration/)** — `opensip-tools.config.yml` schema (the one bit of project state that's not in `.runtime/`).
 - **[`../80-internals/05-layer-policy.md`](/docs/opensip-tools/80-internals/05-layer-policy/)** — where datastore sits in the workspace layering.
-- **[`../../plans/persistence-migration/decisions.md`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/docs/plans/persistence-migration/decisions.md)** — the rationale behind picking SQLite + Drizzle.

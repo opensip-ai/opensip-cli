@@ -3,8 +3,8 @@
 // Generate docs/architecture/70-reference/05-checks-index.md from the
 // metadata extracted by tools/extract-checks-metadata.mjs.
 //
-// Why a generator rather than a hand-curated index: 158+ checks with
-// descriptions and tags is too much to keep in sync by hand. The corpus
+// Why a generator rather than a hand-curated index: the checks corpus, with
+// descriptions and tags, is too much to keep in sync by hand. The corpus
 // changes every time a new check ships; a generated index keeps the
 // docs honest about what's actually in the box. This script is the
 // authoritative writer of docs/architecture/70-reference/05-checks-index.md
@@ -68,6 +68,10 @@ function escapeMd(s) {
   return s.replace(/\|/g, '\\|').replace(/\n/g, ' ').trim();
 }
 
+function checkLabel(count) {
+  return count === 1 ? 'check' : 'checks';
+}
+
 async function readInput(arg) {
   if (!arg || arg === '-') {
     // Read stdin
@@ -123,7 +127,7 @@ async function main() {
     const display = PACK_DISPLAY[pack];
     out.push('---');
     out.push('');
-    out.push(`## ${display.title}  *(${inPack.length} checks)*`);
+    out.push(`## ${display.title}  *(${inPack.length} ${checkLabel(inPack.length)})*`);
     out.push('');
     out.push(display.scope);
     out.push('');
