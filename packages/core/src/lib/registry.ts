@@ -135,9 +135,10 @@ export class Registry<T extends Registerable> {
 
     if (isDup && !internal) {
       switch (this.duplicatePolicy) {
-        case 'silent-skip':
+        case 'silent-skip': {
           return;
-        case 'warn-first-wins':
+        }
+        case 'warn-first-wins': {
           this.logger.warn({
             evt: `${this.evtPrefix}.duplicate`,
             module: this.module,
@@ -147,13 +148,15 @@ export class Registry<T extends Registerable> {
             msg: `${item.id} already registered — keeping incumbent`,
           });
           return;
-        case 'throw':
+        }
+        case 'throw': {
           // @fitness-ignore-next-line result-pattern-consistency -- registration guard, throw is appropriate
           throw new ValidationError(
             `${this.module}: '${item.name}' (${item.id}) already registered`,
             { code: this.validationCode ?? 'VALIDATION.REGISTRY.DUPLICATE' },
           );
-        case 'overwrite':
+        }
+        case 'overwrite': {
           // Drop stale mappings before re-insert so {byId, byName}
           // stay consistent (e.g. overwrite-by-id when the new
           // entry has a different name).
@@ -164,7 +167,8 @@ export class Registry<T extends Registerable> {
             byId.delete(nameIncumbent.id);
           }
           break;
-        case 'allow-internal':
+        }
+        case 'allow-internal': {
           // First non-internal write was allowed (it landed without
           // a dup condition). Subsequent duplicates throw unless
           // `{ internal: true }` is passed.
@@ -173,6 +177,7 @@ export class Registry<T extends Registerable> {
             `${this.module}: '${item.name}' (${item.id}) already registered (allow-internal: only the first write is permitted without { internal: true })`,
             { code: this.validationCode ?? 'VALIDATION.REGISTRY.DUPLICATE' },
           );
+        }
       }
     }
 
