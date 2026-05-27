@@ -214,6 +214,76 @@ Sim packs follow the same recommended layout (`opensip-tools/packages/scenarios-
 
 The opensip codebase ([opensip-ai/opensip](https://github.com/opensip-ai/opensip)) follows this layout: its check pack lives at `opensip-tools/packages/checks-opensip/` (auto-discovered via `@opensip-tools/checks-opensip`), and its sim pack at `opensip-tools/packages/scenarios-opensip/` (auto-discovered via `@opensip-tools/scenarios-opensip`).
 
+### Graduating from loose `.mjs` to a workspace pack
+
+The fastest path to add a check is dropping a `.mjs` file under `<project>/opensip-tools/fit/checks/` ([§1 above](#1-a-project-local-check)). The fastest path to *ship* a versioned, reusable set is a workspace pack (this section). Most consumers start with the loose-file shape and graduate to the pack shape once their coverage grows past what loose files comfortably hold. This subsection walks the bridge.
+
+#### When to graduate
+
+Concrete pain signals, not arbitrary thresholds:
+
+- Your `opensip-tools/fit/checks/*.mjs` count exceeds ~10–20 files and PR diffs are getting noisy.
+- Multiple checks share helper logic and you're copy-pasting it between files.
+- You want TypeScript instead of `.mjs` — type-checked analyzer code and autocomplete on the `defineCheck(...)` shape.
+- You want tests colocated with each check.
+- You want CI to run `pnpm typecheck` over the pack to catch authoring mistakes the platform doesn't notice (a slug typo in a recipe selector, a missing required field on a check).
+
+If none of those apply, stay with loose `.mjs`. The graduation is worthwhile only when the loose-file shape starts to cost more than it saves.
+
+#### The shape after graduation
+
+A workspace pack at `opensip-tools/packages/checks-<name>/` (per [Where should this package live in your repo?](#where-should-this-package-live-in-your-repo)) with a `src/` tree, a `package.json` declaring `@opensip-tools/fitness` and `@opensip-tools/core` as peer deps, and the public surface described in [Layout](#layout) directly below. Two structural details make this scale cleanly past a few dozen checks:
+
+```
+opensip-tools/packages/checks-<name>/
+├── package.json
+├── tsconfig.json
+├── src/
+│   ├── checks/
+│   │   ├── architecture/no-cycle.ts
+│   │   ├── architecture/no-cycle.test.ts     # tests colocated
+│   │   ├── observability/log-on-catch.ts
+│   │   └── …                                 # one file per check
+│   ├── shared/                               # internal helpers
+│   ├── recipes/                              # canonical recipes shipped with the pack
+│   │   └── default.ts
+│   ├── register-checks.ts                    # mechanical aggregation
+│   └── index.ts                              # thin public surface
+└── …
+```
+
+- **`register-checks.ts` is mechanical aggregation.** One `import` line per check, then one big `export const allChecks: readonly Check[] = [...]` array. No logic. It grows linearly with the check count and is easy to skim and diff.
+- **`index.ts` is the thin public surface.** It imports `allChecks` from `register-checks.ts`, imports the recipes, and re-exports the shape the platform consumes (`checks`, `checkDisplay`, `metadata` — see [§4 `src/index.ts`](#srcindexts)). It stays small even as the pack grows past hundreds of checks.
+- **The split exists because in a single-file model every new check would touch the public surface.** With the split, adding a check touches one file (`register-checks.ts`); `index.ts` is stable.
+
+This is a pattern that has worked at scale — the opensip codebase uses it for 308 fitness checks and 192 sim scenarios. Small packs (a handful of checks) can keep everything in one `index.ts`; the split only pays off once re-skimming the public surface on every change becomes a tax.
+
+Sim packs follow the identical pattern: `src/register-scenarios.ts` instead of `register-checks.ts`, `defineLoadScenario(...)` / `defineChaosScenario(...)` / `defineInvariantScenario(...)` / `defineFixEvaluationScenario(...)` calls instead of `defineCheck(...)`, but the aggregation shape is the same.
+
+#### Migration recipe
+
+A step-by-step you can follow when you've decided to graduate:
+
+1. **Pick the pack name and location.** See [Where should this package live in your repo?](#where-should-this-package-live-in-your-repo). For a workspace-only pack, `@opensip-tools/checks-<yourname>` is the simplest naming choice (auto-discovered with no config). For a pack you might publish, use your own scope and pick one of the [three discovery paths](#discovery-three-paths).
+2. **Add the directory as a workspace member.** Append `opensip-tools/packages/*` to your `pnpm-workspace.yaml` (or yarn/npm equivalent).
+3. **Write `package.json`.** Follow [§4 `package.json`](#packagejson) — peer-dep on `@opensip-tools/fitness` and `@opensip-tools/core`. (For sim packs, also `@opensip-tools/simulation`.)
+4. **Convert each `.mjs` to a TypeScript module.** One `<slug>.ts` per check under `src/checks/`, each exporting a `defineCheck(...)` object. **Keep the same slug values** as the loose files used — recipes select by tag/slug, and `--check <slug>` invocations keep working across the move.
+5. **Create `src/register-checks.ts`** that imports every check and exports `allChecks` as a `readonly Check[]`.
+6. **Create `src/index.ts`** that imports `allChecks` and exports it as `checks`, plus `checkDisplay` and `metadata` (see [§4 `src/index.ts`](#srcindexts)).
+7. **Add the pack as a root devDependency.** `"@opensip-tools/checks-<yourname>": "workspace:*"` in the root `package.json`. pnpm will symlink it into `node_modules/@opensip-tools/` where the default discovery walker finds it. If you used your own scope, either add the scope to `plugins.packageScopes` or pin the package under `plugins.checkPackages` in `opensip-tools.config.yml` — whichever fits your monorepo's preferences.
+8. **Delete the original loose `.mjs` files** under `opensip-tools/fit/checks/` once the workspace pack is running cleanly and the same slugs are firing.
+
+**Recipes during the move.** A recipe that lived at `opensip-tools/fit/recipes/<name>.mjs` can either stay there (the platform's project-local recipe walker continues to load it from the reserved path) or move into the pack as `src/recipes/<name>.ts` and be re-exported through `index.ts` alongside `checks`. Moving it into the pack is the cleaner end-state — single source of truth, versioned with the checks it references — but doing so is optional and can happen after the check migration lands.
+
+#### Reference example
+
+The opensip codebase uses this pattern at production scale. The split is visible directly in the public layout:
+
+- [`opensip-tools/packages/checks-opensip/`](https://github.com/opensip-ai/opensip/tree/main/opensip-tools/packages/checks-opensip) — 308 fitness checks under `src/checks/<category>/`, aggregated through `src/register-checks.ts`, with a thin `src/index.ts` as the public surface.
+- [`opensip-tools/packages/scenarios-opensip/`](https://github.com/opensip-ai/opensip/tree/main/opensip-tools/packages/scenarios-opensip) — 192 sim scenarios with the equivalent `src/register-scenarios.ts` shape.
+
+Either is a working reference to pattern after when graduating your own pack.
+
 ### Layout
 
 ```
