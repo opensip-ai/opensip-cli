@@ -154,9 +154,9 @@ Most docs end with a "What's next" section. A few — especially the reference d
 ```markdown
 ## Verification trail
 
-Last verified at v1.0.0 against:
+Last verified at v2.0.0 against:
 
-- `packages/` directory listing (18 packages …).
+- `packages/` directory listing (27 packages …).
 - Each package's `package.json` `description` and `name` field, read directly.
 - The dep-cruiser config for layer rules.
 ```

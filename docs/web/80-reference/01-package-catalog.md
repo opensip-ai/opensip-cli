@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-18
-release: v1.3.0
+last_verified: 2026-05-26
+release: v2.0.0
 title: "Package catalog"
 audience: [contributors, plugin-authors]
 purpose: "Flat reference of every package in the monorepo: name, path, layer, one-line role, key exports. Lookup-only; the conceptual layer narrative lives in 10-mental-model/03-modular-monolith.md."
@@ -40,9 +40,9 @@ Pure types, registries, errors, IDs, logger, paths. No tool-specific knowledge.
 | `@opensip-tools/datastore` | `packages/datastore/` | SQLite + Drizzle persistence kernel — `DataStore` interface, factory, in-memory + on-disk backends, workspace migration store under `migrations/` | `DataStore`, `DataStoreFactory`, `DataStoreOpenOptions`, `DataStoreMigrationError` |
 | `@opensip-tools/contracts` | `packages/contracts/` | Shared contract types — `CliOutput`/`CommandResult` shapes, exit codes, session persistence, dashboard generator | `CliOutput`, `CheckOutput`, `FindingOutput`, `CommandResult`, `EXIT_CODES`, `getErrorSuggestion`, `SessionRepo`, `StoredSession`, `generateDashboardHtml`, `GraphCatalog` |
 
-## Layer 3 — tools and language adapters
+## Layer 3 — tools, shared libraries, and language adapters
 
-Peer packages at the same layer. Tools implement the `Tool` contract; language adapters implement `LanguageAdapter`.
+Peer packages at the same layer. Tools implement the `Tool` contract; shared libraries are consumed by Tools but don't implement the contract themselves; language adapters implement `LanguageAdapter`.
 
 ### Tools
 
@@ -50,22 +50,45 @@ Peer packages at the same layer. Tools implement the `Tool` contract; language a
 |---|---|---|---|
 | `@opensip-tools/fitness` | `packages/fitness/engine/` | Fitness check engine, `defineCheck`, `defineRecipe`, gate, SARIF builder | `defineCheck`, `defineRecipe`, `FitnessRecipeService`, `defaultRecipeRegistry`, `getCheckConfig`, `executeFit`, `loadSignalersConfig`, `fitnessTool`, `saveBaseline`, `compareToBaseline`, `buildSarifLog`, `reportToCloud`, `openDashboard` |
 | `@opensip-tools/simulation` | `packages/simulation/engine/` | Simulation engine, four scenario kinds | `defineLoadScenario`, `defineChaosScenario`, `defineInvariantScenario`, `defineFixEvaluationScenario`, `defineSimulationRecipe`, `simulationTool`, `defaultSimulationRecipeRegistry`, `SCENARIO_KINDS` |
-| `@opensip-tools/graph` | `packages/graph/engine/` | Static call-graph + dead-end analysis, six-stage staged pipeline (discover → inventory → edges → indexes → rules → render). Language-pluggable as of v1.3.0: ships TypeScript, Python, and Rust adapters as internal subdirs (`lang-typescript/`, `lang-python/`, `lang-rust/`), all implementing the `GraphLanguageAdapter` contract under `lang-adapter/`. Imports SARIF helpers from `@opensip-tools/fitness` (peer-layer dep, DEC-3) | `graphTool`, `Catalog`, `FunctionOccurrence`, `CallEdge`, `Indexes`, `Rule`, `Renderer`, `GraphLanguageAdapter`, `registerAdapter`, `pickAdapter` |
+| `@opensip-tools/graph` | `packages/graph/engine/` | Static call-graph + dead-end analysis kernel. Six-stage staged pipeline (discover → inventory → edges → indexes → rules → render). Language-agnostic — adapters live in their own publishable packages (see "Graph language adapters" below) and register through `registerAdapter`. Imports SARIF helpers from `@opensip-tools/fitness` (peer-layer dep, DEC-3) | `graphTool`, `Catalog`, `FunctionOccurrence`, `CallEdge`, `Indexes`, `Rule`, `Renderer`, `GraphLanguageAdapter`, `registerAdapter`, `pickAdapter` |
 
-### Language adapters
+### Shared libraries
+
+Used by Tools but not Tools themselves — no `Tool` contract, no CLI subcommand. Peer-layer deps so a Tool can pull in just the library surface it needs.
 
 | Package | Path | Role | Key exports |
 |---|---|---|---|
-| `@opensip-tools/lang-typescript` | `packages/languages/lang-typescript/` | TypeScript/JavaScript adapter — TS compiler API + query layer | `typescriptAdapter`, `filterContent`, `clearFilterCache` (re-exported from fitness) |
-| `@opensip-tools/lang-rust` | `packages/languages/lang-rust/` | Rust adapter — strip routines + line-offset metadata (tree-sitter integration deferred) | `rustAdapter` |
+| `@opensip-tools/dashboard` | `packages/dashboard/` | Self-contained HTML dashboard generator — renders the fit/sim/graph report from session data + graph catalogs. Consumed by fitness's `dashboard` command and the auto-open hook. | `generateDashboardHtml` |
+| `@opensip-tools/cli-ui` | `packages/cli-ui/` | Shared Ink/React presentational primitives — Banner, Spinner, RunHeader, theme. Extracted from `cli/` so tools that ship a live view depend on the UI kit without pulling in the dispatcher. | `Banner`, `Spinner`, `RunHeader`, `theme` |
+
+### Language adapters (fitness — six languages)
+
+Implement `LanguageAdapter`. Used by fitness checks and any future tool that needs per-language strip/parse routines.
+
+| Package | Path | Role | Key exports |
+|---|---|---|---|
+| `@opensip-tools/lang-typescript` | `packages/languages/lang-typescript/` | TypeScript/JavaScript adapter — TS compiler API + query layer | `typescriptAdapter`, `filterContent`, `clearFilterCache` |
+| `@opensip-tools/lang-rust` | `packages/languages/lang-rust/` | Rust adapter — strip routines + line-offset metadata | `rustAdapter` |
 | `@opensip-tools/lang-python` | `packages/languages/lang-python/` | Python adapter — strip routines | `pythonAdapter` |
 | `@opensip-tools/lang-java` | `packages/languages/lang-java/` | Java adapter — strip routines | `javaAdapter` |
 | `@opensip-tools/lang-go` | `packages/languages/lang-go/` | Go adapter — strip routines | `goAdapter` |
 | `@opensip-tools/lang-cpp` | `packages/languages/lang-cpp/` | C/C++ adapter — strip routines | `cppAdapter` |
 
+### Graph language adapters (five languages)
+
+Distinct from the fitness language adapters above — these implement the graph engine's `GraphLanguageAdapter` contract (catalog inventory, edge extraction). Each is a publishable npm package marked with `opensipTools.kind: "graph-adapter"` and registered via `registerAdapter` when imported.
+
+| Package | Path | Role | Key exports |
+|---|---|---|---|
+| `@opensip-tools/graph-typescript` | `packages/graph/graph-typescript/` | TypeScript graph adapter — symbol-resolved call graph via TS compiler API | `typescriptGraphAdapter` |
+| `@opensip-tools/graph-python` | `packages/graph/graph-python/` | Python graph adapter — tree-sitter backed | `pythonGraphAdapter` |
+| `@opensip-tools/graph-rust` | `packages/graph/graph-rust/` | Rust graph adapter — tree-sitter backed | `rustGraphAdapter` |
+| `@opensip-tools/graph-go` | `packages/graph/graph-go/` | Go graph adapter — tree-sitter backed | `goGraphAdapter` |
+| `@opensip-tools/graph-java` | `packages/graph/graph-java/` | Java graph adapter — tree-sitter backed | `javaGraphAdapter` |
+
 ## Layer 4 — fitness check packs
 
-Each pack ships `checks: Check[]`, `checkDisplay`, and `metadata`. Discovered by name prefix (`@opensip-tools/checks-*`) when installed, or by explicit pinning in `plugins.checkPackages:` for arbitrary scopes.
+Each pack ships `checks: Check[]`, `checkDisplay`, and `metadata`. Discovered via three complementary paths: name-prefix scan under default + configured `plugins.packageScopes`, `opensipTools.kind: "fit-pack"` marker (scope-independent), or explicit pinning in `plugins.checkPackages:`. See [`50-runtime/02-plugin-loader.md`](/docs/opensip-tools/50-runtime/02-plugin-loader/) for the resolution rules.
 
 | Package | Path | Role | Key exports |
 |---|---|---|---|
@@ -75,6 +98,7 @@ Each pack ships `checks: Check[]`, `checkDisplay`, and `metadata`. Discovered by
 | `@opensip-tools/checks-java` | `packages/fitness/checks-java/` | Java checks | `checks`, `checkDisplay`, `metadata` |
 | `@opensip-tools/checks-go` | `packages/fitness/checks-go/` | Go checks | `checks`, `checkDisplay`, `metadata` |
 | `@opensip-tools/checks-cpp` | `packages/fitness/checks-cpp/` | C/C++ checks (clang-tidy backed) | `checks`, `checkDisplay`, `metadata` |
+| `@opensip-tools/checks-rust` | `packages/fitness/checks-rust/` | Rust checks | `checks`, `checkDisplay`, `metadata` |
 
 ## Layer 5 — composition root
 
@@ -95,8 +119,17 @@ Imports every layer below. The published binary.
 
 ## Verification trail
 
-Last verified at v1.3.0 against:
+Last verified at v2.0.0 against:
 
-- `packages/` directory listing (18 packages — 1 kernel + 1 contracts + 6 lang + 1 fitness + 1 simulation + 1 graph + 6 check packs + 1 cli). v1.3.0 added Python and Rust **graph** adapters as internal subdirs of `@opensip-tools/graph` (`lang-python/`, `lang-rust/`); the published-package count is unchanged. The fitness `lang-python` / `lang-rust` packages at Layer 3 are unrelated siblings — see [`60-subsystems/01-language-adapters.md`](/docs/opensip-tools/60-subsystems/01-language-adapters/) for the `LanguageAdapter` vs. `GraphLanguageAdapter` distinction.
+- `packages/` directory listing — **27 publishable packages** total:
+  - Layer 1 (kernel): 1 — `core`
+  - Layer 2 (datastore + contracts): 2 — `datastore`, `contracts`
+  - Layer 3 Tools: 3 — `fitness`, `simulation`, `graph`
+  - Layer 3 Shared libraries: 2 — `dashboard`, `cli-ui`
+  - Layer 3 Fitness language adapters: 6 — `lang-typescript`, `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp`
+  - Layer 3 Graph language adapters: 5 — `graph-typescript`, `graph-python`, `graph-rust`, `graph-go`, `graph-java`
+  - Layer 4 (check packs): 7 — `checks-universal`, `checks-typescript`, `checks-python`, `checks-java`, `checks-go`, `checks-cpp`, `checks-rust`
+  - Layer 5 (composition root): 1 — `cli`
+- v2.0.0 promoted graph language adapters from internal subdirs to publishable npm packages (`@opensip-tools/graph-*`), added `checks-rust` to the bundled check packs, and split `dashboard` and `cli-ui` into peer-layer libraries to keep Tool engines free of UI-kit and rendering dependencies. The fitness language adapters (`@opensip-tools/lang-*`) and the graph language adapters (`@opensip-tools/graph-*`) are unrelated siblings implementing different contracts (`LanguageAdapter` vs. `GraphLanguageAdapter`) — see [`60-subsystems/01-language-adapters.md`](/docs/opensip-tools/60-subsystems/01-language-adapters/) for the distinction.
 - Each package's `package.json` `description` and `name` field, read directly.
 - The dep-cruiser config for layer rules.

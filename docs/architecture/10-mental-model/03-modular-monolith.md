@@ -1,10 +1,10 @@
 ---
 status: current
-last_verified: 2026-05-22
-release: v1.3.x
+last_verified: 2026-05-26
+release: v2.0.x
 title: "Layered package graph"
 audience: [contributors]
-purpose: "The 19-package monorepo, the five-layer dependency rule, why dependency-cruiser exists, and the trade-offs."
+purpose: "The 27-package monorepo, the five-layer dependency rule, why dependency-cruiser exists, and the trade-offs."
 source-files:
   - .dependency-cruiser.cjs
   - pnpm-workspace.yaml
@@ -20,15 +20,15 @@ related-docs:
 ---
 # Layered package graph
 
-Nineteen packages. Five layers. One enforced rule: dependencies flow up only.
+Twenty-seven packages. Five layers. One enforced rule: dependencies flow up only.
 
 This document is the conceptual map. For the lookup-shaped catalog of every package's role and exports, jump to [`80-reference/01-package-catalog.md`](../80-reference/01-package-catalog.md). For the literal dep-cruiser rules, see [`90-conventions/02-layer-policy.md`](../90-conventions/02-layer-policy.md).
 
 > **What you'll understand after this:**
-> - Why opensip-tools ships as 19 packages instead of one.
+> - Why opensip-tools ships as 27 packages instead of one.
 > - The five layers, in order, and what each one is for.
 > - How the layer rule is enforced (and what happens if you break it).
-> - The two documented exceptions and why they exist.
+> - The documented exceptions and why they exist.
 > - Trade-offs: what this shape buys you, what it costs.
 
 ---
@@ -42,16 +42,18 @@ This document is the conceptual map. For the lookup-shaped catalog of every pack
 │           └──────────────────────────────────────────────────┘    │
 │                                  ▲                                 │
 │  Layer 4  ┌──────────────────────┴───────────────────────────┐    │
-│           │ checks-cpp  checks-go  checks-java  checks-python │   │
-│           │     checks-typescript    checks-universal         │   │
+│           │  checks-cpp  checks-go  checks-java  checks-python│   │
+│           │  checks-rust  checks-typescript  checks-universal │   │
 │           └──────────────────────────────────────────────────┘    │
 │                                  ▲                                 │
 │  Layer 3  ┌──────────┬───────────┴───────────┬───────────────┐    │
-│           │ fitness  simulation  graph  dashboard  lang-… │     │
-│           └──────────┴────────────┴───────┴─────────────────┘    │
+│           │  fitness   simulation   graph   dashboard  cli-ui  │   │
+│           │  lang-{ts,rust,py,java,go,cpp}                     │   │
+│           │  graph-{typescript,python,rust,go,java}            │   │
+│           └──────────────────────────────────────────────────┘    │
 │                                  ▲                                 │
 │  Layer 2  ┌──────────────────────┴───────────────────────────┐    │
-│           │            @opensip-tools/contracts             │    │
+│           │  @opensip-tools/datastore    @opensip-tools/contracts │
 │           └──────────────────────────────────────────────────┘    │
 │                                  ▲                                 │
 │  Layer 1  ┌──────────────────────┴───────────────────────────┐    │
@@ -62,17 +64,24 @@ This document is the conceptual map. For the lookup-shaped catalog of every pack
 └────────────────────────────────────────────────────────────────────┘
 ```
 
-**Layer 1 — `@opensip-tools/core`.** The kernel. Ships types, errors, IDs, the logger, the path resolver, the language-adapter contract, the plugin discovery mechanics, and the Tool registry. No knowledge of fitness, simulation, or any other tool. No dependency on Commander, Ink, or any UI library.
+**Layer 1 — `@opensip-tools/core`.** The kernel. Ships types, errors, IDs, the logger, the path resolver, the language-adapter contract, the plugin discovery mechanics (including the generic marker-discovery walker), and the Tool registry. No knowledge of fitness, simulation, or any other tool. No dependency on Commander, Ink, or any UI library.
 
-**Layer 2 — `@opensip-tools/contracts`.** The shared contract layer between Tools and the runner: the `CliOutput`/`CheckOutput`/`FindingOutput` shape every tool produces, the `CommandResult` discriminated union the renderer dispatches on, the exit-code constants, the session persistence helpers (session writer), and the `GraphCatalog` type surface that the graph tool produces and the dashboard consumes. Depends on `core` only. Does not import any tool.
+**Layer 2 — `@opensip-tools/datastore` and `@opensip-tools/contracts`.** Two packages, both depending on `core` only.
 
-**Layer 3 — `@opensip-tools/fitness`, `@opensip-tools/simulation`, `@opensip-tools/graph`, `@opensip-tools/dashboard`, `@opensip-tools/lang-*`.** Peer packages, all depending on `contracts` and `core`. Each tool engine (`fitness`, `simulation`, `graph`) implements the `Tool` contract. The `dashboard` package is the self-contained HTML report renderer — it consumes session data and the `GraphCatalog` shape from `contracts` and produces a single static HTML string; it does not implement the `Tool` contract because it has no CLI-shaped command surface. Each language adapter (`lang-typescript`, `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp`) implements the `LanguageAdapter` contract. Note that `@opensip-tools/graph` carries its own internal `GraphLanguageAdapter` implementations (TypeScript, Python, Rust) under `packages/graph/engine/src/lang-*/` — those are unrelated siblings to the fitness lang packages at this layer; see [`60-subsystems/01-language-adapters.md`](../60-subsystems/01-language-adapters.md).
+- **`@opensip-tools/datastore`** is the persistence kernel — the `DataStore` interface, the SQLite + Drizzle implementation, the in-memory backend for tests, the workspace migration store under `migrations/`. Paradigm-agnostic infrastructure: tools own their domain schemas (sessions in contracts; baseline/catalog in graph; baseline in fitness) and register them with the datastore at open time.
+- **`@opensip-tools/contracts`** is the shared contract layer between Tools and the runner: the `CliOutput`/`CheckOutput`/`FindingOutput` shape every tool produces, the `CommandResult` discriminated union the renderer dispatches on, the exit-code constants, the `SessionRepo`/`StoredSession` persistence helpers, and the `GraphCatalog` type surface that the graph tool produces and the dashboard consumes. Imports `core` and `datastore`. Does not import any tool.
 
-**Layer 4 — `@opensip-tools/checks-*`.** Six check packs: `checks-universal`, `checks-typescript`, `checks-python`, `checks-go`, `checks-java`, `checks-cpp`. Each pack depends on `fitness` (for `defineCheck`) and `core` (for `Signal`, errors, the language adapter type). Check packs do **not** depend on `cli` or `contracts` — they're the marketplace shape, designed to be installable from npm without dragging the CLI in.
+**Layer 3 — Tools, shared libraries, and language adapters.** Peer packages, all depending on `contracts`, `datastore`, and `core`. Three groups at this layer:
+
+- **Tools** — `@opensip-tools/fitness`, `@opensip-tools/simulation`, `@opensip-tools/graph`. Each implements the `Tool` contract and contributes its own CLI subcommand surface.
+- **Shared libraries** — `@opensip-tools/dashboard` (self-contained HTML report renderer; consumed by fitness's `dashboard` command and the auto-open hook) and `@opensip-tools/cli-ui` (Ink/React presentational primitives — `Banner`, `Spinner`, `RunHeader`, `theme` — extracted from `cli/` so tools that ship a live view depend on the UI kit without pulling in the dispatcher). Neither implements the `Tool` contract; they are libraries Tools consume.
+- **Language adapters** — `lang-typescript`, `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp` implement the `LanguageAdapter` contract used by fitness checks. The graph engine has its own `GraphLanguageAdapter` contract, implemented by five publishable adapter packages: `graph-typescript`, `graph-python`, `graph-rust`, `graph-go`, `graph-java`. The fitness `lang-*` packages and the graph `graph-*` packages are unrelated siblings at this layer — different contracts, different parser stacks; see [`60-subsystems/01-language-adapters.md`](../60-subsystems/01-language-adapters.md) for the distinction.
+
+**Layer 4 — `@opensip-tools/checks-*`.** Seven check packs: `checks-universal`, `checks-typescript`, `checks-python`, `checks-go`, `checks-java`, `checks-cpp`, `checks-rust`. Each pack depends on `fitness` (for `defineCheck`) and `core` (for `Signal`, errors, the language adapter type). Check packs do **not** depend on `cli` or `contracts` — they're the marketplace shape, designed to be installable from npm without dragging the CLI in.
 
 **Layer 5 — `@opensip-tools/cli`.** The composition root. Imports every first-party tool and language adapter, registers them, builds the Commander tree, runs the dispatcher. The only package that knows everything below it.
 
-That's it. Five layers, nineteen packages.
+That's it. Five layers, twenty-seven packages.
 
 ---
 
@@ -147,7 +156,7 @@ The trade-off: a *true* type-only cycle (which is a structural smell — usually
 
 ---
 
-## Why 19 packages and not 1
+## Why 27 packages and not 1
 
 A single mega-package was considered. It would compile faster, ship faster, and have a simpler `package.json`. We chose against it for three load-bearing reasons:
 
@@ -159,7 +168,7 @@ A check pack like `@opensip-tools/checks-python` has to be installable on its ow
 opensip-tools plugin add @opensip-tools/checks-python
 ```
 
-…and not pull in the JavaScript universe. With a single mega-package, every install pulls every check. With 19 packages, an install pulls only what's needed. (Today the bundled distribution still installs everything; tomorrow's tree-shaken or selectively-installed distribution doesn't have to.)
+…and not pull in the JavaScript universe. With a single mega-package, every install pulls every check. With 27 packages, an install pulls only what's needed. (Today the bundled distribution still installs everything; tomorrow's tree-shaken or selectively-installed distribution doesn't have to.)
 
 ### 2. The Tool contract's promise
 
@@ -167,13 +176,13 @@ The Tool contract says "any npm package can be a Tool." That promise only holds 
 
 ### 3. The layer rule needs to be visible
 
-A flat package can have any internal structure. With 19 packages, the layer is the directory structure: looking at `packages/` tells you the architecture in five seconds. If a contributor accidentally adds an upward edge, the build fails before the PR is even reviewed. The layer rule isn't aspiration — it's a wall.
+A flat package can have any internal structure. With 27 packages, the layer is the directory structure: looking at `packages/` tells you the architecture in five seconds. If a contributor accidentally adds an upward edge, the build fails before the PR is even reviewed. The layer rule isn't aspiration — it's a wall.
 
 ---
 
 ## What this shape costs
 
-Trade-offs are real. The 19-package layout is more expensive in three places:
+Trade-offs are real. The 27-package layout is more expensive in three places:
 
 - **More `package.json` files to maintain.** Version bumps span 19 publishable files (plus the private workspace-root `package.json` for tooling versions). We use `pnpm` workspace protocol (`workspace:*`) so internal deps are auto-linked, and a release script bumps all 19 in lockstep.
 - **More `tsconfig.json` files.** Each package has its own. Project references handle the build graph. The cost is configuration footprint, not build speed.

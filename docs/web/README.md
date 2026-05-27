@@ -47,7 +47,7 @@ These docs are written for engineers fluent in TypeScript and Node tooling. Voic
 
 4. [**The fitness loop**](/docs/opensip-tools/10-mental-model/01-fitness-loop/) — **The spine.** One check from definition to violation to gate decision. Threads through every later doc.
 5. [**The tool-plugin model**](/docs/opensip-tools/10-mental-model/02-tool-plugin-model/) — Kernel + Tool contract + first-party tools + dispatcher. Why the CLI doesn't know what `fit` does.
-6. [**Layered package graph**](/docs/opensip-tools/10-mental-model/03-modular-monolith/) — The 19-package monorepo, the layer rules, why dependency-cruiser exists.
+6. [**Layered package graph**](/docs/opensip-tools/10-mental-model/03-modular-monolith/) — The 27-package monorepo, the layer rules, why dependency-cruiser exists.
 7. [**Contract surfaces**](/docs/opensip-tools/10-mental-model/04-contract-surfaces/) — The system's public edges: CLI argv, Tool interface, plugin manifests, JSON output.
 
 ### 20 — The fit loop
@@ -95,7 +95,7 @@ These docs are written for engineers fluent in TypeScript and Node tooling. Voic
 ### 80 — Reference
 *Lookup-shaped. Not for sequential reading.*
 
-26. [**Package catalog**](/docs/opensip-tools/80-reference/01-package-catalog/) — All 19 packages with one-line role and key exports. Grouped by layer.
+26. [**Package catalog**](/docs/opensip-tools/80-reference/01-package-catalog/) — All 27 packages with one-line role and key exports. Grouped by layer.
 27. [**Configuration**](/docs/opensip-tools/80-reference/02-configuration/) — `opensip-tools.config.yml` schema, every field, defaults.
 28. [**JSON output schema**](/docs/opensip-tools/80-reference/03-json-output-schema/) — The `CliOutput` shape consumed by CI and dashboards.
 
@@ -139,4 +139,4 @@ See [`./90-conventions/03-doc-conventions.md`](/docs/opensip-tools/90-convention
 
 ## Status
 
-Doc set authored 2026-05-15 against opensip-tools v1.0.0; re-verified against v1.3.x at 2026-05-22 (third tool `graph` and language-pluggability layer added; broken plan links pruned; JSON output union widened to include `graph`). The package count, the layer rules, the command surface, and the JSON output schema all reflect the current release.
+Doc set authored 2026-05-15 against opensip-tools v1.0.0; re-verified against v2.0.0 at 2026-05-26 (SQLite + Drizzle persistence kernel `@opensip-tools/datastore` extracted; marker-based plugin discovery added alongside scope-prefix; graph language adapters promoted from internal subdirs to publishable `@opensip-tools/graph-*` packages with Go and Java support; `@opensip-tools/cli-ui` extracted from `cli/`; `@opensip-tools/checks-rust` added). The package count, the layer rules, the command surface, and the JSON output schema all reflect the current release.

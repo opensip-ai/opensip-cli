@@ -1,10 +1,10 @@
 ---
 status: current
-last_verified: 2026-05-22
-release: v1.3.x
+last_verified: 2026-05-26
+release: v2.0.x
 title: "Check pack architecture"
 audience: [contributors, plugin-authors]
-purpose: "How check packs are structured, the bundled six, scope filters, parameterization, and the marketplace shape."
+purpose: "How check packs are structured, the bundled seven, scope filters, parameterization, and the marketplace shape."
 source-files:
   - packages/fitness/checks-universal/src/index.ts
   - packages/fitness/checks-typescript/src/index.ts
@@ -12,6 +12,9 @@ source-files:
   - packages/fitness/checks-java/src/index.ts
   - packages/fitness/checks-go/src/index.ts
   - packages/fitness/checks-cpp/src/index.ts
+  - packages/fitness/checks-rust/src/index.ts
+  - packages/fitness/engine/src/plugins/check-package-discovery.ts
+  - packages/core/src/plugins/marker-discovery.ts
   - packages/core/src/plugins/types.ts
 related-docs:
   - ./01-language-adapters.md
@@ -21,7 +24,7 @@ related-docs:
 ---
 # Check pack architecture
 
-A check pack is an npm package that contributes one or more `Check` objects. Six pack packages ship today; an arbitrary number of third-party packs can be added by `plugin add` (or by name-prefix auto-discovery in the `@opensip-tools/checks-*` scope). The pack contract is simple, the marketplace shape is intentional, and the discovery layer (covered in [`50-runtime/02-plugin-loader.md`](../50-runtime/02-plugin-loader.md)) takes care of the rest.
+A check pack is an npm package that contributes one or more `Check` objects. Seven pack packages ship today; an arbitrary number of third-party packs can be added by `plugin add`, by name-prefix auto-discovery within a configured npm scope, or by declaring `opensipTools.kind: "fit-pack"` in `package.json`. The pack contract is simple, the marketplace shape is intentional, and the discovery layer (covered in [`50-runtime/02-plugin-loader.md`](../50-runtime/02-plugin-loader.md)) takes care of the rest.
 
 > **What you'll understand after this:**
 > - The `FitPluginExports` shape every pack implements.
@@ -63,18 +66,19 @@ Plus a discoverable package.json shape:
 }
 ```
 
-There is **no `opensipTools.kind` marker** for check packs. Discovery is **name-based**:
+Discovery uses **two complementary paths**, both run on every fit invocation; results are merged and deduplicated by package name (first-seen wins, name-pattern path takes precedence over marker):
 
-- A package whose name starts with `@opensip-tools/checks-*` is auto-discovered when installed in `node_modules`. This is how the six bundled packs and any packs published in the official scope load.
-- A package with any other name (e.g. `@my-org/fitness-checks`) is only loaded when listed in `plugins.checkPackages:` (or `plugins.fit:`) in `opensip-tools.config.yml`. This is how arbitrary-scope packs load.
+- **Name-pattern + scope** — `<scope>/checks-*` packages installed in `node_modules`. The default scope is `@opensip-tools`; customers extend the scan to their own scope via `plugins.packageScopes:` (e.g. `['@acme']` picks up `@acme/checks-*`). This is how the seven bundled packs and any packs published in a configured scope load.
+- **Marker** — any package whose `package.json` declares `opensipTools.kind: "fit-pack"` is discovered regardless of npm scope or name pattern. Best fit for organisations who'd rather not pin a scope or use the `checks-*` naming convention.
+- **Explicit list** — `plugins.checkPackages:` in `opensip-tools.config.yml` pins a deterministic set by exact name; when set, it wins over the name-pattern path entirely. Use for locked-down deployments where the check inventory must be reproducible. Marker discovery still runs alongside it.
 
-See [`50-runtime/02-plugin-loader.md`](../50-runtime/02-plugin-loader.md) for the resolution rules and how `plugins.autoDiscoverChecks: false` lets you opt out of auto-discovery entirely.
+See [`50-runtime/02-plugin-loader.md`](../50-runtime/02-plugin-loader.md) for the resolution rules and how `plugins.autoDiscoverChecks: false` lets you opt out of the name-pattern path entirely.
 
 The [`collectCheckObjects`](../../../packages/fitness/engine/src/framework/check-types.ts) helper (re-exported from `@opensip-tools/fitness`) walks a barrel's exports recursively, narrowing each value to a `Check` via `isCheck` and deduplicating by reference. Each pack's `src/index.ts` calls it on `allChecks` (the re-export of `src/checks/index.ts`) so new checks are picked up by simply re-exporting them from the category barrel — no central registration list to update.
 
 ---
 
-## The six bundled packs
+## The seven bundled packs
 
 | Pack | Path | Scope |
 |---|---|---|
@@ -84,8 +88,9 @@ The [`collectCheckObjects`](../../../packages/fitness/engine/src/framework/check
 | `@opensip-tools/checks-java` | `packages/fitness/checks-java/` | Java-specific. Today ships `no-printstacktrace`. |
 | `@opensip-tools/checks-go` | `packages/fitness/checks-go/` | Go-specific. Today ships `no-fmt-print`. |
 | `@opensip-tools/checks-cpp` | `packages/fitness/checks-cpp/` | C/C++ via clang-tidy passthrough (`clang-tidy-passthrough`). |
+| `@opensip-tools/checks-rust` | `packages/fitness/checks-rust/` | Rust-specific. Today ships `rust-no-dbg-macro`. |
 
-The per-language packs are intentionally minimal at v1 — one canonical check each, exercised by the per-language CI fixtures and by the language adapters' integration tests. They expand as patterns prove worth standardizing across teams.
+The per-language packs are intentionally minimal at v2.0 — one canonical check each, exercised by the per-language CI fixtures and by the language adapters' integration tests. They expand as patterns prove worth standardizing across teams.
 
 Each pack is structured the same way. Inside `src/checks/`, checks live under category directories: `architecture/`, `quality/`, `security/`, `testing/`, `documentation/`, `resilience/`, `performance/`. The categories aren't enforced by the kernel — they're a convention for discoverability.
 
@@ -245,8 +250,8 @@ Peer-depend on `@opensip-tools/fitness` and `@opensip-tools/core` so a project a
 ```json
 {
   "peerDependencies": {
-    "@opensip-tools/fitness": "^1.0.0",
-    "@opensip-tools/core": "^1.0.0"
+    "@opensip-tools/fitness": "^2.0.0",
+    "@opensip-tools/core": "^2.0.0"
   }
 }
 ```

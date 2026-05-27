@@ -94,7 +94,7 @@
       "audience": [
         "contributors"
       ],
-      "purpose": "The 19-package monorepo, the five-layer dependency rule, why dependency-cruiser exists, and the trade-offs."
+      "purpose": "The 27-package monorepo, the five-layer dependency rule, why dependency-cruiser exists, and the trade-offs."
     },
     {
       "file": "docs/web/10-mental-model/04-contract-surfaces.md",
@@ -260,7 +260,7 @@
         "contributors",
         "plugin-authors"
       ],
-      "purpose": "How check packs are structured, the bundled six, scope filters, parameterization, and the marketplace shape."
+      "purpose": "How check packs are structured, the bundled seven, scope filters, parameterization, and the marketplace shape."
     },
     {
       "file": "docs/web/60-subsystems/03-architecture-gate.md",

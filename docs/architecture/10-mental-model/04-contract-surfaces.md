@@ -264,7 +264,7 @@ You've now seen the four mental-model docs:
 
 1. [`01-fitness-loop.md`](./01-fitness-loop.md) — the spine, eight stages.
 2. [`02-tool-plugin-model.md`](./02-tool-plugin-model.md) — how the CLI doesn't know what `fit` does.
-3. [`03-modular-monolith.md`](./03-modular-monolith.md) — five layers, 19 packages.
+3. [`03-modular-monolith.md`](./03-modular-monolith.md) — five layers, 27 packages.
 4. This doc — the public edges.
 
 Time to go deeper. Section [`20-the-fit-loop/`](../20-the-fit-loop/) expands stages 4–8 of the loop with full code paths. Section [`30-the-sim-loop/`](../30-the-sim-loop/) does the same for `sim`. Sections 40+ cover runtime mechanics, subsystems, surfaces, reference, and conventions.
