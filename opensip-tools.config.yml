@@ -106,6 +106,10 @@ fitness:
   failOnErrors: 1
   failOnWarnings: 0
   disabledChecks:
+    # Testing — architectural mismatch with this repo's testing approach
+    # (integration tests over 1:1 file pairing). See Phase 0 audit findings
+    # in docs/plans/ready/dogfood-fit-against-self/phase-0-audit-and-design.md.
+    - test-file-pairing
     # Docker
     - docker-version-sync
     - docker-best-practices

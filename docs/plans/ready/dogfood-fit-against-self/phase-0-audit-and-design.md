@@ -35,12 +35,97 @@ pnpm fit --json | jq '.summary'
 
 **Commit:** No commit — audit findings recorded in this phase file as part of plan revision.
 
-### Audit findings (to be filled in)
+### Audit findings
 
-- Total violations: TBD
-- Severity breakdown (error / warning / info): TBD
-- Per-check top offenders: TBD
-- Recommended treatment per check: TBD (fix-before-CI vs. baseline-and-ratchet vs. disable-as-N/A)
+**Critical pre-existing dogfood gap discovered.** Before any fix, `pnpm fit`
+from the workspace root loaded **0 checks** because:
+
+1. `opensip-tools.config.yml` did not declare `plugins.checkPackages`.
+2. pnpm's default workspace layout does not materialize `@opensip-tools/checks-*`
+   at the root `node_modules/` — the discovery walker (which looks for
+   `<projectDir>/node_modules/@opensip-tools/checks-*`) found nothing.
+3. Result: silent 0-check run that exited 0 — the exact "green run that
+   scanned nothing" failure mode the engine explicitly tries to prevent
+   via the no-checks-loaded guard. The guard fired (stderr warning), but
+   the exit code was still 0.
+
+**Fix applied as part of Phase 0** (so Phase 1's CI step is meaningful):
+- Added `"injectWorkspacePackages": true` to root `package.json`'s `pnpm`
+  block. This is the standard pnpm idiom for materializing workspace deps
+  into the consumer's node_modules so `<root>/node_modules/@opensip-tools/`
+  is populated.
+- Added `@opensip-tools/checks-typescript` and `@opensip-tools/checks-universal`
+  as root devDependencies (`workspace:*`) so they actually get injected.
+
+After the fix, `pnpm fit` from root loads **115 checks** and runs them
+against the codebase.
+
+**Baseline run results** (post-fix, against this worktree):
+
+- Total checks loaded: **115** (113 reported in summary; 2 are runner-level)
+- Failed checks: **22**
+- Total violations: **1,111** (381 errors + 730 warnings)
+- Severity breakdown:
+  - Error: **381**
+  - Warning: **730**
+  - Info: 0
+
+**Top error-level offenders** (per-check error count):
+
+| Check slug | Violations | Errors |
+|------------|-----------:|-------:|
+| `test-file-pairing` | 194 | 194 |
+| `error-handling-quality` | 46 | 46 |
+| `no-eval` | 22 | 22 |
+| `eslint-justifications` | 22 | 22 |
+| `unsafe-secret-comparison` | 15 | 15 |
+| `semgrep-justifications` | 14 | 12 |
+| `file-length-limit` | 54 | 11 |
+| `silent-early-returns` | 9 | 9 |
+| `context-mutation` | 8 | 8 |
+| `circular-import-detection` | 8 | 8 |
+| `no-deprecated-tests` | 7 | 7 |
+| `sentry-dsn-configured` | 5 | 5 |
+| `no-any-types` | 3 | 3 |
+| `logger-event-name-format` | 3 | 3 |
+| `empty-package-detection` | 3 | 3 |
+| `callback-invocation-safe` | 3 | 3 |
+| `stubbed-implementation-detection` | 2 | 2 |
+| `no-console-log` | 1 | 1 |
+| (others) | — | < 5 each |
+
+**Crucial unanticipated finding:** the plan's premise that
+`no-focused-tests` and `no-console-log` are NOT-yet-ported was wrong.
+Both ship as first-party checks in `@opensip-tools/checks-universal`:
+- `packages/fitness/checks-universal/src/checks/testing/no-focused-tests.ts`
+- `packages/fitness/checks-universal/src/checks/quality/code-structure/no-console-log.ts`
+
+The first-party `no-focused-tests` is more thorough than the source-repo
+port would be (handles Playwright/Vitest concurrent variants). The
+first-party `no-console-log` fires one error today and is functionally
+equivalent.
+
+Per the user's "default to plan's recommended options" directive,
+Phases 2 and 3 still ship project-local `.mjs` files but with **distinct
+slugs** (prefixed `dogfood-`) so they don't shadow the first-party
+versions. They retain the documentation-by-example value the plan
+identified.
+
+**Recommended treatment per check (high-traffic offenders only):**
+
+- `test-file-pairing` (194 errs): existing codebase reality — most non-test
+  source files don't have paired tests by design. **Disabled** in
+  `opensip-tools.config.yml` as part of Phase 0 (this team's coverage
+  convention is integration tests, not 1:1 file pairing).
+- `error-handling-quality` (46 errs): genuine quality findings. Defer to
+  ratchet — fixing 46 sites is its own plan.
+- `no-eval` / `unsafe-secret-comparison` (37 errs combined): need
+  case-by-case review; some may be in trusted test fixtures.
+- `eslint-justifications` / `semgrep-justifications`: genuine —
+  housekeeping. Defer.
+- `file-length-limit`: 54 findings, 11 errors. Architectural; defer.
+- All remaining < 10 errors each: ratchet under GH Code Scanning so net-new
+  violations are surfaced without blocking the plan's landing.
 
 ---
 
@@ -81,11 +166,48 @@ Decide the following and record the choice + rationale below.
 
 **Commit:** `docs(plans): dogfood-fit-against-self phase 0 design decisions`
 
-### Decisions (to be filled in)
+### Decisions
 
-- Ratchet mechanism: **TBD** ((A) / (B) / (C)) — rationale: TBD
-- SARIF upload: **TBD** — rationale: TBD
-- CI script naming: **TBD** — rationale: TBD
+- **Ratchet mechanism: (B) GH Code Scanning ratchet** — rationale: 381
+  error-level violations is far above the 20-error threshold in the
+  plan's decision rule. Fixing them all in this PR is impractical and
+  would defer the dogfood loop indefinitely. Option (C) requires a
+  fitness-engine feature (`fit-baseline-import`) that doesn't exist.
+  Option (B) is the only viable path — CI runs `fit --gate-save` (which
+  records the baseline into the CI-ephemeral SQLite, but the
+  `failOnErrors: 1` config still gates the step on any error-level
+  finding). We additionally disable `test-file-pairing` (architectural
+  mismatch with this repo's testing conventions) up front to remove the
+  largest noise source. A follow-up plan will work down the remaining
+  errors.
+
+- **SARIF upload: yes, via `github/codeql-action/upload-sarif@v3`** —
+  rationale: even with the engine-level gate, GH Code Scanning provides
+  inline PR annotations that no other surface can deliver. The export
+  command exists (`fit-baseline-export --out fit.sarif`) and produces
+  valid SARIF.
+
+- **CI script naming: `pnpm fit:ci`** — rationale: keeps local-dev `pnpm
+  fit` ergonomic; CI script is explicit about its flags. Added to
+  `package.json` in Phase 0 (along with the workspace-dep injection
+  required to make `pnpm fit` actually load checks at all). The SARIF
+  export step lives in the workflow YAML rather than the npm script so
+  the script's exit code cleanly reflects fit's exit code.
+
+### Additional Phase 0 fixes applied
+
+Two changes landed in Phase 0 beyond the planned tasks because they
+were prerequisites for any subsequent phase:
+
+1. **Workspace dep injection** (root `package.json` + `pnpm.injectWorkspacePackages: true`):
+   without this, `pnpm fit` from root loads 0 checks. This was a real
+   pre-existing dogfood gap.
+2. **`test-file-pairing` disabled** in `opensip-tools.config.yml`:
+   architectural mismatch with this repo's testing approach (integration
+   tests over 1:1 file pairing). Removes 194 false-positive errors.
+
+Both changes are documented in this phase's commit and explained in
+`CLAUDE.md`'s Dogfood Gate section (added in Phase 1 Task 1.4).
 
 ---
 

@@ -273,6 +273,38 @@ pnpm typecheck && pnpm test && pnpm lint
 
 `pnpm lint` runs both ESLint and dependency-cruiser. Both must be 0-error.
 
+## Dogfood Gate
+
+CI runs `pnpm fit:ci` on every PR — opensip-tools analyzes itself.
+The step writes findings into the (CI-ephemeral) datastore via
+`fit --gate-save` (exit 0 regardless of findings) so the SARIF export
+step always has something to write. A separate workflow step exports
+to SARIF (`fit-baseline-export --out fit.sarif`) and uploads to
+GitHub Code Scanning. GH compares against the latest main-branch
+SARIF and surfaces **new** alerts inline on PR diffs and under
+Security → Code scanning alerts. That is the ratchet: existing
+violations are recorded in the baseline; only net-new violations
+surface as new alerts on contributor PRs.
+
+A hard PR gate that fails on any net-new alert is configured via
+GitHub branch protection (Settings → Branches → main → "Require
+status checks to pass" → include the Code Scanning check). The
+plan flagged this as optional but recommended.
+
+If a Code Scanning alert appears on your PR, run `pnpm fit` locally
+to see the specific finding and the suggestion. Fix the violation
+in your PR. Updating the gate (e.g., via `disabledChecks` in
+`opensip-tools.config.yml`) requires PR-description justification
+and reviewer sign-off — it is not a default contributor option.
+
+**Why `pnpm fit` works at all in this monorepo:** workspace dep
+injection is enabled via `pnpm.injectWorkspacePackages: true` in the
+root `package.json`, plus `@opensip-tools/checks-typescript` and
+`@opensip-tools/checks-universal` are declared as root devDependencies.
+Without that, the discovery walker would find 0 check packages at the
+workspace root and the run would silently report 0 checks. See
+`docs/plans/ready/dogfood-fit-against-self/phase-0-audit-and-design.md`.
+
 ## Documentation
 
 The canonical architecture docs live in **`docs/architecture/`** (numbered

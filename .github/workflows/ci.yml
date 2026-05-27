@@ -10,6 +10,10 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: read
+      security-events: write
+
     strategy:
       matrix:
         node-version: [22]
@@ -35,6 +39,26 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+      # Dogfood: run opensip-tools fit against this repo. The CI step
+      # fails on any error-level finding (failOnErrors: 1 in
+      # opensip-tools.config.yml). See docs/plans/ready/dogfood-fit-against-self/
+      # for the full design. See CLAUDE.md "Dogfood Gate" for the
+      # contributor workflow.
+      - name: Fit (dogfood)
+        id: fit
+        run: pnpm fit:ci
+
+      - name: Export fit baseline to SARIF
+        if: always() && steps.fit.outcome != 'skipped'
+        run: node packages/cli/dist/index.js fit-baseline-export --out fit.sarif
+
+      - name: Upload fit SARIF
+        if: always() && hashFiles('fit.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: fit.sarif
+          category: opensip-tools-fit
 
       # Verify docs/web/ (the website-facing transformed copy of
       # docs/architecture/) is in sync with its source. Editors who

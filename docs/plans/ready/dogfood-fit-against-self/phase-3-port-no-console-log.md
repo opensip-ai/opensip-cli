@@ -46,15 +46,34 @@ grep -rn "console\." packages/ --include="*.ts" | grep -v "test" | grep -v "\.d\
 
 **Commit:** No commit — audit notes recorded in this phase file.
 
-### Allowlist (to be filled in by Task 3.1)
+### Allowlist (Task 3.1 findings)
 
-- `packages/core/src/lib/logger.ts` — logger implementation (assumed; verify by reading the file)
-- `packages/cli-ui/src/` — Ink components (assumed; verify by audit)
-- (additional paths) — TBD
+Audit of `grep -rn "console\.(log|error|warn|info|debug)\s*(" packages/`
+across all production `.ts`/`.tsx` files (excluding tests, dist, and
+node_modules) yielded **one** call site:
 
-### Genuine violations to address before merging (to be filled in)
+- `packages/fitness/engine/src/framework/execution-context.ts:226` —
+  `console.log` inside a verbose check-level debug helper, already
+  exempted via inline `@fitness-ignore-next-line no-console-log` pragma.
 
-- TBD — these MUST be fixed in this PR. The check is the gate; we can't ship a check that fails on day-one. (Project-local checks don't go through the global `failOnErrors` baseline machinery; whatever the check returns surfaces in `pnpm fit` directly.)
+No other production console calls exist in this codebase. The
+hypothesized allowlist paths (`packages/core/src/lib/logger.ts`,
+`packages/cli-ui/src/`) contain ZERO console calls — opensip-tools uses
+its structured Pino logger everywhere and Ink does its own stdout writes
+internally (without calling `console.*` from our code).
+
+The project-local `dogfood-no-console-log` check therefore needs only a
+narrow allowlist — the file-ignore directive on the single exempt site
+is sufficient. The check still implements path-substring allowlist
+support so future call sites that legitimately need console (e.g.,
+boot-time logging before the structured logger is wired) can be added
+without code change.
+
+### Genuine violations to address before merging
+
+**None.** The audit found zero un-pragmaed console calls in production
+code. The new check passes cleanly on a fresh run; no source-file
+fixes are needed in this phase.
 
 ---
 

@@ -11,6 +11,15 @@ importers:
       '@eslint/js':
         specifier: ^9.39.4
         version: 9.39.4
+      '@opensip-tools/checks-typescript':
+        specifier: workspace:*
+        version: link:packages/fitness/checks-typescript
+      '@opensip-tools/checks-universal':
+        specifier: workspace:*
+        version: link:packages/fitness/checks-universal
+      '@opensip-tools/fitness':
+        specifier: workspace:*
+        version: link:packages/fitness/engine
       '@vitest/coverage-v8':
         specifier: ^2.1.9
         version: 2.1.9(vitest@2.1.9(@types/node@22.19.15)(jsdom@29.1.1))
