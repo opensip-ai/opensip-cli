@@ -70,6 +70,14 @@ import type { DataStore } from '@opensip-tools/datastore';
 // literal; each tool decides its own live-view name.
 const FIT_LIVE_VIEW_KEY = 'fit';
 
+// Shared option flags + descriptions reused across every fitness
+// subcommand. Constants exist to satisfy sonarjs/no-duplicate-string
+// and to keep the Commander wiring consistent if the wording changes.
+const JSON_FLAG = '--json';
+const JSON_DESC = 'Output structured JSON';
+const CWD_FLAG = '--cwd <path>';
+const CWD_DESC = 'Target directory';
+
 // =============================================================================
 // COMMAND DESCRIPTORS — used by --help listings and conflict detection.
 // =============================================================================
@@ -172,13 +180,13 @@ function registerFitCommand(program: CliProgram, cli: ToolCliContext): void {
     .option('--tags <tags>', 'Filter checks by tags (comma-separated)')
     .option('--list', 'List available checks', false)
     .option('--recipes', 'List available recipes', false)
-    .option('--json', 'Output structured JSON', false)
+    .option(JSON_FLAG, JSON_DESC, false)
     .option('-v, --verbose', 'Show finding details inline + findings summary', false)
     .option('--findings', 'Show all findings grouped by check after the run', false)
     .option('--report-to <url>', 'POST findings to a URL (OpenSIP Cloud or compatible)')
     .option('--api-key <key>', 'API key for --report-to authentication')
     .option('--exclude <slug>', 'Exclude check (repeatable)', (val: string, prev: string[]) => [...prev, val], [] as string[])
-    .option('--cwd <path>', 'Target directory', process.cwd())
+    .option(CWD_FLAG, CWD_DESC, process.cwd())
     .option('--config <path>', 'Path to opensip-tools.config.yml (overrides package.json pointer and default)')
     .option('-q, --quiet', 'Suppress banner / boxes; print only the pass-fail summary', false)
     .option('--open', 'Launch the HTML dashboard in your browser after the run completes', false)
@@ -212,8 +220,8 @@ function registerDashboardCommand(program: CliProgram, cli: ToolCliContext): voi
   program
     .command(DASHBOARD.name)
     .description(DASHBOARD.description)
-    .option('--cwd <path>', 'Target directory', process.cwd())
-    .option('--json', 'Output structured JSON', false)
+    .option(CWD_FLAG, CWD_DESC, process.cwd())
+    .option(JSON_FLAG, JSON_DESC, false)
     .option('--debug', 'Enable debug mode for structured log output', false)
     .action(async (opts: ToolOptions) => {
       const result = await openDashboard(opts.cwd, cli.datastore as DataStore);
@@ -231,8 +239,8 @@ function registerListCommand(program: CliProgram, cli: ToolCliContext): void {
     .description(FIT_LIST.description);
   for (const alias of FIT_LIST.aliases ?? []) fitListCmd.alias(alias);
   fitListCmd
-    .option('--cwd <path>', 'Target directory', process.cwd())
-    .option('--json', 'Output structured JSON', false)
+    .option(CWD_FLAG, CWD_DESC, process.cwd())
+    .option(JSON_FLAG, JSON_DESC, false)
     .action(async (opts: ToolOptions) => {
       const result = await listChecks(opts.cwd);
       if (opts.json) { cli.emitJson(result); return; }
@@ -246,8 +254,8 @@ function registerRecipesCommand(program: CliProgram, cli: ToolCliContext): void 
     .description(FIT_RECIPES.description);
   for (const alias of FIT_RECIPES.aliases ?? []) fitRecipesCmd.alias(alias);
   fitRecipesCmd
-    .option('--cwd <path>', 'Target directory', process.cwd())
-    .option('--json', 'Output structured JSON', false)
+    .option(CWD_FLAG, CWD_DESC, process.cwd())
+    .option(JSON_FLAG, JSON_DESC, false)
     .action(async (opts: ToolOptions) => {
       const result = await listRecipes(opts.cwd);
       if (opts.json) { cli.emitJson(result); return; }
@@ -260,8 +268,8 @@ function registerBaselineExportCommand(program: CliProgram, cli: ToolCliContext)
     .command(FIT_BASELINE_EXPORT.name)
     .description(FIT_BASELINE_EXPORT.description)
     .requiredOption('--out <path>', 'Output file path for the SARIF baseline')
-    .option('--cwd <path>', 'Target directory', process.cwd())
-    .option('--json', 'Output structured JSON', false)
+    .option(CWD_FLAG, CWD_DESC, process.cwd())
+    .option(JSON_FLAG, JSON_DESC, false)
     .action((opts: ToolOptions & { out: string }) => {
       const datastore = cli.datastore as DataStore;
       const result = exportFitBaseline(datastore, opts.out);
