@@ -11,6 +11,15 @@
  */
 
 // =============================================================================
+// RUNSCOPE AUGMENTATION — D7 (tool subscopes via module augmentation).
+// Side-effect import so importing the simulation package surfaces
+// `scope.simulation` on the augmented RunScope interface.
+// =============================================================================
+
+import './scope-augmentation.js'
+export type { SimulationSubscope } from './scope-augmentation.js'
+
+// =============================================================================
 // KIND DISCRIMINATOR
 // =============================================================================
 
