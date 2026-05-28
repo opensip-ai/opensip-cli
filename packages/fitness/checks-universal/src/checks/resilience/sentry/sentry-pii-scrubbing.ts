@@ -117,6 +117,7 @@ export const sentryPiiScrubbing = defineCheck({
   id: 'd4f0b6c3-7e5a-4b1d-c234-a6f8d0e2b5c7',
   slug: 'sentry-pii-scrubbing',
   scope: { languages: ['typescript', 'javascript'], concerns: ['backend', 'frontend'] },
+  contentFilter: 'strip-strings-and-comments',
   description: 'Detects missing PII scrubbing in Sentry — personal data may leak to third party',
   longDescription: `**Purpose:** Ensures personal data is scrubbed before being sent to Sentry, preventing GDPR/CCPA violations.
 

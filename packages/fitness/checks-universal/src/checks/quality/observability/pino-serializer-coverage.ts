@@ -233,7 +233,7 @@ export const pinoSerializerCoverage = defineCheck({
   id: 'e54a6ff0-332e-4848-bc62-d7df37b4795a',
   slug: 'pino-serializer-coverage',
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'raw',
+  contentFilter: 'strip-strings-and-comments',
 
   confidence: 'medium',
   description: 'Validates that complex objects logged have proper Pino serializers',
