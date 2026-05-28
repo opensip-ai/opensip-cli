@@ -6,10 +6,7 @@
  * Validates with Zod and populates a TargetRegistry.
  */
 
-import { readFileSync, statSync } from 'node:fs'
-
-import { PROJECT_CONFIG_FILENAME, resolveProjectConfigPath , ValidationError, SystemError } from '@opensip-tools/core'
-import yaml from 'js-yaml'
+import { PROJECT_CONFIG_FILENAME, ValidationError, readYamlFileOrThrow, resolveProjectConfigPath } from '@opensip-tools/core'
 import { z } from 'zod'
 
 
@@ -137,46 +134,17 @@ function buildFromParsed(
 // YAML config loader
 // =============================================================================
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB
-
-/** @throws {ValidationError} When the file is too large, missing, or unreadable */
-function readYamlFile(filePath: string): string {
-  try {
-    const stats = statSync(filePath)
-    if (stats.size > MAX_FILE_SIZE) {
-      throw new SystemError(`File too large (${stats.size} bytes, max ${MAX_FILE_SIZE}): ${filePath}`, { code: 'SYSTEM.FILE.TOO_LARGE' })
-    }
-    return readFileSync(filePath, 'utf8')
-  } catch (error) {
-    if (error instanceof ValidationError || error instanceof SystemError) throw error
-    throw new ValidationError(
-      `${YAML_FILENAME} not found at ${filePath}. Create one to define your targets.`,
-      { operation: 'load', loader: 'targets' },
-    )
-  }
-}
-
-/** @throws {ValidationError} When the YAML is malformed */
-function parseYamlContent(raw: string): unknown {
-  try {
-    return yaml.load(raw)
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    throw new ValidationError(`${YAML_FILENAME} contains invalid YAML: ${message}`, {
-      operation: 'load',
-      loader: 'targets',
-      cause: error instanceof Error ? error : undefined,
-    })
-  }
-}
-
 /**
- * @throws {ValidationError} When the file is missing or contains invalid YAML
- * @throws {ValidationError} When the file fails schema validation
+ * @throws {SystemError} When the file exceeds the shared default 10 MB cap.
+ * @throws {ValidationError} When the file is missing, unreadable, contains
+ *   invalid YAML, or fails schema validation.
  */
 function loadYamlConfig(filePath: string): { registry: TargetRegistry; config: TargetsConfig } {
-  const raw = readYamlFile(filePath)
-  const parsed = parseYamlContent(raw)
+  // Strict YAML read + parse via the shared core helper (audit-round-3
+  // Finding G — completes the round-2 migration that signalers/loader
+  // already adopted). Raises `SystemError` for oversized files and
+  // `ValidationError` for missing / unreadable / malformed YAML.
+  const parsed = readYamlFileOrThrow(filePath, { loader: 'targets' })
 
   const result = TargetsFileSchema.safeParse(parsed)
   if (!result.success) {
