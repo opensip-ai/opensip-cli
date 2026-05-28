@@ -297,6 +297,15 @@ export function installPreActionHook(program: Command): void {
       // `getOrOpenDatastore()` find the same instance.
       datastore: buildDatastoreThunk(project, logger),
     });
+    // D7: each registered tool gets a chance to populate its
+    // tool-specific subscope (e.g. `scope.simulation`, `scope.graph`)
+    // BEFORE the scope is entered. The kernel doesn't know about
+    // tool-specific namespaces — the tool's own `extendScope` hook owns
+    // its slot. Run in tool registration order; a tool with no
+    // extendScope hook is silently skipped.
+    for (const tool of tools.list()) {
+      tool.extendScope?.(scope);
+    }
     enterScope(scope);
     setCurrentRunScope(scope);
 
