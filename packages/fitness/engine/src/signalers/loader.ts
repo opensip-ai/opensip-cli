@@ -12,11 +12,27 @@ import { readFileSync, statSync } from 'node:fs'
 import {  resolveProjectConfigPath , ValidationError, SystemError , logger } from '@opensip-tools/core'
 import yaml from 'js-yaml'
 
-const deepFreeze = <T>(obj: T): T => structuredClone(obj)
-
 import { SignalersConfigSchema } from './schema.js'
 
 import type { SignalersConfig } from './types.js'
+
+/**
+ * Recursively freeze every nested object so the `DeepReadonly` claim
+ * on `SignalersConfig` is honoured at runtime, not just at the type
+ * level. The previous implementation aliased `structuredClone` under
+ * the name `deepFreeze` — it copied without freezing, so the
+ * `SignalersConfig` readonly type was a lie at runtime. Audit-round-2
+ * Finding E.
+ */
+function deepFreeze<T>(value: T): T {
+  if (value !== null && typeof value === 'object' && !Object.isFrozen(value)) {
+    for (const key of Object.keys(value)) {
+      deepFreeze((value as Record<string, unknown>)[key])
+    }
+    Object.freeze(value)
+  }
+  return value
+}
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB
 
@@ -138,7 +154,10 @@ export function loadSignalersConfig(
     targetCount,
   })
 
-  const frozen = deepFreeze(data as unknown as Record<string, unknown>) as unknown as SignalersConfig
+  // `data` is typed `z.infer<typeof SignalersConfigSchema>` (mutable).
+  // After deepFreeze it's structurally read-only end-to-end; the single
+  // cast adds the `DeepReadonly` wrapper that defines `SignalersConfig`.
+  const frozen = deepFreeze(data) as SignalersConfig
   cache.set(filePath, { config: frozen, cachedAt: Date.now(), filePath })
   return frozen
 }
