@@ -26,6 +26,7 @@ const VALID_TEST_PATTERNS = [
  * Files/patterns to ignore (test utilities, helpers, setup files)
  */
 const IGNORED_PATTERNS = [
+  /^_/, // Underscore-prefixed files are private helpers/runners by convention
   /^setup\.[jt]sx?$/, // Test setup files
   /^test-setup\.[jt]sx?$/, // Test setup files
   /-test-setup\.[jt]sx?$/, // Test setup files with module prefix (e.g. git-worktree-test-setup.ts)
@@ -45,8 +46,20 @@ const IGNORED_PATTERNS = [
 
 /**
  * Directories to skip (build artifacts, etc.)
+ *
+ * `fixtures` and `test-utils` are subdirectories used to host test inputs
+ * and per-package scope helpers — their files don't follow `.test.ts`
+ * naming because they're not test files in the Vitest-discovery sense.
  */
-const SKIP_DIRECTORIES = new Set(['node_modules', 'dist', 'build', 'coverage', '.turbo'])
+const SKIP_DIRECTORIES = new Set([
+  'node_modules',
+  'dist',
+  'build',
+  'coverage',
+  '.turbo',
+  'fixtures',
+  'test-utils',
+])
 
 /**
  * Directories to scan for tests

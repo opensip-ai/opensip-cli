@@ -1,4 +1,5 @@
 /* eslint-disable sonarjs/fixme-tag -- this file's job is to detect TODO/FIXME markers; the words appear in identifiers and JSDoc by necessity */
+// @fitness-ignore-file no-todo-comments -- this file's job is to detect TODO/FIXME/XXX/OPTIMIZE markers; the words appear in regex and JSDoc by design
 /**
  * @fileoverview Cross-language TODO/FIXME comment detection.
  *

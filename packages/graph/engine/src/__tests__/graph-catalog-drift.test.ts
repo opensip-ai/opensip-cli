@@ -1,3 +1,4 @@
+// @fitness-ignore-file no-stub-tests -- runtime body is intentionally trivial; this is a compile-time drift detector enforced by the type assertion above (line 31)
 /**
  * Compile-time drift detector for the contracts/graph catalog duplication.
  *
