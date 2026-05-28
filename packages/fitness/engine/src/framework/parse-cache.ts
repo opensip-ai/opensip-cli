@@ -34,6 +34,7 @@ export function getSharedSourceFile(filePath: string, content: string): ts.Sourc
     return ts.createSourceFile(filePath, content, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
   /* v8 ignore start -- defensive: ts.createSourceFile is permissive (recovers from syntax errors) and effectively does not throw on real input */
   } catch {
+    // @fitness-ignore-next-line error-handling-quality -- defensive parse-or-null fallback for the no-adapter-bootstrap path; ts.createSourceFile is permissive and effectively unreachable on real input (see v8 ignore above).
     return null
   }
   /* v8 ignore stop */

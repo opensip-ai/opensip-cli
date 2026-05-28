@@ -1,3 +1,4 @@
+// @fitness-ignore-file error-handling-quality -- dashboard is a best-effort UX action: signalers-config load failures degrade gracefully to ungoverned mode (surfaced separately by the fitness run), and browser launch failures fall through to "open manually" (the report file path is already returned to the user).
 /**
  * dashboard command — generate HTML report and open in browser
  */
