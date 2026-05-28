@@ -11,9 +11,6 @@
  * now sections in this unified report.
  */
 
-import { randomUUID } from 'node:crypto';
-import { writeFileSync } from 'node:fs';
-
 import { EXIT_CODES, SessionRepo } from '@opensip-tools/contracts';
 import {
   ConfigurationError,
@@ -22,110 +19,36 @@ import {
   ToolError,
   ValidationError,
 } from '@opensip-tools/core';
-import { reportToCloud } from '@opensip-tools/fitness';
 
-import { compareToBaseline, fingerprintSignal, saveBaseline } from '../gate.js';
-import { GraphBaselineRepo } from '../persistence/baseline-repo.js';
-import { renderCatalogJson } from '../render/catalog-json.js';
 import { buildCliOutput, buildCliOutputFromFindings, renderJson } from '../render/json.js';
-import { renderSarif } from '../render/sarif.js';
-import { inferEntryPoints } from '../rules/_entry-points.js';
-import { currentRules } from '../rules/registry.js';
 
+import { runCatalogJsonMode, runGateMode, runReportMode } from './graph-modes.js';
+import { renderPackagesJson, writePackagesReport } from './graph-packages-report.js';
+import { writeUnifiedReport } from './graph-report.js';
 import { runGraph } from './orchestrate.js';
 import { runPackagesInParallel } from './packages-runner.js';
 import { MemoryPressureError } from './pressure-monitor.js';
 import { discoverWorkspacePackages, resolvePackageScope } from './scope.js';
 
-import type { PackageRunResult } from './packages-runner.js';
-import type { EntryPoint } from '../rules/_entry-points.js';
-import type { Catalog, Indexes } from '../types.js';
+import type { GraphCommandOptions } from './graph-options.js';
 import type { FindingOutput } from '@opensip-tools/contracts';
 import type { Signal, ToolCliContext } from '@opensip-tools/core';
 import type { DataStore } from '@opensip-tools/datastore';
 
-const ENTRY_POINTS_PREVIEW = 10;
-const FINDINGS_PREVIEW = 10;
+export type { GraphCommandOptions } from './graph-options.js';
 
 const EVT_GRAPH_COMPLETE = 'graph.cli.graph.complete';
 const MODULE_GRAPH_CLI = 'graph:cli';
 const MODULE_GRAPH_RENDER = 'graph:render';
 
-function countFiles(catalog: Catalog): number {
-  const files = new Set<string>();
-  for (const name of Object.keys(catalog.functions)) {
-    const occs = catalog.functions[name];
-    if (!occs) continue;
-    for (const o of occs) files.add(o.filePath);
-  }
-  return files.size;
-}
+// MODULE_GRAPH_RENDER is referenced by the json-render path below. The
+// catalog-json + sarif rendering branches now live in `./graph-modes.ts`.
 
-function countOccurrences(catalog: Catalog): number {
-  let n = 0;
-  for (const name of Object.keys(catalog.functions)) {
-    const occs = catalog.functions[name];
-    if (occs) n += occs.length;
-  }
-  return n;
-}
-
-export interface GraphCommandOptions {
-  readonly cwd: string;
-  readonly json?: boolean;
-  readonly noCache?: boolean;
-  readonly gateSave?: boolean;
-  readonly gateCompare?: boolean;
-  readonly baseline?: string;
-  readonly reportTo?: string;
-  readonly apiKey?: string;
-  /**
-   * Optional --package <name|path> scope. When set, the run targets a
-   * single workspace package's tsconfig instead of the whole project.
-   * See docs/plans/graph-performance-improvements.md Phase 6.
-   */
-  readonly packageScope?: string;
-  /**
-   * Optional --packages flag (no argument). When set, the run fans out
-   * across every workspace package under packages/** with a tsconfig.
-   * Each package runs in its own child process; findings are
-   * aggregated in the parent. Wave 3 of the perf plan.
-   */
-  readonly allPackages?: boolean;
-  /**
-   * Optional concurrency cap for --packages. Defaults to
-   * `os.cpus().length - 1`. Exposed primarily for tests.
-   */
-  readonly packagesConcurrency?: number;
-  /**
-   * Path to the CLI entry script. When --packages is set, child
-   * processes invoke `node <cliScript> graph --package <dir> --json`.
-   * Tools wiring `executeGraph` should pass `process.argv[1]`.
-   */
-  readonly cliScript?: string;
-  /**
-   * --catalog-output <path>. When set, runs in catalog-JSON emission
-   * mode: walks the engine's `Catalog` + edges, derives opensip-
-   * compatible symbol/edge IDs, and writes a `CatalogExport` JSON
-   * document to the path. File output (not stdout) because catalog
-   * JSON for 100k-file repos exceeds practical stdout buffer sizes.
-   *
-   * Required companion opts when set: `tenantId`, `repoId`, `gitSha`.
-   * `runId` is auto-generated if not provided.
-   *
-   * Phase 3 Task 3.4 per opensip DEC-498. Phase 6's
-   * EngineSubprocessPort invokes this mode per commit-sync run.
-   */
-  readonly catalogOutput?: string;
-  /** Tenant scope for catalog-output provenance. */
-  readonly tenantId?: string;
-  /** Repository scope — applied to every row in catalog-output. */
-  readonly repoId?: string;
-  /** Commit SHA the catalog was extracted at — provenance for every row. */
-  readonly gitSha?: string;
-  /** Optional UUID for the catalog-output run. Auto-generated if absent. */
-  readonly runId?: string;
-}
+// Re-exported so existing consumers (`@opensip-tools/graph` barrel,
+// `cli/graph-runner.tsx`, tests) keep using `cli/graph.js` as the
+// single import site. The implementation lives in `graph-report.ts`.
+export { buildUnifiedReportLines } from './graph-report.js';
+export type { UnifiedReportInput } from './graph-report.js';
 
 export async function executeGraph(
   opts: GraphCommandOptions,
@@ -313,236 +236,6 @@ async function executePackagesGraph(
   });
 }
 
-function writePackagesReport(
-  perPackage: readonly PackageRunResult[],
-  durationMs: number,
-): void {
-  const totalFindings = perPackage.reduce((n, r) => n + r.findings.length, 0);
-  const lines: string[] = [
-    'opensip-tools graph --packages',
-    '',
-    `== Packages (${String(perPackage.length)}) ==`,
-    ...renderPackagesStatusLines(perPackage),
-    '',
-    '== Findings ==',
-    ...renderPackagesFindingsLines(perPackage),
-    '== Summary ==',
-    `${String(totalFindings)} total finding(s) across ${String(perPackage.length)} package(s) in ${String(durationMs)} ms.`,
-  ];
-  process.stdout.write(`${lines.join('\n')}\n`);
-}
-
-function renderPackagesStatusLines(perPackage: readonly PackageRunResult[]): readonly string[] {
-  const out: string[] = [];
-  for (const r of perPackage) {
-    const status = r.exitCode === 0 ? 'ok' : `FAILED (exit ${String(r.exitCode)})`;
-    const display = packageDisplay(r);
-    out.push(`  ${display}: ${String(r.findings.length)} finding(s) — ${status}`);
-    if (r.exitCode !== 0 && r.stderr.length > 0) {
-      const stderrPreview = r.stderr.split('\n').slice(0, 3).join('\n    ');
-      out.push(`    stderr: ${stderrPreview}`);
-    }
-  }
-  return out;
-}
-
-function renderPackagesFindingsLines(perPackage: readonly PackageRunResult[]): readonly string[] {
-  const out: string[] = [];
-  for (const r of perPackage) {
-    if (r.findings.length === 0) continue;
-    out.push(`[${packageDisplay(r)}]`, ...renderPackageFindingPreview(r), '');
-  }
-  return out;
-}
-
-function renderPackageFindingPreview(r: PackageRunResult): readonly string[] {
-  const preview = r.findings.slice(0, FINDINGS_PREVIEW);
-  const lines = preview.map((f) => {
-    const loc = typeof f.line === 'number' ? `:${String(f.line)}` : '';
-    return `  ${f.filePath}${loc} — ${f.message}`;
-  });
-  if (r.findings.length > preview.length) {
-    lines.push(`  ... ${String(r.findings.length - preview.length)} more (use --json for full list)`);
-  }
-  return lines;
-}
-
-function packageDisplay(r: PackageRunResult): string {
-  return r.displayPath.length > 0 ? r.displayPath : r.packageDir;
-}
-
-function renderPackagesJson(
-  perPackage: readonly PackageRunResult[],
-  durationMs: number,
-): string {
-  return JSON.stringify(
-    {
-      version: '1.0',
-      tool: 'graph',
-      command: 'graph',
-      mode: 'packages',
-      timestamp: new Date().toISOString(),
-      durationMs,
-      packages: perPackage.map((r) => ({
-        packageDir: r.packageDir,
-        displayPath: r.displayPath,
-        exitCode: r.exitCode,
-        findings: r.findings,
-      })),
-      totalFindings: perPackage.reduce((n, r) => n + r.findings.length, 0),
-    },
-    null,
-    2,
-  );
-}
-
-export interface UnifiedReportInput {
-  readonly catalog: Catalog | null;
-  readonly indexes: Indexes | null;
-  readonly signals: readonly Signal[];
-  readonly cacheHit: boolean;
-}
-
-/**
- * Build the unified terminal report lines: catalog summary, findings
- * grouped by rule, top-N entry points, and a single-line summary. The
- * caller decides where to write them (raw stdout for non-interactive
- * paths, or the Ink view in the default human-report path).
- */
-export function buildUnifiedReportLines(input: UnifiedReportInput): readonly string[] {
-  const knownRuleIds = currentRules().map((r) => r.slug);
-  const byRule = groupSignalsByRule(input.signals);
-  const eps = input.catalog && input.indexes
-    ? enrichEntryPoints(input.catalog, input.indexes)
-    : [];
-
-  return [
-    ...renderCatalogSection(input.catalog, input.cacheHit),
-    '',
-    ...renderFindingsSection(input.signals.length, byRule, knownRuleIds),
-    ...renderEntryPointsSection(eps),
-    '',
-    ...renderSummarySection(byRule, knownRuleIds, input.signals.length),
-  ];
-}
-
-function writeUnifiedReport(input: UnifiedReportInput): void {
-  const lines = ['opensip-tools graph', '', ...buildUnifiedReportLines(input)];
-  process.stdout.write(`${lines.join('\n')}\n`);
-}
-
-function renderCatalogSection(catalog: Catalog | null, cacheHit: boolean): readonly string[] {
-  const lines: string[] = ['== Catalog =='];
-  if (catalog) {
-    const fileCount = countFiles(catalog);
-    const fnCount = countOccurrences(catalog);
-    lines.push(
-      `${String(fnCount)} functions across ${String(fileCount)} files (cacheHit=${String(cacheHit)})`,
-    );
-  } else {
-    /* v8 ignore next */
-    lines.push('(no catalog produced)');
-  }
-  return lines;
-}
-
-function renderFindingsSection(
-  totalSignals: number,
-  byRule: ReadonlyMap<string, readonly Signal[]>,
-  knownRuleIds: readonly string[],
-): readonly string[] {
-  const lines: string[] = [`== Findings (${String(totalSignals)}) ==`];
-  for (const ruleId of knownRuleIds) {
-    lines.push(...renderRuleBlock(ruleId, byRule.get(ruleId) ?? []));
-  }
-  return lines;
-}
-
-function renderRuleBlock(ruleId: string, findings: readonly Signal[]): readonly string[] {
-  const header = `[${ruleId}] ${String(findings.length)} finding(s)`;
-  const preview = findings.slice(0, FINDINGS_PREVIEW).map((f) => {
-    const loc = f.line ? `:${String(f.line)}` : '';
-    return `  ${f.filePath}${loc} — ${f.message}`;
-  });
-  const overflow = findings.length > preview.length
-    /* v8 ignore next */
-    ? [`  ... ${String(findings.length - preview.length)} more (use --json for full list)`]
-    : [];
-  return [header, ...preview, ...overflow, ''];
-}
-
-function renderEntryPointsSection(eps: readonly EnrichedEntryPoint[]): readonly string[] {
-  const header = `== Entry points (${String(eps.length)}) ==`;
-  if (eps.length === 0) return [header, '(none inferred)'];
-  const top = [...eps].sort((a, b) => a.qualifiedName.localeCompare(b.qualifiedName)).slice(0, ENTRY_POINTS_PREVIEW);
-  const intro = `Top ${String(top.length)} (use --json for full list):`;
-  const items = top.map((ep) => `  [${ep.reason}] ${ep.qualifiedName}`);
-  return [header, intro, ...items];
-}
-
-function renderSummarySection(
-  byRule: ReadonlyMap<string, readonly Signal[]>,
-  knownRuleIds: readonly string[],
-  totalSignals: number,
-): readonly string[] {
-  const stats = summarizeRules(byRule, knownRuleIds);
-  return [
-    '== Summary ==',
-    `${String(stats.clean)} rule(s) clean, ${String(stats.dirty)} with findings (${String(totalSignals)} total).`,
-    'Run `opensip-tools dashboard` for the interactive Code Paths view.',
-  ];
-}
-
-interface EnrichedEntryPoint {
-  readonly reason: EntryPoint['reason'];
-  readonly qualifiedName: string;
-  readonly filePath: string;
-  readonly line: number;
-}
-
-function enrichEntryPoints(catalog: Catalog, indexes: Indexes): readonly EnrichedEntryPoint[] {
-  const eps = inferEntryPoints(catalog, indexes);
-  const out: EnrichedEntryPoint[] = [];
-  for (const ep of eps) {
-    const occ = indexes.byBodyHash.get(ep.bodyHash);
-    if (!occ) continue;
-    out.push({
-      reason: ep.reason,
-      qualifiedName: occ.qualifiedName,
-      filePath: occ.filePath,
-      line: occ.line,
-    });
-  }
-  return out;
-}
-
-function groupSignalsByRule(signals: readonly Signal[]): ReadonlyMap<string, readonly Signal[]> {
-  const out = new Map<string, Signal[]>();
-  for (const s of signals) {
-    let arr = out.get(s.ruleId);
-    if (!arr) {
-      arr = [];
-      out.set(s.ruleId, arr);
-    }
-    arr.push(s);
-  }
-  return out;
-}
-
-function summarizeRules(
-  byRule: ReadonlyMap<string, readonly Signal[]>,
-  knownRuleIds: readonly string[],
-): { readonly clean: number; readonly dirty: number } {
-  let clean = 0;
-  let dirty = 0;
-  for (const ruleId of knownRuleIds) {
-    const findings = byRule.get(ruleId) ?? [];
-    if (findings.length === 0) clean += 1;
-    else dirty += 1;
-  }
-  return { clean, dirty };
-}
-
 function persistSession(
   opts: GraphCommandOptions,
   signals: readonly Signal[],
@@ -625,146 +318,3 @@ function handleGraphError(label: string, error: unknown, cli: ToolCliContext): v
   process.stderr.write(`${label}: ${error instanceof Error ? error.message : String(error)}\n`);
 }
 
-async function runGateMode(
-  opts: GraphCommandOptions,
-  signals: readonly Signal[],
-  cli: ToolCliContext,
-): Promise<void> {
-  const datastore = cli.scope.datastore() as DataStore | undefined;
-  if (!datastore) {
-    throw new ConfigurationError('Graph gate mode requires a DataStore on ToolCliContext.');
-  }
-  const repo = new GraphBaselineRepo(datastore);
-  if (opts.gateSave === true) {
-    saveBaseline(signals, repo);
-    process.stdout.write(`Graph baseline saved (${String(signals.length)} signals)\n`);
-    cli.setExitCode(EXIT_CODES.SUCCESS);
-    return;
-  }
-  // gate-compare
-  const result = compareToBaseline(signals, repo);
-  if (result.degraded) {
-    cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
-    process.stdout.write(
-      `Graph gate FAILED: ${String(result.newSignals.length)} new finding(s) since baseline.\n`,
-    );
-    for (const s of result.newSignals) {
-      process.stdout.write(`  + ${fingerprintSignal(s)}\n`);
-    }
-  } else {
-    cli.setExitCode(EXIT_CODES.SUCCESS);
-    process.stdout.write(
-      `Graph gate PASS: no regressions (${String(result.resolvedFingerprints.length)} resolved since baseline).\n`,
-    );
-  }
-  // Defer-await is fine; nothing else to do.
-  await Promise.resolve();
-}
-
-async function runReportMode(
-  opts: GraphCommandOptions,
-  signals: readonly Signal[],
-  cli: ToolCliContext,
-): Promise<void> {
-  const cliOutput = buildCliOutput(signals, 'graph');
-  const url = opts.reportTo!;
-  // toolVersion tracks @opensip-tools/graph package.json's version. Manually
-  // synced — bump alongside any package.json version change. A future
-  // build-time constant via tsc plugin or import-assertion would remove this
-  // drift risk; not warranted for a single call site.
-  const sarif = renderSarif(signals, {
-    tool: 'opensip-tools-graph',
-    toolVersion: '2.0.0',
-  });
-  const result = await reportToCloud(cliOutput, url, opts.apiKey);
-  if (!result.success) {
-    cli.setExitCode(EXIT_CODES.REPORT_FAILED);
-    process.stderr.write(`Graph report failed: ${result.error ?? 'unknown error'}\n`);
-    return;
-  }
-  cli.setExitCode(EXIT_CODES.SUCCESS);
-  process.stdout.write(
-    `Graph report sent to ${url} (${String(signals.length)} signals, ${sarif.length} bytes).\n`,
-  );
-}
-
-/**
- * Catalog-JSON emission mode (Phase 3 Task 3.4 per opensip DEC-498).
- * Walks the engine's `Catalog` + `Indexes`, derives opensip-compatible
- * symbol/edge IDs, and writes a `CatalogExport` JSON document to the
- * `--catalog-output <path>` file. Phase 6's `EngineSubprocessPort`
- * invokes this mode per commit-sync run.
- *
- * Synchronous file write — catalog payloads are bounded (per-package
- * fan-out limits per-run scope) and we want backpressure if disk is
- * full rather than a deferred-write surprise.
- */
-function runCatalogJsonMode(
-  opts: GraphCommandOptions,
-  result: {
-    readonly catalog: Catalog | null;
-    readonly indexes: Indexes | null;
-    readonly signals: readonly Signal[];
-    readonly cacheHit: boolean;
-  },
-  cli: ToolCliContext,
-  startedAt: string,
-): void {
-  if (typeof opts.tenantId !== 'string' || opts.tenantId.length === 0) {
-    throw new ConfigurationError('--catalog-output requires --tenant-id <id>.');
-  }
-  if (typeof opts.repoId !== 'string' || opts.repoId.length === 0) {
-    throw new ConfigurationError('--catalog-output requires --repo-id <id>.');
-  }
-  if (typeof opts.gitSha !== 'string' || opts.gitSha.length === 0) {
-    throw new ConfigurationError('--catalog-output requires --git-sha <sha>.');
-  }
-  if (result.catalog === null || result.indexes === null) {
-    throw new ToolError(
-      'Cannot emit catalog-json: engine returned null catalog / indexes (no parseable input).',
-      'GRAPH.CATALOG_JSON.NULL_CATALOG',
-    );
-  }
-
-  const runId = opts.runId ?? randomUUID();
-  const completedAt = new Date().toISOString();
-  // Caller (opensip-side EngineSubprocessPort, Phase 6) inspects the
-  // file's existence + completeness field; engine never emits 'partial'
-  // from this code path (the engine's pressure-monitor / abort-handling
-  // bypass this function entirely on failure). A future task may add
-  // partial-completion semantics by catching MemoryPressureError in
-  // executeGraph and writing a partial CatalogExport here.
-  const provenance = {
-    runId,
-    completeness: 'complete' as const,
-    engineVersion: '2.0.0',
-    startedAt,
-    completedAt,
-    tenantId: opts.tenantId,
-  };
-
-  logger.info({
-    evt: 'graph.render.catalog_json.start',
-    module: MODULE_GRAPH_RENDER,
-    runId,
-    output: opts.catalogOutput,
-  });
-  const json = renderCatalogJson({
-    catalog: result.catalog,
-    indexes: result.indexes,
-    provenance,
-    repoId: opts.repoId,
-    gitSha: opts.gitSha,
-  });
-  writeFileSync(opts.catalogOutput!, json);
-  logger.info({
-    evt: 'graph.render.catalog_json.complete',
-    module: MODULE_GRAPH_RENDER,
-    runId,
-    output: opts.catalogOutput,
-    bytes: json.length,
-    cacheHit: result.cacheHit,
-    signalCount: result.signals.length,
-  });
-  cli.setExitCode(EXIT_CODES.SUCCESS);
-}

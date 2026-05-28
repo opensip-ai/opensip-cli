@@ -21,9 +21,6 @@ import {
 } from '@opensip-tools/contracts';
 /* eslint-enable sonarjs/deprecation */
 
-import { executeFit } from './fit.js';
-import { listChecks } from './list-checks.js';
-import { listRecipes } from './list-recipes.js';
 import {
   saveBaseline,
   compareToBaseline,
@@ -32,6 +29,10 @@ import {
   GateBaselineInvalidError,
 } from '../gate.js';
 import { FitBaselineRepo } from '../persistence/baseline-repo.js';
+
+import { executeFit } from './fit.js';
+import { listChecks } from './list-checks.js';
+import { listRecipes } from './list-recipes.js';
 
 import type { ToolCliContext } from '@opensip-tools/core';
 import type { DataStore } from '@opensip-tools/datastore';

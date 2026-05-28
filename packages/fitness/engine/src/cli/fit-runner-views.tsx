@@ -10,13 +10,11 @@
  */
 
 import { useTheme } from '@opensip-tools/cli-ui';
-/* eslint-disable sonarjs/deprecation -- intentional adapter usage; fit-runner consumes the CliArgs shape produced by fit's *OptsToCliArgs adapter until the rip-out */
 import {
   type CheckOutput,
   type FitDoneResult,
   type TableRow,
 } from '@opensip-tools/contracts';
-/* eslint-enable sonarjs/deprecation */
 import { Box, Text } from 'ink';
 import React from 'react';
 

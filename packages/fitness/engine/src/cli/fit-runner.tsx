@@ -43,7 +43,6 @@ import React, { useCallback, useEffect, useState } from 'react';
 
 import { reportToCloud } from '../sarif.js';
 
-import { ensureChecksLoaded, executeFit, getEnabledCheckCount } from './fit.js';
 import {
   CloudReportStatusLine,
   FindingsBlock,
@@ -51,6 +50,7 @@ import {
   SummaryLine,
   WarningsBlock,
 } from './fit-runner-views.js';
+import { ensureChecksLoaded, executeFit, getEnabledCheckCount } from './fit.js';
 
 import type { DataStore } from '@opensip-tools/datastore';
 
