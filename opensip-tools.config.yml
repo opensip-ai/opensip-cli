@@ -9,18 +9,15 @@
 
 globalExcludes:
   - "docs/**"
-<<<<<<< HEAD
   # Historical changelog — append-only by definition, expected to grow.
   # Not source; source-shape checks (file length, complexity) do not apply.
   - "CHANGELOG.md"
-=======
   # Test fixtures intentionally contain stub patterns, TODO markers,
   # and other shapes that exercise checks; excluding them prevents
   # fixture content from being analyzed as production code.
   - "**/__tests__/fixtures/**"
   - "**/__fixtures__/**"
   - "**/fixtures/**"
->>>>>>> worktree-agent-a41517bd0e1ec0883
 
 targets:
   backend:
