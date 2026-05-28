@@ -99,4 +99,14 @@ describe('detectLanguages', () => {
       ['cpp', 'go', 'java', 'python', 'rust', 'typescript'].sort(),
     )
   })
+
+  it('polyglot fixture (tsconfig + Cargo) produces both adapter ids for --workspace fan-out', () => {
+    writeFileSync(join(root, 'tsconfig.json'), '{}')
+    writeFileSync(join(root, 'Cargo.toml'), '')
+    const result = detectLanguages(root, makeFullRegistry())
+    // Both adapter ids must be present so the workspace runner queries
+    // both `discoverWorkspaceUnits` hooks (D8b).
+    expect(result.adapterIds).toContain('typescript')
+    expect(result.adapterIds).toContain('rust')
+  })
 })
