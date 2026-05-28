@@ -26,7 +26,7 @@ export function dashboardOverviewJs(): string {
 // =======================================================
 function renderOverview() {
   const panel = document.getElementById('panel-overview');
-  if (!sessions.length) { panel.appendChild(el('div', {class:'empty', text:'No sessions yet. Run opensip-tools fit to generate data.'})); return; }
+  if (!sessions.length) { panel.appendChild(el('div', {class:'empty', text:'No sessions yet.'})); return; }
 
   const sec = el('div', {class:'section'}, [el('h3', {text:'Recent Activity'})]);
   const table = el('table', {class:'data-table sortable'});
