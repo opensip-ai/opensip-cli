@@ -149,7 +149,6 @@ describe('runHeapPreflight', () => {
       total_global_handles_size: 0,
       used_global_handles_size: 0,
       external_memory: 0,
-      total_allocated_bytes: 0,
     });
     try {
       const out = await runHeapPreflight({ cwd: dir });

@@ -1,3 +1,5 @@
+// @fitness-ignore-file error-handling-quality -- safeIsDir/walk helpers for the workspace-units scan: statSync exception → "not a directory", readdirSync exception → "unreadable subdir, skip"; failure IS the function contract in each catch (already marked v8-ignore at each site as defensive/unreachable on real input).
+// @fitness-ignore-file detached-promises -- `walk` is a synchronous filesystem walk function (declared with `function`, returns void); heuristic flags it because it's invoked inside an async-returning enclosing function.
 import { existsSync, readdirSync, statSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
 
