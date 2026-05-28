@@ -338,8 +338,3 @@ export const logger: Logger = _logger;
 export function configureLogger(opts: LoggerOptions): void {
   _logger.applyOptions(opts);
 }
-
-/** Read the current correlation id. */
-export function getRunId(): string | undefined {
-  return _logger.getRunId();
-}
