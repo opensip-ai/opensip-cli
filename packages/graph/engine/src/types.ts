@@ -259,7 +259,7 @@ export interface ResolverVerdict {
  * rules that do consult hints MUST also implement a TypeScript-shaped
  * fallback so the rule degrades gracefully when an adapter does not
  * supply the relevant hint (per
- * docs/architecture/40-the-graph-loop/02-rules-and-gating.md).
+ * docs/public/40-graph/02-rules-and-gating.md).
  */
 export interface Rule {
   /** Rule slug, e.g. "graph:orphan-subtree". Must start with "graph:". */

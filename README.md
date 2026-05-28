@@ -200,7 +200,7 @@ The `--packages` flag fans out across every workspace package under `packages/**
 
 For users who prefer external orchestration, `xargs -P 8 -I {} opensip-tools graph --package {}` over a list of package paths achieves the same effect.
 
-Five rules ship today: `orphan-subtree`, `duplicated-function-body`, `no-side-effect-path`, `test-only-reachable`, `always-throws-branch`. Output is grouped by rule with the top 10 findings per rule plus a summary; the full set is always available via `--json`. See [the graph loop docs](./docs/architecture/40-the-graph-loop/) for what each rule detects and how the gate workflow integrates with CI.
+Five rules ship today: `orphan-subtree`, `duplicated-function-body`, `no-side-effect-path`, `test-only-reachable`, `always-throws-branch`. Output is grouped by rule with the top 10 findings per rule plus a summary; the full set is always available via `--json`. See [the graph loop docs](./docs/public/40-graph/) for what each rule detects and how the gate workflow integrates with CI.
 
 #### Heap sizing on large monorepos
 
@@ -711,7 +711,7 @@ pruned automatically on the next run.
 
 For the full educational walkthrough — the fitness loop end-to-end, the
 tool-plugin model, the layer cake, the pipeline subsystems, and a
-lookup-shaped package catalog — see [`docs/architecture/README.md`](./docs/architecture/README.md).
+lookup-shaped package catalog — see [`docs/public/README.md`](./docs/public/README.md).
 What follows here is a one-page overview.
 
 Turborepo + pnpm monorepo. Layered: lower numbers depend only on

@@ -1,18 +1,18 @@
 #!/usr/bin/env node
 //
-// Generate docs/architecture/70-reference/05-checks-index.md from the
+// Generate docs/public/70-reference/05-checks-index.md from the
 // metadata extracted by tools/extract-checks-metadata.mjs.
 //
 // Why a generator rather than a hand-curated index: the checks corpus, with
 // descriptions and tags, is too much to keep in sync by hand. The corpus
 // changes every time a new check ships; a generated index keeps the
 // docs honest about what's actually in the box. This script is the
-// authoritative writer of docs/architecture/70-reference/05-checks-index.md
+// authoritative writer of docs/public/70-reference/05-checks-index.md
 // — do not hand-edit that file; edit this generator instead.
 //
 // Usage:
 //   node tools/extract-checks-metadata.mjs > /tmp/checks.json
-//   node tools/build-checks-index.mjs /tmp/checks.json > docs/architecture/70-reference/05-checks-index.md
+//   node tools/build-checks-index.mjs /tmp/checks.json > docs/public/70-reference/05-checks-index.md
 //
 // Or piped:
 //   node tools/extract-checks-metadata.mjs | node tools/build-checks-index.mjs - > <output>

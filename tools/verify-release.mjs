@@ -12,7 +12,7 @@
 //   1. All @opensip-tools/* packages share the same `version`.
 //   2. Tag matches the package version (CI: --expected-version $TAG).
 //   3. CHANGELOG.md top entry is `## [<consensus version>]`.
-//   4. docs/web/ is in sync with docs/architecture/ (delegates to
+//   4. docs/web-generated/ is in sync with docs/public/ (delegates to
 //      tools/build-web-docs.mjs --check).
 //   5. Cross-package dependencies use `workspace:*` or pin the
 //      consensus version — no stale version ranges.
@@ -164,17 +164,17 @@ if (topEntry === null) {
   }
 }
 
-// 4 — docs/web/ is in sync
+// 4 — docs/web-generated/ is in sync
 try {
   execFileSync('node', ['tools/build-web-docs.mjs', '--check'], {
     cwd: REPO_ROOT,
     stdio: 'pipe',
   });
-  pass(4, 'docs/web/ is in sync with docs/architecture/.');
+  pass(4, 'docs/web-generated/ is in sync with docs/public/.');
 } catch (err) {
   const stderr = err.stderr?.toString() ?? '';
   const stdout = err.stdout?.toString() ?? '';
-  fail(4, `docs/web/ is stale. Run \`pnpm docs:build\` to regenerate.\n${stdout.trim() || stderr.trim() || err.message}`);
+  fail(4, `docs/web-generated/ is stale. Run \`pnpm docs:build\` to regenerate.\n${stdout.trim() || stderr.trim() || err.message}`);
 }
 
 // 5 — Cross-package deps consistent

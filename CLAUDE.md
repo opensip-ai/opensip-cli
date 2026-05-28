@@ -335,20 +335,41 @@ injection is enabled via `pnpm.injectWorkspacePackages: true` in the
 root `package.json`, plus `@opensip-tools/checks-typescript` and
 `@opensip-tools/checks-universal` are declared as root devDependencies.
 Without that, the discovery walker would find 0 check packages at the
-workspace root and the run would silently report 0 checks. See
-`docs/plans/ready/dogfood-fit-against-self/phase-0-audit-and-design.md`.
+workspace root and the run would silently report 0 checks.
 
 ## Documentation
 
-The canonical architecture docs live in **`docs/architecture/`** (numbered
-Diátaxis-ish sections: `00-orientation`, `10-mental-model`, ..., `90-conventions`).
-That is the only tree you edit by hand.
+The `docs/` tree has three committed siblings plus one local-only
+scratch area, each with a distinct contract:
 
-**`docs/web/` is generated output** — it mirrors `docs/architecture/`
-rewritten for the website at opensip.ai/docs/opensip-tools/. The website
-fetches markdown from this repo directly, so the build step pre-rewrites
-links and processes voice markers, then commits the result so PR reviewers
-see what will actually render.
+- **`docs/public/`** — hand-edited source. These are the docs we publish
+  on the website at opensip.ai/docs/opensip-tools/. Numbered
+  Diátaxis-ish sections: `00-start`, `10-concepts`, `20-fit`, `30-sim`,
+  `40-graph`, `50-extend`, `60-guides`, `70-reference`,
+  `80-implementation`. Anything here is reader-facing and externally
+  consumable.
+- **`docs/internal/`** — hand-edited, repo-only but committed.
+  Contributor-facing awareness that doesn't belong on the website:
+  cross-repo consumer relationships, decision records, operational
+  notes. See `docs/internal/README.md` for the charter.
+- **`docs/web-generated/`** — generated output. Never hand-edit. It
+  mirrors `docs/public/` rewritten for the website (links resolved to
+  pinned GitHub URLs and root-relative website paths; `web:skip` /
+  `web:only` voice markers processed). Committed so PR reviewers see
+  what will actually render.
+- **`docs/plans/`** — local-only scratch space, **gitignored**.
+  In-progress implementation plans and design notes that don't belong
+  in a public OSS repo. Not committed; not visible to external
+  contributors. Anything that matures into a durable record (decision,
+  consumer contract, contributor convention) graduates into
+  `docs/internal/` or `docs/public/`.
+
+Boundary rule of thumb: if you can write the fact about opensip-tools
+without naming a specific consumer, it goes in `docs/public/`. If
+naming a specific consumer (or other private context) is load-bearing,
+it goes in `docs/internal/`. If it's pending work or design exploration
+that doesn't need to be visible to external readers, it stays in
+`docs/plans/` (local-only).
 
 - **Generator:** `tools/build-web-docs.mjs`
 - **Scripts:** `pnpm docs:build` (write) · `pnpm docs:check` (CI staleness gate)
@@ -357,10 +378,10 @@ see what will actually render.
   `<!-- web:skip -->` / `<!-- web:only -->` markers (silent in repo view).
 
 **Rules:**
-- Never hand-edit anything under `docs/web/` — it gets overwritten.
-- After editing `docs/architecture/`, run `pnpm docs:build` and commit
-  the regenerated `docs/web/` in the same change.
-- Moves/renames inside `docs/architecture/` propagate to `docs/web/`
+- Never hand-edit anything under `docs/web-generated/` — it gets overwritten.
+- After editing `docs/public/`, run `pnpm docs:build` and commit
+  the regenerated `docs/web-generated/` in the same change.
+- Moves/renames inside `docs/public/` propagate to `docs/web-generated/`
   automatically — don't mirror them manually.
 - If CI's `pnpm docs:check` fails, the fix is `pnpm docs:build` + commit.
 
@@ -396,7 +417,7 @@ default. Two explicit flags express user intent:
 `--remove` deletes `opensip-tools/` entirely before scaffolding
 fresh. The flags are mutually exclusive. The legacy `--force` flag
 is gone; users who scripted it should migrate to `--remove`. See
-`docs/architecture/70-surfaces/01-cli-command-tree.md#init---scaffold-the-project-layout`
+`docs/public/70-reference/01-cli-commands.md#init---scaffold-the-project-layout`
 for the full state table.
 
 Future tool ideas (not implemented): `audit`, `lint`, `bench`. Any of

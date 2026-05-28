@@ -1,0 +1,727 @@
+{
+  "version": "2.0.0",
+  "rawBase": "https://raw.githubusercontent.com/opensip-ai/opensip-tools/v2.0.0/",
+  "pages": [
+    {
+      "file": "docs/web-generated/README.md",
+      "path": "/docs/opensip-tools/",
+      "section": "",
+      "title": "opensip-tools Architecture",
+      "audience": [
+        "contributors",
+        "plugin-authors",
+        "ci-integrators"
+      ],
+      "purpose": "Teaching path through opensip-tools — what it is, how it thinks, how it runs — plus a lookup-shaped reference catalog."
+    },
+    {
+      "file": "docs/web-generated/00-start/00-what-is-opensip-tools.md",
+      "path": "/docs/opensip-tools/00-start/00-what-is-opensip-tools/",
+      "section": "00-start",
+      "title": "What is opensip-tools?",
+      "audience": [
+        "getting-started",
+        "contributors"
+      ],
+      "purpose": "The front door — what problem opensip-tools solves, what it does, what it isn't, and how to try it."
+    },
+    {
+      "file": "docs/web-generated/00-start/01-quick-start.md",
+      "path": "/docs/opensip-tools/00-start/01-quick-start/",
+      "section": "00-start",
+      "title": "Quick start",
+      "audience": [
+        "getting-started",
+        "contributors",
+        "plugin-authors",
+        "ci-integrators"
+      ],
+      "purpose": "Four commands from zero to a passing fitness run. Hands-on before the conceptual material."
+    },
+    {
+      "file": "docs/web-generated/00-start/02-show-me-the-loops.md",
+      "path": "/docs/opensip-tools/00-start/02-show-me-the-loops/",
+      "section": "00-start",
+      "title": "Show me each loop",
+      "audience": [
+        "getting-started"
+      ],
+      "purpose": "One sample per tool — fit check, sim scenario, graph rule — so you can see the shape of the work before reading the architecture docs."
+    },
+    {
+      "file": "docs/web-generated/00-start/03-vs-other-tools.md",
+      "path": "/docs/opensip-tools/00-start/03-vs-other-tools/",
+      "section": "00-start",
+      "title": "vs. other tools",
+      "audience": [
+        "getting-started"
+      ],
+      "purpose": "Honest comparison: what opensip-tools does that ESLint, Semgrep, Sonarqube, and Snyk don't — and what it deliberately doesn't try to do."
+    },
+    {
+      "file": "docs/web-generated/00-start/04-faq.md",
+      "path": "/docs/opensip-tools/00-start/04-faq/",
+      "section": "00-start",
+      "title": "FAQ",
+      "audience": [
+        "getting-started"
+      ],
+      "purpose": "Common questions about adoption, edge cases, and what opensip-tools does or doesn't do."
+    },
+    {
+      "file": "docs/web-generated/00-start/05-vocabulary.md",
+      "path": "/docs/opensip-tools/00-start/05-vocabulary/",
+      "section": "00-start",
+      "title": "Vocabulary",
+      "audience": [
+        "contributors",
+        "plugin-authors",
+        "ci-integrators"
+      ],
+      "purpose": "The terms used everywhere in opensip-tools. Read this once before going deeper."
+    },
+    {
+      "file": "docs/web-generated/00-start/06-system-context.md",
+      "path": "/docs/opensip-tools/00-start/06-system-context/",
+      "section": "00-start",
+      "title": "System context",
+      "audience": [
+        "contributors",
+        "plugin-authors",
+        "ci-integrators"
+      ],
+      "purpose": "Where opensip-tools sits between you, your codebase, CI, and OpenSIP Cloud — and what it touches on disk."
+    },
+    {
+      "file": "docs/web-generated/10-concepts/01-fitness-loop.md",
+      "path": "/docs/opensip-tools/10-concepts/01-fitness-loop/",
+      "section": "10-concepts",
+      "title": "The fitness loop",
+      "audience": [
+        "contributors",
+        "plugin-authors",
+        "ci-integrators"
+      ],
+      "purpose": "One check, end to end. Definition → loading → recipe selection → scope resolution → execution → signal → render → exit. The spine of the doc set."
+    },
+    {
+      "file": "docs/web-generated/10-concepts/02-tool-plugin-model.md",
+      "path": "/docs/opensip-tools/10-concepts/02-tool-plugin-model/",
+      "section": "10-concepts",
+      "title": "The tool-plugin model",
+      "audience": [
+        "contributors",
+        "plugin-authors"
+      ],
+      "purpose": "How the CLI doesn't know what `fit` does. The Tool contract, the registry, the dispatcher, and what it takes to add a third tool."
+    },
+    {
+      "file": "docs/web-generated/10-concepts/03-modular-monolith.md",
+      "path": "/docs/opensip-tools/10-concepts/03-modular-monolith/",
+      "section": "10-concepts",
+      "title": "Layered package graph",
+      "audience": [
+        "contributors"
+      ],
+      "purpose": "The 27-package monorepo, the five-layer dependency rule, why dependency-cruiser exists, and the trade-offs."
+    },
+    {
+      "file": "docs/web-generated/10-concepts/04-contract-surfaces.md",
+      "path": "/docs/opensip-tools/10-concepts/04-contract-surfaces/",
+      "section": "10-concepts",
+      "title": "Contract surfaces",
+      "audience": [
+        "contributors",
+        "plugin-authors",
+        "ci-integrators"
+      ],
+      "purpose": "The system's public edges. Every contract opensip-tools makes with the outside world, and what changing each one would cost."
+    },
+    {
+      "file": "docs/web-generated/10-concepts/05-architecture-gate.md",
+      "path": "/docs/opensip-tools/10-concepts/05-architecture-gate/",
+      "section": "10-concepts",
+      "title": "Architecture gate",
+      "audience": [
+        "contributors",
+        "ci-integrators"
+      ],
+      "purpose": "The baseline-and-compare workflow. Identity hash, line-shift invariance, partial-SARIF tolerance, CI integration patterns."
+    },
+    {
+      "file": "docs/web-generated/20-fit/01-recipes-and-checks.md",
+      "path": "/docs/opensip-tools/20-fit/01-recipes-and-checks/",
+      "section": "20-fit",
+      "title": "Recipes and checks",
+      "audience": [
+        "contributors",
+        "plugin-authors"
+      ],
+      "purpose": "What a recipe is, what a check is, and how they compose. The two primary author-facing primitives in fit."
+    },
+    {
+      "file": "docs/web-generated/20-fit/02-targets-and-scope.md",
+      "path": "/docs/opensip-tools/20-fit/02-targets-and-scope/",
+      "section": "20-fit",
+      "title": "Targets and scope",
+      "audience": [
+        "contributors",
+        "plugin-authors"
+      ],
+      "purpose": "How the framework decides which files a check runs against. Targets, scope, glob expansion, and the marketplace shape."
+    },
+    {
+      "file": "docs/web-generated/20-fit/03-ignore-directives.md",
+      "path": "/docs/opensip-tools/20-fit/03-ignore-directives/",
+      "section": "20-fit",
+      "title": "Ignore directives",
+      "audience": [
+        "contributors",
+        "plugin-authors",
+        "ci-integrators"
+      ],
+      "purpose": "Inline source-level suppression — how `@fitness-ignore-next-line` and `@fitness-ignore-file` work, when to use them, and where they fit in the run."
+    },
+    {
+      "file": "docs/web-generated/20-fit/04-output-gate-sarif.md",
+      "path": "/docs/opensip-tools/20-fit/04-output-gate-sarif/",
+      "section": "20-fit",
+      "title": "Output, gate, SARIF",
+      "audience": [
+        "contributors",
+        "ci-integrators"
+      ],
+      "purpose": "What happens to the violations a check produces — render layer, JSON output, SARIF, the gate, cloud reporting."
+    },
+    {
+      "file": "docs/web-generated/30-sim/01-scenarios-and-recipes.md",
+      "path": "/docs/opensip-tools/30-sim/01-scenarios-and-recipes/",
+      "section": "30-sim",
+      "title": "Scenarios and recipes (sim)",
+      "audience": [
+        "contributors",
+        "plugin-authors"
+      ],
+      "purpose": "What a sim scenario is, the four kinds, and how recipes compose them. The author-facing primitives in the simulation tool."
+    },
+    {
+      "file": "docs/web-generated/30-sim/02-execution-model.md",
+      "path": "/docs/opensip-tools/30-sim/02-execution-model/",
+      "section": "30-sim",
+      "title": "Sim execution model",
+      "audience": [
+        "contributors"
+      ],
+      "purpose": "How the sim engine runs scenarios. Dispatcher, executor lifecycle, result aggregation, exit semantics."
+    },
+    {
+      "file": "docs/web-generated/40-graph/01-stages-and-catalog.md",
+      "path": "/docs/opensip-tools/40-graph/01-stages-and-catalog/",
+      "section": "40-graph",
+      "title": "Stages and catalog (graph)",
+      "audience": [
+        "contributors",
+        "plugin-authors",
+        "ci-integrators"
+      ],
+      "purpose": "How `graph` builds its picture of the codebase — the six-stage pipeline, the catalog format, and the content-keyed cache."
+    },
+    {
+      "file": "docs/web-generated/40-graph/02-rules-and-gating.md",
+      "path": "/docs/opensip-tools/40-graph/02-rules-and-gating/",
+      "section": "40-graph",
+      "title": "Rules and gating (graph)",
+      "audience": [
+        "contributors",
+        "plugin-authors",
+        "ci-integrators"
+      ],
+      "purpose": "The five graph rules, what each one detects, and how the save/compare gate flow integrates with CI."
+    },
+    {
+      "file": "docs/web-generated/40-graph/03-adding-a-language.md",
+      "path": "/docs/opensip-tools/40-graph/03-adding-a-language/",
+      "section": "40-graph",
+      "title": "Adding a language to graph",
+      "audience": [
+        "contributors",
+        "plugin-authors"
+      ],
+      "purpose": "Step-by-step guide for writing a new GraphLanguageAdapter — C/C++, or anything else — without touching the engine."
+    },
+    {
+      "file": "docs/web-generated/50-extend/01-plugin-authoring.md",
+      "path": "/docs/opensip-tools/50-extend/01-plugin-authoring/",
+      "section": "50-extend",
+      "title": "Plugin authoring",
+      "audience": [
+        "plugin-authors"
+      ],
+      "purpose": "Overview of the five ways to extend opensip-tools — from a dropped .mjs file to a full Tool plugin. Routes you to the right deep-dive."
+    },
+    {
+      "file": "docs/web-generated/50-extend/02-project-local-plugins.md",
+      "path": "/docs/opensip-tools/50-extend/02-project-local-plugins/",
+      "section": "50-extend",
+      "title": "Project-local plugins",
+      "audience": [
+        "plugin-authors",
+        "getting-started"
+      ],
+      "purpose": "The fastest path to extend opensip-tools: drop .mjs files under opensip-tools/{fit,sim}/ — checks, recipes, scenarios."
+    },
+    {
+      "file": "docs/web-generated/50-extend/03-publishable-packs.md",
+      "path": "/docs/opensip-tools/50-extend/03-publishable-packs/",
+      "section": "50-extend",
+      "title": "Publishable packs",
+      "audience": [
+        "plugin-authors"
+      ],
+      "purpose": "Author and publish a fit-pack or sim-pack: workspace package skeleton, the marker contract, four discovery paths, and the migration recipe from loose .mjs files."
+    },
+    {
+      "file": "docs/web-generated/50-extend/04-check-pack-architecture.md",
+      "path": "/docs/opensip-tools/50-extend/04-check-pack-architecture/",
+      "section": "50-extend",
+      "title": "Check pack architecture",
+      "audience": [
+        "contributors",
+        "plugin-authors"
+      ],
+      "purpose": "How check packs are structured, the bundled seven, scope filters, parameterization, and the marketplace shape."
+    },
+    {
+      "file": "docs/web-generated/50-extend/05-language-adapters.md",
+      "path": "/docs/opensip-tools/50-extend/05-language-adapters/",
+      "section": "50-extend",
+      "title": "Language adapters (fitness)",
+      "audience": [
+        "contributors",
+        "plugin-authors"
+      ],
+      "purpose": "What the fitness LanguageAdapter is, the six bundled adapters, and how to author a new one."
+    },
+    {
+      "file": "docs/web-generated/50-extend/06-full-tool-plugins.md",
+      "path": "/docs/opensip-tools/50-extend/06-full-tool-plugins/",
+      "section": "50-extend",
+      "title": "Full Tool plugins",
+      "audience": [
+        "plugin-authors"
+      ],
+      "purpose": "Build a Tool plugin — your own opensip-tools subcommand. Use when fit/sim/graph aren't the right shape and you want something fundamentally different."
+    },
+    {
+      "file": "docs/web-generated/60-guides/01-write-your-first-check.md",
+      "path": "/docs/opensip-tools/60-guides/01-write-your-first-check/",
+      "section": "60-guides",
+      "title": "Write your first check",
+      "audience": [
+        "getting-started",
+        "plugin-authors"
+      ],
+      "purpose": "Task-led walkthrough: from `opensip-tools init` to a passing CI gate, with one custom check you authored, in ~15 minutes."
+    },
+    {
+      "file": "docs/web-generated/60-guides/02-ban-an-api-pattern.md",
+      "path": "/docs/opensip-tools/60-guides/02-ban-an-api-pattern/",
+      "section": "60-guides",
+      "title": "Ban an API pattern",
+      "audience": [
+        "plugin-authors",
+        "getting-started"
+      ],
+      "purpose": "Task-led: write a check that flags every use of a specific API — covering the regex shape, the AST shape, and the trade-offs between them."
+    },
+    {
+      "file": "docs/web-generated/60-guides/03-wire-into-ci.md",
+      "path": "/docs/opensip-tools/60-guides/03-wire-into-ci/",
+      "section": "60-guides",
+      "title": "Wire into CI",
+      "audience": [
+        "ci-integrators",
+        "getting-started"
+      ],
+      "purpose": "Task-led: add opensip-tools to your CI pipeline with PR annotations and baseline gating. GitHub Actions and GitLab examples."
+    },
+    {
+      "file": "docs/web-generated/60-guides/04-adopt-in-a-monorepo.md",
+      "path": "/docs/opensip-tools/60-guides/04-adopt-in-a-monorepo/",
+      "section": "60-guides",
+      "title": "Adopt in a monorepo",
+      "audience": [
+        "plugin-authors",
+        "ci-integrators"
+      ],
+      "purpose": "Task-led: introduce opensip-tools to a large polyglot monorepo. Workspace-package graduation, per-package targets, scoped baselines."
+    },
+    {
+      "file": "docs/web-generated/60-guides/05-migrate-from-eslint.md",
+      "path": "/docs/opensip-tools/60-guides/05-migrate-from-eslint/",
+      "section": "60-guides",
+      "title": "Migrate from ESLint",
+      "audience": [
+        "getting-started",
+        "ci-integrators"
+      ],
+      "purpose": "Task-led: when an ESLint rule belongs in opensip-tools, when it doesn't, and how the two tools coexist in one CI pipeline."
+    },
+    {
+      "file": "docs/web-generated/70-reference/01-cli-commands.md",
+      "path": "/docs/opensip-tools/70-reference/01-cli-commands/",
+      "section": "70-reference",
+      "title": "CLI command tree",
+      "audience": [
+        "users",
+        "ci-integrators",
+        "contributors"
+      ],
+      "purpose": "Lookup-shaped reference for every CLI command, its flags, and when to use each."
+    },
+    {
+      "file": "docs/web-generated/70-reference/02-package-catalog.md",
+      "path": "/docs/opensip-tools/70-reference/02-package-catalog/",
+      "section": "70-reference",
+      "title": "Package catalog",
+      "audience": [
+        "contributors",
+        "plugin-authors"
+      ],
+      "purpose": "Flat reference of every package in the monorepo: name, path, layer, one-line role, key exports. Lookup-only; the conceptual layer narrative lives in 10-concepts/03-modular-monolith.md."
+    },
+    {
+      "file": "docs/web-generated/70-reference/03-configuration.md",
+      "path": "/docs/opensip-tools/70-reference/03-configuration/",
+      "section": "70-reference",
+      "title": "Configuration",
+      "audience": [
+        "getting-started",
+        "ci-integrators",
+        "plugin-authors"
+      ],
+      "purpose": "The opensip-tools.config.yml schema, every field, defaults, and where each is read."
+    },
+    {
+      "file": "docs/web-generated/70-reference/04-json-output-schema.md",
+      "path": "/docs/opensip-tools/70-reference/04-json-output-schema/",
+      "section": "70-reference",
+      "title": "JSON output schema",
+      "audience": [
+        "ci-integrators",
+        "plugin-authors"
+      ],
+      "purpose": "The CliOutput shape (and the SimDoneResult shape). Every field, every type, every presence rule."
+    },
+    {
+      "file": "docs/web-generated/70-reference/05-checks-index.md",
+      "path": "/docs/opensip-tools/70-reference/05-checks-index/",
+      "section": "70-reference",
+      "title": "Checks reference",
+      "audience": [
+        "getting-started",
+        "ci-integrators",
+        "plugin-authors"
+      ],
+      "purpose": "Browsable index of every built-in fit check, grouped by pack and primary tag. Auto-generated from source by tools/build-checks-index.mjs."
+    },
+    {
+      "file": "docs/web-generated/70-reference/06-dashboard.md",
+      "path": "/docs/opensip-tools/70-reference/06-dashboard/",
+      "section": "70-reference",
+      "title": "Dashboard",
+      "audience": [
+        "users",
+        "contributors"
+      ],
+      "purpose": "The HTML report — what it shows, when it opens, how it's generated, and where it lives."
+    },
+    {
+      "file": "docs/web-generated/80-implementation/01-cli-dispatch.md",
+      "path": "/docs/opensip-tools/80-implementation/01-cli-dispatch/",
+      "section": "80-implementation",
+      "title": "CLI dispatch",
+      "audience": [
+        "contributors"
+      ],
+      "purpose": "How argv becomes a Tool action handler. The CLI bootstrap, registration order, the global flag set, error suggestions."
+    },
+    {
+      "file": "docs/web-generated/80-implementation/02-plugin-loader.md",
+      "path": "/docs/opensip-tools/80-implementation/02-plugin-loader/",
+      "section": "80-implementation",
+      "title": "Plugin loader",
+      "audience": [
+        "contributors",
+        "plugin-authors"
+      ],
+      "purpose": "How plugins are discovered, loaded, and registered. Source files, npm packages, project pinning, the sync command."
+    },
+    {
+      "file": "docs/web-generated/80-implementation/03-session-and-persistence.md",
+      "path": "/docs/opensip-tools/80-implementation/03-session-and-persistence/",
+      "section": "80-implementation",
+      "title": "Session and persistence",
+      "audience": [
+        "contributors"
+      ],
+      "purpose": "What gets written to disk during and after a run. The runtime dir layout, the SQLite store, logs, reports."
+    },
+    {
+      "file": "docs/web-generated/80-implementation/04-coding-standards.md",
+      "path": "/docs/opensip-tools/80-implementation/04-coding-standards/",
+      "section": "80-implementation",
+      "title": "Coding standards",
+      "audience": [
+        "contributors"
+      ],
+      "purpose": "How code in this workspace is written. ESLint posture, error handling, exit codes, log style."
+    },
+    {
+      "file": "docs/web-generated/80-implementation/05-layer-policy.md",
+      "path": "/docs/opensip-tools/80-implementation/05-layer-policy/",
+      "section": "80-implementation",
+      "title": "Layer policy",
+      "audience": [
+        "contributors"
+      ],
+      "purpose": "The dependency-cruiser rules that enforce the five-layer package graph and the tool-internal partitioning rules (graph stages, dashboard panels), rule by rule, with rationale."
+    },
+    {
+      "file": "docs/web-generated/80-implementation/06-doc-conventions.md",
+      "path": "/docs/opensip-tools/80-implementation/06-doc-conventions/",
+      "section": "80-implementation",
+      "title": "Doc conventions",
+      "audience": [
+        "contributors"
+      ],
+      "purpose": "Voice, frontmatter, diagrams, and verification trail conventions for the architecture doc set."
+    },
+    {
+      "file": "docs/web-generated/80-implementation/07-website-integration.md",
+      "path": "/docs/opensip-tools/80-implementation/07-website-integration/",
+      "section": "80-implementation",
+      "title": "Website integration — opensip.ai",
+      "audience": [
+        "contributors"
+      ],
+      "purpose": "How opensip.ai consumes docs/web-generated/ from this repo: backend proxy, frontend route, manifest contract."
+    }
+  ],
+  "nav": [
+    {
+      "section": "00-start",
+      "title": "00 — Start",
+      "pages": [
+        "/docs/opensip-tools/00-start/00-what-is-opensip-tools/",
+        "/docs/opensip-tools/00-start/01-quick-start/",
+        "/docs/opensip-tools/00-start/02-show-me-the-loops/",
+        "/docs/opensip-tools/00-start/03-vs-other-tools/",
+        "/docs/opensip-tools/00-start/04-faq/",
+        "/docs/opensip-tools/00-start/05-vocabulary/",
+        "/docs/opensip-tools/00-start/06-system-context/"
+      ]
+    },
+    {
+      "section": "10-concepts",
+      "title": "10 — Concepts",
+      "pages": [
+        "/docs/opensip-tools/10-concepts/01-fitness-loop/",
+        "/docs/opensip-tools/10-concepts/02-tool-plugin-model/",
+        "/docs/opensip-tools/10-concepts/03-modular-monolith/",
+        "/docs/opensip-tools/10-concepts/04-contract-surfaces/",
+        "/docs/opensip-tools/10-concepts/05-architecture-gate/"
+      ]
+    },
+    {
+      "section": "20-fit",
+      "title": "20 — Fit",
+      "pages": [
+        "/docs/opensip-tools/20-fit/01-recipes-and-checks/",
+        "/docs/opensip-tools/20-fit/02-targets-and-scope/",
+        "/docs/opensip-tools/20-fit/03-ignore-directives/",
+        "/docs/opensip-tools/20-fit/04-output-gate-sarif/"
+      ]
+    },
+    {
+      "section": "30-sim",
+      "title": "30 — Sim",
+      "pages": [
+        "/docs/opensip-tools/30-sim/01-scenarios-and-recipes/",
+        "/docs/opensip-tools/30-sim/02-execution-model/"
+      ]
+    },
+    {
+      "section": "40-graph",
+      "title": "40 — Graph",
+      "pages": [
+        "/docs/opensip-tools/40-graph/01-stages-and-catalog/",
+        "/docs/opensip-tools/40-graph/02-rules-and-gating/",
+        "/docs/opensip-tools/40-graph/03-adding-a-language/"
+      ]
+    },
+    {
+      "section": "50-extend",
+      "title": "50 — Extend",
+      "pages": [
+        "/docs/opensip-tools/50-extend/01-plugin-authoring/",
+        "/docs/opensip-tools/50-extend/02-project-local-plugins/",
+        "/docs/opensip-tools/50-extend/03-publishable-packs/",
+        "/docs/opensip-tools/50-extend/04-check-pack-architecture/",
+        "/docs/opensip-tools/50-extend/05-language-adapters/",
+        "/docs/opensip-tools/50-extend/06-full-tool-plugins/"
+      ]
+    },
+    {
+      "section": "60-guides",
+      "title": "60 — Guides",
+      "pages": [
+        "/docs/opensip-tools/60-guides/01-write-your-first-check/",
+        "/docs/opensip-tools/60-guides/02-ban-an-api-pattern/",
+        "/docs/opensip-tools/60-guides/03-wire-into-ci/",
+        "/docs/opensip-tools/60-guides/04-adopt-in-a-monorepo/",
+        "/docs/opensip-tools/60-guides/05-migrate-from-eslint/"
+      ]
+    },
+    {
+      "section": "70-reference",
+      "title": "70 — Reference",
+      "pages": [
+        "/docs/opensip-tools/70-reference/01-cli-commands/",
+        "/docs/opensip-tools/70-reference/02-package-catalog/",
+        "/docs/opensip-tools/70-reference/03-configuration/",
+        "/docs/opensip-tools/70-reference/04-json-output-schema/",
+        "/docs/opensip-tools/70-reference/05-checks-index/",
+        "/docs/opensip-tools/70-reference/06-dashboard/"
+      ]
+    },
+    {
+      "section": "80-implementation",
+      "title": "80 — Implementation",
+      "pages": [
+        "/docs/opensip-tools/80-implementation/01-cli-dispatch/",
+        "/docs/opensip-tools/80-implementation/02-plugin-loader/",
+        "/docs/opensip-tools/80-implementation/03-session-and-persistence/",
+        "/docs/opensip-tools/80-implementation/04-coding-standards/",
+        "/docs/opensip-tools/80-implementation/05-layer-policy/",
+        "/docs/opensip-tools/80-implementation/06-doc-conventions/",
+        "/docs/opensip-tools/80-implementation/07-website-integration/"
+      ]
+    }
+  ],
+  "audienceTabs": [
+    {
+      "audience": "getting-started",
+      "title": "Start",
+      "pages": [
+        "/docs/opensip-tools/00-start/00-what-is-opensip-tools/",
+        "/docs/opensip-tools/00-start/01-quick-start/",
+        "/docs/opensip-tools/00-start/02-show-me-the-loops/",
+        "/docs/opensip-tools/00-start/03-vs-other-tools/",
+        "/docs/opensip-tools/00-start/04-faq/",
+        "/docs/opensip-tools/50-extend/02-project-local-plugins/",
+        "/docs/opensip-tools/60-guides/01-write-your-first-check/",
+        "/docs/opensip-tools/60-guides/02-ban-an-api-pattern/",
+        "/docs/opensip-tools/60-guides/03-wire-into-ci/",
+        "/docs/opensip-tools/60-guides/05-migrate-from-eslint/",
+        "/docs/opensip-tools/70-reference/03-configuration/",
+        "/docs/opensip-tools/70-reference/05-checks-index/"
+      ]
+    },
+    {
+      "audience": "plugin-authors",
+      "title": "Author plugins",
+      "pages": [
+        "/docs/opensip-tools/",
+        "/docs/opensip-tools/00-start/01-quick-start/",
+        "/docs/opensip-tools/00-start/05-vocabulary/",
+        "/docs/opensip-tools/00-start/06-system-context/",
+        "/docs/opensip-tools/10-concepts/01-fitness-loop/",
+        "/docs/opensip-tools/10-concepts/02-tool-plugin-model/",
+        "/docs/opensip-tools/10-concepts/04-contract-surfaces/",
+        "/docs/opensip-tools/20-fit/01-recipes-and-checks/",
+        "/docs/opensip-tools/20-fit/02-targets-and-scope/",
+        "/docs/opensip-tools/20-fit/03-ignore-directives/",
+        "/docs/opensip-tools/30-sim/01-scenarios-and-recipes/",
+        "/docs/opensip-tools/40-graph/01-stages-and-catalog/",
+        "/docs/opensip-tools/40-graph/02-rules-and-gating/",
+        "/docs/opensip-tools/40-graph/03-adding-a-language/",
+        "/docs/opensip-tools/50-extend/01-plugin-authoring/",
+        "/docs/opensip-tools/50-extend/02-project-local-plugins/",
+        "/docs/opensip-tools/50-extend/03-publishable-packs/",
+        "/docs/opensip-tools/50-extend/04-check-pack-architecture/",
+        "/docs/opensip-tools/50-extend/05-language-adapters/",
+        "/docs/opensip-tools/50-extend/06-full-tool-plugins/",
+        "/docs/opensip-tools/60-guides/01-write-your-first-check/",
+        "/docs/opensip-tools/60-guides/02-ban-an-api-pattern/",
+        "/docs/opensip-tools/60-guides/04-adopt-in-a-monorepo/",
+        "/docs/opensip-tools/70-reference/02-package-catalog/",
+        "/docs/opensip-tools/70-reference/03-configuration/",
+        "/docs/opensip-tools/70-reference/04-json-output-schema/",
+        "/docs/opensip-tools/70-reference/05-checks-index/",
+        "/docs/opensip-tools/80-implementation/02-plugin-loader/"
+      ]
+    },
+    {
+      "audience": "ci-integrators",
+      "title": "Integrate with CI",
+      "pages": [
+        "/docs/opensip-tools/",
+        "/docs/opensip-tools/00-start/01-quick-start/",
+        "/docs/opensip-tools/00-start/05-vocabulary/",
+        "/docs/opensip-tools/00-start/06-system-context/",
+        "/docs/opensip-tools/10-concepts/01-fitness-loop/",
+        "/docs/opensip-tools/10-concepts/04-contract-surfaces/",
+        "/docs/opensip-tools/10-concepts/05-architecture-gate/",
+        "/docs/opensip-tools/20-fit/03-ignore-directives/",
+        "/docs/opensip-tools/20-fit/04-output-gate-sarif/",
+        "/docs/opensip-tools/40-graph/01-stages-and-catalog/",
+        "/docs/opensip-tools/40-graph/02-rules-and-gating/",
+        "/docs/opensip-tools/60-guides/03-wire-into-ci/",
+        "/docs/opensip-tools/60-guides/04-adopt-in-a-monorepo/",
+        "/docs/opensip-tools/60-guides/05-migrate-from-eslint/",
+        "/docs/opensip-tools/70-reference/01-cli-commands/",
+        "/docs/opensip-tools/70-reference/03-configuration/",
+        "/docs/opensip-tools/70-reference/04-json-output-schema/",
+        "/docs/opensip-tools/70-reference/05-checks-index/"
+      ]
+    },
+    {
+      "audience": "contributors",
+      "title": "Contribute",
+      "pages": [
+        "/docs/opensip-tools/",
+        "/docs/opensip-tools/00-start/00-what-is-opensip-tools/",
+        "/docs/opensip-tools/00-start/01-quick-start/",
+        "/docs/opensip-tools/00-start/05-vocabulary/",
+        "/docs/opensip-tools/00-start/06-system-context/",
+        "/docs/opensip-tools/10-concepts/01-fitness-loop/",
+        "/docs/opensip-tools/10-concepts/02-tool-plugin-model/",
+        "/docs/opensip-tools/10-concepts/03-modular-monolith/",
+        "/docs/opensip-tools/10-concepts/04-contract-surfaces/",
+        "/docs/opensip-tools/10-concepts/05-architecture-gate/",
+        "/docs/opensip-tools/20-fit/01-recipes-and-checks/",
+        "/docs/opensip-tools/20-fit/02-targets-and-scope/",
+        "/docs/opensip-tools/20-fit/03-ignore-directives/",
+        "/docs/opensip-tools/20-fit/04-output-gate-sarif/",
+        "/docs/opensip-tools/30-sim/01-scenarios-and-recipes/",
+        "/docs/opensip-tools/30-sim/02-execution-model/",
+        "/docs/opensip-tools/40-graph/01-stages-and-catalog/",
+        "/docs/opensip-tools/40-graph/02-rules-and-gating/",
+        "/docs/opensip-tools/40-graph/03-adding-a-language/",
+        "/docs/opensip-tools/50-extend/04-check-pack-architecture/",
+        "/docs/opensip-tools/50-extend/05-language-adapters/",
+        "/docs/opensip-tools/70-reference/01-cli-commands/",
+        "/docs/opensip-tools/70-reference/02-package-catalog/",
+        "/docs/opensip-tools/70-reference/06-dashboard/",
+        "/docs/opensip-tools/80-implementation/01-cli-dispatch/",
+        "/docs/opensip-tools/80-implementation/02-plugin-loader/",
+        "/docs/opensip-tools/80-implementation/03-session-and-persistence/",
+        "/docs/opensip-tools/80-implementation/04-coding-standards/",
+        "/docs/opensip-tools/80-implementation/05-layer-policy/",
+        "/docs/opensip-tools/80-implementation/06-doc-conventions/",
+        "/docs/opensip-tools/80-implementation/07-website-integration/"
+      ]
+    }
+  ]
+}

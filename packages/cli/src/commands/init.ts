@@ -21,7 +21,7 @@
  * regardless of npm scope. The init scaffold stays loose-`.mjs` to
  * preserve the fast first-touch experience; graduation is a manual
  * step the customer takes when their coverage becomes substantial.
- * See docs/architecture/70-surfaces/02-plugin-authoring.md.
+ * See docs/public/50-extend/01-plugin-authoring.md.
  *
  * Language selection drives:
  *   - which `targets:` entry shape goes into the YAML config

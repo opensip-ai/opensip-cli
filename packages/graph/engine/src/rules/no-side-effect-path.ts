@@ -23,8 +23,8 @@
  * absent — older adapters, third-party adapters that don't populate
  * it, unit tests that don't pass hints — we fall back to a
  * TypeScript-shaped textual regex so the rule never silently goes
- * dark on a TS project. Per docs/architecture/40-the-graph-loop/
- * 02-rules-and-gating.md fidelity matrix.
+ * dark on a TS project. Per docs/public/40-graph/02-rules-and-gating.md
+ * fidelity matrix.
  */
 
 import { createSignal } from '@opensip-tools/core';

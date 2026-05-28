@@ -3,7 +3,7 @@
 // Extract slug + description + tags from every defineCheck() / defineRegexListCheck()
 // call across the fitness check packs. Output: JSON to stdout.
 //
-// Used to seed docs/architecture/80-reference/04-checks-index.md. Not a perfect
+// Used to seed docs/public/70-reference/05-checks-index.md. Not a perfect
 // AST parser — relies on the project convention that slug/description/tags are
 // inline string literals on their own lines. Sufficient for the first cut;
 // a TypeScript-AST-based generator would replace this if/when the index goes

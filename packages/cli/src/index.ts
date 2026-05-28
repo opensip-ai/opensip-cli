@@ -73,7 +73,7 @@ async function main(): Promise<void> {
 
   // Bare `opensip-tools` → welcome screen. The update notifier runs
   // AFTER this short-circuit by design (don't nag on zero-arg runs);
-  // see docs/architecture/50-runtime/01-cli-dispatch.md.
+  // see docs/public/80-implementation/01-cli-dispatch.md.
   if (process.argv.length <= 2) {
     printWelcome({ version: program.version() ?? 'dev' });
     process.exit(0);

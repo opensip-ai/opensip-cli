@@ -74,7 +74,7 @@ export interface ToolOptions {
  * functions in fitness/simulation/cli to bridge the two shapes; over
  * time those adapters fold away and the per-command types become the
  * single source of truth. See
- * `docs/architecture/70-surfaces/02-plugin-authoring.md` for the
+ * `docs/public/50-extend/01-plugin-authoring.md` for the
  * adapter pattern and the rationale.
  */
 export interface CliArgs {

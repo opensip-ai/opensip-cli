@@ -52,7 +52,7 @@ their `dependencies`.
 3. Sanity-check locally:
    ```bash
    pnpm install && pnpm typecheck && pnpm test && pnpm lint
-   pnpm docs:build                                # regenerate docs/web/ at the new version pin
+   pnpm docs:build                                # regenerate docs/web-generated/ at the new version pin
    pnpm verify-release --expected-version vX.Y.Z  # version + CHANGELOG + docs + cross-pkg deps
    ```
 

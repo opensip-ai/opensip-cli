@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 //
-// Build website-facing docs from docs/architecture/.
+// Build website-facing docs from docs/public/.
 //
 // The website at opensip.ai/docs/opensip-tools/ fetches Markdown files
 // from this repo directly. Two things must differ between the in-repo
@@ -11,11 +11,11 @@
 //      website's external links survive main-branch churn.
 //
 //   2. Sibling .md links — need to become root-relative website paths
-//      (e.g. /docs/opensip-tools/40-runtime/01-cli-dispatch/) so the
-//      website's internal navigation works.
+//      (e.g. /docs/opensip-tools/80-implementation/01-cli-dispatch/) so
+//      the website's internal navigation works.
 //
-// This script reads docs/architecture/**/*.md, applies those rewrites
-// (and a few smaller ones), and writes the result to docs/web/. The
+// This script reads docs/public/**/*.md, applies those rewrites (and a
+// few smaller ones), and writes the result to docs/web-generated/. The
 // output is committed so the website needs no build-on-fetch logic and
 // PR reviewers see exactly what will render.
 //
@@ -28,8 +28,8 @@
 // Both are silent comments in the in-repo view.
 //
 // Usage:
-//   node tools/build-web-docs.mjs           # write docs/web/
-//   node tools/build-web-docs.mjs --check   # exit 1 if docs/web/ is stale
+//   node tools/build-web-docs.mjs           # write docs/web-generated/
+//   node tools/build-web-docs.mjs --check   # exit 1 if docs/web-generated/ is stale
 //
 
 import { promises as fs } from 'node:fs';
@@ -44,8 +44,8 @@ import { fileURLToPath } from 'node:url';
 const REPO_OWNER = 'opensip-ai';
 const REPO_NAME = 'opensip-tools';
 const WEB_BASE_URL = '/docs/opensip-tools'; // root-relative on opensip.ai
-const SOURCE_DOC_ROOT = 'docs/architecture';
-const OUTPUT_DOC_ROOT = 'docs/web';
+const SOURCE_DOC_ROOT = 'docs/public';
+const OUTPUT_DOC_ROOT = 'docs/web-generated';
 const STRIP_MD_EXTENSION = true;
 const TRAILING_SLASH = true;
 
@@ -106,7 +106,7 @@ const main = async () => {
       stale.push('manifest.json');
     }
 
-    // Also flag files in docs/web/ that have no corresponding source
+    // Also flag files in OUTPUT_DOC_ROOT that have no corresponding source
     const expectedDsts = new Set(results.map((r) => r.dstAbs));
     const actualDsts = (
       await collectMarkdownFiles(join(REPO_ROOT, OUTPUT_DOC_ROOT)).catch(
@@ -116,15 +116,15 @@ const main = async () => {
     const orphaned = actualDsts.filter((p) => !expectedDsts.has(p));
 
     if (stale.length === 0 && orphaned.length === 0) {
-      log('docs/web/ is in sync.');
+      log(`${OUTPUT_DOC_ROOT}/ is in sync.`);
       return;
     }
     if (stale.length > 0) {
-      err(`docs/web/ is stale — ${stale.length} file(s) differ:`);
+      err(`${OUTPUT_DOC_ROOT}/ is stale — ${stale.length} file(s) differ:`);
       for (const f of stale) err(`  - ${f}`);
     }
     if (orphaned.length > 0) {
-      err(`docs/web/ has ${orphaned.length} orphan file(s) (no source):`);
+      err(`${OUTPUT_DOC_ROOT}/ has ${orphaned.length} orphan file(s) (no source):`);
       for (const f of orphaned) {
         err(`  - ${relative(REPO_ROOT, f)}`);
       }
@@ -485,7 +485,7 @@ const warnIfMermaid = (text, srcRel) => {
   // SVG pre-rendering for mermaid blocks is not yet wired. When the
   // first mermaid block is added, integrate @mermaid-js/mermaid-cli
   // here: convert each fenced ```mermaid block to an SVG written to
-  // docs/web/diagrams/<hash>.svg and replace the block with an <img>.
+  // docs/web-generated/diagrams/<hash>.svg and replace the block with an <img>.
   if (/```mermaid/.test(text)) {
     err(
       `warn: ${srcRel} contains a mermaid block — SVG pre-rendering not yet wired; leaving block as-is. See tools/build-web-docs.mjs:warnIfMermaid().`

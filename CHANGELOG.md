@@ -257,7 +257,7 @@ and breaks compatibility with v1.x runtime layouts.
   packs. `packageScopes` is now framed as a compatibility shim for
   legacy third-party packs that follow `@scope/checks-*` naming
   conventions without declaring the marker. See
-  [`docs/architecture/70-surfaces/02-plugin-authoring.md`](docs/architecture/70-surfaces/02-plugin-authoring.md).
+  [`docs/public/50-extend/01-plugin-authoring.md`](docs/public/50-extend/01-plugin-authoring.md).
 - **`CliArgs` from `@opensip-tools/contracts` is deprecated for new
   flags.** The interface still works (`*OptsToCliArgs` adapter
   functions in `@opensip-tools/fitness`, `@opensip-tools/simulation`,
@@ -265,7 +265,7 @@ and breaks compatibility with v1.x runtime layouts.
   should land on the per-command options interfaces — `FitOptions`,
   `ToolOptions`, `InitOptions` — rather than on `CliArgs`. The
   `@deprecated` JSDoc tag now surfaces this in IDE tooltips. See
-  `docs/architecture/70-surfaces/02-plugin-authoring.md` for the
+  `docs/public/50-extend/01-plugin-authoring.md` for the
   adapter pattern.
 
 ### Removed
@@ -382,7 +382,7 @@ catalog output is byte-identical pre vs. post refactor.
   test suite that runs against every registered adapter.
 
 - **Contributor authoring guide**:
-  [`docs/architecture/40-the-graph-loop/03-adding-a-language.md`](docs/architecture/40-the-graph-loop/03-adding-a-language.md).
+  [`docs/public/40-graph/03-adding-a-language.md`](docs/public/40-graph/03-adding-a-language.md).
   Walks a contributor through implementing a new adapter against
   the contract test suite. Includes a per-rule fidelity matrix and
   a first-PR checklist.
@@ -543,8 +543,8 @@ heap.
   and the binder cost simply shifts to Stage 2's first
   `getSymbolAtLocation` call. Eager `program.getTypeChecker()` in
   Stage 1 is retained.
-- Architecture docs updated under [`docs/architecture/40-the-graph-loop/`](docs/architecture/40-the-graph-loop/)
-  and [`docs/architecture/70-surfaces/01-cli-command-tree.md`](docs/architecture/70-surfaces/01-cli-command-tree.md)
+- Architecture docs updated under [`docs/public/40-graph/`](docs/public/40-graph/)
+  and [`docs/public/70-reference/01-cli-commands.md`](docs/public/70-reference/01-cli-commands.md)
   to reflect the fused walk, incremental rebuild, `--package` /
   `--packages`, and updated catalog shape (`bodySize`,
   `discarded`). Dead links to retired plan docs (`graph-tool-v2-design`,
@@ -644,7 +644,7 @@ heap.
   and are swept up by `opensip-tools uninstall`.
 
 - **Stale `--force` flag in the architecture docs.** The
-  `docs/architecture/60-surfaces/01-cli-command-tree.md` uninstall
+  `docs/public/70-reference/01-cli-commands.md` uninstall
   section documented a `--force` option; the actual flag has always
   been `--yes` / `-y`. Section rewritten to match reality and document
   the new `--project` mode.

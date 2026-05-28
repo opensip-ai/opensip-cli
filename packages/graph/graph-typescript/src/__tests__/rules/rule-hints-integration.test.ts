@@ -4,7 +4,7 @@
  * The `no-side-effect-path` and `always-throws-branch` rules consult
  * the active adapter's `ruleHints.sideEffectPrimitives` and
  * `ruleHints.throwSyntaxRegex` so per-language fidelity matches the
- * promise in docs/architecture/40-the-graph-loop/02-rules-and-gating.md.
+ * promise in docs/public/40-graph/02-rules-and-gating.md.
  *
  * What these tests cover:
  *   - Python `print(...)` is detected as a side-effect when the Python

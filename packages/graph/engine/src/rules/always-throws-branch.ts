@@ -15,8 +15,8 @@
  * adapters, third-party adapters that don't populate it, unit tests
  * that don't pass hints — we fall back to the TypeScript-shaped
  * regex so the rule keeps firing on the language it was originally
- * authored for. Per docs/architecture/40-the-graph-loop/
- * 02-rules-and-gating.md fidelity matrix.
+ * authored for. Per docs/public/40-graph/02-rules-and-gating.md
+ * fidelity matrix.
  *
  * Rules that need full CFG (per-branch reachability) are deferred to
  * v0.3.
