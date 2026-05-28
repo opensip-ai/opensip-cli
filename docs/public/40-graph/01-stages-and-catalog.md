@@ -266,7 +266,7 @@ Notable shape choices:
 
 The fingerprint is per-file `path|mtimeMs|size`, computed by `computeFilesFingerprint`. Mtime is cheap to read and stable enough — the ones that lie (formatter passes, `touch`, git clean rebuilds) cause an unnecessary incremental rebuild that produces a byte-identical result, not a correctness bug.
 
-Writes go through [`CatalogRepo.replaceAll`](../../../packages/graph/engine/src/persistence/catalog-repo.ts), an UPSERT into `graph_catalog` row 1 in a single transaction. SQLite's WAL mode + transactional semantics replace v1's tmp-file-and-rename atomicity; concurrent reads (e.g. from `graph --packages` child processes) don't see torn writes. Per-package incremental writes are explicitly deferred to a follow-up `graph-catalog-perf` plan.
+Writes go through [`CatalogRepo.replaceAll`](../../../packages/graph/engine/src/persistence/catalog-repo.ts), an UPSERT into `graph_catalog` row 1 in a single transaction. SQLite's WAL mode + transactional semantics replace v1's tmp-file-and-rename atomicity; concurrent reads (e.g. from `graph --workspace` child processes) don't see torn writes. Per-unit incremental writes are explicitly deferred to a follow-up `graph-catalog-perf` plan.
 
 `--no-cache` skips both read and write — useful for the CI gate workflow and when investigating a suspected stale-catalog bug.
 
@@ -286,14 +286,15 @@ Correctness: every file whose cached edges might point at a stale hash is itself
 
 Performance: editing a single file in opensip-tools self-graph drops rebuild time from ~15 s (full) to ~2.5 s (incremental); cache-hit runs (no edits) complete in ~0.8 s.
 
-### `--package` and `--packages`
+### Positional paths and `--workspace`
 
-Two scoping flags narrow expensive graph runs. **Both are TypeScript-only today** because they assume `tsconfig.json` discovery and the workspace-package shape that the TypeScript adapter expects. For Python and Rust projects, run `graph` from the project root.
+Three scoping shapes narrow expensive graph runs. The flag surface is language-neutral; each adapter implements its own `discoverWorkspaceUnits` hook (see [`packages/core/src/languages/adapter.ts`](../../../packages/core/src/languages/adapter.ts)). The TypeScript adapter ships with the hook implemented; other adapters opt in incrementally.
 
-- **`graph --package <name|path>`** scopes a run to one workspace package's tsconfig. Cross-package call sites become unresolved (lower fidelity, much faster). Resolves a basename via [`cli/scope.ts`](../../../packages/graph/engine/src/cli/scope.ts) by searching `<cwd>/packages/**` for a directory with a `tsconfig.json`; an explicit path is also accepted.
-- **`graph --packages`** fans the run out across every workspace package under `<cwd>/packages/**`. One child process per package, concurrency capped at `cpus()-1`. Each child has its own Node heap, so the per-package memory ceiling scales naturally. Implementation: [`cli/packages-runner.ts`](../../../packages/graph/engine/src/cli/packages-runner.ts).
+- **`graph <path> [<path>...]`** scopes a run to one or more existing directories. Cross-subtree call sites become unresolved (lower fidelity, much faster). Multiple paths run sequentially in-process and aggregate into one session (D12).
+- **`graph --workspace`** fans the run out across every workspace unit returned by each detected adapter's `discoverWorkspaceUnits` hook. Polyglot per D8b: a repo with both `tsconfig.json` and `Cargo.toml` markers fans out across both adapters' units in one combined run. One child process per unit, concurrency capped at `cpus()-1` (override via `--concurrency`). Each child has its own Node heap, so the per-unit memory ceiling scales naturally. Implementation: [`cli/workspace-runner.ts`](../../../packages/graph/engine/src/cli/workspace-runner.ts).
+- **`graph --language <name>`** forces a specific adapter, suppressing marker-based detection. If the discovered file count is zero, exits 2 with a clear error (D14 mixed mismatch policy).
 
-Both flags trade cross-package edge fidelity for speed and memory. Use `--no-cache` (and a global run, no scope flag) for full-fidelity CI gates.
+These shapes trade cross-subtree edge fidelity for speed and memory. Use `--no-cache` (and a global run, no scope flag) for full-fidelity CI gates.
 
 ---
 

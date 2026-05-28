@@ -10,9 +10,10 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { enterScope, RunScope } from '@opensip-tools/core';
+import { enterScope, LanguageRegistry, RunScope } from '@opensip-tools/core';
 import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
 import { executeGraph, graphTool, registerAdapter } from '@opensip-tools/graph';
+import { typescriptAdapter } from '@opensip-tools/lang-typescript';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
 import { typescriptGraphAdapter } from '../index.js';
@@ -59,9 +60,18 @@ function makeCli(): CapturedCli {
     walkedUp: 0,
     scope: 'none' as const,
   };
+  const languages = new LanguageRegistry();
+  // Register the real TS adapter so workspace detection (Phase 2)
+  // matches `tsconfig.json` markers and workspace fan-out (Phase 3)
+  // can call `discoverWorkspaceUnits`.
+  languages.register(typescriptAdapter);
   const cli: ToolCliContext = {
     program: {},
-    scope: new RunScope({ projectContext: project, datastore: () => datastore }),
+    scope: new RunScope({
+      projectContext: project,
+      datastore: () => datastore,
+      languages,
+    }),
     render: vi.fn(() => Promise.resolve()),
     registerLiveView: vi.fn(),
     renderLive: vi.fn(() => Promise.resolve()),
@@ -204,37 +214,37 @@ describe('executeGraph', () => {
     expect(stderr).toContain('Graph report failed');
   });
 
-  it('errors when --package and --packages are passed together', async () => {
+  it('errors when --workspace and positional paths are passed together', async () => {
     setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });
     const { cli, exitCodes } = makeCli();
-    await executeGraph({ cwd: dir, packageScope: 'foo', allPackages: true }, cli);
+    await executeGraph({ cwd: dir, paths: ['foo'], workspace: true }, cli);
     expect(stderr).toContain('mutually exclusive');
     expect(exitCodes).toContain(2);
   });
 
-  it('errors when --packages is passed but cliScript is empty', async () => {
+  it('errors when --workspace is passed but cliScript is empty', async () => {
     setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });
     const { cli, exitCodes } = makeCli();
-    await executeGraph({ cwd: dir, allPackages: true, cliScript: '' }, cli);
+    await executeGraph({ cwd: dir, workspace: true, cliScript: '' }, cli);
     expect(stderr).toContain('CLI entry script');
     expect(exitCodes).toContain(2);
   });
 
-  it('errors when --packages is passed but no workspace packages exist', async () => {
+  it('errors when --workspace is passed but no workspace units exist', async () => {
     setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });
     const { cli, exitCodes } = makeCli();
-    // No packages/** dir exists — discoverWorkspacePackages returns [].
+    // No packages/** dir exists — discoverWorkspaceUnits returns [].
     await executeGraph(
-      { cwd: dir, allPackages: true, cliScript: '/usr/bin/node' },
+      { cwd: dir, workspace: true, cliScript: '/usr/bin/node' },
       cli,
     );
-    expect(stderr).toContain('no workspace packages');
+    expect(stderr).toContain('no workspace units');
     expect(exitCodes).toContain(2);
   });
 
-  it('--package <relative dir> scopes to a sub-package tsconfig', async () => {
+  it('positional <relative dir> scopes to a sub-package directory', async () => {
     // Create a nested package layout: cwd has its own tsconfig and the
-    // sub-package has its own. Pass `--package` as an explicit path.
+    // sub-package has its own. Pass a positional path.
     setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });
     mkdirSync(join(dir, 'packages', 'inner'), { recursive: true });
     writeFileSync(
@@ -249,7 +259,7 @@ describe('executeGraph', () => {
     );
     const { cli, exitCodes } = makeCli();
     await executeGraph(
-      { cwd: dir, packageScope: 'packages/inner', json: true },
+      { cwd: dir, paths: [join(dir, 'packages', 'inner')], json: true },
       cli,
     );
     const parsed = JSON.parse(stdout) as { tool: string };
@@ -268,7 +278,7 @@ describe('executeGraph', () => {
     expect(exitCodes).toContain(0);
   });
 
-  it('--packages runs successfully across discovered package dirs', async () => {
+  it('--workspace runs successfully across discovered workspace units', async () => {
     // Set up a packages/** layout and run --packages. Use a CLI script
     // that prints a known JSON shape so the parent's parsing path is
     // exercised. We use `node -e ...` indirectly by pointing cliScript
@@ -299,21 +309,21 @@ describe('executeGraph', () => {
     await executeGraph(
       {
         cwd: dir,
-        allPackages: true,
+        workspace: true,
         cliScript: helper,
         json: true,
-        packagesConcurrency: 1,
+        concurrency: 1,
       },
       cli,
     );
-    const parsed = JSON.parse(stdout) as { tool: string; mode: string; packages: unknown[] };
+    const parsed = JSON.parse(stdout) as { tool: string; mode: string; units: unknown[] };
     expect(parsed.tool).toBe('graph');
-    expect(parsed.mode).toBe('packages');
-    expect(parsed.packages.length).toBeGreaterThanOrEqual(2);
+    expect(parsed.mode).toBe('workspace');
+    expect(parsed.units.length).toBeGreaterThanOrEqual(2);
     expect(exitCodes).toContain(0);
   });
 
-  it('--packages text report renders status + findings sections', async () => {
+  it('--workspace text report renders status + findings sections', async () => {
     setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });
     mkdirSync(join(dir, 'packages', 'a'), { recursive: true });
     writeFileSync(join(dir, 'packages', 'a', 'tsconfig.json'), FIXTURE_TSCONFIG, 'utf8');
@@ -337,11 +347,11 @@ describe('executeGraph', () => {
     );
     const { cli, exitCodes } = makeCli();
     await executeGraph(
-      { cwd: dir, allPackages: true, cliScript: helper, packagesConcurrency: 1 },
+      { cwd: dir, workspace: true, cliScript: helper, concurrency: 1 },
       cli,
     );
-    expect(stdout).toContain('opensip-tools graph --packages');
-    expect(stdout).toContain('== Packages');
+    expect(stdout).toContain('opensip-tools graph --workspace');
+    expect(stdout).toContain('== Units');
     expect(stdout).toContain('== Findings ==');
     expect(stdout).toContain('orphan x');
     expect(exitCodes).toContain(0);
@@ -380,7 +390,7 @@ describe('executeGraph', () => {
     expect(exitCodes).toContain(2);
   });
 
-  it('--packages surfaces child failure as a runtime-error exit code', async () => {
+  it('--workspace surfaces child failure as a runtime-error exit code', async () => {
     setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });
     mkdirSync(join(dir, 'packages', 'a'), { recursive: true });
     writeFileSync(join(dir, 'packages', 'a', 'tsconfig.json'), FIXTURE_TSCONFIG, 'utf8');
@@ -394,10 +404,10 @@ describe('executeGraph', () => {
     );
     const { cli, exitCodes } = makeCli();
     await executeGraph(
-      { cwd: dir, allPackages: true, cliScript: helper, packagesConcurrency: 1 },
+      { cwd: dir, workspace: true, cliScript: helper, concurrency: 1 },
       cli,
     );
     expect(exitCodes).toContain(1);
-    expect(stderr).toContain('at least one package run failed');
+    expect(stderr).toContain('at least one unit run failed');
   });
 });

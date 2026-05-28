@@ -5,6 +5,11 @@
  * Extracted so the orchestrator (`graph.ts`) and the mode helpers
  * (`graph-modes.ts`) can share the same interface without one
  * importing from the other.
+ *
+ * Language-neutral surface per the graph-cli-language-neutral-scoping
+ * spec — positional `[paths...]`, `--workspace`, `--language <name>`
+ * replace the prior TypeScript-flavored `--package` / `--packages`
+ * flags (which were never publicly released — D11 hard-removes them).
  */
 
 export interface GraphCommandOptions {
@@ -17,27 +22,34 @@ export interface GraphCommandOptions {
   readonly reportTo?: string;
   readonly apiKey?: string;
   /**
-   * Optional --package <name|path> scope. When set, the run targets a
-   * single workspace package's tsconfig instead of the whole project.
-   * See docs/plans/graph-performance-improvements.md Phase 6.
+   * Positional `[paths...]`. Empty/undefined means whole-project scope.
+   * Each path must be an existing directory (absolute or relative to
+   * `cwd`). Multiple paths run sequentially in-process and aggregate
+   * into one session (D12).
    */
-  readonly packageScope?: string;
+  readonly paths?: readonly string[];
   /**
-   * Optional --packages flag (no argument). When set, the run fans out
-   * across every workspace package under packages/** with a tsconfig.
-   * Each package runs in its own child process; findings are
-   * aggregated in the parent. Wave 3 of the perf plan.
+   * `--workspace`: fan the run across every workspace unit returned by
+   * each detected adapter's `discoverWorkspaceUnits`. Polyglot per
+   * spec D8b: in a multi-language repo all adapters' units are
+   * aggregated into one combined fan-out.
    */
-  readonly allPackages?: boolean;
+  readonly workspace?: boolean;
   /**
-   * Optional concurrency cap for --packages. Defaults to
+   * `--language <name>`: force a single language adapter. Suppresses
+   * marker-based detection. Errors if the name is not registered.
+   * Also drives the D14 mixed mismatch policy at the end of the run.
+   */
+  readonly language?: string;
+  /**
+   * Optional concurrency cap for `--workspace`. Defaults to
    * `os.cpus().length - 1`. Exposed primarily for tests.
    */
-  readonly packagesConcurrency?: number;
+  readonly concurrency?: number;
   /**
-   * Path to the CLI entry script. When --packages is set, child
-   * processes invoke `node <cliScript> graph --package <dir> --json`.
-   * Tools wiring `executeGraph` should pass `process.argv[1]`.
+   * Path to the CLI entry script. `--workspace` children invoke
+   * `node <cliScript> graph <rootDir> --json`. Tools wiring
+   * `executeGraph` should pass `process.argv[1]`.
    */
   readonly cliScript?: string;
   /**

@@ -14,6 +14,7 @@ export { typescriptQuery } from './query.js'
 export { stripStrings, stripComments } from './strip.js'
 export { filterContent } from './filter.js'
 export type { FilteredContent } from './filter.js'
+export { discoverTypescriptWorkspaceUnits } from './workspace-units.js'
 
 // Function-scope helpers — promoted out of the legacy `ast-utilities.ts`
 // shim into a concern-named module. New scope helpers go in

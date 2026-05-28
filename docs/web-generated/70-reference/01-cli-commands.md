@@ -119,36 +119,66 @@ opensip-tools sim --kind <kind>
 Tool-owned: [`packages/graph/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/graph/engine/src/tool.ts). The pipeline architecture and cache invalidation are documented in [`40-graph/01-stages-and-catalog.md`](/docs/opensip-tools/40-graph/01-stages-and-catalog/); perf-plan history is recoverable from `git -P log -- packages/graph`.
 
 ```
+# Whole project (language auto-detected)
 opensip-tools graph
+
+# Scope to a single subtree
+opensip-tools graph packages/core
+
+# Scope to multiple subtrees (one session aggregates results)
+opensip-tools graph packages/core packages/cli
+
+# Shell glob expansion (the shell expands; opensip-tools doesn't)
+opensip-tools graph 'packages/*/src'
+
+# Fan out across detected workspace units (memory-isolated)
+opensip-tools graph --workspace
+opensip-tools graph --workspace --concurrency 4
+
+# Force a specific language adapter (suppresses auto-detection)
+opensip-tools graph --language typescript
+opensip-tools graph --language python packages/services/api
+
+# Other modes
 opensip-tools graph --json
 opensip-tools graph --no-cache
 opensip-tools graph --gate-save
 opensip-tools graph --gate-compare
 opensip-tools graph --report-to <url>
-opensip-tools graph --package <name|path>
-opensip-tools graph --packages
 ```
 
 `graph` is the single entry point for static call-graph analysis. The default (non-JSON) output is a structured terminal report with four sections: catalog summary, findings grouped by rule (top 10 per rule, with overflow indicator), top 10 inferred entry points, and a one-line summary. The full data is always available via `--json`.
 
-| Flag | Type | Default | Effect |
+| Flag / Argument | Type | Default | Effect |
 |---|---|---|---|
-| `--cwd <path>` | string | `process.cwd()` | Target directory. Adapter is auto-detected by file-extension dominance (TypeScript: `tsconfig.json`; Python: `pyproject.toml`/`setup.py` + `**/*.py` fallback; Rust: `Cargo.toml` + `**/*.rs` fallback; Go: `go.mod` + `**/*.go` fallback; Java: Maven/Gradle config + `**/*.java` fallback). |
+| `[paths...]` | path(s) | — | Positional. Scope the run to one or more existing directories (absolute or relative to `--cwd`). Multiple paths aggregate into a single dashboard session per D12. The shell handles globs (`graph 'packages/*/src'`); no glob expansion happens inside the CLI. Mutually exclusive with `--workspace`. |
+| `--cwd <path>` | string | `process.cwd()` | Target directory. Adapter is auto-detected by marker files (TypeScript: `tsconfig.json`/`package.json`; Python: `pyproject.toml`/`setup.py`/`setup.cfg`; Rust: `Cargo.toml`; Go: `go.mod`; Java: `pom.xml`/`build.gradle*`; C/C++: `CMakeLists.txt`/`meson.build`). Polyglot repos apply every matched adapter simultaneously (D6). |
+| `--workspace` | bool | `false` | Fan the run across every workspace unit returned by each detected adapter's `discoverWorkspaceUnits` hook. Polyglot per D8b: a repo with both a TS pnpm workspace and a Cargo workspace fans out across both adapters' units in one combined run. Memory-isolated (one child process per unit). Mutually exclusive with positional paths. |
+| `--concurrency <n>` | int | `cpus()-1` | Concurrency cap for `--workspace` child processes. |
+| `--language <name>` | string | — | Force a specific language adapter, suppressing marker-based auto-detection. If the discovered file count is zero, exits with code 2 and the message `--language <name> matched 0 files under <paths>; check the flag or paths.` (D14). |
 | `--json` | bool | `false` | Output a `CliOutput`-shaped JSON document instead of the unified terminal report. |
 | `--no-cache` | bool | `false` | Skip the catalog cache and force a full rebuild. |
 | `--gate-save` | bool | `false` | Save the current Signal fingerprint set to the project's SQLite store (`graph_baseline_signals` table). Mutually exclusive with `--gate-compare`. |
 | `--gate-compare` | bool | `false` | Compare current Signals to the saved baseline; exit non-zero on regression. |
 | `--report-to <url>` | string | — | POST findings to OpenSIP Cloud or a compatible SARIF endpoint. |
-| `--package <name\|path>` | string | — | **TypeScript-only.** Scope the run to one workspace package (faster on monorepos; cross-package edges become unresolved). Searches `packages/**` for a basename match, or accepts an explicit directory path. Mutually exclusive with `--packages`. |
-| `--packages` | bool | `false` | **TypeScript-only.** Fan the run across every workspace package under `packages/**` with a `tsconfig.json`. One child process per package; concurrency capped at `cpus()-1`. Aggregates per-package findings. |
-| `--packages-concurrency <n>` | int | `cpus()-1` | Override `--packages` concurrency cap. |
 | `--debug` | bool | `false` | Enable debug-level logging. |
 
-**Adapter selection.** v2.0.0 ships five first-party adapters: `typescript`, `python`, `rust`, `go`, `java`. Each is its own publishable npm package marked with `opensipTools.kind: "graph-adapter"`. `pickAdapter(cwd)` chooses by file-extension dominance over the cwd, ignoring `node_modules/`, `.venv/`, `target/`, `dist/`, `build/`. Ties resolve by a deterministic preference list. The `--package` and `--packages` scoping flags are TypeScript-only; for projects in other languages, run `graph` from the project root.
+**Polyglot example.** In a repo with both a TypeScript pnpm workspace and a Cargo workspace, the polyglot detection applies both adapters in a single run:
 
-**Exit codes:** 0 (success / gate clean), 1 (runtime error / gate regression / any `--packages` child failed), 2 (configuration error), 4 (`--report-to` upload failed).
+```
+# Polyglot repo: TS frontend + Cargo backend
+# `--workspace` aggregates units from BOTH adapters and fans out in parallel.
+opensip-tools graph --workspace
+# → one session in the dashboard combining TS package results + Cargo member results
+```
 
-**Heap sizing:** for projects with > 1000 source files, `graph` emits a one-line stderr hint at startup recommending `NODE_OPTIONS=--max-old-space-size=8192` (or higher). On a 5476-file repo the default 4 GB heap is not enough for a global run. (Heap sizing is most acute for the TypeScript adapter, which holds a project-wide `ts.Program`; tree-sitter adapters parse lazily per file and use far less memory.)
+**Session contract.** A single CLI invocation produces a single dashboard session, regardless of how many positional paths or workspace units the run analyzed. Modes that produce machine-readable artifacts instead of dashboard sessions (`--json`, `--gate-save`, `--gate-compare`, `--report-to`, `--catalog-output`) opt out.
+
+**Adapter selection.** v2.0.0 ships first-party adapters for TypeScript, Python, Rust, Go, Java, and C/C++. Each is its own publishable npm package marked with `opensipTools.kind: "graph-adapter"` for the graph engine, or contributed via the language pack. Marker-file detection chooses which adapter(s) apply; positional paths inherit that decision unless `--language` overrides it.
+
+**Exit codes:** 0 (success / gate clean), 1 (runtime error / gate regression / any `--workspace` child failed), 2 (configuration error / D14 zero-file mismatch), 4 (`--report-to` upload failed).
+
+**Heap sizing:** for projects with > 1000 source files, `graph` emits a one-line stderr hint at startup recommending `NODE_OPTIONS=--max-old-space-size=8192` (or higher). On a 5476-file repo the default 4 GB heap is not enough for a global run. The preflight skips automatically when an explicit scope is present (positional paths, `--workspace`, or `--language`). (Heap sizing is most acute for the TypeScript adapter, which holds a project-wide `ts.Program`; tree-sitter adapters parse lazily per file and use far less memory.)
 
 **Catalog storage:** v2 stores the catalog in the project's SQLite database (`<project>/opensip-tools/.runtime/datastore.sqlite`, `graph_catalog` row). v3 wire-format remains: `language` (adapter id), `cacheKey` (an opaque per-adapter invalidation string — TypeScript: `ts-${ts.version}-${tsconfigContentHash}`; Python and Rust use language-id-prefixed keys), and a per-file mtime+size fingerprint. The reconstructed in-memory `Catalog` shape is unchanged from v1's `cache/read.ts` output.
 

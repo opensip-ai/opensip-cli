@@ -93,14 +93,17 @@ describe('graphTool.register', () => {
     expect(sub).toBeDefined();
     const spy = vi.fn();
     if (sub) {
-      sub.action((opts: unknown) => {
-        spy(opts);
+      // Commander passes (positionalPaths, opts, command) to the
+      // action callback now that `.argument('[paths...]')` is declared.
+      sub.action((paths: readonly string[], opts: unknown) => {
+        spy(paths, opts);
       });
       await sub.parseAsync(['--cwd', '/tmp', '--json'], { from: 'user' });
       expect(spy).toHaveBeenCalledOnce();
-      const opts = spy.mock.calls[0]?.[0] as { cwd: string; json: boolean };
-      expect(opts.cwd).toBe('/tmp');
-      expect(opts.json).toBe(true);
+      const call = spy.mock.calls[0] as [readonly string[], { cwd: string; json: boolean }];
+      expect(call[0]).toEqual([]);
+      expect(call[1].cwd).toBe('/tmp');
+      expect(call[1].json).toBe(true);
     }
   });
 });
@@ -168,9 +171,9 @@ describe('graphTool action handler — end-to-end via Commander', () => {
       };
       graphTool.register(cli);
       try {
-        // With --package set, the heap preflight is skipped — important
-        // because preflight could re-exec the test process.
-        await program.parseAsync(['graph', '--cwd', dir, '--json', '--package', dir], { from: 'user' });
+        // With a positional path, the heap preflight is skipped —
+        // important because preflight could re-exec the test process.
+        await program.parseAsync(['graph', '--cwd', dir, '--json', dir], { from: 'user' });
       } finally {
         stdoutSpy.mockRestore();
       }
@@ -236,8 +239,8 @@ describe('graphTool action handler — end-to-end via Commander', () => {
     }
   });
 
-  it('--packages-concurrency parses as a number', async () => {
-    // Exercise the parse function for --packages-concurrency.
+  it('--concurrency parses as a number', async () => {
+    // Exercise the parse function for --concurrency.
     const program = new Command();
     program.exitOverride();
     graphTool.register(makeCli(program));
@@ -245,12 +248,12 @@ describe('graphTool action handler — end-to-end via Commander', () => {
     expect(sub).toBeDefined();
     const spy = vi.fn();
     if (sub) {
-      sub.action((opts: unknown) => {
-        spy(opts);
+      sub.action((paths: readonly string[], opts: unknown) => {
+        spy(paths, opts);
       });
-      await sub.parseAsync(['--cwd', '/tmp', '--packages-concurrency', '4'], { from: 'user' });
-      const opts = spy.mock.calls[0]?.[0] as { packagesConcurrency: number };
-      expect(opts.packagesConcurrency).toBe(4);
+      await sub.parseAsync(['--cwd', '/tmp', '--concurrency', '4'], { from: 'user' });
+      const call = spy.mock.calls[0] as [readonly string[], { concurrency: number }];
+      expect(call[1].concurrency).toBe(4);
     }
   });
 });

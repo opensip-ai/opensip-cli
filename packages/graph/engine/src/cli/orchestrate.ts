@@ -22,7 +22,7 @@
  * public type surface.
  */
 
-import { pickAdapter } from '../lang-adapter/registry.js';
+import { currentAdapterRegistry, pickAdapter } from '../lang-adapter/registry.js';
 import { CatalogRepo } from '../persistence/catalog-repo.js';
 import { buildIndexes } from '../pipeline/indexes.js';
 import { currentRules } from '../rules/registry.js';
@@ -68,6 +68,13 @@ export interface RunGraphInput {
   readonly rules?: readonly Rule[];
   /** Override the adapter's config-file path (e.g. tsconfig.json). */
   readonly tsConfigPath?: string;
+  /**
+   * Optional canonical adapter id (`typescript`, `python`, `rust`,
+   * etc.). When set, bypasses `pickAdapter`'s file-extension dominance
+   * heuristic and selects the named adapter directly. The graph CLI
+   * surfaces this via the `--language` flag.
+   */
+  readonly language?: string;
   /**
    * Optional structured progress callback. The orchestrator emits one
    * `stage-start` + one of `stage-done` / `stage-cached` per pipeline
@@ -132,7 +139,7 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
 
   const monitor = createPressureMonitor();
   try {
-    const adapter = pickAdapter(input.cwd);
+    const adapter = pickAdapterFor(input);
     const discovery = runStage(
       'discover',
       input.onProgress,
@@ -191,4 +198,20 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
   } finally {
     monitor.dispose();
   }
+}
+
+/**
+ * Pick a graph language adapter for the run. When `language` is set,
+ * look up that adapter directly via the registry; otherwise fall back
+ * to the file-extension dominance heuristic in `pickAdapter`. If the
+ * named language isn't registered, fall through to `pickAdapter` so
+ * the caller's CLI gets a clearer error path (D14 / "no adapter
+ * registered").
+ */
+function pickAdapterFor(input: RunGraphInput): ReturnType<typeof pickAdapter> {
+  if (typeof input.language === 'string' && input.language.length > 0) {
+    const entry = currentAdapterRegistry().getById(input.language);
+    if (entry) return entry.adapter;
+  }
+  return pickAdapter(input.cwd);
 }

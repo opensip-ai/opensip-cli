@@ -1,4 +1,5 @@
 import type { GenericFunction, Import, Location } from './generic-types.js'
+import type { WorkspaceUnit } from './workspace-unit.js'
 
 /**
  * Minimal cross-language query primitives. Each adapter implements
@@ -44,4 +45,20 @@ export interface LanguageAdapter<TTree = unknown, TNode = unknown> {
 
   /** Optional async warmup (e.g. for tree-sitter WASM init). Called by CLI bootstrap. */
   warmup?(): Promise<void>
+
+  /**
+   * Optional workspace discovery. When implemented, returns the units
+   * the `graph --workspace` fan-out should target — one TS package per
+   * tsconfig.json, one Cargo member per `[workspace.members]` entry, etc.
+   *
+   * Adapters that have no workspace concept (or haven't implemented this
+   * yet) omit the method; the CLI treats absence as an empty list. If
+   * every detected adapter omits it AND the user passes `--workspace`,
+   * the CLI errors with a message naming the language(s).
+   *
+   * `rootDir` is the absolute project root (the CLI's `--cwd` or
+   * detection root). Implementations MUST return absolute paths in
+   * `rootDir`; relative paths break the spawn step downstream.
+   */
+  discoverWorkspaceUnits?(rootDir: string): Promise<readonly WorkspaceUnit[]>
 }
