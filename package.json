@@ -40,17 +40,17 @@
     "@opensip-tools/checks-universal": "workspace:*",
     "@opensip-tools/fitness": "workspace:*",
     "@vitest/coverage-v8": "^2.1.9",
-    "dependency-cruiser": "^17.4.0",
+    "dependency-cruiser": "^17.4.2",
     "eslint": "^9.39.4",
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-sonarjs": "^4.0.3",
     "eslint-plugin-unicorn": "^64.0.0",
     "globals": "^17.6.0",
-    "knip": "^6.13.1",
+    "knip": "^6.14.2",
     "turbo": "^2.9.16",
     "typescript": "~5.7.0",
-    "typescript-eslint": "^8.59.3"
+    "typescript-eslint": "^8.60.0"
   },
   "packageManager": "pnpm@10.12.1",
   "engines": {
