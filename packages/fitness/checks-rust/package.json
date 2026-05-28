@@ -29,7 +29,7 @@
   },
   "devDependencies": {
     "@opensip-tools/core": "workspace:*",
-    "@types/node": "^22.0.0",
+    "@types/node": "^25.9.1",
     "vitest": "^2.1.9"
   }
 }
