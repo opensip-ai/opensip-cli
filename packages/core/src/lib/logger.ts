@@ -1,3 +1,4 @@
+// @fitness-ignore-file error-handling-quality -- this module IS the logger; its own write/prune failures cannot be reported via itself without infinite recursion. Best-effort swallow is the documented contract on lines 273/281/297/302.
 /**
  * Structured logger for opensip-tools.
  *

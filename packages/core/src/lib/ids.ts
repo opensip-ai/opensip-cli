@@ -40,6 +40,7 @@ export function extractTimestamp(id: string): Date | null {
     }
     return new Date(time);
   } catch {
+    // @fitness-ignore-next-line error-handling-quality -- parse-or-null helper; exception → null is the function's contract, caller checks for null.
     return null;
   }
 }

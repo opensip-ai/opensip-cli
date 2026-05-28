@@ -36,6 +36,7 @@ function readConfigPathFromPackageJson(rootDir: string): string | null {
     // Malformed package.json is the user's problem to fix — don't
     // silently mask it with a config-resolution error. The subsequent
     // fall-through to the default path will succeed or fail as usual.
+    // @fitness-ignore-next-line error-handling-quality -- intentional swallow: malformed package.json surfaces via null return (see preceding comment).
     return null
   }
 

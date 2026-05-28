@@ -149,6 +149,7 @@ function safeReaddir(dir: string): string[] {
   try {
     return readdirSync(dir);
   } catch {
+    // @fitness-ignore-next-line error-handling-quality -- filesystem probe; exception → empty array is the function's contract (missing directory or permission denied returns "no entries", same as a genuinely empty dir).
     return [];
   }
 }

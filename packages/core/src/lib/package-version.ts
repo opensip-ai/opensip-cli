@@ -1,3 +1,4 @@
+// @fitness-ignore-file error-handling-quality -- upward package.json walk: a missing/unreadable package.json at any non-root level is the expected non-terminal signal to keep walking; logging would be noisy and load-bearing-incorrect.
 import { readFileSync } from 'node:fs';
 import { dirname, join, parse } from 'node:path';
 import { fileURLToPath } from 'node:url';
