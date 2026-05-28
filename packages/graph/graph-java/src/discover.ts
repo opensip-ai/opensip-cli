@@ -1,3 +1,4 @@
+// @fitness-ignore-file batch-operation-limits -- iterates bounded collection (Java source roots resolved from build files within a project)
 /**
  * Java file discovery.
  *

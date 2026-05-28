@@ -1,3 +1,4 @@
+// @fitness-ignore-file unbounded-memory -- reads Cargo.lock / Cargo.toml manifests; bounded by standard Rust crate metadata
 /**
  * Rust cacheKey implementation.
  *

@@ -1,3 +1,4 @@
+// @fitness-ignore-file detached-promises -- stage hooks (registry registration, logger.info) are synchronous; orchestrator threads them inside an async pipeline
 /**
  * Pipeline orchestrator — threads stages 0–5 together.
  *

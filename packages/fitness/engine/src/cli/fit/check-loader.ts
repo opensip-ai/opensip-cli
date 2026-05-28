@@ -1,3 +1,4 @@
+// @fitness-ignore-file detached-promises -- rebuildDisplayLookups, defaultRegistry.register, and mergeCheckDisplay are synchronous mutators flagged by heuristic
 /**
  * Plugin/check discovery + registration for the `fit` command.
  *

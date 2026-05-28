@@ -1,3 +1,4 @@
+// @fitness-ignore-file detached-promises -- load-window driver calls synchronous emit/append helpers inside the async tick loop
 /**
  * @fileoverview Shared load-window driver used by the load and chaos kinds.
  *

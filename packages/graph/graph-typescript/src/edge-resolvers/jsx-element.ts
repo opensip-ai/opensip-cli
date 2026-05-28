@@ -1,3 +1,4 @@
+// @fitness-ignore-file batch-operation-limits -- iterates bounded collection (catalog entries for a single JSX element resolution)
 /**
  * Resolve JSX elements: `<Foo />` / `<Foo>...</Foo>`.
  *

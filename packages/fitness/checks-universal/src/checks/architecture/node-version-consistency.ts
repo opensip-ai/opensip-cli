@@ -1,4 +1,5 @@
 // @fitness-ignore-file fitness-check-standards -- Uses fs for package.json reading, not source file content
+// @fitness-ignore-file detached-promises -- helpers (checkNvmrc, checkWorkspaceEngines, checkTypesNode, checkCiWorkflow) are synchronous violation-collectors; heuristic flags them despite returning void
 /**
  * @fileoverview Node version consistency fitness check
  * @invariants

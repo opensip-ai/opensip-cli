@@ -1,3 +1,4 @@
+// @fitness-ignore-file performance-anti-patterns -- spread patterns appear in the check's own JSDoc example strings, not real loop code
 /**
  * @fileoverview resilience/callback-invocation-safe — callbacks iterated
  * from producer code paths (`subscribers.forEach((cb) => cb(...))`,

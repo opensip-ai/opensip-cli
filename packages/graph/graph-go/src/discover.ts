@@ -1,3 +1,4 @@
+// @fitness-ignore-file batch-operation-limits -- iterates bounded collection (Go module/package directories within a project root)
 /**
  * Go file discovery.
  *

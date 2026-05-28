@@ -171,6 +171,7 @@ export async function openDashboard(
   let opened = false;
   try {
     const platform = process.platform;
+    // @fitness-ignore-next-line no-hardcoded-timeouts -- 5s ceiling for the synchronous browser-opener (open/xdg-open/cmd start); the OS shell call should return immediately, so a fixed safety timeout is preferable to a configurable knob users would never tune
     const execOpts = { timeout: 5000 };
     if (platform === 'darwin') execFileSync('open', [reportPath], execOpts);
     else if (platform === 'linux') execFileSync('xdg-open', [reportPath], execOpts);

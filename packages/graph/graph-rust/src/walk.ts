@@ -1,3 +1,4 @@
+// @fitness-ignore-file performance-anti-patterns -- spread used to flatten AST child nodes during tree-sitter walk; bounded by node arity at each step
 /**
  * Rust walkProject — emit FunctionOccurrences + CallSiteRecords.
  *

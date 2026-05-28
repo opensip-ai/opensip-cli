@@ -1,3 +1,4 @@
+// @fitness-ignore-file unbounded-memory -- reads go.sum / go.mod manifests; bounded by standard Go module metadata
 /**
  * Go cacheKey implementation.
  *

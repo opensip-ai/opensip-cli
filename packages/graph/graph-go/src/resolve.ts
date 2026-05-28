@@ -1,3 +1,4 @@
+// @fitness-ignore-file unbounded-memory -- reads single source files at a time during catalog resolution; per-file memory bounded by source size
 /**
  * Go resolveCallSites — name-based catalog lookup.
  *

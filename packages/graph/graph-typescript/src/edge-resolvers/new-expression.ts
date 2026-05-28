@@ -1,3 +1,4 @@
+// @fitness-ignore-file batch-operation-limits -- iterates bounded collection (catalog entries for a single new-expression resolution)
 /**
  * Resolve `new MyClass(...)` to the constructor's catalog entry.
  *

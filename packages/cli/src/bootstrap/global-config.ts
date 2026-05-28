@@ -1,3 +1,4 @@
+// @fitness-ignore-file unbounded-memory -- reads ~/.opensip-tools/config.yml, a small user-config file bounded by configuration shape
 /**
  * global-config — read/write the user-level (`~/.opensip-tools/config.yml`)
  * config that holds the cloud API key and per-user defaults.

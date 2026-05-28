@@ -1,3 +1,5 @@
+// @fitness-ignore-file batch-operation-limits -- iterates bounded collection (workspace tsconfig files matched by glob; small N per repo)
+// @fitness-ignore-file performance-anti-patterns -- sequential file reads keep memory bounded across tsconfig chains
 /**
  * @fileoverview TSConfig extends validation
  * @module checks-builtin/checks/architecture/tsconfig-extends-validation

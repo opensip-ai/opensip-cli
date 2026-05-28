@@ -1,5 +1,6 @@
 // @fitness-ignore-file file-length-limits -- Complex module with tightly coupled logic; splitting would fragment cohesive functionality
 // @fitness-ignore-file eslint-backend -- Fitness framework orchestrator; ESLint rule variations between fitness runner and IDE are expected
+// @fitness-ignore-file detached-promises -- clearParseCache is explicitly voided; surrounding sync calls (fileCache.clear, abort) are flagged by heuristic
 /**
  * @fileoverview Central orchestrator for fitness recipe execution
  *

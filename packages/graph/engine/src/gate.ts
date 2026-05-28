@@ -1,3 +1,4 @@
+// @fitness-ignore-file batch-operation-limits -- iterates bounded collection (rule findings collected for a single graph run; bounded by rule count)
 /**
  * Gate baseline save / compare per §10 P6.
  *

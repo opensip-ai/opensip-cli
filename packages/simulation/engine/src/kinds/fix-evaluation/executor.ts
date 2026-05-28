@@ -1,3 +1,4 @@
+// @fitness-ignore-file batch-operation-limits -- iterates bounded collection (configured fix candidates per scenario; small N)
 /**
  * @fileoverview Fix-evaluation-kind executor.
  *

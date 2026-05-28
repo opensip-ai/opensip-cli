@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/require-await -- driver stubs match contract `() => Promise<T>`; bodies throw synchronously until Phase 7 wires real drivers */
+// @fitness-ignore-file detached-promises -- phase recorders and assertion builders are synchronous result mutators inside async setup/act/assert phases
 /**
  * @fileoverview Invariant-kind executor.
  *

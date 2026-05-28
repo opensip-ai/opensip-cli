@@ -1,3 +1,4 @@
+// @fitness-ignore-file unbounded-memory -- reads opensip-tools.config.yml + package.json files; bounded by configuration shape and standard npm package metadata
 /**
  * plugin command — manage project-local npm-installed plugins.
  *

@@ -1,3 +1,4 @@
+// @fitness-ignore-file detached-promises -- cli.logger.warn, process.stdout.write, process.stderr.write, saveBaseline, and renderGateCompareOutput are synchronous; flagged by heuristic
 /**
  * fitnessTool — fitness as a Tool plugin.
  *
