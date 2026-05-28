@@ -1,6 +1,6 @@
 import { withRetry, logger } from '@opensip-tools/core';
 
-import type { SarifResult, SarifLocation, SarifFix } from './sarif/types.js';
+import type { SarifResult, SarifLocation } from './sarif/types.js';
 import type { CliOutput } from '@opensip-tools/contracts';
 
 const SARIF_SCHEMA = 'https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json';
@@ -68,10 +68,20 @@ class SarifResultBuilder {
     return this;
   }
 
-  withFix(suggestion: string): this {
+  /**
+   * Append a remediation hint to the result message. SARIF's `fixes`
+   * array requires `artifactChanges` (spec §3.55) — a structured
+   * replacement region. Fitness only has prose advice, so emitting it
+   * as a `fix` produces schema-invalid SARIF (GitHub Code Scanning
+   * rejects the upload). Surfacing the suggestion in `message.text`
+   * keeps it visible in the alert UI without lying about its shape.
+   */
+  withSuggestion(suggestion: string): this {
     if (!suggestion) return this;
-    const fix: SarifFix = { description: { text: suggestion } };
-    this.result.fixes = [fix];
+    const existing = this.result.message?.text ?? '';
+    this.result.message = {
+      text: existing ? `${existing}\n\nSuggestion: ${suggestion}` : `Suggestion: ${suggestion}`,
+    };
     return this;
   }
 
@@ -80,42 +90,60 @@ class SarifResultBuilder {
   }
 }
 
-/** Build a SARIF 2.1.0 log from CLI output — one run per check slug */
+/**
+ * Tool driver name in the emitted SARIF. Matches the CodeQL Action
+ * `category` set in the CI workflow (`opensip-tools-fit`); both must
+ * agree so Code Scanning groups our findings under a single tool.
+ */
+const TOOL_DRIVER_NAME = 'opensip-tools-fit';
+const TOOL_DRIVER_VERSION = '2.0.0';
+
+/**
+ * Build a SARIF 2.1.0 log from CLI output.
+ *
+ * SARIF models one `run` as one analysis tool's output. Fitness is the
+ * tool; each check is a *rule* within fitness — not a separate tool.
+ * The emitted log therefore contains a single run with all findings
+ * aggregated and every check exposed as an entry in
+ * `tool.driver.rules`.
+ *
+ * The previous one-run-per-check shape hit the GitHub Code Scanning
+ * REST limit ("No more than 25 items are allowed; N were supplied")
+ * the moment fitness ran more than 25 checks with findings.
+ */
 export function buildSarifLog(output: CliOutput): Record<string, unknown> {
   return wrapSarifLog(buildSarifRuns(output));
 }
 
 function buildSarifRuns(output: CliOutput): SarifRun[] {
-  const runs: SarifRun[] = [];
+  const ruleIds = new Set<string>();
+  const results: SarifResult[] = [];
 
   for (const ch of output.checks) {
     if (ch.findings.length === 0) continue;
-
-    const ruleIds = new Set<string>();
-    const results: SarifResult[] = [];
 
     for (const f of ch.findings) {
       ruleIds.add(f.ruleId);
       const builder = new SarifResultBuilder(f.ruleId, f.message)
         .withSeverity(f.severity);
       if (f.filePath) builder.withLocation(f.filePath, f.line, f.column);
-      if (f.suggestion) builder.withFix(f.suggestion);
+      if (f.suggestion) builder.withSuggestion(f.suggestion);
       results.push(builder.build());
     }
-
-    runs.push({
-      tool: {
-        driver: {
-          name: ch.checkSlug,
-          version: '1.0.0',
-          rules: [...ruleIds].map((id) => ({ id })),
-        },
-      },
-      results,
-    });
   }
 
-  return runs;
+  if (results.length === 0) return [];
+
+  return [{
+    tool: {
+      driver: {
+        name: TOOL_DRIVER_NAME,
+        version: TOOL_DRIVER_VERSION,
+        rules: [...ruleIds].map((id) => ({ id })),
+      },
+    },
+    results,
+  }];
 }
 
 function wrapSarifLog(runs: SarifRun[]): Record<string, unknown> {

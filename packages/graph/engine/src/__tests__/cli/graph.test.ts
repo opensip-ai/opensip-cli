@@ -9,7 +9,7 @@
  * report renderer is covered without depending on the Ink runner.
  */
 
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -283,11 +283,10 @@ describe('executeGraph — human / JSON modes', () => {
     expect(setExitCode).toHaveBeenCalledWith(0);
 
     // Read written file + assert wire shape
-    // eslint-disable-next-line @typescript-eslint/no-require-imports -- test-only path
-    const written = JSON.parse(require('node:fs').readFileSync(outPath, 'utf8')) as {
+    const written = JSON.parse(readFileSync(outPath, 'utf8')) as {
       version: string;
       provenance: { runId: string; tenantId: string; completeness: string };
-      symbols: Array<{ repoId: string; gitSha: string; qualifiedName: string }>;
+      symbols: { repoId: string; gitSha: string; qualifiedName: string }[];
       edges: unknown[];
     };
     expect(written.version).toBe('1.0');

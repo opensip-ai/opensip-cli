@@ -111,8 +111,8 @@ describe('Java adapter — depends_on emission (Phase 4)', () => {
 
     const deps = dependenciesByOwner!.get(mainInit!.bodyHash);
     expect(deps, 'main has dependency edges').toHaveLength(1);
-    expect(deps![0]!.specifier).toBe('com.example.foo.Bar');
-    expect(deps![0]!.to).toEqual([barInit!.bodyHash]);
+    expect(deps![0].specifier).toBe('com.example.foo.Bar');
+    expect(deps![0].to).toEqual([barInit!.bodyHash]);
   });
 
   it('resolves a wildcard import to every module-init in the package (polymorphic)', () => {
@@ -134,8 +134,8 @@ describe('Java adapter — depends_on emission (Phase 4)', () => {
 
     const deps = dependenciesByOwner!.get(mainInit!.bodyHash);
     expect(deps).toHaveLength(1);
-    expect(deps![0]!.specifier).toBe('com.example.foo.*');
-    expect([...deps![0]!.to].sort()).toEqual([aInit!.bodyHash, bInit!.bodyHash].sort());
+    expect(deps![0].specifier).toBe('com.example.foo.*');
+    expect([...deps![0].to].sort()).toEqual([aInit!.bodyHash, bInit!.bodyHash].sort());
   });
 
   it('resolves an inner-class import via fall-back to the outer class', () => {
@@ -159,8 +159,8 @@ describe('Java adapter — depends_on emission (Phase 4)', () => {
 
     const deps = dependenciesByOwner!.get(mainInit!.bodyHash);
     expect(deps).toHaveLength(1);
-    expect(deps![0]!.specifier).toBe('com.example.foo.Outer.Inner');
-    expect(deps![0]!.to).toEqual([outerInit!.bodyHash]);
+    expect(deps![0].specifier).toBe('com.example.foo.Outer.Inner');
+    expect(deps![0].to).toEqual([outerInit!.bodyHash]);
   });
 
   it('resolves a static type import to the owning class module-init', () => {
@@ -182,8 +182,8 @@ describe('Java adapter — depends_on emission (Phase 4)', () => {
 
     const deps = dependenciesByOwner!.get(mainInit!.bodyHash);
     expect(deps).toHaveLength(1);
-    expect(deps![0]!.specifier).toBe('static com.example.foo.Bar.someMethod');
-    expect(deps![0]!.to).toEqual([barInit!.bodyHash]);
+    expect(deps![0].specifier).toBe('static com.example.foo.Bar.someMethod');
+    expect(deps![0].to).toEqual([barInit!.bodyHash]);
   });
 
   it('resolves a static wildcard import to the owning class module-init', () => {
@@ -205,8 +205,8 @@ describe('Java adapter — depends_on emission (Phase 4)', () => {
 
     const deps = dependenciesByOwner!.get(mainInit!.bodyHash);
     expect(deps).toHaveLength(1);
-    expect(deps![0]!.specifier).toBe('static com.example.foo.Bar.*');
-    expect(deps![0]!.to).toEqual([barInit!.bodyHash]);
+    expect(deps![0].specifier).toBe('static com.example.foo.Bar.*');
+    expect(deps![0].to).toEqual([barInit!.bodyHash]);
   });
 
   it('emits unresolved edges for stdlib (`java.*`) imports', () => {
@@ -221,8 +221,8 @@ describe('Java adapter — depends_on emission (Phase 4)', () => {
 
     const deps = dependenciesByOwner!.get(mainInit!.bodyHash);
     expect(deps).toHaveLength(1);
-    expect(deps![0]!.specifier).toBe('java.util.List');
-    expect(deps![0]!.to).toEqual([]);
+    expect(deps![0].specifier).toBe('java.util.List');
+    expect(deps![0].to).toEqual([]);
   });
 
   it('emits unresolved edges for `javax.*` / `jakarta.*` imports', () => {
@@ -256,8 +256,8 @@ describe('Java adapter — depends_on emission (Phase 4)', () => {
 
     const deps = dependenciesByOwner!.get(mainInit!.bodyHash);
     expect(deps).toHaveLength(1);
-    expect(deps![0]!.specifier).toBe('com.google.gson.Gson');
-    expect(deps![0]!.to).toEqual([]);
+    expect(deps![0].specifier).toBe('com.google.gson.Gson');
+    expect(deps![0].to).toEqual([]);
   });
 
   it('emits one dep site per import statement when a file has many imports', () => {
@@ -318,8 +318,8 @@ describe('Java adapter — depends_on emission (Phase 4)', () => {
 
     const deps = dependenciesByOwner!.get(mainInit!.bodyHash);
     expect(deps).toHaveLength(1);
-    expect(deps![0]!.specifier).toBe('com.example.foo.Bar');
-    expect(deps![0]!.to).toEqual([barInit!.bodyHash]);
+    expect(deps![0].specifier).toBe('com.example.foo.Bar');
+    expect(deps![0].to).toEqual([barInit!.bodyHash]);
   });
 
   it('resolves imports under the plain `src/` source root', () => {
@@ -341,7 +341,7 @@ describe('Java adapter — depends_on emission (Phase 4)', () => {
 
     const deps = dependenciesByOwner!.get(mainInit!.bodyHash);
     expect(deps).toHaveLength(1);
-    expect(deps![0]!.specifier).toBe('com.example.foo.Bar');
-    expect(deps![0]!.to).toEqual([barInit!.bodyHash]);
+    expect(deps![0].specifier).toBe('com.example.foo.Bar');
+    expect(deps![0].to).toEqual([barInit!.bodyHash]);
   });
 });

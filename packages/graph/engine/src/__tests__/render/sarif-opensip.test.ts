@@ -83,7 +83,7 @@ const RULE_FIXTURES: readonly RuleFixture[] = [
 
 function makeSignal(fixture: RuleFixture): Signal {
   return {
-    id: `sig_${fixture.slug.replace('graph:', '').replace(/-/g, '_')}`,
+    id: `sig_${fixture.slug.replace('graph:', '').replaceAll('-', '_')}`,
     source: 'graph',
     provider: 'opensip-tools',
     severity: fixture.severity,
@@ -116,10 +116,10 @@ describe('renderSarifOpenSip — invariants', () => {
   it('every result.ruleId matches the OpenSIP rule-ID regex', () => {
     const signals = RULE_FIXTURES.map(makeSignal);
     const parsed = JSON.parse(renderSarifOpenSip(signals, CONTEXT)) as {
-      runs: Array<{ results: Array<{ ruleId: string }> }>;
+      runs: { results: { ruleId: string }[] }[];
     };
-    expect(parsed.runs[0]!.results.length).toBe(RULE_FIXTURES.length);
-    for (const result of parsed.runs[0]!.results) {
+    expect(parsed.runs[0].results.length).toBe(RULE_FIXTURES.length);
+    for (const result of parsed.runs[0].results) {
       expect(result.ruleId).toMatch(OPENSIP_RULE_ID_REGEX);
     }
   });
@@ -127,22 +127,22 @@ describe('renderSarifOpenSip — invariants', () => {
   it('tool.driver.name is opensip-tools-graph', () => {
     const sarif = renderSarifOpenSip(RULE_FIXTURES.map(makeSignal), CONTEXT);
     const parsed = JSON.parse(sarif) as {
-      runs: Array<{ tool: { driver: { name: string; version: string } } }>;
+      runs: { tool: { driver: { name: string; version: string } } }[];
     };
-    expect(parsed.runs[0]!.tool.driver.name).toBe('opensip-tools-graph');
-    expect(parsed.runs[0]!.tool.driver.version).toBe('2.0.0');
+    expect(parsed.runs[0].tool.driver.name).toBe('opensip-tools-graph');
+    expect(parsed.runs[0].tool.driver.version).toBe('2.0.0');
   });
 
   it('tool.driver.rules contains every OpenSIP rule ID emitted in results', () => {
     const sarif = renderSarifOpenSip(RULE_FIXTURES.map(makeSignal), CONTEXT);
     const parsed = JSON.parse(sarif) as {
-      runs: Array<{
-        tool: { driver: { rules: Array<{ id: string }> } };
-        results: Array<{ ruleId: string }>;
-      }>;
+      runs: {
+        tool: { driver: { rules: { id: string }[] } };
+        results: { ruleId: string }[];
+      }[];
     };
-    const driverRuleIds = new Set(parsed.runs[0]!.tool.driver.rules.map((r) => r.id));
-    for (const result of parsed.runs[0]!.results) {
+    const driverRuleIds = new Set(parsed.runs[0].tool.driver.rules.map((r) => r.id));
+    for (const result of parsed.runs[0].results) {
       expect(driverRuleIds.has(result.ruleId)).toBe(true);
     }
     expect(driverRuleIds.size).toBe(RULE_FIXTURES.length);

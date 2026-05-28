@@ -57,16 +57,20 @@ function mapKindToOpenSip(kind: FunctionKind): string {
   switch (kind) {
     case 'function-declaration':
     case 'function-expression':
-    case 'arrow':
+    case 'arrow': {
       return 'function';
+    }
     case 'method':
     case 'getter':
-    case 'setter':
+    case 'setter': {
       return 'method';
-    case 'constructor':
+    }
+    case 'constructor': {
       return 'constructor';
-    case 'module-init':
+    }
+    case 'module-init': {
       return 'module-init';
+    }
   }
 }
 
@@ -104,9 +108,9 @@ function occurrenceToSymbol(
     startLine: occurrence.line,
     endLine: occurrence.endLine,
     isExported: occurrence.visibility === 'exported',
-    signature: occurrence.returnType !== null
-      ? `(${occurrence.params.map((p) => p.name).join(', ')}): ${occurrence.returnType}`
-      : null,
+    signature: occurrence.returnType === null
+      ? null
+      : `(${occurrence.params.map((p) => p.name).join(', ')}): ${occurrence.returnType}`,
     docSummary: null,
     gitSha,
   };

@@ -108,10 +108,10 @@ describe('Rust adapter — depends_on emission (Phase 4)', () => {
 
     const libDeps = dependenciesByOwner!.get(libInit!.bodyHash);
     expect(libDeps, 'lib has dependency edges').toHaveLength(1);
-    expect(libDeps![0]!.specifier).toBe('crate::foo::bar');
+    expect(libDeps![0].specifier).toBe('crate::foo::bar');
     // `crate::foo::bar` — `bar` is an item, not a module, so resolution
     // walks back to `crate::foo`.
-    expect(libDeps![0]!.to).toEqual([fooInit!.bodyHash]);
+    expect(libDeps![0].to).toEqual([fooInit!.bodyHash]);
   });
 
   it('resolves a nested module import — `crate::foo::sub`', () => {
@@ -132,8 +132,8 @@ describe('Rust adapter — depends_on emission (Phase 4)', () => {
 
     const deps = dependenciesByOwner!.get(libInit!.bodyHash);
     expect(deps).toHaveLength(1);
-    expect(deps![0]!.specifier).toBe('crate::foo::sub::Item');
-    expect(deps![0]!.to).toEqual([subInit!.bodyHash]);
+    expect(deps![0].specifier).toBe('crate::foo::sub::Item');
+    expect(deps![0].to).toEqual([subInit!.bodyHash]);
   });
 
   it('resolves `super::sibling` from a nested module', () => {
@@ -152,8 +152,8 @@ describe('Rust adapter — depends_on emission (Phase 4)', () => {
 
     const deps = dependenciesByOwner!.get(bInit!.bodyHash);
     expect(deps).toHaveLength(1);
-    expect(deps![0]!.specifier).toBe('super::sibling::Thing');
-    expect(deps![0]!.to).toEqual([siblingInit!.bodyHash]);
+    expect(deps![0].specifier).toBe('super::sibling::Thing');
+    expect(deps![0].to).toEqual([siblingInit!.bodyHash]);
   });
 
   it('resolves `self::child` from a parent module file', () => {
@@ -171,8 +171,8 @@ describe('Rust adapter — depends_on emission (Phase 4)', () => {
 
     const deps = dependenciesByOwner!.get(aInit!.bodyHash);
     expect(deps).toHaveLength(1);
-    expect(deps![0]!.specifier).toBe('self::child::Thing');
-    expect(deps![0]!.to).toEqual([childInit!.bodyHash]);
+    expect(deps![0].specifier).toBe('self::child::Thing');
+    expect(deps![0].to).toEqual([childInit!.bodyHash]);
   });
 
   it('emits unresolved edges for stdlib imports', () => {
@@ -188,8 +188,8 @@ describe('Rust adapter — depends_on emission (Phase 4)', () => {
 
     const deps = dependenciesByOwner!.get(libInit!.bodyHash);
     expect(deps).toHaveLength(1);
-    expect(deps![0]!.specifier).toBe('std::collections::HashMap');
-    expect(deps![0]!.to).toEqual([]);
+    expect(deps![0].specifier).toBe('std::collections::HashMap');
+    expect(deps![0].to).toEqual([]);
   });
 
   it('emits unresolved edges for third-party imports', () => {
@@ -202,8 +202,8 @@ describe('Rust adapter — depends_on emission (Phase 4)', () => {
 
     const deps = dependenciesByOwner!.get(libInit!.bodyHash);
     expect(deps).toHaveLength(1);
-    expect(deps![0]!.specifier).toBe('serde::Deserialize');
-    expect(deps![0]!.to).toEqual([]);
+    expect(deps![0].specifier).toBe('serde::Deserialize');
+    expect(deps![0].to).toEqual([]);
   });
 
   it('handles grouped imports — emits one dep site per terminal path', () => {
@@ -260,8 +260,8 @@ describe('Rust adapter — depends_on emission (Phase 4)', () => {
 
     const deps = dependenciesByOwner!.get(libInit!.bodyHash);
     expect(deps).toHaveLength(1);
-    expect(deps![0]!.specifier).toBe('crate::foo::Bar');
-    expect(deps![0]!.to).toEqual([fooInit!.bodyHash]);
+    expect(deps![0].specifier).toBe('crate::foo::Bar');
+    expect(deps![0].to).toEqual([fooInit!.bodyHash]);
   });
 
   it('emits a glob dep site with trailing `*`; resolver leaves it unresolved (v1 limitation)', () => {
@@ -275,8 +275,8 @@ describe('Rust adapter — depends_on emission (Phase 4)', () => {
 
     const deps = dependenciesByOwner!.get(libInit!.bodyHash);
     expect(deps).toHaveLength(1);
-    expect(deps![0]!.specifier).toBe('crate::foo::*');
-    expect(deps![0]!.to).toEqual([]);
+    expect(deps![0].specifier).toBe('crate::foo::*');
+    expect(deps![0].to).toEqual([]);
   });
 
   it('treats `<package-name>::…` as equivalent to `crate::…`', () => {
@@ -293,8 +293,8 @@ describe('Rust adapter — depends_on emission (Phase 4)', () => {
 
     const deps = dependenciesByOwner!.get(libInit!.bodyHash);
     expect(deps).toHaveLength(1);
-    expect(deps![0]!.specifier).toBe('myproj::foo::Bar');
-    expect(deps![0]!.to).toEqual([fooInit!.bodyHash]);
+    expect(deps![0].specifier).toBe('myproj::foo::Bar');
+    expect(deps![0].to).toEqual([fooInit!.bodyHash]);
   });
 
   it('treats all `crate::` imports as unresolved when Cargo.toml is missing', () => {
@@ -313,8 +313,8 @@ describe('Rust adapter — depends_on emission (Phase 4)', () => {
     // `crate::` resolution — only for the `<package-name>::` alias.
     // Document this behavior here:
     expect(deps).toHaveLength(1);
-    expect(deps![0]!.specifier).toBe('crate::foo::Bar');
-    expect(deps![0]!.to).toEqual([findModuleInit(catalog, 'src/foo.rs')!.bodyHash]);
+    expect(deps![0].specifier).toBe('crate::foo::Bar');
+    expect(deps![0].to).toEqual([findModuleInit(catalog, 'src/foo.rs')!.bodyHash]);
   });
 
   it('treats `<package-name>::…` as unresolved when Cargo.toml is missing', () => {
@@ -329,8 +329,8 @@ describe('Rust adapter — depends_on emission (Phase 4)', () => {
 
     const deps = dependenciesByOwner!.get(libInit!.bodyHash);
     expect(deps).toHaveLength(1);
-    expect(deps![0]!.specifier).toBe('myproj::foo::Bar');
-    expect(deps![0]!.to).toEqual([]);
+    expect(deps![0].specifier).toBe('myproj::foo::Bar');
+    expect(deps![0].to).toEqual([]);
   });
 
   it('produces no dependency edges for a file with no `use` declarations', () => {

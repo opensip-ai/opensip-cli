@@ -117,9 +117,9 @@ describe('Python adapter — depends_on emission (Phase 4)', () => {
 
     const greetDeps = dependenciesByOwner!.get(greetInit!.bodyHash);
     expect(greetDeps, 'greet has dependency edges').toHaveLength(1);
-    expect(greetDeps![0]!.specifier).toBe('format');
-    expect(greetDeps![0]!.to).toEqual([formatInit!.bodyHash]);
-    expect(greetDeps![0]!.line).toBe(1);
+    expect(greetDeps![0].specifier).toBe('format');
+    expect(greetDeps![0].to).toEqual([formatInit!.bodyHash]);
+    expect(greetDeps![0].line).toBe(1);
   });
 
   it('resolves a dotted-module `import pkg.helpers`', () => {
@@ -136,8 +136,8 @@ describe('Python adapter — depends_on emission (Phase 4)', () => {
 
     const mainDeps = dependenciesByOwner!.get(mainInit!.bodyHash);
     expect(mainDeps).toHaveLength(1);
-    expect(mainDeps![0]!.specifier).toBe('pkg.helpers');
-    expect(mainDeps![0]!.to).toEqual([helpersInit!.bodyHash]);
+    expect(mainDeps![0].specifier).toBe('pkg.helpers');
+    expect(mainDeps![0].to).toEqual([helpersInit!.bodyHash]);
   });
 
   it('resolves a same-package relative import `from . import sibling`', () => {
@@ -154,8 +154,8 @@ describe('Python adapter — depends_on emission (Phase 4)', () => {
 
     const aDeps = dependenciesByOwner!.get(aInit!.bodyHash);
     expect(aDeps).toHaveLength(1);
-    expect(aDeps![0]!.specifier).toBe('.b');
-    expect(aDeps![0]!.to).toEqual([bInit!.bodyHash]);
+    expect(aDeps![0].specifier).toBe('.b');
+    expect(aDeps![0].to).toEqual([bInit!.bodyHash]);
   });
 
   it('resolves a parent-package relative import `from ..helpers import x`', () => {
@@ -173,8 +173,8 @@ describe('Python adapter — depends_on emission (Phase 4)', () => {
 
     const aDeps = dependenciesByOwner!.get(aInit!.bodyHash);
     expect(aDeps).toHaveLength(1);
-    expect(aDeps![0]!.specifier).toBe('..helpers');
-    expect(aDeps![0]!.to).toEqual([helpersInit!.bodyHash]);
+    expect(aDeps![0].specifier).toBe('..helpers');
+    expect(aDeps![0].to).toEqual([helpersInit!.bodyHash]);
   });
 
   it('emits unresolved edges for external / stdlib imports', () => {

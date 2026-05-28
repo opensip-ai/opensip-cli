@@ -45,17 +45,17 @@ describe('renderSarif (re-export of renderSarifOpenSip)', () => {
   it('emits OpenSIP-convention rule IDs on results', () => {
     const sarif = renderSarif([makeSignal()], CONTEXT);
     const parsed = JSON.parse(sarif) as {
-      runs: Array<{ results: Array<{ ruleId: string }> }>;
+      runs: { results: { ruleId: string }[] }[];
     };
-    expect(parsed.runs[0]!.results[0]!.ruleId).toBe('graph.dead-code.orphan-subtree');
+    expect(parsed.runs[0].results[0].ruleId).toBe('graph.dead-code.orphan-subtree');
   });
 
   it('sets tool.driver.name and version from context', () => {
     const sarif = renderSarif([], CONTEXT);
     const parsed = JSON.parse(sarif) as {
-      runs: Array<{ tool: { driver: { name: string; version: string } } }>;
+      runs: { tool: { driver: { name: string; version: string } } }[];
     };
-    expect(parsed.runs[0]!.tool.driver.name).toBe('opensip-tools-graph');
-    expect(parsed.runs[0]!.tool.driver.version).toBe('2.0.0');
+    expect(parsed.runs[0].tool.driver.name).toBe('opensip-tools-graph');
+    expect(parsed.runs[0].tool.driver.version).toBe('2.0.0');
   });
 });

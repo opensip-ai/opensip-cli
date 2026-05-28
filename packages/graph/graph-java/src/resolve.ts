@@ -95,9 +95,9 @@ export function resolveCallSites(input: ResolveInput<JavaParsedProject>): Resolv
       ? resolveDependencies(input.dependencySites, input.catalog)
       : undefined;
 
-  return dependenciesByOwner !== undefined
-    ? { edgesByOwner, dependenciesByOwner, stats: finalStats }
-    : { edgesByOwner, stats: finalStats };
+  return dependenciesByOwner === undefined
+    ? { edgesByOwner, stats: finalStats }
+    : { edgesByOwner, dependenciesByOwner, stats: finalStats };
 }
 
 /**
@@ -146,8 +146,8 @@ function resolveDependencies(
       specifier: site.specifier,
     };
     const existing = out.get(site.ownerHash);
-    if (existing !== undefined) existing.push(edge);
-    else out.set(site.ownerHash, [edge]);
+    if (existing === undefined) {out.set(site.ownerHash, [edge]);}
+    else {existing.push(edge);}
   }
   return out;
 }
@@ -180,10 +180,10 @@ function buildJavaFQNIndex(catalog: Catalog): {
       if (fqn === null) continue;
       typeFQN.set(fqn, o.bodyHash);
       const lastDot = fqn.lastIndexOf('.');
-      const pkg = lastDot >= 0 ? fqn.slice(0, lastDot) : '';
+      const pkg = lastDot === -1 ? '' : fqn.slice(0, lastDot);
       const bucket = packageFQN.get(pkg);
-      if (bucket !== undefined) bucket.push(o.bodyHash);
-      else packageFQN.set(pkg, [o.bodyHash]);
+      if (bucket === undefined) {packageFQN.set(pkg, [o.bodyHash]);}
+      else {bucket.push(o.bodyHash);}
     }
   }
   return { typeFQN, packageFQN };
@@ -255,21 +255,21 @@ function resolveJavaImportSpecifier(
     if (isStatic) {
       // Static wildcard targets a TYPE's static members.
       const hash = typeFQN.get(head);
-      return hash !== undefined ? [hash] : [];
+      return hash === undefined ? [] : [hash];
     }
     // Plain wildcard targets a PACKAGE.
     const bucket = packageFQN.get(head);
-    return bucket !== undefined ? [...bucket] : [];
+    return bucket === undefined ? [] : [...bucket];
   }
 
   if (isStatic) {
     // `static com.foo.Bar.method` — strip the trailing member to get
     // the owning type's FQN.
     const lastDot = raw.lastIndexOf('.');
-    if (lastDot < 0) return [];
+    if (lastDot === -1) return [];
     const typeFqn = raw.slice(0, lastDot);
     const hash = typeFQN.get(typeFqn);
-    return hash !== undefined ? [hash] : [];
+    return hash === undefined ? [] : [hash];
   }
 
   // Plain type import. Direct lookup; on miss, fall back to treating
@@ -281,10 +281,10 @@ function resolveJavaImportSpecifier(
   const direct = typeFQN.get(raw);
   if (direct !== undefined) return [direct];
   const lastDot = raw.lastIndexOf('.');
-  if (lastDot < 0) return [];
+  if (lastDot === -1) return [];
   const outerFqn = raw.slice(0, lastDot);
   const outer = typeFQN.get(outerFqn);
-  return outer !== undefined ? [outer] : [];
+  return outer === undefined ? [] : [outer];
 }
 
 function buildNameIndex(

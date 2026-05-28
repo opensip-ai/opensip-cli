@@ -32,14 +32,18 @@ export type SarifLevel = 'none' | 'note' | 'warning' | 'error';
  */
 function mapSeverityToSarifLevel(severity: SignalSeverity): SarifLevel {
   switch (severity) {
-    case 'critical':
+    case 'critical': {
       return 'error';
-    case 'high':
+    }
+    case 'high': {
       return 'error';
-    case 'medium':
+    }
+    case 'medium': {
       return 'warning';
-    case 'low':
+    }
+    case 'low': {
       return 'note';
+    }
   }
 }
 

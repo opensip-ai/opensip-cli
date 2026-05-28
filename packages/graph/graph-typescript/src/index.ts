@@ -26,6 +26,10 @@
  */
 
 
+import { relative, sep } from 'node:path';
+
+import ts from 'typescript';
+
 import { cacheKey as typescriptCacheKey } from './cache-key.js';
 import { discoverFiles as legacyDiscoverFiles } from './discover.js';
 import { resolveEdgesFromRecords } from './edges.js';
@@ -33,9 +37,7 @@ import { parseProject as parseTypescriptProject } from './parse.js';
 import { isTypescriptTestFile } from './test-file.js';
 import { walkProgram } from './walk.js';
 
-import { relative, sep } from 'node:path';
 
-import ts from 'typescript';
 
 import type { TypescriptParsedProject } from './parse.js';
 import type {
@@ -211,16 +213,20 @@ function resolveDependencies(
   }
 
   const compilerOptions = program.getCompilerOptions();
+  // Wrap ts.sys methods in arrow functions to satisfy
+  // @typescript-eslint/unbound-method (arrow `this` is lexical / void).
+  // useCaseSensitiveFileNames is a boolean property on modern ts.sys —
+  // the function-vs-boolean branch in earlier code was unreachable
+  // dead-code (both branches returned the same value).
   const moduleResolutionHost: ts.ModuleResolutionHost = {
-    fileExists: ts.sys.fileExists,
-    readFile: ts.sys.readFile,
-    directoryExists: ts.sys.directoryExists,
-    getCurrentDirectory: ts.sys.getCurrentDirectory,
-    getDirectories: ts.sys.getDirectories,
-    useCaseSensitiveFileNames:
-      typeof ts.sys.useCaseSensitiveFileNames === 'function'
-        ? ts.sys.useCaseSensitiveFileNames
-        : ts.sys.useCaseSensitiveFileNames,
+    fileExists: (fileName: string): boolean => ts.sys.fileExists(fileName),
+    readFile: (fileName: string, encoding?: string): string | undefined =>
+      ts.sys.readFile(fileName, encoding),
+    directoryExists: (directoryName: string): boolean =>
+      ts.sys.directoryExists(directoryName),
+    getCurrentDirectory: (): string => ts.sys.getCurrentDirectory(),
+    getDirectories: (path: string): string[] => ts.sys.getDirectories(path),
+    useCaseSensitiveFileNames: ts.sys.useCaseSensitiveFileNames,
   };
 
   const out = new Map<string, DependencyEdge[]>();
@@ -252,10 +258,10 @@ function resolveDependencies(
       specifier: site.specifier,
     };
     const existing = out.get(site.ownerHash);
-    if (existing !== undefined) {
-      existing.push(edge);
-    } else {
+    if (existing === undefined) {
       out.set(site.ownerHash, [edge]);
+    } else {
+      existing.push(edge);
     }
   }
   return out;
