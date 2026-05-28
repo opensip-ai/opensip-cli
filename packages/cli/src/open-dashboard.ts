@@ -56,6 +56,7 @@ export async function launchBrowser(target: string): Promise<boolean> {
     await open(target)
     return true
   } catch {
+    // @fitness-ignore-next-line error-handling-quality -- documented contract (see JSDoc above): failure to open a browser must NOT fail the fitness run; caller dispatches on the boolean return.
     return false
   }
 }

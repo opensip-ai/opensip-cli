@@ -98,6 +98,7 @@ export function loadCliDefaults(cwd: string, explicitPath?: string): CliDefaults
   try {
     filePath = resolveProjectConfigPath(cwd, explicitPath);
   } catch {
+    // @fitness-ignore-next-line error-handling-quality -- documented contract (see JSDoc above): failure to resolve the project config is equivalent to "no cli: section" and treated identically by the merge step.
     return {};
   }
   const doc = readYamlFile(filePath);

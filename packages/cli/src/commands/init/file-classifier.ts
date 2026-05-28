@@ -102,6 +102,7 @@ export function classifyFiles(
     try {
       entries = readdirSync(dir);
     } catch {
+      // @fitness-ignore-next-line error-handling-quality -- directory walk probe: an unreadable directory means "no entries to classify here", same as a genuinely empty dir; failure IS the signal.
       return;
     }
     for (const name of entries) {

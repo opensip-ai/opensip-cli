@@ -1,3 +1,4 @@
+// @fitness-ignore-file error-handling-quality -- readGlobalConfig returns {} on any failure by documented contract (absent file and "everything default" are equivalent to the merge step); writeGlobalConfig's inner unlink is cleanup-of-cleanup where the meaningful rename error is already thrown on the next line.
 /**
  * global-config — read/write the user-level (`~/.opensip-tools/config.yml`)
  * config that holds the cloud API key and per-user defaults.

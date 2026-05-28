@@ -1,3 +1,4 @@
+// @fitness-ignore-file error-handling-quality -- npm install failures already stream to stderr via inherited stdio (downstream loader surfaces unresolved imports), and the package.json / node_modules walks are probes where unreadable/malformed entries mean "not installable" or "not a candidate" — same as absent.
 /**
  * plugin command — manage project-local npm-installed plugins.
  *
