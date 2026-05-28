@@ -25,7 +25,7 @@
  * bypasses).
  */
 
-import type { CliCommandsContext } from './index.js';
+import type { CliCommandsContext } from './shared.js';
 import type { CommandResult } from '@opensip-tools/contracts';
 import type { Command } from 'commander';
 

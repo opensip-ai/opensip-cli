@@ -1,6 +1,13 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "workspaces": {
+    ".": {
+      "ignoreDependencies": [
+        "@opensip-tools/checks-typescript",
+        "@opensip-tools/checks-universal",
+        "@opensip-tools/fitness"
+      ]
+    },
     "packages/cli": {
       "entry": ["src/__tests__/fixtures/**/*.ts"],
       "ignoreDependencies": [

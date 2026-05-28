@@ -27,6 +27,7 @@ import { walkProgram } from './walk.js';
 
 import type { Catalog, FunctionOccurrence, ParseError } from '@opensip-tools/graph';
 
+/** Input to {@link buildInventory}: project root, source files, and TS compiler options. */
 export interface InventoryInput {
   readonly projectDirAbs: string;
   readonly files: readonly string[];
@@ -34,12 +35,14 @@ export interface InventoryInput {
   readonly tsConfigPathAbs: string;
 }
 
+/** Output of {@link buildInventory}: catalog, the live TS program, and any parse errors. */
 export interface InventoryOutput {
   readonly catalog: Catalog;
   readonly program: ts.Program;
   readonly parseErrors: readonly ParseError[];
 }
 
+/** Walks every TS source file and returns the function/class catalog plus the TS program. */
 export function buildInventory(input: InventoryInput): InventoryOutput {
   logger.info({
     evt: 'graph.inventory.start',

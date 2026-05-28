@@ -24,11 +24,13 @@ export type ToolErrorCode =
   | 'CONFIGURATION_ERROR'
   | 'UNKNOWN_LIVE_VIEW';
 
+/** Constructor options for {@link ToolError}: `code` plus arbitrary diagnostic metadata. */
 export interface ToolErrorOptions extends ErrorOptions {
   code?: string;
   [key: string]: unknown;
 }
 
+/** Base class for all opensip-tools errors; carries a `code` for programmatic dispatch. */
 export class ToolError extends Error {
   /**
    * Error code. Typed as a `string` super-set of `ToolErrorCode` because
@@ -46,6 +48,7 @@ export class ToolError extends Error {
   }
 }
 
+/** Thrown when user-supplied input (config, CLI flags, recipes) fails schema or domain validation. */
 export class ValidationError extends ToolError {
   constructor(message: string, options?: ToolErrorOptions) {
     super(message, options?.code ?? 'VALIDATION_ERROR', options);
@@ -53,6 +56,7 @@ export class ValidationError extends ToolError {
   }
 }
 
+/** Thrown when a named resource (check, recipe, file, session) cannot be located. */
 export class NotFoundError extends ToolError {
   constructor(message: string, options?: ToolErrorOptions) {
     super(message, options?.code ?? 'NOT_FOUND', options);
@@ -60,6 +64,7 @@ export class NotFoundError extends ToolError {
   }
 }
 
+/** Thrown for internal invariant violations or unexpected runtime failures. */
 export class SystemError extends ToolError {
   constructor(message: string, options?: ToolErrorOptions) {
     super(message, options?.code ?? 'SYSTEM_ERROR', options);
@@ -67,6 +72,7 @@ export class SystemError extends ToolError {
   }
 }
 
+/** Thrown when an operation exceeds its allotted time budget. */
 export class TimeoutError extends ToolError {
   readonly timeoutMs?: number;
 
@@ -78,6 +84,7 @@ export class TimeoutError extends ToolError {
   }
 }
 
+/** Thrown for HTTP or socket-level failures during outbound requests. */
 export class NetworkError extends ToolError {
   readonly statusCode?: number;
 
@@ -88,6 +95,7 @@ export class NetworkError extends ToolError {
   }
 }
 
+/** Thrown when project or tool configuration is missing, malformed, or contradictory. */
 export class ConfigurationError extends ToolError {
   constructor(message: string, options?: ToolErrorOptions) {
     super(message, options?.code ?? 'CONFIGURATION_ERROR', options);
@@ -103,10 +111,12 @@ export type Result<T, E = ToolError> =
   | { readonly ok: true; readonly value: T }
   | { readonly ok: false; readonly error: E };
 
+/** Constructs a success {@link Result} carrying `value`. */
 export function ok<T>(value: T): Result<T, never> {
   return { ok: true, value };
 }
 
+/** Constructs a failure {@link Result} carrying `error`. */
 export function err<E>(error: E): Result<never, E> {
   return { ok: false, error };
 }

@@ -125,6 +125,7 @@ function typeLooksLikeRequestContext(type: ts.TypeNode | undefined): boolean {
 
   if (ts.isTypeReferenceNode(type)) {
     const name = getTypeRefName(type.typeName)
+    // @fitness-ignore-next-line silent-early-returns -- boolean predicate function: `false` IS the contract value meaning "this wrapper is process-scoped, not request-scoped"; the caller branches on it.
     if (PROCESS_SCOPED_WRAPPER_TYPES.has(name)) {
       // The outer wrapper is process-scoped; ignore its generic arguments.
       return false

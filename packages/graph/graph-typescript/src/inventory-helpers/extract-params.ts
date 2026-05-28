@@ -1,3 +1,4 @@
+// @fitness-ignore-file batch-operation-limits -- iterates bounded collection (parameters on a single function declaration)
 /**
  * Extract Param[] from a TS function-shaped node.
  */

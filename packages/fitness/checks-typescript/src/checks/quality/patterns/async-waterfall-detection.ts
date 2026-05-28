@@ -1,4 +1,4 @@
-// @fitness-ignore-file file-length-limits -- Complex module with tightly coupled logic; splitting would fragment cohesive functionality
+// @fitness-ignore-file file-length-limit -- Complex module with tightly coupled logic; splitting would fragment cohesive functionality
 // @fitness-ignore-file null-safety -- null checks are intentional guards
 /**
  * @fileoverview Async Waterfall Detection Check

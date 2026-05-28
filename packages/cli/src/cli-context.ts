@@ -225,6 +225,9 @@ export function createLiveViewRegistry(
       }
       renderers.set(key, renderer);
     },
+    /**
+     * @throws {UnknownLiveViewError} When `key` has no registered live-view renderer.
+     */
     async render(key, args) {
       const renderer = renderers.get(key);
       if (!renderer) {

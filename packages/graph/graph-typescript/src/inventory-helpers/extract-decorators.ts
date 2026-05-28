@@ -1,3 +1,4 @@
+// @fitness-ignore-file batch-operation-limits -- iterates bounded collection (decorators on a single class member; small N by language spec)
 /**
  * Extract decorator names from a TS class-member or class node.
  */

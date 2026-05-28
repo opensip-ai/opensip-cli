@@ -15,6 +15,14 @@ function defaultMigrationsFolder(): string {
 }
 
 export const DataStoreFactory = {
+  /**
+   * Open a DataStore (SQLite or in-memory) and run pending migrations.
+   *
+   * @throws {DataStoreMigrationError} When the SQLite file cannot be opened
+   *   (corrupt header, missing parent directory, permission errors) or when
+   *   running the migrations folder fails. The original cause is preserved
+   *   via the `cause` field.
+   */
   open(opts: DataStoreOpenOptions & { migrationsFolder?: string }): DataStore {
     let datastore: DataStore;
     try {

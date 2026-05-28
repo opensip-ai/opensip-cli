@@ -1,3 +1,4 @@
+// @fitness-ignore-file file-length-limit -- aggregate coverage-driven test fixture; splitting destroys the contract
 /**
  * @fileoverview Final coverage push targeting the biggest remaining misses:
  * duplicate-utility-functions, result-pattern-consistency,

@@ -1,3 +1,4 @@
+// @fitness-ignore-file file-length-limit -- Coverage-driven aggregate fixture file: per-check fixtures target sub-75% statement coverage paths; splitting destroys the "raise this check's coverage" contract.
 /**
  * @fileoverview Targeted fixture-based tests for low-coverage checks.
  *

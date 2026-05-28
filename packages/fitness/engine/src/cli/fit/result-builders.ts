@@ -33,11 +33,13 @@ import type { DataStore } from '@opensip-tools/datastore';
 // Formatting helpers (used to build TableRow data)
 // ---------------------------------------------------------------------------
 
+/** Formats a millisecond duration as "Xms" under 1s, "X.Ys" otherwise. */
 export function formatDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`;
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
+/** Renders a "validated" table column showing item count with singular/plural noun. */
 export function formatValidatedColumn(totalItems: number | undefined, itemType = 'items'): string {
   // No meaningful count: external tool checks, errored checks, or checks with no file scanning
   if (!totalItems) return '—';
@@ -105,6 +107,7 @@ export function buildCliOutput(
   };
 }
 
+/** Input bundle for {@link buildFitDoneResult}: CLI args, recipe result, and signaler config. */
 export interface BuildFitDoneArgs {
   // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
   args: CliArgs;

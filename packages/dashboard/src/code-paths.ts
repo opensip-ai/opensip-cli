@@ -1,3 +1,4 @@
+// @fitness-ignore-file module-coupling-fan-out -- Panel aggregator: composes JS-string emitters from sibling view-*.ts modules; fan-out is intrinsic to its role as the entry point
 /**
  * Dashboard Code Paths panel — graph-tool surface with two subtabs:
  *   1. Sessions — recent graph runs and their per-rule findings
@@ -13,8 +14,9 @@
  *
  * The file imports JS-string emitters from sibling modules under
  * `code-paths/`. It MUST NOT import from `@opensip-tools/graph` —
- * the catalog is consumed by JSON shape only (see §2.4 of
- * docs/plans/graph-dashboard-v3-design.md).
+ * the catalog is consumed by JSON shape only (the structural shape
+ * lives in @opensip-tools/contracts to keep this panel decoupled
+ * from the graph engine's runtime types).
  */
 
 import { dashboardEditorLinkJs } from './code-paths/editor-link.js';

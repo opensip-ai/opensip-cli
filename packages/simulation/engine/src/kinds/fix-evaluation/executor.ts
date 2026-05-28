@@ -1,3 +1,4 @@
+// @fitness-ignore-file batch-operation-limits -- iterates bounded collection (configured fix candidates per scenario; small N)
 /**
  * @fileoverview Fix-evaluation-kind executor.
  *
@@ -19,7 +20,7 @@ import type {
   FixEvaluationScenarioConfig,
   PredicateComposition,
   PredicateLeaf,
-} from './define.js'
+} from './config.js'
 import type { PredicateVerdict } from './result.js'
 import type { RunnableScenario } from '../../framework/runnable-scenario.js'
 import type { FixEvaluationScenarioExecutorResult } from '../../framework/scenario-executor-result.js'

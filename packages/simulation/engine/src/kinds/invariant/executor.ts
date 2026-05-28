@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/require-await -- driver stubs match contract `() => Promise<T>`; bodies throw synchronously until Phase 7 wires real drivers */
+// @fitness-ignore-file detached-promises -- phase recorders and assertion builders are synchronous result mutators inside async setup/act/assert phases
 /**
  * @fileoverview Invariant-kind executor.
  *
@@ -15,6 +16,7 @@
 import { ScenarioAbortedError } from '../../framework/execution/execution-engine.js'
 
 
+import type { InvariantScenarioConfig } from './config.js'
 import type {
   InvariantContext,
   InvariantContextDeps,
@@ -27,7 +29,6 @@ import type {
   AuditEntryExpectation,
   InvariantTicketProjection,
 } from './context.js'
-import type { InvariantScenarioConfig } from './define.js'
 import type { InvariantAssertion, InvariantPhaseResult } from './result.js'
 import type { RunnableScenario } from '../../framework/runnable-scenario.js'
 import type { InvariantScenarioExecutorResult } from '../../framework/scenario-executor-result.js'
@@ -36,6 +37,7 @@ import type { InvariantScenarioExecutorResult } from '../../framework/scenario-e
 // DEFAULT DRIVER STUBS
 // =============================================================================
 
+// @fitness-ignore-next-line throws-documentation -- closure always throws Error to surface unconfigured InvariantContext drivers; JSDoc cannot attach to a const-arrow
 const NOT_IMPLEMENTED = (
   primitive: string,
 ): never => {
@@ -153,6 +155,14 @@ function buildContext(
 // PHASE EXECUTION
 // =============================================================================
 
+/**
+ * Run a single invariant-scenario phase (setup/act/assert), classifying any
+ * caught error into a structured phase result. Aborts re-throw as
+ * `ScenarioAbortedError` so the outer runner classifies them correctly.
+ *
+ * @throws {ScenarioAbortedError} When `abortSignal.aborted` is observed
+ *   either at entry or during phase execution.
+ */
 async function runPhase(
   phaseName: 'setup' | 'act' | 'assert',
   fn: (ctx: InvariantContext) => Promise<void>,

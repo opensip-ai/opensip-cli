@@ -6,6 +6,7 @@ export interface Location {
   readonly column: number    // 0-based
 }
 
+/** Cross-language import descriptor: specifier, imported names, and source location. */
 export interface Import {
   /** The import specifier as written in source (e.g. './foo', 'std::fs', '"fmt"') */
   readonly specifier: string
@@ -14,6 +15,7 @@ export interface Import {
   readonly location: Location
 }
 
+/** Cross-language function descriptor parameterised by the adapter's native AST node type. */
 export interface GenericFunction<TNode> {
   readonly name: string | null  // null for anonymous / lambdas
   readonly location: Location

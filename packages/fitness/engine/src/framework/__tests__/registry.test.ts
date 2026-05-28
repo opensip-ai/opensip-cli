@@ -20,7 +20,7 @@ function makeCheck(overrides: {
       description: `Check: ${overrides.slug}`,
       analysisMode: 'analyze',
       scope: { include: [], exclude: [] },
-      itemType: 'file' as any,
+      itemType: 'file' as unknown as Check['config']['itemType'],
       disabled: overrides.disabled,
       // eslint-disable-next-line @typescript-eslint/require-await -- mock matches expected `() => Promise<CheckResult>` shape
       execute: async () => ({ findings: [], passed: true }),

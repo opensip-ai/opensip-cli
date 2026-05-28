@@ -1,3 +1,5 @@
+// @fitness-ignore-file callback-invocation-safe -- This file IS the callback-invocation-safe check; its JSDoc and `longDescription` template literal necessarily contain example patterns (`subscribers.forEach((cb) => cb(...))`, `for (const cb of listeners)`) so the documentation can describe what the check detects. The check uses `contentFilter: 'raw'` (intentional — must see real code), so it cannot strip its own documentation. Reviewers grepping for the rationale land here.
+// @fitness-ignore-file performance-anti-patterns -- spread patterns appear in the check's own JSDoc example strings, not real loop code
 /**
  * @fileoverview resilience/callback-invocation-safe — callbacks iterated
  * from producer code paths (`subscribers.forEach((cb) => cb(...))`,

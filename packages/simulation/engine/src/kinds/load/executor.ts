@@ -1,5 +1,6 @@
 // @fitness-ignore-file null-safety -- ScenarioResultBuilder.create() returns a fluent builder; chained method calls are always safe
 // @fitness-ignore-file array-validation -- array parameters validated at API boundary
+// @fitness-ignore-file detached-promises -- ScenarioResultBuilder fluent calls and runLoadWindow delegate are synchronous outside their awaited boundaries
 /**
  * @fileoverview Load-kind executor.
  *
@@ -13,7 +14,7 @@ import { runLoadWindow } from '../../framework/execution/run-load-window.js'
 import { ScenarioResultBuilder } from '../../framework/result-builder.js'
 import { createScenarioLogger } from '../../framework/scenario-logger.js'
 
-import type { LoadScenarioConfig } from './define.js'
+import type { LoadScenarioConfig } from './config.js'
 import type { RunnableScenario } from '../../framework/runnable-scenario.js'
 import type {
   LoadScenarioExecutorResult,

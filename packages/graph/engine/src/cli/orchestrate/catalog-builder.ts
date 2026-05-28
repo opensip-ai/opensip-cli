@@ -16,6 +16,7 @@ import {
   mergeResolvedAndCachedEdges,
 } from './incremental-merge.js';
 
+import type { GraphProgressCallback, GraphStage } from './types.js';
 import type {
   DiscoverOutput,
   GraphLanguageAdapter,
@@ -27,7 +28,6 @@ import type {
   FunctionOccurrence,
   ResolutionStats,
 } from '../../types.js';
-import type { GraphProgressCallback, GraphStage } from '../orchestrate.js';
 import type { PressureMonitor } from '../pressure-monitor.js';
 
 /**

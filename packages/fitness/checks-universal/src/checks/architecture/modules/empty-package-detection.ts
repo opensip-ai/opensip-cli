@@ -1,5 +1,6 @@
 // @fitness-ignore-file fitness-check-standards -- Uses fs for directory listing/stat operations, not file content reading
-// @fitness-ignore-file file-length-limits -- Complex module with tightly coupled logic; refactoring would risk breaking changes
+// @fitness-ignore-file file-length-limit -- Complex module with tightly coupled logic; refactoring would risk breaking changes
+// @fitness-ignore-file unbounded-memory -- reads workspace package.json / barrel index files; bounded by standard package metadata size
 /**
  * @fileoverview Empty Package Detection check
  */
@@ -12,7 +13,13 @@ import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-to
 const MIN_EXPORTS_THRESHOLD = 1
 const COMMENTED_EXPORT_RATIO_THRESHOLD = 0.5
 
-const EXCLUDED_PACKAGES = [/__fixtures__/, /__mocks__/, /examples?\//, /^apps\//]
+const EXCLUDED_PACKAGES = [
+  /__fixtures__/,
+  /__mocks__/,
+  /[/\\]fixtures[/\\]/,
+  /examples?\//,
+  /^apps\//,
+]
 
 interface PackageInfo {
   name: string

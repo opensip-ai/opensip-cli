@@ -1,14 +1,28 @@
-import type { RuleHints } from './lang-adapter/types.js';
 import type { Signal } from '@opensip-tools/core';
 
 /**
- * Re-export of `RuleHints` so rule modules under `rules/` can consult
- * adapter-supplied hints without importing from `lang-adapter/`. The
- * dep-cruiser rule `graph-pipeline-no-lang-import` bans `rules/` from
- * reaching into any `lang-*` directory; this re-export is the single
- * sanctioned doorway between the contract layer and rule implementations.
+ * `RuleHints` — adapter-supplied per-language rule input. Historically
+ * declared in `lang-adapter/types.ts` and re-exported here so rule
+ * modules under `rules/` could consult hints without importing from
+ * `lang-adapter/` (the dep-cruiser rule `graph-pipeline-no-lang-import`
+ * bans `rules/` from reaching into any `lang-*` directory).
+ *
+ * The original re-export created a `types.ts ↔ lang-adapter/types.ts`
+ * file-level cycle reported by `circular-import-detection`. The fix is
+ * to host the canonical declaration here in `types.ts` (which sits at
+ * the bottom of the engine's type layer) and have `lang-adapter/types.ts`
+ * import it from here — inverting the dependency so the cycle is gone.
  */
-export type { RuleHints } from './lang-adapter/types.js';
+export interface RuleHints {
+  /** Predicate: is this file a test? Path is project-relative. */
+  readonly isTestFile?: (filePathProjectRel: string) => boolean;
+  /** Globs treated as generated code. */
+  readonly generatedFilePatterns?: readonly string[];
+  /** Side-effect primitives — fully-qualified names (e.g. 'fs.writeFileSync'). */
+  readonly sideEffectPrimitives?: readonly string[];
+  /** Throw-statement detection regex for `always-throws-branch`. */
+  readonly throwSyntaxRegex?: RegExp;
+}
 
 /**
  * @fileoverview Core type shapes for the graph tool's six-stage pipeline.
@@ -36,6 +50,7 @@ export type FunctionKind =
   | 'setter'
   | 'module-init';
 
+/** How a call edge was resolved (static dispatch, method dispatch, JSX, etc.). */
 export type CallResolution =
   | 'static'
   | 'method-dispatch'
@@ -44,10 +59,13 @@ export type CallResolution =
   | 'unknown'
   | 'dynamic-string';
 
+/** Resolver confidence in a call edge: high (one body), medium (few), low (many or partial). */
 export type CallConfidence = 'high' | 'medium' | 'low';
 
+/** Function visibility tier: exported from module, module-local, or class-private. */
 export type Visibility = 'exported' | 'module-local' | 'private';
 
+/** A function parameter descriptor: name, optionality, and rest-arg flag. */
 export interface Param {
   readonly name: string;
   readonly optional: boolean;
@@ -159,9 +177,8 @@ export interface ParseError {
  * The catalog: functions keyed by simple name. Multiple occurrences
  * per name.
  *
- * v3 — generic over language. PR 3 of plan
- * docs/plans/10-graph-language-pluggability.md replaced the v2
- * fields `tsConfigPath` and `tsCompilerVersion` with adapter-supplied
+ * v3 — generic over language. The language-pluggability work replaced
+ * the v2 fields `tsConfigPath` and `tsCompilerVersion` with adapter-supplied
  * `language` (the registered adapter id) and `cacheKey` (an opaque
  * per-adapter invalidation key). v2 catalogs on disk return
  * `{ kind: 'invalid', reason: 'version-mismatch' }` from
@@ -258,8 +275,8 @@ export interface ResolverVerdict {
  * threading hints through. Rules that don't need hints can ignore it;
  * rules that do consult hints MUST also implement a TypeScript-shaped
  * fallback so the rule degrades gracefully when an adapter does not
- * supply the relevant hint (per
- * docs/public/40-graph/02-rules-and-gating.md).
+ * supply the relevant hint (per the graph rules-and-gating fidelity
+ * matrix).
  */
 export interface Rule {
   /** Rule slug, e.g. "graph:orphan-subtree". Must start with "graph:". */

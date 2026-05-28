@@ -1,6 +1,8 @@
 // @fitness-ignore-file toctou-race-condition -- TOCTOU acceptable in this non-concurrent context
 // @fitness-ignore-file fitness-check-standards -- Check requires direct fs access for package.json parsing outside of standard file scanning pipeline
-// @fitness-ignore-file file-length-limits -- Complex module with tightly coupled logic; refactoring would risk breaking changes
+// @fitness-ignore-file file-length-limit -- Complex module with tightly coupled logic; refactoring would risk breaking changes
+// @fitness-ignore-file unbounded-memory -- reads workspace package.json files; bounded by standard package metadata size
+// @fitness-ignore-file performance-anti-patterns -- sequential package.json reads keep peak memory bounded; small N per workspace
 /**
  * @fileoverview Detect phantom dependencies - packages used in code but not declared in package.json (v2)
  * @invariants

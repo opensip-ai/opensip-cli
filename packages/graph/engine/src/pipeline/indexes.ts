@@ -17,6 +17,7 @@ import type { BlastScore, Catalog, FunctionOccurrence, Indexes } from '../types.
  */
 const BLAST_MAX_DEPTH = 5;
 
+/** Builds query-side indexes (by-body-hash, by-simple-name, blast radius) over the catalog. */
 export function buildIndexes(catalog: Catalog): Indexes {
   const byBodyHash = new Map<string, FunctionOccurrence>();
   const bySimpleName = new Map<string, string[]>();

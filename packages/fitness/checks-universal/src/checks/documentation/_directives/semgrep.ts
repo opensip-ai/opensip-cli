@@ -1,3 +1,4 @@
+// @fitness-ignore-file semgrep-justifications -- this file's job is to parse nosemgrep directives; example nosemgrep strings appear in JSDoc by necessity
 /**
  * @fileoverview Semgrep directive parser (`nosemgrep`).
  *

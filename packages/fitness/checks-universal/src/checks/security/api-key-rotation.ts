@@ -1,4 +1,5 @@
 // @fitness-ignore-file duplicate-implementation-detection -- similar patterns across diagnostic modules
+// @fitness-ignore-file no-todo-comments -- JSDoc uses XXX as a placeholder token in example env-var names
 /**
  * @fileoverview Validate API key handling supports rotation
  */
@@ -32,7 +33,7 @@ function matchesSingleKeyEquality(text: string): RegExpExecArray | null {
 
 /**
  * Checks if text contains a single API key assignment
- * Pattern: const API_KEY = process.env.XXX (not followed by function call)
+ * Pattern: const API_KEY = process.env.SOMETHING (not followed by function call)
  */
 function matchesSingleKeyAssignment(text: string): RegExpExecArray | null {
   logger.debug({
@@ -159,7 +160,7 @@ export const apiKeyRotation = defineCheck({
 
 **Detects:**
 - Single-key equality comparisons: \`=== process.env.API_KEY\` / \`SECRET_KEY\` / \`AUTH_KEY\` without rotation suffixes (CURRENT/PREVIOUS/PRIMARY/SECONDARY)
-- Single-key assignments: \`const API_KEY = process.env.XXX\` not followed by a processing function call
+- Single-key assignments: \`const API_KEY = process.env.SOMETHING\` not followed by a processing function call
 
 **Why it matters:** Without rotation support, key changes cause downtime because old keys stop working immediately. Supporting current + previous keys allows zero-downtime rotation.
 

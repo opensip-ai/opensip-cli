@@ -39,6 +39,6 @@
     "@opensip-tools/graph-rust": "workspace:*",
     "@types/node": "^22.0.0",
     "commander": "^13.1.0",
-    "vitest": "^2.1.0"
+    "vitest": "^2.1.9"
   }
 }

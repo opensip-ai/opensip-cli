@@ -16,8 +16,10 @@
 
 import { buildMinimalTextTree, type MinimalTextTree } from '@opensip-tools/core'
 
+/** Parse-tree alias for Python (currently a minimal text tree; will become a real AST). */
 export type PythonTree = MinimalTextTree
 
+/** Parses Python source into a {@link PythonTree}, or null on unparseable input. */
 export function parsePython(content: string, filePath: string): PythonTree | null {
   return buildMinimalTextTree(content, filePath)
 }

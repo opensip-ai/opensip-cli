@@ -1,3 +1,4 @@
+// @fitness-ignore-file file-length-limit -- aggregate coverage-driven test fixture; splitting destroys the contract
 /**
  * Tests for `executeGraph` — the main `opensip-tools graph` command
  * handler. Drives the full pipeline with a synthetic adapter and

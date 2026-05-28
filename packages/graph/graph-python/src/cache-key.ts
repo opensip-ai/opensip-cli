@@ -1,3 +1,4 @@
+// @fitness-ignore-file unbounded-memory -- reads pyproject.toml manifest; bounded by standard Python project metadata
 /**
  * Python cacheKey implementation.
  *

@@ -188,7 +188,7 @@ function parseChildFindings(
   } catch (error) {
     /* v8 ignore start */
     logger.warn({
-      evt: 'graph.cli.packages.parseError',
+      evt: 'graph.cli.packages.parse-error',
       module: 'graph:cli',
       packageDir,
       err: error instanceof Error ? error.message : String(error),

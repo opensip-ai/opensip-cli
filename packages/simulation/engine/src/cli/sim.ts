@@ -1,3 +1,4 @@
+// @fitness-ignore-file detached-promises -- persistSimSession is a synchronous best-effort SQLite write; heuristic flags it inside the async sim runner
 /**
  * sim command — run simulation scenarios via a named recipe.
  *

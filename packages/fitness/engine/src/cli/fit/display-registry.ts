@@ -40,6 +40,7 @@ function defaultDisplayName(slug: string): string {
     .join(' ');
 }
 
+/** Recomputes the check-slug → display-name/icon lookup closures from the merged display map. */
 export function rebuildDisplayLookups(): void {
   getCheckDisplayName = (slug) => {
     const entry = mergedCheckDisplay.get(slug);

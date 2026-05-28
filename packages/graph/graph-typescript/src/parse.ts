@@ -21,10 +21,12 @@ import ts from 'typescript';
 
 import type { ParseInput, ParseOutput, ParseError } from '@opensip-tools/graph';
 
+/** Parsed TS project: the live tsc {@link ts.Program} instance. */
 export interface TypescriptParsedProject {
   readonly program: ts.Program;
 }
 
+/** Constructs a tsc Program for the TS source files in the input, returning parse errors if any. */
 export function parseProject(input: ParseInput): ParseOutput<TypescriptParsedProject> {
   // Anchor the program to its origin tsconfig when discovery provided
   // one. tsc reads `options.configFilePath` for project-reference and

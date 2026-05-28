@@ -1,3 +1,4 @@
+// @fitness-ignore-file batch-operation-limits -- iterates bounded collection (modifiers + export specifiers on a single declaration)
 /**
  * Classify a function/method's visibility — exported, module-local, private.
  */
@@ -39,6 +40,7 @@ function parentIsExportedVariableStatement(node: ts.Node): boolean {
     if (ts.isVariableStatement(parent)) {
       return hasExportModifier(parent);
     }
+    // @fitness-ignore-next-line silent-early-returns -- boolean predicate (`parentIs…`): `false` IS the contract value meaning "no enclosing exported variable statement found"; the caller treats it as a normal classification result.
     if (ts.isClassDeclaration(parent) || ts.isFunctionDeclaration(parent)) return false;
     parent = parent.parent;
   }

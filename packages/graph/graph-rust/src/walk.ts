@@ -1,3 +1,6 @@
+// @fitness-ignore-file file-length-limit -- tree-sitter language walker spanning AST cases; cohesive grammar-driven dispatch already split (body-digest, walk-metadata extracted by earlier pass), further split would fragment per-node logic.
+// @fitness-ignore-file context-mutation -- `ctx: WalkCtx` here is a function-scoped traversal accumulator (callSites array, occurrence sink, parser refs) threaded through the AST walk, NOT a shared request/execution context. `ctx.callSites.push(...)` is the intended local-accumulator append. The check's `LOCAL_DECLARATION_PATTERNS` heuristic doesn't see it because `ctx` arrives as a typed parameter, not via `const ctx = …`.
+// @fitness-ignore-file performance-anti-patterns -- spread used to flatten AST child nodes during tree-sitter walk; bounded by node arity at each step
 /**
  * Rust walkProject — emit FunctionOccurrences + CallSiteRecords.
  *
@@ -40,8 +43,9 @@
  *     this (you can have `#[cfg(test)] mod tests` in any module).
  */
 
-import { createHash } from 'node:crypto';
 import { relative, sep } from 'node:path';
+
+import { digestRustBody, digestSyntheticBody } from './body-digest.js';
 
 import type { RustParsedFile, RustParsedProject } from './parse.js';
 import type {
@@ -53,6 +57,7 @@ import type {
   WalkOutput,
 } from '@opensip-tools/graph';
 import type Parser from 'tree-sitter';
+
 
 const TEST_PATH_RE = /(?:^|\/)tests?\//;
 const TEST_FILE_NAME_RE = /(?:^|\/)[^/]*_test\.rs$/;
@@ -715,22 +720,8 @@ function hasTestAttribute(node: Parser.SyntaxNode): boolean {
   return false;
 }
 
-// ── body normalization ────────────────────────────────────────────
-
-interface BodyDigest {
-  readonly hash: string;
-  readonly size: number;
-}
-
-function digestRustBody(text: string): BodyDigest {
-  const normalized = normalizeWhitespace(stripRustComments(text));
-  return { hash: sha256(normalized), size: normalized.length };
-}
-
-// Synthetic bodies (module-init) use the same normalization as real
-// bodies; an alias keeps the name at the call site self-documenting
-// without duplicating the implementation (sonarjs/no-identical-functions).
-const digestSyntheticBody = digestRustBody;
+// Body digest helpers (stripRustComments, normalizeWhitespace, sha256,
+// digestRustBody, digestSyntheticBody, BodyDigest) live in body-digest.ts.
 
 function classifyRustFunctionKind(
   name: string,
@@ -739,125 +730,6 @@ function classifyRustFunctionKind(
   if (enclosingImpl === null) return 'function-declaration';
   if (name === 'new') return 'constructor';
   return 'method';
-}
-
-/**
- * Strip Rust line comments (// to end of line) and block comments
- * (slash-star ... star-slash, including nested forms — Rust's grammar
- * permits nesting). Preserve string literals (their content matters).
- */
-function stripRustComments(text: string): string {
-  let out = '';
-  let i = 0;
-  while (i < text.length) {
-    const next2 = text.slice(i, i + 2);
-    if (next2 === '//') {
-      i = skipToEndOfLine(text, i);
-      continue;
-    }
-    if (next2 === '/*') {
-      i = skipBlockComment(text, i + 2);
-      continue;
-    }
-    const c = text[i];
-    if (c === '"') {
-      const block = consumeStringLiteral(text, i);
-      out += block.text;
-      i = block.index;
-      continue;
-    }
-    if (c === "'" && isCharLiteral(text, i)) {
-      /* v8 ignore start */
-      const block = consumeCharLiteral(text, i);
-      out += block.text;
-      i = block.index;
-      continue;
-      /* v8 ignore stop */
-    }
-    out += c;
-    i++;
-  }
-  return out;
-}
-
-function skipToEndOfLine(text: string, start: number): number {
-  let i = start;
-  while (i < text.length && text[i] !== '\n') i++;
-  return i;
-}
-
-function skipBlockComment(text: string, start: number): number {
-  // Rust supports nested block comments. Track depth.
-  let i = start;
-  let depth = 1;
-  while (i < text.length && depth > 0) {
-    const next2 = text.slice(i, i + 2);
-    if (next2 === '/*') {
-      depth++;
-      i += 2;
-      continue;
-    }
-    if (next2 === '*/') {
-      depth--;
-      i += 2;
-      continue;
-    }
-    i++;
-  }
-  return i;
-}
-
-function consumeStringLiteral(text: string, start: number): { readonly text: string; readonly index: number } {
-  let i = start + 1;
-  let buf = '"';
-  while (i < text.length) {
-    if (text[i] === '\\' && i + 1 < text.length) {
-      /* v8 ignore start */
-      buf += text.slice(i, i + 2);
-      i += 2;
-      continue;
-      /* v8 ignore stop */
-    }
-    if (text[i] === '"') {
-      buf += '"';
-      i++;
-      break;
-    }
-    buf += text[i];
-    i++;
-  }
-  return { text: buf, index: i };
-}
-
-/* v8 ignore start */
-function isCharLiteral(text: string, i: number): boolean {
-  // Heuristic: a `'` followed by a single char or escape, then another
-  // `'`, with nothing alphanumeric immediately following the closing
-  // `'` (otherwise it's a lifetime: `'static`, `'a`).
-  if (text[i] !== "'") return false;
-  const slice = text.slice(i, i + 4);
-  // `'a'`, `'\n'`, `'\\''` patterns. Lifetimes don't have a closing
-  // `'`, so we look for one within ~3 chars.
-  if (slice.length < 3) return false;
-  const escape = slice[1] === '\\';
-  const closeIdx = escape ? 3 : 2;
-  return slice[closeIdx] === "'";
-}
-
-function consumeCharLiteral(text: string, start: number): { readonly text: string; readonly index: number } {
-  // Already verified by isCharLiteral.
-  const escape = text[start + 1] === '\\';
-  const len = escape ? 4 : 3;
-  return { text: text.slice(start, start + len), index: start + len };
-}
-/* v8 ignore stop */
-
-function normalizeWhitespace(s: string): string {
-  return s.replaceAll(/\s+/g, ' ').trim();
-}
-
-function sha256(s: string): string {
-  return createHash('sha256').update(s, 'utf8').digest('hex');
 }
 
 // ── output helpers ────────────────────────────────────────────────

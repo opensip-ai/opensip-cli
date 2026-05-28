@@ -24,6 +24,7 @@ interface RegisterableCheck extends Registerable {
   readonly tags?: readonly string[];
 }
 
+/** Registry of fitness checks, indexed by namespaced key with a bare-slug reverse index. */
 export class CheckRegistry {
   private readonly inner = new Registry<RegisterableCheck>({
     module: 'fitness:checks',

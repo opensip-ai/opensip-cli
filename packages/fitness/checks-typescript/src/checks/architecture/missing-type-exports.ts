@@ -1,4 +1,5 @@
 // @fitness-ignore-file fitness-check-standards -- Uses fs for workspace-wide package.json exports map resolution
+// @fitness-ignore-file performance-anti-patterns -- sequential file reads keep memory bounded across workspace package scan
 /**
  * @fileoverview Missing type exports detection
  * @module checks-builtin/checks/architecture/missing-type-exports

@@ -18,51 +18,14 @@ import {
 
 import { createChaosScenarioRunner } from './executor.js'
 
+import type { ChaosScenarioConfig } from './config.js'
 import type { RunnableScenario } from '../../framework/runnable-scenario.js'
-import type { ChaosConfig } from '../../types/base-types.js'
-import type {
-  PersonaConfig,
-  ScenarioAssertion,
-} from '../../types/framework-types.js'
 
-
-/**
- * Author-facing configuration for a chaos scenario.
- *
- * The `kind` discriminator is set by the entry point.
- *
- * Chaos is a framework-driven kind — the runner always uses the shared
- * `runLoadWindow` driver with explicit injection plus a recovery window.
- * A custom-`execute` escape hatch would undermine the injection model and
- * is intentionally omitted here.
- */
-export interface ChaosScenarioConfig {
-  // Required metadata
-  readonly id: string
-  readonly name: string
-  readonly description: string
-  readonly tags: readonly string[]
-
-  // Base load configuration
-  readonly personas: readonly PersonaConfig[]
-  readonly duration: number
-  readonly rampUp?: number
-  readonly targetRps?: number
-
-  // Chaos contract
-  readonly chaos: ChaosConfig
-  readonly steadyStateAssertions: readonly ScenarioAssertion[]
-  readonly recoveryAssertions: readonly ScenarioAssertion[]
-  /** Recovery window in milliseconds after chaos lifts. */
-  readonly recoveryWindow: number
-}
-
-/**
- * Validation error shape for chaos config.
- *
- * @deprecated Use `ScenarioValidationError` from `framework/validation.ts`.
- */
-export type ChaosValidationError = ScenarioValidationError
+// `ChaosScenarioConfig` moved to `./config.ts` to break the
+// `define.ts ↔ executor.ts` file-level cycle. Re-exported here so
+// callers (the engine barrel, downstream tools) continue to import
+// the config shape from `'./define.js'` without churn.
+export type { ChaosScenarioConfig } from './config.js'
 
 function validatePersonasAndDuration(
   config: ChaosScenarioConfig,

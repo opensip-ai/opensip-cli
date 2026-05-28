@@ -5,7 +5,7 @@
  */
 
 import { logger } from '@opensip-tools/core/logger'
-import { defineCheck, type CheckViolation, getLineNumber } from '@opensip-tools/fitness'
+import { defineCheck, isTestFile, type CheckViolation, getLineNumber } from '@opensip-tools/fitness'
 
 // =============================================================================
 // TRANSACTION BOUNDARY VALIDATION
@@ -80,6 +80,24 @@ function isTransactionDelegation(content: string, matchIndex: number): boolean {
   return /^\s*return\s+(await\s+)?(?:this\.)?\w+\.transaction\s*\(/.test(line)
 }
 
+/**
+ * Detect callback-style transactions: `.transaction((tx) => { ... })` or
+ * `.transaction(async (tx) => { ... })`. The callback model commits on
+ * normal return and rolls back on throw — no manual commit/rollback
+ * needed. Used by drizzle, better-sqlite3, knex, and our own DataStore.
+ */
+function isCallbackStyleTransaction(content: string, matchIndex: number): boolean {
+  // Look at the slice starting at the match for callback signatures.
+  // Bounded window keeps this O(1) per match.
+  const window = content.slice(matchIndex, matchIndex + 200)
+  return (
+    /\.(?:transaction|beginTransaction|startTransaction)\s*\(\s*(?:async\s+)?(?:\([^)]{0,80}\)|\w+)\s*=>/.test(
+      window,
+    ) ||
+    /\.(?:transaction|beginTransaction|startTransaction)\s*\(\s*(?:async\s+)?function\b/.test(window)
+  )
+}
+
 function findUncommittedTransactionViolations(content: string, filePath: string): CheckViolation[] {
   logger.debug({
     evt: 'fitness.checks.transaction_patterns.find_uncommitted_transaction_violations',
@@ -91,7 +109,10 @@ function findUncommittedTransactionViolations(content: string, filePath: string)
     pattern.lastIndex = 0
     let match
     while ((match = pattern.exec(content)) !== null) {
-      const isSkippable = match[0].includes('@') || isTransactionDelegation(content, match.index)
+      const isSkippable =
+        match[0].includes('@') ||
+        isTransactionDelegation(content, match.index) ||
+        isCallbackStyleTransaction(content, match.index)
       if (isSkippable) {
         continue
       }
@@ -178,6 +199,10 @@ export const transactionBoundaryValidation = defineCheck({
   fileTypes: ['ts'],
 
   analyze(content: string, filePath: string): CheckViolation[] {
+    // Test fixtures intentionally exercise transaction boundaries (no
+    // commit/rollback, callback throws, etc.) to verify detection logic.
+    if (isTestFile(filePath)) return []
+
     const usesTransactions = TRANSACTION_PATTERNS.some((p) => p.test(content))
     if (!usesTransactions) {
       return []

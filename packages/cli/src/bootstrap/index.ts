@@ -1,3 +1,4 @@
+// @fitness-ignore-file detached-promises -- bootstrap calls synchronous registration helpers (registerLanguageAdapters, registerFirstPartyTools) that the heuristic flags
 /**
  * bootstrap — composition-root for the CLI.
  *

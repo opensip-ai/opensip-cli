@@ -1,4 +1,4 @@
-// @fitness-ignore-file file-length-limits -- Complex module with tightly coupled logic; refactoring would risk breaking changes
+// @fitness-ignore-file file-length-limit -- Complex module with tightly coupled logic; refactoring would risk breaking changes
 /**
  * @fileoverview ESLint Justifications check
  */

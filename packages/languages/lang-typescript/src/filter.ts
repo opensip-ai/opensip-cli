@@ -1,4 +1,5 @@
-// @fitness-ignore-file file-length-limits -- framework/content-filter complexity requires single-file cohesion
+// @fitness-ignore-file file-length-limit -- framework/content-filter complexity requires single-file cohesion
+// @fitness-ignore-file toctou-race-condition -- filterContent cache.get + cache.set on a per-RunScope Map; both operations are synchronous, no async gap, safe in single-threaded Node.js
 /**
  * @fileoverview TypeScript scanner-based content filtering
  *
@@ -147,6 +148,7 @@ function replaceCharsInRange(chars: string[], start: number, end: number, string
 // fallback, not a hot-path concern, because production paths always
 // run inside a scope established by the CLI's pre-action-hook.
 
+/** Strips TS comments and string literals; result is cached per-content on the active scope. */
 export function filterContent(content: string): FilteredContent {
   const scope = currentScope()
   if (scope) {

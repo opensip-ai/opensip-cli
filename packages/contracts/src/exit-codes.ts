@@ -41,6 +41,7 @@ export function mapToolErrorToExitCode(error: ToolError): number {
   return EXIT_CODES.RUNTIME_ERROR;
 }
 
+/** Human-readable diagnosis surfaced when a tool fails, with the exit code it maps to. */
 export interface ErrorSuggestion {
   message: string;
   action?: string;
@@ -208,6 +209,7 @@ const SUGGESTION_RULES: readonly SuggestionRule[] = [
   },
 ];
 
+/** Matches an arbitrary error against the suggestion-rule table; returns null if no rule fires. */
 export function getErrorSuggestion(err: unknown): ErrorSuggestion | null {
   const message = err instanceof Error ? err.message : String(err);
 

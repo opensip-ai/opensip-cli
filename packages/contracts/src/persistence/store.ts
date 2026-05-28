@@ -11,6 +11,7 @@ import { randomUUID } from 'node:crypto';
 
 import type { ToolShortId } from '@opensip-tools/core';
 
+/** A persisted tool-run session: top-line score plus per-check results and findings. */
 export interface StoredSession {
   readonly id: string;
   readonly tool: ToolShortId;

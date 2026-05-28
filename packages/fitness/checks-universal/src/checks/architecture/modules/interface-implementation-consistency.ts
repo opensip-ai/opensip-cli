@@ -1,4 +1,4 @@
-// @fitness-ignore-file file-length-limits -- Fitness check with TypeScript AST traversal and interface consistency analysis
+// @fitness-ignore-file file-length-limit -- Fitness check with TypeScript AST traversal and interface consistency analysis
 // @fitness-ignore-file toctou-race-condition -- TOCTOU acceptable in this non-concurrent context
 // @fitness-ignore-file interface-implementation-consistency -- Fitness check definition file; references interface patterns for detection, not actual implementations
 // @fitness-ignore-file performance-anti-patterns -- sequential file reading and bounded violation loops; not hot paths

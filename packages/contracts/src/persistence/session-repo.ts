@@ -9,6 +9,7 @@ import type { DataStore } from '@opensip-tools/datastore';
 
 const MODULE_NAME = 'contracts:session-repo';
 
+/** Filters for {@link SessionRepo.list}: tool short-id and/or max row count. */
 export interface SessionListOptions {
   readonly tool?: ToolShortId;
   readonly limit?: number;
@@ -34,6 +35,7 @@ function isSessionSummary(v: unknown): v is SessionSummary {
   );
 }
 
+/** Persistence layer for tool-run sessions and their per-check findings. */
 export class SessionRepo {
   constructor(private readonly datastore: DataStore) {}
 

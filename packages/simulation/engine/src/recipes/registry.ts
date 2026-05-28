@@ -33,6 +33,7 @@ export interface SimulationRecipeDisplayInfo {
 
 const BUILT_IN_NAMES = new Set(builtInSimulationRecipes.map((r) => r.name));
 
+/** Registry of simulation recipes — bootstraps built-ins and accepts user-defined additions. */
 export class SimulationRecipeRegistry extends RecipeRegistry<SimulationRecipe> {
   constructor() {
     super({ module: 'simulation:recipes', validationCode: 'VALIDATION.SIMULATION.DUPLICATE_RECIPE' });
@@ -86,6 +87,9 @@ export function createSimulationRecipeRegistry(): SimulationRecipeRegistry {
  * scope is active or when the simulation subscope is missing — both
  * indicate the caller is running outside the CLI's pre-action-hook (or
  * the test fixture forgot to construct + enter a scope).
+ *
+ * @throws {Error} When called outside `runWithScope(...)`, or when the
+ *   active scope has no simulation subscope.
  */
 export function currentSimulationRecipeRegistry(): SimulationRecipeRegistry {
   const scope = currentScope();

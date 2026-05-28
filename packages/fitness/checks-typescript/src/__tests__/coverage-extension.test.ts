@@ -1,3 +1,4 @@
+// @fitness-ignore-file file-length-limit -- Coverage-driven aggregate fixture file: each describe block targets a specific low-coverage check via temp-dir fixtures; splitting fragments the per-check coverage push.
 /**
  * @fileoverview Targeted fixture-based coverage tests for low-coverage checks.
  *

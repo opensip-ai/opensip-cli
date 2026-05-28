@@ -3,14 +3,19 @@
  * @fileoverview Catch clause safety check
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
 
 /**
  * Analyze catch clauses for unsafe patterns
  */
 // eslint-disable-next-line sonarjs/cognitive-complexity -- Inherent complexity: multi-pattern catch clause analysis tracking brace depth, instanceof checks, and rethrow patterns
-function analyzeCatchSafety(content: string, _filePath: string): CheckViolation[] {
+function analyzeCatchSafety(content: string, filePath: string): CheckViolation[] {
   const violations: CheckViolation[] = []
+
+  // Test fixtures intentionally use `catch (e: any)` and unguarded
+  // `as Error` casts to exercise detection logic.
+  if (isTestFile(filePath)) return violations
+
   const lines = content.split('\n')
 
   // Quick check: skip files without catch

@@ -62,6 +62,7 @@ export function readYamlFile(filePath: string): unknown {
   }
 }
 
+/** Knobs for {@link readYamlFileOrThrow}: size guard and loader attribution. */
 export interface ReadYamlFileOrThrowOptions {
   /**
    * Maximum file size in bytes before this loader refuses to read.
@@ -89,6 +90,9 @@ export interface ReadYamlFileOrThrowOptions {
  * Consumers that want hand-rolled stat/read/parse with the same
  * structured errors should call this instead — it consolidates a
  * pattern previously duplicated across loaders (audit-round-2 Finding F).
+ *
+ * @throws {ValidationError} When the file is missing, unreadable, or contains malformed YAML.
+ * @throws {SystemError} When the file exceeds `maxBytes`.
  */
 export function readYamlFileOrThrow(
   filePath: string,

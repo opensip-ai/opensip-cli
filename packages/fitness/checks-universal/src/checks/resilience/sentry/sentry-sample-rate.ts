@@ -72,6 +72,7 @@ export const sentrySampleRate = defineCheck({
   id: 'a7c3e9f6-0b8d-4e4a-f567-d9c1a3b5e8f0',
   slug: 'sentry-sample-rate',
   scope: { languages: ['typescript', 'javascript'], concerns: ['backend', 'frontend'] },
+  contentFilter: 'strip-strings-and-comments',
   description: 'Detects missing or 1.0 tracesSampleRate — tracing disabled or too expensive',
   longDescription: `**Purpose:** Ensures Sentry performance tracing is configured with an appropriate sample rate.
 

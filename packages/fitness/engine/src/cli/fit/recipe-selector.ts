@@ -47,7 +47,13 @@ export function selectRecipe(
   return { recipeName };
 }
 
-/** Run the recipe (or ad-hoc selector built from `--check` / `--tags`). */
+/**
+ * Run the recipe (or ad-hoc selector built from `--check` / `--tags`).
+ *
+ * @throws {Error} When neither `args.check` nor `args.tags` is set but
+ *   `recipeName` is `undefined` — an invariant violation in the caller
+ *   (`selectRecipe` returns `recipeName` non-`undefined` in that branch).
+ */
 export async function runRecipeOrAdHoc(
   service: FitnessRecipeService,
   // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
@@ -62,7 +68,15 @@ export async function runRecipeOrAdHoc(
       const tagFilters = args.tags.split(',').map(t => t.trim()).filter(Boolean);
       return await service.start(FitnessRecipeService.createAdHocRecipe({ tagFilters }));
     }
-    return await service.start(recipeName!);
+    // selectRecipe sets recipeName to undefined only when args.check or
+    // args.tags are present — both of which return earlier in this function.
+    // Guard explicitly so the type system tracks the narrowing without `!`.
+    if (recipeName == null) {
+      throw new Error(
+        'runRecipeOrAdHoc: recipeName must be defined when args.check/args.tags are absent',
+      );
+    }
+    return await service.start(recipeName);
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     return {

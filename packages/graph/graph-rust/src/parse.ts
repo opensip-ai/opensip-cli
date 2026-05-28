@@ -1,3 +1,4 @@
+// @fitness-ignore-file unbounded-memory -- reads source files one at a time; per-file memory bounded by source size (tree-sitter constraint)
 /**
  * Rust parseProject — tree-sitter-rust.
  *
@@ -22,15 +23,18 @@ import Rust from 'tree-sitter-rust';
 
 import type { ParseInput, ParseOutput, ParseError } from '@opensip-tools/graph';
 
+/** Parsed Rust source file: tree-sitter parse tree plus original source text. */
 export interface RustParsedFile {
   readonly tree: Parser.Tree;
   readonly source: string;
 }
 
+/** Parsed Rust project: map of file path → {@link RustParsedFile}. */
 export interface RustParsedProject {
   readonly files: ReadonlyMap<string, RustParsedFile>;
 }
 
+/** Parses every Rust source file in the input set into a {@link RustParsedProject}. */
 export function parseProject(input: ParseInput): ParseOutput<RustParsedProject> {
   const parser = new Parser();
   // tree-sitter-rust's `Language` type and tree-sitter's `Language`

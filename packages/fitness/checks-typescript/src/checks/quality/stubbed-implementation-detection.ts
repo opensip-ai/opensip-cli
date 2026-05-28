@@ -359,6 +359,7 @@ export const stubbedImplementationDetection = defineCheck({
 - Placeholder comments: \`// Placeholder implementation\`, \`// STUB:\`, \`// Not implemented\`
 
 **Skips (not false positives):**
+- Test files (\`*.test.ts\`, files under \`__tests__/\`, \`__fixtures__/\`) — stub patterns in tests are intentional
 - Promise.resolve() in lifecycle methods (destroy, dispose, close, shutdown, cleanup)
 - Promise.resolve() inside conditional blocks (guard clauses)
 - Promise.resolve() in functions with substantive statements (real synchronous work)
@@ -376,6 +377,12 @@ export const stubbedImplementationDetection = defineCheck({
   analyze(content, filePath): CheckViolation[] {
     const violations: CheckViolation[] = []
 
+    // Test files routinely use stub patterns (empty type-asserted objects,
+    // Promise.resolve()) as intentional fixtures or compile-time drift
+    // detectors. Skip AST stub detection in tests; placeholder-comment
+    // scanning below is also already test-aware.
+    const inTestFile = isTestFile(filePath)
+
     try {
       const sourceFile = getSharedSourceFile(filePath, content)
       if (!sourceFile) return []
@@ -383,14 +390,16 @@ export const stubbedImplementationDetection = defineCheck({
       const visit = (node: ts.Node): void => {
         const nodeOptions = { node, sourceFile }
 
-        const emptyStub = checkEmptyObjectStub(nodeOptions)
-        if (emptyStub) violations.push(emptyStub)
+        if (!inTestFile) {
+          const emptyStub = checkEmptyObjectStub(nodeOptions)
+          if (emptyStub) violations.push(emptyStub)
 
-        const promiseStub = checkPromiseResolveStub(nodeOptions)
-        if (promiseStub) violations.push(promiseStub)
+          const promiseStub = checkPromiseResolveStub(nodeOptions)
+          if (promiseStub) violations.push(promiseStub)
 
-        const hardcodedStub = checkHardcodedStubReturn(nodeOptions)
-        if (hardcodedStub) violations.push(hardcodedStub)
+          const hardcodedStub = checkHardcodedStubReturn(nodeOptions)
+          if (hardcodedStub) violations.push(hardcodedStub)
+        }
 
         ts.forEachChild(node, visit)
       }

@@ -7,6 +7,7 @@ import type { DataStore } from '@opensip-tools/datastore';
 
 const MODULE_NAME = 'fitness:baseline-repo';
 
+/** Repository for the single-row SARIF baseline used by --gate-compare. */
 export class FitBaselineRepo {
   constructor(private readonly datastore: DataStore) {}
 

@@ -1,3 +1,4 @@
+// @fitness-ignore-file performance-anti-patterns -- sequential await across discovered tool packages preserves load order for plugin-conflict detection; bounded by installed plugin count
 /**
  * register-tools — populate the kernel `ToolRegistry` with first-party
  * tools (fitness / simulation / graph) plus any third-party tool

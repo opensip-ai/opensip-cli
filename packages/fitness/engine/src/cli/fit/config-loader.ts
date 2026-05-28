@@ -69,6 +69,8 @@ export function loadFitConfig(
  * Async only because `currentScope` is imported via dynamic import to
  * keep the executeFit body free of fitness↔core import arrows beyond
  * the kernel barrel. The scope is bound by the CLI pre-action-hook.
+ *
+ * @throws {Error} When called outside `runWithScope(...)` (no current scope).
  */
 export async function validateLanguagesAgainstAdapters(
   targetRegistry: LoadedFitConfig['targetRegistry'],

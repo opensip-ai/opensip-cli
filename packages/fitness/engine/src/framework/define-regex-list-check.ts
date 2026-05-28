@@ -280,6 +280,7 @@ function processLine(
   }
 }
 
+/** Factory for the common "scan each line against a regex list" check pattern. */
 export function defineRegexListCheck(config: DefineRegexListCheckConfig): Check {
   const skipComments = config.options?.skipCommentLines ?? true
   const skipTests = config.options?.skipTestFiles ?? false

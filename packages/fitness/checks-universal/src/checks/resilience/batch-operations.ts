@@ -1,4 +1,4 @@
-// @fitness-ignore-file file-length-limits -- JSDoc documentation required for public API
+// @fitness-ignore-file file-length-limit -- JSDoc documentation required for public API
 // @fitness-ignore-file duplicate-implementation-detection -- similar patterns across diagnostic modules
 /**
  * @fileoverview Batch operations and memory resilience checks

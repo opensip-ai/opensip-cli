@@ -1,3 +1,4 @@
+// @fitness-ignore-file batch-operation-limits -- iterates bounded collection (catalog entries for a single declaration site)
 /**
  * findCatalogEntry — locate a catalog entry's bodyHash from a TS declaration.
  *

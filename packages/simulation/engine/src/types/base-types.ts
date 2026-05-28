@@ -5,7 +5,7 @@
  * scenarios, chaos injection, execution, and service contracts.
  */
 
-import type { ScenarioMetricKey } from '../framework/resolve-metric.js'
+import type { ScenarioMetricKey } from '../framework/scenario-metric-key.js'
 
 // =============================================================================
 // PERSONA TYPES

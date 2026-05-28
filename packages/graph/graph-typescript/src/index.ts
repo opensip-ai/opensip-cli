@@ -1,3 +1,4 @@
+// @fitness-ignore-file unbounded-memory -- reads single source files for parsing; per-file memory bounded by source size
 /**
  * @opensip-tools/graph — TypeScript language adapter.
  *

@@ -7,7 +7,7 @@
  */
 
 import { logger } from '@opensip-tools/core/logger'
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
 
 /**
  * Creates a pre-compiled RegExp for pattern matching.
@@ -106,6 +106,10 @@ export const envSecretExposure = defineCheck({
   confidence: 'medium',
 
   analyze(content: string, filePath: string): CheckViolation[] {
+    // Test fixtures intentionally spread/serialize process.env to verify
+    // detection logic — skip tests to avoid noise.
+    if (isTestFile(filePath)) return []
+
     logger.debug({
       evt: 'fitness.checks.env_secret_exposure.analyze',
       msg: 'Analyzing file for environment secret exposure',

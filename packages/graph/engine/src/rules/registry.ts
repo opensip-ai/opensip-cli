@@ -1,3 +1,4 @@
+// @fitness-ignore-file batch-operation-limits -- iterates bounded collection (registered rules + getAll() returning the rule list per RunScope)
 /**
  * Rule registry — per-RunScope.
  *
@@ -75,6 +76,9 @@ export function createRulesRegistry(): GraphRulesRegistry {
 /**
  * Read the current scope's graph rule registry. Throws when no scope
  * is active or when the graph subscope is missing.
+ *
+ * @throws {Error} When called outside `runWithScope(...)`, or when the
+ *   active scope has no graph subscope.
  */
 function currentRulesRegistry(): GraphRulesRegistry {
   const scope = currentScope();

@@ -24,35 +24,13 @@ import {
 
 import { createInvariantScenarioRunner } from './executor.js'
 
-import type { InvariantContext, InvariantContextDeps } from './context.js'
+import type { InvariantScenarioConfig } from './config.js'
 import type { RunnableScenario } from '../../framework/runnable-scenario.js'
 
-
-/** Author-facing configuration for an invariant scenario. */
-export interface InvariantScenarioConfig {
-  readonly id: string
-  readonly name: string
-  readonly description: string
-  readonly tags: readonly string[]
-  /** Doc anchor identifying which invariant this scenario verifies. */
-  readonly relatesToInvariant: string
-  readonly setup: (ctx: InvariantContext) => Promise<void>
-  readonly act: (ctx: InvariantContext) => Promise<void>
-  readonly assert: (ctx: InvariantContext) => Promise<void>
-  /**
-   * Optional override for the `InvariantContext` driver dependencies. Tests
-   * inject fake drivers here; production scenarios omit this and get the
-   * default (throw-NOT-IMPLEMENTED) drivers until Phase 7 wires real ones.
-   */
-  readonly deps?: Partial<InvariantContextDeps>
-}
-
-/**
- * Validation error shape for invariant config.
- *
- * @deprecated Use `ScenarioValidationError` from `framework/validation.ts`.
- */
-export type InvariantValidationError = ScenarioValidationError
+// `InvariantScenarioConfig` moved to `./config.ts` to break the
+// `define.ts ↔ executor.ts` file-level cycle. Re-exported here so
+// existing callers keep their import paths.
+export type { InvariantScenarioConfig } from './config.js'
 
 function validateInvariantSpecific(
   config: InvariantScenarioConfig,

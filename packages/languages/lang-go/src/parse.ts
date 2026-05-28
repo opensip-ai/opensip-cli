@@ -16,8 +16,10 @@
 
 import { buildMinimalTextTree, type MinimalTextTree } from '@opensip-tools/core'
 
+/** Parse-tree alias for Go (currently a minimal text tree; will become a real AST). */
 export type GoTree = MinimalTextTree
 
+/** Parses Go source into a {@link GoTree} for check consumption. */
 export function parseGo(content: string, filePath: string): GoTree {
   return buildMinimalTextTree(content, filePath)
 }

@@ -1,5 +1,5 @@
 // @fitness-ignore-file no-generic-error -- Generic errors appropriate in this context
-// @fitness-ignore-file file-length-limits -- JSDoc documentation required for public API
+// @fitness-ignore-file file-length-limit -- JSDoc documentation required for public API
 // @fitness-ignore-file no-hardcoded-timeouts -- framework default for fitness check execution timeout
 /**
  * @fileoverview Missing @throws JSDoc Detection Check
@@ -9,7 +9,7 @@
  */
 
 
-import { defineCheck, getCheckConfig, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, getCheckConfig, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
 import * as ts from 'typescript'
 
@@ -593,6 +593,11 @@ export const throwsDocumentation = defineCheck({
   timeout: 180_000, // 3 minutes - parses TypeScript AST for all backend files
 
   analyze(content, filePath) {
+    // Skip test files — assertion failures, anonymous test callbacks, and
+    // fixture helpers are not public-API surface. Matches the convention in
+    // `null-safety`. Public-API throws are documented in non-test code.
+    if (isTestFile(filePath)) return []
+
     // Quick filter
     if (!content.includes('throw ')) {
       return []

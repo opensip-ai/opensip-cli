@@ -2,7 +2,7 @@
  * @fileoverview Cross-kind scenario registry — per-RunScope.
  *
  * Each `RunScope` owns its own `Registry<RunnableScenario>` (Item 1 /
- * D7 — see docs/plans/ready/architecture-runscope-and-registry/item-1-tool-subscopes.md).
+ * D7 — tool subscopes via module augmentation).
  * The simulation tool's `extendScope` hook constructs a fresh registry
  * per CLI invocation and attaches it to `scope.simulation.scenarios`.
  *
@@ -44,6 +44,9 @@ export function createScenarioRegistry(): Registry<RunnableScenario> {
  * active or when the simulation subscope is missing — both indicate the
  * caller is running outside the CLI's pre-action-hook (or the test
  * fixture forgot to construct + enter a scope).
+ *
+ * @throws {Error} When called outside `runWithScope(...)`, or when the
+ *   active scope has no simulation subscope.
  */
 export function currentScenarioRegistry(): Registry<RunnableScenario> {
   const scope = currentScope()
