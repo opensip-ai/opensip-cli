@@ -22,6 +22,8 @@ import { fitnessTool } from '@opensip-tools/fitness';
 import { graphTool } from '@opensip-tools/graph';
 import { simulationTool } from '@opensip-tools/simulation';
 
+import { isValidTool } from './validate-tool.js';
+
 /** First-party tools — declared as direct deps of @opensip-tools/cli. */
 export const FIRST_PARTY_TOOLS: readonly Tool[] = [
   fitnessTool,
@@ -87,32 +89,6 @@ export async function discoverAndRegisterToolPackages(
     }
   }
 }
-
-/**
- * Runtime shape predicate for third-party tool exports. Verifies the
- * minimal contract the registry depends on: a `metadata.id` string
- * (used for dedupe + listing) and the two required methods
- * (`register`, `commands` — `initialize` and `extendScope` stay
- * optional per the Tool interface).
- */
-function isValidTool(value: unknown): value is Tool {
-  if (typeof value !== 'object' || value === null) return false;
-  const candidate = value as { metadata?: unknown; register?: unknown; commands?: unknown };
-  if (typeof candidate.metadata !== 'object' || candidate.metadata === null) return false;
-  if (typeof (candidate.metadata as { id?: unknown }).id !== 'string') return false;
-  if (typeof candidate.register !== 'function') return false;
-  if (!Array.isArray(candidate.commands)) return false;
-  return true;
-}
-
-/**
- * Test-only export so the runtime shape predicate can be exercised
- * without standing up a fake on-disk npm package. The predicate is the
- * untrusted-boundary check for third-party `tool` exports; its branches
- * (non-object, missing metadata.id, missing register, missing commands)
- * each need a unit covering them.
- */
-export const __test = { isValidTool };
 
 /**
  * Walk the registry and ask each tool to mount its Commander

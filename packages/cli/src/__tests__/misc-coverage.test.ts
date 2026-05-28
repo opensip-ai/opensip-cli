@@ -9,10 +9,10 @@
  *     called from inside `executeInit`'s discovery-refusal branch, which
  *     existing tests cover end-to-end via `executeInit`; no unit pins the
  *     message-shape contract directly.
- *   - `isValidTool` (bootstrap/register-tools.ts) — runtime shape
- *     predicate for third-party tool exports; exposed via a `__test`
- *     shim so we can hit every branch without standing up a fake on-disk
- *     npm package.
+ *   - `isValidTool` (bootstrap/validate-tool.ts) — runtime shape
+ *     predicate for third-party tool exports; tested directly here to
+ *     hit every reject branch without standing up a fake on-disk npm
+ *     package.
  *   - default `write` fallback in `update-notifier.ts` — only fires when
  *     a real npm update is available (untestable in CI); we cover the
  *     branch by mocking `update-notifier` to report a stale version.
@@ -23,7 +23,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { __test as registerToolsTest } from '../bootstrap/register-tools.js';
+import { isValidTool } from '../bootstrap/validate-tool.js';
 import { formatInsideExistingProjectMessage } from '../commands/init/state-machine.js';
 
 // --- state-machine.formatInsideExistingProjectMessage -------------------------
@@ -42,8 +42,6 @@ describe('formatInsideExistingProjectMessage', () => {
 // --- register-tools.isValidTool ----------------------------------------------
 
 describe('isValidTool', () => {
-  const { isValidTool } = registerToolsTest;
-
   it('accepts a minimally well-formed tool', () => {
     expect(
       isValidTool({
