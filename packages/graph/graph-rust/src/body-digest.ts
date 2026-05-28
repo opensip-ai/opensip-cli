@@ -45,7 +45,7 @@ export const digestSyntheticBody = digestRustBody;
  * (slash-star ... star-slash, including nested forms — Rust's grammar
  * permits nesting). Preserve string literals (their content matters).
  */
-export function stripRustComments(text: string): string {
+function stripRustComments(text: string): string {
   let out = '';
   let i = 0;
   while (i < text.length) {

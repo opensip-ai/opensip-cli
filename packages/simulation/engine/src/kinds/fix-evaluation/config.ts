@@ -1,3 +1,4 @@
+// @fitness-ignore-file unused-config-options -- FixEvaluationScenarioConfig is the public author-facing config schema for fix-evaluation scenarios; `criteriaMet`, `expectedDifficulty`, `signalIntent`, `expectedOutcome` are required scenario-metadata fields consumed by downstream analytics/dashboards, not by the engine's internal validation path.
 /**
  * @fileoverview `FixEvaluationScenarioConfig` and predicate-composition
  * types — author-facing configuration.

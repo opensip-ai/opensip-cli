@@ -1,3 +1,4 @@
+// @fitness-ignore-file unbounded-memory -- reads small text files (package.json, src/index.ts barrels) for public-API surface computation; per-file memory bounded by standard config/barrel shape.
 /**
  * @fileoverview Public-API reachability graph for the public-api-jsdoc check.
  *
@@ -22,7 +23,7 @@ import { dirname, isAbsolute, join, resolve, sep } from 'node:path'
  * indicates "could not determine package root" — caller treats every
  * file as public (the original, broad behavior).
  */
-export interface PackagePublicSurface {
+interface PackagePublicSurface {
   readonly packageRoot: string
   readonly publicFiles: ReadonlySet<string>
 }
@@ -54,7 +55,7 @@ export function _resetPublicApiGraphCache(): void {
  * `package.json`), or `undefined` if none found before the filesystem
  * root.
  */
-export function findPackageRoot(filePath: string): string | undefined {
+function findPackageRoot(filePath: string): string | undefined {
   let dir = dirname(filePath)
   // Bound the walk to avoid pathological loops on weird mounts.
   for (let i = 0; i < 64; i++) {
@@ -87,7 +88,7 @@ export function isInPublicApiSurface(filePath: string): boolean {
  * Compute (and memoize) the public-API surface for the package
  * containing `filePath`.
  */
-export function getPackagePublicSurface(filePath: string): PackagePublicSurface | null {
+function getPackagePublicSurface(filePath: string): PackagePublicSurface | null {
   const packageRoot = findPackageRoot(filePath)
   if (!packageRoot) return null
 
