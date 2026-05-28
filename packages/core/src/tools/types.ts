@@ -27,7 +27,56 @@
 import { ToolError, type ToolErrorOptions } from '../lib/errors.js';
 
 import type { Logger } from '../lib/logger.js';
-import type { RunScope } from '../lib/run-scope.js';
+
+/**
+ * Forward reference to `RunScope` via an inline `import()` type query.
+ *
+ * The `lib/run-scope.ts` module already imports `ToolRegistry` and
+ * `LanguageRegistry` as values to provide default-constructor
+ * convenience (so callers and tests can write `new RunScope()` without
+ * threading two registries through). `tools/registry.ts` imports
+ * `Tool` from this file (its registered value type). A normal top-level
+ * `import type { RunScope } from '../lib/run-scope.js'` therefore
+ * closes a file-level cycle:
+ *
+ *   `lib/run-scope.ts` →(value) `tools/registry.ts`
+ *                       →(type)  `tools/types.ts`
+ *                       →(type)  `lib/run-scope.ts`
+ *
+ * `circular-import-detection` walks all top-level `ImportDeclaration`
+ * AST nodes (including `import type`) and reports the cycle. The
+ * runtime graph has no cycle — type-only imports are erased at
+ * transpile time — but the static check can't tell the difference.
+ *
+ * The chosen fix is an inline `import(...)` type query, which expresses
+ * the same type relationship without producing an `ImportDeclaration`
+ * edge. The alternatives considered and rejected:
+ *
+ *   1. Extracting a `RunScope` interface to a leaf file. Module
+ *      augmentations (`declare module '@opensip-tools/core' { interface
+ *      RunScope { simulation?: ... } }`) target the class re-exported
+ *      from the package barrel; routing `tools/types.ts` through a
+ *      separate leaf interface would orphan those augmentations and
+ *      break the typed `cli.scope.simulation` access pattern.
+ *
+ *   2. Removing the `new RunScope()` default-constructor convenience.
+ *      The default-constructor shape is part of the kernel's public
+ *      surface (every test fixture relies on it); a forced registry
+ *      injection would propagate into every test in the repo.
+ *
+ *   3. Splitting the `Tool` interface so the `extendScope` hook lives
+ *      elsewhere. `extendScope` belongs on the Tool contract — moving
+ *      it would fragment a single coherent type.
+ *
+ * The inline-`import()` form is the lowest-impact way to honour the
+ * architectural constraint the check enforces without distorting any
+ * of the type contracts. `@typescript-eslint/consistent-type-imports`
+ * is disabled on the next line because the rule's recommendation
+ * (use top-level `import type`) is exactly what would reintroduce the
+ * cycle this file is structured to avoid.
+ */
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports -- intentional inline import() type query — see the surrounding comment for the cycle-breaking rationale.
+type RunScope = import('../lib/run-scope.js').RunScope;
 
 export interface ToolMetadata {
   /** Stable identifier — e.g. 'fitness', 'simulation'. */

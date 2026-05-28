@@ -36,8 +36,27 @@ import type {
   ResolutionStats,
   Rule,
 } from '../types.js';
+import type {
+  GraphProgressCallback,
+  GraphStage,
+} from './orchestrate/types.js';
 import type { Signal } from '@opensip-tools/core';
 import type { DataStore } from '@opensip-tools/datastore';
+
+// Re-export the orchestration types so existing callers (the engine's
+// public `index.ts` barrel, the Ink live view, downstream tooling)
+// continue to import them from `./orchestrate.js`. The canonical
+// declarations now live in `./orchestrate/types.ts` — a leaf module
+// that the orchestrator's helpers (`cache-orchestrator`,
+// `catalog-builder`) also import from. The split breaks the
+// `orchestrate → cache-orchestrator → catalog-builder → orchestrate`
+// file-level cycle the `circular-import-detection` check flagged.
+export { GRAPH_STAGES } from './orchestrate/types.js';
+export type {
+  GraphProgressCallback,
+  GraphProgressEvent,
+  GraphStage,
+} from './orchestrate/types.js';
 
 export interface RunGraphInput {
   readonly cwd: string;
@@ -71,39 +90,6 @@ export interface RunGraphResult {
   readonly resolutionStats: ResolutionStats | null;
   readonly cacheHit: boolean;
 }
-
-/** Pipeline stage identity, in canonical order. */
-export type GraphStage =
-  | 'discover'
-  | 'parse'
-  | 'walk'
-  | 'resolve'
-  | 'index'
-  | 'rules';
-
-/** Canonical stage order — consumed by the live view to render the checklist. */
-export const GRAPH_STAGES: readonly GraphStage[] = [
-  'discover',
-  'parse',
-  'walk',
-  'resolve',
-  'index',
-  'rules',
-];
-
-/**
- * Structured progress event. `stage-cached` fires for parse/walk/resolve
- * when the on-disk catalog cache satisfies the run; the view renders
- * those stages as "(cached)" instead of running them.
- */
-export interface GraphProgressEvent {
-  readonly type: 'stage-start' | 'stage-done' | 'stage-cached';
-  readonly stage: GraphStage;
-  readonly durationMs?: number;
-  readonly detail?: string;
-}
-
-export type GraphProgressCallback = (event: GraphProgressEvent) => void;
 
 function runStage<T>(
   stage: GraphStage,

@@ -10,17 +10,20 @@
 
 import { ValidationError } from '@opensip-tools/core';
 
+import { fingerprintSignal } from './fingerprint-signal.js';
+
 import type { GraphBaselineRepo } from './persistence/baseline-repo.js';
 import type { Signal } from '@opensip-tools/core';
+
+// Re-exported so existing callers (`packages/graph/engine/src/index.ts`
+// and downstream tools) keep their import paths stable now that the
+// implementation lives in `./fingerprint-signal.ts`.
+export { fingerprintSignal } from './fingerprint-signal.js';
 
 export interface GateCompareResult {
   readonly degraded: boolean;
   readonly newSignals: readonly Signal[];
   readonly resolvedFingerprints: readonly string[];
-}
-
-export function fingerprintSignal(s: Signal): string {
-  return `${s.ruleId}|${s.filePath}|${String(s.line ?? 0)}|${s.message}`;
 }
 
 export function saveBaseline(signals: readonly Signal[], repo: GraphBaselineRepo): void {

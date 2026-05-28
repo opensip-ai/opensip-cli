@@ -63,40 +63,15 @@
  * the looser, more-permissive choice and is the one being tightened.
  */
 
+import type { ScenarioMetricKey } from './scenario-metric-key.js'
 import type { SimulationMetrics } from '../types/base-types.js'
 
-/**
- * Union of every metric key recognised by `resolveMetric`.
- *
- * `ScenarioAssertion.metric` is typed as this union so a typo like
- * `'p99-latnecy'` is a TypeScript error at the assertion-construction
- * call site.
- */
-export type ScenarioMetricKey =
-  // Computed
-  | 'error_rate'
-  | 'success_rate'
-  | 'recovery_rate'
-  | 'requests_per_second'
-  // Latency direct (with `_ms` and bare aliases)
-  | 'avg_latency'
-  | 'avg_latency_ms'
-  | 'p50_latency'
-  | 'p50_latency_ms'
-  | 'p95_latency'
-  | 'p95_latency_ms'
-  | 'p99_latency'
-  | 'p99_latency_ms'
-  // Counter direct
-  | 'total_requests'
-  | 'successful_requests'
-  | 'failed_requests'
-  | 'errors_generated'
-  | 'findings_generated'
-  // Reserved (returns 0 until an executor populates the underlying field)
-  | 'max_latency_ms'
-  | 'memory_mb'
-  | 'cpu_percent'
+// `ScenarioMetricKey` moved to `./scenario-metric-key.ts` (a leaf
+// module) to break the `resolve-metric.ts ↔ base-types.ts` file-level
+// cycle. Re-exported here so existing callers (the engine barrel,
+// downstream tools that build `ScenarioAssertion` values) keep their
+// import paths.
+export type { ScenarioMetricKey } from './scenario-metric-key.js'
 
 /**
  * Resolve a metric key to its numeric value.

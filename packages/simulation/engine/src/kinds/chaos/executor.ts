@@ -18,7 +18,7 @@ import { runLoadWindow } from '../../framework/execution/run-load-window.js'
 import { ScenarioResultBuilder } from '../../framework/result-builder.js'
 import { createScenarioLogger } from '../../framework/scenario-logger.js'
 
-import type { ChaosScenarioConfig } from './define.js'
+import type { ChaosScenarioConfig } from './config.js'
 import type { ChaosAssertionVerdict, ChaosEvent } from './result.js'
 import type { TickOutcome } from '../../framework/execution/run-load-window.js'
 import type { RunnableScenario } from '../../framework/runnable-scenario.js'

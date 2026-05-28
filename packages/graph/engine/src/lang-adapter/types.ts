@@ -24,6 +24,7 @@ import type {
   FunctionOccurrence,
   ParseError,
   ResolutionStats,
+  RuleHints,
 } from '../types.js';
 
 /**
@@ -185,16 +186,11 @@ export interface CacheKeyInput {
 
 // ── method 6 ──────────────────────────────────────────────────────
 
-export interface RuleHints {
-  /** Predicate: is this file a test? Path is project-relative. */
-  readonly isTestFile?: (filePathProjectRel: string) => boolean;
-  /** Globs treated as generated code. */
-  readonly generatedFilePatterns?: readonly string[];
-  /** Side-effect primitives — fully-qualified names (e.g. 'fs.writeFileSync'). */
-  readonly sideEffectPrimitives?: readonly string[];
-  /** Throw-statement detection regex for `always-throws-branch`. */
-  readonly throwSyntaxRegex?: RegExp;
-}
+// `RuleHints` is declared in `../types.ts` (the engine's shared type
+// layer) so it can be re-imported by rules without crossing into
+// `lang-adapter/`. Re-exported here so adapter authors still see it on
+// the adapter contract surface they pull from `lang-adapter/types.js`.
+export type { RuleHints } from '../types.js';
 
 // ── the interface ─────────────────────────────────────────────────
 

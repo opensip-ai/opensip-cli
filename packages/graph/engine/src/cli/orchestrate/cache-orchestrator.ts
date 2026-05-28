@@ -19,13 +19,13 @@ import {
   type RunStage,
 } from './catalog-builder.js';
 
+import type { GraphProgressCallback } from './types.js';
 import type {
   DiscoverOutput,
   GraphLanguageAdapter,
 } from '../../lang-adapter/types.js';
 import type { CatalogRepo } from '../../persistence/catalog-repo.js';
 import type { Catalog, ResolutionStats } from '../../types.js';
-import type { GraphProgressCallback } from '../orchestrate.js';
 import type { PressureMonitor } from '../pressure-monitor.js';
 
 export interface ObtainCatalogInput {

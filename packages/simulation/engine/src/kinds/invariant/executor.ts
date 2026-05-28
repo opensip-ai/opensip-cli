@@ -15,6 +15,7 @@
 import { ScenarioAbortedError } from '../../framework/execution/execution-engine.js'
 
 
+import type { InvariantScenarioConfig } from './config.js'
 import type {
   InvariantContext,
   InvariantContextDeps,
@@ -27,7 +28,6 @@ import type {
   AuditEntryExpectation,
   InvariantTicketProjection,
 } from './context.js'
-import type { InvariantScenarioConfig } from './define.js'
 import type { InvariantAssertion, InvariantPhaseResult } from './result.js'
 import type { RunnableScenario } from '../../framework/runnable-scenario.js'
 import type { InvariantScenarioExecutorResult } from '../../framework/scenario-executor-result.js'
