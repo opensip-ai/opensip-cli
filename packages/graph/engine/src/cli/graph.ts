@@ -20,10 +20,12 @@ import {
 } from '@opensip-tools/core';
 
 
+import { reportToCloud } from '@opensip-tools/fitness';
+
 import { compareToBaseline, fingerprintSignal, saveBaseline } from '../gate.js';
 import { GraphBaselineRepo } from '../persistence/baseline-repo.js';
 import { buildCliOutput, renderJson } from '../render/json.js';
-import { renderSarif, reportToCloud } from '../render/sarif.js';
+import { renderSarif } from '../render/sarif.js';
 import { inferEntryPoints } from '../rules/_entry-points.js';
 import { currentRules } from '../rules/registry.js';
 
@@ -569,7 +571,14 @@ async function runReportMode(
 ): Promise<void> {
   const cliOutput = buildCliOutput(signals, 'graph');
   const url = opts.reportTo!;
-  const sarif = renderSarif(cliOutput);
+  // toolVersion tracks @opensip-tools/graph package.json's version. Manually
+  // synced — bump alongside any package.json version change. A future
+  // build-time constant via tsc plugin or import-assertion would remove this
+  // drift risk; not warranted for a single call site.
+  const sarif = renderSarif(signals, {
+    tool: 'opensip-tools-graph',
+    toolVersion: '2.0.0',
+  });
   const result = await reportToCloud(cliOutput, url, opts.apiKey);
   if (!result.success) {
     cli.setExitCode(EXIT_CODES.REPORT_FAILED);

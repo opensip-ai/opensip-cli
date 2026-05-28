@@ -1,19 +1,13 @@
 /**
- * SARIF renderer — thin wrapper around @opensip-tools/fitness's
- * SARIF builder per DEC-3.
+ * @fileoverview SARIF renderer entry point.
  *
- * Both fitness and graph sit at the tools/lang peer layer; importing
- * fitness's buildSarifLog is the documented exception (recorded in
- * the dep-cruiser config + Appendix C). The wrapper exists so the
- * future @opensip-tools/sarif extraction is mechanical.
+ * Phase 2 Task 2.2 (DEC-498): replaced the prior `@opensip-tools/fitness`
+ * `buildSarifLog` wrapper with a graph-native emitter. Re-exports
+ * `renderSarifOpenSip` as `renderSarif` so existing import paths keep
+ * working. The fitness package's `buildSarifLog` is no longer a graph
+ * dependency; `reportToCloud` is imported directly from
+ * `@opensip-tools/fitness` at its consumption site (`cli/graph.ts`).
  */
 
-import { buildSarifLog } from '@opensip-tools/fitness';
-
-import type { CliOutput } from '@opensip-tools/contracts';
-
-export function renderSarif(output: CliOutput): string {
-  return JSON.stringify(buildSarifLog(output), null, 2);
-}
-
-export { reportToCloud } from '@opensip-tools/fitness';
+export { renderSarifOpenSip as renderSarif } from './sarif-opensip.js';
+export type { RenderSarifContext, SarifLevel } from './sarif-opensip.js';
