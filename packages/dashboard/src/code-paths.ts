@@ -155,18 +155,12 @@ function renderCodePathsTab() {
   const graphSessions = sessions.filter(s => s.tool === 'graph');
   graphCatalog = loadGraphCatalogFromBlob();
 
-  if (graphSessions.length === 0 && !graphCatalog) {
-    panel.appendChild(el('div', { class: 'card' }, [
-      el('h2', { text: 'Code Paths' }),
-      el('p', { class: 'muted', text: 'No graph sessions yet. Run opensip-tools graph to generate one.' }),
-    ]));
-    return;
-  }
-
   // Code Paths uses the shared renderSubtabBar Strategy (F2). The
   // two-subtab Sessions/Explore shape is a config; the DOM-and-click
   // boilerplate now lives in subtab-bar.ts and is shared with
-  // renderToolTab's three-subtab shape.
+  // renderToolTab's three-subtab shape. The subtabs render even when
+  // empty so the tab matches the visual pattern used by Fitness and
+  // Simulation (subtab bar + italic-centered .empty placeholder).
   renderSubtabBar(panel, [
     {
       id: 'sessions',
@@ -175,7 +169,7 @@ function renderCodePathsTab() {
         if (graphSessions.length > 0) {
           renderSessionTable(p, graphSessions, 'var(--accent)');
         } else {
-          p.appendChild(el('div', { class: 'empty', text: 'No graph sessions yet.' }));
+          p.appendChild(el('div', { class: 'empty', text: 'No sessions yet.' }));
         }
       },
     },
@@ -186,7 +180,7 @@ function renderCodePathsTab() {
         if (graphCatalog) {
           renderCodePathsExplore(p);
         } else {
-          p.appendChild(el('div', { class: 'empty', text: 'Catalog cache missing. Re-run opensip-tools graph to populate.' }));
+          p.appendChild(el('div', { class: 'empty', text: 'No catalog yet.' }));
         }
       },
     },
