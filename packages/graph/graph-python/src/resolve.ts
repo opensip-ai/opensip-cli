@@ -105,9 +105,9 @@ export function resolveCallSites(input: ResolveInput<PythonParsedProject>): Reso
       ? resolveDependencies(input.dependencySites, input.catalog)
       : undefined;
 
-  return dependenciesByOwner !== undefined
-    ? { edgesByOwner, dependenciesByOwner, stats: finalStats }
-    : { edgesByOwner, stats: finalStats };
+  return dependenciesByOwner === undefined
+    ? { edgesByOwner, stats: finalStats }
+    : { edgesByOwner, dependenciesByOwner, stats: finalStats };
 }
 
 /**
@@ -155,8 +155,8 @@ function resolveDependencies(
       specifier: site.specifier,
     };
     const existing = out.get(site.ownerHash);
-    if (existing !== undefined) existing.push(edge);
-    else out.set(site.ownerHash, [edge]);
+    if (existing === undefined) {out.set(site.ownerHash, [edge]);}
+    else {existing.push(edge);}
   }
   return out;
 }

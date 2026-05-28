@@ -287,7 +287,7 @@ describe('executeGraph — human / JSON modes', () => {
     const written = JSON.parse(require('node:fs').readFileSync(outPath, 'utf8')) as {
       version: string;
       provenance: { runId: string; tenantId: string; completeness: string };
-      symbols: Array<{ repoId: string; gitSha: string; qualifiedName: string }>;
+      symbols: { repoId: string; gitSha: string; qualifiedName: string }[];
       edges: unknown[];
     };
     expect(written.version).toBe('1.0');

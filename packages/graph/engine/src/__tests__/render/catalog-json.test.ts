@@ -156,7 +156,7 @@ describe('renderCatalogJson — symbol rows', () => {
       repoId: REPO_ID,
       gitSha: GIT_SHA,
     });
-    const parsed = JSON.parse(json) as { symbols: Array<{ id: string; modulePath: string; kind: string; qualifiedName: string; arity: number | null }> };
+    const parsed = JSON.parse(json) as { symbols: { id: string; modulePath: string; kind: string; qualifiedName: string; arity: number | null }[] };
     for (const sym of parsed.symbols) {
       const expected = deriveOpenSipSymbolId({
         repoId: REPO_ID,
@@ -177,7 +177,7 @@ describe('renderCatalogJson — symbol rows', () => {
       repoId: REPO_ID,
       gitSha: GIT_SHA,
     });
-    const parsed = JSON.parse(json) as { symbols: Array<{ modulePath: string; filePath: string }> };
+    const parsed = JSON.parse(json) as { symbols: { modulePath: string; filePath: string }[] };
     for (const sym of parsed.symbols) {
       expect(sym.modulePath).toBe(deriveOpenSipModulePath(sym.filePath));
       expect(sym.modulePath.endsWith('.ts')).toBe(false);
@@ -192,7 +192,7 @@ describe('renderCatalogJson — symbol rows', () => {
       repoId: REPO_ID,
       gitSha: GIT_SHA,
     });
-    const parsed = JSON.parse(json) as { symbols: Array<{ qualifiedName: string; arity: number | null }> };
+    const parsed = JSON.parse(json) as { symbols: { qualifiedName: string; arity: number | null }[] };
     const greet = parsed.symbols.find((s) => s.qualifiedName === 'src/greet.greet');
     const formatName = parsed.symbols.find((s) => s.qualifiedName === 'src/format.formatName');
     expect(greet?.arity).toBe(0);
@@ -207,7 +207,7 @@ describe('renderCatalogJson — symbol rows', () => {
       repoId: REPO_ID,
       gitSha: GIT_SHA,
     });
-    const parsed = JSON.parse(json) as { symbols: Array<{ qualifiedName: string; isExported: boolean }> };
+    const parsed = JSON.parse(json) as { symbols: { qualifiedName: string; isExported: boolean }[] };
     const greet = parsed.symbols.find((s) => s.qualifiedName === 'src/greet.greet');
     const formatName = parsed.symbols.find((s) => s.qualifiedName === 'src/format.formatName');
     expect(greet?.isExported).toBe(false);     // visibility: 'module-local'
@@ -225,13 +225,13 @@ describe('renderCatalogJson — edge rows', () => {
       gitSha: GIT_SHA,
     });
     const parsed = JSON.parse(json) as {
-      edges: Array<{
+      edges: {
         edgeKind: string;
         fromSymbolId: string;
         toSymbolId: string | null;
         toQualifiedNameUnresolved: string | null;
         sourceLine: number | null;
-      }>;
+      }[];
     };
     expect(parsed.edges).toHaveLength(2);
 
@@ -253,13 +253,13 @@ describe('renderCatalogJson — edge rows', () => {
       gitSha: GIT_SHA,
     });
     const parsed = JSON.parse(json) as {
-      edges: Array<{
+      edges: {
         id: string;
         edgeKind: string;
         fromSymbolId: string;
         toSymbolId: string | null;
         toQualifiedNameUnresolved: string | null;
-      }>;
+      }[];
     };
     for (const edge of parsed.edges) {
       const expected = deriveOpenSipEdgeId({
@@ -313,8 +313,8 @@ describe('renderCatalogJson — invariants', () => {
       gitSha: GIT_SHA,
     });
     const parsed = JSON.parse(json) as {
-      symbols: Array<{ repoId: string; gitSha: string }>;
-      edges: Array<{ repoId: string; gitSha: string }>;
+      symbols: { repoId: string; gitSha: string }[];
+      edges: { repoId: string; gitSha: string }[];
     };
     for (const sym of parsed.symbols) {
       expect(sym.repoId).toBe(REPO_ID);
@@ -429,14 +429,14 @@ describe('renderCatalogJson — dependency edges (Phase 4)', () => {
       gitSha: GIT_SHA,
     });
     const parsed = JSON.parse(json) as {
-      edges: Array<{
+      edges: {
         edgeKind: string;
         fromSymbolId: string;
         toSymbolId: string | null;
         toQualifiedNameUnresolved: string | null;
         sourceFile: string;
         sourceLine: number | null;
-      }>;
+      }[];
     };
     const dependsEdges = parsed.edges.filter((e) => e.edgeKind === 'depends_on');
     expect(dependsEdges).toHaveLength(2);
@@ -461,13 +461,13 @@ describe('renderCatalogJson — dependency edges (Phase 4)', () => {
       gitSha: GIT_SHA,
     });
     const parsed = JSON.parse(json) as {
-      edges: Array<{
+      edges: {
         id: string;
         edgeKind: string;
         fromSymbolId: string;
         toSymbolId: string | null;
         toQualifiedNameUnresolved: string | null;
-      }>;
+      }[];
     };
     for (const edge of parsed.edges.filter((e) => e.edgeKind === 'depends_on')) {
       const expected = deriveOpenSipEdgeId({
@@ -488,7 +488,7 @@ describe('renderCatalogJson — dependency edges (Phase 4)', () => {
       repoId: REPO_ID,
       gitSha: GIT_SHA,
     });
-    const parsed = JSON.parse(json) as { edges: Array<{ edgeKind: string }> };
+    const parsed = JSON.parse(json) as { edges: { edgeKind: string }[] };
     const dependsEdges = parsed.edges.filter((e) => e.edgeKind === 'depends_on');
     expect(dependsEdges).toHaveLength(0);
   });

@@ -26,6 +26,10 @@
  */
 
 
+import { relative, sep } from 'node:path';
+
+import ts from 'typescript';
+
 import { cacheKey as typescriptCacheKey } from './cache-key.js';
 import { discoverFiles as legacyDiscoverFiles } from './discover.js';
 import { resolveEdgesFromRecords } from './edges.js';
@@ -33,9 +37,7 @@ import { parseProject as parseTypescriptProject } from './parse.js';
 import { isTypescriptTestFile } from './test-file.js';
 import { walkProgram } from './walk.js';
 
-import { relative, sep } from 'node:path';
 
-import ts from 'typescript';
 
 import type { TypescriptParsedProject } from './parse.js';
 import type {
@@ -252,10 +254,10 @@ function resolveDependencies(
       specifier: site.specifier,
     };
     const existing = out.get(site.ownerHash);
-    if (existing !== undefined) {
-      existing.push(edge);
-    } else {
+    if (existing === undefined) {
       out.set(site.ownerHash, [edge]);
+    } else {
+      existing.push(edge);
     }
   }
   return out;

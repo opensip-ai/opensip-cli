@@ -70,7 +70,6 @@ function runAdapter(): { catalog: Catalog; dependenciesByOwner: ReadonlyMap<stri
   const parsed = typescriptGraphAdapter.parseProject({
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,
-    configPathAbs: discovery.configPathAbs,
     compilerOptions: discovery.compilerOptions,
   });
   const walked = typescriptGraphAdapter.walkProject({
@@ -120,9 +119,9 @@ describe('TypeScript adapter — depends_on emission (Phase 4)', () => {
 
     const greetDeps = dependenciesByOwner!.get(greetModuleInit!.bodyHash);
     expect(greetDeps, 'greet has dependency edges').toHaveLength(1);
-    expect(greetDeps![0]!.specifier).toBe('./format.js');
-    expect(greetDeps![0]!.to).toEqual([formatModuleInit!.bodyHash]);
-    expect(greetDeps![0]!.line).toBe(1);
+    expect(greetDeps![0].specifier).toBe('./format.js');
+    expect(greetDeps![0].to).toEqual([formatModuleInit!.bodyHash]);
+    expect(greetDeps![0].line).toBe(1);
   });
 
   it('emits an unresolved edge for external package imports', () => {
@@ -137,8 +136,8 @@ describe('TypeScript adapter — depends_on emission (Phase 4)', () => {
 
     const greetDeps = dependenciesByOwner!.get(greetModuleInit!.bodyHash);
     expect(greetDeps).toHaveLength(1);
-    expect(greetDeps![0]!.specifier).toBe('@opensip-tools/nonexistent-pkg');
-    expect(greetDeps![0]!.to).toEqual([]);
+    expect(greetDeps![0].specifier).toBe('@opensip-tools/nonexistent-pkg');
+    expect(greetDeps![0].to).toEqual([]);
   });
 
   it('preserves multiple imports as separate dependency edges', () => {
@@ -204,6 +203,6 @@ describe('TypeScript adapter — depends_on emission (Phase 4)', () => {
     const moduleInit = findModuleInit(catalog, 'src/multiline.ts');
     const deps = dependenciesByOwner!.get(moduleInit!.bodyHash);
     expect(deps).toHaveLength(1);
-    expect(deps![0]!.line).toBe(3);
+    expect(deps![0].line).toBe(3);
   });
 });

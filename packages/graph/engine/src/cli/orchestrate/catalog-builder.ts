@@ -232,7 +232,7 @@ function attachDependenciesIncremental(
   for (const [name, occs] of Object.entries(functions)) {
     out[name] = occs.map((o) => {
       const deps = dependenciesByOwner.get(o.bodyHash);
-      return deps !== undefined ? { ...o, dependencies: deps } : o;
+      return deps === undefined ? o : { ...o, dependencies: deps };
     });
   }
   return out;
@@ -293,9 +293,9 @@ function stitchEdges(
       // Omit `dependencies` entirely when no edges resolved — the
       // optional field stays absent, matching the pre-Phase-4 wire
       // shape for adapters that don't emit dependency sites.
-      return dependencies !== undefined
-        ? { ...o, calls, dependencies }
-        : { ...o, calls };
+      return dependencies === undefined
+        ? { ...o, calls }
+        : { ...o, calls, dependencies };
     });
   }
   return { ...initial, functions: next };

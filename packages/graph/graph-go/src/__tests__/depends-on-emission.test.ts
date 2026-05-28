@@ -109,9 +109,9 @@ describe('Go adapter — depends_on emission (Phase 4)', () => {
 
     const mainDeps = dependenciesByOwner!.get(mainInit!.bodyHash);
     expect(mainDeps, 'main has dependency edges').toHaveLength(1);
-    expect(mainDeps![0]!.specifier).toBe('github.com/example/myproj/pkg/foo');
-    expect(mainDeps![0]!.to).toEqual([fooInit!.bodyHash]);
-    expect(mainDeps![0]!.line).toBe(3);
+    expect(mainDeps![0].specifier).toBe('github.com/example/myproj/pkg/foo');
+    expect(mainDeps![0].to).toEqual([fooInit!.bodyHash]);
+    expect(mainDeps![0].line).toBe(3);
   });
 
   it('resolves an internal import targeting a multi-file package to all members', () => {
@@ -134,8 +134,8 @@ describe('Go adapter — depends_on emission (Phase 4)', () => {
 
     const mainDeps = dependenciesByOwner!.get(mainInit!.bodyHash);
     expect(mainDeps).toHaveLength(1);
-    expect(mainDeps![0]!.specifier).toBe('github.com/example/myproj/pkg/foo');
-    const targets = [...mainDeps![0]!.to].sort();
+    expect(mainDeps![0].specifier).toBe('github.com/example/myproj/pkg/foo');
+    const targets = [...mainDeps![0].to].sort();
     const expected = [fooInit!.bodyHash, helpersInit!.bodyHash].sort();
     expect(targets).toEqual(expected);
   });
@@ -153,8 +153,8 @@ describe('Go adapter — depends_on emission (Phase 4)', () => {
 
     const deps = dependenciesByOwner!.get(mainInit!.bodyHash);
     expect(deps).toHaveLength(1);
-    expect(deps![0]!.specifier).toBe('fmt');
-    expect(deps![0]!.to).toEqual([]);
+    expect(deps![0].specifier).toBe('fmt');
+    expect(deps![0].to).toEqual([]);
   });
 
   it('emits unresolved edges for third-party external imports', () => {
@@ -170,8 +170,8 @@ describe('Go adapter — depends_on emission (Phase 4)', () => {
 
     const deps = dependenciesByOwner!.get(mainInit!.bodyHash);
     expect(deps).toHaveLength(1);
-    expect(deps![0]!.specifier).toBe('github.com/external/somelib');
-    expect(deps![0]!.to).toEqual([]);
+    expect(deps![0].specifier).toBe('github.com/external/somelib');
+    expect(deps![0].to).toEqual([]);
   });
 
   it('handles grouped imports — emits one dep site per import_spec', () => {
@@ -235,8 +235,8 @@ describe('Go adapter — depends_on emission (Phase 4)', () => {
 
     const deps = dependenciesByOwner!.get(mainInit!.bodyHash);
     expect(deps).toHaveLength(1);
-    expect(deps![0]!.specifier).toBe('github.com/example/myproj/pkg/foo');
-    expect(deps![0]!.to).toEqual([fooInit!.bodyHash]);
+    expect(deps![0].specifier).toBe('github.com/example/myproj/pkg/foo');
+    expect(deps![0].to).toEqual([fooInit!.bodyHash]);
   });
 
   it('emits dependency edges for blank imports (`_ "path"`) like any other', () => {
@@ -256,8 +256,8 @@ describe('Go adapter — depends_on emission (Phase 4)', () => {
 
     const deps = dependenciesByOwner!.get(mainInit!.bodyHash);
     expect(deps).toHaveLength(1);
-    expect(deps![0]!.specifier).toBe('github.com/example/myproj/pkg/sideeffect');
-    expect(deps![0]!.to).toEqual([sideInit!.bodyHash]);
+    expect(deps![0].specifier).toBe('github.com/example/myproj/pkg/sideeffect');
+    expect(deps![0].to).toEqual([sideInit!.bodyHash]);
   });
 
   it('produces no dependency edges for a file with no imports', () => {
@@ -287,7 +287,7 @@ describe('Go adapter — depends_on emission (Phase 4)', () => {
 
     const deps = dependenciesByOwner!.get(mainInit!.bodyHash);
     expect(deps).toHaveLength(1);
-    expect(deps![0]!.specifier).toBe('github.com/example/myproj/pkg/foo');
-    expect(deps![0]!.to).toEqual([]);
+    expect(deps![0].specifier).toBe('github.com/example/myproj/pkg/foo');
+    expect(deps![0].to).toEqual([]);
   });
 });

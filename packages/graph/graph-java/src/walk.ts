@@ -223,7 +223,7 @@ function decodeImportSpecifier(decl: Parser.SyntaxNode): string | null {
   let isStatic = false;
   for (let i = 0; i < decl.childCount; i++) {
     const c = decl.child(i);
-    if (c && c.type === 'static') {
+    if (c?.type === 'static') {
       isStatic = true;
       break;
     }

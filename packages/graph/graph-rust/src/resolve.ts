@@ -120,9 +120,9 @@ export function resolveCallSites(input: ResolveInput<RustParsedProject>): Resolv
       ? resolveDependencies(input.dependencySites, input.catalog, input.projectDirAbs)
       : undefined;
 
-  return dependenciesByOwner !== undefined
-    ? { edgesByOwner, dependenciesByOwner, stats: finalStats }
-    : { edgesByOwner, stats: finalStats };
+  return dependenciesByOwner === undefined
+    ? { edgesByOwner, stats: finalStats }
+    : { edgesByOwner, dependenciesByOwner, stats: finalStats };
 }
 
 /**
@@ -184,7 +184,7 @@ function resolveDependencies(
   for (const site of sites) {
     const importerFilePath = filePathOfOwner(catalog, site.ownerHash);
     const importerModulePath =
-      importerFilePath !== null ? (modulePathByFilePath.get(importerFilePath) ?? null) : null;
+      importerFilePath === null ? null : (modulePathByFilePath.get(importerFilePath) ?? null);
     const to = resolveRustUseSpecifier(
       site.specifier,
       packageName,
@@ -198,8 +198,8 @@ function resolveDependencies(
       specifier: site.specifier,
     };
     const existing = out.get(site.ownerHash);
-    if (existing !== undefined) existing.push(edge);
-    else out.set(site.ownerHash, [edge]);
+    if (existing === undefined) {out.set(site.ownerHash, [edge]);}
+    else {existing.push(edge);}
   }
   return out;
 }
@@ -284,7 +284,7 @@ function filePathToRustModulePath(filePath: string): string | null {
   const noExt = rel.slice(0, -'.rs'.length);
   // Treat `…/mod` (from `…/mod.rs`) as the parent directory itself.
   const segments = noExt.split('/');
-  if (segments[segments.length - 1] === 'mod') segments.pop();
+  if (segments.at(-1) === 'mod') segments.pop();
   if (segments.length === 0) return 'crate';
   return ['crate', ...segments].join('::');
 }
@@ -370,7 +370,7 @@ function lookupRustModule(
   segments: readonly string[],
   moduleInitByModulePath: ReadonlyMap<string, string>,
 ): readonly string[] {
-  let cur = [...segments];
+  const cur = [...segments];
   while (cur.length > 0) {
     const key = cur.join('::');
     const hash = moduleInitByModulePath.get(key);
