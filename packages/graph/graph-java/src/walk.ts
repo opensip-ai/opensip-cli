@@ -58,6 +58,7 @@ import { relative, sep } from 'node:path';
 import type { JavaParsedFile, JavaParsedProject } from './parse.js';
 import type {
   CallSiteRecord,
+  DependencySiteRecord,
   FunctionOccurrence,
   ParseError,
   WalkInput,
@@ -92,6 +93,7 @@ export function walkProject(input: WalkInput<JavaParsedProject>): WalkOutput {
     FunctionOccurrence[]
   >;
   const callSites: CallSiteRecord[] = [];
+  const dependencySites: DependencySiteRecord[] = [];
   const parseErrors: ParseError[] = [];
 
   const sortedPaths = [...input.files].filter((p) => input.project.files.has(p)).sort();
@@ -100,7 +102,7 @@ export function walkProject(input: WalkInput<JavaParsedProject>): WalkOutput {
     const file = input.project.files.get(path);
     if (!file) continue;
     try {
-      walkFile(path, file, input.projectDirAbs, occurrences, callSites);
+      walkFile(path, file, input.projectDirAbs, occurrences, callSites, dependencySites);
     } catch (error) {
       parseErrors.push({
         filePath: relative(input.projectDirAbs, path),
@@ -109,7 +111,7 @@ export function walkProject(input: WalkInput<JavaParsedProject>): WalkOutput {
     }
   }
 
-  return { occurrences, callSites, parseErrors };
+  return { occurrences, callSites, dependencySites, parseErrors };
 }
 
 function walkFile(
@@ -118,6 +120,7 @@ function walkFile(
   projectDirAbs: string,
   out: Record<string, FunctionOccurrence[]>,
   callSites: CallSiteRecord[],
+  dependencySites: DependencySiteRecord[],
 ): void {
   const filePathProjectRel = relative(projectDirAbs, absPath).split(sep).join('/');
   const inTestFile = isTestFile(filePathProjectRel);
@@ -133,6 +136,12 @@ function walkFile(
   );
   record(out, moduleInit);
 
+  // Phase 4 (DEC-498): walk top-level `import` declarations as dependency
+  // sites. Owner is the file's synthesized module-init occurrence.
+  // Implicit `java.lang.*` and same-package imports are NOT synthesized —
+  // only explicit `import_declaration` nodes are emitted.
+  collectDependencySites(file, moduleInit.bodyHash, dependencySites);
+
   const ctx: WalkCtx = {
     file,
     filePathProjectRel,
@@ -145,6 +154,94 @@ function walkFile(
   const initialFrame: Frame = { ownerHash: moduleInit.bodyHash, enclosingClass: null };
 
   for (const child of file.tree.rootNode.children) visit(child, initialFrame, ctx);
+}
+
+/**
+ * Walk a Java file's top-level `import_declaration` nodes; emit one
+ * `DependencySiteRecord` per import statement. Phase 4 of opensip's
+ * substrate consolidation (DEC-498).
+ *
+ * Tree-sitter-java's `import_declaration` shape (from probe):
+ *
+ *   - Type import — `import com.example.foo.Bar;`
+ *       children: ['import' kw, scoped_identifier 'com.example.foo.Bar', ';']
+ *       specifier: `'com.example.foo.Bar'`
+ *
+ *   - Wildcard — `import com.example.foo.*;`
+ *       children: ['import' kw, scoped_identifier 'com.example.foo',
+ *                  '.' anon, asterisk '*', ';']
+ *       specifier: `'com.example.foo.*'`
+ *
+ *   - Static type — `import static com.example.foo.Bar.method;`
+ *       children: ['import' kw, 'static' kw, scoped_identifier
+ *                  'com.example.foo.Bar.method', ';']
+ *       specifier: `'static com.example.foo.Bar.method'`
+ *
+ *   - Static wildcard — `import static com.example.foo.Bar.*;`
+ *       children: ['import' kw, 'static' kw, scoped_identifier
+ *                  'com.example.foo.Bar', '.' anon, asterisk '*', ';']
+ *       specifier: `'static com.example.foo.Bar.*'`
+ *
+ * We detect `static` by scanning the anonymous (non-named) children for
+ * a token whose type is `'static'`, and detect the wildcard by checking
+ * for a named `asterisk` child. The dotted path is the single named
+ * `scoped_identifier` (or bare `identifier` in the degenerate
+ * `import Foo;` default-package case) child.
+ *
+ * Out of scope at v1:
+ *   - `module-info.java` `requires` directives (Java 9+ Java Platform
+ *     Module System) — declarative module deps live there, not here.
+ *   - Implicit `java.lang.*` imports — every Java file imports these,
+ *     but we don't synthesize edges for non-explicit imports.
+ *   - Implicit same-package visibility — Java doesn't require imports
+ *     for sibling types in the same package; we likewise don't
+ *     synthesize them.
+ */
+function collectDependencySites(
+  file: JavaParsedFile,
+  moduleInitHash: string,
+  out: DependencySiteRecord[],
+): void {
+  for (const stmt of file.tree.rootNode.namedChildren) {
+    if (stmt.type !== 'import_declaration') continue;
+    const specifier = decodeImportSpecifier(stmt);
+    if (specifier === null) continue;
+    out.push({
+      nodeRef: stmt,
+      sourceFileRef: file,
+      ownerHash: moduleInitHash,
+      specifier,
+      line: stmt.startPosition.row + 1,
+      column: stmt.startPosition.column,
+    });
+  }
+}
+
+function decodeImportSpecifier(decl: Parser.SyntaxNode): string | null {
+  // `static` is an anonymous keyword child; scan all children (named +
+  // anonymous) for it.
+  let isStatic = false;
+  for (let i = 0; i < decl.childCount; i++) {
+    const c = decl.child(i);
+    if (c && c.type === 'static') {
+      isStatic = true;
+      break;
+    }
+  }
+  // Named children hold the path (scoped_identifier or identifier) and
+  // the optional `asterisk` wildcard. Scan in order.
+  let path: string | null = null;
+  let wildcard = false;
+  for (const c of decl.namedChildren) {
+    if (c.type === 'scoped_identifier' || c.type === 'identifier') {
+      path = c.text;
+    } else if (c.type === 'asterisk') {
+      wildcard = true;
+    }
+  }
+  if (path === null) /* v8 ignore next */ return null;
+  const tail = wildcard ? `${path}.*` : path;
+  return isStatic ? `static ${tail}` : tail;
 }
 
 interface Frame {
