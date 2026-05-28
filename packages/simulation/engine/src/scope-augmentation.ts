@@ -1,8 +1,9 @@
 /**
  * @fileoverview RunScope augmentation for simulation.
  *
- * D7 (see docs/plans/ready/architecture-runscope-and-registry/phase-0-audit-and-design.md):
- * tool-specific concerns nest under the tool's name on `RunScope` and
+ * D7 (tool subscopes via module augmentation, per the RunScope/
+ * Registry architecture): tool-specific concerns nest under the
+ * tool's name on `RunScope` and
  * are added via TypeScript module augmentation from the tool's own
  * package. Core never imports simulation-shaped types — the layer rule
  * stays intact (`core ← contracts ← {simulation, ...}`).

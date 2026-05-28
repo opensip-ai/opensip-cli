@@ -30,6 +30,9 @@ const ERROR_PROPAGATION_PATTERNS = [
   /return\s+undefined/, // Signal failure to caller via sentinel return
   /\.errors\.push\(/, // Error aggregation pattern — error is collected for batch reporting
   /\.push\(\s*`/, // Template literal push to errors array
+  // CLI dispatcher pattern: tools set a non-success exit code on the
+  // shared context instead of calling process.exit() directly.
+  /setExitCode\s*\([^)]*(?:ERROR|FAILURE|FAIL)\b/,
 ]
 
 /**

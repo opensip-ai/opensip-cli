@@ -2,7 +2,7 @@
  * @fileoverview Cross-kind scenario registry — per-RunScope.
  *
  * Each `RunScope` owns its own `Registry<RunnableScenario>` (Item 1 /
- * D7 — see docs/plans/ready/architecture-runscope-and-registry/item-1-tool-subscopes.md).
+ * D7 — tool subscopes via module augmentation).
  * The simulation tool's `extendScope` hook constructs a fresh registry
  * per CLI invocation and attaches it to `scope.simulation.scenarios`.
  *

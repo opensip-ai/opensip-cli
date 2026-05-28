@@ -84,7 +84,6 @@ export interface GraphCommandOptions {
   /**
    * Optional --package <name|path> scope. When set, the run targets a
    * single workspace package's tsconfig instead of the whole project.
-   * See docs/plans/graph-performance-improvements.md Phase 6.
    */
   readonly packageScope?: string;
   /**
@@ -249,8 +248,7 @@ function renderGraphResult(
  * `graph --packages` — fan a graph run out across every workspace
  * package under <cwd>/packages/** and aggregate the findings. Each
  * package runs in its own child process; per-package memory ceiling
- * scales naturally. See docs/plans/graph-performance-improvements.md
- * Wave 3.
+ * scales naturally.
  */
 async function executePackagesGraph(
   opts: GraphCommandOptions,

@@ -1,4 +1,5 @@
 // @fitness-ignore-file error-handling-quality -- this module IS the logger; its own write/prune failures cannot be reported via itself without infinite recursion. Best-effort swallow is the documented contract on lines 273/281/297/302.
+// @fitness-ignore-file interface-implementation-consistency -- LoggerImpl deliberately exposes configuration methods (applyOptions/setSilent/setDebugMode/setRunId/getRunId/setRunIdProvider/initLogFile) that are not on the public `Logger` interface. The interface is the narrow log-emission seam used by call sites; the impl's wider surface is the bootstrap/test configuration surface (see JSDoc on LoggerImpl).
 /**
  * Structured logger for opensip-tools.
  *

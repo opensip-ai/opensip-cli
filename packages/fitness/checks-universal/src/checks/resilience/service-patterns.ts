@@ -3,7 +3,7 @@
  */
 
 import { logger } from '@opensip-tools/core/logger'
-import { defineCheck, type CheckViolation, getLineNumber } from '@opensip-tools/fitness'
+import { defineCheck, isTestFile, type CheckViolation, getLineNumber } from '@opensip-tools/fitness'
 
 // =============================================================================
 // PRE-COMPILED REGEX PATTERNS (Safe for static code analysis)
@@ -231,6 +231,11 @@ export const rateLimitingCoverage = defineCheck({
 
   analyze(content: string, filePath: string): CheckViolation[] {
     const violations: CheckViolation[] = []
+
+    // Test files routinely embed endpoint shapes inline as fixtures
+    // for this very check; production rate-limiting is the contract,
+    // not test scaffolding.
+    if (isTestFile(filePath)) return violations
 
     if (!hasApiEndpoints(content)) {
       return violations

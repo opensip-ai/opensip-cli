@@ -173,9 +173,8 @@ export interface ParseError {
  * The catalog: functions keyed by simple name. Multiple occurrences
  * per name.
  *
- * v3 — generic over language. PR 3 of plan
- * docs/plans/10-graph-language-pluggability.md replaced the v2
- * fields `tsConfigPath` and `tsCompilerVersion` with adapter-supplied
+ * v3 — generic over language. The language-pluggability work replaced
+ * the v2 fields `tsConfigPath` and `tsCompilerVersion` with adapter-supplied
  * `language` (the registered adapter id) and `cacheKey` (an opaque
  * per-adapter invalidation key). v2 catalogs on disk return
  * `{ kind: 'invalid', reason: 'version-mismatch' }` from
@@ -272,8 +271,8 @@ export interface ResolverVerdict {
  * threading hints through. Rules that don't need hints can ignore it;
  * rules that do consult hints MUST also implement a TypeScript-shaped
  * fallback so the rule degrades gracefully when an adapter does not
- * supply the relevant hint (per
- * docs/public/40-graph/02-rules-and-gating.md).
+ * supply the relevant hint (per the graph rules-and-gating fidelity
+ * matrix).
  */
 export interface Rule {
   /** Rule slug, e.g. "graph:orphan-subtree". Must start with "graph:". */

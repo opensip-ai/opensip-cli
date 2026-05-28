@@ -46,6 +46,6 @@
     "@opensip-tools/lang-typescript": "workspace:*",
     "@types/node": "^22.0.0",
     "@types/react": "^18.3.28",
-    "vitest": "^2.1.0"
+    "vitest": "^2.1.9"
   }
 }

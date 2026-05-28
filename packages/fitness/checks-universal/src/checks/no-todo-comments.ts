@@ -8,7 +8,7 @@
  * dispatches through the registered LanguageAdapter, so this check
  * works for any language whose adapter implements stripStrings.
  */
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
 
 // HACK is intentionally excluded — `no-temporary-workarounds` owns HACK
 // (with qualifier needles like "temporary"/"workaround"). Including HACK
@@ -47,8 +47,18 @@ export const noTodoComments = defineCheck({
   description: 'TODO/FIXME/XXX/OPTIMIZE markers should not ship to production',
   scope: { languages: [], concerns: [] },
   tags: ['quality', 'documentation'],
+  // Restrict to source files. Markdown files legitimately discuss TODO
+  // markers (CONTRIBUTING examples, docs about the check itself); the
+  // marker hygiene rule only applies to executable code.
+  fileTypes: ['ts', 'tsx', 'js', 'jsx', 'mjs', 'cjs', 'py', 'go', 'java', 'rs', 'c', 'cc', 'cpp', 'h', 'hpp'],
   // Use 'strip-strings' so the check sees comments but not string-literal
   // text. A literal value containing the word "TODO" is not a comment.
   contentFilter: 'strip-strings',
-  analyze: (content) => analyzeTodoComments(content),
+  analyze: (content, filePath) => {
+    // Test files routinely contain TODO/FIXME markers as fixture content
+    // or pedagogical examples (e.g. test cases for this very check).
+    // The production-code hygiene rule does not apply to tests.
+    if (isTestFile(filePath)) return []
+    return analyzeTodoComments(content)
+  },
 })

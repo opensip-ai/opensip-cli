@@ -98,6 +98,28 @@ const DOMAIN_SPECIFIC_FUNCTIONS = new Set([
   'validateSchema',
   // Common error-message helper
   'getErrorMessage',
+  // Display-helper wrappers (each check pack closes over its own CHECK_DISPLAY)
+  'getCheckIcon',
+  'getCheckDisplayName',
+  // AST predicates / shared kernel helpers — each layer (engine, lang adapter,
+  // graph adapter) legitimately defines its own implementation tuned to its
+  // node shape; the architecture rules prevent cross-layer imports.
+  'isPropertyAccess',
+  'isFunctionLike',
+  'getSharedSourceFile',
+  'getLineNumber',
+  'isReturnValueDiscarded',
+  // Plugin / package discovery (mirrored in fitness + simulation discovery walkers)
+  'hasPackageJson',
+  // Language-adapter parsers and dir normalizers — one per graph-* pack
+  // (graph-go, graph-java, graph-python, graph-rust, graph-typescript) by
+  // design; cross-pack imports are forbidden by .dependency-cruiser.cjs.
+  'normalizeProjectDir',
+  'parseProject',
+  // Tokenizer helper present in several language-adapter strip-comment passes
+  'isIdentChar',
+  // Assertion validation — fitness engine + simulation engine each own one
+  'validateAssertions',
 ])
 
 /**

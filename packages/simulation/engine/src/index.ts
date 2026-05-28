@@ -1,4 +1,5 @@
 // @fitness-ignore-file no-deprecated-tags -- LegacyLoadResultPayload is the active payload type produced by ScenarioResultBuilder and consumed by load's CustomExecuteFn; the @deprecated tag in the re-export below is a steering hint, not a removal trigger.
+// @fitness-ignore-file module-coupling-fan-out -- Package barrel by design: re-exports the public surface of every kind module; fan-out is the whole job of this file
 /**
  * @opensip-tools/simulation — Simulation scenarios for codebase analysis.
  *

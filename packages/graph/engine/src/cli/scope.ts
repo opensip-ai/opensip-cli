@@ -2,8 +2,7 @@
 /**
  * Scope resolution for `graph --package <name|path>`.
  *
- * Per docs/plans/graph-performance-improvements.md Phase 6: a flag that
- * narrows the run to a single workspace package's tsconfig. Cross-
+ * Narrows the run to a single workspace package's tsconfig. Cross-
  * package call sites become unresolved (lower fidelity, much faster).
  *
  * Resolution rules — in order:
