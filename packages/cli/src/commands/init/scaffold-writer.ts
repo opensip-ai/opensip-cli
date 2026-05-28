@@ -33,6 +33,7 @@ function ensureGitignore(cwd: string): boolean {
   }
 
   const content = readFileSync(path, 'utf8');
+  // @fitness-ignore-next-line silent-early-returns -- idempotent "did I modify?" return: boolean IS the function's contract (caller dispatches on "already present" vs "I appended")
   if (content.split('\n').some((line) => line.trim() === GITIGNORE_LINE)) {
     return false; // already present, idempotent
   }

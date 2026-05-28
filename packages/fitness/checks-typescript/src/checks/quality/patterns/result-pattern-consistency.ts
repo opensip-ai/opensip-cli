@@ -27,7 +27,15 @@ const EXPECTED_ERROR_TYPES = [
 ]
 
 /**
- * Function name patterns where throwing is legitimate (validation/guard helpers)
+ * Function name patterns where throwing is legitimate (validation/guard helpers
+ * + infrastructure-boundary factories, resolvers, loaders, parsers, mappers).
+ *
+ * Factory/resolver/loader helpers (`defineX`, `resolveX`, `loadX`, `parseX`,
+ * `mapXTo…`) are startup-time configuration entry points: a malformed input
+ * is a programmer error caught once at boot rather than a recoverable
+ * business-logic failure, so they throw eagerly. Forcing them to return
+ * `Result` would push a startup-error branch into every call site — a
+ * usability regression, not consistency.
  */
 const LEGITIMATE_THROW_FUNCTION_PATTERNS = [
   /^validate[A-Z]/,
@@ -37,6 +45,11 @@ const LEGITIMATE_THROW_FUNCTION_PATTERNS = [
   /^check[A-Z]/,
   /^verify[A-Z]/,
   /^must[A-Z]/,
+  /^define[A-Z]/,
+  /^resolve[A-Z]/,
+  /^load[A-Z]/,
+  /^parse[A-Z]/,
+  /^map[A-Z]\w*To[A-Z]/,
   /Guard$/,
   /Validator$/,
   /Assertion$/,
@@ -359,7 +372,14 @@ export const resultPatternConsistency = defineCheck({
       if (!ts.isFunctionDeclaration(node) && !ts.isMethodDeclaration(node)) return
 
       const returnType = node.type?.getText(sourceFile)
-      if (!returnType?.includes('Result')) return
+      // Require the canonical generic form `Result<…>` (also matches
+      // `Promise<Result<…>>`). A bare substring match for "Result"
+      // misclassifies domain types like `GateCompareResult`, `AnalyzeResult`,
+      // or `ParseResult` as Result-returning and produces false positives
+      // wherever such a function throws on a legitimate infrastructure
+      // boundary. Word-boundary + `<` preserves the intent without matching
+      // unrelated trailing-token names.
+      if (!returnType || !/\bResult\s*</.test(returnType)) return
 
       /* v8 ignore next -- defensive nullish fallback */
       const bodyText = node.body?.getText(sourceFile) ?? ''

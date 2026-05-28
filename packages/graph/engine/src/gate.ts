@@ -32,6 +32,7 @@ export function compareToBaseline(
   repo: GraphBaselineRepo,
 ): GateCompareResult {
   if (!repo.exists()) {
+    // @fitness-ignore-next-line result-pattern-consistency -- infrastructure boundary (graph gate, called only from `cli/graph.ts` and surfaced as an exit code); throw is appropriate per established pattern in targets/loader.ts and signalers/loader.ts.
     throw new ValidationError('Graph baseline not found. Run with --gate-save first.');
   }
   const baselineSet = new Set(repo.loadFingerprints());
