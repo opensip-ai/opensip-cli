@@ -164,9 +164,27 @@ function resolveDependencies(
   projectDirAbs: string,
 ): ReadonlyMap<string, readonly DependencyEdge[]> {
   const packageName = readCargoPackageName(projectDirAbs);
+  const { moduleInitByModulePath, modulePathByFilePath } = buildCrateModuleIndex(catalog);
 
-  // Build module-path → bodyHash map AND the inverse filePath → module
-  // path so we can rewrite `super::` / `self::` relative to the importer.
+  const out = new Map<string, DependencyEdge[]>();
+  for (const site of sites) {
+    const importerModulePath = lookupImporterModulePath(catalog, modulePathByFilePath, site.ownerHash);
+    const edge = buildDependencyEdge(site, packageName, importerModulePath, moduleInitByModulePath);
+    appendDependencyEdge(out, site.ownerHash, edge);
+  }
+  return out;
+}
+
+/**
+ * Walk the catalog once to derive the two indices used during `use`-path
+ * resolution: `modulePath → moduleInit bodyHash` (for forward lookup) and
+ * `filePath → modulePath` (used to rewrite `super::` / `self::` paths
+ * relative to the importer's own module).
+ */
+function buildCrateModuleIndex(catalog: Catalog): {
+  readonly moduleInitByModulePath: ReadonlyMap<string, string>;
+  readonly modulePathByFilePath: ReadonlyMap<string, string>;
+} {
   const moduleInitByModulePath = new Map<string, string>();
   const modulePathByFilePath = new Map<string, string>();
   for (const occs of Object.values(catalog.functions)) {
@@ -179,29 +197,57 @@ function resolveDependencies(
       modulePathByFilePath.set(o.filePath, modulePath);
     }
   }
+  return { moduleInitByModulePath, modulePathByFilePath };
+}
 
-  const out = new Map<string, DependencyEdge[]>();
-  for (const site of sites) {
-    const importerFilePath = filePathOfOwner(catalog, site.ownerHash);
-    const importerModulePath =
-      importerFilePath === null ? null : (modulePathByFilePath.get(importerFilePath) ?? null);
-    const to = resolveRustUseSpecifier(
-      site.specifier,
-      packageName,
-      importerModulePath,
-      moduleInitByModulePath,
-    );
-    const edge: DependencyEdge = {
-      to,
-      line: site.line,
-      column: site.column,
-      specifier: site.specifier,
-    };
-    const existing = out.get(site.ownerHash);
-    if (existing === undefined) {out.set(site.ownerHash, [edge]);}
-    else {existing.push(edge);}
+/**
+ * Resolve the importer's module path (e.g. `crate::foo::bar`) from its
+ * `ownerHash`. Returns `null` when the owner isn't a recognizable crate
+ * module — `super::` / `self::` rewriting is then impossible.
+ */
+function lookupImporterModulePath(
+  catalog: Catalog,
+  modulePathByFilePath: ReadonlyMap<string, string>,
+  ownerHash: string,
+): string | null {
+  const importerFilePath = filePathOfOwner(catalog, ownerHash);
+  if (importerFilePath === null) return null;
+  return modulePathByFilePath.get(importerFilePath) ?? null;
+}
+
+/** Build a single `DependencyEdge` for one dependency site. */
+function buildDependencyEdge(
+  site: DependencySiteRecord,
+  packageName: string | null,
+  importerModulePath: string | null,
+  moduleInitByModulePath: ReadonlyMap<string, string>,
+): DependencyEdge {
+  const to = resolveRustUseSpecifier(
+    site.specifier,
+    packageName,
+    importerModulePath,
+    moduleInitByModulePath,
+  );
+  return {
+    to,
+    line: site.line,
+    column: site.column,
+    specifier: site.specifier,
+  };
+}
+
+/** Append a dependency edge to the per-owner bucket, creating the bucket on first write. */
+function appendDependencyEdge(
+  out: Map<string, DependencyEdge[]>,
+  ownerHash: string,
+  edge: DependencyEdge,
+): void {
+  const existing = out.get(ownerHash);
+  if (existing === undefined) {
+    out.set(ownerHash, [edge]);
+    return;
   }
-  return out;
+  existing.push(edge);
 }
 
 /**

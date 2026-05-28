@@ -175,18 +175,31 @@ function buildJavaFQNIndex(catalog: Catalog): {
   for (const occs of Object.values(catalog.functions)) {
     if (!occs) continue;
     for (const o of occs) {
-      if (o.kind !== 'module-init') continue;
-      const fqn = filePathToJavaTypeFQN(o.filePath);
-      if (fqn === null) continue;
-      typeFQN.set(fqn, o.bodyHash);
-      const lastDot = fqn.lastIndexOf('.');
-      const pkg = lastDot === -1 ? '' : fqn.slice(0, lastDot);
-      const bucket = packageFQN.get(pkg);
-      if (bucket === undefined) {packageFQN.set(pkg, [o.bodyHash]);}
-      else {bucket.push(o.bodyHash);}
+      indexModuleInitOccurrence(o, typeFQN, packageFQN);
     }
   }
   return { typeFQN, packageFQN };
+}
+
+/**
+ * Index a single catalog occurrence into the FQN maps. No-op for any
+ * occurrence that isn't a `module-init` or whose filePath doesn't
+ * resolve to a Java type FQN.
+ */
+function indexModuleInitOccurrence(
+  o: FunctionOccurrence,
+  typeFQN: Map<string, string>,
+  packageFQN: Map<string, string[]>,
+): void {
+  if (o.kind !== 'module-init') return;
+  const fqn = filePathToJavaTypeFQN(o.filePath);
+  if (fqn === null) return;
+  typeFQN.set(fqn, o.bodyHash);
+  const lastDot = fqn.lastIndexOf('.');
+  const pkg = lastDot === -1 ? '' : fqn.slice(0, lastDot);
+  const bucket = packageFQN.get(pkg);
+  if (bucket === undefined) packageFQN.set(pkg, [o.bodyHash]);
+  else bucket.push(o.bodyHash);
 }
 
 /**
@@ -235,55 +248,76 @@ function resolveJavaImportSpecifier(
   typeFQN: ReadonlyMap<string, string>,
   packageFQN: ReadonlyMap<string, readonly string[]>,
 ): readonly string[] {
-  let raw = specifier;
-  let isStatic = false;
-  if (raw.startsWith('static ')) {
-    isStatic = true;
-    raw = raw.slice('static '.length);
-  }
+  const { raw, isStatic } = parseStaticPrefix(specifier);
 
   // Stdlib short-circuit. These never reside in a project catalog.
-  if (raw.startsWith('java.') || raw.startsWith('javax.') || raw.startsWith('jakarta.')) {
-    return [];
-  }
+  if (isJavaStdlibSpecifier(raw)) return [];
 
-  // Wildcard: `<pkg>.*` (non-static) → all types in the package.
-  //           `<type>.*` (static)    → all static members of the type
-  //                                     → resolve to that type.
   if (raw.endsWith('.*')) {
-    const head = raw.slice(0, -'.*'.length);
-    if (isStatic) {
-      // Static wildcard targets a TYPE's static members.
-      const hash = typeFQN.get(head);
-      return hash === undefined ? [] : [hash];
-    }
-    // Plain wildcard targets a PACKAGE.
-    const bucket = packageFQN.get(head);
-    return bucket === undefined ? [] : [...bucket];
+    return resolveWildcardImport(raw.slice(0, -'.*'.length), isStatic, typeFQN, packageFQN);
   }
+  return resolveSingleTargetImport(raw, isStatic, typeFQN);
+}
 
+/** Strip a leading `static ` keyword, returning the remainder and the flag. */
+function parseStaticPrefix(specifier: string): { readonly raw: string; readonly isStatic: boolean } {
+  if (specifier.startsWith('static ')) {
+    return { raw: specifier.slice('static '.length), isStatic: true };
+  }
+  return { raw: specifier, isStatic: false };
+}
+
+function isJavaStdlibSpecifier(raw: string): boolean {
+  return raw.startsWith('java.') || raw.startsWith('javax.') || raw.startsWith('jakarta.');
+}
+
+/**
+ * Wildcard imports come in two flavors:
+ *   - `<pkg>.*` (non-static) → all types in the package.
+ *   - `<type>.*` (static)    → all static members of the type, which
+ *                              resolves to that type's module-init.
+ */
+function resolveWildcardImport(
+  head: string,
+  isStatic: boolean,
+  typeFQN: ReadonlyMap<string, string>,
+  packageFQN: ReadonlyMap<string, readonly string[]>,
+): readonly string[] {
   if (isStatic) {
-    // `static com.foo.Bar.method` — strip the trailing member to get
-    // the owning type's FQN.
+    const hash = typeFQN.get(head);
+    return hash === undefined ? [] : [hash];
+  }
+  const bucket = packageFQN.get(head);
+  return bucket === undefined ? [] : [...bucket];
+}
+
+/**
+ * Non-wildcard imports target exactly one type's module-init.
+ *
+ *   - Static (`static com.foo.Bar.method`) — strip the trailing member
+ *     identifier; the remainder is the owning type's FQN.
+ *   - Plain (`com.foo.Bar`) — direct FQN lookup, with a one-level
+ *     inner-class fallback for `Outer.Inner`-shaped imports (a
+ *     heuristic, since `Outer.Inner` and `package.Type` are
+ *     structurally indistinguishable without declaring-file resolution).
+ */
+function resolveSingleTargetImport(
+  raw: string,
+  isStatic: boolean,
+  typeFQN: ReadonlyMap<string, string>,
+): readonly string[] {
+  if (isStatic) {
     const lastDot = raw.lastIndexOf('.');
     if (lastDot === -1) return [];
-    const typeFqn = raw.slice(0, lastDot);
-    const hash = typeFQN.get(typeFqn);
+    const hash = typeFQN.get(raw.slice(0, lastDot));
     return hash === undefined ? [] : [hash];
   }
 
-  // Plain type import. Direct lookup; on miss, fall back to treating
-  // the trailing segment as an inner-class name (one level only — for
-  // multiply-nested inner classes the lookup will still miss). This is
-  // a heuristic: Java's `Outer.Inner` import is structurally
-  // indistinguishable from `package.Type` without resolving the type's
-  // declaring file.
   const direct = typeFQN.get(raw);
   if (direct !== undefined) return [direct];
   const lastDot = raw.lastIndexOf('.');
   if (lastDot === -1) return [];
-  const outerFqn = raw.slice(0, lastDot);
-  const outer = typeFQN.get(outerFqn);
+  const outer = typeFQN.get(raw.slice(0, lastDot));
   return outer === undefined ? [] : [outer];
 }
 

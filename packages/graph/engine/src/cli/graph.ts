@@ -46,6 +46,10 @@ import type { DataStore } from '@opensip-tools/datastore';
 const ENTRY_POINTS_PREVIEW = 10;
 const FINDINGS_PREVIEW = 10;
 
+const EVT_GRAPH_COMPLETE = 'graph.cli.graph.complete';
+const MODULE_GRAPH_CLI = 'graph:cli';
+const MODULE_GRAPH_RENDER = 'graph:render';
+
 function countFiles(catalog: Catalog): number {
   const files = new Set<string>();
   for (const name of Object.keys(catalog.functions)) {
@@ -126,78 +130,107 @@ export async function executeGraph(
   opts: GraphCommandOptions,
   cli: ToolCliContext,
 ): Promise<void> {
-  logger.info({ evt: 'graph.cli.graph.start', module: 'graph:cli', cwd: opts.cwd });
+  logger.info({ evt: 'graph.cli.graph.start', module: MODULE_GRAPH_CLI, cwd: opts.cwd });
   const startedAt = new Date().toISOString();
   try {
-    if (opts.gateSave === true && opts.gateCompare === true) {
-      throw new ConfigurationError('--gate-save and --gate-compare are mutually exclusive.');
-    }
+    validateMutuallyExclusiveFlags(opts);
     if (opts.allPackages === true) {
-      if (typeof opts.packageScope === 'string' && opts.packageScope.length > 0) {
-        throw new ConfigurationError('--package and --packages are mutually exclusive.');
-      }
       await executePackagesGraph(opts, cli);
       return;
     }
-    let runCwd = opts.cwd;
-    let runTsConfig: string | undefined;
-    if (typeof opts.packageScope === 'string' && opts.packageScope.length > 0) {
-      const scope = resolvePackageScope({ cwd: opts.cwd, packageArg: opts.packageScope });
-      runCwd = scope.packageDirAbs;
-      runTsConfig = scope.tsConfigPathAbs;
-      logger.info({
-        evt: 'graph.cli.graph.scope',
-        module: 'graph:cli',
-        package: opts.packageScope,
-        packageDir: scope.packageDirAbs,
-      });
-    }
+    const { runCwd, runTsConfig } = resolveRunScope(opts);
     const result = await runGraph({
       cwd: runCwd,
       noCache: opts.noCache,
       tsConfigPath: runTsConfig,
       datastore: cli.scope.datastore() as DataStore | undefined,
     });
-    if (opts.gateSave === true || opts.gateCompare === true) {
-      await runGateMode(opts, result.signals, cli);
-      logger.info({ evt: 'graph.cli.graph.complete', module: 'graph:cli' });
-      return;
-    }
-    if (typeof opts.reportTo === 'string' && opts.reportTo.length > 0) {
-      await runReportMode(opts, result.signals, cli);
-      logger.info({ evt: 'graph.cli.graph.complete', module: 'graph:cli' });
-      return;
-    }
-    if (typeof opts.catalogOutput === 'string' && opts.catalogOutput.length > 0) {
-      runCatalogJsonMode(opts, result, cli, startedAt);
-      logger.info({ evt: 'graph.cli.graph.complete', module: 'graph:cli' });
-      return;
-    }
-    if (opts.json === true) {
-      logger.info({ evt: 'graph.render.json.start', module: 'graph:render' });
-      const out = renderJson(result.signals, { cwd: opts.cwd, tool: 'graph', command: 'graph' });
-      process.stdout.write(`${out}\n`);
-      logger.info({ evt: 'graph.render.json.complete', module: 'graph:render' });
-    } else {
-      logger.info({ evt: 'graph.render.table.start', module: 'graph:render' });
-      writeUnifiedReport({
-        catalog: result.catalog,
-        indexes: result.indexes,
-        signals: result.signals,
-        cacheHit: result.cacheHit,
-      });
-      logger.info({ evt: 'graph.render.table.complete', module: 'graph:render' });
-    }
-    persistSession(opts, result.signals, cli.scope.datastore() as DataStore | undefined);
-    cli.setExitCode(EXIT_CODES.SUCCESS);
-    logger.info({
-      evt: 'graph.cli.graph.complete',
-      module: 'graph:cli',
-      signals: result.signals.length,
-    });
+    await dispatchGraphResult(opts, result, cli, startedAt);
   } catch (error) {
     handleGraphError('graph', error, cli);
   }
+}
+
+function validateMutuallyExclusiveFlags(opts: GraphCommandOptions): void {
+  if (opts.gateSave === true && opts.gateCompare === true) {
+    throw new ConfigurationError('--gate-save and --gate-compare are mutually exclusive.');
+  }
+  if (
+    opts.allPackages === true &&
+    typeof opts.packageScope === 'string' &&
+    opts.packageScope.length > 0
+  ) {
+    throw new ConfigurationError('--package and --packages are mutually exclusive.');
+  }
+}
+
+function resolveRunScope(opts: GraphCommandOptions): {
+  readonly runCwd: string;
+  readonly runTsConfig: string | undefined;
+} {
+  if (typeof opts.packageScope !== 'string' || opts.packageScope.length === 0) {
+    return { runCwd: opts.cwd, runTsConfig: undefined };
+  }
+  const scope = resolvePackageScope({ cwd: opts.cwd, packageArg: opts.packageScope });
+  logger.info({
+    evt: 'graph.cli.graph.scope',
+    module: MODULE_GRAPH_CLI,
+    package: opts.packageScope,
+    packageDir: scope.packageDirAbs,
+  });
+  return { runCwd: scope.packageDirAbs, runTsConfig: scope.tsConfigPathAbs };
+}
+
+async function dispatchGraphResult(
+  opts: GraphCommandOptions,
+  result: Awaited<ReturnType<typeof runGraph>>,
+  cli: ToolCliContext,
+  startedAt: string,
+): Promise<void> {
+  if (opts.gateSave === true || opts.gateCompare === true) {
+    await runGateMode(opts, result.signals, cli);
+    logger.info({ evt: EVT_GRAPH_COMPLETE, module: MODULE_GRAPH_CLI });
+    return;
+  }
+  if (typeof opts.reportTo === 'string' && opts.reportTo.length > 0) {
+    await runReportMode(opts, result.signals, cli);
+    logger.info({ evt: EVT_GRAPH_COMPLETE, module: MODULE_GRAPH_CLI });
+    return;
+  }
+  if (typeof opts.catalogOutput === 'string' && opts.catalogOutput.length > 0) {
+    runCatalogJsonMode(opts, result, cli, startedAt);
+    logger.info({ evt: EVT_GRAPH_COMPLETE, module: MODULE_GRAPH_CLI });
+    return;
+  }
+  renderGraphResult(opts, result);
+  persistSession(opts, result.signals, cli.scope.datastore() as DataStore | undefined);
+  cli.setExitCode(EXIT_CODES.SUCCESS);
+  logger.info({
+    evt: EVT_GRAPH_COMPLETE,
+    module: MODULE_GRAPH_CLI,
+    signals: result.signals.length,
+  });
+}
+
+function renderGraphResult(
+  opts: GraphCommandOptions,
+  result: Awaited<ReturnType<typeof runGraph>>,
+): void {
+  if (opts.json === true) {
+    logger.info({ evt: 'graph.render.json.start', module: MODULE_GRAPH_RENDER });
+    const out = renderJson(result.signals, { cwd: opts.cwd, tool: 'graph', command: 'graph' });
+    process.stdout.write(`${out}\n`);
+    logger.info({ evt: 'graph.render.json.complete', module: MODULE_GRAPH_RENDER });
+    return;
+  }
+  logger.info({ evt: 'graph.render.table.start', module: MODULE_GRAPH_RENDER });
+  writeUnifiedReport({
+    catalog: result.catalog,
+    indexes: result.indexes,
+    signals: result.signals,
+    cacheHit: result.cacheHit,
+  });
+  logger.info({ evt: 'graph.render.table.complete', module: MODULE_GRAPH_RENDER });
 }
 
 /**
@@ -255,8 +288,8 @@ async function executePackagesGraph(
     cli.setExitCode(EXIT_CODES.SUCCESS);
   }
   logger.info({
-    evt: 'graph.cli.graph.complete',
-    module: 'graph:cli',
+    evt: EVT_GRAPH_COMPLETE,
+    module: MODULE_GRAPH_CLI,
     packages: result.perPackage.length,
     findings: allFindings.length,
     failed: result.anyChildFailed,
@@ -537,7 +570,7 @@ function persistSession(
 function handleGraphError(label: string, error: unknown, cli: ToolCliContext): void {
   logger.error({
     evt: `graph.cli.${label}.error`,
-    module: 'graph:cli',
+    module: MODULE_GRAPH_CLI,
     err: error instanceof Error ? error.message : String(error),
   });
   if (error instanceof ConfigurationError) {
@@ -678,7 +711,7 @@ function runCatalogJsonMode(
 
   logger.info({
     evt: 'graph.render.catalog_json.start',
-    module: 'graph:render',
+    module: MODULE_GRAPH_RENDER,
     runId,
     output: opts.catalogOutput,
   });
@@ -692,7 +725,7 @@ function runCatalogJsonMode(
   writeFileSync(opts.catalogOutput!, json);
   logger.info({
     evt: 'graph.render.catalog_json.complete',
-    module: 'graph:render',
+    module: MODULE_GRAPH_RENDER,
     runId,
     output: opts.catalogOutput,
     bytes: json.length,
