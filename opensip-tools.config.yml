@@ -9,6 +9,12 @@
 
 globalExcludes:
   - "docs/**"
+  # Test fixtures intentionally contain stub patterns, TODO markers,
+  # and other shapes that exercise checks; excluding them prevents
+  # fixture content from being analyzed as production code.
+  - "**/__tests__/fixtures/**"
+  - "**/__fixtures__/**"
+  - "**/fixtures/**"
 
 targets:
   backend:

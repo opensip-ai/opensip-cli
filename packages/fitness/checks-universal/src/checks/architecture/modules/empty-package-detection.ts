@@ -12,7 +12,13 @@ import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-to
 const MIN_EXPORTS_THRESHOLD = 1
 const COMMENTED_EXPORT_RATIO_THRESHOLD = 0.5
 
-const EXCLUDED_PACKAGES = [/__fixtures__/, /__mocks__/, /examples?\//, /^apps\//]
+const EXCLUDED_PACKAGES = [
+  /__fixtures__/,
+  /__mocks__/,
+  /[/\\]fixtures[/\\]/,
+  /examples?\//,
+  /^apps\//,
+]
 
 interface PackageInfo {
   name: string

@@ -1,4 +1,6 @@
+/* eslint-disable sonarjs/fixme-tag -- this file detects TODO/FIXME markers; the words appear in JSDoc and regex literals by design */
 // @fitness-ignore-file no-stub-tests -- longDescription contains backtick-escaped stub test examples for documentation
+// @fitness-ignore-file no-todo-comments -- This file detects TODO/FIXME/HACK/STUB markers in stub tests; the words appear in regex source and JSDoc by necessity
 /**
  * @fileoverview No stub tests check
  */
@@ -15,7 +17,6 @@ const EMPTY_BODY_PATTERNS = [
   /(?:it|test)\s*\(\s*['"`].*['"`]\s*,\s*(?:async\s*)?function\s*\(\)\s*\{\s*\}\s*\)/,
 ]
 
-/* eslint-disable sonarjs/fixme-tag -- this file detects TODO/FIXME markers; the words appear in JSDoc and regex literals by design */
 /**
  * Pattern for TODO/FIXME comments inside test bodies on same line
  */

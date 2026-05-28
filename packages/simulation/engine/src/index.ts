@@ -1,3 +1,4 @@
+// @fitness-ignore-file module-coupling-fan-out -- Package barrel by design: re-exports the public surface of every kind module; fan-out is the whole job of this file
 /**
  * @opensip-tools/simulation — Simulation scenarios for codebase analysis.
  *

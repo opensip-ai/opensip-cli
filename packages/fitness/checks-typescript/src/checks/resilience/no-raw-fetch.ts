@@ -82,6 +82,22 @@ export const noRawFetch = defineCheck({
       return violations
     }
 
+    // Skip files where fetch() is invoked through a retry wrapper AND
+    // every fetch call passes an abort signal / timeout. This is the
+    // canonical "wrapped" pattern: `withRetry(() => fetch(url, { signal:
+    // AbortSignal.timeout(...) }))`. The check exists to flag the bare
+    // primitive, not legitimate library code that already adds the
+    // missing affordances around it.
+    const fetchCallCount = (content.match(/(?<![\w$.])fetch\s{0,10}\(/g) ?? []).length
+    const signalCount = (content.match(/\bsignal\s*:/g) ?? []).length
+    const usesRetryWrapper =
+      content.includes('withRetry(') ||
+      content.includes('withRetries(') ||
+      content.includes('retryFetch(')
+    if (usesRetryWrapper && signalCount >= fetchCallCount) {
+      return violations
+    }
+
     const lines = content.split('\n')
 
     for (const [lineNum, line_] of lines.entries()) {

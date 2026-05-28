@@ -3,8 +3,9 @@
  *
  * The graph engine's catalog.json is consumed here purely by JSON shape;
  * this file MUST NOT import from `@opensip-tools/graph`. The shape is
- * intentionally duplicated as readonly structural types — see §2.4 of
- * docs/plans/graph-dashboard-v3-design.md (decoupling claim).
+ * intentionally duplicated as readonly structural types — this decouples
+ * the dashboard panel from the graph engine's runtime types so
+ * @opensip-tools/contracts stays a pure type-only kernel boundary.
  *
  * Runtime exports are forbidden. Only `export type` and `export interface`.
  */

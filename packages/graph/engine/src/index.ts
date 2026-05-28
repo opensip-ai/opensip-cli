@@ -1,9 +1,9 @@
+// @fitness-ignore-file module-coupling-fan-out -- Public barrel: re-exports the surface of each pipeline stage; fan-out is the contract of this file
 /**
  * @opensip-tools/graph — public barrel.
  *
  * The graph tool implements a strict six-stage pipeline:
  * discover → inventory → edges → indexes → rules → render.
- * Per spec docs/plans/graph-tool-v2-design.md.
  */
 
 // Side-effect import: surfaces the `scope.graph` augmentation on

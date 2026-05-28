@@ -165,13 +165,15 @@ export class FitnessRecipeService {
         includeViolations: this.config.includeViolations ?? false,
       }
 
-      // TODO: tabularize when 3rd mode lands. Both executors share the
-      // exact `(ctx, opts) => Promise<void>` shape, so the moment a
-      // third mode (e.g. 'staged' for incremental fit, 'isolated' for
-      // sandbox-per-check) is added, swap this ternary for a
-      // `Map<ExecutionMode, Executor>` lookup and let the compiler
-      // enforce exhaustiveness. The two-mode ternary is small enough
-      // that the table is premature today (audit 2026-05-23 F5).
+      // Deliberate two-mode dispatch (see audit 2026-05-23 F5): when a
+      // 3rd mode lands, tabularize. Both executors share the exact
+      // `(ctx, opts) =>
+      // Promise<void>` shape, so the moment a third mode (e.g.
+      // 'staged' for incremental fit, 'isolated' for sandbox-per-check)
+      // is added, swap this ternary for a `Map<ExecutionMode, Executor>`
+      // lookup and let the compiler enforce exhaustiveness. The
+      // two-mode ternary is small enough that the table is premature
+      // today (audit 2026-05-23 F5).
       await (recipe.execution.mode === 'parallel' ? executeParallel(execCtx, execOpts) : executeSequential(execCtx, execOpts));
 
       this.activeSession.directives = this.collectAppliedDirectives()

@@ -2,11 +2,9 @@
  * GraphLanguageAdapter — the contract every language implements to
  * participate in the graph tool.
  *
- * Lands in PR 3 of plan docs/plans/10-graph-language-pluggability.md.
- * The interface signature is the canonical source for adapter authors;
- * see also docs/plans/11-graph-language-adapter-contract.md for the
- * full method-by-method behavioral discussion and the 9 contract
- * invariants (I-1 through I-9) every adapter must satisfy.
+ * The interface signature below is the canonical source for adapter
+ * authors. Every adapter must satisfy the 9 contract invariants
+ * (I-1 through I-9) documented inline on each method.
  *
  * Six methods total:
  *   1. discoverFiles    — resolve which files belong to the project

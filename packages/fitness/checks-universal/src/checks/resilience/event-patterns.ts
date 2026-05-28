@@ -5,7 +5,7 @@
  */
 
 import { logger } from '@opensip-tools/core/logger'
-import { defineCheck, type CheckViolation, getLineNumber } from '@opensip-tools/fitness'
+import { defineCheck, isTestFile, type CheckViolation, getLineNumber } from '@opensip-tools/fitness'
 
 // =============================================================================
 // EVENT ARCHITECTURE
@@ -211,6 +211,11 @@ export const eventHandlerIdempotency = defineCheck({
       msg: 'Analyzing file for event handler idempotency',
     })
     const violations: CheckViolation[] = []
+
+    // Test files routinely construct event-handler fixtures inline to
+    // exercise checks like this one; the idempotency contract applies
+    // to production handlers, not test scaffolding.
+    if (isTestFile(filePath)) return violations
 
     // Check if this is an event handler file
     const isEventHandler = EVENT_HANDLER_PATTERNS.some((p) => p.test(content))

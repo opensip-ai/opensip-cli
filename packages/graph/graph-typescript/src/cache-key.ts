@@ -2,10 +2,9 @@
  * TypeScript cacheKey implementation.
  *
  * Produces `ts-${ts.version}-${tsconfigContentHash}`. Stored in
- * Catalog.cacheKey (v3 shape introduced by PR 3 of plan
- * docs/plans/10-graph-language-pluggability.md). Replaces the v2
- * fields `tsCompilerVersion` and `tsConfigPath` that lived as
- * separate top-level catalog properties.
+ * Catalog.cacheKey (v3 shape introduced by the language-pluggability
+ * work). Replaces the v2 fields `tsCompilerVersion` and `tsConfigPath`
+ * that lived as separate top-level catalog properties.
  *
  * Per contract invariant I-6 (cacheKey is stable for stable input):
  * the function is purely a function of `(ts.version, tsconfigContent)`.
