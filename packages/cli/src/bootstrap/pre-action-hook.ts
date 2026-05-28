@@ -291,6 +291,11 @@ export function installPreActionHook(program: Command): void {
       projectContext: project,
       languages,
       tools,
+      // Item 2 — runId moves off the logger singleton onto RunScope as
+      // a flat kernel field (per D7). The logger's runId provider,
+      // bound at module init in run-scope.ts, reads it back via
+      // `currentScope()?.runId` for event-stamping.
+      runId,
       // Closure-based lazy datastore. SQLite is materialised only on
       // first access. The thunk captures `project` so non-action paths
       // (post-action handlers, error printers) that read via
