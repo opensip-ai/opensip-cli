@@ -56,7 +56,7 @@ export interface SyntheticPartition {
   readonly files: readonly string[];
 }
 
-export type PartitionStrategy = 'directory-depth' | 'file-count-chunks' | 'hybrid';
+type PartitionStrategy = 'directory-depth' | 'file-count-chunks' | 'hybrid';
 
 /** Default elevation threshold — mirrors `heap-preflight.ts` HEAP_TARGETS top tier. */
 const DEFAULT_HEAP_ELEVATION_THRESHOLD = 2500;

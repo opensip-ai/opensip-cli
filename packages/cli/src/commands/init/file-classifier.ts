@@ -28,7 +28,7 @@ import type { ProjectPaths } from '@opensip-tools/core';
  * content the current init implementation would produce, so the file
  * classifier can detect "scaffolded" files via SHA-256 content match.
  */
-export function buildScaffoldTemplates(
+function buildScaffoldTemplates(
   paths: ProjectPaths,
   languages: readonly SupportedLanguage[],
 ): Map<string, string> {

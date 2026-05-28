@@ -7,7 +7,6 @@
  * boilerplate.
  */
 
-import { runWithScope, runWithScopeSync } from '@opensip-tools/core';
 import { makeTestScope } from '@opensip-tools/core/test-utils/with-scope.js';
 
 import { simulationTool } from '../../tool.js';
@@ -19,14 +18,4 @@ export function makeSimTestScope(): RunScope {
   const scope = makeTestScope();
   simulationTool.extendScope?.(scope);
   return scope;
-}
-
-/** Run `fn` inside a fresh sim-extended scope; returns its result. */
-export function withSimScope<T>(fn: () => Promise<T>): Promise<T> {
-  return runWithScope(makeSimTestScope(), fn);
-}
-
-/** Sync variant of `withSimScope`. */
-export function withSimScopeSync<T>(fn: () => T): T {
-  return runWithScopeSync(makeSimTestScope(), fn);
 }

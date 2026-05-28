@@ -36,7 +36,7 @@ export function classifyWorkingDir(paths: ProjectPaths): WorkingDirState {
   return 'partial-dir-only';
 }
 
-export function userSourceDirHasUserContent(paths: ProjectPaths): boolean {
+function userSourceDirHasUserContent(paths: ProjectPaths): boolean {
   if (!existsSync(paths.userSourceDir)) return false;
   let entries: string[];
   try {

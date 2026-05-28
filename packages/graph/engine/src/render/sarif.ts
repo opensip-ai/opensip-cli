@@ -10,4 +10,3 @@
  */
 
 export { renderSarifOpenSip as renderSarif } from './sarif-opensip.js';
-export type { RenderSarifContext, SarifLevel } from './sarif-opensip.js';

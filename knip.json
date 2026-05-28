@@ -11,11 +11,6 @@
         "@opensip-tools/graph-rust"
       ]
     },
-    "packages/core": {
-      "ignoreDependencies": [
-        "js-yaml"
-      ]
-    },
     "packages/fitness/engine": {
       "entry": [
         "src/tool.ts",

@@ -13,7 +13,7 @@ import { join } from 'node:path';
 
 export type SupportedLanguage = 'typescript' | 'rust' | 'python' | 'go' | 'java' | 'cpp';
 
-export const ALL_LANGUAGES: readonly SupportedLanguage[] = ['typescript', 'rust', 'python', 'go', 'java', 'cpp'];
+const ALL_LANGUAGES: readonly SupportedLanguage[] = ['typescript', 'rust', 'python', 'go', 'java', 'cpp'];
 const ALL_LANGUAGES_SET = new Set<string>(ALL_LANGUAGES);
 
 interface DetectionMarker {

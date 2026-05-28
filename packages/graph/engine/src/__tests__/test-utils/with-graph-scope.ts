@@ -7,7 +7,7 @@
  * the boilerplate.
  */
 
-import { runWithScope, runWithScopeSync } from '@opensip-tools/core';
+import { runWithScopeSync } from '@opensip-tools/core';
 import { makeTestScope } from '@opensip-tools/core/test-utils/with-scope.js';
 
 import { graphTool } from '../../tool.js';
@@ -22,11 +22,6 @@ export function makeGraphTestScope(): RunScope {
 }
 
 /** Run `fn` inside a fresh graph-extended scope; returns its result. */
-export function withGraphScope<T>(fn: () => Promise<T>): Promise<T> {
-  return runWithScope(makeGraphTestScope(), fn);
-}
-
-/** Sync variant of `withGraphScope`. */
 export function withGraphScopeSync<T>(fn: () => T): T {
   return runWithScopeSync(makeGraphTestScope(), fn);
 }

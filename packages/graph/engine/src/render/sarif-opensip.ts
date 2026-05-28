@@ -22,7 +22,7 @@ import { mapEngineSlugToOpenSipRuleId } from './rule-id-mapping.js';
 import type { Signal, SignalSeverity } from '@opensip-tools/core';
 
 /** SARIF v2.1.0 level — `'none' | 'note' | 'warning' | 'error'`. */
-export type SarifLevel = 'none' | 'note' | 'warning' | 'error';
+type SarifLevel = 'none' | 'note' | 'warning' | 'error';
 
 /**
  * Map `Signal.severity` → SARIF `level`. Exhaustive over
@@ -89,7 +89,7 @@ interface SarifLocation {
 }
 
 /** Required context — caller (`cli/graph.ts`) provides tool identity. */
-export interface RenderSarifContext {
+interface RenderSarifContext {
   /** Tool driver name, e.g. `'opensip-tools-graph'`. */
   readonly tool: string;
   /** Tool driver version — typically the engine package version. */

@@ -13,9 +13,7 @@
  * v0.2 shipped with six built-in rules; runtime rule loading is
  * deferred to v0.3 per DEC-6. The legacy `rules` array export was a
  * process-level snapshot read by `orchestrate`/`graph` CLI commands;
- * it's gone. Callers now ask for the registry directly via
- * `currentRulesRegistry().getAll().map((r) => r.rule)` or use the
- * `currentRules()` helper.
+ * it's gone. Callers now use the `currentRules()` helper.
  */
 
 import { Registry, currentScope, type Registerable } from '@opensip-tools/core';
@@ -78,7 +76,7 @@ export function createRulesRegistry(): GraphRulesRegistry {
  * Read the current scope's graph rule registry. Throws when no scope
  * is active or when the graph subscope is missing.
  */
-export function currentRulesRegistry(): GraphRulesRegistry {
+function currentRulesRegistry(): GraphRulesRegistry {
   const scope = currentScope();
   if (!scope) {
     throw new Error(

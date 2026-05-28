@@ -25,7 +25,7 @@ import type { ProjectPaths } from '@opensip-tools/core';
 
 const GITIGNORE_LINE = 'opensip-tools/.runtime/';
 
-export function ensureGitignore(cwd: string): boolean {
+function ensureGitignore(cwd: string): boolean {
   const path = join(cwd, '.gitignore');
   if (!existsSync(path)) {
     writeFileSync(path, `${GITIGNORE_LINE}\n`, 'utf8');
