@@ -10,6 +10,9 @@
  * now sections in this unified report.
  */
 
+import { randomUUID } from 'node:crypto';
+import { writeFileSync } from 'node:fs';
+
 import { EXIT_CODES, SessionRepo } from '@opensip-tools/contracts';
 import {
   ConfigurationError,
@@ -18,12 +21,11 @@ import {
   ToolError,
   ValidationError,
 } from '@opensip-tools/core';
-
-
 import { reportToCloud } from '@opensip-tools/fitness';
 
 import { compareToBaseline, fingerprintSignal, saveBaseline } from '../gate.js';
 import { GraphBaselineRepo } from '../persistence/baseline-repo.js';
+import { renderCatalogJson } from '../render/catalog-json.js';
 import { buildCliOutput, renderJson } from '../render/json.js';
 import { renderSarif } from '../render/sarif.js';
 import { inferEntryPoints } from '../rules/_entry-points.js';
@@ -96,6 +98,28 @@ export interface GraphCommandOptions {
    * Tools wiring `executeGraph` should pass `process.argv[1]`.
    */
   readonly cliScript?: string;
+  /**
+   * --catalog-output <path>. When set, runs in catalog-JSON emission
+   * mode: walks the engine's `Catalog` + edges, derives opensip-
+   * compatible symbol/edge IDs, and writes a `CatalogExport` JSON
+   * document to the path. File output (not stdout) because catalog
+   * JSON for 100k-file repos exceeds practical stdout buffer sizes.
+   *
+   * Required companion opts when set: `tenantId`, `repoId`, `gitSha`.
+   * `runId` is auto-generated if not provided.
+   *
+   * Phase 3 Task 3.4 per opensip DEC-498. Phase 6's
+   * EngineSubprocessPort invokes this mode per commit-sync run.
+   */
+  readonly catalogOutput?: string;
+  /** Tenant scope for catalog-output provenance. */
+  readonly tenantId?: string;
+  /** Repository scope — applied to every row in catalog-output. */
+  readonly repoId?: string;
+  /** Commit SHA the catalog was extracted at — provenance for every row. */
+  readonly gitSha?: string;
+  /** Optional UUID for the catalog-output run. Auto-generated if absent. */
+  readonly runId?: string;
 }
 
 export async function executeGraph(
@@ -103,6 +127,7 @@ export async function executeGraph(
   cli: ToolCliContext,
 ): Promise<void> {
   logger.info({ evt: 'graph.cli.graph.start', module: 'graph:cli', cwd: opts.cwd });
+  const startedAt = new Date().toISOString();
   try {
     if (opts.gateSave === true && opts.gateCompare === true) {
       throw new ConfigurationError('--gate-save and --gate-compare are mutually exclusive.');
@@ -140,6 +165,11 @@ export async function executeGraph(
     }
     if (typeof opts.reportTo === 'string' && opts.reportTo.length > 0) {
       await runReportMode(opts, result.signals, cli);
+      logger.info({ evt: 'graph.cli.graph.complete', module: 'graph:cli' });
+      return;
+    }
+    if (typeof opts.catalogOutput === 'string' && opts.catalogOutput.length > 0) {
+      runCatalogJsonMode(opts, result, cli, startedAt);
       logger.info({ evt: 'graph.cli.graph.complete', module: 'graph:cli' });
       return;
     }
@@ -589,4 +619,85 @@ async function runReportMode(
   process.stdout.write(
     `Graph report sent to ${url} (${String(signals.length)} signals, ${sarif.length} bytes).\n`,
   );
+}
+
+/**
+ * Catalog-JSON emission mode (Phase 3 Task 3.4 per opensip DEC-498).
+ * Walks the engine's `Catalog` + `Indexes`, derives opensip-compatible
+ * symbol/edge IDs, and writes a `CatalogExport` JSON document to the
+ * `--catalog-output <path>` file. Phase 6's `EngineSubprocessPort`
+ * invokes this mode per commit-sync run.
+ *
+ * Synchronous file write — catalog payloads are bounded (per-package
+ * fan-out limits per-run scope) and we want backpressure if disk is
+ * full rather than a deferred-write surprise.
+ */
+function runCatalogJsonMode(
+  opts: GraphCommandOptions,
+  result: {
+    readonly catalog: Catalog | null;
+    readonly indexes: Indexes | null;
+    readonly signals: readonly Signal[];
+    readonly cacheHit: boolean;
+  },
+  cli: ToolCliContext,
+  startedAt: string,
+): void {
+  if (typeof opts.tenantId !== 'string' || opts.tenantId.length === 0) {
+    throw new ConfigurationError('--catalog-output requires --tenant-id <id>.');
+  }
+  if (typeof opts.repoId !== 'string' || opts.repoId.length === 0) {
+    throw new ConfigurationError('--catalog-output requires --repo-id <id>.');
+  }
+  if (typeof opts.gitSha !== 'string' || opts.gitSha.length === 0) {
+    throw new ConfigurationError('--catalog-output requires --git-sha <sha>.');
+  }
+  if (result.catalog === null || result.indexes === null) {
+    throw new ToolError(
+      'Cannot emit catalog-json: engine returned null catalog / indexes (no parseable input).',
+      'GRAPH.CATALOG_JSON.NULL_CATALOG',
+    );
+  }
+
+  const runId = opts.runId ?? randomUUID();
+  const completedAt = new Date().toISOString();
+  // Caller (opensip-side EngineSubprocessPort, Phase 6) inspects the
+  // file's existence + completeness field; engine never emits 'partial'
+  // from this code path (the engine's pressure-monitor / abort-handling
+  // bypass this function entirely on failure). A future task may add
+  // partial-completion semantics by catching MemoryPressureError in
+  // executeGraph and writing a partial CatalogExport here.
+  const provenance = {
+    runId,
+    completeness: 'complete' as const,
+    engineVersion: '2.0.0',
+    startedAt,
+    completedAt,
+    tenantId: opts.tenantId,
+  };
+
+  logger.info({
+    evt: 'graph.render.catalog_json.start',
+    module: 'graph:render',
+    runId,
+    output: opts.catalogOutput,
+  });
+  const json = renderCatalogJson({
+    catalog: result.catalog,
+    indexes: result.indexes,
+    provenance,
+    repoId: opts.repoId,
+    gitSha: opts.gitSha,
+  });
+  writeFileSync(opts.catalogOutput!, json);
+  logger.info({
+    evt: 'graph.render.catalog_json.complete',
+    module: 'graph:render',
+    runId,
+    output: opts.catalogOutput,
+    bytes: json.length,
+    cacheHit: result.cacheHit,
+    signalCount: result.signals.length,
+  });
+  cli.setExitCode(EXIT_CODES.SUCCESS);
 }
