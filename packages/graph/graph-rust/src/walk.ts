@@ -1,3 +1,4 @@
+// @fitness-ignore-file file-length-limit -- tree-sitter language walker spanning AST cases; cohesive grammar-driven dispatch already split (body-digest, walk-metadata extracted by earlier pass), further split would fragment per-node logic.
 // @fitness-ignore-file context-mutation -- `ctx: WalkCtx` here is a function-scoped traversal accumulator (callSites array, occurrence sink, parser refs) threaded through the AST walk, NOT a shared request/execution context. `ctx.callSites.push(...)` is the intended local-accumulator append. The check's `LOCAL_DECLARATION_PATTERNS` heuristic doesn't see it because `ctx` arrives as a typed parameter, not via `const ctx = …`.
 // @fitness-ignore-file performance-anti-patterns -- spread used to flatten AST child nodes during tree-sitter walk; bounded by node arity at each step
 /**

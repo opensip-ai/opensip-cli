@@ -25,7 +25,7 @@ import { resolveProjectPaths } from '@opensip-tools/core'
  *  - 'config'       — opensip-tools.config.yml. Preserved unless --purge.
  *  - 'user-level'   — ~/.opensip-tools/ in user mode.
  */
-export type TargetBucket = 'runtime' | 'user-content' | 'config' | 'user-level'
+type TargetBucket = 'runtime' | 'user-content' | 'config' | 'user-level'
 
 /** Discrete target to remove (a file or a directory). */
 export interface Target {
@@ -60,7 +60,7 @@ function dirSize(path: string): number {
   return total
 }
 
-export function formatSize(bytes: number): string {
+function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`

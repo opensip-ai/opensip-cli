@@ -18,7 +18,7 @@ import {
 import { Box, Text } from 'ink';
 import React from 'react';
 
-export const DEFAULT_VIOLATIONS_PER_CHECK = 25;
+const DEFAULT_VIOLATIONS_PER_CHECK = 25;
 
 interface CheckCounts {
   errorCount: number;

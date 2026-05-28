@@ -1,3 +1,4 @@
+// @fitness-ignore-file file-length-limit -- Stage 2 edge resolver covering call+import+dependency edges in one cohesive pass; the resolution logic is contiguous and a split would push state across module boundaries.
 /**
  * Stage 2 — Edge resolution.
  *

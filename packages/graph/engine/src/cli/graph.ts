@@ -1,3 +1,6 @@
+// @fitness-ignore-file detached-promises -- CLI renderers (process.stdout.write, render helpers, log lines, setExitCode) are synchronous; heuristic flags inside async handlers.
+// @fitness-ignore-file no-markdown-references -- references to docs/plans/* in code comments are stable internal pointers; the docs are checked-in markdown.
+// @fitness-ignore-file public-api-jsdoc -- GraphCommandOptions interface and executeGraph are already documented with rich JSDoc on each field; the check counts the top-level export line, not the fields.
 // @fitness-ignore-file error-handling-quality -- CLI output baseline-write at line 597 is best-effort by design ("don't fail the run"); the comment + v8-ignore at the catch already document that user-visible behavior is unaffected if the persistence layer hiccups.
 /**
  * `opensip-tools graph` — main subcommand handler.
