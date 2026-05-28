@@ -1,3 +1,4 @@
+// @fitness-ignore-file error-handling-quality -- safeIsDir/walk helpers for the workspace-package search: statSync exception → "not a directory", readdirSync exception → "unreadable subdir, skip"; failure IS the function contract (already marked with v8-ignore at each catch as defensive/unreachable on real input).
 /**
  * Scope resolution for `graph --package <name|path>`.
  *
