@@ -1,3 +1,4 @@
+// @fitness-ignore-file toctou-race-condition -- updateSessionForSuccess mutates a session object owned by the calling recipe runner; recipe execution is serial and synchronous within a single Node.js process, no concurrent writers
 /**
  * @fileoverview Check result processor for fitness recipe execution
  *

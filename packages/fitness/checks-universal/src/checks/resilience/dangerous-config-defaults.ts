@@ -6,7 +6,7 @@
  */
 
 import { logger } from '@opensip-tools/core/logger'
-import { defineCheck, type CheckViolation, getLineNumber } from '@opensip-tools/fitness'
+import { defineCheck, isTestFile, type CheckViolation, getLineNumber } from '@opensip-tools/fitness'
 
 import { isDigit, isAlphanumericChar } from './_helpers/config-validation.js'
 
@@ -341,6 +341,11 @@ export const dangerousConfigDefaults = defineCheck({
   fileTypes: ['ts'],
 
   analyze(content: string, filePath: string): CheckViolation[] {
+    // Test fixtures intentionally exercise dangerous defaults (debug:true,
+    // zero retries, SSL disabled, etc.) to verify the check's detection
+    // logic. These are not production config — skip to avoid noise.
+    if (isTestFile(filePath)) return []
+
     logger.debug({
       evt: 'fitness.checks.dangerous_config_defaults.analyze',
       msg: 'Analyzing file for dangerous configuration defaults',
