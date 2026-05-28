@@ -87,8 +87,11 @@ export type {
   CheckPackageMetadata,
 } from './plugins/check-package-discovery.js';
 
-// Tool plugin export — fitness as a Tool.
-export { fitnessTool } from './tool.js';
+// Tool plugin export — fitness as a Tool. Re-exported as `tool` so the
+// third-party plugin-discovery walker (which keys on `mod.tool`) treats
+// first-party and third-party Tool packages uniformly; dedup at
+// register-tools.ts handles the duplicate-id case.
+export { fitnessTool, fitnessTool as tool } from './tool.js';
 
 // CLI command implementations — re-exported for the Phase 2 CLI which
 // still drives commands directly. Phase 4 will collapse these behind

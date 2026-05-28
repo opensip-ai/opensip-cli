@@ -134,7 +134,11 @@ export {
 // TOOL PLUGIN — simulation as a Tool implementation
 // =============================================================================
 
-export { simulationTool } from './tool.js'
+// Re-exported as `tool` so the third-party plugin-discovery walker
+// (which keys on `mod.tool`) treats first-party and third-party Tool
+// packages uniformly; dedup at register-tools.ts handles the
+// duplicate-id case.
+export { simulationTool, simulationTool as tool } from './tool.js'
 export {
   executeSim,
   ensureScenariosLoaded,

@@ -12,7 +12,11 @@
 import './scope-augmentation.js';
 export type { GraphSubscope } from './scope-augmentation.js';
 
-export { graphTool } from './tool.js';
+// Re-exported as `tool` so the third-party plugin-discovery walker
+// (which keys on `mod.tool`) treats first-party and third-party Tool
+// packages uniformly; dedup at register-tools.ts handles the
+// duplicate-id case.
+export { graphTool, graphTool as tool } from './tool.js';
 export { runGraph, GRAPH_STAGES } from './cli/orchestrate.js';
 export type {
   GraphStage,
