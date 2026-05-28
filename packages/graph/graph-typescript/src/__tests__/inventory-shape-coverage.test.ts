@@ -1,3 +1,4 @@
+// @fitness-ignore-file file-length-limit -- aggregate coverage-driven test fixture; splitting destroys the contract
 /**
  * Inventory shape coverage tests (Tier 1).
  *

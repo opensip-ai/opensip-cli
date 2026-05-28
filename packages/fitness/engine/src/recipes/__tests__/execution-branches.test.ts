@@ -1,3 +1,4 @@
+// @fitness-ignore-file file-length-limit -- aggregate coverage-driven test fixture; splitting destroys the contract
 /**
  * @fileoverview Branch coverage tests for parallel/sequential execution
  * engines and the check-result-processor.

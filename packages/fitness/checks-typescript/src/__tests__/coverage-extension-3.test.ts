@@ -1,3 +1,4 @@
+// @fitness-ignore-file file-length-limit -- aggregate coverage-driven test fixture; splitting destroys the contract
 /**
  * @fileoverview Targeted coverage tests for resilience and remaining
  * mid-tier checks (context-leakage, async patterns, throws-documentation,

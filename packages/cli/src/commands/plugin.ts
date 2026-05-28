@@ -1,6 +1,4 @@
 // @fitness-ignore-file error-handling-quality -- npm install failures already stream to stderr via inherited stdio (downstream loader surfaces unresolved imports), and the package.json / node_modules walks are probes where unreadable/malformed entries mean "not installable" or "not a candidate" — same as absent.
-// @fitness-ignore-file silent-early-returns -- editPluginList/appendToPluginList/removeFromPluginList all return boolean as their documented "did I modify?" contract: `false` means "no-op / idempotent (already present, already absent, nothing to remove)"; the caller dispatches on the boolean. These are not silent failures — they are explicit idempotency signals.
-// @fitness-ignore-file unbounded-memory -- reads opensip-tools.config.yml + package.json files; bounded by configuration shape and standard npm package metadata
 /**
  * plugin command — manage project-local npm-installed plugins.
  *
@@ -33,10 +31,17 @@
  * `plugin sync` is the post-clone bootstrap: reads plugins.<domain> from
  * the config and `npm install`s everything declared. Used by CI and
  * by users who clone a repo with custom plugins.
+ *
+ * Module layout
+ * -------------
+ * - This file owns the `plugin {list,add,remove,sync}` command bodies.
+ * - `plugin/config-edit.ts` — YAML round-trip edits to plugins.<domain>.
+ * - `plugin/host-dir.ts` — host package.json creation + installed-
+ *   package introspection (incl. peer-dependency auto-install).
  */
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 import {
@@ -45,15 +50,20 @@ import {
   type PathDomain,
   type PluginDomain,
 } from '@opensip-tools/core';
+
 import {
-  parseDocument,
-  isMap,
-  isScalar,
-  isSeq,
-  type Document as YAMLDocument,
-  type YAMLMap,
-  type YAMLSeq,
-} from 'yaml';
+  addToConfigPluginList,
+  editPluginList,
+  removeFromConfigPluginList,
+} from './plugin/config-edit.js';
+import {
+  ensurePluginHostDir,
+  findInstalledName,
+  HOST_PACKAGE_JSON,
+  installMissingPeers,
+  isSafeNpmSpec,
+  readHostDependencies,
+} from './plugin/host-dir.js';
 
 import type { PluginInfo, PluginResult, SyncEntry } from '@opensip-tools/contracts';
 
@@ -62,9 +72,6 @@ import type { PluginInfo, PluginResult, SyncEntry } from '@opensip-tools/contrac
 // =============================================================================
 
 const VALID_DOMAINS: ReadonlySet<PathDomain> = new Set(['fit', 'sim']);
-
-/** Filename of the host package.json that pins plugin installs. */
-const HOST_PACKAGE_JSON = 'package.json';
 
 function inferDomain(packageName: string): PathDomain {
   if (/\bsim\b/.test(packageName)) return 'sim';
@@ -83,183 +90,11 @@ function resolveDomain(override: string | undefined, packageName: string): PathD
 }
 
 /**
- * Guard against argv-injection through npm. execFileSync doesn't spawn
- * a shell, so shell metacharacters are safe, but any arg starting with
- * '-' would be consumed by npm as a flag (e.g. '-g', '--prefix=/etc').
- */
-function isSafeNpmSpec(spec: string): boolean {
-  if (spec.length === 0) return false;
-  if (spec.startsWith('-')) return false;
-  return true;
-}
-
-// =============================================================================
-// CONFIG MUTATION (plugins.<domain> in opensip-tools.config.yml)
-// =============================================================================
-
-/**
- * Edit the project's `plugins.<domain>` list via the `yaml`
- * Document API. Round-trips comments, ordering, and surrounding
- * whitespace (the regex-driven line edits this replaces could not
- * — they reformatted the file silently when seeing a quoted key or
- * an unusual indent). A malformed document fails closed: the edit
- * is skipped and a structured error is thrown so the caller can
- * surface a clear "your config is broken" message.
- *
- * @throws {Error} When the YAML document at `configPath` cannot be
- *   parsed or has an unexpected shape under `plugins.<domain>`.
- */
-function editPluginList(
-  configPath: string,
-  domain: PathDomain,
-  name: string,
-  op: 'add' | 'remove',
-): boolean {
-  if (!existsSync(configPath)) {
-    if (op === 'remove') return false;
-    // No config to edit — write a minimal one.
-    writeFileSync(
-      configPath,
-      `plugins:\n  ${domain}:\n    - "${name}"\n`,
-      'utf8',
-    );
-    return true;
-  }
-
-  const text = readFileSync(configPath, 'utf8');
-  const doc = parseDocument(text);
-  if (doc.errors.length > 0) {
-    const first = doc.errors[0]?.message ?? 'unknown YAML error';
-    throw new Error(
-      `Cannot edit plugins.${domain} in ${configPath}: ${first}. ` +
-      `Fix the syntax error and re-run.`,
-    );
-  }
-
-  const root = doc.contents;
-  if (root === null) {
-    if (op === 'remove') return false;
-    // Empty doc — write a fresh `plugins:` map.
-    writeFileSync(
-      configPath,
-      `plugins:\n  ${domain}:\n    - "${name}"\n`,
-      'utf8',
-    );
-    return true;
-  }
-
-  // The top-level node must be a YAML map. A scalar / sequence at
-  // the root means the file isn't an opensip-tools config — refuse
-  // to edit rather than reformat the whole thing.
-  if (!isMap(root)) {
-    throw new Error(
-      `Cannot edit plugins.${domain} in ${configPath}: top-level node is not a mapping. ` +
-      `opensip-tools.config.yml must start with a YAML map.`,
-    );
-  }
-
-  if (op === 'add') {
-    return appendToPluginList(doc, root, domain, name, configPath);
-  }
-  return removeFromPluginList(doc, root, domain, name, configPath);
-}
-
-function appendToPluginList(
-  doc: YAMLDocument,
-  root: YAMLMap,
-  domain: PathDomain,
-  name: string,
-  configPath: string,
-): boolean {
-  let plugins = root.get('plugins');
-  if (!isMap(plugins)) {
-    plugins = doc.createNode({});
-    root.set('plugins', plugins);
-  }
-  const pluginsMap = plugins as YAMLMap;
-
-  let list = pluginsMap.get(domain);
-  if (!isSeq(list)) {
-    list = doc.createNode([]);
-    pluginsMap.set(domain, list);
-  }
-  const seq = list as YAMLSeq;
-
-  // Idempotent — first occurrence wins.
-  for (const item of seq.items) {
-    const value = isScalar(item) ? item.value : item;
-    if (value === name) return false;
-  }
-  seq.add(name);
-  writeFileSync(configPath, doc.toString(), 'utf8');
-  return true;
-}
-
-function removeFromPluginList(
-  doc: YAMLDocument,
-  root: YAMLMap,
-  domain: PathDomain,
-  name: string,
-  configPath: string,
-): boolean {
-  const plugins = root.get('plugins');
-  if (!isMap(plugins)) return false;
-  const list = plugins.get(domain);
-  if (!isSeq(list)) return false;
-
-  const before = list.items.length;
-  list.items = list.items.filter((item) => {
-    const value = isScalar(item) ? item.value : item;
-    return value !== name;
-  });
-  if (list.items.length === before) return false;
-  writeFileSync(configPath, doc.toString(), 'utf8');
-  return true;
-}
-
-function addToConfigPluginList(configPath: string, domain: PathDomain, name: string): boolean {
-  return editPluginList(configPath, domain, name, 'add');
-}
-
-function removeFromConfigPluginList(configPath: string, domain: PathDomain, name: string): boolean {
-  return editPluginList(configPath, domain, name, 'remove');
-}
-
-/**
  * Test-only export for the YAML-driven config edit so unit tests can
  * exercise the round-trip behaviour without spawning npm. Intentionally
  * not part of the public CLI API surface.
  */
 export const __test = { editPluginList };
-
-// =============================================================================
-// PLUGIN HOST DIR — node_modules root for a given domain
-// =============================================================================
-
-function ensurePluginHostDir(domain: PathDomain, cwd: string): string {
-  const paths = resolveProjectPaths(cwd);
-  const dir = paths.pluginsDir(domain);
-  mkdirSync(dir, { recursive: true });
-
-  const pkgJsonPath = join(dir, HOST_PACKAGE_JSON);
-  if (!existsSync(pkgJsonPath)) {
-    writeFileSync(
-      pkgJsonPath,
-      JSON.stringify(
-        {
-          name: `opensip-tools-${domain}-plugins`,
-          version: '0.0.0',
-          private: true,
-          type: 'module',
-          dependencies: {},
-        },
-        null,
-        2,
-      ),
-    );
-  }
-  return dir;
-}
 
 // =============================================================================
 // COMMAND: plugin list
@@ -544,114 +379,3 @@ export async function pluginSync(
   };
 }
 /* eslint-enable @typescript-eslint/require-await, sonarjs/cognitive-complexity */
-
-// =============================================================================
-// PEER-DEPENDENCY AUTO-INSTALL
-// =============================================================================
-
-/**
- * After installing a plugin, look at its peerDependencies and install
- * any missing ones into the same plugin directory. Best-effort: missing
- * peers produce a warning, not a failure, since the loader will
- * surface a clear error if the plugin can't resolve its imports.
- */
-function installMissingPeers(dir: string, requestedSpec: string, depsBefore: Set<string>): void {
-  const installed = findInstalledPackage(dir, requestedSpec, depsBefore);
-  if (!installed) return;
-
-  const peerDeps = installed.peerDependencies ?? {};
-  const installedAtRoot = new Set(safeReaddirScopedAndFlat(join(dir, 'node_modules')));
-
-  const missing = Object.entries(peerDeps).filter(([name]) => !installedAtRoot.has(name));
-  if (missing.length === 0) return;
-
-  for (const [name, range] of missing) {
-    if (!isSafeNpmSpec(name)) continue;
-    if (typeof range !== 'string' || !isSafeNpmSpec(range)) continue;
-    try {
-      execFileSync('npm', ['install', '--ignore-scripts', '--no-save', `${name}@${range}`], {
-        cwd: dir,
-        stdio: ['ignore', process.stderr, process.stderr],
-      });
-    } catch {
-      // Loader will surface unresolved imports; swallow here.
-    }
-  }
-}
-
-function findInstalledName(dir: string, requestedSpec: string, depsBefore: Set<string>): string | undefined {
-  return findInstalledPackage(dir, requestedSpec, depsBefore)?.name;
-}
-
-function findInstalledPackage(
-  dir: string,
-  requestedSpec: string,
-  depsBefore: Set<string>,
-): { name: string; peerDependencies?: Record<string, string> } | undefined {
-  const nodeModulesDir = join(dir, 'node_modules');
-  if (!existsSync(nodeModulesDir)) return undefined;
-
-  const namedSpec = extractNameFromSpec(requestedSpec);
-  if (namedSpec) {
-    const pkg = readPackageJson(join(nodeModulesDir, namedSpec, HOST_PACKAGE_JSON));
-    if (pkg) return pkg;
-  }
-
-  // Local-path installs: the new dep key is whichever entry is in the
-  // host package.json now that wasn't there before.
-  const depsAfter = readHostDependencies(dir);
-  for (const name of depsAfter) {
-    if (depsBefore.has(name)) continue;
-    const pkg = readPackageJson(join(nodeModulesDir, name, HOST_PACKAGE_JSON));
-    if (pkg?.name === name) return pkg;
-  }
-  return undefined;
-}
-
-function readHostDependencies(dir: string): Set<string> {
-  const hostPkg = readPackageJson(join(dir, HOST_PACKAGE_JSON));
-  return new Set(Object.keys(hostPkg?.dependencies ?? {}));
-}
-
-function extractNameFromSpec(spec: string): string | undefined {
-  if (spec.startsWith('/') || spec.startsWith('.') || spec.startsWith('file:')) return undefined;
-  if (spec.startsWith('@')) {
-    const withoutScope = spec.slice(1);
-    const slashIdx = withoutScope.indexOf('/');
-    if (slashIdx === -1) return undefined;
-    const rest = withoutScope.slice(slashIdx + 1);
-    const atIdx = rest.indexOf('@');
-    const name = atIdx === -1 ? rest : rest.slice(0, atIdx);
-    return `@${withoutScope.slice(0, slashIdx)}/${name}`;
-  }
-  const atIdx = spec.indexOf('@');
-  return atIdx === -1 ? spec : spec.slice(0, atIdx);
-}
-
-function readPackageJson(
-  path: string,
-): { name: string; dependencies?: Record<string, string>; peerDependencies?: Record<string, string> } | undefined {
-  if (!existsSync(path)) return undefined;
-  try {
-    return JSON.parse(readFileSync(path, 'utf8')) as { name: string; dependencies?: Record<string, string>; peerDependencies?: Record<string, string> };
-  } catch {
-    return undefined;
-  }
-}
-
-function safeReaddirScopedAndFlat(nodeModulesDir: string): string[] {
-  if (!existsSync(nodeModulesDir)) return [];
-  const out: string[] = [];
-  for (const entry of readdirSync(nodeModulesDir)) {
-    if (entry.startsWith('@')) {
-      const scopeDir = join(nodeModulesDir, entry);
-      try {
-        for (const scoped of readdirSync(scopeDir)) out.push(`${entry}/${scoped}`);
-      } catch { /* unreadable scope */ }
-    } else if (!entry.startsWith('.')) {
-      out.push(entry);
-    }
-  }
-  return out;
-}
-

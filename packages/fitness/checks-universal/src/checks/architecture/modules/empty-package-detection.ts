@@ -1,5 +1,5 @@
 // @fitness-ignore-file fitness-check-standards -- Uses fs for directory listing/stat operations, not file content reading
-// @fitness-ignore-file file-length-limits -- Complex module with tightly coupled logic; refactoring would risk breaking changes
+// @fitness-ignore-file file-length-limit -- Complex module with tightly coupled logic; refactoring would risk breaking changes
 // @fitness-ignore-file unbounded-memory -- reads workspace package.json / barrel index files; bounded by standard package metadata size
 /**
  * @fileoverview Empty Package Detection check

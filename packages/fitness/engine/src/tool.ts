@@ -30,13 +30,19 @@
  * own Ink/React renderer (`renderFitLive` in `cli/fit-runner.tsx`)
  * and registers it directly via `cli.registerLiveView`. The prior
  * `cli.builtinLiveViews` self-lookup handshake is gone.
+ *
+ * Module layout
+ * -------------
+ * - This file owns Commander wiring + the tool descriptor.
+ * - `cli/fit-modes.ts` owns the dispatch branches (gate/list/recipes/
+ *   json/live) and their shared option-bridge helper. Extracted to
+ *   keep this module focused on registration and stay under the
+ *   file-length-limit.
  */
 
 
 /* eslint-disable sonarjs/deprecation -- intentional adapter usage; tool.ts bridges per-command FitOptions/ToolOptions to executeFit's legacy CliArgs shape via fitOptsToCliArgs / toolOptsToCliArgs */
 import {
-  EXIT_CODES,
-  mapToolErrorToExitCode,
   type CliArgs,
   type CliProgram,
   type FitOptions,
@@ -47,18 +53,17 @@ import { readPackageVersion } from '@opensip-tools/core';
 
 import { exportFitBaseline } from './cli/baseline-export.js';
 import { openDashboard } from './cli/dashboard.js';
+import {
+  fitOptsToCliArgs,
+  runGateMode,
+  runJsonMode,
+  runListMode,
+  runLiveMode,
+  runRecipesMode,
+} from './cli/fit-modes.js';
 import { renderFitLive } from './cli/fit-runner.js';
-import { executeFit } from './cli/fit.js';
 import { listChecks } from './cli/list-checks.js';
 import { listRecipes } from './cli/list-recipes.js';
-import {
-  saveBaseline,
-  compareToBaseline,
-  renderGateCompareOutput,
-  GateBaselineMissingError,
-  GateBaselineInvalidError,
-} from './gate.js';
-import { FitBaselineRepo } from './persistence/baseline-repo.js';
 
 import type {
   Tool,
@@ -114,31 +119,6 @@ const FIT_BASELINE_EXPORT: ToolCommandDescriptor = {
 // =============================================================================
 // REGISTER — wires Commander subcommands onto the CLI's program.
 // =============================================================================
-
-// eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
-function fitOptsToCliArgs(opts: FitOptions & { quiet?: boolean; open?: boolean }): CliArgs {
-  return {
-    command: 'fit',
-    json: opts.json,
-    check: opts.check,
-    recipe: opts.recipe,
-    cwd: opts.cwd,
-    help: false,
-    list: opts.list,
-    listRecipes: opts.recipes,
-    verbose: opts.verbose,
-    reportTo: opts.reportTo,
-    apiKey: opts.apiKey,
-    exclude: opts.exclude,
-    findings: opts.findings,
-    tags: opts.tags,
-    quiet: opts.quiet === true,
-    open: opts.open === true,
-    config: opts.config,
-    gateSave: opts.gateSave === true,
-    gateCompare: opts.gateCompare === true,
-  };
-}
 
 function register(cli: ToolCliContext): void {
   // Cast once — the contract intentionally types `program` loosely so
@@ -214,7 +194,7 @@ function registerFitCommand(program: CliProgram, cli: ToolCliContext): void {
         await runJsonMode(args, cli);
         return;
       }
-      await runLiveMode(args, cli, opts.open === true);
+      await runLiveMode(args, cli, FIT_LIVE_VIEW_KEY, opts.open === true);
     });
 }
 
@@ -294,10 +274,6 @@ function registerBaselineExportCommand(program: CliProgram, cli: ToolCliContext)
     });
 }
 
-// =============================================================================
-// MODE HELPERS — one per dispatch branch in the `fit` action. Each is
-// callable independently for testing; the action picks one based on the
-// flag combination.
 // =============================================================================
 
 // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
@@ -462,6 +438,7 @@ async function runGateMode(args: CliArgs, cli: ToolCliContext): Promise<void> {
 }
 
 // =============================================================================
+=======
 // EXPORT
 // =============================================================================
 

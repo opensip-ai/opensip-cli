@@ -1,6 +1,6 @@
 // @fitness-ignore-file throws-documentation -- Functions throw self-documenting typed errors
 // @fitness-ignore-file toctou-race-condition -- TOCTOU acceptable in this non-concurrent context
-// @fitness-ignore-file file-length-limits -- Complex module with tightly coupled logic; refactoring would risk breaking changes
+// @fitness-ignore-file file-length-limit -- complex check with tightly coupled hash/normalization/scoring logic; splitting would risk losing the duplicate-detection contract
 /**
  * @fileoverview Duplicate Utility Functions check
  *

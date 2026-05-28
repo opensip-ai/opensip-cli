@@ -18,6 +18,9 @@ globalExcludes:
   - "**/__tests__/fixtures/**"
   - "**/__fixtures__/**"
   - "**/fixtures/**"
+  # Drizzle-generated migration snapshots are data, not source. They have
+  # no comment syntax for inline directives and grow with schema changes.
+  - "packages/datastore/migrations/**"
 
 targets:
   backend:
