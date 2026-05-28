@@ -89,6 +89,9 @@ export interface ReadYamlFileOrThrowOptions {
  * Consumers that want hand-rolled stat/read/parse with the same
  * structured errors should call this instead — it consolidates a
  * pattern previously duplicated across loaders (audit-round-2 Finding F).
+ *
+ * @throws {ValidationError} When the file is missing, unreadable, or contains malformed YAML.
+ * @throws {SystemError} When the file exceeds `maxBytes`.
  */
 export function readYamlFileOrThrow(
   filePath: string,

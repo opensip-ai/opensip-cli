@@ -21,8 +21,11 @@ export function resolveByCatalogFallback(simpleName: string, catalog: Catalog): 
   if (!Object.hasOwn(catalog.functions, simpleName)) return UNRESOLVED;
   const candidates: readonly FunctionOccurrence[] | undefined = catalog.functions[simpleName];
   if (!candidates || candidates.length === 0) return UNRESOLVED;
-  if (candidates.length === 1 && candidates[0]) {
-    return { to: [candidates[0].bodyHash], resolution: 'unknown', confidence: 'medium' };
+  if (candidates.length === 1) {
+    const only = candidates[0];
+    if (only) {
+      return { to: [only.bodyHash], resolution: 'unknown', confidence: 'medium' };
+    }
   }
   return UNRESOLVED;
 }

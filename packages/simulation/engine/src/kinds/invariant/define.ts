@@ -32,13 +32,6 @@ import type { RunnableScenario } from '../../framework/runnable-scenario.js'
 // existing callers keep their import paths.
 export type { InvariantScenarioConfig } from './config.js'
 
-/**
- * Validation error shape for invariant config.
- *
- * @deprecated Use `ScenarioValidationError` from `framework/validation.ts`.
- */
-export type InvariantValidationError = ScenarioValidationError
-
 function validateInvariantSpecific(
   config: InvariantScenarioConfig,
   errors: ScenarioValidationError[],

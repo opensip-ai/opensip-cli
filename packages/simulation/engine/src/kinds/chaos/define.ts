@@ -27,13 +27,6 @@ import type { RunnableScenario } from '../../framework/runnable-scenario.js'
 // the config shape from `'./define.js'` without churn.
 export type { ChaosScenarioConfig } from './config.js'
 
-/**
- * Validation error shape for chaos config.
- *
- * @deprecated Use `ScenarioValidationError` from `framework/validation.ts`.
- */
-export type ChaosValidationError = ScenarioValidationError
-
 function validatePersonasAndDuration(
   config: ChaosScenarioConfig,
   errors: ScenarioValidationError[],

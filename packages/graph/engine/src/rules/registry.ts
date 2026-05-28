@@ -75,6 +75,9 @@ export function createRulesRegistry(): GraphRulesRegistry {
 /**
  * Read the current scope's graph rule registry. Throws when no scope
  * is active or when the graph subscope is missing.
+ *
+ * @throws {Error} When called outside `runWithScope(...)`, or when the
+ *   active scope has no graph subscope.
  */
 function currentRulesRegistry(): GraphRulesRegistry {
   const scope = currentScope();

@@ -283,6 +283,14 @@ interface SarifDoc {
   runs?: readonly SarifRun[];
 }
 
+/**
+ * Convert a parsed SARIF document into the gate's internal `GateViolation`
+ * shape.
+ *
+ * @throws {GateBaselineInvalidError} When `doc` is not an object or its
+ *   `runs` property is missing or not an array — the SARIF document is
+ *   structurally invalid for our gate consumer.
+ */
 function extractViolationsFromSarif(
   doc: unknown,
   identity: ViolationIdentity,

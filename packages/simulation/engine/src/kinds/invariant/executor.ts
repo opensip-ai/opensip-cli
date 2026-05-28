@@ -36,6 +36,7 @@ import type { InvariantScenarioExecutorResult } from '../../framework/scenario-e
 // DEFAULT DRIVER STUBS
 // =============================================================================
 
+// @fitness-ignore-next-line throws-documentation -- closure always throws Error to surface unconfigured InvariantContext drivers; JSDoc cannot attach to a const-arrow
 const NOT_IMPLEMENTED = (
   primitive: string,
 ): never => {
@@ -153,6 +154,14 @@ function buildContext(
 // PHASE EXECUTION
 // =============================================================================
 
+/**
+ * Run a single invariant-scenario phase (setup/act/assert), classifying any
+ * caught error into a structured phase result. Aborts re-throw as
+ * `ScenarioAbortedError` so the outer runner classifies them correctly.
+ *
+ * @throws {ScenarioAbortedError} When `abortSignal.aborted` is observed
+ *   either at entry or during phase execution.
+ */
 async function runPhase(
   phaseName: 'setup' | 'act' | 'assert',
   fn: (ctx: InvariantContext) => Promise<void>,

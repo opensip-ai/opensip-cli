@@ -1,3 +1,4 @@
+// @fitness-ignore-file no-deprecated-tags -- LegacyLoadResultPayload is the active payload type produced by ScenarioResultBuilder and consumed by the load kind's CustomExecuteFn signature; the @deprecated tag steers new code toward ScenarioExecutorResult but the type is not removable until the CustomExecuteFn migration lands.
 /**
  * @fileoverview Cross-kind type definitions for the Simulation Framework.
  *

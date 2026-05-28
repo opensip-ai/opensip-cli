@@ -94,8 +94,13 @@ export const predicateRegistry: ReadonlyMap<string, PredicateEvaluator> = regist
  * The framework-shipped predicates are typed stubs that throw a clear
  * "not yet implemented" error when invoked. Phase 7.5's harness migration
  * replaces these via `registerPredicate` at composition time.
+ *
+ * @throws {Error} Always — the returned async arrow is a stub. Phase 7.5
+ *   wires the real evaluator via `registerPredicate`. The arrow throws
+ *   synchronously despite being `async`.
  */
 function makeStubEvaluator(id: string): PredicateEvaluator {
+  // @fitness-ignore-next-line throws-documentation -- stub closure always throws Error (documented on the enclosing makeStubEvaluator JSDoc); JSDoc cannot attach to a returned anonymous arrow
   // eslint-disable-next-line @typescript-eslint/require-await -- PredicateEvaluator returns a Promise; this stub throws synchronously
   return async () => {
     // @fitness-ignore-next-line result-pattern-consistency -- intentional stub; harness wires real evaluator

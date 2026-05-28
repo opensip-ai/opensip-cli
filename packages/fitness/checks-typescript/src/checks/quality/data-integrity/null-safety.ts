@@ -94,6 +94,11 @@ const SAFE_BUILDER_PREFIXES = [
   'ScenarioResultBuilder.',
   'ResultBuilder.',
   'CheckResultBuilder.',
+  // Node.js URL helpers (always return a URL/string)
+  'pathToFileURL(',
+  'fileURLToPath(',
+  // new URL(...) constructor — returns URL or throws
+  'new URL(',
   // Node.js child_process (spawn always returns ChildProcess or throws)
   'spawn(',
   'fork(',
@@ -388,6 +393,37 @@ const SAFE_FLUENT_METHODS = new Set([
   'provide',
   // Drizzle column builder — column.$type<T>() always returns the same column reference
   '$type',
+  // Commander.js Command builder — every chained method returns the Command instance
+  'command',
+  'description',
+  'option',
+  'requiredOption',
+  'action',
+  'argument',
+  'version',
+  'name',
+  'alias',
+  'aliases',
+  'addCommand',
+  'addOption',
+  'addArgument',
+  'hook',
+  'usage',
+  'summary',
+  'helpOption',
+  'addHelpText',
+  'showHelpAfterError',
+  'showSuggestionAfterError',
+  'exitOverride',
+  'configureOutput',
+  'configureHelp',
+  'allowExcessArguments',
+  'allowUnknownOption',
+  'enablePositionalOptions',
+  'passThroughOptions',
+  'storeOptionsAsProperties',
+  'copyInheritedSettings',
+  'combineFlagAndOptionalValue',
 ])
 
 /**
@@ -420,14 +456,44 @@ const SAFE_METHOD_PREFIXES = [
   'resolve',
   'register',
   'unregister',
+  // Reading conventions (returns a value or throws — never null)
+  'read',
+  'open',
+  'compute',
+  'make',
+  'render',
+  'ensure',
+  // Functional conventions — pure transforms / current-scope accessors that
+  // always return a value (never null). Matches helpers like `classifyCatalog`,
+  // `filterContent`, `currentScenarioRegistry`, `pickAdapter`.
+  'classify',
+  'filter',
+  'current',
+  'pick',
+  'select',
 ]
 
 /**
- * Check if a call expression is a known safe builder pattern
+ * Check if a call expression is a known safe builder pattern.
+ *
+ * Two paths:
+ *  1. Explicit allowlist (`SAFE_BUILDER_PREFIXES`) — exact-prefix match on the
+ *     full call text (e.g. `z.string(`, `pathToFileURL(`).
+ *  2. Convention heuristic — when the callee is a bare identifier whose name
+ *     starts with a recognised safe verb (`get*`, `read*`, `resolve*`,
+ *     `current*`, `create*`, `build*`, etc.). This is the same convention that
+ *     already covers fluent-chain methods via `isSafeFluentMethod`; applying it
+ *     to standalone calls closes the gap for helpers like `resolveProjectPaths`,
+ *     `readScope`, `currentScenarioRegistry`, etc. whose names convey the same
+ *     "returns a value or throws" contract.
  */
 function isSafeBuilderPattern(expression: ts.CallExpression, sourceFile: ts.SourceFile): boolean {
   const text = expression.getText(sourceFile)
-  return SAFE_BUILDER_PREFIXES.some((prefix) => text.startsWith(prefix))
+  if (SAFE_BUILDER_PREFIXES.some((prefix) => text.startsWith(prefix))) return true
+  if (ts.isIdentifier(expression.expression)) {
+    return isSafeFluentMethod(expression.expression.text)
+  }
+  return false
 }
 
 /**

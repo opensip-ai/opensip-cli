@@ -32,7 +32,13 @@ export interface ScenarioResultView {
   readonly outcomeLabel: string
 }
 
-/** Project a `ScenarioExecutorResult` into a uniform view shape. */
+/**
+ * Project a `ScenarioExecutorResult` into a uniform view shape.
+ *
+ * @throws {Error} When `result.kind` is not in the known discriminated-union
+ *   variants. This is an exhaustiveness guard — a runtime hit means a new
+ *   variant was added without updating this dispatch.
+ */
 export function renderScenarioResultView(
   result: ScenarioExecutorResult,
 ): ScenarioResultView {

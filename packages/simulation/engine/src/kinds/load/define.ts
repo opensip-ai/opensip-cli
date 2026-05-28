@@ -28,14 +28,6 @@ import type {
 // existing callers keep their import paths.
 export type { LoadScenarioConfig } from './config.js'
 
-/**
- * Validation error with field name and message.
- *
- * @deprecated Use `ScenarioValidationError` from `framework/validation.ts`.
- * Kept as a type alias for one release so external callers keep compiling.
- */
-export type LoadValidationError = ScenarioValidationError
-
 function validatePersona(
   persona: PersonaConfig | undefined,
   index: number,

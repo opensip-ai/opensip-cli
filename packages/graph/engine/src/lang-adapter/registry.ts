@@ -200,6 +200,9 @@ export function getDiscoveredAdapters(): readonly GraphLanguageAdapter[] {
  * scope is active or when the graph subscope is missing — both
  * indicate the caller is running outside the CLI's pre-action-hook (or
  * the test fixture forgot to construct + enter a scope).
+ *
+ * @throws {Error} When called outside `runWithScope(...)`, or when the
+ *   active scope has no graph subscope.
  */
 export function currentAdapterRegistry(): GraphAdapterRegistry {
   const scope = currentScope();

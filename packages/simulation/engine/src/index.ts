@@ -1,3 +1,4 @@
+// @fitness-ignore-file no-deprecated-tags -- LegacyLoadResultPayload is the active payload type produced by ScenarioResultBuilder and consumed by load's CustomExecuteFn; the @deprecated tag in the re-export below is a steering hint, not a removal trigger.
 /**
  * @opensip-tools/simulation — Simulation scenarios for codebase analysis.
  *
@@ -61,7 +62,6 @@ export {
   defineLoadScenario,
   validateLoadScenarioConfig,
   type LoadScenarioConfig,
-  type LoadValidationError,
 } from './kinds/load/define.js'
 export type { LoadOutcome } from './kinds/load/result.js'
 
@@ -73,7 +73,6 @@ export {
   defineChaosScenario,
   validateChaosScenarioConfig,
   type ChaosScenarioConfig,
-  type ChaosValidationError,
 } from './kinds/chaos/define.js'
 export type { ChaosOutcome, ChaosEvent, ChaosAssertionVerdict } from './kinds/chaos/result.js'
 
@@ -85,7 +84,6 @@ export {
   defineInvariantScenario,
   validateInvariantScenarioConfig,
   type InvariantScenarioConfig,
-  type InvariantValidationError,
 } from './kinds/invariant/define.js'
 export type {
   InvariantContext,
@@ -106,7 +104,6 @@ export {
   defineFixEvaluationScenario,
   validateFixEvaluationScenarioConfig,
   type FixEvaluationScenarioConfig,
-  type FixEvaluationValidationError,
   type PredicateComposition,
   type PredicateLeaf,
   type SignalPayload,

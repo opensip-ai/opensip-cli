@@ -19,6 +19,10 @@ export interface RetryOptions {
 /**
  * Execute an async function with exponential backoff retry.
  * Throws the last error if all attempts fail.
+ *
+ * @throws {Error} The last error thrown by `fn` after exhausting
+ *   `effectiveMaxAttempts` attempts. Non-Error throws are wrapped in
+ *   an `Error` whose message is `String(value)`.
  */
 export async function withRetry<T>(
   fn: () => Promise<T>,
@@ -61,5 +65,9 @@ export async function withRetry<T>(
     }
   }
 
-  throw lastError!;
+  // `lastError` is always assigned before reaching here: the loop runs
+  // `effectiveMaxAttempts >= 1` times and assigns `lastError` on every catch
+  // path before the loop terminates. Guard explicitly for type-safety.
+  if (!lastError) throw new Error('withRetry: unreachable — no attempts ran');
+  throw lastError;
 }

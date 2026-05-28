@@ -73,6 +73,8 @@ export function getParseTree<TTree>(
  * registered for the extension. Throws when called outside runWithScope —
  * engine work must run inside a RunScope so adapters resolve via
  * cli.scope.languages.
+ *
+ * @throws {Error} When called outside a `runWithScope(...)` block (no current scope).
  */
 export function getParseTreeForFile(filePath: string, content: string): unknown {
   const scope = currentScope()

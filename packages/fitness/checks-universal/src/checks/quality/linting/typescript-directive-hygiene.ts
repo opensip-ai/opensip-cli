@@ -4,7 +4,7 @@
  * Validates TypeScript suppression directives (@ts-expect-error, @ts-ignore) have proper justifications.
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
 
 /** Check ID constant to avoid duplicate string literals */
 const CHECK_SLUG = 'typescript-directive-hygiene'
@@ -100,6 +100,10 @@ export const typescriptDirectiveHygiene = defineCheck({
 
   analyze: (content: string, filePath: string): CheckViolation[] => {
     const violations: CheckViolation[] = []
+
+    // Skip test files — directives inside test-fixture string literals are
+    // not source-level directives (the longDescription has always claimed this).
+    if (isTestFile(filePath)) return violations
 
     // Quick filter - skip files without directives
     if (!content.includes('@ts-expect-error') && !content.includes('@ts-ignore')) {

@@ -39,13 +39,6 @@ export type {
   SignalPayload,
 } from './config.js'
 
-/**
- * Validation error shape for fix-evaluation config.
- *
- * @deprecated Use `ScenarioValidationError` from `framework/validation.ts`.
- */
-export type FixEvaluationValidationError = ScenarioValidationError
-
 // =============================================================================
 // VALIDATION
 // =============================================================================

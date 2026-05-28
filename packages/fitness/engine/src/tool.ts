@@ -374,6 +374,15 @@ async function runLiveMode(
 // GATE MODE — extracted helper used by `fit --gate-save` / `--gate-compare`.
 // =============================================================================
 
+/**
+ * Run `fit --gate-save` or `fit --gate-compare` against the project's
+ * stored baseline.
+ *
+ * @throws {Error} When `executeFit` returns a `fit-done` result without an
+ *   `output` payload — an invariant violation in the fit pipeline (the
+ *   guard above narrows the result type but TypeScript doesn't track that
+ *   `output` is required on the `fit-done` branch).
+ */
 // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
 async function runGateMode(args: CliArgs, cli: ToolCliContext): Promise<void> {
   if (args.gateSave === true && args.gateCompare === true) {
@@ -405,7 +414,12 @@ async function runGateMode(args: CliArgs, cli: ToolCliContext): Promise<void> {
     process.stderr.write(`Error: ${fitResult.result.message}\n`);
     return;
   }
-  const output = fitResult.output!;
+  // `output` is guaranteed defined on the `fit-done` branch (the check above
+  // returns early on any other result type). Guard explicitly to avoid `!`.
+  if (!fitResult.output) {
+    throw new Error('gate: fit-done result must include output');
+  }
+  const output = fitResult.output;
   // Surface non-fatal warnings before the gate output so the user sees them
   // alongside the run summary. Safe here because gate mode is non-Ink.
   emitWarningsToStderr(fitResult.result);

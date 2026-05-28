@@ -9,7 +9,7 @@
  */
 
 
-import { defineCheck, getCheckConfig, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, getCheckConfig, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
 import * as ts from 'typescript'
 
@@ -593,6 +593,11 @@ export const throwsDocumentation = defineCheck({
   timeout: 180_000, // 3 minutes - parses TypeScript AST for all backend files
 
   analyze(content, filePath) {
+    // Skip test files — assertion failures, anonymous test callbacks, and
+    // fixture helpers are not public-API surface. Matches the convention in
+    // `null-safety`. Public-API throws are documented in non-test code.
+    if (isTestFile(filePath)) return []
+
     // Quick filter
     if (!content.includes('throw ')) {
       return []

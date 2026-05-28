@@ -1,3 +1,4 @@
+// @fitness-ignore-file no-deprecated-tags -- CliArgs is a mid-migration bridge type intentionally kept around with @deprecated guidance for the per-command options model (`FitOptions`, `ToolOptions`, `InitOptions`); the deprecation is a steering hint, not removable in this PR.
 import type { StoredSession } from './persistence/store.js';
 import type { ToolShortId } from '@opensip-tools/core';
 
