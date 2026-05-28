@@ -215,77 +215,164 @@ function emitFromUseSegment(
     case 'crate':
     case 'super':
     case 'self': {
-      const segments = decodePathSegments(node);
-      pushDepSite([...prefix, ...segments], node, file, ownerHash, line, column, out);
+      emitFromPathLeaf(node, prefix, file, ownerHash, line, column, out);
       return;
     }
     case 'use_as_clause': {
-      // `<path> as <alias>` — emit the underlying path only.
-      const inner = node.namedChild(0);
-      if (inner) {
-        emitFromUseSegment(inner, prefix, file, ownerHash, line, column, out);
-      }
+      emitFromUseAsClause(node, prefix, file, ownerHash, line, column, out);
       return;
     }
     case 'use_wildcard': {
-      // `<path>::*` — single emission with `*` as the trailing segment.
-      // The grammar nests the path under the wildcard (single named
-      // child); we append `'*'` to the segments.
-      const inner = node.namedChild(0);
-      const segments = inner ? decodePathSegments(inner) : [];
-      pushDepSite([...prefix, ...segments, '*'], node, file, ownerHash, line, column, out);
+      emitFromUseWildcard(node, prefix, file, ownerHash, line, column, out);
       return;
     }
     case 'scoped_use_list': {
-      // `<path>::{<list>}` — combine path + each list child.
-      // Children order: a path-like (identifier / scoped_identifier /
-      // crate / super / self) then a `use_list`.
-      let pathSegs: readonly string[] = [];
-      let list: Parser.SyntaxNode | null = null;
-      for (const c of node.namedChildren) {
-        if (c.type === 'use_list') {
-          list = c;
-        } else if (list === null) {
-          pathSegs = decodePathSegments(c);
-        }
-      }
-      if (list === null) return;
-      const newPrefix = [...prefix, ...pathSegs];
-      for (const item of list.namedChildren) {
-        if (item.type === 'self') {
-          // `use a::b::{self, X}` — `self` refers to the parent path,
-          // i.e. emit the prefix itself.
-          pushDepSite(newPrefix, item, file, ownerHash, line, column, out);
-          continue;
-        }
-        emitFromUseSegment(item, newPrefix, file, ownerHash, line, column, out);
-      }
+      emitFromScopedUseList(node, prefix, file, ownerHash, line, column, out);
       return;
     }
     case 'use_list': {
-      // Bare `{a, b}` — uncommon at top level; descend with current prefix.
-      for (const item of node.namedChildren) {
-        if (item.type === 'self') {
-          pushDepSite([...prefix], item, file, ownerHash, line, column, out);
-          continue;
-        }
-        emitFromUseSegment(item, prefix, file, ownerHash, line, column, out);
-      }
+      emitFromUseList(node, prefix, file, ownerHash, line, column, out);
       return;
     }
     /* v8 ignore start */
     default: {
-      // Unknown shape — defensive fallback: emit raw text as a single
-      // segment so downstream attribution still has something to show.
-      const text = node.text;
-      if (text.length > 0) {
-        pushDepSite([...prefix, text], node, file, ownerHash, line, column, out);
-      }
+      emitFromUnknownUseShape(node, prefix, file, ownerHash, line, column, out);
       return;
     }
     /* v8 ignore stop */
   }
 }
+
+function emitFromPathLeaf(
+  node: Parser.SyntaxNode,
+  prefix: readonly string[],
+  file: RustParsedFile,
+  ownerHash: string,
+  line: number,
+  column: number,
+  out: DependencySiteRecord[],
+): void {
+  const segments = decodePathSegments(node);
+  pushDepSite([...prefix, ...segments], node, file, ownerHash, line, column, out);
+}
+
+function emitFromUseAsClause(
+  node: Parser.SyntaxNode,
+  prefix: readonly string[],
+  file: RustParsedFile,
+  ownerHash: string,
+  line: number,
+  column: number,
+  out: DependencySiteRecord[],
+): void {
+  // `<path> as <alias>` — emit the underlying path only.
+  const inner = node.namedChild(0);
+  if (inner) {
+    emitFromUseSegment(inner, prefix, file, ownerHash, line, column, out);
+  }
+}
+
+function emitFromUseWildcard(
+  node: Parser.SyntaxNode,
+  prefix: readonly string[],
+  file: RustParsedFile,
+  ownerHash: string,
+  line: number,
+  column: number,
+  out: DependencySiteRecord[],
+): void {
+  // `<path>::*` — single emission with `*` as the trailing segment.
+  // The grammar nests the path under the wildcard (single named
+  // child); we append `'*'` to the segments.
+  const inner = node.namedChild(0);
+  const segments = inner ? decodePathSegments(inner) : [];
+  pushDepSite([...prefix, ...segments, '*'], node, file, ownerHash, line, column, out);
+}
+
+function emitFromScopedUseList(
+  node: Parser.SyntaxNode,
+  prefix: readonly string[],
+  file: RustParsedFile,
+  ownerHash: string,
+  line: number,
+  column: number,
+  out: DependencySiteRecord[],
+): void {
+  // `<path>::{<list>}` — combine path + each list child.
+  // Children order: a path-like (identifier / scoped_identifier /
+  // crate / super / self) then a `use_list`.
+  const split = splitScopedUseListChildren(node);
+  if (split.list === null) return;
+  const newPrefix = [...prefix, ...split.pathSegs];
+  emitUseListItems(split.list, newPrefix, file, ownerHash, line, column, out);
+}
+
+function splitScopedUseListChildren(
+  node: Parser.SyntaxNode,
+): { readonly pathSegs: readonly string[]; readonly list: Parser.SyntaxNode | null } {
+  let pathSegs: readonly string[] = [];
+  let list: Parser.SyntaxNode | null = null;
+  for (const c of node.namedChildren) {
+    if (c.type === 'use_list') {
+      list = c;
+    } else if (list === null) {
+      pathSegs = decodePathSegments(c);
+    }
+  }
+  return { pathSegs, list };
+}
+
+function emitFromUseList(
+  node: Parser.SyntaxNode,
+  prefix: readonly string[],
+  file: RustParsedFile,
+  ownerHash: string,
+  line: number,
+  column: number,
+  out: DependencySiteRecord[],
+): void {
+  // Bare `{a, b}` — uncommon at top level; descend with current prefix.
+  emitUseListItems(node, prefix, file, ownerHash, line, column, out);
+}
+
+function emitUseListItems(
+  list: Parser.SyntaxNode,
+  prefix: readonly string[],
+  file: RustParsedFile,
+  ownerHash: string,
+  line: number,
+  column: number,
+  out: DependencySiteRecord[],
+): void {
+  for (const item of list.namedChildren) {
+    if (item.type === 'self') {
+      // `use a::b::{self, X}` — `self` refers to the parent path,
+      // i.e. emit the prefix itself.
+      pushDepSite([...prefix], item, file, ownerHash, line, column, out);
+      continue;
+    }
+    emitFromUseSegment(item, prefix, file, ownerHash, line, column, out);
+  }
+}
+
+/* v8 ignore start */
+function emitFromUnknownUseShape(
+  node: Parser.SyntaxNode,
+  prefix: readonly string[],
+  file: RustParsedFile,
+  ownerHash: string,
+  line: number,
+  column: number,
+  out: DependencySiteRecord[],
+): void {
+  // Unknown shape — defensive fallback: emit raw text as a single
+  // segment so downstream attribution still has something to show.
+  const text = node.text;
+  if (text.length > 0) {
+    pushDepSite([...prefix, text], node, file, ownerHash, line, column, out);
+  }
+}
+/* v8 ignore stop */
 
 /**
  * Decode a path-bearing node into canonical `::`-separated segments.

@@ -185,6 +185,73 @@ function resolveCallSitesAdapter(
 }
 
 /**
+ * Build filePath → module-init bodyHash map from the catalog. Catalog
+ * occurrences carry project-relative filePath; only `module-init` kind
+ * occurrences participate (they're the receiver of import edges).
+ */
+function buildModuleInitIndex(catalog: Catalog): ReadonlyMap<string, string> {
+  const index = new Map<string, string>();
+  for (const occs of Object.values(catalog.functions)) {
+    if (!occs) continue;
+    for (const o of occs) {
+      if (o.kind === 'module-init') {
+        index.set(o.filePath, o.bodyHash);
+      }
+    }
+  }
+  return index;
+}
+
+/**
+ * Wrap `ts.sys` into a `ModuleResolutionHost`. Methods are bound
+ * through arrow functions to satisfy `@typescript-eslint/unbound-method`
+ * (arrow `this` is lexical / void). `useCaseSensitiveFileNames` is a
+ * boolean property on modern `ts.sys` — the function-vs-boolean branch
+ * in earlier code was unreachable dead-code (both branches returned the
+ * same value).
+ */
+function createModuleResolutionHost(): ts.ModuleResolutionHost {
+  return {
+    fileExists: (fileName: string): boolean => ts.sys.fileExists(fileName),
+    readFile: (fileName: string, encoding?: string): string | undefined =>
+      ts.sys.readFile(fileName, encoding),
+    directoryExists: (directoryName: string): boolean =>
+      ts.sys.directoryExists(directoryName),
+    getCurrentDirectory: (): string => ts.sys.getCurrentDirectory(),
+    getDirectories: (path: string): string[] => ts.sys.getDirectories(path),
+    useCaseSensitiveFileNames: ts.sys.useCaseSensitiveFileNames,
+  };
+}
+
+/**
+ * Resolve a single import site to its target module-init bodyHash(es).
+ * Returns the empty array if the module resolves outside the catalog
+ * (e.g. external package, `.d.ts` declaration file) or fails to resolve
+ * at all — both treated as unresolved by downstream attribution.
+ */
+function resolveSiteTargets(
+  site: TsDependencySiteRecord,
+  compilerOptions: ts.CompilerOptions,
+  moduleResolutionHost: ts.ModuleResolutionHost,
+  projectDirAbs: string,
+  moduleInitByFilePath: ReadonlyMap<string, string>,
+): readonly string[] {
+  const resolution = ts.resolveModuleName(
+    site.specifier,
+    site.sourceFile.fileName,
+    compilerOptions,
+    moduleResolutionHost,
+  );
+  if (resolution.resolvedModule === undefined) return [];
+  // Convert absolute resolved path → project-relative POSIX path
+  const projectRel = relative(projectDirAbs, resolution.resolvedModule.resolvedFileName)
+    .split(sep)
+    .join('/');
+  const targetHash = moduleInitByFilePath.get(projectRel);
+  return targetHash === undefined ? [] : [targetHash];
+}
+
+/**
  * Resolve TS import sites to target module-init bodyHashes. Imports
  * resolving to a same-project source file map to that file's
  * module-init occurrence; imports resolving to an external package or
@@ -200,57 +267,19 @@ function resolveDependencies(
   program: ts.Program,
   projectDirAbs: string,
 ): ReadonlyMap<string, readonly DependencyEdge[]> {
-  // Build filePath → module-init bodyHash map. Catalog occurrences
-  // carry project-relative filePath; module-init kind is filtered.
-  const moduleInitByFilePath = new Map<string, string>();
-  for (const occs of Object.values(catalog.functions)) {
-    if (!occs) continue;
-    for (const o of occs) {
-      if (o.kind === 'module-init') {
-        moduleInitByFilePath.set(o.filePath, o.bodyHash);
-      }
-    }
-  }
-
+  const moduleInitByFilePath = buildModuleInitIndex(catalog);
   const compilerOptions = program.getCompilerOptions();
-  // Wrap ts.sys methods in arrow functions to satisfy
-  // @typescript-eslint/unbound-method (arrow `this` is lexical / void).
-  // useCaseSensitiveFileNames is a boolean property on modern ts.sys —
-  // the function-vs-boolean branch in earlier code was unreachable
-  // dead-code (both branches returned the same value).
-  const moduleResolutionHost: ts.ModuleResolutionHost = {
-    fileExists: (fileName: string): boolean => ts.sys.fileExists(fileName),
-    readFile: (fileName: string, encoding?: string): string | undefined =>
-      ts.sys.readFile(fileName, encoding),
-    directoryExists: (directoryName: string): boolean =>
-      ts.sys.directoryExists(directoryName),
-    getCurrentDirectory: (): string => ts.sys.getCurrentDirectory(),
-    getDirectories: (path: string): string[] => ts.sys.getDirectories(path),
-    useCaseSensitiveFileNames: ts.sys.useCaseSensitiveFileNames,
-  };
+  const moduleResolutionHost = createModuleResolutionHost();
 
   const out = new Map<string, DependencyEdge[]>();
   for (const site of sites) {
-    const resolution = ts.resolveModuleName(
-      site.specifier,
-      site.sourceFile.fileName,
+    const to = resolveSiteTargets(
+      site,
       compilerOptions,
       moduleResolutionHost,
+      projectDirAbs,
+      moduleInitByFilePath,
     );
-    let to: readonly string[] = [];
-    if (resolution.resolvedModule !== undefined) {
-      // Convert absolute resolved path → project-relative POSIX path
-      const projectRel = relative(projectDirAbs, resolution.resolvedModule.resolvedFileName)
-        .split(sep)
-        .join('/');
-      const targetHash = moduleInitByFilePath.get(projectRel);
-      if (targetHash !== undefined) {
-        to = [targetHash];
-      }
-      // else: resolved but target not in catalog (e.g., .d.ts file the
-      // walker filtered out, or workspace package outside this project's
-      // module-init set). Treated as unresolved.
-    }
     const edge: DependencyEdge = {
       to,
       line: site.line,

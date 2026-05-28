@@ -162,13 +162,7 @@ function collectFromImportStatement(
   out: DependencySiteRecord[],
 ): void {
   for (const child of stmt.namedChildren) {
-    let dotted: Parser.SyntaxNode | null = null;
-    if (child.type === 'dotted_name') {
-      dotted = child;
-    } else if (child.type === 'aliased_import') {
-      const nameField = child.childForFieldName('name');
-      if (nameField?.type === 'dotted_name') dotted = nameField;
-    }
+    const dotted = resolveImportedNameDotted(child);
     if (!dotted) continue;
     pushDependencySite(stmt, file, moduleInitHash, dotted.text, out);
   }
@@ -208,28 +202,55 @@ function collectFromImportFromStatement(
   }
 
   if (moduleNameField.type === 'relative_import') {
-    const prefix = relativeImportPrefix(moduleNameField);
-    const innerDotted = relativeImportInnerDotted(moduleNameField);
-    if (innerDotted !== null) {
-      // `from .pkg import x` — one site, specifier = '.pkg'
-      pushDependencySite(stmt, file, moduleInitHash, prefix + innerDotted, out);
-      return;
-    }
-    // `from . import sibling, other` — one site PER imported name,
-    // specifier = `.sibling`, `.other`.
-    for (const named of stmt.namedChildren) {
-      if (named === moduleNameField) continue;
-      let dotted: Parser.SyntaxNode | null = null;
-      if (named.type === 'dotted_name') {
-        dotted = named;
-      } else if (named.type === 'aliased_import') {
-        const nameField = named.childForFieldName('name');
-        if (nameField?.type === 'dotted_name') dotted = nameField;
-      }
-      if (!dotted) continue;
-      pushDependencySite(stmt, file, moduleInitHash, prefix + dotted.text, out);
-    }
+    collectFromRelativeImport(stmt, moduleNameField, file, moduleInitHash, out);
   }
+}
+
+/**
+ * Handle the `from <relative_import> import …` case. Splits into two
+ * shapes:
+ *   - relative_import carries an inner dotted_name (`from .pkg import x`)
+ *     → ONE dep site with `prefix + inner` as specifier.
+ *   - relative_import is dots-only (`from . import sibling, other`)
+ *     → ONE dep site PER imported name, specifier `prefix + name`.
+ */
+function collectFromRelativeImport(
+  stmt: Parser.SyntaxNode,
+  moduleNameField: Parser.SyntaxNode,
+  file: PythonParsedFile,
+  moduleInitHash: string,
+  out: DependencySiteRecord[],
+): void {
+  const prefix = relativeImportPrefix(moduleNameField);
+  const innerDotted = relativeImportInnerDotted(moduleNameField);
+  if (innerDotted !== null) {
+    // `from .pkg import x` — one site, specifier = '.pkg'
+    pushDependencySite(stmt, file, moduleInitHash, prefix + innerDotted, out);
+    return;
+  }
+  // `from . import sibling, other` — one site PER imported name,
+  // specifier = `.sibling`, `.other`.
+  for (const named of stmt.namedChildren) {
+    if (named === moduleNameField) continue;
+    const dotted = resolveImportedNameDotted(named);
+    if (!dotted) continue;
+    pushDependencySite(stmt, file, moduleInitHash, prefix + dotted.text, out);
+  }
+}
+
+/**
+ * Resolve an imported-name child to its `dotted_name` node, if any.
+ * Accepts either a bare `dotted_name` or an `aliased_import` whose
+ * `name` field is a `dotted_name`. Returns null for anything else
+ * (e.g. punctuation, comments).
+ */
+function resolveImportedNameDotted(named: Parser.SyntaxNode): Parser.SyntaxNode | null {
+  if (named.type === 'dotted_name') return named;
+  if (named.type === 'aliased_import') {
+    const nameField = named.childForFieldName('name');
+    if (nameField?.type === 'dotted_name') return nameField;
+  }
+  return null;
 }
 
 function relativeImportPrefix(node: Parser.SyntaxNode): string {

@@ -104,7 +104,7 @@ export interface DetectMonorepoLayoutInput {
    * Optional injection for tests — root package.json contents. When set,
    * the on-disk root package.json read is skipped.
    */
-  readonly rootPackageJson?: { readonly workspaces?: readonly string[] | unknown } | null;
+  readonly rootPackageJson?: { readonly workspaces?: unknown } | null;
 }
 
 /**
