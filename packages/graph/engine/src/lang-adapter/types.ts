@@ -66,6 +66,17 @@ export interface DiscoverOutput {
 export interface ParseInput {
   readonly projectDirAbs: string;
   readonly files: readonly string[];
+  /**
+   * Absolute path to the language config file that anchored discovery
+   * (tsconfig.json, pyproject.toml, Cargo.toml, etc.). Optional —
+   * adapters that don't need a config-file anchor may ignore it.
+   *
+   * Threaded through DiscoverOutput so synthetic-partition discovery
+   * in flat monorepos can hand each partition's config to the parser
+   * (e.g. tsc's project-reference / rootDir resolution depends on
+   * knowing which tsconfig the program belongs to).
+   */
+  readonly configPathAbs?: string;
   readonly compilerOptions?: unknown;
 }
 
