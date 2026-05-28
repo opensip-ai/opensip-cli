@@ -5,7 +5,7 @@
  */
 
 import { logger } from '@opensip-tools/core/logger'
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
 
 import { isDigit } from './_helpers/config-validation.js'
 
@@ -222,6 +222,10 @@ export const cacheTtlValidation = defineCheck({
   fileTypes: ['ts'],
 
   analyze(content: string, filePath: string): CheckViolation[] {
+    // Test fixtures intentionally exercise TTL boundary cases (too short,
+    // too long, financial TTLs) to verify detection logic.
+    if (isTestFile(filePath)) return []
+
     logger.debug({
       evt: 'fitness.checks.cache_ttl_validation.analyze',
       msg: 'Analyzing file for cache TTL validation violations',

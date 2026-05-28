@@ -1,3 +1,4 @@
+// @fitness-ignore-file toctou-race-condition -- registry register() reads byName.get then byName.set on local Maps owned by the Registry instance; entirely synchronous, no async gap, safe in single-threaded Node.js
 /**
  * @fileoverview Generic registry — the single base class for every
  * registry in the workspace.

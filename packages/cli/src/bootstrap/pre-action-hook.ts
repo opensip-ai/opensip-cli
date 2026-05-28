@@ -187,7 +187,7 @@ function checkNoProjectAndBailout(
   const stream = jsonOutput ? process.stdout : process.stderr;
   stream.write(`${msg}\n`);
   logger.warn({
-    evt: 'cli.no-project-found',
+    evt: 'cli.project.not-found',
     module: MODULE_TAG,
     runId,
     cwd,
@@ -334,7 +334,7 @@ export function installPreActionHook(program: Command): void {
 
     // 7. Structured start log.
     logger.info({
-      evt: 'cli.start',
+      evt: 'cli.run.start',
       module: MODULE_TAG,
       runId,
       command: actionCommand.name(),
