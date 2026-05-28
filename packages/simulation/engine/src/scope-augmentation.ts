@@ -24,10 +24,9 @@
  * carries no `scope.simulation`, and reads return `undefined`.
  */
 
-import type { Registry } from '@opensip-tools/core';
-
 import type { RunnableScenario } from './framework/runnable-scenario.js';
 import type { SimulationRecipeRegistry } from './recipes/registry.js';
+import type { Registry } from '@opensip-tools/core';
 
 /**
  * Per-RunScope simulation state. Constructed by the simulation tool's

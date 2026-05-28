@@ -2,9 +2,9 @@
  * @fileoverview Tests for `defineFixEvaluationScenario` — fix-evaluation entry point.
  */
 
-import { afterEach, describe, expect, it } from 'vitest'
+import { enterScope } from '@opensip-tools/core'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { clearScenarioRegistry } from '../framework/registry.js'
 import {
   defineFixEvaluationScenario,
   validateFixEvaluationScenarioConfig,
@@ -15,6 +15,8 @@ import {
   registerPredicate,
   resetPredicateRegistryToBaseline,
 } from '../kinds/fix-evaluation/predicates/index.js'
+
+import { makeSimTestScope } from './test-utils/with-sim-scope.js'
 
 const baseConfig: Omit<FixEvaluationScenarioConfig, 'id' | 'name' | 'predicate'> = {
   description: 'sql injection fix predicate test',
@@ -39,8 +41,12 @@ const baseConfig: Omit<FixEvaluationScenarioConfig, 'id' | 'name' | 'predicate'>
   targets: ['src/db.ts'],
 }
 
+beforeEach(() => {
+  // Item 1: scenarioRegistry is per-RunScope. Enter a fresh scope.
+  enterScope(makeSimTestScope())
+})
+
 afterEach(() => {
-  clearScenarioRegistry()
   resetPredicateRegistryToBaseline()
 })
 

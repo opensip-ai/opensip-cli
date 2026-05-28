@@ -13,18 +13,20 @@
  * by any of the existing smoke tests.
  */
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { enterScope } from '@opensip-tools/core';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { ASSERTIONS } from '../framework/assertions.js';
 import { ScenarioAbortedError } from '../framework/execution/scenario-aborted-error.js';
 import { persona } from '../framework/personas.js';
-import { clearScenarioRegistry } from '../framework/registry.js';
 import { renderScenarioResultView } from '../framework/result-renderers.js';
 import { defineChaosScenario } from '../kinds/chaos/define.js';
 import { defineFixEvaluationScenario } from '../kinds/fix-evaluation/define.js';
 import { resetPredicateRegistryToBaseline } from '../kinds/fix-evaluation/predicates/index.js';
 import { defineInvariantScenario } from '../kinds/invariant/define.js';
 import { defineLoadScenario } from '../kinds/load/define.js';
+
+import { makeSimTestScope } from './test-utils/with-sim-scope.js';
 
 import type { ChaosConfig } from '../types/base-types.js';
 
@@ -43,8 +45,11 @@ const baseChaos: ChaosConfig = {
   ],
 };
 
+beforeEach(() => {
+  enterScope(makeSimTestScope());
+});
+
 afterEach(() => {
-  clearScenarioRegistry();
   resetPredicateRegistryToBaseline();
 });
 

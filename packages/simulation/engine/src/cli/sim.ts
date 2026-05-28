@@ -24,17 +24,18 @@ import { pathToFileURL } from 'node:url';
 import { EXIT_CODES } from '@opensip-tools/contracts';
 import { discoverPackagesByMarker, logger, registerRecipesFromMod } from '@opensip-tools/core';
 
-import { scenarioRegistry } from '../framework/registry.js';
+import { currentScenarioRegistry } from '../framework/registry.js';
 import { loadAllSimPlugins } from '../plugins/loader.js';
 import {
   discoverScenarioPackages,
   readScenarioPackageMetadata,
   readScenarioPackagePreferences,
 } from '../plugins/scenario-package-discovery.js';
-import { defaultSimulationRecipeRegistry } from '../recipes/registry.js';
+import { currentSimulationRecipeRegistry } from '../recipes/registry.js';
 import { SimulationRecipeService } from '../recipes/service.js';
 import { SCENARIO_KINDS } from '../types/kind-types.js';
 
+import type { RunnableScenario } from '../framework/runnable-scenario.js';
 import type { SimPluginExports } from '../plugins/types.js';
 import type { ScenarioKind } from '../types/kind-types.js';
 // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; executeSim consumes the CliArgs shape produced by toolOptsToCliArgs in sim's tool.ts until the rip-out
@@ -133,7 +134,7 @@ export async function ensureScenariosLoaded(projectDir?: string): Promise<void> 
   //    or missing dep produce a green run that simulated nothing —
   //    the same failure mode fitness's no-checks guard exists to
   //    prevent.
-  if (scenarioRegistry.size === 0) {
+  if (currentScenarioRegistry().size === 0) {
     const msg =
       'opensip-tools: no scenarios were loaded. ' +
       'Install at least one @opensip-tools/scenarios-* package, ' +
@@ -150,14 +151,54 @@ export async function ensureScenariosLoaded(projectDir?: string): Promise<void> 
 }
 
 /**
+ * Lightweight type guard: returns true when `value` has the minimum
+ * shape of a `RunnableScenario`. Pulled out of the inner loop so the
+ * loadDiscoveredScenarioPackages function stays under the cognitive-
+ * complexity limit.
+ */
+function isRunnableScenarioShape(value: unknown): value is { id: string; kind: string; run: unknown } {
+  return value !== null
+    && typeof value === 'object'
+    && 'id' in value
+    && 'kind' in value
+    && 'run' in value;
+}
+
+/**
+ * Register each well-shaped scenario from a discovered scenario
+ * package's exported `scenarios` array into the current scope's
+ * scenario registry. Per-item failures warn but don't throw — one bad
+ * scenario shouldn't disqualify the rest of the package.
+ */
+function registerScenariosFromMod(
+  scenariosField: unknown,
+  packageName: string,
+): void {
+  if (!Array.isArray(scenariosField)) return;
+  const registry = currentScenarioRegistry();
+  for (const scenario of scenariosField) {
+    if (!isRunnableScenarioShape(scenario)) continue;
+    try {
+      registry.register(scenario as RunnableScenario);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      logger.warn({
+        evt: 'cli.scenario_package.scenario_invalid',
+        module: 'cli:sim',
+        name: packageName,
+        error: msg,
+      });
+    }
+  }
+}
+
+/**
  * Import every scenario package returned by discoverScenarioPackages().
- * Scenarios self-register at module-import time (via the side effects
- * of `defineLoadScenario`, `defineChaosScenario`, etc.), so importing
- * the entry point is enough — we don't extract a `scenarios` array.
- *
- * Recipes, in contrast, don't self-register, so a `recipes` array on
- * the module is iterated and registered into the sim recipe registry,
- * matching what `registerSimExports` does for .mjs plugins.
+ * Both scenarios and recipes are explicit array exports — neither
+ * registers as a side effect of definition (commit 1a0a71b migrated
+ * scenarios; Item 1 migrated recipes). The loader iterates each
+ * exported `scenarios` / `recipes` array and registers items into the
+ * scope-bound registries.
  *
  * Errors loading any one package don't fail the others — they surface
  * to stderr the same way sim-domain plugin failures do.
@@ -190,15 +231,20 @@ export async function loadDiscoveredScenarioPackages(projectDir: string): Promis
       continue;
     }
     try {
-      const sizeBefore = scenarioRegistry.size;
+      const scenarioReg = currentScenarioRegistry();
+      const sizeBefore = scenarioReg.size;
       const moduleUrl = pathToFileURL(meta.mainEntry).href;
       const mod = (await import(moduleUrl)) as SimPluginExports;
-      // Scenarios self-registered on import — measure the delta.
-      const scenariosRegistered = scenarioRegistry.size - sizeBefore;
+      // Walk the exported scenarios array (defineX no longer
+      // self-registers; commit 1a0a71b). registerScenariosFromMod
+      // applies the same silent-skip/throw-on-name-collision behavior
+      // as the .mjs loader and warns on per-item failures.
+      registerScenariosFromMod(mod.scenarios, pkg.name);
+      const scenariosRegistered = scenarioReg.size - sizeBefore;
       // Register any explicit recipes via the shared helper. The helper
       // emits the same plugin.recipe.invalid_item warning loader.ts now
       // emits — replaces the previous silent-drop on malformed recipes.
-      const { recipesRegistered } = registerRecipesFromMod(mod, defaultSimulationRecipeRegistry, {
+      const { recipesRegistered } = registerRecipesFromMod(mod, currentSimulationRecipeRegistry(), {
         namespace: pkg.name,
         onWarn: (evt, message, extra) => {
           logger.warn({
@@ -243,7 +289,7 @@ export async function executeSim(
   await ensureScenariosLoaded(args.cwd);
 
   const recipeName = args.recipe ?? 'default';
-  const recipe = defaultSimulationRecipeRegistry.loadRecipe(recipeName);
+  const recipe = currentSimulationRecipeRegistry().loadRecipe(recipeName);
   if (!recipe) {
     return {
       result: {

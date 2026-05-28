@@ -4,16 +4,17 @@
  * kind filtering, and discriminated-union exhaustiveness.
  */
 
-import { afterEach, describe, expect, it } from 'vitest'
+import { enterScope } from '@opensip-tools/core'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { ASSERTIONS } from '../framework/assertions.js'
 import { persona } from '../framework/personas.js'
 import {
   clearScenarioRegistry,
+  currentScenarioRegistry,
   getRegisteredScenarios,
   getScenariosByKind,
   getScenariosByTag,
-  scenarioRegistry,
 } from '../framework/registry.js'
 import { renderScenarioResultView } from '../framework/result-renderers.js'
 import { defineChaosScenario } from '../kinds/chaos/define.js'
@@ -23,7 +24,13 @@ import { defineInvariantScenario } from '../kinds/invariant/define.js'
 import { defineLoadScenario } from '../kinds/load/define.js'
 import { SCENARIO_KINDS } from '../types/kind-types.js'
 
+import { makeSimTestScope } from './test-utils/with-sim-scope.js'
+
 import type { ScenarioExecutorResult } from '../framework/scenario-executor-result.js'
+
+beforeEach(() => {
+  enterScope(makeSimTestScope())
+})
 
 afterEach(() => {
   clearScenarioRegistry()
@@ -31,7 +38,7 @@ afterEach(() => {
 })
 
 function defineOneOfEachKind(): void {
-  scenarioRegistry.register(
+  currentScenarioRegistry().register(
     defineLoadScenario({
       id: 'cross-load',
       name: 'cross load',
@@ -43,7 +50,7 @@ function defineOneOfEachKind(): void {
     }),
   )
 
-  scenarioRegistry.register(
+  currentScenarioRegistry().register(
     defineChaosScenario({
       id: 'cross-chaos',
       name: 'cross chaos',
@@ -69,7 +76,7 @@ function defineOneOfEachKind(): void {
     }),
   )
 
-  scenarioRegistry.register(
+  currentScenarioRegistry().register(
     defineInvariantScenario({
       id: 'cross-invariant',
       name: 'cross invariant',
@@ -82,7 +89,7 @@ function defineOneOfEachKind(): void {
     }),
   )
 
-  scenarioRegistry.register(
+  currentScenarioRegistry().register(
     defineFixEvaluationScenario({
       id: 'cross-fix-eval',
       name: 'cross fix eval',

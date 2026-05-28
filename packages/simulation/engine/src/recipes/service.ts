@@ -15,7 +15,7 @@
 
 import { logger } from '@opensip-tools/core';
 
-import { scenarioRegistry } from '../framework/registry.js';
+import { currentScenarioRegistry } from '../framework/registry.js';
 
 import type { SimulationRecipe, ScenarioSelector } from './types.js';
 import type { RunnableScenario } from '../framework/runnable-scenario.js';
@@ -109,7 +109,7 @@ export class SimulationRecipeService {
  * selector. Order is the registration order from the registry.
  */
 function resolveSelector(selector: ScenarioSelector): readonly RunnableScenario[] {
-  const all = scenarioRegistry.getAll();
+  const all = currentScenarioRegistry().getAll();
 
   switch (selector.type) {
     case 'all': {

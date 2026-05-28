@@ -12,12 +12,11 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { RunScope } from '@opensip-tools/core';
+import { enterScope, RunScope } from '@opensip-tools/core';
 import { Command } from 'commander';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { clearScenarioRegistry } from '../framework/registry.js';
-import { defaultSimulationRecipeRegistry } from '../recipes/registry.js';
 import { simulationTool } from '../tool.js';
 
 import type { ToolCliContext } from '@opensip-tools/core';
@@ -27,9 +26,18 @@ const PKG = JSON.parse(
   readFileSync(resolve(HERE, '../../package.json'), 'utf8'),
 ) as { version: string };
 
+beforeEach(() => {
+  // Item 1: scenarioRegistry and recipe registry are per-RunScope.
+  // Construct a fresh scope (with simulation extended) and enter it via
+  // AsyncLocalStorage so the tool's action body resolves them through
+  // currentScope() while the test's program.parseAsync runs.
+  const scope = new RunScope();
+  simulationTool.extendScope?.(scope);
+  enterScope(scope);
+});
+
 afterEach(() => {
   clearScenarioRegistry();
-  defaultSimulationRecipeRegistry.reset();
 });
 
 function makeFakeContext(program: Command): {
@@ -49,9 +57,14 @@ function makeFakeContext(program: Command): {
     walkedUp: 0,
     scope: 'none' as const,
   };
+  // The action body uses currentScope() (set by enterScope in
+  // beforeEach), not cli.scope, but ToolCliContext requires a scope
+  // value; mirror project into a throwaway scope here.
+  const ctxScope = new RunScope({ projectContext: project });
+  simulationTool.extendScope?.(ctxScope);
   const ctx: ToolCliContext = {
     program,
-    scope: new RunScope({ projectContext: project }),
+    scope: ctxScope,
     project,
     render: vi.fn((result: unknown) => {
       rendered.push(result);

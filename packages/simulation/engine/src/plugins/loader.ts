@@ -16,8 +16,8 @@
 
 import { loadAllPlugins } from '@opensip-tools/core'
 
-import { scenarioRegistry } from '../framework/registry.js'
-import { defaultSimulationRecipeRegistry } from '../recipes/registry.js'
+import { currentScenarioRegistry } from '../framework/registry.js'
+import { currentSimulationRecipeRegistry } from '../recipes/registry.js'
 
 import type { SimPluginExports } from './types.js'
 import type { RunnableScenario } from '../framework/runnable-scenario.js'
@@ -33,7 +33,7 @@ import type {
  *  matching the prior behavior of silently skipping duplicates. */
 function tryRegisterRecipe(recipe: SimulationRecipe): boolean {
   try {
-    defaultSimulationRecipeRegistry.register(recipe, { allowOverwrite: false })
+    currentSimulationRecipeRegistry().register(recipe, { allowOverwrite: false })
     return true
   } catch {
     return false
@@ -45,13 +45,14 @@ function tryRegisterRecipe(recipe: SimulationRecipe): boolean {
  *  `duplicatePolicy: 'silent-skip'`. A name-collision with a different
  *  id throws — surfaced to the caller as `false`. */
 function tryRegisterScenario(scenario: RunnableScenario): boolean {
-  const before = scenarioRegistry.size
+  const registry = currentScenarioRegistry()
+  const before = registry.size
   try {
-    scenarioRegistry.register(scenario)
+    registry.register(scenario)
   } catch {
     return false
   }
-  return scenarioRegistry.size > before
+  return registry.size > before
 }
 
 function isValidRecipe(value: unknown): value is SimulationRecipe {

@@ -2,15 +2,25 @@
  * @fileoverview Tests for `defineLoadScenario` — load-kind entry point.
  */
 
-import { afterEach, describe, expect, it } from 'vitest'
+import { enterScope } from '@opensip-tools/core'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { ASSERTIONS } from '../framework/assertions.js'
 import { persona } from '../framework/personas.js'
-import { clearScenarioRegistry, getScenario, scenarioRegistry } from '../framework/registry.js'
+import { clearScenarioRegistry, currentScenarioRegistry, getScenario } from '../framework/registry.js'
 import {
   defineLoadScenario,
   validateLoadScenarioConfig,
 } from '../kinds/load/define.js'
+
+import { makeSimTestScope } from './test-utils/with-sim-scope.js'
+
+beforeEach(() => {
+  // Build a fresh scope per test and enter it via AsyncLocalStorage.
+  // Item 1 made scenarioRegistry per-RunScope; each test gets its own
+  // empty registry rather than sharing a process-global one.
+  enterScope(makeSimTestScope())
+})
 
 afterEach(() => {
   clearScenarioRegistry()
@@ -43,7 +53,7 @@ describe('defineLoadScenario', () => {
       duration: 1,
       assertions: [ASSERTIONS.lowErrorRate(0.5)],
     })
-    scenarioRegistry.register(scenario)
+    currentScenarioRegistry().register(scenario)
 
     expect(getScenario('load-test-2')).toBeDefined()
     expect(getScenario('Load Test 2')).toBeDefined()

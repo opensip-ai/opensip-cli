@@ -9,14 +9,15 @@
  * As of Phase 6 Task 6.1, `defineX` no longer auto-registers — it
  * returns the scenario object only. Uniqueness against an existing
  * scenario registry is checked at registration time
- * (`scenarioRegistry.register(scenario)`), not at definition time.
+ * (`currentScenarioRegistry().register(scenario)`), not at definition time.
  */
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { enterScope } from '@opensip-tools/core';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { ASSERTIONS } from '../framework/assertions.js';
 import { persona } from '../framework/personas.js';
-import { clearScenarioRegistry, scenarioRegistry } from '../framework/registry.js';
+import { clearScenarioRegistry, currentScenarioRegistry } from '../framework/registry.js';
 import {
   defineChaosScenario,
   validateChaosScenarioConfig,
@@ -35,6 +36,8 @@ import {
   defineLoadScenario,
   validateLoadScenarioConfig,
 } from '../kinds/load/define.js';
+
+import { makeSimTestScope } from './test-utils/with-sim-scope.js';
 
 import type { ChaosConfig } from '../types/base-types.js';
 
@@ -78,6 +81,13 @@ const baseFixEvalConfig: Omit<FixEvaluationScenarioConfig, 'id' | 'name' | 'pred
   },
 };
 
+beforeEach(() => {
+  // Item 1: scenarioRegistry is per-RunScope. Each test gets a fresh
+  // scope with an empty scenario registry; enterScope (enterWith)
+  // propagates it for the test body's async context.
+  enterScope(makeSimTestScope());
+});
+
 afterEach(() => {
   clearScenarioRegistry();
   resetPredicateRegistryToBaseline();
@@ -98,7 +108,7 @@ describe('load kind — validation edges', () => {
       duration: 1,
       assertions: [ASSERTIONS.lowErrorRate()],
     });
-    scenarioRegistry.register(first);
+    currentScenarioRegistry().register(first);
 
     const second = defineLoadScenario({
       id: 'name-load-2',
@@ -109,7 +119,7 @@ describe('load kind — validation edges', () => {
       duration: 1,
       assertions: [ASSERTIONS.lowErrorRate()],
     });
-    expect(() => scenarioRegistry.register(second)).toThrow(/name collision/);
+    expect(() => currentScenarioRegistry().register(second)).toThrow(/name collision/);
   });
 
   it('registry silent-skips a duplicate id (same id, same scenario)', () => {
@@ -122,10 +132,10 @@ describe('load kind — validation edges', () => {
       duration: 1,
       assertions: [ASSERTIONS.lowErrorRate()],
     });
-    scenarioRegistry.register(scenario);
+    currentScenarioRegistry().register(scenario);
     // Re-registering with the same id is a no-op under the
     // silent-skip duplicate policy.
-    expect(() => scenarioRegistry.register(scenario)).not.toThrow();
+    expect(() => currentScenarioRegistry().register(scenario)).not.toThrow();
   });
 
   it('rejects when rampUp exceeds duration', () => {
@@ -247,7 +257,7 @@ describe('chaos kind — validation edges', () => {
       recoveryAssertions: [ASSERTIONS.lowErrorRate(1)],
       recoveryWindow: 100,
     });
-    scenarioRegistry.register(first);
+    currentScenarioRegistry().register(first);
 
     const second = defineChaosScenario({
       id: 'chaos-n-2',
@@ -261,7 +271,7 @@ describe('chaos kind — validation edges', () => {
       recoveryAssertions: [ASSERTIONS.lowErrorRate(1)],
       recoveryWindow: 100,
     });
-    expect(() => scenarioRegistry.register(second)).toThrow(/name collision/);
+    expect(() => currentScenarioRegistry().register(second)).toThrow(/name collision/);
   });
 
   it('defineChaosScenario does not auto-register (Phase 6 contract)', () => {
@@ -278,7 +288,7 @@ describe('chaos kind — validation edges', () => {
       recoveryWindow: 100,
     });
     expect(scenario.kind).toBe('chaos');
-    expect(scenarioRegistry.get('chaos-noreg')).toBeUndefined();
+    expect(currentScenarioRegistry().get('chaos-noreg')).toBeUndefined();
   });
 
   it('defineChaosScenario still requires an id', () => {
@@ -420,7 +430,7 @@ describe('invariant kind — validation edges', () => {
       act: noopAsync,
       assert: noopAsync,
     });
-    scenarioRegistry.register(first);
+    currentScenarioRegistry().register(first);
 
     const second = defineInvariantScenario({
       id: 'inv-n-2',
@@ -432,7 +442,7 @@ describe('invariant kind — validation edges', () => {
       act: noopAsync,
       assert: noopAsync,
     });
-    expect(() => scenarioRegistry.register(second)).toThrow(/name collision/);
+    expect(() => currentScenarioRegistry().register(second)).toThrow(/name collision/);
   });
 
   it('defineInvariantScenario does not auto-register (Phase 6 contract)', () => {
@@ -447,7 +457,7 @@ describe('invariant kind — validation edges', () => {
       assert: noopAsync,
     });
     expect(scenario.kind).toBe('invariant');
-    expect(scenarioRegistry.get('inv-noreg')).toBeUndefined();
+    expect(currentScenarioRegistry().get('inv-noreg')).toBeUndefined();
   });
 
   it('defineInvariantScenario still requires id', () => {
@@ -556,7 +566,7 @@ describe('fix-evaluation kind — validation edges', () => {
       name: 'Shared FE Name',
       predicate: { all_of: [{ id: 'tests-pass' }, { id: 'no-tests-modified' }] },
     });
-    scenarioRegistry.register(first);
+    currentScenarioRegistry().register(first);
 
     const second = defineFixEvaluationScenario({
       ...baseFixEvalConfig,
@@ -564,7 +574,7 @@ describe('fix-evaluation kind — validation edges', () => {
       name: 'Shared FE Name',
       predicate: { all_of: [{ id: 'tests-pass' }, { id: 'no-tests-modified' }] },
     });
-    expect(() => scenarioRegistry.register(second)).toThrow(/name collision/);
+    expect(() => currentScenarioRegistry().register(second)).toThrow(/name collision/);
   });
 
   it('defineFixEvaluationScenario does not auto-register (Phase 6 contract)', () => {
@@ -575,7 +585,7 @@ describe('fix-evaluation kind — validation edges', () => {
       predicate: { all_of: [{ id: 'tests-pass' }, { id: 'no-tests-modified' }] },
     });
     expect(scenario.kind).toBe('fix-evaluation');
-    expect(scenarioRegistry.get('fe-noreg')).toBeUndefined();
+    expect(currentScenarioRegistry().get('fe-noreg')).toBeUndefined();
   });
 
   it('defineFixEvaluationScenario still requires id', () => {

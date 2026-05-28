@@ -44,7 +44,8 @@ export type {
 // =============================================================================
 
 export {
-  scenarioRegistry,
+  createScenarioRegistry,
+  currentScenarioRegistry,
   getRegisteredScenarios,
   getScenario,
   getScenariosByTag,
@@ -209,7 +210,8 @@ export {
 export { defineSimulationRecipe } from './recipes/define-recipe.js'
 export {
   SimulationRecipeRegistry,
-  defaultSimulationRecipeRegistry,
+  createSimulationRecipeRegistry,
+  currentSimulationRecipeRegistry,
 } from './recipes/registry.js'
 export type { SimulationRecipeDisplayInfo } from './recipes/registry.js'
 export {
