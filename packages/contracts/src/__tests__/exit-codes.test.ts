@@ -1,6 +1,20 @@
+import {
+  ConfigurationError,
+  NetworkError,
+  NotFoundError,
+  SystemError,
+  TimeoutError,
+  ToolError,
+  ValidationError,
+} from '@opensip-tools/core';
 import { describe, expect, it } from 'vitest';
 
-import { EXIT_CODES, getErrorSuggestion, type ErrorSuggestion } from '../exit-codes.js';
+import {
+  EXIT_CODES,
+  getErrorSuggestion,
+  mapToolErrorToExitCode,
+  type ErrorSuggestion,
+} from '../exit-codes.js';
 
 describe('EXIT_CODES', () => {
   it('exposes the documented set', () => {
@@ -162,5 +176,50 @@ describe('getErrorSuggestion', () => {
   it('preserves the unknown-recipe message verbatim', () => {
     const out = getErrorSuggestion(new Error('Unknown recipe foo'));
     expect(out?.message).toBe('Unknown recipe foo');
+  });
+});
+
+describe('mapToolErrorToExitCode (Tool error contract — audit-round-2 Finding C)', () => {
+  it('NotFoundError → CHECK_NOT_FOUND', () => {
+    expect(mapToolErrorToExitCode(new NotFoundError('missing'))).toBe(EXIT_CODES.CHECK_NOT_FOUND);
+  });
+
+  it('ConfigurationError → CONFIGURATION_ERROR', () => {
+    expect(mapToolErrorToExitCode(new ConfigurationError('bad config'))).toBe(
+      EXIT_CODES.CONFIGURATION_ERROR,
+    );
+  });
+
+  it('ValidationError → CONFIGURATION_ERROR', () => {
+    expect(mapToolErrorToExitCode(new ValidationError('bad input'))).toBe(
+      EXIT_CODES.CONFIGURATION_ERROR,
+    );
+  });
+
+  it('NetworkError → REPORT_FAILED', () => {
+    expect(mapToolErrorToExitCode(new NetworkError('connection refused'))).toBe(
+      EXIT_CODES.REPORT_FAILED,
+    );
+  });
+
+  it('TimeoutError → RUNTIME_ERROR', () => {
+    expect(mapToolErrorToExitCode(new TimeoutError('took too long'))).toBe(EXIT_CODES.RUNTIME_ERROR);
+  });
+
+  it('SystemError → RUNTIME_ERROR', () => {
+    expect(mapToolErrorToExitCode(new SystemError('boom'))).toBe(EXIT_CODES.RUNTIME_ERROR);
+  });
+
+  it('bare ToolError → RUNTIME_ERROR (fallback)', () => {
+    expect(mapToolErrorToExitCode(new ToolError('opaque', 'WHATEVER'))).toBe(
+      EXIT_CODES.RUNTIME_ERROR,
+    );
+  });
+
+  it('user-defined ToolError subclass routes by its nearest mapped ancestor', () => {
+    class GatePolicyError extends ConfigurationError {}
+    expect(mapToolErrorToExitCode(new GatePolicyError('policy violated'))).toBe(
+      EXIT_CODES.CONFIGURATION_ERROR,
+    );
   });
 });

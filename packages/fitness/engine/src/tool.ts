@@ -35,6 +35,7 @@
 /* eslint-disable sonarjs/deprecation -- intentional adapter usage; tool.ts bridges per-command FitOptions/ToolOptions to executeFit's legacy CliArgs shape via fitOptsToCliArgs / toolOptsToCliArgs */
 import {
   EXIT_CODES,
+  mapToolErrorToExitCode,
   type CliArgs,
   type CliProgram,
   type FitOptions,
@@ -421,6 +422,14 @@ async function runGateMode(args: CliArgs, cli: ToolCliContext): Promise<void> {
     cli.setExitCode(result.degraded ? 1 : 0);
     return;
   } catch (error) {
+    // Gate mode is plain-text (not Ink), so we render the error
+    // ourselves to stderr instead of letting it escape to the CLI's
+    // Ink-based `handleParseError`. The exit-code policy still flows
+    // through the canonical `mapToolErrorToExitCode` so a gate-mode
+    // failure gets the same exit code an Ink-mode failure would —
+    // GateBaselineMissingError (extends ConfigurationError) → 2,
+    // GateBaselineInvalidError (extends SystemError) → 1. Unknown
+    // errors rethrow to the central handler.
     if (error instanceof GateBaselineMissingError || error instanceof GateBaselineInvalidError) {
       cli.logger.warn({
         evt: 'cli.gate.baseline_error',
@@ -429,7 +438,7 @@ async function runGateMode(args: CliArgs, cli: ToolCliContext): Promise<void> {
         errorType: error.name,
         reason: error.message,
       });
-      cli.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
+      cli.setExitCode(mapToolErrorToExitCode(error));
       process.stderr.write(`Error: ${error.message}\n`);
       return;
     }

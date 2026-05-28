@@ -197,6 +197,51 @@ export interface ToolCliContext {
   readonly datastore: unknown;
 }
 
+/**
+ * Tool error-handling contract.
+ *
+ * Tools have two paths for surfacing failure to the CLI dispatcher:
+ *
+ *   1. **Result-shaped return** — for expected business outcomes that
+ *      callers may want to render with full UX (Ink, JSON, dashboard).
+ *      Action handlers compute a `CommandResult` (`type: 'error'` is
+ *      one variant) and pass it through `cli.render` / `cli.emitJson`,
+ *      setting the exit code via `cli.setExitCode`. Both `simulation`
+ *      and `graph` use this path for normal failures.
+ *
+ *   2. **Throw a `ToolError` subclass** — for unrecoverable / programmer
+ *      conditions, or for known-error classes that the tool would
+ *      rather let the central handler map to an exit code. The CLI's
+ *      top-level `handleParseError` catches every `ToolError` that
+ *      escapes a tool's action body and routes it through the
+ *      canonical `mapToolErrorToExitCode` (in `@opensip-tools/contracts`).
+ *
+ * Which subclass to throw, by intent:
+ *
+ *   - `ConfigurationError` — bad user input / missing config / wrong
+ *     flag combination. Exit code: `CONFIGURATION_ERROR` (2).
+ *   - `ValidationError`    — a validated value failed an invariant.
+ *     Exit code: `CONFIGURATION_ERROR` (2).
+ *   - `NotFoundError`      — a named entity (check, recipe, scenario)
+ *     does not exist. Exit code: `CHECK_NOT_FOUND` (3).
+ *   - `NetworkError`       — remote call failed (e.g. `--report-to`).
+ *     Exit code: `REPORT_FAILED` (4).
+ *   - `TimeoutError`       — an operation exceeded its deadline.
+ *     Exit code: `RUNTIME_ERROR` (1).
+ *   - `SystemError`        — bootstrap-invariant violation or data
+ *     corruption. Exit code: `RUNTIME_ERROR` (1).
+ *   - bare `ToolError`     — any other tool failure. Exit code:
+ *     `RUNTIME_ERROR` (1).
+ *
+ * Tools that need to catch their own `ToolError` locally (e.g. to
+ * render in a non-Ink format) should still derive the exit code from
+ * `mapToolErrorToExitCode` rather than hardcoding the constant — that
+ * keeps a single source of truth for the policy.
+ *
+ * Plain `Error` instances thrown from a tool action body fall through
+ * to the data-driven `getErrorSuggestion` substring matcher, then to a
+ * generic `RUNTIME_ERROR`. Prefer the typed path.
+ */
 export interface Tool {
   readonly metadata: ToolMetadata;
   /**

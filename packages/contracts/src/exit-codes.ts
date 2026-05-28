@@ -1,3 +1,12 @@
+import {
+  ConfigurationError,
+  NetworkError,
+  NotFoundError,
+  TimeoutError,
+  ValidationError,
+  type ToolError,
+} from '@opensip-tools/core';
+
 export const EXIT_CODES = {
   SUCCESS: 0,
   RUNTIME_ERROR: 1,
@@ -5,6 +14,32 @@ export const EXIT_CODES = {
   CHECK_NOT_FOUND: 3,
   REPORT_FAILED: 4,
 } as const;
+
+/**
+ * Canonical mapping from typed `ToolError` subclasses to CLI exit
+ * codes. This is the single source of truth for how typed errors flow
+ * into the process exit code — both the CLI's top-level
+ * `handleParseError` and any tool that chooses to handle its own
+ * `ToolError` locally route through this function.
+ *
+ * The mapping policy (see `Tool` interface JSDoc in
+ * `@opensip-tools/core` for the full contract):
+ *
+ *   - `NotFoundError`       → `CHECK_NOT_FOUND` (exit 3)
+ *   - `ConfigurationError`  → `CONFIGURATION_ERROR` (exit 2)
+ *   - `ValidationError`     → `CONFIGURATION_ERROR` (exit 2)
+ *   - `NetworkError`        → `REPORT_FAILED` (exit 4)
+ *   - `TimeoutError`        → `RUNTIME_ERROR` (exit 1)
+ *   - any other `ToolError` → `RUNTIME_ERROR` (exit 1)
+ */
+export function mapToolErrorToExitCode(error: ToolError): number {
+  if (error instanceof NotFoundError) return EXIT_CODES.CHECK_NOT_FOUND;
+  if (error instanceof ConfigurationError) return EXIT_CODES.CONFIGURATION_ERROR;
+  if (error instanceof ValidationError) return EXIT_CODES.CONFIGURATION_ERROR;
+  if (error instanceof NetworkError) return EXIT_CODES.REPORT_FAILED;
+  if (error instanceof TimeoutError) return EXIT_CODES.RUNTIME_ERROR;
+  return EXIT_CODES.RUNTIME_ERROR;
+}
 
 export interface ErrorSuggestion {
   message: string;
