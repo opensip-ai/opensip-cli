@@ -33,10 +33,19 @@ import { parseProject as parseTypescriptProject } from './parse.js';
 import { isTypescriptTestFile } from './test-file.js';
 import { walkProgram } from './walk.js';
 
+import { relative, sep } from 'node:path';
+
+import ts from 'typescript';
+
 import type { TypescriptParsedProject } from './parse.js';
-import type { CallSiteRecord as TsCallSiteRecord } from './walk.js';
+import type {
+  CallSiteRecord as TsCallSiteRecord,
+  DependencySiteRecord as TsDependencySiteRecord,
+} from './walk.js';
 import type {
   CallSiteRecord as ContractCallSiteRecord,
+  DependencyEdge,
+  DependencySiteRecord as ContractDependencySiteRecord,
   DiscoverInput,
   DiscoverOutput,
   GraphLanguageAdapter,
@@ -49,7 +58,6 @@ import type {
   Catalog,
   CallEdge,
 } from '@opensip-tools/graph';
-import type ts from 'typescript';
 
 
 /**
@@ -113,9 +121,18 @@ function walkProjectAdapter(input: WalkInput<TypescriptParsedProject>): WalkOutp
     kind: r.kind,
     childHash: r.childHash,
   }));
+  const dependencySites: ContractDependencySiteRecord[] = walked.dependencySites.map((r) => ({
+    nodeRef: r.node,
+    sourceFileRef: r.sourceFile,
+    ownerHash: r.ownerHash,
+    specifier: r.specifier,
+    line: r.line,
+    column: r.column,
+  }));
   return {
     occurrences: walked.functions,
     callSites,
+    dependencySites,
     parseErrors: walked.parseErrors,
   };
 }
@@ -138,10 +155,110 @@ function resolveCallSitesAdapter(
     projectDirAbs: input.projectDirAbs,
     callSites: legacyCallSites,
   });
+
+  // Phase 4 (DEC-498): resolve dependency sites if any. Translate
+  // back to the TS-specific shape (with real ts.Node handles) and
+  // run module resolution.
+  const dependenciesByOwner = input.dependencySites && input.dependencySites.length > 0
+    ? resolveDependencies(
+        input.dependencySites.map((r): TsDependencySiteRecord => ({
+          node: r.nodeRef as ts.Node,
+          sourceFile: r.sourceFileRef as ts.SourceFile,
+          ownerHash: r.ownerHash,
+          specifier: r.specifier,
+          line: r.line,
+          column: r.column,
+        })),
+        input.catalog,
+        input.project.program,
+        input.projectDirAbs,
+      )
+    : undefined;
+
   return {
     edgesByOwner: collectByOwner(result.catalog),
+    dependenciesByOwner,
     stats: result.resolutionStats,
   };
+}
+
+/**
+ * Resolve TS import sites to target module-init bodyHashes. Imports
+ * resolving to a same-project source file map to that file's
+ * module-init occurrence; imports resolving to an external package or
+ * a `.d.ts` declaration file (outside the catalog) produce unresolved
+ * `DependencyEdge` entries with `to: []` and the raw specifier carried
+ * in `specifier` for downstream attribution.
+ *
+ * Phase 4 of opensip's substrate consolidation (DEC-498).
+ */
+function resolveDependencies(
+  sites: readonly TsDependencySiteRecord[],
+  catalog: Catalog,
+  program: ts.Program,
+  projectDirAbs: string,
+): ReadonlyMap<string, readonly DependencyEdge[]> {
+  // Build filePath → module-init bodyHash map. Catalog occurrences
+  // carry project-relative filePath; module-init kind is filtered.
+  const moduleInitByFilePath = new Map<string, string>();
+  for (const occs of Object.values(catalog.functions)) {
+    if (!occs) continue;
+    for (const o of occs) {
+      if (o.kind === 'module-init') {
+        moduleInitByFilePath.set(o.filePath, o.bodyHash);
+      }
+    }
+  }
+
+  const compilerOptions = program.getCompilerOptions();
+  const moduleResolutionHost: ts.ModuleResolutionHost = {
+    fileExists: ts.sys.fileExists,
+    readFile: ts.sys.readFile,
+    directoryExists: ts.sys.directoryExists,
+    getCurrentDirectory: ts.sys.getCurrentDirectory,
+    getDirectories: ts.sys.getDirectories,
+    useCaseSensitiveFileNames:
+      typeof ts.sys.useCaseSensitiveFileNames === 'function'
+        ? ts.sys.useCaseSensitiveFileNames
+        : ts.sys.useCaseSensitiveFileNames,
+  };
+
+  const out = new Map<string, DependencyEdge[]>();
+  for (const site of sites) {
+    const resolution = ts.resolveModuleName(
+      site.specifier,
+      site.sourceFile.fileName,
+      compilerOptions,
+      moduleResolutionHost,
+    );
+    let to: readonly string[] = [];
+    if (resolution.resolvedModule !== undefined) {
+      // Convert absolute resolved path → project-relative POSIX path
+      const projectRel = relative(projectDirAbs, resolution.resolvedModule.resolvedFileName)
+        .split(sep)
+        .join('/');
+      const targetHash = moduleInitByFilePath.get(projectRel);
+      if (targetHash !== undefined) {
+        to = [targetHash];
+      }
+      // else: resolved but target not in catalog (e.g., .d.ts file the
+      // walker filtered out, or workspace package outside this project's
+      // module-init set). Treated as unresolved.
+    }
+    const edge: DependencyEdge = {
+      to,
+      line: site.line,
+      column: site.column,
+      specifier: site.specifier,
+    };
+    const existing = out.get(site.ownerHash);
+    if (existing !== undefined) {
+      existing.push(edge);
+    } else {
+      out.set(site.ownerHash, [edge]);
+    }
+  }
+  return out;
 }
 
 /**

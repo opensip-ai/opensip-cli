@@ -69,6 +69,30 @@ export interface CallSiteRecord {
   readonly childHash?: string;
 }
 
+/**
+ * One module-level import site discovered by the walker. Resolved to
+ * a target module-init bodyHash by the resolver (Phase 4 of opensip's
+ * substrate consolidation — DEC-498).
+ *
+ * Covers `ImportDeclaration` and `ImportEqualsDeclaration` with a
+ * string moduleSpecifier. Re-exports (`ExportDeclaration` with
+ * `moduleSpecifier`) and dynamic imports (`import('…')` expressions)
+ * are out of scope at v1 — they can be added in a follow-up if
+ * dispatch grouping shows they matter.
+ */
+export interface DependencySiteRecord {
+  readonly node: ts.Node;
+  readonly sourceFile: ts.SourceFile;
+  /** bodyHash of the file's synthesized module-init occurrence. */
+  readonly ownerHash: string;
+  /** Raw import specifier — `'./foo'`, `'@opensip/core'`, etc. */
+  readonly specifier: string;
+  /** 1-based line of the import statement. */
+  readonly line: number;
+  /** 0-based column. */
+  readonly column: number;
+}
+
 export interface WalkInput {
   readonly program: ts.Program;
   readonly files: readonly string[];
@@ -78,6 +102,7 @@ export interface WalkInput {
 export interface WalkOutput {
   readonly functions: Record<string, FunctionOccurrence[]>;
   readonly callSites: readonly CallSiteRecord[];
+  readonly dependencySites: readonly DependencySiteRecord[];
   readonly parseErrors: readonly ParseError[];
 }
 
@@ -87,6 +112,7 @@ export function walkProgram(input: WalkInput): WalkOutput {
     FunctionOccurrence[]
   >;
   const callSites: CallSiteRecord[] = [];
+  const dependencySites: DependencySiteRecord[] = [];
   const parseErrors: ParseError[] = [];
   const filesSet = new Set(input.files.map(normalizeForCompare));
 
@@ -95,7 +121,7 @@ export function walkProgram(input: WalkInput): WalkOutput {
     const sfPath = normalizeForCompare(sf.fileName);
     if (!filesSet.has(sfPath)) continue;
     try {
-      walkFile(sf, input.projectDirAbs, functions, callSites);
+      walkFile(sf, input.projectDirAbs, functions, callSites, dependencySites);
     } catch (error) {
       /* v8 ignore start */
       parseErrors.push({
@@ -106,7 +132,50 @@ export function walkProgram(input: WalkInput): WalkOutput {
     }
   }
 
-  return { functions, callSites, parseErrors };
+  return { functions, callSites, dependencySites, parseErrors };
+}
+
+/**
+ * Walk a source file's top-level statements for `ImportDeclaration`
+ * and `ImportEqualsDeclaration` nodes; emit one `DependencySiteRecord`
+ * per import with a string module specifier. The owner is the file's
+ * synthesized module-init occurrence (every file has exactly one).
+ *
+ * Phase 4 of opensip's substrate consolidation (DEC-498). Out of
+ * scope at v1: re-exports (`ExportDeclaration` with `moduleSpecifier`),
+ * dynamic imports (`import(…)` expressions), and side-effect imports
+ * with no specifier identifier.
+ */
+function collectDependencySites(
+  sourceFile: ts.SourceFile,
+  moduleInitHash: string,
+  out: DependencySiteRecord[],
+): void {
+  for (const stmt of sourceFile.statements) {
+    let specifierNode: ts.Expression | undefined;
+    if (ts.isImportDeclaration(stmt)) {
+      specifierNode = stmt.moduleSpecifier;
+    } else if (
+      ts.isImportEqualsDeclaration(stmt) &&
+      ts.isExternalModuleReference(stmt.moduleReference) &&
+      stmt.moduleReference.expression !== undefined
+    ) {
+      specifierNode = stmt.moduleReference.expression;
+    }
+    if (specifierNode === undefined || !ts.isStringLiteral(specifierNode)) {
+      continue;
+    }
+    const startPos = stmt.getStart(sourceFile);
+    const lineChar = sourceFile.getLineAndCharacterOfPosition(startPos);
+    out.push({
+      node: stmt,
+      sourceFile,
+      ownerHash: moduleInitHash,
+      specifier: specifierNode.text,
+      line: lineChar.line + 1,
+      column: lineChar.character,
+    });
+  }
 }
 
 function walkFile(
@@ -114,6 +183,7 @@ function walkFile(
   projectDirAbs: string,
   out: Record<string, FunctionOccurrence[]>,
   callSites: CallSiteRecord[],
+  dependencySites: DependencySiteRecord[],
 ): void {
   const filePathProjectRel = relative(projectDirAbs, sourceFile.fileName)
     .split(sep)
@@ -132,6 +202,9 @@ function walkFile(
   // call sites discovered before any function-shape descent.
   const moduleInit = synthesizeModuleInit(sourceFile, baseCtx);
   record(out, moduleInit);
+
+  // Phase 4 (DEC-498): walk top-level imports as dependency sites.
+  collectDependencySites(sourceFile, moduleInit.bodyHash, dependencySites);
 
   function descend(node: ts.Node, ctx: VisitorContext, ownerHash: string): void {
     const occ = dispatchVisitor(node, ctx);
