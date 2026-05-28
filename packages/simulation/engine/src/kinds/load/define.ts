@@ -51,14 +51,6 @@ export interface LoadScenarioConfig {
   readonly execute?: CustomExecuteFn
 }
 
-/**
- * Validation error with field name and message.
- *
- * @deprecated Use `ScenarioValidationError` from `framework/validation.ts`.
- * Kept as a type alias for one release so external callers keep compiling.
- */
-export type LoadValidationError = ScenarioValidationError
-
 function validatePersona(
   persona: PersonaConfig | undefined,
   index: number,

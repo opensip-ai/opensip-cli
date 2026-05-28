@@ -660,13 +660,25 @@ async function runGateMode(
   await Promise.resolve();
 }
 
+/**
+ * Send graph findings to an external reporting endpoint (`--report-to`).
+ *
+ * @throws {Error} When `opts.reportTo` is unexpectedly undefined — the CLI
+ *   dispatcher only routes here when `--report-to` is set, so this is an
+ *   invariant violation in the caller, not a user-input error.
+ */
 async function runReportMode(
   opts: GraphCommandOptions,
   signals: readonly Signal[],
   cli: ToolCliContext,
 ): Promise<void> {
   const cliOutput = buildCliOutput(signals, 'graph');
-  const url = opts.reportTo!;
+  // Caller wires runReportMode only when opts.reportTo is set; guard to satisfy
+  // the type system without `!`.
+  if (!opts.reportTo) {
+    throw new Error('runReportMode: opts.reportTo must be defined');
+  }
+  const url = opts.reportTo;
   // toolVersion tracks @opensip-tools/graph package.json's version. Manually
   // synced — bump alongside any package.json version change. A future
   // build-time constant via tsc plugin or import-assertion would remove this
@@ -697,6 +709,12 @@ async function runReportMode(
  * Synchronous file write — catalog payloads are bounded (per-package
  * fan-out limits per-run scope) and we want backpressure if disk is
  * full rather than a deferred-write surprise.
+ *
+ * @throws {ConfigurationError} When `--catalog-output` is set but a
+ *   required provenance flag (`--tenant-id`, `--repo-id`, `--git-sha`)
+ *   is missing or empty, or when `opts.catalogOutput` itself is unset.
+ * @throws {ToolError} When the engine returned a null catalog/indexes
+ *   pair (no parseable input).
  */
 function runCatalogJsonMode(
   opts: GraphCommandOptions,
@@ -755,7 +773,13 @@ function runCatalogJsonMode(
     repoId: opts.repoId,
     gitSha: opts.gitSha,
   });
-  writeFileSync(opts.catalogOutput!, json);
+  // catalogOutput is required to reach this function (CLI options layer
+  // routes to runCatalogJsonMode only when --catalog-output is set). Guard
+  // explicitly so the type system tracks the narrowing without `!`.
+  if (!opts.catalogOutput) {
+    throw new ConfigurationError('--catalog-output is required for catalog-json mode.');
+  }
+  writeFileSync(opts.catalogOutput, json);
   logger.info({
     evt: 'graph.render.catalog_json.complete',
     module: MODULE_GRAPH_RENDER,

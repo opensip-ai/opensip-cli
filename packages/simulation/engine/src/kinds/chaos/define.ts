@@ -57,13 +57,6 @@ export interface ChaosScenarioConfig {
   readonly recoveryWindow: number
 }
 
-/**
- * Validation error shape for chaos config.
- *
- * @deprecated Use `ScenarioValidationError` from `framework/validation.ts`.
- */
-export type ChaosValidationError = ScenarioValidationError
-
 function validatePersonasAndDuration(
   config: ChaosScenarioConfig,
   errors: ScenarioValidationError[],

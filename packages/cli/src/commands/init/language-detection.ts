@@ -61,6 +61,8 @@ export function detectLanguages(cwd: string): SupportedLanguage[] {
  * Parse the `--language <comma-separated>` argv string into a list of
  * known languages. Throws on unknown entries — the CLI surfaces it as
  * an exit-2 configuration error.
+ *
+ * @throws {Error} When `raw` contains a token not present in `ALL_LANGUAGES`.
  */
 export function parseLanguageFlag(raw: string): SupportedLanguage[] {
   const out: SupportedLanguage[] = [];

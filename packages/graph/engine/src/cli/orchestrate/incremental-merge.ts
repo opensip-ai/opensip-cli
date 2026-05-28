@@ -42,6 +42,9 @@ export interface ClosureOutput {
  * that vanished, scans cached edges for any that still point at
  * vanished hashes, and adds those callers to the closure. Stops when
  * no new dependents are discovered.
+ *
+ * @throws {Error} When the incremental walk produces no result for a
+ *   non-empty closure (a logic invariant violation in the walker).
  */
 export function expandClosureToFixpoint(input: ClosureInput): ClosureOutput {
   const { adapter, discovery, cachedCatalog, parsedProject, changedFilesAbs } = input;

@@ -102,6 +102,9 @@ function isSafeNpmSpec(spec: string): boolean {
  * an unusual indent). A malformed document fails closed: the edit
  * is skipped and a structured error is thrown so the caller can
  * surface a clear "your config is broken" message.
+ *
+ * @throws {Error} When the YAML document at `configPath` cannot be
+ *   parsed or has an unexpected shape under `plugins.<domain>`.
  */
 function editPluginList(
   configPath: string,

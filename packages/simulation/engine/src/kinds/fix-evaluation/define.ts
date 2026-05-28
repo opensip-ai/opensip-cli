@@ -98,13 +98,6 @@ export interface FixEvaluationScenarioConfig {
   readonly targets?: readonly string[]
 }
 
-/**
- * Validation error shape for fix-evaluation config.
- *
- * @deprecated Use `ScenarioValidationError` from `framework/validation.ts`.
- */
-export type FixEvaluationValidationError = ScenarioValidationError
-
 // =============================================================================
 // VALIDATION
 // =============================================================================

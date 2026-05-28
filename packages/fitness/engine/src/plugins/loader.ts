@@ -134,6 +134,14 @@ function registerLangExports(
   const registeredAdapterIds = new Set<string>()
   let adaptersRegistered = 0
 
+  // The throws-documentation check requires JSDoc on functions with `throw`
+  // statements, but JSDoc placed above a `const arrow = ...` assignment is
+  // not attached to the arrow node (TS's leading-comment scan starts at the
+  // arrow's getFullStart, which is past the `=`). The closure captures
+  // `registeredAdapterIds` / `adaptersRegistered` / `ctx`, so it can't be
+  // hoisted to a top-level `function` declaration. Suppress the next-line
+  // directive with the same contract the JSDoc would carry.
+  // @fitness-ignore-next-line throws-documentation -- closure throws Error when called outside runWithScope; JSDoc cannot attach to a const-arrow
   const tryRegisterAdapter = (value: unknown, sourceLabel: string): void => {
     if (!looksLikeLanguageAdapter(value)) return
     const id = (value as { id: string }).id

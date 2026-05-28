@@ -185,6 +185,8 @@ export interface PartitionFlatRepoInput {
  * Sorted output: partition IDs are returned in stable lexicographic
  * order; files within each partition are sorted lexicographically.
  * Determinism matters for cache keys and reproducible runs.
+ *
+ * @throws {Error} When `input.chunkSize` is non-positive.
  */
 export function partitionFlatRepo(input: PartitionFlatRepoInput): readonly SyntheticPartition[] {
   const chunkSize = input.chunkSize ?? DEFAULT_CHUNK_SIZE;
@@ -257,6 +259,9 @@ function chunkByCount(
   return out;
 }
 
+/**
+ * @throws {Error} When `depth` is less than 1 (no directory level to chunk by).
+ */
 function chunkByDirectoryDepth(
   files: readonly string[],
   repoRoot: string,

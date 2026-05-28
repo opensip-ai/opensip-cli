@@ -47,13 +47,6 @@ export interface InvariantScenarioConfig {
   readonly deps?: Partial<InvariantContextDeps>
 }
 
-/**
- * Validation error shape for invariant config.
- *
- * @deprecated Use `ScenarioValidationError` from `framework/validation.ts`.
- */
-export type InvariantValidationError = ScenarioValidationError
-
 function validateInvariantSpecific(
   config: InvariantScenarioConfig,
   errors: ScenarioValidationError[],

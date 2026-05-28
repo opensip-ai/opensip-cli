@@ -38,8 +38,9 @@ function run(...args: string[]): { stdout: string; exitCode: number } {
       env: { ...process.env, NO_COLOR: '1' },
     });
     return { stdout, exitCode: 0 };
-  } catch (error: any) {
-    return { stdout: error.stdout ?? '', exitCode: error.status ?? 1 };
+  } catch (error: unknown) {
+    const err = error as { stdout?: string; status?: number };
+    return { stdout: err.stdout ?? '', exitCode: err.status ?? 1 };
   }
 }
 
@@ -53,8 +54,9 @@ function runIn(cwd: string, ...args: string[]): { stdout: string; exitCode: numb
       env: { ...process.env, NO_COLOR: '1' },
     });
     return { stdout, exitCode: 0 };
-  } catch (error: any) {
-    return { stdout: error.stdout ?? '', exitCode: error.status ?? 1 };
+  } catch (error: unknown) {
+    const err = error as { stdout?: string; status?: number };
+    return { stdout: err.stdout ?? '', exitCode: err.status ?? 1 };
   }
 }
 
