@@ -1,6 +1,6 @@
 import { withRetry, logger } from '@opensip-tools/core';
 
-import type { SarifResult, SarifLocation, SarifFix } from './sarif/types.js';
+import type { SarifResult, SarifLocation } from './sarif/types.js';
 import type { CliOutput } from '@opensip-tools/contracts';
 
 const SARIF_SCHEMA = 'https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json';
@@ -68,10 +68,20 @@ class SarifResultBuilder {
     return this;
   }
 
-  withFix(suggestion: string): this {
+  /**
+   * Append a remediation hint to the result message. SARIF's `fixes`
+   * array requires `artifactChanges` (spec §3.55) — a structured
+   * replacement region. Fitness only has prose advice, so emitting it
+   * as a `fix` produces schema-invalid SARIF (GitHub Code Scanning
+   * rejects the upload). Surfacing the suggestion in `message.text`
+   * keeps it visible in the alert UI without lying about its shape.
+   */
+  withSuggestion(suggestion: string): this {
     if (!suggestion) return this;
-    const fix: SarifFix = { description: { text: suggestion } };
-    this.result.fixes = [fix];
+    const existing = this.result.message?.text ?? '';
+    this.result.message = {
+      text: existing ? `${existing}\n\nSuggestion: ${suggestion}` : `Suggestion: ${suggestion}`,
+    };
     return this;
   }
 
@@ -99,7 +109,7 @@ function buildSarifRuns(output: CliOutput): SarifRun[] {
       const builder = new SarifResultBuilder(f.ruleId, f.message)
         .withSeverity(f.severity);
       if (f.filePath) builder.withLocation(f.filePath, f.line, f.column);
-      if (f.suggestion) builder.withFix(f.suggestion);
+      if (f.suggestion) builder.withSuggestion(f.suggestion);
       results.push(builder.build());
     }
 

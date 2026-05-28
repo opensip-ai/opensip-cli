@@ -120,12 +120,16 @@ describe('buildSarifLog', () => {
     expect(results[1].level).toBe('warning');
   });
 
-  it('includes suggestions as fixes', () => {
+  it('folds suggestions into the result message', () => {
+    // SARIF `fixes` require `artifactChanges` (spec §3.55); fitness only
+    // has prose advice, so suggestions are appended to message.text and
+    // no `fixes` array is emitted.
     const sarif = buildSarifLog(makeSampleOutput());
     const runs = sarif.runs as { results: Record<string, unknown>[] }[];
-    const second = runs[0].results[1] as { fixes: { description: { text: string } }[] };
+    const second = runs[0].results[1] as { message: { text: string }; fixes?: unknown };
 
-    expect(second.fixes[0].description.text).toBe('Use a logger');
+    expect(second.message.text).toBe('console.warn found\n\nSuggestion: Use a logger');
+    expect(second.fixes).toBeUndefined();
   });
 
   it('includes rule IDs in driver rules', () => {

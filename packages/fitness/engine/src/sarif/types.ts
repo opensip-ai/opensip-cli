@@ -42,21 +42,20 @@ interface SarifMessage {
   text?: string
 }
 
-/** SARIF 2.1.0 fix description. */
-export interface SarifFix {
-  description?: SarifMessage
-}
-
 /**
  * SARIF 2.1.0 result. Shared by `buildSarifRuns` (producer) and
  * `extractViolationsFromSarif` (consumer) in gate.ts. All fields are
  * optional because real-world SARIF documents from third-party tools
  * frequently omit fields we don't strictly require.
+ *
+ * Note: we deliberately do not model `fixes`. The SARIF spec requires
+ * `artifactChanges` on every `fix` (§3.55), which fitness has no way
+ * to produce from prose suggestions. Suggestion text is folded into
+ * `message.text` by the producer instead.
  */
 export interface SarifResult {
   ruleId?: string
   level?: string
   message?: SarifMessage
   locations?: readonly SarifLocation[]
-  fixes?: readonly SarifFix[]
 }
