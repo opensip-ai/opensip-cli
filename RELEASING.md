@@ -2,10 +2,10 @@
 
 Releases are tag-driven. Pushing a tag matching `v*` triggers
 `.github/workflows/release.yml`, which builds, tests, packs, and
-publishes all 23 `@opensip-tools/*` packages to npm via OIDC trusted
+publishes all 27 `@opensip-tools/*` packages to npm via OIDC trusted
 publishing — no `NPM_TOKEN` required.
 
-## The 24 packages
+## The 27 packages
 
 | Layer | Package | Path |
 |-------|---------|------|
@@ -25,6 +25,8 @@ publishing — no `NPM_TOKEN` required.
 | Graph adapters | `@opensip-tools/graph-typescript` | `packages/graph/graph-typescript` |
 | Graph adapters | `@opensip-tools/graph-python` | `packages/graph/graph-python` |
 | Graph adapters | `@opensip-tools/graph-rust` | `packages/graph/graph-rust` |
+| Graph adapters | `@opensip-tools/graph-go` | `packages/graph/graph-go` |
+| Graph adapters | `@opensip-tools/graph-java` | `packages/graph/graph-java` |
 | Tools | `@opensip-tools/dashboard` | `packages/dashboard` |
 | Check packs | `@opensip-tools/checks-typescript` | `packages/fitness/checks-typescript` |
 | Check packs | `@opensip-tools/checks-universal` | `packages/fitness/checks-universal` |
@@ -32,9 +34,10 @@ publishing — no `NPM_TOKEN` required.
 | Check packs | `@opensip-tools/checks-go` | `packages/fitness/checks-go` |
 | Check packs | `@opensip-tools/checks-java` | `packages/fitness/checks-java` |
 | Check packs | `@opensip-tools/checks-cpp` | `packages/fitness/checks-cpp` |
+| Check packs | `@opensip-tools/checks-rust` | `packages/fitness/checks-rust` |
 | CLI | `@opensip-tools/cli` | `packages/cli` |
 
-All 24 share the same version. The release workflow publishes them in
+All 27 share the same version. The release workflow publishes them in
 dependency order; downstream packages reference upstream versions in
 their `dependencies`.
 
@@ -76,9 +79,9 @@ their `dependencies`.
 6. Verify on npm:
    ```bash
    for p in core datastore contracts cli-ui cli fitness simulation graph dashboard \
-            graph-typescript graph-python graph-rust \
+            graph-typescript graph-python graph-rust graph-go graph-java \
             lang-typescript lang-rust lang-python lang-go lang-java lang-cpp \
-            checks-typescript checks-universal checks-python checks-go checks-java checks-cpp; do
+            checks-typescript checks-universal checks-python checks-go checks-java checks-cpp checks-rust; do
      printf '%-40s %s\n' "@opensip-tools/$p" "$(npm view "@opensip-tools/$p" version 2>/dev/null || echo MISSING)"
    done
    ```
@@ -112,14 +115,17 @@ Order:
 9. **`@opensip-tools/graph`** — depends on core, contracts, cli-ui,
    plus the peer-layer SARIF edge into fitness.
 10. **Graph adapter packs** — `@opensip-tools/graph-typescript`,
-    `graph-python`, `graph-rust`. Each depends on the engine
-    (`@opensip-tools/graph`) plus its parser (typescript /
-    tree-sitter-*). Independent of each other; published in any order
-    within the group.
+    `graph-python`, `graph-rust`, `graph-go`, `graph-java`. Each
+    depends on the engine (`@opensip-tools/graph`) plus its parser
+    (typescript / tree-sitter-*). Independent of each other; published
+    in any order within the group. The non-TS adapters are opt-in
+    plugins — the CLI does not depend on them, so users who want them
+    install explicitly.
 11. **Check packs** (any order within this group):
     `checks-typescript`, `checks-universal`, `checks-python`,
-    `checks-go`, `checks-java`, `checks-cpp` — all peer-depend on
-    fitness.
+    `checks-go`, `checks-java`, `checks-cpp`, `checks-rust` — all
+    peer-depend on fitness. `checks-rust` is opt-in (not a CLI
+    dependency); install explicitly.
 12. **`@opensip-tools/cli`** — depends on every tool, every check pack
     and every graph adapter pack the CLI loads by default, every
     language adapter, contracts, datastore, and cli-ui. Always
@@ -128,7 +134,7 @@ Order:
 ## Prerequisites (one-time setup)
 
 - **npm Trusted Publishers** must be configured per-package on
-  npmjs.com → package settings → Publishing access. Each of the 21
+  npmjs.com → package settings → Publishing access. Each of the 27
   packages needs an entry pointing to:
   - Organization: `opensip-ai`
   - Repository: `opensip-tools`
@@ -160,11 +166,17 @@ To unblock:
    NPM_TOKEN=npm_xxx ./tools/bootstrap-publish.sh
    ```
 
-   The script is **idempotent**. It iterates the 24 packages in
-   dependency order, skips any whose current source version is already
-   on npm, packs and publishes the rest using the token, and at the
-   end prints a list of newly-created packages with direct links to
-   their npmjs.com settings pages.
+   The script is **namespace-creation only** and **idempotent**. It
+   iterates the 27 packages in dependency order, skips any whose NAME
+   already exists on npm (those get v`X.Y.Z` via the OIDC tagged
+   release, with provenance), packs and publishes only the brand-new
+   names using the token, and at the end prints a list of newly-created
+   packages with direct links to their npmjs.com settings pages.
+
+   We deliberately do NOT publish already-existing package names from
+   this script: token-based publishes have no provenance, and npm
+   versions are immutable, so doing so would permanently lock v`X.Y.Z`
+   without provenance and block the OIDC release from re-publishing.
 
 3. Visit each link the script printed and add the trusted publisher
    entry (org/repo/workflow as above).

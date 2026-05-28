@@ -6,11 +6,20 @@
 # npmjs.com. npm trusted publishing (OIDC) requires the package to
 # already exist on the registry before a trusted publisher can be
 # configured — there is no "pending trusted publisher" feature. This
-# script creates the packages so trusted publishers can be set up via
-# the web UI; subsequent releases use OIDC via .github/workflows/release.yml.
+# script creates brand-new package names so trusted publishers can be
+# set up via the web UI; subsequent releases use OIDC via
+# .github/workflows/release.yml.
 #
-# Idempotent — already-published versions are skipped, so the script
-# is safe to re-run if it hits a network error partway through.
+# Namespace-creation only. Packages whose NAME already exists on npm
+# (at any version) are skipped — their v$VERSION will be published by
+# the OIDC tagged release with provenance. Publishing already-existing
+# names here would ship the new version without provenance and then
+# permanently block OIDC from re-publishing (npm versions are
+# immutable), so we deliberately avoid it.
+#
+# Idempotent — re-running after a partial failure skips both
+# already-existing names and brand-new names whose first bootstrap
+# publish has now landed.
 #
 # Usage:
 #   NPM_TOKEN=npm_xxx ./tools/bootstrap-publish.sh
@@ -57,8 +66,8 @@ PACKAGES=(
   lang-typescript lang-rust lang-python lang-go lang-java lang-cpp
   dashboard
   fitness simulation graph
-  graph-typescript graph-python graph-rust
-  checks-universal checks-typescript checks-python checks-go checks-java checks-cpp
+  graph-typescript graph-python graph-rust graph-go graph-java
+  checks-universal checks-typescript checks-python checks-go checks-java checks-cpp checks-rust
   cli
 )
 
@@ -69,22 +78,25 @@ newly_created=()
 for pkg in "${PACKAGES[@]}"; do
   name="@opensip-tools/$pkg"
 
-  # Has this exact version already been published?
-  if npm --userconfig "$NPMRC" view "${name}@${VERSION}" version >/dev/null 2>&1; then
-    echo "skip    $name@$VERSION (already on registry)"
+  # Namespace-creation only: skip any package whose NAME already exists on
+  # npm, regardless of version. Existing packages already have trusted
+  # publishers configured, so their v$VERSION should be published by the
+  # OIDC tagged release (with provenance) — not by this token-based script
+  # (no provenance, and immutable once published would lock v$VERSION
+  # without provenance forever).
+  if npm --userconfig "$NPMRC" view "$name" version >/dev/null 2>&1; then
+    echo "skip    $name (name exists; OIDC release will publish v$VERSION with provenance)"
     skipped=$((skipped + 1))
     continue
   fi
 
-  # Does the package exist at all? (informational — affects trusted-publisher step)
-  if ! npm --userconfig "$NPMRC" view "$name" version >/dev/null 2>&1; then
-    newly_created+=("$name")
-    marker="NEW"
-  else
-    marker="EXISTS"
-  fi
+  # Brand-new package name — must be bootstrapped here so its trusted
+  # publisher entry becomes configurable. This single token-based publish
+  # ships without provenance; all subsequent versions get provenance via
+  # OIDC. Accepted tradeoff documented in RELEASING.md.
+  newly_created+=("$name")
 
-  echo "pack    $name  [$marker]"
+  echo "pack    $name  [NEW]"
   pnpm --filter "$name" pack --pack-destination "$TARBALL_DIR" >/dev/null
 
   tarball="$TARBALL_DIR/opensip-tools-${pkg}-${VERSION}.tgz"

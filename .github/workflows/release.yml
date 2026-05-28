@@ -78,8 +78,8 @@ jobs:
             lang-typescript lang-rust lang-python lang-go lang-java lang-cpp \
             dashboard \
             fitness simulation graph \
-            graph-typescript graph-python graph-rust \
-            checks-universal checks-typescript checks-python checks-go checks-java checks-cpp \
+            graph-typescript graph-python graph-rust graph-go graph-java \
+            checks-universal checks-typescript checks-python checks-go checks-java checks-cpp checks-rust \
             cli ; do
             name="@opensip-tools/$pkg"
             if npm view "$name" version >/dev/null 2>&1 ; then
@@ -95,7 +95,7 @@ jobs:
 
       # Pack every workspace package into a tarball. `pnpm pack` resolves
       # workspace:* deps into concrete versions, which `npm publish` then
-      # uploads. We pack all 19 up front so the publish step can run
+      # uploads. We pack all 27 up front so the publish step can run
       # against a known-good set of tarballs in dependency order.
       - name: Pack all workspace packages (resolves workspace:*)
         run: |
@@ -125,6 +125,8 @@ jobs:
           pnpm --filter @opensip-tools/graph-typescript pack --pack-destination /tmp/tarballs
           pnpm --filter @opensip-tools/graph-python    pack --pack-destination /tmp/tarballs
           pnpm --filter @opensip-tools/graph-rust      pack --pack-destination /tmp/tarballs
+          pnpm --filter @opensip-tools/graph-go        pack --pack-destination /tmp/tarballs
+          pnpm --filter @opensip-tools/graph-java      pack --pack-destination /tmp/tarballs
           # Layer 4 — check packs
           pnpm --filter @opensip-tools/checks-universal  pack --pack-destination /tmp/tarballs
           pnpm --filter @opensip-tools/checks-typescript pack --pack-destination /tmp/tarballs
@@ -132,6 +134,7 @@ jobs:
           pnpm --filter @opensip-tools/checks-go         pack --pack-destination /tmp/tarballs
           pnpm --filter @opensip-tools/checks-java       pack --pack-destination /tmp/tarballs
           pnpm --filter @opensip-tools/checks-cpp        pack --pack-destination /tmp/tarballs
+          pnpm --filter @opensip-tools/checks-rust       pack --pack-destination /tmp/tarballs
           # Layer 5 — composition root
           pnpm --filter @opensip-tools/cli              pack --pack-destination /tmp/tarballs
           ls -la /tmp/tarballs
@@ -189,6 +192,8 @@ jobs:
           publish_if_new graph-typescript
           publish_if_new graph-python
           publish_if_new graph-rust
+          publish_if_new graph-go
+          publish_if_new graph-java
           # Layer 4 — check packs (depend on fitness)
           publish_if_new checks-universal
           publish_if_new checks-typescript
@@ -196,6 +201,7 @@ jobs:
           publish_if_new checks-go
           publish_if_new checks-java
           publish_if_new checks-cpp
+          publish_if_new checks-rust
           # Layer 5 — CLI (depends on every tool, every check pack, every adapter)
           publish_if_new cli
 
