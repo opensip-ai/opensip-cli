@@ -1,3 +1,4 @@
+// @fitness-ignore-file file-length-limit -- Coverage-driven aggregate fixture file (sibling of coverage-branch-push.test.ts); recipe-config-driven branch fixtures must stay co-located so the gate owner is a single push file.
 /**
  * @fileoverview Third branch-coverage push: uses recipe config injection
  * to drive otherwise-unreachable defensive guard branches, plus targeted

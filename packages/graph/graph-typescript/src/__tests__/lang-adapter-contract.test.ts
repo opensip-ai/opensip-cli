@@ -1,3 +1,4 @@
+// @fitness-ignore-file file-length-limit -- Contract test suite covering the 9 behavioral invariants (I-1..I-9) for all three GraphLanguageAdapter implementations (TS/Python/Rust); splitting per-language fragments the single-source contract document those tests verify.
 /**
  * GraphLanguageAdapter contract test suite.
  *

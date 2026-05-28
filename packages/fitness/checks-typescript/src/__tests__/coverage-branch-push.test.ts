@@ -1,3 +1,4 @@
+// @fitness-ignore-file file-length-limit -- Coverage-driven aggregate fixture file: each describe targets a specific uncovered branch and must stay co-located with sibling fixtures so the >=90% branch-coverage gate has a single owner per push.
 /**
  * @fileoverview Branch-coverage push: targets high-impact uncovered branches
  * across many checks via rich, realistic source fixtures. The objective is

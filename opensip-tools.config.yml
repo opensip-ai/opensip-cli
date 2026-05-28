@@ -9,6 +9,9 @@
 
 globalExcludes:
   - "docs/**"
+  # Historical changelog — append-only by definition, expected to grow.
+  # Not source; source-shape checks (file length, complexity) do not apply.
+  - "CHANGELOG.md"
 
 targets:
   backend:
