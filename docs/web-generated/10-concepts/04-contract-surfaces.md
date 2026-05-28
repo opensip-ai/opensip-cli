@@ -60,13 +60,14 @@ opensip-tools
 │   ├── --gate-compare
 │   └── … (see fit-list, fit-recipes for catalogs)
 ├── sim                    (run simulation scenarios — experimental)
-├── graph                  (static call-graph + dead-end analysis)
+├── graph [paths...]       (static call-graph + dead-end analysis)
 │   ├── --json
 │   ├── --no-cache
 │   ├── --gate-save
 │   ├── --gate-compare
-│   ├── --package <name|path>   (TypeScript-only)
-│   └── --packages              (TypeScript-only)
+│   ├── --workspace             (fan-out across detected workspace units)
+│   ├── --concurrency <n>       (cap for --workspace)
+│   └── --language <name>       (force a specific adapter)
 ├── init                   (scaffold the project)
 ├── dashboard              (open the HTML report)
 ├── sessions
