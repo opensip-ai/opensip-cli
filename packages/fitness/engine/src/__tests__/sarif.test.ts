@@ -82,19 +82,49 @@ describe('buildSarifLog', () => {
     expect(result?.locations?.[0]?.physicalLocation.region).toBeUndefined();
   });
 
-  it('creates one run per check with findings', () => {
+  it('collapses many checks into one run (Code Scanning 25-runs cap regression)', () => {
+    // Reproduces the GitHub Code Scanning REST limit: a fit:ci run with
+    // 51 checks producing findings previously emitted 51 runs and the
+    // upload was rejected. Locking in the one-run shape so that limit
+    // can never be re-hit by adding more checks.
+    const manyChecks: CliOutput = {
+      ...makeSampleOutput(),
+      checks: Array.from({ length: 60 }, (_, i) => ({
+        checkSlug: `check-${i}`,
+        passed: false,
+        durationMs: 1,
+        findings: [{
+          ruleId: `check-${i}`,
+          message: `finding ${i}`,
+          severity: 'warning' as const,
+          filePath: `src/f${i}.ts`,
+          line: 1,
+        }],
+      })),
+    };
+    const sarif = buildSarifLog(manyChecks);
+    const runs = sarif.runs as { results: unknown[]; tool: { driver: { rules: { id: string }[] } } }[];
+
+    expect(runs).toHaveLength(1);
+    expect(runs[0].results).toHaveLength(60);
+    expect(runs[0].tool.driver.rules).toHaveLength(60);
+  });
+
+  it('aggregates all checks into a single SARIF run', () => {
+    // SARIF models one `run` as one analysis tool's output. Fitness is
+    // the tool; each check is a rule within it. Emitting one run per
+    // check exceeded GitHub Code Scanning's 25-runs-per-upload limit.
     const sarif = buildSarifLog(makeSampleOutput());
     const runs = sarif.runs as Record<string, unknown>[];
 
-    // Only 1 check has findings (no-console-log); require-error-handling has 0
     expect(runs).toHaveLength(1);
   });
 
-  it('uses check slug as tool driver name', () => {
+  it('names the tool driver after the fitness tool, not the check', () => {
     const sarif = buildSarifLog(makeSampleOutput());
     const runs = sarif.runs as { tool: { driver: { name: string } } }[];
 
-    expect(runs[0].tool.driver.name).toBe('no-console-log');
+    expect(runs[0].tool.driver.name).toBe('opensip-tools-fit');
   });
 
   it('includes file locations in results', () => {

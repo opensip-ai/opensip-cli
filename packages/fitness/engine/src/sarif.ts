@@ -90,19 +90,37 @@ class SarifResultBuilder {
   }
 }
 
-/** Build a SARIF 2.1.0 log from CLI output — one run per check slug */
+/**
+ * Tool driver name in the emitted SARIF. Matches the CodeQL Action
+ * `category` set in the CI workflow (`opensip-tools-fit`); both must
+ * agree so Code Scanning groups our findings under a single tool.
+ */
+const TOOL_DRIVER_NAME = 'opensip-tools-fit';
+const TOOL_DRIVER_VERSION = '2.0.0';
+
+/**
+ * Build a SARIF 2.1.0 log from CLI output.
+ *
+ * SARIF models one `run` as one analysis tool's output. Fitness is the
+ * tool; each check is a *rule* within fitness — not a separate tool.
+ * The emitted log therefore contains a single run with all findings
+ * aggregated and every check exposed as an entry in
+ * `tool.driver.rules`.
+ *
+ * The previous one-run-per-check shape hit the GitHub Code Scanning
+ * REST limit ("No more than 25 items are allowed; N were supplied")
+ * the moment fitness ran more than 25 checks with findings.
+ */
 export function buildSarifLog(output: CliOutput): Record<string, unknown> {
   return wrapSarifLog(buildSarifRuns(output));
 }
 
 function buildSarifRuns(output: CliOutput): SarifRun[] {
-  const runs: SarifRun[] = [];
+  const ruleIds = new Set<string>();
+  const results: SarifResult[] = [];
 
   for (const ch of output.checks) {
     if (ch.findings.length === 0) continue;
-
-    const ruleIds = new Set<string>();
-    const results: SarifResult[] = [];
 
     for (const f of ch.findings) {
       ruleIds.add(f.ruleId);
@@ -112,20 +130,20 @@ function buildSarifRuns(output: CliOutput): SarifRun[] {
       if (f.suggestion) builder.withSuggestion(f.suggestion);
       results.push(builder.build());
     }
-
-    runs.push({
-      tool: {
-        driver: {
-          name: ch.checkSlug,
-          version: '1.0.0',
-          rules: [...ruleIds].map((id) => ({ id })),
-        },
-      },
-      results,
-    });
   }
 
-  return runs;
+  if (results.length === 0) return [];
+
+  return [{
+    tool: {
+      driver: {
+        name: TOOL_DRIVER_NAME,
+        version: TOOL_DRIVER_VERSION,
+        rules: [...ruleIds].map((id) => ({ id })),
+      },
+    },
+    results,
+  }];
 }
 
 function wrapSarifLog(runs: SarifRun[]): Record<string, unknown> {
