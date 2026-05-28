@@ -1,9 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 
 import { LanguageParseCache } from '../../languages/parse-cache.js';
 import { LanguageRegistry } from '../../languages/registry.js';
 import { ToolRegistry } from '../../tools/registry.js';
-import { logger as defaultLogger } from '../logger.js';
+import { logger as defaultLogger, configureLogger } from '../logger.js';
 import { RunScope, runWithScope, runWithScopeSync, currentScope } from '../run-scope.js';
 
 describe('RunScope — construction', () => {
@@ -138,6 +138,52 @@ describe('runWithScope / currentScope', () => {
     const captured = runWithScopeSync(scope, () => currentScope());
     expect(captured).toBe(scope);
     scope.dispose();
+  });
+});
+
+describe('runId — scope-bound propagation to logger event-stamping', () => {
+  const stderrCalls: string[] = [];
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    stderrCalls.length = 0;
+  });
+
+  it('scope.runId is stamped on log entries inside runWithScope', async () => {
+    vi.spyOn(process.stderr, 'write').mockImplementation(((chunk: unknown) => {
+      stderrCalls.push(String(chunk));
+      return true;
+    }));
+    // Enable stderr output by turning on debugMode. Reset runId on the
+    // singleton so the fallback isn't shadowing the scope-bound value.
+    configureLogger({ debugMode: true, silent: false, runId: '' });
+
+    const scope = new RunScope({ runId: 'RUN_scope_xyz' });
+    await runWithScope(scope, () => {
+      defaultLogger.info({ evt: 'test.event', msg: 'inside-scope' });
+      return Promise.resolve();
+    });
+
+    const matched = stderrCalls
+      .map(c => JSON.parse(c.trim()) as { evt?: string; runId?: string })
+      .find(e => e.evt === 'test.event');
+    expect(matched?.runId).toBe('RUN_scope_xyz');
+    scope.dispose();
+  });
+
+  it('outside any scope, the logger falls back to its singleton-level runId', () => {
+    vi.spyOn(process.stderr, 'write').mockImplementation(((chunk: unknown) => {
+      stderrCalls.push(String(chunk));
+      return true;
+    }));
+    configureLogger({ debugMode: true, silent: false, runId: 'RUN_singleton' });
+
+    defaultLogger.info({ evt: 'test.outside', msg: 'no-scope-here' });
+
+    const matched = stderrCalls
+      .map(c => JSON.parse(c.trim()) as { evt?: string; runId?: string })
+      .find(e => e.evt === 'test.outside');
+    expect(matched?.runId).toBe('RUN_singleton');
   });
 });
 

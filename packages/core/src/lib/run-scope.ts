@@ -26,7 +26,7 @@ import { ToolRegistry } from '../tools/registry.js';
 
 import { logger as defaultLogger } from './logger.js';
 
-import type { Logger } from './logger.js';
+import type { Logger, LoggerImpl } from './logger.js';
 import type { ProjectContext } from './project-context.js';
 
 /** Opaque slot for per-run recipe configuration (replaces globalThis Symbol). */
@@ -185,3 +185,17 @@ export function enterScope(scope: RunScope): void {
 export function currentScope(): RunScope | undefined {
   return scopeStorage.getStore();
 }
+
+// ─── Logger ↔ RunScope wiring ────────────────────────────────────────
+//
+// Inject `currentScope()?.runId` as the logger singleton's runId source
+// at module init. The logger module itself cannot import from this file
+// (run-scope already imports logger, so the reverse direction would
+// produce a cycle that depcruise rejects). The wiring lives here, where
+// both symbols are already in scope.
+//
+// `defaultLogger` is typed as `Logger` (a narrow interface) so we
+// type-assert to `LoggerImpl` to reach the `setRunIdProvider` setter —
+// the singleton is always a `LoggerImpl` (see logger.ts), so this is
+// a structural narrowing, not a behavioural cast.
+(defaultLogger as LoggerImpl).setRunIdProvider(() => currentScope()?.runId);

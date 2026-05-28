@@ -83,12 +83,26 @@ export interface LoggerOptions {
   readonly logDir?: string;
 }
 
+/**
+ * Optional indirection for the runId on each log entry. The CLI binds
+ * this to `() => currentScope()?.runId` at module init (in run-scope.ts,
+ * which already depends on logger.ts — this preserves the dependency
+ * direction and avoids a logger→run-scope import cycle that depcruise
+ * would reject). Returns `undefined` when no scope is bound, in which
+ * case `LoggerImpl.log` falls back to its instance-level `runId`.
+ *
+ * Tests that construct an isolated `new LoggerImpl()` skip this path
+ * entirely — they call `setRunId(...)` on the instance.
+ */
+export type RunIdProvider = () => string | undefined;
+
 export class LoggerImpl implements Logger {
   private currentLevel: LogLevel;
   private silent = false;
   private debugMode = false;
   private runId: string | undefined;
   private logFilePath: string | undefined;
+  private runIdProvider: RunIdProvider | undefined;
 
   constructor(opts: LoggerOptions = {}) {
     this.currentLevel = opts.level ?? 'warn';
@@ -155,6 +169,16 @@ export class LoggerImpl implements Logger {
   }
 
   /**
+   * Inject a runId source consulted on every `log()`. Lets the kernel
+   * route the singleton through the RunScope-bound runId without the
+   * logger module having to import run-scope.ts (which would create a
+   * cycle, since run-scope already imports the logger).
+   */
+  setRunIdProvider(provider: RunIdProvider | undefined): void {
+    this.runIdProvider = provider;
+  }
+
+  /**
    * Initialize the log file for this instance.
    *
    * Writes to `<dir>/<YYYY-MM-DD>.jsonl`; the CLI bootstrap supplies
@@ -196,7 +220,16 @@ export class LoggerImpl implements Logger {
   private log(level: LogLevel, msgOrObj: string | Record<string, unknown>, data?: Record<string, unknown>): void {
     if (!this.shouldLog(level) && !this.logFilePath) return;
 
-    const entry = formatEntry(level, msgOrObj, data, this.runId);
+    // RunScope-bound runId wins over the instance-level field.
+    // Production callers always go through the singleton inside a
+    // `runWithScope`/`enterScope` block; the kernel binds a
+    // `runIdProvider` at module init that reads `currentScope()?.runId`
+    // (Item 2 — runId moved off the singleton onto RunScope as a flat
+    // kernel field). Tests that construct an isolated `new LoggerImpl()`
+    // outside any scope still get instance-level runId via the fallback.
+    const scopedRunId = this.runIdProvider?.();
+    const effectiveRunId = (scopedRunId !== undefined && scopedRunId !== '') ? scopedRunId : this.runId;
+    const entry = formatEntry(level, msgOrObj, data, effectiveRunId);
 
     if (this.shouldWriteToFile(level)) {
       writeToFile(this.logFilePath, entry);
