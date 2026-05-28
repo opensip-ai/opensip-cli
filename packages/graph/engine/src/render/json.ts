@@ -67,3 +67,57 @@ export function buildCliOutput(
     durationMs: 0,
   };
 }
+
+/**
+ * Build a CliOutput from an aggregated FindingOutput[] — used by
+ * `executePackagesGraph` after it collects per-package findings from
+ * its child processes. Distinct from `buildCliOutput` because the
+ * severities have already been normalized to the CliOutput vocabulary
+ * (`error` | `warning`), so we trust them as-is instead of re-running
+ * the Signal-severity heuristic that would mis-classify them.
+ */
+export function buildCliOutputFromFindings(
+  findings: readonly FindingOutput[],
+  command: string,
+  durationMs: number,
+): CliOutput {
+  const byRule = new Map<string, FindingOutput[]>();
+  for (const f of findings) {
+    let arr = byRule.get(f.ruleId);
+    if (!arr) {
+      arr = [];
+      byRule.set(f.ruleId, arr);
+    }
+    arr.push(f);
+  }
+  const checks: CheckOutput[] = [];
+  for (const [ruleId, ruleFindings] of byRule.entries()) {
+    checks.push({
+      checkSlug: ruleId,
+      passed: ruleFindings.length === 0,
+      violationCount: ruleFindings.length,
+      findings: ruleFindings,
+      durationMs: 0,
+    });
+  }
+  const totalFindings = findings.length;
+  const errors = findings.filter((f) => f.severity === 'error').length;
+  const warnings = totalFindings - errors;
+  return {
+    version: '1.0',
+    tool: 'graph',
+    timestamp: new Date().toISOString(),
+    recipe: command,
+    score: totalFindings === 0 ? 100 : Math.max(0, 100 - totalFindings),
+    passed: errors === 0,
+    summary: {
+      total: checks.length,
+      passed: checks.filter((c) => c.passed).length,
+      failed: checks.filter((c) => !c.passed).length,
+      errors,
+      warnings,
+    },
+    checks,
+    durationMs,
+  };
+}

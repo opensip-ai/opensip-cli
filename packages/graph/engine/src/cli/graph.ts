@@ -26,7 +26,7 @@ import { reportToCloud } from '@opensip-tools/fitness';
 import { compareToBaseline, fingerprintSignal, saveBaseline } from '../gate.js';
 import { GraphBaselineRepo } from '../persistence/baseline-repo.js';
 import { renderCatalogJson } from '../render/catalog-json.js';
-import { buildCliOutput, renderJson } from '../render/json.js';
+import { buildCliOutput, buildCliOutputFromFindings, renderJson } from '../render/json.js';
 import { renderSarif } from '../render/sarif.js';
 import { inferEntryPoints } from '../rules/_entry-points.js';
 import { currentRules } from '../rules/registry.js';
@@ -203,7 +203,16 @@ async function dispatchGraphResult(
     return;
   }
   renderGraphResult(opts, result);
-  persistSession(opts, result.signals, cli.scope.datastore() as DataStore | undefined);
+  // `--json` is a peer of --gate-save / --gate-compare / --report-to /
+  // --catalog-output: the run's purpose is producing a machine-readable
+  // artifact, not populating dashboard session history. Skipping the
+  // session write here also means children spawned by
+  // `executePackagesGraph` (which always run with --json) don't each
+  // write a row — the parent persists exactly one aggregate session
+  // for the whole `--packages` invocation.
+  if (opts.json !== true) {
+    persistSession(opts, result.signals, cli.scope.datastore() as DataStore | undefined);
+  }
   cli.setExitCode(EXIT_CODES.SUCCESS);
   logger.info({
     evt: EVT_GRAPH_COMPLETE,
@@ -274,6 +283,12 @@ async function executePackagesGraph(
     process.stdout.write(`${renderPackagesJson(result.perPackage, durationMs)}\n`);
   } else {
     writePackagesReport(result.perPackage, durationMs);
+    // Persist exactly one aggregate session for the whole --packages
+    // invocation. Matches the contract "one human-facing CLI invocation
+    // = one session" that fitness/sim already follow; the per-package
+    // child processes don't persist because they always run with --json
+    // (see dispatchGraphResult).
+    persistPackagesSession(opts, allFindings, durationMs, cli);
   }
 
   // If any child failed to spawn or exited with an error, surface it
@@ -533,8 +548,26 @@ function persistSession(
   datastore: DataStore | undefined,
 ): void {
   if (!datastore) return;
+  saveGraphSession(opts, buildCliOutput(signals, 'graph'), datastore);
+}
+
+function persistPackagesSession(
+  opts: GraphCommandOptions,
+  findings: readonly FindingOutput[],
+  durationMs: number,
+  cli: ToolCliContext,
+): void {
+  const datastore = cli.scope.datastore() as DataStore | undefined;
+  if (!datastore) return;
+  saveGraphSession(opts, buildCliOutputFromFindings(findings, 'graph', durationMs), datastore);
+}
+
+function saveGraphSession(
+  opts: GraphCommandOptions,
+  cliOutput: ReturnType<typeof buildCliOutput>,
+  datastore: DataStore,
+): void {
   try {
-    const cliOutput = buildCliOutput(signals, 'graph');
     const repo = new SessionRepo(datastore);
     repo.save({
       id: generatePrefixedId('graph'),
@@ -559,7 +592,7 @@ function persistSession(
         })),
         durationMs: c.durationMs,
       })),
-      durationMs: 0,
+      durationMs: cliOutput.durationMs,
     });
   } catch {
     /* v8 ignore next */
