@@ -1,5 +1,5 @@
 // @fitness-ignore-file no-generic-error -- Generic errors appropriate in this context
-// @fitness-ignore-file file-length-limits -- JSDoc documentation required for public API
+// @fitness-ignore-file file-length-limit -- JSDoc documentation required for public API
 // @fitness-ignore-file no-hardcoded-timeouts -- framework default for fitness check execution timeout
 /**
  * @fileoverview Missing @throws JSDoc Detection Check

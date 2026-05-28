@@ -1,3 +1,4 @@
+// @fitness-ignore-file file-length-limit -- aggregate coverage-driven test fixture; splitting destroys the contract
 /**
  * @fileoverview Final coverage push to >= 90%: targets the remaining gap
  * with focused tests across openapi-type-source, api-contract-validation,

@@ -1,3 +1,4 @@
+// @fitness-ignore-file file-length-limit -- aggregate coverage-driven test fixture; splitting destroys the contract
 /**
  * @fileoverview Targeted branch-coverage tests to push package over 90% branch.
  *

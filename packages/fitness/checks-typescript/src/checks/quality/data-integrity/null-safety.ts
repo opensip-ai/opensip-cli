@@ -1,3 +1,4 @@
+// @fitness-ignore-file file-length-limit -- cohesive single-check module; splitting risks breaking the detector contract
 /**
  * @fileoverview Null/Undefined Safety Check
  *

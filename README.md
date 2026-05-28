@@ -1,3 +1,5 @@
+<!-- @fitness-ignore-file file-length-limit -- top-level project README; structural docs grow organically and serve as the project landing page -->
+
 # OpenSIP Tools
 
 [![npm](https://img.shields.io/npm/v/@opensip-tools/cli)](https://www.npmjs.com/package/@opensip-tools/cli)

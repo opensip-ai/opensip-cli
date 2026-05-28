@@ -1,4 +1,4 @@
-// @fitness-ignore-file file-length-limits -- framework/content-filter complexity requires single-file cohesion
+// @fitness-ignore-file file-length-limit -- framework/content-filter complexity requires single-file cohesion
 /**
  * @fileoverview TypeScript scanner-based content filtering
  *

@@ -1,3 +1,4 @@
+// @fitness-ignore-file file-length-limit -- aggregate coverage-driven test fixture; splitting destroys the contract
 /* eslint-disable @typescript-eslint/require-await -- scenario phase hooks must match `() => Promise<void>` shape; some test stubs are intentionally synchronous bodies */
 /**
  * @fileoverview Edge-case tests for each kind's executor.

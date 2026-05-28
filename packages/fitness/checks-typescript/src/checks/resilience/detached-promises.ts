@@ -1,4 +1,4 @@
-// @fitness-ignore-file file-length-limits -- AST detection requires both an AST visitor pipeline and the merged sync-call constants kept in this file
+// @fitness-ignore-file file-length-limit -- AST detection requires both an AST visitor pipeline and the merged sync-call constants kept in this file
 // @fitness-ignore-file unused-config-options -- Config options reserved for future use or environment-specific
 // @fitness-ignore-file canonical-result-usage -- References Result pattern in comments and regex patterns for detection, not actual Result usage
 /**

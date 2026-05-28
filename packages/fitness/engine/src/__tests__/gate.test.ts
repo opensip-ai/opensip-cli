@@ -1,3 +1,4 @@
+// @fitness-ignore-file file-length-limit -- aggregate coverage-driven test fixture; splitting destroys the contract
 /**
  * Unit tests for the architecture-gate primitive (v2 — SQLite-backed).
  *

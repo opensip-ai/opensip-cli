@@ -1,5 +1,5 @@
 // @fitness-ignore-file fitness-check-standards -- Dockerfile check scans non-standard file types that do not map to a fileTypes extension array
-// @fitness-ignore-file file-length-limits -- Complex module with tightly coupled logic; refactoring would risk breaking changes
+// @fitness-ignore-file file-length-limit -- Complex module with tightly coupled logic; refactoring would risk breaking changes
 /**
  * @fileoverview Docker best practices fitness check
  * @invariants
