@@ -55,10 +55,26 @@ export async function discoverAndRegisterToolPackages(
 
   for (const pkg of discovered) {
     try {
-      const mod = (await import(pkg.name)) as { tool?: Tool };
-      if (mod.tool && !builtInIds.has(mod.tool.metadata.id)) {
-        registry.registerThirdParty(mod.tool, { sourcePackage: pkg.name });
+      const mod = (await import(pkg.name)) as { tool?: unknown };
+      // Runtime shape validation: a third-party tool is an untrusted
+      // boundary. Validate the exported `tool` symbol's shape before
+      // touching it, matching the pattern used by
+      // `register-graph-adapters.ts`. A malformed package gets a clear
+      // stderr line + structured warning and is skipped — better than
+      // a TypeError mid-registration or a silently-broken Tool slot.
+      if (!isValidTool(mod.tool)) {
+        process.stderr.write(
+          `opensip-tools: tool package ${pkg.name} does not export a valid \`tool\` — skipping\n`,
+        );
+        logger.warn({
+          evt: 'cli.tool.invalid_shape',
+          module: 'cli:bootstrap',
+          name: pkg.name,
+        });
+        continue;
       }
+      if (builtInIds.has(mod.tool.metadata.id)) continue;
+      registry.registerThirdParty(mod.tool, { sourcePackage: pkg.name });
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       process.stderr.write(`opensip-tools: failed to load tool ${pkg.name}: ${msg}\n`);
@@ -70,6 +86,23 @@ export async function discoverAndRegisterToolPackages(
       });
     }
   }
+}
+
+/**
+ * Runtime shape predicate for third-party tool exports. Verifies the
+ * minimal contract the registry depends on: a `metadata.id` string
+ * (used for dedupe + listing) and the two required methods
+ * (`register`, `commands` — `initialize` and `extendScope` stay
+ * optional per the Tool interface).
+ */
+function isValidTool(value: unknown): value is Tool {
+  if (typeof value !== 'object' || value === null) return false;
+  const candidate = value as { metadata?: unknown; register?: unknown; commands?: unknown };
+  if (typeof candidate.metadata !== 'object' || candidate.metadata === null) return false;
+  if (typeof (candidate.metadata as { id?: unknown }).id !== 'string') return false;
+  if (typeof candidate.register !== 'function') return false;
+  if (!Array.isArray(candidate.commands)) return false;
+  return true;
 }
 
 /**
