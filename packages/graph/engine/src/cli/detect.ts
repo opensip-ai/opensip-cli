@@ -35,11 +35,17 @@ const MARKER_MAP: readonly { readonly marker: string; readonly adapterId: string
   { marker: 'meson.build', adapterId: 'cpp' },
 ]
 
-export interface DetectionMatch {
+interface DetectionMatch {
   readonly marker: string
   readonly adapterId: string
 }
 
+/**
+ * Result of a project-root language scan. `adapterIds` is the
+ * authoritative list of adapters the CLI should query; `matchedMarkers`
+ * is diagnostic context (which marker files fired, useful for error
+ * messages when an adapter is unregistered).
+ */
 export interface DetectionResult {
   /** Canonical adapter ids of the languages detected at `rootDir`. */
   readonly adapterIds: readonly string[]

@@ -28,6 +28,10 @@ import {
 
 import type { CliOutput, FindingOutput } from '@opensip-tools/contracts'
 
+/**
+ * Per-unit result from a `graph --workspace` fan-out — one entry per
+ * child process spawned by `runWorkspaceUnitsInParallel`.
+ */
 export interface WorkspaceUnitRunResult {
   /** Human-readable unit id (e.g. `core`, `cli`, `crate-foo`). */
   readonly unitId: string
@@ -43,6 +47,10 @@ export interface WorkspaceUnitRunResult {
   readonly stderr: string
 }
 
+/**
+ * Inputs to `runWorkspaceUnitsInParallel`. `units` is the flattened
+ * polyglot list typically produced by `discoverPolyglotUnits`.
+ */
 export interface RunWorkspaceUnitsInput {
   readonly cwd: string
   readonly units: readonly WorkspaceUnit[]
@@ -58,6 +66,10 @@ export interface RunWorkspaceUnitsInput {
   readonly noCache?: boolean
 }
 
+/**
+ * Aggregate output from `runWorkspaceUnitsInParallel` — per-unit
+ * results plus a single boolean indicating whether any child failed.
+ */
 export interface RunWorkspaceUnitsOutput {
   readonly perUnit: readonly WorkspaceUnitRunResult[]
   readonly anyChildFailed: boolean
@@ -85,6 +97,12 @@ export async function discoverPolyglotUnits(
   return all
 }
 
+/**
+ * Spawn one child process per WorkspaceUnit, run `graph <rootDir>
+ * --json` in each, and aggregate the parsed findings. Concurrency is
+ * capped (default `cpus()-1`). Always resolves; child failures are
+ * surfaced via `anyChildFailed`.
+ */
 export async function runWorkspaceUnitsInParallel(
   input: RunWorkspaceUnitsInput,
 ): Promise<RunWorkspaceUnitsOutput> {
@@ -211,7 +229,7 @@ function parseChildFindings(
   } catch (error) {
     /* v8 ignore start */
     logger.warn({
-      evt: 'graph.cli.workspace.parseError',
+      evt: 'graph.cli.workspace.parse-error',
       module: 'graph:cli',
       rootDir,
       err: error instanceof Error ? error.message : String(error),

@@ -44,11 +44,8 @@ import { detectLanguages } from './detect.js';
 import { runGraph } from './orchestrate.js';
 import { positionalPathLabel, resolvePositionalPaths } from './positional-paths.js';
 import { MemoryPressureError } from './pressure-monitor.js';
-import {
-  discoverPolyglotUnits,
-  runWorkspaceUnitsInParallel,
-  type WorkspaceUnitRunResult,
-} from './workspace-runner.js';
+import { renderWorkspaceJson, writeWorkspaceReport } from './workspace-report.js';
+import { discoverPolyglotUnits, runWorkspaceUnitsInParallel } from './workspace-runner.js';
 
 import type { EntryPoint } from '../rules/_entry-points.js';
 import type { Catalog, Indexes } from '../types.js';
@@ -166,6 +163,7 @@ export async function executeGraph(
     const result = await runGraph({
       cwd: runCwd,
       noCache: opts.noCache,
+      language: opts.language,
       datastore: cli.scope.datastore() as DataStore | undefined,
     });
     enforceLanguageMismatchPolicy(opts, result.catalog, [runCwd]);
@@ -225,6 +223,7 @@ async function executeMultiPathGraph(
     const r = await runGraph({
       cwd: p,
       noCache: opts.noCache,
+      language: opts.language,
       datastore: cli.scope.datastore() as DataStore | undefined,
     });
     lastResult = r;
@@ -416,94 +415,6 @@ function resolveAdaptersForRun(
     if (adapter) adapters.push(adapter);
   }
   return adapters;
-}
-
-function writeWorkspaceReport(
-  perUnit: readonly WorkspaceUnitRunResult[],
-  durationMs: number,
-): void {
-  const totalFindings = perUnit.reduce((n, r) => n + r.findings.length, 0);
-  const lines: string[] = [
-    'opensip-tools graph --workspace',
-    '',
-    `== Units (${String(perUnit.length)}) ==`,
-    ...renderWorkspaceStatusLines(perUnit),
-    '',
-    '== Findings ==',
-    ...renderWorkspaceFindingsLines(perUnit),
-    '== Summary ==',
-    `${String(totalFindings)} total finding(s) across ${String(perUnit.length)} unit(s) in ${String(durationMs)} ms.`,
-  ];
-  process.stdout.write(`${lines.join('\n')}\n`);
-}
-
-function renderWorkspaceStatusLines(
-  perUnit: readonly WorkspaceUnitRunResult[],
-): readonly string[] {
-  const out: string[] = [];
-  for (const r of perUnit) {
-    const status = r.exitCode === 0 ? 'ok' : `FAILED (exit ${String(r.exitCode)})`;
-    const display = unitDisplay(r);
-    out.push(`  ${display}: ${String(r.findings.length)} finding(s) — ${status}`);
-    if (r.exitCode !== 0 && r.stderr.length > 0) {
-      const stderrPreview = r.stderr.split('\n').slice(0, 3).join('\n    ');
-      out.push(`    stderr: ${stderrPreview}`);
-    }
-  }
-  return out;
-}
-
-function renderWorkspaceFindingsLines(
-  perUnit: readonly WorkspaceUnitRunResult[],
-): readonly string[] {
-  const out: string[] = [];
-  for (const r of perUnit) {
-    if (r.findings.length === 0) continue;
-    out.push(`[${unitDisplay(r)}]`, ...renderUnitFindingPreview(r), '');
-  }
-  return out;
-}
-
-function renderUnitFindingPreview(r: WorkspaceUnitRunResult): readonly string[] {
-  const preview = r.findings.slice(0, FINDINGS_PREVIEW);
-  const lines = preview.map((f) => {
-    const loc = typeof f.line === 'number' ? `:${String(f.line)}` : '';
-    return `  ${f.filePath}${loc} — ${f.message}`;
-  });
-  if (r.findings.length > preview.length) {
-    lines.push(`  ... ${String(r.findings.length - preview.length)} more (use --json for full list)`);
-  }
-  return lines;
-}
-
-function unitDisplay(r: WorkspaceUnitRunResult): string {
-  return r.displayPath.length > 0 ? r.displayPath : r.rootDir;
-}
-
-function renderWorkspaceJson(
-  perUnit: readonly WorkspaceUnitRunResult[],
-  durationMs: number,
-): string {
-  return JSON.stringify(
-    {
-      version: '1.0',
-      tool: 'graph',
-      command: 'graph',
-      mode: 'workspace',
-      timestamp: new Date().toISOString(),
-      durationMs,
-      units: perUnit.map((r) => ({
-        unitId: r.unitId,
-        rootDir: r.rootDir,
-        displayPath: r.displayPath,
-        exitCode: r.exitCode,
-        findings: r.findings,
-      })),
-      totalFindings: perUnit.reduce((n, r) => n + r.findings.length, 0),
-    },
-    null,
-    2,
-  );
 }
 
 export interface UnifiedReportInput {
