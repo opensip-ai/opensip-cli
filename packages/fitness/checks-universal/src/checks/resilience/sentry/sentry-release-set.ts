@@ -42,6 +42,7 @@ export const sentryReleaseSet = defineCheck({
   id: 'c3e9a5b2-6d4f-4a0c-b123-f5e7c9d1a4b6',
   slug: 'sentry-release-set',
   scope: { languages: ['typescript', 'javascript'], concerns: ['backend', 'frontend'] },
+  contentFilter: 'strip-strings-and-comments',
   description: 'Detects Sentry.init() without release — cannot track regressions across deploys',
   longDescription: `**Purpose:** Ensures Sentry events include a release identifier so errors can be correlated with specific deploys and commits.
 
