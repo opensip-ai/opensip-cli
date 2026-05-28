@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { ConfigurationError } from '@opensip-tools/core';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 
 import { openMemoryBackend } from './backends/memory.js';
@@ -53,7 +54,10 @@ function migrateFailureMessage(opts: DataStoreOpenOptions): string {
 
 function requireSqlitePath(opts: DataStoreOpenOptions): string {
   if (!opts.path) {
-    throw new Error('DataStoreFactory.open: SQLite backend requires a `path` option');
+    throw new ConfigurationError(
+      'DataStoreFactory.open: SQLite backend requires a `path` option',
+      { code: 'CONFIGURATION.DATASTORE.MISSING_PATH' },
+    );
   }
   return opts.path;
 }

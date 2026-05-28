@@ -1,4 +1,4 @@
-import { logger } from '@opensip-tools/core';
+import { SystemError, logger } from '@opensip-tools/core';
 import { desc, eq, lt } from 'drizzle-orm';
 
 import { sessions, sessionChecks, sessionFindings } from './schema/sessions.js';
@@ -199,8 +199,9 @@ export class SessionRepo {
     // row could carry a value outside the type. Casting blindly would
     // silently misroute downstream consumers that branch on `tool`.
     if (!isValidTool(row.tool)) {
-      throw new Error(
+      throw new SystemError(
         `Session ${row.id} has unknown tool value: ${JSON.stringify(row.tool)}`,
+        { code: 'SYSTEM.DATA.UNKNOWN_TOOL' },
       );
     }
     // Validate the JSON summary blob — drizzle returns it as `unknown` and
@@ -208,7 +209,10 @@ export class SessionRepo {
     // them as `undefined` where `number` is expected would corrupt history
     // display and gate comparison silently.
     if (!isSessionSummary(row.summary)) {
-      throw new Error(`Session ${row.id} has corrupted summary JSON`);
+      throw new SystemError(
+        `Session ${row.id} has corrupted summary JSON`,
+        { code: 'SYSTEM.DATA.CORRUPT_SUMMARY' },
+      );
     }
     // Hydrate checks + findings inside a single read transaction so the
     // multi-statement walk presents a consistent snapshot — otherwise a

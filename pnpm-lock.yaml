@@ -247,6 +247,9 @@ importers:
 
   packages/datastore:
     dependencies:
+      '@opensip-tools/core':
+        specifier: workspace:*
+        version: link:../core
       better-sqlite3:
         specifier: ^12.10.0
         version: 12.10.0

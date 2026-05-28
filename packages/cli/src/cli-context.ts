@@ -39,6 +39,7 @@
 
 import {
   type RunScope,
+  SystemError,
   UnknownLiveViewError,
   currentScope,
   logger as defaultLogger,
@@ -101,10 +102,11 @@ export function getCurrentRegistriesForScope(): {
   readonly tools: ToolRegistry;
 } {
   if (!currentLanguageRegistry || !currentToolRegistry) {
-    throw new Error(
+    throw new SystemError(
       'getCurrentRegistriesForScope() called before setCliRegistriesForRun(). ' +
         'main() must construct LanguageRegistry/ToolRegistry and call ' +
         'setCliRegistriesForRun before any preAction hook runs.',
+      { code: 'SYSTEM.BOOTSTRAP.REGISTRIES_UNSET' },
     );
   }
   return { languages: currentLanguageRegistry, tools: currentToolRegistry };
@@ -123,11 +125,12 @@ export function setCurrentRunScope(scope: RunScope): void {
 function readScope(): RunScope {
   const bound = currentScope() ?? currentRunScope;
   if (!bound) {
-    throw new Error(
+    throw new SystemError(
       'CLI scope accessed before pre-action-hook constructed it. ' +
         'This indicates a bootstrap-order bug — tools and CLI commands must access ' +
         'cli.scope / getCurrentProjectRoot() / getOrOpenDatastore() only inside an ' +
         'action body.',
+      { code: 'SYSTEM.BOOTSTRAP.SCOPE_UNSET' },
     );
   }
   return bound;
@@ -142,7 +145,10 @@ function readScope(): RunScope {
 export function getCurrentProjectRoot(): string {
   const project = readScope().projectContext;
   if (!project) {
-    throw new Error('getCurrentProjectRoot() called before pre-action-hook resolved the context.');
+    throw new SystemError(
+      'getCurrentProjectRoot() called before pre-action-hook resolved the context.',
+      { code: 'SYSTEM.BOOTSTRAP.PROJECT_UNSET' },
+    );
   }
   return project.projectRoot;
 }
@@ -165,9 +171,10 @@ export function buildDatastoreThunk(
   return () => {
     if (cached) return cached;
     if (project.scope !== 'project') {
-      throw new Error(
+      throw new SystemError(
         'Datastore accessed in a non-project context. The action body should have ' +
           'errored earlier with "No opensip-tools project found" before touching this.',
+        { code: 'SYSTEM.BOOTSTRAP.DATASTORE_OUTSIDE_PROJECT' },
       );
     }
     const path = `${resolveProjectPaths(project.projectRoot).runtimeDir}/datastore.sqlite`;
@@ -267,10 +274,11 @@ export function buildToolCliContext(
     get project(): ProjectContext {
       const project = readScope().projectContext;
       if (!project) {
-        throw new Error(
+        throw new SystemError(
           'ToolCliContext.project accessed before pre-action-hook resolved it. ' +
             'This indicates a bootstrap-order bug — tools should not access project ' +
             'context during register(); only inside command action bodies.',
+          { code: 'SYSTEM.BOOTSTRAP.PROJECT_UNSET' },
         );
       }
       return project;

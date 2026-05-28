@@ -19,7 +19,7 @@
 
 import { createHash } from 'node:crypto';
 
-import { logger } from '@opensip-tools/core';
+import { ConfigurationError, SystemError, logger } from '@opensip-tools/core';
 
 import { buildSarifLog } from './sarif.js';
 
@@ -75,21 +75,36 @@ export type ViolationIdentity = (input: {
 export const DEFAULT_VIOLATION_IDENTITY: ViolationIdentity = ({ filePath, ruleId, message }) =>
   createHash('sha256').update(`${filePath}\n${ruleId}\n${message}`).digest('hex');
 
-/** Thrown when --gate-compare is invoked but the baseline doesn't exist. */
-export class GateBaselineMissingError extends Error {
+/**
+ * Thrown when --gate-compare is invoked but the baseline doesn't exist.
+ *
+ * Extends `ConfigurationError` so the CLI's top-level `handleParseError`
+ * maps it to `EXIT_CODES.CONFIGURATION_ERROR` automatically — no
+ * per-command try/catch needed in `tool.ts`.
+ */
+export class GateBaselineMissingError extends ConfigurationError {
   constructor() {
     super(
       'Gate baseline not found in the project SQLite store. ' +
         'Run `opensip-tools fit --gate-save` first to create one.',
+      { code: 'CONFIGURATION.GATE.BASELINE_MISSING' },
     );
     this.name = 'GateBaselineMissingError';
   }
 }
 
-/** Thrown when the baseline payload exists but isn't a parseable SARIF document. */
-export class GateBaselineInvalidError extends Error {
+/**
+ * Thrown when the baseline payload exists but isn't a parseable SARIF
+ * document. Extends `SystemError` — a corrupted baseline is data
+ * integrity, not user-input configuration. The CLI maps it through the
+ * standard fatal-runtime path.
+ */
+export class GateBaselineInvalidError extends SystemError {
   constructor(reason: string) {
-    super(`Gate baseline is invalid: ${reason}`);
+    super(
+      `Gate baseline is invalid: ${reason}`,
+      { code: 'SYSTEM.GATE.BASELINE_CORRUPT' },
+    );
     this.name = 'GateBaselineInvalidError';
   }
 }
