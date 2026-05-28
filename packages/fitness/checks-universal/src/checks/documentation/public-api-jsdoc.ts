@@ -5,6 +5,8 @@
 
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
+import { isInPublicApiSurface } from './_public-api-graph.js'
+
 /**
  * Patterns for exported declarations that should have JSDoc
  */
@@ -32,10 +34,24 @@ function getExportKind(line: string): string {
 }
 
 /**
- * Analyze a file for missing JSDoc on public API exports
+ * Analyze a file for missing JSDoc on public API exports.
+ *
+ * Only fires on files that are part of the containing package's
+ * published API surface — files reachable from the package's
+ * `package.json#exports` entries via `export ... from` re-export
+ * chains. Internal helper files (not re-exported from the package
+ * barrel) are skipped: their `export` keyword is a TypeScript
+ * intra-package visibility marker, not part of the npm-published
+ * public API.
+ *
+ * When the package surface cannot be determined (no `package.json`,
+ * no `exports` field), the check falls back to its historical broad
+ * behavior — every `export` is treated as public.
  */
 // eslint-disable-next-line sonarjs/cognitive-complexity -- Inherent complexity: line-by-line export pattern matching with preceding JSDoc detection and re-export filtering
-function analyzeJsdoc(content: string, _filePath: string): CheckViolation[] {
+function analyzeJsdoc(content: string, filePath: string): CheckViolation[] {
+  if (!isInPublicApiSurface(filePath)) return []
+
   const violations: CheckViolation[] = []
   const lines = content.split('\n')
 
@@ -97,7 +113,7 @@ export const publicApiJsdoc = defineCheck({
 
   confidence: 'medium',
   description: 'Requires JSDoc documentation on all public API exports in shared packages',
-  longDescription: `**Purpose:** Ensures all public API exports in shared packages have JSDoc documentation, since these form the platform's public API surface.
+  longDescription: `**Purpose:** Ensures all public API exports in shared packages have JSDoc documentation, since these form the platform's published API surface.
 
 **Detects:**
 - Exported functions, classes, interfaces, types, and function-like constants without \`/** ... */\` JSDoc comments
@@ -106,7 +122,13 @@ export const publicApiJsdoc = defineCheck({
 
 **Why it matters:** Shared packages are consumed by the entire platform. Undocumented public APIs force consumers to read source code to understand behavior.
 
-**Scope:** Shared packages source files only (excludes barrel index.ts, tests, .d.ts). Analyzes each file individually.`,
+**Scope:** Files reachable from the package's \`package.json#exports\` entry barrels via \`export ... from\` re-export chains. Internal helper files (not re-exported from the package barrel) are skipped — their \`export\` keyword is an intra-package visibility marker, not part of the npm-published public API.
+
+**Package shape handling:**
+- Packages with an \`exports\` field — surface is the closure of those entries.
+- Packages with only \`main\` / \`module\` — surface is that entry's closure.
+- Binary-only packages (\`bin\` set, no \`exports\` / \`main\` / \`module\`) — empty surface; nothing is flagged.
+- No containing \`package.json\` — falls back to flagging every \`export\` (historical broad behavior, used by ad-hoc fixtures).`,
   tags: ['documentation', 'api', 'quality'],
   fileTypes: ['ts'],
   analyze: analyzeJsdoc,
