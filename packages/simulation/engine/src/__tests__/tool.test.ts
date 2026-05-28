@@ -65,7 +65,6 @@ function makeFakeContext(program: Command): {
   const ctx: ToolCliContext = {
     program,
     scope: ctxScope,
-    project,
     render: vi.fn((result: unknown) => {
       rendered.push(result);
       return Promise.resolve();
@@ -85,7 +84,6 @@ function makeFakeContext(program: Command): {
     emitJson: (value: unknown) => {
       emitted.push(value);
     },
-    datastore: undefined,
   };
   return { ctx, rendered, exitCodes, emitted };
 }

@@ -166,20 +166,6 @@ describe('buildToolCliContext', () => {
     expect(out[0]).toMatch(/\n$/);
   });
 
-  it('project getter throws when accessed before pre-action-hook resolves it', async () => {
-    // Reset module state: the holders are module-level and may have
-    // been set by a prior test. Reset via dynamic import.
-    vi.resetModules();
-    const mod = await import('../cli-context.js');
-    const ctx = mod.buildToolCliContext({
-      program: new Command('test'),
-      render: vi.fn(() => Promise.resolve()),
-      liveViews: mod.createLiveViewRegistry(),
-      maybeOpenDashboard: vi.fn(() => Promise.resolve()),
-    }).ctx;
-    expect(() => ctx.project).toThrow(/pre-action-hook/);
-  });
-
   it('uses defaultLogger when no logger is supplied', () => {
     const { ctx } = buildToolCliContext({
       program: new Command('test'),

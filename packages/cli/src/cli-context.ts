@@ -271,18 +271,6 @@ export function buildToolCliContext(
       // non-action paths that can't reach ALS.
       return readScope();
     },
-    get project(): ProjectContext {
-      const project = readScope().projectContext;
-      if (!project) {
-        throw new SystemError(
-          'ToolCliContext.project accessed before pre-action-hook resolved it. ' +
-            'This indicates a bootstrap-order bug — tools should not access project ' +
-            'context during register(); only inside command action bodies.',
-          { code: 'SYSTEM.BOOTSTRAP.PROJECT_UNSET' },
-        );
-      }
-      return project;
-    },
     render: (result) => opts.render(result as CommandResult),
     registerLiveView: opts.liveViews.register,
     renderLive: opts.liveViews.render,
@@ -294,9 +282,6 @@ export function buildToolCliContext(
     },
     emitJson: (value) => {
       process.stdout.write(JSON.stringify(value, null, 2) + '\n');
-    },
-    get datastore(): unknown {
-      return readScope().datastore();
     },
   };
 

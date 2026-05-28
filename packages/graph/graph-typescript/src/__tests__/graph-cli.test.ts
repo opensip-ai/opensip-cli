@@ -62,7 +62,6 @@ function makeCli(): CapturedCli {
   const cli: ToolCliContext = {
     program: {},
     scope: new RunScope({ projectContext: project, datastore: () => datastore }),
-    project,
     render: vi.fn(() => Promise.resolve()),
     registerLiveView: vi.fn(),
     renderLive: vi.fn(() => Promise.resolve()),
@@ -75,7 +74,6 @@ function makeCli(): CapturedCli {
     },
     setExitCode: (c: number) => { exitCodes.push(c); },
     emitJson: vi.fn(),
-    datastore,
   };
   return { cli, exitCodes, datastore };
 }
@@ -364,7 +362,6 @@ describe('executeGraph', () => {
     const cli: ToolCliContext = {
       program: {},
       scope: new RunScope({ projectContext: projectNoStore }),
-      project: projectNoStore,
       render: vi.fn(() => Promise.resolve()),
       renderLive: vi.fn(() => Promise.resolve()),
       maybeOpenDashboard: vi.fn(() => Promise.resolve()),
@@ -377,7 +374,6 @@ describe('executeGraph', () => {
       setExitCode: (c: number) => { exitCodes.push(c); },
       emitJson: vi.fn(),
       registerLiveView: vi.fn(),
-      datastore: undefined,
     };
     await executeGraph({ cwd: dir, gateSave: true }, cli);
     expect(stderr).toContain('requires a DataStore');

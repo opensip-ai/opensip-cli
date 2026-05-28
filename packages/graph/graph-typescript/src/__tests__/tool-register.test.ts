@@ -42,7 +42,6 @@ function makeCli(program: Command): ToolCliContext {
   return {
     program,
     scope: new RunScope({ projectContext: project }),
-    project,
     render: vi.fn(() => Promise.resolve()),
     registerLiveView: vi.fn(),
     renderLive: vi.fn(() => Promise.resolve()),
@@ -55,7 +54,6 @@ function makeCli(program: Command): ToolCliContext {
     },
     setExitCode: vi.fn(),
     emitJson: vi.fn(),
-    datastore: undefined,
   };
 }
 
@@ -155,7 +153,6 @@ describe('graphTool action handler — end-to-end via Commander', () => {
       const cli: ToolCliContext = {
         program,
         scope: new RunScope({ projectContext: project }),
-        project,
         render: vi.fn(() => Promise.resolve()),
         renderLive: vi.fn(() => Promise.resolve()),
         maybeOpenDashboard: vi.fn(() => Promise.resolve()),
@@ -168,7 +165,6 @@ describe('graphTool action handler — end-to-end via Commander', () => {
         setExitCode,
         emitJson: vi.fn(),
         registerLiveView: vi.fn(),
-        datastore: undefined,
       };
       graphTool.register(cli);
       try {
@@ -216,7 +212,6 @@ describe('graphTool action handler — end-to-end via Commander', () => {
       const cli: ToolCliContext = {
         program,
         scope: new RunScope({ projectContext: project2 }),
-        project: project2,
         render: vi.fn(() => Promise.resolve()),
         renderLive,
         maybeOpenDashboard: vi.fn(() => Promise.resolve()),
@@ -229,7 +224,6 @@ describe('graphTool action handler — end-to-end via Commander', () => {
         setExitCode: vi.fn(),
         emitJson: vi.fn(),
         registerLiveView: vi.fn(),
-        datastore: undefined,
       };
       graphTool.register(cli);
       // No --json/--gate-*/--report-to/--package: this is the

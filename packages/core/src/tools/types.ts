@@ -27,7 +27,6 @@
 import { ToolError, type ToolErrorOptions } from '../lib/errors.js';
 
 import type { Logger } from '../lib/logger.js';
-import type { ProjectContext } from '../lib/project-context.js';
 import type { RunScope } from '../lib/run-scope.js';
 
 export interface ToolMetadata {
@@ -106,33 +105,15 @@ export interface ToolCliContext {
   /**
    * Per-run resources (logger, parseCache, registries, datastore,
    * recipeCheckConfig, projectContext). Constructed once per CLI
-   * invocation by the bootstrap; tools should prefer `cli.scope.foo`
-   * over reaching into any module-level singleton (the previously-
-   * exported `defaultToolRegistry`/`defaultLanguageRegistry` are gone —
-   * use `cli.scope.tools` / `cli.scope.languages` instead).
-   *
-   * For back-compat during the Phase 5 migration, `cli.project`,
-   * `cli.logger`, and `cli.datastore` continue to work as alias
-   * accessors that read from `scope`. New code should use `scope`
-   * directly.
+   * invocation by the bootstrap. Tools read every per-run resource
+   * via `cli.scope.foo` — the previously-exported `defaultToolRegistry`
+   * / `defaultLanguageRegistry` singletons are gone, and the Phase 5
+   * `cli.project` / `cli.datastore` back-compat alias accessors were
+   * retired in audit-round-3 Finding K once no tool referenced them
+   * directly. Read `cli.scope.projectContext` and `cli.scope.datastore()`
+   * instead.
    */
   readonly scope: RunScope;
-  /**
-   * Resolved project context for this CLI invocation. Computed once in
-   * pre-action-hook after `--cwd` parsing; threaded into every tool's
-   * action body via this field rather than each tool re-reading
-   * `opts.cwd`.
-   *
-   * When `project.scope === 'none'`, no opensip-tools project was found
-   * above cwd. Project-scoped commands should error in this case (with
-   * the "No opensip-tools project found" copy); `init` proceeds.
-   *
-   * Exposed via a getter on the implementation side — accessing it
-   * before pre-action-hook resolves throws to surface bootstrap-order
-   * bugs. Tools must only read this inside command action bodies, not
-   * during `register()`.
-   */
-  readonly project: ProjectContext;
   /** Render an Ink result (CommandResult shape from @opensip-tools/contracts). */
   readonly render: (result: unknown) => Promise<void>;
   /**
@@ -184,17 +165,6 @@ export interface ToolCliContext {
    * future: optional `--out <file>`, envelope wrappers, etc.).
    */
   readonly emitJson: (value: unknown) => void;
-  /**
-   * Persistence layer (SQLite + Drizzle). Opened once per CLI invocation
-   * by the bootstrap and closed at process exit. Tools construct their
-   * domain repos against this handle (SessionRepo, BaselineRepo, etc.).
-   *
-   * Typed loosely (`unknown`) for the same reason `program` is — to keep
-   * core decoupled from datastore. Tools cast to `DataStore` from
-   * `@opensip-tools/datastore` at use time. The shape is structurally
-   * stable; mismatches surface at register() time, not at link/build time.
-   */
-  readonly datastore: unknown;
 }
 
 /**
