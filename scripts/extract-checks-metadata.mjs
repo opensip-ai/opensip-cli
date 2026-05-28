@@ -10,7 +10,7 @@
 // fully auto-generated.
 //
 // Usage:
-//   node tools/extract-checks-metadata.mjs > /tmp/checks.json
+//   node scripts/extract-checks-metadata.mjs > /tmp/checks.json
 //
 
 import { promises as fs } from 'node:fs';

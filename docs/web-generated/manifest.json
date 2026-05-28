@@ -423,7 +423,7 @@
         "ci-integrators",
         "plugin-authors"
       ],
-      "purpose": "Browsable index of every built-in fit check, grouped by pack and primary tag. Auto-generated from source by tools/build-checks-index.mjs."
+      "purpose": "Browsable index of every built-in fit check, grouped by pack and primary tag. Auto-generated from source by scripts/build-checks-index.mjs."
     },
     {
       "file": "docs/web-generated/70-reference/06-dashboard.md",

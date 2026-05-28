@@ -371,7 +371,7 @@ it goes in `docs/internal/`. If it's pending work or design exploration
 that doesn't need to be visible to external readers, it stays in
 `docs/plans/` (local-only).
 
-- **Generator:** `tools/build-web-docs.mjs`
+- **Generator:** `scripts/build-web-docs.mjs`
 - **Scripts:** `pnpm docs:build` (write) · `pnpm docs:check` (CI staleness gate)
 - **What it does:** relative source-code links → pinned GitHub URLs;
   sibling `.md` links → root-relative website paths; processes

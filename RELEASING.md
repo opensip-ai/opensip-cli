@@ -61,7 +61,7 @@ their `dependencies`.
 
    `pnpm lint` runs both ESLint and dependency-cruiser. Both must be
    zero-error. `pnpm verify-release` runs the same gate CI uses (see
-   `tools/verify-release.mjs`); a green local run guarantees CI's
+   `scripts/verify-release.mjs`); a green local run guarantees CI's
    pre-publish step will also be green.
 
 4. Commit, tag, push:
@@ -163,7 +163,7 @@ To unblock:
 
 2. Run the bootstrap script with the token in the environment:
    ```bash
-   NPM_TOKEN=npm_xxx ./tools/bootstrap-publish.sh
+   NPM_TOKEN=npm_xxx ./scripts/bootstrap-publish.sh
    ```
 
    The script is **namespace-creation only** and **idempotent**. It

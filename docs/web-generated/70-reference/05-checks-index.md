@@ -4,7 +4,7 @@ last_verified: 2026-05-27
 release: v2.0.x
 title: "Checks reference"
 audience: [getting-started, ci-integrators, plugin-authors]
-purpose: "Browsable index of every built-in fit check, grouped by pack and primary tag. Auto-generated from source by tools/build-checks-index.mjs."
+purpose: "Browsable index of every built-in fit check, grouped by pack and primary tag. Auto-generated from source by scripts/build-checks-index.mjs."
 source-files:
   - packages/fitness/checks-universal/src/checks/
   - packages/fitness/checks-typescript/src/checks/
@@ -22,7 +22,7 @@ related-docs:
 
 opensip-tools ships **145+ built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
 
-> This page is **auto-generated** from the source by [`tools/build-checks-index.mjs`](https://github.com/opensip-ai/opensip-tools/blob/main/tools/build-checks-index.mjs). Do not edit it by hand — edit the check's source file (the link in each row), then re-run the generator.
+> This page is **auto-generated** from the source by [`scripts/build-checks-index.mjs`](https://github.com/opensip-ai/opensip-tools/blob/main/scripts/build-checks-index.mjs). Do not edit it by hand — edit the check's source file (the link in each row), then re-run the generator.
 
 ---
 

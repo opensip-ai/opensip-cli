@@ -13,17 +13,17 @@
 //   2. Tag matches the package version (CI: --expected-version $TAG).
 //   3. CHANGELOG.md top entry is `## [<consensus version>]`.
 //   4. docs/web-generated/ is in sync with docs/public/ (delegates to
-//      tools/build-web-docs.mjs --check).
+//      scripts/build-web-docs.mjs --check).
 //   5. Cross-package dependencies use `workspace:*` or pin the
 //      consensus version — no stale version ranges.
 //   6. CHANGELOG.md top entry has a valid ISO date (YYYY-MM-DD).
 //
 // Usage:
-//   node tools/verify-release.mjs                     # local pre-flight
-//   node tools/verify-release.mjs --expected-version v1.0.10
+//   node scripts/verify-release.mjs                     # local pre-flight
+//   node scripts/verify-release.mjs --expected-version v1.0.10
 //
 // The `v` prefix on --expected-version is stripped. In CI:
-//   node tools/verify-release.mjs --expected-version "$GITHUB_REF_NAME"
+//   node scripts/verify-release.mjs --expected-version "$GITHUB_REF_NAME"
 //
 
 import { execFileSync } from 'node:child_process';
@@ -166,7 +166,7 @@ if (topEntry === null) {
 
 // 4 — docs/web-generated/ is in sync
 try {
-  execFileSync('node', ['tools/build-web-docs.mjs', '--check'], {
+  execFileSync('node', ['scripts/build-web-docs.mjs', '--check'], {
     cwd: REPO_ROOT,
     stdio: 'pipe',
   });

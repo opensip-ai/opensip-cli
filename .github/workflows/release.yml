@@ -43,7 +43,7 @@ jobs:
       - name: Verify release consistency
         env:
           RELEASE_TAG: ${{ github.ref_name }}
-        run: node tools/verify-release.mjs --expected-version "$RELEASE_TAG"
+        run: node scripts/verify-release.mjs --expected-version "$RELEASE_TAG"
 
       # Clean every package's dist/ before build. tsc never deletes orphan
       # output files when their source is moved or removed, and `files:

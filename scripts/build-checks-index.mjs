@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 //
 // Generate docs/public/70-reference/05-checks-index.md from the
-// metadata extracted by tools/extract-checks-metadata.mjs.
+// metadata extracted by scripts/extract-checks-metadata.mjs.
 //
 // Why a generator rather than a hand-curated index: the checks corpus, with
 // descriptions and tags, is too much to keep in sync by hand. The corpus
@@ -11,11 +11,11 @@
 // — do not hand-edit that file; edit this generator instead.
 //
 // Usage:
-//   node tools/extract-checks-metadata.mjs > /tmp/checks.json
-//   node tools/build-checks-index.mjs /tmp/checks.json > docs/public/70-reference/05-checks-index.md
+//   node scripts/extract-checks-metadata.mjs > /tmp/checks.json
+//   node scripts/build-checks-index.mjs /tmp/checks.json > docs/public/70-reference/05-checks-index.md
 //
 // Or piped:
-//   node tools/extract-checks-metadata.mjs | node tools/build-checks-index.mjs - > <output>
+//   node scripts/extract-checks-metadata.mjs | node scripts/build-checks-index.mjs - > <output>
 //
 
 import { promises as fs } from 'node:fs';
@@ -99,7 +99,7 @@ async function main() {
   out.push('release: v2.0.x');
   out.push('title: "Checks reference"');
   out.push('audience: [getting-started, ci-integrators, plugin-authors]');
-  out.push('purpose: "Browsable index of every built-in fit check, grouped by pack and primary tag. Auto-generated from source by tools/build-checks-index.mjs."');
+  out.push('purpose: "Browsable index of every built-in fit check, grouped by pack and primary tag. Auto-generated from source by scripts/build-checks-index.mjs."');
   out.push('source-files:');
   out.push('  - packages/fitness/checks-universal/src/checks/');
   out.push('  - packages/fitness/checks-typescript/src/checks/');
@@ -117,7 +117,7 @@ async function main() {
   out.push('');
   out.push(`opensip-tools ships **${total}+ built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from \`defineCheck\`.`);
   out.push('');
-  out.push('> This page is **auto-generated** from the source by [`tools/build-checks-index.mjs`](https://github.com/opensip-ai/opensip-tools/blob/main/tools/build-checks-index.mjs). Do not edit it by hand — edit the check\'s source file (the link in each row), then re-run the generator.');
+  out.push('> This page is **auto-generated** from the source by [`scripts/build-checks-index.mjs`](https://github.com/opensip-ai/opensip-tools/blob/main/scripts/build-checks-index.mjs). Do not edit it by hand — edit the check\'s source file (the link in each row), then re-run the generator.');
   out.push('');
 
   // Per-pack section

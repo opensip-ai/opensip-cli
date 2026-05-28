@@ -63,9 +63,9 @@ jobs:
       # Verify docs/web-generated/ (the website-facing transformed copy
       # of docs/public/) is in sync with its source. Editors who change
       # docs/public/*.md must regenerate docs/web-generated/ by running
-      # `node tools/build-web-docs.mjs` and committing the result. The
+      # `node scripts/build-web-docs.mjs` and committing the result. The
       # website at opensip.ai/docs/opensip-tools/ fetches
       # docs/web-generated/ directly, so stale output is a user-visible
       # bug.
       - name: Check generated web docs in sync
-        run: node tools/build-web-docs.mjs --check
+        run: node scripts/build-web-docs.mjs --check

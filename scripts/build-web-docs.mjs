@@ -28,8 +28,8 @@
 // Both are silent comments in the in-repo view.
 //
 // Usage:
-//   node tools/build-web-docs.mjs           # write docs/web-generated/
-//   node tools/build-web-docs.mjs --check   # exit 1 if docs/web-generated/ is stale
+//   node scripts/build-web-docs.mjs           # write docs/web-generated/
+//   node scripts/build-web-docs.mjs --check   # exit 1 if docs/web-generated/ is stale
 //
 
 import { promises as fs } from 'node:fs';
@@ -129,7 +129,7 @@ const main = async () => {
         err(`  - ${relative(REPO_ROOT, f)}`);
       }
     }
-    err('Run: node tools/build-web-docs.mjs');
+    err('Run: node scripts/build-web-docs.mjs');
     process.exit(1);
   }
 
@@ -488,7 +488,7 @@ const warnIfMermaid = (text, srcRel) => {
   // docs/web-generated/diagrams/<hash>.svg and replace the block with an <img>.
   if (/```mermaid/.test(text)) {
     err(
-      `warn: ${srcRel} contains a mermaid block — SVG pre-rendering not yet wired; leaving block as-is. See tools/build-web-docs.mjs:warnIfMermaid().`
+      `warn: ${srcRel} contains a mermaid block — SVG pre-rendering not yet wired; leaving block as-is. See scripts/build-web-docs.mjs:warnIfMermaid().`
     );
   }
   return text;

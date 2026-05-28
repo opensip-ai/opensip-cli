@@ -27,9 +27,9 @@
     "fit:ci": "node packages/cli/dist/index.js fit --gate-save",
     "dashboard": "node packages/cli/dist/index.js dashboard",
     "sessions": "node packages/cli/dist/index.js sessions",
-    "docs:build": "node tools/build-web-docs.mjs",
-    "docs:check": "node tools/build-web-docs.mjs --check",
-    "verify-release": "node tools/verify-release.mjs",
+    "docs:build": "node scripts/build-web-docs.mjs",
+    "docs:check": "node scripts/build-web-docs.mjs --check",
+    "verify-release": "node scripts/verify-release.mjs",
     "prepare": "git config core.hooksPath .githooks 2>/dev/null || true"
   },
   "devDependencies": {

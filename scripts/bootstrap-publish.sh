@@ -22,7 +22,7 @@
 # publish has now landed.
 #
 # Usage:
-#   NPM_TOKEN=npm_xxx ./tools/bootstrap-publish.sh
+#   NPM_TOKEN=npm_xxx ./scripts/bootstrap-publish.sh
 #
 # After it completes:
 #   1. For each package marked NEW in the output, visit its npmjs.com
