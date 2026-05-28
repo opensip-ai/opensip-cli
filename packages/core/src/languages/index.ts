@@ -1,5 +1,6 @@
 export type { LanguageAdapter, LanguageQueryAPI } from './adapter.js'
 export type { GenericFunction, Import, Location } from './generic-types.js'
+export type { WorkspaceUnit } from './workspace-unit.js'
 export { LanguageRegistry } from './registry.js'
 export {
   LanguageParseCache,
