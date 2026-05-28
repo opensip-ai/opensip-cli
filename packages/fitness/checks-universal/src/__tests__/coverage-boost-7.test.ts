@@ -337,56 +337,6 @@ describe('performance-anti-patterns more', () => {
 })
 
 // =============================================================================
-// no-legacy-code: cover branches
-// =============================================================================
-
-// `no-legacy-code` was deleted in audit's C4 phase (split into
-// no-deprecated-tags / no-compatibility-layer-names /
-// no-temporary-workarounds). The test is skipped — coverage moved with
-// the per-check files.
-describe.skip('no-legacy-code', () => {
-  let cwd: string
-
-  beforeAll(() => {
-    cwd = makeFixtureDir('legacy')
-    // Various legacy code patterns
-    writeFixture(cwd, 'src/legacy.ts', [
-      'export function f() {',
-      '  var x = 1;', // var keyword
-      '  return x;',
-      '}',
-      'export class Old {',
-      '  m() { return arguments.length; }', // arguments object
-      '}',
-      'export const cb = function() {};', // anonymous function expression
-    ].join('\n'))
-    // Modern code
-    writeFixture(cwd, 'src/modern.ts', [
-      'export function f() {',
-      '  const x = 1;',
-      '  return x;',
-      '}',
-    ].join('\n'))
-  })
-
-  afterAll(() => rmSync(cwd, { recursive: true, force: true }))
-
-  it('flags legacy patterns', async () => {
-    const result = await findCheck('no-legacy-code').run(cwd, {
-      targetFiles: [join(cwd, 'src/legacy.ts')],
-    })
-    expect(result).toBeDefined()
-  })
-
-  it('does not fire for modern code', async () => {
-    const result = await findCheck('no-legacy-code').run(cwd, {
-      targetFiles: [join(cwd, 'src/modern.ts')],
-    })
-    expect(result).toBeDefined()
-  })
-})
-
-// =============================================================================
 // jwt-validation: branches
 // =============================================================================
 
