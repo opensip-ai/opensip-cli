@@ -2,11 +2,14 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { makeTestScope, withScopeSync } from '@opensip-tools/core/test-utils/with-scope.js'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createExecutionContext } from '../execution-context.js'
 import { fileCache } from '../file-cache.js'
 import { PathMatcher } from '../path-matcher.js'
+
+import type { Logger } from '@opensip-tools/core'
 
 let testDir: string
 
@@ -92,12 +95,18 @@ describe('createExecutionContext > extractSnippet, log, checkAborted', () => {
     expect(out.contextLines).toBeGreaterThan(0)
   })
 
-  it('log writes to console only when verbose is true', () => {
+  it('log routes verbose output through the scope logger only when verbose is true', () => {
     const matcher = PathMatcher.create({ cwd: testDir, include: [], exclude: [] })
-    const messages: string[] = []
-    const realLog = console.log
-    console.log = (...args: unknown[]) => { messages.push(String(args[0])) }
-    try {
+    const infoSpy = vi.fn()
+    const stubLogger = {
+      debug: vi.fn(),
+      info: infoSpy,
+      warn: vi.fn(),
+      error: vi.fn(),
+    } satisfies Logger
+    const scope = makeTestScope({ logger: stubLogger })
+
+    withScopeSync(scope, () => {
       const verboseCtx = createExecutionContext(
         { id: 'id', slug: 'slug', itemType: 'files' },
         testDir,
@@ -112,11 +121,16 @@ describe('createExecutionContext > extractSnippet, log, checkAborted', () => {
         matcher,
       )
       quietCtx.log('silent')
-    } finally {
-      console.log = realLog
-    }
-    expect(messages.some((m) => m.includes('hello'))).toBe(true)
-    expect(messages.some((m) => m.includes('silent'))).toBe(false)
+    })
+
+    expect(infoSpy).toHaveBeenCalledTimes(1)
+    expect(infoSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evt: 'fitness.check.verbose',
+        checkSlug: 'slug',
+        message: 'hello',
+      }),
+    )
   })
 
   it('checkAborted throws CheckAbortedError when the signal is aborted', () => {

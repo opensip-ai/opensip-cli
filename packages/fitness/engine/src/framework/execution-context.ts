@@ -11,7 +11,7 @@ import * as fs from 'node:fs/promises'
 import { relative } from 'node:path'
 
 
-import { SystemError } from '@opensip-tools/core'
+import { SystemError, currentScope, logger as defaultLogger } from '@opensip-tools/core'
 import { Minimatch } from 'minimatch'
 
 import { DEFAULT_EXCLUSION_PATTERNS } from './constants.js'
@@ -219,12 +219,21 @@ export function createExecutionContext(
     },
 
     log(message: string): void {
-      if (options?.verbose) {
-        // @fitness-ignore-next-line no-console-log -- Verbose check-level debug output bypasses structured logger for immediate CLI feedback
-        // @fitness-ignore-next-line logging-standards -- Verbose check-level debug output bypasses structured logger for immediate CLI feedback
-         
-        console.log(`[${config.slug}] ${message}`)
-      }
+      if (!options?.verbose) return
+      // Route through the structured logger from RunScope so future
+      // --json / --quiet modes that reconfigure the logger can suppress
+      // check-level debug output uniformly. Falls back to the module
+      // default logger when no scope is active (e.g. test harnesses
+      // that exercise an ExecutionContext directly). Audit-round-2
+      // Finding D: this was previously `console.log` which bypassed
+      // the structured channel and could not be suppressed.
+      const log = currentScope()?.logger ?? defaultLogger
+      log.info({
+        evt: 'fitness.check.verbose',
+        module: 'fitness:framework',
+        checkSlug: config.slug,
+        message,
+      })
     },
 
     extractSnippet(
