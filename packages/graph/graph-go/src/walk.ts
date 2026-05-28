@@ -1,3 +1,4 @@
+// @fitness-ignore-file context-mutation -- `ctx: WalkCtx` here is a function-scoped traversal accumulator (callSites array, occurrence sink, parser refs) threaded through the AST walk, NOT a shared request/execution context. `ctx.callSites.push(...)` is the intended local-accumulator append. The shared check-side `LOCAL_DECLARATION_PATTERNS` heuristic doesn't see it because `ctx` arrives as a typed parameter, not via `const ctx = …`.
 /**
  * Go walkProject — emit FunctionOccurrences + CallSiteRecords.
  *
