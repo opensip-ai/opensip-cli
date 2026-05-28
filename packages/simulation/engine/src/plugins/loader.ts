@@ -1,3 +1,4 @@
+// @fitness-ignore-file error-handling-quality -- tryRegisterRecipe/tryRegisterScenario translate registry throws (duplicate-id collisions) into a boolean "not newly registered" return per their documented JSDoc contract; the registry's own logging/duplicate policy is the source of truth, this layer just surfaces it as a flag.
 /**
  * @fileoverview Simulation plugin loader — adapter over core's generic
  * loader.
