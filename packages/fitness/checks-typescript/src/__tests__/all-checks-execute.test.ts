@@ -1,3 +1,4 @@
+// @fitness-ignore-file file-length-limit -- Parametric "every check executes" suite; per-check fixtures live in a single iteration block so splitting destroys the coverage contract.
 /**
  * @fileoverview Parametric coverage for every check in checks-typescript.
  *

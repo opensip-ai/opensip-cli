@@ -1,3 +1,4 @@
+// @fitness-ignore-file file-length-limit -- Coverage-driven aggregate fixture file (sibling of coverage-boost.test.ts); second-tier per-check fixtures stay co-located to keep the coverage push owned by a single file.
 /**
  * @fileoverview Additional fixture tests for the second tier of low-coverage checks.
  *
