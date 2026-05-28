@@ -16,12 +16,7 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./dist/index.js",
-    "./adapter": "./dist/adapter.js",
-    "./parse": "./dist/parse.js",
-    "./query": "./dist/query.js",
-    "./strip": "./dist/strip.js",
-    "./ast-utilities": "./dist/ast-utilities.js"
+    ".": "./dist/index.js"
   },
   "scripts": {
     "build": "tsc",
