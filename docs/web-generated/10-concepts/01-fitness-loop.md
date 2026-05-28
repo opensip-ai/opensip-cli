@@ -104,7 +104,7 @@ Source: [`packages/cli/src/index.ts`](https://github.com/opensip-ai/opensip-tool
 
 1. Parse global flags (`--debug`, `--quiet`).
 2. Set up the logger and assign a `runId` (`RUN_<ulid>`).
-3. Walk `defaultToolRegistry` and call `Tool.register(cli)` on every registered Tool. The fitness Tool sees `cli.program` and mounts its `fit`, `dashboard`, `fit-list`, `fit-recipes` Commander commands.
+3. Walk the per-invocation `ToolRegistry` (populated during bootstrap) and call `Tool.register(cli)` on every registered Tool. The fitness Tool sees `cli.program` and mounts its `fit`, `dashboard`, `fit-list`, `fit-recipes` Commander commands.
 4. Hand argv to Commander, which dispatches to `fitnessTool`'s `fit` action handler ([`packages/fitness/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/fitness/engine/src/tool.ts) — the `program.command(FIT.name).action(...)` block; the `dashboard`, `fit-list`, and `fit-recipes` action handlers live alongside it).
 
 The CLI does not know what `fit` does. It knows a Tool exists, it asked the Tool to register, the Tool put a handler on `program.command('fit')`, and Commander now owns the routing. Everything specific to fitness from this point on lives inside `@opensip-tools/fitness`.
@@ -130,11 +130,11 @@ If the config is missing, the CLI exits 2 with a pointer to `opensip-tools init`
 
 ## Stage 3 — Plugin load
 
-Source: [`packages/core/src/plugins/discover.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/core/src/plugins/discover.ts), [`packages/fitness/engine/src/plugins/`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/fitness/engine/src/plugins/), [`packages/cli/src/index.ts:68-73`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/cli/src/index.ts) (language-adapter registration).
+Source: [`packages/core/src/plugins/discover.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/core/src/plugins/discover.ts), [`packages/fitness/engine/src/plugins/`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/fitness/engine/src/plugins/), [`packages/cli/src/bootstrap/register-language-adapters.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/cli/src/bootstrap/register-language-adapters.ts) (language-adapter registration).
 
 Three sources of checks get loaded, in order:
 
-1. **Language adapters.** Bound at module load time by the CLI before any tool initializes — `lang-typescript`, `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp` each register one `LanguageAdapter` into `defaultLanguageRegistry`. Without this, the framework would treat every file as raw text and a regex check looking for `console.log` would also match the literal string in a comment.
+1. **Language adapters.** Registered inside `bootstrapCli()` before any tool's `register()` runs — `lang-typescript`, `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp` each contribute one `LanguageAdapter` to the per-invocation `LanguageRegistry`. Without this, the framework would treat every file as raw text and a regex check looking for `console.log` would also match the literal string in a comment.
 2. **npm-package check packs.** The plugin loader walks `node_modules` for any package whose name matches `@opensip-tools/checks-*` (the auto-discovery prefix), or any package listed in `plugins.checkPackages:` (the explicit-pin form). Each one exports a list of `defineCheck()` results. Bundled packs include `@opensip-tools/checks-universal`, `@opensip-tools/checks-typescript`, `@opensip-tools/checks-python`, etc.
 3. **Project-local checks.** `.mjs` files under `<project>/opensip-tools/fit/checks/` are loaded via dynamic `import()`. Each module either exports a single `Check` (the value returned by `defineCheck()`) or an array of them.
 

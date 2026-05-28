@@ -34,27 +34,36 @@ related-docs:
 ## The startup sequence
 
 ```
-1. Module-load side effects: register language adapters into
-   defaultLanguageRegistry; register first-party tools (fitnessTool,
-   simulationTool, graphTool) into defaultToolRegistry.
-2. main():
-     a. await loadDiscoveredTools()        ← walk node_modules for
-                                             package.json declarations
-                                             of opensipTools.kind === 'tool'
-     b. registerAllTools()                 ← iterate the tool registry,
-                                             call tool.register(cli) on
-                                             each (mounts Commander
-                                             subcommands)
-     c. registerCliCommands()              ← mount CLI-owned commands
-                                             (init, configure, sessions,
-                                             plugin, completion, uninstall)
-3. If argv has no subcommand, print the welcome banner and exit 0.
-4. Fire the once-per-day update notifier (TTY-gated, non-blocking).
-5. await program.parseAsync()
-     The preAction hook reads --debug from each command's options and
-     raises the log level for that run. A runId is generated and the
-     day-level log file (logs/<YYYY-MM-DD>.jsonl) is opened lazily on
-     first write.
+1. main() constructs fresh, per-invocation registries:
+     - new LanguageRegistry()
+     - new ToolRegistry()
+     These replace the long-removed `defaultLanguageRegistry` /
+     `defaultToolRegistry` module singletons; tools later read them
+     via `cli.scope.languages` / `cli.scope.tools` (RunScope).
+2. await bootstrapCli({ langRegistry, toolRegistry, projectDir }):
+     a. Registers the bundled language adapters (typescript, rust,
+        python, java, go, cpp) into langRegistry.
+     b. Registers the first-party tools (fitnessTool, simulationTool,
+        graphTool) into toolRegistry.
+     c. Walks node_modules via discoverToolPackages() to load any
+        third-party packages whose package.json declares
+        opensipTools.kind === 'tool'.
+3. mountAllToolCommands(toolRegistry, ctx)  ← iterate the tool
+                                              registry, call
+                                              tool.register(ctx) on
+                                              each (mounts Commander
+                                              subcommands).
+4. registerCliCommands()                    ← mount CLI-owned commands
+                                              (init, configure,
+                                              sessions, plugin,
+                                              completion, uninstall).
+5. If argv has no subcommand, print the welcome banner and exit 0.
+6. Fire the once-per-day update notifier (TTY-gated, non-blocking).
+7. await program.parseAsync()
+     The preAction hook enters a fresh RunScope, reads --debug from
+     each command's options and raises the log level for that run. A
+     runId is generated and the day-level log file
+     (logs/<YYYY-MM-DD>.jsonl) is opened lazily on first write.
 ```
 
 The whole thing fits in [`packages/cli/src/index.ts`](../../../packages/cli/src/index.ts) at ~530 lines. Every step is direct — no plugin lifecycle hooks, no startup phases, no DI container. Just static imports and explicit registration calls.
@@ -63,8 +72,8 @@ The whole thing fits in [`packages/cli/src/index.ts`](../../../packages/cli/src/
 
 A few of the constraints that pinned the order:
 
-- **Language adapters before any check ever runs.** The fitness tool's content filter dispatches per-file based on the language registry. A check that runs before any adapter is registered would treat every file as raw text and silently miss violations. The adapters are registered as a module-load side effect of importing `packages/cli/src/index.ts`, so they're in place before `main()` executes.
-- **First-party tools before discovery.** `defaultToolRegistry.register()` is last-writer-wins. Registering the bundled tools at module-load time first lets a discovered third-party tool with the same id (e.g. a custom `fitness` replacement) override them. The discovery loop in `loadDiscoveredTools()` explicitly skips packages whose `metadata.id` matches one of the bundled tools so a non-customized third-party install can't accidentally clobber the built-ins.
+- **Language adapters before any check ever runs.** The fitness tool's content filter dispatches per-file based on the language registry. A check that runs before any adapter is registered would treat every file as raw text and silently miss violations. The adapters are registered first inside `bootstrapCli()`, so they're in place before any tool's `register()` is called.
+- **First-party tools before discovery.** `ToolRegistry.register()` is last-writer-wins. `bootstrapCli()` registers the bundled tools first so a discovered third-party tool with the same id (e.g. a custom `fitness` replacement) can override them. The discovery walk via `discoverToolPackages()` explicitly skips packages whose `metadata.id` matches one of the bundled tools so a non-customized third-party install can't accidentally clobber the built-ins.
 - **Tools mount before CLI-owned commands.** Tool subcommands (`fit`, `sim`, `graph`, `dashboard`, …) get mounted in `registerAllTools()` first. CLI-owned commands (`init`, `sessions`, `plugin`, `configure`, `completion`, `uninstall`) are mounted afterwards in `registerCliCommands()`. The order avoids duplicate-name collisions (a tool can't squat a CLI-owned name) and keeps tool subcommands at the top of `--help`.
 - **`parseAsync` last.** Commander parses argv synchronously but action handlers are async. `parseAsync` returns when the action handler resolves, which is what blocks Node's event loop until the run completes.
 
@@ -80,7 +89,7 @@ Some commands belong to the CLI itself, not to any Tool. They live under [`packa
 | `configure` | CLI | Manages user-level (`~/.opensip-tools/config.yml`) state. Cross-tool. |
 | `uninstall` | CLI | Removes the user-level dotdir. Cross-tool. |
 | `plugin add/remove/list/sync` | CLI | Manages project-pinned plugins. Cross-tool. |
-| `completion` | CLI | Prints shell completion. Sources its catalog from `defaultToolRegistry`. |
+| `completion` | CLI | Prints shell completion. Sources its catalog from the per-invocation `ToolRegistry`. |
 | `sessions list/purge` | CLI | Reads the runtime session store. Cross-tool. |
 
 Tool-owned commands (`fit`, `dashboard`, `fit-list`, `fit-recipes`, `sim`) are mounted by their Tool's `register()` call. The CLI's job is to provide the program; the Tool decides what handlers it gets.
@@ -155,14 +164,16 @@ The principle is "log, fall back, keep moving" for non-fatal failures (a plugin 
 
 For `acme-api` running `opensip-tools fit --gate-compare` from CI on 2026-05-17:
 
-1. Module-load side effects: six language adapters (`typescript`, `rust`, `python`, `java`, `go`, `cpp`) registered into `defaultLanguageRegistry`. `fitnessTool`, `simulationTool`, `graphTool` registered into `defaultToolRegistry`.
-2. `main()` runs:
-   - `loadDiscoveredTools()` walks `node_modules`. No third-party Tools installed. Returns empty.
-   - `registerAllTools()`: `fitnessTool.register(cli)` mounts `fit`, `dashboard`, `fit-list`, `fit-recipes`; `simulationTool.register(cli)` mounts `sim`; `graphTool.register(cli)` mounts `graph`.
-   - `registerCliCommands()`: `init`, `configure`, `uninstall`, `plugin`, `completion`, `sessions` mounted.
-3. `argv = ['node', 'opensip-tools', 'fit', '--gate-compare']` — there's a subcommand, so the welcome banner is skipped.
-4. Update notifier fires (no-op — runs in background, won't block).
-5. `parseAsync()` runs. The `preAction` hook reads the `fit` command's `opts.debug` (false) and leaves the log level at `info`. A runId like `RUN_01HXYZG9V8K1J7P3M2N0RQS5T6W` is generated (uppercase prefix + ULID); the day-level log file `<project>/opensip-tools/.runtime/logs/2026-05-17.jsonl` is opened on first write. Commander dispatches to `fitnessTool`'s `fit` action handler with `--gate-compare = true`. The Tool runs `executeFit` and the gate diff. Exit code 1 (regression detected).
+1. `main()` constructs fresh `LanguageRegistry` and `ToolRegistry` instances for this invocation.
+2. `bootstrapCli({ langRegistry, toolRegistry, projectDir })`:
+   - Registers six bundled language adapters (`typescript`, `rust`, `python`, `java`, `go`, `cpp`) into `langRegistry`.
+   - Registers `fitnessTool`, `simulationTool`, `graphTool` into `toolRegistry`.
+   - `discoverToolPackages()` walks `node_modules`. No third-party Tools installed. Returns empty.
+3. `mountAllToolCommands(toolRegistry, ctx)`: `fitnessTool.register(ctx)` mounts `fit`, `dashboard`, `fit-list`, `fit-recipes`; `simulationTool.register(ctx)` mounts `sim`; `graphTool.register(ctx)` mounts `graph`.
+4. `registerCliCommands()`: `init`, `configure`, `uninstall`, `plugin`, `completion`, `sessions` mounted.
+5. `argv = ['node', 'opensip-tools', 'fit', '--gate-compare']` — there's a subcommand, so the welcome banner is skipped.
+6. Update notifier fires (no-op — runs in background, won't block).
+7. `parseAsync()` runs. The `preAction` hook enters a fresh `RunScope`, reads the `fit` command's `opts.debug` (false), and leaves the log level at `info`. A runId like `RUN_01HXYZG9V8K1J7P3M2N0RQS5T6W` is generated (uppercase prefix + ULID); the day-level log file `<project>/opensip-tools/.runtime/logs/2026-05-17.jsonl` is opened on first write. Commander dispatches to `fitnessTool`'s `fit` action handler with `--gate-compare = true`. The Tool runs `executeFit` and the gate diff. Exit code 1 (regression detected).
 
 The whole bootstrap is ~30ms on a developer laptop; the run itself is the bulk of the wall-clock time.
 

@@ -23,7 +23,7 @@ related-docs:
 
 # Adding a language to graph
 
-The `graph` tool started as a TypeScript-only call-graph engine. The language-pluggability work introduced a six-method `GraphLanguageAdapter` contract so the engine itself doesn't know any specific language. v2.0.0 ships **five first-party adapters** — each as its own publishable npm package under `packages/graph/graph-<lang>/`: TypeScript (symbol-resolved via the TS compiler API), Python (tree-sitter), Rust (tree-sitter), Go (tree-sitter), and Java (tree-sitter). Each declares `opensipTools.kind: "graph-adapter"` in its `package.json`. Any first-party or third-party adapter slots in by implementing the contract and registering itself.
+The `graph` tool started as a TypeScript-only call-graph engine. The language-pluggability work introduced a six-method `GraphLanguageAdapter` contract so the engine itself doesn't know any specific language. v2.0.0 ships **five first-party adapters** — each as its own publishable npm package under `packages/graph/graph-<lang>/`: TypeScript (symbol-resolved via the TS compiler API), Python (tree-sitter), Rust (tree-sitter), Go (tree-sitter), and Java (tree-sitter). Discovery is by **name pattern**: any package whose name matches `@opensip-tools/graph-*` is auto-discovered, or you can pin an exact list in `plugins.graphAdapters` in `opensip-tools.config.yml`. Any first-party or third-party adapter slots in by implementing the contract and shipping under that name pattern (or via the explicit-pin form).
 
 This doc walks a contributor through that workflow.
 
@@ -73,8 +73,13 @@ A new first-party adapter ships as its own publishable npm package under `packag
 ```
 packages/graph/graph-<id>/
   package.json       — { "name": "@opensip-tools/graph-<id>",
-                          "opensipTools": { "kind": "graph-adapter" },
                           peer-deps on @opensip-tools/graph + @opensip-tools/core }
+                        (the `@opensip-tools/graph-*` name prefix is
+                        what the discovery walker keys off; first-party
+                        packages also include
+                        `opensipTools: { kind: "graph-adapter" }` as a
+                        descriptive marker, but it is not currently
+                        consulted by the discovery walker)
   tsconfig.json
   src/
     discover.ts      — discoverFiles implementation (reads pyproject.toml / Cargo.toml / go.mod / etc.)
@@ -99,7 +104,7 @@ packages/graph/graph-<id>/
 
 This mirrors `graph-python/`, `graph-rust/`, `graph-go/`, and `graph-java/` — the recommended template for tree-sitter adapters. The TypeScript adapter has a deeper subdir layout (`inventory-visitors/`, `edge-resolvers/`, `inventory-helpers/`) because its symbol-resolved walk is genuinely more complex; for a tree-sitter adapter the flat layout is plenty. Adapters that prefer one big file or a different breakdown are fine — the contract doesn't care, only the public `index.ts` export matters.
 
-**Third-party graph adapters** are supported via the same `opensipTools.kind: "graph-adapter"` marker the first-party packages use. The marker walker (see [`80-implementation/02-plugin-loader.md`](../80-implementation/02-plugin-loader.md)) discovers any installed package declaring that kind and registers its `adapter` export. The adapter contract types (`GraphLanguageAdapter`, `registerAdapter`, `pickAdapter`) are exported from `@opensip-tools/graph`.
+**Third-party graph adapters** are supported via the same name-pattern discovery path the first-party packages use: any package installed in `node_modules` whose name matches `@opensip-tools/graph-*` is loaded and its `adapter` export registered. For deployments that need pinned discovery, list the exact package names under `plugins.graphAdapters:` in `opensip-tools.config.yml` — that list replaces the auto-scan entirely. The adapter contract types (`GraphLanguageAdapter`, `registerAdapter`, `pickAdapter`) are exported from `@opensip-tools/graph`.
 
 ---
 
@@ -152,19 +157,20 @@ When you ship a new adapter, add a row to this table in your PR.
 
 ## 6. Registration
 
-First-party and third-party adapters use the same registration path: ship a package whose `package.json` declares `opensipTools.kind: "graph-adapter"` and whose main entry exports `adapter`.
+First-party and third-party adapters use the same registration path: ship a package whose name matches `@opensip-tools/graph-*` (or whose name is listed under `plugins.graphAdapters:` in the project config) and whose main entry exports `adapter`.
 
 ```json
 {
   "name": "@opensip-tools/graph-cpp",
   "main": "dist/index.js",
-  "opensipTools": { "kind": "graph-adapter" },
   "peerDependencies": {
     "@opensip-tools/graph": "^2.0.0",
     "@opensip-tools/core": "^2.0.0"
   }
 }
 ```
+
+(First-party packages also include `"opensipTools": { "kind": "graph-adapter" }` as a descriptive marker. It is forward-compatible metadata only — the discovery walker does not currently consult it.)
 
 ```ts
 // packages/graph/graph-cpp/src/index.ts

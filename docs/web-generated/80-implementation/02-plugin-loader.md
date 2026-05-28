@@ -24,21 +24,22 @@ related-docs:
 opensip-tools loads four kinds of plugins. Each has its own discovery shape, but they share a small, explicit policy: nothing loads silently, nothing loads transitively without opt-in, and the project owns its plugin set.
 
 > **What you'll understand after this:**
-> - The four discovery shapes (Tool marker, fit-pack marker + scope-prefix scan, sim-pack marker + project-pinned, direct import).
+> - The five discovery shapes (Tool marker, fit-pack marker + scope-prefix scan, sim-pack marker + project-pinned, graph-adapter name-pattern + explicit pin, direct import).
 > - Why source-file plugins auto-load but project-pinned npm packages require explicit listing.
 > - The on-disk layout the `plugin add/remove/list/sync` commands operate on.
 > - What `plugin sync` does and when CI should run it.
 
 ---
 
-## The four discovery shapes
+## The five discovery shapes
 
 | Plugin kind | Discovery shape | Where loaded |
 |---|---|---|
 | **Tools** | `node_modules` walk for `opensipTools.kind === 'tool'` marker | At CLI startup, by `discoverToolPackages()` |
 | **Check packs** | (a) `node_modules` walk for `<scope>/checks-*` under default + configured `plugins.packageScopes`, (b) `node_modules` walk for `opensipTools.kind === 'fit-pack'` marker, (c) explicit `plugins.checkPackages:` list. All run in parallel; results merged and deduped by package name. | Inside fitness's `loadDiscoveredCheckPackages()` |
 | **Sim scenario packs** | (a) Project-local source files under `opensip-tools/sim/`, (b) `node_modules` walk for `opensipTools.kind === 'sim-pack'` marker, (c) project-pinned via `plugins.sim:` list under `.runtime/plugins/sim/` | Inside simulation's `ensureScenariosLoaded()` |
-| **Language adapters** | Direct CLI imports (no discovery walk) | At CLI module load, before any Tool runs |
+| **Graph adapters** | (a) Explicit `plugins.graphAdapters:` list in `opensip-tools.config.yml` (when present, replaces the auto-scan entirely), (b) `plugins.autoDiscoverGraphAdapters: false` opt-out, (c) default: `node_modules` walk for any package whose name matches `@opensip-tools/graph-*`. | At CLI startup, by `discoverGraphAdapterPackages()` |
+| **Language adapters** | Direct CLI imports (no discovery walk) | At CLI bootstrap, before any Tool's `register()` runs |
 
 Different kinds, different lifetimes. Tools are global to the binary — once registered, they're available regardless of cwd. Check packs and scenario packs are project-scoped — they load when the relevant Tool actually runs. Language adapters are bundled — they're a CLI dep, not a discoverable plugin, because the framework can't usefully run without them.
 
@@ -148,22 +149,22 @@ The scope-prefix shape is what makes "install and use" frictionless for the bund
 
 ## 4. Language adapter "discovery" — actually direct imports
 
-[`packages/cli/src/index.ts:68-73`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/cli/src/index.ts) registers the six bundled language adapters at module load time:
+[`packages/cli/src/bootstrap/register-language-adapters.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/cli/src/bootstrap/register-language-adapters.ts) registers the six bundled language adapters into the per-invocation `LanguageRegistry`:
 
 ```ts
 import { typescriptAdapter } from '@opensip-tools/lang-typescript';
 import { rustAdapter }       from '@opensip-tools/lang-rust';
 // ... four more ...
 
-defaultLanguageRegistry.register(typescriptAdapter);
-defaultLanguageRegistry.register(rustAdapter);
-defaultLanguageRegistry.register(pythonAdapter);
-defaultLanguageRegistry.register(javaAdapter);
-defaultLanguageRegistry.register(goAdapter);
-defaultLanguageRegistry.register(cppAdapter);
+langRegistry.register(typescriptAdapter);
+langRegistry.register(rustAdapter);
+langRegistry.register(pythonAdapter);
+langRegistry.register(javaAdapter);
+langRegistry.register(goAdapter);
+langRegistry.register(cppAdapter);
 ```
 
-This isn't discovery. It's a static side-effect import. Why?
+This isn't discovery. It's an explicit static call from `bootstrapCli()`. Why?
 
 - Language adapters are needed *before* any Tool runs. A check that runs against a language with no registered adapter would treat every file as raw text — silent miss.
 - The six bundled adapters are part of the CLI's contract. A project that needs Rust support gets it without installing anything; same for the others.

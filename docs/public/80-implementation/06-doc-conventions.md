@@ -19,7 +19,7 @@ How the architecture docs are written and maintained. Read this if you're contri
 ## Voice
 
 - **Second person, narrative.** "You'll see" / "you can grep for" / "your check will fire." Not "the user can" or "developers should."
-- **Present tense for current behavior.** "The CLI walks `defaultToolRegistry`" — not "the CLI will walk" or "the CLI walked."
+- **Present tense for current behavior.** "The CLI walks the `ToolRegistry`" — not "the CLI will walk" or "the CLI walked."
 - **Past tense for history.** "An earlier refactor moved `filterContent` out of `core`" — explicit about what's no longer the current shape.
 - **Future tense, always labelled.** "Roadmap: a future tool may live at `kind: 'asm'`" — it's clear this isn't current behavior.
 - **Assumes engineering fluency.** Don't re-explain `tsconfig`, `npm`, `glob pattern`, `ESM module`, or `JSON Lines`. Do explain opensip-tools-specific terms (Tool, Check, Recipe, Target) the first time they appear in a doc, with a link to [`../00-start/05-vocabulary.md`](../00-start/05-vocabulary.md).

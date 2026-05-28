@@ -27,7 +27,7 @@ Pure types, registries, errors, IDs, logger, paths. No tool-specific knowledge.
 
 | Package | Path | Role | Key exports |
 |---|---|---|---|
-| `@opensip-tools/core` | `packages/core/` | Kernel — language adapters, plugin loader, errors, logger, IDs, retry, project config, Tool registry | `Tool`, `ToolRegistry`, `defaultToolRegistry`, `LanguageAdapter`, `defaultLanguageRegistry`, `Signal`, `createSignal`, `discoverPlugins`, `discoverToolPackages`, `resolveProjectPaths`, `resolveUserPaths`, `logger`, `ToolError`, `ValidationError` |
+| `@opensip-tools/core` | `packages/core/` | Kernel — language adapters, plugin loader, errors, logger, IDs, retry, project config, per-invocation execution scope | `Tool`, `ToolRegistry`, `LanguageAdapter`, `LanguageRegistry`, `RunScope`, `runWithScope`, `currentScope`, `Registry`, `Signal`, `createSignal`, `discoverPlugins`, `discoverToolPackages`, `resolveProjectPaths`, `resolveUserPaths`, `logger`, `ToolError`, `ValidationError` |
 
 ## Layer 2 — datastore and shared contract types
 
@@ -49,7 +49,7 @@ Peer packages at the same layer. Tools implement the `Tool` contract; shared lib
 | Package | Path | Role | Key exports |
 |---|---|---|---|
 | `@opensip-tools/fitness` | `packages/fitness/engine/` | Fitness check engine, `defineCheck`, `defineRecipe`, gate, SARIF builder | `defineCheck`, `defineRecipe`, `FitnessRecipeService`, `defaultRecipeRegistry`, `getCheckConfig`, `executeFit`, `loadSignalersConfig`, `fitnessTool`, `saveBaseline`, `compareToBaseline`, `buildSarifLog`, `reportToCloud`, `openDashboard` |
-| `@opensip-tools/simulation` | `packages/simulation/engine/` | Simulation engine, four scenario kinds | `defineLoadScenario`, `defineChaosScenario`, `defineInvariantScenario`, `defineFixEvaluationScenario`, `defineSimulationRecipe`, `simulationTool`, `defaultSimulationRecipeRegistry`, `SCENARIO_KINDS` |
+| `@opensip-tools/simulation` | `packages/simulation/engine/` | Simulation engine, four scenario kinds | `defineLoadScenario`, `defineChaosScenario`, `defineInvariantScenario`, `defineFixEvaluationScenario`, `defineSimulationRecipe`, `simulationTool`, `currentSimulationRecipeRegistry`, `SCENARIO_KINDS` |
 | `@opensip-tools/graph` | `packages/graph/engine/` | Static call-graph + dead-end analysis kernel. Six-stage staged pipeline (discover → inventory → edges → indexes → rules → render). Language-agnostic — adapters live in their own publishable packages (see "Graph language adapters" below) and register through `registerAdapter`. Imports SARIF helpers from `@opensip-tools/fitness` (peer-layer dep, DEC-3) | `graphTool`, `Catalog`, `FunctionOccurrence`, `CallEdge`, `Indexes`, `Rule`, `Renderer`, `GraphLanguageAdapter`, `registerAdapter`, `pickAdapter` |
 
 ### Shared libraries

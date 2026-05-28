@@ -198,7 +198,7 @@ JSON shape:
 {
   "type": "list-checks",
   "checks": [{ "slug": "...", "description": "...", "tags": ["..."] }],
-  "totalCount": 162
+  "totalCount": 115
 }
 ```
 
@@ -392,7 +392,7 @@ opensip-tools completion zsh > ~/.opensip-tools-completion.zsh
 echo "source ~/.opensip-tools-completion.zsh" >> ~/.zshrc
 ```
 
-The completion catalog is sourced from `defaultToolRegistry.list()`, so installed third-party tools' commands complete automatically once the script is regenerated.
+The completion catalog is sourced from the per-invocation `ToolRegistry.list()`, so installed third-party tools' commands complete automatically once the script is regenerated.
 
 ---
 

@@ -49,7 +49,7 @@ That's the entire surface. A Tool is anything that satisfies that shape.
 
 The contract has been deliberately kept narrow. Each field exists for a specific reason:
 
-- **`metadata.id`** is the registry key. `defaultToolRegistry.register(t)` writes `tools[t.metadata.id] = t` (last-writer-wins via `Map#set`) — see [`packages/core/src/tools/registry.ts`](../../../packages/core/src/tools/registry.ts). This is how a third-party Tool can override a first-party one (though [`packages/cli/src/index.ts`](../../../packages/cli/src/index.ts)'s discovery loop deliberately skips packages whose `metadata.id` matches a bundled tool, so a non-customized third-party install can't accidentally clobber `fit`/`sim`/`graph`).
+- **`metadata.id`** is the registry key. `ToolRegistry.register(t)` writes `tools[t.metadata.id] = t` (last-writer-wins via `Map#set`) — see [`packages/core/src/tools/registry.ts`](../../../packages/core/src/tools/registry.ts). This is how a third-party Tool can override a first-party one (though [`packages/cli/src/bootstrap/register-tools.ts`](../../../packages/cli/src/bootstrap/register-tools.ts)'s discovery loop deliberately skips packages whose `metadata.id` matches a bundled tool, so a non-customized third-party install can't accidentally clobber `fit`/`sim`/`graph`).
 - **`commands[]`** carries metadata only — no handlers. The CLI uses this list for `--help` listings and conflict detection (two tools can't both claim the `fit` subcommand). Keeping the list metadata-only means `--help` is cheap: the CLI doesn't have to invoke each tool's `register()` to enumerate available commands.
 - **`register(cli)`** does the actual Commander wiring. It receives a `ToolCliContext` (the program object, the render function, the dashboard launcher, the logger, the exit-code setter) and uses it to mount its commands. Tools never import the CLI package directly — they call back into shared infrastructure through this context object.
 - **`initialize()`** is optional async setup, called once before any command runs. Most tools don't need it (`fit` doesn't — its setup is lazy inside command handlers). It's there for tools that need eager work: warming a cache, loading a marketplace catalog, validating a license.
@@ -80,30 +80,32 @@ interface ToolCliContext {
 The flow lives in [`packages/cli/src/index.ts`](../../../packages/cli/src/index.ts) and runs once, at process startup, before argv is parsed.
 
 ```
-1. Static imports (compile-time):
+1. Construct a fresh ToolRegistry for this invocation:
+   const toolRegistry = new ToolRegistry();
+
+2. bootstrapCli() registers first-party tools (compile-time imports):
    import { fitnessTool } from '@opensip-tools/fitness';
    import { simulationTool } from '@opensip-tools/simulation';
    import { graphTool } from '@opensip-tools/graph';
-   defaultToolRegistry.register(fitnessTool);
-   defaultToolRegistry.register(simulationTool);
-   defaultToolRegistry.register(graphTool);
+   toolRegistry.register(fitnessTool);
+   toolRegistry.register(simulationTool);
+   toolRegistry.register(graphTool);
 
-2. Discovery (runtime):
-   for each package in node_modules where package.json
-     declares opensipTools.kind === 'tool':
-       import its main entry, expect a `tool` export,
-       defaultToolRegistry.register(import.tool);
+3. Discovery (runtime, also inside bootstrapCli):
+   discoverToolPackages() walks node_modules for packages whose
+   package.json declares opensipTools.kind === 'tool', imports each,
+   and calls toolRegistry.register(pkg.tool). Bundled-tool ids are
+   skipped so third-party installs can't accidentally clobber them.
 
-3. Optional initialize:
-   for each tool in defaultToolRegistry.list():
+4. Optional initialize:
+   for each tool in toolRegistry.list():
      await tool.initialize?.();
 
-4. Build Commander tree:
-   const cli = createCliContext(program);
-   for each tool:
-     tool.register(cli);
+5. Build Commander tree:
+   const ctx = buildToolCliContext({ program, ... });
+   mountAllToolCommands(toolRegistry, ctx);
 
-5. Parse argv:
+6. Parse argv:
    program.parseAsync(process.argv);
 ```
 
@@ -142,7 +144,7 @@ Once the package is installed under `node_modules` (project-pinned via `plugin a
 A few alternatives were considered. Worth knowing why they're not what's here.
 
 - **No package.json `bin` shimming.** A Tool is *not* a separate binary. It's a subcommand inside the `opensip-tools` binary. This means one config file, one logger, one runtime dir, one exit-code convention — shared across every tool a user has installed.
-- **No JSON manifest schema.** The `opensipTools` field in package.json is just a discovery flag (`kind: 'tool'`). The actual contract is enforced at TypeScript compile time and at runtime by `defaultToolRegistry.register()`. No validator, no schema migration story — if your `tool` export doesn't satisfy the interface, the build fails or the CLI throws on startup.
+- **No JSON manifest schema.** The `opensipTools` field in package.json is just a discovery flag (`kind: 'tool'`). The actual contract is enforced at TypeScript compile time and at runtime by `ToolRegistry.register()`. No validator, no schema migration story — if your `tool` export doesn't satisfy the interface, the build fails or the CLI throws on startup.
 - **No event hooks or middleware chain.** Tools don't subscribe to events; they own their commands end-to-end. This rules out "before-fit" plugins — but those would create an ordering problem (which middleware runs first?) and an observability problem (whose log line is this?). Tools are flat: install one, run one.
 - **No declarative command tree.** A tool wires its own Commander commands inside `register()`. The alternative — declare commands as data, let the CLI build the tree — was rejected because Commander's option-parsing surface is large and varies between major versions. Letting each tool own its own wiring keeps the CLI small.
 

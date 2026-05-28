@@ -95,7 +95,7 @@ That's the whole tool. `npm install @my-co/audit-sec` (or `opensip-tools plugin 
 - A code change in `@opensip-tools/core`.
 - A schema migration.
 
-The Tool contract is the seam. The CLI walks `defaultToolRegistry`, discovers your package via the `opensipTools.kind: 'tool'` marker, and your Tool's `register()` mounts the command. For the architecture behind this decoupling, see [the tool-plugin model](/docs/opensip-tools/10-concepts/02-tool-plugin-model/).
+The Tool contract is the seam. The CLI builds a per-invocation `ToolRegistry`, discovers your package via the `opensipTools.kind: 'tool'` marker, and your Tool's `register()` mounts the command. For the architecture behind this decoupling, see [the tool-plugin model](/docs/opensip-tools/10-concepts/02-tool-plugin-model/).
 
 ## Tools that use the kernel registries
 

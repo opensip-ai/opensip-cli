@@ -112,22 +112,24 @@ Today **no bundled adapter declares `warmup`** and the CLI does not invoke it. T
 
 ## The registry
 
-[`packages/core/src/languages/registry.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/core/src/languages/registry.ts) holds the in-memory list. Registration is by id; dispatch is by extension:
+[`packages/core/src/languages/registry.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/core/src/languages/registry.ts) defines the `LanguageRegistry` class — an in-memory list keyed by id and indexed by extension. The CLI constructs a fresh instance per invocation and populates it during `bootstrapCli()`. Inside a tool, you read from it via `cli.scope.languages` (the per-invocation `RunScope`):
 
 ```ts
-defaultLanguageRegistry.register(typescriptAdapter);
-defaultLanguageRegistry.register(rustAdapter);
+const langs = cli.scope.languages;
+
+langs.register(typescriptAdapter);
+langs.register(rustAdapter);
 // ... four more
 
-defaultLanguageRegistry.forFile('src/foo.ts');  // → typescriptAdapter (lookup by file extension)
-defaultLanguageRegistry.get('rust');            // → rustAdapter (lookup by adapter id)
-defaultLanguageRegistry.has('rust');            // → boolean
-defaultLanguageRegistry.list();                 // → readonly LanguageAdapter[]
+langs.forFile('src/foo.ts');  // → typescriptAdapter (lookup by file extension)
+langs.get('rust');            // → rustAdapter (lookup by adapter id)
+langs.has('rust');            // → boolean
+langs.list();                 // → readonly LanguageAdapter[]
 ```
 
 `LanguageAdapter` carries an `aliases` field on the type, but the registry today does not consult it during lookup — only the canonical `id` and the registered `extensions[]` are indexed. Treat aliases as forward-compatible metadata.
 
-The CLI registers all six bundled adapters at module load time before any Tool runs. See [`packages/cli/src/index.ts:68-73`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/cli/src/index.ts).
+The CLI registers all six bundled adapters in `bootstrapCli()` before any Tool's `register()` runs. See [`packages/cli/src/bootstrap/register-language-adapters.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/cli/src/bootstrap/register-language-adapters.ts).
 
 If a file's extension matches no registered adapter, dispatch falls through to "pass content unchanged." This is the fail-safe — a YAML file or a Markdown file goes through every check unmodified, and checks that target text content (TODO scanners, secret scanners) still work. Checks that depend on language-specific filtering and don't have an adapter for the file simply don't filter.
 
