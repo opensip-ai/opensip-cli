@@ -73,6 +73,19 @@ export interface RunScopeOptions {
   readonly datastore?: DataStoreThunk;
   readonly tools?: ToolRegistry;
   readonly languages?: LanguageRegistry;
+  /**
+   * Correlation id for the current CLI invocation. D7 designates this a
+   * KERNEL concern (every invocation has one) — it stays flat on the
+   * scope rather than under a tool subnamespace. The CLI bootstrap
+   * generates it via `generatePrefixedId('run')` and passes it here;
+   * the logger reads it back via `currentScope()?.runId` for
+   * event-stamping. Optional in `RunScopeOptions` (tests can construct
+   * a bare scope) but if omitted, `RunScope.runId` is the empty string
+   * — matching the prior logger-singleton reset value used in
+   * `configureLogger({ runId: '' })`. Production paths always supply
+   * a non-empty id via the pre-action-hook.
+   */
+  readonly runId?: string;
 }
 
 /**
@@ -100,6 +113,13 @@ export class RunScope {
   readonly datastore: DataStoreThunk;
   readonly tools: ToolRegistry;
   readonly languages: LanguageRegistry;
+  /**
+   * Correlation id for the current invocation. Read by the logger via
+   * `currentScope()?.runId` for event-stamping. Empty string when no
+   * caller supplied one (matches the prior singleton reset semantics —
+   * the logger's `formatEntry` only emits a `runId` field when truthy).
+   */
+  readonly runId: string;
 
   constructor(opts: RunScopeOptions = {}) {
     this.logger = opts.logger ?? defaultLogger;
@@ -110,6 +130,7 @@ export class RunScope {
     this.datastore = opts.datastore ?? (() => undefined);
     this.tools = opts.tools ?? new ToolRegistry();
     this.languages = opts.languages ?? new LanguageRegistry();
+    this.runId = opts.runId ?? '';
   }
 
   /** Release per-run resources (caches, recipe-config slot). */

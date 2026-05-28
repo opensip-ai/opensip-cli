@@ -38,6 +38,18 @@ describe('RunScope — construction', () => {
     expect(scope.datastore()).toBeUndefined();
     scope.dispose();
   });
+
+  it('default runId is the empty string (matches prior singleton reset semantics)', () => {
+    const scope = new RunScope();
+    expect(scope.runId).toBe('');
+    scope.dispose();
+  });
+
+  it('explicit runId is stored verbatim', () => {
+    const scope = new RunScope({ runId: 'RUN_abc123' });
+    expect(scope.runId).toBe('RUN_abc123');
+    scope.dispose();
+  });
 });
 
 describe('RunScope — dispose', () => {
