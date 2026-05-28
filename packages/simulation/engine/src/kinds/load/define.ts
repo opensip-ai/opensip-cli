@@ -17,39 +17,16 @@ import {
 
 import { createLoadScenarioRunner } from './executor.js'
 
+import type { LoadScenarioConfig } from './config.js'
 import type { RunnableScenario } from '../../framework/runnable-scenario.js'
 import type {
-  CustomExecuteFn,
   PersonaConfig,
-  ScenarioAssertion,
 } from '../../types/framework-types.js'
 
-
-/**
- * Author-facing configuration for a load scenario.
- *
- * All optional fields have sensible defaults. The `kind` discriminator is
- * intentionally omitted — `defineLoadScenario` sets it.
- */
-export interface LoadScenarioConfig {
-  // Required metadata
-  readonly id: string
-  readonly name: string
-  readonly description: string
-  readonly tags: readonly string[]
-
-  // Simulation configuration
-  readonly personas: readonly PersonaConfig[]
-  readonly duration: number
-  readonly rampUp?: number
-  readonly targetRps?: number
-
-  // Assertions
-  readonly assertions: readonly ScenarioAssertion[]
-
-  // Optional customization
-  readonly execute?: CustomExecuteFn
-}
+// `LoadScenarioConfig` moved to `./config.ts` to break the
+// `define.ts ↔ executor.ts` file-level cycle. Re-exported here so
+// existing callers keep their import paths.
+export type { LoadScenarioConfig } from './config.js'
 
 /**
  * Validation error with field name and message.

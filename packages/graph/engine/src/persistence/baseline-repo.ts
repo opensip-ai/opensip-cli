@@ -1,7 +1,7 @@
 import { logger, type Signal } from '@opensip-tools/core';
 import { sql } from 'drizzle-orm';
 
-import { fingerprintSignal } from '../gate.js';
+import { fingerprintSignal } from '../fingerprint-signal.js';
 
 import { graphBaselineMeta, graphBaselineSignals } from './schema.js';
 

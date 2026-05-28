@@ -1,14 +1,28 @@
-import type { RuleHints } from './lang-adapter/types.js';
 import type { Signal } from '@opensip-tools/core';
 
 /**
- * Re-export of `RuleHints` so rule modules under `rules/` can consult
- * adapter-supplied hints without importing from `lang-adapter/`. The
- * dep-cruiser rule `graph-pipeline-no-lang-import` bans `rules/` from
- * reaching into any `lang-*` directory; this re-export is the single
- * sanctioned doorway between the contract layer and rule implementations.
+ * `RuleHints` — adapter-supplied per-language rule input. Historically
+ * declared in `lang-adapter/types.ts` and re-exported here so rule
+ * modules under `rules/` could consult hints without importing from
+ * `lang-adapter/` (the dep-cruiser rule `graph-pipeline-no-lang-import`
+ * bans `rules/` from reaching into any `lang-*` directory).
+ *
+ * The original re-export created a `types.ts ↔ lang-adapter/types.ts`
+ * file-level cycle reported by `circular-import-detection`. The fix is
+ * to host the canonical declaration here in `types.ts` (which sits at
+ * the bottom of the engine's type layer) and have `lang-adapter/types.ts`
+ * import it from here — inverting the dependency so the cycle is gone.
  */
-export type { RuleHints } from './lang-adapter/types.js';
+export interface RuleHints {
+  /** Predicate: is this file a test? Path is project-relative. */
+  readonly isTestFile?: (filePathProjectRel: string) => boolean;
+  /** Globs treated as generated code. */
+  readonly generatedFilePatterns?: readonly string[];
+  /** Side-effect primitives — fully-qualified names (e.g. 'fs.writeFileSync'). */
+  readonly sideEffectPrimitives?: readonly string[];
+  /** Throw-statement detection regex for `always-throws-branch`. */
+  readonly throwSyntaxRegex?: RegExp;
+}
 
 /**
  * @fileoverview Core type shapes for the graph tool's six-stage pipeline.

@@ -13,7 +13,7 @@ import { runLoadWindow } from '../../framework/execution/run-load-window.js'
 import { ScenarioResultBuilder } from '../../framework/result-builder.js'
 import { createScenarioLogger } from '../../framework/scenario-logger.js'
 
-import type { LoadScenarioConfig } from './define.js'
+import type { LoadScenarioConfig } from './config.js'
 import type { RunnableScenario } from '../../framework/runnable-scenario.js'
 import type {
   LoadScenarioExecutorResult,
