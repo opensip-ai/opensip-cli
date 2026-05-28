@@ -20,6 +20,7 @@
 import type {
   Catalog,
   CallEdge,
+  DependencyEdge,
   FunctionOccurrence,
   ParseError,
   ResolutionStats,
@@ -101,9 +102,38 @@ export interface CallSiteRecord {
   readonly childHash?: string;
 }
 
+/**
+ * One module-level dependency site emitted by walkProject. Represents
+ * a single `import` / `from … import` / `require` / `use` statement.
+ * Resolved to bodyHashes by `resolveCallSites` (which returns
+ * `dependenciesByOwner` alongside the existing `edgesByOwner`).
+ *
+ * Phase 4 of opensip's substrate consolidation (DEC-498). Optional —
+ * adapters that don't emit dependency sites are not required to populate
+ * this shape; the engine treats absence as "no module-level edges
+ * available for this language."
+ */
+export interface DependencySiteRecord {
+  /** Adapter handle to the AST node (import/require/use statement). */
+  readonly nodeRef: unknown;
+  /** Adapter handle to the source file containing the import. */
+  readonly sourceFileRef: unknown;
+  /** bodyHash of the enclosing file's module-init occurrence. */
+  readonly ownerHash: string;
+  /** The raw import specifier — `'./foo'`, `'@opensip/core'`, etc. */
+  readonly specifier: string;
+  /** 1-based line of the import statement. */
+  readonly line: number;
+  /** 0-based column. */
+  readonly column: number;
+}
+
 export interface WalkOutput {
   readonly occurrences: Record<string, FunctionOccurrence[]>;
   readonly callSites: readonly CallSiteRecord[];
+  /** Optional — Phase 4 (DEC-498) addition. Adapters that emit
+   *  module-level dependency edges populate this; others may omit. */
+  readonly dependencySites?: readonly DependencySiteRecord[];
   readonly parseErrors: readonly ParseError[];
 }
 
@@ -113,12 +143,24 @@ export interface ResolveInput<P = ParsedProject> {
   readonly project: P;
   readonly catalog: Catalog;
   readonly callSites: readonly CallSiteRecord[];
+  /** Optional — Phase 4 (DEC-498) addition. The engine threads any
+   *  `dependencySites` returned from walkProject back into resolveCallSites
+   *  so the resolver can produce module-level edges in the same pass as
+   *  call resolution. */
+  readonly dependencySites?: readonly DependencySiteRecord[];
   readonly projectDirAbs: string;
 }
 
 export interface ResolveOutput {
   /** Map: owner bodyHash → CallEdges produced by resolution. */
   readonly edgesByOwner: ReadonlyMap<string, readonly CallEdge[]>;
+  /**
+   * Optional — Phase 4 (DEC-498) addition. Map: module-init bodyHash →
+   * DependencyEdges produced by import-site resolution. Engine's
+   * stitchEdges merges these into `FunctionOccurrence.dependencies`.
+   * Adapters that don't resolve dependencies may omit.
+   */
+  readonly dependenciesByOwner?: ReadonlyMap<string, readonly DependencyEdge[]>;
   readonly stats: ResolutionStats;
 }
 

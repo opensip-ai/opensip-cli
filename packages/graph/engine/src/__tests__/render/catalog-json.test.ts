@@ -338,3 +338,169 @@ describe('renderCatalogJson — invariants', () => {
     expect(parsed.version).toBe('1.0');
   });
 });
+
+// ── Phase 4 (DEC-498) — dependency edges ──────────────────────────────
+
+const FORMAT_MODULE_INIT: FunctionOccurrence = {
+  bodyHash: 'hash_module_init_format',
+  simpleName: '<module-init:src/format.ts>',
+  qualifiedName: '<module-init:src/format>',
+  filePath: 'src/format.ts',
+  line: 1,
+  column: 0,
+  endLine: 20,
+  kind: 'module-init',
+  params: [],
+  returnType: null,
+  enclosingClass: null,
+  decorators: [],
+  visibility: 'module-local',
+  inTestFile: false,
+  definedInGenerated: false,
+  calls: [],
+};
+
+const GREET_MODULE_INIT: FunctionOccurrence = {
+  bodyHash: 'hash_module_init_greet',
+  simpleName: '<module-init:src/greet.ts>',
+  qualifiedName: '<module-init:src/greet>',
+  filePath: 'src/greet.ts',
+  line: 1,
+  column: 0,
+  endLine: 15,
+  kind: 'module-init',
+  params: [],
+  returnType: null,
+  enclosingClass: null,
+  decorators: [],
+  visibility: 'module-local',
+  inTestFile: false,
+  definedInGenerated: false,
+  calls: [],
+  dependencies: [
+    // Resolved internal import: greet → format
+    {
+      to: ['hash_module_init_format'],
+      line: 2,
+      column: 0,
+      specifier: './format.js',
+    },
+    // Unresolved external import: greet → external pkg
+    {
+      to: [],
+      line: 3,
+      column: 0,
+      specifier: '@opensip/core',
+    },
+  ],
+};
+
+const FIXTURE_CATALOG_WITH_DEPS: Catalog = {
+  version: '3.0',
+  tool: 'graph',
+  language: 'typescript',
+  builtAt: '2026-05-27T00:00:00.000Z',
+  cacheKey: 'ts-5.7.0-test',
+  filesFingerprint: 'test-fp-deps',
+  functions: {
+    '<module-init:src/format.ts>': [FORMAT_MODULE_INIT],
+    '<module-init:src/greet.ts>': [GREET_MODULE_INIT],
+  },
+};
+
+const FIXTURE_INDEXES_WITH_DEPS: Indexes = {
+  byBodyHash: new Map([
+    ['hash_module_init_format', FORMAT_MODULE_INIT],
+    ['hash_module_init_greet', GREET_MODULE_INIT],
+  ]),
+  bySimpleName: new Map(),
+  callees: new Map(),
+  callers: new Map(),
+  blastRadius: new Map(),
+};
+
+describe('renderCatalogJson — dependency edges (Phase 4)', () => {
+  it('emits one resolved + one unresolved depends_on edge from greet module-init', () => {
+    const json = renderCatalogJson({
+      catalog: FIXTURE_CATALOG_WITH_DEPS,
+      indexes: FIXTURE_INDEXES_WITH_DEPS,
+      provenance: makeProvenance(),
+      repoId: REPO_ID,
+      gitSha: GIT_SHA,
+    });
+    const parsed = JSON.parse(json) as {
+      edges: Array<{
+        edgeKind: string;
+        fromSymbolId: string;
+        toSymbolId: string | null;
+        toQualifiedNameUnresolved: string | null;
+        sourceFile: string;
+        sourceLine: number | null;
+      }>;
+    };
+    const dependsEdges = parsed.edges.filter((e) => e.edgeKind === 'depends_on');
+    expect(dependsEdges).toHaveLength(2);
+
+    const resolved = dependsEdges.find((e) => e.toSymbolId !== null);
+    const unresolved = dependsEdges.find((e) => e.toSymbolId === null);
+
+    expect(resolved?.sourceFile).toBe('src/greet.ts');
+    expect(resolved?.sourceLine).toBe(2);
+    expect(resolved?.toQualifiedNameUnresolved).toBeNull();
+
+    expect(unresolved?.toQualifiedNameUnresolved).toBe('@opensip/core');
+    expect(unresolved?.sourceLine).toBe(3);
+  });
+
+  it('depends_on edge id matches deriveOpenSipEdgeId', () => {
+    const json = renderCatalogJson({
+      catalog: FIXTURE_CATALOG_WITH_DEPS,
+      indexes: FIXTURE_INDEXES_WITH_DEPS,
+      provenance: makeProvenance(),
+      repoId: REPO_ID,
+      gitSha: GIT_SHA,
+    });
+    const parsed = JSON.parse(json) as {
+      edges: Array<{
+        id: string;
+        edgeKind: string;
+        fromSymbolId: string;
+        toSymbolId: string | null;
+        toQualifiedNameUnresolved: string | null;
+      }>;
+    };
+    for (const edge of parsed.edges.filter((e) => e.edgeKind === 'depends_on')) {
+      const expected = deriveOpenSipEdgeId({
+        fromSymbolId: edge.fromSymbolId,
+        edgeKind: edge.edgeKind,
+        toSymbolId: edge.toSymbolId,
+        toQualifiedNameUnresolved: edge.toQualifiedNameUnresolved,
+      });
+      expect(edge.id).toBe(expected);
+    }
+  });
+
+  it('occurrence without dependencies field produces no depends_on edges', () => {
+    const json = renderCatalogJson({
+      catalog: FIXTURE_CATALOG,
+      indexes: FIXTURE_INDEXES,
+      provenance: makeProvenance(),
+      repoId: REPO_ID,
+      gitSha: GIT_SHA,
+    });
+    const parsed = JSON.parse(json) as { edges: Array<{ edgeKind: string }> };
+    const dependsEdges = parsed.edges.filter((e) => e.edgeKind === 'depends_on');
+    expect(dependsEdges).toHaveLength(0);
+  });
+
+  it('depends_on golden fixture lock', async () => {
+    const json = renderCatalogJson({
+      catalog: FIXTURE_CATALOG_WITH_DEPS,
+      indexes: FIXTURE_INDEXES_WITH_DEPS,
+      provenance: makeProvenance(),
+      repoId: REPO_ID,
+      gitSha: GIT_SHA,
+    });
+    await expect(json).toMatchFileSnapshot('./__fixtures__/catalog-json/two-modules-with-deps.json');
+  });
+});

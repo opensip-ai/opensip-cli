@@ -74,6 +74,34 @@ export interface CallEdge {
   readonly discarded?: boolean;
 }
 
+/**
+ * A resolved module-level dependency edge — an `import` / `from … import` /
+ * `require` / `use` statement from one source file to another (or to an
+ * external package the catalog doesn't track). Attached to module-init
+ * occurrences only.
+ *
+ * Phase 4 of opensip's substrate consolidation (DEC-498) — preserves the
+ * `depends_on` edge kind required by opensip's
+ * `dependencyEdgesBetweenModules` query, which dispatch ticket grouping
+ * and review-panel blast-radius depend on.
+ *
+ * `to.length === 0` means the import target is outside the catalog
+ * (typically an external npm/PyPI/crates.io package). `specifier`
+ * preserves the raw import string so unresolved edges remain traceable.
+ */
+export interface DependencyEdge {
+  /** bodyHash[] of the target module-init occurrence(s). Empty when the
+   *  import resolves to a module outside the catalog (external package). */
+  readonly to: readonly string[];
+  /** 1-based line of the import / require / use statement. */
+  readonly line: number;
+  /** 0-based column. */
+  readonly column: number;
+  /** The raw import specifier — `'./foo'`, `'@opensip/core'`, `'os.path'`,
+   *  `'std::collections'`, etc. Preserved for unresolved-edge attribution. */
+  readonly specifier: string;
+}
+
 /** A single callable function or method, by simple name + per-occurrence record. */
 export interface FunctionOccurrence {
   /** sha256(normalized body) — the primary identifier. */
@@ -107,6 +135,18 @@ export interface FunctionOccurrence {
   readonly definedInGenerated: boolean;
   /** Populated by stage 2. Empty after stage 1. */
   readonly calls: readonly CallEdge[];
+  /**
+   * Module-level depends-on edges. Only populated on `module-init`
+   * occurrences (one per file); absent on all other occurrence kinds.
+   * Optional for forward-compatibility with pre-Phase-4 catalogs on
+   * disk — absent values are treated as "no dependencies emitted by
+   * this adapter."
+   *
+   * Phase 4 of opensip's substrate consolidation (DEC-498). The opensip
+   * catalog-json renderer emits these as `edge_kind: 'depends_on'` rows
+   * for opensip's `dependencyEdgesBetweenModules` query.
+   */
+  readonly dependencies?: readonly DependencyEdge[];
 }
 
 /** Stage 1's parse-error record (e.g., file unparseable; reported but does not abort the run). */

@@ -34,6 +34,7 @@ import type {
 import type {
   CallEdge,
   Catalog,
+  DependencyEdge,
   FunctionKind,
   FunctionOccurrence,
   Indexes,
@@ -191,6 +192,88 @@ function callEdgeToRows(
   return rows;
 }
 
+/**
+ * Map an engine `DependencyEdge` to one or more `CatalogExportEdge`
+ * rows with `edgeKind: 'depends_on'`.
+ *
+ * - Polymorphic-target case (`to.length > 1`) is rare for imports but
+ *   handled the same way as calls: one row per target.
+ * - Unresolved target (`to.length === 0`) emits a single row with
+ *   `toSymbolId: null` and the raw import specifier in
+ *   `toQualifiedNameUnresolved` — preserves attribution for external
+ *   packages that aren't in the catalog.
+ *
+ * Phase 4 of opensip's substrate consolidation (DEC-498).
+ */
+function dependencyEdgeToRows(
+  fromSymbolId: string,
+  fromFilePath: string,
+  depEdge: DependencyEdge,
+  byBodyHash: ReadonlyMap<string, FunctionOccurrence>,
+  repoId: string,
+  gitSha: string,
+): readonly CatalogExportEdge[] {
+  const edgeKind = 'depends_on';
+
+  if (depEdge.to.length === 0) {
+    const id = deriveOpenSipEdgeId({
+      fromSymbolId,
+      edgeKind,
+      toSymbolId: null,
+      toQualifiedNameUnresolved: depEdge.specifier,
+    });
+    return [
+      {
+        id,
+        repoId,
+        edgeKind,
+        fromSymbolId,
+        toSymbolId: null,
+        toQualifiedNameUnresolved: depEdge.specifier,
+        sourceFile: fromFilePath,
+        sourceLine: depEdge.line,
+        gitSha,
+      },
+    ];
+  }
+
+  const rows: CatalogExportEdge[] = [];
+  for (const toBodyHash of depEdge.to) {
+    const target = byBodyHash.get(toBodyHash);
+    if (target === undefined) {
+      // Engine catalog invariant: every DependencyEdge.to bodyHash
+      // exists in the catalog. A missing target is an engine/adapter
+      // bug; skip rather than emit a half-formed row.
+      continue;
+    }
+    const toSymbolId = deriveOpenSipSymbolId({
+      repoId,
+      modulePath: deriveOpenSipModulePath(target.filePath),
+      kind: mapKindToOpenSip(target.kind),
+      qualifiedName: target.qualifiedName,
+      arity: target.params.length,
+    });
+    const id = deriveOpenSipEdgeId({
+      fromSymbolId,
+      edgeKind,
+      toSymbolId,
+      toQualifiedNameUnresolved: null,
+    });
+    rows.push({
+      id,
+      repoId,
+      edgeKind,
+      fromSymbolId,
+      toSymbolId,
+      toQualifiedNameUnresolved: null,
+      sourceFile: fromFilePath,
+      sourceLine: depEdge.line,
+      gitSha,
+    });
+  }
+  return rows;
+}
+
 export interface RenderCatalogJsonInput {
   readonly catalog: Catalog;
   readonly indexes: Indexes;
@@ -228,6 +311,23 @@ export function renderCatalogJson(input: RenderCatalogJsonInput): string {
           gitSha,
         );
         edges.push(...rows);
+      }
+
+      // Phase 4 (DEC-498): module-level depends_on edges. Only
+      // module-init occurrences carry these; for all other occurrences
+      // the field is absent.
+      if (occurrence.dependencies !== undefined) {
+        for (const depEdge of occurrence.dependencies) {
+          const rows = dependencyEdgeToRows(
+            symbol.id,
+            occurrence.filePath,
+            depEdge,
+            indexes.byBodyHash,
+            repoId,
+            gitSha,
+          );
+          edges.push(...rows);
+        }
       }
     }
   }

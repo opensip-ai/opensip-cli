@@ -23,6 +23,7 @@ import type {
 import type {
   Catalog,
   CallEdge,
+  DependencyEdge,
   FunctionOccurrence,
   ResolutionStats,
 } from '../../types.js';
@@ -94,12 +95,13 @@ export function buildAndResolveCatalog(
       project: parsed.project,
       catalog: initialCatalog,
       callSites: walked.callSites,
+      dependencySites: walked.dependencySites,
       projectDirAbs: discovery.projectDirAbs,
     }),
     (r) => `${String(r.stats.totalCallSites)} call site(s)`,
   );
 
-  const catalog = stitchEdges(initialCatalog, resolved.edgesByOwner);
+  const catalog = stitchEdges(initialCatalog, resolved.edgesByOwner, resolved.dependenciesByOwner);
   return { catalog, resolutionStats: resolved.stats };
 }
 
@@ -176,6 +178,7 @@ export function buildAndResolveCatalogIncremental(
       project: parsed.project,
       catalog: initialCatalog,
       callSites: walked.callSites,
+      dependencySites: walked.dependencySites,
       projectDirAbs: discovery.projectDirAbs,
     }),
     (r) => `${String(r.stats.totalCallSites)} call site(s)`,
@@ -184,15 +187,55 @@ export function buildAndResolveCatalogIncremental(
   // Apply resolved edges only to closure files; unchanged files keep
   // their cached edges. Their bodyHashes are present in the merged
   // catalog by construction, so cached edges are still valid.
+  //
+  // Phase 4 (DEC-498): dependency edges follow the same incremental
+  // discipline as call edges. mergeResolvedAndCachedEdges currently
+  // only handles calls; depends_on edges from the incremental closure
+  // are attached via a follow-up stitch pass below. Adapters that
+  // don't emit dependencies skip this entirely.
   const finalFunctions = mergeResolvedAndCachedEdges(
     initialCatalog,
     cachedCatalog,
     resolved.edgesByOwner,
     closureRel,
   );
-  const finalCatalog: Catalog = { ...initialCatalog, functions: finalFunctions };
+  const stitchedFunctions = attachDependenciesIncremental(
+    finalFunctions,
+    resolved.dependenciesByOwner,
+  );
+  const finalCatalog: Catalog = { ...initialCatalog, functions: stitchedFunctions };
 
   return { catalog: finalCatalog, resolutionStats: resolved.stats };
+}
+
+/**
+ * Phase 4 (DEC-498) post-pass for the incremental path. Attaches
+ * `dependencies` to occurrences whose hash appears in the resolver's
+ * dependency map. Unchanged-file occurrences keep their cached
+ * dependency arrays (if any) untouched — they came from the cached
+ * catalog and are still valid since the file hasn't changed.
+ *
+ * No-op when `dependenciesByOwner` is undefined (adapter doesn't emit
+ * dependency edges) or empty.
+ */
+function attachDependenciesIncremental(
+  functions: Record<string, readonly FunctionOccurrence[]>,
+  dependenciesByOwner: ReadonlyMap<string, readonly DependencyEdge[]> | undefined,
+): Record<string, readonly FunctionOccurrence[]> {
+  if (dependenciesByOwner === undefined || dependenciesByOwner.size === 0) {
+    return functions;
+  }
+  const out: Record<string, FunctionOccurrence[]> = Object.create(null) as Record<
+    string,
+    FunctionOccurrence[]
+  >;
+  for (const [name, occs] of Object.entries(functions)) {
+    out[name] = occs.map((o) => {
+      const deps = dependenciesByOwner.get(o.bodyHash);
+      return deps !== undefined ? { ...o, dependencies: deps } : o;
+    });
+  }
+  return out;
 }
 
 /**
@@ -221,13 +264,22 @@ function assembleCatalog(
 
 /**
  * Stitch resolved edges into the catalog. The adapter returns a
- * `bodyHash → CallEdge[]` map; we walk the catalog and replace each
- * occurrence's `calls` array with the resolved edges (or an empty
- * array if the resolver produced none).
+ * `bodyHash → CallEdge[]` map for call edges and (Phase 4) optionally
+ * a `bodyHash → DependencyEdge[]` map for module-level dependency
+ * edges. We walk the catalog and replace each occurrence's `calls`
+ * array; if the dependency map is provided, attach `dependencies` to
+ * occurrences whose hash appears as a key (typically only module-init
+ * occurrences).
+ *
+ * Adapters that don't emit dependency edges pass `undefined` for the
+ * second map; resulting occurrences have no `dependencies` field
+ * (matches the pre-Phase-4 catalog shape — the field is optional on
+ * `FunctionOccurrence`).
  */
 function stitchEdges(
   initial: Catalog,
   edgesByOwner: ReadonlyMap<string, readonly CallEdge[]>,
+  dependenciesByOwner?: ReadonlyMap<string, readonly DependencyEdge[]>,
 ): Catalog {
   const next: Record<string, FunctionOccurrence[]> = Object.create(null) as Record<
     string,
@@ -235,10 +287,16 @@ function stitchEdges(
   >;
   for (const [name, occs] of Object.entries(initial.functions)) {
     if (!occs) continue;
-    next[name] = occs.map((o) => ({
-      ...o,
-      calls: edgesByOwner.get(o.bodyHash) ?? [],
-    }));
+    next[name] = occs.map((o) => {
+      const calls = edgesByOwner.get(o.bodyHash) ?? [];
+      const dependencies = dependenciesByOwner?.get(o.bodyHash);
+      // Omit `dependencies` entirely when no edges resolved — the
+      // optional field stays absent, matching the pre-Phase-4 wire
+      // shape for adapters that don't emit dependency sites.
+      return dependencies !== undefined
+        ? { ...o, calls, dependencies }
+        : { ...o, calls };
+    });
   }
   return { ...initial, functions: next };
 }
