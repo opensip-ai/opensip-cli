@@ -13,7 +13,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { createSignal, enterScope } from '@opensip-tools/core';
+import { createSignal, enterScope, LanguageRegistry } from '@opensip-tools/core';
 import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
@@ -34,7 +34,12 @@ import type {
   WalkOutput,
 } from '../../lang-adapter/types.js';
 import type { Catalog, FunctionOccurrence, Indexes } from '../../types.js';
-import type { Signal, ToolCliContext } from '@opensip-tools/core';
+import type {
+  LanguageAdapter,
+  Signal,
+  ToolCliContext,
+  WorkspaceUnit,
+} from '@opensip-tools/core';
 
 function fakeAdapter(projectDir: string): GraphLanguageAdapter {
   return {
@@ -92,16 +97,37 @@ interface MockCli {
   readonly setExitCode: MockInstance;
 }
 
-function mockCli(datastore: DataStore | undefined): MockCli {
+function mockCli(
+  datastore: DataStore | undefined,
+  languages?: LanguageRegistry,
+): MockCli {
   const setExitCode = vi.fn();
+  const resolvedLanguages = languages ?? new LanguageRegistry();
   return {
     cli: {
       datastore,
       setExitCode,
-      scope: { datastore: () => datastore },
+      scope: { datastore: () => datastore, languages: resolvedLanguages },
     } as unknown as ToolCliContext,
     setExitCode,
   };
+}
+
+function makeWorkspaceLangRegistry(
+  units: readonly WorkspaceUnit[],
+): LanguageRegistry {
+  const registry = new LanguageRegistry();
+  const adapter: LanguageAdapter = {
+    id: 'typescript',
+    fileExtensions: ['.ts'],
+    parse: () => null,
+    stripStrings: (s) => s,
+    stripComments: (s) => s,
+    // eslint-disable-next-line @typescript-eslint/require-await
+    discoverWorkspaceUnits: async () => units,
+  };
+  registry.register(adapter);
+  return registry;
 }
 
 function sig(over: { ruleId: string; message: string; filePath: string; line?: number }): Signal {
@@ -218,10 +244,10 @@ describe('executeGraph — human / JSON modes', () => {
     expect(err).toContain('mutually exclusive');
   });
 
-  it('emits a configuration error when --package and --packages are both set', async () => {
+  it('emits a configuration error when --workspace and positional paths are both set', async () => {
     const { cli, setExitCode } = mockCli(datastore);
     await executeGraph(
-      { cwd: projectDir, noCache: true, packageScope: 'foo', allPackages: true },
+      { cwd: projectDir, noCache: true, paths: ['foo'], workspace: true },
       cli,
     );
     expect(setExitCode).toHaveBeenCalledWith(2);
@@ -362,7 +388,7 @@ describe('executeGraph — error handling', () => {
   });
 });
 
-describe('executeGraph — package scope', () => {
+describe('executeGraph — positional paths', () => {
   let datastore: DataStore;
 
   beforeEach(() => {
@@ -374,22 +400,24 @@ describe('executeGraph — package scope', () => {
     datastore.close();
   });
 
-  it('errors when --package points at a non-existent directory', async () => {
+  it('errors when a positional path does not exist', async () => {
     const { cli, setExitCode } = mockCli(datastore);
     await executeGraph(
-      { cwd: projectDir, noCache: true, packageScope: join(projectDir, 'missing-pkg') },
+      { cwd: projectDir, noCache: true, paths: [join(projectDir, 'missing-pkg')] },
       cli,
     );
     expect(setExitCode).toHaveBeenCalledWith(2);
+    const err = stderrSpy.mock.calls.map((c) => String(c[0])).join('');
+    expect(err).toContain('does not exist');
   });
 });
 
-describe('executeGraph — --packages aggregation', () => {
+describe('executeGraph — --workspace aggregation', () => {
   let workDir: string;
   let datastore: DataStore;
 
   beforeEach(() => {
-    workDir = mkdtempSync(join(tmpdir(), 'graph-packages-'));
+    workDir = mkdtempSync(join(tmpdir(), 'graph-workspace-'));
     datastore = DataStoreFactory.open({ backend: 'memory' });
     registerAdapter(fakeAdapter(workDir));
   });
@@ -399,15 +427,18 @@ describe('executeGraph — --packages aggregation', () => {
     datastore.close();
   });
 
-  it('errors with ConfigurationError when no packages exist under packages/', async () => {
+  it('errors with ConfigurationError when no workspace units exist', async () => {
     const fakeCliPath = join(workDir, 'cli.cjs');
     writeFileSync(fakeCliPath, 'process.exit(0);');
-    const { cli, setExitCode } = mockCli(datastore);
+    const { cli, setExitCode } = mockCli(datastore, makeWorkspaceLangRegistry([]));
+    // tsconfig present so detection picks up `typescript`; the adapter
+    // returns [] so the workspace path errors with the D9 message.
+    writeFileSync(join(workDir, 'tsconfig.json'), '{}');
     await executeGraph(
       {
         cwd: workDir,
         noCache: true,
-        allPackages: true,
+        workspace: true,
         cliScript: fakeCliPath,
       },
       cli,
@@ -421,9 +452,9 @@ describe('executeGraph — --packages aggregation', () => {
       // Spoof process.argv[1] to empty so the handler hits the
       // "could not determine the CLI entry script" branch.
       process.argv[1] = '';
-      const { cli, setExitCode } = mockCli(datastore);
+      const { cli, setExitCode } = mockCli(datastore, makeWorkspaceLangRegistry([]));
       await executeGraph(
-        { cwd: workDir, noCache: true, allPackages: true },
+        { cwd: workDir, noCache: true, workspace: true },
         cli,
       );
       expect(setExitCode).toHaveBeenCalledWith(2);
@@ -432,7 +463,7 @@ describe('executeGraph — --packages aggregation', () => {
     }
   });
 
-  it('aggregates per-package output and emits human report', async () => {
+  it('aggregates per-unit output and emits human report', async () => {
     const pkgA = join(workDir, 'packages', 'a');
     const pkgB = join(workDir, 'packages', 'b');
     mkdirSync(pkgA, { recursive: true });
@@ -440,6 +471,8 @@ describe('executeGraph — --packages aggregation', () => {
     const TSCONFIG = '{}';
     writeFileSync(join(pkgA, 'tsconfig.json'), TSCONFIG);
     writeFileSync(join(pkgB, 'tsconfig.json'), TSCONFIG);
+    // Top-level marker so detection identifies the language.
+    writeFileSync(join(workDir, 'tsconfig.json'), TSCONFIG);
     const fakeCliPath = join(workDir, 'cli.cjs');
     writeFileSync(
       fakeCliPath,
@@ -454,27 +487,32 @@ process.stdout.write(JSON.stringify(out));
 process.exit(0);
 `,
     );
-    const { cli, setExitCode } = mockCli(datastore);
+    const units: WorkspaceUnit[] = [
+      { id: 'a', rootDir: pkgA, configPath: join(pkgA, 'tsconfig.json') },
+      { id: 'b', rootDir: pkgB, configPath: join(pkgB, 'tsconfig.json') },
+    ];
+    const { cli, setExitCode } = mockCli(datastore, makeWorkspaceLangRegistry(units));
     await executeGraph(
       {
         cwd: workDir,
         noCache: true,
-        allPackages: true,
+        workspace: true,
         cliScript: fakeCliPath,
-        packagesConcurrency: 1,
+        concurrency: 1,
       },
       cli,
     );
     expect(setExitCode).toHaveBeenCalledWith(0);
     const out = stdoutSpy.mock.calls.map((c) => String(c[0])).join('');
-    expect(out).toContain('opensip-tools graph --packages');
-    expect(out).toContain('== Packages (2)');
+    expect(out).toContain('opensip-tools graph --workspace');
+    expect(out).toContain('== Units (2)');
   });
 
-  it('emits JSON when --packages + --json and surfaces failed children', async () => {
+  it('emits JSON when --workspace + --json and surfaces failed children', async () => {
     const pkg = join(workDir, 'packages', 'a');
     mkdirSync(pkg, { recursive: true });
     writeFileSync(join(pkg, 'tsconfig.json'), '{}');
+    writeFileSync(join(workDir, 'tsconfig.json'), '{}');
     const fakeCliPath = join(workDir, 'cli.cjs');
     writeFileSync(
       fakeCliPath,
@@ -483,22 +521,25 @@ process.stderr.write('boom\n');
 process.exit(1);
 `,
     );
-    const { cli, setExitCode } = mockCli(datastore);
+    const units: WorkspaceUnit[] = [
+      { id: 'a', rootDir: pkg, configPath: join(pkg, 'tsconfig.json') },
+    ];
+    const { cli, setExitCode } = mockCli(datastore, makeWorkspaceLangRegistry(units));
     await executeGraph(
       {
         cwd: workDir,
         noCache: true,
-        allPackages: true,
+        workspace: true,
         json: true,
         cliScript: fakeCliPath,
-        packagesConcurrency: 1,
+        concurrency: 1,
       },
       cli,
     );
     expect(setExitCode).toHaveBeenCalledWith(1);
     const out = stdoutSpy.mock.calls.map((c) => String(c[0])).join('');
     const parsed = JSON.parse(out) as { mode: string; totalFindings: number };
-    expect(parsed.mode).toBe('packages');
+    expect(parsed.mode).toBe('workspace');
     expect(parsed.totalFindings).toBe(0);
   });
 });

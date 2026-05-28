@@ -9,7 +9,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { enterScope } from '@opensip-tools/core';
+import { enterScope, LanguageRegistry } from '@opensip-tools/core';
 import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
 import { Command } from 'commander';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
@@ -134,7 +134,7 @@ function makeMockCli(datastore?: DataStore): MockCliBag {
     setExitCode,
     emitJson,
     datastore,
-    scope: { datastore: () => datastore },
+    scope: { datastore: () => datastore, languages: new LanguageRegistry() },
   } as unknown as ToolCliContext;
   return { cli, program, setExitCode, emitJson, registerLiveView, renderLive };
 }
@@ -181,20 +181,20 @@ describe('graphTool.register', () => {
   });
 
   describe('graph subcommand action', () => {
-    it('--package flag bypasses the live view and routes through executeGraph', async () => {
+    it('positional path bypasses the live view and routes through executeGraph', async () => {
       const datastore = DataStoreFactory.open({ backend: 'memory' });
       try {
         registerAdapter(fakeAdapter(workDir));
         const { cli, program, renderLive, setExitCode } = makeMockCli(datastore);
         graphTool.register(cli);
         await program.parseAsync(
-          ['graph', '--json', '--package', join(workDir, 'missing')],
+          ['graph', '--json', join(workDir, 'missing')],
           { from: 'user' },
         );
-        // --package skips heap-preflight and routes to executeGraph
+        // Positional path skips heap-preflight and routes to executeGraph
         // (not the Ink live view).
         expect(renderLive.mock.calls.length).toBe(0);
-        // The package doesn't exist on disk → exit 2.
+        // The path doesn't exist on disk → exit 2.
         expect(setExitCode.mock.calls.length).toBeGreaterThan(0);
       } finally {
         datastore.close();

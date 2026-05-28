@@ -140,7 +140,7 @@ export async function runHeapPreflight(input: PreflightInput): Promise<boolean> 
       `graph: detected ${String(fileCount)} files; would elevate heap to ${String(targetMb)} MB, ` +
         `but system has only ${String(totalMb)} MB RAM (need ~${String(targetMb + OS_HEADROOM_MB)} MB).\n` +
         `Continuing with current heap (${String(currentMb)} MB cap). If the run aborts, try ` +
-        `\`opensip-tools graph --package <name>\` to scope to one package.\n`,
+        `\`opensip-tools graph <path>\` or \`opensip-tools graph --workspace\` to scope the run.\n`,
     );
     return false;
   }

@@ -100,6 +100,7 @@ function register(cli: ToolCliContext): void {
   program
     .command(GRAPH.name)
     .description(GRAPH.description)
+    .argument('[paths...]', 'Subtrees to analyze (default: whole project)')
     .option('--cwd <path>', 'Target directory', process.cwd())
     .option('--json', 'Output structured JSON', false)
     .option('--no-cache', 'Skip catalog cache (force full rebuild)')
@@ -108,21 +109,21 @@ function register(cli: ToolCliContext): void {
     .option('--baseline <path>', 'Override the default baseline path')
     .option('--report-to <url>', 'POST findings to OpenSIP Cloud or compatible')
     .option(
-      '--package <name|path>',
-      'Scope the run to a single workspace package (TypeScript-only; faster on monorepos; cross-package call sites become unresolved)',
-    )
-    .option(
-      '--packages',
-      'Fan the run across every workspace package under packages/** (TypeScript-only; parallel; aggregates per-package findings)',
+      '--workspace',
+      'Fan out across detected workspace units (memory-isolated; polyglot)',
       false,
     )
     .option(
-      '--packages-concurrency <n>',
-      'Concurrency cap for --packages (default: cpus()-1)',
+      '--concurrency <n>',
+      'Concurrency cap for --workspace (default: cpus()-1)',
       (v) => Number.parseInt(v, 10),
     )
+    .option(
+      '--language <name>',
+      'Force a specific language adapter (suppresses auto-detection)',
+    )
     .option('--debug', 'Enable debug mode for structured log output', false)
-    .action(async (opts: {
+    .action(async (paths: readonly string[], opts: {
       cwd: string;
       json?: boolean;
       cache?: boolean;
@@ -130,19 +131,25 @@ function register(cli: ToolCliContext): void {
       gateCompare?: boolean;
       baseline?: string;
       reportTo?: string;
-      package?: string;
-      packages?: boolean;
-      packagesConcurrency?: number;
+      workspace?: boolean;
+      concurrency?: number;
+      language?: string;
     }) => {
       // Preflight runs BEFORE any heavy work. If the repo's file count
       // exceeds a threshold AND the current heap cap is too low, this
       // re-execs the process with elevated `--max-old-space-size`. The
       // re-execing parent never returns from this call (it `process.exit`s
       // with the child's code), so `returned === true` only matters for
-      // the type checker. Skipped when `--package <name>` is set: scoped
-      // runs touch a fraction of files and don't need the global heap
-      // sizing — the user has already opted into a smaller working set.
-      if (typeof opts.package !== 'string' || opts.package.length === 0) {
+      // the type checker. Skipped when the user has expressed an explicit
+      // scope (positional paths, --workspace, or --language): those runs
+      // either touch a fraction of files (positional/language) or spawn
+      // child processes per unit (workspace) and don't need the global
+      // heap sizing.
+      const hasExplicitScope =
+        paths.length > 0 ||
+        opts.workspace === true ||
+        typeof opts.language === 'string';
+      if (!hasExplicitScope) {
         const reExecing = await runHeapPreflight({ cwd: opts.cwd });
         /* v8 ignore next */
         if (reExecing) return;
@@ -154,9 +161,10 @@ function register(cli: ToolCliContext): void {
         && opts.gateCompare !== true
         /* v8 ignore next */
         && (typeof opts.reportTo !== 'string' || opts.reportTo.length === 0)
-        && opts.packages !== true
+        && opts.workspace !== true
+        && paths.length === 0
         /* v8 ignore next */
-        && (typeof opts.package !== 'string' || opts.package.length === 0);
+        && typeof opts.language !== 'string';
 
       if (isInteractiveDefault) {
         await cli.renderLive(GRAPH_LIVE_VIEW_KEY, {
@@ -175,9 +183,10 @@ function register(cli: ToolCliContext): void {
           gateCompare: opts.gateCompare,
           baseline: opts.baseline,
           reportTo: opts.reportTo,
-          packageScope: opts.package,
-          allPackages: opts.packages,
-          packagesConcurrency: opts.packagesConcurrency,
+          paths,
+          workspace: opts.workspace,
+          concurrency: opts.concurrency,
+          language: opts.language,
           cliScript: process.argv[1],
         },
         cli,

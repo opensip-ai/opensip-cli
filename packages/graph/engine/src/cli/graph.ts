@@ -5,9 +5,18 @@
  * rules, entry points, and catalog summary in one invocation. Per
  * DEC-8, a switch in this handler dispatches to the right renderer.
  *
+ * CLI shape (language-neutral):
+ *   - `graph` — whole project, auto-detected language(s)
+ *   - `graph <path> [<path>...]` — scope to one or more subtrees
+ *   - `graph --workspace` — fan out across detected workspace units
+ *     (polyglot: aggregates every adapter's units per spec D8b)
+ *   - `graph --language <name>` — force a single adapter
+ *
  * History: v0.2 originally split this into three subcommands (`graph`,
  * `graph-orphans`, `graph-entry-points`). The two filtered views are
- * now sections in this unified report.
+ * now sections in this unified report. The TS-flavored `--package` /
+ * `--packages` flags were retired in favor of the polyglot surface
+ * above; see docs/plans/graph-cli-language-neutral-scoping/.
  */
 
 import { randomUUID } from 'node:crypto';
@@ -31,16 +40,20 @@ import { renderSarif } from '../render/sarif.js';
 import { inferEntryPoints } from '../rules/_entry-points.js';
 import { currentRules } from '../rules/registry.js';
 
+import { detectLanguages } from './detect.js';
 import { runGraph } from './orchestrate.js';
-import { runPackagesInParallel } from './packages-runner.js';
+import { positionalPathLabel, resolvePositionalPaths } from './positional-paths.js';
 import { MemoryPressureError } from './pressure-monitor.js';
-import { discoverWorkspacePackages, resolvePackageScope } from './scope.js';
+import {
+  discoverPolyglotUnits,
+  runWorkspaceUnitsInParallel,
+  type WorkspaceUnitRunResult,
+} from './workspace-runner.js';
 
-import type { PackageRunResult } from './packages-runner.js';
 import type { EntryPoint } from '../rules/_entry-points.js';
 import type { Catalog, Indexes } from '../types.js';
 import type { FindingOutput } from '@opensip-tools/contracts';
-import type { Signal, ToolCliContext } from '@opensip-tools/core';
+import type { LanguageAdapter, Signal, ToolCliContext } from '@opensip-tools/core';
 import type { DataStore } from '@opensip-tools/datastore';
 
 const ENTRY_POINTS_PREVIEW = 10;
@@ -79,27 +92,33 @@ export interface GraphCommandOptions {
   readonly reportTo?: string;
   readonly apiKey?: string;
   /**
-   * Optional --package <name|path> scope. When set, the run targets a
-   * single workspace package's tsconfig instead of the whole project.
-   * See docs/plans/graph-performance-improvements.md Phase 6.
+   * Positional `[paths...]`. Empty/undefined means whole-project scope.
+   * Each path must be an existing directory (absolute or relative to
+   * `cwd`). Multiple paths run sequentially in-process and aggregate
+   * into one session (D12).
    */
-  readonly packageScope?: string;
+  readonly paths?: readonly string[];
   /**
-   * Optional --packages flag (no argument). When set, the run fans out
-   * across every workspace package under packages/** with a tsconfig.
-   * Each package runs in its own child process; findings are
-   * aggregated in the parent. Wave 3 of the perf plan.
+   * `--workspace`: fan the run across every workspace unit returned by
+   * each detected adapter's `discoverWorkspaceUnits`. Polyglot per
+   * spec D8b: in a multi-language repo all adapters' units are
+   * aggregated into one combined fan-out.
    */
-  readonly allPackages?: boolean;
+  readonly workspace?: boolean;
   /**
-   * Optional concurrency cap for --packages. Defaults to
+   * `--language <name>`: force a single language adapter. Suppresses
+   * marker-based detection. Errors if the name is not registered.
+   */
+  readonly language?: string;
+  /**
+   * Optional concurrency cap for `--workspace`. Defaults to
    * `os.cpus().length - 1`. Exposed primarily for tests.
    */
-  readonly packagesConcurrency?: number;
+  readonly concurrency?: number;
   /**
-   * Path to the CLI entry script. When --packages is set, child
-   * processes invoke `node <cliScript> graph --package <dir> --json`.
-   * Tools wiring `executeGraph` should pass `process.argv[1]`.
+   * Path to the CLI entry script. `--workspace` children invoke
+   * `node <cliScript> graph <rootDir> --json`. Tools wiring
+   * `executeGraph` should pass `process.argv[1]`.
    */
   readonly cliScript?: string;
   /**
@@ -134,17 +153,22 @@ export async function executeGraph(
   const startedAt = new Date().toISOString();
   try {
     validateMutuallyExclusiveFlags(opts);
-    if (opts.allPackages === true) {
-      await executePackagesGraph(opts, cli);
+    if (opts.workspace === true) {
+      await executeWorkspaceGraph(opts, cli);
       return;
     }
-    const { runCwd, runTsConfig } = resolveRunScope(opts);
+    const positionalPaths = resolvePositionalScope(opts);
+    if (positionalPaths.length > 1) {
+      await executeMultiPathGraph(opts, positionalPaths, cli, startedAt);
+      return;
+    }
+    const runCwd = positionalPaths[0] ?? opts.cwd;
     const result = await runGraph({
       cwd: runCwd,
       noCache: opts.noCache,
-      tsConfigPath: runTsConfig,
       datastore: cli.scope.datastore() as DataStore | undefined,
     });
+    enforceLanguageMismatchPolicy(opts, result.catalog, [runCwd]);
     await dispatchGraphResult(opts, result, cli, startedAt);
   } catch (error) {
     handleGraphError('graph', error, cli);
@@ -155,30 +179,79 @@ function validateMutuallyExclusiveFlags(opts: GraphCommandOptions): void {
   if (opts.gateSave === true && opts.gateCompare === true) {
     throw new ConfigurationError('--gate-save and --gate-compare are mutually exclusive.');
   }
-  if (
-    opts.allPackages === true &&
-    typeof opts.packageScope === 'string' &&
-    opts.packageScope.length > 0
-  ) {
-    throw new ConfigurationError('--package and --packages are mutually exclusive.');
+  if (opts.workspace === true && (opts.paths?.length ?? 0) > 0) {
+    throw new ConfigurationError(
+      '--workspace and positional paths are mutually exclusive. Use one or the other.',
+    );
   }
 }
 
-function resolveRunScope(opts: GraphCommandOptions): {
-  readonly runCwd: string;
-  readonly runTsConfig: string | undefined;
-} {
-  if (typeof opts.packageScope !== 'string' || opts.packageScope.length === 0) {
-    return { runCwd: opts.cwd, runTsConfig: undefined };
+function resolvePositionalScope(opts: GraphCommandOptions): readonly string[] {
+  if (!opts.paths || opts.paths.length === 0) return [];
+  return resolvePositionalPaths(opts.paths, opts.cwd);
+}
+
+/**
+ * D14 mixed policy. When `--language X` was specified and the run
+ * discovered zero files matching that adapter, exit 2 with the
+ * canonical error. Auto-detection paths (no `--language`) do NOT
+ * trigger this check — a "zero files" outcome there is a valid
+ * (non-error) state.
+ */
+function enforceLanguageMismatchPolicy(
+  opts: GraphCommandOptions,
+  catalog: Catalog | null,
+  paths: readonly string[],
+): void {
+  if (typeof opts.language !== 'string' || opts.language.length === 0) return;
+  const fileCount = catalog === null ? 0 : countFiles(catalog);
+  if (fileCount > 0) return;
+  const pathLabel = paths.map((p) => positionalPathLabel(p, opts.cwd)).join(', ');
+  throw new ConfigurationError(
+    `--language ${opts.language} matched 0 files under ${pathLabel}; check the flag or paths.`,
+  );
+}
+
+async function executeMultiPathGraph(
+  opts: GraphCommandOptions,
+  paths: readonly string[],
+  cli: ToolCliContext,
+  startedAt: string,
+): Promise<void> {
+  const allSignals: Signal[] = [];
+  let combinedFiles = 0;
+  let lastResult: Awaited<ReturnType<typeof runGraph>> | null = null;
+  for (const p of paths) {
+    const r = await runGraph({
+      cwd: p,
+      noCache: opts.noCache,
+      datastore: cli.scope.datastore() as DataStore | undefined,
+    });
+    lastResult = r;
+    allSignals.push(...r.signals);
+    if (r.catalog !== null) combinedFiles += countFiles(r.catalog);
   }
-  const scope = resolvePackageScope({ cwd: opts.cwd, packageArg: opts.packageScope });
-  logger.info({
-    evt: 'graph.cli.graph.scope',
-    module: MODULE_GRAPH_CLI,
-    package: opts.packageScope,
-    packageDir: scope.packageDirAbs,
-  });
-  return { runCwd: scope.packageDirAbs, runTsConfig: scope.tsConfigPathAbs };
+  // D14: count files across every analyzed path. Zero files + a
+  // `--language` override → exit 2 with the canonical message.
+  if (
+    typeof opts.language === 'string'
+    && opts.language.length > 0
+    && combinedFiles === 0
+  ) {
+    throw new ConfigurationError(
+      `--language ${opts.language} matched 0 files under ${paths.map((p) => positionalPathLabel(p, opts.cwd)).join(', ')}; check the flag or paths.`,
+    );
+  }
+  /* v8 ignore next */
+  if (lastResult === null) return;
+  const combined = {
+    catalog: lastResult.catalog,
+    indexes: lastResult.indexes,
+    signals: allSignals as readonly Signal[],
+    resolutionStats: lastResult.resolutionStats,
+    cacheHit: lastResult.cacheHit,
+  };
+  await dispatchGraphResult(opts, combined, cli, startedAt);
 }
 
 async function dispatchGraphResult(
@@ -207,9 +280,9 @@ async function dispatchGraphResult(
   // --catalog-output: the run's purpose is producing a machine-readable
   // artifact, not populating dashboard session history. Skipping the
   // session write here also means children spawned by
-  // `executePackagesGraph` (which always run with --json) don't each
+  // `executeWorkspaceGraph` (which always run with --json) don't each
   // write a row — the parent persists exactly one aggregate session
-  // for the whole `--packages` invocation.
+  // for the whole `--workspace` invocation.
   if (opts.json !== true) {
     persistSession(opts, result.signals, cli.scope.datastore() as DataStore | undefined);
   }
@@ -243,52 +316,54 @@ function renderGraphResult(
 }
 
 /**
- * `graph --packages` — fan a graph run out across every workspace
- * package under <cwd>/packages/** and aggregate the findings. Each
- * package runs in its own child process; per-package memory ceiling
- * scales naturally. See docs/plans/graph-performance-improvements.md
- * Wave 3.
+ * `graph --workspace` — fan a graph run out across every workspace
+ * unit returned by the adapters' `discoverWorkspaceUnits` hook. Per
+ * spec D8b, polyglot repos aggregate units from EVERY detected
+ * adapter (or the single adapter named by `--language`).
  */
-async function executePackagesGraph(
+async function executeWorkspaceGraph(
   opts: GraphCommandOptions,
   cli: ToolCliContext,
 ): Promise<void> {
   const cliScript = opts.cliScript ?? process.argv[1];
   if (typeof cliScript !== 'string' || cliScript.length === 0) {
     throw new ConfigurationError(
-      '--packages: could not determine the CLI entry script (process.argv[1] is empty).',
+      '--workspace: could not determine the CLI entry script (process.argv[1] is empty).',
     );
   }
-  const packageDirs = discoverWorkspacePackages(opts.cwd);
-  if (packageDirs.length === 0) {
+  const adapters = resolveAdaptersForRun(opts, cli);
+  const units = await discoverPolyglotUnits(opts.cwd, adapters);
+  if (units.length === 0) {
+    const adapterLabel =
+      adapters.map((a) => a.id).join(', ') || '(no language adapters available)';
     throw new ConfigurationError(
-      `--packages: no workspace packages with tsconfig.json found under ${opts.cwd}/packages/**.`,
+      `--workspace: no workspace units detected for [${adapterLabel}]. Use 'opensip-tools graph' for whole-project analysis.`,
     );
   }
 
   const startedAt = Date.now();
-  const result = await runPackagesInParallel({
+  const result = await runWorkspaceUnitsInParallel({
     cwd: opts.cwd,
-    packageDirs,
+    units,
     cliScript,
-    concurrency: opts.packagesConcurrency,
+    concurrency: opts.concurrency,
     noCache: opts.noCache,
   });
   const durationMs = Date.now() - startedAt;
 
   const allFindings: FindingOutput[] = [];
-  for (const r of result.perPackage) allFindings.push(...r.findings);
+  for (const r of result.perUnit) allFindings.push(...r.findings);
 
   if (opts.json === true) {
-    process.stdout.write(`${renderPackagesJson(result.perPackage, durationMs)}\n`);
+    process.stdout.write(`${renderWorkspaceJson(result.perUnit, durationMs)}\n`);
   } else {
-    writePackagesReport(result.perPackage, durationMs);
-    // Persist exactly one aggregate session for the whole --packages
+    writeWorkspaceReport(result.perUnit, durationMs);
+    // Persist exactly one aggregate session for the whole --workspace
     // invocation. Matches the contract "one human-facing CLI invocation
-    // = one session" that fitness/sim already follow; the per-package
+    // = one session" that fitness/sim already follow; the per-unit
     // child processes don't persist because they always run with --json
     // (see dispatchGraphResult).
-    persistPackagesSession(opts, allFindings, durationMs, cli);
+    persistWorkspaceSession(opts, allFindings, durationMs, cli);
   }
 
   // If any child failed to spawn or exited with an error, surface it
@@ -297,7 +372,7 @@ async function executePackagesGraph(
   if (result.anyChildFailed) {
     cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
     process.stderr.write(
-      `graph --packages: at least one package run failed; see per-package output above.\n`,
+      `graph --workspace: at least one unit run failed; see per-unit output above.\n`,
     );
   } else {
     cli.setExitCode(EXIT_CODES.SUCCESS);
@@ -305,37 +380,70 @@ async function executePackagesGraph(
   logger.info({
     evt: EVT_GRAPH_COMPLETE,
     module: MODULE_GRAPH_CLI,
-    packages: result.perPackage.length,
+    units: result.perUnit.length,
     findings: allFindings.length,
     failed: result.anyChildFailed,
     durationMs,
   });
 }
 
-function writePackagesReport(
-  perPackage: readonly PackageRunResult[],
+/**
+ * Resolve which language adapters apply to this run. With `--language`
+ * set, returns exactly that adapter (errors if unregistered). Without
+ * it, runs marker-based detection and returns every adapter the repo
+ * exposes a marker for (polyglot per spec D6).
+ */
+function resolveAdaptersForRun(
+  opts: GraphCommandOptions,
+  cli: ToolCliContext,
+): readonly LanguageAdapter[] {
+  const registry = cli.scope.languages;
+  if (typeof opts.language === 'string' && opts.language.length > 0) {
+    const canonical = registry.canonicalize(opts.language) ?? opts.language;
+    const adapter = registry.get(canonical);
+    if (!adapter) {
+      throw new ConfigurationError(
+        `--language '${opts.language}' is not a registered adapter.`,
+      );
+    }
+    return [adapter];
+  }
+  const detection = detectLanguages(opts.cwd, registry);
+  const adapters: LanguageAdapter[] = [];
+  for (const id of detection.adapterIds) {
+    const adapter = registry.get(id);
+    /* v8 ignore next */
+    if (adapter) adapters.push(adapter);
+  }
+  return adapters;
+}
+
+function writeWorkspaceReport(
+  perUnit: readonly WorkspaceUnitRunResult[],
   durationMs: number,
 ): void {
-  const totalFindings = perPackage.reduce((n, r) => n + r.findings.length, 0);
+  const totalFindings = perUnit.reduce((n, r) => n + r.findings.length, 0);
   const lines: string[] = [
-    'opensip-tools graph --packages',
+    'opensip-tools graph --workspace',
     '',
-    `== Packages (${String(perPackage.length)}) ==`,
-    ...renderPackagesStatusLines(perPackage),
+    `== Units (${String(perUnit.length)}) ==`,
+    ...renderWorkspaceStatusLines(perUnit),
     '',
     '== Findings ==',
-    ...renderPackagesFindingsLines(perPackage),
+    ...renderWorkspaceFindingsLines(perUnit),
     '== Summary ==',
-    `${String(totalFindings)} total finding(s) across ${String(perPackage.length)} package(s) in ${String(durationMs)} ms.`,
+    `${String(totalFindings)} total finding(s) across ${String(perUnit.length)} unit(s) in ${String(durationMs)} ms.`,
   ];
   process.stdout.write(`${lines.join('\n')}\n`);
 }
 
-function renderPackagesStatusLines(perPackage: readonly PackageRunResult[]): readonly string[] {
+function renderWorkspaceStatusLines(
+  perUnit: readonly WorkspaceUnitRunResult[],
+): readonly string[] {
   const out: string[] = [];
-  for (const r of perPackage) {
+  for (const r of perUnit) {
     const status = r.exitCode === 0 ? 'ok' : `FAILED (exit ${String(r.exitCode)})`;
-    const display = packageDisplay(r);
+    const display = unitDisplay(r);
     out.push(`  ${display}: ${String(r.findings.length)} finding(s) — ${status}`);
     if (r.exitCode !== 0 && r.stderr.length > 0) {
       const stderrPreview = r.stderr.split('\n').slice(0, 3).join('\n    ');
@@ -345,16 +453,18 @@ function renderPackagesStatusLines(perPackage: readonly PackageRunResult[]): rea
   return out;
 }
 
-function renderPackagesFindingsLines(perPackage: readonly PackageRunResult[]): readonly string[] {
+function renderWorkspaceFindingsLines(
+  perUnit: readonly WorkspaceUnitRunResult[],
+): readonly string[] {
   const out: string[] = [];
-  for (const r of perPackage) {
+  for (const r of perUnit) {
     if (r.findings.length === 0) continue;
-    out.push(`[${packageDisplay(r)}]`, ...renderPackageFindingPreview(r), '');
+    out.push(`[${unitDisplay(r)}]`, ...renderUnitFindingPreview(r), '');
   }
   return out;
 }
 
-function renderPackageFindingPreview(r: PackageRunResult): readonly string[] {
+function renderUnitFindingPreview(r: WorkspaceUnitRunResult): readonly string[] {
   const preview = r.findings.slice(0, FINDINGS_PREVIEW);
   const lines = preview.map((f) => {
     const loc = typeof f.line === 'number' ? `:${String(f.line)}` : '';
@@ -366,12 +476,12 @@ function renderPackageFindingPreview(r: PackageRunResult): readonly string[] {
   return lines;
 }
 
-function packageDisplay(r: PackageRunResult): string {
-  return r.displayPath.length > 0 ? r.displayPath : r.packageDir;
+function unitDisplay(r: WorkspaceUnitRunResult): string {
+  return r.displayPath.length > 0 ? r.displayPath : r.rootDir;
 }
 
-function renderPackagesJson(
-  perPackage: readonly PackageRunResult[],
+function renderWorkspaceJson(
+  perUnit: readonly WorkspaceUnitRunResult[],
   durationMs: number,
 ): string {
   return JSON.stringify(
@@ -379,16 +489,17 @@ function renderPackagesJson(
       version: '1.0',
       tool: 'graph',
       command: 'graph',
-      mode: 'packages',
+      mode: 'workspace',
       timestamp: new Date().toISOString(),
       durationMs,
-      packages: perPackage.map((r) => ({
-        packageDir: r.packageDir,
+      units: perUnit.map((r) => ({
+        unitId: r.unitId,
+        rootDir: r.rootDir,
         displayPath: r.displayPath,
         exitCode: r.exitCode,
         findings: r.findings,
       })),
-      totalFindings: perPackage.reduce((n, r) => n + r.findings.length, 0),
+      totalFindings: perUnit.reduce((n, r) => n + r.findings.length, 0),
     },
     null,
     2,
@@ -551,7 +662,7 @@ function persistSession(
   saveGraphSession(opts, buildCliOutput(signals, 'graph'), datastore);
 }
 
-function persistPackagesSession(
+function persistWorkspaceSession(
   opts: GraphCommandOptions,
   findings: readonly FindingOutput[],
   durationMs: number,
