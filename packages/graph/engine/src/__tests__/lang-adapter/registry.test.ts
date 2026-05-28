@@ -12,7 +12,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { ConfigurationError } from '@opensip-tools/core';
+import { ConfigurationError, enterScope } from '@opensip-tools/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
@@ -20,6 +20,7 @@ import {
   pickAdapter,
   registerAdapter,
 } from '../../lang-adapter/registry.js';
+import { makeGraphTestScope } from '../test-utils/with-graph-scope.js';
 
 import type {
   DiscoverOutput,
@@ -60,7 +61,11 @@ function fakeAdapter(id: string, exts: readonly string[]): GraphLanguageAdapter 
 
 describe('registerAdapter / pickAdapter', () => {
   beforeEach(() => {
-    clearAdapterRegistry();
+    // Item 1: adapter registry is per-RunScope. Each test enters a
+    // fresh scope (with graph subscope) so the legacy free-function
+    // helpers (registerAdapter / pickAdapter / clearAdapterRegistry)
+    // resolve through `currentAdapterRegistry()`.
+    enterScope(makeGraphTestScope());
   });
 
   afterEach(() => {
@@ -91,7 +96,7 @@ describe('pickAdapter — multi-adapter dominance', () => {
   let dir: string;
 
   beforeEach(() => {
-    clearAdapterRegistry();
+    enterScope(makeGraphTestScope());
     dir = mkdtempSync(join(tmpdir(), 'graph-registry-'));
   });
 

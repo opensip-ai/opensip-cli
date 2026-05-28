@@ -4,12 +4,18 @@
  * concerns: built-in recipe pre-registration with throw-on-duplicate
  * semantics, and display info with `isBuiltIn` / `isUserDefined` flags.
  *
+ * Per-RunScope: the simulation tool's `extendScope` hook constructs a
+ * fresh `SimulationRecipeRegistry` per CLI invocation and attaches it
+ * to `scope.simulation.recipes` (Item 1 / D7). The module-level
+ * singleton is gone — consumers read via `currentSimulationRecipeRegistry()`
+ * which routes through the scope-bound instance.
+ *
  * Built-in seeding goes through `registerAll(builtIns, { internal: true })`
  * — the LSP-clean replacement for the prior direct-map-write pattern
  * (the canonical T2 violation the runscope+registry plan resolves).
  */
 
-import { RecipeRegistry } from '@opensip-tools/core';
+import { RecipeRegistry, currentScope } from '@opensip-tools/core';
 
 import { builtInSimulationRecipes } from './built-in-recipes.js';
 
@@ -70,5 +76,34 @@ export class SimulationRecipeRegistry extends RecipeRegistry<SimulationRecipe> {
   }
 }
 
-/** Shared singleton with the built-in `default` recipe pre-loaded. */
-export const defaultSimulationRecipeRegistry = new SimulationRecipeRegistry();
+/** Factory used by the simulation tool's `extendScope` hook. */
+export function createSimulationRecipeRegistry(): SimulationRecipeRegistry {
+  return new SimulationRecipeRegistry();
+}
+
+/**
+ * Read the current scope's simulation recipe registry. Throws when no
+ * scope is active or when the simulation subscope is missing — both
+ * indicate the caller is running outside the CLI's pre-action-hook (or
+ * the test fixture forgot to construct + enter a scope).
+ */
+export function currentSimulationRecipeRegistry(): SimulationRecipeRegistry {
+  const scope = currentScope();
+  if (!scope) {
+    throw new Error(
+      'simulation: currentSimulationRecipeRegistry() called outside a RunScope. ' +
+        'Wrap the call site in runWithScope (production: pre-action-hook handles ' +
+        'this; tests: use makeTestScope + simulationTool.extendScope or construct ' +
+        'a registry directly).',
+    );
+  }
+  if (!scope.simulation) {
+    throw new Error(
+      'simulation: scope.simulation is missing. The simulation tool must be ' +
+        'registered and its extendScope hook must run before recipe reads. ' +
+        '(production: bootstrap registers simulationTool; tests: call ' +
+        'simulationTool.extendScope(scope) after makeTestScope.)',
+    );
+  }
+  return scope.simulation.recipes;
+}

@@ -9,15 +9,12 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { enterScope, RunScope } from '@opensip-tools/core';
 import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
-import { registerAdapter, runGraph } from '@opensip-tools/graph';
+import { graphTool, registerAdapter, runGraph } from '@opensip-tools/graph';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { typescriptGraphAdapter } from '../index.js';
-
-// Ensure the typescript adapter is registered before runGraph()'s
-// pickAdapter() runs against a TS fixture. Idempotent on re-register.
-registerAdapter(typescriptGraphAdapter);
 
 const FIXTURE_TSCONFIG = JSON.stringify({
   compilerOptions: {
@@ -48,6 +45,14 @@ describe('runGraph orchestrator', () => {
   let datastore: DataStore;
 
   beforeEach(() => {
+    // Item 1: graph registries are per-RunScope. Construct a scope
+    // with graph subscope and register the typescript adapter into it
+    // so runGraph()'s pickAdapter() finds it.
+    const scope = new RunScope();
+    graphTool.extendScope?.(scope);
+    enterScope(scope);
+    registerAdapter(typescriptGraphAdapter);
+
     dir = mkdtempSync(join(tmpdir(), 'graph-orch-'));
     datastore = DataStoreFactory.open({ backend: 'memory' });
   });

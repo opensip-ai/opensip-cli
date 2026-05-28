@@ -3,16 +3,19 @@
  * @fileoverview Tests for `defineInvariantScenario` — invariant-kind entry point.
  */
 
-import { afterEach, describe, expect, it } from 'vitest'
+import { enterScope } from '@opensip-tools/core'
+import { beforeEach, describe, expect, it } from 'vitest'
 
-import { clearScenarioRegistry } from '../framework/registry.js'
 import {
   defineInvariantScenario,
   validateInvariantScenarioConfig,
 } from '../kinds/invariant/define.js'
 
-afterEach(() => {
-  clearScenarioRegistry()
+import { makeSimTestScope } from './test-utils/with-sim-scope.js'
+
+beforeEach(() => {
+  // Item 1: scenarioRegistry is per-RunScope. Enter a fresh scope.
+  enterScope(makeSimTestScope())
 })
 
 describe('defineInvariantScenario', () => {

@@ -2,12 +2,14 @@
  * @fileoverview Tests for `defineChaosScenario` — chaos-kind entry point.
  */
 
-import { afterEach, describe, expect, it } from 'vitest'
+import { enterScope } from '@opensip-tools/core'
+import { beforeEach, describe, expect, it } from 'vitest'
 
 import { ASSERTIONS } from '../framework/assertions.js'
 import { persona } from '../framework/personas.js'
-import { clearScenarioRegistry } from '../framework/registry.js'
 import { defineChaosScenario, validateChaosScenarioConfig } from '../kinds/chaos/define.js'
+
+import { makeSimTestScope } from './test-utils/with-sim-scope.js'
 
 import type { ChaosConfig } from '../types/base-types.js'
 
@@ -24,8 +26,12 @@ const baseChaos: ChaosConfig = {
   ],
 }
 
-afterEach(() => {
-  clearScenarioRegistry()
+beforeEach(() => {
+  // Item 1: scenarioRegistry is per-RunScope. defineX no longer
+  // self-registers (commit 1a0a71b), so the registry stays empty in
+  // these tests; the scope is constructed only to make registry
+  // accessors callable if a test ever needs them.
+  enterScope(makeSimTestScope())
 })
 
 describe('defineChaosScenario', () => {

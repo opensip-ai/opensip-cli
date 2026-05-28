@@ -10,17 +10,20 @@
  * load and chaos kinds.
  */
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { enterScope } from '@opensip-tools/core';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 import { ASSERTIONS } from '../framework/assertions.js';
 import { ScenarioAbortedError } from '../framework/execution/scenario-aborted-error.js';
 import { persona } from '../framework/personas.js';
-import { clearScenarioRegistry } from '../framework/registry.js';
 import { defineChaosScenario } from '../kinds/chaos/define.js';
 import { defineLoadScenario } from '../kinds/load/define.js';
 
-afterEach(() => {
-  clearScenarioRegistry();
+import { makeSimTestScope } from './test-utils/with-sim-scope.js';
+
+beforeEach(() => {
+  // Item 1: scenarioRegistry is per-RunScope. Enter a fresh scope.
+  enterScope(makeSimTestScope());
 });
 
 describe('Load scenario execution', () => {

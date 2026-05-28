@@ -6,20 +6,26 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { RunScope } from '@opensip-tools/core';
+import { enterScope, RunScope } from '@opensip-tools/core';
 import { graphTool, registerAdapter } from '@opensip-tools/graph';
 import { Command } from 'commander';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 
 import { typescriptGraphAdapter } from '../index.js';
 
 import type { ToolCliContext } from '@opensip-tools/core';
 
-// Ensure the typescript adapter is registered before any of these
-// graphTool.register() tests trigger pickAdapter() through the
-// runGraph()/heap-preflight code paths.
-registerAdapter(typescriptGraphAdapter);
+beforeEach(() => {
+  // Item 1: graph registries are per-RunScope. Construct a scope with
+  // graph subscope and register the typescript adapter into it so the
+  // graphTool.register() tests reach pickAdapter() through a live
+  // scope.
+  const scope = new RunScope();
+  graphTool.extendScope?.(scope);
+  enterScope(scope);
+  registerAdapter(typescriptGraphAdapter);
+});
 
 function makeCli(program: Command): ToolCliContext {
   // Layer 5 Phase 3 (audit 2026-05-23 F3): tools own their renderers.

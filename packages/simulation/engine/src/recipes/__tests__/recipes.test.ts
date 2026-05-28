@@ -7,18 +7,19 @@
  * resolving each selector type against the live scenario registry.
  */
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { enterScope } from '@opensip-tools/core';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { makeSimTestScope } from '../../__tests__/test-utils/with-sim-scope.js';
 import { ASSERTIONS } from '../../framework/assertions.js';
 import { persona } from '../../framework/personas.js';
-import { clearScenarioRegistry, scenarioRegistry } from '../../framework/registry.js';
+import { clearScenarioRegistry, currentScenarioRegistry } from '../../framework/registry.js';
 import { defineChaosScenario } from '../../kinds/chaos/define.js';
 import { defineLoadScenario } from '../../kinds/load/define.js';
 import { isBuiltInSimulationRecipe } from '../built-in-recipes.js';
 import { defineSimulationRecipe } from '../define-recipe.js';
 import {
   SimulationRecipeRegistry,
-  defaultSimulationRecipeRegistry,
 } from '../registry.js';
 import { SimulationRecipeService } from '../service.js';
 
@@ -47,11 +48,14 @@ const stubLoadResult = (id: string) => Promise.resolve({
   signals: [] as const,
 });
 
+beforeEach(() => {
+  // Item 1: scenarioRegistry + recipe registry are per-RunScope.
+  // Each test enters a fresh scope with sim subscope attached.
+  enterScope(makeSimTestScope());
+});
+
 afterEach(() => {
   clearScenarioRegistry();
-  // Reset the default registry to its built-in state so user recipes
-  // registered during a test don't leak into the next.
-  defaultSimulationRecipeRegistry.reset();
 });
 
 // =============================================================================
@@ -246,7 +250,7 @@ describe('SimulationRecipeRegistry', () => {
 // =============================================================================
 
 function defineThreeScenarios(): void {
-  scenarioRegistry.register(defineLoadScenario({
+  currentScenarioRegistry().register(defineLoadScenario({
     id: 'load-a',
     name: 'load-a',
     description: 'load',
@@ -255,7 +259,7 @@ function defineThreeScenarios(): void {
     duration: 1,
     assertions: [ASSERTIONS.lowErrorRate(1)],
   }));
-  scenarioRegistry.register(defineLoadScenario({
+  currentScenarioRegistry().register(defineLoadScenario({
     id: 'load-b',
     name: 'load-b',
     description: 'load',
@@ -264,7 +268,7 @@ function defineThreeScenarios(): void {
     duration: 1,
     assertions: [ASSERTIONS.lowErrorRate(1)],
   }));
-  scenarioRegistry.register(defineChaosScenario({
+  currentScenarioRegistry().register(defineChaosScenario({
     id: 'chaos-a',
     name: 'chaos-a',
     description: 'chaos',
@@ -396,10 +400,10 @@ describe('SimulationRecipeService — selector resolution', () => {
 
 describe('SimulationRecipeService — execution modes + failure handling', () => {
   it('records a failed scenario when run() throws and continues with the rest', async () => {
-    scenarioRegistry.register(
+    currentScenarioRegistry().register(
       makeStubScenario('failing', () => Promise.reject(new Error('boom'))),
     );
-    scenarioRegistry.register(makeStubScenario('passing', () => stubLoadResult('passing')));
+    currentScenarioRegistry().register(makeStubScenario('passing', () => stubLoadResult('passing')));
 
     const service = new SimulationRecipeService();
     const result = await service.runRecipe({
@@ -421,11 +425,11 @@ describe('SimulationRecipeService — execution modes + failure handling', () =>
 
   it('runs sequentially when execution.mode === sequential', async () => {
     const order: string[] = [];
-    scenarioRegistry.register(makeStubScenario('first', () => {
+    currentScenarioRegistry().register(makeStubScenario('first', () => {
       order.push('first');
       return stubLoadResult('first');
     }));
-    scenarioRegistry.register(makeStubScenario('second', () => {
+    currentScenarioRegistry().register(makeStubScenario('second', () => {
       order.push('second');
       return stubLoadResult('second');
     }));
@@ -445,11 +449,11 @@ describe('SimulationRecipeService — execution modes + failure handling', () =>
 
   it('stops on first failure in sequential mode when stopOnFirstFailure is set', async () => {
     const order: string[] = [];
-    scenarioRegistry.register(makeStubScenario('crashes', () => {
+    currentScenarioRegistry().register(makeStubScenario('crashes', () => {
       order.push('crashes');
       return Promise.reject(new Error('nope'));
     }));
-    scenarioRegistry.register(makeStubScenario('never-runs', () => {
+    currentScenarioRegistry().register(makeStubScenario('never-runs', () => {
       order.push('never-runs');
       return stubLoadResult('never-runs');
     }));
@@ -469,8 +473,8 @@ describe('SimulationRecipeService — execution modes + failure handling', () =>
   });
 
   it('respects an aborted signal in sequential mode', async () => {
-    scenarioRegistry.register(makeStubScenario('s1', () => stubLoadResult('s1')));
-    scenarioRegistry.register(makeStubScenario('s2', () => stubLoadResult('s2')));
+    currentScenarioRegistry().register(makeStubScenario('s1', () => stubLoadResult('s1')));
+    currentScenarioRegistry().register(makeStubScenario('s2', () => stubLoadResult('s2')));
 
     const ac = new AbortController();
     ac.abort();

@@ -6,6 +6,12 @@
  * Per spec docs/plans/graph-tool-v2-design.md.
  */
 
+// Side-effect import: surfaces the `scope.graph` augmentation on
+// @opensip-tools/core's RunScope interface (D7 — tool subscopes via
+// module augmentation).
+import './scope-augmentation.js';
+export type { GraphSubscope } from './scope-augmentation.js';
+
 export { graphTool } from './tool.js';
 export { runGraph, GRAPH_STAGES } from './cli/orchestrate.js';
 export type {
@@ -82,7 +88,16 @@ export type {
   ParsedProject,
 } from './lang-adapter/types.js';
 export type { CallConfidence as AdapterCallConfidence } from './types.js';
-export { registerAdapter, pickAdapter, clearAdapterRegistry } from './lang-adapter/registry.js';
+export {
+  registerAdapter,
+  pickAdapter,
+  clearAdapterRegistry,
+  createAdapterRegistry,
+  currentAdapterRegistry,
+  setDiscoveredAdapters,
+  getDiscoveredAdapters,
+  GraphAdapterRegistry,
+} from './lang-adapter/registry.js';
 export {
   truncateForCallEdge,
   CALL_EDGE_TEXT_MAX,

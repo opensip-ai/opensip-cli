@@ -222,6 +222,37 @@ export interface Tool {
    * setup inside their register()'d handlers instead.
    */
   readonly initialize?: () => Promise<void>;
+  /**
+   * Optional per-run scope extension hook. Called by the CLI's
+   * pre-action-hook AFTER constructing the per-invocation `RunScope`
+   * and BEFORE `enterScope` makes it visible to tool action bodies.
+   * Each registered tool is invoked once per CLI invocation so it can
+   * populate its tool-specific subscope (D7: tool subscopes via
+   * module augmentation on `RunScope`).
+   *
+   * Tools augment `RunScope` from their own `types.ts`:
+   *
+   *   declare module '@opensip-tools/core' {
+   *     interface RunScope {
+   *       simulation?: { scenarios: Registry<RunnableScenario>; ... };
+   *     }
+   *   }
+   *
+   * and assign their slot here:
+   *
+   *   extendScope(scope) {
+   *     scope.simulation = { scenarios: new Registry(...), ... };
+   *   }
+   *
+   * The kernel never touches the tool-specific slot — only the owning
+   * tool's `extendScope` reads or writes it. Slots are optional so a
+   * graph-only run carries no `scope.simulation`, and vice versa.
+   *
+   * Default behavior (when undefined): the tool contributes no
+   * subscope. Fitness, today, doesn't carry per-run subscope state on
+   * RunScope and can leave this undefined.
+   */
+  readonly extendScope?: (scope: RunScope) => void;
 }
 
 /**

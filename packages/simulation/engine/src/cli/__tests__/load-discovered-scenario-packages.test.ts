@@ -9,12 +9,10 @@
  *
  * Phase 7.5 of the marker-based-discovery plan.
  *
- * Scenarios self-register at module-import time inside the fixture's
- * `index.mjs`. To do that without symlinking the workspace package into
- * the tmpdir, the test stashes the live `scenarioRegistry` on
- * `globalThis.__OPENSIP_TEST_SCENARIO_REGISTRY__` before calling the
- * loader; the fixture reads it back and registers a scenario directly.
- * Cleanup deletes the global between tests.
+ * Scenarios used to self-register at module-import time; after Item 1
+ * they're explicit array exports, so the fixture's `index.mjs` exports
+ * `scenarios: [...]` and the loader's array-walk path picks them up.
+ * The fixture also exports a `recipes` array (unchanged channel).
  */
 
 import { randomUUID } from 'node:crypto';
@@ -22,18 +20,13 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { enterScope } from '@opensip-tools/core';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
-import { clearScenarioRegistry, scenarioRegistry } from '../../framework/registry.js';
-import { defaultSimulationRecipeRegistry } from '../../recipes/registry.js';
+import { makeSimTestScope } from '../../__tests__/test-utils/with-sim-scope.js';
+import { clearScenarioRegistry, currentScenarioRegistry } from '../../framework/registry.js';
+import { currentSimulationRecipeRegistry } from '../../recipes/registry.js';
 import { loadDiscoveredScenarioPackages } from '../sim.js';
-
-const REGISTRY_GLOBAL_KEY = '__OPENSIP_TEST_SCENARIO_REGISTRY__';
-
-declare global {
-  // Test-only global. Documented in the file-header docstring.
-  var __OPENSIP_TEST_SCENARIO_REGISTRY__: typeof scenarioRegistry | undefined;
-}
 
 let testDir: string;
 let stderrSpy: MockInstance<typeof process.stderr.write>;
@@ -41,23 +34,20 @@ let stderrSpy: MockInstance<typeof process.stderr.write>;
 beforeEach(() => {
   testDir = mkdtempSync(join(tmpdir(), 'opensip-sim-loader-'));
   stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
-  globalThis[REGISTRY_GLOBAL_KEY] = scenarioRegistry;
+  enterScope(makeSimTestScope());
 });
 
 afterEach(() => {
   rmSync(testDir, { recursive: true, force: true });
   clearScenarioRegistry();
-  defaultSimulationRecipeRegistry.reset();
-  globalThis[REGISTRY_GLOBAL_KEY] = undefined;
   stderrSpy.mockRestore();
 });
 
 /**
  * Drop a fixture sim pack into the tmpdir's node_modules. The fixture's
- * `index.mjs` registers exactly one scenario (via the globalThis-injected
- * registry handle) and exports a `recipes` array using the fragment
- * passed in. Returns the IDs the fixture used so tests can assert on
- * them.
+ * `index.mjs` exports a `scenarios` array (Item 1: scenarios are
+ * explicit exports; the loader's array-walk path registers them into
+ * the scope's registry) and a `recipes` array.
  */
 function writeFixturePack(opts: {
   packageDir: string;            // absolute path under testDir/node_modules
@@ -81,20 +71,15 @@ function writeFixturePack(opts: {
   writeFileSync(join(opts.packageDir, 'package.json'), JSON.stringify(pkg));
 
   const scenarioBlock = opts.selfRegisterScenario === false
-    ? ''
-    : `
-      const reg = globalThis[${JSON.stringify(REGISTRY_GLOBAL_KEY)}];
-      if (reg) {
-        reg.register({
-          kind: 'load',
-          id: ${JSON.stringify(scenarioId)},
-          name: ${JSON.stringify(scenarioId)},
-          description: 'fixture scenario',
-          tags: [],
-          run: async () => ({ kind: 'load', outcome: { totalRequests: 0, errorRate: 0 } }),
-        });
-      }
-    `;
+    ? `export const scenarios = [];`
+    : `export const scenarios = [{
+        kind: 'load',
+        id: ${JSON.stringify(scenarioId)},
+        name: ${JSON.stringify(scenarioId)},
+        description: 'fixture scenario',
+        tags: [],
+        run: async () => ({ kind: 'load', outcome: { totalRequests: 0, errorRate: 0 } }),
+      }];`;
 
   const recipesExport = opts.recipesFragment === undefined
     ? `export const recipes = [{
@@ -124,8 +109,8 @@ describe('loadDiscoveredScenarioPackages', () => {
 
     await loadDiscoveredScenarioPackages(testDir);
 
-    expect(scenarioRegistry.get(scenarioId)).toBeDefined();
-    expect(defaultSimulationRecipeRegistry.has(recipeId)).toBe(true);
+    expect(currentScenarioRegistry().get(scenarioId)).toBeDefined();
+    expect(currentSimulationRecipeRegistry().has(recipeId)).toBe(true);
   });
 
   it('discovers and loads a name-pattern-only package (@opensip-tools/scenarios-*)', async () => {
@@ -136,8 +121,8 @@ describe('loadDiscoveredScenarioPackages', () => {
 
     await loadDiscoveredScenarioPackages(testDir);
 
-    expect(scenarioRegistry.get(scenarioId)).toBeDefined();
-    expect(defaultSimulationRecipeRegistry.has(recipeId)).toBe(true);
+    expect(currentScenarioRegistry().get(scenarioId)).toBeDefined();
+    expect(currentSimulationRecipeRegistry().has(recipeId)).toBe(true);
   });
 
   it('loads a pack matching BOTH name-pattern and marker only once (dedupe by name)', async () => {
@@ -149,15 +134,14 @@ describe('loadDiscoveredScenarioPackages', () => {
 
     await loadDiscoveredScenarioPackages(testDir);
 
-    expect(scenarioRegistry.get(scenarioId)).toBeDefined();
-    expect(defaultSimulationRecipeRegistry.has(recipeId)).toBe(true);
+    expect(currentScenarioRegistry().get(scenarioId)).toBeDefined();
+    expect(currentSimulationRecipeRegistry().has(recipeId)).toBe(true);
     // Dedupe assertion: the scenario was registered exactly once. If
     // both walker paths loaded the module, the second import attempt
-    // would either re-run the side-effect (causing a Registry<T>
-    // nameCollisionMode='throw' violation) or be cached by Node.
-    // Either way, scenarioRegistry.getAll() should contain a single
-    // entry for this fixture's id.
-    const matches = scenarioRegistry.getAll().filter((s) => s.id === scenarioId);
+    // would either re-run the array-walk (caught by the registry's
+    // 'silent-skip' duplicate policy) or be cached by Node. Either
+    // way, getAll() should contain a single entry for this fixture's id.
+    const matches = currentScenarioRegistry().getAll().filter((s: { id: string }) => s.id === scenarioId);
     expect(matches).toHaveLength(1);
   });
 
@@ -171,7 +155,7 @@ describe('loadDiscoveredScenarioPackages', () => {
 
     await loadDiscoveredScenarioPackages(testDir);
 
-    expect(scenarioRegistry.get(scenarioId)).toBeDefined();
+    expect(currentScenarioRegistry().get(scenarioId)).toBeDefined();
   });
 
   it('emits plugin.recipe.invalid_item warning for malformed recipes; still registers valid recipes', async () => {
@@ -190,9 +174,9 @@ describe('loadDiscoveredScenarioPackages', () => {
 
     await loadDiscoveredScenarioPackages(testDir);
 
-    expect(scenarioRegistry.get(scenarioId)).toBeDefined();
-    expect(defaultSimulationRecipeRegistry.has(recipeIdValid)).toBe(true);
-    expect(defaultSimulationRecipeRegistry.has('missing-name-sim')).toBe(false);
+    expect(currentScenarioRegistry().get(scenarioId)).toBeDefined();
+    expect(currentSimulationRecipeRegistry().has(recipeIdValid)).toBe(true);
+    expect(currentSimulationRecipeRegistry().has('missing-name-sim')).toBe(false);
   });
 
   it('ignores a fit-pack marker when discovering sim-packs', async () => {
@@ -204,21 +188,21 @@ describe('loadDiscoveredScenarioPackages', () => {
 
     await loadDiscoveredScenarioPackages(testDir);
 
-    expect(scenarioRegistry.size).toBe(0);
+    expect(currentScenarioRegistry().size).toBe(0);
   });
 
   it('returns early when projectDir is empty (no-op)', async () => {
     // The loader's documented short-circuit: empty projectDir → return.
     await loadDiscoveredScenarioPackages('');
-    expect(scenarioRegistry.size).toBe(0);
+    expect(currentScenarioRegistry().size).toBe(0);
   });
 
   it('does nothing when no packages match the marker', async () => {
     // The recipe registry baseline includes the built-in `default` recipe,
     // so we measure the delta rather than asserting an absolute zero.
-    const baselineRecipeCount = defaultSimulationRecipeRegistry.getAllRecipes().length;
+    const baselineRecipeCount = currentSimulationRecipeRegistry().getAllRecipes().length;
     await loadDiscoveredScenarioPackages(testDir);
-    expect(scenarioRegistry.size).toBe(0);
-    expect(defaultSimulationRecipeRegistry.getAllRecipes().length).toBe(baselineRecipeCount);
+    expect(currentScenarioRegistry().size).toBe(0);
+    expect(currentSimulationRecipeRegistry().getAllRecipes().length).toBe(baselineRecipeCount);
   });
 });

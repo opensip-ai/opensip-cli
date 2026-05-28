@@ -1,13 +1,29 @@
 /**
  * Rule registry conformance test (PR-1, PR-16).
  *
- * Asserts every entry in `rules` has a non-empty graph: slug, valid
- * defaultSeverity, and a callable evaluate function.
+ * Asserts every entry in the rule registry has a non-empty graph:
+ * slug, valid defaultSeverity, and a callable evaluate function.
+ *
+ * Item 1: the rule registry is per-RunScope. Each test enters a fresh
+ * scope (with graph subscope) and reads via `currentRules()`.
  */
 
-import { describe, expect, it } from 'vitest';
+import { enterScope, RunScope } from '@opensip-tools/core';
+import { beforeEach, describe, expect, it } from 'vitest';
 
-import { rules } from '../../rules/registry.js';
+import { currentRules } from '../../rules/registry.js';
+import { graphTool } from '../../tool.js';
+
+import type { Rule } from '../../types.js';
+
+let rules: readonly Rule[];
+
+beforeEach(() => {
+  const scope = new RunScope();
+  graphTool.extendScope?.(scope);
+  enterScope(scope);
+  rules = currentRules();
+});
 
 describe('rules registry conformance', () => {
   it('registry is non-empty', () => {

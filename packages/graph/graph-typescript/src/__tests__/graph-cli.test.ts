@@ -10,16 +10,14 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { RunScope } from '@opensip-tools/core';
+import { enterScope, RunScope } from '@opensip-tools/core';
 import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
-import { executeGraph, registerAdapter } from '@opensip-tools/graph';
+import { executeGraph, graphTool, registerAdapter } from '@opensip-tools/graph';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
 import { typescriptGraphAdapter } from '../index.js';
 
 import type { ToolCliContext } from '@opensip-tools/core';
-
-registerAdapter(typescriptGraphAdapter);
 
 const FIXTURE_TSCONFIG = JSON.stringify({
   compilerOptions: {
@@ -90,6 +88,14 @@ describe('executeGraph', () => {
   let stderr: string;
 
   beforeEach(() => {
+    // Item 1: graph registries are per-RunScope. Construct a scope
+    // with `scope.graph` populated, then register the typescript
+    // adapter into the scope's registry.
+    const scope = new RunScope();
+    graphTool.extendScope?.(scope);
+    enterScope(scope);
+    registerAdapter(typescriptGraphAdapter);
+
     dir = mkdtempSync(join(tmpdir(), 'graph-cli-'));
     stdout = '';
     stderr = '';

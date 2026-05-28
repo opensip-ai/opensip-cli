@@ -1,10 +1,11 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { enterScope } from '@opensip-tools/core';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { makeSimTestScope } from '../../__tests__/test-utils/with-sim-scope.js';
 import { ASSERTIONS } from '../../framework/assertions.js';
 import { persona } from '../../framework/personas.js';
-import { clearScenarioRegistry, scenarioRegistry } from '../../framework/registry.js';
+import { clearScenarioRegistry, currentScenarioRegistry } from '../../framework/registry.js';
 import { defineLoadScenario } from '../../kinds/load/define.js';
-import { defaultSimulationRecipeRegistry } from '../../recipes/registry.js';
 import { executeSim } from '../sim.js';
 
 // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; sim test fixtures still build CliArgs until executeSim's signature flips to ToolOptions
@@ -24,9 +25,13 @@ const args = (overrides: Partial<CliArgs> = {}): CliArgs => ({
   ...overrides,
 });
 
+beforeEach(() => {
+  // Item 1: registries are per-RunScope. Enter a fresh scope per test.
+  enterScope(makeSimTestScope());
+});
+
 afterEach(() => {
   clearScenarioRegistry();
-  defaultSimulationRecipeRegistry.reset();
 });
 
 describe('executeSim', () => {
@@ -48,7 +53,7 @@ describe('executeSim', () => {
   });
 
   it('returns SimDoneResult with per-scenario outcomes', async () => {
-    scenarioRegistry.register(defineLoadScenario({
+    currentScenarioRegistry().register(defineLoadScenario({
       id: 'load-a',
       name: 'load-a',
       description: 'load a',
@@ -66,7 +71,7 @@ describe('executeSim', () => {
   });
 
   it('honors the --kind filter when set to a valid kind', async () => {
-    scenarioRegistry.register(defineLoadScenario({
+    currentScenarioRegistry().register(defineLoadScenario({
       id: 'load-only',
       name: 'load-only',
       description: 'load',
@@ -83,7 +88,7 @@ describe('executeSim', () => {
   });
 
   it('--kind filter eliminates scenarios of other kinds', async () => {
-    scenarioRegistry.register(defineLoadScenario({
+    currentScenarioRegistry().register(defineLoadScenario({
       id: 'load-x',
       name: 'load-x',
       description: 'load',
@@ -101,7 +106,7 @@ describe('executeSim', () => {
   });
 
   it('ignores unknown --kind values (passes everything through)', async () => {
-    scenarioRegistry.register(defineLoadScenario({
+    currentScenarioRegistry().register(defineLoadScenario({
       id: 'pass-through',
       name: 'pass-through',
       description: 'load',
@@ -119,7 +124,7 @@ describe('executeSim', () => {
 
   it('registers shouldFail=true when at least one scenario fails', async () => {
     // A bare RunnableScenario whose run() rejects to force a failure
-    scenarioRegistry.register({
+    currentScenarioRegistry().register({
       id: 'crashes',
       name: 'crashes',
       description: 'crashes',
@@ -145,7 +150,7 @@ describe('executeSim', () => {
   });
 
   it('preserves error messages on failed scenarios', async () => {
-    scenarioRegistry.register({
+    currentScenarioRegistry().register({
       id: 'msg',
       name: 'msg',
       description: 'msg',

@@ -1,25 +1,33 @@
 /**
  * @fileoverview `defineSimulationRecipe()` — author-facing factory.
  *
- * Mirrors fitness's `defineCheck` pattern. Returns a validated
- * SimulationRecipe and registers it with the default registry as a
- * side effect, so user-authored recipes in `opensip-tools/sim/recipes/`
- * are discovered by the loader.
+ * Returns a validated `SimulationRecipe` value. Registration is the
+ * plugin loader's responsibility — `defineSimulationRecipe` does NOT
+ * register the recipe as a side effect (mirrors what `defineXScenario`
+ * did in commit 1a0a71b; Item 1 closes the symmetry now that the
+ * simulation recipe registry is per-RunScope).
+ *
+ * User code authors recipes by exporting an array:
+ *
+ *   export const recipes = [
+ *     defineSimulationRecipe({ id: 'URCP_my', name: 'my', ... }),
+ *   ];
+ *
+ * The plugin loader's `registerRecipesArray` iterates `recipes` and
+ * registers each into the current scope's `SimulationRecipeRegistry`.
  */
 
 import { ValidationError } from '@opensip-tools/core';
 
-import { defaultSimulationRecipeRegistry } from './registry.js';
-
 import type { SimulationRecipe, SimulationRecipeConfig } from './types.js';
 
 /**
- * Define a sim recipe. Validates the config, registers it with the
- * shared default registry, and returns the canonical
- * `SimulationRecipe` value.
+ * Define a sim recipe. Validates the config and returns the canonical
+ * `SimulationRecipe` value. Does NOT register the recipe — the plugin
+ * loader registers via the explicit `recipes: [...]` array channel.
  *
  * @throws ValidationError if `id` or `name` is missing, or if the
- *   selector shape is invalid.
+ *   selector / execution shape is invalid.
  */
 export function defineSimulationRecipe(config: SimulationRecipeConfig): SimulationRecipe {
   if (!config.id || typeof config.id !== 'string') {
@@ -44,8 +52,5 @@ export function defineSimulationRecipe(config: SimulationRecipeConfig): Simulati
       { code: 'VALIDATION.SIMULATION.RECIPE_EXECUTION_MISSING' },
     );
   }
-  // The factory is the registration point. Tests that need isolation
-  // call defaultSimulationRecipeRegistry.clear() in afterEach.
-  defaultSimulationRecipeRegistry.register(config);
   return config;
 }

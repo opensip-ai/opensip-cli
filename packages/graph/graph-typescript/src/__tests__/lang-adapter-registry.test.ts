@@ -11,9 +11,10 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { ConfigurationError } from '@opensip-tools/core';
+import { ConfigurationError, enterScope, RunScope } from '@opensip-tools/core';
 import {
   clearAdapterRegistry,
+  graphTool,
   pickAdapter,
   registerAdapter,
 } from '@opensip-tools/graph';
@@ -27,7 +28,10 @@ import { typescriptGraphAdapter } from '../index.js';
 
 describe('pickAdapter — registry-size shortcuts', () => {
   beforeEach(() => {
-    clearAdapterRegistry();
+    // Item 1: adapter registry is per-RunScope. Fresh scope per test.
+    const scope = new RunScope();
+    graphTool.extendScope?.(scope);
+    enterScope(scope);
   });
 
   afterEach(() => {
@@ -63,23 +67,38 @@ describe('pickAdapter — registry-size shortcuts', () => {
   });
 });
 
+/**
+ * Register all three first-party adapters into the CURRENT scope.
+ * Lives at module scope (rather than inside a describe block) for
+ * eslint's consistent-function-scoping rule. Called from each test
+ * body in the dominance-heuristic block: vitest's hook → test
+ * transition can swap async contexts, so adapters registered in a
+ * beforeEach don't reliably reach the body. Re-register inside each
+ * test for stability.
+ */
+function registerAllThreeAdapters(): void {
+  registerAdapter(typescriptGraphAdapter);
+  registerAdapter(pythonGraphAdapter);
+  registerAdapter(rustGraphAdapter);
+}
+
 describe('pickAdapter — multi-adapter dominance heuristic', () => {
   let dir: string;
 
   beforeEach(() => {
-    clearAdapterRegistry();
-    registerAdapter(typescriptGraphAdapter);
-    registerAdapter(pythonGraphAdapter);
-    registerAdapter(rustGraphAdapter);
+    // Item 1: adapter registry is per-RunScope. Fresh scope per test.
+    const scope = new RunScope();
+    graphTool.extendScope?.(scope);
+    enterScope(scope);
     dir = mkdtempSync(join(tmpdir(), 'graph-pick-'));
   });
 
   afterEach(() => {
     rmSync(dir, { recursive: true, force: true });
-    clearAdapterRegistry();
   });
 
   it('picks Python when only .py files are present', () => {
+    registerAllThreeAdapters();
     writeFileSync(join(dir, 'a.py'), 'def foo(): pass\n', 'utf8');
     writeFileSync(join(dir, 'b.py'), 'def bar(): pass\n', 'utf8');
     const adapter = pickAdapter(dir);
@@ -87,6 +106,7 @@ describe('pickAdapter — multi-adapter dominance heuristic', () => {
   });
 
   it('picks Rust when only .rs files are present', () => {
+    registerAllThreeAdapters();
     mkdirSync(join(dir, 'src'), { recursive: true });
     writeFileSync(join(dir, 'src/lib.rs'), 'fn foo() {}\n', 'utf8');
     writeFileSync(join(dir, 'src/main.rs'), 'fn main() {}\n', 'utf8');
@@ -95,6 +115,7 @@ describe('pickAdapter — multi-adapter dominance heuristic', () => {
   });
 
   it('picks the dominant language when multiple are present', () => {
+    registerAllThreeAdapters();
     // 3 .py files, 1 .rs file → Python wins.
     writeFileSync(join(dir, 'a.py'), 'pass', 'utf8');
     writeFileSync(join(dir, 'b.py'), 'pass', 'utf8');
@@ -105,6 +126,7 @@ describe('pickAdapter — multi-adapter dominance heuristic', () => {
   });
 
   it('breaks ties by preferring TypeScript', () => {
+    registerAllThreeAdapters();
     // 1 .ts and 1 .py file → tie at 1; TypeScript wins.
     writeFileSync(join(dir, 'tsconfig.json'), '{}', 'utf8');
     mkdirSync(join(dir, 'src'), { recursive: true });
@@ -114,11 +136,13 @@ describe('pickAdapter — multi-adapter dominance heuristic', () => {
   });
 
   it('falls back to TypeScript when no language files match', () => {
+    registerAllThreeAdapters();
     // Empty dir — heuristic returns no winner; preference list picks TS.
     expect(pickAdapter(dir).id).toBe('typescript');
   });
 
   it('ignores excluded directories when counting', () => {
+    registerAllThreeAdapters();
     mkdirSync(join(dir, 'target'), { recursive: true });
     writeFileSync(join(dir, 'target/cached.rs'), 'fn x() {}', 'utf8');
     writeFileSync(join(dir, 'a.py'), 'pass', 'utf8');

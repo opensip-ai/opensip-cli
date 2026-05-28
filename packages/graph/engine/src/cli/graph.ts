@@ -25,7 +25,7 @@ import { GraphBaselineRepo } from '../persistence/baseline-repo.js';
 import { buildCliOutput, renderJson } from '../render/json.js';
 import { renderSarif, reportToCloud } from '../render/sarif.js';
 import { inferEntryPoints } from '../rules/_entry-points.js';
-import { rules as defaultRules } from '../rules/registry.js';
+import { currentRules } from '../rules/registry.js';
 
 import { runGraph } from './orchestrate.js';
 import { runPackagesInParallel } from './packages-runner.js';
@@ -329,7 +329,7 @@ export interface UnifiedReportInput {
  * paths, or the Ink view in the default human-report path).
  */
 export function buildUnifiedReportLines(input: UnifiedReportInput): readonly string[] {
-  const knownRuleIds = defaultRules.map((r) => r.slug);
+  const knownRuleIds = currentRules().map((r) => r.slug);
   const byRule = groupSignalsByRule(input.signals);
   const eps = input.catalog && input.indexes
     ? enrichEntryPoints(input.catalog, input.indexes)
