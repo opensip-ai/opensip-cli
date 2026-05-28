@@ -1,17 +1,24 @@
 /**
- * Rule registry.
+ * Rule registry — per-RunScope.
+ *
+ * Each `RunScope` owns its own rule registry (Item 1 / D7). The graph
+ * tool's `extendScope` hook constructs a fresh registry per CLI
+ * invocation and attaches it to `scope.graph.rules`. The registry is
+ * seeded with the six built-in rules at construction.
  *
  * Built on the kernel's unified `Registry<T>` with
  * `duplicatePolicy: 'warn-first-wins'` — re-registering the same rule
  * slug keeps the incumbent and emits a structured warning.
  *
- * v0.2 ships with six built-in rules; runtime rule loading is
- * deferred to v0.3 per DEC-6. The `rules` export is a snapshot
- * (in registration order) used by `orchestrate` and `graph` CLI
- * commands.
+ * v0.2 shipped with six built-in rules; runtime rule loading is
+ * deferred to v0.3 per DEC-6. The legacy `rules` array export was a
+ * process-level snapshot read by `orchestrate`/`graph` CLI commands;
+ * it's gone. Callers now ask for the registry directly via
+ * `currentRulesRegistry().getAll().map((r) => r.rule)` or use the
+ * `currentRules()` helper.
  */
 
-import { Registry, type Registerable } from '@opensip-tools/core';
+import { Registry, currentScope, type Registerable } from '@opensip-tools/core';
 
 import { alwaysThrowsBranchRule } from './always-throws-branch.js';
 import { duplicatedFunctionBodyRule } from './duplicated-function-body.js';
@@ -28,29 +35,71 @@ interface RegisterableRule extends Registerable {
   readonly rule: Rule;
 }
 
-const registry = new Registry<RegisterableRule>({
-  module: 'graph:rules',
-  duplicatePolicy: 'warn-first-wins',
-  evtPrefix: 'graph.rule.registry',
-});
-
-// Seed built-in rules. They register in fixed order; the array
-// snapshot below preserves that ordering for orchestrate / CLI.
-for (const rule of [
+/** Built-in rule list, in fixed registration order — preserved across
+ *  reconstruction so callers that depend on snapshot ordering keep
+ *  their semantics. */
+const BUILT_IN_RULES: readonly Rule[] = [
   orphanSubtreeRule,
   duplicatedFunctionBodyRule,
   noSideEffectPathRule,
   testOnlyReachableRule,
   alwaysThrowsBranchRule,
   highBlastFunctionRule,
-] as const) {
-  registry.register({ id: rule.slug, name: rule.slug, rule });
+];
+
+/**
+ * Per-RunScope rule registry. Wraps the kernel `Registry<T>` with
+ * built-in seeding at construction.
+ */
+export class GraphRulesRegistry {
+  private readonly inner = new Registry<RegisterableRule>({
+    module: 'graph:rules',
+    duplicatePolicy: 'warn-first-wins',
+    evtPrefix: 'graph.rule.registry',
+  });
+
+  constructor() {
+    for (const rule of BUILT_IN_RULES) {
+      this.inner.register({ id: rule.slug, name: rule.slug, rule });
+    }
+  }
+
+  getAll(): readonly Rule[] {
+    return this.inner.getAll().map((r) => r.rule);
+  }
+}
+
+/** Factory used by the graph tool's `extendScope` hook. */
+export function createRulesRegistry(): GraphRulesRegistry {
+  return new GraphRulesRegistry();
 }
 
 /**
- * Snapshot of every registered rule, in registration order.
- * Consumers (orchestrate, graph CLI, test conformance) read this
- * array; the registry stays internal until v0.3 ships runtime rule
- * loading.
+ * Read the current scope's graph rule registry. Throws when no scope
+ * is active or when the graph subscope is missing.
  */
-export const rules: readonly Rule[] = registry.getAll().map((r) => r.rule);
+export function currentRulesRegistry(): GraphRulesRegistry {
+  const scope = currentScope();
+  if (!scope) {
+    throw new Error(
+      'graph: currentRulesRegistry() called outside a RunScope. ' +
+        'Wrap the call site in runWithScope (production: pre-action-hook handles ' +
+        'this; tests: use makeTestScope + graphTool.extendScope).',
+    );
+  }
+  if (!scope.graph) {
+    throw new Error(
+      'graph: scope.graph is missing. The graph tool must be registered and ' +
+        'its extendScope hook must run before rule reads.',
+    );
+  }
+  return scope.graph.rules;
+}
+
+/**
+ * Snapshot of every registered rule in the current scope, in
+ * registration order. Replaces the prior module-level `rules` export.
+ */
+export function currentRules(): readonly Rule[] {
+  return currentRulesRegistry().getAll();
+}

@@ -1,18 +1,17 @@
 /**
- * register-graph-adapters — discover and register every
- * @opensip-tools/graph-* adapter pack found in node_modules.
+ * register-graph-adapters — discover every @opensip-tools/graph-*
+ * adapter pack found in node_modules and stash the loaded adapter
+ * objects so the graph tool's `extendScope` hook can register them
+ * into each per-run RunScope.
  *
- * Mirrors the fitness check-pack flow: the CLI is the single
- * registration site, discovery uses an ancestor-walking node_modules
- * scan, and each loaded pack contributes its `adapter` export to the
- * graph engine's lang-adapter registry via `registerAdapter`.
- *
- * Lands in PR 1a of plan
- * docs/plans/architecture/2026-05-23-plan-graph-adapter-package-split.md.
- * At PR 1a no graph-* packs exist yet — the three first-party adapters
- * still register through the engine's bootstrap.ts static-import path.
- * The discovery hook is wired in now so PR 1b's relocation of
- * lang-typescript can flip the load-bearing switch in a single move.
+ * History: before Item 1 this file registered adapters directly into a
+ * process-level registry. With per-RunScope adapter registries, that
+ * registration would target a scope that doesn't exist yet at CLI
+ * startup. Instead, we collect the discovered adapters into a single
+ * list and hand it to the graph engine via `setDiscoveredAdapters`;
+ * `graphTool.extendScope` reads that list and re-registers each
+ * adapter into the new scope's fresh adapter registry on every CLI
+ * invocation.
  *
  * Failures (missing export, bad shape, import throw) follow the same
  * isolated-failure pattern register-tools.ts uses for tool packages:
@@ -26,7 +25,7 @@ import {
   discoverGraphAdapterPackages,
   readGraphAdapterPackageMetadata,
   readGraphAdapterPackagePreferences,
-  registerAdapter,
+  setDiscoveredAdapters,
   type GraphLanguageAdapter,
 } from '@opensip-tools/graph';
 
@@ -51,7 +50,7 @@ export async function discoverAndRegisterGraphAdapterPackages(
     autoDiscover: prefs.autoDiscoverGraphAdapters,
   });
 
-  let registered = 0;
+  const loaded: GraphLanguageAdapter[] = [];
   for (const pkg of discovered) {
     const meta = readGraphAdapterPackageMetadata(pkg.packageDir);
     if (!meta) {
@@ -69,8 +68,7 @@ export async function discoverAndRegisterGraphAdapterPackages(
         );
         continue;
       }
-      registerAdapter(mod.adapter);
-      registered++;
+      loaded.push(mod.adapter);
       logger.info({
         evt: 'cli.graph_adapter.loaded',
         module: 'cli:bootstrap',
@@ -90,5 +88,10 @@ export async function discoverAndRegisterGraphAdapterPackages(
       });
     }
   }
-  return registered;
+  // Stash the loaded set on the graph engine's discovered-adapters
+  // holder. graphTool.extendScope reads this list and re-registers
+  // each entry into every new RunScope's adapter registry on each CLI
+  // invocation. Item 1: the registry is per-scope, not per-process.
+  setDiscoveredAdapters(loaded);
+  return loaded.length;
 }

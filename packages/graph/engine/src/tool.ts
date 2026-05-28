@@ -31,8 +31,13 @@ import { executeGraph } from './cli/graph.js';
 import { runHeapPreflight } from './cli/heap-preflight.js';
 import { executeLookup } from './cli/lookup.js';
 import { executeSymbolIndex } from './cli/symbol-index.js';
+import { createAdapterRegistry, getDiscoveredAdapters } from './lang-adapter/registry.js';
+import { createRulesRegistry } from './rules/registry.js';
+// Side-effect import: ensures the RunScope.graph augmentation is
+// loaded so `scope.graph` is correctly-typed here.
+import './scope-augmentation.js';
 
-import type { Tool, ToolCliContext, ToolCommandDescriptor } from '@opensip-tools/core';
+import type { RunScope, Tool, ToolCliContext, ToolCommandDescriptor } from '@opensip-tools/core';
 import type { DataStore } from '@opensip-tools/datastore';
 
 const GRAPH: ToolCommandDescriptor = {
@@ -226,6 +231,29 @@ function register(cli: ToolCliContext): void {
     });
 }
 
+/**
+ * Per-run scope extension (D7). Called by the CLI's pre-action-hook
+ * after constructing the RunScope and before entering it. Attaches
+ * fresh adapter + rule registries to `scope.graph` so concurrent
+ * RunScopes carry independent graph state.
+ *
+ * Adapter seeding: graph-adapter packages are discovered at CLI
+ * startup (before any RunScope exists) and stashed via
+ * `setDiscoveredAdapters`. extendScope reads that list and re-registers
+ * each adapter into this scope's fresh registry so the graph
+ * orchestrator's `pickAdapter` resolves them.
+ */
+function extendScope(scope: RunScope): void {
+  const adapters = createAdapterRegistry();
+  for (const adapter of getDiscoveredAdapters()) {
+    adapters.register(adapter);
+  }
+  scope.graph = {
+    adapters,
+    rules: createRulesRegistry(),
+  };
+}
+
 export const graphTool: Tool = {
   metadata: {
     id: 'graph',
@@ -234,4 +262,5 @@ export const graphTool: Tool = {
   },
   commands: [GRAPH, GRAPH_LOOKUP, GRAPH_SYMBOL_INDEX, GRAPH_BASELINE_EXPORT],
   register,
+  extendScope,
 };

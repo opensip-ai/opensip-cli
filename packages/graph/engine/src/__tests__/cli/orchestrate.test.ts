@@ -13,6 +13,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { enterScope } from '@opensip-tools/core';
 import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -22,6 +23,7 @@ import {
   registerAdapter,
 } from '../../lang-adapter/registry.js';
 import { CatalogRepo } from '../../persistence/catalog-repo.js';
+import { makeGraphTestScope } from '../test-utils/with-graph-scope.js';
 
 import type {
   DiscoverOutput,
@@ -108,7 +110,8 @@ describe('runGraph orchestrator', () => {
   let projectDir: string;
 
   beforeEach(() => {
-    clearAdapterRegistry();
+    // Item 1: graph registries are per-RunScope.
+    enterScope(makeGraphTestScope());
     datastore = DataStoreFactory.open({ backend: 'memory' });
     projectDir = mkdtempSync(join(tmpdir(), 'orch-proj-'));
   });

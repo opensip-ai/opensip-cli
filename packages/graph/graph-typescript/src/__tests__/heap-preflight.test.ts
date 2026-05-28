@@ -11,13 +11,14 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { enterScope, RunScope } from '@opensip-tools/core';
 import {
   HEAP_TARGETS,
   decideHeapTargetMb,
+  graphTool,
   runHeapPreflight,
   systemHasMemoryFor,
   totalSystemMemoryMb,
-  clearAdapterRegistry,
   registerAdapter,
 } from '@opensip-tools/graph';
 import { pythonGraphAdapter } from '@opensip-tools/graph-python';
@@ -85,9 +86,12 @@ describe('runHeapPreflight', () => {
     // Ensure at least one .ts file exists so the tsconfig is not empty.
     writeFileSync(join(dir, 'index.ts'), 'export const x = 1;\n', 'utf8');
     originalSentinel = process.env.OPENSIP_HEAP_ELEVATED;
-    // Sibling lang-adapter-registry tests call clearAdapterRegistry;
-    // restore the default set so pickAdapter doesn't blow up here.
-    clearAdapterRegistry();
+    // Item 1: adapter registry is per-RunScope. Construct a fresh
+    // scope, attach graph subscope, and register the three first-party
+    // adapters so runHeapPreflight()'s pickAdapter() resolves them.
+    const scope = new RunScope();
+    graphTool.extendScope?.(scope);
+    enterScope(scope);
     registerAdapter(typescriptGraphAdapter);
     registerAdapter(pythonGraphAdapter);
     registerAdapter(rustGraphAdapter);

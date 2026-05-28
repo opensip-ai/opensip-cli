@@ -11,7 +11,7 @@
 import os from 'node:os';
 import v8 from 'node:v8';
 
-import { ConfigurationError } from '@opensip-tools/core';
+import { ConfigurationError, enterScope } from '@opensip-tools/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -25,6 +25,7 @@ import {
   clearAdapterRegistry,
   registerAdapter,
 } from '../../lang-adapter/registry.js';
+import { makeGraphTestScope } from '../test-utils/with-graph-scope.js';
 
 import type {
   DiscoverOutput,
@@ -109,7 +110,8 @@ describe('runHeapPreflight', () => {
   let prevSentinel: string | undefined;
 
   beforeEach(() => {
-    clearAdapterRegistry();
+    // Item 1: adapter registry is per-RunScope.
+    enterScope(makeGraphTestScope());
     prevSentinel = process.env.OPENSIP_HEAP_ELEVATED;
     delete process.env.OPENSIP_HEAP_ELEVATED;
   });

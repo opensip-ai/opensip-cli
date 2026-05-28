@@ -13,7 +13,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { createSignal } from '@opensip-tools/core';
+import { createSignal, enterScope } from '@opensip-tools/core';
 import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
@@ -24,6 +24,7 @@ import {
   registerAdapter,
 } from '../../lang-adapter/registry.js';
 import { GraphBaselineRepo } from '../../persistence/baseline-repo.js';
+import { makeGraphTestScope } from '../test-utils/with-graph-scope.js';
 
 import type {
   DiscoverOutput,
@@ -159,7 +160,8 @@ let stderrSpy: MockInstance<typeof process.stderr.write>;
 let projectDir: string;
 
 beforeEach(() => {
-  clearAdapterRegistry();
+  // Item 1: graph adapter + rule registries are per-RunScope.
+  enterScope(makeGraphTestScope());
   projectDir = mkdtempSync(join(tmpdir(), 'graph-test-proj-'));
   stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
   stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);

@@ -32,7 +32,7 @@ import {
 import { pickAdapter } from '../lang-adapter/registry.js';
 import { CatalogRepo } from '../persistence/catalog-repo.js';
 import { buildIndexes } from '../pipeline/indexes.js';
-import { rules as defaultRules } from '../rules/registry.js';
+import { currentRules } from '../rules/registry.js';
 
 import { createPressureMonitor, type PressureMonitor } from './pressure-monitor.js';
 
@@ -153,7 +153,7 @@ function runStage<T>(
 // eslint-disable-next-line @typescript-eslint/require-await -- async surface for future cache I/O
 export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
   const config: GraphConfig = input.config ?? {};
-  const ruleSet: readonly Rule[] = input.rules ?? defaultRules;
+  const ruleSet: readonly Rule[] = input.rules ?? currentRules();
   const catalogRepo = input.datastore ? new CatalogRepo(input.datastore) : null;
 
   const monitor = createPressureMonitor();
