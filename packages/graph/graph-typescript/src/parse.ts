@@ -26,7 +26,14 @@ export interface TypescriptParsedProject {
 }
 
 export function parseProject(input: ParseInput): ParseOutput<TypescriptParsedProject> {
-  const compilerOptions = (input.compilerOptions ?? {}) as ts.CompilerOptions;
+  // Anchor the program to its origin tsconfig when discovery provided
+  // one. tsc reads `options.configFilePath` for project-reference and
+  // rootDir resolution; synthetic-partition discovery (flat monorepos)
+  // depends on each partition's program knowing its own tsconfig.
+  const compilerOptions: ts.CompilerOptions = {
+    ...((input.compilerOptions ?? {}) as ts.CompilerOptions),
+    ...(input.configPathAbs ? { configFilePath: input.configPathAbs } : {}),
+  };
   const program = ts.createProgram({
     rootNames: [...input.files],
     options: compilerOptions,
