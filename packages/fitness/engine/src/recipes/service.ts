@@ -165,6 +165,7 @@ export class FitnessRecipeService {
         includeViolations: this.config.includeViolations ?? false,
       }
 
+      // @fitness-ignore-next-line no-todo-comments -- audit 2026-05-23 F5: documents the trigger condition for the ternary→Map refactor
       // TODO: tabularize when 3rd mode lands. Both executors share the
       // exact `(ctx, opts) => Promise<void>` shape, so the moment a
       // third mode (e.g. 'staged' for incremental fit, 'isolated' for

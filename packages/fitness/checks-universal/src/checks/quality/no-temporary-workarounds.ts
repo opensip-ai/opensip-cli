@@ -1,4 +1,5 @@
 /* eslint-disable sonarjs/fixme-tag -- this file's documentation references the FIXME marker by design */
+// @fitness-ignore-file no-todo-comments -- this file's job is to detect FIXME/HACK workaround markers; the words appear in JSDoc by design
 /**
  * @fileoverview Detects temporary-workaround comments.
  *

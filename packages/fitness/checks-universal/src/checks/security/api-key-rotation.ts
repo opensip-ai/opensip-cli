@@ -1,4 +1,5 @@
 // @fitness-ignore-file duplicate-implementation-detection -- similar patterns across diagnostic modules
+// @fitness-ignore-file no-todo-comments -- JSDoc uses XXX as a placeholder token in example env-var names
 /**
  * @fileoverview Validate API key handling supports rotation
  */

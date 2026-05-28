@@ -99,6 +99,28 @@ targets:
       - config
 
 # =============================================================================
+# Per-check target overrides
+# =============================================================================
+#
+# These checks declare broad scopes (e.g. concerns: [backend, frontend, cli])
+# which causes them to match this repo's `all-ts` target (empty concerns →
+# matches any target). `all-ts` includes test files. Several of these checks
+# are quality/compliance gates whose patterns appear by design in test
+# fixtures (the tests feed the checks code that should trip them), in the
+# check implementations themselves (they detect markers like TODO/nosemgrep),
+# or in docs/markdown that aren't part of any production target.
+#
+# Pinning each check to `[backend, cli]` excludes test files, fixtures, and
+# markdown — the surfaces where these patterns are load-bearing — while
+# keeping the gate active for real production source.
+
+checkOverrides:
+  eslint-justifications: [backend, cli]
+  no-eval: [backend, cli]
+  semgrep-justifications: [backend, cli]
+  no-todo-comments: [backend, cli]
+
+# =============================================================================
 # Fitness Configuration
 # =============================================================================
 
