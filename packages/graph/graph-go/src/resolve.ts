@@ -27,6 +27,9 @@
  * Per I-4: this function does NOT mutate the input catalog.
  */
 
+import { readFileSync } from 'node:fs';
+import { join, posix } from 'node:path';
+
 import { logger } from '@opensip-tools/core';
 import {
   appendEdge,
@@ -37,7 +40,10 @@ import {
 
 import type { GoParsedFile, GoParsedProject } from './parse.js';
 import type {
+  Catalog,
   CallEdge,
+  DependencyEdge,
+  DependencySiteRecord,
   FunctionOccurrence,
   MutableStats,
   ResolutionStats,
@@ -84,7 +90,171 @@ export function resolveCallSites(input: ResolveInput<GoParsedProject>): ResolveO
   };
   logger.info({ evt: 'graph.edges.complete', module: 'graph:edges:go', ...finalStats });
 
-  return { edgesByOwner, stats: finalStats };
+  // Phase 4 (DEC-498): resolve dependency sites if any. Mirrors the
+  // Python adapter's resolveDependencies pattern, adapted to Go's
+  // `go.mod`-mediated module-path resolution.
+  const dependenciesByOwner =
+    input.dependencySites && input.dependencySites.length > 0
+      ? resolveDependencies(input.dependencySites, input.catalog, input.projectDirAbs)
+      : undefined;
+
+  return dependenciesByOwner !== undefined
+    ? { edgesByOwner, dependenciesByOwner, stats: finalStats }
+    : { edgesByOwner, stats: finalStats };
+}
+
+/**
+ * Resolve Go import sites to target module-init bodyHashes. Imports
+ * resolving to a same-module source file (via `go.mod`'s declared
+ * module path) map to that package directory's module-init occurrences;
+ * imports resolving to stdlib (`fmt`, `os`, …), third-party (`github.com/
+ * external/lib`), or unresolvable shapes produce unresolved
+ * `DependencyEdge` entries with `to: []` and the raw specifier carried
+ * in `specifier` for downstream attribution.
+ *
+ * Resolution rules:
+ *
+ *   1. Read `go.mod` from `projectDirAbs`. The first `module <path>`
+ *      line declares the module's own path. If `go.mod` is missing or
+ *      unparseable, ALL imports go unresolved.
+ *
+ *   2. Build a `filePath → module-init bodyHash` map from the catalog.
+ *
+ *   3. For each dependency site, classify the import path:
+ *      - **Internal** — starts with `<module-path>/` (or equals it):
+ *        strip the module-path prefix to get a project-relative
+ *        package-directory path. `to` is every catalog module-init
+ *        occurrence whose `filePath` lives inside that directory (Go
+ *        packages can span multiple files — `pkg/foo/foo.go`,
+ *        `pkg/foo/helpers.go`).
+ *      - **External** — doesn't start with module path (stdlib like
+ *        `fmt`, third-party like `github.com/x/y`, or relative-style
+ *        `./pkg` / `../foo` not common in modern Go): `to: []`.
+ *
+ *   4. Blank imports (`_ "path"`) and dot imports (`. "path"`) resolve
+ *      the same as plain imports — the prefix only affects Go's import
+ *      semantics, not the dependency target.
+ *
+ * Phase 4 of opensip's substrate consolidation (DEC-498).
+ */
+function resolveDependencies(
+  sites: readonly DependencySiteRecord[],
+  catalog: Catalog,
+  projectDirAbs: string,
+): ReadonlyMap<string, readonly DependencyEdge[]> {
+  const modulePath = readGoModulePath(projectDirAbs);
+
+  // Build filePath → module-init bodyHash map. Catalog occurrences carry
+  // project-relative POSIX filePath; module-init kind is filtered.
+  const moduleInitByFilePath = new Map<string, string>();
+  for (const occs of Object.values(catalog.functions)) {
+    if (!occs) continue;
+    for (const o of occs) {
+      if (o.kind === 'module-init') moduleInitByFilePath.set(o.filePath, o.bodyHash);
+    }
+  }
+
+  const out = new Map<string, DependencyEdge[]>();
+  for (const site of sites) {
+    const to = resolveGoImportPath(site.specifier, modulePath, moduleInitByFilePath);
+    const edge: DependencyEdge = {
+      to,
+      line: site.line,
+      column: site.column,
+      specifier: site.specifier,
+    };
+    const existing = out.get(site.ownerHash);
+    if (existing !== undefined) existing.push(edge);
+    else out.set(site.ownerHash, [edge]);
+  }
+  return out;
+}
+
+/**
+ * Extract the module path from `go.mod`. We do a line-grep on `^module
+ * <path>$` rather than parse the full grammar — replace directives,
+ * vendor blocks, retract statements, and toolchain lines are all
+ * out-of-scope for v1. Returns `null` when `go.mod` is missing or no
+ * `module` line is found.
+ *
+ * Edge cases NOT handled (deferred): `replace` directives that retarget
+ * a module path, `go.work` multi-module workspaces (each module's own
+ * `go.mod` is read independently in this v1).
+ */
+function readGoModulePath(projectDirAbs: string): string | null {
+  let content: string;
+  try {
+    content = readFileSync(join(projectDirAbs, 'go.mod'), 'utf8');
+  } catch {
+    return null;
+  }
+  for (const rawLine of content.split('\n')) {
+    const line = rawLine.trim();
+    // Skip comments and blank lines.
+    if (line.length === 0 || line.startsWith('//')) continue;
+    // `module <path>` — capture the bare path. Quoted form `module "<path>"`
+    // is legal in go.mod; strip optional quotes.
+    const match = /^module\s+("([^"]+)"|(\S+))\s*$/.exec(line);
+    if (match) return match[2] ?? match[3] ?? null;
+  }
+  return null;
+}
+
+/**
+ * Resolve one Go import path to its target module-init bodyHash(es).
+ * Returns `[]` when the import is external (stdlib, third-party, or
+ * unresolvable relative).
+ *
+ * Multi-file packages: a single import like `"github.com/me/myproj/pkg/foo"`
+ * corresponds to the DIRECTORY `pkg/foo/`, which may contain `foo.go`,
+ * `helpers.go`, etc. The returned `to` array includes every matching
+ * module-init bodyHash — the engine model's polymorphic-targets case.
+ */
+function resolveGoImportPath(
+  specifier: string,
+  modulePath: string | null,
+  moduleInitByFilePath: ReadonlyMap<string, string>,
+): readonly string[] {
+  if (modulePath === null) return [];
+
+  // Internal: import path equals or is rooted under the module path.
+  if (specifier === modulePath) {
+    return collectGoPackageMembers('', moduleInitByFilePath);
+  }
+  const prefix = `${modulePath}/`;
+  if (!specifier.startsWith(prefix)) return [];
+
+  // The package-directory path is the import path with the module
+  // prefix stripped. Forward-slashes are canonical in both go import
+  // paths and catalog filePaths.
+  const packageDir = specifier.slice(prefix.length);
+  return collectGoPackageMembers(packageDir, moduleInitByFilePath);
+}
+
+/**
+ * Enumerate every module-init in the catalog whose filePath sits
+ * directly inside `packageDir`. Go's package = directory, with `.go`
+ * files at the directory's top level (subdirectories are separate
+ * packages). Excludes `_test.go` files from production-import targets?
+ * NO — the catalog already carries every walked `.go`, and `_test.go`
+ * files belong to the same package directory at the AST level; we
+ * include them as edge targets and let downstream rules filter by
+ * `inTestFile` if needed.
+ */
+function collectGoPackageMembers(
+  packageDir: string,
+  moduleInitByFilePath: ReadonlyMap<string, string>,
+): readonly string[] {
+  // packageDir is empty when the module path itself is imported. In
+  // that case, the package members live directly at the project root.
+  const out: string[] = [];
+  for (const [filePath, hash] of moduleInitByFilePath) {
+    if (!filePath.endsWith('.go')) continue;
+    const dir = posix.dirname(filePath);
+    const normalizedDir = dir === '.' ? '' : dir;
+    if (normalizedDir === packageDir) out.push(hash);
+  }
+  return out;
 }
 
 function buildNameIndex(

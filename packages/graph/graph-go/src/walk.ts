@@ -46,6 +46,7 @@ import { relative, sep } from 'node:path';
 import type { GoParsedFile, GoParsedProject } from './parse.js';
 import type {
   CallSiteRecord,
+  DependencySiteRecord,
   FunctionOccurrence,
   ParseError,
   WalkInput,
@@ -62,6 +63,7 @@ export function walkProject(input: WalkInput<GoParsedProject>): WalkOutput {
     FunctionOccurrence[]
   >;
   const callSites: CallSiteRecord[] = [];
+  const dependencySites: DependencySiteRecord[] = [];
   const parseErrors: ParseError[] = [];
 
   const sortedPaths = [...input.files].filter((p) => input.project.files.has(p)).sort();
@@ -70,7 +72,7 @@ export function walkProject(input: WalkInput<GoParsedProject>): WalkOutput {
     const file = input.project.files.get(path);
     if (!file) continue;
     try {
-      walkFile(path, file, input.projectDirAbs, occurrences, callSites);
+      walkFile(path, file, input.projectDirAbs, occurrences, callSites, dependencySites);
     } catch (error) {
       parseErrors.push({
         filePath: relative(input.projectDirAbs, path),
@@ -79,7 +81,7 @@ export function walkProject(input: WalkInput<GoParsedProject>): WalkOutput {
     }
   }
 
-  return { occurrences, callSites, parseErrors };
+  return { occurrences, callSites, dependencySites, parseErrors };
 }
 
 function walkFile(
@@ -88,6 +90,7 @@ function walkFile(
   projectDirAbs: string,
   out: Record<string, FunctionOccurrence[]>,
   callSites: CallSiteRecord[],
+  dependencySites: DependencySiteRecord[],
 ): void {
   const filePathProjectRel = relative(projectDirAbs, absPath).split(sep).join('/');
   const inTestFile = isTestFile(filePathProjectRel);
@@ -103,6 +106,10 @@ function walkFile(
   );
   record(out, moduleInit);
 
+  // Phase 4 (DEC-498): walk top-level imports as dependency sites. Owner
+  // is the file's synthesized module-init occurrence.
+  collectDependencySites(file, moduleInit.bodyHash, dependencySites);
+
   const ctx: WalkCtx = {
     file,
     filePathProjectRel,
@@ -115,6 +122,95 @@ function walkFile(
   const initialFrame: Frame = { ownerHash: moduleInit.bodyHash };
 
   for (const child of file.tree.rootNode.children) visit(child, initialFrame, ctx);
+}
+
+/**
+ * Walk a Go file's top-level `import_declaration` nodes; emit one
+ * `DependencySiteRecord` per `import_spec`, regardless of whether the
+ * declaration is single (`import "fmt"`) or grouped (`import ( … )`).
+ *
+ * Phase 4 of opensip's substrate consolidation (DEC-498). The emitted
+ * `specifier` is the raw import path WITHOUT the surrounding quotes
+ * (e.g. `'fmt'`, `'github.com/user/repo/pkg/sub'`).
+ *
+ * Aliased imports (`alias "path"`), blank imports (`_ "path"`), and dot
+ * imports (`. "path"`) all emit one dep site keyed by the import path;
+ * the alias / blank / dot prefix doesn't change the dependency target.
+ *
+ * Out of scope at v1:
+ *   - Conditional / nested imports inside function bodies (Go doesn't
+ *     permit these — imports are always file-top-level).
+ *   - `go.work`-mediated multi-module workspaces (a follow-up).
+ */
+function collectDependencySites(
+  file: GoParsedFile,
+  moduleInitHash: string,
+  out: DependencySiteRecord[],
+): void {
+  for (const stmt of file.tree.rootNode.namedChildren) {
+    if (stmt.type !== 'import_declaration') continue;
+    collectFromImportDeclaration(stmt, file, moduleInitHash, out);
+  }
+}
+
+function collectFromImportDeclaration(
+  decl: Parser.SyntaxNode,
+  file: GoParsedFile,
+  moduleInitHash: string,
+  out: DependencySiteRecord[],
+): void {
+  for (const child of decl.namedChildren) {
+    if (child.type === 'import_spec') {
+      pushImportSpec(child, file, moduleInitHash, out);
+    } else if (child.type === 'import_spec_list') {
+      for (const spec of child.namedChildren) {
+        if (spec.type === 'import_spec') {
+          pushImportSpec(spec, file, moduleInitHash, out);
+        }
+      }
+    }
+  }
+}
+
+function pushImportSpec(
+  spec: Parser.SyntaxNode,
+  file: GoParsedFile,
+  ownerHash: string,
+  out: DependencySiteRecord[],
+): void {
+  // The `path` field is an interpreted_string_literal. Its `text` is the
+  // quoted form (`"fmt"`); strip outer quotes to get the raw specifier.
+  const pathNode = spec.childForFieldName('path') ?? findInterpretedString(spec);
+  if (!pathNode) return;
+  const specifier = unquoteGoStringLiteral(pathNode.text);
+  if (specifier === null) return;
+  out.push({
+    nodeRef: spec,
+    sourceFileRef: file,
+    ownerHash,
+    specifier,
+    line: spec.startPosition.row + 1,
+    column: spec.startPosition.column,
+  });
+}
+
+function findInterpretedString(node: Parser.SyntaxNode): Parser.SyntaxNode | null {
+  /* v8 ignore start */
+  for (const child of node.namedChildren) {
+    if (child.type === 'interpreted_string_literal') return child;
+  }
+  return null;
+  /* v8 ignore stop */
+}
+
+function unquoteGoStringLiteral(text: string): string | null {
+  // Go import paths are always interpreted strings — wrapped in `"…"`
+  // with no escape sequences relevant to module paths. (Raw `\`…\``
+  // strings are NOT valid in import declarations per the Go spec.)
+  if (text.length < 2) return null;
+  if (text.startsWith('"') && text.endsWith('"')) return text.slice(1, -1);
+  /* v8 ignore next */
+  return null;
 }
 
 interface Frame {

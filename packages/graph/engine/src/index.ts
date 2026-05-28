@@ -35,6 +35,7 @@ export type {
   Catalog,
   FunctionOccurrence,
   CallEdge,
+  DependencyEdge,
   Param,
   Indexes,
   BlastScore,
@@ -84,6 +85,7 @@ export type {
   ResolveInput,
   ResolveOutput,
   CallSiteRecord,
+  DependencySiteRecord,
   CacheKeyInput,
   ParsedProject,
 } from './lang-adapter/types.js';

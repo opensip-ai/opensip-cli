@@ -228,6 +228,78 @@ describe('executeGraph — human / JSON modes', () => {
     const err = stderrSpy.mock.calls.map((c) => String(c[0])).join('');
     expect(err).toContain('mutually exclusive');
   });
+
+  it('--catalog-output without --tenant-id raises configuration error', async () => {
+    const { cli, setExitCode } = mockCli(datastore);
+    const outPath = join(projectDir, 'catalog.json');
+    await executeGraph(
+      { cwd: projectDir, noCache: true, catalogOutput: outPath, repoId: 'r', gitSha: 'sha' },
+      cli,
+    );
+    expect(setExitCode).toHaveBeenCalledWith(2);
+    const err = stderrSpy.mock.calls.map((c) => String(c[0])).join('');
+    expect(err).toContain('--tenant-id');
+  });
+
+  it('--catalog-output without --repo-id raises configuration error', async () => {
+    const { cli, setExitCode } = mockCli(datastore);
+    const outPath = join(projectDir, 'catalog.json');
+    await executeGraph(
+      { cwd: projectDir, noCache: true, catalogOutput: outPath, tenantId: 't', gitSha: 'sha' },
+      cli,
+    );
+    expect(setExitCode).toHaveBeenCalledWith(2);
+    const err = stderrSpy.mock.calls.map((c) => String(c[0])).join('');
+    expect(err).toContain('--repo-id');
+  });
+
+  it('--catalog-output without --git-sha raises configuration error', async () => {
+    const { cli, setExitCode } = mockCli(datastore);
+    const outPath = join(projectDir, 'catalog.json');
+    await executeGraph(
+      { cwd: projectDir, noCache: true, catalogOutput: outPath, tenantId: 't', repoId: 'r' },
+      cli,
+    );
+    expect(setExitCode).toHaveBeenCalledWith(2);
+    const err = stderrSpy.mock.calls.map((c) => String(c[0])).join('');
+    expect(err).toContain('--git-sha');
+  });
+
+  it('--catalog-output happy path writes a valid CatalogExport JSON file', async () => {
+    const { cli, setExitCode } = mockCli(datastore);
+    const outPath = join(projectDir, 'catalog.json');
+    await executeGraph(
+      {
+        cwd: projectDir,
+        noCache: true,
+        catalogOutput: outPath,
+        tenantId: 'tenant_test',
+        repoId: 'repo_test',
+        gitSha: 'abc1234567890abc1234567890abc1234567890a',
+        runId: 'run_test_fixed',
+      },
+      cli,
+    );
+    expect(setExitCode).toHaveBeenCalledWith(0);
+
+    // Read written file + assert wire shape
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- test-only path
+    const written = JSON.parse(require('node:fs').readFileSync(outPath, 'utf8')) as {
+      version: string;
+      provenance: { runId: string; tenantId: string; completeness: string };
+      symbols: Array<{ repoId: string; gitSha: string; qualifiedName: string }>;
+      edges: unknown[];
+    };
+    expect(written.version).toBe('1.0');
+    expect(written.provenance.runId).toBe('run_test_fixed');
+    expect(written.provenance.tenantId).toBe('tenant_test');
+    expect(written.provenance.completeness).toBe('complete');
+    expect(written.symbols.length).toBeGreaterThan(0);
+    for (const s of written.symbols) {
+      expect(s.repoId).toBe('repo_test');
+      expect(s.gitSha).toBe('abc1234567890abc1234567890abc1234567890a');
+    }
+  });
 });
 
 describe('executeGraph — gate modes', () => {

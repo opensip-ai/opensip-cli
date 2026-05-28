@@ -37,7 +37,10 @@ import {
 
 import type { JavaParsedFile, JavaParsedProject } from './parse.js';
 import type {
+  Catalog,
   CallEdge,
+  DependencyEdge,
+  DependencySiteRecord,
   FunctionOccurrence,
   MutableStats,
   ResolutionStats,
@@ -84,7 +87,204 @@ export function resolveCallSites(input: ResolveInput<JavaParsedProject>): Resolv
   };
   logger.info({ evt: 'graph.edges.complete', module: 'graph:edges:java', ...finalStats });
 
-  return { edgesByOwner, stats: finalStats };
+  // Phase 4 (DEC-498): resolve dependency sites if any. Mirrors the
+  // other tree-sitter adapters' resolveDependencies pattern, adapted to
+  // Java's package = directory-mirror convention.
+  const dependenciesByOwner =
+    input.dependencySites && input.dependencySites.length > 0
+      ? resolveDependencies(input.dependencySites, input.catalog)
+      : undefined;
+
+  return dependenciesByOwner !== undefined
+    ? { edgesByOwner, dependenciesByOwner, stats: finalStats }
+    : { edgesByOwner, stats: finalStats };
+}
+
+/**
+ * Resolve Java `import` sites to target module-init bodyHashes.
+ *
+ * Java has a strict directory-mirrors-package convention: the package
+ * `com.example.foo` lives at directory `com/example/foo/`. A type `Bar`
+ * in that package lives in `com/example/foo/Bar.java`. We build two
+ * lookup tables off this convention:
+ *
+ *   1. **By type FQN** — `com.example.foo.Bar` → bodyHash of the
+ *      `Bar.java` module-init. Used for plain type imports.
+ *   2. **By package FQN** — `com.example.foo` → bodyHash[] (one per
+ *      `*.java` file in that package). Used for wildcard imports
+ *      (`import com.example.foo.*;`).
+ *
+ * Source-root inference: source roots vary by build system. We check
+ * the canonical Maven/Gradle layouts (`src/main/java/`, `src/test/java/`),
+ * the plain `src/` layout, and the project-root layout (`''`) in that
+ * order, using the first prefix that strictly contains the file path.
+ * Non-default Gradle `sourceSets`, multi-module Maven layouts, and
+ * generated-source dirs (`target/generated-sources/...`) are NOT handled
+ * — files outside the four canonical roots fall back to project-root
+ * and may produce inflated FQNs that miss the lookup (those imports
+ * surface as `to: []`, which is the correct unresolved behavior).
+ *
+ * Stdlib classes (`java.*`, `javax.*`, `jakarta.*`) are treated as
+ * external — they're never in the project catalog so we short-circuit
+ * to `to: []` without attempting lookup.
+ *
+ * Phase 4 of opensip's substrate consolidation (DEC-498).
+ */
+function resolveDependencies(
+  sites: readonly DependencySiteRecord[],
+  catalog: Catalog,
+): ReadonlyMap<string, readonly DependencyEdge[]> {
+  const { typeFQN, packageFQN } = buildJavaFQNIndex(catalog);
+
+  const out = new Map<string, DependencyEdge[]>();
+  for (const site of sites) {
+    const to = resolveJavaImportSpecifier(site.specifier, typeFQN, packageFQN);
+    const edge: DependencyEdge = {
+      to,
+      line: site.line,
+      column: site.column,
+      specifier: site.specifier,
+    };
+    const existing = out.get(site.ownerHash);
+    if (existing !== undefined) existing.push(edge);
+    else out.set(site.ownerHash, [edge]);
+  }
+  return out;
+}
+
+/** The canonical source-root prefixes we recognize, in priority order.
+ *  First strict-prefix match on a catalog file's filePath wins. */
+const JAVA_SOURCE_ROOT_PREFIXES = ['src/main/java/', 'src/test/java/', 'src/'] as const;
+
+/**
+ * Build both FQN lookup maps from the catalog's module-init occurrences.
+ *
+ * For each module-init occurrence:
+ *   1. Strip a recognized source-root prefix (or `''` for project-root).
+ *   2. Strip the `.java` extension.
+ *   3. Slash-to-dot → that's the type FQN. The package is everything
+ *      before the last dot.
+ */
+function buildJavaFQNIndex(catalog: Catalog): {
+  readonly typeFQN: ReadonlyMap<string, string>;
+  readonly packageFQN: ReadonlyMap<string, readonly string[]>;
+} {
+  const typeFQN = new Map<string, string>();
+  const packageFQN = new Map<string, string[]>();
+
+  for (const occs of Object.values(catalog.functions)) {
+    if (!occs) continue;
+    for (const o of occs) {
+      if (o.kind !== 'module-init') continue;
+      const fqn = filePathToJavaTypeFQN(o.filePath);
+      if (fqn === null) continue;
+      typeFQN.set(fqn, o.bodyHash);
+      const lastDot = fqn.lastIndexOf('.');
+      const pkg = lastDot >= 0 ? fqn.slice(0, lastDot) : '';
+      const bucket = packageFQN.get(pkg);
+      if (bucket !== undefined) bucket.push(o.bodyHash);
+      else packageFQN.set(pkg, [o.bodyHash]);
+    }
+  }
+  return { typeFQN, packageFQN };
+}
+
+/**
+ * Map a project-relative POSIX filePath to its Java type FQN. Returns
+ * `null` when the file doesn't end in `.java` (defensive — the discover
+ * pass should already filter by extension, but module-init occurrences
+ * could in principle carry any path).
+ *
+ * Examples:
+ *   - `src/main/java/com/example/foo/Bar.java` → `com.example.foo.Bar`
+ *   - `src/test/java/com/example/FooTest.java` → `com.example.FooTest`
+ *   - `src/com/example/foo/Bar.java`           → `com.example.foo.Bar`
+ *   - `com/example/foo/Bar.java`               → `com.example.foo.Bar`
+ *   - `Bar.java`                               → `Bar` (default package)
+ */
+function filePathToJavaTypeFQN(filePath: string): string | null {
+  if (!filePath.endsWith('.java')) /* v8 ignore next */ return null;
+  let stripped = filePath;
+  for (const prefix of JAVA_SOURCE_ROOT_PREFIXES) {
+    if (filePath.startsWith(prefix)) {
+      stripped = filePath.slice(prefix.length);
+      break;
+    }
+  }
+  const noExt = stripped.slice(0, -'.java'.length);
+  return noExt.replaceAll('/', '.');
+}
+
+/**
+ * Resolve one Java import-specifier string to its target module-init
+ * bodyHash(es).
+ *
+ * Stdlib short-circuit: `java.*`, `javax.*`, `jakarta.*` are never in
+ * the catalog. The `kotlin.*` and `scala.*` runtimes are similarly
+ * external for Java projects, but we don't special-case them — they
+ * fall through to the type-FQN lookup and miss naturally.
+ *
+ * Static imports always target a static MEMBER (method or field) of
+ * a class. The class's module-init occurrence is the dependency target,
+ * so we strip the trailing identifier before lookup. Static wildcards
+ * (`static com.foo.Bar.*`) target all static members of one class — same
+ * type lookup as plain static imports.
+ */
+function resolveJavaImportSpecifier(
+  specifier: string,
+  typeFQN: ReadonlyMap<string, string>,
+  packageFQN: ReadonlyMap<string, readonly string[]>,
+): readonly string[] {
+  let raw = specifier;
+  let isStatic = false;
+  if (raw.startsWith('static ')) {
+    isStatic = true;
+    raw = raw.slice('static '.length);
+  }
+
+  // Stdlib short-circuit. These never reside in a project catalog.
+  if (raw.startsWith('java.') || raw.startsWith('javax.') || raw.startsWith('jakarta.')) {
+    return [];
+  }
+
+  // Wildcard: `<pkg>.*` (non-static) → all types in the package.
+  //           `<type>.*` (static)    → all static members of the type
+  //                                     → resolve to that type.
+  if (raw.endsWith('.*')) {
+    const head = raw.slice(0, -'.*'.length);
+    if (isStatic) {
+      // Static wildcard targets a TYPE's static members.
+      const hash = typeFQN.get(head);
+      return hash !== undefined ? [hash] : [];
+    }
+    // Plain wildcard targets a PACKAGE.
+    const bucket = packageFQN.get(head);
+    return bucket !== undefined ? [...bucket] : [];
+  }
+
+  if (isStatic) {
+    // `static com.foo.Bar.method` — strip the trailing member to get
+    // the owning type's FQN.
+    const lastDot = raw.lastIndexOf('.');
+    if (lastDot < 0) return [];
+    const typeFqn = raw.slice(0, lastDot);
+    const hash = typeFQN.get(typeFqn);
+    return hash !== undefined ? [hash] : [];
+  }
+
+  // Plain type import. Direct lookup; on miss, fall back to treating
+  // the trailing segment as an inner-class name (one level only — for
+  // multiply-nested inner classes the lookup will still miss). This is
+  // a heuristic: Java's `Outer.Inner` import is structurally
+  // indistinguishable from `package.Type` without resolving the type's
+  // declaring file.
+  const direct = typeFQN.get(raw);
+  if (direct !== undefined) return [direct];
+  const lastDot = raw.lastIndexOf('.');
+  if (lastDot < 0) return [];
+  const outerFqn = raw.slice(0, lastDot);
+  const outer = typeFQN.get(outerFqn);
+  return outer !== undefined ? [outer] : [];
 }
 
 function buildNameIndex(

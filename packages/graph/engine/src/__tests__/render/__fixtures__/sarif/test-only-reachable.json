@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "opensip-tools-graph",
+          "version": "2.0.0",
+          "informationUri": "https://github.com/opensip-ai/opensip-tools",
+          "rules": [
+            {
+              "id": "graph.dead-code.test-only-reachable"
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "graph.dead-code.test-only-reachable",
+          "level": "note",
+          "message": {
+            "text": "Function 'mockUser' is only reachable from test files."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/users/mock.ts"
+                },
+                "region": {
+                  "startLine": 5
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

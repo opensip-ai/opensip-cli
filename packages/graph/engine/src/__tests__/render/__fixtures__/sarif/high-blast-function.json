@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "opensip-tools-graph",
+          "version": "2.0.0",
+          "informationUri": "https://github.com/opensip-ai/opensip-tools",
+          "rules": [
+            {
+              "id": "graph.complexity.high-blast-function"
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "graph.complexity.high-blast-function",
+          "level": "error",
+          "message": {
+            "text": "Function 'parseConfig' has 47 transitive callers (blast radius)."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/config/parser.ts"
+                },
+                "region": {
+                  "startLine": 12,
+                  "startColumn": 8
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
