@@ -118,9 +118,11 @@ export type { Logger, LogLevel, LoggerOptions, RunIdProvider } from './lib/logge
 // files). Used by plugin-discovery sites that need to peek at a single
 // field of opensip-tools.config.yml without dragging in a Zod schema.
 // Advanced / discouraged for general use — tools that need structured
-// parse errors should keep their dedicated loader (see fitness's
-// targets/loader.ts).
-export { readYamlFile } from './lib/yaml.js';
+// parse errors should use `readYamlFileOrThrow` instead, or build their
+// own dedicated loader (see fitness's targets/loader.ts for a
+// schema-validating example).
+export { readYamlFile, readYamlFileOrThrow } from './lib/yaml.js';
+export type { ReadYamlFileOrThrowOptions } from './lib/yaml.js';
 
 // Lib — IDs
 export { generateId, generatePrefixedId, extractTimestamp, generateUUID } from './lib/ids.js';

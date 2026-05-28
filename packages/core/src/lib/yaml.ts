@@ -21,10 +21,11 @@
  * surface.
  */
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 
 import yaml from 'js-yaml';
 
+import { SystemError, ValidationError } from './errors.js';
 import { logger } from './logger.js';
 
 /**
@@ -58,5 +59,74 @@ export function readYamlFile(filePath: string): unknown {
       error: error instanceof Error ? error.message : String(error),
     });
     return undefined;
+  }
+}
+
+export interface ReadYamlFileOrThrowOptions {
+  /**
+   * Maximum file size in bytes before this loader refuses to read.
+   * Defaults to 10 MB — a project config file that grows past this is
+   * almost certainly checked-in test data or a bug.
+   */
+  readonly maxBytes?: number;
+  /**
+   * Loader name surfaced in `ValidationError.options.loader` so
+   * downstream error rendering can attribute failures to the right
+   * subsystem (e.g. `'signalers'`, `'cli-defaults'`).
+   */
+  readonly loader?: string;
+}
+
+/**
+ * Strict counterpart to `readYamlFile`. Throws structured errors on
+ * any failure mode instead of returning `undefined`:
+ *
+ *   - `ValidationError` — missing file, unreadable file, malformed YAML.
+ *     The `loader` and `operation` fields are populated for downstream
+ *     attribution.
+ *   - `SystemError` — file exceeds `maxBytes` (default 10 MB).
+ *
+ * Consumers that want hand-rolled stat/read/parse with the same
+ * structured errors should call this instead — it consolidates a
+ * pattern previously duplicated across loaders (audit-round-2 Finding F).
+ */
+export function readYamlFileOrThrow(
+  filePath: string,
+  options: ReadYamlFileOrThrowOptions = {},
+): unknown {
+  const loader = options.loader ?? 'yaml';
+  const maxBytes = options.maxBytes ?? 10 * 1024 * 1024;
+
+  let raw: string;
+  try {
+    const stats = statSync(filePath);
+    if (stats.size > maxBytes) {
+      throw new SystemError(
+        `File too large (${stats.size} bytes, max ${maxBytes}): ${filePath}`,
+        { code: 'SYSTEM.FILE.TOO_LARGE', operation: 'read', loader, filePath },
+      );
+    }
+    raw = readFileSync(filePath, 'utf8');
+  } catch (error) {
+    if (error instanceof SystemError || error instanceof ValidationError) throw error;
+    const message = error instanceof Error ? error.message : String(error);
+    throw new ValidationError(`Failed to read ${filePath}: ${message}`, {
+      operation: 'read',
+      loader,
+      filePath,
+      cause: error instanceof Error ? error : undefined,
+    });
+  }
+
+  try {
+    return yaml.load(raw) ?? {};
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new ValidationError(`${filePath} contains invalid YAML: ${message}`, {
+      operation: 'parse',
+      loader,
+      filePath,
+      cause: error instanceof Error ? error : undefined,
+    });
   }
 }

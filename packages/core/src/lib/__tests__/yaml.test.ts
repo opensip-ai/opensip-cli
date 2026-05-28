@@ -9,7 +9,8 @@ import { join } from 'node:path';
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
-import { readYamlFile } from '../yaml.js';
+import { SystemError, ValidationError } from '../errors.js';
+import { readYamlFile, readYamlFileOrThrow } from '../yaml.js';
 
 let testDir: string;
 
@@ -43,5 +44,50 @@ describe('readYamlFile', () => {
     writeFileSync(path, '');
     // js-yaml returns undefined for completely empty input
     expect(readYamlFile(path)).toBeUndefined();
+  });
+});
+
+describe('readYamlFileOrThrow (audit-round-2 Finding F)', () => {
+  it('returns the parsed document for valid YAML', () => {
+    const path = join(testDir, 'good.yml');
+    writeFileSync(path, 'fitness:\n  failOnErrors: 1\n');
+    expect(readYamlFileOrThrow(path)).toEqual({ fitness: { failOnErrors: 1 } });
+  });
+
+  it('returns {} for empty YAML rather than undefined', () => {
+    const path = join(testDir, 'empty.yml');
+    writeFileSync(path, '');
+    expect(readYamlFileOrThrow(path)).toEqual({});
+  });
+
+  it('throws ValidationError for a missing file with loader attribution', () => {
+    const path = join(testDir, 'missing.yml');
+    expect(() => readYamlFileOrThrow(path, { loader: 'signalers' })).toThrowError(
+      ValidationError,
+    );
+  });
+
+  it('throws ValidationError for malformed YAML', () => {
+    const path = join(testDir, 'bad.yml');
+    writeFileSync(path, 'a: [unterminated');
+    try {
+      readYamlFileOrThrow(path, { loader: 'signalers' });
+      throw new Error('expected throw');
+    } catch (error) {
+      expect(error).toBeInstanceOf(ValidationError);
+      expect((error as ValidationError).message).toContain('invalid YAML');
+    }
+  });
+
+  it('throws SystemError when the file exceeds maxBytes', () => {
+    const path = join(testDir, 'big.yml');
+    writeFileSync(path, 'x: '.repeat(2000));
+    try {
+      readYamlFileOrThrow(path, { maxBytes: 64, loader: 'signalers' });
+      throw new Error('expected throw');
+    } catch (error) {
+      expect(error).toBeInstanceOf(SystemError);
+      expect((error as SystemError).code).toBe('SYSTEM.FILE.TOO_LARGE');
+    }
   });
 });

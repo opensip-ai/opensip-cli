@@ -7,10 +7,7 @@
  * the config file is missing — silent no-op would mask a broken scan.
  */
 
-import { readFileSync, statSync } from 'node:fs'
-
-import {  resolveProjectConfigPath , ValidationError, SystemError , logger } from '@opensip-tools/core'
-import yaml from 'js-yaml'
+import { ValidationError, readYamlFileOrThrow, resolveProjectConfigPath, logger } from '@opensip-tools/core'
 
 import { SignalersConfigSchema } from './schema.js'
 
@@ -34,8 +31,6 @@ function deepFreeze<T>(value: T): T {
   return value
 }
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB
-
 /** TTL for cached signalers config entries in milliseconds (30 seconds) */
 const SIGNALERS_CACHE_TTL_MS = 30_000
 
@@ -49,54 +44,6 @@ interface CacheEntry {
  *  stale hits when the same rootDir resolves to different files over
  *  time (e.g. --config flag changes between invocations in tests). */
 const cache = new Map<string, CacheEntry>()
-
-/**
- * Read the raw config file from disk.
- * @throws {SystemError} When the config file exceeds the maximum allowed size
- * @throws {ValidationError} When the config file cannot be read
- */
-function readConfigFile(filePath: string): string {
-  try {
-    const stats = statSync(filePath)
-    if (stats.size > MAX_FILE_SIZE) {
-      throw new SystemError(
-        `Config file too large (${stats.size} bytes, max ${MAX_FILE_SIZE}): ${filePath}`,
-        { code: 'SYSTEM.FILE.TOO_LARGE' },
-      )
-    }
-    return readFileSync(filePath, 'utf8')
-  } catch (error) {
-    if (error instanceof ValidationError || error instanceof SystemError) throw error
-    /* v8 ignore next -- node fs errors are always Error subclasses; the String(error) fallback is defensive */
-    const message = error instanceof Error ? error.message : String(error)
-    throw new ValidationError(
-      `Failed to read config file ${filePath}: ${message}`,
-      {
-        operation: 'load',
-        loader: 'signalers',
-        filePath,
-        /* v8 ignore next -- same defensive Error-vs-non-Error guard */
-        cause: error instanceof Error ? error : undefined,
-      },
-    )
-  }
-}
-
-/** @throws {ValidationError} When the YAML content is invalid */
-function parseYaml(raw: string, filePath: string): unknown {
-  try {
-    return yaml.load(raw) ?? {}
-  } catch (error) {
-    /* v8 ignore next -- js-yaml always throws Error subclasses; the String(error) fallback is defensive */
-    const message = error instanceof Error ? error.message : String(error)
-    throw new ValidationError(`${filePath} contains invalid YAML: ${message}`, {
-      operation: 'load',
-      loader: 'signalers',
-      /* v8 ignore next -- same defensive Error-vs-non-Error guard */
-      cause: error instanceof Error ? error : undefined,
-    })
-  }
-}
 
 /**
  * Load and validate opensip-tools.config.yml from the given root directory.
@@ -123,8 +70,11 @@ export function loadSignalersConfig(
     return cached.config
   }
 
-  const raw = readConfigFile(filePath)
-  const parsed = parseYaml(raw, filePath)
+  // Strict YAML read + parse via the shared core helper (audit-round-2
+  // Finding F). Raises `SystemError` if the file is larger than the
+  // default 10 MB cap, `ValidationError` for missing / unreadable /
+  // malformed YAML — same shape this loader used to throw inline.
+  const parsed = readYamlFileOrThrow(filePath, { loader: 'signalers' })
 
   const result = SignalersConfigSchema.safeParse(parsed)
   if (!result.success) {
