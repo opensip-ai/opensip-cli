@@ -42,5 +42,8 @@ opensip-tools-report.html
 opensip-tools/.runtime/
 **/opensip-tools/.runtime/
 
+# Local-only implementation plans (kept out of the repo)
+docs/plans/
+
 # Claude Code session state
 .claude/scheduled_tasks.lock
