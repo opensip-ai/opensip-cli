@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-import { LoggerImpl, logger, configureLogger, getRunId } from '../../lib/logger.js';
+import { LoggerImpl, logger, configureLogger } from '../../lib/logger.js';
 
 describe('logger', () => {
   const stderrCalls: string[] = [];
@@ -154,9 +154,13 @@ describe('logger', () => {
   });
 
   describe('runId', () => {
-    it('round-trips through configureLogger({ runId }) / getRunId', () => {
-      configureLogger({ runId: 'RUN_xyz' });
-      expect(getRunId()).toBe('RUN_xyz');
+    it('configureLogger({ runId }) stamps the value on entries when no scope is bound', () => {
+      configureLogger({ debugMode: true, runId: 'RUN_xyz' });
+      logger.info({ evt: 'runid.check' });
+      const matched = stderrCalls
+        .map(c => JSON.parse(c.trim()) as { evt?: string; runId?: string })
+        .find(e => e.evt === 'runid.check');
+      expect(matched?.runId).toBe('RUN_xyz');
     });
   });
 
@@ -305,9 +309,6 @@ describe('logger', () => {
       fresh.setRunId('FRESH_RUN');
       fresh.initLogFile(tempDir);
 
-      // The singleton is untouched: runId is the empty string set by the
-      // outer beforeEach, never overwritten by the fresh instance.
-      expect(getRunId()).toBe('');
       // The fresh instance round-trips its own runId.
       expect(fresh.getRunId()).toBe('FRESH_RUN');
 
@@ -330,13 +331,16 @@ describe('logger', () => {
     });
 
     it('configureLogger still targets the singleton', () => {
-      // T1 Item C collapsed the four prior free mutators (setSilent /
-      // setDebugMode / setRunId / initLogFile) into `configureLogger`.
-      // Verify the singleton still receives the writes through that
-      // single seam.
-      configureLogger({ silent: true, debugMode: false, runId: 'SINGLETON' });
+      // Item 2 removed the `getRunId()` free function — the singleton's
+      // runId is now observable only via emitted entries. Verify the
+      // round-trip by stamping a known id and inspecting a log line.
+      configureLogger({ silent: false, debugMode: true, runId: 'SINGLETON' });
       expect(logger).toBeInstanceOf(LoggerImpl);
-      expect(getRunId()).toBe('SINGLETON');
+      logger.info({ evt: 'singleton.runid.probe' });
+      const matched = stderrCalls
+        .map(c => JSON.parse(c.trim()) as { evt?: string; runId?: string })
+        .find(e => e.evt === 'singleton.runid.probe');
+      expect(matched?.runId).toBe('SINGLETON');
     });
   });
 });

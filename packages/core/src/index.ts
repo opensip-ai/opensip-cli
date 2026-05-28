@@ -108,8 +108,11 @@ export type { Result, ToolErrorCode, ToolErrorOptions } from './lib/errors.js';
 // helper functions; `LoggerImpl` is exported for tests (and tools
 // that need an isolated logger) — advanced / discouraged for
 // general use, see the file-level docstring on lib/logger.ts.
-export { logger, LoggerImpl, configureLogger, getRunId } from './lib/logger.js';
-export type { Logger, LogLevel, LoggerOptions } from './lib/logger.js';
+// `getRunId()` free function was removed in Item 2 — read
+// `currentScope()?.runId` instead. The instance methods
+// `LoggerImpl.{get,set}RunId` survive for isolated-instance test use.
+export { logger, LoggerImpl, configureLogger } from './lib/logger.js';
+export type { Logger, LogLevel, LoggerOptions, RunIdProvider } from './lib/logger.js';
 
 // Lib — permissive YAML reader (returns undefined on missing/malformed
 // files). Used by plugin-discovery sites that need to peek at a single
