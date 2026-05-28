@@ -46,6 +46,7 @@ import { relative, sep } from 'node:path';
 import type { RustParsedFile, RustParsedProject } from './parse.js';
 import type {
   CallSiteRecord,
+  DependencySiteRecord,
   FunctionOccurrence,
   ParseError,
   WalkInput,
@@ -63,6 +64,7 @@ export function walkProject(input: WalkInput<RustParsedProject>): WalkOutput {
     FunctionOccurrence[]
   >;
   const callSites: CallSiteRecord[] = [];
+  const dependencySites: DependencySiteRecord[] = [];
   const parseErrors: ParseError[] = [];
 
   const sortedPaths = [...input.files].filter((p) => input.project.files.has(p)).sort();
@@ -71,7 +73,7 @@ export function walkProject(input: WalkInput<RustParsedProject>): WalkOutput {
     const file = input.project.files.get(path);
     if (!file) continue;
     try {
-      walkFile(path, file, input.projectDirAbs, occurrences, callSites);
+      walkFile(path, file, input.projectDirAbs, occurrences, callSites, dependencySites);
     } catch (error) {
       parseErrors.push({
         filePath: relative(input.projectDirAbs, path),
@@ -80,7 +82,7 @@ export function walkProject(input: WalkInput<RustParsedProject>): WalkOutput {
     }
   }
 
-  return { occurrences, callSites, parseErrors };
+  return { occurrences, callSites, dependencySites, parseErrors };
 }
 
 function walkFile(
@@ -89,6 +91,7 @@ function walkFile(
   projectDirAbs: string,
   out: Record<string, FunctionOccurrence[]>,
   callSites: CallSiteRecord[],
+  dependencySites: DependencySiteRecord[],
 ): void {
   const filePathProjectRel = relative(projectDirAbs, absPath).split(sep).join('/');
   const inTestFile = isTestFile(filePathProjectRel);
@@ -96,6 +99,11 @@ function walkFile(
 
   const moduleInit = synthesizeModuleInit(file, filePathProjectRel, inTestFile, definedInGenerated);
   record(out, moduleInit);
+
+  // Phase 4 (DEC-498): walk top-level `use` (and `extern crate`)
+  // declarations as dependency sites. Owner is the file's synthesized
+  // module-init occurrence.
+  collectDependencySites(file, moduleInit.bodyHash, dependencySites);
 
   const ctx: WalkCtx = {
     file,
@@ -108,6 +116,241 @@ function walkFile(
   const initialFrame: Frame = { ownerHash: moduleInit.bodyHash, enclosingImpl: null };
 
   for (const child of file.tree.rootNode.children) visit(child, initialFrame, ctx);
+}
+
+/**
+ * Walk a Rust file's top-level `use_declaration` and `extern_crate_declaration`
+ * nodes; emit one `DependencySiteRecord` per terminal path. Phase 4 of
+ * opensip's substrate consolidation (DEC-498).
+ *
+ * `use_declaration`'s single named child is one of:
+ *
+ *   - `scoped_identifier` — e.g. `use std::collections::HashMap;` →
+ *     emit specifier `'std::collections::HashMap'`.
+ *   - `identifier` — e.g. `use foo;` → emit specifier `'foo'`.
+ *   - `use_as_clause` — e.g. `use std::collections::HashMap as Map;` →
+ *     extract the underlying path (LHS of `as`); alias is dropped.
+ *   - `scoped_use_list` — grouped form. Combines a path prefix with a
+ *     `use_list` of one-or-more children. Each child may itself be a
+ *     `scoped_use_list` (nested groups), `scoped_identifier`,
+ *     `identifier`, `use_as_clause`, `use_wildcard`, or `self` (bare
+ *     `self` inside the list refers to the prefix itself).
+ *   - `use_list` — bare `{a, b}` without prefix (rare at top level —
+ *     usually appears under a `scoped_use_list`).
+ *   - `use_wildcard` — e.g. `use std::prelude::v1::*;` → emit specifier
+ *     ending in `::*`; resolver treats globs as unresolved (no single
+ *     module target). Documented v1 limitation.
+ *
+ * `extern_crate_declaration` — legacy Rust 2015-edition form (mostly
+ * gone in 2018+). `extern crate foo;` → emit specifier `'foo'`.
+ *
+ * Visibility modifiers (`pub use ...`) and the `use`/`extern`/`crate`
+ * keywords are ignored — we emit one dep site per import target.
+ *
+ * Out of scope at v1:
+ *   - Conditional imports inside function bodies (`fn f() { use foo; }`).
+ *     Rust permits these; the walker only inspects file top-level.
+ *   - `use ::absolute::path;` (leading `::`) — uncommon; would be
+ *     emitted with the leading separator stripped.
+ */
+function collectDependencySites(
+  file: RustParsedFile,
+  moduleInitHash: string,
+  out: DependencySiteRecord[],
+): void {
+  for (const stmt of file.tree.rootNode.namedChildren) {
+    if (stmt.type === 'use_declaration') {
+      collectFromUseDeclaration(stmt, file, moduleInitHash, out);
+    } else if (stmt.type === 'extern_crate_declaration') {
+      collectFromExternCrate(stmt, file, moduleInitHash, out);
+    }
+  }
+}
+
+function collectFromUseDeclaration(
+  decl: Parser.SyntaxNode,
+  file: RustParsedFile,
+  ownerHash: string,
+  out: DependencySiteRecord[],
+): void {
+  // The path-bearing child is the last named child (skipping
+  // visibility_modifier on `pub use ...`).
+  const body = pickUsePathNode(decl);
+  if (!body) return;
+  const line = decl.startPosition.row + 1;
+  const column = decl.startPosition.column;
+  emitFromUseSegment(body, [], file, ownerHash, line, column, out);
+}
+
+function pickUsePathNode(decl: Parser.SyntaxNode): Parser.SyntaxNode | null {
+  // Walk named children in reverse, taking the first non-visibility node.
+  for (let i = decl.namedChildCount - 1; i >= 0; i--) {
+    const c = decl.namedChild(i);
+    if (!c) continue;
+    if (c.type === 'visibility_modifier') continue;
+    return c;
+  }
+  /* v8 ignore next */
+  return null;
+}
+
+/**
+ * Walk one path-bearing sub-node of a use declaration. `prefix` is the
+ * canonical path segments accumulated from enclosing `scoped_use_list`
+ * groups. The function dispatches by node type and emits one
+ * `DependencySiteRecord` per terminal path.
+ */
+function emitFromUseSegment(
+  node: Parser.SyntaxNode,
+  prefix: readonly string[],
+  file: RustParsedFile,
+  ownerHash: string,
+  line: number,
+  column: number,
+  out: DependencySiteRecord[],
+): void {
+  switch (node.type) {
+    case 'scoped_identifier':
+    case 'identifier':
+    case 'crate':
+    case 'super':
+    case 'self': {
+      const segments = decodePathSegments(node);
+      pushDepSite([...prefix, ...segments], node, file, ownerHash, line, column, out);
+      return;
+    }
+    case 'use_as_clause': {
+      // `<path> as <alias>` — emit the underlying path only.
+      const inner = node.namedChild(0);
+      if (inner) {
+        emitFromUseSegment(inner, prefix, file, ownerHash, line, column, out);
+      }
+      return;
+    }
+    case 'use_wildcard': {
+      // `<path>::*` — single emission with `*` as the trailing segment.
+      // The grammar nests the path under the wildcard (single named
+      // child); we append `'*'` to the segments.
+      const inner = node.namedChild(0);
+      const segments = inner ? decodePathSegments(inner) : [];
+      pushDepSite([...prefix, ...segments, '*'], node, file, ownerHash, line, column, out);
+      return;
+    }
+    case 'scoped_use_list': {
+      // `<path>::{<list>}` — combine path + each list child.
+      // Children order: a path-like (identifier / scoped_identifier /
+      // crate / super / self) then a `use_list`.
+      let pathSegs: readonly string[] = [];
+      let list: Parser.SyntaxNode | null = null;
+      for (const c of node.namedChildren) {
+        if (c.type === 'use_list') {
+          list = c;
+        } else if (list === null) {
+          pathSegs = decodePathSegments(c);
+        }
+      }
+      if (list === null) return;
+      const newPrefix = [...prefix, ...pathSegs];
+      for (const item of list.namedChildren) {
+        if (item.type === 'self') {
+          // `use a::b::{self, X}` — `self` refers to the parent path,
+          // i.e. emit the prefix itself.
+          pushDepSite(newPrefix, item, file, ownerHash, line, column, out);
+          continue;
+        }
+        emitFromUseSegment(item, newPrefix, file, ownerHash, line, column, out);
+      }
+      return;
+    }
+    case 'use_list': {
+      // Bare `{a, b}` — uncommon at top level; descend with current prefix.
+      for (const item of node.namedChildren) {
+        if (item.type === 'self') {
+          pushDepSite([...prefix], item, file, ownerHash, line, column, out);
+          continue;
+        }
+        emitFromUseSegment(item, prefix, file, ownerHash, line, column, out);
+      }
+      return;
+    }
+    /* v8 ignore start */
+    default: {
+      // Unknown shape — defensive fallback: emit raw text as a single
+      // segment so downstream attribution still has something to show.
+      const text = node.text;
+      if (text.length > 0) {
+        pushDepSite([...prefix, text], node, file, ownerHash, line, column, out);
+      }
+      return;
+    }
+    /* v8 ignore stop */
+  }
+}
+
+/**
+ * Decode a path-bearing node into canonical `::`-separated segments.
+ * Accepts `scoped_identifier` (recursive), `identifier`, `crate`,
+ * `super`, `self`. Returns `[]` for unknown shapes (caller skips).
+ */
+function decodePathSegments(node: Parser.SyntaxNode): readonly string[] {
+  if (node.type === 'identifier' || node.type === 'crate' || node.type === 'super' || node.type === 'self') {
+    return [node.text];
+  }
+  if (node.type === 'scoped_identifier') {
+    const out: string[] = [];
+    for (const c of node.namedChildren) {
+      out.push(...decodePathSegments(c));
+    }
+    return out;
+  }
+  /* v8 ignore next */
+  return [];
+}
+
+function pushDepSite(
+  segments: readonly string[],
+  node: Parser.SyntaxNode,
+  file: RustParsedFile,
+  ownerHash: string,
+  line: number,
+  column: number,
+  out: DependencySiteRecord[],
+): void {
+  if (segments.length === 0) {
+    /* v8 ignore next */
+    return;
+  }
+  out.push({
+    nodeRef: node,
+    sourceFileRef: file,
+    ownerHash,
+    specifier: segments.join('::'),
+    line,
+    column,
+  });
+}
+
+function collectFromExternCrate(
+  decl: Parser.SyntaxNode,
+  file: RustParsedFile,
+  ownerHash: string,
+  out: DependencySiteRecord[],
+): void {
+  // `extern crate <name>;` or `extern crate <name> as <alias>;`. The
+  // crate name is the first identifier (not the `crate` keyword token).
+  for (const c of decl.namedChildren) {
+    if (c.type === 'identifier') {
+      out.push({
+        nodeRef: decl,
+        sourceFileRef: file,
+        ownerHash,
+        specifier: c.text,
+        line: decl.startPosition.row + 1,
+        column: decl.startPosition.column,
+      });
+      return;
+    }
+  }
 }
 
 interface Frame {
