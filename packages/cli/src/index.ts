@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+// @fitness-ignore-file detached-promises -- composition root invokes synchronous bootstrap helpers (mountAllToolCommands, registerCliCommands, printWelcome, maybeNotify) that the heuristic mistakes for promise-returning calls
 /**
  * OpenSIP Tools CLI — composition root. Reads top-to-bottom as wiring.
  * Bootstrap, context, command-mount, and error-handling each live in

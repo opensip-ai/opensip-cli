@@ -1,3 +1,4 @@
+// @fitness-ignore-file batch-operation-limits -- iterates bounded collections (registered language adapters and the small file-extension lookup map)
 import { extname } from 'node:path'
 
 import { logger } from '../lib/logger.js'

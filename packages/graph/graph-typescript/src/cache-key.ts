@@ -1,3 +1,4 @@
+// @fitness-ignore-file unbounded-memory -- reads tsconfig.json; bounded by standard TS configuration shape
 /**
  * TypeScript cacheKey implementation.
  *

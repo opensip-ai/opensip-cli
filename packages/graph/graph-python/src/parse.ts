@@ -1,3 +1,4 @@
+// @fitness-ignore-file unbounded-memory -- reads source files one at a time; per-file memory bounded by source size (tree-sitter constraint)
 /**
  * Python parseProject — tree-sitter-python.
  *

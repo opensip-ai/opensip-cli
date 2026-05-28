@@ -1,3 +1,4 @@
+// @fitness-ignore-file batch-operation-limits -- iterates bounded collection (import bindings + matching catalog entries per call site)
 /**
  * Resolve direct identifier calls: `foo()`.
  *

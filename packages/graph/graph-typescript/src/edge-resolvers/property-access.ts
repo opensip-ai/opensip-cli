@@ -1,3 +1,4 @@
+// @fitness-ignore-file batch-operation-limits -- iterates bounded collection (catalog entries for a single property-access resolution)
 /**
  * Resolve `obj.method()` / `Pkg.fn()` calls.
  *

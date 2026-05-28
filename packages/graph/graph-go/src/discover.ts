@@ -1,4 +1,5 @@
 // @fitness-ignore-file error-handling-quality -- realpathSync probe for symlink dedup; exception → fall through with the original path (file might be in a symlinked dir or have been unlinked), already marked v8-ignore as effectively unreachable on real input.
+// @fitness-ignore-file batch-operation-limits -- iterates bounded collection (Go module/package directories within a project root)
 /**
  * Go file discovery.
  *

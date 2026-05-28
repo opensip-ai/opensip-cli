@@ -1,4 +1,5 @@
 // @fitness-ignore-file error-handling-quality -- two intentional swallows: (1) the ParseConfigHost.readFile shim returns undefined when TS asks about a vanished referenced file (TS treats undefined as "skip"), and (2) realpathSync probe for symlink dedup falls through with the original path; both are marked v8-ignore as effectively unreachable on real input.
+// @fitness-ignore-file unbounded-memory -- ParseConfigHost.readFile reads tsconfig.json files only; bounded by standard TS configuration shape
 /**
  * Stage 0 — Discover files.
  *

@@ -1,3 +1,4 @@
+// @fitness-ignore-file unbounded-memory -- reads pom.xml / build.gradle manifests; bounded by standard Java build metadata
 /**
  * Java cacheKey implementation.
  *

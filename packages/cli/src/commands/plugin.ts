@@ -1,5 +1,6 @@
 // @fitness-ignore-file error-handling-quality -- npm install failures already stream to stderr via inherited stdio (downstream loader surfaces unresolved imports), and the package.json / node_modules walks are probes where unreadable/malformed entries mean "not installable" or "not a candidate" — same as absent.
 // @fitness-ignore-file silent-early-returns -- editPluginList/appendToPluginList/removeFromPluginList all return boolean as their documented "did I modify?" contract: `false` means "no-op / idempotent (already present, already absent, nothing to remove)"; the caller dispatches on the boolean. These are not silent failures — they are explicit idempotency signals.
+// @fitness-ignore-file unbounded-memory -- reads opensip-tools.config.yml + package.json files; bounded by configuration shape and standard npm package metadata
 /**
  * plugin command — manage project-local npm-installed plugins.
  *

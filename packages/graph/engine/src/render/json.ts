@@ -1,3 +1,4 @@
+// @fitness-ignore-file batch-operation-limits -- iterates bounded collection (rule descriptors registered for a single graph run)
 /**
  * JSON renderer — emits a CliOutput-shaped JSON document.
  *

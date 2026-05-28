@@ -1,3 +1,4 @@
+// @fitness-ignore-file unbounded-memory -- reads npm package.json files; bounded by standard package metadata size
 /**
  * @fileoverview Resolve a package's main entry point from its
  * `package.json` — shared between plugin discovery (project-local

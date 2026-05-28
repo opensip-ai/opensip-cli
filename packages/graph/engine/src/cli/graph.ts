@@ -1,4 +1,6 @@
 // @fitness-ignore-file error-handling-quality -- CLI output baseline-write at line 597 is best-effort by design ("don't fail the run"); the comment + v8-ignore at the catch already document that user-visible behavior is unaffected if the persistence layer hiccups.
+// @fitness-ignore-file detached-promises -- CLI renderers (process.stdout.write, render helpers, log lines, setExitCode) are synchronous; heuristic flags inside async handlers
+// @fitness-ignore-file performance-anti-patterns -- spread in CLI report aggregation iterates bounded result sets (rule counts, entry-point lists)
 /**
  * `opensip-tools graph` — main subcommand handler.
  *

@@ -1,3 +1,4 @@
+// @fitness-ignore-file detached-promises -- persistFitSession is a synchronous best-effort SQLite write; the heuristic flags it because it lives in an async caller
 /**
  * fit command — run fitness checks.
  *

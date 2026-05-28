@@ -1,3 +1,4 @@
+// @fitness-ignore-file batch-operation-limits -- iterates bounded collection (workspace package roots and their dist/ siblings; small N per repo)
 /**
  * @fileoverview Stale build artifact detection
  * @module checks-builtin/checks/architecture/stale-build-artifacts

@@ -1,3 +1,4 @@
+// @fitness-ignore-file batch-operation-limits -- iterates bounded collection (registered rules + getAll() returning the rule list per RunScope)
 /**
  * Rule registry — per-RunScope.
  *

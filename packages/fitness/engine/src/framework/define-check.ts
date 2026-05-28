@@ -1,5 +1,6 @@
 // @fitness-ignore-file module-coupling-metrics -- central orchestration module with necessary coupling
 // @fitness-ignore-file null-safety -- ResultBuilder.create() returns a fluent builder; .totalItems().filesScanned() chain is always safe
+// @fitness-ignore-file unbounded-memory -- reads single source files at a time via FileAccessor; per-file memory bounded by source size
 /**
  * @fileoverview defineCheck - Unified check definition API
  *

@@ -1,4 +1,5 @@
 // @fitness-ignore-file no-unbounded-concurrency -- Concurrency bounded by design in this context
+// @fitness-ignore-file performance-anti-patterns -- this file IS the performance-anti-patterns check; loop body iterates the PATTERNS array (small, constant) and "await" appears in surrounding comments describing what the check detects
 /**
  * @fileoverview Performance Anti-Patterns Check
  *
