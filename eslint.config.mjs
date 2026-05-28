@@ -90,6 +90,11 @@ export default tseslint.config(
       },
     },
     rules: {
+      // -- ESLint core (10.x additions) -----------------------------------
+      // Disabled: codebase pattern of `let x: T | null = null` initialized
+      // to null and reassigned in a branch (e.g. tree walks, loop
+      // fixed-points). Reassignment-before-read is the intended pattern.
+      'no-useless-assignment': 'off',
       // -- TypeScript fine-tuning -----------------------------------------
       // The codebase uses `_unused` arg conventions and intentional `void`
       // expressions for fire-and-forget promises.
