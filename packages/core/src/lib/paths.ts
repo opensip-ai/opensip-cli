@@ -29,6 +29,8 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
+import type { ToolShortId } from '../tools/ids.js';
+
 // =============================================================================
 // PROJECT PATHS
 // =============================================================================
@@ -75,8 +77,13 @@ export interface ProjectPaths {
  * `'graph'` is included so graph-tool can persist per-project cache +
  * baseline state under `.runtime/cache/graph/` and (later) load
  * project-local rule plugins from `.runtime/plugins/graph/`.
+ *
+ * Aliased to `ToolShortId` from the central registry (audit-round-3
+ * Finding H) so the four prior inline copies of this union stay in
+ * sync. Kept as a named alias for self-documentation at use sites
+ * that talk about path/domain semantics rather than tool ids.
  */
-export type PathDomain = 'fit' | 'sim' | 'graph';
+export type PathDomain = ToolShortId;
 
 /**
  * Domain set accepted by `pluginsDir`. Wider than `PathDomain` because

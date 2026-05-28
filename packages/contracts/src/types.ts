@@ -1,4 +1,5 @@
 import type { StoredSession } from './persistence/store.js';
+import type { ToolShortId } from '@opensip-tools/core';
 
 // =============================================================================
 // CLI OPTIONS TYPES
@@ -110,7 +111,7 @@ export interface CliArgs {
 /** Structured JSON output format */
 export interface CliOutput {
   readonly version: '1.0';
-  readonly tool: 'fit' | 'sim' | 'graph';
+  readonly tool: ToolShortId;
   readonly timestamp: string;
   readonly recipe?: string;
   readonly score: number;

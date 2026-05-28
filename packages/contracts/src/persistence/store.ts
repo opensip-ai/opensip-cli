@@ -9,9 +9,11 @@
 
 import { randomUUID } from 'node:crypto';
 
+import type { ToolShortId } from '@opensip-tools/core';
+
 export interface StoredSession {
   readonly id: string;
-  readonly tool: 'fit' | 'sim' | 'graph';
+  readonly tool: ToolShortId;
   readonly timestamp: string;
   readonly cwd: string;
   readonly recipe?: string;

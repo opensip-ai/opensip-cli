@@ -58,6 +58,15 @@ export type {
   ToolPluginExports,
   LiveViewRenderer,
 } from './tools/index.js';
+export {
+  TOOL_LONG_IDS,
+  TOOL_LONG_TO_SHORT,
+  TOOL_SHORT_IDS,
+  TOOL_SHORT_TO_LONG,
+  isToolLongId,
+  isToolShortId,
+} from './tools/index.js';
+export type { ToolLongId, ToolShortId } from './tools/index.js';
 
 // Recipes — generic recipe registry shared by fitness + simulation.
 export { RecipeRegistry } from './recipes/registry.js';

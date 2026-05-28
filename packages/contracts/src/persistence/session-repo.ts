@@ -1,15 +1,16 @@
-import { SystemError, logger } from '@opensip-tools/core';
+import { SystemError, isToolShortId, logger } from '@opensip-tools/core';
 import { desc, eq, lt } from 'drizzle-orm';
 
 import { sessions, sessionChecks, sessionFindings } from './schema/sessions.js';
 
 import type { StoredSession } from './store.js';
+import type { ToolShortId } from '@opensip-tools/core';
 import type { DataStore } from '@opensip-tools/datastore';
 
 const MODULE_NAME = 'contracts:session-repo';
 
 export interface SessionListOptions {
-  readonly tool?: 'fit' | 'sim' | 'graph';
+  readonly tool?: ToolShortId;
   readonly limit?: number;
 }
 
@@ -19,12 +20,6 @@ interface SessionSummary {
   readonly failed: number;
   readonly errors: number;
   readonly warnings: number;
-}
-
-const VALID_TOOLS: ReadonlySet<StoredSession['tool']> = new Set(['fit', 'sim', 'graph']);
-
-function isValidTool(v: unknown): v is StoredSession['tool'] {
-  return typeof v === 'string' && (VALID_TOOLS as ReadonlySet<string>).has(v);
 }
 
 function isSessionSummary(v: unknown): v is SessionSummary {
@@ -198,7 +193,7 @@ export class SessionRepo {
     // is plain text with no CHECK constraint, so a legacy or hand-edited
     // row could carry a value outside the type. Casting blindly would
     // silently misroute downstream consumers that branch on `tool`.
-    if (!isValidTool(row.tool)) {
+    if (!isToolShortId(row.tool)) {
       throw new SystemError(
         `Session ${row.id} has unknown tool value: ${JSON.stringify(row.tool)}`,
         { code: 'SYSTEM.DATA.UNKNOWN_TOOL' },
