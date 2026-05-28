@@ -13,6 +13,12 @@ export default defineConfig({
         // Pure type / interface declarations — no runtime code.
         'src/graph-catalog.ts',
       ],
+      thresholds: {
+        statements: 95,
+        branches: 85,
+        functions: 95,
+        lines: 95,
+      },
     },
   },
 });

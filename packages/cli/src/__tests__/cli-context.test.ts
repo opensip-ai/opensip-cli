@@ -201,6 +201,42 @@ describe('getCurrentProjectRoot / setCurrentRunScope', () => {
   });
 });
 
+describe('setCliRegistriesForRun / getCurrentRegistriesForScope', () => {
+  it('throws when read before write — bootstrap-ordering safety', async () => {
+    vi.resetModules();
+    const mod = await import('../cli-context.js');
+    expect(() => mod.getCurrentRegistriesForScope()).toThrow(/setCliRegistriesForRun/);
+  });
+
+  it('round-trips the registries set by main()', async () => {
+    vi.resetModules();
+    const mod = await import('../cli-context.js');
+    const core = await import('@opensip-tools/core');
+    const languages = new core.LanguageRegistry();
+    const tools = new core.ToolRegistry();
+    mod.setCliRegistriesForRun({ languages, tools });
+    const out = mod.getCurrentRegistriesForScope();
+    expect(out.languages).toBe(languages);
+    expect(out.tools).toBe(tools);
+  });
+});
+
+describe('ToolCliContext.scope getter', () => {
+  it('returns the RunScope set via setCurrentRunScope', async () => {
+    vi.resetModules();
+    const mod = await import('../cli-context.js');
+    const { RunScope } = await import('@opensip-tools/core');
+    const scope = new RunScope({
+      projectContext: { scope: 'project', projectRoot: '/p', walkedUp: 0 } as never,
+    });
+    mod.setCurrentRunScope(scope);
+
+    const opts = makeBuildOpts();
+    const { ctx } = mod.buildToolCliContext(opts);
+    expect(ctx.scope).toBe(scope);
+  });
+});
+
 describe('getOrOpenDatastore', () => {
   it('throws when called before scope is set', async () => {
     vi.resetModules();

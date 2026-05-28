@@ -5,6 +5,12 @@ export default defineConfig({
     coverage: {
       include: ['src/**'],
       exclude: ['src/**/*.test.ts', 'src/**/__tests__/**', 'src/**/index.ts'],
+      thresholds: {
+        statements: 95,
+        branches: 85,
+        functions: 95,
+        lines: 95,
+      },
     },
   },
 });

@@ -106,6 +106,15 @@ function isValidTool(value: unknown): value is Tool {
 }
 
 /**
+ * Test-only export so the runtime shape predicate can be exercised
+ * without standing up a fake on-disk npm package. The predicate is the
+ * untrusted-boundary check for third-party `tool` exports; its branches
+ * (non-object, missing metadata.id, missing register, missing commands)
+ * each need a unit covering them.
+ */
+export const __test = { isValidTool };
+
+/**
  * Walk the registry and ask each tool to mount its Commander
  * subcommands via `tool.register(cli)`. Failures are isolated so one
  * misbehaving tool doesn't take the whole CLI down — the failure is

@@ -11,6 +11,12 @@ export default defineConfig({
         // Pure barrel — re-exports only, no executable logic.
         'src/index.ts',
       ],
+      thresholds: {
+        statements: 90,
+        branches: 85,
+        functions: 90,
+        lines: 90,
+      },
     },
   },
 });

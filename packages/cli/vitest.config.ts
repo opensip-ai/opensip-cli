@@ -31,6 +31,12 @@ export default defineConfig({
         // alongside its target.
         'src/bootstrap/render.ts',
       ],
+      thresholds: {
+        statements: 90,
+        branches: 85,
+        functions: 90,
+        lines: 90,
+      },
     },
   },
 });

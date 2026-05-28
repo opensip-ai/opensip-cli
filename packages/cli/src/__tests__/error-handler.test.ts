@@ -18,7 +18,7 @@ import {
 } from '@opensip-tools/core';
 import { describe, expect, it, vi } from 'vitest';
 
-import { handleParseError } from '../error-handler.js';
+import { handleFatalBootstrapError, handleParseError } from '../error-handler.js';
 
 function makeOpts(): {
   setExitCode: ReturnType<typeof vi.fn>;
@@ -84,6 +84,46 @@ describe('handleParseError', () => {
     await handleParseError('plain string', opts);
     expect(opts.setExitCode).toHaveBeenCalledWith(EXIT_CODES.RUNTIME_ERROR);
     expect(opts.rendered[0]?.message).toBe('plain string');
+  });
+
+  it('handleFatalBootstrapError writes to stderr, logs, and sets exitCode=1', () => {
+    const savedExitCode = process.exitCode;
+    process.exitCode = 0;
+    const writes: string[] = [];
+    const spy = vi.spyOn(process.stderr, 'write').mockImplementation((c: unknown) => {
+      writes.push(String(c));
+      return true;
+    });
+    const errorLog = vi.fn();
+    let observedExitCode: number | string | undefined;
+    try {
+      handleFatalBootstrapError(new Error('bootstrap exploded'), { error: errorLog });
+      observedExitCode = process.exitCode;
+    } finally {
+      spy.mockRestore();
+      process.exitCode = savedExitCode;
+    }
+    expect(writes.join('')).toContain('bootstrap exploded');
+    expect(errorLog).toHaveBeenCalledWith(
+      expect.objectContaining({ evt: 'cli.bootstrap.failed', error: 'bootstrap exploded' }),
+    );
+    expect(observedExitCode).toBe(EXIT_CODES.RUNTIME_ERROR);
+  });
+
+  it('handleFatalBootstrapError handles non-Error throws', () => {
+    const savedExitCode = process.exitCode;
+    process.exitCode = 0;
+    const spy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    const errorLog = vi.fn();
+    try {
+      handleFatalBootstrapError('plain string', { error: errorLog });
+    } finally {
+      spy.mockRestore();
+      process.exitCode = savedExitCode;
+    }
+    expect(errorLog).toHaveBeenCalledWith(
+      expect.objectContaining({ error: 'plain string', stack: undefined }),
+    );
   });
 
   it('typed errors take priority over substring suggestions', async () => {

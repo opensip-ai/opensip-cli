@@ -64,11 +64,20 @@ export function parseClangTidyOutput(
     const message = match[5]
     const lintName = match[6]
     if (severity === 'note') continue
+    // The regex guarantees groups 1 (filePath), 2 (lineStr), 3 (colStr), 4
+    // (severity) and 5 (message) are non-empty captures when it matches; the
+    // `?` / `??` fallbacks below exist for type-narrowing of `match[n]` (which
+    // is typed `string | undefined`) and are not reachable at runtime. Only
+    // group 6 (lintName) is optional in the pattern and is exercised by tests.
     violations.push({
+      /* v8 ignore next */
       message: lintName ? `[${lintName}] ${message}` : message ?? 'clang-tidy diagnostic',
       severity: severity === 'error' ? 'error' : 'warning',
+      /* v8 ignore next */
       line: lineStr ? Number.parseInt(lineStr, 10) : 1,
+      /* v8 ignore next */
       column: colStr ? Number.parseInt(colStr, 10) : undefined,
+      /* v8 ignore next */
       filePath: filePath ? resolveFilePath(filePath, cwd) : undefined,
       suggestion: 'See clang-tidy docs for the named lint',
     })

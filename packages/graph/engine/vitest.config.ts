@@ -27,6 +27,12 @@ export default defineConfig({
         // happens at the CLI dispatcher level.
         'src/cli/graph-runner.tsx',
       ],
+      thresholds: {
+        statements: 90,
+        branches: 85,
+        functions: 90,
+        lines: 90,
+      },
     },
   },
 });
