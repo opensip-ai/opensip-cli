@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "opensip-tools-graph",
+          "version": "2.0.0",
+          "informationUri": "https://github.com/opensip-ai/opensip-tools",
+          "rules": [
+            {
+              "id": "graph.safety.always-throws-branch"
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "graph.safety.always-throws-branch",
+          "level": "error",
+          "message": {
+            "text": "Branch in 'handleError' always throws."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/error/handler.ts"
+                },
+                "region": {
+                  "startLine": 67
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

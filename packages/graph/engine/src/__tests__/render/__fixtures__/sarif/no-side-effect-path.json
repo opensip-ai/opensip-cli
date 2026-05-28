@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "opensip-tools-graph",
+          "version": "2.0.0",
+          "informationUri": "https://github.com/opensip-ai/opensip-tools",
+          "rules": [
+            {
+              "id": "graph.dead-code.no-side-effect-path"
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "graph.dead-code.no-side-effect-path",
+          "level": "warning",
+          "message": {
+            "text": "Function 'computeMetrics' return value is never consumed."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/metrics/compute.ts"
+                },
+                "region": {
+                  "startLine": 23
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
