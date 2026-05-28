@@ -50,6 +50,7 @@ export type FunctionKind =
   | 'setter'
   | 'module-init';
 
+/** How a call edge was resolved (static dispatch, method dispatch, JSX, etc.). */
 export type CallResolution =
   | 'static'
   | 'method-dispatch'
@@ -58,10 +59,13 @@ export type CallResolution =
   | 'unknown'
   | 'dynamic-string';
 
+/** Resolver confidence in a call edge: high (one body), medium (few), low (many or partial). */
 export type CallConfidence = 'high' | 'medium' | 'low';
 
+/** Function visibility tier: exported from module, module-local, or class-private. */
 export type Visibility = 'exported' | 'module-local' | 'private';
 
+/** A function parameter descriptor: name, optionality, and rest-arg flag. */
 export interface Param {
   readonly name: string;
   readonly optional: boolean;

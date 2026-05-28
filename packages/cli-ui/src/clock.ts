@@ -19,11 +19,13 @@ const TICK_INTERVAL_MS = 80;
 
 const ClockContext = createContext<number>(0);
 
+/** Props for {@link ClockProvider}: tick interval (ms) and tree children. */
 export interface ClockProviderProps {
   readonly intervalMs?: number;
   readonly children: ReactNode;
 }
 
+/** React provider that broadcasts a tick counter to descendants via {@link useClock}. */
 export function ClockProvider({ intervalMs = TICK_INTERVAL_MS, children }: ClockProviderProps): ReactElement {
   const [tick, setTick] = useState(0);
 
@@ -37,6 +39,7 @@ export function ClockProvider({ intervalMs = TICK_INTERVAL_MS, children }: Clock
   return createElement(ClockContext.Provider, { value: tick }, children);
 }
 
+/** Returns the current tick from the enclosing {@link ClockProvider} (or 0). */
 export function useClock(): number {
   return useContext(ClockContext);
 }

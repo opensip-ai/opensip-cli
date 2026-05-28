@@ -43,4 +43,5 @@ export interface GraphProgressEvent {
   readonly detail?: string;
 }
 
+/** Callback invoked with each {@link GraphProgressEvent} during graph orchestration. */
 export type GraphProgressCallback = (event: GraphProgressEvent) => void;

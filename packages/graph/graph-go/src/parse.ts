@@ -23,15 +23,18 @@ import Go from 'tree-sitter-go';
 
 import type { ParseInput, ParseOutput, ParseError } from '@opensip-tools/graph';
 
+/** Parsed Go source file: tree-sitter parse tree plus original source text. */
 export interface GoParsedFile {
   readonly tree: Parser.Tree;
   readonly source: string;
 }
 
+/** Parsed Go project: map of file path → {@link GoParsedFile}. */
 export interface GoParsedProject {
   readonly files: ReadonlyMap<string, GoParsedFile>;
 }
 
+/** Parses every Go source file in the input set into a {@link GoParsedProject}. */
 export function parseProject(input: ParseInput): ParseOutput<GoParsedProject> {
   const parser = new Parser();
   // tree-sitter-go's `Language` type and tree-sitter's `Language` type

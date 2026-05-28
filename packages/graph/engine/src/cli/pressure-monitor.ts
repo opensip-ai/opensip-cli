@@ -24,6 +24,7 @@ import type { ToolErrorOptions } from '@opensip-tools/core';
 const DEFAULT_THRESHOLD = 0.9;
 const DEFAULT_POLL_INTERVAL_MS = 1000;
 
+/** Thrown when heap usage crosses the configured pressure threshold during graph work. */
 export class MemoryPressureError extends ToolError {
   readonly usedBytes: number;
   readonly limitBytes: number;
@@ -42,6 +43,7 @@ export class MemoryPressureError extends ToolError {
   }
 }
 
+/** Constructor options for {@link createPressureMonitor}: threshold and poll cadence. */
 export interface PressureMonitorOptions {
   /** Fraction of `heap_size_limit` above which we abort. Default 0.90. */
   readonly threshold?: number;
@@ -49,6 +51,7 @@ export interface PressureMonitorOptions {
   readonly pollIntervalMs?: number;
 }
 
+/** Stage-aware heap-pressure monitor that aborts work before the V8 OOM line. */
 export interface PressureMonitor {
   /**
    * Bind the monitor to a logical stage. Subsequent `check()` calls and

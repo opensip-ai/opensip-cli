@@ -10,6 +10,7 @@
 import type { CliOutput } from '@opensip-tools/contracts';
 import type { Signal } from '@opensip-tools/core';
 
+/** Context passed to every {@link Renderer}: cwd, tool name, command, and CLI output bundle. */
 export interface RenderContext {
   readonly cwd: string;
   readonly tool: 'graph';
@@ -18,4 +19,5 @@ export interface RenderContext {
   readonly output?: CliOutput;
 }
 
+/** Pure signal-to-string renderer (table/json/sarif) selected by CLI flags. */
 export type Renderer = (signals: readonly Signal[], context: RenderContext) => string;

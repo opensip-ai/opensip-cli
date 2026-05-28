@@ -120,6 +120,7 @@ function loadGraphCatalog(datastore?: DataStore): GraphCatalog | null {
   }
 }
 
+/** Renders the fitness HTML dashboard to a temp file and returns its path + URL. */
 export async function openDashboard(
   projectDir?: string,
   datastore?: DataStore,

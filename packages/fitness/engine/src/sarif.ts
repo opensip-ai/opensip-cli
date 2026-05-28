@@ -206,6 +206,7 @@ function isTransientError(status: number): boolean {
   return status >= 500 || status === 429;
 }
 
+/** Uploads SARIF runs to OpenSIP Cloud in chunks with per-chunk retries; returns aggregate result. */
 // eslint-disable-next-line sonarjs/cognitive-complexity -- network reporter: chunked uploads with per-chunk retries and aggregated error summary; phases read better inline
 export async function reportToCloud(output: CliOutput, url: string, apiKey?: string): Promise<ReportResult> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };

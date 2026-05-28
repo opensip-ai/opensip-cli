@@ -24,6 +24,7 @@ interface RegisterableLanguageAdapter extends Registerable {
   readonly adapter: LanguageAdapter
 }
 
+/** Per-run registry of language adapters, indexed by id and file extension. */
 export class LanguageRegistry {
   private readonly inner = new Registry<RegisterableLanguageAdapter>({
     module: 'core:languages',

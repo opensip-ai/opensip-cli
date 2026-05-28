@@ -148,6 +148,7 @@ function replaceCharsInRange(chars: string[], start: number, end: number, string
 // fallback, not a hot-path concern, because production paths always
 // run inside a scope established by the CLI's pre-action-hook.
 
+/** Strips TS comments and string literals; result is cached per-content on the active scope. */
 export function filterContent(content: string): FilteredContent {
   const scope = currentScope()
   if (scope) {

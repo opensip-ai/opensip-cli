@@ -16,8 +16,10 @@
 
 import { buildMinimalTextTree, type MinimalTextTree } from '@opensip-tools/core'
 
+/** Parse-tree alias for Java (currently a minimal text tree; will become a real AST). */
 export type JavaTree = MinimalTextTree
 
+/** Parses Java source into a {@link JavaTree} for check consumption. */
 export function parseJava(content: string, filePath: string): JavaTree {
   return buildMinimalTextTree(content, filePath)
 }

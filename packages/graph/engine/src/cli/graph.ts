@@ -72,6 +72,7 @@ function countOccurrences(catalog: Catalog): number {
   return n;
 }
 
+/** Options bag for the `graph` CLI subcommand: scope, output mode, and provenance fields. */
 export interface GraphCommandOptions {
   readonly cwd: string;
   readonly json?: boolean;
@@ -128,6 +129,7 @@ export interface GraphCommandOptions {
   readonly runId?: string;
 }
 
+/** Entry point for the `graph` CLI subcommand — orchestrates parsing, edge resolution, and output. */
 export async function executeGraph(
   opts: GraphCommandOptions,
   cli: ToolCliContext,
@@ -396,6 +398,7 @@ function renderPackagesJson(
   );
 }
 
+/** Input to the unified terminal-report builder: catalog, indexes, signals, and cache state. */
 export interface UnifiedReportInput {
   readonly catalog: Catalog | null;
   readonly indexes: Indexes | null;

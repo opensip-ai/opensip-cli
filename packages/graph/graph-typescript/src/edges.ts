@@ -59,17 +59,20 @@ function tsPosition(node: ts.Node, sourceFile: ts.SourceFile): {
   };
 }
 
+/** Input to TS edge resolution: catalog and the source TS program. */
 export interface EdgeResolutionInput {
   readonly catalog: Catalog;
   readonly program: ts.Program;
   readonly projectDirAbs: string;
 }
 
+/** Output of TS edge resolution: catalog (with edges populated) and per-stage stats. */
 export interface EdgeResolutionOutput {
   readonly catalog: Catalog;
   readonly resolutionStats: ResolutionStats;
 }
 
+/** Input for re-resolving edges from cached {@link CallSiteRecord} arrays (warm path). */
 export interface EdgeResolutionFromRecordsInput {
   readonly catalog: Catalog;
   readonly program: ts.Program;

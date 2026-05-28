@@ -18,11 +18,13 @@ import ts from 'typescript';
 
 import { normalizeProjectDir } from './normalize-project-dir.js';
 
+/** Input to {@link discoverFiles}: project directory and optional tsconfig override. */
 export interface DiscoveryInput {
   readonly projectDir: string;
   readonly tsConfigPath?: string;
 }
 
+/** Result of {@link discoverFiles}: resolved paths, source files, and TS compiler options. */
 export interface DiscoveryOutput {
   readonly projectDirAbs: string;
   readonly tsConfigPathAbs: string;
@@ -30,6 +32,7 @@ export interface DiscoveryOutput {
   readonly compilerOptions: ts.CompilerOptions;
 }
 
+/** Resolves the tsconfig for a TS project and returns the in-program source-file set. */
 export function discoverFiles(input: DiscoveryInput): DiscoveryOutput {
   logger.info({
     evt: 'graph.discover.start',

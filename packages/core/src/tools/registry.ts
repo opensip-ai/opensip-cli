@@ -27,6 +27,7 @@ interface RegisterableTool extends Registerable {
   readonly tool: Tool;
 }
 
+/** Per-run registry of {@link Tool} plugins, indexed by id. */
 export class ToolRegistry {
   private readonly inner = new Registry<RegisterableTool>({
     module: 'core:tools',

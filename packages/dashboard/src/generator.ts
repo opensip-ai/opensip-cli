@@ -96,6 +96,7 @@ function serializeOptionalBlob(
   }
 }
 
+/** Renders a self-contained HTML dashboard string from sessions and catalog inputs. */
 export function generateDashboardHtml(input: DashboardInput): string {
   const {
     sessions,

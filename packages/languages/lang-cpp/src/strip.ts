@@ -197,11 +197,13 @@ function matchCharLiteralPrefix(src: string, i: number): number {
   return -1
 }
 
+/** Returns C/C++ source with every string-literal region blanked out. */
 export function stripStrings(content: string): string {
   const { stringRegions } = scan(content)
   return applyRegions(content, stringRegions)
 }
 
+/** Returns C/C++ source with every string-literal AND comment region blanked out. */
 export function stripComments(content: string): string {
   const { stringRegions, commentRegions } = scan(content)
   return applyRegions(content, [...stringRegions, ...commentRegions])

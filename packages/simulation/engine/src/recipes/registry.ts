@@ -33,6 +33,7 @@ export interface SimulationRecipeDisplayInfo {
 
 const BUILT_IN_NAMES = new Set(builtInSimulationRecipes.map((r) => r.name));
 
+/** Registry of simulation recipes — bootstraps built-ins and accepts user-defined additions. */
 export class SimulationRecipeRegistry extends RecipeRegistry<SimulationRecipe> {
   constructor() {
     super({ module: 'simulation:recipes', validationCode: 'VALIDATION.SIMULATION.DUPLICATE_RECIPE' });

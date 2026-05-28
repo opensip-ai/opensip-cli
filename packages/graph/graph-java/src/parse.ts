@@ -22,15 +22,18 @@ import Java from 'tree-sitter-java';
 
 import type { ParseInput, ParseOutput, ParseError } from '@opensip-tools/graph';
 
+/** Parsed Java source file: tree-sitter parse tree plus original source text. */
 export interface JavaParsedFile {
   readonly tree: Parser.Tree;
   readonly source: string;
 }
 
+/** Parsed Java project: map of file path → {@link JavaParsedFile}. */
 export interface JavaParsedProject {
   readonly files: ReadonlyMap<string, JavaParsedFile>;
 }
 
+/** Parses every Java source file in the input set into a {@link JavaParsedProject}. */
 export function parseProject(input: ParseInput): ParseOutput<JavaParsedProject> {
   const parser = new Parser();
   // Same CJS-typing cast as graph-rust / graph-python / graph-go.

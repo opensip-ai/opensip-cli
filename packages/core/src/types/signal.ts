@@ -4,8 +4,10 @@
  */
 
 export type SignalSeverity = 'critical' | 'high' | 'medium' | 'low'
+/** Canonical category labels a Signal may declare (open at the plugin layer). */
 export type SignalCategory = 'security' | 'quality' | 'architecture' | 'testing' | 'resilience' | 'documentation' | 'warning' | 'performance' | 'error'
 
+/** A finding produced by any analyzer — file location, severity, message, and metadata. */
 export interface Signal {
   readonly id: string
   readonly source: string
@@ -28,6 +30,7 @@ export interface Signal {
   readonly createdAt: string
 }
 
+/** Input shape for {@link createSignal} — required fields plus optional fix hint. */
 export interface CreateSignalInput {
   source: string
   provider?: string
@@ -42,6 +45,7 @@ export interface CreateSignalInput {
   metadata?: Record<string, unknown>
 }
 
+/** Optional remediation hint attached to a Signal — action label and confidence. */
 export interface FixHint {
   readonly action?: string
   readonly confidence?: number
@@ -50,6 +54,7 @@ export interface FixHint {
 
 import { randomUUID } from 'node:crypto'
 
+/** Builds a {@link Signal} with default provider, generated id, and ISO timestamp. */
 export function createSignal(input: CreateSignalInput): Signal {
   return {
     id: `sig_${randomUUID().slice(0, 12)}`,

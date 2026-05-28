@@ -78,6 +78,7 @@ import type { Logger } from '../lib/logger.js';
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports -- intentional inline import() type query — see the surrounding comment for the cycle-breaking rationale.
 type RunScope = import('../lib/run-scope.js').RunScope;
 
+/** Static descriptor for a tool plugin: id, semver, and one-line description. */
 export interface ToolMetadata {
   /** Stable identifier — e.g. 'fitness', 'simulation'. */
   readonly id: string;

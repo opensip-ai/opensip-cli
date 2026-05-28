@@ -13,6 +13,7 @@ import type { ListChecksResult } from '@opensip-tools/contracts';
 // listChecks
 // ---------------------------------------------------------------------------
 
+/** Returns metadata for every enabled check in the project's check registry. */
 export async function listChecks(projectDir?: string): Promise<ListChecksResult> {
   await ensureChecksLoaded(projectDir);
   const checks = defaultRegistry.listEnabled();

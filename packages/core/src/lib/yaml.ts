@@ -62,6 +62,7 @@ export function readYamlFile(filePath: string): unknown {
   }
 }
 
+/** Knobs for {@link readYamlFileOrThrow}: size guard and loader attribution. */
 export interface ReadYamlFileOrThrowOptions {
   /**
    * Maximum file size in bytes before this loader refuses to read.

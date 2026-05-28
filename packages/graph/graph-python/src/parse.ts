@@ -25,16 +25,19 @@ import Python from 'tree-sitter-python';
 
 import type { ParseInput, ParseOutput, ParseError } from '@opensip-tools/graph';
 
+/** Parsed Python source file: tree-sitter parse tree plus original source text. */
 export interface PythonParsedFile {
   readonly tree: Parser.Tree;
   readonly source: string;
 }
 
+/** Parsed Python project: map of normalized file path → {@link PythonParsedFile}. */
 export interface PythonParsedProject {
   /** Keyed by the absolute, realpath-normalized file path from discover. */
   readonly files: ReadonlyMap<string, PythonParsedFile>;
 }
 
+/** Parses every Python source file in the input set into a {@link PythonParsedProject}. */
 export function parseProject(input: ParseInput): ParseOutput<PythonParsedProject> {
   const parser = new Parser();
   // tree-sitter-python's `Language` type and tree-sitter's `Language`

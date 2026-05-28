@@ -59,6 +59,7 @@ export type {
   GraphStage,
 } from './orchestrate/types.js';
 
+/** Input bundle for {@link runGraph}: project scope, optional overrides, and progress callback. */
 export interface RunGraphInput {
   readonly cwd: string;
   readonly noCache?: boolean;
@@ -84,6 +85,7 @@ export interface RunGraphInput {
   readonly datastore?: DataStore;
 }
 
+/** Output of {@link runGraph}: catalog, indexes, signals, resolution stats, and cache state. */
 export interface RunGraphResult {
   readonly catalog: Catalog | null;
   readonly indexes: Indexes | null;

@@ -55,7 +55,9 @@ import type { ZodType } from 'zod'
  *                its own config interface.
  */
 export function getCheckConfig<T extends Record<string, unknown>>(slug: string): T
+/** Overload: returns the recipe-configured slice validated against the supplied Zod schema. */
 export function getCheckConfig<T extends Record<string, unknown>>(slug: string, schema: ZodType<T>): T
+/** Implementation signature — dispatches to the unvalidated or schema-validated path. */
 export function getCheckConfig<T extends Record<string, unknown>>(
   slug: string,
   schema?: ZodType<T>,

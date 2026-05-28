@@ -48,6 +48,7 @@ export interface ProjectContext {
   readonly scope: 'project' | 'none';
 }
 
+/** Input to {@link resolveProjectContext}: cwd plus optional overrides controlling discovery. */
 export interface ResolveProjectContextInput {
   /** Literal cwd or `--cwd` value. */
   readonly cwd: string;

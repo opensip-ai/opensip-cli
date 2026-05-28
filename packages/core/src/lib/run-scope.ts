@@ -66,6 +66,7 @@ class DefaultRecipeCheckConfigSlot implements RecipeCheckConfigSlot {
  */
 export type DataStoreThunk = () => unknown;
 
+/** Constructor input for {@link RunScope}: registries, services, and per-run identifiers. */
 export interface RunScopeOptions {
   readonly logger?: Logger;
   readonly parseCache?: LanguageParseCache;

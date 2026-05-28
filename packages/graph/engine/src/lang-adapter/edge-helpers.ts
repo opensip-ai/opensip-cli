@@ -107,6 +107,7 @@ export interface MutableStats {
   apply(edge: CallEdge): void;
 }
 
+/** Constructs a fresh {@link MutableStats} accumulator for edge resolver bookkeeping. */
 export function createMutableStats(): MutableStats {
   const stats = {
     totalCallSites: 0,

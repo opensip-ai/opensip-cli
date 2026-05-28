@@ -36,6 +36,7 @@
 import { appendFileSync, mkdirSync, readdirSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 
+/** Structured logger surface; accepts a message string or a structured record. */
 export interface Logger {
   debug(msgOrObj: string | Record<string, unknown>, data?: Record<string, unknown>): void;
   info(msgOrObj: string | Record<string, unknown>, data?: Record<string, unknown>): void;
@@ -43,6 +44,7 @@ export interface Logger {
   error(msgOrObj: string | Record<string, unknown>, data?: Record<string, unknown>): void;
 }
 
+/** Log severity levels, ordered from most to least verbose. */
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 const LEVELS = { debug: 0, info: 1, warn: 2, error: 3 } as const;
@@ -98,6 +100,7 @@ export interface LoggerOptions {
  */
 export type RunIdProvider = () => string | undefined;
 
+/** Concrete logger writing JSONL to stderr and an optional daily file. */
 export class LoggerImpl implements Logger {
   private currentLevel: LogLevel;
   private silent = false;

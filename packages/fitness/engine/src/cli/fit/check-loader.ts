@@ -122,6 +122,7 @@ export function getEnabledCheckCount(): number {
 // Lazy-load fitness checks
 // ---------------------------------------------------------------------------
 
+/** Lazily discovers and registers all check packs for the given project (idempotent per project). */
 export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
   const key = projectDir ?? '';
   if (checksLoadedFor === key) return;
