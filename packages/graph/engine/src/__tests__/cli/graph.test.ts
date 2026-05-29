@@ -213,15 +213,49 @@ describe('executeGraph — human / JSON modes', () => {
     datastore.close();
   });
 
-  it('renders the unified human report on the default path', async () => {
+  it('renders the fit-style summary + footer hint on the default (non-verbose) path', async () => {
     const { cli, setExitCode } = mockCli(datastore);
     await executeGraph({ cwd: projectDir, noCache: true }, cli);
+    expect(setExitCode).toHaveBeenCalledWith(0);
+    const out = stdoutSpy.mock.calls.map((c) => String(c[0])).join('');
+    // Default surface: one-line summary + footer hint, no detailed
+    // report blocks (matches fit's done view).
+    // Single fit-style summary line; subtleties of the exact counts
+    // depend on the fixture's rule findings (the .ts fixtures here
+    // emit ~1 warning), so just assert the structural anchors.
+    expect(out).toContain(' Passed, ');
+    expect(out).toContain(' Failed (');
+    expect(out).toContain(' Errors, ');
+    expect(out).toContain(' Warnings)');
+    expect(out).toContain(' | Duration ');
+    expect(out).toContain('Use --verbose for detailed results');
+    expect(out).not.toContain('== Catalog ==');
+    expect(out).not.toContain('== Findings');
+  });
+
+  it('renders the unified human report on the --verbose path', async () => {
+    const { cli, setExitCode } = mockCli(datastore);
+    await executeGraph({ cwd: projectDir, noCache: true, verbose: true }, cli);
     expect(setExitCode).toHaveBeenCalledWith(0);
     const out = stdoutSpy.mock.calls.map((c) => String(c[0])).join('');
     expect(out).toContain('opensip-tools graph');
     expect(out).toContain('== Catalog ==');
     expect(out).toContain('== Findings');
-    expect(out).toContain('== Summary ==');
+    // The trailing "== Summary ==" block from buildUnifiedReportLines
+    // is suppressed in verbose mode (writeUnifiedReport now passes
+    // includeSummary: false); the fit-style summary line follows
+    // immediately after the report body.
+    expect(out).not.toContain('== Summary ==');
+    // Single fit-style summary line; subtleties of the exact counts
+    // depend on the fixture's rule findings (the .ts fixtures here
+    // emit ~1 warning), so just assert the structural anchors.
+    expect(out).toContain(' Passed, ');
+    expect(out).toContain(' Failed (');
+    expect(out).toContain(' Errors, ');
+    expect(out).toContain(' Warnings)');
+    expect(out).toContain(' | Duration ');
+    // Footer hint is suppressed when verbose, mirroring fit.
+    expect(out).not.toContain('Use --verbose for detailed results');
   });
 
   it('renders JSON when --json is set', async () => {

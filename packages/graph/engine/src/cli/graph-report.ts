@@ -87,8 +87,57 @@ export function buildUnifiedReportLines(
 }
 
 export function writeUnifiedReport(input: UnifiedReportInput): void {
-  const lines = ['opensip-tools graph', '', ...buildUnifiedReportLines(input)];
+  // `includeSummary: false` — the stdout dispatcher emits the
+  // fit-style one-line summary via `writeRunSummaryPlain` after this,
+  // so the trailing "== Summary ==" block would be redundant.
+  const lines = [
+    'opensip-tools graph',
+    '',
+    ...buildUnifiedReportLines(input, { includeSummary: false }),
+  ];
   process.stdout.write(`${lines.join('\n')}\n`);
+}
+
+/** Plain-text equivalent of cli-ui's `RunSummary` for the stdout path. */
+export interface RunSummaryPlainInput {
+  readonly passed: number;
+  readonly failed: number;
+  readonly errors: number;
+  readonly warnings: number;
+  readonly durationMs: number;
+}
+
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${String(ms)}ms`;
+  return `${(ms / 1000).toFixed(1)}s`;
+}
+
+/**
+ * Emit the one-line PASS/FAIL summary in plain text, matching the
+ * format of cli-ui's `RunSummary` Ink component. Used by the
+ * non-interactive stdout path so default `pnpm graph <scope>` runs
+ * surface the same shape as the Ink live view.
+ */
+export function writeRunSummaryPlain(input: RunSummaryPlainInput): void {
+  const { passed, failed, errors, warnings, durationMs } = input;
+  process.stdout.write(
+    `${String(passed)} Passed, ${String(failed)} Failed (${String(errors)} Errors, ${String(warnings)} Warnings) | Duration ${formatDuration(durationMs)}\n`,
+  );
+}
+
+/**
+ * Emit the footer hint strip in plain text, matching the cli-ui
+ * `RunFooterHints` content the Ink live view shows on a non-verbose
+ * done state. Suppressed when the user passed `--verbose`.
+ */
+export function writeFooterHintsPlain(): void {
+  process.stdout.write(
+    [
+      '',
+      '  Use --verbose for detailed results | opensip-tools dashboard for HTML report | --report-to <url> to send to OpenSIP',
+      '',
+    ].join('\n'),
+  );
 }
 
 function renderCatalogSection(catalog: Catalog | null, cacheHit: boolean): readonly string[] {

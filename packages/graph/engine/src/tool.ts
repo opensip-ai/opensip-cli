@@ -194,6 +194,7 @@ function register(cli: ToolCliContext): void {
           workspace: opts.workspace,
           concurrency: opts.concurrency,
           language: opts.language,
+          verbose: opts.verbose,
           cliScript: process.argv[1],
         },
         cli,

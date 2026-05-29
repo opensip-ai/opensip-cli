@@ -42,6 +42,13 @@ export interface GraphCommandOptions {
    */
   readonly language?: string;
   /**
+   * `-v, --verbose`: when true, the renderer includes the detailed
+   * catalog / findings-by-rule / entry-points sections in addition to
+   * the one-line summary. Default (false) shows the summary + footer
+   * hint only, matching fit's surface.
+   */
+  readonly verbose?: boolean;
+  /**
    * Optional concurrency cap for `--workspace`. Defaults to
    * `os.cpus().length - 1`. Exposed primarily for tests.
    */

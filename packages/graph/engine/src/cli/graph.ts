@@ -38,7 +38,7 @@ import { buildCliOutput, buildCliOutputFromFindings, renderJson } from '../rende
 
 import { detectLanguages } from './detect.js';
 import { runCatalogJsonMode, runGateMode, runReportMode } from './graph-modes.js';
-import { writeUnifiedReport } from './graph-report.js';
+import { writeFooterHintsPlain, writeRunSummaryPlain, writeUnifiedReport } from './graph-report.js';
 import { runGraph } from './orchestrate.js';
 import { positionalPathLabel, resolvePositionalPaths } from './positional-paths.js';
 import { MemoryPressureError } from './pressure-monitor.js';
@@ -203,7 +203,7 @@ async function dispatchGraphResult(
     logger.info({ evt: EVT_GRAPH_COMPLETE, module: MODULE_GRAPH_CLI });
     return;
   }
-  renderGraphResult(opts, result);
+  renderGraphResult(opts, result, startedAt);
   // `--json` is a peer of --gate-save / --gate-compare / --report-to /
   // --catalog-output: the run's purpose is producing a machine-readable
   // artifact, not populating dashboard session history. Skipping the
@@ -225,6 +225,7 @@ async function dispatchGraphResult(
 function renderGraphResult(
   opts: GraphCommandOptions,
   result: Awaited<ReturnType<typeof runGraph>>,
+  startedAt: string,
 ): void {
   if (opts.json === true) {
     logger.info({ evt: 'graph.render.json.start', module: MODULE_GRAPH_RENDER });
@@ -234,12 +235,30 @@ function renderGraphResult(
     return;
   }
   logger.info({ evt: 'graph.render.table.start', module: MODULE_GRAPH_RENDER });
-  writeUnifiedReport({
-    catalog: result.catalog,
-    indexes: result.indexes,
-    signals: result.signals,
-    cacheHit: result.cacheHit,
+  // Mirror the Ink live-view surface: default shows summary + footer
+  // hint only; `--verbose` opens up the catalog / findings-by-rule /
+  // entry-points report. Both paths emit the fit-style one-line summary
+  // so a default `pnpm graph <scope>` run reads the same as default
+  // `pnpm graph`.
+  const verbose = opts.verbose === true;
+  if (verbose) {
+    writeUnifiedReport({
+      catalog: result.catalog,
+      indexes: result.indexes,
+      signals: result.signals,
+      cacheHit: result.cacheHit,
+    });
+  }
+  const cliOutput = buildCliOutput(result.signals, 'graph');
+  const durationMs = Math.max(0, Date.now() - Date.parse(startedAt));
+  writeRunSummaryPlain({
+    passed: cliOutput.summary.passed,
+    failed: cliOutput.summary.failed,
+    errors: cliOutput.summary.errors,
+    warnings: cliOutput.summary.warnings,
+    durationMs,
   });
+  if (!verbose) writeFooterHintsPlain();
   logger.info({ evt: 'graph.render.table.complete', module: MODULE_GRAPH_RENDER });
 }
 
