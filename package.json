@@ -20,6 +20,7 @@
     "lint": "eslint 'packages/**/src/**/*.{ts,tsx}' && pnpm depcruise",
     "lint:fix": "eslint --fix 'packages/**/src/**/*.{ts,tsx}'",
     "depcruise": "depcruise packages",
+    "depcruise:types": "depcruise packages --config .dependency-cruiser.types.cjs",
     "depcruise:graph": "depcruise --output-type dot packages | dot -T svg > docs/dependency-graph.svg",
     "clean": "turbo run clean",
     "cli": "node packages/cli/dist/index.js",

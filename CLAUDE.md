@@ -49,7 +49,8 @@ opensip-tools/
 │   │   ├── checks-python/       # @opensip-tools/checks-python
 │   │   ├── checks-go/           # @opensip-tools/checks-go
 │   │   ├── checks-java/         # @opensip-tools/checks-java
-│   │   └── checks-cpp/          # @opensip-tools/checks-cpp
+│   │   ├── checks-cpp/          # @opensip-tools/checks-cpp
+│   │   └── checks-rust/         # @opensip-tools/checks-rust
 │   │
 │   ├── simulation/              # simulation namespace
 │   │   └── engine/              # @opensip-tools/simulation
@@ -153,7 +154,7 @@ Subcommands available out of the box:
   (drizzle-orm, typed-inject, react, package.json exports, tsconfig).
 - `@opensip-tools/checks-universal` (92 checks) — text/regex/glob checks
   (Docker, .env, Sentry, generic structure, dead-code via knip).
-- `@opensip-tools/checks-python|go|java|cpp` — language-specific checks.
+- `@opensip-tools/checks-python|go|java|cpp|rust` — language-specific checks.
 
 ### Key Files
 
