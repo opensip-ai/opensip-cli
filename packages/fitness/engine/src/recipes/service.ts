@@ -8,6 +8,7 @@
  * coordinates parallel/sequential execution, and builds results.
  */
 
+import { passRate } from '@opensip-tools/contracts'
 import { logger , NotFoundError, SystemError , generateId , initParseCache, clearParseCache, RunScope, currentScope, runWithScope } from '@opensip-tools/core'
 
 import { fileCache, DEFAULT_PREWARM_PATTERNS } from '../framework/file-cache.js'
@@ -311,7 +312,7 @@ export class FitnessRecipeService {
       totalIgnored: session.totalIgnored,
     }
 
-    const score = session.totalChecks > 0 ? Math.round((session.passedChecks / session.totalChecks) * 100) : 100
+    const score = passRate({ total: session.totalChecks, passed: session.passedChecks })
 
     const result: FitnessRecipeResult = {
       recipeId: session.recipe.id,

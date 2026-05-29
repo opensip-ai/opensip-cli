@@ -77,10 +77,28 @@ describe('renderJson', () => {
     expect(cliOutput.summary.warnings).toBe(1);
   });
 
-  it('score caps at 0 for many findings', () => {
+  it('scores 100 for a warnings-only run regardless of finding count (fit-aligned)', () => {
+    // 200 warning-severity findings under one rule: the rule still passes
+    // (no errors), so the pass rate is 100% — score is passed/total checks,
+    // NOT a per-finding penalty. Regression for the dashboard rendering 0%
+    // PASS RATE on a warnings-only graph run while showing 4/4 checks passed.
     const signals = Array.from({ length: 200 }, (_, i) => sig({ message: `m${String(i)}` }));
     const cliOutput = buildCliOutput(signals, 'graph');
-    expect(cliOutput.score).toBe(0);
+    expect(cliOutput.summary).toMatchObject({ total: 1, passed: 1, failed: 0 });
+    expect(cliOutput.passed).toBe(true);
+    expect(cliOutput.score).toBe(100);
+  });
+
+  it('score is the passed/total check ratio when some rules have errors', () => {
+    // One error-bearing rule (fails) + one warning-only rule (passes) -> 50%.
+    const signals = [
+      sig({ ruleId: 'graph:has-errors', severity: 'high', message: 'e1' }),
+      sig({ ruleId: 'graph:warn-only', severity: 'low', message: 'w1' }),
+    ];
+    const cliOutput = buildCliOutput(signals, 'graph');
+    expect(cliOutput.summary).toMatchObject({ total: 2, passed: 1, failed: 1 });
+    expect(cliOutput.score).toBe(50);
+    expect(cliOutput.passed).toBe(false);
   });
 
   it('preserves filePath, line, column and suggestion in findings', () => {

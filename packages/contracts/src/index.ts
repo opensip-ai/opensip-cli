@@ -53,6 +53,11 @@ export type {
   ErrorResult,
 } from './types.js';
 
+// Canonical pass-rate (`score`) computation — shared by every tool that
+// builds a CliOutput so the dashboard "PASS RATE" stays consistent across
+// fit/graph and cannot drift back into per-tool formulas.
+export { passRate } from './score.js';
+
 // Exit codes + error suggestion helper + typed-error → exit-code mapping
 export { EXIT_CODES, getErrorSuggestion, mapToolErrorToExitCode } from './exit-codes.js';
 export type { ErrorSuggestion } from './exit-codes.js';

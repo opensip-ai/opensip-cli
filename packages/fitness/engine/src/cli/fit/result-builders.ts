@@ -12,6 +12,7 @@
 
 import {
   SessionRepo,
+  passRate,
   // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
   type CliArgs,
   type CliOutput,
@@ -70,12 +71,11 @@ export function buildCliOutput(
   recipeName: string | undefined,
 ): CliOutput {
   const { summary, checkResults, durationMs } = fitnessResult;
-  // Empty-recipe score is 100 to match service.buildResult's formula —
-  // gate baselines and the live renderer must agree on the same value
-  // or --gate-compare reports a phantom regression on the next run.
-  const score = summary.totalChecks > 0
-    ? Math.round((summary.passedChecks / summary.totalChecks) * 100)
-    : 100;
+  // Shared pass-rate helper — the live renderer, service.buildResult, and
+  // graph all route through passRate() so gate baselines and the dashboard
+  // can never disagree (a divergence here used to risk a phantom
+  // --gate-compare regression).
+  const score = passRate({ total: summary.totalChecks, passed: summary.passedChecks });
   return {
     version: '1.0',
     tool: 'fit',

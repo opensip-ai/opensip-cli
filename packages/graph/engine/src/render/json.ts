@@ -6,6 +6,8 @@
  * shape from @opensip-tools/contracts. No graph-private JSON shape.
  */
 
+import { passRate } from '@opensip-tools/contracts';
+
 import type { Renderer } from './types.js';
 import type { CheckOutput, CliOutput, FindingOutput } from '@opensip-tools/contracts';
 
@@ -55,20 +57,24 @@ export function buildCliOutput(
   const totalFindings = signals.length;
   const errors = signals.filter((s) => s.severity === 'critical' || s.severity === 'high').length;
   const warnings = totalFindings - errors;
+  const summary = {
+    total: checks.length,
+    passed: checks.filter((c) => c.passed).length,
+    failed: checks.filter((c) => !c.passed).length,
+    errors,
+    warnings,
+  };
   return {
     version: '1.0',
     tool: 'graph',
     timestamp: new Date().toISOString(),
     recipe: command,
-    score: totalFindings === 0 ? 100 : Math.max(0, 100 - totalFindings),
+    // Pass rate from passed/total checks — same definition as fit. A
+    // warnings-only run is all-checks-passed, so it scores 100 (was a
+    // `100 - findings` penalty that showed 0% for warning-heavy runs).
+    score: passRate(summary),
     passed: errors === 0,
-    summary: {
-      total: checks.length,
-      passed: checks.filter((c) => c.passed).length,
-      failed: checks.filter((c) => !c.passed).length,
-      errors,
-      warnings,
-    },
+    summary,
     checks,
     durationMs: 0,
   };
@@ -112,20 +118,22 @@ export function buildCliOutputFromFindings(
   const totalFindings = findings.length;
   const errors = findings.filter((f) => f.severity === 'error').length;
   const warnings = totalFindings - errors;
+  const summary = {
+    total: checks.length,
+    passed: checks.filter((c) => c.passed).length,
+    failed: checks.filter((c) => !c.passed).length,
+    errors,
+    warnings,
+  };
   return {
     version: '1.0',
     tool: 'graph',
     timestamp: new Date().toISOString(),
     recipe: command,
-    score: totalFindings === 0 ? 100 : Math.max(0, 100 - totalFindings),
+    // Pass rate from passed/total checks — see buildCliOutput above.
+    score: passRate(summary),
     passed: errors === 0,
-    summary: {
-      total: checks.length,
-      passed: checks.filter((c) => c.passed).length,
-      failed: checks.filter((c) => !c.passed).length,
-      errors,
-      warnings,
-    },
+    summary,
     checks,
     durationMs,
   };
