@@ -1,12 +1,23 @@
 import { mkdirSync, writeFileSync, rmSync , mkdtempSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 
 import { loadPlugin, loadAllPlugins } from '../loader.js'
 
 import type { DiscoveredPlugin } from '@opensip-tools/core'
+
+// Test fixtures are written to tmpdir() and dynamically imported. Node ESM
+// resolution walks up from /tmp/... and can never reach the workspace's
+// node_modules, so bare specifiers like '@opensip-tools/fitness' fail at
+// import time. Resolve the fitness entrypoint here (the test file IS in
+// fitness, so its require can resolve the package) and inject the absolute
+// file URL into each fixture template.
+const require = createRequire(import.meta.url)
+const FITNESS_URL = pathToFileURL(require.resolve('@opensip-tools/fitness')).href
 
 let testDir: string
 
@@ -98,7 +109,7 @@ describe('loadPlugin', () => {
   it('registers Check instances exported as named exports (no array wrapper)', async () => {
     const pluginFile = join(testDir, 'named-export-checks.mjs')
     writeFileSync(pluginFile, `
-      import { defineCheck } from '@opensip-tools/fitness';
+      import { defineCheck } from '${FITNESS_URL}';
 
       export const myFirstCheck = defineCheck({
         id: '11111111-1111-1111-1111-111111111111',
@@ -138,7 +149,7 @@ describe('loadPlugin', () => {
   it('registers a Check from default export', async () => {
     const pluginFile = join(testDir, 'default-export-check.mjs')
     writeFileSync(pluginFile, `
-      import { defineCheck } from '@opensip-tools/fitness';
+      import { defineCheck } from '${FITNESS_URL}';
 
       export default defineCheck({
         id: '33333333-3333-3333-3333-333333333333',
@@ -233,7 +244,7 @@ describe('loadPlugin', () => {
   it('deduplicates checks appearing in both array and named exports', async () => {
     const pluginFile = join(testDir, 'dedup-checks.mjs')
     writeFileSync(pluginFile, `
-      import { defineCheck } from '@opensip-tools/fitness';
+      import { defineCheck } from '${FITNESS_URL}';
 
       export const sameCheck = defineCheck({
         id: '44444444-4444-4444-4444-444444444444',

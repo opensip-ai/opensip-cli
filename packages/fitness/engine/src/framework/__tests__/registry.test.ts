@@ -43,8 +43,8 @@ describe('CheckRegistry', () => {
 
     it('throws NotFoundError for missing slug', () => {
       const registry = new CheckRegistry();
-      expect(() => registry.get('nonexistent')).toThrowError(NotFoundError);
-      expect(() => registry.get('nonexistent')).toThrowError('Check not found: nonexistent');
+      expect(() => registry.get('nonexistent')).toThrow(NotFoundError);
+      expect(() => registry.get('nonexistent')).toThrow('Check not found: nonexistent');
     });
   });
 

@@ -74,7 +74,7 @@ describe('mapTagsToSignalCategory — warn-once on unknown tags', () => {
     mapTagsToSignalCategory(['warn-once-fixture-tag']);
     mapTagsToSignalCategory(['warn-once-fixture-tag']);
     mapTagsToSignalCategory(['warn-once-fixture-tag']);
-    const matching = warnSpy.mock.calls.filter((c) => {
+    const matching = warnSpy.mock.calls.filter((c: readonly unknown[]) => {
       const arg = c[0] as { tags?: string[] } | undefined;
       return arg?.tags?.[0] === 'warn-once-fixture-tag';
     });
