@@ -96,6 +96,14 @@ export { fitnessTool, fitnessTool as tool } from './tool.js';
 // CLI command implementations — re-exported for the Phase 2 CLI which
 // still drives commands directly. Phase 4 will collapse these behind
 // the Tool contract.
+//
+// Audit 2026-05-29 (L2): `executeFit` and `openDashboard` were assessed
+// for removal as "legacy" exports but BOTH have live consumers —
+// `executeFit` by the SaaS-mode concurrency test
+// (cli/__tests__/saas-mode-smoke.test.ts) and `openDashboard` by the
+// CLI dashboard auto-open (cli/bootstrap/dashboard.ts). They are active
+// API, not dead code; removing them needs those consumers migrated to
+// the Tool contract first (Phase 4), which is out of scope for L2.
 export {
   executeFit,
   ensureChecksLoaded,
@@ -124,8 +132,10 @@ export {
 } from './gate.js';
 export type { GateCompareResult } from './gate.js';
 export { FitBaselineRepo } from './persistence/baseline-repo.js';
-export { buildSarifLog, chunkSarifRuns, reportToCloud } from './sarif.js';
-export type { ReportResult } from './sarif.js';
+// SARIF + cloud reporting moved to @opensip-tools/contracts (audit
+// 2026-05-29, M1) so graph can report without a graph→fitness cycle.
+// Import buildSarifLog / chunkSarifRuns / reportToCloud / ReportResult
+// from @opensip-tools/contracts.
 
 // Shared utilities for check authors (extracted from per-pack copies).
 export { isCommentLine, isTestFile, getCheckDisplayName, getCheckIcon } from './check-utils/index.js';

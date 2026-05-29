@@ -17,6 +17,7 @@ import { sql } from 'drizzle-orm';
 import { graphCatalog } from './schema.js';
 
 import type { Catalog } from '../types.js';
+import type { GraphCatalog } from '@opensip-tools/contracts';
 import type { DataStore } from '@opensip-tools/datastore';
 
 const MODULE_NAME = 'graph:catalog-repo';
@@ -135,6 +136,19 @@ export class CatalogRepo {
       throw error;
       /* v8 ignore stop */
     }
+  }
+
+  /**
+   * Read the catalog as the cross-tool {@link GraphCatalog} contract —
+   * the shape the dashboard (and fitness's dashboard command) depend on.
+   * This is the supported cross-tool read path: it lets fitness drop its
+   * raw-SQL `SELECT … FROM graph_catalog` (audit 2026-05-29, H1). The
+   * internal `Catalog` is structurally assignable to the GraphCatalog
+   * contract, so this is a plain widening — no cast — verified by the
+   * compiler at this boundary, where graph owns both types.
+   */
+  loadCatalogContract(): GraphCatalog | null {
+    return this.loadFullCatalog();
   }
 
   /**

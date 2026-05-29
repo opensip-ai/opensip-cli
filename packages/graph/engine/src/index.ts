@@ -27,6 +27,10 @@ export type {
 } from './cli/orchestrate.js';
 export { buildUnifiedReportLines } from './cli/graph.js';
 export type { UnifiedReportInput } from './cli/graph.js';
+// Graph catalog persistence — exposed so consumers (e.g. fitness's
+// dashboard command) can read the catalog via a typed repo instead of
+// raw SQL against the graph_catalog table (audit 2026-05-29, H1).
+export { CatalogRepo } from './persistence/catalog-repo.js';
 export { MemoryPressureError } from './cli/pressure-monitor.js';
 export {
   HEAP_TARGETS,

@@ -38,12 +38,11 @@ import {
   type CliOutput,
   type ErrorResult,
   type FitDoneResult,
+  reportToCloud,
 } from '@opensip-tools/contracts';
 /* eslint-enable sonarjs/deprecation */
 import { Box, Static, Text, useApp, render } from 'ink';
 import React, { useCallback, useEffect, useState } from 'react';
-
-import { reportToCloud } from '../sarif.js';
 
 import {
   CloudReportStatusLine,

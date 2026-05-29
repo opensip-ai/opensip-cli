@@ -10,14 +10,12 @@ import { join } from 'node:path';
 
 import {
   SessionRepo,
-  type CheckCatalogEntry,
   type GraphCatalog,
-  type RecipeCatalogEntry,
   type DashboardResult,
 } from '@opensip-tools/contracts';
 import { logger, resolveProjectPaths } from '@opensip-tools/core';
 import { generateDashboardHtml } from '@opensip-tools/dashboard';
-import { sql } from 'drizzle-orm';
+import { CatalogRepo } from '@opensip-tools/graph';
 
 
 import { defaultRegistry } from '../framework/registry.js';
@@ -27,6 +25,40 @@ import { loadSignalersConfig } from '../signalers/index.js';
 import { ensureChecksLoaded, getDisplayName, getIcon } from './fit.js';
 
 import type { DataStore } from '@opensip-tools/datastore';
+
+// ---------------------------------------------------------------------------
+// Dashboard catalog entries (fitness-owned)
+//
+// Audit 2026-05-29 (L1): these describe fitness's check/recipe catalogs
+// rendered on the dashboard. They are fitness domain vocabulary, so they
+// live here rather than in @opensip-tools/contracts. The dashboard, as
+// the presentation owner, consumes them structurally via DashboardInput
+// (typed `readonly unknown[]`) — the same opaque-payload model used for
+// session detail and the graph catalog.
+// ---------------------------------------------------------------------------
+
+/** Check catalog entry for dashboard display. */
+export interface CheckCatalogEntry {
+  readonly slug: string;
+  readonly name: string;
+  readonly icon: string;
+  readonly description: string;
+  readonly longDescription?: string;
+  readonly tags: readonly string[];
+  readonly confidence: 'high' | 'medium' | 'low';
+  readonly source: 'built-in' | 'community';
+}
+
+/** Recipe catalog entry for dashboard display. */
+export interface RecipeCatalogEntry {
+  readonly name: string;
+  readonly displayName: string;
+  readonly description: string;
+  readonly tags: readonly string[];
+  readonly selectorType: string;
+  readonly mode: string;
+  readonly timeout: number;
+}
 
 // ---------------------------------------------------------------------------
 // openDashboard
@@ -67,48 +99,38 @@ function loadEditorProtocol(projectDir?: string): string | null {
 }
 
 /**
- * Read the graph catalog from the datastore's `graph_catalog` table.
- * Returns null when no datastore is available (e.g. the auto-open flow
- * that doesn't pass one) or when the catalog table is empty — the
- * dashboard renders the Code Paths panel in a no-data state.
+ * Read the graph catalog for the dashboard's Code Paths panel via graph's
+ * typed {@link CatalogRepo}. Returns null when no datastore is available
+ * (e.g. the auto-open flow that doesn't pass one) or when the catalog is
+ * empty — the dashboard renders the panel in a no-data state.
  *
- * Why raw SQL instead of importing `CatalogRepo` from `@opensip-tools/graph`:
- * graph already depends on fitness (the SARIF helpers — DEC-3), so a
- * fitness → graph dep would create a build cycle. The graph_catalog
- * table schema is stable and documented in
- * `packages/graph/engine/src/persistence/schema.ts`. The dashboard
- * reads `payload` (typed columns aren't needed for rendering) and
- * deserializes it as the `GraphCatalog` shape the renderer expects.
- *
- * If a non-cyclic seam ever becomes available (e.g. SARIF helpers
- * relocated to a lower layer breaking the graph → fitness edge), this
- * function should switch to importing the repo class.
+ * History (audit 2026-05-29, H1): this used to read `graph_catalog` with
+ * raw SQL because a `fitness → graph` import would have closed a cycle
+ * (graph → fitness existed via reportToCloud). That cycle was removed by
+ * relocating the SARIF/reportToCloud module to @opensip-tools/contracts
+ * (M1), so fitness now consumes graph's catalog through the supported
+ * `CatalogRepo.loadCatalogContract()` seam — typed, no hardcoded table
+ * name, and it can't silently drift from graph's schema.
  */
-interface GraphCatalogRow {
-  readonly payload: string;
-}
-
 function loadGraphCatalog(datastore?: DataStore): GraphCatalog | null {
   if (!datastore) return null;
   try {
-    const row = datastore.db
-      .get<GraphCatalogRow>(sql`SELECT payload FROM graph_catalog WHERE id = 1`);
-    if (!row) {
+    const catalog = new CatalogRepo(datastore).loadCatalogContract();
+    if (!catalog) {
       logger.info({
         evt: 'graph.dashboard.catalog.miss',
         module: 'fitness:dashboard',
-        msg: 'No graph_catalog row in datastore; rendering panel without it',
+        msg: 'No graph catalog in datastore; rendering panel without it',
       });
       return null;
     }
-    const parsed = (typeof row.payload === 'string' ? JSON.parse(row.payload) : row.payload) as GraphCatalog;
     logger.info({
       evt: 'graph.dashboard.catalog.load',
       module: 'fitness:dashboard',
       msg: 'Loaded graph catalog from datastore',
-      functions: Object.keys(parsed.functions).length,
+      functions: Object.keys(catalog.functions).length,
     });
-    return parsed;
+    return catalog;
   } catch (error) {
     logger.warn({
       evt: 'graph.dashboard.catalog.read-error',

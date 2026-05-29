@@ -460,18 +460,50 @@ module.exports = {
     // tree-sitter ships only as a dep of the @opensip-tools/graph-
     // (python|rust) adapter packs, where it belongs.
     {
-      // Documented exception: graph imports SARIF helpers from fitness
-      // (DEC-3 in docs/plans/graph-tool-v2-design.md Appendix C).
-      // Both packages sit at the tools/lang peer layer; the import is
-      // restricted to render/sarif.ts via the rule below. Listed as
-      // 'info' so the build records the edge but doesn't reject it.
-      name: 'graph-may-import-fitness-sarif',
-      severity: 'info',
+      // Audit 2026-05-29 (M1): the prior `graph-may-import-fitness-sarif`
+      // info-exception is gone. The only real graph→fitness edge was
+      // `reportToCloud`; the SARIF + cloud-reporting module moved to
+      // @opensip-tools/contracts (the cross-cutting output-format
+      // contract), so graph and fitness both consume it from below with
+      // no peer cycle. Graph must now NOT import fitness at all — there
+      // is no sanctioned exception. (Breaking this cycle is what lets
+      // fitness read graph's catalog via CatalogRepo instead of raw SQL;
+      // see H1.) Production source only; test files may use devDeps.
+      name: 'graph-no-fitness',
+      severity: 'error',
       comment:
-        'Graph imports SARIF helpers from fitness as a peer-layer dependency. ' +
-        'Allowed cross-tool import documented in DEC-3.',
-      from: { path: '^packages/graph/engine/src/render/sarif\\.ts$' },
-      to: { path: '^@opensip-tools/fitness$' },
+        'Graph must not import @opensip-tools/fitness. The former SARIF / ' +
+        'reportToCloud edge was removed by relocating that module to ' +
+        '@opensip-tools/contracts (audit 2026-05-29, M1).',
+      from: {
+        path: '^packages/graph/',
+        pathNot: ['/__tests__/', '\\.test\\.(ts|tsx)$'],
+      },
+      to: { path: '^@opensip-tools/fitness($|/)' },
+    },
+    {
+      // Audit 2026-05-29 (H1): the ONE sanctioned fitness→graph edge.
+      // Fitness's dashboard command reads the graph catalog via graph's
+      // typed CatalogRepo (replacing the prior raw-SQL graph_catalog
+      // read). Pin it to dashboard.ts so the cross-tool edge stays
+      // tracked and can't sprawl — the lesson from M1's stale rule.
+      // `@opensip-tools/graph($|/)` matches the engine only, not the
+      // graph-* adapter packs.
+      name: 'fitness-no-graph-except-dashboard',
+      severity: 'error',
+      comment:
+        'Only fitness/engine/src/cli/dashboard.ts may import ' +
+        '@opensip-tools/graph (CatalogRepo, for the dashboard Code Paths ' +
+        'panel). Any other fitness→graph import is forbidden.',
+      from: {
+        path: '^packages/fitness/',
+        pathNot: [
+          '^packages/fitness/engine/src/cli/dashboard\\.ts$',
+          '/__tests__/',
+          '\\.test\\.(ts|tsx)$',
+        ],
+      },
+      to: { path: '^@opensip-tools/graph($|/)' },
     },
 
     // -------------------------------------------------------------------

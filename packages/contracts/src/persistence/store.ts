@@ -40,28 +40,10 @@ export interface StoredSession {
   readonly payload?: unknown;
 }
 
-/** Check catalog entry for dashboard display */
-export interface CheckCatalogEntry {
-  readonly slug: string;
-  readonly name: string;
-  readonly icon: string;
-  readonly description: string;
-  readonly longDescription?: string;
-  readonly tags: readonly string[];
-  readonly confidence: 'high' | 'medium' | 'low';
-  readonly source: 'built-in' | 'community';
-}
-
-/** Recipe catalog entry for dashboard display */
-export interface RecipeCatalogEntry {
-  readonly name: string;
-  readonly displayName: string;
-  readonly description: string;
-  readonly tags: readonly string[];
-  readonly selectorType: string;
-  readonly mode: string;
-  readonly timeout: number;
-}
+// CheckCatalogEntry / RecipeCatalogEntry moved to fitness (audit
+// 2026-05-29, L1) — they are fitness check/recipe catalog vocabulary,
+// not a cross-cutting contract. The dashboard consumes them structurally
+// via DashboardInput. See packages/fitness/engine/src/cli/dashboard.ts.
 
 /** Generate a unique session ID */
 export function generateSessionId(): string {

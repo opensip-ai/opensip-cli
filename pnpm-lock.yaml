@@ -424,6 +424,9 @@ importers:
       '@opensip-tools/datastore':
         specifier: workspace:*
         version: link:../../datastore
+      '@opensip-tools/graph':
+        specifier: workspace:*
+        version: link:../../graph/engine
       commander:
         specifier: ^14.0.3
         version: 14.0.3
@@ -476,9 +479,6 @@ importers:
       '@opensip-tools/datastore':
         specifier: workspace:*
         version: link:../../datastore
-      '@opensip-tools/fitness':
-        specifier: workspace:*
-        version: link:../../fitness/engine
       commander:
         specifier: ^14.0.3
         version: 14.0.3

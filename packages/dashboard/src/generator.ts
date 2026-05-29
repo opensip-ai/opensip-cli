@@ -20,8 +20,6 @@ import { dashboardToolTabsJs } from './tool-tabs.js'
 
 import type {
   StoredSession,
-  CheckCatalogEntry,
-  RecipeCatalogEntry,
   GraphCatalog,
 } from '@opensip-tools/contracts'
 
@@ -40,8 +38,13 @@ import type {
  */
 export interface DashboardInput {
   sessions: StoredSession[];
-  checkCatalog?: CheckCatalogEntry[];
-  recipeCatalog?: RecipeCatalogEntry[];
+  // Tool-owned catalog data, consumed structurally by the dashboard's
+  // renderers (audit 2026-05-29, L1). Typed `unknown[]` because the entry
+  // shapes (fitness's CheckCatalogEntry / RecipeCatalogEntry) are tool
+  // domain vocabulary owned by the producing tool, not contracts. The
+  // dashboard inlines them as JSON and its JS reads fields structurally.
+  checkCatalog?: readonly unknown[];
+  recipeCatalog?: readonly unknown[];
   graphCatalog?: GraphCatalog | null;
   editorProtocol?: string | null;
 }

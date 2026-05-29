@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { generateDashboardHtml } from '../generator.js';
 
-import type { CheckCatalogEntry, RecipeCatalogEntry, StoredSession } from '@opensip-tools/contracts';
+import type { StoredSession } from '@opensip-tools/contracts';
 
 function makeSession(overrides: Partial<StoredSession> = {}): StoredSession {
   return {
@@ -19,7 +19,9 @@ function makeSession(overrides: Partial<StoredSession> = {}): StoredSession {
   };
 }
 
-const checkCatalog: CheckCatalogEntry[] = [
+// Catalog entry shapes are fitness-owned (L1); the dashboard consumes
+// them structurally, so the test supplies plain objects.
+const checkCatalog = [
   {
     slug: 'no-console-log',
     name: 'No console.log',
@@ -31,7 +33,7 @@ const checkCatalog: CheckCatalogEntry[] = [
   },
 ];
 
-const recipeCatalog: RecipeCatalogEntry[] = [
+const recipeCatalog = [
   {
     name: 'default',
     displayName: 'Default',

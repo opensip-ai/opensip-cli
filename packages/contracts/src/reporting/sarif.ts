@@ -1,7 +1,7 @@
 import { withRetry, logger } from '@opensip-tools/core';
 
-import type { SarifResult, SarifLocation } from './sarif/types.js';
-import type { CliOutput } from '@opensip-tools/contracts';
+import type { SarifResult, SarifLocation } from './sarif-types.js';
+import type { CliOutput } from '../types.js';
 
 const SARIF_SCHEMA = 'https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json';
 const MAX_FINDINGS_PER_CHUNK = 500;
@@ -28,8 +28,9 @@ interface SarifRun {
 /**
  * Fluent builder for a single SARIF result. Replaces the inline
  * Record-shaped construction in `buildSarifRuns`; keeps the producer
- * type-aligned with the consumer (`gate.ts extractViolationsFromSarif`)
- * by routing every result through the shared `SarifResult` interface.
+ * type-aligned with the consumer (fitness `gate.ts
+ * extractViolationsFromSarif`) by routing every result through the
+ * shared `SarifResult` interface.
  */
 class SarifResultBuilder {
   private readonly result: SarifResult;

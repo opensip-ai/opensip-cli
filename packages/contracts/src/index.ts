@@ -65,11 +65,7 @@ export type { CliDefaults } from './cli-config.js';
 
 // Session persistence
 export { generateSessionId, sanitizeForFilename } from './persistence/store.js';
-export type {
-  StoredSession,
-  CheckCatalogEntry,
-  RecipeCatalogEntry,
-} from './persistence/store.js';
+export type { StoredSession } from './persistence/store.js';
 // v2 persistence: SessionRepo + sessions schema.
 // `LegacyStoredSession` and `migrateLegacyStoredSession` (if either survived
 // the v2 migration) are intentionally NOT re-exported here — they are
@@ -93,6 +89,15 @@ export type {
   GraphCallConfidence,
   GraphVisibility,
 } from './graph-catalog.js';
+
+// SARIF + cloud reporting (audit 2026-05-29, M1). The cross-cutting
+// output-format contract — sits with CliOutput and the exit codes.
+// Relocated from fitness so both fitness and graph can report to cloud
+// without a `graph → fitness` import cycle (the cycle that previously
+// forced fitness's raw-SQL graph_catalog read; see H1).
+export { buildSarifLog, chunkSarifRuns, reportToCloud } from './reporting/sarif.js';
+export type { ReportResult } from './reporting/sarif.js';
+export type { SarifResult, SarifLocation } from './reporting/sarif-types.js';
 
 // `commander` is referenced here purely as a type — `import type` keeps
 // the runtime bundle (`dist/index.js`) free of any commander require.
