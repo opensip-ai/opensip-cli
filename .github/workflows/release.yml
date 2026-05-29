@@ -164,7 +164,12 @@ jobs:
               echo "::notice::skip ${name}@${VERSION} (already on npm)"
               return 0
             fi
-            npm publish /tmp/tarballs/opensip-tools-${pkg}-*.tgz --access public --provenance
+            # Pin the tarball filename to the exact version rather than a
+            # `-*.tgz` glob. The glob form bites when one package's name is
+            # a prefix of another's — e.g. `graph` matches `graph-typescript`,
+            # `graph-python`, `graph-rust`, `graph-go`, `graph-java` — and
+            # `npm publish` receives multiple paths and errors EUSAGE.
+            npm publish /tmp/tarballs/opensip-tools-${pkg}-${VERSION}.tgz --access public --provenance
           }
 
           # Layer 1 — kernel
