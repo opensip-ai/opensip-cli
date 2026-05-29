@@ -1,52 +1,36 @@
 /**
- * graph:high-blast-function — flag functions whose change-impact (a.k.a.
- * "blast radius") exceeds a threshold. A function-level analogue of
- * codeindex's file-level blast metric, computed in Stage 3 via bounded
- * reverse BFS and surfaced as a refactor-risk signal.
+ * graph:high-blast-function — surface functions whose change-impact
+ * (a.k.a. "blast radius") sits at the top of the codebase, as an
+ * **informational structural insight**, not a defect.
  *
- * The blast score (BlastScore.score = direct + 0.5 × transitive) is
- * already in `indexes.blastRadius`; this rule only decides *which*
- * scores are worth flagging and at what severity.
+ * High blast is often intentional: shared kernel primitives
+ * (`currentScope`, `getById`, `ConfigurationError`) and framework
+ * factories (`defineCheck`) have wide reach by design — that's their
+ * contract. Refactoring them to lower their score would just promote
+ * the next-highest function into the top percentile; there is no
+ * "clean" state for a percentile-based rule.
+ *
+ * The signal is therefore emitted at `'low'` severity (SARIF `note`).
+ * It maps to `warning` in the CliOutput severity vocabulary because
+ * the type system bottoms out there, but it should not be treated as
+ * a gate. Use it as a map of where refactor risk lives — verify the
+ * listed functions have stable contracts and integration coverage.
+ *
+ * The blast score (`BlastScore.score = direct + 0.5 × transitive`) is
+ * computed in Stage 3 via bounded reverse BFS and lives in
+ * `indexes.blastRadius`; this rule only decides which scores are worth
+ * surfacing.
  */
 
 import { createSignal } from '@opensip-tools/core';
 
-import type { BlastScore, Rule } from '../types.js';
+import type { Rule } from '../types.js';
 import type { Signal } from '@opensip-tools/core';
 
-/**
- * Verdict returned by the threshold policy. `null` means "don't flag."
- * A non-null verdict drives the Signal severity. We intentionally
- * support both 'medium' and 'high' so the policy can escalate the
- * worst offenders without flooding the report at uniform severity.
- */
-type HighBlastVerdict = 'medium' | 'high' | null;
-
-/** Hybrid policy thresholds — tune these if the rule is too quiet or too noisy. */
-const HIGH_PERCENTILE = 0.01;   // top 1% of scores → 'high'
-const MEDIUM_PERCENTILE = 0.05; // next 4% (down to top 5%) → 'medium'
-const ABSOLUTE_FLOOR = 5;       // never flag scores below this, regardless of percentile
-
-/**
- * Decide whether a blast score is high enough to flag, and if so, at
- * what severity. Hybrid policy — relative percentile gate AND absolute
- * floor — so small/shallow graphs don't generate flags and pathological
- * graphs don't drown the report.
- */
-function classifyBlast(
-  score: BlastScore,
-  allScores: readonly BlastScore[],
-): HighBlastVerdict {
-  if (score.score < ABSOLUTE_FLOOR) return null;
-  if (allScores.length === 0) return null;
-  const highCut = allScores[Math.floor(allScores.length * HIGH_PERCENTILE)]?.score
-    ?? Number.POSITIVE_INFINITY;
-  if (score.score >= highCut) return 'high';
-  const medCut = allScores[Math.floor(allScores.length * MEDIUM_PERCENTILE)]?.score
-    ?? Number.POSITIVE_INFINITY;
-  if (score.score >= medCut) return 'medium';
-  return null;
-}
+/** Surface the top 5% of scored functions (above the absolute floor) as informational signals. */
+const SURFACE_PERCENTILE = 0.05;
+/** Never surface scores below this — shallow graphs would otherwise emit noise. */
+const ABSOLUTE_FLOOR = 5;
 
 export const highBlastFunctionRule: Rule = {
   slug: 'graph:high-blast-function',
@@ -55,6 +39,9 @@ export const highBlastFunctionRule: Rule = {
     const allScores = [...indexes.blastRadius.values()].sort(
       (a, b) => b.score - a.score,
     );
+    if (allScores.length === 0) return [];
+    const cutoffScore = allScores[Math.floor(allScores.length * SURFACE_PERCENTILE)]?.score
+      ?? Number.POSITIVE_INFINITY;
     const signals: Signal[] = [];
     for (const occ of indexes.byBodyHash.values()) {
       if (occ.kind === 'module-init') continue;
@@ -62,24 +49,24 @@ export const highBlastFunctionRule: Rule = {
       if (occ.definedInGenerated) continue;
       const score = indexes.blastRadius.get(occ.bodyHash);
       if (!score) continue;
-      const verdict = classifyBlast(score, allScores);
-      if (verdict === null) continue;
+      if (score.score < ABSOLUTE_FLOOR) continue;
+      if (score.score < cutoffScore) continue;
       signals.push(
         createSignal({
           source: 'graph',
           provider: 'opensip-tools',
-          severity: verdict,
+          severity: 'low',
           category: 'quality',
           ruleId: 'graph:high-blast-function',
           message:
             `${occ.simpleName} has a blast radius of ${score.score.toFixed(1)} `
             + `(direct=${String(score.direct)}, transitive=${String(score.transitive)}). `
-            + `Changes here ripple through many call sites — refactor with care.`,
+            + `Structural insight — many call sites depend on this function.`,
           code: { file: occ.filePath, line: occ.line, column: occ.column },
           suggestion:
-            'Consider whether this function does too much. Splitting it, '
-            + 'introducing a stable interface, or adding integration coverage '
-            + 'will reduce refactor risk.',
+            'Informational. High blast is often intentional (shared primitives, framework factories). '
+            + 'Verify the function has a stable contract and integration coverage. '
+            + 'Splitting only helps if the function genuinely does too much.',
           metadata: {
             simpleName: occ.simpleName,
             qualifiedName: occ.qualifiedName,

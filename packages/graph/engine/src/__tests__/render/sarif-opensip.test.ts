@@ -45,7 +45,7 @@ const RULE_FIXTURES: readonly RuleFixture[] = [
   },
   {
     slug: 'graph:high-blast-function',
-    severity: 'high',
+    severity: 'low',
     message: "Function 'parseConfig' has 47 transitive callers (blast radius).",
     filePath: 'src/config/parser.ts',
     line: 12,

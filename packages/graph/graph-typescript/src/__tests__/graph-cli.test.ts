@@ -123,17 +123,39 @@ describe('executeGraph', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it('default mode prints the unified text report', async () => {
+  it('default mode prints the fit-style summary + footer hint (no detailed report)', async () => {
     setupFixture(dir, {
       'index.ts': `function unused(): number { return 1; }\nexport function main(): void {}\n`,
     });
     const { cli, exitCodes } = makeCli();
     await executeGraph({ cwd: dir }, cli);
+    // Default surface mirrors fit's done view: one-line summary + footer hint,
+    // detail behind --verbose.
+    expect(stdout).toContain(' Passed, ');
+    expect(stdout).toContain(' Failed (');
+    expect(stdout).toContain(' Errors, ');
+    expect(stdout).toContain(' Warnings)');
+    expect(stdout).toContain(' | Duration ');
+    expect(stdout).toContain('Use --verbose for detailed results');
+    expect(stdout).not.toContain('== Catalog ==');
+    expect(stdout).not.toContain('== Findings');
+    expect(exitCodes).toContain(0);
+  });
+
+  it('--verbose mode prints the detailed unified text report', async () => {
+    setupFixture(dir, {
+      'index.ts': `function unused(): number { return 1; }\nexport function main(): void {}\n`,
+    });
+    const { cli, exitCodes } = makeCli();
+    await executeGraph({ cwd: dir, verbose: true }, cli);
     expect(stdout).toContain('opensip-tools graph');
     expect(stdout).toContain('== Catalog ==');
     expect(stdout).toContain('== Findings');
     expect(stdout).toContain('== Entry points');
-    expect(stdout).toContain('== Summary ==');
+    // The trailing "== Summary ==" block is suppressed in verbose mode;
+    // the fit-style summary line follows the report body.
+    expect(stdout).not.toContain('== Summary ==');
+    expect(stdout).toContain(' Passed, ');
     expect(exitCodes).toContain(0);
   });
 

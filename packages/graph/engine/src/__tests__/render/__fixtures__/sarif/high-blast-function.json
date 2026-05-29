@@ -18,7 +18,7 @@
       "results": [
         {
           "ruleId": "graph.complexity.high-blast-function",
-          "level": "error",
+          "level": "note",
           "message": {
             "text": "Function 'parseConfig' has 47 transitive callers (blast radius)."
           },

@@ -47,10 +47,9 @@ describe('graph:high-blast-function', () => {
     expect(signals).toHaveLength(0);
   });
 
-  it('flags the top-percentile function when it clears the absolute floor', () => {
+  it('surfaces the top-percentile function when it clears the absolute floor', () => {
     // One hub called by 10 unique callers (direct=10 → score=10, above floor=5).
-    // The hub is the top 1/11 ≈ top 9% — clears HIGH_PERCENTILE=1% gate iff it
-    // is the strict maximum, which it is.
+    // The hub is the strict maximum, so it clears the SURFACE_PERCENTILE=5% gate.
     const hub = occ({ bodyHash: 'h', simpleName: 'hub' });
     const callers = Array.from({ length: 10 }, (_, i) =>
       occ({ bodyHash: `c${String(i)}`, simpleName: `c${String(i)}`, calls: [staticCall('h')] }),
@@ -60,7 +59,7 @@ describe('graph:high-blast-function', () => {
     const signals = highBlastFunctionRule.evaluate(catalog, indexes, {});
     const hubSignal = signals.find((s) => s.metadata.simpleName === 'hub');
     expect(hubSignal).toBeDefined();
-    expect(hubSignal?.severity).toBe('high');
+    expect(hubSignal?.severity).toBe('low');
     expect(hubSignal?.metadata.blastDirect).toBe(10);
   });
 
