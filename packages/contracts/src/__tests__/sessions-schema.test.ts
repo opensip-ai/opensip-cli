@@ -1,11 +1,7 @@
 import { getTableConfig } from 'drizzle-orm/sqlite-core';
 import { describe, expect, it } from 'vitest';
 
-import {
-  sessionChecks,
-  sessionFindings,
-  sessions,
-} from '../persistence/schema/sessions.js';
+import { sessions, sessionToolPayload } from '../persistence/schema/sessions.js';
 
 describe('sessions schema', () => {
   it('declares the (tool, timestamp DESC) lookup index on sessions', () => {
@@ -20,28 +16,28 @@ describe('sessions schema', () => {
     expect(toolTimestampIdx?.config.columns).toHaveLength(2);
   });
 
-  it('wires the session_checks -> sessions cascade foreign key', () => {
+  it('keeps the sessions table free of tool-specific detail columns', () => {
+    // The session split removed the fitness-shaped `summary` column; detail
+    // lives in the opaque session_tool_payload table. Guard against a
+    // regression that reintroduces domain vocabulary into the generic row.
+    const { columns } = getTableConfig(sessions);
+    const names = columns.map((c) => c.name);
+    expect(names).not.toContain('summary');
+    expect(names).toEqual(
+      expect.arrayContaining(['id', 'tool', 'timestamp', 'cwd', 'recipe', 'score', 'passed', 'duration_ms']),
+    );
+  });
+
+  it('wires the session_tool_payload -> sessions cascade foreign key', () => {
     // Foreign-key targets in Drizzle are lazy thunks (`() => sessions.id`).
     // Calling fk.reference() invokes them, both proving the cascade target
     // resolves and covering the otherwise-dead callback in coverage reports.
-    const { foreignKeys, indexes } = getTableConfig(sessionChecks);
+    const { foreignKeys, columns } = getTableConfig(sessionToolPayload);
     expect(foreignKeys).toHaveLength(1);
     expect(foreignKeys[0]?.onDelete).toBe('cascade');
     const ref = foreignKeys[0]?.reference();
     expect(ref?.foreignTable).toBe(sessions);
-    expect(indexes.some((idx) => idx.config.name === 'session_checks_session_idx')).toBe(
-      true,
-    );
-  });
-
-  it('wires the session_findings -> session_checks cascade foreign key', () => {
-    const { foreignKeys, indexes } = getTableConfig(sessionFindings);
-    expect(foreignKeys).toHaveLength(1);
-    expect(foreignKeys[0]?.onDelete).toBe('cascade');
-    const ref = foreignKeys[0]?.reference();
-    expect(ref?.foreignTable).toBe(sessionChecks);
-    expect(
-      indexes.some((idx) => idx.config.name === 'session_findings_check_idx'),
-    ).toBe(true);
+    // Opaque by construction: just the FK, the tool discriminator, and the blob.
+    expect(columns.map((c) => c.name).sort()).toEqual(['payload', 'session_id', 'tool']);
   });
 });

@@ -4,24 +4,15 @@ import { generateDashboardHtml } from '../generator.js';
 
 import type { StoredSession } from '@opensip-tools/contracts';
 
-function makeSession(overrides: Partial<StoredSession> = {}): StoredSession {
+// Fitness-shaped detail now lives in the tool-owned opaque `payload`;
+// `contracts` no longer carries summary/checks on StoredSession. The
+// dashboard inlines the whole session (payload included), so data
+// assertions below still hold.
+function fitnessPayload(): unknown {
   return {
-    id: overrides.id ?? 'test-session-1',
-    tool: overrides.tool ?? 'fit',
-    timestamp: overrides.timestamp ?? '2025-06-15T10:30:00.000Z',
-    // eslint-disable-next-line sonarjs/publicly-writable-directories -- test fixture cwd; not a runtime filesystem operation
-    cwd: overrides.cwd ?? '/tmp/my-project',
-    recipe: overrides.recipe,
-    score: overrides.score ?? 85,
-    passed: overrides.passed ?? true,
-    summary: overrides.summary ?? { total: 10, passed: 8, failed: 2, errors: 1, warnings: 3 },
-    checks: overrides.checks ?? [
-      {
-        checkSlug: 'no-console-log',
-        passed: true,
-        findings: [],
-        durationMs: 42,
-      },
+    summary: { total: 10, passed: 8, failed: 2, errors: 1, warnings: 3 },
+    checks: [
+      { checkSlug: 'no-console-log', passed: true, findings: [], durationMs: 42 },
       {
         checkSlug: 'no-hardcoded-secrets',
         passed: false,
@@ -37,7 +28,21 @@ function makeSession(overrides: Partial<StoredSession> = {}): StoredSession {
         durationMs: 100,
       },
     ],
+  };
+}
+
+function makeSession(overrides: Partial<StoredSession> = {}): StoredSession {
+  return {
+    id: 'test-session-1',
+    tool: 'fit',
+    timestamp: '2025-06-15T10:30:00.000Z',
+    // eslint-disable-next-line sonarjs/publicly-writable-directories -- test fixture cwd; not a runtime filesystem operation
+    cwd: '/tmp/my-project',
+    score: 85,
+    passed: true,
     durationMs: 1234,
+    payload: fitnessPayload(),
+    ...overrides,
   };
 }
 
@@ -77,20 +82,23 @@ describe('generateDashboardHtml', () => {
     // If session data contains "</script>", it could break out of the script tag.
     // The function replaces </ with <\/ to prevent this.
     const session = makeSession({
-      checks: [
-        {
-          checkSlug: 'xss-check',
-          passed: false,
-          findings: [
-            {
-              ruleId: 'xss',
-              message: 'Contains </script><script>alert(1)</script> payload',
-              severity: 'error',
-            },
-          ],
-          durationMs: 10,
-        },
-      ],
+      payload: {
+        summary: { total: 1, passed: 0, failed: 1, errors: 1, warnings: 0 },
+        checks: [
+          {
+            checkSlug: 'xss-check',
+            passed: false,
+            findings: [
+              {
+                ruleId: 'xss',
+                message: 'Contains </script><script>alert(1)</script> payload',
+                severity: 'error',
+              },
+            ],
+            durationMs: 10,
+          },
+        ],
+      },
     });
     const html = generateDashboardHtml({ sessions: [session] });
     // The raw "</script>" inside the data should be escaped

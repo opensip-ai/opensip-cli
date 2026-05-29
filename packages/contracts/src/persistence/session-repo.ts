@@ -1,7 +1,7 @@
 import { SystemError, isToolShortId, logger } from '@opensip-tools/core';
 import { desc, eq, lt } from 'drizzle-orm';
 
-import { sessions, sessionChecks, sessionFindings } from './schema/sessions.js';
+import { sessions, sessionToolPayload } from './schema/sessions.js';
 
 import type { StoredSession } from './store.js';
 import type { ToolShortId } from '@opensip-tools/core';
@@ -15,27 +15,14 @@ export interface SessionListOptions {
   readonly limit?: number;
 }
 
-interface SessionSummary {
-  readonly total: number;
-  readonly passed: number;
-  readonly failed: number;
-  readonly errors: number;
-  readonly warnings: number;
-}
-
-function isSessionSummary(v: unknown): v is SessionSummary {
-  if (typeof v !== 'object' || v === null) return false;
-  const s = v as Record<string, unknown>;
-  return (
-    typeof s.total === 'number' &&
-    typeof s.passed === 'number' &&
-    typeof s.failed === 'number' &&
-    typeof s.errors === 'number' &&
-    typeof s.warnings === 'number'
-  );
-}
-
-/** Persistence layer for tool-run sessions and their per-check findings. */
+/**
+ * Persistence layer for tool-run sessions.
+ *
+ * Stores generic session columns plus one opaque per-tool `payload`
+ * blob. This layer holds ZERO tool vocabulary — it never inspects or
+ * validates the payload shape; the producing tool owns that. (Audit
+ * 2026-05-29, session split.)
+ */
 export class SessionRepo {
   constructor(private readonly datastore: DataStore) {}
 
@@ -51,39 +38,18 @@ export class SessionRepo {
             recipe: session.recipe ?? null,
             score: session.score,
             passed: session.passed,
-            summary: session.summary,
             durationMs: session.durationMs,
           })
           .run();
-        for (const check of session.checks) {
-          const inserted = tx
-            .insert(sessionChecks)
+        // Tool-owned opaque detail. Written when the caller supplies it;
+        // `contracts` never inspects the shape.
+        if (session.payload !== undefined) {
+          tx.insert(sessionToolPayload)
             .values({
               sessionId: session.id,
-              checkSlug: check.checkSlug,
-              passed: check.passed,
-              violationCount: check.violationCount ?? null,
-              durationMs: check.durationMs,
+              tool: session.tool,
+              payload: session.payload,
             })
-            .returning({ id: sessionChecks.id })
-            .all();
-          const sessionCheckId = inserted[0]?.id;
-          if (sessionCheckId === undefined) continue;
-          if (check.findings.length === 0) continue;
-          tx.insert(sessionFindings)
-            .values(
-              check.findings.map((f) => ({
-                sessionCheckId,
-                ruleId: f.ruleId,
-                severity: f.severity,
-                message: f.message,
-                filePath: f.filePath ?? null,
-                line: f.line ?? null,
-                column: f.column ?? null,
-                suggestion: f.suggestion ?? null,
-                category: f.category ?? null,
-              })),
-            )
             .run();
         }
       });
@@ -93,7 +59,7 @@ export class SessionRepo {
         msg: 'Session saved',
         sessionId: session.id,
         tool: session.tool,
-        checkCount: session.checks.length,
+        hasPayload: session.payload !== undefined,
       });
     } catch (error) {
       logger.error({
@@ -201,51 +167,14 @@ export class SessionRepo {
         { code: 'SYSTEM.DATA.UNKNOWN_TOOL' },
       );
     }
-    // Validate the JSON summary blob — drizzle returns it as `unknown` and
-    // an older writer (or a corrupted row) could be missing fields. Reading
-    // them as `undefined` where `number` is expected would corrupt history
-    // display and gate comparison silently.
-    if (!isSessionSummary(row.summary)) {
-      throw new SystemError(
-        `Session ${row.id} has corrupted summary JSON`,
-        { code: 'SYSTEM.DATA.CORRUPT_SUMMARY' },
-      );
-    }
-    // Hydrate checks + findings inside a single read transaction so the
-    // multi-statement walk presents a consistent snapshot — otherwise a
-    // concurrent writer could insert or delete findings between the
-    // check-row fetch and the per-check finding fetch, producing phantom
-    // or missing findings for the same session.
-    const checks = this.datastore.transaction((tx) => {
-      const checkRows = tx
-        .select()
-        .from(sessionChecks)
-        .where(eq(sessionChecks.sessionId, row.id))
-        .all();
-      return checkRows.map((check) => {
-        const findingRows = tx
-          .select()
-          .from(sessionFindings)
-          .where(eq(sessionFindings.sessionCheckId, check.id))
-          .all();
-        return {
-          checkSlug: check.checkSlug,
-          passed: check.passed,
-          violationCount: check.violationCount ?? undefined,
-          findings: findingRows.map((f) => ({
-            ruleId: f.ruleId,
-            message: f.message,
-            severity: f.severity,
-            filePath: f.filePath ?? undefined,
-            line: f.line ?? undefined,
-            column: f.column ?? undefined,
-            suggestion: f.suggestion ?? undefined,
-            category: f.category ?? undefined,
-          })),
-          durationMs: check.durationMs,
-        };
-      });
-    });
+    // Tool-owned opaque detail. drizzle returns the JSON column already
+    // parsed; contracts does not inspect or validate the shape — that is
+    // the owning tool's responsibility.
+    const payloadRow = this.datastore.db
+      .select({ payload: sessionToolPayload.payload })
+      .from(sessionToolPayload)
+      .where(eq(sessionToolPayload.sessionId, row.id))
+      .get();
     return {
       id: row.id,
       tool: row.tool,
@@ -254,9 +183,8 @@ export class SessionRepo {
       recipe: row.recipe ?? undefined,
       score: row.score,
       passed: row.passed,
-      summary: row.summary,
-      checks,
       durationMs: row.durationMs,
+      payload: payloadRow?.payload,
     };
   }
 }

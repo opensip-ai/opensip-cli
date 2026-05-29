@@ -49,6 +49,10 @@ ${badgeStylesEntries}
 
   sessions.forEach(s => {
     const sc2 = s.score >= 90 ? 'color:var(--success)' : s.score >= 70 ? 'color:var(--warning)' : 'color:var(--error)';
+    // Per-session counts live in the tool-owned opaque payload. Tools
+    // that persist no summary (or none yet) fall back to zeros so the
+    // cross-tool row stays well-formed.
+    const sm = (s.payload && s.payload.summary) || { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 };
     const row = el('tr', {class:'clickable', onclick: () => {
       // Tabs that need session-aware deep-linking (Code Paths today;
       // future fit/sim detail views) register an activator into the
@@ -73,8 +77,8 @@ ${badgeStylesEntries}
     const statusCell = el('td');
     statusCell.appendChild(statusBadge(sessionStatus(s)));
     row.appendChild(statusCell);
-    row.appendChild(el('td', {text: s.summary.passed+'/'+s.summary.total}));
-    row.appendChild(el('td', {text: ''+(s.summary.errors + (s.summary.warnings || 0))}));
+    row.appendChild(el('td', {text: sm.passed+'/'+sm.total}));
+    row.appendChild(el('td', {text: ''+(sm.errors + (sm.warnings || 0))}));
     row.appendChild(el('td', {text: (s.durationMs/1000).toFixed(1)+'s', style:'color:var(--text-dim)'}));
     tbody.appendChild(row);
   });

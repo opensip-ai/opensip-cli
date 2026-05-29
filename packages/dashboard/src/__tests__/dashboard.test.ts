@@ -12,9 +12,9 @@ function makeSession(overrides: Partial<StoredSession> = {}): StoredSession {
     cwd: '/proj',
     score: 92,
     passed: true,
-    summary: { total: 10, passed: 9, failed: 1, errors: 0, warnings: 0 },
-    checks: [],
     durationMs: 100,
+    // Tool-owned opaque detail; contracts no longer carries summary/checks.
+    payload: { summary: { total: 10, passed: 9, failed: 1, errors: 0, warnings: 0 }, checks: [] },
     ...overrides,
   };
 }

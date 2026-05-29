@@ -77,7 +77,7 @@ export type {
 // barrel only if a real external consumer materializes.
 export { SessionRepo } from './persistence/session-repo.js';
 export type { SessionListOptions } from './persistence/session-repo.js';
-export { sessions, sessionChecks, sessionFindings } from './persistence/schema/sessions.js';
+export { sessions, sessionToolPayload } from './persistence/schema/sessions.js';
 
 // Graph catalog type surface. This is the contract surface between the
 // graph tool (which writes catalog.json) and the dashboard package

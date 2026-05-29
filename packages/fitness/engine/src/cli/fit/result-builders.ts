@@ -21,6 +21,8 @@ import {
 } from '@opensip-tools/contracts';
 import { generatePrefixedId, logger } from '@opensip-tools/core';
 
+import { buildFitnessSessionPayload } from '../../persistence/session-payload.js';
+
 import { getPluginLoadErrors } from './check-loader.js';
 import { getDisplayName } from './display-registry.js';
 
@@ -265,23 +267,11 @@ export function persistFitSession(
       recipe: output.recipe,
       score: output.score,
       passed: output.passed,
-      summary: output.summary,
-      checks: output.checks.map((c) => ({
-        checkSlug: c.checkSlug,
-        passed: c.passed,
-        violationCount: c.violationCount,
-        findings: c.findings.map((f) => ({
-          ruleId: f.ruleId,
-          message: f.message,
-          severity: f.severity,
-          filePath: f.filePath,
-          line: f.line,
-          column: f.column,
-          suggestion: f.suggestion,
-        })),
-        durationMs: c.durationMs,
-      })),
       durationMs: output.durationMs,
+      // Fitness-owned opaque detail (summary + per-check findings). The
+      // generic session row above holds zero fitness vocabulary; the
+      // dashboard reads this payload to render the Fitness tab.
+      payload: buildFitnessSessionPayload(output),
     });
   } catch (error) {
     logger.warn({

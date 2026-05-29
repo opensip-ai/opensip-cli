@@ -34,6 +34,7 @@ import {
   ValidationError,
 } from '@opensip-tools/core';
 
+import { buildGraphSessionPayload } from '../persistence/session-payload.js';
 import { buildCliOutput, buildCliOutputFromFindings, renderJson } from '../render/json.js';
 
 import { detectLanguages } from './detect.js';
@@ -408,23 +409,11 @@ function saveGraphSession(
       cwd: opts.cwd,
       score: cliOutput.score,
       passed: cliOutput.passed,
-      summary: cliOutput.summary,
-      checks: cliOutput.checks.map((c) => ({
-        checkSlug: c.checkSlug,
-        passed: c.passed,
-        violationCount: c.violationCount,
-        findings: c.findings.map((f) => ({
-          ruleId: f.ruleId,
-          message: f.message,
-          severity: f.severity,
-          filePath: f.filePath,
-          line: f.line,
-          column: f.column,
-          suggestion: f.suggestion,
-        })),
-        durationMs: c.durationMs,
-      })),
       durationMs: cliOutput.durationMs,
+      // Graph-owned opaque detail: a native signal summary. No more
+      // contorting signals into fitness-style "checks/findings" — the
+      // generic session row holds zero graph vocabulary.
+      payload: buildGraphSessionPayload(cliOutput.summary),
     });
   } catch {
     /* v8 ignore next */

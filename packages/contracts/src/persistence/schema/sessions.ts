@@ -1,6 +1,11 @@
 import { sql } from 'drizzle-orm';
 import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
+/**
+ * Generic tool-run session record. Holds only columns every tool shares;
+ * per-session detail lives in {@link sessionToolPayload}. The persistence
+ * layer holds ZERO tool-specific vocabulary. (Audit 2026-05-29.)
+ */
 export const sessions = sqliteTable(
   'sessions',
   {
@@ -11,7 +16,6 @@ export const sessions = sqliteTable(
     recipe: text('recipe'),
     score: integer('score').notNull(),
     passed: integer('passed', { mode: 'boolean' }).notNull(),
-    summary: text('summary', { mode: 'json' }).notNull(),
     durationMs: integer('duration_ms').notNull(),
   },
   (table) => [
@@ -19,36 +23,19 @@ export const sessions = sqliteTable(
   ],
 );
 
-export const sessionChecks = sqliteTable(
-  'session_checks',
-  {
-    id: integer('id').primaryKey({ autoIncrement: true }),
-    sessionId: text('session_id')
-      .notNull()
-      .references(() => sessions.id, { onDelete: 'cascade' }),
-    checkSlug: text('check_slug').notNull(),
-    passed: integer('passed', { mode: 'boolean' }).notNull(),
-    violationCount: integer('violation_count'),
-    durationMs: integer('duration_ms').notNull(),
-  },
-  (table) => [index('session_checks_session_idx').on(table.sessionId)],
-);
-
-export const sessionFindings = sqliteTable(
-  'session_findings',
-  {
-    id: integer('id').primaryKey({ autoIncrement: true }),
-    sessionCheckId: integer('session_check_id')
-      .notNull()
-      .references(() => sessionChecks.id, { onDelete: 'cascade' }),
-    ruleId: text('rule_id').notNull(),
-    severity: text('severity').notNull(),
-    message: text('message').notNull(),
-    filePath: text('file_path'),
-    line: integer('line'),
-    column: integer('column'),
-    suggestion: text('suggestion'),
-    category: text('category'),
-  },
-  (table) => [index('session_findings_check_idx').on(table.sessionCheckId)],
-);
+/**
+ * Tool-owned opaque per-session detail (audit 2026-05-29, session split).
+ *
+ * One row per session. `payload` is a JSON blob whose shape is owned and
+ * validated by the writing tool — `contracts` treats it as opaque and
+ * holds zero tool-specific (check/finding/summary) vocabulary. The
+ * dashboard, as the presentation owner, reads this payload and renders
+ * it — the same producer/consumer split used for `GraphCatalog`.
+ */
+export const sessionToolPayload = sqliteTable('session_tool_payload', {
+  sessionId: text('session_id')
+    .primaryKey()
+    .references(() => sessions.id, { onDelete: 'cascade' }),
+  tool: text('tool').notNull(),
+  payload: text('payload', { mode: 'json' }).notNull(),
+});

@@ -6,6 +6,25 @@ import { SessionRepo } from '../persistence/session-repo.js';
 
 import type { StoredSession } from '../persistence/store.js';
 
+// A representative opaque payload. `contracts` never inspects the shape;
+// these tests exercise verbatim round-tripping of whatever a tool writes.
+function fitnessLikePayload(): unknown {
+  return {
+    summary: { total: 5, passed: 4, failed: 1, errors: 0, warnings: 1 },
+    checks: [
+      {
+        checkSlug: 'demo-check',
+        passed: true,
+        violationCount: 1,
+        durationMs: 50,
+        findings: [
+          { ruleId: 'demo-check', message: 'demo finding', severity: 'warning', filePath: 'src/a.ts', line: 10 },
+        ],
+      },
+    ],
+  };
+}
+
 function makeSession(overrides: Partial<StoredSession> = {}): StoredSession {
   return {
     id: 'ses-test-1',
@@ -15,26 +34,8 @@ function makeSession(overrides: Partial<StoredSession> = {}): StoredSession {
     recipe: 'default',
     score: 95,
     passed: true,
-    summary: { total: 5, passed: 4, failed: 1, errors: 0, warnings: 1 },
     durationMs: 250,
-    checks: [
-      {
-        checkSlug: 'demo-check',
-        passed: true,
-        violationCount: 1,
-        durationMs: 50,
-        findings: [
-          {
-            ruleId: 'demo-check',
-            message: 'demo finding',
-            severity: 'warning',
-            filePath: 'src/a.ts',
-            line: 10,
-            column: 0,
-          },
-        ],
-      },
-    ],
+    payload: fitnessLikePayload(),
     ...overrides,
   };
 }
@@ -52,7 +53,7 @@ afterEach(() => {
 });
 
 describe('SessionRepo — save / get', () => {
-  it('persists a session with checks + findings and reads it back unchanged', () => {
+  it('persists a session with its opaque payload and reads it back unchanged', () => {
     const session = makeSession();
     repo.save(session);
     const fetched = repo.get(session.id);
@@ -64,30 +65,19 @@ describe('SessionRepo — save / get', () => {
     expect(repo.get('does-not-exist')).toBeNull();
   });
 
-  it('round-trips empty checks array', () => {
-    const session = makeSession({ checks: [] });
+  it('round-trips a session with no payload (tools may persist none)', () => {
+    const session = makeSession({ payload: undefined });
     repo.save(session);
     const fetched = repo.get(session.id);
-    expect(fetched?.checks).toEqual([]);
+    expect(fetched).not.toBeNull();
+    expect(fetched?.payload).toBeUndefined();
   });
 
-  it('round-trips findings with optional fields omitted', () => {
-    const session = makeSession({
-      checks: [
-        {
-          checkSlug: 'no-loc',
-          passed: true,
-          durationMs: 10,
-          findings: [{ ruleId: 'no-loc', message: 'global', severity: 'info' }],
-        },
-      ],
-    });
+  it('treats the payload as fully opaque — any JSON shape round-trips verbatim', () => {
+    const payload = { kind: 'graph', summary: { total: 3 }, nested: [{ a: 1 }, { b: [true, null] }] };
+    const session = makeSession({ id: 'opaque', tool: 'graph', payload });
     repo.save(session);
-    const fetched = repo.get(session.id);
-    const finding = fetched?.checks[0]?.findings[0];
-    expect(finding?.filePath).toBeUndefined();
-    expect(finding?.line).toBeUndefined();
-    expect(finding?.column).toBeUndefined();
+    expect(repo.get('opaque')?.payload).toEqual(payload);
   });
 });
 
@@ -126,7 +116,7 @@ describe('SessionRepo — purge / clearAll / count', () => {
     expect(repo.count()).toBe(2);
   });
 
-  it('purge(date) deletes sessions older than the cutoff and cascades to checks/findings', () => {
+  it('purge(date) deletes sessions older than the cutoff', () => {
     repo.save(makeSession({ id: 'old', timestamp: '2026-01-01T00:00:00.000Z' }));
     repo.save(makeSession({ id: 'recent', timestamp: '2026-05-21T00:00:00.000Z' }));
     const cutoff = new Date('2026-03-01T00:00:00.000Z');
@@ -144,13 +134,12 @@ describe('SessionRepo — purge / clearAll / count', () => {
   });
 });
 
-describe('SessionRepo — JSON round-trip', () => {
-  it('preserves the summary aggregate exactly', () => {
-    const session = makeSession({
-      summary: { total: 100, passed: 90, failed: 10, errors: 3, warnings: 7 },
-    });
+describe('SessionRepo — payload round-trip', () => {
+  it('preserves a nested payload aggregate exactly', () => {
+    const payload = { summary: { total: 100, passed: 90, failed: 10, errors: 3, warnings: 7 } };
+    const session = makeSession({ payload });
     repo.save(session);
-    expect(repo.get(session.id)?.summary).toEqual(session.summary);
+    expect(repo.get(session.id)?.payload).toEqual(payload);
   });
 });
 
@@ -184,11 +173,11 @@ describe('SessionRepo — error paths', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Hydration guards — regression coverage for the 2026-05-25 audit fix that
-// replaced blind `as`-casts on row.tool / row.summary with runtime validation.
-// Both fields are stored as plain text (no SQLite CHECK constraint), so a
-// legacy or hand-edited row could carry a value outside the declared union.
-// The guards turn that silent corruption into an immediate, explicit throw.
+// Hydration guard — row.tool is stored as plain text (no SQLite CHECK
+// constraint), so a legacy or hand-edited row could carry a value outside
+// the declared union. The guard turns that silent corruption into an
+// explicit throw. (The prior summary-shape guard was removed with the
+// session split: contracts no longer knows or validates the payload shape.)
 // ---------------------------------------------------------------------------
 
 describe('SessionRepo — hydration guards', () => {
@@ -199,17 +188,5 @@ describe('SessionRepo — hydration guards', () => {
     datastore.db.update(sessions).set({ tool: 'not-a-real-tool' }).run();
     expect(() => repo.get('tool-corrupt')).toThrow(/unknown tool value/);
     expect(() => repo.list()).toThrow(/unknown tool value/);
-  });
-
-  it('throws on a session row whose summary blob is missing required fields', () => {
-    repo.save(makeSession({ id: 'summary-corrupt' }));
-    // mode:'json' columns accept any JSON-serialisable value at the driver
-    // layer — drizzle types it as `unknown` precisely because no runtime
-    // schema is enforced.
-    datastore.db
-      .update(sessions)
-      .set({ summary: { total: 5, passed: 4 } })
-      .run();
-    expect(() => repo.get('summary-corrupt')).toThrow(/corrupted summary JSON/);
   });
 });

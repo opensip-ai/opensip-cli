@@ -9,10 +9,12 @@ export function dashboardSessionsJs(): string {
 // SESSION TABLE (used by fitness/sim tabs)
 // =======================================================
 
-/** Derive 3-state session status: 'fail' | 'warn' | 'pass' */
+/** Derive 3-state session status: 'fail' | 'warn' | 'pass'
+ *  Counts live in the tool-owned opaque payload (summary). */
 function sessionStatus(s) {
-  if (s.summary.failed > 0) return 'fail';
-  if (s.summary.warnings > 0) return 'warn';
+  const sm = (s.payload && s.payload.summary) || {};
+  if (sm.failed > 0) return 'fail';
+  if (sm.warnings > 0) return 'warn';
   return 'pass';
 }
 
@@ -42,6 +44,7 @@ function renderSessionTable(panel, toolSessions, accentColor) {
   const tbody = el('tbody');
   toolSessions.forEach((s, idx) => {
     const sc = s.score >= 90 ? 'color:var(--success)' : s.score >= 70 ? 'color:var(--warning)' : 'color:var(--error)';
+    const sm = (s.payload && s.payload.summary) || { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 };
     const row = el('tr', {class:'clickable', id: 'session-row-' + tool + '-' + idx, 'data-session-id': s.id, onclick: () => {
       tbody.querySelectorAll('tr.selected').forEach(r => r.classList.remove('selected'));
       row.classList.add('selected');
@@ -55,9 +58,9 @@ function renderSessionTable(panel, toolSessions, accentColor) {
     const badgeCell = el('td');
     badgeCell.appendChild(statusBadge(sessionStatus(s)));
     row.appendChild(badgeCell);
-    row.appendChild(el('td', {text: ''+s.summary.passed, style:'color:var(--success)'}));
-    row.appendChild(el('td', {text: ''+s.summary.failed, style: s.summary.failed > 0 ? 'color:var(--error)' : 'color:var(--text-dim)'}));
-    row.appendChild(el('td', {text: ''+(s.summary.errors + (s.summary.warnings || 0))}));
+    row.appendChild(el('td', {text: ''+sm.passed, style:'color:var(--success)'}));
+    row.appendChild(el('td', {text: ''+sm.failed, style: sm.failed > 0 ? 'color:var(--error)' : 'color:var(--text-dim)'}));
+    row.appendChild(el('td', {text: ''+(sm.errors + (sm.warnings || 0))}));
     row.appendChild(el('td', {text: (s.durationMs/1000).toFixed(1)+'s', style:'color:var(--text-dim)'}));
     tbody.appendChild(row);
   });
@@ -76,10 +79,13 @@ function renderSessionTable(panel, toolSessions, accentColor) {
     detailContainer.style.display = 'block';
     while (detailContainer.firstChild) detailContainer.removeChild(detailContainer.firstChild);
 
+    // Per-check detail lives in the tool-owned opaque payload.
+    const checks = (session.payload && session.payload.checks) || [];
+
     // Compute session-level totals from check findings
     let totalErrors = 0;
     let totalWarnings = 0;
-    session.checks.forEach(c => {
+    checks.forEach(c => {
       if (c.findings) {
         c.findings.forEach(f => {
           if (f.severity === 'error') totalErrors++;
@@ -114,7 +120,7 @@ function renderSessionTable(panel, toolSessions, accentColor) {
     table.appendChild(thead);
 
     const tbody = el('tbody');
-    const sortedChecks = [...session.checks].sort((a, b) => {
+    const sortedChecks = [...checks].sort((a, b) => {
       const aErrors = a.findings ? a.findings.filter(f => f.severity === 'error').length : 0;
       const bErrors = b.findings ? b.findings.filter(f => f.severity === 'error').length : 0;
       return bErrors - aErrors;

@@ -19,6 +19,21 @@ function scoreColor(score: number, theme: { scoreHigh: string; scoreMid: string;
   return theme.scoreLow;
 }
 
+/**
+ * Extract a generic passed/total ratio from a session's opaque payload,
+ * if the tool wrote one. The history view is presentation: it reads the
+ * tool-owned payload structurally (the same model the dashboard uses)
+ * rather than `contracts` carrying a fitness-shaped summary. Returns null
+ * for sessions whose payload has no summary so the column is omitted.
+ */
+function payloadCounts(payload: unknown): { passed: number; total: number } | null {
+  if (payload === null || typeof payload !== 'object') return null;
+  const summary = (payload as { summary?: unknown }).summary;
+  if (summary === null || typeof summary !== 'object') return null;
+  const { passed, total } = summary as { passed?: unknown; total?: unknown };
+  return typeof passed === 'number' && typeof total === 'number' ? { passed, total } : null;
+}
+
 export function HistoryTable({ sessions }: HistoryTableProps): React.ReactElement {
   const theme = useTheme();
 
@@ -44,6 +59,7 @@ export function HistoryTable({ sessions }: HistoryTableProps): React.ReactElemen
       {visible.map((s) => {
         const date = new Date(s.timestamp).toLocaleString();
         const duration = `${(s.durationMs / 1000).toFixed(1)}s`;
+        const counts = payloadCounts(s.payload);
         return (
           <Text key={s.id}>
             {'  '}
@@ -55,7 +71,7 @@ export function HistoryTable({ sessions }: HistoryTableProps): React.ReactElemen
               {s.passed ? 'PASS' : 'FAIL'}
             </Text>
             {'  '}
-            {s.summary.passed}/{s.summary.total} checks
+            {counts ? `${counts.passed}/${counts.total} checks` : ''}
             {s.recipe && <Text dimColor> ({s.recipe})</Text>}
             {'  '}
             <Text dimColor>{duration}</Text>

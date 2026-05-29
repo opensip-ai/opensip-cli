@@ -13,7 +13,11 @@ export function dashboardChecksJs(): string {
 function computeCheckStats() {
   const stats = {};
   for (const s of sessions) {
-    for (const ch of s.checks) {
+    // Per-session detail lives in the tool-owned opaque payload; fitness
+    // sessions carry { summary, checks }. Sessions without checks (graph,
+    // sim) contribute nothing here.
+    const checks = (s.payload && s.payload.checks) || [];
+    for (const ch of checks) {
       if (!stats[ch.checkSlug]) stats[ch.checkSlug] = { runs: 0, passed: 0, failed: 0, lastRun: null };
       const st = stats[ch.checkSlug];
       st.runs++;
