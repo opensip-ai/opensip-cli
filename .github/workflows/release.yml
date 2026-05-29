@@ -139,6 +139,22 @@ jobs:
           pnpm --filter @opensip-tools/cli              pack --pack-destination /tmp/tarballs
           ls -la /tmp/tarballs
 
+      # Post-pack / pre-publish smoke test. Installs the freshly-packed
+      # tarballs *together* into a throwaway consumer project (forcing
+      # every @opensip-tools/* dep to its local tarball via npm
+      # overrides) and actually loads the CLI. This is the gate that
+      # would have caught the 2.0.0 incident: a stale cli-ui tarball that
+      # did not export `RunFooterHints` while fitness imported it — every
+      # version string and dep range was valid, but the CLI crashed on
+      # startup. verify-release checks strings and ranges; only loading
+      # the packed bytes together catches an inter-package export/ABI
+      # mismatch. Runs BEFORE publish, so a bad set never reaches npm
+      # (where version immutability makes it unrecoverable).
+      - name: Smoke-test packed tarballs (load CLI before publishing)
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: node scripts/smoke-pack.mjs --expected-version "$RELEASE_TAG"
+
       # Publish in strict dependency order. Sequential (not parallel) by
       # design — racing a downstream publish ahead of its upstream
       # produces a broken release because the upstream version isn't in
