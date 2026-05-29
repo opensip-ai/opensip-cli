@@ -97,6 +97,12 @@ function initialStages(): Record<GraphStage, StageStatus> {
 interface GraphRunnerArgs {
   readonly cwd: string;
   readonly noCache?: boolean;
+  /**
+   * `--verbose`: when true, show the detailed catalog / findings-by-rule
+   * / entry-points blocks in the done view. Default (false) shows the
+   * summary line + footer hint only, matching fit's default surface.
+   */
+  readonly verbose?: boolean;
 }
 
 interface GraphRunnerProps {
@@ -221,11 +227,13 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
       <StageChecklist stages={state.stages} />
       {state.phase === 'done' && (
         <>
-          <Box flexDirection="column" paddingTop={1}>
-            {state.reportLines.map((line, i) => (
-              <Text key={i}>{line}</Text>
-            ))}
-          </Box>
+          {args.verbose === true && (
+            <Box flexDirection="column" paddingTop={1}>
+              {state.reportLines.map((line, i) => (
+                <Text key={i}>{line}</Text>
+              ))}
+            </Box>
+          )}
           <RunSummary
             passed={state.summary.passed}
             failed={state.summary.failed}
@@ -233,13 +241,15 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
             warnings={state.summary.warnings}
             durationMs={state.summary.durationMs}
           />
-          <RunFooterHints
-            hints={[
-              { text: 'opensip-tools dashboard for HTML report', bold: ['opensip-tools dashboard'] },
-              { text: '--json for structured output', bold: ['--json'] },
-              { text: '--workspace to fan out across packages', bold: ['--workspace'] },
-            ]}
-          />
+          {args.verbose !== true && (
+            <RunFooterHints
+              hints={[
+                { text: 'Use --verbose for detailed results', bold: ['--verbose'] },
+                { text: 'opensip-tools dashboard for HTML report', bold: ['opensip-tools dashboard'] },
+                { text: '--report-to <url> to send to OpenSIP', bold: ['--report-to <url>'] },
+              ]}
+            />
+          )}
         </>
       )}
     </Box>

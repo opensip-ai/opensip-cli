@@ -122,6 +122,11 @@ function register(cli: ToolCliContext): void {
       '--language <name>',
       'Force a specific language adapter (suppresses auto-detection)',
     )
+    .option(
+      '-v, --verbose',
+      'Show detailed catalog, findings-by-rule, and entry-point sections in the done view (default: summary only)',
+      false,
+    )
     .option('--debug', 'Enable debug mode for structured log output', false)
     .action(async (paths: readonly string[], opts: {
       cwd: string;
@@ -134,6 +139,7 @@ function register(cli: ToolCliContext): void {
       workspace?: boolean;
       concurrency?: number;
       language?: string;
+      verbose?: boolean;
     }) => {
       // Preflight runs BEFORE any heavy work. If the repo's file count
       // exceeds a threshold AND the current heap cap is too low, this
@@ -170,6 +176,7 @@ function register(cli: ToolCliContext): void {
         await cli.renderLive(GRAPH_LIVE_VIEW_KEY, {
           cwd: opts.cwd,
           noCache: opts.cache === false,
+          verbose: opts.verbose === true,
         });
         return;
       }
