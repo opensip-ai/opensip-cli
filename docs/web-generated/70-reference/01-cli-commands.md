@@ -152,7 +152,7 @@ opensip-tools graph --report-to <url>
 | Flag / Argument | Type | Default | Effect |
 |---|---|---|---|
 | `[paths...]` | path(s) | — | Positional. Scope the run to one or more existing directories (absolute or relative to `--cwd`). Multiple paths aggregate into a single dashboard session per D12. The shell handles globs (`graph 'packages/*/src'`); no glob expansion happens inside the CLI. Mutually exclusive with `--workspace`. |
-| `--cwd <path>` | string | `process.cwd()` | Target directory. Adapter is auto-detected by marker files (TypeScript: `tsconfig.json`/`package.json`; Python: `pyproject.toml`/`setup.py`/`setup.cfg`; Rust: `Cargo.toml`; Go: `go.mod`; Java: `pom.xml`/`build.gradle*`; C/C++: `CMakeLists.txt`/`meson.build`). Polyglot repos apply every matched adapter simultaneously (D6). |
+| `--cwd <path>` | string | `process.cwd()` | Target directory. Adapter is auto-detected by marker files (TypeScript: `tsconfig.json`/`package.json`; Python: `pyproject.toml`/`setup.py`/`setup.cfg`; Rust: `Cargo.toml`; Go: `go.mod`; Java: `pom.xml`/`build.gradle*`). Polyglot repos apply every matched adapter simultaneously (D6). |
 | `--workspace` | bool | `false` | Fan the run across every workspace unit returned by each detected adapter's `discoverWorkspaceUnits` hook. Polyglot per D8b: a repo with both a TS pnpm workspace and a Cargo workspace fans out across both adapters' units in one combined run. Memory-isolated (one child process per unit). Mutually exclusive with positional paths. |
 | `--concurrency <n>` | int | `cpus()-1` | Concurrency cap for `--workspace` child processes. |
 | `--language <name>` | string | — | Force a specific language adapter, suppressing marker-based auto-detection. If the discovered file count is zero, exits with code 2 and the message `--language <name> matched 0 files under <paths>; check the flag or paths.` (D14). |
@@ -160,6 +160,7 @@ opensip-tools graph --report-to <url>
 | `--no-cache` | bool | `false` | Skip the catalog cache and force a full rebuild. |
 | `--gate-save` | bool | `false` | Save the current Signal fingerprint set to the project's SQLite store (`graph_baseline_signals` table). Mutually exclusive with `--gate-compare`. |
 | `--gate-compare` | bool | `false` | Compare current Signals to the saved baseline; exit non-zero on regression. |
+| `--baseline <path>` | path | — | Override the default baseline location (used with `--gate-save` / `--gate-compare`) — e.g. pin to a CI artifact location instead of the project's SQLite store. |
 | `--report-to <url>` | string | — | POST findings to OpenSIP Cloud or a compatible SARIF endpoint. |
 | `--debug` | bool | `false` | Enable debug-level logging. |
 
@@ -174,7 +175,7 @@ opensip-tools graph --workspace
 
 **Session contract.** A single CLI invocation produces a single dashboard session, regardless of how many positional paths or workspace units the run analyzed. Modes that produce machine-readable artifacts instead of dashboard sessions (`--json`, `--gate-save`, `--gate-compare`, `--report-to`, `--catalog-output`) opt out.
 
-**Adapter selection.** v2.0.0 ships first-party adapters for TypeScript, Python, Rust, Go, Java, and C/C++. Each is its own publishable npm package marked with `opensipTools.kind: "graph-adapter"` for the graph engine, or contributed via the language pack. Marker-file detection chooses which adapter(s) apply; positional paths inherit that decision unless `--language` overrides it.
+**Adapter selection.** v2.0.0 ships first-party graph adapters for TypeScript, Python, Rust, Go, and Java — each is its own publishable npm package under the `@opensip-tools/graph-*` namespace. Discovery is by name pattern: `node_modules` is walked for any package whose name matches `@opensip-tools/graph-*`, or you can pin an explicit list under `plugins.graphAdapters:` in `opensip-tools.config.yml`. Marker-file detection (`tsconfig.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `pom.xml`/`build.gradle*`) then chooses which discovered adapter(s) apply to the run; positional paths inherit that decision unless `--language` overrides it.
 
 **Exit codes:** 0 (success / gate clean), 1 (runtime error / gate regression / any `--workspace` child failed), 2 (configuration error / D14 zero-file mismatch), 4 (`--report-to` upload failed).
 
@@ -187,6 +188,60 @@ opensip-tools graph --workspace
 **Entry-point reasons** (rendered in the entry-points section): `module-init` (every file's top-level statements), `name-match` (`main` / `run` / `start` / `register` / `init` / `bootstrap` / `initialize`), `no-callers-exported` (exported with no in-project caller). Bin-entry and tool-registration heuristics are deferred to v0.3.
 
 > **History.** v0.2 originally registered three subcommands — `graph`, `graph-orphans`, and `graph-entry-points`. The two filtered views were folded into the unified `graph` output; all three data slices (rules, entry points, catalog summary) are now reachable from the single `graph` invocation.
+
+---
+
+## `graph-lookup` — look up function occurrences by name
+
+Tool-owned (graph Tool). Queries the persisted catalog in the project's datastore for every function occurrence whose simple name matches the argument. Useful for "where is `saveBaseline` defined?" probes without re-running the full graph build.
+
+```
+opensip-tools graph-lookup <name>
+opensip-tools graph-lookup <name> --json
+```
+
+| Flag / Argument | Type | Default | Effect |
+|---|---|---|---|
+| `<name>` | string | — | Positional. Function simple name to look up (e.g. `saveBaseline`). Required. |
+| `--json` | bool | `false` | Output structured JSON instead of the human-readable list. |
+
+The command reads from the catalog stored in `<project>/opensip-tools/.runtime/datastore.sqlite`. Run `opensip-tools graph` at least once first to populate the catalog.
+
+---
+
+## `graph-symbol-index` — emit symbol index artifact
+
+Tool-owned (graph Tool). Writes a `symbolindex.json` file built from the persisted catalog: two maps — `name → [{ file, line }, …]` and `file → [name, …]`. Intended for editor tooling and offline cross-reference.
+
+```
+opensip-tools graph-symbol-index
+opensip-tools graph-symbol-index --out path/to/symbolindex.json
+```
+
+| Flag | Type | Default | Effect |
+|---|---|---|---|
+| `--cwd <path>` | path | `process.cwd()` | Target directory; `--out` resolves against this. |
+| `--out <path>` | path | `symbolindex.json` | Output file path. |
+
+Reads from the persisted catalog; run `opensip-tools graph` first to populate it.
+
+---
+
+## `graph-baseline-export` — export graph gate baseline
+
+Tool-owned (graph Tool). Exports the stored graph gate baseline (the Signal fingerprint set saved by `graph --gate-save`) from the SQLite datastore to a portable JSON file. Mirrors `fit-baseline-export` for the graph tool.
+
+```
+opensip-tools graph-baseline-export --out graph-baseline.json
+```
+
+| Flag | Type | Default | Effect |
+|---|---|---|---|
+| `--out <path>` | path | — | **Required.** Output file path for the JSON baseline. |
+| `--cwd <path>` | path | `process.cwd()` | Target directory. |
+| `--json` | bool | `false` | Emit a JSON result envelope on stdout instead of the human-readable summary. |
+
+Exit codes: 0 on success, non-zero with a `result.exitCode` if the baseline is missing or the write fails. Useful for promoting a local baseline into CI or sharing one across machines without copying the SQLite file.
 
 ---
 
@@ -260,6 +315,24 @@ JSON shape:
 ```
 
 `checkCount` is a human-readable string set by the recipe's selector — `"all checks"` for `selector.type === 'all'`, `"<n> checks"` for explicit selectors, `"pattern-based"` for tag/pattern selectors. It is never a bare numeric string.
+
+---
+
+## `fit-baseline-export` — export fit gate baseline as SARIF
+
+Tool-owned (fitness Tool). Exports the stored fit gate baseline (the violation set saved by `fit --gate-save`) from the SQLite datastore to a SARIF file. Used to promote a local baseline into CI or to feed GitHub Code Scanning.
+
+```
+opensip-tools fit-baseline-export --out fit.sarif
+```
+
+| Flag | Type | Default | Effect |
+|---|---|---|---|
+| `--out <path>` | path | — | **Required.** Output file path for the SARIF baseline. |
+| `--cwd <path>` | path | `process.cwd()` | Project root. |
+| `--json` | bool | `false` | Emit a JSON result envelope on stdout instead of the human-readable summary. |
+
+The dogfood CI uses this command to write `fit.sarif` after a `fit --gate-save` step, then uploads it to GitHub Code Scanning. Exits non-zero with a `result.exitCode` if no baseline is stored or the write fails.
 
 ---
 

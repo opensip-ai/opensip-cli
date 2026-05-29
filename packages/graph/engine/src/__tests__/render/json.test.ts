@@ -34,9 +34,12 @@ describe('renderJson', () => {
   });
 
   it('groups signals by ruleId into CheckOutput entries', () => {
+    // Per the fit-aligned per-rule pass policy (`errors === 0`), a
+    // rule with only warning-severity findings still passes; use
+    // 'high' here so the assertion below tests the fail branch.
     const signals = [
-      sig({ ruleId: 'graph:orphan-subtree', message: 'm1' }),
-      sig({ ruleId: 'graph:orphan-subtree', message: 'm2' }),
+      sig({ ruleId: 'graph:orphan-subtree', message: 'm1', severity: 'high' }),
+      sig({ ruleId: 'graph:orphan-subtree', message: 'm2', severity: 'high' }),
       sig({ ruleId: 'graph:duplicated-function-body', message: 'm3' }),
     ];
     const out = renderJson(signals, { cwd: '/tmp', tool: 'graph', command: 'graph' });
@@ -46,7 +49,10 @@ describe('renderJson', () => {
     const dups = parsed.checks.find((c) => c.checkSlug === 'graph:duplicated-function-body');
     expect(orphans?.violationCount).toBe(2);
     expect(dups?.violationCount).toBe(1);
+    // orphans has 2 error-severity findings -> fails.
     expect(orphans?.passed).toBe(false);
+    // dups has 1 warning-severity ('low'-mapped-to-warning) finding -> still passes per fit-alignment.
+    expect(dups?.passed).toBe(true);
   });
 
   it('maps high/critical signal severity to error in FindingOutput', () => {

@@ -26,7 +26,9 @@ import {
   Banner,
   ClockProvider,
   ErrorMessage,
+  RunFooterHints,
   RunHeader,
+  RunSummary,
   Spinner,
   ThemeProvider,
 } from '@opensip-tools/cli-ui';
@@ -47,7 +49,6 @@ import {
   CloudReportStatusLine,
   FindingsBlock,
   ResultsTable,
-  SummaryLine,
   WarningsBlock,
 } from './fit-runner-views.js';
 import { ensureChecksLoaded, executeFit, getEnabledCheckCount } from './fit.js';
@@ -214,7 +215,13 @@ function FitRunner({ args, datastore, setExitCode }: FitRunnerProps): React.Reac
               <ResultsTable rows={state.result.rows} />
             </Box>
           )}
-          <SummaryLine summary={state.result.summary} />
+          <RunSummary
+            passed={state.result.summary.passed}
+            failed={state.result.summary.failed}
+            errors={state.result.summary.totalErrors}
+            warnings={state.result.summary.totalWarnings}
+            durationMs={state.result.summary.durationMs}
+          />
           {!args.quiet && state.result.warnings && state.result.warnings.length > 0 && (
             <WarningsBlock warnings={state.result.warnings} />
           )}
@@ -225,11 +232,13 @@ function FitRunner({ args, datastore, setExitCode }: FitRunnerProps): React.Reac
             <CloudReportStatusLine status={state.result.reportStatus} />
           )}
           {!args.quiet && args.verbose !== true && args.findings !== true && (
-            <Box paddingTop={1} paddingLeft={2}>
-              <Text dimColor>
-                Use <Text bold>--verbose</Text> for detailed results | <Text bold>opensip-tools dashboard</Text> for HTML report | <Text bold>--report-to {'<url>'}</Text> to send to OpenSIP
-              </Text>
-            </Box>
+            <RunFooterHints
+              hints={[
+                { text: 'Use --verbose for detailed results', bold: ['--verbose'] },
+                { text: 'opensip-tools dashboard for HTML report', bold: ['opensip-tools dashboard'] },
+                { text: '--report-to <url> to send to OpenSIP', bold: ['--report-to <url>'] },
+              ]}
+            />
           )}
           {!args.quiet && state.result.configFound === false && (
             <Box paddingLeft={2}>

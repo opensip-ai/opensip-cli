@@ -108,7 +108,7 @@ cd opensip-tools/fit
   },
   "devDependencies": {
     "@opensip-tools/fitness": "workspace:*",
-    "typescript": "^5.7.0",
+    "typescript": "~6.0.0",
     "vitest": "^2.0.0"
   }
 }

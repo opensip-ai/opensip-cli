@@ -54,20 +54,35 @@ function countOccurrences(catalog: Catalog): number {
  * caller decides where to write them (raw stdout for non-interactive
  * paths, or the Ink view in the default human-report path).
  */
-export function buildUnifiedReportLines(input: UnifiedReportInput): readonly string[] {
+export interface BuildUnifiedReportOptions {
+  /**
+   * Whether to append the trailing "== Summary ==" footer block.
+   * Default `true` for back-compat with the stdout writer. The Ink
+   * runner sets this to `false` because the cli-ui `RunSummary`
+   * component renders the summary in its place.
+   */
+  readonly includeSummary?: boolean;
+}
+
+export function buildUnifiedReportLines(
+  input: UnifiedReportInput,
+  options?: BuildUnifiedReportOptions,
+): readonly string[] {
   const knownRuleIds = currentRules().map((r) => r.slug);
   const byRule = groupSignalsByRule(input.signals);
   const eps = input.catalog && input.indexes
     ? enrichEntryPoints(input.catalog, input.indexes)
     : [];
+  const includeSummary = options?.includeSummary ?? true;
 
   return [
     ...renderCatalogSection(input.catalog, input.cacheHit),
     '',
     ...renderFindingsSection(input.signals.length, byRule, knownRuleIds),
     ...renderEntryPointsSection(eps),
-    '',
-    ...renderSummarySection(byRule, knownRuleIds, input.signals.length),
+    ...(includeSummary
+      ? ['', ...renderSummarySection(byRule, knownRuleIds, input.signals.length)]
+      : []),
   ];
 }
 

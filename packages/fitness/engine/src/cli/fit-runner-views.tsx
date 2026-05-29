@@ -118,30 +118,10 @@ export function ResultsTable({ rows }: { readonly rows: readonly TableRow[] }): 
   );
 }
 
-function formatDurationLine(ms: number): string {
-  if (ms < 1000) return `${ms}ms`;
-  return `${(ms / 1000).toFixed(1)}s`;
-}
-
-export function SummaryLine({ summary }: { readonly summary: FitDoneResult['summary'] }): React.ReactElement {
-  const theme = useTheme();
-  const { passed, failed, totalErrors, totalWarnings, durationMs } = summary;
-  return (
-    <Box paddingTop={1}>
-      <Text>
-        <Text color={theme.success}>{passed} Passed</Text>
-        , <Text color={failed > 0 ? theme.error : theme.muted}>{failed} Failed</Text>
-        {' ('}
-        <Text color={totalErrors > 0 ? theme.error : theme.muted}>{totalErrors} Errors</Text>
-        , <Text color={totalWarnings > 0 ? theme.warning : theme.muted}>{totalWarnings} Warnings</Text>
-        {') '}
-        <Text dimColor>|</Text>
-        {' Duration '}
-        <Text color={theme.info}>{formatDurationLine(durationMs)}</Text>
-      </Text>
-    </Box>
-  );
-}
+// SummaryLine previously lived here — now provided by
+// `@opensip-tools/cli-ui`'s shared `RunSummary` component so fit, graph,
+// and future tools render the same single-line summary at the bottom
+// of every run. fit-runner.tsx imports `RunSummary` directly.
 
 /**
  * WarningsBlock — renders non-fatal user-facing warnings collected during

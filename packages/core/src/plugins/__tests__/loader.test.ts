@@ -94,15 +94,15 @@ describe('loadPlugin', () => {
   it('warns when nothing was registered', async () => {
     const entry = writePluginFile('plugin-empty.mjs', 'export const x = 1;');
     await loadPlugin(makeDiscovered(entry), () => ({}));
-    const calls = warnSpy.mock.calls.map((c) => c[0]);
-    expect(calls.some((c) => (c as { evt?: string }).evt === 'plugin.loader.no_exports')).toBe(true);
+    const calls = warnSpy.mock.calls.map((c: readonly unknown[]) => c[0]);
+    expect(calls.some((c: unknown) => (c as { evt?: string }).evt === 'plugin.loader.no_exports')).toBe(true);
   });
 
   it('does not warn when at least one counter is non-zero', async () => {
     const entry = writePluginFile('plugin-nonzero.mjs', 'export const x = 1;');
     await loadPlugin(makeDiscovered(entry), () => ({ checksRegistered: 1 }));
     const noExports = warnSpy.mock.calls.some(
-      (c) => (c[0] as { evt?: string }).evt === 'plugin.loader.no_exports',
+      (c: readonly unknown[]) => (c[0] as { evt?: string }).evt === 'plugin.loader.no_exports',
     );
     expect(noExports).toBe(false);
   });

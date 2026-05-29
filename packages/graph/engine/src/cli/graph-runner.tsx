@@ -23,13 +23,17 @@ import {
   Banner,
   ClockProvider,
   ErrorMessage,
+  RunFooterHints,
   RunHeader,
+  RunSummary,
   ThemeProvider,
   useSpinner,
   useTheme,
 } from '@opensip-tools/cli-ui';
 import { Box, Text, useApp, render } from 'ink';
 import React, { useCallback, useEffect, useState } from 'react';
+
+import { buildCliOutput } from '../render/json.js';
 
 import { buildUnifiedReportLines, persistSession } from './graph.js';
 import { GRAPH_STAGES, runGraph } from './orchestrate.js';
@@ -70,10 +74,18 @@ const STAGE_RUNNING_DETAIL: Readonly<Record<GraphStage, string>> = {
   rules: 'Evaluating rule set...',
 };
 
+interface RunSummaryShape {
+  readonly passed: number;
+  readonly failed: number;
+  readonly errors: number;
+  readonly warnings: number;
+  readonly durationMs: number;
+}
+
 type ViewState =
   | { phase: 'loading' }
   | { phase: 'running'; stages: StageMap }
-  | { phase: 'done'; stages: StageMap; reportLines: readonly string[] }
+  | { phase: 'done'; stages: StageMap; reportLines: readonly string[]; summary: RunSummaryShape }
   | { phase: 'error'; message: string };
 
 function initialStages(): Record<GraphStage, StageStatus> {
@@ -119,6 +131,7 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
 
   useEffect(() => {
     let cancelled = false;
+    const startedAt = Date.now();
     void (async () => {
       setState({ phase: 'running', stages: initialStages() });
       try {
@@ -129,22 +142,39 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
           datastore,
         });
         if (cancelled) return;
+        const durationMs = Date.now() - startedAt;
         // Persist exactly one session — matches the contract the
         // dispatch-path orchestrator (`executeGraph` → `persistSession`)
         // enforces. Without this call, default `opensip-tools graph`
         // (no args, no flags) runs the live view but writes no row,
         // so the dashboard's Code Paths > Sessions never sees the run.
         persistSession({ cwd: args.cwd }, result.signals, datastore);
+        // Compute the fit-style summary the cli-ui `RunSummary` renders.
+        // buildCliOutput already applies the fit-aligned per-rule pass
+        // rule (`errors === 0` per render/json.ts), so the passed/failed
+        // counts here match what fit shows for an equivalent run.
+        const cliOutput = buildCliOutput(result.signals, 'graph');
+        const summary: RunSummaryShape = {
+          passed: cliOutput.summary.passed,
+          failed: cliOutput.summary.failed,
+          errors: cliOutput.summary.errors,
+          warnings: cliOutput.summary.warnings,
+          durationMs,
+        };
+        // includeSummary: false — RunSummary takes the place of the
+        // text "== Summary ==" footer that buildUnifiedReportLines used
+        // to append.
         const reportLines = buildUnifiedReportLines({
           catalog: result.catalog,
           indexes: result.indexes,
           signals: result.signals,
           cacheHit: result.cacheHit,
-        });
+        }, { includeSummary: false });
         setState((prev) => ({
           phase: 'done',
           stages: prev.phase === 'running' ? prev.stages : initialStages(),
           reportLines,
+          summary,
         }));
         setTimeout(() => exit(), 50);
       } catch (error) {
@@ -190,11 +220,27 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
       {header}
       <StageChecklist stages={state.stages} />
       {state.phase === 'done' && (
-        <Box flexDirection="column" paddingTop={1}>
-          {state.reportLines.map((line, i) => (
-            <Text key={i}>{line}</Text>
-          ))}
-        </Box>
+        <>
+          <Box flexDirection="column" paddingTop={1}>
+            {state.reportLines.map((line, i) => (
+              <Text key={i}>{line}</Text>
+            ))}
+          </Box>
+          <RunSummary
+            passed={state.summary.passed}
+            failed={state.summary.failed}
+            errors={state.summary.errors}
+            warnings={state.summary.warnings}
+            durationMs={state.summary.durationMs}
+          />
+          <RunFooterHints
+            hints={[
+              { text: 'opensip-tools dashboard for HTML report', bold: ['opensip-tools dashboard'] },
+              { text: '--json for structured output', bold: ['--json'] },
+              { text: '--workspace to fan out across packages', bold: ['--workspace'] },
+            ]}
+          />
+        </>
       )}
     </Box>
   );

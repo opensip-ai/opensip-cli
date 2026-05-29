@@ -92,7 +92,7 @@ Some commands belong to the CLI itself, not to any Tool. They live under [`packa
 | `completion` | CLI | Prints shell completion. Sources its catalog from the per-invocation `ToolRegistry`. |
 | `sessions list/purge` | CLI | Reads the runtime session store. Cross-tool. |
 
-Tool-owned commands (`fit`, `dashboard`, `fit-list`, `fit-recipes`, `sim`) are mounted by their Tool's `register()` call. The CLI's job is to provide the program; the Tool decides what handlers it gets.
+Tool-owned commands are mounted by their Tool's `register()` call. The current first-party set: fitness contributes `fit`, `dashboard`, `fit-list`, `fit-recipes`, and `fit-baseline-export`; simulation contributes `sim`; graph contributes `graph`, `graph-lookup`, `graph-symbol-index`, and `graph-baseline-export`. Third-party tools add their own. The CLI's job is to provide the program; the Tool decides what handlers it gets.
 
 The split is functional, not arbitrary. CLI-owned commands deal with concerns that span every Tool — initialization, plugins, sessions, user config. Tool-owned commands deal with concerns specific to that Tool's domain. A new Tool doesn't need to provide its own `init`; it inherits the CLI's.
 
@@ -169,7 +169,7 @@ For `acme-api` running `opensip-tools fit --gate-compare` from CI on 2026-05-17:
    - Registers six bundled language adapters (`typescript`, `rust`, `python`, `java`, `go`, `cpp`) into `langRegistry`.
    - Registers `fitnessTool`, `simulationTool`, `graphTool` into `toolRegistry`.
    - `discoverToolPackages()` walks `node_modules`. No third-party Tools installed. Returns empty.
-3. `mountAllToolCommands(toolRegistry, ctx)`: `fitnessTool.register(ctx)` mounts `fit`, `dashboard`, `fit-list`, `fit-recipes`; `simulationTool.register(ctx)` mounts `sim`; `graphTool.register(ctx)` mounts `graph`.
+3. `mountAllToolCommands(toolRegistry, ctx)`: `fitnessTool.register(ctx)` mounts `fit`, `dashboard`, `fit-list`, `fit-recipes`, `fit-baseline-export`; `simulationTool.register(ctx)` mounts `sim`; `graphTool.register(ctx)` mounts `graph`, `graph-lookup`, `graph-symbol-index`, `graph-baseline-export`.
 4. `registerCliCommands()`: `init`, `configure`, `uninstall`, `plugin`, `completion`, `sessions` mounted.
 5. `argv = ['node', 'opensip-tools', 'fit', '--gate-compare']` — there's a subcommand, so the welcome banner is skipped.
 6. Update notifier fires (no-op — runs in background, won't block).

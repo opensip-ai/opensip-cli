@@ -39,9 +39,14 @@ export function buildCliOutput(
   }
   const checks: CheckOutput[] = [];
   for (const [ruleId, findings] of byRule.entries()) {
+    // Per-rule passed matches fit's per-check semantics
+    // (`types/findings.ts:187`): warnings alone do not fail a rule.
+    // The user runs all three tools (fit/sim/graph) interchangeably and
+    // expects the same PASS/FAIL bar across them.
+    const ruleErrors = findings.filter((f) => f.severity === 'error').length;
     checks.push({
       checkSlug: ruleId,
-      passed: findings.length === 0,
+      passed: ruleErrors === 0,
       violationCount: findings.length,
       findings,
       durationMs: 0,
@@ -93,9 +98,12 @@ export function buildCliOutputFromFindings(
   }
   const checks: CheckOutput[] = [];
   for (const [ruleId, ruleFindings] of byRule.entries()) {
+    // Same fit-aligned semantics as `buildCliOutput` above: warnings
+    // alone do not fail a rule.
+    const ruleErrors = ruleFindings.filter((f) => f.severity === 'error').length;
     checks.push({
       checkSlug: ruleId,
-      passed: ruleFindings.length === 0,
+      passed: ruleErrors === 0,
       violationCount: ruleFindings.length,
       findings: ruleFindings,
       durationMs: 0,
