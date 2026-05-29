@@ -409,6 +409,15 @@ module.exports = {
       // PR 1b. Adapter packs MUST NOT depend on each other. Each pack
       // implements the contract for one language; cross-pack imports
       // would couple parser ecosystems together.
+      //
+      // Pattern-based (`graph-[a-z0-9-]+`) rather than a hand-listed set
+      // of language names: every adapter package under packages/graph/
+      // (graph-typescript|python|rust|go|java and any future pack) is
+      // covered by construction. The engine package is named
+      // `@opensip-tools/graph` (no hyphen suffix), so it never matches.
+      // Audit 2026-05-29: graph-go / graph-java were added without being
+      // listed in the prior name-pinned regex and silently escaped this
+      // rule; pattern matching closes that class of drift permanently.
       name: 'graph-adapters-disjoint',
       severity: 'error',
       comment:
@@ -418,27 +427,30 @@ module.exports = {
         'adapter packs as devDeps (multi-adapter contract / registry / ' +
         'pickAdapter coverage); production-source imports are forbidden.',
       from: {
-        path: '^packages/graph/graph-(typescript|python|rust)/src/',
-        pathNot: '^packages/graph/graph-(typescript|python|rust)/src/__tests__/',
+        path: '^packages/graph/graph-[a-z0-9-]+/src/',
+        pathNot: '^packages/graph/graph-[a-z0-9-]+/src/__tests__/',
       },
-      to: { path: '^@opensip-tools/graph-(typescript|python|rust)($|/)' },
+      to: { path: '^@opensip-tools/graph-[a-z0-9-]+($|/)' },
     },
     {
-      // PR 1b. Adapter packs MUST NOT depend on the CLI.
+      // PR 1b. Adapter packs MUST NOT depend on the CLI. Pattern-based:
+      // covers every graph-* adapter pack, incl. go/java (audit 2026-05-29).
       name: 'graph-adapters-no-cli',
       severity: 'error',
       comment: 'Graph adapter packs must not depend on @opensip-tools/cli.',
-      from: { path: '^packages/graph/graph-(typescript|python|rust)/' },
+      from: { path: '^packages/graph/graph-[a-z0-9-]+/' },
       to: { path: '^@opensip-tools/cli($|/)' },
     },
     {
       // PR 1b. Adapter packs MUST NOT depend on fitness or check packs.
+      // Pattern-based: covers every graph-* adapter pack, incl. go/java
+      // (audit 2026-05-29).
       name: 'graph-adapters-no-fitness-or-checks',
       severity: 'error',
       comment:
         'Graph adapter packs must not depend on @opensip-tools/fitness or ' +
         'any @opensip-tools/checks-* package — peer-layer isolation.',
-      from: { path: '^packages/graph/graph-(typescript|python|rust)/' },
+      from: { path: '^packages/graph/graph-[a-z0-9-]+/' },
       to: { path: '^@opensip-tools/(fitness|checks-)' },
     },
     // PR 3 of plan 2026-05-23-plan-graph-adapter-package-split.md

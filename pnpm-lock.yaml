@@ -96,6 +96,12 @@ importers:
       '@opensip-tools/graph':
         specifier: workspace:*
         version: link:../graph/engine
+      '@opensip-tools/graph-go':
+        specifier: workspace:*
+        version: link:../graph/graph-go
+      '@opensip-tools/graph-java':
+        specifier: workspace:*
+        version: link:../graph/graph-java
       '@opensip-tools/graph-python':
         specifier: workspace:*
         version: link:../graph/graph-python

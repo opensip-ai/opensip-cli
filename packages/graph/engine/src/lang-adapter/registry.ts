@@ -24,7 +24,7 @@
  * orchestrator behaves identically to today.
  */
 
-import { ConfigurationError, Registry, currentScope, type Registerable } from '@opensip-tools/core';
+import { ConfigurationError, Registry, currentScope, logger, type Registerable } from '@opensip-tools/core';
 import { globSync } from 'glob';
 
 import type { GraphLanguageAdapter } from './types.js';
@@ -75,9 +75,11 @@ export class GraphAdapterRegistry {
   pick(cwd?: string): GraphLanguageAdapter {
     if (this.inner.size === 0) {
       throw new ConfigurationError(
-        'graph: no language adapter registered. The TypeScript adapter ' +
-          'registers itself when @opensip-tools/graph loads; check that the ' +
-          'graph tool was installed correctly.',
+        'graph: no language adapter is registered. Graph adapters ship as ' +
+          'separate packages (@opensip-tools/graph-typescript, -python, ' +
+          '-rust, -go, -java) and are auto-discovered from node_modules. ' +
+          "Install the adapter for your project's language, or list it under " +
+          'plugins.graphAdapters in opensip-tools.config.yml.',
       );
     }
     if (this.inner.size === 1) {
@@ -88,6 +90,11 @@ export class GraphAdapterRegistry {
     if (cwd !== undefined && cwd.length > 0) {
       const dominant = this.pickByFileDominance(cwd);
       if (dominant) return dominant;
+      // None of the installed adapters matched a single source file under
+      // `cwd`. We still fall back (below) so the run doesn't hard-fail,
+      // but a silent empty catalog reads as "no findings" when the real
+      // cause is a missing adapter for the project's language. Surface it.
+      this.warnNoMatchingAdapter(cwd);
     }
     // Deterministic fallback: prefer TypeScript when present; otherwise
     // the first id alphabetically.
@@ -117,6 +124,28 @@ export class GraphAdapterRegistry {
 
   getById(id: string): RegisterableAdapter | undefined {
     return this.inner.getById(id);
+  }
+
+  /**
+   * Emit an actionable warning when no installed adapter matched any
+   * source file under `cwd`. Names the registered adapters and points at
+   * the per-language packages so a Go/Java (or any unsupported-language)
+   * repo gets "install @opensip-tools/graph-<lang>" instead of a silent
+   * empty result. Audit 2026-05-29 (#4 fix 3).
+   */
+  private warnNoMatchingAdapter(cwd: string): void {
+    logger.warn({
+      evt: 'graph.lang_adapter.no_match',
+      module: 'graph:lang-adapter',
+      msg:
+        'No installed graph adapter matched any source files under the ' +
+        'target; falling back to TypeScript, which may yield an empty ' +
+        'result. If this project is in another language, install its ' +
+        'adapter (e.g. @opensip-tools/graph-go, @opensip-tools/graph-java) ' +
+        'or list it under plugins.graphAdapters in opensip-tools.config.yml.',
+      registered: this.inner.getAll().map((entry) => entry.id),
+      cwd,
+    });
   }
 
   private pickByFileDominance(cwd: string): GraphLanguageAdapter | undefined {

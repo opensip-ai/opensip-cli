@@ -12,8 +12,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { ConfigurationError, enterScope } from '@opensip-tools/core';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { ConfigurationError, enterScope, logger } from '@opensip-tools/core';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   clearAdapterRegistry,
@@ -74,7 +74,7 @@ describe('registerAdapter / pickAdapter', () => {
 
   it('throws ConfigurationError when no adapters are registered', () => {
     expect(() => pickAdapter()).toThrow(ConfigurationError);
-    expect(() => pickAdapter('/tmp')).toThrow(/no language adapter registered/);
+    expect(() => pickAdapter('/tmp')).toThrow(/no language adapter is registered/);
   });
 
   it('returns the only adapter when exactly one is registered', () => {
@@ -155,6 +155,25 @@ describe('pickAdapter — multi-adapter dominance', () => {
     registerAdapter(ts);
     registerAdapter(py);
     expect(pickAdapter(dir)).toBe(ts);
+  });
+
+  it('warns with an install hint when no installed adapter matches any file (#4 fix 3)', () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    try {
+      const ts = fakeAdapter('typescript', ['.ts']);
+      const py = fakeAdapter('python', ['.py']);
+      registerAdapter(ts);
+      registerAdapter(py);
+      // `dir` is empty — neither registered adapter matches a file, which
+      // is the "Go/Java repo but no Go/Java adapter installed" smell.
+      expect(pickAdapter(dir)).toBe(ts);
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      const payload = warnSpy.mock.calls[0]?.[0] as { evt: string; registered: string[] };
+      expect(payload.evt).toBe('graph.lang_adapter.no_match');
+      expect(payload.registered).toEqual(expect.arrayContaining(['typescript', 'python']));
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 
   it('skips node_modules / dist / build when counting files', () => {
