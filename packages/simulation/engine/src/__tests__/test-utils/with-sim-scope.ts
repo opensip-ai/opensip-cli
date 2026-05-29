@@ -16,6 +16,6 @@ import type { RunScope } from '@opensip-tools/core';
 /** Build a fresh RunScope with `scope.simulation` populated. */
 export function makeSimTestScope(): RunScope {
   const scope = makeTestScope();
-  simulationTool.extendScope?.(scope);
+  Object.assign(scope, simulationTool.contributeScope?.() ?? {});
   return scope;
 }

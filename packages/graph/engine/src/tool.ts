@@ -37,7 +37,7 @@ import { createRulesRegistry } from './rules/registry.js';
 // loaded so `scope.graph` is correctly-typed here.
 import './scope-augmentation.js';
 
-import type { RunScope, Tool, ToolCliContext, ToolCommandDescriptor } from '@opensip-tools/core';
+import type { ScopeContribution, Tool, ToolCliContext, ToolCommandDescriptor } from '@opensip-tools/core';
 import type { DataStore } from '@opensip-tools/datastore';
 
 const GRAPH: ToolCommandDescriptor = {
@@ -249,25 +249,27 @@ function register(cli: ToolCliContext): void {
 }
 
 /**
- * Per-run scope extension (D7). Called by the CLI's pre-action-hook
- * after constructing the RunScope and before entering it. Attaches
- * fresh adapter + rule registries to `scope.graph` so concurrent
- * RunScopes carry independent graph state.
+ * Per-run subscope contribution (D7). Called by the CLI's pre-action-hook
+ * after constructing the scope and before entering it; the kernel installs
+ * the returned `graph` slot. Fresh adapter + rule registries per run so
+ * concurrent scopes carry independent graph state.
  *
- * Adapter seeding: graph-adapter packages are discovered at CLI
- * startup (before any RunScope exists) and stashed via
- * `setDiscoveredAdapters`. extendScope reads that list and re-registers
- * each adapter into this scope's fresh registry so the graph
- * orchestrator's `pickAdapter` resolves them.
+ * Adapter seeding: graph-adapter packages are discovered at CLI startup
+ * (before any scope exists) and stashed via `setDiscoveredAdapters`.
+ * `contributeScope` reads that list and re-registers each adapter into
+ * this run's fresh registry so the orchestrator's `pickAdapter` resolves
+ * them.
  */
-function extendScope(scope: RunScope): void {
+function contributeScope(): ScopeContribution {
   const adapters = createAdapterRegistry();
   for (const adapter of getDiscoveredAdapters()) {
     adapters.register(adapter);
   }
-  scope.graph = {
-    adapters,
-    rules: createRulesRegistry(),
+  return {
+    graph: {
+      adapters,
+      rules: createRulesRegistry(),
+    },
   };
 }
 
@@ -279,5 +281,5 @@ export const graphTool: Tool = {
   },
   commands: [GRAPH, GRAPH_LOOKUP, GRAPH_SYMBOL_INDEX, GRAPH_BASELINE_EXPORT],
   register,
-  extendScope,
+  contributeScope,
 };

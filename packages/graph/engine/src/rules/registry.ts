@@ -3,7 +3,7 @@
  * Rule registry — per-RunScope.
  *
  * Each `RunScope` owns its own rule registry (Item 1 / D7). The graph
- * tool's `extendScope` hook constructs a fresh registry per CLI
+ * tool's `contributeScope` hook constructs a fresh registry per CLI
  * invocation and attaches it to `scope.graph.rules`. The registry is
  * seeded with the six built-in rules at construction.
  *
@@ -68,7 +68,7 @@ export class GraphRulesRegistry {
   }
 }
 
-/** Factory used by the graph tool's `extendScope` hook. */
+/** Factory used by the graph tool's `contributeScope` hook. */
 export function createRulesRegistry(): GraphRulesRegistry {
   return new GraphRulesRegistry();
 }
@@ -86,13 +86,13 @@ function currentRulesRegistry(): GraphRulesRegistry {
     throw new Error(
       'graph: currentRulesRegistry() called outside a RunScope. ' +
         'Wrap the call site in runWithScope (production: pre-action-hook handles ' +
-        'this; tests: use makeTestScope + graphTool.extendScope).',
+        'this; tests: use makeTestScope + graphTool.contributeScope).',
     );
   }
   if (!scope.graph) {
     throw new Error(
       'graph: scope.graph is missing. The graph tool must be registered and ' +
-        'its extendScope hook must run before rule reads.',
+        'its contributeScope hook must run before rule reads.',
     );
   }
   return scope.graph.rules;

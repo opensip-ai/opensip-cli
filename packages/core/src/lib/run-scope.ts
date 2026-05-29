@@ -28,14 +28,13 @@ import { logger as defaultLogger } from './logger.js';
 
 import type { Logger, LoggerImpl } from './logger.js';
 import type { ProjectContext } from './project-context.js';
+import type { DataStoreThunk, RecipeCheckConfigSlot, ToolScope } from './scope-types.js';
 
-/** Opaque slot for per-run recipe configuration (replaces globalThis Symbol). */
-export interface RecipeCheckConfigSlot {
-  get<T extends Record<string, unknown>>(slug: string): T | undefined;
-  set(slug: string, config: Record<string, unknown>): void;
-  setAll(config: Record<string, Record<string, unknown>>): void;
-  clear(): void;
-}
+// RecipeCheckConfigSlot, DataStoreThunk, ToolScope, and ScopeContribution
+// live in the leaf `scope-types.ts` (audit 2026-05-29, M4) so the `Tool`
+// contract can depend on them without naming the concrete `RunScope` —
+// breaking the RunScope⟷Tool type cycle. Re-exported here for back-compat.
+export type { RecipeCheckConfigSlot, DataStoreThunk, ToolScope, ScopeContribution } from './scope-types.js';
 
 class DefaultRecipeCheckConfigSlot implements RecipeCheckConfigSlot {
   private store: Record<string, Record<string, unknown>> = {};
@@ -56,15 +55,6 @@ class DefaultRecipeCheckConfigSlot implements RecipeCheckConfigSlot {
     this.store = {};
   }
 }
-
-/**
- * Opaque accessor that lazily opens the datastore on first read.
- *
- * Returns `undefined` when no datastore is configured for this scope
- * (matches the prior `cli.datastore` contract — tools cast to
- * `DataStore | undefined` and handle the no-store case explicitly).
- */
-export type DataStoreThunk = () => unknown;
 
 /** Constructor input for {@link RunScope}: registries, services, and per-run identifiers. */
 export interface RunScopeOptions {
@@ -106,6 +96,7 @@ export interface RunScopeOptions {
  * registry and pass it in, or register fixtures into `scope.languages`
  * inside the test body's `runWithScope` block.
  */
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- intentional: the class merges with the `interface RunScope extends ToolScope` below to gain the augmentable ScopeContribution slots for reading. The slots are optional and runtime-installed via Object.assign (the kernel's contributeScope loop), so the "interface declares members the class lacks" warning is the desired, safe behavior here.
 export class RunScope {
   readonly logger: Logger;
   readonly parseCache: LanguageParseCache;
@@ -143,6 +134,17 @@ export class RunScope {
     // doesn't open it eagerly.
   }
 }
+
+/**
+ * Declaration-merge: `RunScope` IS-A `ToolScope` (the Tool-facing view)
+ * plus the `tools` registry it adds. Extending `ToolScope` here also
+ * brings in the augmentable `ScopeContribution` slots, so
+ * `currentScope()?.simulation` / `?.graph` stay readable on a RunScope.
+ * Tools augment `ScopeContribution` (not `RunScope`) from their own
+ * packages; the slots flow in through `ToolScope extends ScopeContribution`.
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- merge target: gives the RunScope class the ToolScope + augmentable ScopeContribution members for reads (e.g. `currentScope()?.graph`). Empty body is intentional — members arrive via ToolScope/ScopeContribution.
+export interface RunScope extends ToolScope {}
 
 // ─── AsyncLocalStorage seam ──────────────────────────────────────────
 //

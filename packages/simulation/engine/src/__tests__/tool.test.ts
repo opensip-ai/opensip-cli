@@ -32,7 +32,7 @@ beforeEach(() => {
   // AsyncLocalStorage so the tool's action body resolves them through
   // currentScope() while the test's program.parseAsync runs.
   const scope = new RunScope();
-  simulationTool.extendScope?.(scope);
+  Object.assign(scope, simulationTool.contributeScope?.() ?? {});
   enterScope(scope);
 });
 
@@ -61,7 +61,7 @@ function makeFakeContext(program: Command): {
   // beforeEach), not cli.scope, but ToolCliContext requires a scope
   // value; mirror project into a throwaway scope here.
   const ctxScope = new RunScope({ projectContext: project });
-  simulationTool.extendScope?.(ctxScope);
+  Object.assign(ctxScope, simulationTool.contributeScope?.() ?? {});
   const ctx: ToolCliContext = {
     program,
     scope: ctxScope,

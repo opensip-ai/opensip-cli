@@ -9,7 +9,7 @@
  *
  * The setup mirrors the kernel-level smoke test: construct two
  * RunScopes side-by-side, attach simulation + graph subscopes via each
- * tool's `extendScope` hook, register a fixture into one scope's
+ * tool's `contributeScope` hook, register a fixture into one scope's
  * subscope, and verify the other scope's subscope is independent.
  */
 
@@ -34,8 +34,8 @@ import type { RunnableScenario } from '@opensip-tools/simulation';
 /** Fresh scope with both tool subscopes attached. */
 function makeScopeWithBothTools(): RunScope {
   const scope = new RunScope();
-  simulationTool.extendScope?.(scope);
-  graphTool.extendScope?.(scope);
+  Object.assign(scope, simulationTool.contributeScope?.() ?? {});
+  Object.assign(scope, graphTool.contributeScope?.() ?? {});
   return scope;
 }
 
@@ -176,7 +176,7 @@ describe('SaaS-mode tool-subscope isolation', () => {
   });
 
   it('scopes that DO NOT load a tool have no subscope for it', () => {
-    // Bare scope — no simulationTool.extendScope, no graphTool.extendScope.
+    // Bare scope — no simulationTool.contributeScope, no graphTool.contributeScope.
     const bareScope = new RunScope();
 
     expect(bareScope.simulation).toBeUndefined();
@@ -187,7 +187,7 @@ describe('SaaS-mode tool-subscope isolation', () => {
 
   it('a scope can load just one tool (graph-only run carries no simulation)', () => {
     const graphOnly = new RunScope();
-    graphTool.extendScope?.(graphOnly);
+    Object.assign(graphOnly, graphTool.contributeScope?.() ?? {});
 
     expect(graphOnly.graph).toBeDefined();
     expect(graphOnly.simulation).toBeUndefined();

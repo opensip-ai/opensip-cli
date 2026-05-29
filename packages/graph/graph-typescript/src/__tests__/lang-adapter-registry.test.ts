@@ -30,7 +30,7 @@ describe('pickAdapter — registry-size shortcuts', () => {
   beforeEach(() => {
     // Item 1: adapter registry is per-RunScope. Fresh scope per test.
     const scope = new RunScope();
-    graphTool.extendScope?.(scope);
+    Object.assign(scope, graphTool.contributeScope?.() ?? {});
     enterScope(scope);
   });
 
@@ -88,7 +88,7 @@ describe('pickAdapter — multi-adapter dominance heuristic', () => {
   beforeEach(() => {
     // Item 1: adapter registry is per-RunScope. Fresh scope per test.
     const scope = new RunScope();
-    graphTool.extendScope?.(scope);
+    Object.assign(scope, graphTool.contributeScope?.() ?? {});
     enterScope(scope);
     dir = mkdtempSync(join(tmpdir(), 'graph-pick-'));
   });

@@ -13,14 +13,14 @@
  *   - `scenarioRegistry`                — per-process scenario registry.
  *   - `defaultSimulationRecipeRegistry` — per-process recipe registry.
  *
- * Both are now per-RunScope. The simulation tool's `extendScope` hook
+ * Both are now per-RunScope. The simulation tool's `contributeScope` hook
  * (in `tool.ts`) instantiates fresh registries and attaches them to
  * `scope.simulation` once per CLI invocation. Tools and library code
  * read via `currentScope()?.simulation?.{scenarios,recipes}`.
  *
  * The `simulation` slot is intentionally optional and mutable (no
  * `readonly`) on the augmented interface: the kernel doesn't construct
- * it, and only the simulation tool's `extendScope` writes to it during
+ * it, and only the simulation tool's `contributeScope` writes to it during
  * scope construction. A run that doesn't load the simulation tool
  * carries no `scope.simulation`, and reads return `undefined`.
  */
@@ -31,7 +31,7 @@ import type { Registry } from '@opensip-tools/core';
 
 /**
  * Per-RunScope simulation state. Constructed by the simulation tool's
- * `extendScope(scope)` hook and attached to `scope.simulation`.
+ * `contributeScope()` hook and attached to `scope.simulation`.
  */
 export interface SimulationSubscope {
   /** Scenario registry — populated by `loadAllSimPlugins` /
@@ -43,11 +43,14 @@ export interface SimulationSubscope {
 }
 
 declare module '@opensip-tools/core' {
-  interface RunScope {
+  interface ScopeContribution {
     /**
-     * Simulation tool's per-run state. Populated by the simulation
-     * tool's `extendScope` hook; absent in runs where the simulation
-     * tool is not registered. Consumers MUST null-check before reading.
+     * Simulation tool's per-run state. Returned by the simulation tool's
+     * `contributeScope` hook and installed by the kernel; absent in runs
+     * where the simulation tool is not registered. Consumers MUST
+     * null-check before reading. Augments `ScopeContribution`, which
+     * `ToolScope`/`RunScope` extend — so `cli.scope.simulation` /
+     * `currentScope()?.simulation` stay readable (audit 2026-05-29, M4).
      */
     simulation?: SimulationSubscope;
   }

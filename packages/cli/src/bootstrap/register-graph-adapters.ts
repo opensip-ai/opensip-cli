@@ -1,7 +1,7 @@
 /**
  * register-graph-adapters — discover every @opensip-tools/graph-*
  * adapter pack found in node_modules and stash the loaded adapter
- * objects so the graph tool's `extendScope` hook can register them
+ * objects so the graph tool's `contributeScope` hook can register them
  * into each per-run RunScope.
  *
  * History: before Item 1 this file registered adapters directly into a
@@ -9,7 +9,7 @@
  * registration would target a scope that doesn't exist yet at CLI
  * startup. Instead, we collect the discovered adapters into a single
  * list and hand it to the graph engine via `setDiscoveredAdapters`;
- * `graphTool.extendScope` reads that list and re-registers each
+ * `graphTool.contributeScope` reads that list and re-registers each
  * adapter into the new scope's fresh adapter registry on every CLI
  * invocation.
  *
@@ -89,7 +89,7 @@ export async function discoverAndRegisterGraphAdapterPackages(
     }
   }
   // Stash the loaded set on the graph engine's discovered-adapters
-  // holder. graphTool.extendScope reads this list and re-registers
+  // holder. graphTool.contributeScope reads this list and re-registers
   // each entry into every new RunScope's adapter registry on each CLI
   // invocation. Item 1: the registry is per-scope, not per-process.
   setDiscoveredAdapters(loaded);

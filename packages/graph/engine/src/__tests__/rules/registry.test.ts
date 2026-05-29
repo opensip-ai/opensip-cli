@@ -20,7 +20,7 @@ let rules: readonly Rule[];
 
 beforeEach(() => {
   const scope = new RunScope();
-  graphTool.extendScope?.(scope);
+  Object.assign(scope, graphTool.contributeScope?.() ?? {});
   enterScope(scope);
   rules = currentRules();
 });

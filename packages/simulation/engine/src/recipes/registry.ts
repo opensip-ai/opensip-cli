@@ -4,7 +4,7 @@
  * concerns: built-in recipe pre-registration with throw-on-duplicate
  * semantics, and display info with `isBuiltIn` / `isUserDefined` flags.
  *
- * Per-RunScope: the simulation tool's `extendScope` hook constructs a
+ * Per-RunScope: the simulation tool's `contributeScope` hook constructs a
  * fresh `SimulationRecipeRegistry` per CLI invocation and attaches it
  * to `scope.simulation.recipes` (Item 1 / D7). The module-level
  * singleton is gone — consumers read via `currentSimulationRecipeRegistry()`
@@ -77,7 +77,7 @@ export class SimulationRecipeRegistry extends RecipeRegistry<SimulationRecipe> {
   }
 }
 
-/** Factory used by the simulation tool's `extendScope` hook. */
+/** Factory used by the simulation tool's `contributeScope` hook. */
 export function createSimulationRecipeRegistry(): SimulationRecipeRegistry {
   return new SimulationRecipeRegistry();
 }
@@ -97,16 +97,16 @@ export function currentSimulationRecipeRegistry(): SimulationRecipeRegistry {
     throw new Error(
       'simulation: currentSimulationRecipeRegistry() called outside a RunScope. ' +
         'Wrap the call site in runWithScope (production: pre-action-hook handles ' +
-        'this; tests: use makeTestScope + simulationTool.extendScope or construct ' +
+        'this; tests: use makeTestScope + simulationTool.contributeScope or construct ' +
         'a registry directly).',
     );
   }
   if (!scope.simulation) {
     throw new Error(
       'simulation: scope.simulation is missing. The simulation tool must be ' +
-        'registered and its extendScope hook must run before recipe reads. ' +
+        'registered and its contributeScope hook must run before recipe reads. ' +
         '(production: bootstrap registers simulationTool; tests: call ' +
-        'simulationTool.extendScope(scope) after makeTestScope.)',
+        'simulationTool.contributeScope() after makeTestScope.)',
     );
   }
   return scope.simulation.recipes;

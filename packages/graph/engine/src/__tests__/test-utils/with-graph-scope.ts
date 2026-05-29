@@ -17,7 +17,7 @@ import type { RunScope } from '@opensip-tools/core';
 /** Build a fresh RunScope with `scope.graph` populated. */
 export function makeGraphTestScope(): RunScope {
   const scope = makeTestScope();
-  graphTool.extendScope?.(scope);
+  Object.assign(scope, graphTool.contributeScope?.() ?? {});
   return scope;
 }
 

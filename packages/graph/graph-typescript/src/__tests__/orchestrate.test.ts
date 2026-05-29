@@ -49,7 +49,7 @@ describe('runGraph orchestrator', () => {
     // with graph subscope and register the typescript adapter into it
     // so runGraph()'s pickAdapter() finds it.
     const scope = new RunScope();
-    graphTool.extendScope?.(scope);
+    Object.assign(scope, graphTool.contributeScope?.() ?? {});
     enterScope(scope);
     registerAdapter(typescriptGraphAdapter);
 

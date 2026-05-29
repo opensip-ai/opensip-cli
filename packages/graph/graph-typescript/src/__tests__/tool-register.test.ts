@@ -22,7 +22,7 @@ beforeEach(() => {
   // graphTool.register() tests reach pickAdapter() through a live
   // scope.
   const scope = new RunScope();
-  graphTool.extendScope?.(scope);
+  Object.assign(scope, graphTool.contributeScope?.() ?? {});
   enterScope(scope);
   registerAdapter(typescriptGraphAdapter);
 });

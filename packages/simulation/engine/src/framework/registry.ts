@@ -3,7 +3,7 @@
  *
  * Each `RunScope` owns its own `Registry<RunnableScenario>` (Item 1 /
  * D7 — tool subscopes via module augmentation).
- * The simulation tool's `extendScope` hook constructs a fresh registry
+ * The simulation tool's `contributeScope` hook constructs a fresh registry
  * per CLI invocation and attaches it to `scope.simulation.scenarios`.
  *
  * Built on the kernel's unified `Registry<T>` with
@@ -13,7 +13,7 @@
  * shape the legacy `IdNameTagRegistry` provided (which has been deleted).
  *
  * Public API:
- *   - `createScenarioRegistry()`  — factory used by `extendScope`.
+ *   - `createScenarioRegistry()`  — factory used by `contributeScope`.
  *   - `currentScenarioRegistry()` — reads the scope-bound registry;
  *                                   throws when called outside a scope
  *                                   or when `simulation` subscope is
@@ -54,16 +54,16 @@ export function currentScenarioRegistry(): Registry<RunnableScenario> {
     throw new Error(
       'simulation: currentScenarioRegistry() called outside a RunScope. ' +
         'Wrap the call site in runWithScope (production: pre-action-hook handles ' +
-        'this; tests: use makeTestScope + simulationTool.extendScope or construct ' +
+        'this; tests: use makeTestScope + simulationTool.contributeScope or construct ' +
         'a Registry directly).',
     )
   }
   if (!scope.simulation) {
     throw new Error(
       'simulation: scope.simulation is missing. The simulation tool must be ' +
-        'registered and its extendScope hook must run before scenario reads. ' +
+        'registered and its contributeScope hook must run before scenario reads. ' +
         '(production: bootstrap registers simulationTool; tests: call ' +
-        'simulationTool.extendScope(scope) after makeTestScope.)',
+        'simulationTool.contributeScope() after makeTestScope.)',
     )
   }
   return scope.simulation.scenarios

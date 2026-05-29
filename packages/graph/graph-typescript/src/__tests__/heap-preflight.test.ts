@@ -90,7 +90,7 @@ describe('runHeapPreflight', () => {
     // scope, attach graph subscope, and register the three first-party
     // adapters so runHeapPreflight()'s pickAdapter() resolves them.
     const scope = new RunScope();
-    graphTool.extendScope?.(scope);
+    Object.assign(scope, graphTool.contributeScope?.() ?? {});
     enterScope(scope);
     registerAdapter(typescriptGraphAdapter);
     registerAdapter(pythonGraphAdapter);

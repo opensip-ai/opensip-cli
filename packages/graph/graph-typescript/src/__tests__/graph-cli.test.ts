@@ -100,7 +100,7 @@ describe('executeGraph', () => {
     // with `scope.graph` populated, then register the typescript
     // adapter into the scope's registry.
     const scope = new RunScope();
-    graphTool.extendScope?.(scope);
+    Object.assign(scope, graphTool.contributeScope?.() ?? {});
     enterScope(scope);
     registerAdapter(typescriptGraphAdapter);
 

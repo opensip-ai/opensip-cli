@@ -18,7 +18,7 @@ import { createSimulationRecipeRegistry } from './recipes/registry.js';
 // loaded so `scope.simulation` is the correctly-typed slot here.
 import './scope-augmentation.js';
 
-import type { RunScope, Tool, ToolCliContext, ToolCommandDescriptor } from '@opensip-tools/core';
+import type { ScopeContribution, Tool, ToolCliContext, ToolCommandDescriptor } from '@opensip-tools/core';
 
 
 const SIM: ToolCommandDescriptor = {
@@ -98,15 +98,17 @@ function register(cli: ToolCliContext): void {
 }
 
 /**
- * Per-run scope extension (D7). Called by the CLI's pre-action-hook
- * after constructing the RunScope and before entering it. Attaches
- * fresh scenario + recipe registries to `scope.simulation` so concurrent
- * RunScopes carry independent simulation state.
+ * Per-run subscope contribution (D7). Called by the CLI's pre-action-hook
+ * after constructing the scope and before entering it; the kernel installs
+ * the returned `simulation` slot. Fresh scenario + recipe registries per
+ * run so concurrent scopes carry independent simulation state.
  */
-function extendScope(scope: RunScope): void {
-  scope.simulation = {
-    scenarios: createScenarioRegistry(),
-    recipes: createSimulationRecipeRegistry(),
+function contributeScope(): ScopeContribution {
+  return {
+    simulation: {
+      scenarios: createScenarioRegistry(),
+      recipes: createSimulationRecipeRegistry(),
+    },
   };
 }
 
@@ -118,7 +120,7 @@ export const simulationTool: Tool = {
   },
   commands: [SIM],
   register,
-  extendScope,
+  contributeScope,
 };
 
 // Pre-load hook re-export — mirrors fitness's tool surface so a future

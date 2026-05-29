@@ -104,6 +104,8 @@ export type {
   RunScopeOptions,
   RecipeCheckConfigSlot,
   DataStoreThunk,
+  ToolScope,
+  ScopeContribution,
 } from './lib/run-scope.js';
 
 // Lib — errors + Result pattern

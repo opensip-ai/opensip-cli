@@ -27,56 +27,15 @@
 import { ToolError, type ToolErrorOptions } from '../lib/errors.js';
 
 import type { Logger } from '../lib/logger.js';
+import type { ScopeContribution, ToolScope } from '../lib/scope-types.js';
 
-/**
- * Forward reference to `RunScope` via an inline `import()` type query.
- *
- * The `lib/run-scope.ts` module already imports `ToolRegistry` and
- * `LanguageRegistry` as values to provide default-constructor
- * convenience (so callers and tests can write `new RunScope()` without
- * threading two registries through). `tools/registry.ts` imports
- * `Tool` from this file (its registered value type). A normal top-level
- * `import type { RunScope } from '../lib/run-scope.js'` therefore
- * closes a file-level cycle:
- *
- *   `lib/run-scope.ts` →(value) `tools/registry.ts`
- *                       →(type)  `tools/types.ts`
- *                       →(type)  `lib/run-scope.ts`
- *
- * `circular-import-detection` walks all top-level `ImportDeclaration`
- * AST nodes (including `import type`) and reports the cycle. The
- * runtime graph has no cycle — type-only imports are erased at
- * transpile time — but the static check can't tell the difference.
- *
- * The chosen fix is an inline `import(...)` type query, which expresses
- * the same type relationship without producing an `ImportDeclaration`
- * edge. The alternatives considered and rejected:
- *
- *   1. Extracting a `RunScope` interface to a leaf file. Module
- *      augmentations (`declare module '@opensip-tools/core' { interface
- *      RunScope { simulation?: ... } }`) target the class re-exported
- *      from the package barrel; routing `tools/types.ts` through a
- *      separate leaf interface would orphan those augmentations and
- *      break the typed `cli.scope.simulation` access pattern.
- *
- *   2. Removing the `new RunScope()` default-constructor convenience.
- *      The default-constructor shape is part of the kernel's public
- *      surface (every test fixture relies on it); a forced registry
- *      injection would propagate into every test in the repo.
- *
- *   3. Splitting the `Tool` interface so the `extendScope` hook lives
- *      elsewhere. `extendScope` belongs on the Tool contract — moving
- *      it would fragment a single coherent type.
- *
- * The inline-`import()` form is the lowest-impact way to honour the
- * architectural constraint the check enforces without distorting any
- * of the type contracts. `@typescript-eslint/consistent-type-imports`
- * is disabled on the next line because the rule's recommendation
- * (use top-level `import type`) is exactly what would reintroduce the
- * cycle this file is structured to avoid.
- */
-// eslint-disable-next-line @typescript-eslint/consistent-type-imports -- intentional inline import() type query — see the surrounding comment for the cycle-breaking rationale.
-type RunScope = import('../lib/run-scope.js').RunScope;
+// `ToolScope` (the Tool-facing scope view) and `ScopeContribution` (the
+// augmentable subscope bag a tool returns from `contributeScope`) live in
+// the leaf `lib/scope-types.ts`. The `Tool` contract depends on those
+// abstractions, never on the concrete `RunScope`, so there is no
+// `tools/types.ts → lib/run-scope.ts` edge — the former RunScope⟷Tool
+// type cycle is gone (audit 2026-05-29, M4). A plain top-level
+// `import type` is safe: scope-types is a leaf with no edge back here.
 
 /** Static descriptor for a tool plugin: id, semver, and one-line description. */
 export interface ToolMetadata {
@@ -162,8 +121,13 @@ export interface ToolCliContext {
    * retired in audit-round-3 Finding K once no tool referenced them
    * directly. Read `cli.scope.projectContext` and `cli.scope.datastore()`
    * instead.
+   *
+   * Typed as the Tool-facing `ToolScope` view (not the concrete
+   * `RunScope`): everything tools read via `cli.scope.*`, minus the
+   * `tools` registry tools never touch. This is what keeps the `Tool`
+   * contract free of any `RunScope` reference (audit 2026-05-29, M4).
    */
-  readonly scope: RunScope;
+  readonly scope: ToolScope;
   /** Render an Ink result (CommandResult shape from @opensip-tools/contracts). */
   readonly render: (result: unknown) => Promise<void>;
   /**
@@ -288,36 +252,43 @@ export interface Tool {
    */
   readonly initialize?: () => Promise<void>;
   /**
-   * Optional per-run scope extension hook. Called by the CLI's
-   * pre-action-hook AFTER constructing the per-invocation `RunScope`
-   * and BEFORE `enterScope` makes it visible to tool action bodies.
-   * Each registered tool is invoked once per CLI invocation so it can
-   * populate its tool-specific subscope (D7: tool subscopes via
-   * module augmentation on `RunScope`).
+   * Optional per-run subscope contribution. Called by the CLI's
+   * pre-action-hook AFTER constructing the per-invocation scope and
+   * BEFORE `enterScope` makes it visible to tool action bodies. Each
+   * registered tool is invoked once per CLI invocation; the kernel
+   * `Object.assign`s the returned contribution onto the scope (D7: tool
+   * subscopes via module augmentation).
    *
-   * Tools augment `RunScope` from their own `types.ts`:
+   * Inversion of control (audit 2026-05-29, M4): the tool RETURNS its
+   * subscope rather than mutating a passed-in `RunScope`. This keeps the
+   * `Tool` contract free of any `RunScope` reference (breaking the
+   * RunScope⟷Tool type cycle) and removes shared-mutable-state from the
+   * extension API.
+   *
+   * Tools augment `ScopeContribution` from their own package:
    *
    *   declare module '@opensip-tools/core' {
-   *     interface RunScope {
+   *     interface ScopeContribution {
    *       simulation?: { scenarios: Registry<RunnableScenario>; ... };
    *     }
    *   }
    *
-   * and assign their slot here:
+   * and return their slot here:
    *
-   *   extendScope(scope) {
-   *     scope.simulation = { scenarios: new Registry(...), ... };
+   *   contributeScope() {
+   *     return { simulation: { scenarios: new Registry(...), ... } };
    *   }
    *
-   * The kernel never touches the tool-specific slot — only the owning
-   * tool's `extendScope` reads or writes it. Slots are optional so a
-   * graph-only run carries no `scope.simulation`, and vice versa.
+   * The kernel never inspects the slot — it just installs it. Slots are
+   * optional so a graph-only run carries no `scope.simulation`, and vice
+   * versa. `ScopeContribution` is empty in core; every member arrives via
+   * tool augmentation, and `ToolScope`/`RunScope` extend it for reads.
    *
-   * Default behavior (when undefined): the tool contributes no
-   * subscope. Fitness, today, doesn't carry per-run subscope state on
-   * RunScope and can leave this undefined.
+   * Default behavior (when undefined): the tool contributes no subscope.
+   * Fitness, today, carries no per-run subscope state and leaves this
+   * undefined.
    */
-  readonly extendScope?: (scope: RunScope) => void;
+  readonly contributeScope?: () => ScopeContribution;
 }
 
 /**

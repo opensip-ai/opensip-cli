@@ -6,7 +6,7 @@
  * Verifies the minimal contract the registry depends on: a
  * `metadata.id` string (used for dedupe + listing) and the two
  * required members (`register` function, `commands` array).
- * `initialize` and `extendScope` stay optional per the Tool interface.
+ * `initialize` and `contributeScope` stay optional per the Tool interface.
  */
 
 import type { Tool } from '@opensip-tools/core';

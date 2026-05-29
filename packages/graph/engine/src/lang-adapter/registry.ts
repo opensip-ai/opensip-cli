@@ -2,7 +2,7 @@
  * Graph language-adapter registry — per-RunScope.
  *
  * Each `RunScope` owns its own adapter registry (Item 1 / D7). The
- * graph tool's `extendScope` hook constructs a fresh registry per CLI
+ * graph tool's `contributeScope` hook constructs a fresh registry per CLI
  * invocation and attaches it to `scope.graph.adapters`.
  *
  * Built on the kernel's unified `Registry<T>` with
@@ -13,7 +13,7 @@
  *
  * Public API:
  *   - `GraphAdapterRegistry`         — the registry class.
- *   - `createAdapterRegistry()`      — factory used by `extendScope`.
+ *   - `createAdapterRegistry()`      — factory used by `contributeScope`.
  *   - `currentAdapterRegistry()`     — reads the scope-bound instance.
  *   - `registerAdapter` / `pickAdapter` / `clearAdapterRegistry` —
  *     thin helpers that route through the scope-bound instance for
@@ -187,7 +187,7 @@ export class GraphAdapterRegistry {
   }
 }
 
-/** Factory used by the graph tool's `extendScope` hook. */
+/** Factory used by the graph tool's `contributeScope` hook. */
 export function createAdapterRegistry(): GraphAdapterRegistry {
   return new GraphAdapterRegistry();
 }
@@ -200,7 +200,7 @@ export function createAdapterRegistry(): GraphAdapterRegistry {
 // per-scope registries we can't register the discovered adapters
 // immediately — there's no scope yet. Instead, the CLI calls
 // `setDiscoveredAdapters(adapters)` once after discovery, and the
-// graph tool's `extendScope` reads `getDiscoveredAdapters()` to seed
+// graph tool's `contributeScope` reads `getDiscoveredAdapters()` to seed
 // each new scope's adapter registry.
 //
 // The holder is intentionally module-level (one per process). It is
@@ -212,7 +212,7 @@ let discoveredAdapters: readonly GraphLanguageAdapter[] = [];
 
 /**
  * Stash the list of adapters discovered at CLI startup so the graph
- * tool's `extendScope` can register them into each new scope's adapter
+ * tool's `contributeScope` can register them into each new scope's adapter
  * registry. Called once at bootstrap; idempotent.
  */
 export function setDiscoveredAdapters(adapters: readonly GraphLanguageAdapter[]): void {
@@ -239,15 +239,15 @@ export function currentAdapterRegistry(): GraphAdapterRegistry {
     throw new Error(
       'graph: currentAdapterRegistry() called outside a RunScope. ' +
         'Wrap the call site in runWithScope (production: pre-action-hook handles ' +
-        'this; tests: use makeTestScope + graphTool.extendScope or construct a ' +
+        'this; tests: use makeTestScope + graphTool.contributeScope or construct a ' +
         'registry directly).',
     );
   }
   if (!scope.graph) {
     throw new Error(
       'graph: scope.graph is missing. The graph tool must be registered and ' +
-        'its extendScope hook must run before adapter reads. (production: ' +
-        'bootstrap registers graphTool; tests: call graphTool.extendScope(scope) ' +
+        'its contributeScope hook must run before adapter reads. (production: ' +
+        'bootstrap registers graphTool; tests: call graphTool.contributeScope() ' +
         'after makeTestScope.)',
     );
   }
