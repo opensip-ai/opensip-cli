@@ -5,7 +5,8 @@
       "ignoreDependencies": [
         "@opensip-tools/checks-typescript",
         "@opensip-tools/checks-universal",
-        "@opensip-tools/fitness"
+        "@opensip-tools/fitness",
+        "vite"
       ]
     },
     "packages/cli": {
