@@ -31,7 +31,7 @@ import {
 import { Box, Text, useApp, render } from 'ink';
 import React, { useCallback, useEffect, useState } from 'react';
 
-import { buildUnifiedReportLines } from './graph.js';
+import { buildUnifiedReportLines, persistSession } from './graph.js';
 import { GRAPH_STAGES, runGraph } from './orchestrate.js';
 
 import type { GraphProgressEvent, GraphStage, RunGraphResult } from './orchestrate.js';
@@ -129,6 +129,12 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
           datastore,
         });
         if (cancelled) return;
+        // Persist exactly one session — matches the contract the
+        // dispatch-path orchestrator (`executeGraph` → `persistSession`)
+        // enforces. Without this call, default `opensip-tools graph`
+        // (no args, no flags) runs the live view but writes no row,
+        // so the dashboard's Code Paths > Sessions never sees the run.
+        persistSession({ cwd: args.cwd }, result.signals, datastore);
         const reportLines = buildUnifiedReportLines({
           catalog: result.catalog,
           indexes: result.indexes,

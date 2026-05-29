@@ -347,7 +347,15 @@ function resolveAdaptersForRun(
 }
 
 
-function persistSession(
+/**
+ * Persist one graph session after a non-opt-out run. Exported so the
+ * live-view orchestrator (`graph-runner.tsx`) can call it on its own
+ * success transition — the dispatch-path orchestrator (`executeGraph`)
+ * and the live-view path are parallel today, so both call this
+ * directly. A future cleanup should consolidate the post-run
+ * finalization into a single shared helper rather than two call sites.
+ */
+export function persistSession(
   opts: GraphCommandOptions,
   signals: readonly Signal[],
   datastore: DataStore | undefined,
