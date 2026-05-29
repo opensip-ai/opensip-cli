@@ -32,6 +32,7 @@
     "docs:build": "node scripts/build-web-docs.mjs",
     "docs:check": "node scripts/build-web-docs.mjs --check",
     "verify-release": "node scripts/verify-release.mjs",
+    "smoke-pack": "node scripts/smoke-pack.mjs",
     "prepare": "git config core.hooksPath .githooks 2>/dev/null || true"
   },
   "devDependencies": {
