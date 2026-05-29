@@ -136,7 +136,7 @@ describe('Filter drawer', () => {
     pkgChips[0].click();
     const refreshed = c.querySelectorAll<HTMLElement>('.code-paths-filter-row:nth-child(1) .code-paths-chip');
     expect(refreshed[0].classList.contains('active')).toBe(true);
-    expect(env.filterState.packages.has(refreshed[0].textContent!)).toBe(true);
+    expect(env.filterState.packages.has(refreshed[0].textContent)).toBe(true);
   });
 
   it('Scope row exposes Production-only / Include-tests as a radio pair', () => {
