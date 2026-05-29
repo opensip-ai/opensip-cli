@@ -88,7 +88,7 @@ const CliDefaultsSchema = z.object({
   exclude:   z.array(z.string()).optional(),
   verbose:   z.boolean().optional(),
   json:      z.boolean().optional(),
-  reportTo:  z.string().url().optional(),
+  reportTo:  z.url().optional(),
   apiKey:    z.string().min(1).optional(),
   fileTypes: z.array(z.string()).optional(),
   ignore:    z.array(z.string()).optional(),
@@ -112,9 +112,14 @@ const DashboardSchema = z.object({
 // Root Schema
 // =============================================================================
 
-/** Wrap a section schema so YAML `null` is treated as `{}` (all defaults). */
-function section<T extends z.ZodTypeAny>(schema: T) {
-  return z.preprocess((v) => v ?? {}, schema).default({})
+/** Wrap a section schema so YAML `null` or missing keys are treated as `{}` (all defaults). */
+function section<T extends z.ZodType>(schema: T) {
+  // Zod 4 change: `.default(...)` no longer re-parses the supplied default through
+  // the inner schema, so a literal `{}` default would skip every nested
+  // `.default(...)` declaration on the section's fields. Instead, coerce
+  // undefined / null inputs to `{}` *before* delegating to the section schema —
+  // that way the inner schema parses `{}` and its per-field defaults apply.
+  return z.preprocess((v) => v ?? {}, schema)
 }
 
 /** Root schema for opensip-tools.config.yml validation */

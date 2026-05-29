@@ -286,8 +286,7 @@ export type UnifiedCheckConfig = AnalyzeCheckConfig | AnalyzeAllCheckConfig | Co
 
 /** Zod schema for validating unified check configurations (exactly one analysis mode required). */
 const UnifiedCheckConfigSchema = z
-  .object({})
-  .passthrough()
+  .looseObject({})
   .superRefine((config, ctx) => {
     const modes = ['analyze' in config, 'analyzeAll' in config, 'command' in config].filter(
       Boolean,
@@ -295,12 +294,12 @@ const UnifiedCheckConfigSchema = z
 
     if (modes === 0) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: 'Check config must specify an analysis mode: analyze, analyzeAll, or command',
       })
     } else if (modes > 1) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: 'Check config must specify exactly one analysis mode (found multiple)',
       })
     }
