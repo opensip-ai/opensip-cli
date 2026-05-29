@@ -23,7 +23,7 @@ opensip-tools reads two config files:
 | `<project>/opensip-tools.config.yml` | Project (committed) | Targets, plugins, fitness config, CLI defaults |
 | `~/.opensip-tools/config.yml` | User (gitignored, cross-project) | OpenSIP Cloud API key |
 
-The Zod schema lives at [`packages/fitness/engine/src/signalers/schema.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/fitness/engine/src/signalers/schema.ts).
+The Zod schema lives at [`packages/fitness/engine/src/signalers/schema.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.1/packages/fitness/engine/src/signalers/schema.ts).
 
 ## Top-level shape
 
@@ -40,7 +40,7 @@ dashboard: {}             # dashboard.editor (read out-of-band — see below)
 
 Every section is optional; a missing section becomes `{}`.
 
-The validated schema (`SignalersConfigSchema`) covers `globalExcludes`, `targets`, `checkOverrides`, `fitness`, `simulation`, and `cli`. **`plugins:` and `dashboard:` are read out-of-band** by separate parsers ([`readProjectPluginsList`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/core/src/plugins/discover.ts) and `extractDashboardEditor` in [`dashboard.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.0/packages/fitness/engine/src/cli/dashboard.ts)) so they can evolve independently of the fitness schema.
+The validated schema (`SignalersConfigSchema`) covers `globalExcludes`, `targets`, `checkOverrides`, `fitness`, `simulation`, and `cli`. **`plugins:` and `dashboard:` are read out-of-band** by separate parsers ([`readProjectPluginsList`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.1/packages/core/src/plugins/discover.ts) and `extractDashboardEditor` in [`dashboard.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.1/packages/fitness/engine/src/cli/dashboard.ts)) so they can evolve independently of the fitness schema.
 
 ---
 

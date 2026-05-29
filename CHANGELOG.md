@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.0.1] — 2026-05-29
+
+Republish of the 2.0.0 feature set from a single consistent build. No
+source behavior changes — this release exists only to repair a broken
+2.0.0 publish.
+
+### Fixed
+
+- **`opensip-tools` crashed on startup under 2.0.0** with
+  `SyntaxError: The requested module '@opensip-tools/cli-ui' does not
+  provide an export named 'RunFooterHints'`. The 2.0.0 release was
+  non-atomic: `@opensip-tools/cli-ui@2.0.0` was published from an
+  earlier build that predated the `RunFooterHints` export, while
+  `@opensip-tools/fitness@2.0.0` (published ~11h later) imported it.
+  Because npm package versions are immutable, the stale `cli-ui` tarball
+  could not be overwritten in place. 2.0.1 republishes all 27
+  `@opensip-tools/*` packages together from one clean build, restoring a
+  consistent inter-package export contract. **Anyone on 2.0.0 should
+  upgrade: `npm install -g @opensip-tools/cli@2.0.1`.**
+
 ## [2.0.0] — 2026-05-28
 
 Persistence migration: every internal runtime artifact (sessions, graph
