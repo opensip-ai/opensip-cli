@@ -291,6 +291,9 @@ importers:
 
   packages/fitness/checks-cpp:
     dependencies:
+      '@opensip-tools/core':
+        specifier: workspace:*
+        version: link:../../core
       '@opensip-tools/fitness':
         specifier: workspace:*
         version: link:../engine
