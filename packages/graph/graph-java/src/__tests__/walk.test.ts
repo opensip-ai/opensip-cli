@@ -22,6 +22,7 @@ function run(dir: string): ReturnType<typeof javaGraphAdapter.walkProject> {
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,
     compilerOptions: discovery.compilerOptions,
+    resolutionMode: 'exact',
   });
   return javaGraphAdapter.walkProject({
     project: parsed.project,

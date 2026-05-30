@@ -25,16 +25,16 @@ describe('lang-python cacheKey — branches', () => {
   });
 
   it('returns py-unknown-no-config when configPathAbs is undefined', () => {
-    expect(cacheKey({ projectDirAbs: dir })).toBe('py-unknown-no-config');
+    expect(cacheKey({ projectDirAbs: dir, resolutionMode: 'exact' })).toBe('py-unknown-no-config');
   });
 
   it('returns py-unknown-no-config when configPathAbs is empty', () => {
-    expect(cacheKey({ projectDirAbs: dir, configPathAbs: '' })).toBe('py-unknown-no-config');
+    expect(cacheKey({ projectDirAbs: dir, configPathAbs: '', resolutionMode: 'exact' })).toBe('py-unknown-no-config');
   });
 
   it('returns py-unknown-missing:<path> when the file does not exist', () => {
     const fake = join(dir, 'no-such-file.toml');
-    const out = cacheKey({ projectDirAbs: dir, configPathAbs: fake });
+    const out = cacheKey({ projectDirAbs: dir, configPathAbs: fake, resolutionMode: 'exact' });
     expect(out).toContain('missing:');
     expect(out.startsWith('py-unknown-')).toBe(true);
   });
@@ -46,7 +46,7 @@ describe('lang-python cacheKey — branches', () => {
       '[project]\nname = "p"\nrequires-python = ">=3.10,<4.0"\n',
       'utf8',
     );
-    const out = cacheKey({ projectDirAbs: dir, configPathAbs: file });
+    const out = cacheKey({ projectDirAbs: dir, configPathAbs: file, resolutionMode: 'exact' });
     // requires-python should appear (sanitized) in the key.
     expect(out.startsWith('py-')).toBe(true);
     expect(out).toContain('3.10');
@@ -55,7 +55,7 @@ describe('lang-python cacheKey — branches', () => {
   it('falls back to py-unknown-<hash> when requires-python is absent', () => {
     const file = join(dir, 'pyproject.toml');
     writeFileSync(file, '[project]\nname = "p"\n', 'utf8');
-    const out = cacheKey({ projectDirAbs: dir, configPathAbs: file });
+    const out = cacheKey({ projectDirAbs: dir, configPathAbs: file, resolutionMode: 'exact' });
     expect(out.startsWith('py-unknown-')).toBe(true);
     expect(out).not.toBe('py-unknown-no-config');
   });
@@ -63,8 +63,8 @@ describe('lang-python cacheKey — branches', () => {
   it('produces a stable hash across repeated calls', () => {
     const file = join(dir, 'pyproject.toml');
     writeFileSync(file, '[project]\n', 'utf8');
-    const a = cacheKey({ projectDirAbs: dir, configPathAbs: file });
-    const b = cacheKey({ projectDirAbs: dir, configPathAbs: file });
+    const a = cacheKey({ projectDirAbs: dir, configPathAbs: file, resolutionMode: 'exact' });
+    const b = cacheKey({ projectDirAbs: dir, configPathAbs: file, resolutionMode: 'exact' });
     expect(a).toBe(b);
   });
 });

@@ -37,6 +37,7 @@ describe('lang-python walk.ts — comment-stripping branches', () => {
       projectDirAbs: discovery.projectDirAbs,
       files: discovery.files,
       compilerOptions: discovery.compilerOptions,
+      resolutionMode: 'exact',
     });
     const walk = pythonGraphAdapter.walkProject({
       project: parsed.project,
@@ -57,6 +58,7 @@ describe('lang-python walk.ts — comment-stripping branches', () => {
       projectDirAbs: discovery.projectDirAbs,
       files: discovery.files,
       compilerOptions: discovery.compilerOptions,
+      resolutionMode: 'exact',
     });
     const walk = pythonGraphAdapter.walkProject({
       project: parsed.project,
@@ -77,6 +79,7 @@ describe('lang-python walk.ts — comment-stripping branches', () => {
       projectDirAbs: discovery.projectDirAbs,
       files: discovery.files,
       compilerOptions: discovery.compilerOptions,
+      resolutionMode: 'exact',
     });
     const walk = pythonGraphAdapter.walkProject({
       project: parsed.project,

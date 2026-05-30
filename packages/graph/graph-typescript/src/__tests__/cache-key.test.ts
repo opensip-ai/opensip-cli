@@ -25,27 +25,27 @@ describe('lang-typescript cacheKey — branches', () => {
   });
 
   it('returns ts-<version>-no-tsconfig when configPathAbs is undefined', () => {
-    const out = cacheKey({ projectDirAbs: dir });
+    const out = cacheKey({ projectDirAbs: dir, resolutionMode: 'exact' });
     expect(out).toContain('-no-tsconfig');
     expect(out.startsWith('ts-')).toBe(true);
   });
 
   it('returns ts-<version>-no-tsconfig when configPathAbs is empty', () => {
-    const out = cacheKey({ projectDirAbs: dir, configPathAbs: '' });
+    const out = cacheKey({ projectDirAbs: dir, configPathAbs: '', resolutionMode: 'exact' });
     expect(out).toContain('-no-tsconfig');
   });
 
   it('returns ts-<version>-missing:<path> when the tsconfig does not exist', () => {
     const fake = join(dir, 'tsconfig.json');
-    const out = cacheKey({ projectDirAbs: dir, configPathAbs: fake });
+    const out = cacheKey({ projectDirAbs: dir, configPathAbs: fake, resolutionMode: 'exact' });
     expect(out).toContain('missing:');
   });
 
   it('returns a stable ts-<version>-<hash> when the tsconfig is readable', () => {
     const file = join(dir, 'tsconfig.json');
     writeFileSync(file, '{"compilerOptions": {"target": "ES2022"}}', 'utf8');
-    const a = cacheKey({ projectDirAbs: dir, configPathAbs: file });
-    const b = cacheKey({ projectDirAbs: dir, configPathAbs: file });
+    const a = cacheKey({ projectDirAbs: dir, configPathAbs: file, resolutionMode: 'exact' });
+    const b = cacheKey({ projectDirAbs: dir, configPathAbs: file, resolutionMode: 'exact' });
     expect(a).toBe(b);
     expect(a.startsWith('ts-')).toBe(true);
     expect(a).not.toContain('no-tsconfig');

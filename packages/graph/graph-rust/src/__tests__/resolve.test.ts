@@ -49,6 +49,7 @@ function runPipeline(dir: string): {
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,
     compilerOptions: discovery.compilerOptions,
+    resolutionMode: 'exact',
   });
   const walk = rustGraphAdapter.walkProject({
     project: parsed.project,
@@ -68,6 +69,7 @@ function runPipeline(dir: string): {
     catalog,
     callSites: walk.callSites,
     projectDirAbs: discovery.projectDirAbs,
+    resolutionMode: 'exact',
   });
   const allEdges: CallEdge[] = [];
   for (const list of resolved.edgesByOwner.values()) {
@@ -461,6 +463,7 @@ function runResolveSynthetic(dir: string, callSites: readonly unknown[]): Resolv
     // node refs to drive the resolver's defensive null branches.
     callSites: callSites as never,
     projectDirAbs: dir,
+    resolutionMode: 'exact',
   });
 }
 

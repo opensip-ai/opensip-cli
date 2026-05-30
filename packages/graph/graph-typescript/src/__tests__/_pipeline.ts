@@ -44,6 +44,7 @@ export function buildCatalog(input: PipelineInput): PipelineResult {
     projectDirAbs: input.projectDirAbs,
     files: input.files,
     compilerOptions: input.compilerOptions,
+    resolutionMode: 'exact',
   });
   const walked = walkProgram({
     program: parsed.project.program,

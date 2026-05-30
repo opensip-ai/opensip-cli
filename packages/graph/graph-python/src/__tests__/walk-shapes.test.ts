@@ -27,6 +27,7 @@ function runWalk(dir: string): ReturnType<typeof pythonGraphAdapter.walkProject>
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,
     compilerOptions: discovery.compilerOptions,
+    resolutionMode: 'exact',
   });
   return pythonGraphAdapter.walkProject({
     project: parsed.project,
@@ -190,6 +191,7 @@ describe('lang-python walk.ts — function/param shapes', () => {
       projectDirAbs: discovery.projectDirAbs,
       files: discovery.files,
       compilerOptions: discovery.compilerOptions,
+      resolutionMode: 'exact',
     });
     // Pass an extra file that wasn't parsed — walkProject should skip it.
     const walk = pythonGraphAdapter.walkProject({
