@@ -40,8 +40,8 @@ import { walkProgram } from './walk.js';
 
 
 
-import type { TsParsed, TypescriptParsedProject } from './parse.js';
 import type { TypescriptFastParsedProject } from './parse-fast.js';
+import type { TsParsed, TypescriptParsedProject } from './parse.js';
 import type {
   CallSiteRecord as TsCallSiteRecord,
   DependencySiteRecord as TsDependencySiteRecord,

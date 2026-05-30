@@ -9,11 +9,12 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import type ts from 'typescript';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { parseProject } from '../parse.js';
 import { walkProgram } from '../walk.js';
+
+import type ts from 'typescript';
 
 const SOURCE = `
 import { dep } from './dep.js';

@@ -106,16 +106,20 @@ export function parseProjectFast(
  */
 function scriptKindForFile(fileName: string): ts.ScriptKind {
   switch (extname(fileName).toLowerCase()) {
-    case '.tsx':
+    case '.tsx': {
       return ts.ScriptKind.TSX;
-    case '.jsx':
+    }
+    case '.jsx': {
       return ts.ScriptKind.JSX;
+    }
     case '.js':
     case '.cjs':
-    case '.mjs':
+    case '.mjs': {
       return ts.ScriptKind.JS;
-    default:
+    }
+    default: {
       // .ts, .cts, .mts and anything else the adapter admitted.
       return ts.ScriptKind.TS;
+    }
   }
 }

@@ -13,8 +13,8 @@ import { join } from 'node:path';
 import ts from 'typescript';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { parseProject } from '../parse.js';
 import { parseProjectFast } from '../parse-fast.js';
+import { parseProject } from '../parse.js';
 
 describe('parseProjectFast', () => {
   let dir: string;
@@ -58,7 +58,7 @@ describe('parseProjectFast', () => {
     // proof setParentNodes ran without a binder/checker.
     const firstStmt = sf!.statements[0];
     expect(firstStmt).toBeDefined();
-    expect(firstStmt!.parent).toBe(sf);
+    expect(firstStmt.parent).toBe(sf);
   });
 
   it('surfaces syntactic diagnostics into parseErrors for an unparseable file', () => {

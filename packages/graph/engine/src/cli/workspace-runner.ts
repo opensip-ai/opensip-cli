@@ -27,8 +27,8 @@ import {
   type WorkspaceUnit,
 } from '@opensip-tools/core'
 
-import type { CliOutput, FindingOutput } from '@opensip-tools/contracts'
 import type { ResolutionMode } from '../types.js'
+import type { CliOutput, FindingOutput } from '@opensip-tools/contracts'
 
 /**
  * Per-unit result from a `graph --workspace` fan-out — one entry per

@@ -45,7 +45,11 @@ function occ(simpleName: string, filePath: string, hash: string): FunctionOccurr
 
 function catalogOf(...occs: FunctionOccurrence[]): Catalog {
   const functions: Record<string, FunctionOccurrence[]> = {};
-  for (const o of occs) (functions[o.simpleName] ??= []).push(o);
+  for (const o of occs) {
+    const bucket = functions[o.simpleName];
+    if (bucket) bucket.push(o);
+    else functions[o.simpleName] = [o];
+  }
   return {
     version: '3.0',
     tool: 'graph',
