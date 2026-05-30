@@ -2,16 +2,18 @@
 
 Releases are tag-driven. Pushing a tag matching `v*` triggers
 `.github/workflows/release.yml`, which builds, tests, packs, and
-publishes all 27 `@opensip-tools/*` packages to npm via OIDC trusted
+publishes all 29 `@opensip-tools/*` packages to npm via OIDC trusted
 publishing — no `NPM_TOKEN` required.
 
-## The 27 packages
+## The 29 packages
 
 | Layer | Package | Path |
 |-------|---------|------|
 | Kernel | `@opensip-tools/core` | `packages/core` |
 | Persistence | `@opensip-tools/datastore` | `packages/datastore` |
 | Shared CLI | `@opensip-tools/contracts` | `packages/contracts` |
+| Persistence | `@opensip-tools/session-store` | `packages/session-store` |
+| Reporting | `@opensip-tools/reporting` | `packages/reporting` |
 | Shared CLI | `@opensip-tools/cli-ui` | `packages/cli-ui` |
 | Languages | `@opensip-tools/lang-typescript` | `packages/languages/lang-typescript` |
 | Languages | `@opensip-tools/lang-rust` | `packages/languages/lang-rust` |
@@ -37,7 +39,7 @@ publishing — no `NPM_TOKEN` required.
 | Check packs | `@opensip-tools/checks-rust` | `packages/fitness/checks-rust` |
 | CLI | `@opensip-tools/cli` | `packages/cli` |
 
-All 27 share the same version. The release workflow publishes them in
+All 29 share the same version. The release workflow publishes them in
 dependency order; downstream packages reference upstream versions in
 their `dependencies`.
 
@@ -78,7 +80,7 @@ their `dependencies`.
 
 6. Verify on npm:
    ```bash
-   for p in core datastore contracts cli-ui cli fitness simulation graph dashboard \
+   for p in core datastore contracts session-store reporting cli-ui cli fitness simulation graph dashboard \
             graph-typescript graph-python graph-rust graph-go graph-java \
             lang-typescript lang-rust lang-python lang-go lang-java lang-cpp \
             checks-typescript checks-universal checks-python checks-go checks-java checks-cpp checks-rust; do
@@ -97,44 +99,53 @@ Order:
 
 1. **`@opensip-tools/core`** — depends on nothing else workspace-internal.
 2. **`@opensip-tools/datastore`** — depends on core. Bundles SQLite + Drizzle persistence.
-3. **`@opensip-tools/contracts`** — depends on core, datastore.
-4. **`@opensip-tools/cli-ui`** — Ink/React presentational primitives (banner,
+3. **`@opensip-tools/contracts`** — depends on core only (types-only; the
+   former datastore + drizzle-orm runtime deps moved to session-store /
+   reporting in the 2026-05-29 contracts split).
+4. **`@opensip-tools/session-store`** — depends on core, datastore, and
+   contracts (StoredSession type). Owns the session SQLite schema +
+   SessionRepo. Published before fitness / graph / cli, which persist
+   sessions through it.
+5. **`@opensip-tools/reporting`** — depends on core and contracts
+   (CliOutput type). Owns SARIF build + cloud report. Published before
+   fitness / graph, which report findings through it.
+6. **`@opensip-tools/cli-ui`** — Ink/React presentational primitives (banner,
    spinner, run header, theme). Leaf package, depends on no
    workspace-internal package; consumed by every tool live view + the
    CLI's static-render path.
-5. **Language adapters** (lang-typescript first, then any order):
+7. **Language adapters** (lang-typescript first, then any order):
    `lang-typescript` → others. lang-typescript is published before the
    rest because it has more downstream consumers (every TS-AST check
    pack peer-depends on it transitively).
-6. **`@opensip-tools/dashboard`** — depends on core + contracts only.
+8. **`@opensip-tools/dashboard`** — depends on core + contracts only.
    Published before `fitness` because fitness's `cli/dashboard.ts`
    imports `generateDashboardHtml` from it.
-7. **`@opensip-tools/fitness`** — depends on core, contracts,
-   datastore, lang-typescript, dashboard, and cli-ui.
-8. **`@opensip-tools/simulation`** — depends on core, contracts, datastore.
-9. **`@opensip-tools/graph`** — depends on core, contracts, cli-ui,
-   plus the peer-layer SARIF edge into fitness.
-10. **Graph adapter packs** — `@opensip-tools/graph-typescript`,
+9. **`@opensip-tools/fitness`** — depends on core, contracts,
+   datastore, session-store, reporting, lang-typescript, dashboard, and cli-ui.
+10. **`@opensip-tools/simulation`** — depends on core, contracts, datastore.
+11. **`@opensip-tools/graph`** — depends on core, contracts, datastore,
+    session-store, reporting, and cli-ui.
+12. **Graph adapter packs** — `@opensip-tools/graph-typescript`,
     `graph-python`, `graph-rust`, `graph-go`, `graph-java`. Each
     depends on the engine (`@opensip-tools/graph`) plus its parser
     (typescript / tree-sitter-*). Independent of each other; published
     in any order within the group. The non-TS adapters are opt-in
     plugins — the CLI does not depend on them, so users who want them
     install explicitly.
-11. **Check packs** (any order within this group):
+13. **Check packs** (any order within this group):
     `checks-typescript`, `checks-universal`, `checks-python`,
     `checks-go`, `checks-java`, `checks-cpp`, `checks-rust` — all
     peer-depend on fitness. `checks-rust` is opt-in (not a CLI
     dependency); install explicitly.
-12. **`@opensip-tools/cli`** — depends on every tool, every check pack
+14. **`@opensip-tools/cli`** — depends on every tool, every check pack
     and every graph adapter pack the CLI loads by default, every
-    language adapter, contracts, datastore, and cli-ui. Always
-    published last.
+    language adapter, contracts, datastore, session-store, reporting,
+    and cli-ui. Always published last.
 
 ## Prerequisites (one-time setup)
 
 - **npm Trusted Publishers** must be configured per-package on
-  npmjs.com → package settings → Publishing access. Each of the 27
+  npmjs.com → package settings → Publishing access. Each of the 29
   packages needs an entry pointing to:
   - Organization: `opensip-ai`
   - Repository: `opensip-tools`
@@ -167,7 +178,7 @@ To unblock:
    ```
 
    The script is **namespace-creation only** and **idempotent**. It
-   iterates the 27 packages in dependency order, skips any whose NAME
+   iterates the 29 packages in dependency order, skips any whose NAME
    already exists on npm (those get v`X.Y.Z` via the OIDC tagged
    release, with provenance), packs and publishes only the brand-new
    names using the token, and at the end prints a list of newly-created
