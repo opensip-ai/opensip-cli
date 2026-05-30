@@ -9,8 +9,8 @@
  *
  */
 
-import { defineCheck, type CheckViolation, getASTLineNumber } from '@opensip-tools/fitness'
-import { parseSource, walkNodes } from '@opensip-tools/lang-typescript'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { parseSource, walkNodes, getLineNumber } from '@opensip-tools/lang-typescript'
 import * as ts from 'typescript'
 
 /** Names of user input sources on request objects */
@@ -110,7 +110,7 @@ function checkInnerHtmlAssignment(
     referencesUserInput(node.right)
   ) {
     return {
-      line: getASTLineNumber(node, sourceFile),
+      line: getLineNumber(node, sourceFile),
       column: 0,
       message: 'innerHTML with potential user input - use textContent or sanitize',
       severity: 'error',
@@ -134,7 +134,7 @@ function checkDangerouslySetInnerHTML(
     node.name.text === 'dangerouslySetInnerHTML'
   ) {
     return {
-      line: getASTLineNumber(node, sourceFile),
+      line: getLineNumber(node, sourceFile),
       column: 0,
       message: 'dangerouslySetInnerHTML usage - ensure input is sanitized',
       severity: 'warning',
@@ -170,7 +170,7 @@ function checkUnsanitizedCallArgs(
   for (const arg of node.arguments) {
     if (referencesUserInput(arg)) {
       return {
-        line: getASTLineNumber(node, sourceFile),
+        line: getLineNumber(node, sourceFile),
         column: 0,
         message,
         severity: 'error',
@@ -193,7 +193,7 @@ function checkHtmlTemplateInterpolation(
   for (const span of node.templateSpans) {
     if (referencesUserInput(span.expression)) {
       return {
-        line: getASTLineNumber(node, sourceFile),
+        line: getLineNumber(node, sourceFile),
         column: 0,
         message: 'Unsanitized user input in HTML template - use html-escaper',
         severity: 'error',

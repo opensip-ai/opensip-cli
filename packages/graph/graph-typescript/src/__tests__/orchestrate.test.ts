@@ -11,7 +11,7 @@ import { join } from 'node:path';
 
 import { enterScope, RunScope } from '@opensip-tools/core';
 import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
-import { graphTool, registerAdapter, runGraph } from '@opensip-tools/graph';
+import { currentAdapterRegistry, graphTool, runGraph } from '@opensip-tools/graph';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { typescriptGraphAdapter } from '../index.js';
@@ -51,7 +51,7 @@ describe('runGraph orchestrator', () => {
     const scope = new RunScope();
     Object.assign(scope, graphTool.contributeScope?.() ?? {});
     enterScope(scope);
-    registerAdapter(typescriptGraphAdapter);
+    currentAdapterRegistry().register(typescriptGraphAdapter);
 
     dir = mkdtempSync(join(tmpdir(), 'graph-orch-'));
     datastore = DataStoreFactory.open({ backend: 'memory' });

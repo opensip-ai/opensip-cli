@@ -5,7 +5,7 @@
  * depend on this package for:
  *   - CLI option / output / result types
  *   - Exit code constants and error suggestions
- *   - Session persistence (saveSession, loadSessions)
+ *   - Session persistence (StoredSession, SessionRepo)
  *
  * Dashboard rendering moved to @opensip-tools/dashboard (Layer 3).
  * contracts type-re-exports the GraphCatalog shape from there as part
@@ -70,11 +70,9 @@ export type { CliDefaults } from './cli-config.js';
 // Session persistence
 export { generateSessionId, sanitizeForFilename } from './persistence/store.js';
 export type { StoredSession } from './persistence/store.js';
-// v2 persistence: SessionRepo + sessions schema.
-// `LegacyStoredSession` and `migrateLegacyStoredSession` (if either survived
-// the v2 migration) are intentionally NOT re-exported here — they are
-// internal. Tests reach in via the relative path. Promote them to the
-// barrel only if a real external consumer materializes.
+// SessionRepo + sessions schema. The SQLite `SessionRepo` is the sole
+// persistence path; the v1 JSON session format it replaced has no
+// surviving code.
 export { SessionRepo } from './persistence/session-repo.js';
 export type { SessionListOptions } from './persistence/session-repo.js';
 export { sessions, sessionToolPayload } from './persistence/schema/sessions.js';

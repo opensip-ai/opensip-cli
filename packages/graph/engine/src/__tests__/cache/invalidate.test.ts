@@ -16,7 +16,6 @@ import {
   classifyCatalog,
   computeFilesFingerprint,
   diffFingerprints,
-  isCatalogValid,
 } from '../../cache/invalidate.js';
 
 import type { Catalog } from '../../types.js';
@@ -37,61 +36,61 @@ function makeCatalog(over: Partial<Catalog> = {}): Catalog {
   };
 }
 
-describe('isCatalogValid', () => {
-  it('returns false when language differs', () => {
+describe('classifyCatalog → valid verdict', () => {
+  it('is not valid when language differs', () => {
     const cat = makeCatalog({ language: 'python' });
     expect(
-      isCatalogValid(cat, {
+      classifyCatalog(cat, {
         currentLanguage: FAKE_LANG,
         currentCacheKey: FAKE_CACHE_KEY,
         currentFiles: [],
-      }),
+      }).kind === 'valid',
     ).toBe(false);
   });
 
-  it('returns false when cacheKey differs', () => {
+  it('is not valid when cacheKey differs', () => {
     const cat = makeCatalog({ cacheKey: 'ts-5.6.0-abcdef0123456789' });
     expect(
-      isCatalogValid(cat, {
+      classifyCatalog(cat, {
         currentLanguage: FAKE_LANG,
         currentCacheKey: FAKE_CACHE_KEY,
         currentFiles: [],
-      }),
+      }).kind === 'valid',
     ).toBe(false);
   });
 
-  it('returns false when filesFingerprint is missing', () => {
+  it('is not valid when filesFingerprint is missing', () => {
     const noFp = makeCatalog();
     const stripped: Catalog = { ...noFp, filesFingerprint: undefined };
     expect(
-      isCatalogValid(stripped, {
+      classifyCatalog(stripped, {
         currentLanguage: FAKE_LANG,
         currentCacheKey: FAKE_CACHE_KEY,
         currentFiles: [],
-      }),
+      }).kind === 'valid',
     ).toBe(false);
   });
 
-  it('returns false when files have changed', () => {
+  it('is not valid when files have changed', () => {
     const cat = makeCatalog({ filesFingerprint: 'old-fp' });
     expect(
-      isCatalogValid(cat, {
+      classifyCatalog(cat, {
         currentLanguage: FAKE_LANG,
         currentCacheKey: FAKE_CACHE_KEY,
         currentFiles: ['fake/does-not-exist.ts'],
-      }),
+      }).kind === 'valid',
     ).toBe(false);
   });
 
-  it('returns true when all signals agree', () => {
+  it('is valid when all signals agree', () => {
     const fp = computeFilesFingerprint([]);
     const cat = makeCatalog({ filesFingerprint: fp });
     expect(
-      isCatalogValid(cat, {
+      classifyCatalog(cat, {
         currentLanguage: FAKE_LANG,
         currentCacheKey: FAKE_CACHE_KEY,
         currentFiles: [],
-      }),
+      }).kind === 'valid',
     ).toBe(true);
   });
 });

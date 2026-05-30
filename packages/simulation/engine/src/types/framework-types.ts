@@ -1,4 +1,3 @@
-// @fitness-ignore-file no-deprecated-tags -- LegacyLoadResultPayload is the active payload type produced by ScenarioResultBuilder and consumed by the load kind's CustomExecuteFn signature; the @deprecated tag steers new code toward ScenarioExecutorResult but the type is not removable until the CustomExecuteFn migration lands.
 /**
  * @fileoverview Cross-kind type definitions for the Simulation Framework.
  *
@@ -10,8 +9,8 @@
  *
  * The exports below are the small set of cross-kind shapes that each kind's
  * `define`/`executor`/`result` modules consume — execution context + logger,
- * persona config, assertion + failed-assertion shapes, the legacy load result
- * payload (still produced by `ScenarioResultBuilder`), and the optional
+ * persona config, assertion + failed-assertion shapes, the load result
+ * payload (produced by `ScenarioResultBuilder`), and the optional
  * custom-`execute` hook.
  */
 
@@ -77,16 +76,16 @@ export interface ScenarioLogger {
 }
 
 /**
- * Legacy load-shaped scenario result payload, produced by `ScenarioResultBuilder`.
+ * Load-shaped scenario result payload, produced by `ScenarioResultBuilder`.
  *
- * The new public `ScenarioExecutorResult` (discriminated union over kinds)
- * lives in `framework/scenario-executor-result.ts`. Each kind's runner wraps
- * a payload of this shape into its kind-specific envelope.
- *
- * @deprecated Prefer the discriminated `ScenarioExecutorResult` from
- * `framework/scenario-executor-result.ts`.
+ * This is the builder's output shape: the load and chaos executors build a
+ * payload of this shape and wrap it into their kind-specific
+ * `ScenarioExecutorResult` envelope (the discriminated union over kinds in
+ * `framework/scenario-executor-result.ts`). It is also the return type of the
+ * optional custom-`execute` hook (`CustomExecuteFn`), so scenario authors who
+ * supply their own load driver return this shape.
  */
-export interface LegacyLoadResultPayload {
+export interface LoadResultPayload {
   readonly passed: boolean
   readonly metrics: SimulationMetrics
   readonly assertions: {
@@ -99,11 +98,12 @@ export interface LegacyLoadResultPayload {
 /**
  * Custom execute function signature for load scenarios.
  *
- * Custom execute functions return the legacy load result payload; the
- * load runner wraps the payload into a `LoadScenarioExecutorResult`.
+ * The documented extension point for plugging a real load driver into a load
+ * scenario (in place of the built-in mock loop). Custom execute functions
+ * return a `LoadResultPayload`; the load runner wraps it into a
+ * `LoadScenarioExecutorResult`.
  */
-// eslint-disable-next-line sonarjs/deprecation -- the legacy custom-execute hook returns the legacy payload by design
-export type CustomExecuteFn = (context: ScenarioExecutionContext) => Promise<LegacyLoadResultPayload>
+export type CustomExecuteFn = (context: ScenarioExecutionContext) => Promise<LoadResultPayload>
 
 // =============================================================================
 // RE-EXPORTS

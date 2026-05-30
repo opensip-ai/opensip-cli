@@ -119,7 +119,7 @@ These docs are written for engineers fluent in TypeScript and Node tooling. Voic
 41. [**Coding standards**](/docs/opensip-tools/80-implementation/04-coding-standards/) — TS strictness, error handling, exit codes, ESLint posture.
 42. [**Layer policy**](/docs/opensip-tools/80-implementation/05-layer-policy/) — Dependency-cruiser rules, allowed imports, why the kernel can't import a tool.
 43. [**Doc conventions**](/docs/opensip-tools/80-implementation/06-doc-conventions/) — Voice, frontmatter, diagrams, verification trails.
-44. [**Website integration**](/docs/opensip-tools/80-implementation/07-website-integration/) — How opensip.ai consumes `docs/web/`: proxy, route, manifest contract.
+44. [**Website integration**](/docs/opensip-tools/80-implementation/07-website-integration/) — How opensip.ai consumes `docs/web-generated/`: proxy, route, manifest contract.
 
 ---
 

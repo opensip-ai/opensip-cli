@@ -14,14 +14,14 @@ import { describe, expect, it } from 'vitest';
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 import { discoverFiles } from '../../discover.js';
-import { buildInventory } from '../../inventory.js';
+import { buildCatalog } from '../_pipeline.js';
 
 import type { Catalog } from '@opensip-tools/graph';
 
 function loadFitnessCatalog(): Catalog {
   const projectDir = resolve(HERE, '../../../../../fitness/engine');
   const discovery = discoverFiles({ projectDir });
-  const inventory = buildInventory({
+  const inventory = buildCatalog({
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,
     compilerOptions: discovery.compilerOptions,

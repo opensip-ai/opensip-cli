@@ -46,8 +46,8 @@ export const pythonGraphAdapter: GraphLanguageAdapter<PythonParsedProject> = {
 
 /**
  * Discovery contract: external adapter packs export `adapter` (the
- * GraphLanguageAdapter) and `metadata`. The CLI bootstrap calls
- * `registerAdapter` with `adapter` after a successful `import()`.
+ * GraphLanguageAdapter) and `metadata`. The CLI bootstrap registers
+ * `adapter` into the adapter registry after a successful `import()`.
  */
 export { pythonGraphAdapter as adapter };
 export const metadata = {

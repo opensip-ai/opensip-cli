@@ -9,7 +9,7 @@
  * Lives in its own module so consumers reading these helpers don't scroll
  * past unrelated parsing / inspection / comment-detection code, and so the
  * next round of scope helpers has a sensible home rather than landing in
- * the legacy `ast-utilities.ts` shim.
+ * the general-purpose `ast-utilities.ts` module.
  */
 
 import * as ts from 'typescript'

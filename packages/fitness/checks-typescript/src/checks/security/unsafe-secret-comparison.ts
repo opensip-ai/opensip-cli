@@ -7,8 +7,8 @@
  * constant-time comparison function like safeCompare().
  */
 
-import { defineCheck, type CheckViolation, isPropertyAccess, getASTLineNumber } from '@opensip-tools/fitness'
-import { parseSource, walkNodes, getIdentifierName, isLiteral } from '@opensip-tools/lang-typescript'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { parseSource, walkNodes, getIdentifierName, isLiteral, isPropertyAccess, getLineNumber } from '@opensip-tools/lang-typescript'
 import * as ts from 'typescript'
 
 /**
@@ -173,7 +173,7 @@ export const unsafeSecretComparison = defineCheck({
       ) {
         const secretName = findSecretOperand(node.left, node.right)
         if (secretName) {
-          const line = getASTLineNumber(node, sourceFile)
+          const line = getLineNumber(node, sourceFile)
           const operator =
             node.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken ? '===' : '!=='
           violations.push({

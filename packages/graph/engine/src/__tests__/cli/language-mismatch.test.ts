@@ -16,7 +16,7 @@ import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 
 import { executeGraph } from '../../cli/graph.js'
-import { clearAdapterRegistry, registerAdapter } from '../../lang-adapter/registry.js'
+import { currentAdapterRegistry } from '../../lang-adapter/registry.js'
 import { makeGraphTestScope } from '../test-utils/with-graph-scope.js'
 
 import type {
@@ -140,7 +140,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  clearAdapterRegistry()
+  currentAdapterRegistry().clear()
   datastore.close()
   stdoutSpy.mockRestore()
   stderrSpy.mockRestore()
@@ -149,7 +149,7 @@ afterEach(() => {
 
 describe('D14 — --language with zero matching files', () => {
   it('exits 2 with the canonical error message', async () => {
-    registerAdapter(emptyAdapter(projectDir))
+    currentAdapterRegistry().register(emptyAdapter(projectDir))
     const { cli, setExitCode } = mockCli(datastore)
     await executeGraph(
       { cwd: projectDir, noCache: true, language: 'typescript' },
@@ -162,7 +162,7 @@ describe('D14 — --language with zero matching files', () => {
   })
 
   it('does NOT trigger when --language is unset (auto-detect path)', async () => {
-    registerAdapter(emptyAdapter(projectDir))
+    currentAdapterRegistry().register(emptyAdapter(projectDir))
     const { cli, setExitCode } = mockCli(datastore)
     await executeGraph(
       { cwd: projectDir, noCache: true },
@@ -175,7 +175,7 @@ describe('D14 — --language with zero matching files', () => {
   })
 
   it('exits 0 when --language is set and ≥1 file matches', async () => {
-    registerAdapter(populatedAdapter(projectDir))
+    currentAdapterRegistry().register(populatedAdapter(projectDir))
     const { cli, setExitCode } = mockCli(datastore)
     await executeGraph(
       { cwd: projectDir, noCache: true, language: 'typescript' },

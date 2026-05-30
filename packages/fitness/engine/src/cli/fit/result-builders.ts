@@ -246,8 +246,7 @@ export function buildFitCallbacks(
  * Best-effort session persistence — invoked when `executeFit` is called
  * with a `datastore` opt. Maps `CliOutput` directly onto the
  * `StoredSession` shape that `SessionRepo` consumes. Errors are caught
- * and logged so a write failure never fails the run; the same policy
- * applied to v1's file-based `saveSession` path.
+ * and logged so a write failure never fails the run.
  */
 export function persistFitSession(
   datastore: DataStore,

@@ -15,8 +15,7 @@ import type { SimulationMetrics } from '../types/base-types.js'
 import type {
   ScenarioAssertion,
   FailedAssertion,
-  // eslint-disable-next-line sonarjs/deprecation -- this builder IS the legacy load-result implementation; the deprecated type is its return shape by design
-  LegacyLoadResultPayload,
+  LoadResultPayload,
 } from '../types/framework-types.js'
 import type { Signal } from '@opensip-tools/core'
 
@@ -136,9 +135,8 @@ export class ScenarioResultBuilder {
   // ===========================================================================
 
   /** Build the final load-shaped payload. Throws if metrics are not set. */
-  // @fitness-ignore-next-line result-pattern-consistency -- return type is LegacyLoadResultPayload (not canonical Result); throw is a builder precondition
-  // eslint-disable-next-line sonarjs/deprecation -- legacy builder return type, kept for back-compat
-  build(): LegacyLoadResultPayload {
+  // @fitness-ignore-next-line result-pattern-consistency -- return type is LoadResultPayload (not canonical Result); throw is a builder precondition
+  build(): LoadResultPayload {
     if (!this._metrics) {
       // @fitness-ignore-next-line result-pattern-consistency -- builder precondition, throw is appropriate
       throw new ValidationError('Metrics are required. Call withMetrics() before build().', {

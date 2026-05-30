@@ -29,8 +29,8 @@ import { dirname, join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { discoverFiles } from '../discover.js';
-import { resolveEdges } from '../edges.js';
-import { buildInventory } from '../inventory.js';
+
+import { buildCatalog as runInventory, resolveCatalogEdges } from './_pipeline.js';
 
 import type { Catalog, FunctionOccurrence } from '@opensip-tools/graph';
 
@@ -59,13 +59,12 @@ function buildCatalog(rootDir: string, files: Readonly<Record<string, string>>):
     writeFileSync(filePath, content, 'utf8');
   }
   const discovery = discoverFiles({ projectDir: rootDir });
-  const inv = buildInventory({
+  return runInventory({
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,
     compilerOptions: discovery.compilerOptions,
     tsConfigPathAbs: discovery.tsConfigPathAbs,
-  });
-  return inv.catalog;
+  }).catalog;
 }
 
 function buildCatalogWithEdges(rootDir: string, files: Readonly<Record<string, string>>): Catalog {
@@ -78,18 +77,13 @@ function buildCatalogWithEdges(rootDir: string, files: Readonly<Record<string, s
     writeFileSync(filePath, content, 'utf8');
   }
   const discovery = discoverFiles({ projectDir: rootDir });
-  const inv = buildInventory({
+  const inv = runInventory({
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,
     compilerOptions: discovery.compilerOptions,
     tsConfigPathAbs: discovery.tsConfigPathAbs,
   });
-  const edges = resolveEdges({
-    catalog: inv.catalog,
-    program: inv.program,
-    projectDirAbs: discovery.projectDirAbs,
-  });
-  return edges.catalog;
+  return resolveCatalogEdges(inv, discovery.projectDirAbs);
 }
 
 function allOccurrences(catalog: Catalog): FunctionOccurrence[] {

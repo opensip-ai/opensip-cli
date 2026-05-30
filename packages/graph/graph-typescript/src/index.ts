@@ -9,8 +9,8 @@
  * by `lang-adapter/types.ts`.
  *
  * The contract surface is intentionally small (six methods); each
- * one delegates to the existing legacy implementation and translates
- * I/O shapes:
+ * one delegates to the TypeScript-specific implementation and
+ * translates I/O shapes:
  *
  *   discoverFiles    → ./discover.ts:discoverFiles
  *   parseProject     → ./parse.ts:parseProject
@@ -32,7 +32,7 @@ import { relative, sep } from 'node:path';
 import ts from 'typescript';
 
 import { cacheKey as typescriptCacheKey } from './cache-key.js';
-import { discoverFiles as legacyDiscoverFiles } from './discover.js';
+import { discoverFiles as discoverTypescriptFiles } from './discover.js';
 import { resolveEdgesFromRecords } from './edges.js';
 import { parseProject as parseTypescriptProject } from './parse.js';
 import { isTypescriptTestFile } from './test-file.js';
@@ -96,7 +96,7 @@ const THROW_SYNTAX_REGEX = /\bthrow\s+(?:new\s+)?[A-Za-z_$]/;
 // ── Adapter façade ─────────────────────────────────────────────────
 
 function discoverFilesAdapter(input: DiscoverInput): DiscoverOutput {
-  const result = legacyDiscoverFiles({
+  const result = discoverTypescriptFiles({
     projectDir: input.cwd,
     tsConfigPath: input.configPathOverride,
   });
@@ -114,7 +114,7 @@ function walkProjectAdapter(input: WalkInput<TypescriptParsedProject>): WalkOutp
     files: input.files,
     projectDirAbs: input.projectDirAbs,
   });
-  // Translate legacy CallSiteRecord (node/sourceFile) into the
+  // Translate the TS-internal CallSiteRecord (node/sourceFile) into the
   // contract's opaque shape (nodeRef/sourceFileRef). No data loss —
   // the same handles flow back into resolveCallSites unchanged.
   const callSites: ContractCallSiteRecord[] = walked.callSites.map((r) => ({
@@ -143,9 +143,9 @@ function walkProjectAdapter(input: WalkInput<TypescriptParsedProject>): WalkOutp
 function resolveCallSitesAdapter(
   input: ResolveInput<TypescriptParsedProject>,
 ): ResolveOutput {
-  // Translate the contract's CallSiteRecord back into the legacy shape
-  // that resolveEdgesFromRecords consumes.
-  const legacyCallSites: TsCallSiteRecord[] = input.callSites.map((r) => ({
+  // Translate the contract's CallSiteRecord back into the TS-internal
+  // shape that resolveEdgesFromRecords consumes.
+  const tsCallSites: TsCallSiteRecord[] = input.callSites.map((r) => ({
     node: r.nodeRef as ts.Node,
     sourceFile: r.sourceFileRef as ts.SourceFile,
     ownerHash: r.ownerHash,
@@ -156,7 +156,7 @@ function resolveCallSitesAdapter(
     catalog: input.catalog,
     program: input.project.program,
     projectDirAbs: input.projectDirAbs,
-    callSites: legacyCallSites,
+    callSites: tsCallSites,
   });
 
   // Phase 4 (DEC-498): resolve dependency sites if any. Translate
@@ -298,11 +298,10 @@ function resolveDependencies(
 }
 
 /**
- * Build the `bodyHash → CallEdge[]` map the contract returns. The
- * legacy resolver wrote the edges directly into a freshly rebuilt
- * catalog; the contract surface separates resolution from catalog
- * mutation, so the orchestrator can stitch the edges into whatever
- * catalog shape it owns.
+ * Build the `bodyHash → CallEdge[]` map the contract returns.
+ * `resolveEdgesFromRecords` writes edges onto a rebuilt catalog; the
+ * contract surface separates resolution from catalog mutation, so the
+ * orchestrator can stitch the edges into whatever catalog shape it owns.
  */
 function collectByOwner(
   catalog: Catalog,
@@ -338,8 +337,8 @@ export const typescriptGraphAdapter: GraphLanguageAdapter<TypescriptParsedProjec
 /**
  * Discovery contract: external adapter packs export `adapter` (the
  * GraphLanguageAdapter) and `metadata` (a small descriptor used by
- * the CLI for diagnostics). The CLI bootstrap calls `registerAdapter`
- * with `adapter` after a successful `import()`.
+ * the CLI for diagnostics). The CLI bootstrap registers `adapter` into
+ * the adapter registry after a successful `import()`.
  */
 export { typescriptGraphAdapter as adapter };
 export const metadata = {
@@ -354,12 +353,3 @@ export type { TypescriptParsedProject } from './parse.js';
 export type { EdgeResolver, ResolverContext } from './edge-resolvers/types.js';
 export type { InventoryVisitor, VisitorContext } from './inventory-visitors/types.js';
 export { isTypescriptTestFile } from './test-file.js';
-
-// Lower-level helpers that engine integration tests (in
-// @opensip-tools/graph) consume to drive a real TS pipeline against a
-// temporary fixture without needing to wire the full orchestrator.
-// Exposed for cross-package tests; not intended as a stable third-party
-// adapter authoring API.
-export { discoverFiles } from './discover.js';
-export { buildInventory } from './inventory.js';
-export { resolveEdges } from './edges.js';

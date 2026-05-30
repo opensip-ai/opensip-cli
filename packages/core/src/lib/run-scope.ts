@@ -33,8 +33,8 @@ import type { DataStoreThunk, RecipeCheckConfigSlot, ToolScope } from './scope-t
 // RecipeCheckConfigSlot, DataStoreThunk, ToolScope, and ScopeContribution
 // live in the leaf `scope-types.ts` (audit 2026-05-29, M4) so the `Tool`
 // contract can depend on them without naming the concrete `RunScope` —
-// breaking the RunScope⟷Tool type cycle. Re-exported here for back-compat.
-export type { RecipeCheckConfigSlot, DataStoreThunk, ToolScope, ScopeContribution } from './scope-types.js';
+// breaking the RunScope⟷Tool type cycle. The core barrel sources them
+// directly from `scope-types.ts`; `run-scope.ts` imports what it needs below.
 
 class DefaultRecipeCheckConfigSlot implements RecipeCheckConfigSlot {
   private store: Record<string, Record<string, unknown>> = {};

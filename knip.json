@@ -33,8 +33,5 @@
         "src/cli/sim.ts"
       ]
     }
-  },
-  "ignoreBinaries": [
-    "dot"
-  ]
+  }
 }

@@ -6,8 +6,8 @@
  * text, error messages, and comments.
  */
 
-import { defineCheck, type CheckViolation, getASTLineNumber } from '@opensip-tools/fitness'
-import { parseSource, walkNodes } from '@opensip-tools/lang-typescript'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { parseSource, walkNodes, getLineNumber } from '@opensip-tools/lang-typescript'
 import * as ts from 'typescript'
 
 /**
@@ -230,7 +230,7 @@ function checkTemplateInjection(
   const templateText = getTemplateText(node)
   if (!SQL_STRUCTURE_PATTERN.test(templateText)) return
 
-  const line = getASTLineNumber(node, sourceFile)
+  const line = getLineNumber(node, sourceFile)
   const matchText = node.getText()
   const isQueryArg = isInQueryCall(node)
 
@@ -271,7 +271,7 @@ function checkConcatenationInjection(
 
   if (leftIsString && SQL_KEYWORD_PATTERN.test(leftText) && !rightIsString) {
     violations.push({
-      line: getASTLineNumber(node, sourceFile),
+      line: getLineNumber(node, sourceFile),
       column: 0,
       message: 'Potential SQL injection: SQL string concatenation detected',
       severity: 'error',
@@ -293,7 +293,7 @@ function checkConcatenationInjection(
     concatChainHasSqlKeyword(node)
   ) {
     violations.push({
-      line: getASTLineNumber(node, sourceFile),
+      line: getLineNumber(node, sourceFile),
       column: 0,
       message: 'Potential SQL injection: string concatenation in SQL clause detected',
       severity: 'error',

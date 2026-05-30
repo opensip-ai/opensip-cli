@@ -99,9 +99,7 @@ export type {
 } from './lang-adapter/types.js';
 export type { CallConfidence as AdapterCallConfidence } from './types.js';
 export {
-  registerAdapter,
   pickAdapter,
-  clearAdapterRegistry,
   createAdapterRegistry,
   currentAdapterRegistry,
   setDiscoveredAdapters,

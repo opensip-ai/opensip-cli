@@ -3,7 +3,7 @@
  * Inventory shape coverage tests (Tier 1).
  *
  * One focused test per syntactic TypeScript shape that stage 1
- * (buildInventory) must catch — and one per shape that it must NOT.
+ * (buildCatalog) must catch — and one per shape that it must NOT.
  *
  * Each test builds a tiny in-memory source string in a temp directory,
  * runs stage 0 + stage 1 (no edge resolution required for inventory),
@@ -21,7 +21,8 @@ import { dirname, join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { discoverFiles } from '../discover.js';
-import { buildInventory } from '../inventory.js';
+
+import { buildCatalog } from './_pipeline.js';
 
 import type { Catalog, FunctionOccurrence } from '@opensip-tools/graph';
 
@@ -51,7 +52,7 @@ function buildCatalogFor(rootDir: string, files: Readonly<Record<string, string>
     writeFileSync(filePath, content, 'utf8');
   }
   const discovery = discoverFiles({ projectDir: rootDir });
-  const inv = buildInventory({
+  const inv = buildCatalog({
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,
     compilerOptions: discovery.compilerOptions,

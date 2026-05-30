@@ -10,8 +10,7 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { discoverFiles } from '../../discover.js';
-import { resolveEdges } from '../../edges.js';
-import { buildInventory } from '../../inventory.js';
+import { buildCatalog, resolveCatalogEdges } from '../_pipeline.js';
 
 import type { Catalog, FunctionOccurrence } from '@opensip-tools/graph';
 
@@ -45,18 +44,13 @@ export function writeFixture(rootDir: string, files: FixtureFiles): void {
 
 export function runFixture(rootDir: string): Catalog {
   const discovery = discoverFiles({ projectDir: rootDir });
-  const inv = buildInventory({
+  const inventory = buildCatalog({
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,
     compilerOptions: discovery.compilerOptions,
     tsConfigPathAbs: discovery.tsConfigPathAbs,
   });
-  const edges = resolveEdges({
-    catalog: inv.catalog,
-    program: inv.program,
-    projectDirAbs: discovery.projectDirAbs,
-  });
-  return edges.catalog;
+  return resolveCatalogEdges(inventory, discovery.projectDirAbs);
 }
 
 export function findOccurrence(

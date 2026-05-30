@@ -713,6 +713,20 @@ describe('no-raw-regex-on-code', () => {
         '  },',
         '});',
       ].join('\n')),
+      writeFixture(cwd, 'fitness/src/checks/strip-strings-filter.ts', [
+        'import { defineCheck } from "@opensip-tools/fitness";',
+        'export const myCheck = defineCheck({',
+        '  id: "abc-654",',
+        '  slug: "my-check",',
+        '  description: "x",',
+        '  tags: [],',
+        "  contentFilter: 'strip-strings',",
+        '  analyze(content: string) {',
+        '    if (/foo/.test(content)) return [{ message: "no" }];',
+        '    return [];',
+        '  },',
+        '});',
+      ].join('\n')),
       writeFixture(cwd, 'fitness/src/checks/no-regex.ts', [
         'import { defineCheck } from "@opensip-tools/fitness";',
         'export const myCheck = defineCheck({',
@@ -744,6 +758,13 @@ describe('no-raw-regex-on-code', () => {
   it('does not fire when contentFilter is declared', async () => {
     const result = await findCheck('no-raw-regex-on-code').run(cwd, {
       targetFiles: [join(cwd, 'fitness/src/checks/has-filter.ts')],
+    })
+    expect(result.signals.length).toBe(0)
+  })
+
+  it('does not fire when contentFilter: strip-strings is declared', async () => {
+    const result = await findCheck('no-raw-regex-on-code').run(cwd, {
+      targetFiles: [join(cwd, 'fitness/src/checks/strip-strings-filter.ts')],
     })
     expect(result.signals.length).toBe(0)
   })

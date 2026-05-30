@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-05-29
+last_verified: 2026-05-30
 release: v2.0.x
 title: "Checks reference"
 audience: [getting-started, ci-integrators, plugin-authors]
@@ -89,7 +89,7 @@ Language-agnostic; runs against every project.
 | [`no-deprecated-tags`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/quality/no-deprecated-tags.ts) | Detects @deprecated JSDoc tags in production code |
 | [`no-non-null-assertions`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/quality/patterns/no-non-null-assertions.ts) | Detects TypeScript non-null assertion operator (!) usage in production code — prefer proper null handling |
 | [`no-process-artifacts`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/quality/code-structure/no-process-artifacts.ts) | Detects process/planning artifacts (Phase X, Sprint X, version stamps) in comments |
-| [`no-raw-regex-on-code`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/quality/no-raw-regex-on-code.ts) | Detect regex checks that should use contentFilter: code-only |
+| [`no-raw-regex-on-code`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/quality/no-raw-regex-on-code.ts) | Detect regex checks that should use contentFilter: strip-strings |
 | [`no-temporary-workarounds`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/quality/no-temporary-workarounds.ts) | Detects HACK/FIXME comments that describe themselves as temporary |
 | [`no-todo-comments`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/no-todo-comments.ts) | TODO/FIXME/XXX/OPTIMIZE markers should not ship to production |
 | [`no-window-alert`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/quality/no-window-alert.ts) | Disallows window.alert(), window.confirm(), and window.prompt() — use proper UI components |

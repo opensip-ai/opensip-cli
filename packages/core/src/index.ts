@@ -100,13 +100,17 @@ export type {
 // datastore thunk). See `lib/run-scope.ts` for the AsyncLocalStorage
 // seam and the two-copies-of-fitness hazard resolution.
 export { RunScope, runWithScope, runWithScopeSync, enterScope, currentScope } from './lib/run-scope.js';
+export type { RunScopeOptions } from './lib/run-scope.js';
+// The Tool-contract scope types live in the leaf `scope-types.ts` so the
+// `Tool` contract can depend on them without naming the concrete `RunScope`
+// (breaks the RunScope⟷Tool type cycle; audit 2026-05-29 M4). Source them
+// here directly from the leaf.
 export type {
-  RunScopeOptions,
   RecipeCheckConfigSlot,
   DataStoreThunk,
   ToolScope,
   ScopeContribution,
-} from './lib/run-scope.js';
+} from './lib/scope-types.js';
 
 // Lib — errors + Result pattern
 export { ToolError, ValidationError, NotFoundError, SystemError, TimeoutError, NetworkError, ConfigurationError } from './lib/errors.js';

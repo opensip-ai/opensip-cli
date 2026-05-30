@@ -13,10 +13,9 @@ import { join } from 'node:path';
 
 import { ConfigurationError, enterScope, RunScope } from '@opensip-tools/core';
 import {
-  clearAdapterRegistry,
+  currentAdapterRegistry,
   graphTool,
   pickAdapter,
-  registerAdapter,
 } from '@opensip-tools/graph';
 import { pythonGraphAdapter } from '@opensip-tools/graph-python';
 import { rustGraphAdapter } from '@opensip-tools/graph-rust';
@@ -35,7 +34,7 @@ describe('pickAdapter — registry-size shortcuts', () => {
   });
 
   afterEach(() => {
-    clearAdapterRegistry();
+    currentAdapterRegistry().clear();
   });
 
   it('throws when no adapter is registered', () => {
@@ -43,7 +42,7 @@ describe('pickAdapter — registry-size shortcuts', () => {
   });
 
   it('returns the only adapter when exactly one is registered', () => {
-    registerAdapter(rustGraphAdapter);
+    currentAdapterRegistry().register(rustGraphAdapter);
     const picked = pickAdapter('/tmp');
     expect(picked.id).toBe('rust');
   });
@@ -55,7 +54,7 @@ describe('pickAdapter — registry-size shortcuts', () => {
     // alphabetical sort, picks rust.
     const dir = mkdtempSync(join(tmpdir(), 'graph-pick-fb-'));
     try {
-      registerAdapter(rustGraphAdapter);
+      currentAdapterRegistry().register(rustGraphAdapter);
       // Write only an unrelated file so the dominance counter sees no
       // matches and findMaxCount returns null.
       writeFileSync(join(dir, 'README.md'), '', 'utf8');
@@ -77,9 +76,9 @@ describe('pickAdapter — registry-size shortcuts', () => {
  * test for stability.
  */
 function registerAllThreeAdapters(): void {
-  registerAdapter(typescriptGraphAdapter);
-  registerAdapter(pythonGraphAdapter);
-  registerAdapter(rustGraphAdapter);
+  currentAdapterRegistry().register(typescriptGraphAdapter);
+  currentAdapterRegistry().register(pythonGraphAdapter);
+  currentAdapterRegistry().register(rustGraphAdapter);
 }
 
 describe('pickAdapter — multi-adapter dominance heuristic', () => {

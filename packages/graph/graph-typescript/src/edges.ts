@@ -13,8 +13,6 @@
  * 1).
  */
 
-import { relative, sep } from 'node:path';
-
 import { logger } from '@opensip-tools/core';
 import {
   appendEdge,
@@ -35,9 +33,6 @@ import {
   resolveShorthandAssignment,
   resolveValueReference,
 } from './edges-value-reference.js';
-import { hashFunctionBody, hashSyntheticBody } from './inventory-helpers/hash-body.js';
-import { synthesizeModuleInitName } from './inventory-helpers/synthesize-name.js';
-import { isInlineCallable } from './walk.js';
 
 import type { ResolverContext } from './edge-resolvers/types.js';
 import type { CallSiteRecord } from './walk.js';
@@ -64,13 +59,6 @@ function tsPosition(node: ts.Node, sourceFile: ts.SourceFile): {
   };
 }
 
-/** Input to TS edge resolution: catalog and the source TS program. */
-export interface EdgeResolutionInput {
-  readonly catalog: Catalog;
-  readonly program: ts.Program;
-  readonly projectDirAbs: string;
-}
-
 /** Output of TS edge resolution: catalog (with edges populated) and per-stage stats. */
 export interface EdgeResolutionOutput {
   readonly catalog: Catalog;
@@ -86,11 +74,10 @@ export interface EdgeResolutionFromRecordsInput {
 }
 
 /**
- * Phase 4 entry point: resolve a pre-collected list of call-site
- * records produced by `walkProgram`. Skips the AST descent that the
- * legacy `resolveEdges` did. Used by the orchestrator. The legacy
- * `resolveEdges` is retained for tests and external callers that
- * want a one-shot Stage 1+2 from a catalog.
+ * Stage 2 entry point: resolve a pre-collected list of call-site records
+ * produced by `walkProgram` (no AST re-descent). The orchestrator's
+ * `resolveCallSitesAdapter` drives this directly with the records the walk
+ * already emitted.
  */
 export function resolveEdgesFromRecords(
   input: EdgeResolutionFromRecordsInput,
@@ -168,95 +155,6 @@ function pushCallEdge(
   };
   appendEdge(callsByHash, ownerHash, edge);
   stats.apply(edge);
-}
-
-/**
- * Legacy one-shot Stage 1+2 entry kept for tests and external callers
- * that don't go through the orchestrator. Descends the AST to produce
- * a flat `CallSiteRecord[]`, then delegates to
- * `resolveEdgesFromRecords` — the same path the orchestrator uses.
- *
- * Production code should call `resolveEdgesFromRecords` directly with
- * the records produced by `walkProgram`.
- */
-export function resolveEdges(input: EdgeResolutionInput): EdgeResolutionOutput {
-  const fnByHash = buildHashIndex(input.catalog);
-  const callSites: CallSiteRecord[] = [];
-
-  for (const sf of input.program.getSourceFiles()) {
-    if (sf.isDeclarationFile) continue;
-    const filePathProjectRel = relative(input.projectDirAbs, sf.fileName).split(sep).join('/');
-    if (!hasFileInCatalog(input.catalog, filePathProjectRel)) continue;
-    collectCallSites(sf, filePathProjectRel, input.catalog, fnByHash, callSites);
-  }
-
-  return resolveEdgesFromRecords({
-    catalog: input.catalog,
-    program: input.program,
-    projectDirAbs: input.projectDirAbs,
-    callSites,
-  });
-}
-
-/**
- * Walk a single file's AST in the same order as `walkProgram`, pairing
- * every resolver-candidate site (calls, new-expressions, JSX, value
- * references, shorthand) and every inline-callable creation with its
- * owning function's bodyHash. Pushes records onto the shared list so
- * a downstream `resolveEdgesFromRecords` can drive resolver dispatch
- * without re-walking.
- */
-function collectCallSites(
-  sourceFile: ts.SourceFile,
-  filePathProjectRel: string,
-  catalog: Catalog,
-  fnByHash: ReadonlyMap<string, FunctionOccurrence>,
-  out: CallSiteRecord[],
-): void {
-  const moduleInitHash = lookupModuleInitHash(sourceFile, filePathProjectRel, catalog);
-
-  function walk(node: ts.Node, ownerHash: string | null): void {
-    const hash = isFunctionLike(node) ? hashOf(node, sourceFile, fnByHash) : null;
-    const childOwner = hash ?? ownerHash;
-
-    if (ownerHash !== null && isResolverCandidateNode(node)) {
-      out.push({ node, sourceFile, ownerHash, kind: 'call' });
-    }
-
-    if (
-      hash !== null &&
-      ownerHash !== null &&
-      hash !== ownerHash &&
-      isInlineCallable(node)
-    ) {
-      out.push({
-        node,
-        sourceFile,
-        ownerHash,
-        kind: 'creation',
-        childHash: hash,
-      });
-    }
-
-    ts.forEachChild(node, (c) => { walk(c, childOwner); });
-  }
-
-  ts.forEachChild(sourceFile, (c) => { walk(c, moduleInitHash); });
-}
-
-/**
- * Pre-filter mirroring `computeVerdict`'s acceptance set. Pushing
- * non-candidates would still produce no edges (the resolver returns
- * null), but skipping them up front keeps `resolveEdgesFromRecords`
- * out of pointless dispatcher hops.
- */
-function isResolverCandidateNode(node: ts.Node): boolean {
-  if (ts.isCallExpression(node)) return true;
-  if (ts.isNewExpression(node)) return true;
-  if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) return true;
-  if (ts.isShorthandPropertyAssignment(node)) return true;
-  if (ts.isIdentifier(node) && isValueReference(node)) return true;
-  return false;
 }
 
 /**
@@ -357,67 +255,6 @@ function isReturnValueDiscarded(node: ts.Node): boolean {
     }
     return ts.isExpressionStatement(parent);
   }
-  return false;
-}
-
-function isFunctionLike(node: ts.Node): boolean {
-  return (
-    ts.isFunctionDeclaration(node) ||
-    ts.isArrowFunction(node) ||
-    ts.isFunctionExpression(node) ||
-    ts.isMethodDeclaration(node) ||
-    ts.isConstructorDeclaration(node) ||
-    ts.isGetAccessor(node) ||
-    ts.isSetAccessor(node)
-  );
-}
-
-function hashOf(
-  node: ts.Node,
-  sourceFile: ts.SourceFile,
-  fnByHash: ReadonlyMap<string, FunctionOccurrence>,
-): string | null {
-  const h = hashFunctionBody(node, sourceFile);
-  return fnByHash.has(h) ? h : null;
-}
-
-function buildHashIndex(catalog: Catalog): Map<string, FunctionOccurrence> {
-  const map = new Map<string, FunctionOccurrence>();
-  for (const name of Object.keys(catalog.functions)) {
-    const occs: readonly FunctionOccurrence[] | undefined = catalog.functions[name];
-    if (!occs) continue;
-    for (const o of occs) {
-      // First wins; per-file collisions are intentional duplicates.
-      if (!map.has(o.bodyHash)) map.set(o.bodyHash, o);
-    }
-  }
-  return map;
-}
-
-function lookupModuleInitHash(
-  sourceFile: ts.SourceFile,
-  filePathProjectRel: string,
-  catalog: Catalog,
-): string | null {
-  const name = synthesizeModuleInitName(filePathProjectRel);
-  if (!Object.hasOwn(catalog.functions, name)) return null;
-  const occs: readonly FunctionOccurrence[] | undefined = catalog.functions[name];
-  if (!occs || occs.length === 0) return null;
-  // Validate by hash so cross-file synonyms can't collide accidentally.
-  const topLevelText = sourceFile.statements.map((s) => s.getText(sourceFile)).join('\n');
-  const expected = hashSyntheticBody(`${filePathProjectRel}\n${topLevelText}`);
-  const occ = occs.find((o) => o.bodyHash === expected) ?? occs[0];
-  return occ?.bodyHash ?? null;
-}
-
-function hasFileInCatalog(catalog: Catalog, filePath: string): boolean {
-  for (const name of Object.keys(catalog.functions)) {
-    const occs: readonly FunctionOccurrence[] | undefined = catalog.functions[name];
-    /* v8 ignore next */
-    if (!occs) continue;
-    for (const o of occs) if (o.filePath === filePath) return true;
-  }
-  /* v8 ignore next */
   return false;
 }
 

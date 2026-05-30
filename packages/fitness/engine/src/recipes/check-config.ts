@@ -30,11 +30,10 @@
  * check's own defaults handle the empty case.
  */
 
-import { currentScope, logger } from '@opensip-tools/core'
+import { currentScope } from '@opensip-tools/core'
 
 import type { RecipeCheckConfigMap } from './types.js'
 import type { RunScope } from '@opensip-tools/core'
-import type { ZodType } from 'zod'
 
 /**
  * Read the per-check config slice for the given slug.
@@ -42,42 +41,17 @@ import type { ZodType } from 'zod'
  * Returns an empty object when no recipe-config has been set or no
  * entry exists for the slug — checks that call this should treat the
  * result as "augmentation only" and merge with their own defaults.
- *
- * Two signatures (audit 2026-05-23 F10):
- *
- *   1. **Without `schema`** — back-compat path. Returns the stored entry
- *      cast to `T` without runtime validation.
- *   2. **With `schema`** — validated path. The stored entry is parsed
- *      against the supplied Zod schema; on failure a structured
- *      warning is logged and the result is treated as "missing".
+ * The stored entry is returned cast to `T` without runtime validation;
+ * each check owns its own defaults and tolerates the empty case.
  *
  * @typeParam T - The shape the calling check expects. Each check declares
  *                its own config interface.
  */
-export function getCheckConfig<T extends Record<string, unknown>>(slug: string): T
-/** Overload: returns the recipe-configured slice validated against the supplied Zod schema. */
-export function getCheckConfig<T extends Record<string, unknown>>(slug: string, schema: ZodType<T>): T
-/** Implementation signature — dispatches to the unvalidated or schema-validated path. */
-export function getCheckConfig<T extends Record<string, unknown>>(
-  slug: string,
-  schema?: ZodType<T>,
-): T {
+export function getCheckConfig<T extends Record<string, unknown>>(slug: string): T {
   const scope = currentScope()
   const entry = scope?.recipeCheckConfig.get<T>(slug)
   if (!entry) return {} as T
-  if (!schema) return entry
-  const parsed = schema.safeParse(entry)
-  if (!parsed.success) {
-    logger.warn({
-      evt: 'fitness.check_config.invalid',
-      module: 'fitness:check-config',
-      checkSlug: slug,
-      issues: parsed.error.issues,
-      msg: `Recipe-supplied config for check '${slug}' failed schema validation; falling back to defaults.`,
-    })
-    return {} as T
-  }
-  return parsed.data
+  return entry
 }
 
 /**

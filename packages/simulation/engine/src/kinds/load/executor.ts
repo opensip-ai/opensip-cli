@@ -69,8 +69,8 @@ function createStandardExecutor(
 
 /**
  * Build a custom executor for a load scenario that supplied its own `execute`
- * function. The custom function returns the legacy executor result shape;
- * we wrap it in the new discriminated `LoadScenarioExecutorResult`.
+ * function. The custom function returns a `LoadResultPayload`; we wrap it in
+ * the discriminated `LoadScenarioExecutorResult` envelope.
  *
  * @throws {ValidationError} When the execute function is not provided
  */
@@ -86,16 +86,16 @@ function createCustomExecutor(
   return async (context) => {
     const startTime = Date.now()
     context.logger.info('Starting custom load scenario execution')
-    const legacyResult = await customFn(context)
+    const payload = await customFn(context)
     return Object.freeze({
       kind: 'load' as const,
       scenarioId: config.id,
-      passed: legacyResult.passed,
+      passed: payload.passed,
       durationMs: Date.now() - startTime,
-      signals: legacyResult.signals,
+      signals: payload.signals,
       outcome: Object.freeze({
-        metrics: legacyResult.metrics,
-        assertions: legacyResult.assertions,
+        metrics: payload.metrics,
+        assertions: payload.assertions,
       }),
     })
   }

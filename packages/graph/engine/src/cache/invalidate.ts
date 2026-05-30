@@ -89,15 +89,6 @@ export function classifyCatalog(cached: Catalog, ctx: ValidationContext): Catalo
 }
 
 /**
- * Backwards-compatible boolean wrapper around classifyCatalog. Kept so
- * existing tests/callers that just need "is the cache exactly valid"
- * don't have to switch to the verdict shape.
- */
-export function isCatalogValid(cached: Catalog, ctx: ValidationContext): boolean {
-  return classifyCatalog(cached, ctx).kind === 'valid';
-}
-
-/**
  * Compute a fingerprint over the project's source files. Uses mtime
  * (nanosecond resolution) per file plus the file count; cheap to
  * compute and stable for unchanged trees.

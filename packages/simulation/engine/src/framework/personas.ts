@@ -59,7 +59,7 @@ export function persona(type: PersonaType, count: number, options?: PersonaOptio
  *
  * @example
  * ```typescript
- * export const myScenario = defineScenario({
+ * export const myScenario = defineLoadScenario({
  *   // ...
  *   personas: PERSONAS.standardMix(),
  * });

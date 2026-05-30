@@ -2,18 +2,18 @@
  * Canonical TypeScript test-file predicate.
  *
  * Single source of truth for "is this project-relative path a test
- * file?" within the TypeScript adapter. Three callers used to roll
- * their own copies:
+ * file?" within the TypeScript adapter. Callers used to roll their
+ * own copies:
  *
  *   - walk.ts (file-walker) — stamped `inTestFile` on every occurrence
  *     during stage 1+2 descent.
- *   - inventory.ts (legacy buildInventory) — same job, narrower regex.
  *   - index.ts (RuleHints.isTestFile) — the canonical answer wired
  *     into rule evaluation, with broader recall.
  *
- * The 2026-05-23 audit (M-1) flagged the divergence: three predicates
- * at three layer altitudes drifting silently. This module is the one
- * place to extend the rule.
+ * The 2026-05-23 audit (M-1) flagged the divergence — at the time a
+ * third copy lived in the now-removed `inventory.ts` — three
+ * predicates at three layer altitudes drifting silently. This module
+ * is the one place to extend the rule.
  *
  * Two anchored patterns instead of one alternation; avoids
  * catastrophic backtracking on pathological inputs.

@@ -12,7 +12,7 @@ import { join } from 'node:path';
 
 import { enterScope, LanguageRegistry, RunScope } from '@opensip-tools/core';
 import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
-import { executeGraph, graphTool, registerAdapter } from '@opensip-tools/graph';
+import { currentAdapterRegistry, executeGraph, graphTool } from '@opensip-tools/graph';
 import { typescriptAdapter } from '@opensip-tools/lang-typescript';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
@@ -102,7 +102,7 @@ describe('executeGraph', () => {
     const scope = new RunScope();
     Object.assign(scope, graphTool.contributeScope?.() ?? {});
     enterScope(scope);
-    registerAdapter(typescriptGraphAdapter);
+    currentAdapterRegistry().register(typescriptGraphAdapter);
 
     dir = mkdtempSync(join(tmpdir(), 'graph-cli-'));
     stdout = '';

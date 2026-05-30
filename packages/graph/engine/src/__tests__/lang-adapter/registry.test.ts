@@ -16,9 +16,8 @@ import { ConfigurationError, enterScope, logger } from '@opensip-tools/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  clearAdapterRegistry,
+  currentAdapterRegistry,
   pickAdapter,
-  registerAdapter,
 } from '../../lang-adapter/registry.js';
 import { makeGraphTestScope } from '../test-utils/with-graph-scope.js';
 
@@ -59,17 +58,16 @@ function fakeAdapter(id: string, exts: readonly string[]): GraphLanguageAdapter 
   };
 }
 
-describe('registerAdapter / pickAdapter', () => {
+describe('adapter registry register / pickAdapter', () => {
   beforeEach(() => {
     // Item 1: adapter registry is per-RunScope. Each test enters a
-    // fresh scope (with graph subscope) so the legacy free-function
-    // helpers (registerAdapter / pickAdapter / clearAdapterRegistry)
-    // resolve through `currentAdapterRegistry()`.
+    // fresh scope (with graph subscope) so `currentAdapterRegistry()`
+    // resolves the scope-bound registry instance.
     enterScope(makeGraphTestScope());
   });
 
   afterEach(() => {
-    clearAdapterRegistry();
+    currentAdapterRegistry().clear();
   });
 
   it('throws ConfigurationError when no adapters are registered', () => {
@@ -79,15 +77,15 @@ describe('registerAdapter / pickAdapter', () => {
 
   it('returns the only adapter when exactly one is registered', () => {
     const ts = fakeAdapter('typescript', ['.ts']);
-    registerAdapter(ts);
+    currentAdapterRegistry().register(ts);
     expect(pickAdapter()).toBe(ts);
     expect(pickAdapter('/tmp')).toBe(ts);
   });
 
   it('re-registering an adapter with the same id replaces the previous one', () => {
-    registerAdapter(fakeAdapter('typescript', ['.ts']));
+    currentAdapterRegistry().register(fakeAdapter('typescript', ['.ts']));
     const replacement = fakeAdapter('typescript', ['.tsx']);
-    registerAdapter(replacement);
+    currentAdapterRegistry().register(replacement);
     expect(pickAdapter()).toBe(replacement);
   });
 });
@@ -101,7 +99,7 @@ describe('pickAdapter — multi-adapter dominance', () => {
   });
 
   afterEach(() => {
-    clearAdapterRegistry();
+    currentAdapterRegistry().clear();
     rmSync(dir, { recursive: true, force: true });
   });
 
@@ -116,8 +114,8 @@ describe('pickAdapter — multi-adapter dominance', () => {
   it('picks by file-extension dominance', () => {
     const ts = fakeAdapter('typescript', ['.ts']);
     const py = fakeAdapter('python', ['.py']);
-    registerAdapter(ts);
-    registerAdapter(py);
+    currentAdapterRegistry().register(ts);
+    currentAdapterRegistry().register(py);
     writeFiles(['src/a.py', 'src/b.py', 'src/c.py', 'src/x.ts']);
     expect(pickAdapter(dir)).toBe(py);
   });
@@ -125,8 +123,8 @@ describe('pickAdapter — multi-adapter dominance', () => {
   it('tie-breaks in favor of typescript', () => {
     const ts = fakeAdapter('typescript', ['.ts']);
     const py = fakeAdapter('python', ['.py']);
-    registerAdapter(ts);
-    registerAdapter(py);
+    currentAdapterRegistry().register(ts);
+    currentAdapterRegistry().register(py);
     writeFiles(['src/a.py', 'src/x.ts']);
     expect(pickAdapter(dir)).toBe(ts);
   });
@@ -134,8 +132,8 @@ describe('pickAdapter — multi-adapter dominance', () => {
   it('tie-breaks in favor of python when typescript is not present', () => {
     const py = fakeAdapter('python', ['.py']);
     const rs = fakeAdapter('rust', ['.rs']);
-    registerAdapter(py);
-    registerAdapter(rs);
+    currentAdapterRegistry().register(py);
+    currentAdapterRegistry().register(rs);
     writeFiles(['src/a.py', 'src/x.rs']);
     expect(pickAdapter(dir)).toBe(py);
   });
@@ -143,8 +141,8 @@ describe('pickAdapter — multi-adapter dominance', () => {
   it('falls back to typescript preference when no files match', () => {
     const ts = fakeAdapter('typescript', ['.ts']);
     const py = fakeAdapter('python', ['.py']);
-    registerAdapter(ts);
-    registerAdapter(py);
+    currentAdapterRegistry().register(ts);
+    currentAdapterRegistry().register(py);
     // Empty cwd, but no cwd-based override either
     expect(pickAdapter()).toBe(ts);
   });
@@ -152,8 +150,8 @@ describe('pickAdapter — multi-adapter dominance', () => {
   it('falls back to typescript preference when cwd has zero matching files', () => {
     const ts = fakeAdapter('typescript', ['.ts']);
     const py = fakeAdapter('python', ['.py']);
-    registerAdapter(ts);
-    registerAdapter(py);
+    currentAdapterRegistry().register(ts);
+    currentAdapterRegistry().register(py);
     expect(pickAdapter(dir)).toBe(ts);
   });
 
@@ -162,8 +160,8 @@ describe('pickAdapter — multi-adapter dominance', () => {
     try {
       const ts = fakeAdapter('typescript', ['.ts']);
       const py = fakeAdapter('python', ['.py']);
-      registerAdapter(ts);
-      registerAdapter(py);
+      currentAdapterRegistry().register(ts);
+      currentAdapterRegistry().register(py);
       // `dir` is empty — neither registered adapter matches a file, which
       // is the "Go/Java repo but no Go/Java adapter installed" smell.
       expect(pickAdapter(dir)).toBe(ts);
@@ -179,8 +177,8 @@ describe('pickAdapter — multi-adapter dominance', () => {
   it('skips node_modules / dist / build when counting files', () => {
     const py = fakeAdapter('python', ['.py']);
     const ts = fakeAdapter('typescript', ['.ts']);
-    registerAdapter(py);
-    registerAdapter(ts);
+    currentAdapterRegistry().register(py);
+    currentAdapterRegistry().register(ts);
     writeFiles([
       'node_modules/poison.py',
       'node_modules/poison2.py',
@@ -194,8 +192,8 @@ describe('pickAdapter — multi-adapter dominance', () => {
   it('handles adapters with multiple extensions', () => {
     const ts = fakeAdapter('typescript', ['.ts', '.tsx']);
     const py = fakeAdapter('python', ['.py']);
-    registerAdapter(ts);
-    registerAdapter(py);
+    currentAdapterRegistry().register(ts);
+    currentAdapterRegistry().register(py);
     writeFiles(['src/a.tsx', 'src/b.tsx', 'src/c.py']);
     expect(pickAdapter(dir)).toBe(ts);
   });
@@ -203,8 +201,8 @@ describe('pickAdapter — multi-adapter dominance', () => {
   it('ignores adapters with empty fileExtensions in dominance counting', () => {
     const empty = fakeAdapter('empty', []);
     const ts = fakeAdapter('typescript', ['.ts']);
-    registerAdapter(empty);
-    registerAdapter(ts);
+    currentAdapterRegistry().register(empty);
+    currentAdapterRegistry().register(ts);
     writeFiles(['src/a.ts']);
     expect(pickAdapter(dir)).toBe(ts);
   });
@@ -212,8 +210,8 @@ describe('pickAdapter — multi-adapter dominance', () => {
   it('tolerates extension specs without a leading dot', () => {
     const ts = fakeAdapter('typescript', ['ts']);
     const py = fakeAdapter('python', ['py']);
-    registerAdapter(ts);
-    registerAdapter(py);
+    currentAdapterRegistry().register(ts);
+    currentAdapterRegistry().register(py);
     writeFiles(['src/a.py', 'src/b.py']);
     expect(pickAdapter(dir)).toBe(py);
   });

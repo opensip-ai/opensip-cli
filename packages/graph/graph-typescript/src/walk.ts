@@ -17,10 +17,9 @@
  *     about, paired with the bodyHash that owns them. Resolution
  *     happens *outside* the walk, against this flat list.
  *
- * The orchestrator (`cli/orchestrate.ts`) still drives the pipeline
- * end-to-end. `inventory.ts` and `edges.ts` retain their public
- * single-stage entry points for tests/external callers; their bodies
- * delegate to this module.
+ * The orchestrator (`cli/orchestrate.ts`) drives the pipeline
+ * end-to-end. `edges.ts` exposes `resolveEdgesFromRecords` as the
+ * Stage 2 entry point, consuming the `callSites` this walk emits.
  */
 
 import { relative, sep } from 'node:path';
@@ -325,7 +324,7 @@ function dispatchVisitor(node: ts.Node, ctx: VisitorContext): FunctionOccurrence
  * dispatch site is unresolvable. Function declarations are
  * deliberately excluded — they need a real call edge to be reachable.
  */
-export function isInlineCallable(node: ts.Node): boolean {
+function isInlineCallable(node: ts.Node): boolean {
   return (
     ts.isArrowFunction(node) ||
     ts.isFunctionExpression(node) ||

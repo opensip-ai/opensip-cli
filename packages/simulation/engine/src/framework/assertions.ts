@@ -18,7 +18,7 @@ import type { ScenarioAssertion, AssertionOperator } from '../types/framework-ty
  *
  * @example
  * ```typescript
- * export const myScenario = defineScenario({
+ * export const myScenario = defineLoadScenario({
  *   // ...
  *   assertions: [
  *     ASSERTIONS.lowErrorRate(),

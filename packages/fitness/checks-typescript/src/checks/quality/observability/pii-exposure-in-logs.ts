@@ -10,8 +10,8 @@
  * @see Logging Standards
  */
 
-import { defineCheck, type CheckViolation, getASTLineNumber } from '@opensip-tools/fitness'
-import { parseSource, walkNodes, getPropertyChain } from '@opensip-tools/lang-typescript'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { parseSource, walkNodes, getPropertyChain, getLineNumber } from '@opensip-tools/lang-typescript'
 import * as ts from 'typescript'
 
 // PII field names that should never be logged directly
@@ -195,7 +195,7 @@ export const piiExposureInLogs = defineCheck({
           const piiField = findPiiFieldInObject(arg)
           if (piiField && !piiField.safe) {
             violations.push({
-              line: getASTLineNumber(node, sourceFile),
+              line: getLineNumber(node, sourceFile),
               column: 0,
               message: `Potential PII field '${piiField.fieldName}' in log call (should be hashed/sanitized)`,
               severity: 'error',

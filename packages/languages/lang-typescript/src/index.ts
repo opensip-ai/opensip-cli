@@ -16,9 +16,9 @@ export { filterContent } from './filter.js'
 export type { FilteredContent } from './filter.js'
 export { discoverTypescriptWorkspaceUnits } from './workspace-units.js'
 
-// Function-scope helpers — promoted out of the legacy `ast-utilities.ts`
-// shim into a concern-named module. New scope helpers go in
-// `./function-scope.ts`, NOT in the legacy shim.
+// Function-scope helpers — extracted from `ast-utilities.ts` into a
+// concern-named module. New scope helpers go in `./function-scope.ts`,
+// NOT in `ast-utilities.ts`.
 export {
   findEnclosingFunction,
   findEnclosingFunctionBody,
@@ -30,10 +30,10 @@ export {
 } from './function-scope.js'
 export type { FunctionLikeNode } from './function-scope.js'
 
-// Legacy AST helpers — re-exported so existing TS checks can keep their
-// imports pointing at @opensip-tools/lang-typescript. The `ts` re-export
-// from this module is intentionally NOT re-surfaced here (it now lives at
-// the top of the barrel above).
+// Canonical TS AST helpers — the compiler-API utilities check packs use.
+// Re-exported so TS checks import them from @opensip-tools/lang-typescript.
+// The `ts` re-export from this module is intentionally NOT re-surfaced here
+// (it now lives at the top of the barrel above).
 export {
   getSharedSourceFile,
   walkNodes,

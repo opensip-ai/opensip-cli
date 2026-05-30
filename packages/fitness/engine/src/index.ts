@@ -23,14 +23,11 @@ export type { ExecutionContext, RunOptions } from './framework/execution-context
 
 // Framework utilities used by checks
 export { getLineNumber, extractSnippet, isAPIFile } from './framework/result-builder.js';
-// Most TS compiler-API helpers (parseSource, walkNodes,
-// getIdentifierName, getPropertyChain, isLiteral, isInStringLiteral)
-// live in @opensip-tools/lang-typescript. Only the narrow set fitness
-// still owns is re-exported from here.
-export {
-  getASTLineNumber,
-  isPropertyAccess,
-} from './framework/ast-utilities.js';
+// TS compiler-API helpers (parseSource, walkNodes, getIdentifierName,
+// getPropertyChain, isLiteral, isInStringLiteral, isPropertyAccess, and
+// node→line lookup) live in @opensip-tools/lang-typescript. Check packs
+// import them directly from the language adapter; fitness no longer
+// re-exports any of them.
 export { execAbortable } from './framework/abortable-exec.js';
 // File cache (used by checks for content access; tests may seed/clear).
 export { fileCache, DEFAULT_PREWARM_PATTERNS } from './framework/file-cache.js';

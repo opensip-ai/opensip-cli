@@ -9,7 +9,7 @@
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
 const REGEX_USAGE_PATTERN = /\.(test|match|exec|search)\s*\(/
-const CONTENT_FILTER_PATTERN = /contentFilter\s*:\s*['"](raw|code-only)['"]/
+const CONTENT_FILTER_PATTERN = /contentFilter\s*:\s*['"](raw|strip-strings|strip-strings-and-comments)['"]/
 const DEFINE_CHECK_PATTERN = /defineCheck\s*\(/
 
 export const noRawRegexOnCode = defineCheck({
@@ -18,7 +18,7 @@ export const noRawRegexOnCode = defineCheck({
   scope: { languages: ['typescript'], concerns: ['fitness'] },
 
   confidence: 'medium',
-  description: 'Detect regex checks that should use contentFilter: code-only',
+  description: "Detect regex checks that should use contentFilter: strip-strings",
   longDescription: `**Purpose:** Advisory meta-check that identifies fitness checks using regex pattern matching without declaring \`contentFilter: 'strip-strings'\`. Such checks may produce false positives when patterns match inside string literals or comments.
 
 **Detects:**

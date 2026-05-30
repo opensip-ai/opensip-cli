@@ -19,7 +19,8 @@ import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 import { discoverFiles } from '../discover.js';
-import { buildInventory } from '../inventory.js';
+
+import { buildCatalog } from './_pipeline.js';
 
 import type { Catalog, FunctionOccurrence } from '@opensip-tools/graph';
 
@@ -209,7 +210,7 @@ function differentialFor(filePathProjectRel: string, projectDir: string): {
   tsCount: number;
 } {
   const discovery = discoverFiles({ projectDir });
-  const inv = buildInventory({
+  const inv = buildCatalog({
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,
     compilerOptions: discovery.compilerOptions,

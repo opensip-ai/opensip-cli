@@ -21,10 +21,7 @@ import {
   systemHasMemoryFor,
   totalSystemMemoryMb,
 } from '../../cli/heap-preflight.js';
-import {
-  clearAdapterRegistry,
-  registerAdapter,
-} from '../../lang-adapter/registry.js';
+import { currentAdapterRegistry } from '../../lang-adapter/registry.js';
 import { makeGraphTestScope } from '../test-utils/with-graph-scope.js';
 
 import type {
@@ -117,7 +114,7 @@ describe('runHeapPreflight', () => {
   });
 
   afterEach(() => {
-    clearAdapterRegistry();
+    currentAdapterRegistry().clear();
     vi.restoreAllMocks();
     if (prevSentinel === undefined) {
       delete process.env.OPENSIP_HEAP_ELEVATED;
@@ -131,13 +128,13 @@ describe('runHeapPreflight', () => {
   });
 
   it('short-circuits to false when running inside the elevated child', async () => {
-    registerAdapter(adapterWithFileCount(10_000));
+    currentAdapterRegistry().register(adapterWithFileCount(10_000));
     process.env.OPENSIP_HEAP_ELEVATED = '1';
     expect(await runHeapPreflight({ cwd: '/tmp' })).toBe(false);
   });
 
   it('returns false when file count is below the smallest threshold', async () => {
-    registerAdapter(adapterWithFileCount(100));
+    currentAdapterRegistry().register(adapterWithFileCount(100));
     expect(await runHeapPreflight({ cwd: '/tmp' })).toBe(false);
   });
 
@@ -146,7 +143,7 @@ describe('runHeapPreflight', () => {
     // above target by stubbing v8.getHeapStatistics; otherwise the test
     // falls through to the re-exec branch and spawns a real Node
     // process. heap_size_limit is in bytes — 10 GB > 8192 MB.
-    registerAdapter(adapterWithFileCount(1500));
+    currentAdapterRegistry().register(adapterWithFileCount(1500));
     vi.spyOn(v8, 'getHeapStatistics').mockReturnValue({
       heap_size_limit: 10 * 1024 * 1024 * 1024,
     } as ReturnType<typeof v8.getHeapStatistics>);
@@ -158,7 +155,7 @@ describe('runHeapPreflight', () => {
     // OS_HEADROOM_MB). Pin currentHeap below target so the
     // already-elevated branch can't short-circuit, then stub
     // os.totalmem to 4 GB so systemHasMemoryFor() returns false.
-    registerAdapter(adapterWithFileCount(1500));
+    currentAdapterRegistry().register(adapterWithFileCount(1500));
     vi.spyOn(v8, 'getHeapStatistics').mockReturnValue({
       heap_size_limit: 1024 * 1024 * 1024, // 1 GB — well below 8192 MB target
     } as ReturnType<typeof v8.getHeapStatistics>);

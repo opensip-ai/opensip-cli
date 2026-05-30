@@ -16,7 +16,7 @@ import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 
 import { executeGraph } from '../../cli/graph.js'
-import { clearAdapterRegistry, registerAdapter } from '../../lang-adapter/registry.js'
+import { currentAdapterRegistry } from '../../lang-adapter/registry.js'
 import { makeGraphTestScope } from '../test-utils/with-graph-scope.js'
 
 import type {
@@ -119,13 +119,13 @@ beforeEach(() => {
   enterScope(makeGraphTestScope())
   projectDir = mkdtempSync(join(tmpdir(), 'graph-session-'))
   datastore = DataStoreFactory.open({ backend: 'memory' })
-  registerAdapter(fakeAdapter(projectDir))
+  currentAdapterRegistry().register(fakeAdapter(projectDir))
   stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
   stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
 })
 
 afterEach(() => {
-  clearAdapterRegistry()
+  currentAdapterRegistry().clear()
   datastore.close()
   stdoutSpy.mockRestore()
   stderrSpy.mockRestore()

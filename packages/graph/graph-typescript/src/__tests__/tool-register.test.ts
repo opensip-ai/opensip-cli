@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { enterScope, RunScope } from '@opensip-tools/core';
-import { graphTool, registerAdapter } from '@opensip-tools/graph';
+import { currentAdapterRegistry, graphTool } from '@opensip-tools/graph';
 import { Command } from 'commander';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -24,7 +24,7 @@ beforeEach(() => {
   const scope = new RunScope();
   Object.assign(scope, graphTool.contributeScope?.() ?? {});
   enterScope(scope);
-  registerAdapter(typescriptGraphAdapter);
+  currentAdapterRegistry().register(typescriptGraphAdapter);
 });
 
 function makeCli(program: Command): ToolCliContext {

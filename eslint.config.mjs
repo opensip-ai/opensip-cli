@@ -43,8 +43,6 @@ export default tseslint.config(
       '**/dist/**',
       '**/node_modules/**',
       '**/.turbo/**',
-      'verdaccio-storage/**',
-      'tarballs/**',
       'fixtures/**',
       '**/__fixtures__/**',
       'docs/**',

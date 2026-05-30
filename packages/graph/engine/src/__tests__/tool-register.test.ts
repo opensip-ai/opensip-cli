@@ -15,10 +15,7 @@ import { Command } from 'commander';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
 import { saveBaseline } from '../gate.js';
-import {
-  clearAdapterRegistry,
-  registerAdapter,
-} from '../lang-adapter/registry.js';
+import { currentAdapterRegistry } from '../lang-adapter/registry.js';
 import { GraphBaselineRepo } from '../persistence/baseline-repo.js';
 import { CatalogRepo } from '../persistence/catalog-repo.js';
 import { graphTool } from '../tool.js';
@@ -152,7 +149,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  clearAdapterRegistry();
+  currentAdapterRegistry().clear();
   stdoutSpy.mockRestore();
   stderrSpy.mockRestore();
   rmSync(workDir, { recursive: true, force: true });
@@ -184,7 +181,7 @@ describe('graphTool.register', () => {
     it('positional path bypasses the live view and routes through executeGraph', async () => {
       const datastore = DataStoreFactory.open({ backend: 'memory' });
       try {
-        registerAdapter(fakeAdapter(workDir));
+        currentAdapterRegistry().register(fakeAdapter(workDir));
         const { cli, program, renderLive, setExitCode } = makeMockCli(datastore);
         graphTool.register(cli);
         await program.parseAsync(
@@ -204,7 +201,7 @@ describe('graphTool.register', () => {
     it('default interactive path routes through cli.renderLive', async () => {
       const datastore = DataStoreFactory.open({ backend: 'memory' });
       try {
-        registerAdapter(fakeAdapter(workDir));
+        currentAdapterRegistry().register(fakeAdapter(workDir));
         const { cli, program, renderLive } = makeMockCli(datastore);
         graphTool.register(cli);
         // Set the sentinel so heap-preflight short-circuits without

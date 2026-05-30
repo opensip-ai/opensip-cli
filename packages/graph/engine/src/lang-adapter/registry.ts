@@ -15,9 +15,8 @@
  *   - `GraphAdapterRegistry`         — the registry class.
  *   - `createAdapterRegistry()`      — factory used by `contributeScope`.
  *   - `currentAdapterRegistry()`     — reads the scope-bound instance.
- *   - `registerAdapter` / `pickAdapter` / `clearAdapterRegistry` —
- *     thin helpers that route through the scope-bound instance for
- *     back-compat with existing callers.
+ *   - `pickAdapter()`                — thin helper that routes through
+ *     the scope-bound instance to select the adapter for the run.
  *
  * Future PRs may auto-detect the right adapter from project files;
  * for now `pickAdapter()` returns the only registered adapter so the
@@ -37,7 +36,7 @@ interface RegisterableAdapter extends Registerable {
 
 /**
  * Per-RunScope adapter registry. Wraps the kernel `Registry<T>` with
- * the graph-specific `registerAdapter` / `pickAdapter` surface.
+ * the graph-specific `register` / `pick` surface.
  */
 export class GraphAdapterRegistry {
   private readonly inner = new Registry<RegisterableAdapter>({
@@ -255,32 +254,13 @@ export function currentAdapterRegistry(): GraphAdapterRegistry {
 }
 
 // ---------------------------------------------------------------------------
-// Back-compat helpers — keep the existing free-function surface
-// (registerAdapter, pickAdapter, clearAdapterRegistry) so callers across
-// the codebase don't all need to change at once. Each routes through
-// the scope-bound registry.
+// Scope-bound helper — `pickAdapter` routes through the current scope's
+// registry to select the adapter for the run.
 // ---------------------------------------------------------------------------
-
-/**
- * Register an adapter into the current scope's registry. Convenience
- * wrapper that preserves the historical free-function surface.
- */
-export function registerAdapter(adapter: GraphLanguageAdapter): void {
-  currentAdapterRegistry().register(adapter);
-}
 
 /** Pick the adapter for the current run. See `GraphAdapterRegistry.pick`. */
 export function pickAdapter(cwd?: string): GraphLanguageAdapter {
   return currentAdapterRegistry().pick(cwd);
-}
-
-/**
- * Clear every registered adapter in the current scope. Used by tests
- * and by host applications that need to swap the adapter set at
- * runtime.
- */
-export function clearAdapterRegistry(): void {
-  currentAdapterRegistry().clear();
 }
 
 const COUNT_EXCLUDES: readonly string[] = [

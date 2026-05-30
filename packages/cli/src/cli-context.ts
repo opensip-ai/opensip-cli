@@ -30,11 +30,9 @@
  *
  * Lazy datastore: pre-action-hook constructs a closure-based thunk
  * that caches the open DataStore on first access. The thunk lands on
- * `RunScope.datastore`; tools read `cli.scope.datastore()` (typed as
- * `unknown` per the Tool contract). The legacy `cli.datastore` getter
- * routes through the same thunk for back-compat. Dry-runs and error
- * paths that never touch the datastore never materialise
- * `.runtime/datastore.sqlite`.
+ * `RunScope.datastore`; tools read it via `cli.scope.datastore()` (typed
+ * as `unknown` per the Tool contract). Dry-runs and error paths that never
+ * touch the datastore never materialise `.runtime/datastore.sqlite`.
  */
 
 import {

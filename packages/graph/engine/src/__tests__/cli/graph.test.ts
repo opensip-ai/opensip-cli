@@ -20,10 +20,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } fr
 
 import { buildUnifiedReportLines, executeGraph } from '../../cli/graph.js';
 import { saveBaseline } from '../../gate.js';
-import {
-  clearAdapterRegistry,
-  registerAdapter,
-} from '../../lang-adapter/registry.js';
+import { currentAdapterRegistry } from '../../lang-adapter/registry.js';
 import { GraphBaselineRepo } from '../../persistence/baseline-repo.js';
 import { makeGraphTestScope } from '../test-utils/with-graph-scope.js';
 
@@ -195,7 +192,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  clearAdapterRegistry();
+  currentAdapterRegistry().clear();
   stdoutSpy.mockRestore();
   stderrSpy.mockRestore();
   rmSync(projectDir, { recursive: true, force: true });
@@ -206,7 +203,7 @@ describe('executeGraph — human / JSON modes', () => {
 
   beforeEach(() => {
     datastore = DataStoreFactory.open({ backend: 'memory' });
-    registerAdapter(fakeAdapter(projectDir));
+    currentAdapterRegistry().register(fakeAdapter(projectDir));
   });
 
   afterEach(() => {
@@ -367,7 +364,7 @@ describe('executeGraph — gate modes', () => {
 
   beforeEach(() => {
     datastore = DataStoreFactory.open({ backend: 'memory' });
-    registerAdapter(fakeAdapter(projectDir));
+    currentAdapterRegistry().register(fakeAdapter(projectDir));
   });
 
   afterEach(() => {
@@ -428,7 +425,7 @@ describe('executeGraph — positional paths', () => {
 
   beforeEach(() => {
     datastore = DataStoreFactory.open({ backend: 'memory' });
-    registerAdapter(fakeAdapter(projectDir));
+    currentAdapterRegistry().register(fakeAdapter(projectDir));
   });
 
   afterEach(() => {
@@ -454,7 +451,7 @@ describe('executeGraph — --workspace aggregation', () => {
   beforeEach(() => {
     workDir = mkdtempSync(join(tmpdir(), 'graph-workspace-'));
     datastore = DataStoreFactory.open({ backend: 'memory' });
-    registerAdapter(fakeAdapter(workDir));
+    currentAdapterRegistry().register(fakeAdapter(workDir));
   });
 
   afterEach(() => {
@@ -584,7 +581,7 @@ describe('executeGraph — report-to mode', () => {
 
   beforeEach(() => {
     datastore = DataStoreFactory.open({ backend: 'memory' });
-    registerAdapter(fakeAdapter(projectDir));
+    currentAdapterRegistry().register(fakeAdapter(projectDir));
   });
 
   afterEach(() => {

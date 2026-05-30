@@ -14,12 +14,12 @@ import { join } from 'node:path';
 import { enterScope, RunScope } from '@opensip-tools/core';
 import {
   HEAP_TARGETS,
+  currentAdapterRegistry,
   decideHeapTargetMb,
   graphTool,
   runHeapPreflight,
   systemHasMemoryFor,
   totalSystemMemoryMb,
-  registerAdapter,
 } from '@opensip-tools/graph';
 import { pythonGraphAdapter } from '@opensip-tools/graph-python';
 import { rustGraphAdapter } from '@opensip-tools/graph-rust';
@@ -92,9 +92,9 @@ describe('runHeapPreflight', () => {
     const scope = new RunScope();
     Object.assign(scope, graphTool.contributeScope?.() ?? {});
     enterScope(scope);
-    registerAdapter(typescriptGraphAdapter);
-    registerAdapter(pythonGraphAdapter);
-    registerAdapter(rustGraphAdapter);
+    currentAdapterRegistry().register(typescriptGraphAdapter);
+    currentAdapterRegistry().register(pythonGraphAdapter);
+    currentAdapterRegistry().register(rustGraphAdapter);
   });
 
   afterEach(() => {

@@ -18,10 +18,7 @@ import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { runGraph } from '../../cli/orchestrate.js';
-import {
-  clearAdapterRegistry,
-  registerAdapter,
-} from '../../lang-adapter/registry.js';
+import { currentAdapterRegistry } from '../../lang-adapter/registry.js';
 import { CatalogRepo } from '../../persistence/catalog-repo.js';
 import { makeGraphTestScope } from '../test-utils/with-graph-scope.js';
 
@@ -117,13 +114,13 @@ describe('runGraph orchestrator', () => {
   });
 
   afterEach(() => {
-    clearAdapterRegistry();
+    currentAdapterRegistry().clear();
     datastore.close();
     rmSync(projectDir, { recursive: true, force: true });
   });
 
   it('runs every pipeline stage end-to-end and emits a catalog with no signals', async () => {
-    registerAdapter(
+    currentAdapterRegistry().register(
       fakeAdapter({
         projectDir,
         occurrences: {
@@ -141,7 +138,7 @@ describe('runGraph orchestrator', () => {
   });
 
   it('emits stage-start / stage-done progress events in canonical order', async () => {
-    registerAdapter(fakeAdapter({ projectDir }));
+    currentAdapterRegistry().register(fakeAdapter({ projectDir }));
     const events: string[] = [];
     await runGraph({
       cwd: projectDir,
@@ -172,7 +169,7 @@ describe('runGraph orchestrator', () => {
   });
 
   it('writes the catalog to the datastore when one is provided and cache is enabled', async () => {
-    registerAdapter(
+    currentAdapterRegistry().register(
       fakeAdapter({
         projectDir,
         occurrences: {
@@ -196,7 +193,7 @@ describe('runGraph orchestrator', () => {
         fn: [occurrence({ bodyHash: 'h-fresh', simpleName: 'fn' })],
       },
     });
-    registerAdapter(adapter);
+    currentAdapterRegistry().register(adapter);
 
     await runGraph({ cwd: projectDir, rules: [], datastore });
 
@@ -216,7 +213,7 @@ describe('runGraph orchestrator', () => {
   });
 
   it('runs rules against the produced catalog + indexes', async () => {
-    registerAdapter(
+    currentAdapterRegistry().register(
       fakeAdapter({
         projectDir,
         occurrences: {
@@ -238,7 +235,7 @@ describe('runGraph orchestrator', () => {
       seen.push(inp.configPathOverride ?? 'absent');
       return { projectDirAbs: projectDir, files: [join(projectDir, 'src', 'a.ts')] };
     });
-    registerAdapter(a);
+    currentAdapterRegistry().register(a);
     await runGraph({
       cwd: projectDir,
       noCache: true,
@@ -250,7 +247,7 @@ describe('runGraph orchestrator', () => {
   });
 
   it('skips writing to the datastore when noCache is true', async () => {
-    registerAdapter(fakeAdapter({ projectDir }));
+    currentAdapterRegistry().register(fakeAdapter({ projectDir }));
     await runGraph({ cwd: projectDir, noCache: true, rules: [], datastore });
     expect(new CatalogRepo(datastore).hasAnyCatalog()).toBe(false);
   });
@@ -267,7 +264,7 @@ describe('runGraph orchestrator', () => {
       generatedFilePatterns: ['**/_pb2.py'],
       isTestFile: (p) => p.startsWith('tests/'),
     };
-    registerAdapter(fakeAdapter({ projectDir, ruleHints: hints }));
+    currentAdapterRegistry().register(fakeAdapter({ projectDir, ruleHints: hints }));
 
     const seenHints: (RuleHints | undefined)[] = [];
     const capturingRule: Rule = {
@@ -291,13 +288,13 @@ describe('runGraph — incremental rebuild path', () => {
   let dir: string;
 
   beforeEach(() => {
-    clearAdapterRegistry();
+    currentAdapterRegistry().clear();
     datastore = DataStoreFactory.open({ backend: 'memory' });
     dir = mkdtempSync(join(tmpdir(), 'orch-incr-'));
   });
 
   afterEach(() => {
-    clearAdapterRegistry();
+    currentAdapterRegistry().clear();
     datastore.close();
     rmSync(dir, { recursive: true, force: true });
   });
@@ -309,7 +306,7 @@ describe('runGraph — incremental rebuild path', () => {
     writeFileSync(fileA, 'v1');
     writeFileSync(fileB, 'v1');
 
-    registerAdapter(
+    currentAdapterRegistry().register(
       fakeAdapter({
         projectDir: dir,
         cacheKey: 'k1',
@@ -325,8 +322,8 @@ describe('runGraph — incremental rebuild path', () => {
 
     writeFileSync(fileB, 'v2-changed');
 
-    clearAdapterRegistry();
-    registerAdapter(
+    currentAdapterRegistry().clear();
+    currentAdapterRegistry().register(
       fakeAdapter({
         projectDir: dir,
         cacheKey: 'k1',

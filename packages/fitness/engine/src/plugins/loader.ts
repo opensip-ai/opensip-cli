@@ -199,8 +199,8 @@ function registerLangExports(
 }
 
 /**
- * Public loadPlugin signature preserved for backward compat. Dispatches
- * to the right registerExports callback based on domain.
+ * Fitness-domain `loadPlugin` entry point. Dispatches to the right
+ * `registerExports` callback (fit vs lang) and delegates to core's loader.
  */
 export async function loadPlugin(
   plugin: DiscoveredPlugin,
@@ -211,8 +211,8 @@ export async function loadPlugin(
 }
 
 /**
- * Public loadAllPlugins signature preserved for backward compat.
- * Dispatches to the right callback based on domain.
+ * Fitness-domain `loadAllPlugins` entry point. Dispatches to the right
+ * `registerExports` callback (fit vs lang) and delegates to core's loader.
  */
 export async function loadAllPlugins(
   domain: PluginDomain,

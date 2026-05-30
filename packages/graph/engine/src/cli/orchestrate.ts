@@ -11,7 +11,8 @@
  * looks up an adapter from the lang-adapter registry and routes
  * file-discovery / parse / walk / resolution through its method
  * surface. The TypeScript adapter is the only one registered today;
- * future adapters slot in by calling `registerAdapter` at bootstrap.
+ * future adapters slot in via `currentAdapterRegistry().register(...)`
+ * at bootstrap.
  *
  * Stage decomposition (siblings under `./orchestrate/`):
  *   - `catalog-builder.ts`    — full + incremental rebuild paths

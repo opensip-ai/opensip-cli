@@ -76,8 +76,8 @@ export { formatDuration, formatValidatedColumn } from './fit/result-builders.js'
  *     `SessionRepo.save(...)` after `buildCliOutput`. Errors during the
  *     save are best-effort: a failed write logs `cli.fit.session.save_failed`
  *     and is swallowed so a SQLite hiccup never fails an otherwise
- *     successful fitness run. Matches the legacy v1 `saveSession` semantics
- *     (file-based) and the v2 graph-engine `persistSession` policy.
+ *     successful fitness run — the same best-effort policy the graph
+ *     tool's `persistSession` uses.
  */
 export interface ExecuteFitOptions {
   onProgress?: (completed: number, total: number) => void;
@@ -146,10 +146,10 @@ export async function executeFit(
 
   const output = buildCliOutput(fitnessResult, recipeName);
 
-  // v2 persistence: when bootstrap supplied a datastore, write the
+  // Persistence: when bootstrap supplied a datastore, write the
   // session via SessionRepo. Best-effort — a SQLite write failure never
-  // fails an otherwise-successful fitness run (mirrors v1's saveSession
-  // policy and graph's persistSession). `buildFitDoneResult` stays a
+  // fails an otherwise-successful fitness run (same policy as graph's
+  // persistSession). `buildFitDoneResult` stays a
   // pure builder; the side effect lives here so every executeFit caller
   // (FitView, runJsonMode, runGateMode) gets the write for free as long
   // as they pass `datastore` through.
