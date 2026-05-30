@@ -56,6 +56,7 @@ export type {
   FunctionKind,
   CallResolution,
   CallConfidence,
+  ResolutionMode,
   Visibility,
 } from './types.js';
 export type { Renderer, RenderContext } from './render/types.js';
