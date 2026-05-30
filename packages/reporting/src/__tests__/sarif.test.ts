@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 
-import { buildSarifLog, chunkSarifRuns, reportToCloud } from '../reporting/sarif.js';
+import { buildSarifLog, chunkSarifRuns, reportToCloud } from '../sarif.js';
 
-import type { CliOutput } from '../types.js';
+import type { CliOutput } from '@opensip-tools/contracts';
 
 function makeSampleOutput(): CliOutput {
   return {
