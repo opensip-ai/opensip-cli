@@ -6,7 +6,7 @@
  * @fileoverview Detect secrets exposed through env vars in logs/errors
  */
 
-import { logger } from '@opensip-tools/core/logger'
+import { logger } from '@opensip-tools/core'
 import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
 
 /**

@@ -2,7 +2,7 @@
  * @fileoverview Detect webhook endpoints without signature verification
  */
 
-import { logger } from '@opensip-tools/core/logger'
+import { logger } from '@opensip-tools/core'
 import { defineCheck, isCommentLine, type CheckViolation } from '@opensip-tools/fitness'
 
 /**

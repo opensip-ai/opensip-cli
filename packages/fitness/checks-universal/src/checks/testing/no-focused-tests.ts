@@ -4,7 +4,7 @@
  * Focused tests should not be committed as they prevent other tests from running.
  */
 
-import { logger } from '@opensip-tools/core/logger'
+import { logger } from '@opensip-tools/core'
 import { defineCheck, isCommentLine, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
 
 /**

@@ -6,7 +6,7 @@
  * receives the constructed repo from its caller.
  */
 
-import { SessionRepo } from '@opensip-tools/contracts';
+import { SessionRepo } from '@opensip-tools/session-store';
 
 import type { HistoryResult } from '@opensip-tools/contracts';
 import type { DataStore } from '@opensip-tools/datastore';

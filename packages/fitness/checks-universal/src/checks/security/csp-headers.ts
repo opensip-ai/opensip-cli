@@ -6,7 +6,7 @@
  * @fileoverview Validate Content Security Policy headers configuration
  */
 
-import { logger } from '@opensip-tools/core/logger'
+import { logger } from '@opensip-tools/core'
 import { defineCheck, isCommentLine, type CheckViolation } from '@opensip-tools/fitness'
 
 /**

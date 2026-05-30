@@ -25,7 +25,7 @@
  * above; see docs/plans/graph-cli-language-neutral-scoping/.
  */
 
-import { EXIT_CODES, SessionRepo } from '@opensip-tools/contracts';
+import { EXIT_CODES } from '@opensip-tools/contracts';
 import {
   ConfigurationError,
   generatePrefixedId,
@@ -33,6 +33,7 @@ import {
   ToolError,
   ValidationError,
 } from '@opensip-tools/core';
+import { SessionRepo } from '@opensip-tools/session-store';
 
 import { buildGraphSessionPayload } from '../persistence/session-payload.js';
 import { buildCliOutput, buildCliOutputFromFindings, renderJson } from '../render/json.js';

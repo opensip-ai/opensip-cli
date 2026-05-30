@@ -2,7 +2,7 @@
  * @fileoverview No hardcoded timeouts check
  */
 
-import { logger } from '@opensip-tools/core/logger'
+import { logger } from '@opensip-tools/core'
 import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
 import { stripStringLiterals, stripStringsAndComments } from '@opensip-tools/fitness'
 

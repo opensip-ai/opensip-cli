@@ -11,7 +11,6 @@
  */
 
 import {
-  SessionRepo,
   passRate,
   type FitOptions,
   type CliOutput,
@@ -20,6 +19,7 @@ import {
   type FitDoneResult,
 } from '@opensip-tools/contracts';
 import { generatePrefixedId, logger } from '@opensip-tools/core';
+import { SessionRepo } from '@opensip-tools/session-store';
 
 import { buildFitnessSessionPayload } from '../../persistence/session-payload.js';
 

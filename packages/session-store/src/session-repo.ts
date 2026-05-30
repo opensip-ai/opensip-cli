@@ -3,11 +3,11 @@ import { desc, eq, lt } from 'drizzle-orm';
 
 import { sessions, sessionToolPayload } from './schema/sessions.js';
 
-import type { StoredSession } from './store.js';
+import type { StoredSession } from '@opensip-tools/contracts';
 import type { ToolShortId } from '@opensip-tools/core';
 import type { DataStore } from '@opensip-tools/datastore';
 
-const MODULE_NAME = 'contracts:session-repo';
+const MODULE_NAME = 'session-store:session-repo';
 
 /** Filters for {@link SessionRepo.list}: tool short-id and/or max row count. */
 export interface SessionListOptions {

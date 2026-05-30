@@ -4,7 +4,7 @@
  * @fileoverview Event handling resilience checks
  */
 
-import { logger } from '@opensip-tools/core/logger'
+import { logger } from '@opensip-tools/core'
 import { defineCheck, isTestFile, type CheckViolation, getLineNumber } from '@opensip-tools/fitness'
 
 // =============================================================================

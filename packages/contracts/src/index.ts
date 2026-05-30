@@ -67,15 +67,11 @@ export type { ErrorSuggestion } from './exit-codes.js';
 export { loadCliDefaults } from './cli-config.js';
 export type { CliDefaults } from './cli-config.js';
 
-// Session persistence
-export { generateSessionId, sanitizeForFilename } from './persistence/store.js';
-export type { StoredSession } from './persistence/store.js';
-// SessionRepo + sessions schema. The SQLite `SessionRepo` is the sole
-// persistence path; the v1 JSON session format it replaced has no
-// surviving code.
-export { SessionRepo } from './persistence/session-repo.js';
-export type { SessionListOptions } from './persistence/session-repo.js';
-export { sessions, sessionToolPayload } from './persistence/schema/sessions.js';
+// Session persistence type. The cross-tool StoredSession shape stays here
+// as the contract surface; SessionRepo + the sessions schema +
+// generateSessionId/sanitizeForFilename moved to @opensip-tools/session-store
+// (audit 2026-05-29, contracts split).
+export type { StoredSession } from './session-types.js';
 
 // Graph catalog type surface. This is the contract surface between the
 // graph tool (which writes catalog.json) and the dashboard package
@@ -92,14 +88,9 @@ export type {
   GraphVisibility,
 } from './graph-catalog.js';
 
-// SARIF + cloud reporting (audit 2026-05-29, M1). The cross-cutting
-// output-format contract — sits with CliOutput and the exit codes.
-// Relocated from fitness so both fitness and graph can report to cloud
-// without a `graph → fitness` import cycle (the cycle that previously
-// forced fitness's raw-SQL graph_catalog read; see H1).
-export { buildSarifLog, chunkSarifRuns, reportToCloud } from './reporting/sarif.js';
-export type { ReportResult } from './reporting/sarif.js';
-export type { SarifResult, SarifLocation } from './reporting/sarif-types.js';
+// SARIF + cloud reporting moved to @opensip-tools/reporting (audit
+// 2026-05-29, contracts split). The build/cloud-report runtime + its
+// types live there; contracts no longer re-exports them.
 
 // `commander` is referenced here purely as a type — `import type` keeps
 // the runtime bundle (`dist/index.js`) free of any commander require.

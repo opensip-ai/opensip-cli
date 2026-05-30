@@ -1,7 +1,7 @@
 import { getTableConfig } from 'drizzle-orm/sqlite-core';
 import { describe, expect, it } from 'vitest';
 
-import { sessions, sessionToolPayload } from '../persistence/schema/sessions.js';
+import { sessions, sessionToolPayload } from '../schema/sessions.js';
 
 describe('sessions schema', () => {
   it('declares the (tool, timestamp DESC) lookup index on sessions', () => {

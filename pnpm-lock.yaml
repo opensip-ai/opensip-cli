@@ -132,6 +132,9 @@ importers:
       '@opensip-tools/lang-typescript':
         specifier: workspace:*
         version: link:../languages/lang-typescript
+      '@opensip-tools/session-store':
+        specifier: workspace:*
+        version: link:../session-store
       '@opensip-tools/simulation':
         specifier: workspace:*
         version: link:../simulation/engine
@@ -203,12 +206,6 @@ importers:
       '@opensip-tools/core':
         specifier: workspace:*
         version: link:../core
-      '@opensip-tools/datastore':
-        specifier: workspace:*
-        version: link:../datastore
-      drizzle-orm:
-        specifier: ^0.45.2
-        version: 0.45.2(@types/better-sqlite3@7.6.13)(better-sqlite3@12.10.0)
     devDependencies:
       '@types/node':
         specifier: ^22.19.19
@@ -216,9 +213,6 @@ importers:
       commander:
         specifier: ^14.0.3
         version: 14.0.3
-      jsdom:
-        specifier: ^29.1.1
-        version: 29.1.1
       typescript:
         specifier: ~6.0.3
         version: 6.0.3
@@ -297,6 +291,9 @@ importers:
 
   packages/fitness/checks-cpp:
     dependencies:
+      '@opensip-tools/core':
+        specifier: workspace:*
+        version: link:../../core
       '@opensip-tools/fitness':
         specifier: workspace:*
         version: link:../engine
@@ -424,6 +421,12 @@ importers:
       '@opensip-tools/datastore':
         specifier: workspace:*
         version: link:../../datastore
+      '@opensip-tools/reporting':
+        specifier: workspace:*
+        version: link:../../reporting
+      '@opensip-tools/session-store':
+        specifier: workspace:*
+        version: link:../../session-store
       commander:
         specifier: ^14.0.3
         version: 14.0.3
@@ -476,6 +479,12 @@ importers:
       '@opensip-tools/datastore':
         specifier: workspace:*
         version: link:../../datastore
+      '@opensip-tools/reporting':
+        specifier: workspace:*
+        version: link:../../reporting
+      '@opensip-tools/session-store':
+        specifier: workspace:*
+        version: link:../../session-store
       commander:
         specifier: ^14.0.3
         version: 14.0.3
@@ -716,6 +725,50 @@ importers:
       '@types/node':
         specifier: ^22.19.19
         version: 22.19.19
+      vitest:
+        specifier: ^4.1.7
+        version: 4.1.7(@types/node@22.19.19)(@vitest/coverage-v8@4.1.7)(jsdom@29.1.1)(vite@7.3.3(@types/node@22.19.19)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.22.3)(yaml@2.9.0))
+
+  packages/reporting:
+    dependencies:
+      '@opensip-tools/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@opensip-tools/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@types/node':
+        specifier: ^22.19.19
+        version: 22.19.19
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.7
+        version: 4.1.7(@types/node@22.19.19)(@vitest/coverage-v8@4.1.7)(jsdom@29.1.1)(vite@7.3.3(@types/node@22.19.19)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.22.3)(yaml@2.9.0))
+
+  packages/session-store:
+    dependencies:
+      '@opensip-tools/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@opensip-tools/core':
+        specifier: workspace:*
+        version: link:../core
+      '@opensip-tools/datastore':
+        specifier: workspace:*
+        version: link:../datastore
+      drizzle-orm:
+        specifier: ^0.45.2
+        version: 0.45.2(@types/better-sqlite3@7.6.13)(better-sqlite3@12.10.0)
+    devDependencies:
+      '@types/node':
+        specifier: ^22.19.19
+        version: 22.19.19
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
       vitest:
         specifier: ^4.1.7
         version: 4.1.7(@types/node@22.19.19)(@vitest/coverage-v8@4.1.7)(jsdom@29.1.1)(vite@7.3.3(@types/node@22.19.19)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.22.3)(yaml@2.9.0))

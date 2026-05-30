@@ -25,9 +25,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@opensip-tools/core": "workspace:*",
-    "@opensip-tools/datastore": "workspace:*",
-    "drizzle-orm": "^0.45.2"
+    "@opensip-tools/core": "workspace:*"
   },
   "peerDependencies": {
     "commander": "^14.0.0"

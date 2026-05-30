@@ -1,10 +1,10 @@
 import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { sessions } from '../persistence/schema/sessions.js';
-import { SessionRepo } from '../persistence/session-repo.js';
+import { sessions } from '../schema/sessions.js';
+import { SessionRepo } from '../session-repo.js';
 
-import type { StoredSession } from '../persistence/store.js';
+import type { StoredSession } from '@opensip-tools/contracts';
 
 // A representative opaque payload. `contracts` never inspects the shape;
 // these tests exercise verbatim round-tripping of whatever a tool writes.

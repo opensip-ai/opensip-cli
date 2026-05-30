@@ -2,7 +2,7 @@
  * @fileoverview Verify auth group routes are protected
  */
 
-import { logger } from '@opensip-tools/core/logger'
+import { logger } from '@opensip-tools/core'
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
 // Patterns indicating auth protection
