@@ -96,10 +96,22 @@ function gvSccColor(sccId) {
   return 'hsl(' + h + ', 70%, 55%)';
 }
 
-function gvBuildElements(vm) {
+// A view-model node carries the same facets passesFilter() reads off a
+// catalog occurrence (filePath, kind, inTestFile). Reuse the shared
+// predicate so the Graph view culls exactly like the table views do — a
+// filter chip toggled in one view hides the same functions here.
+function gvNodePasses(node, filterState) {
+  if (typeof passesFilter !== 'function' || !filterState) return true;
+  return passesFilter(node, filterState);
+}
+
+function gvBuildElements(vm, filterState) {
   var elements = [];
+  var visible = {};
   for (var i = 0; i < vm.nodes.length; i++) {
     var n = vm.nodes[i];
+    if (!gvNodePasses(n, filterState)) continue;
+    visible[n.id] = true;
     var degree = (n.callDegreeIn || 0) + (n.callDegreeOut || 0);
     elements.push({
       group: 'nodes',
@@ -120,6 +132,8 @@ function gvBuildElements(vm) {
   }
   for (var j = 0; j < vm.edges.length; j++) {
     var e = vm.edges[j];
+    // An edge survives only when BOTH endpoints survive the filter.
+    if (!visible[e.source] || !visible[e.target]) continue;
     elements.push({
       group: 'edges',
       data: {
@@ -180,6 +194,18 @@ function gvStylesheet() {
       selector: 'node.gv-node-selected',
       style: { 'background-color': '#e0a96d', 'border-color': '#fff', 'border-width': 3 },
     },
+    {
+      selector: 'node.gv-search-hit',
+      style: { 'background-color': '#e0a96d', 'border-color': '#fff', 'border-width': 3, 'opacity': 1 },
+    },
+    {
+      selector: 'node.gv-search-fade',
+      style: { 'opacity': 0.12 },
+    },
+    {
+      selector: 'edge.gv-search-fade',
+      style: { 'opacity': 0.05 },
+    },
   ];
 }
 
@@ -223,6 +249,43 @@ function gvRenderLayoutSelector(host) {
   host.appendChild(bar);
 }
 
+// Search box (DOM, above the canvas). Reuses the same fuzzy index the
+// Search view uses (fuzzyMatch over simple names). A hit centers + fits the
+// matched node and flags it; non-matches fade. Clearing restores opacity.
+function gvRenderSearchBox(host) {
+  var input = el('input', {
+    type: 'search',
+    class: 'search-input code-paths-graph-search',
+    id: 'code-paths-graph-search-input',
+    placeholder: 'Find a node by name…',
+  });
+  input.addEventListener('input', function(e) {
+    gvApplySearch((e.target && e.target.value) || '');
+  });
+  host.appendChild(input);
+}
+
+function gvApplySearch(query) {
+  if (!gvCy) return;
+  var q = (query || '').trim();
+  gvCy.nodes().removeClass('gv-search-hit gv-search-fade');
+  if (q.length === 0) return;
+  // The view-model label is the qualified name; match against it directly
+  // (the fuzzy scorer lives in search.js, emitted earlier in the bundle).
+  var labels = gvCy.nodes().map(function(n) { return n.data('label') || ''; });
+  var matches = (typeof fuzzyMatch === 'function') ? fuzzyMatch(q, labels) : [];
+  var hitLabels = {};
+  for (var i = 0; i < matches.length; i++) hitLabels[matches[i].name] = true;
+  var hitCollection = gvCy.collection();
+  gvCy.nodes().forEach(function(n) {
+    if (hitLabels[n.data('label')]) { n.addClass('gv-search-hit'); hitCollection = hitCollection.union(n); }
+    else { n.addClass('gv-search-fade'); }
+  });
+  if (hitCollection.length > 0) {
+    try { gvCy.center(hitCollection); gvCy.fit(hitCollection, 120); } catch (e) { /* ignore */ }
+  }
+}
+
 views.push({
   id: 'graph',
   label: 'Graph',
@@ -232,7 +295,7 @@ views.push({
       { heading: 'What this is', body: 'A node-link visualization of the call graph rendered with Cytoscape.js. Each node is a function; each edge is a static call. Node size reflects total call degree (callers + callees); cyclic clusters share an accent border.' },
       { heading: 'Why you care', body: 'The seven table views project the graph into rankings and lists. This view shows topology directly — hub functions, tightly cyclic clusters, disconnected islands, and the upstream/downstream radius around a node — which is work to reconstruct from a table.' },
       { heading: 'How to read it', body: 'Node shape encodes kind (diamond=constructor, hexagon=module-init, rounded=method). Border style encodes visibility (solid=exported, dotted=module-local, dashed=private). Edge style encodes call resolution; faded edges are low-confidence. Use the layout selector to switch between layered (dagre), force (cose), and hierarchical (breadthfirst).' },
-      { heading: 'What to do', body: 'Pan and zoom to explore. Click a node to select it. Later phases add filter, search, and click-to-trace upstream/downstream impact.' },
+      { heading: 'What to do', body: 'Pan and zoom to explore. The filter chips above the view tab bar cull nodes here exactly as they cull rows in the table views. Type in the search box to center and highlight a node; non-matches fade. Click a node to trace its upstream/downstream impact.' },
     ],
   },
   render(container, catalog, indexes, filterState) {
@@ -248,6 +311,7 @@ views.push({
     }
 
     gvRenderLayoutSelector(container);
+    gvRenderSearchBox(container);
 
     if (typeof vm.truncatedFromTotal === 'number' && vm.truncatedFromTotal > vm.nodes.length) {
       container.appendChild(el('div', {
@@ -259,12 +323,21 @@ views.push({
     var canvas = el('div', { class: 'code-paths-graph-canvas', id: 'code-paths-graph-canvas' });
     container.appendChild(canvas);
 
+    // Re-render fires on every filterState change (notifyViews fans out to
+    // every view's render). Cull nodes/edges the active filter rejects — an
+    // edge survives only when both endpoints do.
+    var elements = gvBuildElements(vm, filterState);
+    if (elements.length === 0) {
+      canvas.appendChild(el('div', { class: 'empty', text: 'No nodes match the active filters.' }));
+      return;
+    }
+
     // Mounting can throw in environments without a real 2D canvas (e.g.
     // headless test runners). Fail soft — the rest of the page stays usable.
     try {
       gvCy = cytoscape({
         container: canvas,
-        elements: gvBuildElements(vm),
+        elements: elements,
         style: gvStylesheet(),
         layout: gvLayoutOptions(gvCurrentLayout),
         wheelSensitivity: 0.2,

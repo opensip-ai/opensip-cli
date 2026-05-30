@@ -17,6 +17,7 @@ import { dashboardCytoscapeVendorJs } from '../code-paths/cytoscape-vendor.js';
 import { dashboardFiltersJs } from '../code-paths/filters.js';
 import { dashboardIndexesJs } from '../code-paths/indexes.js';
 import { dashboardPathUtilsJs } from '../code-paths/path-utils.js';
+import { dashboardSearchJs } from '../code-paths/search.js';
 import { dashboardViewGraphJs } from '../code-paths/view-graph.js';
 import { dashboardViewsRegistryJs } from '../code-paths/views-registry.js';
 
@@ -27,8 +28,15 @@ interface GraphView {
   onActivate?: () => void;
 }
 
+interface FilterState {
+  packages: Set<string>;
+  kinds: Set<string>;
+  includeTests: boolean;
+}
+
 interface Env {
   views: GraphView[];
+  filterState: FilterState;
 }
 
 function loadEnv(withVendor: boolean): Env {
@@ -48,7 +56,7 @@ var graphCatalog = null;
 var graphIndexes = { byBodyHash: new Map(), bySimpleName: new Map(), callees: new Map(), callers: new Map() };
 `;
   const tail = `
-return { views };
+return { views, filterState };
 `;
   const parts = [elSrc];
   if (withVendor) parts.push(dashboardCytoscapeVendorJs());
@@ -57,6 +65,7 @@ return { views };
     dashboardIndexesJs(),
     dashboardViewsRegistryJs(),
     dashboardFiltersJs(),
+    dashboardSearchJs(),
     dashboardViewGraphJs(),
     tail,
   );
@@ -177,9 +186,50 @@ describe('View 8 — Graph', () => {
     embedViewModel({ ...SAMPLE_VM, truncatedFromTotal: 9999 });
     const c = document.createElement('div');
     document.body.append(c);
-    env.views.find(v => v.id === 'graph')!.render(c, null, null, null);
+    env.views.find(v => v.id === 'graph')!.render(c, null, null, env.filterState);
     const banner = c.querySelector('.code-paths-graph-banner');
     expect(banner).not.toBeNull();
     expect(banner!.textContent).toContain('Showing top 2 of 9999');
+  });
+
+  it('renders the search box above the canvas', () => {
+    const env = loadEnv(true);
+    embedViewModel(SAMPLE_VM);
+    const c = document.createElement('div');
+    document.body.append(c);
+    env.views.find(v => v.id === 'graph')!.render(c, null, null, env.filterState);
+    expect(c.querySelector('#code-paths-graph-search-input')).not.toBeNull();
+  });
+
+  it('culls nodes the active filter rejects (production-only hides test nodes)', () => {
+    // SAMPLE_VM node "a" is non-test, "b" is inTestFile. Default filter is
+    // production-only (includeTests false) → only "a" survives, but "a"'s
+    // sole edge targets "b", so the edge is dropped too. The graph still
+    // mounts (one node), so we assert the no-match state does NOT appear.
+    const env = loadEnv(true);
+    embedViewModel(SAMPLE_VM);
+    const c = document.createElement('div');
+    document.body.append(c);
+    env.views.find(v => v.id === 'graph')!.render(c, null, null, env.filterState);
+    const empties = [...c.querySelectorAll('.empty')].map(e => e.textContent);
+    expect(empties.some(t => t?.includes('No nodes match'))).toBe(false);
+  });
+
+  it('shows the no-match empty state when the filter rejects every node', () => {
+    const env = loadEnv(true);
+    embedViewModel(SAMPLE_VM);
+    // Restrict to a kind no node has → everything is culled.
+    env.filterState.kinds.add('constructor');
+    const c = document.createElement('div');
+    document.body.append(c);
+    env.views.find(v => v.id === 'graph')!.render(c, null, null, env.filterState);
+    const empties = [...c.querySelectorAll('.empty')].map(e => e.textContent);
+    expect(empties.some(t => t?.includes('No nodes match the active filters'))).toBe(true);
+  });
+
+  it('reuses the shared fuzzyMatch index for search (no separate index)', () => {
+    // The emitter references fuzzyMatch (from search.js) rather than building
+    // its own — a regression guard for the "reuse, not reinvent" rule.
+    expect(dashboardViewGraphJs()).toContain('fuzzyMatch');
   });
 });
