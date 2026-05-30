@@ -410,10 +410,11 @@ function saveGraphSession(
       score: cliOutput.score,
       passed: cliOutput.passed,
       durationMs: cliOutput.durationMs,
-      // Graph-owned opaque detail: a native signal summary. No more
-      // contorting signals into fitness-style "checks/findings" — the
-      // generic session row holds zero graph vocabulary.
-      payload: buildGraphSessionPayload(cliOutput.summary),
+      // Graph-owned opaque detail: summary + rule-grouped per-signal
+      // findings (the same rule grouping graph already computes for its
+      // JSON/SARIF surfaces). The generic session row holds zero graph
+      // vocabulary; the dashboard reads this blob structurally.
+      payload: buildGraphSessionPayload(cliOutput),
     });
   } catch {
     /* v8 ignore next */

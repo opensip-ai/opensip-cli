@@ -26,6 +26,7 @@ import type {
   ResolveOutput,
   WalkOutput,
 } from '../../lang-adapter/types.js'
+import type { GraphSessionPayload } from '../../persistence/session-payload.js'
 import type { LanguageAdapter, ToolCliContext, WorkspaceUnit } from '@opensip-tools/core'
 
 function fakeAdapter(projectDir: string): GraphLanguageAdapter {
@@ -208,5 +209,35 @@ describe('D12 — one CLI invocation = one session', () => {
       mockCli(datastore),
     )
     expect(countSessions(datastore)).toBe(0)
+  })
+})
+
+describe('graph session payload — rule-grouped detail is persisted', () => {
+  it('default run writes a payload with summary + checks (not summary-only)', async () => {
+    await executeGraph({ cwd: projectDir, noCache: true }, mockCli(datastore))
+
+    const session = new SessionRepo(datastore).latest()
+    expect(session).not.toBeNull()
+
+    const payload = session?.payload as GraphSessionPayload | undefined
+    expect(payload).toBeDefined()
+
+    // The native signal summary is carried verbatim from the run's CliOutput.
+    expect(payload?.summary).toEqual(
+      expect.objectContaining({
+        total: expect.any(Number),
+        passed: expect.any(Number),
+        failed: expect.any(Number),
+        errors: expect.any(Number),
+        warnings: expect.any(Number),
+      }),
+    )
+
+    // The rule-grouped detail (`checks`) is what the Code Paths → Sessions
+    // panel renders, and the reason the payload is no longer summary-only.
+    // A regression to `{ summary }` (the pre-extension shape) drops this key —
+    // session count stays 1, so only this assertion catches it.
+    expect(payload).toHaveProperty('checks')
+    expect(Array.isArray(payload?.checks)).toBe(true)
   })
 })

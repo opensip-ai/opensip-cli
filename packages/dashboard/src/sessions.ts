@@ -79,7 +79,18 @@ function renderSessionTable(panel, toolSessions, accentColor) {
     detailContainer.style.display = 'block';
     while (detailContainer.firstChild) detailContainer.removeChild(detailContainer.firstChild);
 
-    // Per-check detail lives in the tool-owned opaque payload.
+    // Sessions written before the tool-owned payload split (or by a tool
+    // that records no per-item detail) have no payload at all. Distinguish
+    // that from "payload present but empty" so the panel says so explicitly
+    // rather than rendering a silent empty table.
+    if (!session.payload) {
+      detailContainer.appendChild(el('h3', {text: 'Session Detail — ' + new Date(session.timestamp).toLocaleString(), style:'margin-bottom:4px'}));
+      detailContainer.appendChild(el('div', {class:'empty', text:'No detail recorded for this session.'}));
+      return;
+    }
+
+    // Per-item detail lives in the tool-owned opaque payload. Fitness calls
+    // these "checks"; graph groups signals by rule (relabeled below).
     const checks = (session.payload && session.payload.checks) || [];
 
     // Compute session-level totals from check findings
@@ -113,7 +124,11 @@ function renderSessionTable(panel, toolSessions, accentColor) {
     const table = el('table', {class:'data-table sortable'});
     const thead = el('thead');
     const thRow = el('tr');
-    ['', 'Check', 'Status', 'Errors', 'Warnings', 'Findings', 'Duration'].forEach(h => {
+    // Graph groups findings by rule, not by check — relabel that one
+    // column so the header reads in the tool's own vocabulary. The
+    // structural payload shape is identical; only the label differs.
+    const itemColumn = tool === 'graph' ? 'Rule' : 'Check';
+    ['', itemColumn, 'Status', 'Errors', 'Warnings', 'Findings', 'Duration'].forEach(h => {
       thRow.appendChild(el('th', {text: h}));
     });
     thead.appendChild(thRow);
