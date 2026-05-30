@@ -32,12 +32,13 @@ import { runHeapPreflight } from './cli/heap-preflight.js';
 import { executeLookup } from './cli/lookup.js';
 import { executeSymbolIndex } from './cli/symbol-index.js';
 import { createAdapterRegistry, getDiscoveredAdapters } from './lang-adapter/registry.js';
+import { CatalogRepo } from './persistence/catalog-repo.js';
 import { createRulesRegistry } from './rules/registry.js';
 // Side-effect import: ensures the RunScope.graph augmentation is
 // loaded so `scope.graph` is correctly-typed here.
 import './scope-augmentation.js';
 
-import type { ScopeContribution, Tool, ToolCliContext, ToolCommandDescriptor } from '@opensip-tools/core';
+import type { ScopeContribution, Tool, ToolCliContext, ToolCommandDescriptor, ToolScope } from '@opensip-tools/core';
 import type { DataStore } from '@opensip-tools/datastore';
 
 const GRAPH: ToolCommandDescriptor = {
@@ -273,6 +274,24 @@ function contributeScope(): ScopeContribution {
   };
 }
 
+/**
+ * Dashboard-data contribution (audit 2026-05-29, L2). Graph owns its
+ * Code Paths panel data: it returns the graph catalog (via its own
+ * `CatalogRepo`) under the `graphCatalog` key that `generateDashboardHtml`
+ * consumes. Best-effort — a missing/empty catalog yields no contribution
+ * and the panel renders a no-data state. This is what lets the CLI
+ * compose the cross-tool dashboard without fitness reaching into graph.
+ */
+function collectDashboardData(scope: ToolScope): Record<string, unknown> {
+  const datastore = scope.datastore() as DataStore | undefined;
+  if (!datastore) return {};
+  try {
+    return { graphCatalog: new CatalogRepo(datastore).loadCatalogContract() };
+  } catch {
+    return {};
+  }
+}
+
 export const graphTool: Tool = {
   metadata: {
     id: 'graph',
@@ -282,4 +301,5 @@ export const graphTool: Tool = {
   commands: [GRAPH, GRAPH_LOOKUP, GRAPH_SYMBOL_INDEX, GRAPH_BASELINE_EXPORT],
   register,
   contributeScope,
+  collectDashboardData,
 };

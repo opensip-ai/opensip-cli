@@ -289,6 +289,22 @@ export interface Tool {
    * undefined.
    */
   readonly contributeScope?: () => ScopeContribution;
+  /**
+   * Optional dashboard-data contribution (audit 2026-05-29, L2). The CLI
+   * is the dashboard composition root: it gathers generic sessions, then
+   * walks the tool registry calling this hook and merges each tool's
+   * contribution into the dashboard input. A tool returns ITS OWN inputs
+   * to the HTML report (fitness: check/recipe catalogs; graph: its
+   * catalog) — keyed by the field names `generateDashboardHtml` consumes.
+   *
+   * Returns an opaque `Record<string, unknown>` so the kernel carries no
+   * tool/dashboard vocabulary; the CLI `Object.assign`s it onto the
+   * `DashboardInput`. Tools that contribute nothing leave this undefined.
+   * Receives the Tool-facing `ToolScope` (datastore, projectContext, …).
+   */
+  readonly collectDashboardData?: (
+    scope: ToolScope,
+  ) => Record<string, unknown> | Promise<Record<string, unknown>>;
 }
 
 /**

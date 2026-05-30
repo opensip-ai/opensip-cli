@@ -97,13 +97,15 @@ export { fitnessTool, fitnessTool as tool } from './tool.js';
 // still drives commands directly. Phase 4 will collapse these behind
 // the Tool contract.
 //
-// Audit 2026-05-29 (L2): `executeFit` and `openDashboard` were assessed
-// for removal as "legacy" exports but BOTH have live consumers —
-// `executeFit` by the SaaS-mode concurrency test
-// (cli/__tests__/saas-mode-smoke.test.ts) and `openDashboard` by the
-// CLI dashboard auto-open (cli/bootstrap/dashboard.ts). They are active
-// API, not dead code; removing them needs those consumers migrated to
-// the Tool contract first (Phase 4), which is out of scope for L2.
+// Audit 2026-05-29 (L2): `executeFit` retains a live consumer — the
+// SaaS-mode concurrency test (cli/__tests__/saas-mode-smoke.test.ts). It
+// is active API, not dead code; removing it needs that consumer migrated
+// to the Tool contract first (Phase 4), which is out of scope for L2.
+//
+// The old `openDashboard` export is GONE (L2): fitness no longer owns
+// dashboard composition. It now contributes only its own dashboard
+// inputs via `collectFitnessDashboardData`, wired into `fitnessTool`'s
+// `collectDashboardData`. The CLI is the composition root.
 export {
   executeFit,
   ensureChecksLoaded,
@@ -116,7 +118,11 @@ export {
   formatValidatedColumn,
 } from './cli/fit.js';
 export type { PreLoadHook } from './cli/fit.js';
-export { openDashboard } from './cli/dashboard.js';
+// Fitness's dashboard-data collector — exported for unit coverage and
+// so the Tool descriptor can reference it. The CLI walks every tool's
+// `collectDashboardData`; it does not import this symbol directly.
+export { collectFitnessDashboardData } from './cli/dashboard.js';
+export type { CheckCatalogEntry, RecipeCatalogEntry } from './cli/dashboard.js';
 export { listChecks } from './cli/list-checks.js';
 export { listRecipes } from './cli/list-recipes.js';
 

@@ -33,11 +33,20 @@ describe('fitnessTool contract conformance', () => {
     expect(fitnessTool.metadata.description.length).toBeGreaterThan(0);
   });
 
-  it('commands list includes fit, dashboard, fit-list, fit-recipes', () => {
+  it('commands list includes fit, fit-list, fit-recipes', () => {
     const names = fitnessTool.commands.map((c) => c.name);
     expect(names).toEqual(
-      expect.arrayContaining(['fit', 'dashboard', 'fit-list', 'fit-recipes']),
+      expect.arrayContaining(['fit', 'fit-list', 'fit-recipes']),
     );
+  });
+
+  it("no longer owns the cross-tool 'dashboard' command (moved to the CLI in L2)", () => {
+    const names = fitnessTool.commands.map((c) => c.name);
+    expect(names).not.toContain('dashboard');
+  });
+
+  it('contributes dashboard data via the Tool.collectDashboardData seam', () => {
+    expect(typeof fitnessTool.collectDashboardData).toBe('function');
   });
 
   it('register is callable', () => {

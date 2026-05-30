@@ -51,7 +51,7 @@ import {
 import { readPackageVersion } from '@opensip-tools/core';
 
 import { exportFitBaseline } from './cli/baseline-export.js';
-import { openDashboard } from './cli/dashboard.js';
+import { collectFitnessDashboardData } from './cli/dashboard.js';
 import {
   fitOptsToCliArgs,
   runGateMode,
@@ -91,11 +91,6 @@ const CWD_DESC = 'Target directory';
 const FIT: ToolCommandDescriptor = {
   name: 'fit',
   description: 'Run fitness checks',
-};
-
-const DASHBOARD: ToolCommandDescriptor = {
-  name: 'dashboard',
-  description: 'Generate the HTML dashboard and open it in your browser',
 };
 
 const FIT_LIST: ToolCommandDescriptor = {
@@ -140,7 +135,6 @@ function register(cli: ToolCliContext): void {
   });
 
   registerFitCommand(program, cli);
-  registerDashboardCommand(program, cli);
   registerListCommand(program, cli);
   registerRecipesCommand(program, cli);
   registerBaselineExportCommand(program, cli);
@@ -194,23 +188,6 @@ function registerFitCommand(program: CliProgram, cli: ToolCliContext): void {
         return;
       }
       await runLiveMode(args, cli, FIT_LIVE_VIEW_KEY, opts.open === true);
-    });
-}
-
-function registerDashboardCommand(program: CliProgram, cli: ToolCliContext): void {
-  program
-    .command(DASHBOARD.name)
-    .description(DASHBOARD.description)
-    .option(CWD_FLAG, CWD_DESC, process.cwd())
-    .option(JSON_FLAG, JSON_DESC, false)
-    .option('--debug', 'Enable debug mode for structured log output', false)
-    .action(async (opts: ToolOptions) => {
-      const result = await openDashboard(opts.cwd, cli.scope.datastore() as DataStore);
-      if (opts.json) {
-        cli.emitJson(result);
-        return;
-      }
-      await cli.render(result);
     });
 }
 
@@ -283,8 +260,9 @@ export const fitnessTool: Tool = {
     version: readPackageVersion(import.meta.url),
     description: 'Run fitness checks against a codebase',
   },
-  commands: [FIT, DASHBOARD, FIT_LIST, FIT_RECIPES, FIT_BASELINE_EXPORT],
+  commands: [FIT, FIT_LIST, FIT_RECIPES, FIT_BASELINE_EXPORT],
   register,
+  collectDashboardData: collectFitnessDashboardData,
   initialize: async (): Promise<void> => {
     // ensureChecksLoaded() is called inside the executeFit / listChecks
     // / listRecipes paths, so a separate initialize() pass is not

@@ -4,6 +4,7 @@
  * Cross-tool housekeeping that doesn't belong to any single tool:
  *
  *   - `init`         — scaffold opensip-tools.config.yml + example tree
+ *   - `dashboard`    — compose + open the cross-tool HTML report
  *   - `sessions`     — `list` / `purge`
  *   - `configure`    — set up the OpenSIP Cloud API key
  *   - `plugin`       — `list` / `add` / `remove` / `sync`
@@ -21,6 +22,7 @@
 
 import { registerCompletion } from './register-completion.js';
 import { registerConfigure } from './register-configure.js';
+import { registerDashboard } from './register-dashboard.js';
 import { registerInit } from './register-init.js';
 import { registerPlugins } from './register-plugins.js';
 import { registerSessions } from './register-sessions.js';
@@ -39,6 +41,7 @@ export type { CliCommandsContext } from './shared.js';
  */
 export function registerCliCommands(program: Command, ctx: CliCommandsContext): void {
   registerInit(program, ctx);
+  registerDashboard(program, ctx);
   registerSessions(program, ctx);
   registerConfigure(program, ctx);
   registerPlugins(program, ctx);

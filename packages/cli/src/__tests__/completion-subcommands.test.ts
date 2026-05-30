@@ -68,9 +68,10 @@ describe('SUBCOMMANDS drift test', () => {
     });
 
     const live = program.commands.map((c) => c.name()).sort();
-    // `dashboard` is mounted as a tool subcommand by fitness's
-    // register(); `help` is a Commander built-in that the completion
-    // script also surfaces. Filter out the `help` synthetic since
+    // `dashboard` is a CLI-owned command (registerCliCommands) since L2 —
+    // the cross-tool composition root. `help` is a Commander built-in
+    // that the completion script also surfaces. Filter out the `help`
+    // synthetic since
     // Commander adds it automatically and SUBCOMMANDS lists it
     // explicitly.
     const completionList = [...SUBCOMMANDS].sort();

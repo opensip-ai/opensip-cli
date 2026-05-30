@@ -482,26 +482,24 @@ module.exports = {
       to: { path: '^@opensip-tools/fitness($|/)' },
     },
     {
-      // Audit 2026-05-29 (H1): the ONE sanctioned fitness→graph edge.
-      // Fitness's dashboard command reads the graph catalog via graph's
-      // typed CatalogRepo (replacing the prior raw-SQL graph_catalog
-      // read). Pin it to dashboard.ts so the cross-tool edge stays
-      // tracked and can't sprawl — the lesson from M1's stale rule.
+      // Audit 2026-05-29 (L2): fitness and graph are now fully decoupled.
+      // The former sole sanctioned fitness→graph edge (the dashboard
+      // command reading graph's CatalogRepo) is gone — the CLI is now the
+      // dashboard composition root and each tool contributes its OWN
+      // dashboard data via `collectDashboardData`. Graph returns its
+      // `graphCatalog`; fitness returns its catalogs; neither reaches
+      // into the other. This rule is now strict (no exception).
       // `@opensip-tools/graph($|/)` matches the engine only, not the
       // graph-* adapter packs.
-      name: 'fitness-no-graph-except-dashboard',
+      name: 'fitness-no-graph',
       severity: 'error',
       comment:
-        'Only fitness/engine/src/cli/dashboard.ts may import ' +
-        '@opensip-tools/graph (CatalogRepo, for the dashboard Code Paths ' +
-        'panel). Any other fitness→graph import is forbidden.',
+        'fitness must not import @opensip-tools/graph. Cross-tool ' +
+        'dashboard composition is owned by the CLI; each tool contributes ' +
+        'its own dashboard data via the Tool.collectDashboardData seam.',
       from: {
         path: '^packages/fitness/',
-        pathNot: [
-          '^packages/fitness/engine/src/cli/dashboard\\.ts$',
-          '/__tests__/',
-          '\\.test\\.(ts|tsx)$',
-        ],
+        pathNot: ['/__tests__/', '\\.test\\.(ts|tsx)$'],
       },
       to: { path: '^@opensip-tools/graph($|/)' },
     },
