@@ -3,7 +3,7 @@ import type { Config } from 'drizzle-kit';
 export default {
   dialect: 'sqlite',
   schema: [
-    '../contracts/src/persistence/schema/sessions.ts',
+    '../session-store/src/schema/sessions.ts',
     '../graph/engine/src/persistence/schema.ts',
     '../fitness/engine/src/persistence/schema.ts',
   ],
