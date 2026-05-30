@@ -126,6 +126,30 @@ module.exports = {
     },
 
     // -------------------------------------------------------------------
+    // Layer enforcement — session-store depends on core + datastore +
+    // contracts (StoredSession type) only.
+    // -------------------------------------------------------------------
+    {
+      name: 'session-store-imports-core-datastore-contracts-only',
+      severity: 'error',
+      comment:
+        'session-store owns session persistence. It depends on core, ' +
+        'datastore, and contracts (StoredSession type) only — never a tool, ' +
+        'cli, lang, check pack, graph, or simulation.',
+      from: { path: '^packages/session-store/src/' },
+      to: {
+        path: [
+          '^@opensip-tools/cli($|/)',
+          '^@opensip-tools/fitness',
+          '^@opensip-tools/simulation',
+          '^@opensip-tools/graph',
+          '^@opensip-tools/lang-',
+          '^@opensip-tools/checks-',
+        ],
+      },
+    },
+
+    // -------------------------------------------------------------------
     // Layer enforcement — contracts depends only on core
     // -------------------------------------------------------------------
     {
