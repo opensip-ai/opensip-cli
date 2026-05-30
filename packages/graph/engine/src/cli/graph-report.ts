@@ -12,6 +12,8 @@
  * (`writeUnifiedReport`, used by non-interactive paths).
  */
 
+import { formatDuration } from '@opensip-tools/core';
+
 import { inferEntryPoints } from '../rules/_entry-points.js';
 import { currentRules } from '../rules/registry.js';
 
@@ -105,11 +107,6 @@ export interface RunSummaryPlainInput {
   readonly errors: number;
   readonly warnings: number;
   readonly durationMs: number;
-}
-
-function formatDuration(ms: number): string {
-  if (ms < 1000) return `${String(ms)}ms`;
-  return `${(ms / 1000).toFixed(1)}s`;
 }
 
 /**

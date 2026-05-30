@@ -1,5 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignoreExportsUsedInFile": true,
   "workspaces": {
     ".": {
       "ignoreDependencies": [
@@ -19,6 +20,17 @@
         "@opensip-tools/graph-rust",
         "@opensip-tools/graph-go",
         "@opensip-tools/graph-java"
+      ]
+    },
+    "packages/dashboard": {
+      "ignoreDependencies": [
+        "cytoscape",
+        "cytoscape-dagre"
+      ]
+    },
+    "packages/fitness/checks-cpp": {
+      "ignoreDependencies": [
+        "@opensip-tools/core"
       ]
     },
     "packages/fitness/engine": {

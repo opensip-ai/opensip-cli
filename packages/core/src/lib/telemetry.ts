@@ -64,7 +64,10 @@ export function withSpan<T>(
     try {
       return fn(span);
     } catch (error) {
-      span.recordException(error as Error);
+      // Normalize before recording: a thrown non-Error (string, object) must
+      // record as a message rather than be unsafely cast to Error. OTel's
+      // `recordException` accepts `string | Exception`, so this is type-safe.
+      span.recordException(error instanceof Error ? error : String(error));
       span.setStatus({ code: SpanStatusCode.ERROR });
       throw error;
     } finally {

@@ -59,7 +59,10 @@ export {
 } from './fit/check-loader.js';
 export type { LoadDiscoveredResult, PreLoadHook } from './fit/check-loader.js';
 export { getDisplayName, getIcon } from './fit/display-registry.js';
-export { formatDuration, formatValidatedColumn } from './fit/result-builders.js';
+export { formatValidatedColumn } from './fit/result-builders.js';
+// `formatDuration` is shared across tools and lives in core; re-export it
+// here so fitness's public surface is unchanged.
+export { formatDuration } from '@opensip-tools/core';
 
 // ---------------------------------------------------------------------------
 // executeFit — main fit command (returns data, no console output)

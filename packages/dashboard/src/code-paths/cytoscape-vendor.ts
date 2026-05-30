@@ -37,6 +37,13 @@ const BUNDLE_CANDIDATES = [
 
 let cachedBundle: string | null = null;
 
+/**
+ * Read and cache the committed Cytoscape UMD bundle from the first candidate
+ * path that exists.
+ *
+ * @throws {Error} When the bundle is absent from every candidate path (the
+ *   `vendor:cytoscape` build step has not been run / the asset was not shipped).
+ */
 function readVendorBundle(): string {
   if (cachedBundle !== null) return cachedBundle;
   for (const candidate of BUNDLE_CANDIDATES) {

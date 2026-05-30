@@ -14,6 +14,12 @@
 
 import type { ResolutionMode } from '../types.js';
 
+/**
+ * Public option shape for `executeGraph` — the language-neutral surface shared
+ * by the orchestrator (`graph.ts`) and the mode helpers (`graph-modes.ts`).
+ * Programmatic callers and tests construct this directly; the CLI builds it
+ * from parsed Commander flags.
+ */
 export interface GraphCommandOptions {
   readonly cwd: string;
   readonly json?: boolean;

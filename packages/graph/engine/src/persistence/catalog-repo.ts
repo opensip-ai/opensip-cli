@@ -41,6 +41,13 @@ interface CatalogRowPayload {
   readonly functions: Catalog['functions'];
 }
 
+/**
+ * SQLite/Drizzle-backed repository for the graph catalog and its per-shard
+ * fragments. Owns the `graph_catalog` row plus the `graph_shard_fragment`
+ * table; all reads/writes are synchronous (better-sqlite3). The orchestrator
+ * uses it to persist whole catalogs and incremental shard fragments, and to
+ * fingerprint-match for cache validity without parsing the full payload.
+ */
 export class CatalogRepo {
   constructor(private readonly datastore: DataStore) {}
 

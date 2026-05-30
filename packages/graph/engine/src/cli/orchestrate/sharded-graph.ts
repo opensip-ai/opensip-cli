@@ -25,6 +25,11 @@ import type { GraphLanguageAdapter } from '../../lang-adapter/types.js';
 import type { CatalogRepo } from '../../persistence/catalog-repo.js';
 import type { Catalog, GraphConfig, Indexes, ResolutionMode, ResolutionStats, Rule } from '../../types.js';
 
+/**
+ * Input to {@link runShardedGraph}: the planned shards plus the shared build
+ * context (project root, worker entry script, language adapter, resolution
+ * tier, cache/persistence handles, and optional rules/config overrides).
+ */
 export interface RunShardedInput {
   readonly shards: readonly Shard[];
   /** Common project root — every fragment's filePaths resolve against it. */
@@ -40,6 +45,12 @@ export interface RunShardedInput {
   readonly rules?: readonly Rule[];
 }
 
+/**
+ * Result of {@link runShardedGraph}: the unified catalog and derived indexes,
+ * the rule signals evaluated over it, cross-shard resolution stats, and
+ * cache/failure metadata (whether every shard was a cache hit, and the ids of
+ * any shards whose worker failed).
+ */
 export interface RunShardedResult {
   readonly catalog: Catalog;
   readonly indexes: Indexes;
@@ -84,7 +95,9 @@ export async function runShardedGraph(input: RunShardedInput): Promise<RunSharde
   // 4. Persist: each rebuilt shard's fragment, prune removed shards, and the
   //    unified full catalog (so whole-catalog consumers still work).
   if (useCache && catalogRepo) {
+    // @fitness-ignore-next-line detached-promises -- CatalogRepo is synchronous (better-sqlite3/Drizzle); upsertShardFragment returns void, not a Promise.
     for (const fragment of built.fragments) catalogRepo.upsertShardFragment(fragment);
+    // @fitness-ignore-next-line detached-promises -- CatalogRepo is synchronous (better-sqlite3/Drizzle); pruneShardFragmentsExcept returns void, not a Promise.
     catalogRepo.pruneShardFragmentsExcept(shards.map((s) => s.id));
     try {
       catalogRepo.replaceAll(catalog);
@@ -107,7 +120,10 @@ export async function runShardedGraph(input: RunShardedInput): Promise<RunSharde
   const config: GraphConfig = input.config ?? {};
   const signals: Signal[] = [];
   for (const rule of ruleSet) {
-    signals.push(...rule.evaluate(catalog, indexes, config, adapter.ruleHints));
+    // Indexed append rather than spread-in-loop — avoids re-allocating the
+    // accumulator on every rule (O(n²)) over a potentially large rule set.
+    const ruleSignals = rule.evaluate(catalog, indexes, config, adapter.ruleHints);
+    for (const signal of ruleSignals) signals.push(signal);
   }
 
   return {

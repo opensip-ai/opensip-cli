@@ -18,7 +18,7 @@ import {
   type SummaryOptions,
   type FitDoneResult,
 } from '@opensip-tools/contracts';
-import { generatePrefixedId, logger } from '@opensip-tools/core';
+import { formatDuration, generatePrefixedId, logger } from '@opensip-tools/core';
 import { SessionRepo } from '@opensip-tools/session-store';
 
 import { buildFitnessSessionPayload } from '../../persistence/session-payload.js';
@@ -35,11 +35,9 @@ import type { DataStore } from '@opensip-tools/datastore';
 // Formatting helpers (used to build TableRow data)
 // ---------------------------------------------------------------------------
 
-/** Formats a millisecond duration as "Xms" under 1s, "X.Ys" otherwise. */
-export function formatDuration(ms: number): string {
-  if (ms < 1000) return `${ms}ms`;
-  return `${(ms / 1000).toFixed(1)}s`;
-}
+// `formatDuration` now lives in `@opensip-tools/core` (shared across tools);
+// imported above for the table builders below. Fitness's public re-export of
+// it is sourced straight from core in `cli/fit.ts`.
 
 /** Renders a "validated" table column showing item count with singular/plural noun. */
 export function formatValidatedColumn(totalItems: number | undefined, itemType = 'items'): string {
