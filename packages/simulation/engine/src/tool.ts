@@ -6,9 +6,7 @@
  * surface, JSON/Ink dispatch, and dashboard auto-open hook.
  */
 
-/* eslint-disable sonarjs/deprecation -- intentional adapter usage; sim's tool.ts bridges per-command ToolOptions to executeSim's legacy CliArgs shape via toolOptsToCliArgs */
-import { EXIT_CODES, type CliArgs, type CliProgram, type ToolOptions } from '@opensip-tools/contracts';
-/* eslint-enable sonarjs/deprecation */
+import { EXIT_CODES, type CliProgram, type ToolOptions } from '@opensip-tools/contracts';
 import { readPackageVersion } from '@opensip-tools/core';
 
 import { executeSim } from './cli/sim.js';
@@ -25,26 +23,6 @@ const SIM: ToolCommandDescriptor = {
   name: 'sim',
   description: 'Run simulation scenarios [experimental]',
 };
-
-function toolOptsToCliArgs(
-  command: string,
-  opts: ToolOptions & { recipe?: string; kind?: string },
-  // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
-): CliArgs {
-  return {
-    command,
-    json: opts.json,
-    cwd: opts.cwd,
-    help: false,
-    list: false,
-    listRecipes: false,
-    verbose: false,
-    exclude: [],
-    findings: false,
-    ...(opts.recipe ? { recipe: opts.recipe } : {}),
-    ...(opts.kind ? { kind: opts.kind } : {}),
-  };
-}
 
 function register(cli: ToolCliContext): void {
   // `CliProgram` is contracts' alias for commander's `Command` —
@@ -66,10 +44,9 @@ function register(cli: ToolCliContext): void {
       async (
         opts: ToolOptions & { recipe?: string; quiet?: boolean; open?: boolean; kind?: string },
       ) => {
-        const args = toolOptsToCliArgs('sim', opts);
-        const { result } = await executeSim(args);
+        const { result } = await executeSim(opts);
 
-        if (args.json) {
+        if (opts.json) {
           if (result.type === 'error') {
             cli.setExitCode(result.exitCode);
             cli.emitJson({ error: result.message });
@@ -91,7 +68,7 @@ function register(cli: ToolCliContext): void {
 
         await cli.maybeOpenDashboard({
           openRequested: Boolean(opts.open),
-          jsonOutput: Boolean(args.json),
+          jsonOutput: Boolean(opts.json),
         });
       },
     );

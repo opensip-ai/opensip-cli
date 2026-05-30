@@ -43,20 +43,16 @@
  */
 
 
-/* eslint-disable sonarjs/deprecation -- intentional adapter usage; tool.ts bridges per-command FitOptions/ToolOptions to executeFit's legacy CliArgs shape via fitOptsToCliArgs / toolOptsToCliArgs */
 import {
-  type CliArgs,
   type CliProgram,
   type FitOptions,
   type ToolOptions,
 } from '@opensip-tools/contracts';
-/* eslint-enable sonarjs/deprecation */
 import { readPackageVersion } from '@opensip-tools/core';
 
 import { exportFitBaseline } from './cli/baseline-export.js';
 import { collectFitnessDashboardData } from './cli/dashboard.js';
 import {
-  fitOptsToCliArgs,
   runGateMode,
   runJsonMode,
   runListMode,
@@ -131,8 +127,7 @@ function register(cli: ToolCliContext): void {
   // lookup handshake is gone — adding a fourth tool with a live view
   // requires zero CLI edits.
   cli.registerLiveView(FIT_LIVE_VIEW_KEY, async (args) => {
-    // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
-    await renderFitLive(args as CliArgs, cli.scope.datastore() as DataStore | undefined, {
+    await renderFitLive(args as FitOptions, cli.scope.datastore() as DataStore | undefined, {
       setExitCode: cli.setExitCode,
     });
   });
@@ -171,26 +166,24 @@ function registerFitCommand(program: CliProgram, cli: ToolCliContext): void {
     .option('--debug', 'Enable debug mode for structured log output', false)
     .option('--gate-save', 'Architecture-gate: save current findings as baseline in the project SQLite store (mutually exclusive with --gate-compare)', false)
     .option('--gate-compare', 'Architecture-gate: compare current findings against the saved baseline; exit 1 on regression', false)
-    .action(async (opts: FitOptions & { quiet?: boolean; open?: boolean }) => {
-      const args = fitOptsToCliArgs(opts);
-
-      if (args.gateSave === true || args.gateCompare === true) {
-        await runGateMode(args, cli);
+    .action(async (opts: FitOptions) => {
+      if (opts.gateSave === true || opts.gateCompare === true) {
+        await runGateMode(opts, cli);
         return;
       }
-      if (args.list) {
-        await runListMode(args, cli);
+      if (opts.list) {
+        await runListMode(opts, cli);
         return;
       }
-      if (args.listRecipes) {
-        await runRecipesMode(args, cli);
+      if (opts.recipes) {
+        await runRecipesMode(opts, cli);
         return;
       }
-      if (args.json) {
-        await runJsonMode(args, cli);
+      if (opts.json) {
+        await runJsonMode(opts, cli);
         return;
       }
-      await runLiveMode(args, cli, FIT_LIVE_VIEW_KEY, opts.open === true);
+      await runLiveMode(opts, cli, FIT_LIVE_VIEW_KEY, opts.open === true);
     });
 }
 

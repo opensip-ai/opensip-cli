@@ -274,9 +274,9 @@ describe('registerInit — action body', () => {
     await program.parseAsync(['init'], { from: 'user' });
     expect(executeInit).toHaveBeenCalledTimes(1);
     const callArgs = vi.mocked(executeInit).mock.calls[0]?.[0] as {
-      command: string; cwd: string; cwdExplicit: boolean; language?: string;
+      cwd: string; cwdExplicit: boolean; json: boolean; language?: string;
     };
-    expect(callArgs.command).toBe('init');
+    expect(callArgs.json).toBe(false);
     expect(callArgs.cwdExplicit).toBe(false);
     expect(rendered).toHaveLength(1);
   });

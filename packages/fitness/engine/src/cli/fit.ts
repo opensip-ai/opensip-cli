@@ -35,8 +35,7 @@ import { runRecipeOrAdHoc, selectRecipe } from './fit/recipe-selector.js';
 import { buildCliOutput, buildFitCallbacks, buildFitDoneResult, persistFitSession } from './fit/result-builders.js';
 
 import type {
-  // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
-  CliArgs,
+  FitOptions,
   CliOutput,
   FitDoneResult,
   ErrorResult,
@@ -108,8 +107,7 @@ export interface ExecuteFitOptions {
  * ordering here is the contract that lets those reads be safe.
  */
 export async function executeFit(
-  // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
-  args: CliArgs,
+  args: FitOptions,
   opts: ExecuteFitOptions = {},
 ): Promise<{ result: FitDoneResult; output: CliOutput } | { result: ErrorResult; output?: undefined }> {
   logger.info({ evt: 'cli.checks.loading', module: 'cli:fit' });

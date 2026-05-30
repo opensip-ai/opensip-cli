@@ -39,23 +39,7 @@ export function registerInit(program: Command, ctx: CliCommandsContext): void {
       // 'default' otherwise. The escape hatch for `init --cwd .` from
       // a subdir of an existing project hangs off this.
       const cwdExplicit = cmd.getOptionValueSource('cwd') === 'cli';
-      const args = {
-        command: 'init',
-        json: opts.json,
-        cwd: opts.cwd,
-        help: false,
-        list: false,
-        listRecipes: false,
-        verbose: false,
-        exclude: [],
-        findings: false,
-        language: opts.language,
-        keep: opts.keep,
-        remove: opts.remove,
-        projectContext: opts.projectContext,
-        cwdExplicit,
-      };
-      const result = executeInit(args);
+      const result = executeInit({ ...opts, cwdExplicit });
       // Exit 2 for any non-success path that the user can act on:
       // ambiguous-language detection, partial-state refusal, mutex flag
       // error, inside-existing-project refusal.

@@ -39,8 +39,7 @@ import { SCENARIO_KINDS } from '../types/kind-types.js';
 import type { RunnableScenario } from '../framework/runnable-scenario.js';
 import type { SimPluginExports } from '../plugins/types.js';
 import type { ScenarioKind } from '../types/kind-types.js';
-// eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; executeSim consumes the CliArgs shape produced by toolOptsToCliArgs in sim's tool.ts until the rip-out
-import type { CliArgs, ErrorResult, SimDoneResult } from '@opensip-tools/contracts';
+import type { ErrorResult, SimDoneResult, ToolOptions } from '@opensip-tools/contracts';
 
 const VALID_KINDS = new Set<ScenarioKind>(SCENARIO_KINDS);
 
@@ -282,8 +281,7 @@ export async function loadDiscoveredScenarioPackages(projectDir: string): Promis
  * recipe is missing). The caller decides what to print or render.
  */
 export async function executeSim(
-  // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
-  args: CliArgs,
+  args: ToolOptions,
 ): Promise<{ result: SimDoneResult | ErrorResult }> {
   // Lifecycle: load .mjs plugins + scenario packages before the recipe
   // registry is read. Idempotent per project dir.

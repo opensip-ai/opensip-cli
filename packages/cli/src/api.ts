@@ -20,7 +20,6 @@ export type {
   TableRow,
   SummaryOptions,
   CommandResult,
-  CliArgs,
   FitOptions,
   InitOptions,
   ToolOptions,

@@ -13,8 +13,7 @@
 import {
   SessionRepo,
   passRate,
-  // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
-  type CliArgs,
+  type FitOptions,
   type CliOutput,
   type TableRow,
   type SummaryOptions,
@@ -111,8 +110,7 @@ export function buildCliOutput(
 
 /** Input bundle for {@link buildFitDoneResult}: CLI args, recipe result, and signaler config. */
 export interface BuildFitDoneArgs {
-  // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
-  args: CliArgs;
+  args: FitOptions;
   fitnessResult: FitnessRecipeResult;
   signalersConfig: SignalersConfig;
   recipeName: string | undefined;
@@ -253,8 +251,7 @@ export function buildFitCallbacks(
  */
 export function persistFitSession(
   datastore: DataStore,
-  // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
-  args: CliArgs,
+  args: FitOptions,
   output: CliOutput,
 ): void {
   try {

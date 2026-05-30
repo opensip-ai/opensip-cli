@@ -74,8 +74,7 @@ import { resolveLanguages } from './init/language-detection.js';
 import { runScaffold } from './init/scaffold-writer.js';
 import { buildPartialStateMessage, classifyWorkingDir, formatInsideExistingProjectMessage } from './init/state-machine.js';
 
-// eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs is the bridge type for the legacy executeInit signature until the per-command type rip-out
-import type { CliArgs, InitResult } from '@opensip-tools/contracts';
+import type { InitOptions, InitResult } from '@opensip-tools/contracts';
 
 // Re-export the public API of `init` so existing imports (notably the
 // test suite) continue to resolve through `commands/init.js`.
@@ -86,8 +85,7 @@ export type { SupportedLanguage } from './init/language-detection.js';
  * Run init for the given args. Returns an InitResult — the caller
  * (CLI render layer) prints it.
  */
-// eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge type
-export function executeInit(args: CliArgs & { language?: string; keep?: boolean; remove?: boolean; projectContext?: ProjectContext; cwdExplicit?: boolean }): InitResult {
+export function executeInit(args: InitOptions & { projectContext?: ProjectContext; cwdExplicit?: boolean }): InitResult {
   const cwd = args.cwd;
   const keep = args.keep === true;
   const remove = args.remove === true;

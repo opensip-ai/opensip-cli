@@ -14,8 +14,7 @@ import { loadSignalersConfig } from '../../signalers/index.js';
 import { loadTargetsConfig } from '../../targets/index.js';
 
 import type { SignalersConfig } from '../../signalers/types.js';
-// eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
-import type { CliArgs, ErrorResult } from '@opensip-tools/contracts';
+import type { ErrorResult, FitOptions } from '@opensip-tools/contracts';
 
 export interface LoadedFitConfig {
   signalersConfig: SignalersConfig;
@@ -31,8 +30,7 @@ export interface LoadedFitConfig {
  * silently produce zero findings).
  */
 export function loadFitConfig(
-  // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
-  args: CliArgs,
+  args: FitOptions,
 ): LoadedFitConfig | { error: ErrorResult } {
   try {
     const signalersConfig = loadSignalersConfig(args.cwd, args.config);

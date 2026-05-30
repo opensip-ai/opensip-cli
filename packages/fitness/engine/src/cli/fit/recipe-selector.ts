@@ -13,8 +13,7 @@ import { defaultRecipeRegistry } from '../../recipes/registry.js';
 import { FitnessRecipeService } from '../../recipes/service.js';
 
 import type { FitnessRecipeResult } from '../../recipes/types.js';
-// eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
-import type { CliArgs, ErrorResult } from '@opensip-tools/contracts';
+import type { ErrorResult, FitOptions } from '@opensip-tools/contracts';
 
 /**
  * Decide which recipe to execute. `--check` and `--tags` each create an
@@ -29,8 +28,7 @@ import type { CliArgs, ErrorResult } from '@opensip-tools/contracts';
  * lines silently breaks recipe lookup for plugin-provided recipes.
  */
 export function selectRecipe(
-  // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
-  args: CliArgs,
+  args: FitOptions,
 ): { recipeName: string | undefined } | { error: ErrorResult } {
   const useAdHoc = args.check != null || args.tags != null;
   const recipeName = useAdHoc ? undefined : (args.recipe ?? 'default');
@@ -56,8 +54,7 @@ export function selectRecipe(
  */
 export async function runRecipeOrAdHoc(
   service: FitnessRecipeService,
-  // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
-  args: CliArgs,
+  args: FitOptions,
   recipeName: string | undefined,
 ): Promise<FitnessRecipeResult | { error: ErrorResult }> {
   try {
