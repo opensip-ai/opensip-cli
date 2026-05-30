@@ -1,0 +1,597 @@
+{
+  "version": "3.0",
+  "tool": "graph",
+  "language": "typescript",
+  "builtAt": "2026-05-30T00:00:00.000Z",
+  "functions": {
+    "fn0": [
+      {
+        "bodyHash": "h00",
+        "simpleName": "fn0",
+        "qualifiedName": "pkg/mod.fn0",
+        "filePath": "packages/core/src/file0.ts",
+        "line": 1,
+        "column": 0,
+        "endLine": 10,
+        "kind": "function-declaration",
+        "params": [],
+        "returnType": null,
+        "enclosingClass": null,
+        "decorators": [],
+        "visibility": "exported",
+        "inTestFile": true,
+        "definedInGenerated": false,
+        "calls": []
+      }
+    ],
+    "fn1": [
+      {
+        "bodyHash": "h01",
+        "simpleName": "fn1",
+        "qualifiedName": "pkg/mod.fn1",
+        "filePath": "packages/fit/src/file1.ts",
+        "line": 2,
+        "column": 0,
+        "endLine": 11,
+        "kind": "function-expression",
+        "params": [],
+        "returnType": null,
+        "enclosingClass": null,
+        "decorators": [],
+        "visibility": "module-local",
+        "inTestFile": false,
+        "definedInGenerated": false,
+        "calls": [
+          {
+            "to": [
+              "h02",
+              "h03"
+            ],
+            "line": 1,
+            "column": 0,
+            "resolution": "method-dispatch",
+            "confidence": "medium",
+            "text": "call"
+          }
+        ]
+      }
+    ],
+    "fn2": [
+      {
+        "bodyHash": "h02",
+        "simpleName": "fn2",
+        "qualifiedName": "pkg/mod.fn2",
+        "filePath": "packages/graph/src/file2.ts",
+        "line": 3,
+        "column": 0,
+        "endLine": 12,
+        "kind": "arrow",
+        "params": [],
+        "returnType": null,
+        "enclosingClass": null,
+        "decorators": [],
+        "visibility": "private",
+        "inTestFile": false,
+        "definedInGenerated": false,
+        "calls": [
+          {
+            "to": [
+              "h04"
+            ],
+            "line": 1,
+            "column": 0,
+            "resolution": "jsx",
+            "confidence": "low",
+            "text": "call"
+          }
+        ]
+      }
+    ],
+    "fn3": [
+      {
+        "bodyHash": "h03",
+        "simpleName": "fn3",
+        "qualifiedName": "pkg/mod.fn3",
+        "filePath": "packages/core/src/file3.ts",
+        "line": 4,
+        "column": 0,
+        "endLine": 13,
+        "kind": "method",
+        "params": [],
+        "returnType": null,
+        "enclosingClass": null,
+        "decorators": [],
+        "visibility": "exported",
+        "inTestFile": false,
+        "definedInGenerated": false,
+        "calls": [
+          {
+            "to": [
+              "h04"
+            ],
+            "line": 1,
+            "column": 0,
+            "resolution": "constructor",
+            "confidence": "high",
+            "text": "call"
+          }
+        ]
+      }
+    ],
+    "fn4": [
+      {
+        "bodyHash": "h04",
+        "simpleName": "fn4",
+        "qualifiedName": "pkg/mod.fn4",
+        "filePath": "packages/fit/src/file4.ts",
+        "line": 5,
+        "column": 0,
+        "endLine": 14,
+        "kind": "constructor",
+        "params": [],
+        "returnType": null,
+        "enclosingClass": null,
+        "decorators": [],
+        "visibility": "module-local",
+        "inTestFile": false,
+        "definedInGenerated": false,
+        "calls": [
+          {
+            "to": [
+              "h00",
+              "hZZ_external"
+            ],
+            "line": 1,
+            "column": 0,
+            "resolution": "unknown",
+            "confidence": "medium",
+            "text": "call"
+          }
+        ]
+      }
+    ],
+    "fn5": [
+      {
+        "bodyHash": "h05",
+        "simpleName": "fn5",
+        "qualifiedName": "pkg/mod.fn5",
+        "filePath": "packages/graph/src/file5.ts",
+        "line": 6,
+        "column": 0,
+        "endLine": 15,
+        "kind": "getter",
+        "params": [],
+        "returnType": null,
+        "enclosingClass": null,
+        "decorators": [],
+        "visibility": "private",
+        "inTestFile": true,
+        "definedInGenerated": false,
+        "calls": [
+          {
+            "to": [
+              "h06"
+            ],
+            "line": 1,
+            "column": 0,
+            "resolution": "dynamic-string",
+            "confidence": "low",
+            "text": "call"
+          }
+        ]
+      }
+    ],
+    "fn6": [
+      {
+        "bodyHash": "h06",
+        "simpleName": "fn6",
+        "qualifiedName": "pkg/mod.fn6",
+        "filePath": "packages/core/src/file6.ts",
+        "line": 7,
+        "column": 0,
+        "endLine": 16,
+        "kind": "setter",
+        "params": [],
+        "returnType": null,
+        "enclosingClass": null,
+        "decorators": [],
+        "visibility": "exported",
+        "inTestFile": false,
+        "definedInGenerated": false,
+        "calls": [
+          {
+            "to": [
+              "h07"
+            ],
+            "line": 1,
+            "column": 0,
+            "resolution": "syntactic",
+            "confidence": "high",
+            "text": "call"
+          }
+        ]
+      }
+    ],
+    "fn7": [
+      {
+        "bodyHash": "h07",
+        "simpleName": "fn7",
+        "qualifiedName": "pkg/mod.fn7",
+        "filePath": "packages/fit/src/file7.ts",
+        "line": 8,
+        "column": 0,
+        "endLine": 17,
+        "kind": "module-init",
+        "params": [],
+        "returnType": null,
+        "enclosingClass": null,
+        "decorators": [],
+        "visibility": "module-local",
+        "inTestFile": false,
+        "definedInGenerated": false,
+        "calls": [
+          {
+            "to": [
+              "h05"
+            ],
+            "line": 1,
+            "column": 0,
+            "resolution": "static",
+            "confidence": "medium",
+            "text": "call"
+          }
+        ]
+      }
+    ],
+    "fn8": [
+      {
+        "bodyHash": "h08",
+        "simpleName": "fn8",
+        "qualifiedName": "pkg/mod.fn8",
+        "filePath": "packages/graph/src/file8.ts",
+        "line": 9,
+        "column": 0,
+        "endLine": 18,
+        "kind": "function-declaration",
+        "params": [],
+        "returnType": null,
+        "enclosingClass": null,
+        "decorators": [],
+        "visibility": "private",
+        "inTestFile": false,
+        "definedInGenerated": false,
+        "calls": [
+          {
+            "to": [
+              "h01"
+            ],
+            "line": 1,
+            "column": 0,
+            "resolution": "method-dispatch",
+            "confidence": "low",
+            "text": "call"
+          }
+        ]
+      }
+    ],
+    "fn9": [
+      {
+        "bodyHash": "h09",
+        "simpleName": "fn9",
+        "qualifiedName": "pkg/mod.fn9",
+        "filePath": "packages/core/src/file9.ts",
+        "line": 10,
+        "column": 0,
+        "endLine": 19,
+        "kind": "function-expression",
+        "params": [],
+        "returnType": null,
+        "enclosingClass": null,
+        "decorators": [],
+        "visibility": "exported",
+        "inTestFile": false,
+        "definedInGenerated": false,
+        "calls": [
+          {
+            "to": [
+              "h01"
+            ],
+            "line": 1,
+            "column": 0,
+            "resolution": "jsx",
+            "confidence": "high",
+            "text": "call"
+          }
+        ]
+      }
+    ],
+    "fn10": [
+      {
+        "bodyHash": "h10",
+        "simpleName": "fn10",
+        "qualifiedName": "pkg/mod.fn10",
+        "filePath": "packages/fit/src/file10.ts",
+        "line": 11,
+        "column": 0,
+        "endLine": 20,
+        "kind": "arrow",
+        "params": [],
+        "returnType": null,
+        "enclosingClass": null,
+        "decorators": [],
+        "visibility": "module-local",
+        "inTestFile": true,
+        "definedInGenerated": false,
+        "calls": [
+          {
+            "to": [
+              "h00"
+            ],
+            "line": 1,
+            "column": 0,
+            "resolution": "constructor",
+            "confidence": "medium",
+            "text": "call"
+          }
+        ]
+      }
+    ],
+    "fn11": [
+      {
+        "bodyHash": "h11",
+        "simpleName": "fn11",
+        "qualifiedName": "pkg/mod.fn11",
+        "filePath": "packages/graph/src/file11.ts",
+        "line": 12,
+        "column": 0,
+        "endLine": 21,
+        "kind": "method",
+        "params": [],
+        "returnType": null,
+        "enclosingClass": null,
+        "decorators": [],
+        "visibility": "private",
+        "inTestFile": false,
+        "definedInGenerated": false,
+        "calls": [
+          {
+            "to": [
+              "h00"
+            ],
+            "line": 1,
+            "column": 0,
+            "resolution": "unknown",
+            "confidence": "low",
+            "text": "call"
+          }
+        ]
+      }
+    ],
+    "fn12": [
+      {
+        "bodyHash": "h12",
+        "simpleName": "fn12",
+        "qualifiedName": "pkg/mod.fn12",
+        "filePath": "packages/core/src/file12.ts",
+        "line": 13,
+        "column": 0,
+        "endLine": 22,
+        "kind": "constructor",
+        "params": [],
+        "returnType": null,
+        "enclosingClass": null,
+        "decorators": [],
+        "visibility": "exported",
+        "inTestFile": false,
+        "definedInGenerated": false,
+        "calls": [
+          {
+            "to": [
+              "h00"
+            ],
+            "line": 1,
+            "column": 0,
+            "resolution": "dynamic-string",
+            "confidence": "high",
+            "text": "call"
+          }
+        ]
+      }
+    ],
+    "fn13": [
+      {
+        "bodyHash": "h13",
+        "simpleName": "fn13",
+        "qualifiedName": "pkg/mod.fn13",
+        "filePath": "packages/fit/src/file13.ts",
+        "line": 14,
+        "column": 0,
+        "endLine": 23,
+        "kind": "getter",
+        "params": [],
+        "returnType": null,
+        "enclosingClass": null,
+        "decorators": [],
+        "visibility": "module-local",
+        "inTestFile": false,
+        "definedInGenerated": false,
+        "calls": [
+          {
+            "to": [
+              "h00"
+            ],
+            "line": 1,
+            "column": 0,
+            "resolution": "syntactic",
+            "confidence": "medium",
+            "text": "call"
+          }
+        ]
+      }
+    ],
+    "fn14": [
+      {
+        "bodyHash": "h14",
+        "simpleName": "fn14",
+        "qualifiedName": "pkg/mod.fn14",
+        "filePath": "packages/graph/src/file14.ts",
+        "line": 15,
+        "column": 0,
+        "endLine": 24,
+        "kind": "setter",
+        "params": [],
+        "returnType": null,
+        "enclosingClass": null,
+        "decorators": [],
+        "visibility": "private",
+        "inTestFile": false,
+        "definedInGenerated": false,
+        "calls": [
+          {
+            "to": [
+              "h00"
+            ],
+            "line": 1,
+            "column": 0,
+            "resolution": "static",
+            "confidence": "low",
+            "text": "call"
+          }
+        ]
+      }
+    ],
+    "fn15": [
+      {
+        "bodyHash": "h15",
+        "simpleName": "fn15",
+        "qualifiedName": "pkg/mod.fn15",
+        "filePath": "packages/core/src/file15.ts",
+        "line": 16,
+        "column": 0,
+        "endLine": 25,
+        "kind": "module-init",
+        "params": [],
+        "returnType": null,
+        "enclosingClass": null,
+        "decorators": [],
+        "visibility": "exported",
+        "inTestFile": true,
+        "definedInGenerated": false,
+        "calls": [
+          {
+            "to": [
+              "h00"
+            ],
+            "line": 1,
+            "column": 0,
+            "resolution": "method-dispatch",
+            "confidence": "high",
+            "text": "call"
+          }
+        ]
+      }
+    ],
+    "fn16": [
+      {
+        "bodyHash": "h16",
+        "simpleName": "fn16",
+        "qualifiedName": "pkg/mod.fn16",
+        "filePath": "packages/fit/src/file16.ts",
+        "line": 17,
+        "column": 0,
+        "endLine": 26,
+        "kind": "function-declaration",
+        "params": [],
+        "returnType": null,
+        "enclosingClass": null,
+        "decorators": [],
+        "visibility": "module-local",
+        "inTestFile": false,
+        "definedInGenerated": false,
+        "calls": [
+          {
+            "to": [
+              "h00"
+            ],
+            "line": 1,
+            "column": 0,
+            "resolution": "jsx",
+            "confidence": "medium",
+            "text": "call"
+          }
+        ]
+      }
+    ],
+    "fn17": [
+      {
+        "bodyHash": "h17",
+        "simpleName": "fn17",
+        "qualifiedName": "pkg/mod.fn17",
+        "filePath": "packages/graph/src/file17.ts",
+        "line": 18,
+        "column": 0,
+        "endLine": 27,
+        "kind": "function-expression",
+        "params": [],
+        "returnType": null,
+        "enclosingClass": null,
+        "decorators": [],
+        "visibility": "private",
+        "inTestFile": false,
+        "definedInGenerated": false,
+        "calls": [
+          {
+            "to": [
+              "h00"
+            ],
+            "line": 1,
+            "column": 0,
+            "resolution": "constructor",
+            "confidence": "low",
+            "text": "call"
+          }
+        ]
+      }
+    ],
+    "fn18": [
+      {
+        "bodyHash": "h18",
+        "simpleName": "fn18",
+        "qualifiedName": "pkg/mod.fn18",
+        "filePath": "packages/core/src/file18.ts",
+        "line": 19,
+        "column": 0,
+        "endLine": 28,
+        "kind": "arrow",
+        "params": [],
+        "returnType": null,
+        "enclosingClass": null,
+        "decorators": [],
+        "visibility": "exported",
+        "inTestFile": false,
+        "definedInGenerated": false,
+        "calls": []
+      }
+    ],
+    "fn19": [
+      {
+        "bodyHash": "h19",
+        "simpleName": "fn19",
+        "qualifiedName": "pkg/mod.fn19",
+        "filePath": "packages/fit/src/file19.ts",
+        "line": 20,
+        "column": 0,
+        "endLine": 29,
+        "kind": "method",
+        "params": [],
+        "returnType": null,
+        "enclosingClass": null,
+        "decorators": [],
+        "visibility": "module-local",
+        "inTestFile": false,
+        "definedInGenerated": false,
+        "calls": []
+      }
+    ]
+  }
+}

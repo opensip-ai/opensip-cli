@@ -53,6 +53,27 @@ export function dashboardCssCodePaths(): string {
 .code-paths-view .data-table td,
 .code-paths-view .data-table th { white-space: normal; word-break: break-all; overflow-wrap: anywhere; vertical-align: top; }
 
+/* ====== Code Paths Graph view (Cytoscape) ====== */
+.code-paths-graph-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+.code-paths-graph-toolbar-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+.code-paths-graph-layout-btn { font-size: 12px; padding: 4px 10px; border-radius: var(--radius-sm); cursor: pointer; background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-muted); font-family: var(--font); user-select: none; }
+.code-paths-graph-layout-btn:hover { background: var(--bg-hover); color: var(--text); }
+.code-paths-graph-layout-btn.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+.code-paths-graph-banner { font-size: 12px; color: var(--text-muted); background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 10px; margin-bottom: 10px; }
+.code-paths-graph-search { width: 320px; margin-bottom: 10px; display: block; }
+.code-paths-graph-canvas { width: 100%; height: 640px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+/* Node highlight + impact states live on the Cytoscape canvas (set via cy
+   classes gv-search-hit / gv-search-fade / gv-selected / gv-upstream /
+   gv-downstream / gv-dimmed). The canvas can't read CSS custom properties,
+   so the authoritative colors are inline in view-graph.ts's stylesheet;
+   these DOM classes mirror the naming for any future DOM overlay. */
+.search-hit { outline: 2px solid var(--accent); }
+.search-fade { opacity: 0.3; }
+.gv-selected { outline: 2px solid var(--accent); }
+.gv-upstream { color: var(--accent-sim); }
+.gv-downstream { color: var(--accent-fitness); }
+.gv-dimmed { opacity: 0.1; }
+
 /* Coupling heat map cell shading — set --coupling-density per cell */
 .coupling-cell { background: color-mix(in srgb, var(--bg-surface), var(--accent) calc(var(--coupling-density, 0) * 60%)); cursor: pointer; }
 .coupling-cell.empty { color: var(--text-dim); cursor: default; }

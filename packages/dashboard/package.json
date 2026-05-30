@@ -19,9 +19,10 @@
     ".": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/copy-vendor.mjs",
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit",
+    "vendor:cytoscape": "node scripts/vendor-cytoscape.mjs",
     "clean": "rm -rf dist"
   },
   "dependencies": {
@@ -29,6 +30,8 @@
   },
   "devDependencies": {
     "@types/node": "^22.19.19",
+    "cytoscape": "3.33.4",
+    "cytoscape-dagre": "3.0.0",
     "jsdom": "^29.1.1",
     "typescript": "~6.0.3",
     "vitest": "^4.1.7"

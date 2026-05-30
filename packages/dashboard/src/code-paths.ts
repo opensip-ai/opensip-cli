@@ -19,6 +19,7 @@
  * from the graph engine's runtime types).
  */
 
+import { dashboardCytoscapeVendorJs } from './code-paths/cytoscape-vendor.js';
 import { dashboardEditorLinkJs } from './code-paths/editor-link.js';
 import { dashboardFiltersJs } from './code-paths/filters.js';
 import { dashboardFunctionCardJs } from './code-paths/function-card.js';
@@ -31,6 +32,7 @@ import { dashboardSearchJs } from './code-paths/search.js';
 import { dashboardTraceJs } from './code-paths/trace.js';
 import { dashboardViewBigJs } from './code-paths/view-big.js';
 import { dashboardViewCouplingJs } from './code-paths/view-coupling.js';
+import { dashboardViewGraphJs } from './code-paths/view-graph.js';
 import { dashboardViewHotJs } from './code-paths/view-hot.js';
 import { dashboardViewSccsJs } from './code-paths/view-sccs.js';
 import { dashboardViewSearchJs } from './code-paths/view-search.js';
@@ -79,6 +81,10 @@ import { dashboardViewsRegistryJs } from './code-paths/views-registry.js';
  */
 export function dashboardCodePathsJs(): string {
   return [
+    // 0. cytoscape vendor — defines the `cytoscape` / `cytoscapeDagre`
+    //    browser globals the Graph view consumes. MUST precede any view
+    //    emitter that references them. No deps of its own.
+    dashboardCytoscapeVendorJs(),
     dashboardPathUtilsJs(),
     dashboardIndexesJs(),
     dashboardFiltersJs(),
@@ -97,6 +103,7 @@ export function dashboardCodePathsJs(): string {
     dashboardViewUntestedJs(),
     dashboardViewSccsJs(),
     dashboardViewSearchJs(),
+    dashboardViewGraphJs(),
     panelOrchestratorJs(),
   ].join('\n');
 }
