@@ -14,8 +14,9 @@
 import { logger } from '@opensip-tools/core';
 import { sql } from 'drizzle-orm';
 
-import { graphCatalog } from './schema.js';
+import { graphCatalog, graphShardFragment } from './schema.js';
 
+import type { ShardBuildResult } from '../cli/orchestrate/shard-model.js';
 import type { Catalog, ResolutionMode } from '../types.js';
 import type { GraphCatalog } from '@opensip-tools/contracts';
 import type { DataStore } from '@opensip-tools/datastore';
@@ -172,5 +173,74 @@ export class CatalogRepo {
       .limit(1)
       .get();
     return row !== undefined;
+  }
+
+  // ── Per-shard fragment cache (plan #2 — sharded build) ──────────
+
+  /**
+   * Persist one shard's `ShardBuildResult`, replacing any prior row for
+   * the same shard id. The validity keys (`cache_key`, `shard_fingerprint`)
+   * are lifted from the result so a reuse check needs no payload parse.
+   */
+  upsertShardFragment(result: ShardBuildResult): void {
+    this.datastore.db
+      .insert(graphShardFragment)
+      .values({
+        shardId: result.shardId,
+        language: result.fragment.language,
+        cacheKey: result.fragment.cacheKey,
+        shardFingerprint: result.fingerprint,
+        payload: result,
+      })
+      .onConflictDoUpdate({
+        target: graphShardFragment.shardId,
+        set: {
+          language: sql`excluded.language`,
+          cacheKey: sql`excluded.cache_key`,
+          shardFingerprint: sql`excluded.shard_fingerprint`,
+          payload: sql`excluded.payload`,
+        },
+      })
+      .run();
+  }
+
+  /**
+   * Load a shard fragment ONLY if it is still valid — both the shard's
+   * cache key (tsconfig/version/mode) and its files fingerprint must match
+   * the current run. Returns `null` on miss or staleness, signalling the
+   * orchestrator to re-run that shard's worker. No parse happens here
+   * beyond the JSON payload of a single valid shard.
+   */
+  loadValidShardFragment(
+    shardId: string,
+    expectedCacheKey: string,
+    expectedFingerprint: string,
+  ): ShardBuildResult | null {
+    const row = this.datastore.db
+      .select()
+      .from(graphShardFragment)
+      .where(sql`shard_id = ${shardId}`)
+      .get();
+    if (!row) return null;
+    if (row.cacheKey !== expectedCacheKey || row.shardFingerprint !== expectedFingerprint) {
+      return null;
+    }
+    return row.payload as ShardBuildResult;
+  }
+
+  /**
+   * Drop fragment rows for shards no longer present in the current build
+   * (e.g. a package was removed). Keeps the per-shard cache from
+   * accumulating stale rows. No-op when `keepShardIds` is empty.
+   */
+  pruneShardFragmentsExcept(keepShardIds: readonly string[]): void {
+    if (keepShardIds.length === 0) return;
+    const separator = sql`, `;
+    const placeholders = keepShardIds.map((id) => sql`${id}`);
+    const keepList = sql.join(placeholders, separator);
+    this.datastore.db
+      .delete(graphShardFragment)
+      .where(sql`shard_id NOT IN (${keepList})`)
+      .run();
   }
 }

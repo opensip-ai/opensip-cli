@@ -46,3 +46,28 @@ export const graphCatalog = sqliteTable('graph_catalog', {
   builtAt: text('built_at').notNull(),
   payload: text('payload', { mode: 'json' }).notNull(),
 });
+
+/**
+ * Per-shard catalog fragment store (plan #2 — sharded build).
+ *
+ * One row per shard (keyed by `shard_id`), holding that shard's
+ * serialized `ShardBuildResult` (fragment + boundary calls + parse
+ * errors). A fragment is valid for incremental reuse only when BOTH its
+ * `cache_key` (the shard's tsconfig/version/mode key) and its
+ * `shard_fingerprint` (mtime+size over the shard's files) match the
+ * current run — the same validity discipline as the full-catalog path.
+ * On a rebuild, shards whose fingerprint matches load their fragment with
+ * no parse; only changed shards re-run a worker.
+ *
+ * Schema note (flagged in the plan for a data-layer pass): this is a
+ * draft — table-vs-column, stale-row retention, and a build-scoped sweep
+ * are deferred. Replacement is per-shard upsert; stale rows for shards no
+ * longer present are pruned by the orchestrator after a build.
+ */
+export const graphShardFragment = sqliteTable('graph_shard_fragment', {
+  shardId: text('shard_id').primaryKey(),
+  language: text('language').notNull(),
+  cacheKey: text('cache_key').notNull(),
+  shardFingerprint: text('shard_fingerprint').notNull(),
+  payload: text('payload', { mode: 'json' }).notNull(),
+});

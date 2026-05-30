@@ -52,6 +52,9 @@ export interface GraphCallEdge {
   readonly resolution: GraphCallResolution;
   readonly confidence: GraphCallConfidence;
   readonly text: string;
+  /** True for an edge recovered by the cross-shard boundary pass (always
+   *  syntactic). Mirrors the engine `CallEdge.crossShard`. */
+  readonly crossShard?: boolean;
 }
 
 export interface GraphFunctionOccurrence {

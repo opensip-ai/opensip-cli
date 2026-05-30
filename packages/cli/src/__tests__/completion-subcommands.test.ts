@@ -84,9 +84,16 @@ describe('SUBCOMMANDS drift test', () => {
     }
     // Conversely — every live tool / CLI subcommand should be in
     // SUBCOMMANDS so a new `audit` tool would force the completion
-    // script to surface it.
+    // script to surface it. Internal, non-user-facing commands are
+    // exempt: they are not offered in shell completion.
+    const INTERNAL = new Set([
+      'help', // optional Commander built-in
+      // Spawned by the sharded build (`graph --json` on a multi-package
+      // repo), never typed by a user — intentionally absent from completion.
+      'graph-shard-worker',
+    ]);
     for (const sub of live) {
-      if (sub === 'help') continue; // optional Commander built-in
+      if (INTERNAL.has(sub)) continue;
       expect(completionList, `expected SUBCOMMANDS to include '${sub}'`).toContain(sub);
     }
   });

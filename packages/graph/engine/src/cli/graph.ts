@@ -35,12 +35,16 @@ import {
 } from '@opensip-tools/core';
 import { SessionRepo } from '@opensip-tools/session-store';
 
+import { pickAdapter } from '../lang-adapter/registry.js';
+import { CatalogRepo } from '../persistence/catalog-repo.js';
 import { buildGraphSessionPayload } from '../persistence/session-payload.js';
 import { buildCliOutput, buildCliOutputFromFindings, renderJson } from '../render/json.js';
+
 
 import { detectLanguages } from './detect.js';
 import { runCatalogJsonMode, runGateMode, runReportMode } from './graph-modes.js';
 import { writeFooterHintsPlain, writeResolutionBannerPlain, writeRunSummaryPlain, writeUnifiedReport } from './graph-report.js';
+import { runShardedGraph } from './orchestrate/sharded-graph.js';
 import { runGraph } from './orchestrate.js';
 import { positionalPathLabel, resolvePositionalPaths } from './positional-paths.js';
 import { MemoryPressureError } from './pressure-monitor.js';
@@ -48,6 +52,8 @@ import { renderWorkspaceJson, writeWorkspaceReport } from './workspace-report.js
 import { discoverPolyglotUnits, runWorkspaceUnitsInParallel } from './workspace-runner.js';
 
 import type { GraphCommandOptions } from './graph-options.js';
+import type { Shard } from './orchestrate/shard-model.js';
+import type { RunGraphResult } from './orchestrate.js';
 import type { Catalog } from '../types.js';
 import type { FindingOutput } from '@opensip-tools/contracts';
 import type { LanguageAdapter, Signal, ToolCliContext } from '@opensip-tools/core';
@@ -91,18 +97,90 @@ export async function executeGraph(
       return;
     }
     const runCwd = positionalPaths[0] ?? opts.cwd;
-    const result = await runGraph({
-      cwd: runCwd,
-      noCache: opts.noCache,
-      resolution: opts.resolution,
-      language: opts.language,
-      datastore: cli.scope.datastore() as DataStore | undefined,
-    });
+    // Auto-shard a multi-package project (bare `graph`, no explicit subtree):
+    // build packages in parallel and recover cross-package edges. Falls back
+    // to the single-process build for one-package repos or when sharding
+    // can't engage (no worker script, discovery failure).
+    const shards = positionalPaths.length === 0 ? await resolveShards(opts, cli) : [];
+    const result = shards.length > 1
+      ? await runShardedBuild(opts, shards, runCwd, cli)
+      : await runGraph({
+          cwd: runCwd,
+          noCache: opts.noCache,
+          resolution: opts.resolution,
+          language: opts.language,
+          datastore: cli.scope.datastore() as DataStore | undefined,
+        });
     enforceLanguageMismatchPolicy(opts, result.catalog, [runCwd]);
     await dispatchGraphResult(opts, result, cli, startedAt);
   } catch (error) {
     handleGraphError('graph', error, cli);
   }
+}
+
+/**
+ * Resolve a project to its shards (one per workspace package). Returns an
+ * empty array — signalling the caller to use the single-process build —
+ * when the project isn't multi-package, when no worker script is
+ * available to spawn, or when discovery fails. Each unit's file set is
+ * enumerated via the graph adapter; partitions with no files are dropped.
+ */
+async function resolveShards(opts: GraphCommandOptions, cli: ToolCliContext): Promise<Shard[]> {
+  const cliScript = opts.cliScript ?? process.argv[1];
+  if (typeof cliScript !== 'string' || cliScript.length === 0) return [];
+
+  let units: readonly { id: string; rootDir: string; configPath?: string }[];
+  try {
+    units = await discoverPolyglotUnits(opts.cwd, resolveAdaptersForRun(opts, cli));
+  } catch {
+    /* v8 ignore next */
+    return [];
+  }
+  if (units.length <= 1) return [];
+
+  const adapter = pickAdapter(opts.cwd);
+  const shards: Shard[] = [];
+  for (const unit of units) {
+    let files: readonly string[];
+    let configPathAbs: string | undefined;
+    try {
+      const disc = adapter.discoverFiles({ cwd: unit.rootDir, configPathOverride: unit.configPath });
+      files = disc.files;
+      configPathAbs = unit.configPath ?? disc.configPathAbs;
+    } catch {
+      continue; // a unit the graph adapter can't discover is skipped, not fatal
+    }
+    if (files.length > 0) shards.push({ id: unit.id, rootDir: unit.rootDir, files, configPathAbs });
+  }
+  // Need at least two non-empty shards to justify the parallel/merge overhead.
+  return shards.length > 1 ? shards : [];
+}
+
+/** Drive the sharded build and adapt it to the RunGraphResult dispatch shape. */
+async function runShardedBuild(
+  opts: GraphCommandOptions,
+  shards: readonly Shard[],
+  projectRoot: string,
+  cli: ToolCliContext,
+): Promise<RunGraphResult> {
+  const datastore = cli.scope.datastore() as DataStore | undefined;
+  const sharded = await runShardedGraph({
+    shards,
+    projectRoot,
+    cliScript: opts.cliScript ?? process.argv[1] ?? '',
+    adapter: pickAdapter(projectRoot),
+    resolutionMode: opts.resolution ?? 'exact',
+    concurrency: opts.concurrency,
+    useCache: opts.noCache !== true,
+    catalogRepo: datastore ? new CatalogRepo(datastore) : null,
+  });
+  return {
+    catalog: sharded.catalog,
+    indexes: sharded.indexes,
+    signals: sharded.signals,
+    resolutionStats: sharded.resolutionStats,
+    cacheHit: sharded.cacheHit,
+  };
 }
 
 function validateMutuallyExclusiveFlags(opts: GraphCommandOptions): void {

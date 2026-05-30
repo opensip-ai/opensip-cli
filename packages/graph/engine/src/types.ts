@@ -106,6 +106,17 @@ export interface CallEdge {
    * Optional for forward-compatibility with pre-discard catalogs.
    */
   readonly discarded?: boolean;
+  /**
+   * True when this edge was recovered by the cross-shard boundary pass
+   * (a sharded build) rather than resolved within a single shard. A
+   * `crossShard` edge is therefore `resolution: 'syntactic'` regardless
+   * of the build's resolution mode — the ASTs were gone by the time it
+   * was resolved, so only the callee name + import specifier were
+   * available. Lets consumers reason about boundary edges (e.g. "my
+   * low-confidence edges are the cross-package ones, which is expected").
+   * Omitted/false for intra-shard edges; optional for forward-compat.
+   */
+  readonly crossShard?: boolean;
 }
 
 /**
@@ -187,6 +198,37 @@ export interface FunctionOccurrence {
 export interface ParseError {
   readonly filePath: string;
   readonly message: string;
+}
+
+/**
+ * A call site a shard worker could NOT resolve within its own files —
+ * the callee name is not among the shard's own occurrences. Plain,
+ * JSON-safe data (no AST): the cross-shard pass re-resolves these against
+ * the global merged catalog + import graph, syntactically.
+ *
+ * Emitted by an adapter's `resolveCallSites` when `emitBoundaryCalls` is
+ * set (only the adapter can extract a callee name from its AST), and
+ * carried across the worker boundary inside a `ShardBuildResult`.
+ */
+export interface CrossBoundaryCall {
+  /** bodyHash of the enclosing function (an occurrence in this shard's fragment). */
+  readonly ownerHash: string;
+  /** Syntactic callee simple name (`foo` in `foo()`, rightmost in `a.b.c()`). */
+  readonly calleeName: string;
+  /** The raw import specifier the name came from, if imported (`'./x.js'`, `'@scope/pkg'`). */
+  readonly importSpecifier?: string;
+  /** 1-based line of the call site. */
+  readonly line: number;
+  /** 0-based column. */
+  readonly column: number;
+  /** Truncated call-expression text for display (≤ 80 chars, the CallEdge.text contract). */
+  readonly text: string;
+  /**
+   * True when the call's return value is discarded (ExpressionStatement).
+   * Carried so the recovered cross-shard CallEdge preserves the `discarded`
+   * flag that `no-side-effect-path` relies on.
+   */
+  readonly discarded?: boolean;
 }
 
 /**

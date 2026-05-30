@@ -27,6 +27,8 @@ import {
   type WorkspaceUnit,
 } from '@opensip-tools/core'
 
+import { runWorkerPool } from './orchestrate/worker-pool.js'
+
 import type { ResolutionMode } from '../types.js'
 import type { CliOutput, FindingOutput } from '@opensip-tools/contracts'
 
@@ -128,31 +130,18 @@ export async function runWorkspaceUnitsInParallel(
     concurrency,
   })
 
-  // Simple worker-pool pattern: each slot runs one child at a time;
-  // when a child finishes, the slot picks up the next pending unit.
-  const queue = [...input.units]
-  const results: WorkspaceUnitRunResult[] = []
-  let anyChildFailed = false
-
-  async function runOne(): Promise<void> {
-    while (queue.length > 0) {
-      const unit = queue.shift()
-      if (unit === undefined) return
-      const result = await spawnGraphChild({
-        cliScript: input.cliScript,
-        unit,
-        cwd: input.cwd,
-        noCache: input.noCache === true,
-        resolution: input.resolution,
-      })
-      if (result.exitCode !== 0) anyChildFailed = true
-      results.push(result)
-    }
-  }
-
-  const workers: Promise<void>[] = []
-  for (let i = 0; i < concurrency; i++) workers.push(runOne())
-  await Promise.all(workers)
+  // Shared bounded worker pool (also used by the shard runner). Each slot
+  // spawns one child at a time and pulls the next unit when it finishes.
+  const results = await runWorkerPool(input.units, concurrency, (unit) =>
+    spawnGraphChild({
+      cliScript: input.cliScript,
+      unit,
+      cwd: input.cwd,
+      noCache: input.noCache === true,
+      resolution: input.resolution,
+    }),
+  )
+  const anyChildFailed = results.some((r) => r.exitCode !== 0)
 
   // Sort for deterministic display order regardless of completion
   // order — units finish in unpredictable order under parallelism.

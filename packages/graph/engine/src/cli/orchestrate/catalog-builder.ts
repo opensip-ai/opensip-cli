@@ -24,8 +24,10 @@ import type {
 import type {
   Catalog,
   CallEdge,
+  CrossBoundaryCall,
   DependencyEdge,
   FunctionOccurrence,
+  ParseError,
   ResolutionMode,
   ResolutionStats,
 } from '../../types.js';
@@ -59,7 +61,18 @@ export function buildAndResolveCatalog(
   resolutionMode: ResolutionMode,
   onProgress?: GraphProgressCallback,
   monitor?: PressureMonitor,
-): { readonly catalog: Catalog; readonly resolutionStats: ResolutionStats } {
+  /**
+   * Sharded build (plan #2): when true, request cross-boundary call
+   * descriptors from the adapter and surface them in the return for the
+   * cross-shard pass. Off for ordinary single-process builds.
+   */
+  emitBoundaryCalls?: boolean,
+): {
+  readonly catalog: Catalog;
+  readonly resolutionStats: ResolutionStats;
+  readonly boundaryCalls?: readonly CrossBoundaryCall[];
+  readonly parseErrors: readonly ParseError[];
+} {
   // Phase 4 unified walk: Stage 1's catalog construction and Stage 2's
   // call-site location share a single AST descent per file. The walk
   // emits the catalog plus a flat list of pre-located call-site
@@ -101,12 +114,18 @@ export function buildAndResolveCatalog(
       dependencySites: walked.dependencySites,
       projectDirAbs: discovery.projectDirAbs,
       resolutionMode,
+      emitBoundaryCalls,
     }),
     (r) => `${String(r.stats.totalCallSites)} call site(s)`,
   );
 
   const catalog = stitchEdges(initialCatalog, resolved.edgesByOwner, resolved.dependenciesByOwner);
-  return { catalog, resolutionStats: resolved.stats };
+  return {
+    catalog,
+    resolutionStats: resolved.stats,
+    boundaryCalls: resolved.boundaryCalls,
+    parseErrors: [...parsed.parseErrors, ...walked.parseErrors],
+  };
 }
 
 /**

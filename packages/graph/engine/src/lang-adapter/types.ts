@@ -18,6 +18,7 @@
 import type {
   Catalog,
   CallEdge,
+  CrossBoundaryCall,
   DependencyEdge,
   FunctionOccurrence,
   ParseError,
@@ -175,6 +176,16 @@ export interface ResolveInput<P = ParsedProject> {
    * that only implement exact resolution may ignore a `'fast'` value.
    */
   readonly resolutionMode: ResolutionMode;
+  /**
+   * Sharded-build flag (plan #2). When `true`, the adapter additionally
+   * emits a `CrossBoundaryCall` for every call site whose callee name is
+   * NOT among the shard's own occurrences — the candidates the cross-shard
+   * boundary pass re-resolves against the global catalog. Boundary
+   * detection is purely syntactic (name + import specifier), independent
+   * of `resolutionMode`. Adapters that don't implement it leave
+   * `boundaryCalls` undefined. Omitted/false in single-process builds.
+   */
+  readonly emitBoundaryCalls?: boolean;
 }
 
 export interface ResolveOutput {
@@ -187,6 +198,13 @@ export interface ResolveOutput {
    * Adapters that don't resolve dependencies may omit.
    */
   readonly dependenciesByOwner?: ReadonlyMap<string, readonly DependencyEdge[]>;
+  /**
+   * Sharded-build output (plan #2). Populated only when the input set
+   * `emitBoundaryCalls`: the call sites that didn't resolve within this
+   * shard's files, as plain descriptors the cross-shard pass re-resolves
+   * globally. Undefined when not requested or not implemented.
+   */
+  readonly boundaryCalls?: readonly CrossBoundaryCall[];
   readonly stats: ResolutionStats;
 }
 
