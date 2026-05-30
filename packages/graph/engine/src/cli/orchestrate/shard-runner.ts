@@ -20,9 +20,13 @@ import { join } from 'node:path';
 
 import { logger } from '@opensip-tools/core';
 
+import { computeFilesFingerprint } from '../../cache/invalidate.js';
+
 import { runWorkerPool } from './worker-pool.js';
 
 import type { Shard, ShardBuildResult, ShardWorkerSpec } from './shard-model.js';
+import type { GraphLanguageAdapter } from '../../lang-adapter/types.js';
+import type { CatalogRepo } from '../../persistence/catalog-repo.js';
 import type { ResolutionMode } from '../../types.js';
 
 export interface RunShardsInput {
@@ -83,6 +87,54 @@ export async function runShardsInParallel(input: RunShardsInput): Promise<RunSha
     failed: failures.length,
   });
   return { fragments, failures };
+}
+
+/** Partition of a build's shards into reusable-from-cache vs needs-rebuild. */
+export interface ShardWorkPlan {
+  /** Fragments loaded verbatim from the per-shard cache — no worker runs. */
+  readonly cached: readonly ShardBuildResult[];
+  /** Shards whose files (or config/mode) changed — a worker must rebuild them. */
+  readonly toBuild: readonly Shard[];
+}
+
+/**
+ * Decide, per shard, whether its cached fragment is still valid (config
+ * key + files fingerprint match) and can be reused without a worker, or
+ * whether the shard must be rebuilt. This is the incremental-parse fix:
+ * unchanged shards skip parse entirely. With `useCache=false` (or no
+ * repo) every shard is rebuilt.
+ *
+ * Cheap by design — it stats each shard's files (fingerprint) and reads
+ * each shard's config (cacheKey); no parsing, no worker spawn.
+ */
+export function planShardWork(
+  shards: readonly Shard[],
+  repo: CatalogRepo | null,
+  adapter: GraphLanguageAdapter,
+  resolutionMode: ResolutionMode,
+  useCache: boolean,
+): ShardWorkPlan {
+  if (!useCache || !repo) return { cached: [], toBuild: [...shards] };
+  const cached: ShardBuildResult[] = [];
+  const toBuild: Shard[] = [];
+  for (const shard of shards) {
+    const cacheKey = adapter.cacheKey({
+      projectDirAbs: shard.rootDir,
+      configPathAbs: shard.configPathAbs,
+      resolutionMode,
+    });
+    const fingerprint = computeFilesFingerprint(shard.files);
+    const fragment = repo.loadValidShardFragment(shard.id, cacheKey, fingerprint);
+    if (fragment) cached.push(fragment);
+    else toBuild.push(shard);
+  }
+  logger.info({
+    evt: 'graph.shard.plan',
+    module: 'graph:shard-runner',
+    reused: cached.length,
+    rebuild: toBuild.length,
+  });
+  return { cached, toBuild };
 }
 
 interface ShardOutcome {
