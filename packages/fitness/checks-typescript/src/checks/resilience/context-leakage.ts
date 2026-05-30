@@ -115,6 +115,51 @@ function getTypeRefName(typeName: ts.EntityName): string {
   return ''
 }
 
+/** Outer type-reference name(s) of a TypeNode, including each union branch. */
+function typeRefNames(type: ts.TypeNode | undefined): string[] {
+  if (!type) return []
+  if (ts.isUnionTypeNode(type)) return type.types.flatMap((t) => typeRefNames(t))
+  if (ts.isTypeReferenceNode(type)) return [getTypeRefName(type.typeName)]
+  return []
+}
+
+/**
+ * Collect names imported from `@opentelemetry/*` packages. OTel's `Context`
+ * (the W3C trace-propagation context) and its siblings are process-scoped SDK
+ * types — a module-level `let parentContext: Context` holding propagation
+ * state is NOT the per-request tenant context this check targets. Inspecting
+ * the import source (rather than the bare `Context`/`Ctx` name) keeps the
+ * exclusion sound: only OTel's own types are spared, not every type ending
+ * in "Context".
+ */
+function isOtelImport(stmt: ts.Statement): stmt is ts.ImportDeclaration {
+  return (
+    ts.isImportDeclaration(stmt) &&
+    ts.isStringLiteral(stmt.moduleSpecifier) &&
+    stmt.moduleSpecifier.text.startsWith('@opentelemetry/')
+  )
+}
+
+/** Names bound by an import clause (default + named bindings). */
+function importClauseNames(clause: ts.ImportClause): string[] {
+  const names: string[] = []
+  if (clause.name) names.push(clause.name.text)
+  const bindings = clause.namedBindings
+  if (bindings && ts.isNamedImports(bindings)) {
+    for (const el of bindings.elements) names.push(el.name.text)
+  }
+  return names
+}
+
+function collectOtelImportedNames(sourceFile: ts.SourceFile): Set<string> {
+  const names = new Set<string>()
+  for (const stmt of sourceFile.statements) {
+    if (!isOtelImport(stmt) || !stmt.importClause) continue
+    for (const name of importClauseNames(stmt.importClause)) names.add(name)
+  }
+  return names
+}
+
 function typeLooksLikeRequestContext(type: ts.TypeNode | undefined): boolean {
   if (!type) return false
 
@@ -245,6 +290,7 @@ interface ContextLeakageFinding {
 // eslint-disable-next-line sonarjs/cognitive-complexity -- module/class-level walk; branches map to AST node kinds and are easier to read inline than as a fragmented dispatcher
 function collectContextLeakage(sourceFile: ts.SourceFile): ContextLeakageFinding[] {
   const findings: ContextLeakageFinding[] = []
+  const otelImportedNames = collectOtelImportedNames(sourceFile)
 
   // 1. Module-level `let`/`var` declarations
   for (const stmt of sourceFile.statements) {
@@ -264,6 +310,9 @@ function collectContextLeakage(sourceFile: ts.SourceFile): ContextLeakageFinding
 
       // Lazy-init metric instrument: process-scoped per metric, not per request
       if (isMetricLazyInit(decl)) continue
+
+      // OTel SDK types (Context, Span, …) are process/propagation scoped.
+      if (typeRefNames(decl.type).some((n) => otelImportedNames.has(n))) continue
 
       const typeIsContextual = typeLooksLikeRequestContext(decl.type)
       const nameIsContextual = variableNameLooksContextual(varName)
@@ -308,6 +357,9 @@ function collectContextLeakage(sourceFile: ts.SourceFile): ContextLeakageFinding
       const isReadonly = mods?.some((m) => m.kind === ts.SyntaxKind.ReadonlyKeyword) ?? false
       const isStatic = mods?.some((m) => m.kind === ts.SyntaxKind.StaticKeyword) ?? false
       if (isReadonly || isStatic) continue
+
+      // OTel SDK types are process/propagation scoped, not request state.
+      if (typeRefNames(member.type).some((n) => otelImportedNames.has(n))) continue
 
       if (!typeLooksLikeRequestContext(member.type)) continue
 
@@ -366,40 +418,46 @@ export const contextLeakage = defineCheck({
   tags: ['resilience', 'context', 'security'],
   fileTypes: ['ts', 'tsx'],
 
-  analyze(content: string, filePath: string): CheckViolation[] {
-    if (isTestFile(filePath)) return []
-    if (isSkippedPath(filePath)) return []
-
-    logger.debug({
-      evt: 'fitness.checks.context_leakage.context_leakage_analyze',
-      msg: 'Analyzing file for request context leakage (AST)',
-    })
-
-    // Quick text bail-out: if the file mentions neither "context" nor "ctx",
-    // there is nothing to find. Saves the parse-cache hit.
-    const lower = content.toLowerCase()
-    if (!lower.includes('context') && !lower.includes('ctx')) return []
-
-    let sourceFile: ts.SourceFile | null
-    try {
-      sourceFile = getSharedSourceFile(filePath, content)
-    } catch {
-      // @swallow-ok Skip files that fail to parse — no signal to emit.
-      return []
-    }
-    if (!sourceFile) return []
-
-    const findings = collectContextLeakage(sourceFile)
-    return findings.map<CheckViolation>((f) => ({
-      line: f.line,
-      column: f.column,
-      message: 'Request context stored in module/class scope may leak between requests',
-      severity: 'warning',
-      suggestion:
-        'Use AsyncLocalStorage for request-scoped context or pass context as a parameter. Storing context in module/class scope can cause cross-request pollution.',
-      match: f.match,
-      type: 'context-leakage',
-      filePath,
-    }))
-  },
+  analyze: analyzeContextLeakage,
 })
+
+/**
+ * Analyze a file for request-context leakage. Exported for the FP-regression
+ * suite (see `__tests__/context-leakage-fp.test.ts`).
+ */
+export function analyzeContextLeakage(content: string, filePath: string): CheckViolation[] {
+  if (isTestFile(filePath)) return []
+  if (isSkippedPath(filePath)) return []
+
+  logger.debug({
+    evt: 'fitness.checks.context_leakage.context_leakage_analyze',
+    msg: 'Analyzing file for request context leakage (AST)',
+  })
+
+  // Quick text bail-out: if the file mentions neither "context" nor "ctx",
+  // there is nothing to find. Saves the parse-cache hit.
+  const lower = content.toLowerCase()
+  if (!lower.includes('context') && !lower.includes('ctx')) return []
+
+  let sourceFile: ts.SourceFile | null
+  try {
+    sourceFile = getSharedSourceFile(filePath, content)
+  } catch {
+    // @swallow-ok Skip files that fail to parse — no signal to emit.
+    return []
+  }
+  if (!sourceFile) return []
+
+  const findings = collectContextLeakage(sourceFile)
+  return findings.map<CheckViolation>((f) => ({
+    line: f.line,
+    column: f.column,
+    message: 'Request context stored in module/class scope may leak between requests',
+    severity: 'warning',
+    suggestion:
+      'Use AsyncLocalStorage for request-scoped context or pass context as a parameter. Storing context in module/class scope can cause cross-request pollution.',
+    match: f.match,
+    type: 'context-leakage',
+    filePath,
+  }))
+}

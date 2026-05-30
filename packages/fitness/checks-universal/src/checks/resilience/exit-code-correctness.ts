@@ -31,8 +31,13 @@ const ERROR_PROPAGATION_PATTERNS = [
   /\.errors\.push\(/, // Error aggregation pattern — error is collected for batch reporting
   /\.push\(\s*`/, // Template literal push to errors array
   // CLI dispatcher pattern: tools set a non-success exit code on the
-  // shared context instead of calling process.exit() directly.
+  // shared context instead of calling process.exit() directly. Two forms:
+  // a named exit-code constant (…ERROR / …FAILURE / …FAIL) …
   /setExitCode\s*\([^)]*(?:ERROR|FAILURE|FAIL)\b/,
+  // … or a numeric non-zero literal (`setExitCode(1)`, `cli.setExitCode(2)`).
+  // A zero literal is intentionally NOT matched — that would mask the very
+  // "log error then exit 0" pattern this check exists to catch.
+  /setExitCode\s*\(\s*[1-9]/,
 ]
 
 /**

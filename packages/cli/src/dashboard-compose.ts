@@ -43,6 +43,10 @@ import type { DataStore } from '@opensip-tools/datastore';
  * onto the base via `Object.assign`. Contributions are best-effort: a
  * tool that omits `collectDashboardData`, or returns an empty object,
  * simply contributes nothing.
+ *
+ * @throws {Error} When called outside an entered `RunScope` (i.e. not inside
+ *   a CLI action body), since session history and tool contributions both
+ *   require the scope.
  */
 async function composeDashboardInput(): Promise<DashboardInput> {
   const scope = currentScope();

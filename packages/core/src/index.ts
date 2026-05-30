@@ -158,6 +158,11 @@ export type { RetryOptions } from './lib/retry.js';
 // metadata.version without duplicating the literal in source).
 export { readPackageVersion } from './lib/package-version.js';
 
+// Lib — shared presentation formatters (duration, …) used by more than one
+// tool's CLI/report layer; centralized here since tools cannot depend on
+// each other.
+export { formatDuration } from './lib/format.js';
+
 // Lib — path resolver (project-local opensip-tools/.runtime, user-level
 // ~/.opensip-tools/config.yml). Every consumer constructs paths through
 // this module so a layout change is a single-file edit.

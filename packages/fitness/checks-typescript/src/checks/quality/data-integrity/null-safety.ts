@@ -317,6 +317,11 @@ const SAFE_FLUENT_METHODS = new Set([
   'getInstance',
   'create',
   'of',
+  // Immutable-combinator methods — return a new non-null value built from
+  // the receiver (e.g. OTel `Resource.merge`, Immutable.js `.merge`,
+  // builder `.concat`/`.assign`). The chain result is never null.
+  'merge',
+  'mergeWith',
   // Vitest/Jest assertion methods (expect() always returns Assertion object)
   'toBe',
   'toEqual',
@@ -508,6 +513,49 @@ function isSafeFluentMethod(methodName: string): boolean {
 }
 
 /**
+ * Walk ancestors to find an enclosing truthiness guard whose condition
+ * references the access's base expression — an `if (...)`, a `cond ? … : …`,
+ * or the left side of a `&&` chain (e.g. `if (candidates.length === 1 &&
+ * candidates[0]) { … candidates[0].bodyHash … }`).
+ *
+ * The line-local {@link SAFE_PATTERNS} scan only inspects the physical line
+ * of the access, so a guard placed on a *previous* line is missed. This
+ * closes that cross-line gap. Substring matching is intentionally lenient:
+ * the check errs toward treating a guarded access as safe (fewer false
+ * positives), consistent with the existing line-local guard handling.
+ */
+function isGuardedByEnclosingCondition(
+  node: ts.PropertyAccessExpression,
+  sourceFile: ts.SourceFile,
+): boolean {
+  const baseText = node.expression.getText(sourceFile)
+  let current: ts.Node = node
+  let parent: ts.Node | undefined = node.parent
+  while (parent) {
+    if (ts.isIfStatement(parent) && parent.expression.getText(sourceFile).includes(baseText)) {
+      return true
+    }
+    if (
+      ts.isConditionalExpression(parent) &&
+      parent.condition.getText(sourceFile).includes(baseText)
+    ) {
+      return true
+    }
+    if (
+      ts.isBinaryExpression(parent) &&
+      parent.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken &&
+      parent.right === current &&
+      parent.left.getText(sourceFile).includes(baseText)
+    ) {
+      return true
+    }
+    current = parent
+    parent = parent.parent
+  }
+  return false
+}
+
+/**
  * Check if a property access originates from `this`.
  * Accessing properties on `this` is always safe — the object exists within its own methods.
  */
@@ -650,9 +698,10 @@ function isSafeNullPath(filePath: string, paths: readonly RegExp[]): boolean {
  * @param {*} content
  * @param {*} filePath
  * @returns {*}
- * Analyze a file for null safety issues
+ * Analyze a file for null safety issues. Exported for the FP-regression
+ * suite (see `__tests__/null-safety-fp.test.ts`).
  */
-function analyzeFile(content: string, filePath: string): CheckViolation[] {
+export function analyzeNullSafety(content: string, filePath: string): CheckViolation[] {
   const violations: CheckViolation[] = []
 
   // Skip safe-by-construction path families (DI fragments + schema declarations).
@@ -700,6 +749,10 @@ function analyzeFile(content: string, filePath: string): CheckViolation[] {
 
       // Skip if line has safety patterns
       if (SAFE_PATTERNS.some((p) => p.test(lineText))) return
+
+      // Skip if guarded by an enclosing if / ternary / && condition on a
+      // previous line (the line-local scan above only sees this line).
+      if (isGuardedByEnclosingCondition(node, sourceFile)) return
 
       // Skip common safe cases
       if (['length', 'toString', 'valueOf'].includes(propName)) return
@@ -756,6 +809,6 @@ export const nullSafety = defineCheck({
   analyze(content: string, filePath: string): CheckViolation[] {
     // Skip test files — null safety in tests is low-risk due to controlled inputs
     if (isTestFile(filePath)) return []
-    return analyzeFile(content, filePath)
+    return analyzeNullSafety(content, filePath)
   },
 })

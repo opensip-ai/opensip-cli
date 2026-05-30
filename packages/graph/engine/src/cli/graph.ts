@@ -44,8 +44,7 @@ import { buildCliOutput, buildCliOutputFromFindings, renderJson } from '../rende
 import { detectLanguages } from './detect.js';
 import { runCatalogJsonMode, runGateMode, runReportMode } from './graph-modes.js';
 import { writeFooterHintsPlain, writeResolutionBannerPlain, writeRunSummaryPlain, writeUnifiedReport } from './graph-report.js';
-import { runShardedGraph } from './orchestrate/sharded-graph.js';
-import { runGraph } from './orchestrate.js';
+import { runGraph, runShardedGraph } from './orchestrate.js';
 import { positionalPathLabel, resolvePositionalPaths } from './positional-paths.js';
 import { MemoryPressureError } from './pressure-monitor.js';
 import { renderWorkspaceJson, writeWorkspaceReport } from './workspace-report.js';

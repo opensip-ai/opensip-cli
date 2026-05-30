@@ -13,7 +13,7 @@
  * detection. Safe to import from any Layer 3 tool package.
  */
 
-export { Banner } from './banner.js';
+export { Banner, type BannerSize } from './banner.js';
 export { ErrorMessage, type ErrorMessageProps } from './error-message.js';
 export { ProjectHeader, type ProjectHeaderInput } from './project-header.js';
 export { RunHeader, type RunHeaderProps, type RunHeaderMeta } from './run-header.js';

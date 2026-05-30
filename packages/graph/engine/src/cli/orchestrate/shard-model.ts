@@ -20,13 +20,11 @@
  *   cache(fragment by shardId+fingerprint)    (Phase 3)
  */
 
-import type { Catalog, CrossBoundaryCall, ParseError, ResolutionMode } from '../../types.js';
-
 // `CrossBoundaryCall` lives in the shared engine type layer (`types.ts`)
 // because the adapter contract (`lang-adapter/types.ts` → `ResolveOutput`)
 // emits it — only the adapter can extract a callee name syntactically.
-// Re-exported here so shard-model consumers see it on the shard surface.
-export type { CrossBoundaryCall } from '../../types.js';
+// Consumers import it from `../../types.js` (or the package barrel) directly.
+import type { Catalog, CrossBoundaryCall, ParseError, ResolutionMode } from '../../types.js';
 
 /**
  * One parallelizable unit of a sharded build. The discovery strategies

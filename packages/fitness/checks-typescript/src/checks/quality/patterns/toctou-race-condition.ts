@@ -316,6 +316,75 @@ function collectClassInMemoryFieldNames(node: FunctionLikeNode): Set<string> {
   return names
 }
 
+/**
+ * Index file-local `interface` / `type` declarations to the set of field
+ * names whose declared type is an in-memory keyed collection (`Map`/`Set`/…).
+ *
+ * Used to treat `<stateObj>.<mapField>.get/set(...)` as a *local-collection*
+ * access. The "state bag of Maps" pattern — an interface bundling several
+ * `Map`/`Set` fields, threaded as a parameter through the steps of an
+ * iterative graph / DP algorithm (e.g. Tarjan SCC's `TarjanState`) — is
+ * single-threaded in-memory work, not a shared-state read-then-update race.
+ * The receiver `state.lowlink` is a *chained* access that the simple-receiver
+ * classifier would otherwise treat conservatively as shared.
+ */
+function collectInterfaceCollectionFields(sourceFile: ts.SourceFile): Map<string, Set<string>> {
+  const byType = new Map<string, Set<string>>()
+  const fieldsFrom = (members: ts.NodeArray<ts.TypeElement>): Set<string> => {
+    const fields = new Set<string>()
+    for (const member of members) {
+      if (
+        ts.isPropertySignature(member) &&
+        ts.isIdentifier(member.name) &&
+        isInMemoryCollectionTypeNode(member.type)
+      ) {
+        fields.add(member.name.text)
+      }
+    }
+    return fields
+  }
+  for (const stmt of sourceFile.statements) {
+    if (ts.isInterfaceDeclaration(stmt)) {
+      const fields = fieldsFrom(stmt.members)
+      if (fields.size > 0) byType.set(stmt.name.text, fields)
+    } else if (ts.isTypeAliasDeclaration(stmt) && ts.isTypeLiteralNode(stmt.type)) {
+      const fields = fieldsFrom(stmt.type.members)
+      if (fields.size > 0) byType.set(stmt.name.text, fields)
+    }
+  }
+  return byType
+}
+
+/**
+ * Collect `<receiver>.<field>` keys for parameters/locals whose declared type
+ * is a file-local interface/type that declares `Map`/`Set` fields. Those
+ * `<obj>.<field>` accesses behave like local collections (see
+ * {@link collectInterfaceCollectionFields}).
+ */
+function collectLocalObjectCollectionFieldKeys(
+  node: FunctionLikeNode,
+  interfaceCollectionFields: ReadonlyMap<string, Set<string>>,
+): Set<string> {
+  const keys = new Set<string>()
+  const addFor = (name: string, typeNode: ts.TypeNode | undefined): void => {
+    if (!typeNode || !ts.isTypeReferenceNode(typeNode)) return
+    if (!ts.isIdentifier(typeNode.typeName)) return
+    const fields = interfaceCollectionFields.get(typeNode.typeName.text)
+    if (!fields) return
+    for (const field of fields) keys.add(`${name}.${field}`)
+  }
+  for (const param of node.parameters) {
+    if (ts.isIdentifier(param.name)) addFor(param.name.text, param.type)
+  }
+  const visit = (n: ts.Node): void => {
+    if (n !== node && isFunctionLikeNode(n)) return
+    if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name)) addFor(n.name.text, n.type)
+    ts.forEachChild(n, visit)
+  }
+  if (node.body) visit(node.body)
+  return keys
+}
+
 /** Call-site classification kinds — narrow string literal alias set. */
 const KIND_READ_SHARED = 'read-shared' as const
 const KIND_UPDATE_SHARED = 'update-shared' as const
@@ -387,6 +456,14 @@ function getReceiverName(call: ts.CallExpression): { name: string; isThisField: 
   if (ts.isPropertyAccessExpression(receiver) && receiver.expression.kind === ts.SyntaxKind.ThisKeyword) {
     return { name: receiver.name.text, isThisField: true }
   }
+  // `<id>.<field>.method()` — a dotted receiver key (e.g. `state.lowlink`).
+  // Keying per `<id>.<field>` is strictly more precise than the old
+  // "deep chain → unknown receiver" fallback: a read on `x.a` and an update
+  // on `x.b` no longer collide, and it lets the classifier match a
+  // state-object's Map/Set field against the local-collection key set.
+  if (ts.isPropertyAccessExpression(receiver) && ts.isIdentifier(receiver.expression)) {
+    return { name: `${receiver.expression.text}.${receiver.name.text}`, isThisField: false }
+  }
   return null
 }
 
@@ -395,7 +472,11 @@ function getReceiverName(call: ts.CallExpression): { name: string; isThisField: 
  */
 function classifyCall(
   call: ts.CallExpression,
-  ctx: { localCollections: Set<string>; classCacheFields: Set<string> },
+  ctx: {
+    localCollections: Set<string>
+    classCacheFields: Set<string>
+    localObjectCollectionKeys: Set<string>
+  },
 ): CallKind {
   // First, atomic SQL writes anywhere short-circuit.
   if (isAtomicSqlExecute(call)) return { kind: 'atomic-sql-write' }
@@ -413,18 +494,37 @@ function classifyCall(
     return { kind: isRead ? KIND_READ_SHARED : KIND_UPDATE_SHARED }
   }
 
-  const isLocal =
-    (!receiver.isThisField && ctx.localCollections.has(receiver.name)) ||
-    (receiver.isThisField &&
-      (ctx.classCacheFields.has(receiver.name) || isInMemoryCacheReceiverText(receiver.name))) ||
-    // bare `this.cache` / `this.<X>Cache` even when class field decl wasn't
-    // statically detected as `new Map()` — the naming convention is enough.
-    (!receiver.isThisField && isInMemoryCacheReceiverText(receiver.name))
-
-  if (isLocal) {
+  if (isLocalReceiver(receiver, ctx)) {
     return { kind: isRead ? KIND_READ_LOCAL : KIND_UPDATE_LOCAL }
   }
   return { kind: isRead ? KIND_READ_SHARED : KIND_UPDATE_SHARED }
+}
+
+/**
+ * Decide whether a classified receiver refers to a local in-memory collection
+ * (so reads/updates on it are not shared-state TOCTOU). Covers: local
+ * `Map`/`Set` names, the `<stateObj>.<mapField>` "state bag" key, `this.<cache>`
+ * class fields, and the `cache`-named convention.
+ */
+function isLocalReceiver(
+  receiver: { name: string; isThisField: boolean },
+  ctx: {
+    localCollections: Set<string>
+    classCacheFields: Set<string>
+    localObjectCollectionKeys: Set<string>
+  },
+): boolean {
+  if (receiver.isThisField) {
+    return ctx.classCacheFields.has(receiver.name) || isInMemoryCacheReceiverText(receiver.name)
+  }
+  return (
+    ctx.localCollections.has(receiver.name) ||
+    // `<stateObj>.<mapField>` dotted key resolved to a file-local interface/
+    // type whose field is a Map/Set — the "state bag" pattern.
+    ctx.localObjectCollectionKeys.has(receiver.name) ||
+    // bare `cache` / `<X>Cache` naming convention.
+    isInMemoryCacheReceiverText(receiver.name)
+  )
 }
 
 /**
@@ -439,8 +539,9 @@ function classifyFunctionCalls(
   node: FunctionLikeNode,
   localCollections: Set<string>,
   classCacheFields: Set<string>,
+  localObjectCollectionKeys: Set<string>,
 ): { hasSharedReadAndUpdateOnSameReceiver: boolean } {
-  const ctx = { localCollections, classCacheFields }
+  const ctx = { localCollections, classCacheFields, localObjectCollectionKeys }
   // receiver-key → { read, update }. Receiver-key is `<name>` for plain
   // identifiers and `this.<name>` for this-field accesses.
   const perReceiver = new Map<string, { read: boolean; update: boolean }>()
@@ -492,13 +593,15 @@ function classifyFunctionCalls(
 interface CheckFunctionForToctouOptions {
   node: FunctionLikeNode
   sourceFile: ts.SourceFile
+  /** File-local interface/type → Map/Set field names (computed once per file). */
+  interfaceCollectionFields: ReadonlyMap<string, Set<string>>
 }
 
 /**
  * Check a function for TOCTOU patterns
  */
 function checkFunctionForToctou(options: CheckFunctionForToctouOptions): CheckViolation | null {
-  const { node, sourceFile } = options
+  const { node, sourceFile, interfaceCollectionFields } = options
   if (!node.body) return null
 
   // Atomic-comment escape hatch retained from the regex implementation —
@@ -509,10 +612,15 @@ function checkFunctionForToctou(options: CheckFunctionForToctouOptions): CheckVi
 
   const localCollections = collectLocalCollectionNames(node)
   const classCacheFields = collectClassInMemoryFieldNames(node)
+  const localObjectCollectionKeys = collectLocalObjectCollectionFieldKeys(
+    node,
+    interfaceCollectionFields,
+  )
   const { hasSharedReadAndUpdateOnSameReceiver } = classifyFunctionCalls(
     node,
     localCollections,
     classCacheFields,
+    localObjectCollectionKeys,
   )
 
   if (!hasSharedReadAndUpdateOnSameReceiver) return null
@@ -533,9 +641,10 @@ function checkFunctionForToctou(options: CheckFunctionForToctouOptions): CheckVi
 }
 
 /**
- * Analyze a file for TOCTOU race conditions
+ * Analyze a file for TOCTOU race conditions. Exported for the FP-regression
+ * suite (see `__tests__/toctou-fp.test.ts`).
  */
-function analyzeFileForToctou(filePath: string, content: string): CheckViolation[] {
+export function analyzeFileForToctou(filePath: string, content: string): CheckViolation[] {
   const violations: CheckViolation[] = []
 
   // Skip files in safe TOCTOU paths (caches, rate limiters, CLI, etc.).
@@ -553,9 +662,11 @@ function analyzeFileForToctou(filePath: string, content: string): CheckViolation
   const sourceFile = getSharedSourceFile(filePath, content)
   if (!sourceFile) return []
 
+  const interfaceCollectionFields = collectInterfaceCollectionFields(sourceFile)
+
   const visit = (node: ts.Node): void => {
     if (isFunctionLikeNode(node)) {
-      const violation = checkFunctionForToctou({ node, sourceFile })
+      const violation = checkFunctionForToctou({ node, sourceFile, interfaceCollectionFields })
       if (violation) {
         violations.push(violation)
       }

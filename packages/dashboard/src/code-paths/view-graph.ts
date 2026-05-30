@@ -28,6 +28,8 @@
  *   - edge opacity  ← confidence  (low=faded)
  */
 
+import { dashboardViewGraphStylesheetJs } from './graph-stylesheet.js';
+
 export function dashboardViewGraphJs(): string {
   return String.raw`
 // Register the dagre layout extension once (the vendored globals are
@@ -149,85 +151,7 @@ function gvBuildElements(vm, filterState) {
   return elements;
 }
 
-function gvStylesheet() {
-  return [
-    {
-      selector: 'node',
-      style: {
-        'background-color': '#c4956a',
-        'border-color': function(ele) { return ele.data('sccColor') || '#8a8a8a'; },
-        'border-width': function(ele) { return ele.data('sccId') ? 3 : 1; },
-        'border-style': function(ele) { return ele.data('borderStyle'); },
-        'shape': function(ele) { return ele.data('shape'); },
-        'width': function(ele) { return 18 + Math.min(42, ele.data('degree') * 3); },
-        'height': function(ele) { return 18 + Math.min(42, ele.data('degree') * 3); },
-        'label': function(ele) {
-          var l = ele.data('label') || '';
-          return l.length > 28 ? l.slice(0, 27) + '…' : l;
-        },
-        'font-size': 7,
-        'color': '#ddd',
-        'text-valign': 'bottom',
-        'text-halign': 'center',
-        'text-margin-y': 2,
-        'opacity': function(ele) { return ele.data('inTestFile') ? 0.55 : 1; },
-      },
-    },
-    {
-      selector: 'edge',
-      style: {
-        'width': 1,
-        'line-color': '#5a5a5a',
-        'line-style': function(ele) { return ele.data('lineStyle'); },
-        'opacity': function(ele) { return ele.data('edgeOpacity'); },
-        'target-arrow-color': '#5a5a5a',
-        'target-arrow-shape': 'triangle',
-        'arrow-scale': 0.6,
-        'curve-style': 'bezier',
-      },
-    },
-    {
-      selector: 'edge[?isCycleEdge]',
-      style: { 'line-color': '#d46a6a', 'target-arrow-color': '#d46a6a', 'width': 1.5 },
-    },
-    {
-      selector: 'node.gv-node-selected',
-      style: { 'background-color': '#e0a96d', 'border-color': '#fff', 'border-width': 3 },
-    },
-    {
-      selector: 'node.gv-search-hit',
-      style: { 'background-color': '#e0a96d', 'border-color': '#fff', 'border-width': 3, 'opacity': 1 },
-    },
-    {
-      selector: 'node.gv-search-fade',
-      style: { 'opacity': 0.12 },
-    },
-    {
-      selector: 'edge.gv-search-fade',
-      style: { 'opacity': 0.05 },
-    },
-    // Impact highlight (Phase 5). Accent palette mirrors the dashboard
-    // theme: --accent (selected), --accent-fitness (downstream),
-    // --accent-sim (upstream). Hard-coded here because the Cytoscape canvas
-    // can't read CSS custom properties.
-    {
-      selector: 'node.gv-selected',
-      style: { 'background-color': '#e0a96d', 'border-color': '#fff', 'border-width': 4, 'opacity': 1 },
-    },
-    {
-      selector: 'node.gv-upstream',
-      style: { 'background-color': '#6a9bd4', 'opacity': 1 },
-    },
-    {
-      selector: 'node.gv-downstream',
-      style: { 'background-color': '#7ec47e', 'opacity': 1 },
-    },
-    {
-      selector: '.gv-dimmed',
-      style: { 'opacity': 0.1 },
-    },
-  ];
-}
+${dashboardViewGraphStylesheetJs()}
 
 function gvLayoutOptions(layoutId) {
   if (layoutId === 'dagre') {

@@ -300,6 +300,35 @@ function hasFileSizeCheck(content: string): boolean {
   return FILE_SIZE_CHECK_KEYWORDS.some((keyword) => lowerContent.includes(keyword))
 }
 
+/**
+ * A read whose result is handed directly to `JSON.parse(...)` is loading a
+ * structured document (config / manifest / internal IPC spec), not streaming
+ * an arbitrarily large blob — the same bounded-by-nature rationale as the
+ * `.json` entry in {@link KNOWN_SMALL_FILE_PATTERNS}. Matches `JSON.parse(`
+ * (whitespace-tolerant) directly preceding the read call.
+ */
+function isStructuredParseRead(code: string, readIndex: number): boolean {
+  const before = code.slice(Math.max(0, readIndex - 16), readIndex)
+  return /JSON\s*\.\s*parse\s*\(\s*$/.test(before)
+}
+
+/**
+ * Markers indicating a read resolved against the module's OWN location.
+ */
+const SELF_RELATIVE_MARKERS = ['import.meta.url', '__dirname', '__filename', 'fileurltopath']
+
+/**
+ * A read resolved against the module's own location (`import.meta.url`,
+ * `__dirname`, `__filename`, `fileURLToPath`) loads a committed, version-
+ * pinned asset shipped alongside the code (e.g. a vendored bundle), not
+ * untrusted external input — detected by a self-location marker in the
+ * look-back window.
+ */
+function isModuleSelfRelativeRead(codeContext: string): boolean {
+  const lower = codeContext.toLowerCase()
+  return SELF_RELATIVE_MARKERS.some((marker) => lower.includes(marker))
+}
+
 /** Config files that are bounded by nature and don't need size validation. */
 const KNOWN_SMALL_FILE_PATTERNS = [
   'package.json',
@@ -425,8 +454,18 @@ export const unboundedMemory = defineCheck({
       // → readFile, easily putting the guard >500 chars upstream.
       const start = Math.max(0, readCall.index - 1500)
       const context = content.slice(start, readCall.index)
+      const codeContext = codeOnly.slice(start, readCall.index)
 
       if (isReadingKnownSmallFile(content, readCall.index)) {
+        continue
+      }
+
+      // Bounded-by-nature reads: a `JSON.parse(readFile(...))` structured-doc
+      // load, or a read of a module-self-relative committed asset.
+      if (
+        isStructuredParseRead(codeOnly, readCall.index) ||
+        isModuleSelfRelativeRead(codeContext)
+      ) {
         continue
       }
 

@@ -31,6 +31,7 @@ import {
   useSpinner,
   useTheme,
 } from '@opensip-tools/cli-ui';
+import { formatDuration } from '@opensip-tools/core';
 import { Box, Text, useApp, render } from 'ink';
 import React, { useCallback, useEffect, useState } from 'react';
 
@@ -349,11 +350,6 @@ function RunningStageLine({ stage, startedAt, label }: RunningStageLineProps): R
       </Text>
     </Box>
   );
-}
-
-function formatDuration(ms: number): string {
-  if (ms < 1000) return `${String(ms)}ms`;
-  return `${(ms / 1000).toFixed(1)}s`;
 }
 
 // ---------------------------------------------------------------------------
