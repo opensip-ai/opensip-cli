@@ -236,11 +236,12 @@ export default tseslint.config(
   // lang-adapter/; the TypeScript-specific adapter lives in its own
   // package (@opensip-tools/graph-typescript), NOT in the engine.
   //
-  // `typescript` is a build dependency of the engine, so an
-  // `import 'typescript'` in engine code would resolve at runtime — this
-  // rule is the active guardrail against that. dep-cruiser cannot observe
-  // 'typescript' edges (tsPreCompilationDeps: false), so ESLint is the
-  // sole enforcer. Tests are exempt (they may construct compiler fixtures).
+  // `typescript` is a dev dependency of the engine (for its own build +
+  // tests), so engine code importing it would compile and pass local
+  // tests yet break at runtime in any published consumer — and it
+  // violates the parser-agnostic architecture regardless. dep-cruiser
+  // cannot observe 'typescript' edges (tsPreCompilationDeps: false), so
+  // ESLint is the sole enforcer. Tests are exempt (compiler fixtures).
   // ---------------------------------------------------------------------------
   {
     files: ['packages/graph/engine/src/**/*.ts'],

@@ -37,7 +37,7 @@
  *
  * Result-shape contract (audit 2026-05-23 G5)
  * -------------------------------------------
- * `executeUninstall` returns a discriminated `UninstallResult` whose
+ * `executeUninstall` returns a discriminated `UninstallDoneResult` whose
  * `type === 'uninstall-done'` makes it a valid `CommandResult`. The
  * trailing success / cancelled / dry-run / empty notice — previously
  * raw-stdout writes that bypassed the theme — is rendered via Ink in
@@ -104,19 +104,6 @@ export interface UninstallOptions {
   readonly prompt?: (question: string) => Promise<string>
 }
 
-/**
- * Result returned by `executeUninstall`. Extends the contract shape
- * `UninstallDoneResult` with a few legacy convenience flags
- * (`removed`, `cancelled`, `dryRun`) the existing test suite asserts
- * against. The discriminator `action` is the canonical signal; the
- * boolean flags are derivable but kept for back-compat.
- */
-export interface UninstallResult extends UninstallDoneResult {
-  readonly removed: boolean
-  readonly dryRun: boolean
-  readonly cancelled: boolean
-}
-
 const DEFAULT_USER_ROOT = join(homedir(), '.opensip-tools')
 
 async function confirm(
@@ -148,16 +135,17 @@ function targetsForResult(targets: readonly Target[]): readonly { readonly path:
 }
 
 /**
- * Build the canonical "no-op" / "post-removal" result. Centralises the
- * derived fields (`removed`, `dryRun`, `cancelled`) so the dispatch
- * arms stay declarative.
+ * Build the canonical "no-op" / "post-removal" result. The `action`
+ * discriminator is the single source of truth for what happened
+ * (`removed` / `dry-run` / `cancelled` / `empty`); consumers branch on
+ * it rather than on derived boolean flags.
  */
 function buildResult(args: {
   action: UninstallDoneResult['action'];
   mode: UninstallMode;
   targets: readonly Target[];
   rootPath: string;
-}): UninstallResult {
+}): UninstallDoneResult {
   const sizeBytes = args.targets.reduce((sum, t) => sum + t.sizeBytes, 0);
   return {
     type: 'uninstall-done',
@@ -166,9 +154,6 @@ function buildResult(args: {
     targets: targetsForResult(args.targets),
     sizeBytes,
     rootPath: args.rootPath,
-    removed: args.action === 'removed',
-    dryRun: args.action === 'dry-run',
-    cancelled: args.action === 'cancelled',
   };
 }
 
@@ -205,7 +190,7 @@ function printPreambleForRun(
   }
 }
 
-export async function executeUninstall(opts: UninstallOptions = {}): Promise<UninstallResult> {
+export async function executeUninstall(opts: UninstallOptions = {}): Promise<UninstallDoneResult> {
   const mode: UninstallMode = opts.project === undefined ? 'user' : 'project'
   const userRoot = opts.rootDir ?? DEFAULT_USER_ROOT
   const projectDir = resolveProjectDir(opts)

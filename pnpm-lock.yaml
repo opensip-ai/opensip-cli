@@ -231,9 +231,6 @@ importers:
       js-yaml:
         specifier: ^4.1.0
         version: 4.1.1
-      typescript:
-        specifier: ~6.0.3
-        version: 6.0.3
       ulid:
         specifier: ^3.0.2
         version: 3.0.2
@@ -244,6 +241,9 @@ importers:
       '@types/node':
         specifier: ^22.19.19
         version: 22.19.19
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
       vitest:
         specifier: ^4.1.7
         version: 4.1.7(@types/node@22.19.19)(@vitest/coverage-v8@4.1.7)(jsdom@29.1.1)(vite@7.3.3(@types/node@22.19.19)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.22.3)(yaml@2.9.0))

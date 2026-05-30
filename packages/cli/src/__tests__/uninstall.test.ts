@@ -55,8 +55,6 @@ describe('executeUninstall — user mode', () => {
     expect(result.type).toBe('uninstall-done');
     expect(result.mode).toBe('user');
     expect(result.action).toBe('removed');
-    expect(result.removed).toBe(true);
-    expect(result.cancelled).toBe(false);
     expect(existsSync(rootDir)).toBe(false);
     // The pre-prompt target list still surfaces through the write sink.
     expect(out.text()).toContain(rootDir);
@@ -71,8 +69,6 @@ describe('executeUninstall — user mode', () => {
     });
 
     expect(result.action).toBe('dry-run');
-    expect(result.removed).toBe(false);
-    expect(result.dryRun).toBe(true);
     expect(existsSync(rootDir)).toBe(true);
     // Targets list still surfaces pre-prompt; the [dry-run] outcome
     // moved to the Ink renderer so the result discriminator is
@@ -89,7 +85,7 @@ describe('executeUninstall — user mode', () => {
       write: out.write,
     });
 
-    expect(result.removed).toBe(false);
+    expect(result.action).not.toBe('removed');
     expect(result.targets).toHaveLength(0);
     expect(out.text()).toContain('Nothing to remove');
   });
@@ -103,8 +99,6 @@ describe('executeUninstall — user mode', () => {
     });
 
     expect(result.action).toBe('cancelled');
-    expect(result.cancelled).toBe(true);
-    expect(result.removed).toBe(false);
     expect(existsSync(rootDir)).toBe(true);
     // Cancelled outcome is rendered by Ink; pre-prompt target list
     // still surfaces via the write sink.
@@ -144,7 +138,7 @@ describe('executeUninstall — project mode', () => {
       });
 
       expect(result.mode).toBe('project');
-      expect(result.removed).toBe(true);
+      expect(result.action).toBe('removed');
       // Only the runtime target was deleted.
       expect(result.targets).toHaveLength(1);
       expect(result.targets[0].path).toBe(runtimeDir);
@@ -194,7 +188,7 @@ describe('executeUninstall — project mode', () => {
         write: out.write,
       });
 
-      expect(result.removed).toBe(true);
+      expect(result.action).toBe('removed');
       expect(existsSync(runtimeDir)).toBe(false);
       expect(existsSync(join(userSourceDir, 'fit', 'checks', 'custom.mjs'))).toBe(false);
       expect(existsSync(configFile)).toBe(false);
@@ -239,7 +233,7 @@ describe('executeUninstall — project mode', () => {
       write: out.write,
     });
 
-    expect(result.removed).toBe(false);
+    expect(result.action).not.toBe('removed');
     expect(result.targets).toHaveLength(0);
     expect(out.text()).toContain('Nothing to remove');
     expect(out.text()).toContain('no opensip-tools state');
@@ -255,7 +249,7 @@ describe('executeUninstall — project mode', () => {
     });
 
     expect(result.mode).toBe('project');
-    expect(result.removed).toBe(true);
+    expect(result.action).toBe('removed');
     // Default mode still: only .runtime/ removed.
     expect(existsSync(runtimeDir)).toBe(false);
     expect(existsSync(join(userSourceDir, 'fit', 'checks', 'custom.mjs'))).toBe(true);

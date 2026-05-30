@@ -77,7 +77,7 @@ export async function discoverAndRegisterToolPackages(
         continue;
       }
       if (builtInIds.has(mod.tool.metadata.id)) continue;
-      registry.registerThirdParty(mod.tool, { sourcePackage: pkg.name });
+      registry.register(mod.tool, { sourcePackage: pkg.name });
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       process.stderr.write(`opensip-tools: failed to load tool ${pkg.name}: ${msg}\n`);

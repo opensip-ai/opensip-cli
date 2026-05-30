@@ -179,7 +179,7 @@ describe('uninstall.ts — default I/O fallbacks', () => {
     try {
       const result = await executeUninstall({ rootDir: dir });
       // 'n' from the stubbed readline → cancelled.
-      expect(result.cancelled).toBe(true);
+      expect(result.action).toBe('cancelled');
     } finally {
       writeSpy.mockRestore();
       try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* ignore */ }
