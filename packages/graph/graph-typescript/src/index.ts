@@ -33,6 +33,7 @@ import ts from 'typescript';
 
 import { cacheKey as typescriptCacheKey } from './cache-key.js';
 import { discoverFiles as discoverTypescriptFiles } from './discover.js';
+import { extractBoundaryCalls } from './edge-resolvers/boundary.js';
 import { resolveEdgesFromRecords, resolveEdgesSyntactic } from './edges.js';
 import { parseProject as parseTypescriptProject } from './parse.js';
 import { isTypescriptTestFile } from './test-file.js';
@@ -153,31 +154,43 @@ function walkProjectAdapter(input: WalkInput<TsParsed>): WalkOutput {
   };
 }
 
-function resolveCallSitesAdapter(
-  input: ResolveInput<TsParsed>,
-): ResolveOutput {
-  // Branch on the parsed-project tier BEFORE touching the checker. The
-  // fast tier has no `ts.Program`, so the exact (checker-backed) resolver
-  // cannot run on it.
-  if (input.project.kind === 'fast') {
-    return resolveCallSitesFast(input, input.project);
-  }
-  return resolveCallSitesExact(input, input.project);
-}
-
-function resolveCallSitesExact(
-  input: ResolveInput<TsParsed>,
-  project: TypescriptParsedProject,
-): ResolveOutput {
-  // Translate the contract's CallSiteRecord back into the TS-internal
-  // shape that resolveEdgesFromRecords consumes.
-  const tsCallSites: TsCallSiteRecord[] = input.callSites.map((r) => ({
+/**
+ * Translate the contract's opaque CallSiteRecord (nodeRef/sourceFileRef)
+ * back into the TS-internal shape (real ts.Node / ts.SourceFile handles)
+ * that the resolvers and the boundary extractor consume.
+ */
+function toTsCallSites(callSites: readonly ContractCallSiteRecord[]): TsCallSiteRecord[] {
+  return callSites.map((r) => ({
     node: r.nodeRef as ts.Node,
     sourceFile: r.sourceFileRef as ts.SourceFile,
     ownerHash: r.ownerHash,
     kind: r.kind,
     childHash: r.childHash,
   }));
+}
+
+function resolveCallSitesAdapter(
+  input: ResolveInput<TsParsed>,
+): ResolveOutput {
+  // Branch on the parsed-project tier BEFORE touching the checker. The
+  // fast tier has no `ts.Program`, so the exact (checker-backed) resolver
+  // cannot run on it.
+  const base = input.project.kind === 'fast'
+    ? resolveCallSitesFast(input, input.project)
+    : resolveCallSitesExact(input, input.project);
+  // Sharded build: also emit cross-boundary descriptors for calls that
+  // didn't land within this shard's own occurrences. Syntactic and
+  // mode-independent, so it runs identically for both tiers.
+  if (input.emitBoundaryCalls !== true) return base;
+  const boundaryCalls = extractBoundaryCalls(toTsCallSites(input.callSites), input.catalog);
+  return { ...base, boundaryCalls };
+}
+
+function resolveCallSitesExact(
+  input: ResolveInput<TsParsed>,
+  project: TypescriptParsedProject,
+): ResolveOutput {
+  const tsCallSites = toTsCallSites(input.callSites);
   const result = resolveEdgesFromRecords({
     catalog: input.catalog,
     program: project.program,
@@ -226,16 +239,7 @@ function resolveCallSitesFast(
   input: ResolveInput<TsParsed>,
   _project: TypescriptFastParsedProject,
 ): ResolveOutput {
-  // Translate the contract's opaque CallSiteRecord back into the
-  // TS-internal shape the syntactic resolver consumes (real ts.Node /
-  // ts.SourceFile handles), mirroring the exact path's translation.
-  const tsCallSites: TsCallSiteRecord[] = input.callSites.map((r) => ({
-    node: r.nodeRef as ts.Node,
-    sourceFile: r.sourceFileRef as ts.SourceFile,
-    ownerHash: r.ownerHash,
-    kind: r.kind,
-    childHash: r.childHash,
-  }));
+  const tsCallSites = toTsCallSites(input.callSites);
   const result = resolveEdgesSyntactic({
     catalog: input.catalog,
     projectDirAbs: input.projectDirAbs,

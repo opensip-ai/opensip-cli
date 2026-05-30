@@ -57,9 +57,11 @@ export type {
   CallResolution,
   CallConfidence,
   ResolutionMode,
+  CrossBoundaryCall,
   Visibility,
 } from './types.js';
 export type { Renderer, RenderContext } from './render/types.js';
+export type { Shard, ShardBuildResult } from './cli/orchestrate/shard-model.js';
 
 // EdgeResolver, ResolverContext, InventoryVisitor, VisitorContext used
 // to live here as TS-specific re-exports. PR 1b moved them to

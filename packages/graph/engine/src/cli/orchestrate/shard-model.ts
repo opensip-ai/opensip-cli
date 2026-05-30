@@ -20,12 +20,18 @@
  *   cache(fragment by shardId+fingerprint)    (Phase 3)
  */
 
-import type { Catalog, ParseError } from '../../types.js';
+import type { Catalog, CrossBoundaryCall, ParseError, ResolutionMode } from '../../types.js';
+
+// `CrossBoundaryCall` lives in the shared engine type layer (`types.ts`)
+// because the adapter contract (`lang-adapter/types.ts` → `ResolveOutput`)
+// emits it — only the adapter can extract a callee name syntactically.
+// Re-exported here so shard-model consumers see it on the shard surface.
+export type { CrossBoundaryCall } from '../../types.js';
 
 /**
- * One parallelizable unit of a sharded build. The three discovery
- * strategies (workspace units, `--packages`, flat-monorepo partitions)
- * all map their output onto this single shape.
+ * One parallelizable unit of a sharded build. The discovery strategies
+ * (workspace units, flat-monorepo partitions) map their output onto this
+ * single shape.
  */
 export interface Shard {
   /** Stable shard id, e.g. `'pkg:core'`, `'partition:3'`. Used as the cache key component. */
@@ -39,30 +45,20 @@ export interface Shard {
 }
 
 /**
- * A call site a shard worker could NOT resolve within its own files —
- * the callee name is not among the shard's own occurrences. Plain data
- * only: the cross-shard pass (Phase 2) re-resolves these against the
- * global merged catalog + import graph, syntactically.
+ * The JSON spec a shard worker reads (written by the runner to a temp
+ * file, path passed via argv — file, not argv, so thousands of file
+ * paths don't overflow the command line).
  */
-export interface CrossBoundaryCall {
-  /** bodyHash of the enclosing function (an occurrence in this shard's fragment). */
-  readonly ownerHash: string;
-  /** Syntactic callee simple name (`foo` in `foo()`, rightmost in `a.b.c()`). */
-  readonly calleeName: string;
-  /** The import specifier the name came from, if it was imported (`'./x.js'`, `'@scope/pkg'`). */
-  readonly importSpecifier?: string;
-  /** 1-based line of the call site. */
-  readonly line: number;
-  /** 0-based column. */
-  readonly column: number;
-  /** Truncated call-expression text for display (≤ 80 chars, the CallEdge.text contract). */
-  readonly text: string;
+export interface ShardWorkerSpec {
+  readonly shard: Shard;
   /**
-   * True when the call's return value is discarded (ExpressionStatement).
-   * Carried so the recovered cross-shard CallEdge preserves the `discarded`
-   * flag that `no-side-effect-path` relies on.
+   * The COMMON project root all shards share. The worker computes every
+   * occurrence's project-relative `filePath` against this root (not the
+   * shard's own rootDir) so fragments from different shards align in the
+   * merged catalog.
    */
-  readonly discarded?: boolean;
+  readonly projectRoot: string;
+  readonly resolutionMode: ResolutionMode;
 }
 
 /**

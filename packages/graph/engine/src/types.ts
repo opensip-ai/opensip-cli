@@ -201,6 +201,37 @@ export interface ParseError {
 }
 
 /**
+ * A call site a shard worker could NOT resolve within its own files —
+ * the callee name is not among the shard's own occurrences. Plain,
+ * JSON-safe data (no AST): the cross-shard pass re-resolves these against
+ * the global merged catalog + import graph, syntactically.
+ *
+ * Emitted by an adapter's `resolveCallSites` when `emitBoundaryCalls` is
+ * set (only the adapter can extract a callee name from its AST), and
+ * carried across the worker boundary inside a `ShardBuildResult`.
+ */
+export interface CrossBoundaryCall {
+  /** bodyHash of the enclosing function (an occurrence in this shard's fragment). */
+  readonly ownerHash: string;
+  /** Syntactic callee simple name (`foo` in `foo()`, rightmost in `a.b.c()`). */
+  readonly calleeName: string;
+  /** The raw import specifier the name came from, if imported (`'./x.js'`, `'@scope/pkg'`). */
+  readonly importSpecifier?: string;
+  /** 1-based line of the call site. */
+  readonly line: number;
+  /** 0-based column. */
+  readonly column: number;
+  /** Truncated call-expression text for display (≤ 80 chars, the CallEdge.text contract). */
+  readonly text: string;
+  /**
+   * True when the call's return value is discarded (ExpressionStatement).
+   * Carried so the recovered cross-shard CallEdge preserves the `discarded`
+   * flag that `no-side-effect-path` relies on.
+   */
+  readonly discarded?: boolean;
+}
+
+/**
  * The catalog: functions keyed by simple name. Multiple occurrences
  * per name.
  *

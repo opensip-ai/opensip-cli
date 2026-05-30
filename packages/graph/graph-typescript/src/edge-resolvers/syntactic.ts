@@ -164,7 +164,7 @@ function nameOnlyVerdict(candidates: readonly FunctionOccurrence[]): ResolverVer
 
 // ── syntactic callee-name extraction ──────────────────────────────
 
-interface Callee {
+export interface Callee {
   readonly name: string;
   /** 'call' = call/new/jsx (a real invocation); 'ref' = bare value reference. */
   readonly shape: 'call' | 'ref';
@@ -174,8 +174,11 @@ interface Callee {
  * Extract the callee's simple name from a walked resolver-candidate node,
  * purely syntactically. Returns `null` when no simple name is available
  * (e.g. an element-access call `a[b]()` or a computed tag).
+ *
+ * Exported so the cross-shard boundary extractor can identify a call
+ * site's callee name without re-implementing the per-node-kind logic.
  */
-function calleeSimpleName(node: ts.Node): Callee | null {
+export function calleeSimpleName(node: ts.Node): Callee | null {
   if (ts.isCallExpression(node) || ts.isNewExpression(node)) {
     const name = expressionSimpleName(node.expression);
     return name === null ? null : { name, shape: 'call' };
@@ -246,24 +249,50 @@ export function buildImportIndex(
   return index;
 }
 
-/** Record every binding name an import clause introduces → its target. */
-function indexImportClause(
+/** Record every binding name an import clause introduces → `value`. */
+function indexImportClause<V>(
   clause: ts.ImportClause | undefined,
-  target: string | null,
-  index: Map<string, string | null>,
+  value: V,
+  index: Map<string, V>,
 ): void {
   if (clause === undefined) return;
   // `import Foo from '…'`
-  if (clause.name !== undefined) index.set(clause.name.text, target);
+  if (clause.name !== undefined) index.set(clause.name.text, value);
   const bindings = clause.namedBindings;
   if (bindings === undefined) return;
   if (ts.isNamespaceImport(bindings)) {
     // `import * as ns from '…'`
-    index.set(bindings.name.text, target);
+    index.set(bindings.name.text, value);
   } else {
     // `import { a, b as c } from '…'`
-    for (const el of bindings.elements) index.set(el.name.text, target);
+    for (const el of bindings.elements) index.set(el.name.text, value);
   }
+}
+
+/**
+ * Build a per-file index of imported binding name → the RAW import
+ * specifier it came from (`'./x.js'`, `'@scope/pkg'`). Distinct from
+ * {@link buildImportIndex} (which resolves to a project file): the
+ * cross-shard boundary pass needs the raw specifier to re-resolve against
+ * the GLOBAL catalog, where the target file may live in another shard not
+ * present in this file's known-file set.
+ */
+export function buildImportSpecifierIndex(sourceFile: ts.SourceFile): ReadonlyMap<string, string> {
+  const index = new Map<string, string>();
+  for (const stmt of sourceFile.statements) {
+    if (ts.isImportDeclaration(stmt)) {
+      if (!ts.isStringLiteral(stmt.moduleSpecifier)) continue;
+      indexImportClause(stmt.importClause, stmt.moduleSpecifier.text, index);
+    } else if (
+      ts.isImportEqualsDeclaration(stmt) &&
+      ts.isExternalModuleReference(stmt.moduleReference) &&
+      stmt.moduleReference.expression !== undefined &&
+      ts.isStringLiteral(stmt.moduleReference.expression)
+    ) {
+      index.set(stmt.name.text, stmt.moduleReference.expression.text);
+    }
+  }
+  return index;
 }
 
 /**
