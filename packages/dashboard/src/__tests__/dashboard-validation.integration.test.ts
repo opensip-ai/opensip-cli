@@ -17,7 +17,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 // HERE is packages/contracts/src/__tests__; repo root is four levels up.
@@ -43,6 +43,12 @@ function bootDashboard(html: string): BootResult {
   // inlined script bodies in a single sandbox. Returns the local
   // bindings (views, activateView, openFunctionCard) — they're const
   // so they never reach globalThis.
+  //
+  // Booted ONCE per file (see beforeAll): the live report embeds the full
+  // graph catalog (tens of MB), and each boot parses it, builds indexes, and
+  // attaches document-level listeners that capture that state. Re-booting per
+  // test never releases the prior boots' listeners/closures, so the worker
+  // heap climbs with each `it` and eventually OOMs. One boot keeps it flat.
   document.documentElement.innerHTML = html.replace(/^[\s\S]*?<html[^>]*>/i, '').replace(/<\/html>[\s\S]*$/i, '');
   // eslint-disable-next-line unicorn/prefer-spread -- NodeListOf<HTMLScriptElement> spread requires lib.dom.iterable.
   const scripts = Array.from(document.querySelectorAll('script'));
@@ -65,24 +71,41 @@ function activateExploreSubtab(): void {
 }
 
 describe.runIf(existsSync(REPORT))('Phase V — dashboard end-to-end validation', () => {
-  it('latest.html embeds the graph catalog', () => {
-    const html = readReportOrSkip();
-    if (!html) { expect(true).toBe(true); return; }
-    expect(html).toContain('id="graph-catalog"');
+  // The report embeds the full graph catalog (tens of MB). Boot the dashboard
+  // exactly ONCE for the whole file (see bootDashboard) and share the result —
+  // re-booting per test accumulated listeners/closures and OOM'd the worker.
+  let env: BootResult | null = null;
+  let reportHtml: string | null = null;
+
+  beforeAll(() => {
+    reportHtml = readReportOrSkip();
+    if (reportHtml) env = bootDashboard(reportHtml);
   });
 
-  it('boots without throwing and registers 7 views', () => {
-    const html = readReportOrSkip();
-    if (!html) { expect(true).toBe(true); return; }
-    const env = bootDashboard(html);
+  // Strip transient overlays/drawers between tests so the single shared boot
+  // doesn't leak UI state across `it` blocks.
+  beforeEach(() => {
+    if (!env) return;
+    for (const sel of ['.function-card-overlay', '.help-drawer-overlay', '.help-drawer']) {
+      for (const node of document.querySelectorAll(sel)) node.remove();
+    }
+  });
+
+  it('latest.html embeds the graph catalog', () => {
+    if (!reportHtml) { expect(true).toBe(true); return; }
+    expect(reportHtml).toContain('id="graph-catalog"');
+  });
+
+  it('boots without throwing and registers all 8 Code Paths views', () => {
+    if (!env) { expect(true).toBe(true); return; }
     expect(env.views).toBeDefined();
-    expect(env.views.length).toBe(7);
+    // 7 ranked/explore views (hot, big, wide, coupling, untested, sccs,
+    // search) + the graph node-link view (view 8).
+    expect(env.views.length).toBe(8);
   });
 
   it('Code Paths panel hosts Sessions and Explore subtabs', () => {
-    const html = readReportOrSkip();
-    if (!html) { expect(true).toBe(true); return; }
-    bootDashboard(html);
+    if (!env) { expect(true).toBe(true); return; }
     expect(document.querySelector('#panel-code-paths-sessions')).not.toBeNull();
     expect(document.querySelector('#panel-code-paths-explore')).not.toBeNull();
     expect(document.querySelector('#panel-code-paths .subtab[data-subtab="sessions"]')).not.toBeNull();
@@ -90,9 +113,7 @@ describe.runIf(existsSync(REPORT))('Phase V — dashboard end-to-end validation'
   });
 
   it('renders the search input inside the Search view (not above the tab bar)', () => {
-    const html = readReportOrSkip();
-    if (!html) { expect(true).toBe(true); return; }
-    const env = bootDashboard(html);
+    if (!env) { expect(true).toBe(true); return; }
     activateExploreSubtab();
     env.activateView('search');
     const inSearchTab = document.querySelector('#code-paths-view-search #code-paths-search-input');
@@ -103,9 +124,7 @@ describe.runIf(existsSync(REPORT))('Phase V — dashboard end-to-end validation'
   });
 
   it('every Explore view container exists and the active one renders something', () => {
-    const html = readReportOrSkip();
-    if (!html) { expect(true).toBe(true); return; }
-    bootDashboard(html);
+    if (!env) { expect(true).toBe(true); return; }
     activateExploreSubtab();
     for (const id of ['hot', 'big', 'wide', 'coupling', 'untested', 'sccs', 'search']) {
       const c = document.querySelector('#code-paths-view-' + id);
@@ -119,9 +138,7 @@ describe.runIf(existsSync(REPORT))('Phase V — dashboard end-to-end validation'
   });
 
   it('Function Card overlay opens for the first row of the hot view', () => {
-    const html = readReportOrSkip();
-    if (!html) { expect(true).toBe(true); return; }
-    const env = bootDashboard(html);
+    if (!env) { expect(true).toBe(true); return; }
     activateExploreSubtab();
     env.activateView('hot');
     const firstRow = document.querySelector('#code-paths-view-hot [data-body-hash]');
@@ -132,9 +149,7 @@ describe.runIf(existsSync(REPORT))('Phase V — dashboard end-to-end validation'
   });
 
   it('typing into the search input renders results in place', () => {
-    const html = readReportOrSkip();
-    if (!html) { expect(true).toBe(true); return; }
-    const env = bootDashboard(html);
+    if (!env) { expect(true).toBe(true); return; }
     activateExploreSubtab();
     env.activateView('search');
     const input = document.querySelector('#code-paths-view-search #code-paths-search-input')!;
@@ -148,9 +163,7 @@ describe.runIf(existsSync(REPORT))('Phase V — dashboard end-to-end validation'
   });
 
   it('the active view section heading exposes an info button that opens the help drawer', () => {
-    const html = readReportOrSkip();
-    if (!html) { expect(true).toBe(true); return; }
-    const env = bootDashboard(html);
+    if (!env) { expect(true).toBe(true); return; }
     activateExploreSubtab();
     env.activateView('hot');
     const info = document.querySelector<HTMLButtonElement>('#code-paths-view-hot .section-info');
@@ -165,9 +178,7 @@ describe.runIf(existsSync(REPORT))('Phase V — dashboard end-to-end validation'
   });
 
   it('openCodePathsSession switches to Code Paths and selects the session row', () => {
-    const html = readReportOrSkip();
-    if (!html) { expect(true).toBe(true); return; }
-    const env = bootDashboard(html);
+    if (!env) { expect(true).toBe(true); return; }
     const firstGraphRow = document.querySelector<HTMLElement>('#panel-code-paths-sessions tr[data-session-id]');
     if (!firstGraphRow) { expect(true).toBe(true); return; } // No graph sessions yet.
     const sessionId = firstGraphRow.dataset.sessionId!;

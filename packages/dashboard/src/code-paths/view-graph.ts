@@ -61,6 +61,20 @@ function gvLoadViewModel() {
   try { return JSON.parse(blob.textContent); } catch (e) { return null; }
 }
 
+// notifyViews() (and the init loop) fan render() out to EVERY Code Paths
+// panel, not just the active one — the row-table views re-render in O(rows),
+// but a full Cytoscape mount + dagre layout over thousands of nodes is far
+// from free. Defer that work until this panel is actually visible: the panel
+// orchestrator toggles an 'active' class on the live '.code-paths-view'
+// panel. A container that is a panel but not active is hidden → skip the
+// mount (it runs on activation). A container that is NOT a panel (e.g. a
+// unit-test harness div) is treated as visible so direct render() calls mount.
+function gvPanelHidden(container) {
+  return !!(container && container.classList &&
+    container.classList.contains('code-paths-view') &&
+    !container.classList.contains('active'));
+}
+
 function gvNodeShape(kind) {
   switch (kind) {
     case 'constructor': return 'diamond';
@@ -308,6 +322,10 @@ views.push({
       container.appendChild(el('div', { class: 'empty', text: 'Graph renderer unavailable.' }));
       return;
     }
+
+    // Defer the expensive mount while this panel is hidden (see gvPanelHidden).
+    // activateView() re-renders the panel once it becomes visible.
+    if (gvPanelHidden(container)) return;
 
     gvRenderLayoutSelector(container);
     gvRenderSearchBox(container);
