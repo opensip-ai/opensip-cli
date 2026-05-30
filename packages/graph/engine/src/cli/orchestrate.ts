@@ -35,6 +35,7 @@ import type {
   Catalog,
   GraphConfig,
   Indexes,
+  ResolutionMode,
   ResolutionStats,
   Rule,
 } from '../types.js';
@@ -76,6 +77,15 @@ export interface RunGraphInput {
    * surfaces this via the `--language` flag.
    */
   readonly language?: string;
+  /**
+   * Edge resolution tier. `'exact'` (default, or absent) runs the
+   * semantic type-checker-backed resolvers; `'fast'` runs the syntactic
+   * resolver with no type checker. Normalized to `'exact'` at the
+   * orchestrator boundary and folded into the cacheKey so the two tiers
+   * never collide in the catalog cache. Surfaced by the `--resolution`
+   * CLI flag.
+   */
+  readonly resolution?: ResolutionMode;
   /**
    * Optional structured progress callback. The orchestrator emits one
    * `stage-start` + one of `stage-done` / `stage-cached` per pipeline
@@ -137,6 +147,8 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
   const config: GraphConfig = input.config ?? {};
   const ruleSet: readonly Rule[] = input.rules ?? currentRules();
   const catalogRepo = input.datastore ? new CatalogRepo(input.datastore) : null;
+  // Normalize the tier once at the boundary; absence ⇒ exact (historical).
+  const resolutionMode: ResolutionMode = input.resolution ?? 'exact';
 
   const monitor = createPressureMonitor();
   try {
@@ -158,6 +170,7 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
       discovery,
       catalogRepo,
       useCache: input.noCache !== true,
+      resolutionMode,
       onProgress: input.onProgress,
       monitor,
     });

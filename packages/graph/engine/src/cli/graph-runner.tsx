@@ -40,6 +40,7 @@ import { buildUnifiedReportLines, persistSession } from './graph.js';
 import { GRAPH_STAGES, runGraph } from './orchestrate.js';
 
 import type { GraphProgressEvent, GraphStage, RunGraphResult } from './orchestrate.js';
+import type { ResolutionMode } from '../types.js';
 import type { DataStore } from '@opensip-tools/datastore';
 
 const GRAPH_TOOL_TITLE = 'Code Graph';
@@ -99,6 +100,12 @@ interface GraphRunnerArgs {
   readonly cwd: string;
   readonly noCache?: boolean;
   /**
+   * `--resolution`: edge resolution tier. Forwarded to `runGraph` so the
+   * interactive default path (`graph --resolution fast` with no other
+   * flags) actually runs the chosen tier instead of silently using exact.
+   */
+  readonly resolution?: ResolutionMode;
+  /**
    * `--verbose`: when true, show the detailed catalog / findings-by-rule
    * / entry-points blocks in the done view. Default (false) shows the
    * summary line + footer hint only, matching fit's default surface.
@@ -145,6 +152,7 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
         const result: RunGraphResult = await runGraph({
           cwd: args.cwd,
           noCache: args.noCache,
+          resolution: args.resolution,
           onProgress,
           datastore,
         });

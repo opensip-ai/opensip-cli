@@ -94,6 +94,7 @@ export async function executeGraph(
     const result = await runGraph({
       cwd: runCwd,
       noCache: opts.noCache,
+      resolution: opts.resolution,
       language: opts.language,
       datastore: cli.scope.datastore() as DataStore | undefined,
     });
@@ -154,6 +155,7 @@ async function executeMultiPathGraph(
     const r = await runGraph({
       cwd: p,
       noCache: opts.noCache,
+      resolution: opts.resolution,
       language: opts.language,
       datastore: cli.scope.datastore() as DataStore | undefined,
     });
@@ -297,6 +299,7 @@ async function executeWorkspaceGraph(
     cliScript,
     concurrency: opts.concurrency,
     noCache: opts.noCache,
+    resolution: opts.resolution,
   });
   const durationMs = Date.now() - startedAt;
 
