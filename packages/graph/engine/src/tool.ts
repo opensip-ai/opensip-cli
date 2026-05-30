@@ -17,7 +17,7 @@
  */
 
 import { type CliProgram } from '@opensip-tools/contracts';
-import { ConfigurationError, readPackageVersion, ValidationError } from '@opensip-tools/core';
+import { ConfigurationError, logger, readPackageVersion, ValidationError } from '@opensip-tools/core';
 
 // PR 3 of plan 2026-05-23-plan-graph-adapter-package-split.md: the
 // engine no longer hosts any adapter source. All three first-party
@@ -330,7 +330,15 @@ function collectDashboardData(scope: ToolScope): Record<string, unknown> {
   if (!datastore) return {};
   try {
     return { graphCatalog: new CatalogRepo(datastore).loadCatalogContract() };
-  } catch {
+  } catch (error) {
+    // No catalog (or an unreadable one) → the panel renders its no-data
+    // state. Log at debug so the empty-result path is traceable rather
+    // than silent.
+    logger.debug({
+      evt: 'graph.dashboard.catalog_load_failed',
+      module: 'graph:tool',
+      err: error instanceof Error ? error.message : String(error),
+    });
     return {};
   }
 }

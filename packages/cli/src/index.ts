@@ -77,9 +77,12 @@ async function main(): Promise<void> {
   // Bare `opensip-tools` → welcome screen. The update notifier runs
   // AFTER this short-circuit by design (don't nag on zero-arg runs);
   // see docs/public/80-implementation/01-cli-dispatch.md.
+  // Return (not process.exit) so the top-level `finally` still runs the
+  // telemetry shutdown flush — consistent with this file's exitCode-over-
+  // exit() principle below. Exit code defaults to 0.
   if (process.argv.length <= 2) {
     printWelcome({ version: program.version() ?? 'dev' });
-    process.exit(0);
+    return;
   }
   maybeNotify({ name: '@opensip-tools/cli', version: program.version() ?? '0.0.0' });
 

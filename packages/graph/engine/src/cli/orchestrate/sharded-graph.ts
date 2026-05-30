@@ -88,8 +88,16 @@ export async function runShardedGraph(input: RunShardedInput): Promise<RunSharde
     catalogRepo.pruneShardFragmentsExcept(shards.map((s) => s.id));
     try {
       catalogRepo.replaceAll(catalog);
-    } catch {
-      /* v8 ignore next */ // Cache write failure is non-fatal — already logged.
+    } catch (error) {
+      /* v8 ignore next */
+      // Best-effort write: the freshly-built catalog is returned regardless.
+      // replaceAll already logged the underlying error; note the continuation
+      // so the swallow isn't silent.
+      logger.debug({
+        evt: 'graph.sharded.cache_write_skipped',
+        module: 'graph:sharded',
+        err: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 
