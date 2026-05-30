@@ -150,6 +150,30 @@ module.exports = {
     },
 
     // -------------------------------------------------------------------
+    // Layer enforcement — reporting depends on core + contracts only.
+    // -------------------------------------------------------------------
+    {
+      name: 'reporting-imports-core-contracts-only',
+      severity: 'error',
+      comment:
+        'reporting builds SARIF and reports to cloud. It depends on core ' +
+        '(withRetry, logger) and contracts (CliOutput type) only — never ' +
+        'datastore, a tool, cli, lang, check pack, graph, or simulation.',
+      from: { path: '^packages/reporting/src/' },
+      to: {
+        path: [
+          '^@opensip-tools/datastore',
+          '^@opensip-tools/cli($|/)',
+          '^@opensip-tools/fitness',
+          '^@opensip-tools/simulation',
+          '^@opensip-tools/graph',
+          '^@opensip-tools/lang-',
+          '^@opensip-tools/checks-',
+        ],
+      },
+    },
+
+    // -------------------------------------------------------------------
     // Layer enforcement — contracts depends only on core
     // -------------------------------------------------------------------
     {
