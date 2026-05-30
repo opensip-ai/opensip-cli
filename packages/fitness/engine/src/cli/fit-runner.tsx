@@ -33,15 +33,13 @@ import {
   Spinner,
   ThemeProvider,
 } from '@opensip-tools/cli-ui';
-/* eslint-disable sonarjs/deprecation -- intentional adapter usage; fit-runner consumes the CliArgs shape produced by fit's *OptsToCliArgs adapter until the rip-out */
 import {
-  type CliArgs,
+  type FitOptions,
   type CliOutput,
   type ErrorResult,
   type FitDoneResult,
   reportToCloud,
 } from '@opensip-tools/contracts';
-/* eslint-enable sonarjs/deprecation */
 import { Box, Static, Text, useApp, render } from 'ink';
 import React, { useCallback, useEffect, useState } from 'react';
 
@@ -74,8 +72,7 @@ type FitState =
   | { phase: 'error'; result: ErrorResult };
 
 interface FitRunnerProps {
-  // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
-  readonly args: CliArgs;
+  readonly args: FitOptions;
   readonly datastore?: DataStore;
   readonly setExitCode?: (code: number) => void;
 }
@@ -294,8 +291,7 @@ export interface RenderFitLiveOptions {
  * exit-code seam stays the only writer.
  */
 export async function renderFitLive(
-  // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
-  args: CliArgs,
+  args: FitOptions,
   datastore?: DataStore,
   options?: RenderFitLiveOptions,
 ): Promise<void> {

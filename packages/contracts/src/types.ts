@@ -1,4 +1,3 @@
-// @fitness-ignore-file no-deprecated-tags -- CliArgs is a mid-migration bridge type intentionally kept around with @deprecated guidance for the per-command options model (`FitOptions`, `ToolOptions`, `InitOptions`); the deprecation is a steering hint, not removable in this PR.
 import type { StoredSession } from './persistence/store.js';
 import type { ToolShortId } from '@opensip-tools/core';
 
@@ -23,6 +22,10 @@ export interface FitOptions {
   /** Explicit path to opensip-tools.config.yml (overrides package.json pointer and default location). */
   config?: string;
   debug: boolean;
+  /** Suppress banner/boxes; show only the pass-fail summary line. */
+  quiet?: boolean;
+  /** Open the HTML dashboard in the default browser after a successful run. */
+  open?: boolean;
   /** Architecture-gate: save the current run's findings as a baseline. Mutually exclusive with --gate-compare. */
   gateSave?: boolean;
   /** Architecture-gate: compare current findings against a saved baseline; exit 1 if regressions found. Mutually exclusive with --gate-save. */
@@ -61,51 +64,6 @@ export interface ToolOptions {
   /** Recipe name to run. Defaults to the built-in `default` if omitted. */
   recipe?: string;
   /** Filter by scenario kind (load / chaos / invariant / fix-evaluation). */
-  kind?: string;
-}
-
-/**
- * Backwards-compatible alias — commands that previously accepted CliArgs
- * can accept this union instead. The shape covers all fields used by any command.
- *
- * @deprecated Do not extend this interface for new flags. Add new
- * flags to the per-command options interface instead — `FitOptions`
- * for the `fit` subcommand, `ToolOptions` for `sim`, `InitOptions` for
- * `init`. The remaining call sites use `*OptsToCliArgs` adapter
- * functions in fitness/simulation/cli to bridge the two shapes; over
- * time those adapters fold away and the per-command types become the
- * single source of truth. See
- * `docs/public/50-extend/01-plugin-authoring.md` for the
- * adapter pattern and the rationale.
- */
-export interface CliArgs {
-  command: string;
-  json: boolean;
-  check?: string;
-  recipe?: string;
-  cwd: string;
-  help: boolean;
-  list: boolean;
-  listRecipes: boolean;
-  verbose: boolean;
-  reportTo?: string;
-  apiKey?: string;
-  exclude: string[];
-  findings: boolean;
-  tags?: string;
-  /** Suppress banner/boxes; show only the pass-fail summary line. */
-  quiet?: boolean;
-  /** Open the HTML dashboard in the default browser after a successful run. */
-  open?: boolean;
-  /** Explicit opensip-tools.config.yml path from --config flag. */
-  config?: string;
-  /** Architecture-gate flags — see FitOptions for details. */
-  gateSave?: boolean;
-  gateCompare?: boolean;
-  /**
-   * Sim-only: filter scenarios by kind.
-   * One of 'load' | 'chaos' | 'invariant' | 'fix-evaluation', or undefined for all.
-   */
   kind?: string;
 }
 

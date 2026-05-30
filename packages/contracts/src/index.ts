@@ -20,7 +20,6 @@
 
 // CLI option / argument types
 export type {
-  CliArgs,
   FitOptions,
   InitOptions,
   ToolOptions,

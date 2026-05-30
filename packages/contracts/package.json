@@ -30,7 +30,7 @@
     "drizzle-orm": "^0.45.2"
   },
   "peerDependencies": {
-    "commander": "^13.1.0"
+    "commander": "^14.0.0"
   },
   "peerDependenciesMeta": {
     "commander": {

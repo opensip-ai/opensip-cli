@@ -19,6 +19,11 @@
 //
 
 import { promises as fs } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
+const INDEX_DOC = join(REPO_ROOT, 'docs/public/70-reference/05-checks-index.md');
 
 const PACK_DISPLAY = {
   'checks-universal':  { title: 'Universal',  scope: 'Language-agnostic; runs against every project.' },
@@ -86,7 +91,10 @@ async function readInput(arg) {
 }
 
 async function main() {
-  const raw = await readInput(process.argv[2]);
+  const args = process.argv.slice(2);
+  const checkMode = args.includes('--check');
+  const inputArg = args.find((a) => a !== '--check');
+  const raw = await readInput(inputArg);
   const checks = JSON.parse(raw);
   const total = checks.length;
 
@@ -173,7 +181,33 @@ async function main() {
   out.push('');
   out.push('To write your own check, see [plugin authoring](../50-extend/01-plugin-authoring.md).');
 
-  process.stdout.write(out.join('\n') + '\n');
+  const generated = out.join('\n') + '\n';
+
+  if (checkMode) {
+    // The `last_verified` stamp is intentionally volatile (today's date),
+    // so normalise it out before comparing — only real corpus drift
+    // should fail the gate.
+    const normalize = (s) => s.replace(/^last_verified:.*$/m, 'last_verified: <stamp>');
+    let committed;
+    try {
+      committed = await fs.readFile(INDEX_DOC, 'utf8');
+    } catch {
+      process.stderr.write(
+        `error: ${INDEX_DOC} not found. Run \`pnpm docs:checks-index\` to generate it.\n`,
+      );
+      process.exit(1);
+    }
+    if (normalize(generated) !== normalize(committed)) {
+      process.stderr.write(
+        'error: docs/public/70-reference/05-checks-index.md is stale relative to the checks corpus.\n' +
+          '       Run `pnpm docs:checks-index` and commit the regenerated file.\n',
+      );
+      process.exit(1);
+    }
+    return;
+  }
+
+  process.stdout.write(generated);
 }
 
 main().catch((e) => {

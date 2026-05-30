@@ -44,8 +44,7 @@ import {
 import { executeFit } from '@opensip-tools/fitness';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-// eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
-import type { CliArgs } from '@opensip-tools/contracts';
+import type { FitOptions } from '@opensip-tools/contracts';
 
 let projectA: string;
 let projectB: string;
@@ -90,16 +89,14 @@ afterEach(() => {
   rmSync(projectB, { recursive: true, force: true });
 });
 
-// eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
-function makeArgs(cwd: string): CliArgs {
+function makeArgs(cwd: string): FitOptions {
   return {
-    command: 'fit',
     json: false,
-    help: false,
     list: false,
-    listRecipes: false,
+    recipes: false,
     verbose: false,
     findings: false,
+    debug: false,
     quiet: true,
     open: false,
     cwd,

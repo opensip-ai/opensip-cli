@@ -25,9 +25,6 @@ function makeRegistry(): ToolRegistry {
     register: (tool: Tool) => {
       if (!map.has(tool.metadata.id)) map.set(tool.metadata.id, tool);
     },
-    registerThirdParty: (tool: Tool) => {
-      if (!map.has(tool.metadata.id)) map.set(tool.metadata.id, tool);
-    },
     get: (id: string) => map.get(id),
     list,
     clear: () => map.clear(),

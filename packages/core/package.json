@@ -35,12 +35,12 @@
   },
   "dependencies": {
     "js-yaml": "^4.1.0",
-    "typescript": "~6.0.3",
     "ulid": "^3.0.2"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.0",
     "@types/node": "^22.19.19",
+    "typescript": "~6.0.3",
     "vitest": "^4.1.7"
   }
 }

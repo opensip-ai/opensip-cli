@@ -69,3 +69,10 @@ jobs:
       # bug.
       - name: Check generated web docs in sync
         run: node scripts/build-web-docs.mjs --check
+
+      # Verify docs/public/70-reference/05-checks-index.md is in sync with
+      # the checks corpus. Adding, removing, or re-describing a check
+      # changes the generated index; regenerate via `pnpm docs:checks-index`
+      # and commit the result. The `last_verified` date stamp is ignored.
+      - name: Check generated checks index in sync
+        run: pnpm docs:checks-index:check

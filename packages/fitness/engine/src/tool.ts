@@ -1,11 +1,14 @@
 /**
  * fitnessTool — fitness as a Tool plugin.
  *
- * Owns its full Commander wiring for the `fit`, `dashboard`, `fit-list`,
- * and `fit-recipes` subcommands. The CLI calls register() once at
- * startup and the rest is local: every option-parsing rule, gate-mode
- * dispatch, JSON-vs-Ink rendering decision, and dashboard auto-open
- * lives here, in the package that owns the fitness command surface.
+ * Owns its full Commander wiring for the `fit`, `fit-list`,
+ * `fit-recipes`, and `fit-baseline-export` subcommands. The CLI calls
+ * register() once at startup and the rest is local: every option-parsing
+ * rule, gate-mode dispatch, JSON-vs-Ink rendering decision, and the
+ * post-run dashboard auto-open (`fit --open`) lives here, in the package
+ * that owns the fitness command surface. (The standalone `dashboard`
+ * subcommand is owned by the CLI, which composes it from every tool's
+ * contributed data — see packages/cli/src/commands/register-dashboard.ts.)
  *
  * The CLI no longer imports `executeFit`, `openDashboard`, etc.
  * directly — it just calls `fitnessTool.register(cli)`. Adding a new
@@ -40,20 +43,16 @@
  */
 
 
-/* eslint-disable sonarjs/deprecation -- intentional adapter usage; tool.ts bridges per-command FitOptions/ToolOptions to executeFit's legacy CliArgs shape via fitOptsToCliArgs / toolOptsToCliArgs */
 import {
-  type CliArgs,
   type CliProgram,
   type FitOptions,
   type ToolOptions,
 } from '@opensip-tools/contracts';
-/* eslint-enable sonarjs/deprecation */
 import { readPackageVersion } from '@opensip-tools/core';
 
 import { exportFitBaseline } from './cli/baseline-export.js';
 import { collectFitnessDashboardData } from './cli/dashboard.js';
 import {
-  fitOptsToCliArgs,
   runGateMode,
   runJsonMode,
   runListMode,
@@ -128,8 +127,7 @@ function register(cli: ToolCliContext): void {
   // lookup handshake is gone — adding a fourth tool with a live view
   // requires zero CLI edits.
   cli.registerLiveView(FIT_LIVE_VIEW_KEY, async (args) => {
-    // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
-    await renderFitLive(args as CliArgs, cli.scope.datastore() as DataStore | undefined, {
+    await renderFitLive(args as FitOptions, cli.scope.datastore() as DataStore | undefined, {
       setExitCode: cli.setExitCode,
     });
   });
@@ -168,26 +166,24 @@ function registerFitCommand(program: CliProgram, cli: ToolCliContext): void {
     .option('--debug', 'Enable debug mode for structured log output', false)
     .option('--gate-save', 'Architecture-gate: save current findings as baseline in the project SQLite store (mutually exclusive with --gate-compare)', false)
     .option('--gate-compare', 'Architecture-gate: compare current findings against the saved baseline; exit 1 on regression', false)
-    .action(async (opts: FitOptions & { quiet?: boolean; open?: boolean }) => {
-      const args = fitOptsToCliArgs(opts);
-
-      if (args.gateSave === true || args.gateCompare === true) {
-        await runGateMode(args, cli);
+    .action(async (opts: FitOptions) => {
+      if (opts.gateSave === true || opts.gateCompare === true) {
+        await runGateMode(opts, cli);
         return;
       }
-      if (args.list) {
-        await runListMode(args, cli);
+      if (opts.list) {
+        await runListMode(opts, cli);
         return;
       }
-      if (args.listRecipes) {
-        await runRecipesMode(args, cli);
+      if (opts.recipes) {
+        await runRecipesMode(opts, cli);
         return;
       }
-      if (args.json) {
-        await runJsonMode(args, cli);
+      if (opts.json) {
+        await runJsonMode(opts, cli);
         return;
       }
-      await runLiveMode(args, cli, FIT_LIVE_VIEW_KEY, opts.open === true);
+      await runLiveMode(opts, cli, FIT_LIVE_VIEW_KEY, opts.open === true);
     });
 }
 

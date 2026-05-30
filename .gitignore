@@ -30,9 +30,6 @@ coverage/
 # Logs
 *.log
 
-# Generated reports (legacy ~/.opensip-tools/reports/)
-opensip-tools-report.html
-
 # Packed tarballs (from `pnpm pack` / `npm pack`)
 *.tgz
 

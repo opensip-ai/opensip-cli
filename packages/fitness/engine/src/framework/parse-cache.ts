@@ -1,15 +1,16 @@
 /**
- * @fileoverview Re-export from the language-aware parse cache.
+ * @fileoverview TS SourceFile helper for framework/import-graph.ts.
  *
- * The init/clear lifecycle and getParseTree API live in
- * core/src/languages/parse-cache.ts. This file forwards those calls
- * for backward compatibility with code that imported from this path.
+ * Sole export: `getSharedSourceFile`, a TS-specific convenience wrapper
+ * that resolves the TypeScript adapter from the language registry and
+ * parses through the language-aware cache (core/src/languages/
+ * parse-cache.ts), falling back to a direct parse when no adapter is
+ * registered (e.g. unit tests without CLI bootstrap).
  *
- * getSharedSourceFile remains as a TS-specific convenience wrapper
- * that resolves the TypeScript adapter from the language registry.
- * Phase 2 moved the canonical TS AST helpers to
- * @opensip-tools/lang-typescript; this shim is retained for the
- * core framework/import-graph.ts internal use case.
+ * This file no longer re-exports the parse-cache lifecycle/getParseTree
+ * API — `import-graph.ts` is its only internal consumer. New TS check
+ * authors should import the canonical AST helpers from
+ * @opensip-tools/lang-typescript instead.
  */
 
 

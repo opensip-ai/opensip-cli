@@ -12,7 +12,7 @@
 import type { CliOutput } from '@opensip-tools/contracts';
 
 /** Per-check finding inside a {@link FitnessSessionPayload}. */
-export interface FitnessSessionFinding {
+interface FitnessSessionFinding {
   readonly ruleId: string;
   readonly message: string;
   readonly severity: string;
@@ -23,7 +23,7 @@ export interface FitnessSessionFinding {
 }
 
 /** Per-check result inside a {@link FitnessSessionPayload}. */
-export interface FitnessSessionCheck {
+interface FitnessSessionCheck {
   readonly checkSlug: string;
   readonly passed: boolean;
   readonly violationCount?: number;

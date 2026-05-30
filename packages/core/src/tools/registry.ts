@@ -44,20 +44,6 @@ export class ToolRegistry {
     this.inner.register({ id, name: id, tool }, { sourcePackage: opts.sourcePackage });
   }
 
-  /**
-   * Register a third-party tool. Equivalent to {@link register} today —
-   * the duplicate-id policy lives entirely in the registry — but
-   * exposes the discovery source as a structured log field so warnings
-   * point at the offending package. Use this in CLI bootstrap when
-   * iterating discovered npm packages.
-   *
-   * NEW CODE should use `register(tool, { sourcePackage })`. This
-   * method survives as a back-compat alias for one minor release.
-   */
-  registerThirdParty(tool: Tool, opts: { sourcePackage?: string } = {}): void {
-    this.register(tool, opts);
-  }
-
   list(): readonly Tool[] {
     return this.inner.getAll().map((r) => r.tool);
   }

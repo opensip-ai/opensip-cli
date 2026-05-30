@@ -231,23 +231,21 @@ export default tseslint.config(
   },
 
   // ---------------------------------------------------------------------------
-  // graph engine — only the lang-typescript/ adapter subtree may import the
-  // TypeScript compiler API. Everywhere else routes through the
-  // GraphLanguageAdapter contract from lang-adapter/. The dep-cruiser rule
-  // graph-no-typescript-import-outside-lang-typescript documents the same
-  // intent at the architecture level, but with this project's
-  // tsPreCompilationDeps: false setting, dep-cruiser does not observe
-  // 'typescript' import edges at all — so ESLint is the active enforcer.
+  // graph engine — must stay parser-agnostic. Engine code routes all
+  // language work through the GraphLanguageAdapter contract from
+  // lang-adapter/; the TypeScript-specific adapter lives in its own
+  // package (@opensip-tools/graph-typescript), NOT in the engine.
   //
-  // Plan: docs/plans/10-graph-language-pluggability.md PR 3.
+  // `typescript` is a dev dependency of the engine (for its own build +
+  // tests), so engine code importing it would compile and pass local
+  // tests yet break at runtime in any published consumer — and it
+  // violates the parser-agnostic architecture regardless. dep-cruiser
+  // cannot observe 'typescript' edges (tsPreCompilationDeps: false), so
+  // ESLint is the sole enforcer. Tests are exempt (compiler fixtures).
   // ---------------------------------------------------------------------------
   {
     files: ['packages/graph/engine/src/**/*.ts'],
     ignores: [
-      'packages/graph/engine/src/lang-typescript/**',
-      // Tests legitimately construct ts.SourceFile etc. as fixtures and
-      // exercise the adapter's TS-coupled internals. The architectural
-      // rule applies to production engine code only.
       'packages/graph/engine/src/**/__tests__/**',
       'packages/graph/engine/src/**/*.test.ts',
     ],
@@ -256,10 +254,10 @@ export default tseslint.config(
         paths: [{
           name: 'typescript',
           message:
-            'Only the lang-typescript/ adapter may import the TypeScript ' +
-            'compiler API. Engine code must route through the ' +
-            'GraphLanguageAdapter contract from lang-adapter/. See ' +
-            'docs/plans/10-graph-language-pluggability.md.',
+            'The graph engine must stay parser-agnostic. Route language ' +
+            'work through the GraphLanguageAdapter contract from ' +
+            'lang-adapter/; TypeScript compiler access belongs in the ' +
+            '@opensip-tools/graph-typescript adapter package.',
         }],
       }],
     },

@@ -9,19 +9,15 @@
  * keeps `tool.ts` focused on Commander wiring and lets the runner
  * branches be tested independently.
  *
- * The exported helpers all take a normalized `CliArgs` (the bridge
- * shape executeFit consumes) plus the `ToolCliContext` the dispatcher
- * provides to each tool.
+ * The exported helpers all take the Commander-parsed `FitOptions` plus
+ * the `ToolCliContext` the dispatcher provides to each tool.
  */
 
-/* eslint-disable sonarjs/deprecation -- intentional adapter usage; CliArgs bridge between FitOptions and executeFit's legacy shape */
 import {
   EXIT_CODES,
   mapToolErrorToExitCode,
-  type CliArgs,
   type FitOptions,
 } from '@opensip-tools/contracts';
-/* eslint-enable sonarjs/deprecation */
 
 import {
   saveBaseline,
@@ -40,35 +36,6 @@ import type { ToolCliContext } from '@opensip-tools/core';
 import type { DataStore } from '@opensip-tools/datastore';
 
 /**
- * Bridge `FitOptions` (Commander-parsed) to the legacy `CliArgs` shape
- * that `executeFit` and friends consume.
- */
-// eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
-export function fitOptsToCliArgs(opts: FitOptions & { quiet?: boolean; open?: boolean }): CliArgs {
-  return {
-    command: 'fit',
-    json: opts.json,
-    check: opts.check,
-    recipe: opts.recipe,
-    cwd: opts.cwd,
-    help: false,
-    list: opts.list,
-    listRecipes: opts.recipes,
-    verbose: opts.verbose,
-    reportTo: opts.reportTo,
-    apiKey: opts.apiKey,
-    exclude: opts.exclude,
-    findings: opts.findings,
-    tags: opts.tags,
-    quiet: opts.quiet === true,
-    open: opts.open === true,
-    config: opts.config,
-    gateSave: opts.gateSave === true,
-    gateCompare: opts.gateCompare === true,
-  };
-}
-
-/**
  * Emit any non-fatal warnings collected during the run to stderr. Safe to
  * call from non-Ink paths (JSON, gate modes) because Ink is not managing
  * the screen there. The live renderer surfaces these through Ink in the
@@ -81,15 +48,13 @@ function emitWarningsToStderr(result: { warnings?: readonly string[] }): void {
   }
 }
 
-// eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
-export async function runListMode(args: CliArgs, cli: ToolCliContext): Promise<void> {
+export async function runListMode(args: FitOptions, cli: ToolCliContext): Promise<void> {
   const result = await listChecks(args.cwd);
   if (args.json) { cli.emitJson(result); return; }
   await cli.render(result);
 }
 
-// eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
-export async function runRecipesMode(args: CliArgs, cli: ToolCliContext): Promise<void> {
+export async function runRecipesMode(args: FitOptions, cli: ToolCliContext): Promise<void> {
   const result = await listRecipes(args.cwd);
   if (args.json) { cli.emitJson(result); return; }
   await cli.render(result);
@@ -103,8 +68,7 @@ export async function runRecipesMode(args: CliArgs, cli: ToolCliContext): Promis
  * history alongside live-mode and gate-mode runs. No `onProgress`: JSON
  * output is one-shot, no progress UI.
  */
-// eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
-export async function runJsonMode(args: CliArgs, cli: ToolCliContext): Promise<void> {
+export async function runJsonMode(args: FitOptions, cli: ToolCliContext): Promise<void> {
   const fitResult = await executeFit(args, { datastore: cli.scope.datastore() as DataStore | undefined });
   if (fitResult.result.type === 'error') {
     cli.setExitCode(fitResult.result.exitCode);
@@ -127,8 +91,7 @@ export async function runJsonMode(args: CliArgs, cli: ToolCliContext): Promise<v
  * dashboard.
  */
 export async function runLiveMode(
-  // eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
-  args: CliArgs,
+  args: FitOptions,
   cli: ToolCliContext,
   liveViewKey: string,
   openRequested: boolean,
@@ -140,8 +103,7 @@ export async function runLiveMode(
   });
 }
 
-// eslint-disable-next-line sonarjs/deprecation -- intentional adapter usage; CliArgs bridge
-export async function runGateMode(args: CliArgs, cli: ToolCliContext): Promise<void> {
+export async function runGateMode(args: FitOptions, cli: ToolCliContext): Promise<void> {
   if (args.gateSave === true && args.gateCompare === true) {
     cli.logger.warn({
       evt: 'cli.gate.config_error',

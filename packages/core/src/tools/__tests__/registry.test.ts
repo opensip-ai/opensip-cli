@@ -84,17 +84,17 @@ describe('ToolRegistry', () => {
     expect(reg.list()).toHaveLength(1);
   });
 
-  describe('registerThirdParty', () => {
+  describe('register with sourcePackage (third-party discovery path)', () => {
     it('registers when no incumbent exists', () => {
       const t = stub('a');
-      reg.registerThirdParty(t, { sourcePackage: '@vendor/a' });
+      reg.register(t, { sourcePackage: '@vendor/a' });
       expect(reg.get('a')).toBe(t);
     });
 
     it('rejects when an incumbent exists and surfaces the source package in the warning', () => {
       const incumbent = stub('a');
       reg.register(incumbent);
-      reg.registerThirdParty(stub('a'), { sourcePackage: '@vendor/a' });
+      reg.register(stub('a'), { sourcePackage: '@vendor/a' });
       expect(reg.get('a')).toBe(incumbent);
       expect(warnSpy).toHaveBeenCalledWith(
         expect.objectContaining({
