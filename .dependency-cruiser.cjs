@@ -648,8 +648,13 @@ module.exports = {
     },
 
     tsConfig: {
-      // Use each package's tsconfig automatically — same setup ESLint uses.
-      fileName: 'tsconfig.json',
+      // depcruise-only tsconfig: extends the root config but adds `paths`
+      // mapping every @opensip-tools/* specifier to its package SOURCE
+      // (packages/*/src/index.ts). Without this, workspace imports resolve
+      // via each package's `exports` to dist/, which exclude + includeOnly
+      // below then drop — making every cross-package layer rule inert
+      // (the whole point of this gate). NOT used for tsc builds.
+      fileName: 'tsconfig.depcruise.json',
     },
 
     // Type-only imports are stripped at compile time, so a file A that
