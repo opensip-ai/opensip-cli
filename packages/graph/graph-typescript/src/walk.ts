@@ -93,7 +93,15 @@ export interface DependencySiteRecord {
 }
 
 export interface WalkInput {
-  readonly program: ts.Program;
+  /**
+   * The project's source files to walk. Supplied by the adapter from
+   * either tier: exact mode passes `program.getSourceFiles()`; fast mode
+   * passes the standalone source-file map's values. The walk is purely
+   * structural — it needs `ts.SourceFile`s with parent pointers (which
+   * both tiers provide) and nothing from the type checker — so it is
+   * mode-agnostic and never sees a `ts.Program`.
+   */
+  readonly sourceFiles: Iterable<ts.SourceFile>;
   readonly files: readonly string[];
   readonly projectDirAbs: string;
 }
@@ -115,7 +123,7 @@ export function walkProgram(input: WalkInput): WalkOutput {
   const parseErrors: ParseError[] = [];
   const filesSet = new Set(input.files.map(normalizeForCompare));
 
-  for (const sf of input.program.getSourceFiles()) {
+  for (const sf of input.sourceFiles) {
     if (sf.isDeclarationFile) continue;
     const sfPath = normalizeForCompare(sf.fileName);
     if (!filesSet.has(sfPath)) continue;

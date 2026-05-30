@@ -38,7 +38,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 
-import { typescriptGraphAdapter, type TypescriptParsedProject } from '../index.js';
+import { typescriptGraphAdapter, type TsParsed } from '../index.js';
 
 import type ts from 'typescript';
 
@@ -86,7 +86,7 @@ function setupFixture(dir: string): void {
 }
 
 function buildPipeline(adapter = typescriptGraphAdapter, dir: string): {
-  readonly project: TypescriptParsedProject;
+  readonly project: TsParsed;
   readonly walk: WalkOutput;
   readonly catalog: Catalog;
   readonly discovery: ReturnType<typeof typescriptGraphAdapter.discoverFiles>;
