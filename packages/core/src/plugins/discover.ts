@@ -16,10 +16,9 @@
  *      list is required so a `plugin install` step is intentional, not
  *      an accidental load of every transitive devDep.
  *
- * Other domains (`'lang'` for language adapters; `'asm'` reserved for
- * a future tool) don't have project-local plugin dirs — they return
- * an empty array. Language adapters ship as direct deps of the CLI;
- * assess is not yet implemented.
+ * The `'lang'` domain (language adapters) doesn't have project-local
+ * plugin dirs — it returns an empty array. Language adapters ship as
+ * direct deps of the CLI.
  */
 
 import { existsSync, readdirSync, realpathSync, statSync } from 'node:fs'
@@ -59,7 +58,7 @@ const USER_SUBDIRS: Partial<Record<PluginDomain, readonly string[]>> = {
  * missing project directory or absent subdirs — callers that care
  * about "did we find anything?" should check the returned length.
  *
- * @param domain      'fit' / 'sim' / 'asm' / 'lang'.
+ * @param domain      'fit' / 'sim' / 'lang'.
  * @param projectDir  Project root. Required — there is no user-global
  *                    fallback. Pass undefined to discover nothing
  *                    (used by callers that don't have a project
@@ -73,7 +72,7 @@ export function discoverPlugins(
 
   const subdirs = USER_SUBDIRS[domain]
   if (!subdirs) {
-    // 'lang' / 'asm' — no user-source layout. Return empty; caller
+    // 'lang' — no user-source layout. Return empty; caller
     // (e.g. CLI bootstrap) registers language adapters via direct
     // package imports, not the file-plugin path.
     return []

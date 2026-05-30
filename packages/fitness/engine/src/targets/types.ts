@@ -12,8 +12,6 @@ export interface TargetConfig {
   readonly include: readonly string[]
   /** Glob patterns to exclude */
   readonly exclude: readonly string[]
-  /** Context doc paths for assessments */
-  readonly context?: readonly string[]
   /** Tags for filtering/grouping */
   readonly tags?: readonly string[]
   /** Languages this target contains (e.g. 'typescript', 'tsx', 'json') */
@@ -47,7 +45,6 @@ type CheckTargetMap = Readonly<Record<string, string | readonly string[]>>
 interface PluginsConfig {
   readonly fit?: readonly string[]
   readonly sim?: readonly string[]
-  readonly asm?: readonly string[]
   readonly lang?: readonly string[]
   /**
    * Explicit list of npm package names to load as check providers

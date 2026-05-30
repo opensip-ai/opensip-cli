@@ -38,7 +38,6 @@ const CheckTargetValueSchema = z.union([
 const PluginsSchema = z.object({
   fit: z.array(z.string()).optional(),
   sim: z.array(z.string()).optional(),
-  asm: z.array(z.string()).optional(),
   lang: z.array(z.string()).optional(),
   checkPackages: z.array(z.string()).optional(),
   autoDiscoverChecks: z.boolean().optional(),
@@ -69,7 +68,6 @@ function buildFromParsed(
   rawPlugins?: {
     fit?: readonly string[]
     sim?: readonly string[]
-    asm?: readonly string[]
     lang?: readonly string[]
     checkPackages?: readonly string[]
     autoDiscoverChecks?: boolean
@@ -113,7 +111,6 @@ function buildFromParsed(
     ? Object.freeze({
         ...(rawPlugins.fit && { fit: Object.freeze([...rawPlugins.fit]) }),
         ...(rawPlugins.sim && { sim: Object.freeze([...rawPlugins.sim]) }),
-        ...(rawPlugins.asm && { asm: Object.freeze([...rawPlugins.asm]) }),
         ...(rawPlugins.lang && { lang: Object.freeze([...rawPlugins.lang]) }),
         ...(rawPlugins.checkPackages && { checkPackages: Object.freeze([...rawPlugins.checkPackages]) }),
         ...(rawPlugins.autoDiscoverChecks !== undefined && { autoDiscoverChecks: rawPlugins.autoDiscoverChecks }),

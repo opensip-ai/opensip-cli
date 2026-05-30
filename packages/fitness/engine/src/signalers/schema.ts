@@ -1,8 +1,8 @@
 /**
  * @fileoverview Zod validation schema for opensip-tools.config.yml
  *
- * Defines the schema for signal producer configuration (fitness, simulation,
- * assess) and file targeting. These settings live alongside the target
+ * Defines the schema for signal producer configuration (fitness,
+ * simulation) and file targeting. These settings live alongside the target
  * definitions in opensip-tools.config.yml.
  */
 
@@ -29,21 +29,6 @@ const TargetDefinitionSchema = z.object({
 })
 
 // =============================================================================
-// Signaler Schedule Schema
-// =============================================================================
-
-const SignalerScheduleSchema = z.object({
-  name: z.string().min(1).max(128),
-  recipe: z.string().min(1).max(128).optional(),
-  scenario: z.string().min(1).max(128).optional(),
-  interval: z.enum(['hourly', 'daily', 'weekdays', 'weekly']),
-  time: z.string().regex(/^\d{2}:\d{2}$/).default('00:00'),
-  day: z.enum(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']).optional(),
-}).refine(s => s.interval !== 'weekly' || s.day != null, {
-  message: 'Weekly schedules must specify a day',
-})
-
-// =============================================================================
 // Producer Schemas (copied from config/schema.ts — removed from there in Phase 2)
 // =============================================================================
 
@@ -55,13 +40,10 @@ const FitnessSchema = z.object({
   failOnErrors: z.number().int().min(0).default(DEFAULTS.signals.fitness.failOnErrors),
   failOnWarnings: z.number().int().min(0).default(DEFAULTS.signals.fitness.failOnWarnings),
   disabledChecks: z.array(z.string().min(1).max(255)).optional().default([]),
-  schedules: z.array(SignalerScheduleSchema).default([]),
 })
 
-/** Schema for simulation engine configuration */
-const SimulationSchema = z.object({
-  schedules: z.array(SignalerScheduleSchema).default([]),
-})
+/** Schema for simulation engine configuration. Currently has no fields. */
+const SimulationSchema = z.object({})
 
 // =============================================================================
 // Check Overrides

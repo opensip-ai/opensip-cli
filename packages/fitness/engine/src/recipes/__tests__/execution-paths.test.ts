@@ -71,7 +71,7 @@ describe('parallel execution — error paths', () => {
     const svc = new FitnessRecipeService({
       cwd: testDir,
       checkRegistry,
-      recipeRegistry: new FitnessRecipeRegistry({ loadUserRecipes: false, logWarnings: false }),
+      recipeRegistry: new FitnessRecipeRegistry(),
       prewarmCache: true,
     })
 
@@ -106,7 +106,7 @@ describe('parallel execution — error paths', () => {
     const svc = new FitnessRecipeService({
       cwd: testDir,
       checkRegistry,
-      recipeRegistry: new FitnessRecipeRegistry({ loadUserRecipes: false, logWarnings: false }),
+      recipeRegistry: new FitnessRecipeRegistry(),
       prewarmCache: true,
     })
 
@@ -140,7 +140,7 @@ describe('sequential execution — timeout', () => {
     const svc = new FitnessRecipeService({
       cwd: testDir,
       checkRegistry,
-      recipeRegistry: new FitnessRecipeRegistry({ loadUserRecipes: false, logWarnings: false }),
+      recipeRegistry: new FitnessRecipeRegistry(),
       prewarmCache: false,
     })
 
@@ -168,7 +168,7 @@ describe('sequential execution — timeout', () => {
     const svc = new FitnessRecipeService({
       cwd: testDir,
       checkRegistry,
-      recipeRegistry: new FitnessRecipeRegistry({ loadUserRecipes: false, logWarnings: false }),
+      recipeRegistry: new FitnessRecipeRegistry(),
       prewarmCache: false,
     })
 
@@ -198,7 +198,7 @@ describe('parallel execution — timeout', () => {
     const svc = new FitnessRecipeService({
       cwd: testDir,
       checkRegistry,
-      recipeRegistry: new FitnessRecipeRegistry({ loadUserRecipes: false, logWarnings: false }),
+      recipeRegistry: new FitnessRecipeRegistry(),
       prewarmCache: false,
     })
 
@@ -230,7 +230,7 @@ describe('check-result-processor — error result fields', () => {
     const svc = new FitnessRecipeService({
       cwd: testDir,
       checkRegistry,
-      recipeRegistry: new FitnessRecipeRegistry({ loadUserRecipes: false, logWarnings: false }),
+      recipeRegistry: new FitnessRecipeRegistry(),
       prewarmCache: false,
     })
 
@@ -258,7 +258,7 @@ describe('check-result-processor — error result fields', () => {
     const svc = new FitnessRecipeService({
       cwd: testDir,
       checkRegistry,
-      recipeRegistry: new FitnessRecipeRegistry({ loadUserRecipes: false, logWarnings: false }),
+      recipeRegistry: new FitnessRecipeRegistry(),
       prewarmCache: false,
     })
 
@@ -292,7 +292,7 @@ describe('catalog sync', () => {
     const svc = new FitnessRecipeService({
       cwd: testDir,
       checkRegistry,
-      recipeRegistry: new FitnessRecipeRegistry({ loadUserRecipes: false, logWarnings: false }),
+      recipeRegistry: new FitnessRecipeRegistry(),
       prewarmCache: false,
       callbacks,
     })

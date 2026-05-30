@@ -81,4 +81,4 @@ export interface PluginLoadResult {
 }
 
 /** Plugin domains. `lang` packs register language adapters; the others register checks/recipes. */
-export type PluginDomain = 'fit' | 'sim' | 'asm' | 'lang'
+export type PluginDomain = 'fit' | 'sim' | 'lang'

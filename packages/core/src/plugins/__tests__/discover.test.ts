@@ -57,11 +57,9 @@ describe('discoverPlugins', () => {
     expect(discoverPlugins('fit', testDir)).toEqual([])
   })
 
-  it('returns empty array for `lang` and `asm` (no subdir model)', () => {
+  it('returns empty array for `lang` (no subdir model)', () => {
     mkdirSync(join(testDir, 'opensip-tools', 'lang'), { recursive: true })
-    mkdirSync(join(testDir, 'opensip-tools', 'asm'), { recursive: true })
     expect(discoverPlugins('lang', testDir)).toEqual([])
-    expect(discoverPlugins('asm', testDir)).toEqual([])
   })
 
   describe('user-source files (no config opt-in needed)', () => {

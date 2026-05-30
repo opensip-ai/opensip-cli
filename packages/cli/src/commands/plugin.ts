@@ -330,10 +330,10 @@ export async function pluginSync(
   cwd: string = process.cwd(),
   domainOverride?: string,
 ): Promise<PluginResult> {
-  // pluginSync only iterates plugin-supporting domains. The domain
-  // type here is the intersection of PathDomain (fit|sim|graph) and
-  // PluginDomain (fit|sim|asm|lang), which is fit|sim. Graph does not
-  // yet load project-local rule plugins (deferred to v0.3 per DEC-6).
+  // pluginSync only iterates plugin-supporting domains. PluginDomain is
+  // fit|sim|lang; lang plugins route through the language registry rather
+  // than this installer, so the plugin command handles only fit|sim. Graph
+  // does not route through plugin install.
   type SyncDomain = 'fit' | 'sim';
   const syncDomains: SyncDomain[] = ['fit', 'sim'];
   const domains: SyncDomain[] = (

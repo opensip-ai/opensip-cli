@@ -103,7 +103,7 @@ describe('FitnessRecipeService — construction', () => {
   it('uses provided check + recipe registries', async () => {
     const checkRegistry = new CheckRegistry();
     checkRegistry.register(makeMarkerCheck('flag-foo', 'FOO'));
-    const recipeRegistry = new FitnessRecipeRegistry({ loadUserRecipes: false, logWarnings: false });
+    const recipeRegistry = new FitnessRecipeRegistry();
 
     const svc = new FitnessRecipeService({ cwd: testDir, checkRegistry, recipeRegistry, prewarmCache: false });
     writeFixture('a.ts', 'const x = "FOO";');
@@ -113,13 +113,13 @@ describe('FitnessRecipeService — construction', () => {
   });
 
   it('listRecipes exposes the recipe registry contents', () => {
-    const recipeRegistry = new FitnessRecipeRegistry({ loadUserRecipes: false, logWarnings: false });
+    const recipeRegistry = new FitnessRecipeRegistry();
     const svc = new FitnessRecipeService({ recipeRegistry });
     expect(svc.listRecipes().length).toBeGreaterThan(0);
   });
 
   it('getRecipe resolves a recipe by name and ID', () => {
-    const recipeRegistry = new FitnessRecipeRegistry({ loadUserRecipes: false, logWarnings: false });
+    const recipeRegistry = new FitnessRecipeRegistry();
     const svc = new FitnessRecipeService({ recipeRegistry });
     expect(svc.getRecipe('default')).toBeDefined();
     expect(svc.getRecipe('NOT_REAL')).toBeUndefined();
@@ -141,7 +141,7 @@ describe('FitnessRecipeService — parallel execution', () => {
     const svc = new FitnessRecipeService({
       cwd: testDir,
       checkRegistry,
-      recipeRegistry: new FitnessRecipeRegistry({ loadUserRecipes: false, logWarnings: false }),
+      recipeRegistry: new FitnessRecipeRegistry(),
       prewarmCache: true,
     });
 
@@ -162,7 +162,7 @@ describe('FitnessRecipeService — parallel execution', () => {
     const svc = new FitnessRecipeService({
       cwd: testDir,
       checkRegistry,
-      recipeRegistry: new FitnessRecipeRegistry({ loadUserRecipes: false, logWarnings: false }),
+      recipeRegistry: new FitnessRecipeRegistry(),
       prewarmCache: false,
       callbacks: {
         onCheckStart: (slug) => starts.push(slug),
@@ -185,7 +185,7 @@ describe('FitnessRecipeService — parallel execution', () => {
     const svc = new FitnessRecipeService({
       cwd: testDir,
       checkRegistry,
-      recipeRegistry: new FitnessRecipeRegistry({ loadUserRecipes: false, logWarnings: false }),
+      recipeRegistry: new FitnessRecipeRegistry(),
       prewarmCache: true,
     });
 
@@ -200,7 +200,7 @@ describe('FitnessRecipeService — parallel execution', () => {
     const svc = new FitnessRecipeService({
       cwd: testDir,
       checkRegistry: new CheckRegistry(),
-      recipeRegistry: new FitnessRecipeRegistry({ loadUserRecipes: false, logWarnings: false }),
+      recipeRegistry: new FitnessRecipeRegistry(),
       prewarmCache: false,
     });
 
@@ -233,7 +233,7 @@ describe('FitnessRecipeService — sequential execution', () => {
     const svc = new FitnessRecipeService({
       cwd: testDir,
       checkRegistry,
-      recipeRegistry: new FitnessRecipeRegistry({ loadUserRecipes: false, logWarnings: false }),
+      recipeRegistry: new FitnessRecipeRegistry(),
       prewarmCache: true,
     });
 
@@ -258,7 +258,7 @@ describe('FitnessRecipeService — selector types', () => {
     const svc = new FitnessRecipeService({
       cwd: testDir,
       checkRegistry,
-      recipeRegistry: new FitnessRecipeRegistry({ loadUserRecipes: false, logWarnings: false }),
+      recipeRegistry: new FitnessRecipeRegistry(),
       prewarmCache: false,
     });
 
@@ -278,7 +278,7 @@ describe('FitnessRecipeService — selector types', () => {
     const svc = new FitnessRecipeService({
       cwd: testDir,
       checkRegistry,
-      recipeRegistry: new FitnessRecipeRegistry({ loadUserRecipes: false, logWarnings: false }),
+      recipeRegistry: new FitnessRecipeRegistry(),
       prewarmCache: false,
     });
 
@@ -298,7 +298,7 @@ describe('FitnessRecipeService — selector types', () => {
     const svc = new FitnessRecipeService({
       cwd: testDir,
       checkRegistry,
-      recipeRegistry: new FitnessRecipeRegistry({ loadUserRecipes: false, logWarnings: false }),
+      recipeRegistry: new FitnessRecipeRegistry(),
       prewarmCache: false,
     });
 
@@ -324,7 +324,7 @@ describe('FitnessRecipeService — disabled checks', () => {
     const svc = new FitnessRecipeService({
       cwd: testDir,
       checkRegistry,
-      recipeRegistry: new FitnessRecipeRegistry({ loadUserRecipes: false, logWarnings: false }),
+      recipeRegistry: new FitnessRecipeRegistry(),
       prewarmCache: false,
       disabledChecks: ['disabled'],
     });
@@ -342,7 +342,7 @@ describe('FitnessRecipeService — disabled checks', () => {
     const svc = new FitnessRecipeService({
       cwd: testDir,
       checkRegistry,
-      recipeRegistry: new FitnessRecipeRegistry({ loadUserRecipes: false, logWarnings: false }),
+      recipeRegistry: new FitnessRecipeRegistry(),
       prewarmCache: false,
       disabledChecks: ['forced'],
     });
@@ -360,7 +360,7 @@ describe('FitnessRecipeService — errors', () => {
   it('throws NotFoundError when run() receives an unknown recipe name', async () => {
     const svc = new FitnessRecipeService({
       cwd: testDir,
-      recipeRegistry: new FitnessRecipeRegistry({ loadUserRecipes: false, logWarnings: false }),
+      recipeRegistry: new FitnessRecipeRegistry(),
       prewarmCache: false,
     });
     await expect(svc.start('does-not-exist')).rejects.toThrow(/Recipe not found/);
@@ -380,7 +380,7 @@ describe('FitnessRecipeService — errors', () => {
     const svc = new FitnessRecipeService({
       cwd: testDir,
       checkRegistry,
-      recipeRegistry: new FitnessRecipeRegistry({ loadUserRecipes: false, logWarnings: false }),
+      recipeRegistry: new FitnessRecipeRegistry(),
       prewarmCache: false,
     });
 
@@ -401,7 +401,7 @@ describe('FitnessRecipeService — errors', () => {
     const svc = new FitnessRecipeService({
       cwd: testDir,
       checkRegistry,
-      recipeRegistry: new FitnessRecipeRegistry({ loadUserRecipes: false, logWarnings: false }),
+      recipeRegistry: new FitnessRecipeRegistry(),
       prewarmCache: true,
     });
 
@@ -487,7 +487,7 @@ describe('FitnessRecipeService — abort', () => {
     const svc = new FitnessRecipeService({
       cwd: testDir,
       checkRegistry,
-      recipeRegistry: new FitnessRecipeRegistry({ loadUserRecipes: false, logWarnings: false }),
+      recipeRegistry: new FitnessRecipeRegistry(),
       prewarmCache: false,
     });
 
@@ -517,7 +517,7 @@ describe('FitnessRecipeService — timeout', () => {
     const svc = new FitnessRecipeService({
       cwd: testDir,
       checkRegistry,
-      recipeRegistry: new FitnessRecipeRegistry({ loadUserRecipes: false, logWarnings: false }),
+      recipeRegistry: new FitnessRecipeRegistry(),
       prewarmCache: true,
     });
 
@@ -543,7 +543,7 @@ describe('FitnessRecipeService — includeViolations', () => {
     const svc = new FitnessRecipeService({
       cwd: testDir,
       checkRegistry,
-      recipeRegistry: new FitnessRecipeRegistry({ loadUserRecipes: false, logWarnings: false }),
+      recipeRegistry: new FitnessRecipeRegistry(),
       prewarmCache: true,
     });
 
@@ -560,7 +560,7 @@ describe('FitnessRecipeService — includeViolations', () => {
     const svc = new FitnessRecipeService({
       cwd: testDir,
       checkRegistry,
-      recipeRegistry: new FitnessRecipeRegistry({ loadUserRecipes: false, logWarnings: false }),
+      recipeRegistry: new FitnessRecipeRegistry(),
       prewarmCache: true,
       includeViolations: true,
     });

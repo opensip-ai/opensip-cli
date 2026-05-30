@@ -20,8 +20,8 @@ export function dashboardToolTabsJs(): string {
  * @param panelId - e.g., 'panel-fitness'
  * @param toolSessions - filtered sessions for this tool
  * @param accentColor - CSS var for accent
- * @param catalogLabel - e.g., 'Checks', 'Scenarios', 'Assessments'
- * @param catalogData - check/scenario/assessment catalog entries (or empty)
+ * @param catalogLabel - e.g., 'Checks', 'Scenarios'
+ * @param catalogData - check/scenario catalog entries (or empty)
  * @param renderCatalogFn - function(container, data) to render the catalog
  * @param recipesData - recipe catalog entries (or empty array). Passed
  *     in so each tool can carry its own recipe namespace once recipes

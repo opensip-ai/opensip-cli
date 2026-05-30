@@ -70,9 +70,8 @@ export interface ProjectPaths {
 /**
  * Path-resolver domain set — tools whose plugins land in project
  * paths. Intentionally narrower than `core/plugins`'s `PluginDomain`
- * (`'fit' | 'sim' | 'asm' | 'lang'`); 'asm' is reserved for a future
- * tool, and 'lang' adapters install via package deps not
- * project-local plugin dirs.
+ * (`'fit' | 'sim' | 'lang'`); 'lang' adapters install via package deps
+ * not project-local plugin dirs.
  *
  * `'graph'` is included so graph-tool can persist per-project cache +
  * baseline state under `.runtime/cache/graph/` and (later) load
@@ -88,13 +87,13 @@ export type PathDomain = ToolShortId;
 /**
  * Domain set accepted by `pluginsDir`. Wider than `PathDomain` because
  * `core/plugins/discover` calls it with a value typed `PluginDomain`
- * (`'fit' | 'sim' | 'asm' | 'lang'`); `'asm'` and `'lang'` will not
- * actually reach `pluginsDir` today (the discover function returns
- * empty for them before constructing a path), but typing the union
- * here removes a `as 'fit' | 'sim'` cast at the call site and keeps
- * the type system honest if a third tool lands.
+ * (`'fit' | 'sim' | 'lang'`); `'lang'` will not actually reach
+ * `pluginsDir` today (the discover function returns empty for it before
+ * constructing a path), but typing the union here removes a
+ * `as 'fit' | 'sim'` cast at the call site and keeps the type system
+ * honest if a third tool lands.
  */
-export type PluginsPathDomain = PathDomain | 'asm' | 'lang';
+export type PluginsPathDomain = PathDomain | 'lang';
 
 /** Resolve the project path layout for a given project directory. */
 export function resolveProjectPaths(projectDir: string): ProjectPaths {

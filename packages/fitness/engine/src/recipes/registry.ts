@@ -1,6 +1,4 @@
 // @fitness-ignore-file batch-operation-limits -- iterates bounded collections (config entries, registry items, or small analysis results)
-// @fitness-ignore-file no-console-log -- User recipe warnings/summary output before CLI framework is initialized
-// @fitness-ignore-file logging-standards -- User recipe warnings/summary output before structured logger is available
 /**
  * @fileoverview Fitness recipe registry
  *
@@ -20,21 +18,6 @@ import { builtInRecipes, isBuiltInRecipe } from './built-in-recipes.js'
 
 import type { FitnessRecipe } from './types.js'
 
-/** Stub for user recipe loading (not ported to opensip-tools) */
-interface UserFitnessRecipesResult {
-  recipes: FitnessRecipe[]
-  warnings: string[]
-  loadedFrom?: string
-}
-
-/** Options for constructing a FitnessRecipeRegistry */
-export interface FitnessRecipeRegistryOptions {
-  readonly basePath?: string
-  readonly loadUserRecipes?: boolean
-  readonly logWarnings?: boolean
-  readonly logSummary?: boolean
-}
-
 /** Display-friendly info about a registered recipe */
 export interface RecipeDisplayInfo {
   readonly name: string
@@ -48,24 +31,11 @@ export interface RecipeDisplayInfo {
 
 /** Registry for fitness recipes, loading built-in and user-defined recipes */
 export class FitnessRecipeRegistry extends RecipeRegistry<FitnessRecipe> {
-  private _userRecipesLoadResult: UserFitnessRecipesResult | undefined
   private readonly _overriddenBuiltIns = new Set<string>()
 
-  constructor(options: FitnessRecipeRegistryOptions = {}) {
+  constructor() {
     super({ module: 'fitness:recipes', validationCode: 'VALIDATION.FITNESS.DUPLICATE_RECIPE' })
-
-    const {
-      basePath,
-      loadUserRecipes: shouldLoadUserRecipes = true,
-      logWarnings = true,
-      logSummary = false,
-    } = options
-
     this.registerBuiltInRecipes()
-
-    if (shouldLoadUserRecipes) {
-      this.loadAndRegisterUserRecipes(basePath, logWarnings, logSummary)
-    }
   }
 
   private registerBuiltInRecipes(): void {
@@ -74,15 +44,6 @@ export class FitnessRecipeRegistry extends RecipeRegistry<FitnessRecipe> {
     // (or a reset()/re-seed) don't trip the warn-first-wins policy.
     // Replaces the prior direct-map-write LSP violation.
     this.registerAll(builtInRecipes, { internal: true })
-  }
-
-  private loadAndRegisterUserRecipes(
-    _basePath: string | undefined,
-    _logWarnings: boolean,
-    _logSummary: boolean,
-  ): void {
-    // User recipe loading not ported to opensip-tools — stub
-    this._userRecipesLoadResult = { recipes: [], warnings: [] }
   }
 
   /**
@@ -98,11 +59,6 @@ export class FitnessRecipeRegistry extends RecipeRegistry<FitnessRecipe> {
       allowOverwrite: options?.allowOverwrite ?? false,
       throwOnDuplicate: !(options?.allowOverwrite ?? false),
     })
-  }
-
-  /** Return the result of loading user-defined recipes, if attempted */
-  getUserRecipesLoadResult(): UserFitnessRecipesResult | undefined {
-    return this._userRecipesLoadResult
   }
 
   /** Check whether a built-in recipe has been overridden by a user recipe */
@@ -139,4 +95,4 @@ export class FitnessRecipeRegistry extends RecipeRegistry<FitnessRecipe> {
 }
 
 /** Shared singleton recipe registry with built-in recipes pre-loaded */
-export const defaultRecipeRegistry = new FitnessRecipeRegistry({ logWarnings: false })
+export const defaultRecipeRegistry = new FitnessRecipeRegistry()

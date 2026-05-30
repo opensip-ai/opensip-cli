@@ -63,7 +63,6 @@ export interface FixEvaluationScenarioConfig {
   readonly source:
     | 'fitness'
     | 'simulation'
-    | 'assess'
     | 'continuous-review'
     | 'import'
     | 'sarif'
