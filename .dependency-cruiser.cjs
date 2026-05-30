@@ -320,26 +320,14 @@ module.exports = {
         ],
       },
     },
-    {
-      // Phase D6: check packs must not import from @opensip-tools/core
-      // sub-paths (e.g. /errors, /logger). The barrel is the supported
-      // surface. The single documented exception is the parse-cache module
-      // — language adapters and AST helpers route through that path
-      // because the cache is keyed by adapter and lives outside the
-      // barrel for layering reasons.
-      name: 'check-pack-no-core-subpath',
-      severity: 'error',
-      comment:
-        'Check packs must import @opensip-tools/core via the package barrel, ' +
-        'not via subpath (e.g. /errors, /logger). The only documented ' +
-        'exception is @opensip-tools/core/languages/parse-cache.js, which ' +
-        'language adapters consume by design.',
-      from: { path: '^packages/fitness/checks-' },
-      to: {
-        path: '^@opensip-tools/core/',
-        pathNot: '^@opensip-tools/core/languages/parse-cache(\\.js)?$',
-      },
-    },
+    // `check-pack-no-core-subpath` was retired here (gate-activation, 2026-05-30)
+    // and reimplemented in eslint.config.mjs as a scoped `no-restricted-imports`
+    // rule. Specifier-shape rules ("import from the barrel, not a subpath") are
+    // ESLint's natural domain and don't depend on the depcruise resolver — and
+    // depcruise can't reliably match `@opensip-tools/core/<subpath>` once it
+    // resolves through `paths` to source (the `src/lib/...` layout differs from
+    // the `core/<subpath>` specifier). Sanctioned subpaths remain
+    // languages/* and test-utils/*.
 
     // -------------------------------------------------------------------
     // Layer enforcement — lang-* must not depend on cli/contracts/checks-*
