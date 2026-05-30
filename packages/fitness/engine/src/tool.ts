@@ -1,11 +1,14 @@
 /**
  * fitnessTool — fitness as a Tool plugin.
  *
- * Owns its full Commander wiring for the `fit`, `dashboard`, `fit-list`,
- * and `fit-recipes` subcommands. The CLI calls register() once at
- * startup and the rest is local: every option-parsing rule, gate-mode
- * dispatch, JSON-vs-Ink rendering decision, and dashboard auto-open
- * lives here, in the package that owns the fitness command surface.
+ * Owns its full Commander wiring for the `fit`, `fit-list`,
+ * `fit-recipes`, and `fit-baseline-export` subcommands. The CLI calls
+ * register() once at startup and the rest is local: every option-parsing
+ * rule, gate-mode dispatch, JSON-vs-Ink rendering decision, and the
+ * post-run dashboard auto-open (`fit --open`) lives here, in the package
+ * that owns the fitness command surface. (The standalone `dashboard`
+ * subcommand is owned by the CLI, which composes it from every tool's
+ * contributed data — see packages/cli/src/commands/register-dashboard.ts.)
  *
  * The CLI no longer imports `executeFit`, `openDashboard`, etc.
  * directly — it just calls `fitnessTool.register(cli)`. Adding a new

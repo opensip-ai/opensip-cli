@@ -44,8 +44,8 @@ opensip-tools/
 │   │   ├── engine/              # @opensip-tools/fitness — fitness engine,
 │   │   │                        #   fit/dashboard/list-checks/list-recipes,
 │   │   │                        #   gate, SARIF
-│   │   ├── checks-typescript/   # @opensip-tools/checks-typescript (66 checks)
-│   │   ├── checks-universal/    # @opensip-tools/checks-universal (92 checks)
+│   │   ├── checks-typescript/   # @opensip-tools/checks-typescript (~50 checks)
+│   │   ├── checks-universal/    # @opensip-tools/checks-universal (~90 checks)
 │   │   ├── checks-python/       # @opensip-tools/checks-python
 │   │   ├── checks-go/           # @opensip-tools/checks-go
 │   │   ├── checks-java/         # @opensip-tools/checks-java
@@ -118,10 +118,14 @@ pnpm --filter=@opensip-tools/<pkg> test
 The `opensip-tools` binary (`packages/cli/src/index.ts`) is a generic
 tool dispatcher:
 
-1. Registers bundled language adapters (TypeScript, Rust, Python, Java,
-   Go, C/C++) into the kernel's `defaultLanguageRegistry`.
-2. Registers first-party tools — `fitnessTool` and `simulationTool` —
-   into `defaultToolRegistry`.
+1. Constructs a fresh per-invocation `LanguageRegistry` and registers
+   the bundled language adapters (TypeScript, Rust, Python, Java, Go,
+   C/C++) into it.
+2. Constructs a fresh per-invocation `ToolRegistry` and registers the
+   first-party tools — `fitnessTool` and `simulationTool` — into it.
+   Both registries are passed into `new RunScope({ tools, languages })`
+   — there are no module-singleton registries (see the RunScope section
+   below).
 3. Discovers third-party tools via `discoverToolPackages()` (any npm
    package whose `package.json` declares `opensipTools.kind === 'tool'`).
 4. Walks the tool registry; each tool's `register(cli)` method mounts
@@ -139,7 +143,12 @@ Subcommands available out of the box:
   --recipe, --check, --tags, --json, --report-to)
 - `opensip-tools fit-list` (alias `list-checks`) — List available checks
 - `opensip-tools fit-recipes` (alias `list-recipes`) — List available recipes
+- `opensip-tools fit-baseline-export` — Export fitness findings to SARIF
 - `opensip-tools dashboard` — Generate HTML report
+- `opensip-tools graph` — Build the static call graph
+- `opensip-tools graph-lookup` — Look up a symbol's callers/callees in the graph
+- `opensip-tools graph-symbol-index` — Build/query the symbol index
+- `opensip-tools graph-baseline-export` — Export the graph baseline to SARIF
 - `opensip-tools sim` — Run simulation scenarios [experimental]
 - `opensip-tools init` — Generate `opensip-tools.config.yml`
 - `opensip-tools sessions list|purge` — Manage stored sessions
@@ -148,11 +157,14 @@ Subcommands available out of the box:
 
 ## Fitness Check System
 
-158+ checks across 6 language packs and 2 cross-cutting packs:
+~145 checks across seven check packs (TypeScript, Universal, Python,
+Go, Java, C/C++, Rust). The authoritative per-pack list lives in
+`docs/public/70-reference/05-checks-index.md` (generated) — counts below
+are approximate and drift as checks are added:
 
-- `@opensip-tools/checks-typescript` (66 checks) — TS-AST-driven checks
+- `@opensip-tools/checks-typescript` (~50 checks) — TS-AST-driven checks
   (drizzle-orm, typed-inject, react, package.json exports, tsconfig).
-- `@opensip-tools/checks-universal` (92 checks) — text/regex/glob checks
+- `@opensip-tools/checks-universal` (~90 checks) — text/regex/glob checks
   (Docker, .env, Sentry, generic structure, dead-code via knip).
 - `@opensip-tools/checks-python|go|java|cpp|rust` — language-specific checks.
 
@@ -388,7 +400,7 @@ that doesn't need to be visible to external readers, it stays in
 
 ## Release Process
 
-Releases are tag-driven. See `RELEASING.md` — there are 23 packages
+Releases are tag-driven. See `RELEASING.md` — there are 27 packages
 to publish, in a specific dependency order, via OIDC trusted publishing.
 
 The release workflow has two non-obvious steps (npm 11 to a separate
