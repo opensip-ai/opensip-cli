@@ -5,10 +5,10 @@ This is the **START HERE** document for AI agents working on the OpenSIP Tools c
 ## What is OpenSIP Tools?
 
 OpenSIP Tools is an **open-source codebase analysis toolkit** — a CLI that
-hosts pluggable tools for static analysis. Today it ships with two: `fit`
-(fitness checks across TypeScript, Rust, Python, Java, Go, C/C++) and `sim`
-(simulation scenarios, experimental). Adding a new tool is a plugin
-operation; the CLI is a generic dispatcher.
+hosts pluggable tools for static analysis. Today it ships with three: `fit`
+(fitness checks across TypeScript, Rust, Python, Java, Go, C/C++), `graph`
+(static call-graph analysis), and `sim` (simulation scenarios, experimental).
+Adding a new tool is a plugin operation; the CLI is a generic dispatcher.
 
 ## Repository Structure
 

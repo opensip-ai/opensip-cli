@@ -206,10 +206,6 @@ interface BaseCheckConfig {
    *   for checks that pattern-match identifiers via regex and would
    *   false-positive on the same banned phrase appearing in JSDoc /
    *   line / block comments documenting the rule itself.
-   *
-   * The legacy `'code-only'` / `'no-strings-no-comments'` aliases were
-   * retained through 0.4.x for backwards-compat and removed in 0.5.0.
-   * Migrate any remaining call sites to the strip-* names.
    */
   readonly contentFilter?: 'raw' | 'strip-strings' | 'strip-strings-and-comments'
   /**

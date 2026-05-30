@@ -13,8 +13,9 @@
 Open-source codebase analysis toolkit. Run fitness checks against TypeScript, Rust, Python, Java, Go, or C/C++ codebases standalone, in CI, or as a regression detector around AI-agent coding sessions.
 
 opensip-tools is a **collection of tools**, not a single tool. Today it ships
-with two: `fit` (fitness checks) and `sim` (simulation scenarios, experimental).
-Adding a new tool is a plugin operation — install a package that implements the
+with three: `fit` (fitness checks), `graph` (static call-graph analysis), and
+`sim` (simulation scenarios, experimental). Adding a new tool is a plugin
+operation — install a package that implements the
 [Tool contract](#tool-plugin-architecture) and the CLI picks it up automatically.
 
 ## Upgrading from v1.x to v2.x
@@ -23,7 +24,7 @@ v2.0.0 swaps internal runtime persistence from JSON files to SQLite. **v2 ignore
 v1's `<project>/opensip-tools/.runtime/` contents** and initializes a fresh
 `datastore.sqlite` on first run. Caches rebuild automatically; session history
 from v1 is **not preserved**. The `--baseline <path>` flag is removed — there is
-now exactly one gate baseline per project, stored in the SQLite database.
+now exactly one gate baseline per project, stored in the project's SQLite database.
 
 If you depend on the v1 layout (committed `baseline.sarif`, scripts that read
 `.runtime/sessions/*.json`, etc.), pin to v1.x. See the v2.0.0 entry in
@@ -349,9 +350,12 @@ Resolved (1):
 - `1` — regression detected (at least one new violation)
 - `2` — config error (missing baseline, malformed SARIF)
 
-**Default baseline location** is `<cwd>/opensip-tools/.runtime/baseline.sarif`
-— gitignored automatically by `opensip-tools init`. Use `--baseline <path>`
-to override.
+**Baseline storage:** the gate baseline lives in the project's
+`datastore.sqlite` (under `<cwd>/opensip-tools/.runtime/`, gitignored
+automatically by `opensip-tools init`). There is exactly one baseline per
+project — `--gate-save` writes it and `--gate-compare` reads it. To export the
+current baseline to a portable SARIF file (e.g. for GitHub Code Scanning), use
+`fit-baseline-export --out <path>`.
 
 **How diffs are matched:** by `(filePath, ruleId, message)` tuple. Line numbers are intentionally **not** in the matching key — unrelated edits that shift lines won't register as false-positive added/resolved entries.
 
@@ -723,21 +727,36 @@ enforced in CI by [dependency-cruiser](https://github.com/sverweij/dependency-cr
 ```
 packages/
   core/                    # @opensip-tools/core — kernel: errors, logger, IDs,
-                           #   language adapters, plugin loader, Tool contract
+                           #   language adapters, plugin loader, Registry/RunScope,
+                           #   Tool contract
   contracts/               # @opensip-tools/contracts — contract types between
                            #   Tools and the runner: CliOutput/CommandResult
-                           #   shapes, exit codes, session persistence
-  cli/                     # @opensip-tools/cli — generic tool dispatcher (Ink/React)
+                           #   shapes, exit codes, GraphCatalog surface
+  datastore/               # @opensip-tools/datastore — SQLite + Drizzle persistence
+  session-store/           # @opensip-tools/session-store — session persistence
+  reporting/               # @opensip-tools/reporting — SARIF / cloud report output
+  dashboard/               # @opensip-tools/dashboard — self-contained HTML report
+  cli-ui/                  # @opensip-tools/cli-ui — shared Ink/React primitives
+  cli/                     # @opensip-tools/cli — generic tool dispatcher
 
   fitness/                 # @opensip-tools/fitness namespace
     engine/                # @opensip-tools/fitness — fit/dashboard/list-checks
-                           #   commands, recipe service, gate, SARIF reporting
+                           #   commands, recipe service, gate, SARIF
     checks-typescript/     # @opensip-tools/checks-typescript — TS-AST checks
     checks-universal/      # @opensip-tools/checks-universal — text/regex/glob checks
     checks-python/         # @opensip-tools/checks-python — Python (no-bare-except)
     checks-go/             # @opensip-tools/checks-go — Go (no-fmt-print)
     checks-java/           # @opensip-tools/checks-java — Java (no-printstacktrace)
     checks-cpp/            # @opensip-tools/checks-cpp — C/C++ (clang-tidy)
+    checks-rust/           # @opensip-tools/checks-rust — Rust (no-dbg-macro)
+
+  graph/                   # @opensip-tools/graph namespace
+    engine/                # @opensip-tools/graph — language-agnostic graph kernel
+    graph-typescript/      # TS call-graph adapter
+    graph-python/          # Python call-graph adapter
+    graph-rust/            # Rust call-graph adapter
+    graph-go/              # Go call-graph adapter
+    graph-java/            # Java call-graph adapter
 
   simulation/              # @opensip-tools/simulation namespace
     engine/                # @opensip-tools/simulation — sim command + scenarios
@@ -753,10 +772,11 @@ packages/
 
 ### Tool plugin architecture
 
-The CLI is a generic dispatcher that walks `defaultToolRegistry` and asks
-each registered Tool to mount its own subcommands. fitness and simulation
-are first-party tools; third-party tools are discovered automatically when
-their `package.json` declares:
+The CLI is a generic dispatcher. Each invocation constructs a fresh
+`ToolRegistry`, registers the first-party tools (fitness, graph, simulation)
+into it, and walks it asking each registered Tool to mount its own
+subcommands. Third-party tools are discovered automatically when their
+`package.json` declares:
 
 ```json
 {

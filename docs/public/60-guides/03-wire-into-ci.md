@@ -123,7 +123,7 @@ This is the shape we recommend: PRs see "is this getting worse?", main updates t
 
 ## Speed
 
-Typical timings on the opensip-tools self-graph (~300 files, 158 checks):
+Typical timings on the opensip-tools self-graph (~300 files, ~145 checks):
 
 - `fit` (default recipe, parallel) — ~8s
 - `fit --gate-compare` — same as `fit`, plus ~50ms baseline diff
