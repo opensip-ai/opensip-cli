@@ -106,6 +106,17 @@ export interface CallEdge {
    * Optional for forward-compatibility with pre-discard catalogs.
    */
   readonly discarded?: boolean;
+  /**
+   * True when this edge was recovered by the cross-shard boundary pass
+   * (a sharded build) rather than resolved within a single shard. A
+   * `crossShard` edge is therefore `resolution: 'syntactic'` regardless
+   * of the build's resolution mode — the ASTs were gone by the time it
+   * was resolved, so only the callee name + import specifier were
+   * available. Lets consumers reason about boundary edges (e.g. "my
+   * low-confidence edges are the cross-package ones, which is expected").
+   * Omitted/false for intra-shard edges; optional for forward-compat.
+   */
+  readonly crossShard?: boolean;
 }
 
 /**
