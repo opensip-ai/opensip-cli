@@ -17,7 +17,7 @@
  */
 
 import { type CliProgram } from '@opensip-tools/contracts';
-import { ConfigurationError, readPackageVersion } from '@opensip-tools/core';
+import { ConfigurationError, readPackageVersion, ValidationError } from '@opensip-tools/core';
 
 // PR 3 of plan 2026-05-23-plan-graph-adapter-package-split.md: the
 // engine no longer hosts any adapter source. All three first-party
@@ -38,8 +38,23 @@ import { createRulesRegistry } from './rules/registry.js';
 // loaded so `scope.graph` is correctly-typed here.
 import './scope-augmentation.js';
 
+import type { ResolutionMode } from './types.js';
 import type { ScopeContribution, Tool, ToolCliContext, ToolCommandDescriptor, ToolScope } from '@opensip-tools/core';
 import type { DataStore } from '@opensip-tools/datastore';
+
+/**
+ * Validate and normalize the raw `--resolution` string into a
+ * `ResolutionMode`. Commander defaults the flag to `'exact'`, so a value
+ * is always present; anything other than `exact`/`fast` is a user typo
+ * and fails loudly with a ValidationError rather than silently degrading.
+ */
+function parseResolutionMode(raw: string | undefined): ResolutionMode {
+  if (raw === undefined || raw === 'exact') return 'exact';
+  if (raw === 'fast') return 'fast';
+  throw new ValidationError(
+    `--resolution must be 'exact' or 'fast' (got '${raw}').`,
+  );
+}
 
 const GRAPH: ToolCommandDescriptor = {
   name: 'graph',
@@ -92,7 +107,7 @@ function register(cli: ToolCliContext): void {
   // requires zero CLI edits.
   cli.registerLiveView(GRAPH_LIVE_VIEW_KEY, async (args) => {
     await renderGraphLive(
-      args as { cwd: string; noCache?: boolean },
+      args as { cwd: string; noCache?: boolean; resolution?: ResolutionMode },
       cli.scope.datastore() as DataStore | undefined,
       { setExitCode: cli.setExitCode },
     );
@@ -105,6 +120,11 @@ function register(cli: ToolCliContext): void {
     .option('--cwd <path>', 'Target directory', process.cwd())
     .option('--json', 'Output structured JSON', false)
     .option('--no-cache', 'Skip catalog cache (force full rebuild)')
+    .option(
+      '--resolution <mode>',
+      'Edge resolution tier: exact (semantic) or fast (syntactic, no type checker)',
+      'exact',
+    )
     .option('--gate-save', 'Save current Signal set as the gate baseline', false)
     .option('--gate-compare', 'Compare current Signals to the gate baseline', false)
     .option('--baseline <path>', 'Override the default baseline path')
@@ -141,7 +161,13 @@ function register(cli: ToolCliContext): void {
       concurrency?: number;
       language?: string;
       verbose?: boolean;
+      resolution?: string;
     }) => {
+      // Validate --resolution at the boundary so a typo fails loudly
+      // rather than silently falling back to exact. Covers every
+      // downstream path (interactive live view, executeGraph, workspace
+      // fan-out) since they all branch off this single action.
+      const resolution = parseResolutionMode(opts.resolution);
       // Preflight runs BEFORE any heavy work. If the repo's file count
       // exceeds a threshold AND the current heap cap is too low, this
       // re-execs the process with elevated `--max-old-space-size`. The
@@ -178,6 +204,7 @@ function register(cli: ToolCliContext): void {
           cwd: opts.cwd,
           noCache: opts.cache === false,
           verbose: opts.verbose === true,
+          resolution,
         });
         return;
       }
@@ -187,6 +214,7 @@ function register(cli: ToolCliContext): void {
           cwd: opts.cwd,
           json: opts.json,
           noCache: opts.cache === false,
+          resolution,
           gateSave: opts.gateSave,
           gateCompare: opts.gateCompare,
           baseline: opts.baseline,
