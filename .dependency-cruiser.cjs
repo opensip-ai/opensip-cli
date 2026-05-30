@@ -180,9 +180,11 @@ module.exports = {
       name: 'contracts-imports-core-only',
       severity: 'error',
       comment:
-        'contracts holds the CliOutput / exit codes / persistence types used ' +
+        'contracts holds the CliOutput / exit codes / persistence TYPES used ' +
         'by every tool. It must not import from any tool, the cli entry ' +
-        'point, language packs, or dashboard.',
+        'point, language packs, dashboard, or the runtime packages it was ' +
+        'split into (datastore / session-store / reporting). It depends on ' +
+        'core only (audit 2026-05-29, contracts split).',
       from: { path: '^packages/contracts/src/' },
       to: {
         path: [
@@ -190,6 +192,9 @@ module.exports = {
           '^@opensip-tools/fitness',
           '^@opensip-tools/simulation',
           '^@opensip-tools/dashboard',
+          '^@opensip-tools/datastore',
+          '^@opensip-tools/session-store',
+          '^@opensip-tools/reporting',
           '^@opensip-tools/lang-',
           '^@opensip-tools/checks-',
         ],

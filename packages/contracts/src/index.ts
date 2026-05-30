@@ -67,15 +67,11 @@ export type { ErrorSuggestion } from './exit-codes.js';
 export { loadCliDefaults } from './cli-config.js';
 export type { CliDefaults } from './cli-config.js';
 
-// Session persistence
-export { generateSessionId, sanitizeForFilename } from './persistence/store.js';
-export type { StoredSession } from './persistence/store.js';
-// SessionRepo + sessions schema. The SQLite `SessionRepo` is the sole
-// persistence path; the v1 JSON session format it replaced has no
-// surviving code.
-export { SessionRepo } from './persistence/session-repo.js';
-export type { SessionListOptions } from './persistence/session-repo.js';
-export { sessions, sessionToolPayload } from './persistence/schema/sessions.js';
+// Session persistence type. The cross-tool StoredSession shape stays here
+// as the contract surface; SessionRepo + the sessions schema +
+// generateSessionId/sanitizeForFilename moved to @opensip-tools/session-store
+// (audit 2026-05-29, contracts split).
+export type { StoredSession } from './session-types.js';
 
 // Graph catalog type surface. This is the contract surface between the
 // graph tool (which writes catalog.json) and the dashboard package

@@ -1,4 +1,4 @@
-import type { StoredSession } from './persistence/store.js';
+import type { StoredSession } from './session-types.js';
 import type { ToolShortId } from '@opensip-tools/core';
 
 // =============================================================================

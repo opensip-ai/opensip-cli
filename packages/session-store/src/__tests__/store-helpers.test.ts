@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { generateSessionId, sanitizeForFilename } from '../persistence/store.js';
+import { generateSessionId, sanitizeForFilename } from '../store.js';
 
 describe('generateSessionId', () => {
   it('returns a UUID-shaped string', () => {
