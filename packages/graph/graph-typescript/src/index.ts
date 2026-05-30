@@ -33,7 +33,7 @@ import ts from 'typescript';
 
 import { cacheKey as typescriptCacheKey } from './cache-key.js';
 import { discoverFiles as discoverTypescriptFiles } from './discover.js';
-import { resolveEdgesFromRecords } from './edges.js';
+import { resolveEdgesFromRecords, resolveEdgesSyntactic } from './edges.js';
 import { parseProject as parseTypescriptProject } from './parse.js';
 import { isTypescriptTestFile } from './test-file.js';
 import { walkProgram } from './walk.js';
@@ -213,26 +213,37 @@ function resolveCallSitesExact(
 
 /**
  * Fast-tier resolution entry. Resolves call edges syntactically — from
- * callee names and the file's import graph — with NO type checker.
+ * callee names and the file's import graph — with NO type checker. The
+ * fast parse produced standalone source files (no `ts.Program`), so the
+ * semantic resolvers cannot run; `resolveEdgesSyntactic` works purely off
+ * the walked records and the catalog.
  *
- * Phase 2 placeholder: returns an empty, honest result (no edges, every
- * call site counted as unresolved) so a `--resolution fast` run completes
- * end-to-end after parse + walk. Phase 3 replaces this body with the real
- * syntactic resolver (`edge-resolvers/syntactic.ts`).
+ * Dependency (module-level import) edges are not emitted in fast mode —
+ * they remain an exact-tier feature, so `dependenciesByOwner` is omitted
+ * (the contract treats absence as "not emitted by this tier").
  */
 function resolveCallSitesFast(
   input: ResolveInput<TsParsed>,
   _project: TypescriptFastParsedProject,
 ): ResolveOutput {
+  // Translate the contract's opaque CallSiteRecord back into the
+  // TS-internal shape the syntactic resolver consumes (real ts.Node /
+  // ts.SourceFile handles), mirroring the exact path's translation.
+  const tsCallSites: TsCallSiteRecord[] = input.callSites.map((r) => ({
+    node: r.nodeRef as ts.Node,
+    sourceFile: r.sourceFileRef as ts.SourceFile,
+    ownerHash: r.ownerHash,
+    kind: r.kind,
+    childHash: r.childHash,
+  }));
+  const result = resolveEdgesSyntactic({
+    catalog: input.catalog,
+    projectDirAbs: input.projectDirAbs,
+    callSites: tsCallSites,
+  });
   return {
-    edgesByOwner: new Map<string, readonly CallEdge[]>(),
-    stats: {
-      totalCallSites: input.callSites.length,
-      resolvedHigh: 0,
-      resolvedMedium: 0,
-      resolvedLow: 0,
-      unresolved: input.callSites.length,
-    },
+    edgesByOwner: collectByOwner(result.catalog),
+    stats: result.resolutionStats,
   };
 }
 
