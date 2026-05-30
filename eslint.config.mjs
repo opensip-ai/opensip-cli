@@ -10,7 +10,9 @@
  *   - typescript-eslint        — type-aware TypeScript rules
  *   - eslint-plugin-sonarjs    — bug detection + complexity + duplication
  *   - eslint-plugin-unicorn    — modern-JS idioms (selectively enabled)
- *   - eslint-plugin-import     — import-order + circular-dep guard
+ *   - eslint-plugin-import-x   — import-order + circular-dep guard
+ *     (the maintained fork of eslint-plugin-import; the original
+ *     2.32 crashed ESLint 10's import/order autofix)
  *
  * Tuning notes:
  *   - sonarjs's cognitive-complexity left at default 15. The CLI's
@@ -20,7 +22,7 @@
  *     abbreviations (cwd, ctx, opts) we don't want to expand.
  *   - unicorn's no-null is OFF — the codebase mixes null/undefined
  *     intentionally for serialized boundaries (JSON, schemas).
- *   - import/no-unresolved uses TypeScript resolver via the .ts
+ *   - import-x/no-unresolved uses TypeScript resolver via the .ts
  *     extension list; node_modules are resolved by tsconfig moduleResolution.
  */
 
@@ -28,7 +30,7 @@ import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import sonarjs from 'eslint-plugin-sonarjs';
 import unicorn from 'eslint-plugin-unicorn';
-import importPlugin from 'eslint-plugin-import';
+import { importX } from 'eslint-plugin-import-x';
 import globals from 'globals';
 
 export default tseslint.config(
@@ -61,7 +63,7 @@ export default tseslint.config(
   {
     files: ['**/*.ts', '**/*.tsx'],
     plugins: {
-      import: importPlugin,
+      'import-x': importX,
     },
     languageOptions: {
       ecmaVersion: 2024,
@@ -78,7 +80,7 @@ export default tseslint.config(
       },
     },
     settings: {
-      'import/resolver': {
+      'import-x/resolver': {
         typescript: {
           alwaysTryTypes: true,
           project: ['packages/*/tsconfig.json', 'packages/*/*/tsconfig.json'],
@@ -168,17 +170,20 @@ export default tseslint.config(
       'sonarjs/different-types-comparison': 'off',
 
       // -- import hygiene -------------------------------------------------
-      'import/no-cycle': ['error', { maxDepth: 10 }],
-      'import/order': ['error', {
+      // eslint-plugin-import-x: the maintained fork of eslint-plugin-import.
+      // Migrated 2026-05-29 — eslint-plugin-import@2.32 crashed ESLint 10's
+      // import/order autofix (removed `sourceCode.getTokenOrCommentAfter`).
+      'import-x/no-cycle': ['error', { maxDepth: 10 }],
+      'import-x/order': ['error', {
         'groups': ['builtin', 'external', 'internal', 'parent', 'sibling', 'index', 'type'],
         'newlines-between': 'always',
         'alphabetize': { order: 'asc', caseInsensitive: true },
       }],
-      'import/no-duplicates': 'error',
+      'import-x/no-duplicates': 'error',
       // Default to off — the typescript resolver can't always see workspace
       // package mains before they're built. Type checker catches missing
       // imports for type-checked code anyway.
-      'import/no-unresolved': 'off',
+      'import-x/no-unresolved': 'off',
     },
   },
 
