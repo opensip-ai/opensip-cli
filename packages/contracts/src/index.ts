@@ -92,14 +92,9 @@ export type {
   GraphVisibility,
 } from './graph-catalog.js';
 
-// SARIF + cloud reporting (audit 2026-05-29, M1). The cross-cutting
-// output-format contract — sits with CliOutput and the exit codes.
-// Relocated from fitness so both fitness and graph can report to cloud
-// without a `graph → fitness` import cycle (the cycle that previously
-// forced fitness's raw-SQL graph_catalog read; see H1).
-export { buildSarifLog, chunkSarifRuns, reportToCloud } from './reporting/sarif.js';
-export type { ReportResult } from './reporting/sarif.js';
-export type { SarifResult, SarifLocation } from './reporting/sarif-types.js';
+// SARIF + cloud reporting moved to @opensip-tools/reporting (audit
+// 2026-05-29, contracts split). The build/cloud-report runtime + its
+// types live there; contracts no longer re-exports them.
 
 // `commander` is referenced here purely as a type — `import type` keeps
 // the runtime bundle (`dist/index.js`) free of any commander require.
