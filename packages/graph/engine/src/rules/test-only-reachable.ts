@@ -7,6 +7,7 @@
 
 import { createSignal } from '@opensip-tools/core';
 
+import { approximateSuffix } from './_approximation.js';
 import { inferEntryPoints } from './_entry-points.js';
 
 import type { Indexes, Rule } from '../types.js';
@@ -18,6 +19,8 @@ export const testOnlyReachableRule: Rule = {
   evaluate(catalog, indexes, _config): readonly Signal[] {
     const productionEntries = computeProductionEntries(catalog, indexes);
     const reachableFromProd = bfsReachable(productionEntries, indexes);
+    // Missing prod-caller edges on a fast catalog can fake "test-only".
+    const caveat = approximateSuffix(catalog);
     const signals: Signal[] = [];
     for (const occ of indexes.byBodyHash.values()) {
       if (occ.kind === 'module-init') continue;
@@ -42,7 +45,7 @@ export const testOnlyReachableRule: Rule = {
           severity: 'low',
           category: 'testing',
           ruleId: 'graph:test-only-reachable',
-          message: `${occ.simpleName} is reached only from test files.`,
+          message: `${occ.simpleName} is reached only from test files.${caveat}`,
           code: { file: occ.filePath, line: occ.line, column: occ.column },
           suggestion: 'Move this function to a __tests__/ helper or co-locate it with its tests.',
           metadata: {

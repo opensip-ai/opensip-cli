@@ -10,6 +10,7 @@
 
 import { createSignal } from '@opensip-tools/core';
 
+import { approximateSuffix } from './_approximation.js';
 import { inferEntryPoints } from './_entry-points.js';
 
 import type { Catalog, GraphConfig, Indexes, Rule } from '../types.js';
@@ -20,6 +21,8 @@ export const orphanSubtreeRule: Rule = {
   defaultSeverity: 'warning',
   evaluate(catalog, indexes, config): readonly Signal[] {
     const reachable = computeReachable(catalog, indexes, config);
+    // On a fast catalog a missing caller-edge can fake an orphan; mark it.
+    const caveat = approximateSuffix(catalog);
     const orphans: Signal[] = [];
     for (const occ of indexes.byBodyHash.values()) {
       if (reachable.has(occ.bodyHash)) continue;
@@ -35,7 +38,7 @@ export const orphanSubtreeRule: Rule = {
           severity: 'medium',
           category: 'quality',
           ruleId: 'graph:orphan-subtree',
-          message: `${occ.simpleName} is not reachable from any inferred entry point.`,
+          message: `${occ.simpleName} is not reachable from any inferred entry point.${caveat}`,
           code: { file: occ.filePath, line: occ.line, column: occ.column },
           suggestion: 'Either delete the function, mark it as an entry point in opensip-tools.config.yml, or add a caller.',
           metadata: {
