@@ -19,11 +19,12 @@
  * layer, where the subprocess shape (cliScript, displayPath rendering)
  * already exists.
  *
- * Cross-partition fidelity: identical to the existing `--packages`
- * trade-off — cross-partition call sites become unresolved (catalog
- * renderer emits them with `toQualifiedNameUnresolved`). A future
- * follow-up may tag partition-boundary edges with
- * `partition_boundary: true` metadata; out of scope for v1.
+ * Cross-partition fidelity: cross-package call sites are NO LONGER
+ * dropped. Plan #2 (sharded build) recovers them in the cross-shard
+ * boundary pass — each partition becomes a `Shard`, and the inter-shard
+ * edges are resolved against the merged catalog and tagged
+ * `CallEdge.crossShard: true` (the `partition_boundary` follow-up this
+ * comment once anticipated). Intra-partition edges keep full fidelity.
  */
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
