@@ -262,6 +262,38 @@ export default tseslint.config(
   },
 
   // ---------------------------------------------------------------------------
+  // Check packs — import @opensip-tools/core via the BARREL, not subpaths.
+  //
+  // Replaces the retired dependency-cruiser `check-pack-no-core-subpath`
+  // rule (gate-activation, 2026-05-30). Specifier-shape rules are ESLint's
+  // domain and don't depend on the depcruise resolver. The barrel
+  // (`@opensip-tools/core`) is the supported surface; the only sanctioned
+  // subpaths are `languages/*` (incl. parse-cache) and `test-utils/*`,
+  // which AST helpers and tests consume by design. Tests are exempt.
+  // ---------------------------------------------------------------------------
+  {
+    files: ['packages/fitness/checks-*/src/**/*.ts'],
+    ignores: [
+      'packages/fitness/checks-*/src/**/__tests__/**',
+      'packages/fitness/checks-*/src/**/*.test.ts',
+    ],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [{
+          group: [
+            '@opensip-tools/core/*',
+            '!@opensip-tools/core/languages/*',
+            '!@opensip-tools/core/test-utils/*',
+          ],
+          message:
+            'Import @opensip-tools/core via the package barrel, not a ' +
+            'subpath. Sanctioned subpaths: languages/* and test-utils/*.',
+        }],
+      }],
+    },
+  },
+
+  // ---------------------------------------------------------------------------
   // Dist files (some intermediate scripts emit JS during builds).
   // ---------------------------------------------------------------------------
   {
