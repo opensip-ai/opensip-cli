@@ -23,7 +23,8 @@ import { buildSarifLog } from '@opensip-tools/reporting';
 import { ConfigurationError, SystemError, logger } from '@opensip-tools/core';
 
 import type { FitBaselineRepo } from './persistence/baseline-repo.js';
-import type { CliOutput, SarifResult } from '@opensip-tools/contracts';
+import type { CliOutput } from '@opensip-tools/contracts';
+import type { SarifResult } from '@opensip-tools/reporting';
 
 // ---------------------------------------------------------------------------
 // Types
