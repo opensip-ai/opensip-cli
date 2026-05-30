@@ -23,6 +23,8 @@
  * public type surface.
  */
 
+import { withSpan, type Attributes, type Signal } from '@opensip-tools/core';
+
 import { currentAdapterRegistry, pickAdapter } from '../lang-adapter/registry.js';
 import { CatalogRepo } from '../persistence/catalog-repo.js';
 import { buildIndexes } from '../pipeline/indexes.js';
@@ -43,7 +45,6 @@ import type {
   GraphProgressCallback,
   GraphStage,
 } from './orchestrate/types.js';
-import type { Signal } from '@opensip-tools/core';
 import type { DataStore } from '@opensip-tools/datastore';
 
 // Re-export the orchestration types so existing callers (the engine's
@@ -112,12 +113,16 @@ export interface RunGraphResult {
   readonly cacheHit: boolean;
 }
 
+/** Instrumentation scope for every graph stage span. */
+const GRAPH_TRACER = 'opensip-tools-graph';
+
 function runStage<T>(
   stage: GraphStage,
   onProgress: GraphProgressCallback | undefined,
   monitor: PressureMonitor | undefined,
   fn: () => T,
   detailFn?: (result: T) => string | undefined,
+  attrsFn?: (result: T) => Attributes,
 ): T {
   monitor?.setStage(stage);
   // Sample BEFORE the stage starts. The previous stage may have left
@@ -126,7 +131,16 @@ function runStage<T>(
   monitor?.check();
   onProgress?.({ type: 'stage-start', stage });
   const startedAt = Date.now();
-  const result = fn();
+  // Emit one span per stage. withSpan is a no-op when no SDK is registered
+  // (standalone runs), so the span captures wall-clock + low-cardinality
+  // stage attributes for embedding consumers without changing standalone
+  // behavior. The existing durationMs/onProgress logic is untouched and keeps
+  // feeding the live view alongside the span.
+  const result = withSpan(GRAPH_TRACER, `opensip_tools.graph.${stage}`, (span) => {
+    const out = fn();
+    if (attrsFn) span.setAttributes(attrsFn(out));
+    return out;
+  }, { 'opensip_tools.graph.stage': stage });
   const durationMs = Date.now() - startedAt;
   onProgress?.({
     type: 'stage-done',
@@ -162,6 +176,7 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
         configPathOverride: input.tsConfigPath,
       }),
       (d) => `${String(d.files.length)} files`,
+      (d) => ({ 'opensip_tools.graph.file_count': d.files.length }),
     );
 
     const { catalog, cacheHit, resolutionStats } = obtainCatalog({
@@ -180,6 +195,11 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
       input.onProgress,
       monitor,
       () => buildIndexes(catalog),
+      undefined,
+      // cacheHit is resolved by obtainCatalog (parse/walk/resolve) above, so it
+      // is known by the time the index stage runs. Surfacing it here gives the
+      // consumer a low-cardinality flag for "was this an incremental/cached run."
+      () => ({ 'opensip_tools.graph.cache_hit': cacheHit }),
     );
 
     const signals: Signal[] = runStage(
@@ -200,6 +220,10 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
         return collected;
       },
       (sigs) => `${String(ruleSet.length)} rule(s), ${String(sigs.length)} signal(s)`,
+      (sigs) => ({
+        'opensip_tools.graph.rule_count': ruleSet.length,
+        'opensip_tools.graph.signal_count': sigs.length,
+      }),
     );
 
     return {
