@@ -1,0 +1,38 @@
+{
+  "//": "depcruise-only. Maps @opensip-tools/* to package SOURCE so dependency-cruiser resolves cross-package imports into packages/*/src (where the layer rules match). Without this, workspace imports resolve via each package's exports to dist/, which the cruiser's exclude + includeOnly drop — making every cross-package rule inert. NOT used for tsc builds; the real builds use each package's own tsconfig.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@opensip-tools/core": ["packages/core/src/index.ts"],
+      "@opensip-tools/datastore": ["packages/datastore/src/index.ts"],
+      "@opensip-tools/contracts": ["packages/contracts/src/index.ts"],
+      "@opensip-tools/session-store": ["packages/session-store/src/index.ts"],
+      "@opensip-tools/reporting": ["packages/reporting/src/index.ts"],
+      "@opensip-tools/cli-ui": ["packages/cli-ui/src/index.ts"],
+      "@opensip-tools/cli": ["packages/cli/src/index.ts"],
+      "@opensip-tools/dashboard": ["packages/dashboard/src/index.ts"],
+      "@opensip-tools/fitness": ["packages/fitness/engine/src/index.ts"],
+      "@opensip-tools/simulation": ["packages/simulation/engine/src/index.ts"],
+      "@opensip-tools/graph": ["packages/graph/engine/src/index.ts"],
+      "@opensip-tools/graph-typescript": ["packages/graph/graph-typescript/src/index.ts"],
+      "@opensip-tools/graph-python": ["packages/graph/graph-python/src/index.ts"],
+      "@opensip-tools/graph-rust": ["packages/graph/graph-rust/src/index.ts"],
+      "@opensip-tools/graph-go": ["packages/graph/graph-go/src/index.ts"],
+      "@opensip-tools/graph-java": ["packages/graph/graph-java/src/index.ts"],
+      "@opensip-tools/checks-typescript": ["packages/fitness/checks-typescript/src/index.ts"],
+      "@opensip-tools/checks-universal": ["packages/fitness/checks-universal/src/index.ts"],
+      "@opensip-tools/checks-python": ["packages/fitness/checks-python/src/index.ts"],
+      "@opensip-tools/checks-go": ["packages/fitness/checks-go/src/index.ts"],
+      "@opensip-tools/checks-java": ["packages/fitness/checks-java/src/index.ts"],
+      "@opensip-tools/checks-cpp": ["packages/fitness/checks-cpp/src/index.ts"],
+      "@opensip-tools/checks-rust": ["packages/fitness/checks-rust/src/index.ts"],
+      "@opensip-tools/lang-typescript": ["packages/languages/lang-typescript/src/index.ts"],
+      "@opensip-tools/lang-python": ["packages/languages/lang-python/src/index.ts"],
+      "@opensip-tools/lang-rust": ["packages/languages/lang-rust/src/index.ts"],
+      "@opensip-tools/lang-go": ["packages/languages/lang-go/src/index.ts"],
+      "@opensip-tools/lang-java": ["packages/languages/lang-java/src/index.ts"],
+      "@opensip-tools/lang-cpp": ["packages/languages/lang-cpp/src/index.ts"]
+    }
+  }
+}
