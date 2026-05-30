@@ -32,6 +32,7 @@ import { dashboardSearchJs } from './code-paths/search.js';
 import { dashboardTraceJs } from './code-paths/trace.js';
 import { dashboardViewBigJs } from './code-paths/view-big.js';
 import { dashboardViewCouplingJs } from './code-paths/view-coupling.js';
+import { dashboardViewGraphJs } from './code-paths/view-graph.js';
 import { dashboardViewHotJs } from './code-paths/view-hot.js';
 import { dashboardViewSccsJs } from './code-paths/view-sccs.js';
 import { dashboardViewSearchJs } from './code-paths/view-search.js';
@@ -102,6 +103,7 @@ export function dashboardCodePathsJs(): string {
     dashboardViewUntestedJs(),
     dashboardViewSccsJs(),
     dashboardViewSearchJs(),
+    dashboardViewGraphJs(),
     panelOrchestratorJs(),
   ].join('\n');
 }

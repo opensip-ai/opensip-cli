@@ -1,0 +1,271 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`dashboardViewGraphJs (emitter) > matches the snapshot 1`] = `
+"
+// Register the dagre layout extension once (the vendored globals are
+// declared earlier in the bundle). Guarded so a double-load is harmless.
+(function registerGraphLayouts() {
+  try {
+    if (typeof cytoscape === 'function' && typeof cytoscapeDagre !== 'undefined' && !cytoscape.__gvDagreRegistered) {
+      cytoscape.use(cytoscapeDagre);
+      cytoscape.__gvDagreRegistered = true;
+    }
+  } catch (e) { /* extension already registered or unavailable */ }
+})();
+
+// Available layouts. dagre is the default for mostly-DAG code graphs; cose
+// (built-in force-directed) reads better when cycles dominate;
+// breadthfirst is a cheap hierarchical fallback. No fcose — it needs a
+// fourth vendored extension and the bundle budget is tight.
+var GV_LAYOUTS = [
+  { id: 'dagre', label: 'Dagre (layered)' },
+  { id: 'cose', label: 'Cose (force)' },
+  { id: 'breadthfirst', label: 'Breadthfirst' },
+];
+var gvCurrentLayout = 'dagre';
+var gvCy = null;
+
+function gvLoadViewModel() {
+  var blob = document.getElementById('graph-view-model');
+  if (!blob || !blob.textContent) return null;
+  try { return JSON.parse(blob.textContent); } catch (e) { return null; }
+}
+
+function gvNodeShape(kind) {
+  switch (kind) {
+    case 'constructor': return 'diamond';
+    case 'method': return 'round-rectangle';
+    case 'getter': case 'setter': return 'round-rectangle';
+    case 'arrow': return 'round-tag';
+    case 'module-init': return 'hexagon';
+    default: return 'ellipse';
+  }
+}
+
+function gvNodeBorderStyle(visibility) {
+  if (visibility === 'private') return 'dashed';
+  if (visibility === 'module-local') return 'dotted';
+  return 'solid';
+}
+
+function gvEdgeStyle(resolution) {
+  if (resolution === 'static' || resolution === 'constructor') return 'solid';
+  if (resolution === 'dynamic-string') return 'dotted';
+  return 'dashed';
+}
+
+function gvEdgeOpacity(confidence) {
+  if (confidence === 'low') return 0.3;
+  if (confidence === 'medium') return 0.6;
+  return 0.9;
+}
+
+// Map a sccId to a stable hue so cyclic clusters are visually grouped.
+function gvSccColor(sccId) {
+  if (!sccId) return null;
+  var h = 0;
+  for (var i = 0; i < sccId.length; i++) { h = (h * 31 + sccId.charCodeAt(i)) % 360; }
+  return 'hsl(' + h + ', 70%, 55%)';
+}
+
+function gvBuildElements(vm) {
+  var elements = [];
+  for (var i = 0; i < vm.nodes.length; i++) {
+    var n = vm.nodes[i];
+    var degree = (n.callDegreeIn || 0) + (n.callDegreeOut || 0);
+    elements.push({
+      group: 'nodes',
+      data: {
+        id: n.id,
+        label: n.label,
+        filePath: n.filePath,
+        kind: n.kind,
+        visibility: n.visibility,
+        inTestFile: !!n.inTestFile,
+        degree: degree,
+        sccId: n.sccId || null,
+        sccColor: gvSccColor(n.sccId),
+        shape: gvNodeShape(n.kind),
+        borderStyle: gvNodeBorderStyle(n.visibility),
+      },
+    });
+  }
+  for (var j = 0; j < vm.edges.length; j++) {
+    var e = vm.edges[j];
+    elements.push({
+      group: 'edges',
+      data: {
+        id: 'e' + j,
+        source: e.source,
+        target: e.target,
+        lineStyle: gvEdgeStyle(e.resolution),
+        edgeOpacity: gvEdgeOpacity(e.confidence),
+        isCycleEdge: !!e.isCycleEdge,
+      },
+    });
+  }
+  return elements;
+}
+
+function gvStylesheet() {
+  return [
+    {
+      selector: 'node',
+      style: {
+        'background-color': '#c4956a',
+        'border-color': function(ele) { return ele.data('sccColor') || '#8a8a8a'; },
+        'border-width': function(ele) { return ele.data('sccId') ? 3 : 1; },
+        'border-style': function(ele) { return ele.data('borderStyle'); },
+        'shape': function(ele) { return ele.data('shape'); },
+        'width': function(ele) { return 18 + Math.min(42, ele.data('degree') * 3); },
+        'height': function(ele) { return 18 + Math.min(42, ele.data('degree') * 3); },
+        'label': function(ele) {
+          var l = ele.data('label') || '';
+          return l.length > 28 ? l.slice(0, 27) + '…' : l;
+        },
+        'font-size': 7,
+        'color': '#ddd',
+        'text-valign': 'bottom',
+        'text-halign': 'center',
+        'text-margin-y': 2,
+        'opacity': function(ele) { return ele.data('inTestFile') ? 0.55 : 1; },
+      },
+    },
+    {
+      selector: 'edge',
+      style: {
+        'width': 1,
+        'line-color': '#5a5a5a',
+        'line-style': function(ele) { return ele.data('lineStyle'); },
+        'opacity': function(ele) { return ele.data('edgeOpacity'); },
+        'target-arrow-color': '#5a5a5a',
+        'target-arrow-shape': 'triangle',
+        'arrow-scale': 0.6,
+        'curve-style': 'bezier',
+      },
+    },
+    {
+      selector: 'edge[?isCycleEdge]',
+      style: { 'line-color': '#d46a6a', 'target-arrow-color': '#d46a6a', 'width': 1.5 },
+    },
+    {
+      selector: 'node.gv-node-selected',
+      style: { 'background-color': '#e0a96d', 'border-color': '#fff', 'border-width': 3 },
+    },
+  ];
+}
+
+function gvLayoutOptions(layoutId) {
+  if (layoutId === 'dagre') {
+    return { name: 'dagre', rankDir: 'LR', nodeSep: 14, rankSep: 48, fit: true, padding: 24 };
+  }
+  if (layoutId === 'breadthfirst') {
+    return { name: 'breadthfirst', directed: true, spacingFactor: 1.1, fit: true, padding: 24 };
+  }
+  return { name: 'cose', animate: false, fit: true, padding: 24, nodeRepulsion: 4500 };
+}
+
+function gvRunLayout(layoutId) {
+  if (!gvCy) return;
+  gvCurrentLayout = layoutId;
+  var layout = gvCy.layout(gvLayoutOptions(layoutId));
+  layout.run();
+}
+
+function gvRenderLayoutSelector(host) {
+  var bar = el('div', { class: 'code-paths-graph-toolbar' });
+  bar.appendChild(el('span', { class: 'code-paths-graph-toolbar-label', text: 'Layout' }));
+  for (var i = 0; i < GV_LAYOUTS.length; i++) {
+    (function(layout) {
+      var btn = el('button', {
+        class: 'code-paths-graph-layout-btn' + (layout.id === gvCurrentLayout ? ' active' : ''),
+        'data-layout': layout.id,
+        text: layout.label,
+        onclick: function() {
+          gvRunLayout(layout.id);
+          var btns = host.querySelectorAll('.code-paths-graph-layout-btn');
+          for (var k = 0; k < btns.length; k++) {
+            btns[k].classList.toggle('active', btns[k].dataset.layout === layout.id);
+          }
+        },
+      });
+      bar.appendChild(btn);
+    })(GV_LAYOUTS[i]);
+  }
+  host.appendChild(bar);
+}
+
+views.push({
+  id: 'graph',
+  label: 'Graph',
+  help: {
+    title: 'Graph',
+    sections: [
+      { heading: 'What this is', body: 'A node-link visualization of the call graph rendered with Cytoscape.js. Each node is a function; each edge is a static call. Node size reflects total call degree (callers + callees); cyclic clusters share an accent border.' },
+      { heading: 'Why you care', body: 'The seven table views project the graph into rankings and lists. This view shows topology directly — hub functions, tightly cyclic clusters, disconnected islands, and the upstream/downstream radius around a node — which is work to reconstruct from a table.' },
+      { heading: 'How to read it', body: 'Node shape encodes kind (diamond=constructor, hexagon=module-init, rounded=method). Border style encodes visibility (solid=exported, dotted=module-local, dashed=private). Edge style encodes call resolution; faded edges are low-confidence. Use the layout selector to switch between layered (dagre), force (cose), and hierarchical (breadthfirst).' },
+      { heading: 'What to do', body: 'Pan and zoom to explore. Click a node to select it. Later phases add filter, search, and click-to-trace upstream/downstream impact.' },
+    ],
+  },
+  render(container, catalog, indexes, filterState) {
+    while (container.firstChild) container.removeChild(container.firstChild);
+    var vm = gvLoadViewModel();
+    if (!vm || !vm.nodes || vm.nodes.length === 0) {
+      container.appendChild(el('div', { class: 'empty', text: 'No graph to display.' }));
+      return;
+    }
+    if (typeof cytoscape !== 'function') {
+      container.appendChild(el('div', { class: 'empty', text: 'Graph renderer unavailable.' }));
+      return;
+    }
+
+    gvRenderLayoutSelector(container);
+
+    if (typeof vm.truncatedFromTotal === 'number' && vm.truncatedFromTotal > vm.nodes.length) {
+      container.appendChild(el('div', {
+        class: 'code-paths-graph-banner',
+        text: 'Showing top ' + vm.nodes.length + ' of ' + vm.truncatedFromTotal + ' by call degree. Use filters to broaden.',
+      }));
+    }
+
+    var canvas = el('div', { class: 'code-paths-graph-canvas', id: 'code-paths-graph-canvas' });
+    container.appendChild(canvas);
+
+    // Mounting can throw in environments without a real 2D canvas (e.g.
+    // headless test runners). Fail soft — the rest of the page stays usable.
+    try {
+      gvCy = cytoscape({
+        container: canvas,
+        elements: gvBuildElements(vm),
+        style: gvStylesheet(),
+        layout: gvLayoutOptions(gvCurrentLayout),
+        wheelSensitivity: 0.2,
+        minZoom: 0.05,
+        maxZoom: 4,
+      });
+    } catch (e) {
+      gvCy = null;
+      canvas.appendChild(el('div', { class: 'empty', text: 'Graph renderer could not initialize in this environment.' }));
+      return;
+    }
+
+    // Node selection — toggle a CSS class for now (later phases add impact).
+    gvCy.on('tap', 'node', function(evt) {
+      gvCy.nodes().removeClass('gv-node-selected');
+      evt.target.addClass('gv-node-selected');
+    });
+    gvCy.on('tap', function(evt) {
+      if (evt.target === gvCy) gvCy.nodes().removeClass('gv-node-selected');
+    });
+  },
+  onActivate() {
+    // The canvas needs a measured size before fit() — defer one frame so
+    // the container has finished switching from display:none to block.
+    if (!gvCy) return;
+    setTimeout(function() {
+      try { gvCy.resize(); gvCy.fit(undefined, 24); } catch (e) { /* ignore */ }
+    }, 0);
+  },
+});
+"
+`;
