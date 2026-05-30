@@ -44,7 +44,9 @@ function readVendorBundle(): string {
       cachedBundle = readFileSync(candidate, 'utf8');
       return cachedBundle;
     } catch {
-      // try the next candidate
+      // @swallow-ok candidate-path probe: a missing candidate is expected
+      // (dist vs src layout). The final `throw` below reports if ALL fail.
+      continue;
     }
   }
   throw new Error(

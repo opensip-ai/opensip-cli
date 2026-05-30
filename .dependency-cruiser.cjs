@@ -557,11 +557,12 @@ module.exports = {
     },
 
     // -------------------------------------------------------------------
-    // graph dashboard v0.3 — Code Paths panel architectural invariants
-    // (§9.1 of docs/plans/graph-dashboard-v3-design.md). The panel lives
-    // in @opensip-tools/dashboard; it consumes the graph catalog by JSON
-    // shape only. Each rule below codifies a single architectural-
-    // invariant claim from the design doc.
+    // graph dashboard — Code Paths panel architectural invariants. The
+    // catalog-decoupling rule (dashboard consumes the graph catalog by JSON
+    // shape only, never importing @opensip-tools/graph) is documented in
+    // docs/plans/ready/graph-visualizer-view/. The panel lives in
+    // @opensip-tools/dashboard. Each rule below codifies a single
+    // architectural-invariant claim.
     // -------------------------------------------------------------------
     {
       name: 'dashboard-no-graph-import',
