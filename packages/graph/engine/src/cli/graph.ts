@@ -40,7 +40,7 @@ import { buildCliOutput, buildCliOutputFromFindings, renderJson } from '../rende
 
 import { detectLanguages } from './detect.js';
 import { runCatalogJsonMode, runGateMode, runReportMode } from './graph-modes.js';
-import { writeFooterHintsPlain, writeRunSummaryPlain, writeUnifiedReport } from './graph-report.js';
+import { writeFooterHintsPlain, writeResolutionBannerPlain, writeRunSummaryPlain, writeUnifiedReport } from './graph-report.js';
 import { runGraph } from './orchestrate.js';
 import { positionalPathLabel, resolvePositionalPaths } from './positional-paths.js';
 import { MemoryPressureError } from './pressure-monitor.js';
@@ -193,7 +193,7 @@ async function dispatchGraphResult(
   startedAt: string,
 ): Promise<void> {
   if (opts.gateSave === true || opts.gateCompare === true) {
-    await runGateMode(opts, result.signals, cli);
+    await runGateMode(opts, result.signals, cli, result.catalog?.resolutionMode);
     logger.info({ evt: EVT_GRAPH_COMPLETE, module: MODULE_GRAPH_CLI });
     return;
   }
@@ -233,7 +233,12 @@ function renderGraphResult(
 ): void {
   if (opts.json === true) {
     logger.info({ evt: 'graph.render.json.start', module: MODULE_GRAPH_RENDER });
-    const out = renderJson(result.signals, { cwd: opts.cwd, tool: 'graph', command: 'graph' });
+    const out = renderJson(result.signals, {
+      cwd: opts.cwd,
+      tool: 'graph',
+      command: 'graph',
+      resolutionMode: result.catalog?.resolutionMode,
+    });
     process.stdout.write(`${out}\n`);
     logger.info({ evt: 'graph.render.json.complete', module: MODULE_GRAPH_RENDER });
     return;
@@ -253,8 +258,10 @@ function renderGraphResult(
       cacheHit: result.cacheHit,
     });
   }
-  const cliOutput = buildCliOutput(result.signals, 'graph');
+  const cliOutput = buildCliOutput(result.signals, 'graph', result.catalog?.resolutionMode);
   const durationMs = Math.max(0, Date.now() - Date.parse(startedAt));
+  // Honest-approximation banner on the always-visible default path.
+  writeResolutionBannerPlain(result.catalog?.resolutionMode);
   writeRunSummaryPlain({
     passed: cliOutput.summary.passed,
     failed: cliOutput.summary.failed,

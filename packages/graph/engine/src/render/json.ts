@@ -12,13 +12,14 @@ import type { Renderer } from './types.js';
 import type { CheckOutput, CliOutput, FindingOutput } from '@opensip-tools/contracts';
 
 export const renderJson: Renderer = (signals, context): string => {
-  const cliOutput = buildCliOutput(signals, context.command);
+  const cliOutput = buildCliOutput(signals, context.command, context.resolutionMode);
   return JSON.stringify(cliOutput, null, 2);
 };
 
 export function buildCliOutput(
   signals: readonly { ruleId: string; message: string; severity: string; filePath: string; line?: number; column?: number; suggestion?: string }[],
   command: string,
+  resolutionMode?: 'exact' | 'fast',
 ): CliOutput {
   // Group findings by ruleId so each rule maps to a CheckOutput.
   const byRule = new Map<string, FindingOutput[]>();
@@ -77,6 +78,9 @@ export function buildCliOutput(
     summary,
     checks,
     durationMs: 0,
+    // Honest-approximation marker: present only when the run was fast,
+    // so machine consumers see that edges are syntactic/approximate.
+    ...(resolutionMode === 'fast' ? { resolutionMode } : {}),
   };
 }
 

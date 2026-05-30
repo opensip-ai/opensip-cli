@@ -113,6 +113,26 @@ function formatDuration(ms: number): string {
 }
 
 /**
+ * The one-line "approximate edges" banner for a fast-tier catalog. Kept
+ * factual and non-alarming: fast mode is a legitimate chosen tier, not an
+ * error — "you asked for fast; here's the honest caveat."
+ */
+function resolutionBanner(): string {
+  return 'Resolution: fast (syntactic) — edges are approximate; re-run with --resolution exact for semantic precision.';
+}
+
+/**
+ * Emit the fast-mode approximation banner on the default (non-verbose)
+ * stdout path when the rendered catalog is approximate. No-op for exact
+ * catalogs, so nothing changes for the common case.
+ */
+export function writeResolutionBannerPlain(resolutionMode: 'exact' | 'fast' | undefined): void {
+  if (resolutionMode === 'fast') {
+    process.stdout.write(`${resolutionBanner()}\n`);
+  }
+}
+
+/**
  * Emit the one-line PASS/FAIL summary in plain text, matching the
  * format of cli-ui's `RunSummary` Ink component. Used by the
  * non-interactive stdout path so default `pnpm graph <scope>` runs
@@ -148,6 +168,9 @@ function renderCatalogSection(catalog: Catalog | null, cacheHit: boolean): reado
     lines.push(
       `${String(fnCount)} functions across ${String(fileCount)} files (cacheHit=${String(cacheHit)})`,
     );
+    if (catalog.resolutionMode === 'fast') {
+      lines.push(resolutionBanner());
+    }
   } else {
     /* v8 ignore next */
     lines.push('(no catalog produced)');

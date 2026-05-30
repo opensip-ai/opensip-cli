@@ -17,6 +17,8 @@ export interface RenderContext {
   readonly command: string;
   /** Used by JSON renderer to construct CliOutput. */
   readonly output?: CliOutput;
+  /** Resolution tier of the catalog being rendered; surfaced into JSON. */
+  readonly resolutionMode?: 'exact' | 'fast';
 }
 
 /** Pure signal-to-string renderer (table/json/sarif) selected by CLI flags. */
