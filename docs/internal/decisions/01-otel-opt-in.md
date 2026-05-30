@@ -100,3 +100,41 @@ exits.
 - Exporter resilience (a dead collector must degrade to "no telemetry," not a
   broken run) is partially handled (`shutdownTelemetry` swallows shutdown
   errors) and otherwise flagged for a hardening pass.
+
+## Validation
+
+Validated **in-process** (no live infrastructure required, runs in CI):
+
+- **Core no-op contract** (`packages/core/src/lib/__tests__/telemetry.test.ts`):
+  with no SDK registered, `withSpan` runs `fn`, returns its value, the span is
+  non-recording, and on throw it records the exception, sets ERROR status, ends
+  the span, and rethrows.
+- **CLI SDK gate** (`packages/cli/src/telemetry/__tests__/sdk-init.test.ts`):
+  `OTEL_EXPORTER_OTLP_ENDPOINT` unset ⇒ no provider (spans non-recording); set ⇒
+  exactly one real provider, idempotent; `TRACEPARENT` extracted into a parent
+  context so a child span inherits the parent trace id; `shutdownTelemetry`
+  resolves in both modes.
+- **Graph stage spans** — capture
+  (`packages/cli/src/telemetry/__tests__/graph-spans.test.ts`, using
+  `InMemorySpanExporter` from the SDK, which lives in `cli`): a `runGraph` run
+  produces the six `opensip_tools.graph.<stage>` spans in `GRAPH_STAGES` order,
+  each with the stage attribute plus orchestrator-level attributes (file_count,
+  cache_hit, rule/signal counts), and — under an active parent context — all six
+  nest under the parent's trace id. With no provider, the run emits nothing.
+- **Graph no-op invariant**
+  (`packages/graph/engine/src/cli/__tests__/orchestrate-spans.test.ts`, no SDK in
+  the tool package): `runGraph` completes identically and its stage spans are
+  non-recording when no provider is registered.
+
+Still requires a **real OTLP collector** (Phase 4 of the plan; not runnable in
+this CI environment, documented in
+`docs/plans/ready/telemetry-opt-in/phase-4-validation.md`):
+
+- OTLP/HTTP export over the wire to a running `otel-collector` (the in-process
+  tests use `InMemorySpanExporter`, so the protocol/exporter path is exercised in
+  init/shutdown but not asserted end-to-end against a collector).
+- End-to-end resource-attribute propagation from a **spawned subprocess**
+  (`OTEL_RESOURCE_ATTRIBUTES=tenant_id=…,run_id=…` + `TRACEPARENT` set by a parent
+  process that spawns `opensip-tools graph`).
+- The standalone "no network attempt / no measurable overhead vs a pre-plan
+  build" timing comparison.
