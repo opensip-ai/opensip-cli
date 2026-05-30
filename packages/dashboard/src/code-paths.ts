@@ -19,6 +19,7 @@
  * from the graph engine's runtime types).
  */
 
+import { dashboardCytoscapeVendorJs } from './code-paths/cytoscape-vendor.js';
 import { dashboardEditorLinkJs } from './code-paths/editor-link.js';
 import { dashboardFiltersJs } from './code-paths/filters.js';
 import { dashboardFunctionCardJs } from './code-paths/function-card.js';
@@ -79,6 +80,10 @@ import { dashboardViewsRegistryJs } from './code-paths/views-registry.js';
  */
 export function dashboardCodePathsJs(): string {
   return [
+    // 0. cytoscape vendor — defines the `cytoscape` / `cytoscapeDagre`
+    //    browser globals the Graph view consumes. MUST precede any view
+    //    emitter that references them. No deps of its own.
+    dashboardCytoscapeVendorJs(),
     dashboardPathUtilsJs(),
     dashboardIndexesJs(),
     dashboardFiltersJs(),
