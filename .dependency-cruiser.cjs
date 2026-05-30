@@ -483,10 +483,18 @@ module.exports = {
         'adapter packs as devDeps (multi-adapter contract / registry / ' +
         'pickAdapter coverage); production-source imports are forbidden.',
       from: {
-        path: '^packages/graph/graph-[a-z0-9-]+/src/',
+        // Capture the source adapter package dir so `to.pathNot` can
+        // exclude self-imports. In resolved-path form a flat
+        // `^packages/graph/graph-` would match a pack's OWN files; the
+        // backreference ($1) makes the rule fire only on a DIFFERENT
+        // adapter pack.
+        path: '^packages/graph/(graph-[a-z0-9-]+)/src/',
         pathNot: '^packages/graph/graph-[a-z0-9-]+/src/__tests__/',
       },
-      to: { path: '^@opensip-tools/graph-[a-z0-9-]+($|/)' },
+      to: {
+        path: '^packages/graph/graph-[a-z0-9-]+/',
+        pathNot: '^packages/graph/$1/',
+      },
     },
     {
       // PR 1b. Adapter packs MUST NOT depend on the CLI. Pattern-based:
