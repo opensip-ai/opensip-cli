@@ -129,6 +129,14 @@ export type { Result, ToolErrorCode, ToolErrorOptions } from './lib/errors.js';
 export { logger, LoggerImpl, configureLogger } from './lib/logger.js';
 export type { Logger, LogLevel, LoggerOptions, RunIdProvider } from './lib/logger.js';
 
+// Lib — telemetry (tracing). The kernel sibling of `logger`: a thin seam over
+// the OpenTelemetry *API* (`@opentelemetry/api`) only. No-op until an SDK
+// registers a global provider at the application boundary (the CLI). Tools emit
+// spans via `withSpan` and reach span types through this barrel so they never
+// import `@opentelemetry/api` directly — the kernel is the single seam.
+export { getTracer, withSpan } from './lib/telemetry.js';
+export type { Span, Attributes, Tracer } from '@opentelemetry/api';
+
 // Lib — permissive YAML reader (returns undefined on missing/malformed
 // files). Used by plugin-discovery sites that need to peek at a single
 // field of opensip-tools.config.yml without dragging in a Zod schema.

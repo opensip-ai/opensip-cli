@@ -32,6 +32,7 @@ import type {
   ResolutionStats,
 } from '../../types.js';
 import type { PressureMonitor } from '../pressure-monitor.js';
+import type { Attributes } from '@opensip-tools/core';
 
 /**
  * Shape of the `runStage` helper passed in by the orchestrator.
@@ -45,6 +46,7 @@ export type RunStage = <T>(
   monitor: PressureMonitor | undefined,
   fn: () => T,
   detailFn?: (result: T) => string | undefined,
+  attrsFn?: (result: T) => Attributes,
 ) => T;
 
 /**

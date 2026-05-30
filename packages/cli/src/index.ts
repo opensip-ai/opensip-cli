@@ -29,6 +29,7 @@ import {
 import { buildToolCliContext, createLiveViewRegistry, getOrOpenDatastore, setCliRegistriesForRun } from './cli-context.js';
 import { registerCliCommands } from './commands/index.js';
 import { handleFatalBootstrapError, handleParseError } from './error-handler.js';
+import { runWithTelemetryContext, shutdownTelemetry } from './telemetry/sdk-init.js';
 import { maybeNotify } from './update-notifier.js';
 import { printWelcome } from './welcome.js';
 
@@ -58,6 +59,7 @@ async function main(): Promise<void> {
     langRegistry,
     toolRegistry,
     projectDir: dirname(dirname(fileURLToPath(import.meta.url))),
+    cliEntryUrl: import.meta.url,
   });
 
   const { ctx } = buildToolCliContext({
@@ -81,8 +83,14 @@ async function main(): Promise<void> {
   }
   maybeNotify({ name: '@opensip-tools/cli', version: program.version() ?? '0.0.0' });
 
-  await program.parseAsync().catch((error: unknown) =>
-    handleParseError(error, { setExitCode: ctx.setExitCode, render: renderResult }),
+  // Dispatch inside the telemetry parent context so spans emitted during the
+  // run (e.g. graph's per-stage spans) nest under the consumer's TRACEPARENT
+  // when one was supplied. A plain pass-through when telemetry is disabled or
+  // no parent context was extracted, so standalone runs pay nothing.
+  await runWithTelemetryContext(() =>
+    program.parseAsync().catch((error: unknown) =>
+      handleParseError(error, { setExitCode: ctx.setExitCode, render: renderResult }),
+    ),
   );
 }
 
@@ -97,4 +105,11 @@ try {
   await main();
 } catch (error) {
   handleFatalBootstrapError(error, logger);
+} finally {
+  // Flush batched spans before the short-lived process exits — on normal
+  // completion and on handled error exits alike. No-op when telemetry was
+  // never started (standalone), so standalone runs pay nothing. The early
+  // welcome-screen `process.exit(0)` above runs no commands and emits no
+  // spans, so skipping the flush there is harmless.
+  await shutdownTelemetry();
 }

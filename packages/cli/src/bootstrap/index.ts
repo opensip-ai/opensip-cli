@@ -34,6 +34,8 @@
  * 2026-05-23 M1.
  */
 
+import { initTelemetry } from '../telemetry/sdk-init.js';
+
 import { discoverAndRegisterGraphAdapterPackages } from './register-graph-adapters.js';
 import { registerLanguageAdapters } from './register-language-adapters.js';
 import {
@@ -54,6 +56,13 @@ export interface BootstrapOptions {
   readonly toolRegistry: ToolRegistry;
   /** Project directory used by `discoverToolPackages`; usually the CLI install dir. */
   readonly projectDir: string;
+  /**
+   * `import.meta.url` of the CLI entry. Used to init telemetry as early as
+   * possible (reads the CLI package version for the `service.version` resource
+   * attribute). Telemetry init is a no-op unless `OTEL_EXPORTER_OTLP_ENDPOINT`
+   * is set, so this is inert for standalone runs.
+   */
+  readonly cliEntryUrl: string;
 }
 
 /**
@@ -71,6 +80,11 @@ export interface BootstrapOptions {
  * docs/plans/architecture/2026-05-23-plan-graph-adapter-package-split.md.
  */
 export async function bootstrapCli(opts: BootstrapOptions): Promise<void> {
+  // Telemetry first — before any tool runs — so provider registration happens
+  // once per process ahead of the first stage span. Hard no-op unless the OTLP
+  // endpoint env var is set (see telemetry/sdk-init.ts), so standalone startup
+  // is byte-for-byte unaffected.
+  initTelemetry(opts.cliEntryUrl);
   registerLanguageAdapters(opts.langRegistry);
   registerFirstPartyTools(opts.toolRegistry);
   await discoverAndRegisterToolPackages(opts.toolRegistry, {
