@@ -3,7 +3,7 @@
  * @fileoverview Validate routes have authentication middleware
  */
 
-import { logger } from '@opensip-tools/core/logger'
+import { logger } from '@opensip-tools/core'
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 import { stripStringLiterals, stripStringsAndComments } from '@opensip-tools/fitness'
 

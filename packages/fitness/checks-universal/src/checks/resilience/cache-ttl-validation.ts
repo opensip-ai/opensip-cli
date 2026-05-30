@@ -4,7 +4,7 @@
  * @fileoverview Cache TTL validation check
  */
 
-import { logger } from '@opensip-tools/core/logger'
+import { logger } from '@opensip-tools/core'
 import { defineCheck, isTestFile, type CheckViolation } from '@opensip-tools/fitness'
 
 import { isDigit } from './_helpers/config-validation.js'
