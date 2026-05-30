@@ -24,7 +24,7 @@ describe('graph-go parse.ts — branches', () => {
   it('returns no parseErrors for a syntactically valid file', () => {
     const file = join(dir, 'main.go');
     writeFileSync(file, 'package main\nfunc main() { x := 1; _ = x }\n', 'utf8');
-    const out = parseProject({ projectDirAbs: dir, files: [file] });
+    const out = parseProject({ projectDirAbs: dir, files: [file], resolutionMode: 'exact' });
     expect(out.parseErrors).toEqual([]);
     expect(out.project.files.size).toBe(1);
   });
@@ -34,7 +34,7 @@ describe('graph-go parse.ts — branches', () => {
     // Unterminated function body — tree-sitter marks hasError but
     // still produces a partial tree.
     writeFileSync(file, 'package main\nfunc broken() { x := \n', 'utf8');
-    const out = parseProject({ projectDirAbs: dir, files: [file] });
+    const out = parseProject({ projectDirAbs: dir, files: [file], resolutionMode: 'exact' });
     expect(out.parseErrors.length).toBeGreaterThan(0);
     expect(out.parseErrors[0]?.message).toContain('tree-sitter');
     expect(out.project.files.size).toBe(1);
@@ -45,7 +45,7 @@ describe('graph-go parse.ts — branches', () => {
     const b = join(dir, 'b.go');
     writeFileSync(a, 'package main\nfunc ok() { }\n', 'utf8');
     writeFileSync(b, 'package main\nfunc broken() { x := \n', 'utf8');
-    const out = parseProject({ projectDirAbs: dir, files: [a, b] });
+    const out = parseProject({ projectDirAbs: dir, files: [a, b], resolutionMode: 'exact' });
     expect(out.project.files.size).toBe(2);
     expect(out.parseErrors.length).toBeGreaterThan(0);
   });
@@ -66,7 +66,7 @@ describe('graph-go parse.ts — branches', () => {
         `}\n`,
       'utf8',
     );
-    const out = parseProject({ projectDirAbs: dir, files: [file] });
+    const out = parseProject({ projectDirAbs: dir, files: [file], resolutionMode: 'exact' });
     expect(out.parseErrors).toEqual([]);
   });
 });

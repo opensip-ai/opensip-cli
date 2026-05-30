@@ -44,9 +44,16 @@ export function buildCatalog(input: PipelineInput): PipelineResult {
     projectDirAbs: input.projectDirAbs,
     files: input.files,
     compilerOptions: input.compilerOptions,
+    resolutionMode: 'exact',
   });
+  // This helper drives the exact (semantic) pipeline only; narrow the
+  // discriminated parsed-project union to the exact variant.
+  if (parsed.project.kind !== 'exact') {
+    throw new Error('buildCatalog: expected exact parse result');
+  }
+  const program = parsed.project.program;
   const walked = walkProgram({
-    program: parsed.project.program,
+    sourceFiles: program.getSourceFiles(),
     files: input.files,
     projectDirAbs: input.projectDirAbs,
   });
@@ -62,7 +69,7 @@ export function buildCatalog(input: PipelineInput): PipelineResult {
 
   return {
     catalog,
-    program: parsed.project.program,
+    program,
     callSites: walked.callSites,
     parseErrors: [...parsed.parseErrors, ...walked.parseErrors],
   };

@@ -39,6 +39,7 @@ describe('lang-rust walk.ts — comment-stripping branches', () => {
       projectDirAbs: discovery.projectDirAbs,
       files: discovery.files,
       compilerOptions: discovery.compilerOptions,
+      resolutionMode: 'exact',
     });
     const walk = rustGraphAdapter.walkProject({
       project: parsed.project,
@@ -66,6 +67,7 @@ describe('lang-rust walk.ts — comment-stripping branches', () => {
       projectDirAbs: discovery.projectDirAbs,
       files: discovery.files,
       compilerOptions: discovery.compilerOptions,
+      resolutionMode: 'exact',
     });
     const walk = rustGraphAdapter.walkProject({
       project: parsed.project,
@@ -91,6 +93,7 @@ describe('lang-rust walk.ts — comment-stripping branches', () => {
       projectDirAbs: discovery.projectDirAbs,
       files: discovery.files,
       compilerOptions: discovery.compilerOptions,
+      resolutionMode: 'exact',
     });
     const walk = rustGraphAdapter.walkProject({
       project: parsed.project,
@@ -124,6 +127,7 @@ describe('lang-rust walk.ts — function shapes and occurrences', () => {
       projectDirAbs: discovery.projectDirAbs,
       files: discovery.files,
       compilerOptions: discovery.compilerOptions,
+      resolutionMode: 'exact',
     });
     return rustGraphAdapter.walkProject({
       project: parsed.project,
@@ -275,6 +279,7 @@ describe('lang-rust walk.ts — function shapes and occurrences', () => {
       projectDirAbs: discovery.projectDirAbs,
       files: [f1, f2],
       compilerOptions: discovery.compilerOptions,
+      resolutionMode: 'exact',
     });
     const walk = rustGraphAdapter.walkProject({
       project: parsed.project,
@@ -354,6 +359,7 @@ describe('lang-rust walk.ts — function shapes and occurrences', () => {
       projectDirAbs: discovery.projectDirAbs,
       files: [], // parse no files
       compilerOptions: discovery.compilerOptions,
+      resolutionMode: 'exact',
     });
     const walk = rustGraphAdapter.walkProject({
       project: parsed.project,

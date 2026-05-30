@@ -26,6 +26,7 @@ import type {
   CallEdge,
   DependencyEdge,
   FunctionOccurrence,
+  ResolutionMode,
   ResolutionStats,
 } from '../../types.js';
 import type { PressureMonitor } from '../pressure-monitor.js';
@@ -55,6 +56,7 @@ export function buildAndResolveCatalog(
   runStage: RunStage,
   adapter: GraphLanguageAdapter,
   discovery: DiscoverOutput,
+  resolutionMode: ResolutionMode,
   onProgress?: GraphProgressCallback,
   monitor?: PressureMonitor,
 ): { readonly catalog: Catalog; readonly resolutionStats: ResolutionStats } {
@@ -70,6 +72,7 @@ export function buildAndResolveCatalog(
       projectDirAbs: discovery.projectDirAbs,
       files: discovery.files,
       compilerOptions: discovery.compilerOptions,
+      resolutionMode,
     }),
     () => adapter.displayName,
   );
@@ -85,7 +88,7 @@ export function buildAndResolveCatalog(
     (w) => `${String(Object.keys(w.occurrences).length)} functions`,
   );
 
-  const initialCatalog = assembleCatalog(adapter, discovery, walked.occurrences);
+  const initialCatalog = assembleCatalog(adapter, discovery, walked.occurrences, resolutionMode);
 
   const resolved = runStage(
     'resolve',
@@ -97,6 +100,7 @@ export function buildAndResolveCatalog(
       callSites: walked.callSites,
       dependencySites: walked.dependencySites,
       projectDirAbs: discovery.projectDirAbs,
+      resolutionMode,
     }),
     (r) => `${String(r.stats.totalCallSites)} call site(s)`,
   );
@@ -133,6 +137,7 @@ export function buildAndResolveCatalogIncremental(
   discovery: DiscoverOutput,
   cachedCatalog: Catalog,
   changedFilesAbs: readonly string[],
+  resolutionMode: ResolutionMode,
   onProgress?: GraphProgressCallback,
   monitor?: PressureMonitor,
 ): { readonly catalog: Catalog; readonly resolutionStats: ResolutionStats } {
@@ -144,6 +149,7 @@ export function buildAndResolveCatalogIncremental(
       projectDirAbs: discovery.projectDirAbs,
       files: discovery.files,
       compilerOptions: discovery.compilerOptions,
+      resolutionMode,
     }),
     () => `${adapter.displayName} (incremental)`,
   );
@@ -166,7 +172,12 @@ export function buildAndResolveCatalogIncremental(
   // so name- and hash-based fallbacks see the full project.
   const mergedFunctions = mergeOccurrences(cachedCatalog, walked.occurrences, closureRel);
   const initialCatalog = {
-    ...assembleCatalog(adapter, discovery, mergedFunctions as Record<string, FunctionOccurrence[]>),
+    ...assembleCatalog(
+      adapter,
+      discovery,
+      mergedFunctions as Record<string, FunctionOccurrence[]>,
+      resolutionMode,
+    ),
     functions: mergedFunctions,
   } as Catalog;
 
@@ -180,6 +191,7 @@ export function buildAndResolveCatalogIncremental(
       callSites: walked.callSites,
       dependencySites: walked.dependencySites,
       projectDirAbs: discovery.projectDirAbs,
+      resolutionMode,
     }),
     (r) => `${String(r.stats.totalCallSites)} call site(s)`,
   );
@@ -247,6 +259,7 @@ function assembleCatalog(
   adapter: GraphLanguageAdapter,
   discovery: DiscoverOutput,
   occurrences: Record<string, FunctionOccurrence[]>,
+  resolutionMode: ResolutionMode,
 ): Catalog {
   return {
     version: '3.0',
@@ -257,7 +270,11 @@ function assembleCatalog(
       projectDirAbs: discovery.projectDirAbs,
       configPathAbs: discovery.configPathAbs,
       compilerOptions: discovery.compilerOptions,
+      resolutionMode,
     }),
+    // Self-describe the tier so loaded catalogs are honest about
+    // approximation without re-deriving it from the cacheKey.
+    resolutionMode,
     functions: occurrences,
   };
 }

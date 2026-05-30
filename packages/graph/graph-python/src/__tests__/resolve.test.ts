@@ -28,6 +28,7 @@ function runPipeline(dir: string): {
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,
     compilerOptions: discovery.compilerOptions,
+    resolutionMode: 'exact',
   });
   const walk = pythonGraphAdapter.walkProject({
     project: parsed.project,
@@ -47,6 +48,7 @@ function runPipeline(dir: string): {
     catalog,
     callSites: walk.callSites,
     projectDirAbs: discovery.projectDirAbs,
+    resolutionMode: 'exact',
   });
   return {
     occurrences: walk.occurrences,

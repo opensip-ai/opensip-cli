@@ -27,6 +27,7 @@ import {
   type WorkspaceUnit,
 } from '@opensip-tools/core'
 
+import type { ResolutionMode } from '../types.js'
 import type { CliOutput, FindingOutput } from '@opensip-tools/contracts'
 
 /**
@@ -65,6 +66,12 @@ export interface RunWorkspaceUnitsInput {
   readonly concurrency?: number
   /** Forwarded to children if true. */
   readonly noCache?: boolean
+  /**
+   * Edge resolution tier. Forwarded to each child as `--resolution
+   * <mode>` so a `--workspace --resolution fast` run is fast per unit,
+   * not silently exact. Omitted/`'exact'` ⇒ children use their default.
+   */
+  readonly resolution?: ResolutionMode
 }
 
 /**
@@ -136,6 +143,7 @@ export async function runWorkspaceUnitsInParallel(
         unit,
         cwd: input.cwd,
         noCache: input.noCache === true,
+        resolution: input.resolution,
       })
       if (result.exitCode !== 0) anyChildFailed = true
       results.push(result)
@@ -165,12 +173,14 @@ interface SpawnInput {
   readonly unit: WorkspaceUnit
   readonly cwd: string
   readonly noCache: boolean
+  readonly resolution?: ResolutionMode
 }
 
 function spawnGraphChild(input: SpawnInput): Promise<WorkspaceUnitRunResult> {
   return new Promise((resolvePromise) => {
     const args: string[] = [input.cliScript, 'graph', input.unit.rootDir, '--json']
     if (input.noCache) args.push('--no-cache')
+    if (input.resolution !== undefined) args.push('--resolution', input.resolution)
 
     const child = spawn(process.execPath, args, {
       cwd: input.cwd,

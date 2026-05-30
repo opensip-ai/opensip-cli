@@ -38,7 +38,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 
-import { typescriptGraphAdapter, type TypescriptParsedProject } from '../index.js';
+import { typescriptGraphAdapter, type TsParsed } from '../index.js';
 
 import type ts from 'typescript';
 
@@ -86,7 +86,7 @@ function setupFixture(dir: string): void {
 }
 
 function buildPipeline(adapter = typescriptGraphAdapter, dir: string): {
-  readonly project: TypescriptParsedProject;
+  readonly project: TsParsed;
   readonly walk: WalkOutput;
   readonly catalog: Catalog;
   readonly discovery: ReturnType<typeof typescriptGraphAdapter.discoverFiles>;
@@ -96,6 +96,7 @@ function buildPipeline(adapter = typescriptGraphAdapter, dir: string): {
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,
     compilerOptions: discovery.compilerOptions,
+    resolutionMode: 'exact',
   });
   const walk = adapter.walkProject({
     project: parsed.project,
@@ -111,6 +112,7 @@ function buildPipeline(adapter = typescriptGraphAdapter, dir: string): {
       projectDirAbs: discovery.projectDirAbs,
       configPathAbs: discovery.configPathAbs,
       compilerOptions: discovery.compilerOptions,
+      resolutionMode: 'exact',
     }),
     functions: walk.occurrences,
   };
@@ -209,6 +211,7 @@ describe('GraphLanguageAdapter contract — TypeScript', () => {
       catalog,
       callSites: walk.callSites,
       projectDirAbs: dir,
+      resolutionMode: 'exact',
     });
     const after = JSON.stringify(catalog);
     expect(after).toBe(before);
@@ -227,6 +230,7 @@ describe('GraphLanguageAdapter contract — TypeScript', () => {
       catalog,
       callSites: walk.callSites,
       projectDirAbs: dir,
+      resolutionMode: 'exact',
     });
     for (const edges of resolved.edgesByOwner.values()) {
       for (const e of edges) {
@@ -246,11 +250,13 @@ describe('GraphLanguageAdapter contract — TypeScript', () => {
       projectDirAbs: discovery.projectDirAbs,
       configPathAbs: discovery.configPathAbs,
       compilerOptions: discovery.compilerOptions,
+      resolutionMode: 'exact',
     });
     const k2 = typescriptGraphAdapter.cacheKey({
       projectDirAbs: discovery.projectDirAbs,
       configPathAbs: discovery.configPathAbs,
       compilerOptions: discovery.compilerOptions,
+      resolutionMode: 'exact',
     });
     expect(k2).toBe(k1);
     // The TS adapter prefixes with its id so cross-adapter collisions
@@ -264,6 +270,7 @@ describe('GraphLanguageAdapter contract — TypeScript', () => {
       projectDirAbs: discovery.projectDirAbs,
       configPathAbs: discovery.configPathAbs,
       compilerOptions: discovery.compilerOptions,
+      resolutionMode: 'exact',
     });
     // Mutate the tsconfig (a meaningful semantic change).
     if (discovery.configPathAbs) {
@@ -285,6 +292,7 @@ describe('GraphLanguageAdapter contract — TypeScript', () => {
       projectDirAbs: discovery.projectDirAbs,
       configPathAbs: discovery.configPathAbs,
       compilerOptions: discovery.compilerOptions,
+      resolutionMode: 'exact',
     });
     expect(after).not.toBe(before);
   });
@@ -297,6 +305,7 @@ describe('GraphLanguageAdapter contract — TypeScript', () => {
       projectDirAbs: discovery.projectDirAbs,
       files: discovery.files,
       compilerOptions: discovery.compilerOptions,
+      resolutionMode: 'exact',
     });
     // For TypeScript: a clean fixture parses without errors.
     // The contract: each file either parses (i.e. is reachable from
@@ -318,7 +327,7 @@ describe('GraphLanguageAdapter contract — TypeScript', () => {
     expect(typescriptGraphAdapter.id).toBe('typescript');
     // The TS adapter's catalog cacheKey prefix encodes the language;
     // a Python adapter (when it lands) MUST emit a different prefix.
-    const k = typescriptGraphAdapter.cacheKey({ projectDirAbs: dir });
+    const k = typescriptGraphAdapter.cacheKey({ projectDirAbs: dir, resolutionMode: 'exact' });
     expect(k).toMatch(/^ts-/);
   });
 
@@ -358,6 +367,7 @@ describe('GraphLanguageAdapter contract — TypeScript', () => {
         catalog,
         callSites: records,
         projectDirAbs: dir,
+        resolutionMode: 'exact',
       }),
     ).not.toThrow();
   });
@@ -434,6 +444,7 @@ function buildPythonPipeline(
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,
     compilerOptions: discovery.compilerOptions,
+    resolutionMode: 'exact',
   });
   const walk = adapter.walkProject({
     project: parsed.project,
@@ -444,6 +455,7 @@ function buildPythonPipeline(
     projectDirAbs: discovery.projectDirAbs,
     ...(discovery.configPathAbs === undefined ? {} : { configPathAbs: discovery.configPathAbs }),
     ...(discovery.compilerOptions === undefined ? {} : { compilerOptions: discovery.compilerOptions }),
+    resolutionMode: 'exact',
   };
   const catalog: Catalog = {
     version: '3.0',
@@ -517,6 +529,7 @@ describe('GraphLanguageAdapter contract — Python', () => {
       catalog,
       callSites: walk.callSites,
       projectDirAbs: dir,
+      resolutionMode: 'exact',
     });
     const after = JSON.stringify(catalog);
     expect(after).toBe(before);
@@ -533,6 +546,7 @@ describe('GraphLanguageAdapter contract — Python', () => {
       catalog,
       callSites: walk.callSites,
       projectDirAbs: dir,
+      resolutionMode: 'exact',
     });
     for (const edges of resolved.edgesByOwner.values()) {
       for (const e of edges) {
@@ -549,10 +563,12 @@ describe('GraphLanguageAdapter contract — Python', () => {
     const k1 = pythonGraphAdapter.cacheKey({
       projectDirAbs: discovery.projectDirAbs,
       ...(discovery.configPathAbs === undefined ? {} : { configPathAbs: discovery.configPathAbs }),
+      resolutionMode: 'exact',
     });
     const k2 = pythonGraphAdapter.cacheKey({
       projectDirAbs: discovery.projectDirAbs,
       ...(discovery.configPathAbs === undefined ? {} : { configPathAbs: discovery.configPathAbs }),
+      resolutionMode: 'exact',
     });
     expect(k2).toBe(k1);
     expect(k1.startsWith('py-')).toBe(true);
@@ -563,6 +579,7 @@ describe('GraphLanguageAdapter contract — Python', () => {
     const before = pythonGraphAdapter.cacheKey({
       projectDirAbs: discovery.projectDirAbs,
       ...(discovery.configPathAbs === undefined ? {} : { configPathAbs: discovery.configPathAbs }),
+      resolutionMode: 'exact',
     });
     if (discovery.configPathAbs) {
       writeFileSync(
@@ -578,6 +595,7 @@ requires-python = ">=3.11"
     const after = pythonGraphAdapter.cacheKey({
       projectDirAbs: discovery.projectDirAbs,
       ...(discovery.configPathAbs === undefined ? {} : { configPathAbs: discovery.configPathAbs }),
+      resolutionMode: 'exact',
     });
     expect(after).not.toBe(before);
   });
@@ -587,6 +605,7 @@ requires-python = ">=3.11"
     const parsed = pythonGraphAdapter.parseProject({
       projectDirAbs: discovery.projectDirAbs,
       files: discovery.files,
+      resolutionMode: 'exact',
     });
     const erroredFiles = new Set(parsed.parseErrors.map((e) => e.filePath));
     for (const f of discovery.files) {
@@ -601,7 +620,7 @@ requires-python = ">=3.11"
 
   it('I-8 — adapter id matches its handled language family', () => {
     expect(pythonGraphAdapter.id).toBe('python');
-    const k = pythonGraphAdapter.cacheKey({ projectDirAbs: dir });
+    const k = pythonGraphAdapter.cacheKey({ projectDirAbs: dir, resolutionMode: 'exact' });
     expect(k).toMatch(/^py-/);
     // Cross-adapter prefix isolation: the TS adapter must NEVER produce
     // a key starting with `py-` and vice-versa. (I-8 backstop.)
@@ -637,6 +656,7 @@ requires-python = ">=3.11"
       catalog,
       callSites: walk.callSites,
       projectDirAbs: dir,
+      resolutionMode: 'exact',
     });
     let resolvedEdges = 0;
     for (const edges of resolved.edgesByOwner.values()) {
@@ -738,6 +758,7 @@ function buildRustPipeline(
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,
     compilerOptions: discovery.compilerOptions,
+    resolutionMode: 'exact',
   });
   const walk = adapter.walkProject({
     project: parsed.project,
@@ -747,6 +768,7 @@ function buildRustPipeline(
   const cacheKeyArgs: Parameters<typeof adapter.cacheKey>[0] = {
     projectDirAbs: discovery.projectDirAbs,
     ...(discovery.configPathAbs === undefined ? {} : { configPathAbs: discovery.configPathAbs }),
+    resolutionMode: 'exact',
   };
   const catalog: Catalog = {
     version: '3.0',
@@ -820,6 +842,7 @@ describe('GraphLanguageAdapter contract — Rust', () => {
       catalog,
       callSites: walk.callSites,
       projectDirAbs: dir,
+      resolutionMode: 'exact',
     });
     const after = JSON.stringify(catalog);
     expect(after).toBe(before);
@@ -836,6 +859,7 @@ describe('GraphLanguageAdapter contract — Rust', () => {
       catalog,
       callSites: walk.callSites,
       projectDirAbs: dir,
+      resolutionMode: 'exact',
     });
     for (const edges of resolved.edgesByOwner.values()) {
       for (const e of edges) {
@@ -852,10 +876,12 @@ describe('GraphLanguageAdapter contract — Rust', () => {
     const k1 = rustGraphAdapter.cacheKey({
       projectDirAbs: discovery.projectDirAbs,
       ...(discovery.configPathAbs === undefined ? {} : { configPathAbs: discovery.configPathAbs }),
+      resolutionMode: 'exact',
     });
     const k2 = rustGraphAdapter.cacheKey({
       projectDirAbs: discovery.projectDirAbs,
       ...(discovery.configPathAbs === undefined ? {} : { configPathAbs: discovery.configPathAbs }),
+      resolutionMode: 'exact',
     });
     expect(k2).toBe(k1);
     expect(k1.startsWith('rs-')).toBe(true);
@@ -866,6 +892,7 @@ describe('GraphLanguageAdapter contract — Rust', () => {
     const before = rustGraphAdapter.cacheKey({
       projectDirAbs: discovery.projectDirAbs,
       ...(discovery.configPathAbs === undefined ? {} : { configPathAbs: discovery.configPathAbs }),
+      resolutionMode: 'exact',
     });
     if (discovery.configPathAbs) {
       writeFileSync(
@@ -881,6 +908,7 @@ edition = "2021"
     const after = rustGraphAdapter.cacheKey({
       projectDirAbs: discovery.projectDirAbs,
       ...(discovery.configPathAbs === undefined ? {} : { configPathAbs: discovery.configPathAbs }),
+      resolutionMode: 'exact',
     });
     expect(after).not.toBe(before);
   });
@@ -890,6 +918,7 @@ edition = "2021"
     const parsed = rustGraphAdapter.parseProject({
       projectDirAbs: discovery.projectDirAbs,
       files: discovery.files,
+      resolutionMode: 'exact',
     });
     const erroredFiles = new Set(parsed.parseErrors.map((e) => e.filePath));
     for (const f of discovery.files) {
@@ -904,7 +933,7 @@ edition = "2021"
 
   it('I-8 — adapter id matches its handled language family', () => {
     expect(rustGraphAdapter.id).toBe('rust');
-    const k = rustGraphAdapter.cacheKey({ projectDirAbs: dir });
+    const k = rustGraphAdapter.cacheKey({ projectDirAbs: dir, resolutionMode: 'exact' });
     expect(k).toMatch(/^rs-/);
     // Cross-adapter prefix isolation. (I-8 backstop.)
     expect(k.startsWith('ts-')).toBe(false);
@@ -945,6 +974,7 @@ edition = "2021"
       catalog,
       callSites: walk.callSites,
       projectDirAbs: dir,
+      resolutionMode: 'exact',
     });
     let resolvedEdges = 0;
     for (const edges of resolved.edgesByOwner.values()) {

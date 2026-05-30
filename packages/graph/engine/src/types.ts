@@ -50,17 +50,33 @@ export type FunctionKind =
   | 'setter'
   | 'module-init';
 
-/** How a call edge was resolved (static dispatch, method dispatch, JSX, etc.). */
+/**
+ * How a call edge was resolved (static dispatch, method dispatch, JSX, etc.).
+ *
+ * `'syntactic'` is the fast-mode tag: the edge was resolved from the callee's
+ * name plus the file's import graph WITHOUT the type checker. It is always
+ * approximate — fast-mode edges carry capped confidence (never `'high'`) so
+ * consumers can distinguish them from semantic (`exact`-mode) edges.
+ */
 export type CallResolution =
   | 'static'
   | 'method-dispatch'
   | 'jsx'
   | 'constructor'
   | 'unknown'
-  | 'dynamic-string';
+  | 'dynamic-string'
+  | 'syntactic';
 
 /** Resolver confidence in a call edge: high (one body), medium (few), low (many or partial). */
 export type CallConfidence = 'high' | 'medium' | 'low';
+
+/**
+ * Call-graph resolution tier. `exact` = semantic (type-checker-backed),
+ * the default that preserves historical behavior; `fast` = syntactic
+ * (name + import-graph), no type checker — bounded accuracy for a large
+ * cold-build speedup on monorepos.
+ */
+export type ResolutionMode = 'exact' | 'fast';
 
 /** Function visibility tier: exported from module, module-local, or class-private. */
 export type Visibility = 'exported' | 'module-local' | 'private';
@@ -204,6 +220,15 @@ export interface Catalog {
    * which invalidates the catalog conservatively.
    */
   readonly filesFingerprint?: string;
+  /**
+   * The resolution tier that produced this catalog. `'exact'` =
+   * semantic (type-checker-backed); `'fast'` = syntactic (approximate).
+   * Optional for forward-compatibility: catalogs persisted before fast
+   * mode landed have no marker, and **absence is interpreted as
+   * `'exact'`** (the historical behavior). Consumers that need to know
+   * whether edges are approximate read this field.
+   */
+  readonly resolutionMode?: ResolutionMode;
   readonly functions: Readonly<Record<string, readonly FunctionOccurrence[]>>;
 }
 

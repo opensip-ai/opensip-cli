@@ -78,6 +78,13 @@ export interface CliOutput {
   readonly summary: { total: number; passed: number; failed: number; errors: number; warnings: number };
   readonly checks: readonly CheckOutput[];
   readonly durationMs: number;
+  /**
+   * Graph-only: the call-graph resolution tier this run used. `'fast'`
+   * means edges are approximate (syntactic, no type checker); absent or
+   * `'exact'` means semantic. Surfaced so machine consumers of `graph
+   * --json` can branch on edge fidelity. Other tools never set it.
+   */
+  readonly resolutionMode?: 'exact' | 'fast';
 }
 
 export interface CheckOutput {

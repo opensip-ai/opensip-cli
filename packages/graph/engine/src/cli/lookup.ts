@@ -39,10 +39,14 @@ export function executeLookup(opts: LookupCommandOptions, cli: ToolCliContext): 
       );
     }
     const matches = collectMatches(catalog, opts.name);
+    // Absent ⇒ exact (historical catalogs predate the marker).
+    const resolutionMode = catalog.resolutionMode ?? 'exact';
     if (opts.json === true) {
-      process.stdout.write(`${JSON.stringify({ name: opts.name, matches }, null, 2)}\n`);
+      process.stdout.write(
+        `${JSON.stringify({ name: opts.name, resolutionMode, matches }, null, 2)}\n`,
+      );
     } else {
-      writeHumanReport(opts.name, matches);
+      writeHumanReport(opts.name, matches, resolutionMode);
     }
     cli.setExitCode(EXIT_CODES.SUCCESS);
     logger.info({
@@ -72,7 +76,20 @@ function collectMatches(catalog: Catalog, name: string): readonly FunctionOccurr
   return bucket ?? [];
 }
 
-function writeHumanReport(name: string, matches: readonly FunctionOccurrence[]): void {
+function writeHumanReport(
+  name: string,
+  matches: readonly FunctionOccurrence[],
+  resolutionMode: 'exact' | 'fast',
+): void {
+  // Honest caveat: a fast catalog's edges (callers/callees this command
+  // reflects) are approximate, so the reader knows not to treat them as
+  // ground truth.
+  if (resolutionMode === 'fast') {
+    process.stdout.write(
+      'Note: catalog built in fast mode — edges are approximate (syntactic). ' +
+        'Re-run `graph --resolution exact` for semantic precision.\n',
+    );
+  }
   if (matches.length === 0) {
     process.stdout.write(`No function named '${name}' in the catalog.\n`);
     return;

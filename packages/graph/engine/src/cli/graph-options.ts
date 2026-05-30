@@ -12,10 +12,21 @@
  * flags (which were never publicly released — D11 hard-removes them).
  */
 
+import type { ResolutionMode } from '../types.js';
+
 export interface GraphCommandOptions {
   readonly cwd: string;
   readonly json?: boolean;
   readonly noCache?: boolean;
+  /**
+   * `--resolution <mode>`: edge resolution tier. `'exact'` (default) is
+   * the semantic, type-checker-backed path; `'fast'` is the syntactic
+   * (name + import-graph) path that skips the checker for a large
+   * cold-build speedup, at the cost of approximate edges. Optional here
+   * because programmatic callers and tests may omit it; the orchestrator
+   * normalizes a missing value to `'exact'`.
+   */
+  readonly resolution?: ResolutionMode;
   readonly gateSave?: boolean;
   readonly gateCompare?: boolean;
   readonly baseline?: string;

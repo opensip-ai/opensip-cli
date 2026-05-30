@@ -71,6 +71,7 @@ function runAdapter(): { catalog: Catalog; dependenciesByOwner: ReadonlyMap<stri
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,
     compilerOptions: discovery.compilerOptions,
+    resolutionMode: 'exact',
   });
   const walked = typescriptGraphAdapter.walkProject({
     project: parsed.project,
@@ -94,6 +95,7 @@ function runAdapter(): { catalog: Catalog; dependenciesByOwner: ReadonlyMap<stri
     callSites: walked.callSites,
     dependencySites: walked.dependencySites,
     projectDirAbs: discovery.projectDirAbs,
+    resolutionMode: 'exact',
   });
   return { catalog: initialCatalog, dependenciesByOwner: resolved.dependenciesByOwner };
 }

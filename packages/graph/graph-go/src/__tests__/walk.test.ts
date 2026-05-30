@@ -21,6 +21,7 @@ function run(dir: string): ReturnType<typeof goGraphAdapter.walkProject> {
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,
     compilerOptions: discovery.compilerOptions,
+    resolutionMode: 'exact',
   });
   return goGraphAdapter.walkProject({
     project: parsed.project,

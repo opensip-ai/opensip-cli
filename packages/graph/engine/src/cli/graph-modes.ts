@@ -40,10 +40,23 @@ export async function runGateMode(
   opts: GraphCommandOptions,
   signals: readonly Signal[],
   cli: ToolCliContext,
+  resolutionMode?: 'exact' | 'fast',
 ): Promise<void> {
   const datastore = cli.scope.datastore() as DataStore | undefined;
   if (!datastore) {
     throw new ConfigurationError('Graph gate mode requires a DataStore on ToolCliContext.');
+  }
+  // A fast catalog's edges are approximate (syntactic). Seeding the
+  // security ratchet from them — or comparing against an exact baseline —
+  // would let false orphans/regressions flip the gate. The gate's value
+  // depends on edge fidelity, so fast mode is declined by default; the
+  // user must re-run with --resolution exact to gate.
+  if (resolutionMode === 'fast') {
+    throw new ConfigurationError(
+      'Graph gate refuses a fast (--resolution fast) catalog: its syntactic edges ' +
+        'are approximate and must not seed or compare against the security gate. ' +
+        'Re-run with --resolution exact to gate.',
+    );
   }
   const repo = new GraphBaselineRepo(datastore);
   if (opts.gateSave === true) {

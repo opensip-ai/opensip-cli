@@ -26,23 +26,23 @@ describe('lang-rust cacheKey — branches', () => {
   });
 
   it('returns rs-no-config when configPathAbs is undefined', () => {
-    expect(cacheKey({ projectDirAbs: dir })).toBe('rs-no-config');
+    expect(cacheKey({ projectDirAbs: dir, resolutionMode: 'exact' })).toBe('rs-no-config');
   });
 
   it('returns rs-no-config when configPathAbs is empty string', () => {
-    expect(cacheKey({ projectDirAbs: dir, configPathAbs: '' })).toBe('rs-no-config');
+    expect(cacheKey({ projectDirAbs: dir, configPathAbs: '', resolutionMode: 'exact' })).toBe('rs-no-config');
   });
 
   it('returns rs-missing:<path> when the config file does not exist', () => {
     const fake = join(dir, 'no-such-file.toml');
-    expect(cacheKey({ projectDirAbs: dir, configPathAbs: fake })).toContain('missing:');
+    expect(cacheKey({ projectDirAbs: dir, configPathAbs: fake, resolutionMode: 'exact' })).toContain('missing:');
   });
 
   it('returns a stable rs-<hash> when the config file is readable', () => {
     const file = join(dir, 'Cargo.toml');
     writeFileSync(file, '[package]\nname = "x"\n', 'utf8');
-    const a = cacheKey({ projectDirAbs: dir, configPathAbs: file });
-    const b = cacheKey({ projectDirAbs: dir, configPathAbs: file });
+    const a = cacheKey({ projectDirAbs: dir, configPathAbs: file, resolutionMode: 'exact' });
+    const b = cacheKey({ projectDirAbs: dir, configPathAbs: file, resolutionMode: 'exact' });
     expect(a).toBe(b);
     expect(a.startsWith('rs-')).toBe(true);
     expect(a).not.toBe('rs-no-config');
@@ -51,9 +51,9 @@ describe('lang-rust cacheKey — branches', () => {
   it('changes when the config file content changes', () => {
     const file = join(dir, 'Cargo.toml');
     writeFileSync(file, '[package]\nname = "a"\n', 'utf8');
-    const a = cacheKey({ projectDirAbs: dir, configPathAbs: file });
+    const a = cacheKey({ projectDirAbs: dir, configPathAbs: file, resolutionMode: 'exact' });
     writeFileSync(file, '[package]\nname = "b"\n', 'utf8');
-    const b = cacheKey({ projectDirAbs: dir, configPathAbs: file });
+    const b = cacheKey({ projectDirAbs: dir, configPathAbs: file, resolutionMode: 'exact' });
     expect(a).not.toBe(b);
   });
 });

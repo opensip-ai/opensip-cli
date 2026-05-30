@@ -24,7 +24,7 @@ describe('graph-java parse.ts — branches', () => {
   it('returns no parseErrors for a syntactically valid file', () => {
     const file = join(dir, 'A.java');
     writeFileSync(file, 'class A { void m() { int x = 1; } }\n', 'utf8');
-    const out = parseProject({ projectDirAbs: dir, files: [file] });
+    const out = parseProject({ projectDirAbs: dir, files: [file], resolutionMode: 'exact' });
     expect(out.parseErrors).toEqual([]);
     expect(out.project.files.size).toBe(1);
   });
@@ -33,7 +33,7 @@ describe('graph-java parse.ts — branches', () => {
     const file = join(dir, 'Broken.java');
     // Unterminated method body — tree-sitter still produces a partial tree.
     writeFileSync(file, 'class Broken { void m() { int x = \n', 'utf8');
-    const out = parseProject({ projectDirAbs: dir, files: [file] });
+    const out = parseProject({ projectDirAbs: dir, files: [file], resolutionMode: 'exact' });
     expect(out.parseErrors.length).toBeGreaterThan(0);
     expect(out.parseErrors[0]?.message).toContain('tree-sitter');
     expect(out.project.files.size).toBe(1);
@@ -44,7 +44,7 @@ describe('graph-java parse.ts — branches', () => {
     const b = join(dir, 'B.java');
     writeFileSync(a, 'class A { void ok() {} }\n', 'utf8');
     writeFileSync(b, 'class B { void broken() { int x = \n', 'utf8');
-    const out = parseProject({ projectDirAbs: dir, files: [a, b] });
+    const out = parseProject({ projectDirAbs: dir, files: [a, b], resolutionMode: 'exact' });
     expect(out.project.files.size).toBe(2);
     expect(out.parseErrors.length).toBeGreaterThan(0);
   });
@@ -66,7 +66,7 @@ describe('graph-java parse.ts — branches', () => {
         `}\n`,
       'utf8',
     );
-    const out = parseProject({ projectDirAbs: dir, files: [file] });
+    const out = parseProject({ projectDirAbs: dir, files: [file], resolutionMode: 'exact' });
     expect(out.parseErrors).toEqual([]);
   });
 });

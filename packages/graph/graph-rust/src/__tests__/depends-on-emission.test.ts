@@ -66,6 +66,7 @@ function runAdapter(): {
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,
     compilerOptions: discovery.compilerOptions,
+    resolutionMode: 'exact',
   });
   const walked = rustGraphAdapter.walkProject({
     project: parsed.project,
@@ -86,6 +87,7 @@ function runAdapter(): {
     callSites: walked.callSites,
     dependencySites: walked.dependencySites,
     projectDirAbs: discovery.projectDirAbs,
+    resolutionMode: 'exact',
   });
   return { catalog: initialCatalog, dependenciesByOwner: resolved.dependenciesByOwner };
 }

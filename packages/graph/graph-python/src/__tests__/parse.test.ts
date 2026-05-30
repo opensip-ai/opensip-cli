@@ -27,7 +27,7 @@ describe('lang-python parse.ts — branches', () => {
   it('returns no parseErrors for a syntactically valid file', () => {
     const file = join(dir, 'main.py');
     writeFileSync(file, 'def main():\n    return 1\n', 'utf8');
-    const out = parseProject({ projectDirAbs: dir, files: [file] });
+    const out = parseProject({ projectDirAbs: dir, files: [file], resolutionMode: 'exact' });
     expect(out.parseErrors).toEqual([]);
     expect(out.project.files.size).toBe(1);
   });
@@ -36,7 +36,7 @@ describe('lang-python parse.ts — branches', () => {
     const file = join(dir, 'broken.py');
     // Unbalanced parens; tree-sitter recovers but flags hasError.
     writeFileSync(file, 'def broken(\n', 'utf8');
-    const out = parseProject({ projectDirAbs: dir, files: [file] });
+    const out = parseProject({ projectDirAbs: dir, files: [file], resolutionMode: 'exact' });
     expect(out.parseErrors.length).toBeGreaterThan(0);
     expect(out.parseErrors[0]?.message).toContain('tree-sitter');
     expect(out.project.files.size).toBe(1);

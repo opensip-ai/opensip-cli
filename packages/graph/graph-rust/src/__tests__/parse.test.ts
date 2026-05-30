@@ -27,7 +27,7 @@ describe('lang-rust parse.ts — branches', () => {
   it('returns no parseErrors for a syntactically valid file', () => {
     const file = join(dir, 'main.rs');
     writeFileSync(file, 'fn main() { let x = 1; }\n', 'utf8');
-    const out = parseProject({ projectDirAbs: dir, files: [file] });
+    const out = parseProject({ projectDirAbs: dir, files: [file], resolutionMode: 'exact' });
     expect(out.parseErrors).toEqual([]);
     expect(out.project.files.size).toBe(1);
   });
@@ -37,7 +37,7 @@ describe('lang-rust parse.ts — branches', () => {
     // Unterminated function body: tree-sitter will mark hasError but
     // still produce a partial tree.
     writeFileSync(file, 'fn broken() { let x =\n', 'utf8');
-    const out = parseProject({ projectDirAbs: dir, files: [file] });
+    const out = parseProject({ projectDirAbs: dir, files: [file], resolutionMode: 'exact' });
     expect(out.parseErrors.length).toBeGreaterThan(0);
     expect(out.parseErrors[0]?.message).toContain('tree-sitter');
     // The partial tree is still retained for the walk stage.
@@ -49,7 +49,7 @@ describe('lang-rust parse.ts — branches', () => {
     const b = join(dir, 'b.rs');
     writeFileSync(a, 'fn ok() { }\n', 'utf8');
     writeFileSync(b, 'fn broken() { let x =\n', 'utf8');
-    const out = parseProject({ projectDirAbs: dir, files: [a, b] });
+    const out = parseProject({ projectDirAbs: dir, files: [a, b], resolutionMode: 'exact' });
     expect(out.project.files.size).toBe(2);
     expect(out.parseErrors.length).toBeGreaterThan(0);
   });
@@ -71,7 +71,7 @@ describe('lang-rust parse.ts — branches', () => {
         `}\n`,
       'utf8',
     );
-    const out = parseProject({ projectDirAbs: dir, files: [file] });
+    const out = parseProject({ projectDirAbs: dir, files: [file], resolutionMode: 'exact' });
     expect(out.parseErrors).toEqual([]);
   });
 });

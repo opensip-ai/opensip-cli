@@ -33,14 +33,15 @@ import ts from 'typescript';
 
 import { cacheKey as typescriptCacheKey } from './cache-key.js';
 import { discoverFiles as discoverTypescriptFiles } from './discover.js';
-import { resolveEdgesFromRecords } from './edges.js';
+import { resolveEdgesFromRecords, resolveEdgesSyntactic } from './edges.js';
 import { parseProject as parseTypescriptProject } from './parse.js';
 import { isTypescriptTestFile } from './test-file.js';
 import { walkProgram } from './walk.js';
 
 
 
-import type { TypescriptParsedProject } from './parse.js';
+import type { TypescriptFastParsedProject } from './parse-fast.js';
+import type { TsParsed, TypescriptParsedProject } from './parse.js';
 import type {
   CallSiteRecord as TsCallSiteRecord,
   DependencySiteRecord as TsDependencySiteRecord,
@@ -108,9 +109,21 @@ function discoverFilesAdapter(input: DiscoverInput): DiscoverOutput {
   };
 }
 
-function walkProjectAdapter(input: WalkInput<TypescriptParsedProject>): WalkOutput {
+/**
+ * Yield the project's source files from either parsed-project tier. The
+ * walk is structural and mode-agnostic, so it consumes whichever shape
+ * the parse stage produced: exact mode pulls them from the `ts.Program`;
+ * fast mode pulls them from the standalone source-file map.
+ */
+function sourceFilesOf(project: TsParsed): Iterable<ts.SourceFile> {
+  return project.kind === 'fast'
+    ? project.sourceFiles.values()
+    : project.program.getSourceFiles();
+}
+
+function walkProjectAdapter(input: WalkInput<TsParsed>): WalkOutput {
   const walked = walkProgram({
-    program: input.project.program,
+    sourceFiles: sourceFilesOf(input.project),
     files: input.files,
     projectDirAbs: input.projectDirAbs,
   });
@@ -141,7 +154,20 @@ function walkProjectAdapter(input: WalkInput<TypescriptParsedProject>): WalkOutp
 }
 
 function resolveCallSitesAdapter(
-  input: ResolveInput<TypescriptParsedProject>,
+  input: ResolveInput<TsParsed>,
+): ResolveOutput {
+  // Branch on the parsed-project tier BEFORE touching the checker. The
+  // fast tier has no `ts.Program`, so the exact (checker-backed) resolver
+  // cannot run on it.
+  if (input.project.kind === 'fast') {
+    return resolveCallSitesFast(input, input.project);
+  }
+  return resolveCallSitesExact(input, input.project);
+}
+
+function resolveCallSitesExact(
+  input: ResolveInput<TsParsed>,
+  project: TypescriptParsedProject,
 ): ResolveOutput {
   // Translate the contract's CallSiteRecord back into the TS-internal
   // shape that resolveEdgesFromRecords consumes.
@@ -154,7 +180,7 @@ function resolveCallSitesAdapter(
   }));
   const result = resolveEdgesFromRecords({
     catalog: input.catalog,
-    program: input.project.program,
+    program: project.program,
     projectDirAbs: input.projectDirAbs,
     callSites: tsCallSites,
   });
@@ -173,7 +199,7 @@ function resolveCallSitesAdapter(
           column: r.column,
         })),
         input.catalog,
-        input.project.program,
+        project.program,
         input.projectDirAbs,
       )
     : undefined;
@@ -181,6 +207,42 @@ function resolveCallSitesAdapter(
   return {
     edgesByOwner: collectByOwner(result.catalog),
     dependenciesByOwner,
+    stats: result.resolutionStats,
+  };
+}
+
+/**
+ * Fast-tier resolution entry. Resolves call edges syntactically — from
+ * callee names and the file's import graph — with NO type checker. The
+ * fast parse produced standalone source files (no `ts.Program`), so the
+ * semantic resolvers cannot run; `resolveEdgesSyntactic` works purely off
+ * the walked records and the catalog.
+ *
+ * Dependency (module-level import) edges are not emitted in fast mode —
+ * they remain an exact-tier feature, so `dependenciesByOwner` is omitted
+ * (the contract treats absence as "not emitted by this tier").
+ */
+function resolveCallSitesFast(
+  input: ResolveInput<TsParsed>,
+  _project: TypescriptFastParsedProject,
+): ResolveOutput {
+  // Translate the contract's opaque CallSiteRecord back into the
+  // TS-internal shape the syntactic resolver consumes (real ts.Node /
+  // ts.SourceFile handles), mirroring the exact path's translation.
+  const tsCallSites: TsCallSiteRecord[] = input.callSites.map((r) => ({
+    node: r.nodeRef as ts.Node,
+    sourceFile: r.sourceFileRef as ts.SourceFile,
+    ownerHash: r.ownerHash,
+    kind: r.kind,
+    childHash: r.childHash,
+  }));
+  const result = resolveEdgesSyntactic({
+    catalog: input.catalog,
+    projectDirAbs: input.projectDirAbs,
+    callSites: tsCallSites,
+  });
+  return {
+    edgesByOwner: collectByOwner(result.catalog),
     stats: result.resolutionStats,
   };
 }
@@ -317,12 +379,12 @@ function collectByOwner(
   return out;
 }
 
-export const typescriptGraphAdapter: GraphLanguageAdapter<TypescriptParsedProject> = {
+export const typescriptGraphAdapter: GraphLanguageAdapter<TsParsed> = {
   id: 'typescript',
   fileExtensions: ['.ts', '.tsx'],
   displayName: 'TypeScript',
   discoverFiles: discoverFilesAdapter,
-  parseProject: (input: ParseInput): ParseOutput<TypescriptParsedProject> =>
+  parseProject: (input: ParseInput): ParseOutput<TsParsed> =>
     parseTypescriptProject(input),
   walkProject: walkProjectAdapter,
   resolveCallSites: resolveCallSitesAdapter,
@@ -349,7 +411,8 @@ export const metadata = {
 
 // Re-export TS-specific helper types so package consumers / tests can
 // reference them (these moved out of the engine barrel by PR 1b).
-export type { TypescriptParsedProject } from './parse.js';
+export type { TsParsed, TypescriptParsedProject } from './parse.js';
+export type { TypescriptFastParsedProject } from './parse-fast.js';
 export type { EdgeResolver, ResolverContext } from './edge-resolvers/types.js';
 export type { InventoryVisitor, VisitorContext } from './inventory-visitors/types.js';
 export { isTypescriptTestFile } from './test-file.js';

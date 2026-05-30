@@ -39,6 +39,7 @@ function pipeline(dir: string): Pipeline {
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,
     compilerOptions: discovery.compilerOptions,
+    resolutionMode: 'exact',
   });
   const walk = goGraphAdapter.walkProject({
     project: parsed.project,
@@ -54,6 +55,7 @@ function pipeline(dir: string): Pipeline {
       projectDirAbs: discovery.projectDirAbs,
       configPathAbs: discovery.configPathAbs,
       compilerOptions: discovery.compilerOptions,
+      resolutionMode: 'exact',
     }),
     functions: walk.occurrences,
   };
@@ -62,6 +64,7 @@ function pipeline(dir: string): Pipeline {
     catalog,
     callSites: walk.callSites,
     projectDirAbs: discovery.projectDirAbs,
+    resolutionMode: 'exact',
   });
   return { project: parsed.project, walk, catalog, resolved };
 }
@@ -262,6 +265,7 @@ describe('graph-go resolve.ts', () => {
       catalog,
       callSites: walk.callSites,
       projectDirAbs: dir,
+      resolutionMode: 'exact',
     });
     expect(JSON.stringify(catalog)).toBe(before);
   });

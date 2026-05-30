@@ -13,6 +13,8 @@
  * 1).
  */
 
+import { relative, sep } from 'node:path';
+
 import { logger } from '@opensip-tools/core';
 import {
   appendEdge,
@@ -28,6 +30,12 @@ import { resolveJsxElement } from './edge-resolvers/jsx-element.js';
 import { resolveNewExpression } from './edge-resolvers/new-expression.js';
 import { resolvePolymorphicCall } from './edge-resolvers/polymorphic.js';
 import { resolvePropertyAccessCall } from './edge-resolvers/property-access.js';
+import {
+  buildImportIndex,
+  collectKnownFiles,
+  resolveSyntactic,
+  type ImportIndex,
+} from './edge-resolvers/syntactic.js';
 import {
   isValueReference,
   resolveShorthandAssignment,
@@ -120,6 +128,80 @@ export function resolveEdgesFromRecords(
     module: 'graph:edges',
     totalCallSites: stats.totalCallSites,
     resolvedHigh: stats.resolvedHigh,
+    resolvedMedium: stats.resolvedMedium,
+    resolvedLow: stats.resolvedLow,
+    unresolved: stats.unresolved,
+  });
+
+  return { catalog: newCatalog, resolutionStats: stats };
+}
+
+/** Input for the fast (syntactic, checker-free) resolve path. */
+export interface EdgeResolutionSyntacticInput {
+  readonly catalog: Catalog;
+  readonly projectDirAbs: string;
+  readonly callSites: readonly CallSiteRecord[];
+}
+
+/**
+ * Fast-tier Stage 2 entry point: resolve the same pre-collected call-site
+ * records WITHOUT a `ts.Program` or type checker. Creation edges are
+ * static and handled identically to the exact path; call edges are
+ * resolved syntactically (callee name + the file's import graph) and
+ * labeled `resolution: 'syntactic'` with capped confidence (never
+ * `'high'`). The output shape is identical to {@link resolveEdgesFromRecords}
+ * — only the verdicts differ — so the catalog stitches the same way.
+ *
+ * Stats stay honest: fast edges land in `resolvedMedium`/`resolvedLow`/
+ * `unresolved`, never `resolvedHigh`.
+ */
+export function resolveEdgesSyntactic(
+  input: EdgeResolutionSyntacticInput,
+): EdgeResolutionOutput {
+  logger.info({ evt: 'graph.edges.syntactic.start', module: 'graph:edges' });
+  const callsByHash = new Map<string, CallEdge[]>();
+  const stats = createMutableStats();
+  const knownFiles = collectKnownFiles(input.catalog);
+  // One import index per source file — cached across that file's sites.
+  const importIndexByFile = new Map<ts.SourceFile, ImportIndex>();
+
+  for (const r of input.callSites) {
+    if (r.kind === 'creation') {
+      if (r.childHash === undefined) continue;
+      pushSharedCreationEdge(
+        r.node,
+        r.sourceFile,
+        r.ownerHash,
+        r.childHash,
+        callsByHash,
+        stats,
+        tsPosition,
+      );
+      continue;
+    }
+    let importIndex = importIndexByFile.get(r.sourceFile);
+    if (importIndex === undefined) {
+      importIndex = buildImportIndex(r.sourceFile, input.projectDirAbs, knownFiles);
+      importIndexByFile.set(r.sourceFile, importIndex);
+    }
+    const currentFileRel = relative(input.projectDirAbs, r.sourceFile.fileName)
+      .split(sep)
+      .join('/');
+    const verdict = resolveSyntactic(r.node, {
+      catalog: input.catalog,
+      currentFileRel,
+      importIndex,
+    });
+    if (verdict === null) continue;
+    pushCallEdge(r.node, r.sourceFile, verdict, r.ownerHash, callsByHash, stats);
+  }
+
+  const newCatalog = rebuildCatalog(input.catalog, callsByHash);
+
+  logger.info({
+    evt: 'graph.edges.syntactic.complete',
+    module: 'graph:edges',
+    totalCallSites: stats.totalCallSites,
     resolvedMedium: stats.resolvedMedium,
     resolvedLow: stats.resolvedLow,
     unresolved: stats.unresolved,

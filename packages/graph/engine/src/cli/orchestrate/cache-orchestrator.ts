@@ -26,7 +26,7 @@ import type {
   GraphLanguageAdapter,
 } from '../../lang-adapter/types.js';
 import type { CatalogRepo } from '../../persistence/catalog-repo.js';
-import type { Catalog, ResolutionStats } from '../../types.js';
+import type { Catalog, ResolutionMode, ResolutionStats } from '../../types.js';
 import type { PressureMonitor } from '../pressure-monitor.js';
 
 export interface ObtainCatalogInput {
@@ -35,6 +35,9 @@ export interface ObtainCatalogInput {
   readonly discovery: DiscoverOutput;
   readonly catalogRepo: CatalogRepo | null;
   readonly useCache: boolean;
+  /** Active resolution tier. Folded into the cacheKey so fast/exact
+   *  catalogs never collide, and forwarded into the build path. */
+  readonly resolutionMode: ResolutionMode;
   readonly onProgress?: GraphProgressCallback;
   readonly monitor?: PressureMonitor;
 }
@@ -57,6 +60,7 @@ export function obtainCatalog(input: ObtainCatalogInput): ObtainCatalogOutput {
     projectDirAbs: input.discovery.projectDirAbs,
     configPathAbs: input.discovery.configPathAbs,
     compilerOptions: input.discovery.compilerOptions,
+    resolutionMode: input.resolutionMode,
   });
   const verdict = cachedCatalog
     ? classifyCatalog(cachedCatalog, {
@@ -81,6 +85,7 @@ export function obtainCatalog(input: ObtainCatalogInput): ObtainCatalogOutput {
         input.discovery,
         cachedCatalog,
         verdict.changedFiles,
+        input.resolutionMode,
         input.onProgress,
         input.monitor,
       )
@@ -88,6 +93,7 @@ export function obtainCatalog(input: ObtainCatalogInput): ObtainCatalogOutput {
         input.runStage,
         input.adapter,
         input.discovery,
+        input.resolutionMode,
         input.onProgress,
         input.monitor,
       );

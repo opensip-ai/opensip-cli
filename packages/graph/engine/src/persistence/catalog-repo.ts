@@ -16,7 +16,7 @@ import { sql } from 'drizzle-orm';
 
 import { graphCatalog } from './schema.js';
 
-import type { Catalog } from '../types.js';
+import type { Catalog, ResolutionMode } from '../types.js';
 import type { GraphCatalog } from '@opensip-tools/contracts';
 import type { DataStore } from '@opensip-tools/datastore';
 
@@ -29,6 +29,14 @@ interface CatalogRowPayload {
   readonly builtAt: string;
   readonly cacheKey: string;
   readonly filesFingerprint?: string;
+  /**
+   * The resolution tier that built this catalog. Stored in the JSON
+   * payload (no schema column needed) so a loaded catalog self-describes
+   * its tier on cache hits — consumers (report banner, lookup note, gate
+   * refusal, rule caveats) stay honest on warm runs, not just fresh
+   * builds. Absent ⇒ exact (catalogs persisted before fast mode landed).
+   */
+  readonly resolutionMode?: ResolutionMode;
   readonly functions: Catalog['functions'];
 }
 
@@ -50,6 +58,7 @@ export class CatalogRepo {
         builtAt: catalog.builtAt,
         cacheKey: catalog.cacheKey,
         filesFingerprint: catalog.filesFingerprint,
+        resolutionMode: catalog.resolutionMode,
         functions: catalog.functions,
       };
       this.datastore.db
@@ -123,6 +132,7 @@ export class CatalogRepo {
         builtAt: payload.builtAt,
         cacheKey: payload.cacheKey,
         filesFingerprint: payload.filesFingerprint,
+        resolutionMode: payload.resolutionMode,
         functions: payload.functions,
       };
     } catch (error) {
