@@ -4,8 +4,12 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "exports": { ".": "./dist/index.js" },
-  "files": ["dist"],
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
     "test": "vitest run --passWithNoTests",
@@ -13,9 +17,10 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@opensip-tools/contracts": "workspace:*",
     "@opensip-tools/core": "workspace:*",
     "@opensip-tools/datastore": "workspace:*",
-    "@opensip-tools/contracts": "workspace:*",
+    "@opentelemetry/api": "^1.9.1",
     "drizzle-orm": "^0.45.2"
   },
   "devDependencies": {
