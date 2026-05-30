@@ -62,11 +62,17 @@ export function dashboardCssCodePaths(): string {
 .code-paths-graph-banner { font-size: 12px; color: var(--text-muted); background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 10px; margin-bottom: 10px; }
 .code-paths-graph-search { width: 320px; margin-bottom: 10px; display: block; }
 .code-paths-graph-canvas { width: 100%; height: 640px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); }
-/* Node highlight states live on the Cytoscape canvas (set via cy classes
-   gv-search-hit / gv-search-fade / gv-node-selected); these DOM classes
-   mirror the naming for any future DOM overlay. */
+/* Node highlight + impact states live on the Cytoscape canvas (set via cy
+   classes gv-search-hit / gv-search-fade / gv-selected / gv-upstream /
+   gv-downstream / gv-dimmed). The canvas can't read CSS custom properties,
+   so the authoritative colors are inline in view-graph.ts's stylesheet;
+   these DOM classes mirror the naming for any future DOM overlay. */
 .search-hit { outline: 2px solid var(--accent); }
 .search-fade { opacity: 0.3; }
+.gv-selected { outline: 2px solid var(--accent); }
+.gv-upstream { color: var(--accent-sim); }
+.gv-downstream { color: var(--accent-fitness); }
+.gv-dimmed { opacity: 0.1; }
 
 /* Coupling heat map cell shading — set --coupling-density per cell */
 .coupling-cell { background: color-mix(in srgb, var(--bg-surface), var(--accent) calc(var(--coupling-density, 0) * 60%)); cursor: pointer; }

@@ -37,6 +37,7 @@ interface FilterState {
 interface Env {
   views: GraphView[];
   filterState: FilterState;
+  gvBfsReach: (seedId: string, adjacency: Map<string, string[]>) => Record<string, true>;
 }
 
 function loadEnv(withVendor: boolean): Env {
@@ -56,7 +57,7 @@ var graphCatalog = null;
 var graphIndexes = { byBodyHash: new Map(), bySimpleName: new Map(), callees: new Map(), callers: new Map() };
 `;
   const tail = `
-return { views, filterState };
+return { views, filterState, gvBfsReach };
 `;
   const parts = [elSrc];
   if (withVendor) parts.push(dashboardCytoscapeVendorJs());
@@ -231,5 +232,61 @@ describe('View 8 — Graph', () => {
     // The emitter references fuzzyMatch (from search.js) rather than building
     // its own — a regression guard for the "reuse, not reinvent" rule.
     expect(dashboardViewGraphJs()).toContain('fuzzyMatch');
+  });
+
+  it('keys impact highlight off graphIndexes callers/callees and clears on Esc', () => {
+    const js = dashboardViewGraphJs();
+    expect(js).toContain('indexes.callers');
+    expect(js).toContain('indexes.callees');
+    expect(js).toContain("e.key === 'Escape'");
+  });
+});
+
+describe('gvBfsReach — impact traversal', () => {
+  it('returns the downstream reach set, excluding the seed', () => {
+    const env = loadEnv(false);
+    // a -> b -> c -> d (linear chain).
+    const adj = new Map<string, string[]>([
+      ['a', ['b']],
+      ['b', ['c']],
+      ['c', ['d']],
+    ]);
+    const reached = env.gvBfsReach('a', adj);
+    expect(Object.keys(reached).sort()).toEqual(['b', 'c', 'd']);
+    expect(reached.a).toBeUndefined();
+  });
+
+  it('is cycle-safe (does not hang on a cycle)', () => {
+    const env = loadEnv(false);
+    // a -> b -> c -> a (3-cycle) plus c -> d.
+    const adj = new Map<string, string[]>([
+      ['a', ['b']],
+      ['b', ['c']],
+      ['c', ['a', 'd']],
+    ]);
+    const reached = env.gvBfsReach('a', adj);
+    // a is the seed → excluded even though c points back to it.
+    expect(Object.keys(reached).sort()).toEqual(['b', 'c', 'd']);
+    expect(reached.a).toBeUndefined();
+  });
+
+  it('skips self-edges (a node is not its own caller/callee)', () => {
+    const env = loadEnv(false);
+    const adj = new Map<string, string[]>([['a', ['a', 'b']]]);
+    const reached = env.gvBfsReach('a', adj);
+    expect(reached.a).toBeUndefined();
+    expect(reached.b).toBe(true);
+  });
+
+  it('returns an empty set for a disconnected node', () => {
+    const env = loadEnv(false);
+    const adj = new Map<string, string[]>([['x', ['y']]]);
+    const reached = env.gvBfsReach('lonely', adj);
+    expect(Object.keys(reached)).toHaveLength(0);
+  });
+
+  it('tolerates a missing/invalid adjacency map', () => {
+    const env = loadEnv(false);
+    expect(env.gvBfsReach('a', undefined as unknown as Map<string, string[]>)).toEqual({});
   });
 });

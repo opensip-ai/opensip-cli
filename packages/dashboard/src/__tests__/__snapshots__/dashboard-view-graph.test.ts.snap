@@ -178,6 +178,26 @@ function gvStylesheet() {
       selector: 'edge.gv-search-fade',
       style: { 'opacity': 0.05 },
     },
+    // Impact highlight (Phase 5). Accent palette mirrors the dashboard
+    // theme: --accent (selected), --accent-fitness (downstream),
+    // --accent-sim (upstream). Hard-coded here because the Cytoscape canvas
+    // can't read CSS custom properties.
+    {
+      selector: 'node.gv-selected',
+      style: { 'background-color': '#e0a96d', 'border-color': '#fff', 'border-width': 4, 'opacity': 1 },
+    },
+    {
+      selector: 'node.gv-upstream',
+      style: { 'background-color': '#6a9bd4', 'opacity': 1 },
+    },
+    {
+      selector: 'node.gv-downstream',
+      style: { 'background-color': '#7ec47e', 'opacity': 1 },
+    },
+    {
+      selector: '.gv-dimmed',
+      style: { 'opacity': 0.1 },
+    },
   ];
 }
 
@@ -219,6 +239,61 @@ function gvRenderLayoutSelector(host) {
     })(GV_LAYOUTS[i]);
   }
   host.appendChild(bar);
+}
+
+// Breadth-first reach set over one of the graphIndexes adjacency maps
+// (callers for upstream, callees for downstream). Cycle-safe via a visited
+// set. The seed itself is NOT included in the returned set, and self-edges
+// are skipped (a node is not treated as its own caller/callee) — both
+// choices keep the seed styled 'selected' rather than upstream/downstream.
+function gvBfsReach(seedId, adjacency) {
+  var reached = {};
+  if (!adjacency || typeof adjacency.get !== 'function') return reached;
+  var queue = [seedId];
+  var visited = {};
+  visited[seedId] = true;
+  while (queue.length > 0) {
+    var cur = queue.shift();
+    var neighbors = adjacency.get(cur) || [];
+    for (var i = 0; i < neighbors.length; i++) {
+      var nxt = neighbors[i];
+      if (nxt === seedId) continue; // skip self-edge back to the seed
+      if (visited[nxt]) continue;
+      visited[nxt] = true;
+      reached[nxt] = true;
+      queue.push(nxt);
+    }
+  }
+  return reached;
+}
+
+function gvClearImpact() {
+  if (!gvCy) return;
+  gvCy.elements().removeClass('gv-selected gv-upstream gv-downstream gv-dimmed');
+}
+
+function gvApplyImpact(seedId, indexes) {
+  if (!gvCy || !indexes) return;
+  var upstream = gvBfsReach(seedId, indexes.callers);   // who reaches the seed
+  var downstream = gvBfsReach(seedId, indexes.callees); // what the seed reaches
+  gvCy.batch(function() {
+    gvCy.elements().removeClass('gv-selected gv-upstream gv-downstream');
+    gvCy.elements().addClass('gv-dimmed');
+    gvCy.nodes().forEach(function(n) {
+      var id = n.id();
+      if (id === seedId) { n.removeClass('gv-dimmed').addClass('gv-selected'); }
+      else if (upstream[id]) { n.removeClass('gv-dimmed').addClass('gv-upstream'); }
+      else if (downstream[id]) { n.removeClass('gv-dimmed').addClass('gv-downstream'); }
+    });
+    // Un-dim edges whose endpoints are both in the lit set so the highlighted
+    // subgraph reads as connected paths, not just isolated nodes.
+    gvCy.edges().forEach(function(ed) {
+      var s = ed.source().id();
+      var t = ed.target().id();
+      var lit = function(id) { return id === seedId || upstream[id] || downstream[id]; };
+      if (lit(s) && lit(t)) ed.removeClass('gv-dimmed');
+    });
+  });
 }
 
 // Search box (DOM, above the canvas). Reuses the same fuzzy index the
@@ -322,14 +397,17 @@ views.push({
       return;
     }
 
-    // Node selection — toggle a CSS class for now (later phases add impact).
+    // Click a node → highlight upstream (callers, transitive) and downstream
+    // (callees, transitive) reach sets via the shared graphIndexes adjacency
+    // lists. Background click or Esc clears.
     gvCy.on('tap', 'node', function(evt) {
-      gvCy.nodes().removeClass('gv-node-selected');
-      evt.target.addClass('gv-node-selected');
+      gvApplyImpact(evt.target.id(), indexes);
     });
     gvCy.on('tap', function(evt) {
-      if (evt.target === gvCy) gvCy.nodes().removeClass('gv-node-selected');
+      if (evt.target === gvCy) gvClearImpact();
     });
+    gvCy.__gvEscHandler = function(e) { if (e.key === 'Escape') gvClearImpact(); };
+    document.addEventListener('keydown', gvCy.__gvEscHandler);
   },
   onActivate() {
     // The canvas needs a measured size before fit() — defer one frame so
