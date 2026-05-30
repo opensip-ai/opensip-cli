@@ -5,13 +5,16 @@
  * depend on this package for:
  *   - CLI option / output / result types
  *   - Exit code constants and error suggestions
- *   - Session persistence (StoredSession, SessionRepo)
+ *   - The cross-tool StoredSession type (the SessionRepo runtime + the
+ *     sessions schema live in @opensip-tools/session-store)
  *
- * Dashboard rendering moved to @opensip-tools/dashboard (Layer 3).
- * contracts type-re-exports the GraphCatalog shape from there as part
- * of the contract surface between the graph tool and the dashboard;
- * that re-export is type-only (erased at compile time) so contracts
- * keeps zero runtime dependency on dashboard.
+ * The GraphCatalog shape is DEFINED here (./graph-catalog.ts), not
+ * re-exported from elsewhere. It is the contract surface between the
+ * graph tool (which writes catalog.json) and @opensip-tools/dashboard
+ * (which renders it): both producer and consumer depend on contracts
+ * from below, so the shape lives in the layer beneath both. contracts
+ * holds zero runtime dependency on dashboard or graph — these are
+ * type-only declarations.
  *
  * contracts depends only on @opensip-tools/core. Tools depend on
  * contracts. The CLI entry-point depends on contracts and on every

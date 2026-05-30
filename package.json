@@ -17,7 +17,7 @@
     "test": "turbo run test",
     "test:coverage": "turbo run test --continue -- --coverage",
     "typecheck": "turbo run typecheck",
-    "lint": "eslint 'packages/**/src/**/*.{ts,tsx}' && pnpm depcruise && pnpm gate:verify",
+    "lint": "eslint 'packages/**/src/**/*.{ts,tsx}' && pnpm depcruise && pnpm depcruise:types && pnpm gate:verify",
     "lint:fix": "eslint --fix 'packages/**/src/**/*.{ts,tsx}'",
     "depcruise": "depcruise packages",
     "gate:verify": "node scripts/verify-gate-live.mjs",

@@ -410,10 +410,10 @@ npm's self-replacement and pnpm's lack of OIDC support.
 
 ## Project Status
 
-**v1.0.0** — first stable release. opensip-tools is a tool-plugin
-platform: `core` is a strict kernel, `fitness` and `simulation` are
-peer tools implementing a shared Tool contract, and `cli` is a
-generic dispatcher. Adding a new tool requires zero CLI changes.
+**v2.0.0** — opensip-tools is a tool-plugin platform: `core` is a
+strict kernel, and `fitness`, `graph`, and `simulation` are peer
+tools implementing a shared Tool contract, with `cli` as a generic
+dispatcher. Adding a new tool requires zero CLI changes.
 
 The new-customer flow is three commands: `init` (language detection
 + scaffolded layout) → `fit --recipe example` → `sim --recipe

@@ -13,11 +13,14 @@
  * on and reports circular dependencies INCLUDING type-only ones. Run it
  * with `pnpm depcruise:types`.
  *
- * It is intentionally NOT part of `pnpm lint` (non-gating): known
- * type-only cycles already exist (see the note in the main config re:
- * LoadScenarioConfig), so gating would fail today. This surfaces the
- * type graph for incremental cleanup; promote `no-circular-incl-types`
- * to `error` and add it to `lint` once the existing cycles are paid down.
+ * GATING (audit 2026-05-30, round-3): the historical type-only cycles
+ * (LoadScenarioConfig etc.) are paid down — `pnpm depcruise:types` now
+ * reports zero violations — so `no-circular-incl-types` is promoted to
+ * `error` and `depcruise:types` is wired into `pnpm lint`. This closes
+ * the type-only blind spot while it is empty, so a future type-only
+ * cycle cannot land silently. (Type-only LAYER inversions are a deeper
+ * blind spot still open; adding type-aware layer rules here is a tracked
+ * follow-up.)
  */
 
 const base = require('./.dependency-cruiser.cjs');
@@ -27,11 +30,11 @@ module.exports = {
   forbidden: [
     {
       name: 'no-circular-incl-types',
-      severity: 'warn',
+      severity: 'error',
       comment:
         'Circular dependency including type-only edges. Type-only cycles ' +
         'are a structural smell — usually the shared type belongs in a ' +
-        'third module. Visibility-only for now (see file header).',
+        'third module. Gating as of round-3 (see file header).',
       from: {},
       to: { circular: true },
     },
