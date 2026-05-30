@@ -90,13 +90,13 @@ module.exports = {
       from: { path: '^packages/core/src/' },
       to: {
         path: [
-          '^@opensip-tools/datastore',
-          '^@opensip-tools/contracts',
-          '^@opensip-tools/cli($|/)',
-          '^@opensip-tools/fitness',
-          '^@opensip-tools/simulation',
-          '^@opensip-tools/lang-',
-          '^@opensip-tools/checks-',
+          '^packages/datastore/',
+          '^packages/contracts/',
+          '^packages/cli/',
+          '^packages/fitness/engine/',
+          '^packages/simulation/engine/',
+          '^packages/languages/lang-',
+          '^packages/fitness/checks-',
         ],
       },
     },
@@ -114,13 +114,13 @@ module.exports = {
       from: { path: '^packages/datastore/src/' },
       to: {
         path: [
-          '^@opensip-tools/contracts',
-          '^@opensip-tools/cli($|/)',
-          '^@opensip-tools/fitness',
-          '^@opensip-tools/simulation',
-          '^@opensip-tools/lang-',
-          '^@opensip-tools/checks-',
-          '^@opensip-tools/graph',
+          '^packages/contracts/',
+          '^packages/cli/',
+          '^packages/fitness/engine/',
+          '^packages/simulation/engine/',
+          '^packages/languages/lang-',
+          '^packages/fitness/checks-',
+          '^packages/graph/',
         ],
       },
     },
@@ -139,12 +139,12 @@ module.exports = {
       from: { path: '^packages/session-store/src/' },
       to: {
         path: [
-          '^@opensip-tools/cli($|/)',
-          '^@opensip-tools/fitness',
-          '^@opensip-tools/simulation',
-          '^@opensip-tools/graph',
-          '^@opensip-tools/lang-',
-          '^@opensip-tools/checks-',
+          '^packages/cli/',
+          '^packages/fitness/engine/',
+          '^packages/simulation/engine/',
+          '^packages/graph/',
+          '^packages/languages/lang-',
+          '^packages/fitness/checks-',
         ],
       },
     },
@@ -162,13 +162,13 @@ module.exports = {
       from: { path: '^packages/reporting/src/' },
       to: {
         path: [
-          '^@opensip-tools/datastore',
-          '^@opensip-tools/cli($|/)',
-          '^@opensip-tools/fitness',
-          '^@opensip-tools/simulation',
-          '^@opensip-tools/graph',
-          '^@opensip-tools/lang-',
-          '^@opensip-tools/checks-',
+          '^packages/datastore/',
+          '^packages/cli/',
+          '^packages/fitness/engine/',
+          '^packages/simulation/engine/',
+          '^packages/graph/',
+          '^packages/languages/lang-',
+          '^packages/fitness/checks-',
         ],
       },
     },
@@ -188,15 +188,15 @@ module.exports = {
       from: { path: '^packages/contracts/src/' },
       to: {
         path: [
-          '^@opensip-tools/cli($|/)',
-          '^@opensip-tools/fitness',
-          '^@opensip-tools/simulation',
-          '^@opensip-tools/dashboard',
-          '^@opensip-tools/datastore',
-          '^@opensip-tools/session-store',
-          '^@opensip-tools/reporting',
-          '^@opensip-tools/lang-',
-          '^@opensip-tools/checks-',
+          '^packages/cli/',
+          '^packages/fitness/engine/',
+          '^packages/simulation/engine/',
+          '^packages/dashboard/',
+          '^packages/datastore/',
+          '^packages/session-store/',
+          '^packages/reporting/',
+          '^packages/languages/lang-',
+          '^packages/fitness/checks-',
         ],
       },
     },
@@ -216,12 +216,12 @@ module.exports = {
       from: { path: '^packages/dashboard/src/' },
       to: {
         path: [
-          '^@opensip-tools/cli($|/)',
-          '^@opensip-tools/fitness',
-          '^@opensip-tools/simulation',
-          '^@opensip-tools/graph',
-          '^@opensip-tools/lang-',
-          '^@opensip-tools/checks-',
+          '^packages/cli/',
+          '^packages/fitness/engine/',
+          '^packages/simulation/engine/',
+          '^packages/graph/',
+          '^packages/languages/lang-',
+          '^packages/fitness/checks-',
         ],
       },
     },
@@ -242,7 +242,10 @@ module.exports = {
         'depend on any other @opensip-tools/* package. Other packages depend ' +
         'on it to share visual primitives across the CLI and tool live views.',
       from: { path: '^packages/cli-ui/src/' },
-      to: { path: '^@opensip-tools/' },
+      // Resolved-path form: any workspace package EXCEPT cli-ui's own
+      // source (a leaf importing its own files is fine; importing any
+      // other package is the violation).
+      to: { path: '^packages/', pathNot: '^packages/cli-ui/' },
     },
 
     // -------------------------------------------------------------------
@@ -266,11 +269,11 @@ module.exports = {
       from: { path: '^packages/cli/src/ui/' },
       to: {
         path: [
-          '^@opensip-tools/fitness',
-          '^@opensip-tools/simulation',
-          '^@opensip-tools/graph',
-          '^@opensip-tools/lang-',
-          '^@opensip-tools/checks-',
+          '^packages/fitness/engine/',
+          '^packages/simulation/engine/',
+          '^packages/graph/',
+          '^packages/languages/lang-',
+          '^packages/fitness/checks-',
         ],
       },
     },
@@ -286,7 +289,7 @@ module.exports = {
         'a cycle (cli depends on fitness). Tools call back into shared CLI ' +
         'infrastructure via the ToolCliContext interface from core.',
       from: { path: '^packages/fitness/' },
-      to: { path: '^@opensip-tools/cli($|/)' },
+      to: { path: '^packages/cli/' },
     },
     {
       name: 'simulation-no-cli',
@@ -296,7 +299,7 @@ module.exports = {
         'ToolCliContext from @opensip-tools/core to call back into render / ' +
         'maybeOpenDashboard.',
       from: { path: '^packages/simulation/' },
-      to: { path: '^@opensip-tools/cli($|/)' },
+      to: { path: '^packages/cli/' },
     },
 
     // -------------------------------------------------------------------
@@ -312,8 +315,8 @@ module.exports = {
       from: { path: '^packages/fitness/checks-' },
       to: {
         path: [
-          '^@opensip-tools/cli($|/)',
-          '^@opensip-tools/contracts',
+          '^packages/cli/',
+          '^packages/contracts/',
         ],
       },
     },
@@ -354,9 +357,9 @@ module.exports = {
       from: { path: '^packages/languages/lang-' },
       to: {
         path: [
-          '^@opensip-tools/cli($|/)',
-          '^@opensip-tools/contracts',
-          '^@opensip-tools/checks-',
+          '^packages/cli/',
+          '^packages/contracts/',
+          '^packages/fitness/checks-',
         ],
       },
     },
@@ -368,7 +371,7 @@ module.exports = {
         'reach up into it. (The historical lang-typescript exception for ' +
         'filterContent was paid down by moving the symbol into lang-typescript.)',
       from: { path: '^packages/languages/lang-' },
-      to: { path: '^@opensip-tools/fitness' },
+      to: { path: '^packages/fitness/engine/' },
     },
 
     // -------------------------------------------------------------------
@@ -381,7 +384,7 @@ module.exports = {
         'Graph is a Tool plugin; it must not depend on the CLI entry point. ' +
         'Tool callbacks happen through the ToolCliContext interface from core.',
       from: { path: '^packages/graph/' },
-      to: { path: '^@opensip-tools/cli($|/)' },
+      to: { path: '^packages/cli/' },
     },
     {
       name: 'graph-no-check-packs',
@@ -389,7 +392,7 @@ module.exports = {
       comment:
         'Graph sits in the tools/lang peer layer. It must not import any check pack.',
       from: { path: '^packages/graph/engine/src/' },
-      to: { path: '^@opensip-tools/checks-' },
+      to: { path: '^packages/fitness/checks-' },
     },
     {
       name: 'graph-rules-no-parser',
@@ -456,7 +459,7 @@ module.exports = {
         path: '^packages/graph/engine/src/',
         pathNot: '^packages/graph/engine/src/__tests__/',
       },
-      to: { path: '^@opensip-tools/graph-(?!engine)[a-z0-9-]+($|/)' },
+      to: { path: '^packages/graph/graph-' },
     },
     {
       // PR 1b. Adapter packs MUST NOT depend on each other. Each pack
@@ -492,7 +495,7 @@ module.exports = {
       severity: 'error',
       comment: 'Graph adapter packs must not depend on @opensip-tools/cli.',
       from: { path: '^packages/graph/graph-[a-z0-9-]+/' },
-      to: { path: '^@opensip-tools/cli($|/)' },
+      to: { path: '^packages/cli/' },
     },
     {
       // PR 1b. Adapter packs MUST NOT depend on fitness or check packs.
@@ -504,7 +507,7 @@ module.exports = {
         'Graph adapter packs must not depend on @opensip-tools/fitness or ' +
         'any @opensip-tools/checks-* package — peer-layer isolation.',
       from: { path: '^packages/graph/graph-[a-z0-9-]+/' },
-      to: { path: '^@opensip-tools/(fitness|checks-)' },
+      to: { path: '^packages/fitness/(engine|checks-)' },
     },
     // PR 3 of plan 2026-05-23-plan-graph-adapter-package-split.md
     // deleted graph-no-tree-sitter-import-outside-lang-packs. The
@@ -532,7 +535,7 @@ module.exports = {
         path: '^packages/graph/',
         pathNot: ['/__tests__/', '\\.test\\.(ts|tsx)$'],
       },
-      to: { path: '^@opensip-tools/fitness($|/)' },
+      to: { path: '^packages/fitness/engine/' },
     },
     {
       // Audit 2026-05-29 (L2): fitness and graph are now fully decoupled.
@@ -554,7 +557,7 @@ module.exports = {
         path: '^packages/fitness/',
         pathNot: ['/__tests__/', '\\.test\\.(ts|tsx)$'],
       },
-      to: { path: '^@opensip-tools/graph($|/)' },
+      to: { path: '^packages/graph/engine/' },
     },
 
     // -------------------------------------------------------------------
@@ -571,7 +574,7 @@ module.exports = {
         'AI-3: dashboard code-paths must not import @opensip-tools/graph; ' +
         'consume the catalog by JSON shape only.',
       from: { path: '^packages/dashboard/src/code-paths' },
-      to: { path: '^@opensip-tools/graph(/|$)' },
+      to: { path: '^packages/graph/engine/' },
     },
     {
       name: 'dashboard-code-paths-self-contained',
@@ -581,9 +584,11 @@ module.exports = {
         '(for GraphCatalog types), @opensip-tools/core, dashboard siblings, ' +
         'and Node built-ins. No other cross-package imports.',
       from: { path: '^packages/dashboard/src/code-paths/' },
+      // Resolved-path form: any workspace package EXCEPT contracts, core,
+      // and dashboard's own source (siblings). Node built-ins never match
+      // `^packages/`, so they're implicitly allowed.
       to: {
-        path: '^@opensip-tools/(?!(contracts|core|dashboard)(/|$))',
-        pathNot: '^node:',
+        path: '^packages/(?!(contracts|core|dashboard)/)',
       },
     },
     {
