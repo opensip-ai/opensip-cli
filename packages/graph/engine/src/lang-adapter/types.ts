@@ -21,6 +21,7 @@ import type {
   DependencyEdge,
   FunctionOccurrence,
   ParseError,
+  ResolutionMode,
   ResolutionStats,
   RuleHints,
 } from '../types.js';
@@ -77,6 +78,14 @@ export interface ParseInput {
    */
   readonly configPathAbs?: string;
   readonly compilerOptions?: unknown;
+  /**
+   * The resolution tier the run was invoked with. The engine always
+   * supplies it (defaulting to `'exact'` at the CLI boundary). An
+   * adapter that only implements semantic parsing MAY ignore a `'fast'`
+   * value and behave as `'exact'` — the contract permits, but does not
+   * require, a per-adapter fast implementation.
+   */
+  readonly resolutionMode: ResolutionMode;
 }
 
 export interface ParseOutput<P = ParsedProject> {
@@ -159,6 +168,13 @@ export interface ResolveInput<P = ParsedProject> {
    *  call resolution. */
   readonly dependencySites?: readonly DependencySiteRecord[];
   readonly projectDirAbs: string;
+  /**
+   * The resolution tier. `'exact'` runs the semantic, type-checker-backed
+   * resolvers; `'fast'` runs the syntactic resolver (name + import graph)
+   * and labels every edge `'syntactic'` with capped confidence. Adapters
+   * that only implement exact resolution may ignore a `'fast'` value.
+   */
+  readonly resolutionMode: ResolutionMode;
 }
 
 export interface ResolveOutput {
@@ -180,6 +196,12 @@ export interface CacheKeyInput {
   readonly projectDirAbs: string;
   readonly configPathAbs?: string;
   readonly compilerOptions?: unknown;
+  /**
+   * The resolution tier. Adapters MUST fold this into the returned key so
+   * fast and exact catalogs never collide in the cache (a mode switch must
+   * be a cache miss against the other tier, not a wrong-tier reuse).
+   */
+  readonly resolutionMode: ResolutionMode;
 }
 
 // ── method 6 ──────────────────────────────────────────────────────
