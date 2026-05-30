@@ -38,8 +38,8 @@ import {
   type CliOutput,
   type ErrorResult,
   type FitDoneResult,
-  reportToCloud,
 } from '@opensip-tools/contracts';
+import { reportToCloud } from '@opensip-tools/reporting';
 import { Box, Static, Text, useApp, render } from 'ink';
 import React, { useCallback, useEffect, useState } from 'react';
 

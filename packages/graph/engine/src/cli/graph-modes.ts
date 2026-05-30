@@ -15,7 +15,8 @@
 import { randomUUID } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 
-import { EXIT_CODES, reportToCloud } from '@opensip-tools/contracts';
+import { EXIT_CODES } from '@opensip-tools/contracts';
+import { reportToCloud } from '@opensip-tools/reporting';
 import {
   ConfigurationError,
   logger,
