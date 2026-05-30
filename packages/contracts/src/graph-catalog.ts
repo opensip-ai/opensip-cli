@@ -26,9 +26,16 @@ export type GraphCallResolution =
   | 'jsx'
   | 'constructor'
   | 'unknown'
-  | 'dynamic-string';
+  | 'dynamic-string'
+  /** Fast-mode (syntactic) edge: resolved from name + import graph, no
+   *  type checker. Always approximate — carries capped confidence. */
+  | 'syntactic';
 
 export type GraphCallConfidence = 'high' | 'medium' | 'low';
+
+/** Mirror of the engine's `ResolutionMode`. `exact` = semantic;
+ *  `fast` = syntactic (approximate). Kept structurally in sync. */
+export type GraphResolutionMode = 'exact' | 'fast';
 
 export type GraphVisibility = 'exported' | 'module-local' | 'private';
 
@@ -87,5 +94,8 @@ export interface GraphCatalog {
   readonly builtAt: string;
   readonly cacheKey?: string;
   readonly filesFingerprint?: string;
+  /** The resolution tier that produced this catalog. Absent ⇒ `'exact'`
+   *  (historical behavior). Mirrors the engine `Catalog.resolutionMode`. */
+  readonly resolutionMode?: GraphResolutionMode;
   readonly functions: Readonly<Record<string, readonly GraphFunctionOccurrence[]>>;
 }

@@ -85,6 +85,7 @@ export type {
   GraphFunctionKind,
   GraphCallResolution,
   GraphCallConfidence,
+  GraphResolutionMode,
   GraphVisibility,
 } from './graph-catalog.js';
 
