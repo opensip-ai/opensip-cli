@@ -14,16 +14,10 @@
  *   3. SHA-256.
  */
 
-import { createHash } from 'node:crypto';
-
-export interface BodyDigest {
-  readonly hash: string;
-  readonly size: number;
-}
+import { hashBody, normalizeWhitespace, type BodyDigest } from '@opensip-tools/graph';
 
 export function digestJavaBody(text: string): BodyDigest {
-  const normalized = normalizeWhitespace(stripJavaComments(text));
-  return { hash: sha256(normalized), size: normalized.length };
+  return hashBody(normalizeWhitespace(stripJavaComments(text)));
 }
 
 export const digestSyntheticBody = digestJavaBody;
@@ -172,12 +166,4 @@ function consumeCharLiteral(
     i++;
   }
   return { text: buf, index: i };
-}
-
-function normalizeWhitespace(s: string): string {
-  return s.replaceAll(/\s+/g, ' ').trim();
-}
-
-function sha256(s: string): string {
-  return createHash('sha256').update(s, 'utf8').digest('hex');
 }

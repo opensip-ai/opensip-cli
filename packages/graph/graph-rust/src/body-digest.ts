@@ -14,12 +14,7 @@
  * to warrant its own file.
  */
 
-import { createHash } from 'node:crypto';
-
-export interface BodyDigest {
-  readonly hash: string;
-  readonly size: number;
-}
+import { hashBody, normalizeWhitespace, type BodyDigest } from '@opensip-tools/graph';
 
 /**
  * Digest a Rust body text — strip comments, collapse whitespace, hash.
@@ -29,8 +24,7 @@ export interface BodyDigest {
  * the call site self-documenting without duplicating logic.
  */
 export function digestRustBody(text: string): BodyDigest {
-  const normalized = normalizeWhitespace(stripRustComments(text));
-  return { hash: sha256(normalized), size: normalized.length };
+  return hashBody(normalizeWhitespace(stripRustComments(text)));
 }
 
 /**
@@ -150,11 +144,3 @@ function consumeCharLiteral(text: string, start: number): { readonly text: strin
   return { text: text.slice(start, start + len), index: start + len };
 }
 /* v8 ignore stop */
-
-function normalizeWhitespace(s: string): string {
-  return s.replaceAll(/\s+/g, ' ').trim();
-}
-
-function sha256(s: string): string {
-  return createHash('sha256').update(s, 'utf8').digest('hex');
-}

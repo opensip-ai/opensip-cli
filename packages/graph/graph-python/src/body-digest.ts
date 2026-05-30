@@ -13,21 +13,14 @@
  *     synthetic text isn't a function body.
  */
 
-import { createHash } from 'node:crypto';
-
-export interface BodyDigest {
-  readonly hash: string;
-  readonly size: number;
-}
+import { hashBody, normalizeWhitespace, type BodyDigest } from '@opensip-tools/graph';
 
 export function digestPythonBody(text: string): BodyDigest {
-  const normalized = normalizePythonBody(text);
-  return { hash: sha256(normalized), size: normalized.length };
+  return hashBody(normalizePythonBody(text));
 }
 
 export function digestSyntheticBody(text: string): BodyDigest {
-  const normalized = normalizeWhitespace(stripPythonComments(text));
-  return { hash: sha256(normalized), size: normalized.length };
+  return hashBody(normalizeWhitespace(stripPythonComments(text)));
 }
 
 /**
@@ -106,12 +99,4 @@ function stripLeadingDocstring(text: string): string {
   const match = /^\s*(?:[ru]?(?:'''[\s\S]*?'''|"""[\s\S]*?"""))\s*\n/i.exec(text);
   if (match) return text.slice(match[0].length);
   return text;
-}
-
-function normalizeWhitespace(s: string): string {
-  return s.replaceAll(/\s+/g, ' ').trim();
-}
-
-function sha256(s: string): string {
-  return createHash('sha256').update(s, 'utf8').digest('hex');
 }

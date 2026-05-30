@@ -128,6 +128,16 @@ export {
 // inline the structural type at every helper boundary.
 export type { EdgePosition, MutableStats } from './lang-adapter/edge-helpers.js';
 
+// ── Shared body-digest primitives ─────────────────────────────────
+//
+// The normalize-to-hash tail of the `bodyHash` pipeline (BodyDigest
+// shape + whitespace normalizer + hash/size step) was byte-identical
+// across the tree-sitter adapter packs. Hoisted here so each pack keeps
+// only its language-specific comment stripper / normalizer (round-3
+// audit 2026-05-30, finding D). Mirrors the edge-helpers rationale.
+export { normalizeWhitespace, hashBody } from './lang-adapter/body-digest.js';
+export type { BodyDigest } from './lang-adapter/body-digest.js';
+
 // ── Graph adapter discovery (used by the CLI to load adapter packs) ─
 export {
   discoverGraphAdapterPackages,
