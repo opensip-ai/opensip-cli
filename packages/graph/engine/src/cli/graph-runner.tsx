@@ -23,6 +23,7 @@ import {
   Banner,
   ClockProvider,
   ErrorMessage,
+  ProjectHeader,
   RunFooterHints,
   RunHeader,
   RunSummary,
@@ -197,7 +198,8 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
   const header = (
     <>
       <Banner />
-      <RunHeader tool={GRAPH_TOOL_TITLE} description={GRAPH_TOOL_DESCRIPTION} projectRoot={args.cwd} />
+      <ProjectHeader root={args.cwd} />
+      <RunHeader tool={GRAPH_TOOL_TITLE} description={GRAPH_TOOL_DESCRIPTION} />
     </>
   );
 

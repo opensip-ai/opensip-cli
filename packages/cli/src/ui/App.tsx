@@ -2,7 +2,7 @@
  * App — top-level Ink component that dispatches on CommandResult.type.
  */
 
-import { RunHeader , useTheme , ErrorMessage , Banner } from '@opensip-tools/cli-ui';
+import { RunHeader , useTheme , ErrorMessage , Banner , ProjectHeader } from '@opensip-tools/cli-ui';
 import { Text, Box } from 'ink';
 import React from 'react';
 
@@ -28,16 +28,58 @@ import type {
   UninstallDoneResult,
 } from '@opensip-tools/contracts';
 
-export interface AppProps {
-  readonly result: CommandResult;
+/** Project location for the shell's `ℹ Project:` line. */
+export interface ProjectHeaderProps {
+  readonly root: string;
+  readonly walkedUp: number;
 }
 
-export function App({ result }: AppProps): React.ReactElement {
+export interface AppProps {
+  readonly result: CommandResult;
+  /** Omitted for project-agnostic commands (init/configure/completion) and scopeless error paths. */
+  readonly projectHeader?: ProjectHeaderProps;
+}
+
+/**
+ * Result types that render WITHOUT the banner. `error` stays terse — a
+ * bare `✗` line reads better in CI logs and above a stack of error text.
+ * `--json` and `completion` never reach this component (they bypass the
+ * Ink render seam entirely), so they need no entry here.
+ */
+const BANNERLESS_RESULT_TYPES: ReadonlySet<CommandResult['type']> = new Set(['error']);
+
+/** Display title for the simulation tool — shared by its two render branches. */
+const SIMULATION_TOOL_TITLE = 'Simulation';
+
+/**
+ * App shell — the single source of truth for banner visibility. Renders
+ * the banner once for every human-facing command, then delegates the
+ * body to {@link AppBody}. Replaces the prior per-branch `<Banner/>`
+ * sprinkling that left `dashboard` (and the list/plugin/configure/
+ * uninstall commands) with no banner at all.
+ */
+export function App({ result, projectHeader }: AppProps): React.ReactElement {
+  const showBanner = !BANNERLESS_RESULT_TYPES.has(result.type);
+  return (
+    <Box flexDirection="column">
+      {showBanner && <Banner />}
+      {showBanner && projectHeader && (
+        <ProjectHeader root={projectHeader.root} walkedUp={projectHeader.walkedUp} />
+      )}
+      <AppBody result={result} />
+    </Box>
+  );
+}
+
+/**
+ * Dispatches on `CommandResult.type`. Body only — the banner is owned by
+ * {@link App}, so no branch renders its own.
+ */
+function AppBody({ result }: AppProps): React.ReactElement {
   switch (result.type) {
     case 'fit-done': {
       return (
         <Box flexDirection="column">
-          <Banner />
           <ResultsTable rows={result.rows} />
           <Summary {...result.summary} />
           {result.findings && <Findings checks={result.findings.checks} />}
@@ -63,25 +105,14 @@ export function App({ result }: AppProps): React.ReactElement {
     }
 
     case 'init': {
-      return (
-        <Box flexDirection="column">
-          {result.created && <Banner />}
-          <InitFeedback {...result} />
-        </Box>
-      );
+      return <InitFeedback {...result} />;
     }
 
     case 'experimental': {
-      const toolName = 'Simulation';
       const toolDesc = 'Run scenario-based tests against your codebase.';
       return (
         <Box flexDirection="column">
-          <Banner />
-          <RunHeader
-            tool={toolName}
-            description={toolDesc}
-            projectRoot={result.cwd}
-          />
+          <RunHeader tool={SIMULATION_TOOL_TITLE} description={toolDesc} />
           <ExperimentalNotice tool={result.tool} cwd={result.cwd} />
         </Box>
       );
@@ -140,11 +171,9 @@ function SimDoneSummary({
 
   return (
     <Box flexDirection="column">
-      <Banner />
       <RunHeader
-        tool="Simulation"
+        tool={SIMULATION_TOOL_TITLE}
         description={`Recipe: ${result.recipeName}`}
-        projectRoot={result.cwd}
       />
       <Box flexDirection="column" paddingLeft={2} paddingTop={1}>
         {result.scenarios.length === 0 ? (
@@ -200,7 +229,6 @@ function ClearDoneSummary({ result }: Readonly<{ result: ClearDoneResult }>): Re
   const theme = useTheme();
   return (
     <Box flexDirection="column">
-      <Banner />
       <Box paddingLeft={2} paddingTop={1}>
         {result.action === 'empty' && <Text dimColor>No session data to clear.</Text>}
         {result.action === 'cancelled' && <Text dimColor>Cancelled. No data was deleted.</Text>}

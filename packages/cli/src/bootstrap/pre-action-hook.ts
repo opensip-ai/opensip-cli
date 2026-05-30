@@ -24,7 +24,6 @@
 
 import { existsSync } from 'node:fs';
 
-import { formatProjectHeader } from '@opensip-tools/cli-ui';
 import {
   RunScope,
   checkSchemaCompat,
@@ -48,23 +47,6 @@ import {
 import { loadCliDefaults, mergeConfigDefaults } from './cli-defaults.js';
 
 import type { Command } from 'commander';
-
-/**
- * Commands that DON'T emit the imperative Project: header. JSON output,
- * shell-sourceable completion, help/version, user-scoped commands, and
- * Ink-rendered tools (RunHeader takes over) are all suppressed.
- */
-const PROJECT_HEADER_SUPPRESSED_COMMANDS: ReadonlySet<string> = new Set([
-  'completion',
-  'configure',
-]);
-
-const COMMANDS_WITH_INK_RUN_HEADER: ReadonlySet<string> = new Set([
-  'fit',
-  'sim',
-  'graph',
-  'dashboard',
-]);
 
 /**
  * Commands that operate WITHOUT requiring a project context. These don't
@@ -315,25 +297,12 @@ export function installPreActionHook(program: Command): void {
     enterScope(scope);
     setCurrentRunScope(scope);
 
-    // 6. Imperative Project: header for non-Ink, project-scoped commands.
-    const cmdName = actionCommand.name();
-    const suppress =
-      PROJECT_HEADER_SUPPRESSED_COMMANDS.has(cmdName) ||
-      Boolean(opts.json) ||
-      project.scope !== 'project' ||
-      // Ink-rendered tools mount their own RunHeader with the Project line.
-      (COMMANDS_WITH_INK_RUN_HEADER.has(cmdName) && !opts.json) ||
-      // uninstall --project's printer (Phase 5) owns its pre-prompt block;
-      // uninstall --user is user-scoped.
-      cmdName === 'uninstall';
-    if (!suppress) {
-      process.stdout.write(formatProjectHeader({
-        root: project.projectRoot,
-        walkedUp: project.walkedUp,
-      }));
-    }
+    // The `ℹ Project:` location line is rendered once, under the banner,
+    // by cli-ui's ProjectHeader — mounted by the App shell (static
+    // commands, via render.ts reading currentScope().project) and by each
+    // live view (fit/graph). No imperative pre-action print.
 
-    // 7. Structured start log.
+    // Structured start log.
     logger.info({
       evt: 'cli.run.start',
       module: MODULE_TAG,

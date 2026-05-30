@@ -12,10 +12,25 @@
  * --json` path stays React-free.
  */
 
+import { currentScope } from '@opensip-tools/core';
+
 import type { CommandResult } from '@opensip-tools/contracts';
 
-/** Render a `CommandResult` via the static Ink app. */
+/**
+ * Render a `CommandResult` via the static Ink app.
+ *
+ * Reads the project location from the entered `RunScope` (the static
+ * render runs inside the pre-action hook's scope) and hands it to the
+ * App shell, which renders the canonical `ℹ Project:` line under the
+ * banner. Project-agnostic commands (scope ≠ 'project') and error/parse
+ * paths with no scope pass `undefined` → no project line.
+ */
 export async function renderResult(result: CommandResult): Promise<void> {
+  const project = currentScope()?.projectContext;
+  const projectHeader =
+    project?.scope === 'project'
+      ? { root: project.projectRoot, walkedUp: project.walkedUp }
+      : undefined;
   const { renderApp } = await import('../ui/render.js');
-  await renderApp(result);
+  await renderApp(result, projectHeader);
 }

@@ -10,14 +10,23 @@ import { render } from 'ink-testing-library';
 import React from 'react';
 import { describe, it, expect } from 'vitest';
 
-import { App } from '../../ui/App.js';
+import { App, type AppProps } from '../../ui/App.js';
 
-import type { ClearDoneResult, ConfigureDoneResult } from '@opensip-tools/contracts';
+import type {
+  ClearDoneResult,
+  ConfigureDoneResult,
+  DashboardResult,
+  ErrorResult,
+  HelpResult,
+} from '@opensip-tools/contracts';
 
-function renderApp(result: Parameters<typeof App>[0]['result']): string {
+function renderApp(
+  result: AppProps['result'],
+  projectHeader?: AppProps['projectHeader'],
+): string {
   const { lastFrame } = render(
     <ThemeProvider>
-      <App result={result} />
+      <App result={result} projectHeader={projectHeader} />
     </ThemeProvider>,
   );
   return lastFrame() ?? '';
@@ -92,5 +101,67 @@ describe('App.tsx — configure-done branch', () => {
     };
     const output = renderApp(result);
     expect(output).toContain('No key provided. Configuration unchanged.');
+  });
+});
+
+describe('App.tsx — banner shell (single source of truth)', () => {
+  // Banner block characters confirm the Ink banner rendered.
+  const BANNER_GLYPH = '█';
+
+  it('renders the banner for dashboard (regression: dashboard had no banner)', () => {
+    const result: DashboardResult = {
+      type: 'dashboard',
+      path: '/repo/report.html',
+      opened: false,
+    };
+    const output = renderApp(result);
+    expect(output).toContain('Report written to');
+    expect(output).toContain(BANNER_GLYPH);
+  });
+
+  it('renders the banner for configure-done (gained via the shell)', () => {
+    const result: ConfigureDoneResult = {
+      type: 'configure-done',
+      action: 'saved',
+      configPath: '/Users/test/.opensip-tools/config.yml',
+      maskedKey: 'abcd...wxyz',
+    };
+    expect(renderApp(result)).toContain(BANNER_GLYPH);
+  });
+
+  it('renders the banner for help (D1: help is bannered)', () => {
+    const result: HelpResult = { type: 'help' };
+    expect(renderApp(result)).toContain(BANNER_GLYPH);
+  });
+
+  it('does NOT render the banner for error (D1: errors stay terse)', () => {
+    const result: ErrorResult = {
+      type: 'error',
+      message: 'Something went wrong',
+      exitCode: 1,
+    };
+    const output = renderApp(result);
+    expect(output).toContain('Something went wrong');
+    expect(output).not.toContain(BANNER_GLYPH);
+  });
+});
+
+describe('App.tsx — project header (single renderer, under the banner)', () => {
+  it('renders the project line when project context is supplied', () => {
+    const result: DashboardResult = { type: 'dashboard', path: '/repo/r.html', opened: false };
+    const output = renderApp(result, { root: '/repo', walkedUp: 0 });
+    expect(output).toContain('ℹ Project: /repo');
+  });
+
+  it('includes the walked-up suffix', () => {
+    const result: DashboardResult = { type: 'dashboard', path: '/repo/r.html', opened: false };
+    const output = renderApp(result, { root: '/repo', walkedUp: 2 });
+    expect(output).toContain('ℹ Project: /repo  (found 2 levels up)');
+  });
+
+  it('omits the project line for bannerless results (error), even with context', () => {
+    const result: ErrorResult = { type: 'error', message: 'boom', exitCode: 1 };
+    const output = renderApp(result, { root: '/repo', walkedUp: 0 });
+    expect(output).not.toContain('ℹ Project:');
   });
 });

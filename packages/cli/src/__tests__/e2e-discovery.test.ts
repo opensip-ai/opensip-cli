@@ -63,7 +63,9 @@ describe('Project: header', () => {
     writeFileSync(join(testDir, 'opensip-tools.config.yml'), 'schemaVersion: 1\ntargets: {}\n', 'utf8');
     const { stdout, exitCode } = runCli(['fit-list'], testDir);
     expect(exitCode).toBe(0);
-    expect(stdout.split('\n')[0]).toBe(`ℹ Project: ${testDir}`);
+    // The project line is now rendered by the App shell's ProjectHeader,
+    // under the banner — no longer the literal first line of stdout.
+    expect(stdout).toContain(`ℹ Project: ${testDir}`);
     expect(stdout).not.toContain('found');
   });
 
@@ -74,7 +76,11 @@ describe('Project: header', () => {
     const { stdout, exitCode } = runCli(['fit-list'], subdir);
     expect(exitCode).toBe(0);
     expect(stdout).toContain(`ℹ Project: ${testDir}`);
-    expect(stdout).toContain('(found 2 levels up)');
+    // The walked-up suffix surfaces (vs the cwd===root case, which asserts
+    // NOT 'found'). Exact "(found N levels up)" wording is unit-tested in
+    // cli-ui formatProjectHeader; here it may wrap at 80 cols on long tmp
+    // paths, so we assert the marker word rather than the contiguous phrase.
+    expect(stdout).toContain('found');
   });
 
   it('suppresses the imperative header for --json', () => {

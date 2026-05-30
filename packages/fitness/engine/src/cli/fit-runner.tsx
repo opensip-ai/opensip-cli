@@ -26,6 +26,7 @@ import {
   Banner,
   ClockProvider,
   ErrorMessage,
+  ProjectHeader,
   RunFooterHints,
   RunHeader,
   RunSummary,
@@ -159,7 +160,14 @@ function FitRunner({ args, datastore, setExitCode }: FitRunnerProps): React.Reac
   const staticItems = computeStaticItems(args.quiet === true, checkCount);
 
   const renderStaticItem = (item: 'banner' | 'header'): React.ReactElement => {
-    if (item === 'banner') return <Banner key={item} />;
+    if (item === 'banner') {
+      return (
+        <React.Fragment key={item}>
+          <Banner />
+          <ProjectHeader root={args.cwd} />
+        </React.Fragment>
+      );
+    }
     const metadata = [
       { label: 'Recipe', value: recipe },
       { label: 'Checks', value: String(checkCount) },
@@ -169,7 +177,6 @@ function FitRunner({ args, datastore, setExitCode }: FitRunnerProps): React.Reac
         key={item}
         tool={FIT_TOOL_TITLE}
         description={FIT_TOOL_DESCRIPTION}
-        projectRoot={args.cwd}
         metadata={metadata}
       />
     );

@@ -11,17 +11,20 @@
 import { ThemeProvider } from '@opensip-tools/cli-ui';
 import React from 'react';
 
-import { App } from './App.js';
+import { App, type ProjectHeaderProps } from './App.js';
 
 import type { CommandResult } from '@opensip-tools/contracts';
 
 /** Render a static command result. */
-export async function renderApp(result: CommandResult): Promise<void> {
+export async function renderApp(
+  result: CommandResult,
+  projectHeader?: ProjectHeaderProps,
+): Promise<void> {
   const { render } = await import('ink');
 
   const app = render(
     <ThemeProvider>
-      <App result={result} />
+      <App result={result} projectHeader={projectHeader} />
     </ThemeProvider>,
   );
 

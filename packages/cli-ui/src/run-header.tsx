@@ -1,13 +1,12 @@
 /**
- * RunHeader — info header shown after the banner for each tool run. Displays
- * tool name, an optional description, metadata key-value pairs, and a
- * separator line. Used by every Ink live view + the static-render path.
+ * RunHeader — tool header shown after the banner + project line for each
+ * tool run. Displays the tool name, optional metadata key-value pairs,
+ * and an optional description, followed by a separator line.
  *
- * Renders the `Project: <root>` line as the canonical project-location
- * marker for Ink-rendered commands. Non-Ink commands use the imperative
- * `formatProjectHeader` printed by pre-action-hook. Together these
- * cover every command path exactly once — no duplicate "Target:/Project:"
- * lines.
+ * The project-location line is NOT rendered here — {@link ProjectHeader}
+ * is the single canonical renderer of `ℹ Project: <root>`, mounted by the
+ * App shell and each live view directly under the banner. RunHeader is
+ * purely the per-tool title/metadata band.
  */
 
 import { Text, Box } from 'ink';
@@ -25,39 +24,24 @@ export interface RunHeaderProps {
   readonly tool: string;
   /** Optional description shown below the metadata row. */
   readonly description?: string;
-  /** Resolved project root the tool is operating against (from ctx.project.projectRoot). */
-  readonly projectRoot: string;
-  /** Ancestor steps walked from cwd to projectRoot; renders the "(found N levels up)" suffix when > 0. */
-  readonly walkedUp?: number;
-  /** Extra metadata pairs prepended before the project line. */
+  /** Metadata pairs rendered in the dim band below the title. */
   readonly metadata?: readonly RunHeaderMeta[];
-}
-
-function formatProjectLine(projectRoot: string, walkedUp: number): string {
-  if (walkedUp === 0) return `Project: ${projectRoot}`;
-  const noun = walkedUp === 1 ? 'level' : 'levels';
-  return `Project: ${projectRoot}  (found ${walkedUp} ${noun} up)`;
 }
 
 export function RunHeader({
   tool,
   description,
-  projectRoot,
-  walkedUp = 0,
   metadata = [],
 }: RunHeaderProps): React.ReactElement {
   const theme = useTheme();
   const separator = '─'.repeat(60);
 
-  const metaParts = [
-    ...metadata.map((m) => `${m.label}: ${m.value}`),
-    formatProjectLine(projectRoot, walkedUp),
-  ];
-
   return (
     <Box flexDirection="column" paddingLeft={2} paddingTop={1}>
       <Text bold color={theme.brand}>{tool}</Text>
-      <Text dimColor>{metaParts.join('   ')}</Text>
+      {metadata.length > 0 && (
+        <Text dimColor>{metadata.map((m) => `${m.label}: ${m.value}`).join('   ')}</Text>
+      )}
       {description !== undefined && (
         <>
           <Text> </Text>
