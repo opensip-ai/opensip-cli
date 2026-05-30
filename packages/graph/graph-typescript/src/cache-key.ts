@@ -2,15 +2,23 @@
 /**
  * TypeScript cacheKey implementation.
  *
- * Produces `ts-${ts.version}-${tsconfigContentHash}`. Stored in
- * Catalog.cacheKey (v3 shape introduced by the language-pluggability
- * work). Replaces the v2 fields `tsCompilerVersion` and `tsConfigPath`
- * that lived as separate top-level catalog properties.
+ * Produces `ts-${ts.version}-${resolutionMode}-${tsconfigContentHash}`.
+ * Stored in Catalog.cacheKey (v3 shape introduced by the
+ * language-pluggability work). Replaces the v2 fields
+ * `tsCompilerVersion` and `tsConfigPath` that lived as separate
+ * top-level catalog properties.
+ *
+ * The resolution mode is part of the key so a fast catalog and an exact
+ * catalog for the same tsconfig occupy distinct `cache_key` rows in the
+ * datastore — switching `--resolution` is a clean cache miss against the
+ * other tier, never a wrong-tier reuse. No schema change is needed; the
+ * existing `cache_key` column carries the mode.
  *
  * Per contract invariant I-6 (cacheKey is stable for stable input):
- * the function is purely a function of `(ts.version, tsconfigContent)`.
- * If the tsconfig file is missing on disk we fall back to a literal
- * `no-tsconfig` marker so two calls without a tsconfig still match.
+ * the function is purely a function of
+ * `(ts.version, resolutionMode, tsconfigContent)`. If the tsconfig file
+ * is missing on disk we fall back to a literal `no-tsconfig` marker so
+ * two calls without a tsconfig still match.
  */
 
 import { createHash } from 'node:crypto';
@@ -22,7 +30,7 @@ import type { CacheKeyInput } from '@opensip-tools/graph';
 
 export function cacheKey(input: CacheKeyInput): string {
   const tsconfigHash = hashTsconfig(input.configPathAbs);
-  return `ts-${ts.version}-${tsconfigHash}`;
+  return `ts-${ts.version}-${input.resolutionMode}-${tsconfigHash}`;
 }
 
 function hashTsconfig(configPathAbs: string | undefined): string {
