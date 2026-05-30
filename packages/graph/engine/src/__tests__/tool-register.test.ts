@@ -156,13 +156,14 @@ afterEach(() => {
 });
 
 describe('graphTool.register', () => {
-  it('mounts all four subcommands on the program', () => {
+  it('mounts all subcommands on the program', () => {
     const { cli, program } = makeMockCli();
     graphTool.register(cli);
     const names = program.commands.map((c) => c.name());
     expect(names).toEqual([
       'graph',
       'graph-lookup',
+      'graph-shard-worker',
       'graph-symbol-index',
       'graph-baseline-export',
     ]);

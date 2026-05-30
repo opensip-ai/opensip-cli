@@ -30,6 +30,7 @@ import { renderGraphLive } from './cli/graph-runner.js';
 import { executeGraph } from './cli/graph.js';
 import { runHeapPreflight } from './cli/heap-preflight.js';
 import { executeLookup } from './cli/lookup.js';
+import { executeShardWorker } from './cli/shard-worker.js';
 import { executeSymbolIndex } from './cli/symbol-index.js';
 import { createAdapterRegistry, getDiscoveredAdapters } from './lang-adapter/registry.js';
 import { CatalogRepo } from './persistence/catalog-repo.js';
@@ -75,6 +76,12 @@ const GRAPH_SYMBOL_INDEX: ToolCommandDescriptor = {
 const GRAPH_BASELINE_EXPORT: ToolCommandDescriptor = {
   name: 'graph-baseline-export',
   description: 'Export the graph gate baseline (JSON) from the datastore to a file',
+};
+
+const GRAPH_SHARD_WORKER: ToolCommandDescriptor = {
+  name: 'graph-shard-worker',
+  description:
+    '[internal] Build one shard from a spec file and emit a ShardBuildResult JSON (spawned by the sharded build)',
 };
 
 // Live-view key graph contributes to the CLI's renderer registry. Owned
@@ -240,6 +247,14 @@ function register(cli: ToolCliContext): void {
     });
 
   program
+    .command(GRAPH_SHARD_WORKER.name)
+    .description(GRAPH_SHARD_WORKER.description)
+    .argument('<specPath>', 'Path to a JSON ShardWorkerSpec file')
+    .action((specPath: string) => {
+      executeShardWorker(specPath, cli);
+    });
+
+  program
     .command(GRAPH_SYMBOL_INDEX.name)
     .description(GRAPH_SYMBOL_INDEX.description)
     .option('--cwd <path>', 'Target directory (out path resolves against this)', process.cwd())
@@ -326,7 +341,7 @@ export const graphTool: Tool = {
     version: readPackageVersion(import.meta.url),
     description: 'Static call-graph + dead-end analysis',
   },
-  commands: [GRAPH, GRAPH_LOOKUP, GRAPH_SYMBOL_INDEX, GRAPH_BASELINE_EXPORT],
+  commands: [GRAPH, GRAPH_LOOKUP, GRAPH_SYMBOL_INDEX, GRAPH_BASELINE_EXPORT, GRAPH_SHARD_WORKER],
   register,
   contributeScope,
   collectDashboardData,
