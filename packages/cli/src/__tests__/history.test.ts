@@ -2,8 +2,8 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { SessionRepo } from '@opensip-tools/session-store';
 import { DataStoreFactory } from '@opensip-tools/datastore';
+import { SessionRepo } from '@opensip-tools/session-store';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { showHistory } from '../commands/history.js';

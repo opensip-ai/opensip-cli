@@ -26,7 +26,6 @@
  */
 
 import { EXIT_CODES } from '@opensip-tools/contracts';
-import { SessionRepo } from '@opensip-tools/session-store';
 import {
   ConfigurationError,
   generatePrefixedId,
@@ -34,6 +33,7 @@ import {
   ToolError,
   ValidationError,
 } from '@opensip-tools/core';
+import { SessionRepo } from '@opensip-tools/session-store';
 
 import { buildGraphSessionPayload } from '../persistence/session-payload.js';
 import { buildCliOutput, buildCliOutputFromFindings, renderJson } from '../render/json.js';

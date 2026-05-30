@@ -18,8 +18,8 @@ import {
   type SummaryOptions,
   type FitDoneResult,
 } from '@opensip-tools/contracts';
-import { SessionRepo } from '@opensip-tools/session-store';
 import { generatePrefixedId, logger } from '@opensip-tools/core';
+import { SessionRepo } from '@opensip-tools/session-store';
 
 import { buildFitnessSessionPayload } from '../../persistence/session-payload.js';
 

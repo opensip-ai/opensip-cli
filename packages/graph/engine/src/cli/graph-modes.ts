@@ -16,12 +16,12 @@ import { randomUUID } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 
 import { EXIT_CODES } from '@opensip-tools/contracts';
-import { reportToCloud } from '@opensip-tools/reporting';
 import {
   ConfigurationError,
   logger,
   ToolError,
 } from '@opensip-tools/core';
+import { reportToCloud } from '@opensip-tools/reporting';
 
 import { compareToBaseline, fingerprintSignal, saveBaseline } from '../gate.js';
 import { GraphBaselineRepo } from '../persistence/baseline-repo.js';

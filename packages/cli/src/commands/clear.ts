@@ -15,8 +15,8 @@
 import { createInterface } from 'node:readline';
 
 import { SessionRepo } from '@opensip-tools/session-store';
-import type { ClearDoneResult } from '@opensip-tools/contracts';
 
+import type { ClearDoneResult } from '@opensip-tools/contracts';
 import type { DataStore } from '@opensip-tools/datastore';
 
 export interface ClearOptions {

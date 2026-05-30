@@ -19,8 +19,8 @@
 
 import { createHash } from 'node:crypto';
 
-import { buildSarifLog } from '@opensip-tools/reporting';
 import { ConfigurationError, SystemError, logger } from '@opensip-tools/core';
+import { buildSarifLog } from '@opensip-tools/reporting';
 
 import type { FitBaselineRepo } from './persistence/baseline-repo.js';
 import type { CliOutput } from '@opensip-tools/contracts';

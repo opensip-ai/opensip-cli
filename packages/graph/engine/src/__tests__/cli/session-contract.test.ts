@@ -10,9 +10,9 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { SessionRepo } from '@opensip-tools/session-store'
 import { enterScope, LanguageRegistry } from '@opensip-tools/core'
 import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore'
+import { SessionRepo } from '@opensip-tools/session-store'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 
 import { executeGraph } from '../../cli/graph.js'

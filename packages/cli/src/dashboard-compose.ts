@@ -24,14 +24,14 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { SessionRepo } from '@opensip-tools/session-store';
-import type { DashboardResult } from '@opensip-tools/contracts';
 import { currentScope, resolveProjectPaths } from '@opensip-tools/core';
 import { generateDashboardHtml, type DashboardInput } from '@opensip-tools/dashboard';
+import { SessionRepo } from '@opensip-tools/session-store';
 
 import { getCurrentProjectRoot } from './cli-context.js';
 import { launchBrowser } from './open-dashboard.js';
 
+import type { DashboardResult } from '@opensip-tools/contracts';
 import type { DataStore } from '@opensip-tools/datastore';
 
 /**
