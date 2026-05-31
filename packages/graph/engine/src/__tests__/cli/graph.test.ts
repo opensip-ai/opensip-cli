@@ -357,6 +357,26 @@ describe('executeGraph — human / JSON modes', () => {
       expect(s.gitSha).toBe('abc1234567890abc1234567890abc1234567890a');
     }
   });
+
+  it('--catalog-output creates the parent directory when the output path is nested', async () => {
+    const { cli, setExitCode } = mockCli(datastore);
+    const outPath = join(projectDir, 'nested', 'deep', 'catalog.json');
+    await executeGraph(
+      {
+        cwd: projectDir,
+        noCache: true,
+        catalogOutput: outPath,
+        tenantId: 'tenant_test',
+        repoId: 'repo_test',
+        gitSha: 'abc1234567890abc1234567890abc1234567890a',
+        runId: 'run_test_nested',
+      },
+      cli,
+    );
+    expect(setExitCode).toHaveBeenCalledWith(0);
+    const written = JSON.parse(readFileSync(outPath, 'utf8')) as { version: string };
+    expect(written.version).toBe('1.0');
+  });
 });
 
 describe('executeGraph — gate modes', () => {

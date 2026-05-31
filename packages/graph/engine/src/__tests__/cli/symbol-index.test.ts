@@ -119,6 +119,19 @@ describe('graph symbol-index', () => {
       expect(Object.keys(payload.fileSymbols).sort()).toEqual(['src/a.ts', 'src/b.ts']);
     });
 
+    it('creates the parent directory when --out is nested', () => {
+      new CatalogRepo(datastore).replaceAll(
+        makeCatalog([occ({ bodyHash: 'h1', simpleName: 'fnA', filePath: 'src/a.ts' })]),
+      );
+      const { cli, setExitCode } = mockCli(datastore);
+      executeSymbolIndex({ cwd: workDir, out: join('nested', 'deep', 'out.json') }, cli);
+      expect(setExitCode).toHaveBeenCalledWith(0);
+      const payload = JSON.parse(
+        readFileSync(join(workDir, 'nested', 'deep', 'out.json'), 'utf8'),
+      ) as { symbols: Record<string, unknown[]> };
+      expect(Object.keys(payload.symbols)).toEqual(['fnA']);
+    });
+
     it('errors with CONFIGURATION_ERROR when no catalog has been built', () => {
       const { cli, setExitCode } = mockCli(datastore);
       executeSymbolIndex({ cwd: workDir, out: 'out.json' }, cli);

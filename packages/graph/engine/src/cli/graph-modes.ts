@@ -13,7 +13,8 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 
 import { EXIT_CODES } from '@opensip-tools/contracts';
 import {
@@ -180,6 +181,12 @@ export function runCatalogJsonMode(
     repoId: opts.repoId,
     gitSha: opts.gitSha,
   });
+  // Defensively create the parent dir before writing — siblings
+  // `runSarifExportMode` and `exportGraphBaseline` do the same. The
+  // opensip `EngineSubprocessPort.runCatalogExport` may point
+  // `--catalog-output` at a run-scoped temp dir that doesn't exist yet,
+  // so a bare writeFileSync would throw ENOENT.
+  mkdirSync(dirname(opts.catalogOutput!), { recursive: true });
   writeFileSync(opts.catalogOutput!, json);
   logger.info({
     evt: 'graph.render.catalog_json.complete',
