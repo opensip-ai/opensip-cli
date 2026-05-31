@@ -23,15 +23,53 @@ function sig(over: { ruleId: string; message: string; filePath: string; line?: n
 }
 
 describe('gate fingerprintSignal', () => {
-  it('builds rule|file|line|message identifier', () => {
+  it('builds rule|file|line|column identifier', () => {
     const s = sig({ ruleId: 'graph:orphan-subtree', message: 'foo is unreachable', filePath: 'src/a.ts', line: 7 });
-    expect(fingerprintSignal(s)).toBe('graph:orphan-subtree|src/a.ts|7|foo is unreachable');
+    expect(fingerprintSignal(s)).toBe('graph:orphan-subtree|src/a.ts|7|0');
   });
 
-  it('treats missing line as 0', () => {
+  it('treats missing line/column as 0', () => {
     const s = sig({ ruleId: 'r', message: 'm', filePath: 'src/a.ts' });
-    const noLine: Signal = { ...s, line: undefined };
-    expect(fingerprintSignal(noLine)).toBe('r|src/a.ts|0|m');
+    const noLoc: Signal = { ...s, line: undefined, column: undefined };
+    expect(fingerprintSignal(noLoc)).toBe('r|src/a.ts|0|0');
+  });
+
+  it('is stable across a changed message at the same location', () => {
+    // Regression guard: rules like graph:high-blast-function embed
+    // run-varying numbers in their message. The fingerprint must not
+    // change when only the message text does, or the gate flips a stable
+    // finding between "resolved" and "new".
+    const base = { ruleId: 'graph:high-blast-function', filePath: 'src/a.ts', line: 7 };
+    const before = sig({ ...base, message: 'f has a blast radius of 12.0 (direct=3, transitive=9).' });
+    const after = sig({ ...base, message: 'f has a blast radius of 14.0 (direct=4, transitive=10).' });
+    expect(fingerprintSignal(after)).toBe(fingerprintSignal(before));
+  });
+});
+
+describe('gate stability against volatile rule messages', () => {
+  let datastore: DataStore;
+  let repo: GraphBaselineRepo;
+
+  beforeEach(() => {
+    datastore = DataStoreFactory.open({ backend: 'memory' });
+    repo = new GraphBaselineRepo(datastore);
+  });
+
+  afterEach(() => {
+    datastore.close();
+  });
+
+  it('does not flag a regression when only a finding message changes', () => {
+    const base = { ruleId: 'graph:high-blast-function', filePath: 'src/a.ts', line: 7 };
+    saveBaseline([sig({ ...base, message: 'blast radius of 12.0 (direct=3, transitive=9).' })], repo);
+    // Same finding, message text drifted because the graph changed elsewhere.
+    const result = compareToBaseline(
+      [sig({ ...base, message: 'blast radius of 18.0 (direct=5, transitive=13).' })],
+      repo,
+    );
+    expect(result.degraded).toBe(false);
+    expect(result.newSignals).toHaveLength(0);
+    expect(result.resolvedFingerprints).toHaveLength(0);
   });
 });
 
@@ -83,7 +121,7 @@ describe('saveBaseline / compareToBaseline (SQLite-backed)', () => {
     const result = compareToBaseline(fewer, repo);
     expect(result.degraded).toBe(false);
     expect(result.resolvedFingerprints).toHaveLength(1);
-    expect(result.resolvedFingerprints[0]).toContain('|b');
+    expect(result.resolvedFingerprints[0]).toContain('src/b.ts');
   });
 
   it('throws ValidationError when baseline does not exist', () => {
@@ -99,7 +137,7 @@ describe('saveBaseline / compareToBaseline (SQLite-backed)', () => {
     saveBaseline(replacement, repo);
     const fps = repo.loadFingerprints();
     expect(fps).toHaveLength(1);
-    expect(fps[0]).toContain('|new');
+    expect(fps[0]).toContain('src/y.ts');
   });
 
   it('save then compare against an empty current set marks every baseline entry resolved', () => {
