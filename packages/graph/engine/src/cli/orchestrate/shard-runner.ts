@@ -167,8 +167,15 @@ function spawnShardWorker(
     });
     let stdout = '';
     let stderr = '';
-    child.stdout.on('data', (c: Buffer) => { stdout += c.toString('utf8'); });
-    child.stderr.on('data', (c: Buffer) => { stderr += c.toString('utf8'); });
+    // setEncoding routes chunks through a StringDecoder that buffers
+    // partial multi-byte UTF-8 sequences across 'data' chunk boundaries.
+    // Without it, a non-ASCII char split across two chunks (likely for
+    // large fragments arriving in many chunks) decodes to replacement
+    // chars and corrupts the JSON parsed in the close handler.
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
+    child.stdout.on('data', (c: string) => { stdout += c; });
+    child.stderr.on('data', (c: string) => { stderr += c; });
     child.on('error', (err) => {
       /* v8 ignore start */
       cleanup();

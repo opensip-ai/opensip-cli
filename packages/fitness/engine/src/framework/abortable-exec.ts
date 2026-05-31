@@ -109,15 +109,21 @@ export function execAbortable(
     let aborted = false
     let timeoutId: NodeJS.Timeout | undefined
 
-    child.stdout?.on('data', (data: Buffer) => {
-      const chunk = data.toString()
+    // setEncoding routes chunks through a StringDecoder that buffers
+    // partial multi-byte UTF-8 sequences across 'data' chunk boundaries.
+    // Without it, a non-ASCII char (unicode in a file path, an error
+    // message) split across two chunks decodes to replacement chars and
+    // corrupts the captured output used for downstream text matching.
+    child.stdout?.setEncoding('utf8')
+    child.stderr?.setEncoding('utf8')
+
+    child.stdout?.on('data', (chunk: string) => {
       if (stdout.length + chunk.length <= maxBuffer) {
         stdout += chunk
       }
     })
 
-    child.stderr?.on('data', (data: Buffer) => {
-      const chunk = data.toString()
+    child.stderr?.on('data', (chunk: string) => {
       if (stderr.length + chunk.length <= maxBuffer) {
         stderr += chunk
       }

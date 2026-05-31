@@ -25,6 +25,24 @@ describe('execAbortable — array mode', () => {
     expect(result.exitCode).toBe(0)
   })
 
+  it('preserves multi-byte UTF-8 output split across stream chunks', async () => {
+    // A large payload is delivered by the OS pipe in multiple ~64 KiB
+    // 'data' chunks. A 3-byte char (中, U+4E2D) is used deliberately:
+    // 65536 is not a multiple of 3, so the chunk boundary lands
+    // mid-character. Without setEncoding, per-chunk decoding emits U+FFFD
+    // replacement chars there. (A 4-byte char would falsely pass — 65536
+    // is divisible by 4, so its boundaries align.)
+    const count = 300_000
+    const result = await execAbortable([
+      process.execPath,
+      '-e',
+      `process.stdout.write('中'.repeat(${count}))`,
+    ])
+    expect(result.exitCode).toBe(0)
+    expect(result.stdout).not.toContain('�')
+    expect(result.stdout).toBe('中'.repeat(count))
+  })
+
   it('returns a non-zero exit code without throwing', async () => {
     const result = await execAbortable(['sh', '-c', 'exit 3'])
     expect(result.exitCode).toBe(3)

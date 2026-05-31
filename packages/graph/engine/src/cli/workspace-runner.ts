@@ -178,11 +178,17 @@ function spawnGraphChild(input: SpawnInput): Promise<WorkspaceUnitRunResult> {
     })
     let stdout = ''
     let stderr = ''
-    child.stdout.on('data', (chunk: Buffer) => {
-      stdout += chunk.toString('utf8')
+    // setEncoding routes chunks through a StringDecoder that buffers
+    // partial multi-byte UTF-8 sequences across 'data' chunk boundaries.
+    // Without it, a non-ASCII char split across two chunks decodes to
+    // replacement chars and corrupts the --json stdout parsed below.
+    child.stdout.setEncoding('utf8')
+    child.stderr.setEncoding('utf8')
+    child.stdout.on('data', (chunk: string) => {
+      stdout += chunk
     })
-    child.stderr.on('data', (chunk: Buffer) => {
-      stderr += chunk.toString('utf8')
+    child.stderr.on('data', (chunk: string) => {
+      stderr += chunk
     })
     child.on('error', (err) => {
       /* v8 ignore start */
