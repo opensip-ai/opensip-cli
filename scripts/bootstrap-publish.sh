@@ -62,6 +62,8 @@ PACKAGES=(
   core
   datastore
   contracts
+  session-store
+  reporting
   cli-ui
   lang-typescript lang-rust lang-python lang-go lang-java lang-cpp
   dashboard
