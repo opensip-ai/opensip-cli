@@ -4,6 +4,68 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.1.0] — 2026-05-30
+
+Feature release on top of the v2 SQLite-backed platform. The headline
+is a faster, parallel graph engine and an in-browser graph visualizer;
+under the hood, `@opensip-tools/contracts` was purified to a types-only
+package and its runtime concerns extracted into two new packages. The
+`opensip-tools` CLI surface is backward-compatible with 2.0.x — the
+breaking items below affect only direct consumers of the
+`@opensip-tools/*` library packages.
+
+### Added
+
+- **Two new packages — `@opensip-tools/session-store` and
+  `@opensip-tools/reporting`** (the workspace is now 29 packages).
+  `session-store` owns the session SQLite schema + `SessionRepo`;
+  `reporting` owns SARIF build + cloud report. Both were extracted from
+  `contracts` so that `contracts` could become types-only.
+- **`graph --resolution fast`** — a checker-free syntactic resolution
+  tier that trades exactness for ~2× cold-build speedup. Approximate
+  edges are marked as such in `graph-lookup`; rules degrade gracefully
+  on approximate catalogs, and the gate refuses a fast catalog where
+  exactness is required.
+- **Sharded parallel graph builds.** Multi-package projects build one
+  shard per package in a worker pool, recover cross-package edges in a
+  boundary pass, and cache each shard fragment for incremental reuse.
+- **Opt-in OpenTelemetry.** Env-gated instrumentation: the no-op API
+  lives in `core`, the SDK is initialized only in `cli`, and the graph
+  engine emits a per-stage span via `runStage`. Off unless explicitly
+  enabled.
+- **Dashboard Graph view** — an 8th Code Paths view rendering the call
+  graph as a Cytoscape.js + dagre node-link diagram, with filter,
+  search, and upstream/downstream impact highlighting. The renderer
+  stack is vendored into the report bundle (offline-render guarantee).
+- **Per-language check display metadata** for the Python, Go, Java,
+  C/C++, and Rust check packs, plus `cli-ui` `Banner` `size` prop
+  (`md`/`sm`) and a unified banner + project line across all commands.
+
+### Changed
+
+- **`@opensip-tools/contracts` is now types-only.** Its former
+  drizzle/datastore runtime dependencies are gone; consumers that
+  imported `SessionRepo`, the session schema, or SARIF/cloud-report
+  helpers from `contracts` must now import them from
+  `@opensip-tools/session-store` or `@opensip-tools/reporting`
+  respectively.
+- **The `CliArgs` bridge was removed** — per-command Commander options
+  are the single source of truth. Tool authors reading a shared
+  `CliArgs` object should read their own command's options instead.
+- **The dependency-cruiser architecture gate is now live.** Cross-package
+  layer rules are enforced against resolved paths (not inert), with an
+  ESLint barrel-only rule for core imports in check packs and a
+  gate-liveness guard wired into `pnpm lint`.
+
+### Fixed
+
+- Resolved all 30 dogfood `fit` warnings across fitness, graph,
+  dashboard, and core.
+- Fixed an OOM in the dashboard end-to-end integration test (boot-once +
+  lazy graph mount).
+- Wired the `graph-go` and `graph-java` adapters into the CLI and made
+  the adapter guardrails pattern-based.
+
 ## [2.0.1] — 2026-05-29
 
 Republish of the 2.0.0 feature set from a single consistent build. No
