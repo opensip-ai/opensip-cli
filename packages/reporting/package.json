@@ -1,6 +1,17 @@
 {
   "name": "@opensip-tools/reporting",
   "version": "2.2.1",
+  "license": "MIT",
+  "description": "Reporting for OpenSIP Tools — SARIF build and cloud report, extracted from contracts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opensip-ai/opensip-tools.git",
+    "directory": "packages/reporting"
+  },
+  "homepage": "https://github.com/opensip-ai/opensip-tools",
+  "bugs": {
+    "url": "https://github.com/opensip-ai/opensip-tools/issues"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
