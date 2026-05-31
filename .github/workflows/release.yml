@@ -74,6 +74,8 @@ jobs:
             core \
             datastore \
             contracts \
+            session-store \
+            reporting \
             cli-ui \
             lang-typescript lang-rust lang-python lang-go lang-java lang-cpp \
             dashboard \
@@ -95,7 +97,7 @@ jobs:
 
       # Pack every workspace package into a tarball. `pnpm pack` resolves
       # workspace:* deps into concrete versions, which `npm publish` then
-      # uploads. We pack all 27 up front so the publish step can run
+      # uploads. We pack all 29 up front so the publish step can run
       # against a known-good set of tarballs in dependency order.
       - name: Pack all workspace packages (resolves workspace:*)
         run: |
@@ -106,6 +108,10 @@ jobs:
           pnpm --filter @opensip-tools/datastore        pack --pack-destination /tmp/tarballs
           # Layer 2 — shared CLI infra
           pnpm --filter @opensip-tools/contracts       pack --pack-destination /tmp/tarballs
+          # Layer 2 — session-store (session schema + SessionRepo) + reporting
+          # (SARIF + cloud report); both extracted from contracts in the 2.1.0 split
+          pnpm --filter @opensip-tools/session-store   pack --pack-destination /tmp/tarballs
+          pnpm --filter @opensip-tools/reporting       pack --pack-destination /tmp/tarballs
           # Layer 3 — shared Ink/React UI primitives (used by every tool live view + the CLI)
           pnpm --filter @opensip-tools/cli-ui          pack --pack-destination /tmp/tarballs
           # Layer 3 — language adapters
@@ -194,6 +200,9 @@ jobs:
           publish_if_new datastore
           # Layer 2 — shared CLI infra
           publish_if_new contracts
+          # Layer 2 — session-store + reporting (extracted from contracts in 2.1.0)
+          publish_if_new session-store
+          publish_if_new reporting
           # Layer 3 — shared Ink/React UI primitives
           publish_if_new cli-ui
           # Layer 3 — language adapters (lang-typescript first; downstream check packs depend on it)
