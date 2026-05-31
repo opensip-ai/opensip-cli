@@ -74,7 +74,7 @@ Discovery uses **two complementary paths**, both run on every fit invocation; re
 
 See [`80-implementation/02-plugin-loader.md`](/docs/opensip-tools/80-implementation/02-plugin-loader/) for the resolution rules and how `plugins.autoDiscoverChecks: false` lets you opt out of the name-pattern path entirely.
 
-The [`collectCheckObjects`](https://github.com/opensip-ai/opensip-tools/blob/v2.1.0/packages/fitness/engine/src/framework/check-types.ts) helper (re-exported from `@opensip-tools/fitness`) walks a barrel's exports recursively, narrowing each value to a `Check` via `isCheck` and deduplicating by reference. Each pack's `src/index.ts` calls it on `allChecks` (the re-export of `src/checks/index.ts`) so new checks are picked up by simply re-exporting them from the category barrel — no central registration list to update.
+The [`collectCheckObjects`](https://github.com/opensip-ai/opensip-tools/blob/v2.2.1/packages/fitness/engine/src/framework/check-types.ts) helper (re-exported from `@opensip-tools/fitness`) walks a barrel's exports recursively, narrowing each value to a `Check` via `isCheck` and deduplicating by reference. Each pack's `src/index.ts` calls it on `allChecks` (the re-export of `src/checks/index.ts`) so new checks are picked up by simply re-exporting them from the category barrel — no central registration list to update.
 
 ---
 
@@ -179,7 +179,7 @@ The recipe service projects the `config:` map into module-level state before exe
 
 ## The display map
 
-The `CHECK_DISPLAY` map ([`packages/fitness/checks-universal/src/display/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.1.0/packages/fitness/checks-universal/src/display/index.ts) and analogues) maps a check slug to `[icon, displayName]`:
+The `CHECK_DISPLAY` map ([`packages/fitness/checks-universal/src/display/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.2.1/packages/fitness/checks-universal/src/display/index.ts) and analogues) maps a check slug to `[icon, displayName]`:
 
 ```ts
 export const CHECK_DISPLAY: Record<string, CheckDisplayEntry> = {

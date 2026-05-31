@@ -1,6 +1,6 @@
 {
   "name": "@opensip-tools/graph-python",
-  "version": "2.1.0",
+  "version": "2.2.1",
   "license": "MIT",
   "description": "Python language adapter for the opensip-tools graph engine",
   "repository": {

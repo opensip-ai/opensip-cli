@@ -32,7 +32,7 @@ The CLI is a generic dispatcher. It cannot tell `fit` from `sim` from `graph` fr
 
 ## The contract
 
-A Tool is a TypeScript object. Five fields, two methods. The whole interface lives at [`packages/core/src/tools/types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.1.0/packages/core/src/tools/types.ts):
+A Tool is a TypeScript object. Five fields, two methods. The whole interface lives at [`packages/core/src/tools/types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.2.1/packages/core/src/tools/types.ts):
 
 ```ts
 interface Tool {
@@ -49,7 +49,7 @@ That's the entire surface. A Tool is anything that satisfies that shape.
 
 The contract has been deliberately kept narrow. Each field exists for a specific reason:
 
-- **`metadata.id`** is the registry key. `ToolRegistry.register(t)` writes `tools[t.metadata.id] = t` (last-writer-wins via `Map#set`) — see [`packages/core/src/tools/registry.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.1.0/packages/core/src/tools/registry.ts). This is how a third-party Tool can override a first-party one (though [`packages/cli/src/bootstrap/register-tools.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.1.0/packages/cli/src/bootstrap/register-tools.ts)'s discovery loop deliberately skips packages whose `metadata.id` matches a bundled tool, so a non-customized third-party install can't accidentally clobber `fit`/`sim`/`graph`).
+- **`metadata.id`** is the registry key. `ToolRegistry.register(t)` writes `tools[t.metadata.id] = t` (last-writer-wins via `Map#set`) — see [`packages/core/src/tools/registry.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.2.1/packages/core/src/tools/registry.ts). This is how a third-party Tool can override a first-party one (though [`packages/cli/src/bootstrap/register-tools.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.2.1/packages/cli/src/bootstrap/register-tools.ts)'s discovery loop deliberately skips packages whose `metadata.id` matches a bundled tool, so a non-customized third-party install can't accidentally clobber `fit`/`sim`/`graph`).
 - **`commands[]`** carries metadata only — no handlers. The CLI uses this list for `--help` listings and conflict detection (two tools can't both claim the `fit` subcommand). Keeping the list metadata-only means `--help` is cheap: the CLI doesn't have to invoke each tool's `register()` to enumerate available commands.
 - **`register(cli)`** does the actual Commander wiring. It receives a `ToolCliContext` (the program object, the render function, the dashboard launcher, the logger, the exit-code setter) and uses it to mount its commands. Tools never import the CLI package directly — they call back into shared infrastructure through this context object.
 - **`initialize()`** is optional async setup, called once before any command runs. Most tools don't need it (`fit` doesn't — its setup is lazy inside command handlers). It's there for tools that need eager work: warming a cache, loading a marketplace catalog, validating a license.
@@ -77,7 +77,7 @@ interface ToolCliContext {
 
 ## How tools get registered
 
-The flow lives in [`packages/cli/src/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.1.0/packages/cli/src/index.ts) and runs once, at process startup, before argv is parsed.
+The flow lives in [`packages/cli/src/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.2.1/packages/cli/src/index.ts) and runs once, at process startup, before argv is parsed.
 
 ```
 1. Construct a fresh ToolRegistry for this invocation:
@@ -109,7 +109,7 @@ The flow lives in [`packages/cli/src/index.ts`](https://github.com/opensip-ai/op
    program.parseAsync(process.argv);
 ```
 
-First-party tools (`fit`, `sim`, `graph`) are imported statically. They're a direct dep of `@opensip-tools/cli` and ship in the same npm install. Third-party tools are discovered by walking `node_modules` for any package whose `package.json` declares the `opensipTools` metadata block — see [`packages/core/src/plugins/tool-package-discovery.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.1.0/packages/core/src/plugins/tool-package-discovery.ts).
+First-party tools (`fit`, `sim`, `graph`) are imported statically. They're a direct dep of `@opensip-tools/cli` and ship in the same npm install. Third-party tools are discovered by walking `node_modules` for any package whose `package.json` declares the `opensipTools` metadata block — see [`packages/core/src/plugins/tool-package-discovery.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.2.1/packages/core/src/plugins/tool-package-discovery.ts).
 
 The discovery shape is:
 
@@ -222,7 +222,7 @@ If your tool also wants to ship checks (the way `@opensip-tools/checks-typescrip
 
 Three things, in order of importance:
 
-1. **A stable kernel.** `@opensip-tools/core` does not import any tool. The layer policy ([dependency-cruiser config](https://github.com/opensip-ai/opensip-tools/blob/v2.1.0/.dependency-cruiser.cjs)) enforces this — `core-imports-nothing-workspace` would fail the build if `core` ever reached up. This means kernel changes are safe: a kernel bump can't break a tool, because the kernel can't see the tool.
+1. **A stable kernel.** `@opensip-tools/core` does not import any tool. The layer policy ([dependency-cruiser config](https://github.com/opensip-ai/opensip-tools/blob/v2.2.1/.dependency-cruiser.cjs)) enforces this — `core-imports-nothing-workspace` would fail the build if `core` ever reached up. This means kernel changes are safe: a kernel bump can't break a tool, because the kernel can't see the tool.
 2. **Independent tool versioning.** Each Tool package has its own version. The CLI is pinned to a major-version range of each first-party tool, but third-party tools can release on their own cadence. A user can pin `@opensip-tools/checks-python@2.x` while staying on `@opensip-tools/cli@1.x`.
 3. **A future where `fit` is just one of many tools.** The platform was designed for `audit-*`, `lint-*`, `report-*`, `bench-*`, and similar Tools to slot in. Today there are three (`fit`, `sim`, `graph`); tomorrow there might be ten. The CLI grows by zero lines.
 

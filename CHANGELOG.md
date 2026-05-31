@@ -4,6 +4,52 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.2.1] — 2026-05-31
+
+Adds two dedicated graph export subcommands and rounds out the
+OpenTelemetry tracing so the parallel build path is observable and
+telemetry can never degrade a run. Backward-compatible with 2.1.0 — all
+existing commands, flags, and output are unchanged. (Versioned 2.2.1; there
+is no 2.2.0 release.)
+
+### Added
+
+- **`graph-catalog-export` and `graph-sarif-export` subcommands.** Catalog
+  emission (previously reachable only as a `graph --catalog-output` mode)
+  and OpenSIP-convention SARIF file output now have dedicated subcommands
+  matching the `@opensip/code-intelligence` engine-subprocess contract.
+  `catalog-export` takes `--catalog-output --tenant-id --repo-id --git-sha
+  --run-id --mode <initial|incremental> [--changed-file …]`; `sarif-export`
+  takes `--output-sarif --tenant-id --repo-id --run-id`. Existing `graph`
+  usage is unaffected.
+- **OpenTelemetry now covers the sharded (multi-package) build.** Previously
+  only the sequential build emitted per-stage spans; multi-package builds —
+  which run each package in a worker subprocess — emitted none. Core gains
+  `withSpanAsync` (an async-aware span) and `currentTraceparent` (W3C context
+  serialization); the shard runner propagates the parent build's trace
+  context to each worker via `TRACEPARENT`, and workers emit per-stage spans
+  (tagged with shard id) that nest under a parent `sharded_build` span. No-op
+  unless telemetry is enabled.
+
+### Fixed
+
+- **Telemetry shutdown is now fail-safe.** A dead or slow OTLP collector
+  could stall CLI exit (and every shard-worker subprocess) for seconds on
+  the final span flush. Each export attempt and the final flush are now
+  bounded by a timeout, so a broken collector degrades to "spans dropped"
+  rather than a hang.
+- **Telemetry's own shutdown-failure log is now a structured `evt`** (with
+  `module`), so it is queryable/alertable like every other event instead of
+  being buried as a bare message.
+- **`graph` creates the parent directory** before writing catalog-json and
+  symbol-index outputs (previously failed if the target dir did not exist).
+- **`graph`/`fitness` decode child-process output across UTF-8 chunk
+  boundaries.** A multi-byte character split across two pipe chunks decoded
+  to replacement characters, corrupting JSON fragments and captured output;
+  streams now decode through a boundary-aware `StringDecoder`.
+- **The fitness/graph gate fingerprint is stable against volatile rule
+  messages**, so cosmetic message changes no longer churn the baseline.
+
 ## [2.1.0] — 2026-05-30
 
 Feature release on top of the v2 SQLite-backed platform. The headline
