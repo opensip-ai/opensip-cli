@@ -510,7 +510,7 @@ function saveGraphSession(
   }
 }
 
-function handleGraphError(label: string, error: unknown, cli: ToolCliContext): void {
+export function handleGraphError(label: string, error: unknown, cli: ToolCliContext): void {
   logger.error({
     evt: `graph.cli.${label}.error`,
     module: MODULE_GRAPH_CLI,

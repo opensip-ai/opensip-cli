@@ -5,7 +5,7 @@
  * instance so the option-parsing layer is exercised end-to-end.
  */
 
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -166,6 +166,8 @@ describe('graphTool.register', () => {
       'graph-shard-worker',
       'graph-symbol-index',
       'graph-baseline-export',
+      'catalog-export',
+      'sarif-export',
     ]);
   });
 
@@ -328,6 +330,70 @@ describe('graphTool.register', () => {
         expect(emitJson.mock.calls.length).toBe(1);
         const payload = emitJson.mock.calls[0]?.[0] as { error?: string };
         expect(payload?.error).toContain('No graph baseline');
+      } finally {
+        datastore.close();
+      }
+    });
+  });
+
+  describe('catalog-export subcommand action', () => {
+    it('runs the pipeline and routes through runCatalogJsonMode', async () => {
+      const datastore = DataStoreFactory.open({ backend: 'memory' });
+      try {
+        currentAdapterRegistry().register(fakeAdapter(workDir));
+        const outPath = join(workDir, 'catalog.json');
+        const { cli, program, setExitCode } = makeMockCli(datastore);
+        graphTool.register(cli);
+        await program.parseAsync(
+          [
+            'catalog-export',
+            '--catalog-output', outPath,
+            '--tenant-id', 't1',
+            '--repo-id', 'r1',
+            '--git-sha', 'abc123',
+            '--run-id', 'run-1',
+            '--cwd', workDir,
+          ],
+          { from: 'user' },
+        );
+        expect(setExitCode).toHaveBeenCalledWith(0);
+        expect(existsSync(outPath)).toBe(true);
+        const parsed = JSON.parse(readFileSync(outPath, 'utf8')) as {
+          version?: string;
+          provenance?: { runId?: string; tenantId?: string; completeness?: string };
+        };
+        expect(parsed.version).toBe('1.0');
+        expect(parsed.provenance?.runId).toBe('run-1');
+        expect(parsed.provenance?.tenantId).toBe('t1');
+        expect(parsed.provenance?.completeness).toBe('complete');
+      } finally {
+        datastore.close();
+      }
+    });
+  });
+
+  describe('sarif-export subcommand action', () => {
+    it('runs the pipeline and writes a SARIF v2.1.0 document to the output path', async () => {
+      const datastore = DataStoreFactory.open({ backend: 'memory' });
+      try {
+        currentAdapterRegistry().register(fakeAdapter(workDir));
+        const outPath = join(workDir, 'out.sarif');
+        const { cli, program, setExitCode } = makeMockCli(datastore);
+        graphTool.register(cli);
+        await program.parseAsync(
+          [
+            'sarif-export',
+            '--output-sarif', outPath,
+            '--tenant-id', 't1',
+            '--repo-id', 'r1',
+            '--cwd', workDir,
+          ],
+          { from: 'user' },
+        );
+        expect(setExitCode).toHaveBeenCalledWith(0);
+        expect(existsSync(outPath)).toBe(true);
+        const parsed = JSON.parse(readFileSync(outPath, 'utf8')) as { version?: string };
+        expect(parsed.version).toBe('2.1.0');
       } finally {
         datastore.close();
       }

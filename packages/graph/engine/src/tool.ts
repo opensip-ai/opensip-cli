@@ -26,10 +26,13 @@ import { ConfigurationError, logger, readPackageVersion, ValidationError } from 
 // (register-graph-adapters.ts). The historical engine-side bootstrap
 // is gone.
 import { exportGraphBaseline } from './cli/baseline-export.js';
+import { runCatalogJsonMode } from './cli/graph-modes.js';
 import { renderGraphLive } from './cli/graph-runner.js';
-import { executeGraph } from './cli/graph.js';
+import { executeGraph, handleGraphError } from './cli/graph.js';
 import { runHeapPreflight } from './cli/heap-preflight.js';
 import { executeLookup } from './cli/lookup.js';
+import { runGraph } from './cli/orchestrate.js';
+import { runSarifExportMode } from './cli/sarif-export.js';
 import { executeShardWorker } from './cli/shard-worker.js';
 import { executeSymbolIndex } from './cli/symbol-index.js';
 import { createAdapterRegistry, getDiscoveredAdapters } from './lang-adapter/registry.js';
@@ -84,6 +87,24 @@ const GRAPH_SHARD_WORKER: ToolCommandDescriptor = {
     '[internal] Build one shard from a spec file and emit a ShardBuildResult JSON (spawned by the sharded build)',
 };
 
+const GRAPH_CATALOG_EXPORT: ToolCommandDescriptor = {
+  name: 'catalog-export',
+  description:
+    'Run graph analysis and write the CatalogExport JSON document (symbols + edges + provenance) to a file',
+};
+
+const GRAPH_SARIF_EXPORT: ToolCommandDescriptor = {
+  name: 'sarif-export',
+  description:
+    'Run graph analysis and write OpenSIP-convention SARIF v2.1.0 findings to a file',
+};
+
+// Shared --cwd option flag + description (the `graph`, symbol-index,
+// baseline-export, and the two export subcommands all target a directory).
+// Deduped to one literal each.
+const OPT_CWD = '--cwd <path>';
+const OPT_DESC_CWD = 'Target directory';
+
 // Live-view key graph contributes to the CLI's renderer registry. Owned
 // by this package — the CLI dispatcher does NOT key off this literal;
 // each tool decides its own live-view name.
@@ -124,7 +145,7 @@ function register(cli: ToolCliContext): void {
     .command(GRAPH.name)
     .description(GRAPH.description)
     .argument('[paths...]', 'Subtrees to analyze (default: whole project)')
-    .option('--cwd <path>', 'Target directory', process.cwd())
+    .option(OPT_CWD, OPT_DESC_CWD, process.cwd())
     .option('--json', 'Output structured JSON', false)
     .option('--no-cache', 'Skip catalog cache (force full rebuild)')
     .option(
@@ -257,7 +278,7 @@ function register(cli: ToolCliContext): void {
   program
     .command(GRAPH_SYMBOL_INDEX.name)
     .description(GRAPH_SYMBOL_INDEX.description)
-    .option('--cwd <path>', 'Target directory (out path resolves against this)', process.cwd())
+    .option(OPT_CWD, 'Target directory (out path resolves against this)', process.cwd())
     .option('--out <path>', 'Output file path', 'symbolindex.json')
     .action((opts: { cwd: string; out: string }) => {
       executeSymbolIndex({ cwd: opts.cwd, out: opts.out }, cli);
@@ -267,7 +288,7 @@ function register(cli: ToolCliContext): void {
     .command(GRAPH_BASELINE_EXPORT.name)
     .description(GRAPH_BASELINE_EXPORT.description)
     .requiredOption('--out <path>', 'Output file path for the JSON baseline')
-    .option('--cwd <path>', 'Target directory', process.cwd())
+    .option(OPT_CWD, OPT_DESC_CWD, process.cwd())
     .option('--json', 'Output structured JSON', false)
     .action((opts: { cwd: string; out: string; json?: boolean }) => {
       const datastore = cli.scope.datastore() as DataStore;
@@ -289,6 +310,138 @@ function register(cli: ToolCliContext): void {
         `Exported graph baseline to ${result.outPath} ` +
           `(${String(result.fingerprintCount)} fingerprint(s), ${String(result.bytesWritten)} bytes)\n`,
       );
+    });
+
+  // catalog-export — dedicated subcommand over the same catalog-JSON
+  // renderer as `graph --catalog-output`, matching the CLI contract the
+  // opensip `EngineSubprocessPort.runCatalogExport` spawns (DEC-498).
+  program
+    .command(GRAPH_CATALOG_EXPORT.name)
+    .description(GRAPH_CATALOG_EXPORT.description)
+    .requiredOption('--catalog-output <path>', 'Output file path for the CatalogExport JSON')
+    .requiredOption('--tenant-id <id>', 'Tenant scope stamped on every row + provenance')
+    .requiredOption('--repo-id <id>', 'Repository scope stamped on every row')
+    .requiredOption('--git-sha <sha>', 'Commit SHA the catalog was extracted at')
+    .option('--run-id <uuid>', 'Run id for provenance (auto-generated if absent)')
+    .option(
+      '--mode <mode>',
+      "'initial' (full rebuild) or 'incremental' (reuse cache when present)",
+      'initial',
+    )
+    .option(
+      '--changed-file <relPath>',
+      'Changed file (repeatable). Advisory today — the engine derives the true changed set from fingerprint diffs; recorded for observability.',
+      (val: string, acc: string[]) => [...acc, val],
+      [] as string[],
+    )
+    .option(OPT_CWD, OPT_DESC_CWD, process.cwd())
+    .option('--language <name>', 'Force a specific language adapter (suppresses auto-detection)')
+    .option(
+      '--resolution <mode>',
+      'Edge resolution tier: exact (semantic) or fast (syntactic, no type checker)',
+      'exact',
+    )
+    .action(async (opts: {
+      catalogOutput: string;
+      tenantId: string;
+      repoId: string;
+      gitSha: string;
+      runId?: string;
+      mode?: string;
+      changedFile?: readonly string[];
+      cwd: string;
+      language?: string;
+      resolution?: string;
+    }) => {
+      const startedAt = new Date().toISOString();
+      try {
+        const resolution = parseResolutionMode(opts.resolution);
+        const incremental = opts.mode === 'incremental';
+        const changedFiles = opts.changedFile ?? [];
+        if (incremental && changedFiles.length > 0) {
+          // Advisory only: the incremental path self-derives the changed
+          // set from on-disk fingerprint diffs, so a caller-supplied set
+          // does not (yet) narrow the walk. Logged for observability.
+          logger.info({
+            evt: 'graph.cli.catalog_export.changed_files_advisory',
+            module: 'graph:cli',
+            runId: opts.runId,
+            changedFileCount: changedFiles.length,
+          });
+        }
+        const result = await runGraph({
+          cwd: opts.cwd,
+          noCache: !incremental,
+          resolution,
+          language: opts.language,
+          datastore: cli.scope.datastore() as DataStore | undefined,
+        });
+        runCatalogJsonMode(
+          {
+            cwd: opts.cwd,
+            catalogOutput: opts.catalogOutput,
+            tenantId: opts.tenantId,
+            repoId: opts.repoId,
+            gitSha: opts.gitSha,
+            runId: opts.runId,
+          },
+          result,
+          cli,
+          startedAt,
+        );
+      } catch (error) {
+        handleGraphError('catalog-export', error, cli);
+      }
+    });
+
+  // sarif-export — runs the pipeline and writes OpenSIP-convention SARIF
+  // to a file, matching the opensip `EngineSubprocessPort.runSarifExport`
+  // contract (DEC-498). Always a full run (findings, not incremental).
+  program
+    .command(GRAPH_SARIF_EXPORT.name)
+    .description(GRAPH_SARIF_EXPORT.description)
+    .requiredOption('--output-sarif <path>', 'Output file path for the SARIF v2.1.0 document')
+    .requiredOption('--tenant-id <id>', 'Tenant scope for the run')
+    .requiredOption('--repo-id <id>', 'Repository scope for the run')
+    .option('--run-id <uuid>', 'Run id for trace correlation (auto-generated if absent)')
+    .option(OPT_CWD, OPT_DESC_CWD, process.cwd())
+    .option('--language <name>', 'Force a specific language adapter (suppresses auto-detection)')
+    .option(
+      '--resolution <mode>',
+      'Edge resolution tier: exact (semantic) or fast (syntactic, no type checker)',
+      'exact',
+    )
+    .action(async (opts: {
+      outputSarif: string;
+      tenantId: string;
+      repoId: string;
+      runId?: string;
+      cwd: string;
+      language?: string;
+      resolution?: string;
+    }) => {
+      try {
+        const resolution = parseResolutionMode(opts.resolution);
+        const result = await runGraph({
+          cwd: opts.cwd,
+          noCache: true,
+          resolution,
+          language: opts.language,
+          datastore: cli.scope.datastore() as DataStore | undefined,
+        });
+        runSarifExportMode(
+          {
+            outputSarif: opts.outputSarif,
+            tenantId: opts.tenantId,
+            repoId: opts.repoId,
+            runId: opts.runId,
+          },
+          result.signals,
+          cli,
+        );
+      } catch (error) {
+        handleGraphError('sarif-export', error, cli);
+      }
     });
 }
 
@@ -349,7 +502,7 @@ export const graphTool: Tool = {
     version: readPackageVersion(import.meta.url),
     description: 'Static call-graph + dead-end analysis',
   },
-  commands: [GRAPH, GRAPH_LOOKUP, GRAPH_SYMBOL_INDEX, GRAPH_BASELINE_EXPORT, GRAPH_SHARD_WORKER],
+  commands: [GRAPH, GRAPH_LOOKUP, GRAPH_SYMBOL_INDEX, GRAPH_BASELINE_EXPORT, GRAPH_SHARD_WORKER, GRAPH_CATALOG_EXPORT, GRAPH_SARIF_EXPORT],
   register,
   contributeScope,
   collectDashboardData,

@@ -91,6 +91,10 @@ describe('SUBCOMMANDS drift test', () => {
       // Spawned by the sharded build (`graph --json` on a multi-package
       // repo), never typed by a user — intentionally absent from completion.
       'graph-shard-worker',
+      // Machine-facing exports spawned by opensip's EngineSubprocessPort
+      // (DEC-498), never typed by a user — intentionally absent from completion.
+      'catalog-export',
+      'sarif-export',
     ]);
     for (const sub of live) {
       if (INTERNAL.has(sub)) continue;
