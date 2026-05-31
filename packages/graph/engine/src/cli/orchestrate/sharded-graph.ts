@@ -12,10 +12,11 @@
  * by the boundary pass and labeled `crossShard: true` / `'syntactic'`.
  */
 
-import { logger, type Signal } from '@opensip-tools/core';
+import { logger, withSpanAsync, type Signal, type Span } from '@opensip-tools/core';
 
 import { buildIndexes } from '../../pipeline/indexes.js';
 import { currentRules } from '../../rules/registry.js';
+import { GRAPH_TRACER } from '../graph-tracer.js';
 
 import { mergeAndResolveShards } from './cross-shard-resolve.js';
 import { planShardWork, runShardsInParallel } from './shard-runner.js';
@@ -64,6 +65,19 @@ export interface RunShardedResult {
 
 /** Run the full sharded build and return a unified RunGraphResult-shaped value. */
 export async function runShardedGraph(input: RunShardedInput): Promise<RunShardedResult> {
+  // One parent span for the whole sharded build. withSpanAsync keeps it open
+  // across the awaited parallel work, so the per-shard worker spans — which
+  // inherit our context via the TRACEPARENT the runner propagates — nest under
+  // it instead of forming orphan traces. Hard no-op when no SDK is registered.
+  return withSpanAsync(
+    GRAPH_TRACER,
+    'opensip_tools.graph.sharded_build',
+    (span) => buildShardedGraph(input, span),
+    { 'opensip_tools.graph.shard_count': input.shards.length },
+  );
+}
+
+async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<RunShardedResult> {
   const { shards, projectRoot, cliScript, adapter, resolutionMode, useCache, catalogRepo } = input;
 
   // 1. Decide which shards can be reused from cache vs must be rebuilt.
@@ -126,6 +140,11 @@ export async function runShardedGraph(input: RunShardedInput): Promise<RunSharde
     for (const signal of ruleSignals) signals.push(signal);
   }
 
+  span.setAttributes({
+    'opensip_tools.graph.shards_built': plan.toBuild.length,
+    'opensip_tools.graph.shards_cached': plan.cached.length,
+    'opensip_tools.graph.shards_failed': built.failures.length,
+  });
   return {
     catalog,
     indexes,

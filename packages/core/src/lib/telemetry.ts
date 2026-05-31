@@ -23,7 +23,15 @@
  * depend on, and it is asserted in `__tests__/telemetry.test.ts`.
  */
 
-import { trace, SpanStatusCode, type Span, type Attributes, type Tracer } from '@opentelemetry/api';
+import {
+  context,
+  propagation,
+  trace,
+  SpanStatusCode,
+  type Span,
+  type Attributes,
+  type Tracer,
+} from '@opentelemetry/api';
 
 /**
  * Resolve a `Tracer` for a given instrumentation scope name (e.g.
@@ -74,4 +82,59 @@ export function withSpan<T>(
       span.end();
     }
   });
+}
+
+/**
+ * Async sibling of {@link withSpan}: the span stays open across awaited work and
+ * ends only when the returned promise settles.
+ *
+ * {@link withSpan} is synchronous — its `finally` runs the instant the callback
+ * returns, so wrapping awaited work with it would end the span before the work
+ * completes and miss async rejections. Use this for any `fn` that returns a
+ * promise. The span stays active for the duration of the awaited work (under the
+ * SDK's AsyncLocalStorage context manager), so descendants — including spans
+ * emitted by spawned subprocesses that inherit {@link currentTraceparent} — nest
+ * under it. Same no-op-until-SDK contract: a hard no-op when no SDK is registered.
+ *
+ * @param tracerName instrumentation scope (passed to {@link getTracer})
+ * @param spanName   the span name
+ * @param fn         the async work to run inside the span
+ * @param attrs      optional attributes set on the span before `fn` runs
+ */
+export async function withSpanAsync<T>(
+  tracerName: string,
+  spanName: string,
+  fn: (span: Span) => Promise<T>,
+  attrs?: Attributes,
+): Promise<T> {
+  return getTracer(tracerName).startActiveSpan(spanName, async (span) => {
+    if (attrs) span.setAttributes(attrs);
+    try {
+      return await fn(span);
+    } catch (error) {
+      span.recordException(error instanceof Error ? error : String(error));
+      span.setStatus({ code: SpanStatusCode.ERROR });
+      throw error;
+    } finally {
+      span.end();
+    }
+  });
+}
+
+/**
+ * Serialize the currently-active span context to a W3C `traceparent` string, for
+ * propagation into a spawned subprocess (passed as the `TRACEPARENT` env var,
+ * which {@link initTelemetry} extracts at the child's boundary so its spans nest
+ * under ours).
+ *
+ * Returns `undefined` when there is no active recording span — which includes
+ * every standalone run, since the no-op tracer produces an invalid (all-zero)
+ * span context that the W3C propagator declines to emit. Uses the globally
+ * registered propagator (installed by the SDK at the application boundary), so
+ * the kernel stays a pure `@opentelemetry/api` consumer with no SDK dependency.
+ */
+export function currentTraceparent(): string | undefined {
+  const carrier: Record<string, string> = {};
+  propagation.inject(context.active(), carrier);
+  return carrier.traceparent;
 }

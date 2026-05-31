@@ -18,7 +18,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { cpus, tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { logger } from '@opensip-tools/core';
+import { currentTraceparent, logger } from '@opensip-tools/core';
 
 import { computeFilesFingerprint } from '../../cache/invalidate.js';
 
@@ -157,13 +157,20 @@ function spawnShardWorker(
     writeFileSync(specPath, JSON.stringify(spec), 'utf8');
 
     const cleanup = (): void => rmSync(specDir, { recursive: true, force: true });
+    // Propagate the active trace context (the parent's sharded-build span) to
+    // the worker as TRACEPARENT, so the worker's per-stage spans nest under our
+    // build trace instead of forming orphan traces. `currentTraceparent()` is
+    // undefined for standalone runs (no SDK) — then we pass the env through
+    // untouched and the worker emits no spans, exactly as before.
+    const traceparent = currentTraceparent();
+    const env = traceparent ? { ...process.env, TRACEPARENT: traceparent } : process.env;
     // Inherit the PARENT's cwd (the opensip-tools project dir) so the
     // child's CLI bootstrap resolves the project + adapter registry. The
     // shard's own files are built from `shard.rootDir` in the spec, not
     // from cwd — so the shard need not be a project itself.
     const child = spawn(process.execPath, [cliScript, 'graph-shard-worker', specPath], {
       stdio: ['ignore', 'pipe', 'pipe'],
-      env: process.env,
+      env,
     });
     let stdout = '';
     let stderr = '';

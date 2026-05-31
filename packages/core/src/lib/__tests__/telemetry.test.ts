@@ -1,7 +1,7 @@
 import { trace } from '@opentelemetry/api';
 import { describe, it, expect, vi } from 'vitest';
 
-import { getTracer, withSpan } from '../../lib/telemetry.js';
+import { currentTraceparent, getTracer, withSpan, withSpanAsync } from '../../lib/telemetry.js';
 
 /**
  * Kernel-level telemetry tests assert the **no-op-until-SDK contract** — the
@@ -99,5 +99,73 @@ describe('telemetry primitive (no-op-until-SDK contract)', () => {
     } finally {
       spy.mockRestore();
     }
+  });
+});
+
+describe('withSpanAsync (async-aware span)', () => {
+  it('awaits fn and returns its resolved value with no SDK registered', async () => {
+    const sentinel = { value: 7 };
+    const result = await withSpanAsync('test-scope', 'unit', async () => {
+      await Promise.resolve();
+      return sentinel;
+    });
+    expect(result).toBe(sentinel);
+  });
+
+  it('ends the span only after the awaited work settles (not when the callback returns)', async () => {
+    const events: string[] = [];
+    const span = {
+      setAttributes: vi.fn(),
+      setStatus: vi.fn(),
+      recordException: vi.fn(),
+      end: vi.fn(() => events.push('end')),
+      isRecording: () => false,
+    };
+    const spy = vi.spyOn(trace, 'getTracer').mockReturnValue({
+      startActiveSpan: ((_name: string, fn: (s: unknown) => unknown) => fn(span)) as never,
+    } as never);
+    try {
+      await withSpanAsync('test-scope', 'unit', async () => {
+        await Promise.resolve();
+        events.push('work-done');
+      });
+      // The span must end AFTER the awaited work, proving it spans the await.
+      expect(events).toEqual(['work-done', 'end']);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('records an async rejection, sets ERROR status, ends the span, and rejects', async () => {
+    const recordException = vi.fn();
+    const setStatus = vi.fn();
+    const end = vi.fn();
+    const span = { setAttributes: vi.fn(), setStatus, recordException, end, isRecording: () => false };
+    const spy = vi.spyOn(trace, 'getTracer').mockReturnValue({
+      startActiveSpan: ((_name: string, fn: (s: unknown) => unknown) => fn(span)) as never,
+    } as never);
+    const boom = new Error('async boom');
+    try {
+      await expect(
+        withSpanAsync('test-scope', 'unit', async () => {
+          await Promise.resolve();
+          throw boom;
+        }),
+      ).rejects.toBe(boom);
+      expect(recordException).toHaveBeenCalledWith(boom);
+      expect(setStatus).toHaveBeenCalledWith({ code: 2 }); // SpanStatusCode.ERROR
+      expect(end).toHaveBeenCalledTimes(1);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
+describe('currentTraceparent (subprocess context propagation)', () => {
+  it('returns undefined when no SDK/propagator is registered (standalone runs)', () => {
+    // No provider/propagator ⇒ the no-op tracer yields an invalid span context,
+    // which the W3C propagator declines to serialize. Standalone runs spawning
+    // a child thus pass no TRACEPARENT, and the child emits no spans.
+    expect(currentTraceparent()).toBeUndefined();
   });
 });

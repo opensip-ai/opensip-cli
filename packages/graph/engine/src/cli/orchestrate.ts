@@ -30,6 +30,7 @@ import { CatalogRepo } from '../persistence/catalog-repo.js';
 import { buildIndexes } from '../pipeline/indexes.js';
 import { currentRules } from '../rules/registry.js';
 
+import { GRAPH_TRACER } from './graph-tracer.js';
 import { obtainCatalog } from './orchestrate/cache-orchestrator.js';
 import { createPressureMonitor, type PressureMonitor } from './pressure-monitor.js';
 
@@ -118,9 +119,6 @@ export interface RunGraphResult {
   readonly resolutionStats: ResolutionStats | null;
   readonly cacheHit: boolean;
 }
-
-/** Instrumentation scope for every graph stage span. */
-const GRAPH_TRACER = 'opensip-tools-graph';
 
 function runStage<T>(
   stage: GraphStage,

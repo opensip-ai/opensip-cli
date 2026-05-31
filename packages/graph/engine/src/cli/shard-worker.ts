@@ -23,14 +23,12 @@ import { logger } from '@opensip-tools/core';
 import { computeFilesFingerprint } from '../cache/invalidate.js';
 import { pickAdapter } from '../lang-adapter/registry.js';
 
-import { buildAndResolveCatalog, type RunStage } from './orchestrate/catalog-builder.js';
+import { spanRunStage } from './graph-tracer.js';
+import { buildAndResolveCatalog } from './orchestrate/catalog-builder.js';
 
 import type { ShardBuildResult, ShardWorkerSpec } from './orchestrate/shard-model.js';
 import type { DiscoverOutput } from '../lang-adapter/types.js';
 import type { ToolCliContext } from '@opensip-tools/core';
-
-/** A progress-less runStage: the worker has no live view, so stages just run. */
-const passthroughRunStage: RunStage = (_stage, _onProgress, _monitor, fn) => fn();
 
 /**
  * Build one shard and emit its `ShardBuildResult` as JSON on stdout.
@@ -78,8 +76,12 @@ function buildShard(spec: ShardWorkerSpec): ShardBuildResult {
     compilerOptions: discovered.compilerOptions,
   };
 
+  // Emit per-stage spans tagged with this shard's id. They nest under the
+  // parent build's sharded span via the TRACEPARENT the runner propagates into
+  // this worker's env (extracted at the CLI boundary by initTelemetry). No live
+  // view here — the worker is headless — so no progress/monitor plumbing.
   const built = buildAndResolveCatalog(
-    passthroughRunStage,
+    spanRunStage({ 'opensip_tools.graph.shard_id': shard.id }),
     adapter,
     discovery,
     resolutionMode,
