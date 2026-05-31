@@ -162,7 +162,12 @@ export async function shutdownTelemetry(): Promise<void> {
   try {
     await raceWithTimeout(provider.shutdown(), SHUTDOWN_TIMEOUT_MS);
   } catch (error) {
-    logger.warn('telemetry.shutdown.failed', {
+    // Structured event (evt + module), matching the codebase logging
+    // convention — so telemetry's own failure signal is queryable by `evt`
+    // like every other event, not buried as a bare `msg`.
+    logger.warn('telemetry shutdown failed', {
+      evt: 'telemetry.shutdown.failed',
+      module: 'cli:telemetry',
       err: error instanceof Error ? error.message : String(error),
     });
   }
