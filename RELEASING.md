@@ -129,9 +129,12 @@ Order:
     `graph-python`, `graph-rust`, `graph-go`, `graph-java`. Each
     depends on the engine (`@opensip-tools/graph`) plus its parser
     (typescript / tree-sitter-*). Independent of each other; published
-    in any order within the group. The non-TS adapters are opt-in
-    plugins — the CLI does not depend on them, so users who want them
-    install explicitly.
+    in any order within the group. All five are first-party CLI
+    dependencies — the CLI bundles every graph adapter it loads by
+    default (see step 14), so installing `@opensip-tools/cli` pulls
+    them all in. (Only *third-party* `@opensip-tools/graph-*` adapters
+    are opt-in: they're discovered by name pattern and installed
+    explicitly.)
 13. **Check packs** (any order within this group):
     `checks-typescript`, `checks-universal`, `checks-python`,
     `checks-go`, `checks-java`, `checks-cpp`, `checks-rust` — all
