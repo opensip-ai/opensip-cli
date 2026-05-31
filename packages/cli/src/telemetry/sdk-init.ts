@@ -31,13 +31,17 @@
  * consumer's trace. When `TRACEPARENT` is unset the spans form their own trace,
  * which is still valid.
  *
- * > Hardening note (deferred to manual enrichment): exporter failure must never
- * > crash or hang the CLI. A dead collector should degrade to "no telemetry,"
- * > not a broken run. `shutdownTelemetry` already swallows shutdown errors; the
- * > exporter's own retry/timeout tuning is flagged for the plan-improvements pass.
+ * ## Fail-safe shutdown
+ *
+ * Telemetry must never crash OR hang the primary CLI run: a dead/slow collector
+ * has to degrade to "spans dropped," not a multi-second stall on exit (amplified
+ * on the sharded path, where every shard-worker subprocess also flushes). Two
+ * bounds enforce this: each export attempt is capped at {@link SHUTDOWN_TIMEOUT_MS}
+ * (`OTLPTraceExporter({ timeoutMillis })`), and {@link shutdownTelemetry} races the
+ * final flush against the same deadline and swallows any failure.
  */
 
-import { logger, readPackageVersion } from '@opensip-tools/core';
+import { logger, readPackageVersion, TimeoutError } from '@opensip-tools/core';
 import {
   ROOT_CONTEXT,
   context as otelContext,
@@ -51,6 +55,14 @@ import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { resourceFromAttributes, detectResources, envDetector } from '@opentelemetry/resources';
 import { BatchSpanProcessor, NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
+
+/**
+ * Hard ceiling (ms) on the final span flush AND on each individual export
+ * attempt. A dead/slow collector degrades to "spans dropped," never a hang on
+ * CLI or shard-worker exit. Kept short — a few seconds of lost batched spans is
+ * a fair trade for never stalling the primary run.
+ */
+const SHUTDOWN_TIMEOUT_MS = 2000;
 
 /** Idempotency guard — provider registration is process-wide and one-shot. */
 let started = false;
@@ -92,7 +104,11 @@ export function initTelemetry(cliEntryUrl: string): void {
 
   provider = new NodeTracerProvider({
     resource,
-    spanProcessors: [new BatchSpanProcessor(new OTLPTraceExporter())],
+    // Bound each export attempt so a slow/dead collector fails fast instead of
+    // letting the batch processor block the final flush — see SHUTDOWN_TIMEOUT_MS.
+    spanProcessors: [
+      new BatchSpanProcessor(new OTLPTraceExporter({ timeoutMillis: SHUTDOWN_TIMEOUT_MS })),
+    ],
   });
 
   // register() installs the GLOBAL provider + propagator + context manager,
@@ -144,11 +160,35 @@ export function runWithTelemetryContext<T>(fn: () => T): T {
 export async function shutdownTelemetry(): Promise<void> {
   if (!started || !provider) return;
   try {
-    await provider.shutdown();
+    await raceWithTimeout(provider.shutdown(), SHUTDOWN_TIMEOUT_MS);
   } catch (error) {
     logger.warn('telemetry.shutdown.failed', {
       err: error instanceof Error ? error.message : String(error),
     });
+  }
+}
+
+/**
+ * Resolve when `work` settles, or reject with {@link TimeoutError} after `ms` —
+ * whichever comes first. The deadline timer is `unref`'d so it never keeps the
+ * (short-lived CLI) event loop alive when the work wins, and cleared on the
+ * happy path. Exported for tests.
+ */
+export async function raceWithTimeout(work: Promise<void>, ms: number): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      work,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new TimeoutError(`telemetry shutdown exceeded ${String(ms)}ms`)),
+          ms,
+        );
+        timer.unref();
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 

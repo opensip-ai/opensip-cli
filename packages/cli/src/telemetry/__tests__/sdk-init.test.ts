@@ -1,9 +1,11 @@
+import { TimeoutError } from '@opensip-tools/core';
 import { trace } from '@opentelemetry/api';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   initTelemetry,
   parentTelemetryContext,
+  raceWithTimeout,
   resetTelemetryForTests,
   runWithTelemetryContext,
   shutdownTelemetry,
@@ -121,5 +123,19 @@ describe('telemetry SDK init (opt-in gate)', () => {
     process.env[ENDPOINT] = 'http://localhost:4318/v1/traces';
     initTelemetry(CLI_ENTRY);
     await expect(shutdownTelemetry()).resolves.toBeUndefined();
+  });
+});
+
+describe('raceWithTimeout (fail-safe shutdown bound)', () => {
+  it('resolves when the work settles before the deadline', async () => {
+    await expect(raceWithTimeout(Promise.resolve(), 1000)).resolves.toBeUndefined();
+  });
+
+  it('rejects with TimeoutError when the work outlives the deadline (never hangs)', async () => {
+    // A flush that never settles — the deadline must win so the CLI exits.
+    const neverSettles = new Promise<void>(() => {
+      /* intentionally pending */
+    });
+    await expect(raceWithTimeout(neverSettles, 10)).rejects.toBeInstanceOf(TimeoutError);
   });
 });
