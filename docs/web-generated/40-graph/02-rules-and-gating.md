@@ -24,10 +24,10 @@ related-docs:
 ---
 # Rules and gating (graph)
 
-[`01-stages-and-catalog.md`](/docs/opensip-tools/40-graph/01-stages-and-catalog/) explained how `graph` builds its picture of the codebase. This doc covers what happens at stage 4 — the five rules that turn that picture into actionable findings — and the gate workflow that lets you keep new regressions out of `main` without forcing a clean-up of everything that exists today.
+[`01-stages-and-catalog.md`](/docs/opensip-tools/40-graph/01-stages-and-catalog/) explained how `graph` builds its picture of the codebase. This doc covers what happens at stage 4 — the six rules that turn that picture into actionable findings — and the gate workflow that lets you keep new regressions out of `main` without forcing a clean-up of everything that exists today.
 
 > **What you'll understand after this:**
-> - The five rules graph ships with, what each detects, and the false-positive shape of each.
+> - The six rules graph ships with, what each detects, and the false-positive shape of each.
 > - The gate save/compare model and how it differs from `fit`'s architecture gate.
 > - How graph's SARIF output integrates with the same CI infrastructure `fit` uses.
 
@@ -51,11 +51,11 @@ interface Rule {
 
 A rule receives frozen inputs (the catalog from stages 1+2, the indexes from stage 3) and returns a list of typed `Signal`s. It cannot import the parser, cannot import another rule, cannot read files. That isolation makes rules unit-testable in ten lines and lets us replace any one of them without touching the rest.
 
-The five rules below are registered in [`rules/registry.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.1/packages/graph/engine/src/rules/registry.ts) and run on every `graph` invocation unless the caller filters with `--check <slug>` (planned, not yet shipped) or `--no-check <slug>` (also planned).
+The six rules below are registered in [`rules/registry.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.1/packages/graph/engine/src/rules/registry.ts) and run on every `graph` invocation unless the caller filters with `--check <slug>` (planned, not yet shipped) or `--no-check <slug>` (also planned).
 
 ---
 
-## The five rules
+## The six rules
 
 ### `graph:orphan-subtree`
 
@@ -89,6 +89,12 @@ This is the rule for catching "production helper that's only exercised by tests"
 
 This catches the common case — a function whose body is a precondition wall — but it is not full control-flow analysis. Functions that throw under most, but not all, branches may be missed.
 
+### `graph:high-blast-function`
+
+[`rules/high-blast-function.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.1/packages/graph/engine/src/rules/high-blast-function.ts) — surface the functions with the widest change-impact ("blast radius") as an **informational structural insight, not a defect**. The blast score (`direct + 0.5 × transitive`, computed in Stage 3 via bounded reverse BFS and stored in `indexes.blastRadius`) ranks every function; the rule emits the top 5% (above an absolute floor) at `'low'` severity (SARIF `note`).
+
+Unlike the other five, this rule is **not a gate**. High blast is often intentional — shared kernel primitives (`currentScope`, `defineCheck`) have wide reach by design, and refactoring them just promotes the next function into the top percentile. Treat its output as a map of where refactor risk concentrates, not a list of things to fix.
+
 ### Entry-point inference
 
 [`rules/_entry-points.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.1/packages/graph/engine/src/rules/_entry-points.ts) is consumed by `orphan-subtree` and `test-only-reachable`. It's not itself a rule (note the leading underscore). The current implementation classifies each occurrence into one of three reasons:
@@ -97,7 +103,7 @@ This catches the common case — a function whose body is a precondition wall �
 type EntryPointReason = 'module-init' | 'name-match' | 'no-callers-exported';
 ```
 
-The five rules above don't know how the entry point list was built — they consume the resulting `EntryPoint[]`. That decoupling means refining the inference (e.g. teaching it about `bin` fields or framework route registrations) doesn't touch any rule.
+The rules above don't know how the entry point list was built — the ones that use it (chiefly `orphan-subtree`) just consume the resulting `EntryPoint[]`. That decoupling means refining the inference (e.g. teaching it about `bin` fields or framework route registrations) doesn't touch any rule.
 
 ---
 
@@ -166,13 +172,13 @@ This intentionally **allows fingerprint removal**. Cleaning up findings doesn't 
 
 `graph --json` produces the same `CliOutput` envelope `fit` does, so any consumer of the JSON contract works unchanged. For external integration, `--report-to <url>` posts SARIF 2.1.0 to a configured endpoint (OpenSIP Cloud or any SARIF-compatible receiver).
 
-The SARIF mapping in [`render/sarif.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.1/packages/graph/engine/src/render/sarif.ts):
+The SARIF mapping is a graph-native emitter, [`renderSarifOpenSip` in `render/sarif-opensip.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.1/packages/graph/engine/src/render/sarif-opensip.ts) (re-exported as `renderSarif` from [`render/sarif.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.1/packages/graph/engine/src/render/sarif.ts); since DEC-498 it no longer wraps fitness's `buildSarifLog`):
 
 | Graph concept | SARIF field |
 |---|---|
-| Run (per-rule) | `runs[i].tool.driver.name = <rule slug>` (one SARIF run per check/rule; see `buildSarifLog` in [`packages/fitness/engine/src/sarif.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.1/packages/fitness/engine/src/sarif.ts), which assigns `driver.name = ch.checkSlug`) |
-| Rule | `runs[i].tool.driver.rules[].id = <rule slug>` |
-| Signal | `runs[i].results[]` |
+| Run | A single run per invocation: `runs[0].tool.driver.name = 'opensip-tools-graph'` |
+| Rule | `runs[0].tool.driver.rules[].id` — the distinct OpenSIP-convention rule ids (`graph.<rule-family>.<rule-id>`), sorted |
+| Signal | `runs[0].results[]`, each with `ruleId` set to its mapped OpenSIP rule id |
 | Function occurrence | `result.locations[0].physicalLocation.{artifactLocation,region}` |
 | Severity | `result.level` (`error` \| `warning`) |
 

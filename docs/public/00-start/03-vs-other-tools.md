@@ -62,7 +62,7 @@ Many teams use both: Semgrep for the security-rule library, opensip-tools for pr
 Sonarqube is the closest in *scope* — multi-language code quality with rule customization and baseline tracking — but the operating model is different:
 
 - **Sonarqube is a server.** You run an analyzer (sonar-scanner) that posts to a Sonarqube instance, and gates happen in the server. opensip-tools is a CLI that exits with a code. No server, no database (beyond a local SQLite file for sessions).
-- **Rules.** Sonarqube ships thousands of pre-built rules; customizing them requires the (paid) Developer Edition or higher. opensip-tools ships ~158 rules and assumes you'll author project-specific ones in 15-line files.
+- **Rules.** Sonarqube ships thousands of pre-built rules; customizing them requires the (paid) Developer Edition or higher. opensip-tools ships 145+ rules and assumes you'll author project-specific ones in 15-line files.
 - **Architecture rules.** Sonarqube has limited architecture-rule support (some via XPath in Java). opensip-tools is designed *around* architectural rules — that's the central use case.
 
 If you want a managed server with a UI for triage, Sonarqube fits. If you want a CLI that exits with an exit code and lives entirely in your repo, opensip-tools fits.
@@ -84,7 +84,7 @@ A short anti-claims list, since "what we don't do" is often more useful than "wh
 
 - **Not a linter replacement.** ESLint, Ruff, golangci-lint, and clang-tidy still belong in your toolchain.
 - **Not a service.** No daemon. No API server. The optional OpenSIP Cloud dashboard is a separate product that opensip-tools can post to, not require.
-- **Not opinionated about your bar.** The 158 built-in checks are a starting point. The point is *your* rules — the constraints that matter to your codebase.
+- **Not opinionated about your bar.** The 145+ built-in checks are a starting point. The point is *your* rules — the constraints that matter to your codebase.
 - **Not a CI runner.** It runs *under* GitHub Actions / GitLab CI / Buildkite. Produces an exit code and SARIF; doesn't replace your CI orchestrator.
 - **Not an AI tool.** No model calls, no embeddings, no agentic anything. (You can build an AI tool *on top of* the Tool plugin contract.)
 - **Not a security scanner.** Limited security checks (no-eval, no-hardcoded-secrets, sql-injection patterns) ship in `checks-universal`, but Snyk / Dependabot / GitHub Advanced Security are the right call for CVE-scale work.

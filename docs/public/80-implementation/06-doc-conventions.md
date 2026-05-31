@@ -156,7 +156,7 @@ Most docs end with a "What's next" section. A few — especially the reference d
 
 Last verified at v2.0.0 against:
 
-- `packages/` directory listing (27 packages …).
+- `packages/` directory listing (29 packages …).
 - Each package's `package.json` `description` and `name` field, read directly.
 - The dep-cruiser config for layer rules.
 ```

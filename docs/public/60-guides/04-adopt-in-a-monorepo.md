@@ -203,7 +203,7 @@ Each runs only the checks that match that target's scope. Run them as separate C
 
 This guide focused on `fit` because that's where adoption usually starts. Once `fit` is running:
 
-- **`graph`** — adds static call-graph rules (orphan code, duplicated bodies, dead paths). Five rules, no authoring required, runs in ~15s cold / ~2.5s incremental on a large repo. See [graph stages and catalog](../40-graph/01-stages-and-catalog.md).
+- **`graph`** — adds static call-graph rules (orphan code, duplicated bodies, dead paths). Six rules, no authoring required, runs in ~15s cold / ~2.5s incremental on a large repo. See [graph stages and catalog](../40-graph/01-stages-and-catalog.md).
 - **`sim`** — load / chaos / invariant simulation. Opt-in, experimental. Useful if you have a service to simulate against. See [scenarios and recipes](../30-sim/01-scenarios-and-recipes.md).
 
 Both share the same baseline-gate model and the same CLI shape. Add them when the team has bandwidth.

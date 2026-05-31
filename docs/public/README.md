@@ -56,7 +56,7 @@ These docs are written for engineers fluent in TypeScript and Node tooling. Voic
 
 7. [**The fitness loop**](./10-concepts/01-fitness-loop.md) — **The spine.** One check from definition to violation to gate decision. Threads through every later doc.
 8. [**The tool-plugin model**](./10-concepts/02-tool-plugin-model.md) — Kernel + Tool contract + first-party tools + dispatcher. Why the CLI doesn't know what `fit` does.
-9. [**Layered package graph**](./10-concepts/03-modular-monolith.md) — The 27-package monorepo, the layer rules, why dependency-cruiser exists.
+9. [**Layered package graph**](./10-concepts/03-modular-monolith.md) — The 29-package monorepo, the layer rules, why dependency-cruiser exists.
 10. [**Contract surfaces**](./10-concepts/04-contract-surfaces.md) — The system's public edges: CLI argv, Tool interface, plugin manifests, JSON output.
 11. [**Architecture gate**](./10-concepts/05-architecture-gate.md) — Baseline workflow, drift detection, line-shift invariance, CI integration.
 
@@ -78,7 +78,7 @@ These docs are written for engineers fluent in TypeScript and Node tooling. Voic
 *Static call-graph analysis: what `opensip-tools graph` produces and how the dashboard consumes it.*
 
 18. [**Stages and catalog**](./40-graph/01-stages-and-catalog.md) — The six-stage pipeline (discover → inventory → edges → indexes → rules → render) and the catalog's on-disk shape.
-19. [**Rules and gating**](./40-graph/02-rules-and-gating.md) — The five rules, entry-point inference, `--gate-save`/`--gate-compare`, SARIF output.
+19. [**Rules and gating**](./40-graph/02-rules-and-gating.md) — The six rules, entry-point inference, `--gate-save`/`--gate-compare`, SARIF output.
 20. [**Adding a language**](./40-graph/03-adding-a-language.md) — Step-by-step guide for writing a new `GraphLanguageAdapter`.
 
 ### 50 — Extend
@@ -104,7 +104,7 @@ These docs are written for engineers fluent in TypeScript and Node tooling. Voic
 *Lookup-shaped. Not for sequential reading.*
 
 32. [**CLI commands**](./70-reference/01-cli-commands.md) — Every command, its flags, when to use each.
-33. [**Package catalog**](./70-reference/02-package-catalog.md) — All 27 packages with one-line role and key exports. Grouped by layer.
+33. [**Package catalog**](./70-reference/02-package-catalog.md) — All 29 packages with one-line role and key exports. Grouped by layer.
 34. [**Configuration**](./70-reference/03-configuration.md) — `opensip-tools.config.yml` schema, every field, defaults.
 35. [**JSON output schema**](./70-reference/04-json-output-schema.md) — The `CliOutput` shape consumed by CI and dashboards.
 36. [**Checks reference**](./70-reference/05-checks-index.md) — Browsable index of every built-in fit check, grouped by pack and primary tag. Auto-generated from source.

@@ -29,16 +29,20 @@ Pure types, registries, errors, IDs, logger, paths. No tool-specific knowledge.
 |---|---|---|---|
 | `@opensip-tools/core` | `packages/core/` | Kernel — language adapters, plugin loader, errors, logger, IDs, retry, project config, per-invocation execution scope | `Tool`, `ToolRegistry`, `LanguageAdapter`, `LanguageRegistry`, `RunScope`, `runWithScope`, `currentScope`, `Registry`, `Signal`, `createSignal`, `discoverPlugins`, `discoverToolPackages`, `resolveProjectPaths`, `resolveUserPaths`, `logger`, `ToolError`, `ValidationError` |
 
-## Layer 2 — datastore and shared contract types
+## Layer 2 — datastore, contracts, session-store, and reporting
 
-`@opensip-tools/datastore` is the SQLite + Drizzle persistence kernel; it sits between `core` and `contracts` and depends only on `core`. Tools own their domain schemas (sessions in contracts; baseline/catalog in graph; baseline in fitness). Adding a new tool means adding a new schema module — datastore is paradigm-agnostic infrastructure.
+`@opensip-tools/datastore` is the SQLite + Drizzle persistence kernel; it sits between `core` and the rest of this layer and depends only on `core`. Tools and `session-store` own their domain schemas (sessions in session-store; baseline/catalog in graph; baseline in fitness). Adding a new tool means adding a new schema module — datastore is paradigm-agnostic infrastructure.
 
-`@opensip-tools/contracts` defines the contract layer between Tools and the runner. Output shapes, exit codes, persistence helpers, dashboard generator. Imports `core` and `datastore` only.
+`@opensip-tools/contracts` defines the contract layer between Tools and the runner — output shapes, exit codes, the cross-tool `StoredSession` type, and the `GraphCatalog` surface. A types-and-constants package (no runtime persistence or rendering). Imports `core` and `datastore` only.
+
+`@opensip-tools/session-store` owns session persistence (the `SessionRepo` runtime and the sessions schema). `@opensip-tools/reporting` builds SARIF and reports findings to the cloud. Both are Layer 2 siblings consumed by the tools above.
 
 | Package | Path | Role | Key exports |
 |---|---|---|---|
 | `@opensip-tools/datastore` | `packages/datastore/` | SQLite + Drizzle persistence kernel — `DataStore` interface, factory, in-memory + on-disk backends, workspace migration store under `migrations/` | `DataStore`, `DataStoreFactory`, `DataStoreOpenOptions`, `DataStoreMigrationError` |
-| `@opensip-tools/contracts` | `packages/contracts/` | Shared contract types — `CliOutput`/`CommandResult` shapes, exit codes, session persistence, dashboard generator | `CliOutput`, `CheckOutput`, `FindingOutput`, `CommandResult`, `EXIT_CODES`, `getErrorSuggestion`, `SessionRepo`, `StoredSession`, `generateDashboardHtml`, `GraphCatalog` |
+| `@opensip-tools/contracts` | `packages/contracts/` | Shared contract types — `CliOutput`/`CommandResult` shapes, exit codes, the cross-tool `StoredSession` type, `GraphCatalog` surface | `CliOutput`, `CheckOutput`, `FindingOutput`, `CommandResult`, `EXIT_CODES`, `getErrorSuggestion`, `StoredSession`, `GraphCatalog` |
+| `@opensip-tools/session-store` | `packages/session-store/` | Session persistence — `SessionRepo` runtime, `sessions`/`session_checks`/`session_findings` schema, session-id helpers. Depends on `core`, `datastore`, `contracts` | `SessionRepo`, `SessionListOptions`, `sessions`, `generateSessionId`, `sanitizeForFilename` |
+| `@opensip-tools/reporting` | `packages/reporting/` | SARIF construction + cloud reporting. Depends on `core`, `contracts` | `buildSarifLog`, `chunkSarifRuns`, `reportToCloud`, `ReportResult`, `SarifResult`, `SarifLocation` |
 
 ## Layer 3 — tools, shared libraries, and language adapters
 
@@ -121,9 +125,9 @@ Imports every layer below. The published binary.
 
 Last verified at v2.0.0 against:
 
-- `packages/` directory listing — **27 publishable packages** total:
+- `packages/` directory listing — **29 publishable packages** total:
   - Layer 1 (kernel): 1 — `core`
-  - Layer 2 (datastore + contracts): 2 — `datastore`, `contracts`
+  - Layer 2 (datastore + contracts + session-store + reporting): 4 — `datastore`, `contracts`, `session-store`, `reporting`
   - Layer 3 Tools: 3 — `fitness`, `simulation`, `graph`
   - Layer 3 Shared libraries: 2 — `dashboard`, `cli-ui`
   - Layer 3 Fitness language adapters: 6 — `lang-typescript`, `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp`

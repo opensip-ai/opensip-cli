@@ -4,7 +4,7 @@ last_verified: 2026-05-26
 release: v2.0.x
 title: "Layered package graph"
 audience: [contributors]
-purpose: "The 27-package monorepo, the five-layer dependency rule, why dependency-cruiser exists, and the trade-offs."
+purpose: "The 29-package monorepo, the five-layer dependency rule, why dependency-cruiser exists, and the trade-offs."
 source-files:
   - .dependency-cruiser.cjs
   - pnpm-workspace.yaml
@@ -20,12 +20,12 @@ related-docs:
 ---
 # Layered package graph
 
-Twenty-seven packages. Five layers. One enforced rule: dependencies flow up only.
+Twenty-nine packages. Five layers. One enforced rule: dependencies flow up only.
 
 This document is the conceptual map. For the lookup-shaped catalog of every package's role and exports, jump to [`70-reference/02-package-catalog.md`](../70-reference/02-package-catalog.md). For the literal dep-cruiser rules, see [`80-implementation/05-layer-policy.md`](../80-implementation/05-layer-policy.md).
 
 > **What you'll understand after this:**
-> - Why opensip-tools ships as 27 packages instead of one.
+> - Why opensip-tools ships as 29 packages instead of one.
 > - The five layers, in order, and what each one is for.
 > - How the layer rule is enforced (and what happens if you break it).
 > - The documented exceptions and why they exist.
@@ -53,7 +53,7 @@ This document is the conceptual map. For the lookup-shaped catalog of every pack
 │           └──────────────────────────────────────────────────┘    │
 │                                  ▲                                 │
 │  Layer 2  ┌──────────────────────┴───────────────────────────┐    │
-│           │  @opensip-tools/datastore    @opensip-tools/contracts │
+│           │  datastore   contracts   session-store   reporting │   │
 │           └──────────────────────────────────────────────────┘    │
 │                                  ▲                                 │
 │  Layer 1  ┌──────────────────────┴───────────────────────────┐    │
@@ -66,10 +66,12 @@ This document is the conceptual map. For the lookup-shaped catalog of every pack
 
 **Layer 1 — `@opensip-tools/core`.** The kernel. Ships types, errors, IDs, the logger, the path resolver, the language-adapter contract, the plugin discovery mechanics (including the generic marker-discovery walker), and the Tool registry. No knowledge of fitness, simulation, or any other tool. No dependency on Commander, Ink, or any UI library.
 
-**Layer 2 — `@opensip-tools/datastore` and `@opensip-tools/contracts`.** Two packages, both depending on `core` only.
+**Layer 2 — `@opensip-tools/datastore`, `@opensip-tools/contracts`, `@opensip-tools/session-store`, and `@opensip-tools/reporting`.** Four packages above the kernel, each depending only on `core` and (where noted) on lower siblings within this layer — never on a tool.
 
-- **`@opensip-tools/datastore`** is the persistence kernel — the `DataStore` interface, the SQLite + Drizzle implementation, the in-memory backend for tests, the workspace migration store under `migrations/`. Paradigm-agnostic infrastructure: tools own their domain schemas (sessions in contracts; baseline/catalog in graph; baseline in fitness) and register them with the datastore at open time.
-- **`@opensip-tools/contracts`** is the shared contract layer between Tools and the runner: the `CliOutput`/`CheckOutput`/`FindingOutput` shape every tool produces, the `CommandResult` discriminated union the renderer dispatches on, the exit-code constants, the `SessionRepo`/`StoredSession` persistence helpers, and the `GraphCatalog` type surface that the graph tool produces and the dashboard consumes. Imports `core` and `datastore`. Does not import any tool.
+- **`@opensip-tools/datastore`** is the persistence kernel — the `DataStore` interface, the SQLite + Drizzle implementation, the in-memory backend for tests, the workspace migration store under `migrations/`. Paradigm-agnostic infrastructure: tools and session-store own their domain schemas (sessions in session-store; baseline/catalog in graph; baseline in fitness) and register them with the datastore at open time. Depends on `core` only.
+- **`@opensip-tools/contracts`** is the shared contract layer between Tools and the runner: the `CliOutput`/`CheckOutput`/`FindingOutput` shape every tool produces, the `CommandResult` discriminated union the renderer dispatches on, the exit-code constants, the cross-tool `StoredSession` type, and the `GraphCatalog` type surface that the graph tool produces and the dashboard consumes. A types-and-constants surface — the `SessionRepo` runtime and sessions schema live in `session-store`, not here. Imports `core` and `datastore`. Does not import any tool.
+- **`@opensip-tools/session-store`** owns session persistence: the `SessionRepo` runtime, the `sessions`/`session_checks`/`session_findings` schema, and the `generateSessionId`/`sanitizeForFilename` helpers. Depends on `core`, `datastore`, and `contracts` (for the `StoredSession` shape it round-trips).
+- **`@opensip-tools/reporting`** builds SARIF and reports findings to the cloud (`reportToCloud`). Consumed by the fitness and graph baseline-export paths. Depends on `core` and `contracts` only.
 
 **Layer 3 — Tools, shared libraries, and language adapters.** Peer packages, all depending on `contracts`, `datastore`, and `core`. Three groups at this layer:
 
@@ -81,7 +83,7 @@ This document is the conceptual map. For the lookup-shaped catalog of every pack
 
 **Layer 5 — `@opensip-tools/cli`.** The composition root. Imports every first-party tool and language adapter, registers them, builds the Commander tree, runs the dispatcher. The only package that knows everything below it.
 
-That's it. Five layers, twenty-seven packages.
+That's it. Five layers, twenty-nine packages.
 
 ---
 
@@ -156,7 +158,7 @@ The trade-off: a *true* type-only cycle (which is a structural smell — usually
 
 ---
 
-## Why 27 packages and not 1
+## Why 29 packages and not 1
 
 A single mega-package was considered. It would compile faster, ship faster, and have a simpler `package.json`. We chose against it for three load-bearing reasons:
 
@@ -168,7 +170,7 @@ A check pack like `@opensip-tools/checks-python` has to be installable on its ow
 opensip-tools plugin add @opensip-tools/checks-python
 ```
 
-…and not pull in the JavaScript universe. With a single mega-package, every install pulls every check. With 27 packages, an install pulls only what's needed. (Today the bundled distribution still installs everything; tomorrow's tree-shaken or selectively-installed distribution doesn't have to.)
+…and not pull in the JavaScript universe. With a single mega-package, every install pulls every check. With 29 packages, an install pulls only what's needed. (Today the bundled distribution still installs everything; tomorrow's tree-shaken or selectively-installed distribution doesn't have to.)
 
 ### 2. The Tool contract's promise
 
@@ -176,15 +178,15 @@ The Tool contract says "any npm package can be a Tool." That promise only holds 
 
 ### 3. The layer rule needs to be visible
 
-A flat package can have any internal structure. With 27 packages, the layer is the directory structure: looking at `packages/` tells you the architecture in five seconds. If a contributor accidentally adds an upward edge, the build fails before the PR is even reviewed. The layer rule isn't aspiration — it's a wall.
+A flat package can have any internal structure. With 29 packages, the layer is the directory structure: looking at `packages/` tells you the architecture in five seconds. If a contributor accidentally adds an upward edge, the build fails before the PR is even reviewed. The layer rule isn't aspiration — it's a wall.
 
 ---
 
 ## What this shape costs
 
-Trade-offs are real. The 27-package layout is more expensive in three places:
+Trade-offs are real. The 29-package layout is more expensive in three places:
 
-- **More `package.json` files to maintain.** Version bumps span 19 publishable files (plus the private workspace-root `package.json` for tooling versions). We use `pnpm` workspace protocol (`workspace:*`) so internal deps are auto-linked, and a release script bumps all 19 in lockstep.
+- **More `package.json` files to maintain.** Version bumps span 29 publishable files (plus the private workspace-root `package.json` for tooling versions). We use `pnpm` workspace protocol (`workspace:*`) so internal deps are auto-linked, and a release script bumps all 29 in lockstep.
 - **More `tsconfig.json` files.** Each package has its own. Project references handle the build graph. The cost is configuration footprint, not build speed.
 - **A discovery cost when reading the codebase.** "Where does `Signal` live?" is one search now: `packages/core/src/types/signal.ts`. But "where does `defineCheck` live?" requires knowing the layer (`fitness`) and the framework subdir (`fitness/engine/src/framework/`). The package catalog ([`70-reference/02-package-catalog.md`](../70-reference/02-package-catalog.md)) is the antidote.
 

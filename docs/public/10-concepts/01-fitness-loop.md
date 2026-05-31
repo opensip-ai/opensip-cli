@@ -269,7 +269,7 @@ These are policy choices, not technical limits. They keep the loop comprehensibl
 The fitness loop is the spine. The next three docs in this section sharpen it:
 
 - **[`02-tool-plugin-model.md`](./02-tool-plugin-model.md)** — how the CLI doesn't know what `fit` does. Stage 1 in depth.
-- **[`03-modular-monolith.md`](./03-modular-monolith.md)** — the 27-package layer cake that makes Stages 1, 3, and 6 isolatable.
+- **[`03-modular-monolith.md`](./03-modular-monolith.md)** — the 29-package layer cake that makes Stages 1, 3, and 6 isolatable.
 - **[`04-contract-surfaces.md`](./04-contract-surfaces.md)** — the public edges: argv, Tool interface, plugin manifest, CliOutput.
 
 When you want stage-by-stage detail, jump to [`../20-fit/`](../20-fit/) — each doc there expands one of these stages with full code paths.

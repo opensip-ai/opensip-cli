@@ -56,7 +56,7 @@ These docs are written for engineers fluent in TypeScript and Node tooling. Voic
 
 7. [**The fitness loop**](/docs/opensip-tools/10-concepts/01-fitness-loop/) — **The spine.** One check from definition to violation to gate decision. Threads through every later doc.
 8. [**The tool-plugin model**](/docs/opensip-tools/10-concepts/02-tool-plugin-model/) — Kernel + Tool contract + first-party tools + dispatcher. Why the CLI doesn't know what `fit` does.
-9. [**Layered package graph**](/docs/opensip-tools/10-concepts/03-modular-monolith/) — The 27-package monorepo, the layer rules, why dependency-cruiser exists.
+9. [**Layered package graph**](/docs/opensip-tools/10-concepts/03-modular-monolith/) — The 29-package monorepo, the layer rules, why dependency-cruiser exists.
 10. [**Contract surfaces**](/docs/opensip-tools/10-concepts/04-contract-surfaces/) — The system's public edges: CLI argv, Tool interface, plugin manifests, JSON output.
 11. [**Architecture gate**](/docs/opensip-tools/10-concepts/05-architecture-gate/) — Baseline workflow, drift detection, line-shift invariance, CI integration.
 
@@ -78,7 +78,7 @@ These docs are written for engineers fluent in TypeScript and Node tooling. Voic
 *Static call-graph analysis: what `opensip-tools graph` produces and how the dashboard consumes it.*
 
 18. [**Stages and catalog**](/docs/opensip-tools/40-graph/01-stages-and-catalog/) — The six-stage pipeline (discover → inventory → edges → indexes → rules → render) and the catalog's on-disk shape.
-19. [**Rules and gating**](/docs/opensip-tools/40-graph/02-rules-and-gating/) — The five rules, entry-point inference, `--gate-save`/`--gate-compare`, SARIF output.
+19. [**Rules and gating**](/docs/opensip-tools/40-graph/02-rules-and-gating/) — The six rules, entry-point inference, `--gate-save`/`--gate-compare`, SARIF output.
 20. [**Adding a language**](/docs/opensip-tools/40-graph/03-adding-a-language/) — Step-by-step guide for writing a new `GraphLanguageAdapter`.
 
 ### 50 — Extend
@@ -104,7 +104,7 @@ These docs are written for engineers fluent in TypeScript and Node tooling. Voic
 *Lookup-shaped. Not for sequential reading.*
 
 32. [**CLI commands**](/docs/opensip-tools/70-reference/01-cli-commands/) — Every command, its flags, when to use each.
-33. [**Package catalog**](/docs/opensip-tools/70-reference/02-package-catalog/) — All 27 packages with one-line role and key exports. Grouped by layer.
+33. [**Package catalog**](/docs/opensip-tools/70-reference/02-package-catalog/) — All 29 packages with one-line role and key exports. Grouped by layer.
 34. [**Configuration**](/docs/opensip-tools/70-reference/03-configuration/) — `opensip-tools.config.yml` schema, every field, defaults.
 35. [**JSON output schema**](/docs/opensip-tools/70-reference/04-json-output-schema/) — The `CliOutput` shape consumed by CI and dashboards.
 36. [**Checks reference**](/docs/opensip-tools/70-reference/05-checks-index/) — Browsable index of every built-in fit check, grouped by pack and primary tag. Auto-generated from source.

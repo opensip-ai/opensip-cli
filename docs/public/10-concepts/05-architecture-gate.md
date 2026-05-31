@@ -7,7 +7,7 @@ audience: [contributors, ci-integrators]
 purpose: "The baseline-and-compare workflow. Identity hash, line-shift invariance, partial-SARIF tolerance, CI integration patterns."
 source-files:
   - packages/fitness/engine/src/gate.ts
-  - packages/fitness/engine/src/sarif.ts
+  - packages/reporting/src/sarif.ts
   - packages/fitness/engine/src/persistence/baseline-repo.ts
   - packages/fitness/engine/src/__tests__/gate.test.ts
   - packages/fitness/engine/src/tool.ts

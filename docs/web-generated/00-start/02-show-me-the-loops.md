@@ -117,7 +117,7 @@ The four scenario kinds — `defineLoadScenario`, `defineChaosScenario`, `define
 
 ## `graph` — a rule on the call graph
 
-`graph` is different from `fit` and `sim` in one important way: **you don't author rules; you run the bundled ones.** The engine builds your project's static call graph in five stages (discover → walk → resolve → index → render); five rules consume that graph and emit findings.
+`graph` is different from `fit` and `sim` in one important way: **you don't author rules; you run the bundled ones.** The engine builds your project's static call graph in five stages (discover → walk → resolve → index → render); six rules consume that graph and emit findings.
 
 ```text
 > opensip-tools graph
@@ -130,17 +130,19 @@ The four scenario kinds — `defineLoadScenario`, `defineChaosScenario`, `define
   ✓ no-side-effect-path         0 violations
   ✗ test-only-reachable         1 violation
   ✓ always-throws-branch        0 violations
+  ◦ high-blast-function         7 noted
 
   3 Passed, 2 Failed | Duration 2.5s   (incremental rebuild)
 ```
 
-The five rules:
+The six rules:
 
 - **`orphan-subtree`** — functions reachable from nothing (no entry point, no test).
 - **`duplicated-function-body`** — distinct functions whose bodies hash the same (refactor candidates).
 - **`no-side-effect-path`** — code paths that should have side effects but don't (e.g. a logged-out branch that doesn't log).
 - **`test-only-reachable`** — code only reached from test files (likely dead in production).
 - **`always-throws-branch`** — branches that always throw, suggesting an unreachable code path.
+- **`high-blast-function`** — the functions with the widest change-impact (blast radius), surfaced as an informational insight at `note` severity, not a gate.
 
 Like `fit`, `graph` ships with a gate flow: `--gate-save` captures today's catalog as a baseline, `--gate-compare` fails the run when new violations appear. Five language adapters ship in v2.0: TypeScript, Python, Rust, Go, Java. Deeper detail: [stages and catalog](/docs/opensip-tools/40-graph/01-stages-and-catalog/) and [rules and gating](/docs/opensip-tools/40-graph/02-rules-and-gating/).
 

@@ -11,7 +11,7 @@ source-files:
   - packages/core/src/tools/types.ts
   - packages/core/src/plugins/types.ts
   - packages/core/src/languages/adapter.ts
-  - packages/fitness/engine/src/sarif.ts
+  - packages/reporting/src/sarif.ts
 related-docs:
   - ./01-fitness-loop.md
   - ./02-tool-plugin-model.md
@@ -36,7 +36,7 @@ A contract is a promise to a consumer outside your control. Break it, and the co
 | 1 | CLI argv (commands and flags) | humans, CI, shells | **stable** (semver-major) | `packages/*/src/*tool.ts` |
 | 2 | Exit codes | CI, scripts | **stable** (semver-major) | `packages/contracts/src/exit-codes.ts` |
 | 3 | JSON output (`CliOutput`) | CI, dashboards, the gate, OpenSIP Cloud | **stable** (semver-major) | `packages/contracts/src/types.ts` |
-| 4 | SARIF output | GitHub Code Scanning, IDEs | **stable** (versioned by SARIF spec) | `packages/fitness/engine/src/sarif.ts` |
+| 4 | SARIF output | GitHub Code Scanning, IDEs | **stable** (versioned by SARIF spec) | `packages/reporting/src/sarif.ts` |
 | 5 | Tool plugin contract (`Tool`) | third-party tools | **stable** (semver-major) | `packages/core/src/tools/types.ts` |
 | 6 | Plugin discovery (Tool marker + check-pack name prefix) | third-party tools, check packs | **stable** (semver-major) | `packages/core/src/plugins/tool-package-discovery.ts`, `packages/fitness/engine/src/plugins/check-package-discovery.ts` |
 
@@ -155,7 +155,7 @@ The full per-field reference (when each field is present, what each value can be
 
 ## 4. SARIF output
 
-When `--gate-save` runs, the baseline is a SARIF 2.1.0 document built by [`packages/fitness/engine/src/sarif.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.1/packages/fitness/engine/src/sarif.ts). The shape is the SARIF spec's, not ours — opensip-tools commits to producing valid SARIF 2.1.0, not to a custom shape. Consumers (GitHub Code Scanning, VS Code SARIF Viewer, custom CI tooling) can read these files with any SARIF parser.
+When `--gate-save` runs, the baseline is a SARIF 2.1.0 document built by [`packages/reporting/src/sarif.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.1/packages/reporting/src/sarif.ts). The shape is the SARIF spec's, not ours — opensip-tools commits to producing valid SARIF 2.1.0, not to a custom shape. Consumers (GitHub Code Scanning, VS Code SARIF Viewer, custom CI tooling) can read these files with any SARIF parser.
 
 **Stability rule.** The fields opensip-tools fills in are: `runs[].tool.driver.name = 'opensip-tools'`, `runs[].results[]` carrying `ruleId`, `message.text`, `level`, and `locations[].physicalLocation.{artifactLocation, region}`. Future versions may fill in more SARIF fields; we won't stop filling in those.
 
@@ -264,7 +264,7 @@ You've now seen the four mental-model docs:
 
 1. [`01-fitness-loop.md`](/docs/opensip-tools/10-concepts/01-fitness-loop/) — the spine, eight stages.
 2. [`02-tool-plugin-model.md`](/docs/opensip-tools/10-concepts/02-tool-plugin-model/) — how the CLI doesn't know what `fit` does.
-3. [`03-modular-monolith.md`](/docs/opensip-tools/10-concepts/03-modular-monolith/) — five layers, 27 packages.
+3. [`03-modular-monolith.md`](/docs/opensip-tools/10-concepts/03-modular-monolith/) — five layers, 29 packages.
 4. This doc — the public edges.
 
 Time to go deeper. Section [`20-fit/`](/docs/opensip-tools/20-fit/) expands stages 4–8 of the loop with full code paths. Section [`30-sim/`](/docs/opensip-tools/30-sim/) does the same for `sim`. Sections 40+ cover runtime mechanics, subsystems, surfaces, reference, and conventions.

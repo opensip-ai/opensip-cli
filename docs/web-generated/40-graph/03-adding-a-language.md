@@ -238,4 +238,4 @@ These are drawn from real bugs caught while shipping the Python and Rust adapter
 ## What's next
 
 - **[`01-stages-and-catalog.md`](/docs/opensip-tools/40-graph/01-stages-and-catalog/)** — the engine pipeline your adapter feeds into.
-- **[`02-rules-and-gating.md`](/docs/opensip-tools/40-graph/02-rules-and-gating/)** — the five rules that consume the catalog and the gate workflow.
+- **[`02-rules-and-gating.md`](/docs/opensip-tools/40-graph/02-rules-and-gating/)** — the six rules that consume the catalog and the gate workflow.

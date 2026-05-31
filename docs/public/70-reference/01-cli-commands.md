@@ -147,7 +147,7 @@ opensip-tools graph --gate-compare
 opensip-tools graph --report-to <url>
 ```
 
-`graph` is the single entry point for static call-graph analysis. The default (non-JSON) output is a structured terminal report with four sections: catalog summary, findings grouped by rule (top 10 per rule, with overflow indicator), top 10 inferred entry points, and a one-line summary. The full data is always available via `--json`.
+`graph` is the single entry point for static call-graph analysis. The default (non-JSON) output is a one-line summary; pass `-v`/`--verbose` to expand the structured terminal report into its detailed sections: catalog summary, findings grouped by rule (top 10 per rule, with overflow indicator), and top 10 inferred entry points. The full data is always available via `--json`.
 
 | Flag / Argument | Type | Default | Effect |
 |---|---|---|---|
@@ -158,11 +158,13 @@ opensip-tools graph --report-to <url>
 | `--language <name>` | string | — | Force a specific language adapter, suppressing marker-based auto-detection. If the discovered file count is zero, exits with code 2 and the message `--language <name> matched 0 files under <paths>; check the flag or paths.` (D14). |
 | `--json` | bool | `false` | Output a `CliOutput`-shaped JSON document instead of the unified terminal report. |
 | `--no-cache` | bool | `false` | Skip the catalog cache and force a full rebuild. |
+| `--resolution <mode>` | string | `exact` | Edge resolution tier: `exact` (semantic, uses the type checker) or `fast` (syntactic, no type checker — ~2× faster cold builds at lower edge fidelity). Invalid values fail loudly at the boundary. |
 | `--gate-save` | bool | `false` | Save the current Signal fingerprint set to the project's SQLite store (`graph_baseline_signals` table). Mutually exclusive with `--gate-compare`. |
 | `--gate-compare` | bool | `false` | Compare current Signals to the saved baseline; exit non-zero on regression. |
 | `--baseline <path>` | path | — | Override the default baseline location (used with `--gate-save` / `--gate-compare`) — e.g. pin to a CI artifact location instead of the project's SQLite store. |
 | `--report-to <url>` | string | — | POST findings to OpenSIP Cloud or a compatible SARIF endpoint. |
-| `--debug` | bool | `false` | Enable debug-level logging. |
+| `-v, --verbose` | bool | `false` | Expand the done view to show the detailed catalog, findings-by-rule, and entry-point sections (default: one-line summary only). |
+| `--debug` | bool | `false` | Enable debug-mode structured log output. |
 
 **Polyglot example.** In a repo with both a TypeScript pnpm workspace and a Cargo workspace, the polyglot detection applies both adapters in a single run:
 
@@ -181,7 +183,7 @@ opensip-tools graph --workspace
 
 **Heap sizing:** for projects with > 1000 source files, `graph` emits a one-line stderr hint at startup recommending `NODE_OPTIONS=--max-old-space-size=8192` (or higher). On a 5476-file repo the default 4 GB heap is not enough for a global run. The preflight skips automatically when an explicit scope is present (positional paths, `--workspace`, or `--language`). (Heap sizing is most acute for the TypeScript adapter, which holds a project-wide `ts.Program`; tree-sitter adapters parse lazily per file and use far less memory.)
 
-**`OPENSIP_HEAP_NO_MONITOR`** (env var): during a build, `graph` runs a V8 heap-pressure monitor that aborts with a readable `MemoryPressureError` when old-gen usage crosses ~90% of the heap limit — catching an impending OOM before V8 SIGABRTs the process. In unusual GC scenarios (REPL embedding, custom allocators) this guard can fire as a false positive before a real OOM is imminent. Set `OPENSIP_HEAP_NO_MONITOR=1` to disable it entirely. This is an escape hatch only: with the monitor off, an actual out-of-memory condition becomes a bare V8 abort instead of a structured error. Prefer raising the heap ceiling (above) or scoping the run (`--package` / `--workspace`) first.
+**`OPENSIP_HEAP_NO_MONITOR`** (env var): during a build, `graph` runs a V8 heap-pressure monitor that aborts with a readable `MemoryPressureError` when old-gen usage crosses ~90% of the heap limit — catching an impending OOM before V8 SIGABRTs the process. In unusual GC scenarios (REPL embedding, custom allocators) this guard can fire as a false positive before a real OOM is imminent. Set `OPENSIP_HEAP_NO_MONITOR=1` to disable it entirely. This is an escape hatch only: with the monitor off, an actual out-of-memory condition becomes a bare V8 abort instead of a structured error. Prefer raising the heap ceiling (above) or scoping the run (positional paths / `--workspace`) first.
 
 **Catalog storage:** v2 stores the catalog in the project's SQLite database (`<project>/opensip-tools/.runtime/datastore.sqlite`, `graph_catalog` row). v3 wire-format remains: `language` (adapter id), `cacheKey` (an opaque per-adapter invalidation string — TypeScript: `ts-${ts.version}-${tsconfigContentHash}`; Python and Rust use language-id-prefixed keys), and a per-file mtime+size fingerprint. The reconstructed in-memory `Catalog` shape is unchanged from v1's `cache/read.ts` output.
 
@@ -249,19 +251,18 @@ Exit codes: 0 on success, non-zero with a `result.exitCode` if the baseline is m
 
 ## `dashboard` — open the HTML report
 
-Tool-owned (fitness Tool registers it). Renders the most recent run as HTML and opens it in the user's default browser.
+CLI-owned. The cross-tool `dashboard` command lives at the CLI layer (not inside any one tool) because composition walks every tool's `collectDashboardData` contribution via the tool registry. Renders the most recent run as HTML and opens it in the user's default browser.
 
 ```
 opensip-tools dashboard
-opensip-tools dashboard --cwd <path>
+opensip-tools dashboard --no-open
 opensip-tools dashboard --json
 ```
 
 | Flag | Type | Default | Effect |
 |---|---|---|---|
-| `--cwd <path>` | path | `process.cwd()` | Project root. |
-| `--json` | bool | `false` | Emit a `{ type: 'dashboard', path, opened }` JSON envelope on stdout instead of the table renderer (the browser is still launched if `decideOpen` would normally open it; the JSON just adds a machine-readable result). |
-| `--debug` | bool | `false` | Enable debug-level logging. |
+| `--no-open` | bool | `false` | Write the report but do not launch a browser. |
+| `--json` | bool | `false` | Emit a `{ type: 'dashboard', path, opened }` JSON envelope on stdout instead of the table renderer. In `--json` mode the browser is never launched (machine-output contract). |
 
 The dashboard is a single self-contained HTML file at `<project>/opensip-tools/.runtime/reports/latest.html`. Each generation overwrites the previous file. The command launches the browser and exits; the file works without opensip-tools installed, so you can email it directly to a teammate.
 
@@ -532,7 +533,7 @@ Both modes:
 - Refuse to run when no targets exist (`--project` against a directory that contains no opensip-tools state is a no-op, not a destructive accident).
 - Do **not** remove the npm-global binary — the running binary can't safely self-delete. The user-mode success message prints the next step (`npm uninstall -g @opensip-tools/cli`); the project-mode success message points back at the user-mode command for the matching cleanup.
 
-State contract enforced by code: `~/.opensip-tools/` holds `config.yml` only. Persistence and logging modules throw when asked to write there (see [`store.ts`](../../../packages/contracts/src/persistence/store.ts), [`logger.ts`](../../../packages/core/src/lib/logger.ts)). Anything else in that directory is legacy cruft from pre-1.0 versions and is swept up by the default `uninstall`.
+State contract enforced by code: `~/.opensip-tools/` holds `config.yml` only. Persistence and logging modules throw when asked to write there (see [`paths.ts`](../../../packages/core/src/lib/paths.ts), [`logger.ts`](../../../packages/core/src/lib/logger.ts)). Anything else in that directory is legacy cruft from pre-1.0 versions and is swept up by the default `uninstall`.
 
 ---
 

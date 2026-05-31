@@ -72,14 +72,15 @@ For walking the TypeScript AST instead of regex, see [Ban an API pattern](../60-
 // <project>/opensip-tools/fit/recipes/quick-smoke.mjs
 import { defineRecipe } from '@opensip-tools/fitness';
 
-export default defineRecipe({
+// Recipes load only from a `recipes` array export — not a default export.
+export const recipes = [defineRecipe({
   name: 'quick-smoke',
   displayName: 'Quick smoke',
   description: 'Fast PR feedback — universal checks only',
   checks: { type: 'tags', include: ['universal'] },
   execution: { mode: 'parallel', timeout: 10_000, stopOnFirstFailure: false },
   reporting: { format: 'table' },
-});
+})];
 ```
 
 `opensip-tools fit-recipes` lists it. `opensip-tools fit --recipe quick-smoke` runs it.
@@ -105,7 +106,8 @@ The check reads its slice via `getCheckConfig<T>('complex-function')`.
 // <project>/opensip-tools/sim/scenarios/checkout-burst.mjs
 import { defineLoadScenario } from '@opensip-tools/simulation';
 
-export default defineLoadScenario({
+// Scenarios load only from a `scenarios` array export — not a default export.
+export const scenarios = [defineLoadScenario({
   id: '11111111-1111-4111-8111-111111111111',
   name: 'checkout-burst',
   description: 'Sustain 200 RPS checkout traffic for 30s',
@@ -126,7 +128,7 @@ export default defineLoadScenario({
     { name: 'p99-under-500ms', assert: (r) => r.p99LatencyMs < 500 },
     { name: 'error-rate-under-1pct', assert: (r) => r.errorRate < 0.01 },
   ],
-});
+})];
 ```
 
 Same shape for `defineChaosScenario`, `defineInvariantScenario`, `defineFixEvaluationScenario` — each pinned to its own kind. See [scenarios and recipes](../30-sim/01-scenarios-and-recipes.md).

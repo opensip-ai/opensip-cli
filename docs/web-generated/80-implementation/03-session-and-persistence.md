@@ -10,9 +10,10 @@ source-files:
   - packages/core/src/lib/logger.ts
   - packages/datastore/src/data-store.ts
   - packages/datastore/src/factory.ts
-  - packages/contracts/src/persistence/store.ts
-  - packages/contracts/src/persistence/session-repo.ts
-  - packages/contracts/src/persistence/schema/sessions.ts
+  - packages/contracts/src/session-types.ts
+  - packages/session-store/src/session-repo.ts
+  - packages/session-store/src/store.ts
+  - packages/session-store/src/schema/sessions.ts
   - packages/graph/engine/src/persistence/baseline-repo.ts
   - packages/graph/engine/src/persistence/catalog-repo.ts
   - packages/graph/engine/src/persistence/schema.ts
@@ -60,11 +61,11 @@ The WAL/SHM sidecar files are SQLite implementation details (Write-Ahead Log mod
 
 [`packages/datastore`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.1/packages/datastore) hosts the persistence kernel: a `DataStore` interface, a SQLite-backed implementation, an in-memory implementation for tests, and the workspace-wide migration store under `migrations/`. The CLI bootstrap opens one `DataStore` per invocation in the `preAction` hook ([`packages/cli/src/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.1/packages/cli/src/index.ts)) and closes it on `process.exit`. Every tool's command receives the handle via `ToolCliContext.datastore`.
 
-Schemas are owned by the package that produces the data — datastore is paradigm-agnostic infrastructure. Adding a new tool means adding a new schema module under that tool's `src/persistence/schema.ts` and registering it in [`packages/datastore/drizzle.config.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.1/packages/datastore/drizzle.config.ts). Three packages register schemas today:
+Schemas are owned by the package that produces the data — datastore is paradigm-agnostic infrastructure. Adding a new tool means adding a new schema module under that package's `src/persistence/schema.ts` and registering it in [`packages/datastore/drizzle.config.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.1/packages/datastore/drizzle.config.ts). Three packages register schemas today:
 
 | Owner | Schema file | Tables |
 |---|---|---|
-| `@opensip-tools/contracts` | `src/persistence/schema/sessions.ts` | `sessions`, `session_checks`, `session_findings` |
+| `@opensip-tools/session-store` | `src/schema/sessions.ts` | `sessions`, `session_checks`, `session_findings` |
 | `@opensip-tools/graph` | `src/persistence/schema.ts` | `graph_baseline_signals`, `graph_baseline_meta`, `graph_catalog` |
 | `@opensip-tools/fitness` | `src/persistence/schema.ts` | `fit_baseline` |
 
@@ -76,7 +77,7 @@ SQLite + Drizzle were chosen because the runtime store is local, project-scoped,
 
 ## Sessions
 
-A session is one record per `fit`, `sim`, or `graph` run. Stored as a row in the `sessions` table, with a `session_checks` row per check and `session_findings` rows for each violation. The wire-shape is unchanged from v1 — the `StoredSession` interface in [`packages/contracts/src/persistence/store.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.1/packages/contracts/src/persistence/store.ts) is what `SessionRepo` round-trips:
+A session is one record per `fit`, `sim`, or `graph` run. Stored as a row in the `sessions` table, with a `session_checks` row per check and `session_findings` rows for each violation. The wire-shape is unchanged from v1 — the `StoredSession` interface in [`packages/contracts/src/session-types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.1/packages/contracts/src/session-types.ts) is what `SessionRepo` round-trips:
 
 ```ts
 interface StoredSession {
@@ -95,7 +96,7 @@ interface StoredSession {
 }
 ```
 
-The session is written via [`SessionRepo.save()`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.1/packages/contracts/src/persistence/session-repo.ts) inside a single transaction (sessions row + per-check rows + per-finding rows), so even a run that crashes mid-render leaves a complete or no record — never a partial one.
+The session is written via [`SessionRepo.save()`](https://github.com/opensip-ai/opensip-tools/blob/v2.0.1/packages/session-store/src/session-repo.ts) inside a single transaction (sessions row + per-check rows + per-finding rows), so even a run that crashes mid-render leaves a complete or no record — never a partial one.
 
 ### The `sessions` command
 

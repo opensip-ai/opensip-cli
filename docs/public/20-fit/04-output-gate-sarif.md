@@ -7,7 +7,7 @@ audience: [contributors, ci-integrators]
 purpose: "What happens to the violations a check produces — render layer, JSON output, SARIF, the gate, cloud reporting."
 source-files:
   - packages/contracts/src/types.ts
-  - packages/fitness/engine/src/sarif.ts
+  - packages/reporting/src/sarif.ts
   - packages/fitness/engine/src/gate.ts
   - packages/fitness/engine/src/cli/fit.ts
   - packages/cli/src/ui/
@@ -201,7 +201,7 @@ opensip-tools fit --report-to https://opensip.ai/api --api-key $OPENSIP_API_KEY
 
 The same `CliOutput` is converted to SARIF runs and POSTed in chunks to the configured URL. This path is composable — `--report-to` runs alongside the default Ink renderer, alongside `--json`, alongside `--gate-compare`. Reporting is a side-channel, not a stdout-replacement.
 
-The chunker lives in [`packages/fitness/engine/src/sarif.ts`](../../../packages/fitness/engine/src/sarif.ts):
+The chunker lives in [`packages/reporting/src/sarif.ts`](../../../packages/reporting/src/sarif.ts):
 
 ```ts
 chunkSarifRuns(runs, maxFindings = 500): SarifRun[][]
@@ -226,7 +226,7 @@ The result is a `ReportResult` with `chunksTotal` / `chunksSucceeded`. Partial s
 
 ## SARIF, specifically
 
-opensip-tools emits SARIF 2.1.0. The schema URI is hardcoded in [`packages/fitness/engine/src/sarif.ts:5`](../../../packages/fitness/engine/src/sarif.ts):
+opensip-tools emits SARIF 2.1.0. The schema URI is hardcoded in [`packages/reporting/src/sarif.ts:6`](../../../packages/reporting/src/sarif.ts):
 
 ```
 https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json
