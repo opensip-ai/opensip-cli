@@ -25,6 +25,7 @@ import { posix } from 'node:path';
 
 import { computeFilesFingerprint } from '../../cache/invalidate.js';
 import { appendEdge, createMutableStats, truncateForCallEdge } from '../../lang-adapter/edge-helpers.js';
+import { packageOf } from '../../pipeline/resolve-callee.js';
 
 import type { ShardBuildResult } from './shard-model.js';
 import type {
@@ -131,12 +132,13 @@ export function resolveCrossBoundaryCalls(
   const nameIndex = buildNameIndex(merged);
   const fileByHash = buildFileByHash(merged);
   const knownFiles = new Set<string>(Object.values(merged.functions).flat().map((o) => o.filePath));
+  const importedByFile = buildImportedPackagesByFile(merged, fileByHash);
 
   const edgesByOwner = new Map<string, CallEdge[]>();
   const stats = createMutableStats();
 
   for (const bc of boundaryCalls) {
-    const edge = resolveOne(bc, nameIndex, fileByHash, knownFiles);
+    const edge = resolveOne(bc, nameIndex, fileByHash, knownFiles, importedByFile);
     stats.totalCallSites++;
     appendEdge(edgesByOwner, bc.ownerHash, edge);
     stats.apply(edge);
@@ -151,6 +153,7 @@ function resolveOne(
   nameIndex: ReadonlyMap<string, readonly FunctionOccurrence[]>,
   fileByHash: ReadonlyMap<string, string>,
   knownFiles: ReadonlySet<string>,
+  importedByFile: ReadonlyMap<string, ReadonlySet<string>>,
 ): CallEdge {
   const base = {
     line: bc.line,
@@ -165,16 +168,95 @@ function resolveOne(
     // Genuinely external (e.g. an npm package) — unresolved, but counted.
     return { ...base, to: [], confidence: 'low' };
   }
-  const pinned = pinBySpecifier(bc, candidates, fileByHash, knownFiles);
+  // Constrain to occurrences the caller can actually reach: its own package
+  // or a package its module imports. This is what stops a globally-unique
+  // name from resolving into a package the caller never imported (the source
+  // of impossible coupling edges). Falls back to all candidates only when the
+  // caller's file is unknown (cannot constrain).
+  const reachable = reachableCandidates(bc, candidates, fileByHash, importedByFile);
+  const pinned = pinBySpecifier(bc, reachable, fileByHash, knownFiles);
   if (pinned.length > 0) {
     return { ...base, to: pinned.map((o) => o.bodyHash), confidence: 'medium' };
   }
-  if (candidates.length === 1 && candidates[0]) {
-    // Unique name, but the specifier didn't pin a file → name-only guess.
-    return { ...base, to: [candidates[0].bodyHash], confidence: 'low' };
+  const chosen = chooseReachable(bc, reachable, fileByHash);
+  if (chosen) {
+    return { ...base, to: [chosen.bodyHash], confidence: 'low' };
   }
-  // Ambiguous and unpinned — decline rather than emit a wrong target.
+  // No reachable target, or ambiguous after constraint — decline rather than
+  // emit a wrong (cross-package) target.
   return { ...base, to: [], confidence: 'low' };
+}
+
+/** Candidates in the caller's own package or a package its module imports. */
+function reachableCandidates(
+  bc: CrossBoundaryCall,
+  candidates: readonly FunctionOccurrence[],
+  fileByHash: ReadonlyMap<string, string>,
+  importedByFile: ReadonlyMap<string, ReadonlySet<string>>,
+): readonly FunctionOccurrence[] {
+  const ownerFile = fileByHash.get(bc.ownerHash);
+  if (ownerFile === undefined) return candidates; // cannot constrain
+  const callerPkg = packageOf(ownerFile);
+  const imported = importedByFile.get(ownerFile) ?? EMPTY_PKG_SET;
+  return candidates.filter((c) => {
+    const p = packageOf(c.filePath);
+    return p === callerPkg || imported.has(p);
+  });
+}
+
+/** Pick a single reachable target: unique → it; else same-package unique → it; else decline. */
+function chooseReachable(
+  bc: CrossBoundaryCall,
+  reachable: readonly FunctionOccurrence[],
+  fileByHash: ReadonlyMap<string, string>,
+): FunctionOccurrence | undefined {
+  if (reachable.length === 0) return undefined;
+  if (reachable.length === 1) return reachable[0];
+  const ownerFile = fileByHash.get(bc.ownerHash);
+  const callerPkg = ownerFile === undefined ? '<unknown>' : packageOf(ownerFile);
+  const samePkg = reachable.filter((c) => packageOf(c.filePath) === callerPkg);
+  return samePkg.length === 1 ? samePkg[0] : undefined;
+}
+
+const EMPTY_PKG_SET: ReadonlySet<string> = new Set<string>();
+
+/** filePath → imported package groups, from module-init `dependencies[]`. */
+function buildImportedPackagesByFile(
+  merged: Catalog,
+  fileByHash: ReadonlyMap<string, string>,
+): Map<string, Set<string>> {
+  const out = new Map<string, Set<string>>();
+  for (const occs of Object.values(merged.functions)) {
+    for (const occ of occs) {
+      const pkgs = importedPackagesOf(occ, fileByHash);
+      if (pkgs.size > 0) mergeSet(out, occ.filePath, pkgs);
+    }
+  }
+  return out;
+}
+
+function mergeSet(map: Map<string, Set<string>>, key: string, values: ReadonlySet<string>): void {
+  const existing = map.get(key);
+  if (existing) {
+    for (const v of values) existing.add(v);
+    return;
+  }
+  map.set(key, new Set(values));
+}
+
+/** Package groups one module-init occurrence imports (via resolved dependencies[].to). */
+function importedPackagesOf(
+  occ: FunctionOccurrence,
+  fileByHash: ReadonlyMap<string, string>,
+): Set<string> {
+  const set = new Set<string>();
+  for (const dep of occ.dependencies ?? []) {
+    for (const targetHash of dep.to) {
+      const targetFile = fileByHash.get(targetHash);
+      if (targetFile !== undefined) set.add(packageOf(targetFile));
+    }
+  }
+  return set;
 }
 
 /**
