@@ -49,6 +49,7 @@ function writeFixturePack(opts: {
   marker?: 'fit-pack' | 'sim-pack' | 'tool';
   recipesFragment?: string;      // raw JS literal for `export const recipes = ...`
   omitChecks?: boolean;
+  withForeignCore?: boolean;     // plant a nested @opensip-tools/core so the pack resolves a DIFFERENT core
 }): { checkId: string; checkSlug: string; recipeId: string; recipeName: string } {
   const checkId = randomUUID();
   const checkSlug = `fix-${checkId.slice(0, 8)}`;
@@ -94,6 +95,20 @@ function writeFixturePack(opts: {
     join(opts.packageDir, 'index.mjs'),
     `${checksExport}\n${recipesExport}\n`,
   );
+
+  if (opts.withForeignCore) {
+    // Plant a self-contained @opensip-tools/core under the pack's own
+    // node_modules so `require.resolve('@opensip-tools/core')` anchored in the
+    // pack resolves THIS copy — a different physical path than the engine's
+    // real core. This is the dual-core condition the single-core guard refuses.
+    const coreDir = join(opts.packageDir, 'node_modules', '@opensip-tools', 'core');
+    mkdirSync(coreDir, { recursive: true });
+    writeFileSync(
+      join(coreDir, 'package.json'),
+      JSON.stringify({ name: '@opensip-tools/core', version: '0.0.0-fixture', main: './index.js' }),
+    );
+    writeFileSync(join(coreDir, 'index.js'), 'export {}\n');
+  }
 
   return { checkId, checkSlug, recipeId, recipeName };
 }
@@ -215,5 +230,42 @@ describe('loadDiscoveredCheckPackages', () => {
   it('returns 0 when no packages are discoverable', async () => {
     const { totalRegistered: registered } = await loadDiscoveredCheckPackages(testDir);
     expect(registered).toBe(0);
+  });
+
+  it('refuses a pack that resolves a DIFFERENT @opensip-tools/core (single-core guard, B)', async () => {
+    // A pack that ships its own nested @opensip-tools/core resolves a second
+    // core instance. Loading it would split the run scope (AsyncLocalStorage),
+    // silently degrading content filters to raw and producing false positives.
+    // The guard refuses it at load time with an actionable warning.
+    const { checkSlug } = writeFixturePack({
+      packageDir: join(testDir, 'node_modules', '@opensip-tools', 'checks-foreigncore'),
+      packageName: '@opensip-tools/checks-foreigncore',
+      withForeignCore: true,
+    });
+
+    const { totalRegistered, warnings } = await loadDiscoveredCheckPackages(testDir);
+
+    expect(totalRegistered).toBe(0);
+    expect(defaultRegistry.getBySlug(checkSlug)).toBeUndefined();
+    expect(
+      warnings.some(
+        (m) => m.includes('@opensip-tools/checks-foreigncore') && m.includes('different @opensip-tools/core'),
+      ),
+    ).toBe(true);
+  });
+
+  it('still loads a same-core pack that does NOT vendor its own core (no false skip)', async () => {
+    // Sibling of the guard test: a pack with no nested core resolves the
+    // engine's own core (or none), so it must load normally — proving the
+    // guard does not over-skip.
+    const { checkSlug } = writeFixturePack({
+      packageDir: join(testDir, 'node_modules', '@opensip-tools', 'checks-samecore'),
+      packageName: '@opensip-tools/checks-samecore',
+    });
+
+    const { totalRegistered } = await loadDiscoveredCheckPackages(testDir);
+
+    expect(totalRegistered).toBe(1);
+    expect(defaultRegistry.getBySlug(checkSlug)).toBeDefined();
   });
 });

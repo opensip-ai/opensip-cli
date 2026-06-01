@@ -24,7 +24,8 @@
  * readers always run after the setter completes.
  */
 
-import { dirname } from 'node:path';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import {
@@ -212,6 +213,49 @@ function cliInstallDir(): string {
 }
 
 /**
+ * The `@opensip-tools/core` module THIS engine resolves — the same core whose
+ * `AsyncLocalStorage` `runWithScope` populates. Captured once for comparison
+ * against each check pack's resolved core (see {@link foreignCorePath}).
+ */
+const selfCorePath: string | undefined = (() => {
+  try {
+    return createRequire(import.meta.url).resolve('@opensip-tools/core');
+  } catch {
+    /* v8 ignore next 2 -- core is always resolvable from the engine; purely defensive */
+    // @fitness-ignore-next-line error-handling-quality -- intentional: an unresolvable core simply disables the single-core guard (fail-open), not an error to log.
+    return;
+  }
+})();
+
+/**
+ * Single-core guard. If `packageDir` resolves a DIFFERENT physical
+ * `@opensip-tools/core` than this engine, return that foreign core's path;
+ * otherwise undefined.
+ *
+ * A check pack resolving a second core instance registers its checks against
+ * a core whose `currentScope()` is always undefined here (a different
+ * `AsyncLocalStorage`). That silently degrades content filters to raw and
+ * produces false positives — the failure mode seen when a globally-installed
+ * CLI discovers check packs in a project that also vendors `@opensip-tools`
+ * packages. Such packs are refused at load time rather than run with a broken
+ * scope. Packs that don't depend on core at all resolve nothing and are
+ * allowed (they can't create a scope-bearing duplicate).
+ */
+function foreignCorePath(packageDir: string): string | undefined {
+  if (selfCorePath === undefined) return undefined;
+  try {
+    // The anchor file need not exist — createRequire only uses its directory
+    // as the resolution base, walking up node_modules from the pack.
+    const anchor = pathToFileURL(join(packageDir, 'noop.js')).href;
+    const packCore = createRequire(anchor).resolve('@opensip-tools/core');
+    return packCore === selfCorePath ? undefined : packCore;
+  } catch {
+    // @fitness-ignore-next-line error-handling-quality -- resolution probe: a pack that doesn't depend on @opensip-tools/core throws here, and "no foreign core → allow" is the function's contract (mirrors plugins/package-entry.ts).
+    return undefined;
+  }
+}
+
+/**
  * Return shape of `loadDiscoveredCheckPackages`. Warnings are returned
  * (rather than written to a module singleton) so direct callers and tests
  * can read them without depending on `ensureChecksLoaded` having run.
@@ -260,7 +304,26 @@ export async function loadDiscoveredCheckPackages(projectDir: string): Promise<L
   ];
   let totalRegistered = 0;
   const warnings: string[] = [];
-  for (const pkg of allPacks) {
+
+  // Single-core guard (B): drop any pack that resolves a different
+  // @opensip-tools/core than this engine BEFORE the load loop. Loading such a
+  // pack would split the run scope (AsyncLocalStorage) so its checks see
+  // `currentScope() === undefined`, silently degrading content filters to raw
+  // and producing false positives. Done as a pre-pass to keep the load loop's
+  // control flow simple.
+  const sameCorePacks = allPacks.filter((pkg) => {
+    const foreign = foreignCorePath(pkg.packageDir);
+    if (foreign === undefined) return true;
+    warnings.push(
+      `check package ${pkg.name} resolves a different @opensip-tools/core (${foreign}) ` +
+        `than this CLI (${selfCorePath ?? '<unknown>'}); loading it would split the run ` +
+        `scope and produce false positives. Skipping — run the project's own CLI instead ` +
+        `(e.g. \`pnpm fit\`, or \`npx @opensip-tools/cli fit\` from the project).`,
+    );
+    return false;
+  });
+
+  for (const pkg of sameCorePacks) {
     const meta = readCheckPackageMetadata(pkg.packageDir);
     if (!meta) {
       warnings.push(`check package ${pkg.name} has no readable package.json — skipping`);

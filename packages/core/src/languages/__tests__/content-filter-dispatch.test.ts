@@ -1,7 +1,8 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { logger } from '../../lib/logger.js';
 import { RunScope, runWithScopeSync } from '../../lib/run-scope.js';
-import { applyContentFilter } from '../content-filter-dispatch.js';
+import { applyContentFilter, resetContentFilterWarningForTests } from '../content-filter-dispatch.js';
 import { LanguageRegistry } from '../registry.js';
 
 import type { LanguageAdapter } from '../adapter.js';
@@ -62,5 +63,43 @@ describe('applyContentFilter', () => {
     // "raw" / "none" short-circuit before reading the scope — safe to call outside.
     expect(applyContentFilter('a.fake', 'const x', 'raw')).toBe('const x');
     expect(applyContentFilter('a.fake', 'const x', 'none')).toBe('const x');
+  });
+
+  describe('degradation warning (C)', () => {
+    beforeEach(() => {
+      resetContentFilterWarningForTests();
+    });
+
+    it('warns once when stripping is requested but no scope is active', () => {
+      const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {
+        /* swallow log output */
+      });
+      try {
+        // Two no-scope strip calls — the warning must fire exactly once.
+        expect(applyContentFilter('a.fake', 'x = "hi"', 'strip-strings')).toBe('x = "hi"');
+        expect(applyContentFilter('b.fake', 'y = "yo"', 'strip-strings-and-comments')).toBe('y = "yo"');
+        expect(warn).toHaveBeenCalledTimes(1);
+        expect(warn).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.objectContaining({ evt: 'core.content_filter.degraded' }),
+        );
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    it('does NOT warn for a genuinely unknown language (scope present, no adapter)', () => {
+      const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {
+        /* swallow log output */
+      });
+      try {
+        // Scope is active but no adapter owns `.unknown` — returning raw is
+        // correct and expected here, so it must stay silent.
+        expect(inScope(() => applyContentFilter('a.unknown', 'x = "hi"', 'strip-strings'))).toBe('x = "hi"');
+        expect(warn).not.toHaveBeenCalled();
+      } finally {
+        warn.mockRestore();
+      }
+    });
   });
 });
