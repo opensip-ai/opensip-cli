@@ -145,7 +145,7 @@ See [`./80-implementation/06-doc-conventions.md`](/docs/opensip-tools/80-impleme
 
 ## Relationship to other docs
 
-- **[`README.md`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.0/README.md)** — Marketing-shaped product README. Start *here* for architecture, not there.
+- **[`README.md`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.1/README.md)** — Marketing-shaped product README. Start *here* for architecture, not there.
 
 ---
 

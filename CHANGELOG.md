@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.3.1] — 2026-05-31
+
+A reliability fix for running a globally-installed `opensip-tools` inside a
+project that also installs `@opensip-tools/*` packages.
+
+### Fixed
+
+- **`fit` no longer produces false positives from a split run scope.** When
+  the global CLI discovered check packs from a project's `node_modules`, those
+  packs loaded a second `@opensip-tools/core` instance whose `AsyncLocalStorage`
+  scope differed from the CLI's. Checks then saw no active scope, so the
+  content filter silently fell back to raw (unstripped) text and regex checks
+  matched patterns inside string literals and comments — e.g. `console.log`
+  inside a test fixture. The fit loader now **refuses any check pack that
+  resolves a different `@opensip-tools/core` than the engine** (with an
+  actionable warning pointing at the project-local CLI / `pnpm fit`), and the
+  content filter **warns once** instead of silently degrading when no run
+  scope is active. Packs that share the engine's core (the normal case) are
+  unaffected.
+
 ## [2.3.0] — 2026-05-31
 
 A compact new CLI banner with an inline upgrade prompt, two dedicated graph

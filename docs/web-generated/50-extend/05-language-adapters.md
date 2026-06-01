@@ -23,8 +23,8 @@ related-docs:
 
 > **Two adapter contracts, one ambiguous word.** opensip-tools has two distinct language-adapter interfaces, used by different subsystems:
 >
-> - **`LanguageAdapter`** (this doc) lives in [`@opensip-tools/core`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.0/packages/core/src/languages/adapter.ts). Used by the **fitness** engine. Three required methods (`parse`, `stripStrings`, `stripComments`) plus an optional query API. Lets fitness checks operate on filtered (comment- and string-stripped) source. Implemented by the six `@opensip-tools/lang-*` packages.
-> - **`GraphLanguageAdapter`** (separate, [`@opensip-tools/graph`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.0/packages/graph/engine/src/lang-adapter/types.ts)) is used by the **graph** engine. Six methods (`discoverFiles`, `parseProject`, `walkProject`, `resolveCallSites`, `cacheKey`, optional `ruleHints`). Lets graph build call catalogs across languages. Implemented by the **five publishable `@opensip-tools/graph-*` packages** under `packages/graph/graph-{typescript,python,rust,go,java}/`, each marked with `opensipTools.kind: "graph-adapter"`.
+> - **`LanguageAdapter`** (this doc) lives in [`@opensip-tools/core`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.1/packages/core/src/languages/adapter.ts). Used by the **fitness** engine. Three required methods (`parse`, `stripStrings`, `stripComments`) plus an optional query API. Lets fitness checks operate on filtered (comment- and string-stripped) source. Implemented by the six `@opensip-tools/lang-*` packages.
+> - **`GraphLanguageAdapter`** (separate, [`@opensip-tools/graph`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.1/packages/graph/engine/src/lang-adapter/types.ts)) is used by the **graph** engine. Six methods (`discoverFiles`, `parseProject`, `walkProject`, `resolveCallSites`, `cacheKey`, optional `ruleHints`). Lets graph build call catalogs across languages. Implemented by the **five publishable `@opensip-tools/graph-*` packages** under `packages/graph/graph-{typescript,python,rust,go,java}/`, each marked with `opensipTools.kind: "graph-adapter"`.
 >
 > They are siblings, not the same thing. A given language has one of each (e.g. TypeScript has both a fitness `typescriptAdapter` shipped by `@opensip-tools/lang-typescript` and a graph `typescriptGraphAdapter` shipped by `@opensip-tools/graph-typescript`). For graph adapters, see [`40-graph/03-adding-a-language.md`](/docs/opensip-tools/40-graph/03-adding-a-language/). The rest of this doc covers the fitness `LanguageAdapter` only.
 
@@ -42,7 +42,7 @@ That's the load-bearing part. Adapters also expose a richer query API (functions
 
 ## The contract
 
-[`packages/core/src/languages/adapter.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.0/packages/core/src/languages/adapter.ts):
+[`packages/core/src/languages/adapter.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.1/packages/core/src/languages/adapter.ts):
 
 ```ts
 interface LanguageAdapter<TTree = unknown, TNode = unknown> {
@@ -73,7 +73,7 @@ The two filter operations are the spine of the content-filter system. Both must:
 
 The names describe what's left, not what's stripped: `stripStrings` removes strings (comments preserved), `stripComments` removes both strings *and* comments. The asymmetry is intentional: a check that reads comment-based directives (e.g. `// @fitness-ignore-next-line`) wants strings stripped but comments kept, while a check that scans for identifier patterns (e.g. `console.log`) wants both stripped.
 
-The framework's content-filter dispatcher ([`packages/core/src/languages/content-filter-dispatch.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.0/packages/core/src/languages/content-filter-dispatch.ts)) maps the check's `contentFilter` setting to one of these:
+The framework's content-filter dispatcher ([`packages/core/src/languages/content-filter-dispatch.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.1/packages/core/src/languages/content-filter-dispatch.ts)) maps the check's `contentFilter` setting to one of these:
 
 | Check declares | Adapter call |
 |---|---|
@@ -96,7 +96,7 @@ interface LanguageQueryAPI<TTree, TNode> {
 }
 ```
 
-The query API is for AST-shaped checks. A check that wants "every function with cyclomatic complexity > 25" calls `adapter.query.findFunctions(tree)` and inspects each function's body. The shapes (`GenericFunction`, `Import`, `Location`) are language-neutral — see [`packages/core/src/languages/generic-types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.0/packages/core/src/languages/generic-types.ts).
+The query API is for AST-shaped checks. A check that wants "every function with cyclomatic complexity > 25" calls `adapter.query.findFunctions(tree)` and inspects each function's body. The shapes (`GenericFunction`, `Import`, `Location`) are language-neutral — see [`packages/core/src/languages/generic-types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.1/packages/core/src/languages/generic-types.ts).
 
 The query API is **optional**. An adapter that only implements `parse` + `stripStrings` + `stripComments` is fully functional for regex-shaped checks. Implementing `query` is what unlocks the cross-language check pattern — `@opensip-tools/checks-universal`'s complexity check calls `adapter.query?.findFunctions(...)` and runs against any language whose adapter ships a query API.
 
@@ -112,7 +112,7 @@ Today **no bundled adapter declares `warmup`** and the CLI does not invoke it. T
 
 ## The registry
 
-[`packages/core/src/languages/registry.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.0/packages/core/src/languages/registry.ts) defines the `LanguageRegistry` class — an in-memory list keyed by id and indexed by extension. The CLI constructs a fresh instance per invocation and populates it during `bootstrapCli()`. Inside a tool, you read from it via `cli.scope.languages` (the per-invocation `RunScope`):
+[`packages/core/src/languages/registry.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.1/packages/core/src/languages/registry.ts) defines the `LanguageRegistry` class — an in-memory list keyed by id and indexed by extension. The CLI constructs a fresh instance per invocation and populates it during `bootstrapCli()`. Inside a tool, you read from it via `cli.scope.languages` (the per-invocation `RunScope`):
 
 ```ts
 const langs = cli.scope.languages;
@@ -129,7 +129,7 @@ langs.list();                 // → readonly LanguageAdapter[]
 
 `LanguageAdapter` carries an `aliases` field on the type, but the registry today does not consult it during lookup — only the canonical `id` and the registered `extensions[]` are indexed. Treat aliases as forward-compatible metadata.
 
-The CLI registers all six bundled adapters in `bootstrapCli()` before any Tool's `register()` runs. See [`packages/cli/src/bootstrap/register-language-adapters.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.0/packages/cli/src/bootstrap/register-language-adapters.ts).
+The CLI registers all six bundled adapters in `bootstrapCli()` before any Tool's `register()` runs. See [`packages/cli/src/bootstrap/register-language-adapters.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.1/packages/cli/src/bootstrap/register-language-adapters.ts).
 
 If a file's extension matches no registered adapter, dispatch falls through to "pass content unchanged." This is the fail-safe — a YAML file or a Markdown file goes through every check unmodified, and checks that target text content (TODO scanners, secret scanners) still work. Checks that depend on language-specific filtering and don't have an adapter for the file simply don't filter.
 
@@ -156,7 +156,7 @@ The trade-off: a check that *would* benefit from AST-aware analysis on Rust (say
 
 ## The exception: `lang-typescript` → `fitness`
 
-`@opensip-tools/lang-typescript` re-exports `filterContent`, `clearFilterCache`, and `FilteredContent` from `@opensip-tools/fitness`. This is the documented exception to the "lang packs depend only on core" layer rule — see [`80-implementation/05-layer-policy.md`](/docs/opensip-tools/80-implementation/05-layer-policy/) and the named `lang-no-fitness-except-typescript` carve-out in [`.dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.0/.dependency-cruiser.cjs).
+`@opensip-tools/lang-typescript` re-exports `filterContent`, `clearFilterCache`, and `FilteredContent` from `@opensip-tools/fitness`. This is the documented exception to the "lang packs depend only on core" layer rule — see [`80-implementation/05-layer-policy.md`](/docs/opensip-tools/80-implementation/05-layer-policy/) and the named `lang-no-fitness-except-typescript` carve-out in [`.dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.1/.dependency-cruiser.cjs).
 
 The history: those symbols moved out of `core` during an earlier refactor but the typescript adapter still re-exports them for downstream consumers that grew used to importing them from `lang-typescript`. The exception is named (`lang-no-fitness-except-typescript`) so any *other* lang pack reaching into fitness trips the rule.
 

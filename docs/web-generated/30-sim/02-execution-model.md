@@ -57,7 +57,7 @@ opensip-tools sim --recipe <name>
                                                                        shell prompt
 ```
 
-All four executors live under [`packages/simulation/engine/src/kinds/<kind>/executor.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.0/packages/simulation/engine/src/kinds/). Each accepts a kind-specific config (validated at `define*Scenario` time) and a `ScenarioContext` (signal/abort, logger, persona context for load/chaos).
+All four executors live under [`packages/simulation/engine/src/kinds/<kind>/executor.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.1/packages/simulation/engine/src/kinds/). Each accepts a kind-specific config (validated at `define*Scenario` time) and a `ScenarioContext` (signal/abort, logger, persona context for load/chaos).
 
 ---
 
@@ -65,7 +65,7 @@ All four executors live under [`packages/simulation/engine/src/kinds/<kind>/exec
 
 ### Load executor
 
-[`packages/simulation/engine/src/kinds/load/executor.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.0/packages/simulation/engine/src/kinds/load/executor.ts)
+[`packages/simulation/engine/src/kinds/load/executor.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.1/packages/simulation/engine/src/kinds/load/executor.ts)
 
 The load executor's job:
 
@@ -80,9 +80,9 @@ A load scenario that's interrupted (signal abort, timeout) returns whatever stat
 
 ### Chaos executor
 
-[`packages/simulation/engine/src/kinds/chaos/executor.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.0/packages/simulation/engine/src/kinds/chaos/executor.ts)
+[`packages/simulation/engine/src/kinds/chaos/executor.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.1/packages/simulation/engine/src/kinds/chaos/executor.ts)
 
-The chaos executor delegates the tick loop to the same shared `runLoadWindow` driver the load kind uses ([`packages/simulation/engine/src/framework/execution/run-load-window.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.0/packages/simulation/engine/src/framework/execution/run-load-window.ts)) and supplies an `injectChaos` callback per the Template Method pattern. The full sequence:
+The chaos executor delegates the tick loop to the same shared `runLoadWindow` driver the load kind uses ([`packages/simulation/engine/src/framework/execution/run-load-window.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.1/packages/simulation/engine/src/framework/execution/run-load-window.ts)) and supplies an `injectChaos` callback per the Template Method pattern. The full sequence:
 
 1. Run the steady-state window via `runLoadWindow(config, ctx, { windowMs: duration*1000, injectChaos })`. The callback fires per-request: at `chaos.probability` it returns a `chaos-event` outcome (recording a `ChaosEvent`); otherwise it returns `null` and the loop falls through to the default 95% success roll.
 2. Run the recovery window via `runLoadWindow(config, ctx, { windowMs: recoveryWindow })` — no `injectChaos` hook means chaos is off and only the default success roll applies.
@@ -91,11 +91,11 @@ The chaos executor delegates the tick loop to the same shared `runLoadWindow` dr
 
 The result type is `ChaosScenarioExecutorResult` — load metrics plus the steady-state and recovery verdicts. Pass/fail is the AND of every steady-state and recovery assertion.
 
-The bundled `ChaosType` set ([`packages/simulation/engine/src/types/base-types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.0/packages/simulation/engine/src/types/base-types.ts)) is `'latency' | 'error' | 'timeout' | 'rate-limit' | 'connection-drop' | 'data-corruption'`. Each type has its own `*ChaosConfig` payload (e.g. `LatencyChaosConfig` with `minMs`/`maxMs`; `ErrorChaosConfig` with `statusCode`/`message`). `target` is a free-form pattern matched against the request's service or endpoint — there's no fixed `database`/`cache`/`service` enum.
+The bundled `ChaosType` set ([`packages/simulation/engine/src/types/base-types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.1/packages/simulation/engine/src/types/base-types.ts)) is `'latency' | 'error' | 'timeout' | 'rate-limit' | 'connection-drop' | 'data-corruption'`. Each type has its own `*ChaosConfig` payload (e.g. `LatencyChaosConfig` with `minMs`/`maxMs`; `ErrorChaosConfig` with `statusCode`/`message`). `target` is a free-form pattern matched against the request's service or endpoint — there's no fixed `database`/`cache`/`service` enum.
 
 ### Invariant executor
 
-[`packages/simulation/engine/src/kinds/invariant/executor.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.0/packages/simulation/engine/src/kinds/invariant/executor.ts)
+[`packages/simulation/engine/src/kinds/invariant/executor.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.1/packages/simulation/engine/src/kinds/invariant/executor.ts)
 
 The invariant executor drives a workflow-integration lifecycle, not a property-based test loop:
 
@@ -107,16 +107,16 @@ The invariant executor drives a workflow-integration lifecycle, not a property-b
 
 All three callbacks have signature `(ctx: InvariantContext) => Promise<void>` — none takes or returns state. There is no random operation sequence, no counterexample capture, no RNG seed preservation; the model is "set up the world, act on it, observe via expectations."
 
-The result type is `InvariantScenarioExecutorResult` ([`packages/simulation/engine/src/framework/scenario-executor-result.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.0/packages/simulation/engine/src/framework/scenario-executor-result.ts)): `outcome.phases` (per-phase status + duration) and `outcome.assertions` (the assertion records the assert phase produced). Pass/fail = every assertion held AND every phase ended in `pass`.
+The result type is `InvariantScenarioExecutorResult` ([`packages/simulation/engine/src/framework/scenario-executor-result.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.1/packages/simulation/engine/src/framework/scenario-executor-result.ts)): `outcome.phases` (per-phase status + duration) and `outcome.assertions` (the assertion records the assert phase produced). Pass/fail = every assertion held AND every phase ended in `pass`.
 
 ### Fix-evaluation executor
 
-[`packages/simulation/engine/src/kinds/fix-evaluation/executor.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.0/packages/simulation/engine/src/kinds/fix-evaluation/executor.ts)
+[`packages/simulation/engine/src/kinds/fix-evaluation/executor.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.1/packages/simulation/engine/src/kinds/fix-evaluation/executor.ts)
 
 The most complex and the most experimental:
 
 1. Fetch the corpus — a sample of past signals matching `corpus.signalRuleId`, drawn from cloud storage or a local fixture.
-2. For each signal: invoke the configured agent to generate a fix, score the output with each `predicate` ([`packages/simulation/engine/src/kinds/fix-evaluation/predicates/`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.0/packages/simulation/engine/src/kinds/fix-evaluation/predicates/)).
+2. For each signal: invoke the configured agent to generate a fix, score the output with each `predicate` ([`packages/simulation/engine/src/kinds/fix-evaluation/predicates/`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.1/packages/simulation/engine/src/kinds/fix-evaluation/predicates/)).
 3. Aggregate: how many signals scored above threshold for each predicate.
 4. Pass/fail: aggregate score ≥ `scoreThreshold` for all predicates.
 
@@ -133,7 +133,7 @@ The recipe's `execution.mode` decides ordering:
 - **`sequential`** — one scenario at a time. The default for sim recipes. Required for load and chaos scenarios that drive the same target system: running them in parallel would create cross-contamination (latency injected for chaos #1 affects load #2's measurements).
 - **`parallel`** — N scenarios at once, bounded by `maxParallel`. Safe for invariant scenarios (each invariant is pure) and for fix-evaluation scenarios that fan out across independent corpus items.
 
-The recipe service ([`packages/simulation/engine/src/recipes/service.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.0/packages/simulation/engine/src/recipes/service.ts)) dispatches based on mode. Sequential dispatch awaits each scenario's result before starting the next; parallel uses a `Promise.all`-with-concurrency wrapper similar to fit's parallel dispatcher.
+The recipe service ([`packages/simulation/engine/src/recipes/service.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.1/packages/simulation/engine/src/recipes/service.ts)) dispatches based on mode. Sequential dispatch awaits each scenario's result before starting the next; parallel uses a `Promise.all`-with-concurrency wrapper similar to fit's parallel dispatcher.
 
 The `--kind` CLI filter (`opensip-tools sim --kind invariant`) is a post-selector intersection. If your recipe selects `{ type: 'all' }` and you pass `--kind invariant`, you run the invariant subset and nothing else.
 
@@ -141,7 +141,7 @@ The `--kind` CLI filter (`opensip-tools sim --kind invariant`) is a post-selecto
 
 ## The aggregated result
 
-After every scenario runs, the recipe service produces a `SimDoneResult` ([`packages/contracts/src/types.ts:271`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.0/packages/contracts/src/types.ts)):
+After every scenario runs, the recipe service produces a `SimDoneResult` ([`packages/contracts/src/types.ts:271`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.1/packages/contracts/src/types.ts)):
 
 ```ts
 interface SimDoneResult {
@@ -164,7 +164,7 @@ interface SimDoneResult {
 }
 ```
 
-This is the union member that the renderer consumes (the `App.tsx` dispatcher in [`packages/cli/src/ui/`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.0/packages/cli/src/ui/) switches on `result.type`). It's also the shape `--json` serializes.
+This is the union member that the renderer consumes (the `App.tsx` dispatcher in [`packages/cli/src/ui/`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.1/packages/cli/src/ui/) switches on `result.type`). It's also the shape `--json` serializes.
 
 Per-kind details (the load p99, the invariant counterexample, the chaos recovery time) are *not* in `SimDoneResult.scenarios[]`. They're in the executor result, which lives in the run's session record on disk under `<project>/opensip-tools/.runtime/sessions/{timestamp}-sim-{recipe?}.json`. The dashboard reads the session record to show full per-kind detail; the CLI summary stays compact.
 
