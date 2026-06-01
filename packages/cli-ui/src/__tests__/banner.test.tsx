@@ -2,7 +2,8 @@ import { render } from 'ink-testing-library';
 import React from 'react';
 import { describe, it, expect } from 'vitest';
 
-import { Banner, normalizeBannerSize } from '../banner.js';
+import { Banner, UpdateHint, normalizeBannerSize } from '../banner.js';
+import { ThemeProvider } from '../theme.js';
 
 const widestLine = (frame: string): number =>
   Math.max(...frame.split('\n').map((line) => line.length));
@@ -104,5 +105,17 @@ describe('normalizeBannerSize', () => {
     expect(normalizeBannerSize('enormous')).toBe('lg');
     expect(normalizeBannerSize('')).toBe('lg');
     expect(normalizeBannerSize(undefined)).toBe('lg');
+  });
+});
+
+describe('UpdateHint', () => {
+  it('renders the dim upgrade command line', () => {
+    const frame = render(
+      <ThemeProvider>
+        <UpdateHint />
+      </ThemeProvider>,
+    ).lastFrame() ?? '';
+    expect(frame).toContain('↑ Update:');
+    expect(frame).toContain('npm install -g @opensip-tools/cli');
   });
 });

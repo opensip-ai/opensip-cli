@@ -33,6 +33,7 @@ import {
   RunSummary,
   Spinner,
   ThemeProvider,
+  UpdateHint,
 } from '@opensip-tools/cli-ui';
 import {
   type FitOptions,
@@ -174,6 +175,7 @@ function FitRunner({ args, datastore, setExitCode }: FitRunnerProps): React.Reac
       return (
         <React.Fragment key={item}>
           <Banner size={bannerSize} version={ui?.version} projectPath={args.cwd} walkedUp={walkedUp} update={ui?.update} />
+          {bannerSize === 'mini' && ui?.update !== undefined && <UpdateHint />}
           {showProjectHeader && <ProjectHeader root={args.cwd} walkedUp={walkedUp} />}
         </React.Fragment>
       );

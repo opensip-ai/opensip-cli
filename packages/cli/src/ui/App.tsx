@@ -2,7 +2,7 @@
  * App — top-level Ink component that dispatches on CommandResult.type.
  */
 
-import { RunHeader , useTheme , ErrorMessage , Banner , normalizeBannerSize , ProjectHeader } from '@opensip-tools/cli-ui';
+import { RunHeader , useTheme , ErrorMessage , Banner , UpdateHint , normalizeBannerSize , ProjectHeader } from '@opensip-tools/cli-ui';
 import { Text, Box } from 'ink';
 import React from 'react';
 
@@ -79,6 +79,7 @@ export function App({ result, projectHeader, ui }: AppProps): React.ReactElement
           update={ui?.update}
         />
       )}
+      {showBanner && bannerSize === 'mini' && ui?.update !== undefined && <UpdateHint />}
       {showBanner && showProjectHeader && (
         <ProjectHeader root={projectHeader.root} walkedUp={projectHeader.walkedUp} />
       )}

@@ -36,6 +36,25 @@ const BANNER_SIZES: ReadonlySet<string> = new Set<BannerSize>(['lg', 'md', 'sm',
 /** Product tagline shown in the `mini` banner — mirrors the welcome screen. */
 const MINI_TAGLINE = 'codebase analysis toolkit';
 
+/** The npm command that upgrades a global install. */
+const UPGRADE_COMMAND = 'npm install -g @opensip-tools/cli';
+
+/**
+ * UpdateHint — a single dim line printed UNDER the `mini` banner box when an
+ * update is available, giving the actionable upgrade command. The `mini`
+ * card's version-line flag (`(vX.Y.Z available)`) announces the update but
+ * isn't actionable on its own; this line closes that gap without growing the
+ * fixed-height box. The other banner sizes get the same command via the
+ * stderr update nag, so callers render this only for `mini`.
+ */
+export function UpdateHint(): React.ReactElement {
+  return (
+    <Box paddingLeft={2}>
+      <Text dimColor>↑ Update: {UPGRADE_COMMAND}</Text>
+    </Box>
+  );
+}
+
 /**
  * Narrow an untyped banner-size string (e.g. from `ui.banner` in
  * `opensip-tools.config.yml`, which reaches the kernel as a plain `string`)

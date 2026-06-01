@@ -29,6 +29,7 @@ import {
   RunHeader,
   RunSummary,
   ThemeProvider,
+  UpdateHint,
   useSpinner,
   useTheme,
 } from '@opensip-tools/cli-ui';
@@ -216,6 +217,7 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
   const header = (
     <>
       <Banner size={bannerSize} version={ui?.version} projectPath={args.cwd} walkedUp={walkedUp} update={ui?.update} />
+      {bannerSize === 'mini' && ui?.update !== undefined && <UpdateHint />}
       {bannerSize !== 'mini' && <ProjectHeader root={args.cwd} walkedUp={walkedUp} />}
       <RunHeader tool={GRAPH_TOOL_TITLE} description={GRAPH_TOOL_DESCRIPTION} />
     </>

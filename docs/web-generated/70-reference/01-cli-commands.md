@@ -537,6 +537,25 @@ State contract enforced by code: `~/.opensip-tools/` holds `config.yml` only. Pe
 
 ---
 
+## Upgrading
+
+opensip-tools is distributed on npm; upgrading is your package manager's job — there is no self-update command (running the wrong manager's command in your environment would do more harm than good). For a global install:
+
+```
+npm install -g @opensip-tools/cli@latest
+```
+
+The CLI checks npm for a newer version once a day (non-blocking, TTY-only). When one is available it surfaces it without nagging:
+
+- On the default `mini` banner, the version line shows `(vX.Y.Z available)` and a dim `↑ Update: npm install -g @opensip-tools/cli` line prints just below the banner.
+- On the `lg`/`md`/`sm` banners (and the `--json` path, which renders no banner), the same upgrade command is printed as a one-line note on stderr.
+
+Silence the check entirely with `OPENSIP_NO_UPDATE=1` (or the conventional `NO_UPDATE_NOTIFIER=1`). It's also skipped automatically when `CI` is set or stdout isn't a TTY. Check your installed version any time with `opensip-tools --version`.
+
+If you installed via a version manager (volta, asdf) or Homebrew, use that tool's upgrade path instead of the npm command above.
+
+---
+
 ## What's next
 
 - **[`../50-extend/01-plugin-authoring.md`](/docs/opensip-tools/50-extend/01-plugin-authoring/)** — write a check, recipe, scenario, or full Tool plugin.
