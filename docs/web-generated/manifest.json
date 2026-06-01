@@ -1,6 +1,6 @@
 {
-  "version": "2.3.2",
-  "rawBase": "https://raw.githubusercontent.com/opensip-ai/opensip-tools/v2.3.2/",
+  "version": "2.3.3",
+  "rawBase": "https://raw.githubusercontent.com/opensip-ai/opensip-tools/v2.3.3/",
   "pages": [
     {
       "file": "docs/web-generated/README.md",

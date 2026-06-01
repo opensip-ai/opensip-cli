@@ -1,6 +1,6 @@
 {
   "name": "@opensip-tools/reporting",
-  "version": "2.3.2",
+  "version": "2.3.3",
   "license": "MIT",
   "description": "Reporting for OpenSIP Tools — SARIF build and cloud report, extracted from contracts",
   "repository": {

@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.3.3] — 2026-05-31
+
+### Fixed
+
+- **`fit` no longer warns about recognized non-code format tags.** A target's
+  `languages:` field is a matching dimension that routes files to checks; only
+  a subset of those tags also have a content-filter adapter (the AST-backed
+  code languages). The config validator conflated "no adapter" with "unknown
+  language", so legitimate adapter-less format tags — `json`, `markdown`,
+  `yaml` — tripped a spurious `target config declares unknown language(s)`
+  warning, even though the content filter already (correctly) scans those
+  files raw. The validator now recognizes a set of non-code format tags
+  (`json`, `yaml`, `markdown`, `toml`, `plaintext`) and warns only for
+  genuinely unrecognized tags (e.g. a typo like `pythonn`), with a clearer
+  message.
+
 ## [2.3.2] — 2026-05-31
 
 ### Changed

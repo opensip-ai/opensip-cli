@@ -1,6 +1,6 @@
 {
   "name": "@opensip-tools/graph-typescript",
-  "version": "2.3.2",
+  "version": "2.3.3",
   "license": "MIT",
   "description": "TypeScript language adapter for the opensip-tools graph engine",
   "repository": {
