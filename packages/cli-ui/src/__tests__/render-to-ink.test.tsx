@@ -48,4 +48,23 @@ describe('renderToInk — visible text', () => {
     expect(out).toContain('check  status');
     expect(out).toContain('a  PASS');
   });
+
+  it('renders key/value pairs one per line', () => {
+    const out = frame({ kind: 'keyValues', pairs: [{ label: 'recipe', value: 'example' }] });
+    expect(out).toContain('recipe: example');
+  });
+
+  it('renders a separator rule', () => {
+    expect(frame({ kind: 'separator' })).toContain('─');
+  });
+
+  it('renders a dim line without dropping its text', () => {
+    expect(frame({ kind: 'line', spans: [{ text: 'note' }], dim: true })).toContain('note');
+  });
+
+  it('renders a group of mixed nodes incl. spacer', () => {
+    const out = frame(group([line('top'), { kind: 'spacer' }, line('bottom')]));
+    expect(out).toContain('top');
+    expect(out).toContain('bottom');
+  });
 });
