@@ -149,6 +149,16 @@
       "purpose": "The baseline-and-compare workflow. Identity hash, line-shift invariance, partial-SARIF tolerance, CI integration patterns."
     },
     {
+      "file": "docs/web-generated/10-concepts/06-cli-output-rendering.md",
+      "path": "/docs/opensip-tools/10-concepts/06-cli-output-rendering/",
+      "section": "10-concepts",
+      "title": "CLI output rendering",
+      "audience": [
+        "contributors"
+      ],
+      "purpose": "How every command's human-readable output is defined once and rendered two ways — Ink for a TTY, plain text for pipes/CI — so the two cannot drift."
+    },
+    {
       "file": "docs/web-generated/20-fit/01-recipes-and-checks.md",
       "path": "/docs/opensip-tools/20-fit/01-recipes-and-checks/",
       "section": "20-fit",
@@ -530,7 +540,8 @@
         "/docs/opensip-tools/10-concepts/02-tool-plugin-model/",
         "/docs/opensip-tools/10-concepts/03-modular-monolith/",
         "/docs/opensip-tools/10-concepts/04-contract-surfaces/",
-        "/docs/opensip-tools/10-concepts/05-architecture-gate/"
+        "/docs/opensip-tools/10-concepts/05-architecture-gate/",
+        "/docs/opensip-tools/10-concepts/06-cli-output-rendering/"
       ]
     },
     {
@@ -700,6 +711,7 @@
         "/docs/opensip-tools/10-concepts/03-modular-monolith/",
         "/docs/opensip-tools/10-concepts/04-contract-surfaces/",
         "/docs/opensip-tools/10-concepts/05-architecture-gate/",
+        "/docs/opensip-tools/10-concepts/06-cli-output-rendering/",
         "/docs/opensip-tools/20-fit/01-recipes-and-checks/",
         "/docs/opensip-tools/20-fit/02-targets-and-scope/",
         "/docs/opensip-tools/20-fit/03-ignore-directives/",

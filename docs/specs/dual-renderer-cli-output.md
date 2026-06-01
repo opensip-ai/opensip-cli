@@ -1,6 +1,10 @@
 # Spec: Dual-Renderer CLI Output Architecture
 
-> Status: **DRAFT — awaiting approval.** Gates `/backend-plan`.
+> Status: **IMPLEMENTED** (2026-06-01). Built on branch
+> `feat/dual-renderer-cli-output` (Phases 0–7). The drift bug is closed for
+> the fit + graph report/gate paths and every `CommandResult` renders
+> through the view-model. One residual is tracked in
+> `docs/backlog/graph-side-channel-stdout.md`.
 > Author: audit follow-up, 2026-06-01.
 
 ## Objective
