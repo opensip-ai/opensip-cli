@@ -130,6 +130,7 @@ const FIXTURE_INDEXES: Indexes = {
     ['hash_greet', [GREET_OCCURRENCE]],
     ['hash_format_name', [FORMAT_NAME_OCCURRENCE]],
   ]),
+  importedPackagesByFile: new Map(),
   bySimpleName: new Map([
     ['greet', ['hash_greet']],
     ['formatName', ['hash_format_name']],
@@ -422,6 +423,7 @@ const FIXTURE_INDEXES_WITH_DEPS: Indexes = {
     ['hash_module_init_format', [FORMAT_MODULE_INIT]],
     ['hash_module_init_greet', [GREET_MODULE_INIT]],
   ]),
+  importedPackagesByFile: new Map(),
   bySimpleName: new Map(),
   callees: new Map(),
   callers: new Map(),

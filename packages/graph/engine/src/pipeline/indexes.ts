@@ -7,6 +7,8 @@
 
 import { logger } from '@opensip-tools/core';
 
+import { packageOf } from './resolve-callee.js';
+
 import type { BlastScore, Catalog, FunctionOccurrence, Indexes } from '../types.js';
 
 /**
@@ -27,6 +29,7 @@ export function buildIndexes(catalog: Catalog): Indexes {
   }
   const { callees, callers } = buildAdjacency(byBodyHash);
   const blastRadius = buildBlastRadius(byBodyHash, callers);
+  const importedPackagesByFile = buildImportedPackagesByFile(occurrencesByHash, byBodyHash);
 
   logger.info({
     evt: 'graph.indexes.build.complete',
@@ -35,7 +38,51 @@ export function buildIndexes(catalog: Catalog): Indexes {
     edges: [...callees.values()].reduce((n, arr) => n + arr.length, 0),
   });
 
-  return { byBodyHash, occurrencesByHash, bySimpleName, callees, callers, blastRadius };
+  return { byBodyHash, occurrencesByHash, importedPackagesByFile, bySimpleName, callees, callers, blastRadius };
+}
+
+/**
+ * filePath → set of package groups it imports. Reads each file's module-init
+ * `dependencies[]` (the resolved import targets) and maps each to its
+ * package via `packageOf`. Files without resolved imports (and all files in
+ * `fast` mode, which has no `dependencies[]`) get no entry.
+ */
+function buildImportedPackagesByFile(
+  occurrencesByHash: ReadonlyMap<string, readonly FunctionOccurrence[]>,
+  byBodyHash: ReadonlyMap<string, FunctionOccurrence>,
+): Map<string, Set<string>> {
+  const out = new Map<string, Set<string>>();
+  for (const occs of occurrencesByHash.values()) {
+    for (const occ of occs) {
+      const pkgs = importedPackagesOf(occ, byBodyHash);
+      if (pkgs.size > 0) unionInto(out, occ.filePath, pkgs);
+    }
+  }
+  return out;
+}
+
+/** Package groups one module-init occurrence imports (resolved via byBodyHash). */
+function importedPackagesOf(
+  occ: FunctionOccurrence,
+  byBodyHash: ReadonlyMap<string, FunctionOccurrence>,
+): Set<string> {
+  const set = new Set<string>();
+  for (const dep of occ.dependencies ?? []) {
+    for (const targetHash of dep.to) {
+      const target = byBodyHash.get(targetHash);
+      if (target) set.add(packageOf(target.filePath));
+    }
+  }
+  return set;
+}
+
+function unionInto(map: Map<string, Set<string>>, key: string, values: ReadonlySet<string>): void {
+  let set = map.get(key);
+  if (!set) {
+    set = new Set<string>();
+    map.set(key, set);
+  }
+  for (const v of values) set.add(v);
 }
 
 function indexNameBucket(
@@ -50,19 +97,19 @@ function indexNameBucket(
   if (!occs) return;
   for (const o of occs) {
     byBodyHash.set(o.bodyHash, o);
-    let all = occurrencesByHash.get(o.bodyHash);
-    if (!all) {
-      all = [];
-      occurrencesByHash.set(o.bodyHash, all);
-    }
-    all.push(o);
-    let names = bySimpleName.get(name);
-    if (!names) {
-      names = [];
-      bySimpleName.set(name, names);
-    }
-    names.push(o.bodyHash);
+    pushTo(occurrencesByHash, o.bodyHash, o);
+    pushTo(bySimpleName, name, o.bodyHash);
   }
+}
+
+/** Append `value` to the array stored at `key`, creating it if absent. */
+function pushTo<K, V>(map: Map<K, V[]>, key: K, value: V): void {
+  let arr = map.get(key);
+  if (!arr) {
+    arr = [];
+    map.set(key, arr);
+  }
+  arr.push(value);
 }
 
 function buildAdjacency(

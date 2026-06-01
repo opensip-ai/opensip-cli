@@ -149,6 +149,7 @@ function makeIndexes(): Indexes {
   return {
     byBodyHash: new Map(),
     occurrencesByHash: new Map(),
+    importedPackagesByFile: new Map(),
     bySimpleName: new Map(),
     callees: new Map(),
     callers: new Map(),

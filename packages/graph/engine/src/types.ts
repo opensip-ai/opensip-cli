@@ -298,6 +298,15 @@ export interface Indexes {
    * disambiguated to the correct package. Consumed by `resolveCallee`.
    */
   readonly occurrencesByHash: ReadonlyMap<string, readonly FunctionOccurrence[]>;
+  /**
+   * Project-relative filePath → set of package groups that file's module
+   * imports (derived from the file's module-init `dependencies[]` resolved
+   * to packages). Empty for files with no resolved imports — and empty in
+   * `fast` mode, where `dependencies[]` is not populated. Lets
+   * `resolveCallee` constrain a duplicated-body callee to a package the
+   * caller actually depends on.
+   */
+  readonly importedPackagesByFile: ReadonlyMap<string, ReadonlySet<string>>;
   readonly bySimpleName: ReadonlyMap<string, readonly string[]>;
   /** bodyHash → bodyHash[] (forward). */
   readonly callees: ReadonlyMap<string, readonly string[]>;
