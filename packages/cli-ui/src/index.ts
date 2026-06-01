@@ -22,6 +22,17 @@ export { RunFooterHints, type RunFooterHint, type RunFooterHintsProps } from './
 export { Spinner, type SpinnerProps, useSpinner, useStandaloneSpinner } from './spinner.js';
 export { ClockProvider, type ClockProviderProps, useClock, useTick } from './clock.js';
 export {
+  type ViewNode,
+  type Span,
+  type Tone,
+  type HintItem,
+  text,
+  line,
+  group,
+} from './view-model.js';
+export { renderToText } from './render-to-text.js';
+export { renderToInk } from './render-to-ink.js';
+export {
   DEFAULT_THEME,
   ThemeContext,
   ThemeProvider,
