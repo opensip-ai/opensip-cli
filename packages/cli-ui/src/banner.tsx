@@ -140,16 +140,30 @@ const BANNER_SM: CompactBanner = {
 };
 
 /**
- * `mini` cup art — four rows (steam, mug rim, mug body, saucer), one per
- * info line, so the steam sits beside the version line and the saucer beside
- * the project path. Rendered entirely in `theme.brand` (amber).
+ * `mini` cup art — four rows (steam, lid, cup body, saucer), one per info
+ * line, so the steam sits beside the version line and the saucer beside the
+ * project path. The cup body and saucer render in `theme.brand` (amber); the
+ * steam and lid rows ({@link MINI_CUP_LIGHT_ROWS}) render in the default
+ * terminal foreground so they read as white vapor + a white to-go-cup lid on
+ * dark terminals and auto-contrast (rather than vanishing) on light
+ * backgrounds — see {@link MiniBanner}.
  */
 const BANNER_MINI_CUP: readonly string[] = [
-  ' ░ ░ ',
+  ' ⋮ ⋮ ',
   '▟███▙',
   '▐███▌',
   ' ▀▀▀ ',
 ];
+
+/**
+ * Rows of {@link BANNER_MINI_CUP} rendered in the default foreground (no
+ * `color`) rather than brand amber: the steam (row 0, white vapor) and the
+ * lid (row 1, white to-go-cup lid). Default fg is ≈bright white on dark
+ * terminals, an auto-contrast dark on light backgrounds, and correctly
+ * colorless under `NO_COLOR`. A literal `'white'` would be invisible on light
+ * terminals and would bypass the no-color theme.
+ */
+const MINI_CUP_LIGHT_ROWS: ReadonlySet<number> = new Set([0, 1]);
 
 /** Marketing URL shown in the `mini` banner — brand-coloured, reads as a link. */
 const MINI_URL = 'www.opensip.ai';
@@ -204,7 +218,13 @@ function MiniBanner({
     >
       <Box flexDirection="column" marginRight={2}>
         {BANNER_MINI_CUP.map((line, i) => (
-          <Text key={i} color={theme.brand}>{line}</Text>
+          // Steam + lid render in the default terminal foreground (no color) so
+          // they read as white vapor and a white to-go-cup lid on dark
+          // terminals and auto-contrast on light ones; the cup body and saucer
+          // stay brand amber.
+          <Text key={i} color={MINI_CUP_LIGHT_ROWS.has(i) ? undefined : theme.brand}>
+            {line}
+          </Text>
         ))}
       </Box>
       <Box flexDirection="column">
