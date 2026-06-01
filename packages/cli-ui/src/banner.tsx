@@ -37,7 +37,7 @@ const BANNER_SIZES: ReadonlySet<string> = new Set<BannerSize>(['lg', 'md', 'sm',
 const MINI_TAGLINE = 'codebase analysis toolkit';
 
 /** The npm command that upgrades a global install. */
-const UPGRADE_COMMAND = 'npm install -g @opensip-tools/cli';
+const UPGRADE_COMMAND = 'npm install -g opensip-tools';
 
 /**
  * UpdateHint — a single dim line printed UNDER the `mini` banner box when an

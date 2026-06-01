@@ -1,8 +1,8 @@
 {
-  "name": "@opensip-tools/cli",
+  "name": "opensip-tools",
   "version": "2.3.3",
   "license": "MIT",
-  "description": "OpenSIP Tools CLI — codebase analysis from the command line",
+  "description": "OpenSIP Tools — codebase analysis from the command line (the CLI; `npm i -g opensip-tools`)",
   "repository": {
     "type": "git",
     "url": "https://github.com/opensip-ai/opensip-tools.git",

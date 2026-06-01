@@ -93,20 +93,26 @@ if (tarballs.length === 0) {
   fail(`no ${TARBALL_PREFIX}*${tarballSuffix} tarballs found in ${tarballDir}`);
 }
 
-// pnpm pack names files `opensip-tools-<unscoped-name>-<version>.tgz`.
-// All packages share one version (verify-release.mjs enforces this), so
-// the suffix is deterministic and we can recover the scoped name by
-// stripping the known prefix and suffix.
+// pnpm pack names scoped packages `opensip-tools-<unscoped-name>-<version>.tgz`
+// and the unscoped CLI package (`opensip-tools`) just `opensip-tools-<version>.tgz`.
+// All packages share one version (verify-release.mjs enforces this), so the
+// suffix is deterministic. The CLI tarball is the install entry point; every
+// other tarball is a scoped transitive dep we force via `overrides`.
+const cliFileName = `opensip-tools-${expectedVersion}.tgz`;
 const overrides = {};
+let cliTarball;
 for (const file of tarballs) {
+  if (file === cliFileName) {
+    cliTarball = `file:${join(tarballDir, file)}`;
+    continue;
+  }
   const unscoped = file.slice(TARBALL_PREFIX.length, -tarballSuffix.length);
   overrides[`${SCOPE}${unscoped}`] = `file:${join(tarballDir, file)}`;
 }
-info(`discovered ${Object.keys(overrides).length} @opensip-tools/* tarball(s)`);
+info(`discovered ${Object.keys(overrides).length} @opensip-tools/* tarball(s) + the opensip-tools CLI`);
 
-const cliTarball = overrides[`${SCOPE}cli`];
 if (!cliTarball) {
-  fail(`@opensip-tools/cli tarball missing from ${tarballDir} — cannot smoke-test the entry point`);
+  fail(`opensip-tools tarball (${cliFileName}) missing from ${tarballDir} — cannot smoke-test the entry point`);
 }
 
 // ---------------------------------------------------------------------
@@ -123,7 +129,7 @@ const consumerPkg = {
   name: 'opensip-tools-smoke',
   version: '0.0.0',
   private: true,
-  dependencies: { [`${SCOPE}cli`]: cliTarball },
+  dependencies: { 'opensip-tools': cliTarball },
   overrides,
 };
 await fs.writeFile(

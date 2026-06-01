@@ -12,7 +12,7 @@
  * `dashboard.ts` consume.
  *
  * They are NOT threaded through a `FitContext` parameter today because
- * two external consumers (`FitView` in `@opensip-tools/cli`,
+ * two external consumers (`FitView` in `opensip-tools`,
  * `dashboard.ts` in this package) reach for the accessors directly —
  * wiring everything through a context object would either break those
  * imports or maintain a dual access path. Audit 2026-05-23 F6 documents
@@ -163,7 +163,7 @@ export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
   // 3. Discover and load every @opensip-tools/checks-* package installed
   //    in node_modules. No package is privileged — what used to be a
   //    hardcoded `import('@opensip-tools/checks-builtin')` is now an
-  //    ordinary npm dependency declared by @opensip-tools/cli and
+  //    ordinary npm dependency declared by opensip-tools and
   //    discovered via discoverCheckPackages() like every other pack.
   //    Project config can override (plugins.checkPackages: [...]) or
   //    opt out (plugins.autoDiscoverChecks: false).
@@ -212,7 +212,7 @@ export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
 /**
  * Resolve the directory the CLI was installed into, used as a discovery
  * fallback when no projectDir is supplied. Walks up from this module's
- * URL to the @opensip-tools/cli package root so node_modules lookup
+ * URL to the opensip-tools package root so node_modules lookup
  * sees the CLI's own dependency tree (which now contains checks-builtin
  * and any other check packages declared in cli/package.json).
  */
@@ -307,7 +307,7 @@ function coreMismatchWarning(skips: readonly string[], foreignCore: string | und
       `@opensip-tools/core (${foreignCore ?? '<unknown>'}) than this CLI ` +
       `(${selfCorePath ?? '<unknown>'}): ${skips.join(', ')}. Loading them would split the run ` +
       `scope and produce false positives. Run the project's own CLI instead ` +
-      `(e.g. \`pnpm fit\`, or \`npx @opensip-tools/cli fit\` from the project).`,
+      `(e.g. \`pnpm fit\`, or \`npx opensip-tools fit\` from the project).`,
   ];
 }
 

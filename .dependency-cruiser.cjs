@@ -13,7 +13,7 @@
  *   4. @opensip-tools/dashboard      — HTML report generator (depends on core + contracts)
  *   4. @opensip-tools/cli-ui         — shared Ink/React presentational primitives (banner, spinner, header, theme)
  *   5. @opensip-tools/checks-*       — fitness check packs (depend on fitness)
- *   6. @opensip-tools/cli            — entry point (depends on every tool)
+ *   6. opensip-tools            — entry point (depends on every tool)
  *
  * Forbidden edges enforce that dependencies flow from lower-numbered layers
  * upward only — a higher layer must never reach DOWN into a lower layer.
@@ -489,7 +489,7 @@ module.exports = {
       // covers every graph-* adapter pack, incl. go/java (audit 2026-05-29).
       name: 'graph-adapters-no-cli',
       severity: 'error',
-      comment: 'Graph adapter packs must not depend on @opensip-tools/cli.',
+      comment: 'Graph adapter packs must not depend on opensip-tools.',
       from: { path: '^packages/graph/graph-[a-z0-9-]+/' },
       to: { path: '^packages/cli/' },
     },

@@ -29,7 +29,7 @@ Layered monorepo with three top-level groupings: top-level packages
 packages/
   core/                    # @opensip-tools/core — kernel
   contracts/               # @opensip-tools/contracts — Tool↔runner contract types
-  cli/                     # @opensip-tools/cli — generic tool dispatcher
+  cli/                     # opensip-tools — generic tool dispatcher
 
   fitness/
     engine/                # @opensip-tools/fitness — fitness engine + commands
@@ -174,7 +174,7 @@ We use Vitest. Test files go next to the source as `*.test.ts` (or `*.test.tsx` 
 ```bash
 pnpm test                                    # All tests
 pnpm --filter=@opensip-tools/core test       # Core tests only
-pnpm --filter=@opensip-tools/cli test        # CLI tests only
+pnpm --filter=opensip-tools test        # CLI tests only
 ```
 
 ### Testing Ink components

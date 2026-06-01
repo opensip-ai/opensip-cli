@@ -91,7 +91,7 @@ That's the whole tool. `npm install @my-co/audit-sec` (or `opensip-tools plugin 
 
 - An entry-points declaration.
 - A hook or middleware registration.
-- A code change in `@opensip-tools/cli`.
+- A code change in `opensip-tools`.
 - A code change in `@opensip-tools/core`.
 - A schema migration.
 

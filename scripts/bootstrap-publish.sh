@@ -70,7 +70,7 @@ PACKAGES=(
   fitness simulation graph
   graph-typescript graph-python graph-rust graph-go graph-java
   checks-universal checks-typescript checks-python checks-go checks-java checks-cpp checks-rust
-  cli
+  opensip-tools
 )
 
 published=0
@@ -78,7 +78,16 @@ skipped=0
 newly_created=()
 
 for pkg in "${PACKAGES[@]}"; do
-  name="@opensip-tools/$pkg"
+  # The CLI publishes under the unscoped name `opensip-tools`; everything else
+  # is `@opensip-tools/<pkg>`. pnpm pack names the tarball accordingly:
+  # unscoped → `opensip-tools-<ver>.tgz`, scoped → `opensip-tools-<pkg>-<ver>.tgz`.
+  if [[ "$pkg" == "opensip-tools" ]]; then
+    name="opensip-tools"
+    tarball="$TARBALL_DIR/opensip-tools-${VERSION}.tgz"
+  else
+    name="@opensip-tools/$pkg"
+    tarball="$TARBALL_DIR/opensip-tools-${pkg}-${VERSION}.tgz"
+  fi
 
   # Namespace-creation only: skip any package whose NAME already exists on
   # npm, regardless of version. Existing packages already have trusted
@@ -101,7 +110,6 @@ for pkg in "${PACKAGES[@]}"; do
   echo "pack    $name  [NEW]"
   pnpm --filter "$name" pack --pack-destination "$TARBALL_DIR" >/dev/null
 
-  tarball="$TARBALL_DIR/opensip-tools-${pkg}-${VERSION}.tgz"
   if [[ ! -f "$tarball" ]]; then
     echo "error: expected tarball not found at $tarball" >&2
     echo "       $(ls "$TARBALL_DIR")" >&2

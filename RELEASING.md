@@ -2,8 +2,10 @@
 
 Releases are tag-driven. Pushing a tag matching `v*` triggers
 `.github/workflows/release.yml`, which builds, tests, packs, and
-publishes all 29 `@opensip-tools/*` packages to npm via OIDC trusted
-publishing — no `NPM_TOKEN` required.
+publishes all 29 packages to npm via OIDC trusted publishing — no
+`NPM_TOKEN` required. (28 are scoped `@opensip-tools/*`; the CLI itself
+publishes under the unscoped name **`opensip-tools`** — the one package
+end-users install directly, via `npm i -g opensip-tools`.)
 
 ## The 29 packages
 
@@ -37,7 +39,7 @@ publishing — no `NPM_TOKEN` required.
 | Check packs | `@opensip-tools/checks-java` | `packages/fitness/checks-java` |
 | Check packs | `@opensip-tools/checks-cpp` | `packages/fitness/checks-cpp` |
 | Check packs | `@opensip-tools/checks-rust` | `packages/fitness/checks-rust` |
-| CLI | `@opensip-tools/cli` | `packages/cli` |
+| CLI | `opensip-tools` (unscoped) | `packages/cli` |
 
 All 29 share the same version. The release workflow publishes them in
 dependency order; downstream packages reference upstream versions in
@@ -80,12 +82,14 @@ their `dependencies`.
 
 6. Verify on npm:
    ```bash
-   for p in core datastore contracts session-store reporting cli-ui cli fitness simulation graph dashboard \
+   for p in core datastore contracts session-store reporting cli-ui fitness simulation graph dashboard \
             graph-typescript graph-python graph-rust graph-go graph-java \
             lang-typescript lang-rust lang-python lang-go lang-java lang-cpp \
             checks-typescript checks-universal checks-python checks-go checks-java checks-cpp checks-rust; do
      printf '%-40s %s\n' "@opensip-tools/$p" "$(npm view "@opensip-tools/$p" version 2>/dev/null || echo MISSING)"
    done
+   # The CLI publishes under the unscoped name:
+   printf '%-40s %s\n' "opensip-tools" "$(npm view opensip-tools version 2>/dev/null || echo MISSING)"
    ```
 
 ## Publish order
@@ -131,7 +135,7 @@ Order:
     (typescript / tree-sitter-*). Independent of each other; published
     in any order within the group. All five are first-party CLI
     dependencies — the CLI bundles every graph adapter it loads by
-    default (see step 14), so installing `@opensip-tools/cli` pulls
+    default (see step 14), so installing `opensip-tools` pulls
     them all in. (Only *third-party* `@opensip-tools/graph-*` adapters
     are opt-in: they're discovered by name pattern and installed
     explicitly.)
@@ -140,10 +144,12 @@ Order:
     `checks-go`, `checks-java`, `checks-cpp`, `checks-rust` — all
     peer-depend on fitness. `checks-rust` is opt-in (not a CLI
     dependency); install explicitly.
-14. **`@opensip-tools/cli`** — depends on every tool, every check pack
-    and every graph adapter pack the CLI loads by default, every
-    language adapter, contracts, datastore, session-store, reporting,
-    and cli-ui. Always published last.
+14. **`opensip-tools`** (unscoped — the user-facing CLI) — depends on
+    every tool, every check pack and every graph adapter pack the CLI
+    loads by default, every language adapter, contracts, datastore,
+    session-store, reporting, and cli-ui. Always published last. Its
+    tarball is `opensip-tools-<version>.tgz` (no scope segment); the
+    release workflow's `publish_unscoped` handles the bare name.
 
 ## Prerequisites (one-time setup)
 

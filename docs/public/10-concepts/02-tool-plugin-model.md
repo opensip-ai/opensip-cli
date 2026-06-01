@@ -109,7 +109,7 @@ The flow lives in [`packages/cli/src/index.ts`](../../../packages/cli/src/index.
    program.parseAsync(process.argv);
 ```
 
-First-party tools (`fit`, `sim`, `graph`) are imported statically. They're a direct dep of `@opensip-tools/cli` and ship in the same npm install. Third-party tools are discovered by walking `node_modules` for any package whose `package.json` declares the `opensipTools` metadata block — see [`packages/core/src/plugins/tool-package-discovery.ts`](../../../packages/core/src/plugins/tool-package-discovery.ts).
+First-party tools (`fit`, `sim`, `graph`) are imported statically. They're a direct dep of `opensip-tools` and ship in the same npm install. Third-party tools are discovered by walking `node_modules` for any package whose `package.json` declares the `opensipTools` metadata block — see [`packages/core/src/plugins/tool-package-discovery.ts`](../../../packages/core/src/plugins/tool-package-discovery.ts).
 
 The discovery shape is:
 
@@ -198,7 +198,7 @@ export const tool = auditSecTool; // discovery export
   "main": "dist/index.js",
   "opensipTools": { "kind": "tool" },
   "peerDependencies": {
-    "@opensip-tools/cli": "^1.0.0",
+    "opensip-tools": "^1.0.0",
     "@opensip-tools/core": "^1.0.0"
   }
 }
@@ -210,7 +210,7 @@ What you *don't* need:
 
 - An entry-points declaration.
 - A hook or middleware registration.
-- A code change in `@opensip-tools/cli`.
+- A code change in `opensip-tools`.
 - A code change in `@opensip-tools/core`.
 - A schema migration for the project config (unless your tool has its own config — which goes in a tool-namespaced section under `opensip-tools.config.yml`).
 
@@ -223,7 +223,7 @@ If your tool also wants to ship checks (the way `@opensip-tools/checks-typescrip
 Three things, in order of importance:
 
 1. **A stable kernel.** `@opensip-tools/core` does not import any tool. The layer policy ([dependency-cruiser config](../../../.dependency-cruiser.cjs)) enforces this — `core-imports-nothing-workspace` would fail the build if `core` ever reached up. This means kernel changes are safe: a kernel bump can't break a tool, because the kernel can't see the tool.
-2. **Independent tool versioning.** Each Tool package has its own version. The CLI is pinned to a major-version range of each first-party tool, but third-party tools can release on their own cadence. A user can pin `@opensip-tools/checks-python@2.x` while staying on `@opensip-tools/cli@1.x`.
+2. **Independent tool versioning.** Each Tool package has its own version. The CLI is pinned to a major-version range of each first-party tool, but third-party tools can release on their own cadence. A user can pin `@opensip-tools/checks-python@2.x` while staying on `opensip-tools@1.x`.
 3. **A future where `fit` is just one of many tools.** The platform was designed for `audit-*`, `lint-*`, `report-*`, `bench-*`, and similar Tools to slot in. Today there are three (`fit`, `sim`, `graph`); tomorrow there might be ten. The CLI grows by zero lines.
 
 ---

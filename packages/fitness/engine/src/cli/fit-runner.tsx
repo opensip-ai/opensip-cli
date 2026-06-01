@@ -1,7 +1,7 @@
 /**
  * fit-runner — owns the live-view state machine for `opensip-tools fit`.
  *
- * Layer 5 Phase 3 lifted the fit live view out of `@opensip-tools/cli`.
+ * Layer 5 Phase 3 lifted the fit live view out of `opensip-tools`.
  * The state machine (loading → running → done | error), `executeFit`
  * orchestration, `reportToCloud` post-call, and the Ink/React render
  * tree all live here, in the package that owns the fitness command

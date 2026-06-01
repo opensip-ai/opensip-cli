@@ -18,7 +18,7 @@
  *
  * This file re-exports the public surface (`executeFit`,
  * `ensureChecksLoaded`, the display accessors, `setPreLoadHook`, the
- * formatting helpers) so existing consumers (`@opensip-tools/cli`,
+ * formatting helpers) so existing consumers (`opensip-tools`,
  * `dashboard.ts`, the fitness `index.ts` barrel) keep resolving the
  * same names.
  */
@@ -44,7 +44,7 @@ import type { DataStore } from '@opensip-tools/datastore';
 
 // ---------------------------------------------------------------------------
 // Re-exports — preserve the public surface that external consumers
-// (`@opensip-tools/cli`, `dashboard.ts`, fitness's barrel) import from
+// (`opensip-tools`, `dashboard.ts`, fitness's barrel) import from
 // this file. Splitting the implementation under `./fit/` is an internal
 // refactor; the import sites stay on `./fit.js`.
 // ---------------------------------------------------------------------------

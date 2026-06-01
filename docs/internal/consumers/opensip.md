@@ -34,12 +34,12 @@ These are **content packs** — the package ships YAML/JSON check definitions th
 opensip's `package.json` additionally pins:
 
 ```json
-"@opensip-tools/cli": "^2.0.0"
+"opensip-tools": "^2.0.0"
 ```
 
 opensip's catalog-ingestion path calls `spawn('opensip-tools', ['graph', '--catalog-output', ...])` to produce a JSON catalog file, which `CatalogIngestor` then upserts to Postgres. This is the first time opensip has had a **runtime production dependency** on opensip-tools (all prior deps were content packs loaded as data, not commands invoked at runtime).
 
-The PATH resolution works because `@opensip-tools/cli` declares `"bin": { "opensip-tools": "./dist/index.js" }`. pnpm symlinks `node_modules/.bin/opensip-tools` and prepends `node_modules/.bin/` to PATH at runtime, so `spawn('opensip-tools', ...)` resolves to our binary inside opensip's containers.
+The PATH resolution works because `opensip-tools` declares `"bin": { "opensip-tools": "./dist/index.js" }`. pnpm symlinks `node_modules/.bin/opensip-tools` and prepends `node_modules/.bin/` to PATH at runtime, so `spawn('opensip-tools', ...)` resolves to our binary inside opensip's containers.
 
 **Hidden contracts:**
 
@@ -56,11 +56,11 @@ The PATH resolution works because `@opensip-tools/cli` declares `"bin": { "opens
 
 ### Transitive dependency footprint
 
-`@opensip-tools/cli` pulls a substantial transitive graph: `@opensip-tools/graph`, `graph-typescript`, `graph-python`, `graph-go`, `graph-rust`, `graph-java`, `@opensip-tools/contracts`, `core`, `datastore`, `fitness`, `cli-ui`. opensip's container image weight increases by roughly 5–10 MB versus the content-pack-only setup. This is acknowledged on the opensip side and is not a problem we need to solve — but be aware that adding a heavy transitive dep to `@opensip-tools/cli` cascades into opensip's container size.
+`opensip-tools` pulls a substantial transitive graph: `@opensip-tools/graph`, `graph-typescript`, `graph-python`, `graph-go`, `graph-rust`, `graph-java`, `@opensip-tools/contracts`, `core`, `datastore`, `fitness`, `cli-ui`. opensip's container image weight increases by roughly 5–10 MB versus the content-pack-only setup. This is acknowledged on the opensip side and is not a problem we need to solve — but be aware that adding a heavy transitive dep to `opensip-tools` cascades into opensip's container size.
 
 ### Independent version trains
 
-`@opensip-tools/checks-typescript` (content) and `@opensip-tools/cli` (binary) ship on separate version trains. opensip can bump one without the other. Bumping `cli` to a new major does not disturb the pinned `checks-typescript` version. This is intentional — content-pack changes and CLI changes have different review cadences and different breakage profiles.
+`@opensip-tools/checks-typescript` (content) and `opensip-tools` (binary) ship on separate version trains. opensip can bump one without the other. Bumping `cli` to a new major does not disturb the pinned `checks-typescript` version. This is intentional — content-pack changes and CLI changes have different review cadences and different breakage profiles.
 
 ### Engine subprocess has no OpenTelemetry SDK
 

@@ -14,7 +14,7 @@
  * `startActiveSpan` runs the callback with a no-op span, records nothing, makes
  * no network calls, and adds an unmeasurable amount of overhead. That
  * registration happens ONLY at the application boundary — the CLI composition
- * root (`@opensip-tools/cli`), gated on `OTEL_EXPORTER_OTLP_ENDPOINT`. The heavy
+ * root (`opensip-tools`), gated on `OTEL_EXPORTER_OTLP_ENDPOINT`. The heavy
  * SDK packages (`@opentelemetry/sdk-*`, exporters, context managers) never enter
  * the kernel.
  *

@@ -10,7 +10,7 @@
       "@opensip-tools/session-store": ["packages/session-store/src/index.ts"],
       "@opensip-tools/reporting": ["packages/reporting/src/index.ts"],
       "@opensip-tools/cli-ui": ["packages/cli-ui/src/index.ts"],
-      "@opensip-tools/cli": ["packages/cli/src/index.ts"],
+      "opensip-tools": ["packages/cli/src/index.ts"],
       "@opensip-tools/dashboard": ["packages/dashboard/src/index.ts"],
       "@opensip-tools/fitness": ["packages/fitness/engine/src/index.ts"],
       "@opensip-tools/simulation": ["packages/simulation/engine/src/index.ts"],

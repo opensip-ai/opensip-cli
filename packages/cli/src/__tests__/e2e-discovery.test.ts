@@ -12,7 +12,7 @@
  *  - No-side-effects: --dry-run uninstall doesn't create .runtime/.
  *
  * These tests run the actual binary (`packages/cli/dist/index.js`), so
- * the build must be done first (pnpm --filter=@opensip-tools/cli build).
+ * the build must be done first (pnpm --filter=opensip-tools build).
  */
 
 import { execFileSync } from 'node:child_process';
@@ -179,7 +179,7 @@ describe('schema-version skew', () => {
     const { stderr, exitCode } = runCli(['fit-list'], testDir);
     expect(exitCode).toBe(2);
     expect(stderr).toContain('uses a newer schema than your CLI supports');
-    expect(stderr).toContain('npm install -g @opensip-tools/cli@latest');
+    expect(stderr).toContain('npm install -g opensip-tools@latest');
     // Critical: must NOT say "migrate" — direction was previously wrong.
     expect(stderr.toLowerCase()).not.toContain('opensip-tools migrate');
   });

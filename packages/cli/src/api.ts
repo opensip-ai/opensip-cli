@@ -2,7 +2,7 @@
  * api — re-exports forming the CLI's programmatic API surface.
  *
  * Imported and re-exported by `index.ts` so the composition root stays
- * focused on wiring. Tools that depend on `@opensip-tools/cli` (a few
+ * focused on wiring. Tools that depend on `opensip-tools` (a few
  * test harnesses, downstream consumers) import these symbols from the
  * package root; this barrel keeps the surface in one file.
  */

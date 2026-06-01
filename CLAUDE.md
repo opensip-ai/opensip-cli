@@ -33,7 +33,7 @@ opensip-tools/
 │   ├── dashboard/               # @opensip-tools/dashboard — self-contained
 │   │                            #   HTML report generator (generateDashboardHtml);
 │   │                            #   consumed by fitness's `dashboard` command
-│   ├── cli/                     # @opensip-tools/cli — generic tool dispatcher
+│   ├── cli/                     # opensip-tools — generic tool dispatcher
 │   ├── cli-ui/                  # @opensip-tools/cli-ui — shared Ink/React
 │   │                            #   primitives (Banner, Spinner, RunHeader,
 │   │                            #   theme). Extracted from cli/ so tools that

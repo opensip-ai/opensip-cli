@@ -3,7 +3,7 @@
  *
  * These tests exercise the actual CLI binary (packages/cli/dist/index.js)
  * against a small fixture project. The build must be done before running
- * these tests (pnpm --filter=@opensip-tools/cli build).
+ * these tests (pnpm --filter=opensip-tools build).
  */
 
 import { execFileSync } from 'node:child_process';

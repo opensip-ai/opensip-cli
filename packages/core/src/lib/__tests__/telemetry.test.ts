@@ -11,7 +11,7 @@ import { currentTraceparent, getTracer, withSpan, withSpanAsync } from '../../li
  * nothing through the API's no-op tracer.
  *
  * Span-CAPTURE behavior (assertions that a real span is produced with the
- * expected name/attributes) is tested in `@opensip-tools/cli`, where the OTel
+ * expected name/attributes) is tested in `opensip-tools`, where the OTel
  * SDK + InMemorySpanExporter legitimately live. Putting span-capture tests
  * there keeps the SDK out of the kernel — see
  * `packages/cli/src/telemetry/__tests__/`.

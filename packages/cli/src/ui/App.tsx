@@ -323,7 +323,7 @@ function UninstallDoneSummary({ result }: Readonly<{ result: UninstallDoneResult
 
   // action === 'removed'
   const hint = result.mode === 'user'
-    ? 'To remove the CLI itself: npm uninstall -g @opensip-tools/cli'
+    ? 'To remove the CLI itself: npm uninstall -g opensip-tools'
     : 'To also remove user-level config: opensip-tools uninstall';
   return (
     <Box flexDirection="column" paddingLeft={2}>

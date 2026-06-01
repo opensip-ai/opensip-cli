@@ -25,7 +25,7 @@ import { simulationTool } from '@opensip-tools/simulation';
 
 import { isValidTool } from './validate-tool.js';
 
-/** First-party tools — declared as direct deps of @opensip-tools/cli. */
+/** First-party tools — declared as direct deps of opensip-tools. */
 export const FIRST_PARTY_TOOLS: readonly Tool[] = [
   fitnessTool,
   simulationTool,

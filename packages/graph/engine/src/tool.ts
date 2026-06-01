@@ -7,7 +7,7 @@
  * surface and dispatches to cli/graph.ts.
  *
  * Per spec §10A AC-2 / AC-1: this module does NOT import from
- * @opensip-tools/cli. It receives the ToolCliContext interface from
+ * opensip-tools. It receives the ToolCliContext interface from
  * @opensip-tools/core and uses it for setExitCode + logger.
  *
  * History: v0.2 originally registered three subcommands (`graph`,

@@ -47,7 +47,7 @@ Different kinds, different lifetimes. Tools are global to the binary — once re
 
 ## Tool discovery (`opensipTools.kind === 'tool'`)
 
-[`packages/core/src/plugins/tool-package-discovery.ts`](../../../packages/core/src/plugins/tool-package-discovery.ts) implements the walk. The CLI passes its own install directory as the `projectDir` argument (`packages/cli/src/index.ts` — `cliInstallDir = dirname(__dirname)` inside `loadDiscoveredTools()`); the function then walks upward through that directory's ancestors, looking at each `node_modules/`. Anchoring discovery at the CLI's install location (rather than the user's cwd) is deliberate — third-party tool packages installed alongside `@opensip-tools/cli` are picked up regardless of where the user runs the binary from. For each `node_modules` entry (and one level into scoped directories like `@opensip-tools/`), inspect the `package.json`:
+[`packages/core/src/plugins/tool-package-discovery.ts`](../../../packages/core/src/plugins/tool-package-discovery.ts) implements the walk. The CLI passes its own install directory as the `projectDir` argument (`packages/cli/src/index.ts` — `cliInstallDir = dirname(__dirname)` inside `loadDiscoveredTools()`); the function then walks upward through that directory's ancestors, looking at each `node_modules/`. Anchoring discovery at the CLI's install location (rather than the user's cwd) is deliberate — third-party tool packages installed alongside `opensip-tools` are picked up regardless of where the user runs the binary from. For each `node_modules` entry (and one level into scoped directories like `@opensip-tools/`), inspect the `package.json`:
 
 ```ts
 const isToolPackage = (pkgDir: string): boolean => {
@@ -245,7 +245,7 @@ CI's pipeline:
 ```bash
 git clone …
 cd acme-api
-npm install -g @opensip-tools/cli@2
+npm install -g opensip-tools@2
 opensip-tools plugin sync           # bootstrap project-pinned plugins
 opensip-tools fit --gate-compare    # the actual gate
 ```

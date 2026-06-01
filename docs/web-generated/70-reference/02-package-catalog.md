@@ -110,7 +110,7 @@ Imports every layer below. The published binary.
 
 | Package | Path | Role | Key exports |
 |---|---|---|---|
-| `@opensip-tools/cli` | `packages/cli/` | The `opensip-tools` command-line binary; argv parsing, Tool registration, top-level commands | `bin/opensip-tools`, `decideOpen`, `launchBrowser`, `printWelcome`, `executeUninstall`, `getErrorSuggestion` (re-export) |
+| `opensip-tools` | `packages/cli/` | The `opensip-tools` command-line binary; argv parsing, Tool registration, top-level commands | `bin/opensip-tools`, `decideOpen`, `launchBrowser`, `printWelcome`, `executeUninstall`, `getErrorSuggestion` (re-export) |
 
 ## Adding a new package
 

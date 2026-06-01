@@ -6,7 +6,7 @@
  * CLI is a generic dispatcher that walks the registered tool list and
  * delegates command definition to each tool's `register(cli)` method.
  *
- * Tools are first-party (declared as a direct dep of @opensip-tools/cli)
+ * Tools are first-party (declared as a direct dep of opensip-tools)
  * or third-party (any npm package whose package.json declares
  * `opensipTools.kind === 'tool'` — discovered via tool-package-discovery).
  *

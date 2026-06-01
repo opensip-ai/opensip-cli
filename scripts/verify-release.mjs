@@ -92,7 +92,10 @@ async function findScopedPackages() {
 async function maybeAdd(list, pkgPath) {
   if (!(await pathExists(pkgPath))) return;
   const pkg = JSON.parse(await fs.readFile(pkgPath, 'utf8'));
-  if (typeof pkg.name === 'string' && pkg.name.startsWith(SCOPE)) {
+  // The CLI publishes under the unscoped name `opensip-tools` (the one package
+  // end-users install directly); everything else is `@opensip-tools/*`. Both
+  // must share the consensus version, so include the unscoped name here.
+  if (typeof pkg.name === 'string' && (pkg.name === 'opensip-tools' || pkg.name.startsWith(SCOPE))) {
     list.push({
       path: pkgPath,
       name: pkg.name,

@@ -81,7 +81,7 @@ The eight rules that pin the cross-package layer cake.
     path: [
       '^@opensip-tools/datastore',
       '^@opensip-tools/contracts',
-      '^@opensip-tools/cli($|/)',
+      '^opensip-tools($|/)',
       '^@opensip-tools/fitness',
       '^@opensip-tools/simulation',
       '^@opensip-tools/lang-',
@@ -105,7 +105,7 @@ The rule's path-list is exhaustive — every package outside `packages/core/` is
   to: {
     path: [
       '^@opensip-tools/contracts',
-      '^@opensip-tools/cli($|/)',
+      '^opensip-tools($|/)',
       '^@opensip-tools/fitness',
       '^@opensip-tools/simulation',
       '^@opensip-tools/lang-',
@@ -129,7 +129,7 @@ For the deeper rationale (why a separate package, why not core, why not contract
   from: { path: '^packages/contracts/src/' },
   to: {
     path: [
-      '^@opensip-tools/cli($|/)',
+      '^opensip-tools($|/)',
       '^@opensip-tools/fitness',
       '^@opensip-tools/simulation',
       '^@opensip-tools/lang-',
@@ -146,8 +146,8 @@ The reasoning: contracts exists to define the contract surface (`CliOutput`, `Co
 ### `fitness-no-cli` and `simulation-no-cli`
 
 ```js
-{ name: 'fitness-no-cli',     from: { path: '^packages/fitness/' },    to: { path: '^@opensip-tools/cli($|/)' } }
-{ name: 'simulation-no-cli',  from: { path: '^packages/simulation/' }, to: { path: '^@opensip-tools/cli($|/)' } }
+{ name: 'fitness-no-cli',     from: { path: '^packages/fitness/' },    to: { path: '^opensip-tools($|/)' } }
+{ name: 'simulation-no-cli',  from: { path: '^packages/simulation/' }, to: { path: '^opensip-tools($|/)' } }
 ```
 
 Tools cannot import the CLI. This would create a cycle (cli depends on every tool). Tools call back into shared CLI infrastructure via `ToolCliContext` (the inversion-of-control seam from the Tool contract).
@@ -158,7 +158,7 @@ Tools cannot import the CLI. This would create a cycle (cli depends on every too
 {
   from: { path: '^packages/fitness/checks-' },
   to: {
-    path: ['^@opensip-tools/cli($|/)', '^@opensip-tools/contracts'],
+    path: ['^opensip-tools($|/)', '^@opensip-tools/contracts'],
   },
 }
 ```
@@ -173,7 +173,7 @@ A consumer using `@opensip-tools/checks-typescript` from inside their own custom
 {
   from: { path: '^packages/languages/lang-' },
   to: {
-    path: ['^@opensip-tools/cli($|/)', '^@opensip-tools/contracts', '^@opensip-tools/checks-'],
+    path: ['^opensip-tools($|/)', '^@opensip-tools/contracts', '^@opensip-tools/checks-'],
   },
 }
 ```
@@ -211,7 +211,7 @@ Ten rules in `.dependency-cruiser.cjs` keep the graph tool's stages clean and th
 - **`graph-no-check-packs`** — graph engine never reaches into fitness check packs.
 - **`graph-engine-no-adapter-packs`** *(v2.0.0)* — the engine package must not depend on any `@opensip-tools/graph-*` adapter pack. Adapters are downstream consumers discovered through the registry walker, not import edges. The inverse (engine → adapter) would create a cycle and defeat the package split. (Engine `__tests__/` are exempt — tests may pull adapter packs as devDeps.)
 - **`graph-adapters-disjoint`** *(v2.0.0)* — adapter packs must not import each other from production source. Each pack implements the contract for one language; cross-pack imports would couple parser ecosystems together. (Test sources may consume sibling adapter packs as devDeps for multi-adapter contract / registry / `pickAdapter` coverage.)
-- **`graph-adapters-no-cli`** *(v2.0.0)* — adapter packs must not depend on `@opensip-tools/cli`.
+- **`graph-adapters-no-cli`** *(v2.0.0)* — adapter packs must not depend on `opensip-tools`.
 - **`graph-adapters-no-fitness-or-checks`** *(v2.0.0)* — adapter packs must not depend on `@opensip-tools/fitness` or any `@opensip-tools/checks-*` package (peer-layer isolation).
 
 **In-engine stage discipline** (unchanged from the pre-split layout, just with no `engine/src/lang-*` subtrees to police):
@@ -250,8 +250,8 @@ These rules exist because the dashboard ships as a single self-contained `index.
 Concrete examples of edges that fail the build:
 
 - **`packages/core/src/foo.ts` imports from `@opensip-tools/fitness`** — `core-imports-nothing-workspace` fails. Move the fitness-using code to a higher layer.
-- **`packages/fitness/engine/src/foo.ts` imports from `@opensip-tools/cli`** — `fitness-no-cli` fails. Use `ToolCliContext` instead.
-- **`packages/fitness/checks-typescript/src/foo.ts` imports from `@opensip-tools/cli`** — `check-pack-no-cli` fails. Check packs only depend on fitness + core.
+- **`packages/fitness/engine/src/foo.ts` imports from `opensip-tools`** — `fitness-no-cli` fails. Use `ToolCliContext` instead.
+- **`packages/fitness/checks-typescript/src/foo.ts` imports from `opensip-tools`** — `check-pack-no-cli` fails. Check packs only depend on fitness + core.
 - **`packages/languages/lang-rust/src/foo.ts` imports from `@opensip-tools/fitness`** — `lang-no-fitness-except-typescript` fails. Only the typescript adapter is exempt.
 - **`packages/contracts/src/foo.ts` imports from `@opensip-tools/simulation`** — `contracts-imports-core-only` fails. contracts talks to core only.
 - **`packages/graph/engine/src/rules/foo.ts` imports `typescript` or anything under `pipeline/`** — `graph-rules-no-parser` fails. Rules consume frozen catalog/indexes only.

@@ -81,8 +81,7 @@ jobs:
             dashboard \
             fitness simulation graph \
             graph-typescript graph-python graph-rust graph-go graph-java \
-            checks-universal checks-typescript checks-python checks-go checks-java checks-cpp checks-rust \
-            cli ; do
+            checks-universal checks-typescript checks-python checks-go checks-java checks-cpp checks-rust ; do
             name="@opensip-tools/$pkg"
             if npm view "$name" version >/dev/null 2>&1 ; then
               echo "  ok  $name"
@@ -91,6 +90,13 @@ jobs:
               new_count=$((new_count + 1))
             fi
           done
+          # The CLI publishes under the unscoped name `opensip-tools`.
+          if npm view "opensip-tools" version >/dev/null 2>&1 ; then
+            echo "  ok  opensip-tools"
+          else
+            echo "::warning title=New package detected::opensip-tools is not yet on npm. Publish will fail unless trusted publisher is registered on npmjs.com (org opensip-ai → package settings → Publishing access)."
+            new_count=$((new_count + 1))
+          fi
           if [ "$new_count" -gt 0 ] ; then
             echo "::notice::$new_count new package(s) detected. Continuing — publish step will fail loudly for any unregistered trusted publisher."
           fi
@@ -141,8 +147,8 @@ jobs:
           pnpm --filter @opensip-tools/checks-java       pack --pack-destination /tmp/tarballs
           pnpm --filter @opensip-tools/checks-cpp        pack --pack-destination /tmp/tarballs
           pnpm --filter @opensip-tools/checks-rust       pack --pack-destination /tmp/tarballs
-          # Layer 5 — composition root
-          pnpm --filter @opensip-tools/cli              pack --pack-destination /tmp/tarballs
+          # Layer 5 — composition root (unscoped name → opensip-tools-<ver>.tgz)
+          pnpm --filter opensip-tools                   pack --pack-destination /tmp/tarballs
           ls -la /tmp/tarballs
 
       # Post-pack / pre-publish smoke test. Installs the freshly-packed
@@ -194,6 +200,18 @@ jobs:
             npm publish /tmp/tarballs/opensip-tools-${pkg}-${VERSION}.tgz --access public --provenance
           }
 
+          # The CLI publishes under the UNSCOPED name `opensip-tools`, so its
+          # tarball is `opensip-tools-<version>.tgz` (no `<unscoped>` segment)
+          # and the registry lookup uses the bare name.
+          publish_unscoped() {
+            local name="$1"
+            if npm view "${name}@${VERSION}" version >/dev/null 2>&1; then
+              echo "::notice::skip ${name}@${VERSION} (already on npm)"
+              return 0
+            fi
+            npm publish /tmp/tarballs/${name}-${VERSION}.tgz --access public --provenance
+          }
+
           # Layer 1 — kernel
           publish_if_new core
           # Layer 2 — datastore (SQLite + Drizzle persistence)
@@ -232,8 +250,8 @@ jobs:
           publish_if_new checks-java
           publish_if_new checks-cpp
           publish_if_new checks-rust
-          # Layer 5 — CLI (depends on every tool, every check pack, every adapter)
-          publish_if_new cli
+          # Layer 5 — CLI (unscoped `opensip-tools`; depends on every tool, every check pack, every adapter)
+          publish_unscoped opensip-tools
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

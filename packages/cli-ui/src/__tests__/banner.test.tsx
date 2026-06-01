@@ -116,6 +116,6 @@ describe('UpdateHint', () => {
       </ThemeProvider>,
     ).lastFrame() ?? '';
     expect(frame).toContain('↑ Update:');
-    expect(frame).toContain('npm install -g @opensip-tools/cli');
+    expect(frame).toContain('npm install -g opensip-tools');
   });
 });

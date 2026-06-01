@@ -9,7 +9,7 @@
  *    `graph-symbol-index`) added alongside the codeindex-parity work.
  *    Orphans and entry-points were folded into the unified `graph`
  *    output — they remain output sections, not separate commands.
- *  - graphTool does NOT import from @opensip-tools/cli (compile-time
+ *  - graphTool does NOT import from opensip-tools (compile-time
  *    via TypeScript imports — if it did, package wouldn't build)
  */
 

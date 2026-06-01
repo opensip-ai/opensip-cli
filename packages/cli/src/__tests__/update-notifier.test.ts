@@ -46,7 +46,7 @@ describe('maybeNotify', () => {
     Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
     const writes: string[] = [];
     const out = maybeNotify({
-      name: '@opensip-tools/cli',
+      name: 'opensip-tools',
       version: '0.0.1',
       write: (s) => writes.push(s),
     });
@@ -83,12 +83,12 @@ describe('isNewerVersion', () => {
 describe('checkForUpdate', () => {
   it('returns undefined when opted out via OPENSIP_NO_UPDATE', () => {
     process.env.OPENSIP_NO_UPDATE = '1';
-    expect(checkForUpdate({ name: '@opensip-tools/cli', version: '0.0.1' })).toBeUndefined();
+    expect(checkForUpdate({ name: 'opensip-tools', version: '0.0.1' })).toBeUndefined();
   });
 
   it('returns undefined when stdout is not a TTY', () => {
     Object.defineProperty(process.stdout, 'isTTY', { value: false, configurable: true });
-    expect(checkForUpdate({ name: '@opensip-tools/cli', version: '0.0.1' })).toBeUndefined();
+    expect(checkForUpdate({ name: 'opensip-tools', version: '0.0.1' })).toBeUndefined();
   });
 
   it('does not throw on a TTY and returns a string or undefined', () => {
@@ -104,7 +104,7 @@ describe('formatUpdateNag', () => {
   it('renders the current → latest line with the install command and silence hint', () => {
     const nag = formatUpdateNag('2.2.1', '2.3.0');
     expect(nag).toContain('opensip-tools 2.2.1 → 2.3.0 available');
-    expect(nag).toContain('npm install -g @opensip-tools/cli');
+    expect(nag).toContain('npm install -g opensip-tools');
     expect(nag).toContain('OPENSIP_NO_UPDATE=1');
   });
 });

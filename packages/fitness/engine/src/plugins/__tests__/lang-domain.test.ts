@@ -206,7 +206,7 @@ describe('lang plugin domain', () => {
 
   it('loadAllPlugins for the lang domain returns empty', async () => {
     // There is no project-local lang plugin discovery path —
-    // language adapters ship as direct deps of @opensip-tools/cli
+    // language adapters ship as direct deps of opensip-tools
     // and are registered by the CLI bootstrap, not by walking a
     // user-source dir. Verify that loadAllPlugins('lang', ...)
     // discovers nothing rather than reading from a stray directory.

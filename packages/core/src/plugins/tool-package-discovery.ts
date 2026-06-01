@@ -12,7 +12,7 @@
  * existing CLI consumers depend on, and delegates the actual node_modules
  * traversal to the shared primitive.
  *
- * Direct dependencies of @opensip-tools/cli are always loaded by the
+ * Direct dependencies of opensip-tools are always loaded by the
  * CLI's own import statements; this discovery exists so a user can
  * install a third-party tool via `npm install` and have it picked up
  * with no further wiring.

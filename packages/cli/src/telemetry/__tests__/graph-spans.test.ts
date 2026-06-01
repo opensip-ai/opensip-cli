@@ -2,7 +2,7 @@
  * Graph stage-span CAPTURE test — the in-process counterpart to Phase 4's
  * real-collector validation.
  *
- * This lives in `@opensip-tools/cli` because the OTel SDK + InMemorySpanExporter
+ * This lives in `opensip-tools` because the OTel SDK + InMemorySpanExporter
  * legitimately live here (the application boundary), keeping the SDK out of the
  * `@opensip-tools/graph` tool package. We register an in-memory provider, run
  * `runGraph` over a synthetic fixture, and assert:

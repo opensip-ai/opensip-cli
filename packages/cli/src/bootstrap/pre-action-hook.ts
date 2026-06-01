@@ -50,7 +50,7 @@ import { loadCliDefaults, mergeConfigDefaults } from './cli-defaults.js';
 import type { Command } from 'commander';
 
 /** npm package whose version the update check compares against. */
-const CLI_PACKAGE_NAME = '@opensip-tools/cli';
+const CLI_PACKAGE_NAME = 'opensip-tools';
 
 /**
  * Commands that operate WITHOUT requiring a project context. These don't
@@ -92,9 +92,9 @@ function formatCliTooOldMessage(input: CliTooOldInput): string {
     `  CLI supports:   v${input.cliVersion}`,
     ``,
     `  Update your CLI to continue:`,
-    `    npm install -g @opensip-tools/cli@latest`,
+    `    npm install -g opensip-tools@latest`,
     ``,
-    `  (Or, if installed locally to the project: pnpm up @opensip-tools/cli@latest)`,
+    `  (Or, if installed locally to the project: pnpm up opensip-tools@latest)`,
   ].join('\n');
 }
 

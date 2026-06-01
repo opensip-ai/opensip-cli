@@ -1,7 +1,7 @@
 /**
  * graph-runner — owns the live-view state machine for `opensip-tools graph`.
  *
- * Layer 5 Phase 3 lifted the graph live view out of `@opensip-tools/cli`.
+ * Layer 5 Phase 3 lifted the graph live view out of `opensip-tools`.
  * The state machine (loading → running → done | error), `runGraph`
  * orchestration, `buildUnifiedReportLines` post-call, and the Ink/React
  * render tree live here, in the package that owns the graph command

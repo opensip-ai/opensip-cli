@@ -531,7 +531,7 @@ Both modes:
 
 - Print every target path and its size before acting.
 - Refuse to run when no targets exist (`--project` against a directory that contains no opensip-tools state is a no-op, not a destructive accident).
-- Do **not** remove the npm-global binary — the running binary can't safely self-delete. The user-mode success message prints the next step (`npm uninstall -g @opensip-tools/cli`); the project-mode success message points back at the user-mode command for the matching cleanup.
+- Do **not** remove the npm-global binary — the running binary can't safely self-delete. The user-mode success message prints the next step (`npm uninstall -g opensip-tools`); the project-mode success message points back at the user-mode command for the matching cleanup.
 
 State contract enforced by code: `~/.opensip-tools/` holds `config.yml` only. Persistence and logging modules throw when asked to write there (see [`paths.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.3/packages/core/src/lib/paths.ts), [`logger.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.3/packages/core/src/lib/logger.ts)). Anything else in that directory is legacy cruft from pre-1.0 versions and is swept up by the default `uninstall`.
 
@@ -542,12 +542,12 @@ State contract enforced by code: `~/.opensip-tools/` holds `config.yml` only. Pe
 opensip-tools is distributed on npm; upgrading is your package manager's job — there is no self-update command (running the wrong manager's command in your environment would do more harm than good). For a global install:
 
 ```
-npm install -g @opensip-tools/cli@latest
+npm install -g opensip-tools@latest
 ```
 
 The CLI checks npm for a newer version once a day (non-blocking, TTY-only). When one is available it surfaces it without nagging:
 
-- On the default `mini` banner, the version line shows `(vX.Y.Z available)` and a dim `↑ Update: npm install -g @opensip-tools/cli` line prints just below the banner.
+- On the default `mini` banner, the version line shows `(vX.Y.Z available)` and a dim `↑ Update: npm install -g opensip-tools` line prints just below the banner.
 - On the `lg`/`md`/`sm` banners (and the `--json` path, which renders no banner), the same upgrade command is printed as a one-line note on stderr.
 
 Silence the check entirely with `OPENSIP_NO_UPDATE=1` (or the conventional `NO_UPDATE_NOTIFIER=1`). It's also skipped automatically when `CI` is set or stdout isn't a TTY. Check your installed version any time with `opensip-tools --version`.

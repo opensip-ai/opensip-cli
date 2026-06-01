@@ -9,7 +9,7 @@
  * `getIcon()` accessors resolve through the merged map.
  *
  * The map state is module-singleton because two external consumers
- * (`FitView` in `@opensip-tools/cli`, `dashboard.ts` in this package)
+ * (`FitView` in `opensip-tools`, `dashboard.ts` in this package)
  * read the accessors directly. See `check-loader.ts`'s lifecycle
  * comment for the broader rationale.
  */

@@ -117,12 +117,12 @@ describe('update-notifier default write fallback', () => {
     });
     try {
       const { maybeNotify } = await import('../update-notifier.js');
-      maybeNotify({ name: '@opensip-tools/cli', version: '0.0.1' });
+      maybeNotify({ name: 'opensip-tools', version: '0.0.1' });
     } finally {
       spy.mockRestore();
     }
     expect(writes.join('')).toMatch(/0\.0\.1.*9\.9\.9/);
-    expect(writes.join('')).toContain('npm install -g @opensip-tools/cli');
+    expect(writes.join('')).toContain('npm install -g opensip-tools');
   });
 });
 

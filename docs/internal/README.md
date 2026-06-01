@@ -21,7 +21,7 @@ That distinction matters because the website is the curated story we tell extern
 
 > If you can write the fact about opensip-tools without naming a specific consumer (or other private context), it goes in `docs/public/`. If naming a specific consumer is load-bearing, it goes in `docs/internal/`.
 
-Example: "The `@opensip-tools/cli` package exposes a `bin` entry intended to be spawn-invocable from other Node processes" — public. "opensip spawns it for catalog export, so changes to the catalog JSON shape are a breaking change for them" — internal.
+Example: "The `opensip-tools` package exposes a `bin` entry intended to be spawn-invocable from other Node processes" — public. "opensip spawns it for catalog export, so changes to the catalog JSON shape are a breaking change for them" — internal.
 
 ## Relationship to other doc trees
 

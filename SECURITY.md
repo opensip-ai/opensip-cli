@@ -30,7 +30,7 @@ If you discover a security vulnerability in opensip-tools, please report it resp
 
 This policy covers all 17 first-party `@opensip-tools/*` packages:
 
-- `@opensip-tools/cli` — the CLI binary
+- `opensip-tools` — the CLI binary
 - `@opensip-tools/contracts` — shared CLI infrastructure
 - `@opensip-tools/core` — kernel (errors, logger, language adapters,
   plugin loader, Tool contract)
@@ -58,7 +58,7 @@ We recommend always running the latest version.
 
 ### 0.2.5 (2026-05-04) — Plugin discovery path traversal & symlink escape
 
-Affected: `@opensip-tools/core` and `@opensip-tools/cli` versions `< 0.2.5`.
+Affected: `@opensip-tools/core` and `opensip-tools` versions `< 0.2.5`.
 
 A user-controlled `.opensip-tools/fit/package.json` or a symlink planted in
 the plugin directory could cause the toolkit to dynamically import code

@@ -38,7 +38,7 @@ This document is the conceptual map. For the lookup-shaped catalog of every pack
 ```
 ┌────────────────────────────────────────────────────────────────────┐
 │  Layer 5  ┌──────────────────────────────────────────────────┐    │
-│           │                @opensip-tools/cli                │    │
+│           │                opensip-tools                │    │
 │           └──────────────────────────────────────────────────┘    │
 │                                  ▲                                 │
 │  Layer 4  ┌──────────────────────┴───────────────────────────┐    │
@@ -81,7 +81,7 @@ This document is the conceptual map. For the lookup-shaped catalog of every pack
 
 **Layer 4 — `@opensip-tools/checks-*`.** Seven check packs: `checks-universal`, `checks-typescript`, `checks-python`, `checks-go`, `checks-java`, `checks-cpp`, `checks-rust`. Each pack depends on `fitness` (for `defineCheck`) and `core` (for `Signal`, errors, the language adapter type). Check packs do **not** depend on `cli` or `contracts` — they're the marketplace shape, designed to be installable from npm without dragging the CLI in.
 
-**Layer 5 — `@opensip-tools/cli`.** The composition root. Imports every first-party tool and language adapter, registers them, builds the Commander tree, runs the dispatcher. The only package that knows everything below it.
+**Layer 5 — `opensip-tools`.** The composition root. Imports every first-party tool and language adapter, registers them, builds the Commander tree, runs the dispatcher. The only package that knows everything below it.
 
 That's it. Five layers, twenty-nine packages.
 
@@ -95,7 +95,7 @@ The layer rule — "dependencies flow up only" — is enforced by [dependency-cr
 // core imports nothing else from the workspace.
 { name: 'core-imports-nothing-workspace',
   from: { path: '^packages/core/src/' },
-  to:   { path: ['^@opensip-tools/contracts', '^@opensip-tools/cli($|/)',
+  to:   { path: ['^@opensip-tools/contracts', '^opensip-tools($|/)',
                  '^@opensip-tools/fitness',    '^@opensip-tools/simulation',
                  '^@opensip-tools/lang-',      '^@opensip-tools/checks-'] },
 }
@@ -104,9 +104,9 @@ The layer rule — "dependencies flow up only" — is enforced by [dependency-cr
 { name: 'contracts-imports-core-only', /* ... */ }
 
 // fitness / simulation / graph cannot import cli (would create a cycle).
-{ name: 'fitness-no-cli',     from: { path: '^packages/fitness/' },    to: { path: '^@opensip-tools/cli($|/)' } }
-{ name: 'simulation-no-cli',  from: { path: '^packages/simulation/' }, to: { path: '^@opensip-tools/cli($|/)' } }
-{ name: 'graph-no-cli',       from: { path: '^packages/graph/' },      to: { path: '^@opensip-tools/cli($|/)' } }
+{ name: 'fitness-no-cli',     from: { path: '^packages/fitness/' },    to: { path: '^opensip-tools($|/)' } }
+{ name: 'simulation-no-cli',  from: { path: '^packages/simulation/' }, to: { path: '^opensip-tools($|/)' } }
+{ name: 'graph-no-cli',       from: { path: '^packages/graph/' },      to: { path: '^opensip-tools($|/)' } }
 
 // checks-* cannot reach into cli or contracts.
 { name: 'check-pack-no-cli', /* ... */ }
@@ -174,7 +174,7 @@ opensip-tools plugin add @opensip-tools/checks-python
 
 ### 2. The Tool contract's promise
 
-The Tool contract says "any npm package can be a Tool." That promise only holds if a Tool can depend on `@opensip-tools/core` *without* depending on `@opensip-tools/cli`. With a mega-package, importing `core` would import the entire CLI, including Commander and Ink. A third-party Tool that runs in a non-CLI context (a CI plugin, a server-side runner, a future GUI) couldn't shed those deps.
+The Tool contract says "any npm package can be a Tool." That promise only holds if a Tool can depend on `@opensip-tools/core` *without* depending on `opensip-tools`. With a mega-package, importing `core` would import the entire CLI, including Commander and Ink. A third-party Tool that runs in a non-CLI context (a CI plugin, a server-side runner, a future GUI) couldn't shed those deps.
 
 ### 3. The layer rule needs to be visible
 
@@ -199,7 +199,7 @@ We've been comfortable with these costs. They're the price of the marketplace sh
 Tracing the dependency arrows for the `no-console-log` check we followed in [`01-fitness-loop.md`](./01-fitness-loop.md):
 
 ```
-@opensip-tools/cli           ─── imports ───►  @opensip-tools/fitness
+opensip-tools           ─── imports ───►  @opensip-tools/fitness
                                                        │
                                                        │ imports
                                                        ▼

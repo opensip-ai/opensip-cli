@@ -1,11 +1,11 @@
-# @opensip-tools/cli
+# opensip-tools
 
 The `opensip-tools` command — codebase analysis from the command line.
 
 ## Install
 
 ```bash
-npm install -g @opensip-tools/cli
+npm install -g opensip-tools
 ```
 
 ## Quick start

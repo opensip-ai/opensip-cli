@@ -79,7 +79,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
-      - run: npm install -g @opensip-tools/cli
+      - run: npm install -g opensip-tools
       - run: opensip-tools fit --gate-compare \
                --report-format sarif --report-out fit.sarif
       - uses: github/codeql-action/upload-sarif@v3

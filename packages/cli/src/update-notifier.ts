@@ -1,6 +1,6 @@
 /**
  * @fileoverview Thin wrapper around `update-notifier` that checks npm
- * once a day for a newer version of @opensip-tools/cli.
+ * once a day for a newer version of opensip-tools.
  *
  * Two consumers, one cached check:
  *   - {@link checkForUpdate} returns the newer version string (if any) so
@@ -116,7 +116,7 @@ export function checkForUpdate(opts: CheckForUpdateOptions): string | undefined 
 export function formatUpdateNag(current: string, latest: string): string {
   return (
     `\nopensip-tools ${current} → ${latest} available. ` +
-    `Run \`npm install -g @opensip-tools/cli\` to update.\n` +
+    `Run \`npm install -g opensip-tools\` to update.\n` +
     `(Silence with OPENSIP_NO_UPDATE=1.)\n\n`
   )
 }
@@ -143,7 +143,7 @@ export function maybeNotify(opts: NotifyOptions): UpdateNotifier | null {
     const write = opts.write ?? ((s: string) => process.stderr.write(s))
     const line =
       `\nopensip-tools ${update.current} \u2192 ${update.latest} available. ` +
-      `Run \`npm install -g @opensip-tools/cli\` to update.\n` +
+      `Run \`npm install -g opensip-tools\` to update.\n` +
       `(Silence with OPENSIP_NO_UPDATE=1.)\n\n`
     write(line)
   }

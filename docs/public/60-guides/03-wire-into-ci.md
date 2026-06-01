@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
-      - run: npm install -g @opensip-tools/cli
+      - run: npm install -g opensip-tools
       - run: opensip-tools fit
 ```
 
@@ -97,7 +97,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
-      - run: npm install -g @opensip-tools/cli
+      - run: npm install -g opensip-tools
 
       # On PRs: gate against new violations only.
       # On main: refresh the baseline (so the next PR sees current state).

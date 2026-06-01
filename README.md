@@ -2,7 +2,7 @@
 
 # OpenSIP Tools
 
-[![npm](https://img.shields.io/npm/v/@opensip-tools/cli)](https://www.npmjs.com/package/@opensip-tools/cli)
+[![npm](https://img.shields.io/npm/v/opensip-tools)](https://www.npmjs.com/package/opensip-tools)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](#license)
 [![Node](https://img.shields.io/badge/node-%E2%89%A522-brightgreen)](https://nodejs.org)
 [![Docs](https://img.shields.io/badge/docs-opensip.ai-2563eb)](https://opensip.ai/docs/opensip-tools/)
@@ -36,7 +36,7 @@ Four commands from zero to a passing fitness run:
 
 ```bash
 # 1. Install the CLI globally from npm
-npm install -g @opensip-tools/cli
+npm install -g opensip-tools
 
 # 2. Change into your project's repo
 cd your-project
@@ -53,7 +53,7 @@ Both example commands should pass. From there, edit (or delete) the example
 files under `opensip-tools/{fit,sim}/`, write your own checks and scenarios,
 and run `opensip-tools fit` (no recipe flag) to use the default recipe.
 
-**No global install?** `npx @opensip-tools/cli fit` works for one-offs.
+**No global install?** `npx opensip-tools fit` works for one-offs.
 **Install from source?**
 
 ```bash
@@ -568,10 +568,10 @@ the same way under `opensip-tools/sim/recipes/` and run via
 
 ```yaml
 - name: Run fitness checks
-  run: npx @opensip-tools/cli fit --json > fitness-report.json
+  run: npx opensip-tools fit --json > fitness-report.json
 
 - name: Upload to OpenSIP
-  run: npx @opensip-tools/cli fit --report-to ${{ secrets.OPENSIP_URL }} --api-key ${{ secrets.OPENSIP_KEY }}
+  run: npx opensip-tools fit --report-to ${{ secrets.OPENSIP_URL }} --api-key ${{ secrets.OPENSIP_KEY }}
 ```
 
 ### JSON Output
@@ -640,7 +640,7 @@ opensip-tools sessions purge --yes           # Skip confirmation
 
 ```bash
 # Update to the latest release
-npm install -g @opensip-tools/cli@latest        # or: pnpm add -g @opensip-tools/cli@latest
+npm install -g opensip-tools@latest        # or: pnpm add -g opensip-tools@latest
 
 # Check the installed version
 opensip-tools --version
@@ -668,7 +668,7 @@ opensip-tools uninstall --project /path/to/repo   # explicit path
 opensip-tools uninstall
 
 # 3. The CLI binary itself
-npm uninstall -g @opensip-tools/cli               # or: pnpm rm -g @opensip-tools/cli
+npm uninstall -g opensip-tools               # or: pnpm rm -g opensip-tools
 ```
 
 The running binary can't safely self-delete, so step 3 is always a separate
@@ -737,7 +737,7 @@ packages/
   reporting/               # @opensip-tools/reporting — SARIF / cloud report output
   dashboard/               # @opensip-tools/dashboard — self-contained HTML report
   cli-ui/                  # @opensip-tools/cli-ui — shared Ink/React primitives
-  cli/                     # @opensip-tools/cli — generic tool dispatcher
+  cli/                     # opensip-tools — generic tool dispatcher
 
   fitness/                 # @opensip-tools/fitness namespace
     engine/                # @opensip-tools/fitness — fit/dashboard/list-checks
