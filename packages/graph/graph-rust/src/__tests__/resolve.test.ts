@@ -584,6 +584,29 @@ describe('lang-rust resolve.ts — defensive guards via synthetic nodes', () => 
     expect(edges[0]?.resolution).toBe('unknown');
   });
 
+  it('decodes a scoped_identifier with a `name` but a null `path` (no receiver narrowing)', () => {
+    // `decodeReceiverPath(null)` — the scoped_identifier carries a name
+    // child but no `path` field, so the receiver type resolves to null
+    // and the resolver falls back to broad name lookup.
+    const name = makeNode('identifier', { text: 'free_fn' });
+    const fn = makeNode('scoped_identifier', {
+      text: '::free_fn',
+      fields: { name }, // no `path` field → decodeReceiverPath(null)
+      named: [name],
+    });
+    const fakeNode = makeNode('call_expression', {
+      text: '::free_fn()',
+      fields: { function: fn },
+    });
+    const out = runResolve([
+      { nodeRef: fakeNode, sourceFileRef: makeFile(), ownerHash: 'hp', kind: 'call' },
+    ]);
+    const edges = [...out.edgesByOwner.values()].flat();
+    expect(edges).toHaveLength(1);
+    // `free_fn` not in the (empty) catalog → unknown.
+    expect(edges[0]?.resolution).toBe('unknown');
+  });
+
   it('skips creation call-sites whose childHash is undefined (defensive)', () => {
     // The walker normally sets childHash; if a downstream caller forgets,
     // the creation site is silently skipped.

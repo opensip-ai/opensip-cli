@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { RunScope, runWithScopeSync } from '../../lib/run-scope.js'
 import {
@@ -144,6 +144,53 @@ describe('language-aware parse cache', () => {
       expect(fromIsolated).not.toBe(fromDefault)
       expect(isolated.size).toBe(1)
       isolated.dispose()
+    })
+
+    it('clear() empties the parse-tree map without touching the timer', () => {
+      const cache = new LanguageParseCache()
+      const adapter = makeAdapter('rust', ['.rs'])
+      cache.getOrParse(adapter, 'foo.rs', 'fn main() {}')
+      expect(cache.size).toBe(1)
+      cache.clear()
+      expect(cache.size).toBe(0)
+      cache.dispose()
+    })
+
+    it('the auto-clear timer empties both maps when it fires', () => {
+      vi.useFakeTimers()
+      try {
+        const cache = new LanguageParseCache()
+        cache.startAutoClear()
+        const adapter = makeAdapter('rust', ['.rs'])
+        cache.getOrParse(adapter, 'foo.rs', 'fn main() {}')
+        cache.filteredContent.set('raw', 'filtered')
+        expect(cache.size).toBe(1)
+        expect(cache.filteredContent.size).toBe(1)
+        // Advance past AUTO_CLEAR_MS (10 minutes) so the timer fires.
+        vi.advanceTimersByTime(10 * 60 * 1000)
+        expect(cache.size).toBe(0)
+        expect(cache.filteredContent.size).toBe(0)
+        cache.dispose()
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('startAutoClear twice resets the timer rather than stacking two', () => {
+      vi.useFakeTimers()
+      try {
+        const cache = new LanguageParseCache()
+        cache.startAutoClear()
+        // Second call clears the first timer and installs a fresh one.
+        cache.startAutoClear()
+        const adapter = makeAdapter('rust', ['.rs'])
+        cache.getOrParse(adapter, 'foo.rs', 'fn main() {}')
+        vi.advanceTimersByTime(10 * 60 * 1000)
+        expect(cache.size).toBe(0)
+        cache.dispose()
+      } finally {
+        vi.useRealTimers()
+      }
     })
 
     it('dispose() clears the auto-clear timer and the cache', () => {

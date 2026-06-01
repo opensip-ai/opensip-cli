@@ -140,4 +140,40 @@ describe('ThemeProvider / useTheme', () => {
     render(<ProbeTheme onTheme={(t) => { captured = t; }} />);
     expect(captured).toEqual(DEFAULT_THEME);
   });
+
+  describe('with no theme prop, driven by detected capabilities', () => {
+    const originalEnv = { ...process.env };
+    const originalIsTTY = process.stdout.isTTY;
+
+    afterEach(() => {
+      process.env = { ...originalEnv };
+      Object.defineProperty(process.stdout, 'isTTY', { value: originalIsTTY, configurable: true });
+    });
+
+    it('resolves a no-color theme when color is unsupported (NO_COLOR set)', () => {
+      process.env.NO_COLOR = '1';
+      Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
+      let captured: ReturnType<typeof useTheme> | undefined;
+      render(
+        <ThemeProvider>
+          <ProbeTheme onTheme={(t) => { captured = t; }} />
+        </ThemeProvider>,
+      );
+      expect(captured?.colorsEnabled).toBe(false);
+      expect(captured?.brand).toBe('');
+    });
+
+    it('resolves DEFAULT_THEME when color is supported', () => {
+      delete process.env.NO_COLOR;
+      process.env.COLORTERM = 'truecolor';
+      Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
+      let captured: ReturnType<typeof useTheme> | undefined;
+      render(
+        <ThemeProvider>
+          <ProbeTheme onTheme={(t) => { captured = t; }} />
+        </ThemeProvider>,
+      );
+      expect(captured).toEqual(DEFAULT_THEME);
+    });
+  });
 });

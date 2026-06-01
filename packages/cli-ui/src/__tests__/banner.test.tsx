@@ -90,6 +90,27 @@ describe('Banner', () => {
       ).lastFrame() ?? '';
       expect(frame).not.toContain('available');
     });
+
+    it('appends a singular "level" walk-up suffix for walkedUp=1', () => {
+      const frame = render(
+        <Banner size="mini" version="2.2.1" projectPath="/home/me" walkedUp={1} />,
+      ).lastFrame() ?? '';
+      expect(frame).toContain('(found 1 level up)');
+    });
+
+    it('appends a plural "levels" walk-up suffix for walkedUp>1', () => {
+      const frame = render(
+        <Banner size="mini" version="2.2.1" projectPath="/home/me" walkedUp={3} />,
+      ).lastFrame() ?? '';
+      expect(frame).toContain('(found 3 levels up)');
+    });
+
+    it('omits the walk-up suffix when walkedUp is 0', () => {
+      const frame = render(
+        <Banner size="mini" version="2.2.1" projectPath="/home/me" walkedUp={0} />,
+      ).lastFrame() ?? '';
+      expect(frame).not.toContain('found');
+    });
   });
 });
 

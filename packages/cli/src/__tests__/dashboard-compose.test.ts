@@ -120,6 +120,14 @@ describe('composeAndWriteDashboard', () => {
     expect(opened.opened).toBe(true);
   });
 
+  it('throws when invoked outside an entered RunScope', async () => {
+    // No runWithScope wrapper ⇒ currentScope() is undefined ⇒ composition
+    // refuses with a clear "requires an entered RunScope" error.
+    await expect(composeAndWriteDashboard({ open: false })).rejects.toThrow(
+      /requires an entered RunScope/,
+    );
+  });
+
   it('composes with zero contributing tools (sessions-only dashboard)', async () => {
     vi.spyOn(openDashboardMod, 'launchBrowser').mockResolvedValue(true);
     const scope = makeScope([makeTool('simulation')]);

@@ -125,4 +125,26 @@ describe('resolveMetric symmetry', () => {
     expect(resolveMetric('memory_mb', m)).toBe(0);
     expect(resolveMetric('max_latency_ms', m)).toBe(0);
   });
+
+  it('resolves the raw count metric keys directly off SimulationMetrics', () => {
+    const m = baseMetrics({
+      successfulRequests: 95,
+      failedRequests: 5,
+      errorsGenerated: 7,
+      findingsGenerated: 3,
+      totalRequests: 100,
+    });
+    expect(resolveMetric('successful_requests', m)).toBe(95);
+    expect(resolveMetric('failed_requests', m)).toBe(5);
+    expect(resolveMetric('errors_generated', m)).toBe(7);
+    expect(resolveMetric('findings_generated', m)).toBe(3);
+    expect(resolveMetric('total_requests', m)).toBe(100);
+  });
+
+  it('falls through to 0 for a key outside the supported set (type-bypass guard)', () => {
+    const m = baseMetrics();
+    // A caller that deliberately bypasses the compile-time narrowing hits the
+    // exhaustive default arm, which returns 0.
+    expect(resolveMetric('not-a-real-metric' as ScenarioMetricKey, m)).toBe(0);
+  });
 });

@@ -1,3 +1,7 @@
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import {
   UnknownLiveViewError,
   type LiveViewRenderer,
@@ -199,6 +203,16 @@ describe('getCurrentProjectRoot / setCurrentRunScope', () => {
     );
     expect(mod.getCurrentProjectRoot()).toBe('/path/to/proj');
   });
+
+  it('throws when the scope is set but carries no project context', async () => {
+    vi.resetModules();
+    const mod = await import('../cli-context.js');
+    const { RunScope } = await import('@opensip-tools/core');
+    // A scope with no projectContext (e.g. a bare bootstrap scope) ⇒
+    // getCurrentProjectRoot must surface the PROJECT_UNSET error.
+    mod.setCurrentRunScope(new RunScope({}));
+    expect(() => mod.getCurrentProjectRoot()).toThrow(/pre-action-hook resolved the context/);
+  });
 });
 
 describe('setCliRegistriesForRun / getCurrentRegistriesForScope', () => {
@@ -260,5 +274,30 @@ describe('getOrOpenDatastore', () => {
       }),
     );
     expect(() => mod.getOrOpenDatastore()).toThrow(/non-project context/);
+  });
+
+  it('opens the project-local sqlite datastore and caches it across calls', async () => {
+    vi.resetModules();
+    const mod = await import('../cli-context.js');
+    const { RunScope, resolveProjectPaths } = await import('@opensip-tools/core');
+
+    const projectRoot = mkdtempSync(join(tmpdir(), 'opensip-clictx-ds-'));
+    try {
+      const project = { scope: 'project', projectRoot, walkedUp: 0 } as never;
+      const thunk = mod.buildDatastoreThunk(project);
+      mod.setCurrentRunScope(new RunScope({ projectContext: project, datastore: thunk }));
+
+      const first = mod.getOrOpenDatastore();
+      expect(first).toBeDefined();
+      // The sqlite file lands under the resolved runtime dir.
+      const dbPath = join(resolveProjectPaths(projectRoot).runtimeDir, 'datastore.sqlite');
+      expect(existsSync(dbPath)).toBe(true);
+
+      // Second access returns the SAME cached instance (no re-open).
+      const second = mod.getOrOpenDatastore();
+      expect(second).toBe(first);
+    } finally {
+      rmSync(projectRoot, { recursive: true, force: true });
+    }
   });
 });

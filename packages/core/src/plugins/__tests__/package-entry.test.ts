@@ -91,6 +91,31 @@ describe('resolvePackageEntryPoint', () => {
     expect(r?.entry).toBe(join(dir, './fallback.js'));
   });
 
+  it('falls back to `node` when neither `import` nor `default` is present', () => {
+    const dir = writePkg({
+      name: 'p',
+      exports: { '.': { node: './node-entry.js' } },
+    });
+    const r = resolvePackageEntryPoint(dir);
+    expect(r?.entry).toBe(join(dir, './node-entry.js'));
+  });
+
+  it('falls back to pkg.main when conditioned exports has no recognised condition', () => {
+    const dir = writePkg({
+      name: 'p',
+      main: './main.js',
+      exports: { '.': { types: './types.d.ts' } },
+    });
+    const r = resolvePackageEntryPoint(dir);
+    expect(r?.entry).toBe(join(dir, './main.js'));
+  });
+
+  it('falls back to pkg.main when exports `.` is a non-string, non-object value', () => {
+    const dir = writePkg({ name: 'p', main: './main.js', exports: { '.': 123 } });
+    const r = resolvePackageEntryPoint(dir);
+    expect(r?.entry).toBe(join(dir, './main.js'));
+  });
+
   it('falls back to pkg.main when exports is absent', () => {
     const dir = writePkg({ name: 'p', main: './lib/main.js' });
     const r = resolvePackageEntryPoint(dir);

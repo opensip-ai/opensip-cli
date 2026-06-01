@@ -125,6 +125,32 @@ describe('LatencyTracker — reset and zero-sample edges', () => {
     expect(t.getPercentile(50)).toBe(42);
     expect(t.getPercentile(99)).toBe(42);
   });
+
+  it('getPercentile interpolates linearly between bracketing samples', () => {
+    const t = new LatencyTracker();
+    // 4 samples → index for p50 = 0.5 * 3 = 1.5 → interpolate between
+    // sorted[1]=20 and sorted[2]=30 with fraction 0.5 → 25.
+    t.record(40);
+    t.record(20);
+    t.record(10);
+    t.record(30);
+    expect(t.getPercentile(50)).toBeCloseTo(25);
+    // p0 and p100 land exactly on the endpoints (lower === upper path).
+    expect(t.getPercentile(0)).toBe(10);
+    expect(t.getPercentile(100)).toBe(40);
+  });
+
+  it('getLatencySnapshot reports avg + percentiles together', () => {
+    const t = new LatencyTracker();
+    t.record(10);
+    t.record(20);
+    t.record(30);
+    const snap = t.getLatencySnapshot();
+    expect(snap.avgLatencyMs).toBeCloseTo(20);
+    expect(snap.p50LatencyMs).toBeCloseTo(20);
+    expect(snap.p95LatencyMs).toBeGreaterThanOrEqual(snap.p50LatencyMs);
+    expect(snap.p99LatencyMs).toBeGreaterThanOrEqual(snap.p95LatencyMs);
+  });
 });
 
 // ---------------------------------------------------------------------------

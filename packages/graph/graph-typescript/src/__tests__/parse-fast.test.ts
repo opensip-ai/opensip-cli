@@ -90,6 +90,35 @@ describe('parseProjectFast', () => {
     expect(sawJsx).toBe(true);
   });
 
+  it('parses .jsx as JSX and .js/.cjs/.mjs as plain JS (ScriptKind by extension)', () => {
+    const jsx = join(dir, 'view.jsx');
+    const js = join(dir, 'plain.js');
+    const cjs = join(dir, 'legacy.cjs');
+    const mjs = join(dir, 'modern.mjs');
+    writeFileSync(jsx, 'export const View = () => <span>x</span>;\n', 'utf8');
+    writeFileSync(js, 'export const a = 1;\n', 'utf8');
+    writeFileSync(cjs, 'module.exports = { b: 2 };\n', 'utf8');
+    writeFileSync(mjs, 'export const c = 3;\n', 'utf8');
+
+    const out = parseProjectFast({
+      projectDirAbs: dir,
+      files: [jsx, js, cjs, mjs],
+      resolutionMode: 'fast',
+    });
+    expect(out.parseErrors).toEqual([]);
+    expect(out.project.sourceFiles.size).toBe(4);
+
+    // The .jsx file parsed its JSX as JSX (a JSX node exists).
+    const jsxSf = out.project.sourceFiles.get(jsx)!;
+    let sawJsx = false;
+    const visit = (node: ts.Node): void => {
+      if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) sawJsx = true;
+      ts.forEachChild(node, visit);
+    };
+    visit(jsxSf);
+    expect(sawJsx).toBe(true);
+  });
+
   it('parseProject dispatches to the fast path when resolutionMode is fast', () => {
     const a = join(dir, 'a.ts');
     writeFileSync(a, 'export function foo() { return 1; }\n', 'utf8');

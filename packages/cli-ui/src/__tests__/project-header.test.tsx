@@ -1,6 +1,8 @@
+import { render } from 'ink-testing-library';
+import React from 'react';
 import { describe, it, expect } from 'vitest';
 
-import { formatProjectHeader } from '../project-header.js';
+import { formatProjectHeader, ProjectHeader } from '../project-header.js';
 
 describe('formatProjectHeader', () => {
   it('formats without suffix when walkedUp is 0', () => {
@@ -24,5 +26,17 @@ describe('formatProjectHeader', () => {
     expect(formatProjectHeader({ root: '/x/y', walkedUp: 7 })).toBe(
       'ℹ Project: /x/y  (found 7 levels up)',
     );
+  });
+});
+
+describe('<ProjectHeader />', () => {
+  it('renders the formatted project line', () => {
+    const { lastFrame } = render(<ProjectHeader root="/home/me/proj" />);
+    expect(lastFrame() ?? '').toContain('ℹ Project: /home/me/proj');
+  });
+
+  it('includes the walk-up suffix when walkedUp is set', () => {
+    const { lastFrame } = render(<ProjectHeader root="/home/me/proj" walkedUp={2} />);
+    expect(lastFrame() ?? '').toContain('(found 2 levels up)');
   });
 });

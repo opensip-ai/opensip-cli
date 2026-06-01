@@ -1,6 +1,7 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import {
   ToolRegistry as ToolRegistryClass,
@@ -9,7 +10,7 @@ import {
   type ToolRegistry,
 } from '@opensip-tools/core';
 import { Command } from 'commander';
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 
 import {
   FIRST_PARTY_TOOLS,
@@ -154,5 +155,134 @@ describe('discoverAndRegisterToolPackages', () => {
     } finally {
       rmSync(empty, { recursive: true, force: true });
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Discovery loop body. `discoverAndRegisterToolPackages` does `await
+// import(pkg.name)` on every discovered package, so the package must be
+// importable by its bare name. We stage fixture packages inside the CLI
+// package's own node_modules (under a throwaway @opensip-tools-fixture scope)
+// and point projectDir at the CLI package root so the ancestor-walk finds
+// them AND Node's resolver can import them. Each fixture is removed afterwards.
+// ---------------------------------------------------------------------------
+
+const CLI_PKG_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const FIXTURE_SCOPE = join(CLI_PKG_ROOT, 'node_modules', '@opensip-tools-fixture');
+
+interface Fixture {
+  readonly name: string;
+  readonly dir: string;
+}
+
+function stageFixture(shortName: string, files: { packageJson: object; indexJs: string }): Fixture {
+  const dir = join(FIXTURE_SCOPE, shortName);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'package.json'), JSON.stringify(files.packageJson), 'utf8');
+  writeFileSync(join(dir, 'index.js'), files.indexJs, 'utf8');
+  return { name: `@opensip-tools-fixture/${shortName}`, dir };
+}
+
+function silenceStderr(): () => void {
+  const orig = process.stderr.write.bind(process.stderr);
+  process.stderr.write = (() => true);
+  return () => {
+    process.stderr.write = orig;
+  };
+}
+
+describe('discoverAndRegisterToolPackages — discovered package handling', () => {
+  const staged: Fixture[] = [];
+
+  afterEach(() => {
+    for (const f of staged.splice(0)) rmSync(f.dir, { recursive: true, force: true });
+    rmSync(FIXTURE_SCOPE, { recursive: true, force: true });
+  });
+
+  it('registers a discovered package that exports a valid tool', async () => {
+    staged.push(
+      stageFixture('valid-tool', {
+        packageJson: {
+          name: '@opensip-tools-fixture/valid-tool',
+          version: '0.0.0',
+          type: 'module',
+          main: './index.js',
+          opensipTools: { kind: 'tool' },
+        },
+        indexJs:
+          "export const tool = { metadata: { id: 'fixture-valid', name: 'Fixture', version: '0.0.0' }, commands: [], register() {} };",
+      }),
+    );
+    const registry = new ToolRegistryClass();
+    await discoverAndRegisterToolPackages(registry, { projectDir: CLI_PKG_ROOT });
+    expect(registry.get('fixture-valid')).toBeDefined();
+  });
+
+  it('skips a discovered package whose `tool` export is malformed', async () => {
+    staged.push(
+      stageFixture('bad-shape', {
+        packageJson: {
+          name: '@opensip-tools-fixture/bad-shape',
+          version: '0.0.0',
+          type: 'module',
+          main: './index.js',
+          opensipTools: { kind: 'tool' },
+        },
+        indexJs: "export const tool = { not: 'a tool' };",
+      }),
+    );
+    const registry = new ToolRegistryClass();
+    const restore = silenceStderr();
+    try {
+      await discoverAndRegisterToolPackages(registry, { projectDir: CLI_PKG_ROOT });
+    } finally {
+      restore();
+    }
+    expect(registry.list()).toHaveLength(0);
+  });
+
+  it('skips a discovered package whose tool id collides with a built-in', async () => {
+    staged.push(
+      stageFixture('shadow-fitness', {
+        packageJson: {
+          name: '@opensip-tools-fixture/shadow-fitness',
+          version: '0.0.0',
+          type: 'module',
+          main: './index.js',
+          opensipTools: { kind: 'tool' },
+        },
+        indexJs:
+          "export const tool = { metadata: { id: 'fitness', name: 'Shadow', version: '0.0.0' }, commands: [], register() {} };",
+      }),
+    );
+    const registry = new ToolRegistryClass();
+    await discoverAndRegisterToolPackages(registry, { projectDir: CLI_PKG_ROOT });
+    // The built-in id is skipped before registration ⇒ nothing added.
+    expect(registry.list()).toHaveLength(0);
+  });
+
+  it('isolates a package whose module throws on import', async () => {
+    staged.push(
+      stageFixture('throws-on-load', {
+        packageJson: {
+          name: '@opensip-tools-fixture/throws-on-load',
+          version: '0.0.0',
+          type: 'module',
+          main: './index.js',
+          opensipTools: { kind: 'tool' },
+        },
+        indexJs: "throw new Error('boom on import');",
+      }),
+    );
+    const registry = new ToolRegistryClass();
+    const restore = silenceStderr();
+    try {
+      await expect(
+        discoverAndRegisterToolPackages(registry, { projectDir: CLI_PKG_ROOT }),
+      ).resolves.toBeUndefined();
+    } finally {
+      restore();
+    }
+    expect(registry.list()).toHaveLength(0);
   });
 });

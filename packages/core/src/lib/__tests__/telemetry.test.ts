@@ -69,6 +69,32 @@ describe('telemetry primitive (no-op-until-SDK contract)', () => {
     }
   });
 
+  it('withSpan stringifies a thrown non-Error before recording it', () => {
+    const recordException = vi.fn();
+    const span = {
+      setAttributes: vi.fn(),
+      setStatus: vi.fn(),
+      recordException,
+      end: vi.fn(),
+      isRecording: () => false,
+    };
+    const spy = vi.spyOn(trace, 'getTracer').mockReturnValue({
+      startActiveSpan: ((_name: string, fn: (s: unknown) => unknown) => fn(span)) as never,
+    } as never);
+    try {
+      expect(() =>
+        withSpan('test-scope', 'unit', () => {
+          // Throwing a bare string exercises the non-Error normalization branch.
+          // eslint-disable-next-line @typescript-eslint/only-throw-error -- exercising non-Error normalization
+          throw 'string boom';
+        }),
+      ).toThrow('string boom');
+      expect(recordException).toHaveBeenCalledWith('string boom');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it('withSpan records the exception, sets ERROR status, ends the span, and rethrows', () => {
     const recordException = vi.fn();
     const setStatus = vi.fn();
@@ -131,6 +157,32 @@ describe('withSpanAsync (async-aware span)', () => {
       });
       // The span must end AFTER the awaited work, proving it spans the await.
       expect(events).toEqual(['work-done', 'end']);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('stringifies a non-Error async rejection before recording it', async () => {
+    const recordException = vi.fn();
+    const span = {
+      setAttributes: vi.fn(),
+      setStatus: vi.fn(),
+      recordException,
+      end: vi.fn(),
+      isRecording: () => false,
+    };
+    const spy = vi.spyOn(trace, 'getTracer').mockReturnValue({
+      startActiveSpan: ((_name: string, fn: (s: unknown) => unknown) => fn(span)) as never,
+    } as never);
+    try {
+      await expect(
+        withSpanAsync('test-scope', 'unit', async () => {
+          await Promise.resolve();
+          // eslint-disable-next-line @typescript-eslint/only-throw-error -- exercising non-Error normalization
+          throw 'async string boom';
+        }),
+      ).rejects.toBe('async string boom');
+      expect(recordException).toHaveBeenCalledWith('async string boom');
     } finally {
       spy.mockRestore();
     }

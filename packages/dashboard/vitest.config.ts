@@ -10,7 +10,20 @@ export default defineConfig({
     testTimeout: 20_000,
     coverage: {
       include: ['src/**'],
-      exclude: ['src/**/*.test.ts', 'src/**/__tests__/**', 'src/index.ts'],
+      exclude: [
+        'src/**/*.test.ts',
+        'src/**/__tests__/**',
+        'src/index.ts',
+        // Vendored third-party Cytoscape UMD bundle (~493KB minified). It is
+        // read as TEXT via `node:fs` and inlined into the generated report's
+        // <script> block (see code-paths/cytoscape-vendor.ts) — it is never
+        // imported or executed in node, so v8 node-coverage reports it 0%.
+        // Its ~13.5k statements / ~2.7k functions otherwise swamp the
+        // first-party totals (dragging 98%+ first-party coverage down to ~2%).
+        // Excluding genuinely-uninstrumentable vendored code is correct; the
+        // thresholds below scope to node-instrumentable first-party logic.
+        'src/vendor/**',
+      ],
       thresholds: {
         statements: 90,
         branches: 85,

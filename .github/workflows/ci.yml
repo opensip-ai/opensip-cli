@@ -40,8 +40,12 @@ jobs:
       - name: Lint
         run: pnpm lint
 
-      - name: Test
-        run: pnpm test
+      # Runs the full test suite WITH coverage so the per-package thresholds
+      # in each vitest.config.ts are enforced on every PR. Coverage had
+      # silently drifted below threshold in 13 packages because the gate only
+      # ran `pnpm test` (no `--coverage`); test:coverage closes that hole.
+      - name: Test (with coverage thresholds)
+        run: pnpm test:coverage
 
       # Dogfood: run opensip-tools fit against this repo. The CI step
       # fails on any error-level finding (failOnErrors: 1 in

@@ -183,6 +183,35 @@ describe('load kind — validation edges', () => {
     ).toThrow(/count must be a positive number/);
   });
 
+  it('rejects when personas is empty', () => {
+    expect(() =>
+      validateLoadScenarioConfig({
+        id: 'no-personas',
+        name: 'No Personas',
+        description: 'd',
+        tags: [],
+        personas: [],
+        duration: 1,
+        assertions: [ASSERTIONS.lowErrorRate()],
+      }),
+    ).toThrow(/at least one persona is required/);
+  });
+
+  it('rejects when a persona is missing its personaId', () => {
+    expect(() =>
+      validateLoadScenarioConfig({
+        id: 'p-no-id',
+        name: 'Persona No Id',
+        description: 'd',
+        tags: [],
+        // personaId intentionally blank to trip the required-field path
+        personas: [{ personaId: '', count: 1, spawnRate: 1, actions: ['random'] }],
+        duration: 1,
+        assertions: [ASSERTIONS.lowErrorRate()],
+      }),
+    ).toThrow(/personaId is required/);
+  });
+
   it('rejects when name is empty', () => {
     expect(() =>
       validateLoadScenarioConfig({

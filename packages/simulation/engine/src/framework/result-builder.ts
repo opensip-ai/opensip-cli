@@ -160,6 +160,9 @@ export class ScenarioResultBuilder {
   // ===========================================================================
 
   private resolveAssertionMetric(metric: ScenarioAssertion['metric']): number {
+    /* v8 ignore next 3 -- unreachable defensive guard: the only caller
+       (evaluateAssertions) already throws when `_metrics` is unset, so this
+       branch can never fire through the public API. */
     if (!this._metrics) {
       return 0
     }

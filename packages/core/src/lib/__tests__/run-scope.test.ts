@@ -4,7 +4,13 @@ import { LanguageParseCache } from '../../languages/parse-cache.js';
 import { LanguageRegistry } from '../../languages/registry.js';
 import { ToolRegistry } from '../../tools/registry.js';
 import { logger as defaultLogger, configureLogger } from '../logger.js';
-import { RunScope, runWithScope, runWithScopeSync, currentScope } from '../run-scope.js';
+import {
+  RunScope,
+  runWithScope,
+  runWithScopeSync,
+  currentScope,
+  enterScope,
+} from '../run-scope.js';
 
 describe('RunScope — construction', () => {
   it('default constructor produces a usable scope', () => {
@@ -83,6 +89,24 @@ describe('runWithScope / currentScope', () => {
 
   it('currentScope returns undefined outside any runWithScope block', () => {
     expect(currentScope()).toBeUndefined();
+  });
+
+  it('enterScope sets the current scope for the rest of the async context', async () => {
+    // Wrap in an outer runWithScope frame so the enterWith only affects
+    // this frame's async subtree and does not leak into the test runner.
+    const outer = new RunScope();
+    const entered = new RunScope();
+    await runWithScope(outer, async () => {
+      expect(currentScope()).toBe(outer);
+      enterScope(entered);
+      // After enterScope, the current scope is the entered one — without
+      // a callback wrapper, for the remainder of this async context.
+      expect(currentScope()).toBe(entered);
+      await Promise.resolve();
+      expect(currentScope()).toBe(entered);
+    });
+    outer.dispose();
+    entered.dispose();
   });
 
   it('nested runWithScope: inner overrides; outer is restored', async () => {

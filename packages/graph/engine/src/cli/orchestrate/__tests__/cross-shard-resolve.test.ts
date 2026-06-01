@@ -175,7 +175,73 @@ describe('resolveCrossBoundaryCalls', () => {
   });
 });
 
+describe('mergeShardFragments — edge cases', () => {
+  it('defaults the merged language to typescript for an empty fragment list', () => {
+    const merged = mergeShardFragments([], []);
+    expect(merged.language).toBe('typescript');
+    expect(Object.keys(merged.functions)).toEqual([]);
+  });
+
+  it('dedups by (bodyHash, filePath, line) but keeps distinct occurrences of one name', () => {
+    const merged = mergeShardFragments(
+      [
+        fragment('typescript', occ('handler', 'a.ts', 'A'), occ('handler', 'b.ts', 'B')),
+        // Exact duplicate of the first → deduped.
+        fragment('typescript', occ('handler', 'a.ts', 'A')),
+      ],
+      ['a.ts', 'b.ts'],
+    );
+    expect(merged.functions.handler).toHaveLength(2);
+  });
+});
+
+describe('resolveCrossBoundaryCalls — ambiguity', () => {
+  const merged = mergeShardFragments(
+    [
+      fragment('typescript', occ('mainA', 'pkgA/index.ts', 'A')),
+      fragment('typescript', occ('dup', 'pkgB/index.ts', 'B1')),
+      fragment('typescript', occ('dup', 'pkgC/index.ts', 'B2')),
+    ],
+    ['pkgA/index.ts', 'pkgB/index.ts', 'pkgC/index.ts'],
+  );
+
+  it('declines an ambiguous, unpinned name (two candidates, bare specifier)', () => {
+    const bc: CrossBoundaryCall = {
+      ownerHash: 'A',
+      calleeName: 'dup', // two occurrences named 'dup'
+      importSpecifier: '@scope/anything', // bare → not path-pinnable
+      line: 2,
+      column: 1,
+      text: 'dup()',
+    };
+    const { catalog, boundaryStats } = resolveCrossBoundaryCalls(merged, [bc]);
+    const edge = catalog.functions.mainA?.[0]?.calls.find((e) => e.crossShard);
+    // Ambiguous + unpinned → declines (empty target) but is counted.
+    expect(edge?.to).toEqual([]);
+    expect(edge?.confidence).toBe('low');
+    expect(boundaryStats.totalCallSites).toBe(1);
+  });
+});
+
 describe('diffCatalogsByEdge', () => {
+  it('reports an intra-shard edge difference when a non-cross edge target changed', () => {
+    const a = mergeShardFragments(
+      [fragment('typescript', occ('mainA', 'pkgA/index.ts', 'A', [
+        { to: ['X'], line: 2, column: 1, resolution: 'static', confidence: 'high', text: 'x()' },
+      ]))],
+      ['pkgA/index.ts'],
+    );
+    const b = mergeShardFragments(
+      [fragment('typescript', occ('mainA', 'pkgA/index.ts', 'A', [
+        { to: ['Y'], line: 2, column: 1, resolution: 'static', confidence: 'high', text: 'x()' },
+      ]))],
+      ['pkgA/index.ts'],
+    );
+    const diff = diffCatalogsByEdge(a, b);
+    expect(diff.intraMismatches.length).toBe(1);
+    expect(diff.crossDifferences).toEqual([]);
+  });
+
   it('reports zero intra mismatches and the cross-shard difference', () => {
     const whole = mergeShardFragments(
       [fragment('typescript', occ('mainA', 'pkgA/index.ts', 'A'))],

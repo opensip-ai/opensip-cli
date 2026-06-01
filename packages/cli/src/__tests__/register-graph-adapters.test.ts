@@ -48,6 +48,38 @@ describe('discoverAndRegisterGraphAdapterPackages', () => {
     stderr.mockRestore();
   });
 
+  it('loads and registers a pack that exports a valid adapter', async () => {
+    const dir = join(testDir, 'node_modules', '@opensip-tools', 'graph-fixture');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, 'package.json'),
+      JSON.stringify({ name: '@opensip-tools/graph-fixture', version: '0.0.0', type: 'module', main: './index.js' }),
+    );
+    writeFileSync(
+      join(dir, 'index.js'),
+      "export const adapter = { id: 'fixture-lang', extensions: ['.fx'] };",
+    );
+
+    const registered = await discoverAndRegisterGraphAdapterPackages({ projectDir: testDir });
+    expect(registered).toBe(1);
+  });
+
+  it('skips a discovered pack whose package.json is unreadable (no metadata)', async () => {
+    // Discovery only checks that package.json EXISTS (existsSync), so a
+    // malformed package.json is still discovered, but
+    // readGraphAdapterPackageMetadata returns undefined ⇒ the pack is
+    // skipped before any import.
+    const dir = join(testDir, 'node_modules', '@opensip-tools', 'graph-malformed');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'package.json'), '{ this is not valid json');
+
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    const registered = await discoverAndRegisterGraphAdapterPackages({ projectDir: testDir });
+    expect(registered).toBe(0);
+    expect(stderr).toHaveBeenCalled();
+    stderr.mockRestore();
+  });
+
   it('skips packs that lack a valid adapter export', async () => {
     const dir = join(testDir, 'node_modules', '@opensip-tools', 'graph-empty');
     mkdirSync(dir, { recursive: true });

@@ -85,6 +85,26 @@ describe('writeGlobalConfig', () => {
 
     expect(readGlobalConfig().apiKey).toBe('sk-second');
   });
+
+  it('cleans up the temp file and rethrows when the rename fails', async () => {
+    const { mkdirSync, writeFileSync, readdirSync, existsSync } = await import('node:fs');
+    const { writeGlobalConfig, GLOBAL_CONFIG_PATH } = await loadModule();
+
+    // Make the destination a NON-EMPTY directory so renameSync(file → dir)
+    // fails (ENOTEMPTY / EISDIR depending on platform). This drives the
+    // rename-failure cleanup branch.
+    mkdirSync(GLOBAL_CONFIG_PATH, { recursive: true });
+    writeFileSync(join(GLOBAL_CONFIG_PATH, 'blocker'), 'x', 'utf8');
+
+    expect(() => writeGlobalConfig({ apiKey: 'sk-doomed' })).toThrow();
+
+    // The temp file must not linger after the failed rename.
+    const opensipDir = join(HOME, '.opensip-tools');
+    const stragglers = readdirSync(opensipDir).filter((name) => name.endsWith('.tmp'));
+    expect(stragglers).toEqual([]);
+    // The destination directory is untouched (still a dir, still has blocker).
+    expect(existsSync(join(GLOBAL_CONFIG_PATH, 'blocker'))).toBe(true);
+  });
 });
 
 describe('readGlobalConfig (missing / malformed paths)', () => {

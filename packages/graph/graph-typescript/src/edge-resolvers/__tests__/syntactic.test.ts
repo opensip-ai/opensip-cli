@@ -14,6 +14,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildImportIndex,
+  buildImportSpecifierIndex,
   collectKnownFiles,
   resolveSyntactic,
   type ImportIndex,
@@ -188,5 +189,59 @@ describe('buildImportIndex', () => {
     expect(idx.get('ns')).toBe('c.ts');
     // bare specifier → external (null)
     expect(idx.get('ext')).toBeNull();
+  });
+
+  it('maps a relative specifier that resolves to no known file to null', () => {
+    // The import resolves to a file the catalog does not know about →
+    // null (the resolveSpecifierToFile no-candidate-match fall-through).
+    const sf = ts.createSourceFile(
+      '/proj/app.ts',
+      "import { missing } from './does-not-exist.js';",
+      ts.ScriptTarget.Latest,
+      true,
+    );
+    const known = collectKnownFiles(catalogOf(occ('x', 'other.ts', '1')));
+    const idx = buildImportIndex(sf, '/proj', known);
+    expect(idx.get('missing')).toBeNull();
+  });
+
+  it('resolves an `import =` (ImportEqualsDeclaration) binding to its target file', () => {
+    const sf = ts.createSourceFile(
+      '/proj/app.ts',
+      "import legacy = require('./legacy.js');",
+      ts.ScriptTarget.Latest,
+      true,
+    );
+    const known = collectKnownFiles(catalogOf(occ('fn', 'legacy.ts', 'L')));
+    const idx = buildImportIndex(sf, '/proj', known);
+    expect(idx.get('legacy')).toBe('legacy.ts');
+  });
+});
+
+describe('buildImportSpecifierIndex', () => {
+  it('maps binding names to their RAW import specifier (named + default + namespace)', () => {
+    const source = [
+      "import def from './a.js';",
+      "import { named, other as alias } from '@scope/pkg';",
+      "import * as ns from './c.js';",
+    ].join('\n');
+    const sf = ts.createSourceFile('/proj/app.ts', source, ts.ScriptTarget.Latest, true);
+
+    const idx = buildImportSpecifierIndex(sf);
+    expect(idx.get('def')).toBe('./a.js');
+    expect(idx.get('named')).toBe('@scope/pkg');
+    expect(idx.get('alias')).toBe('@scope/pkg');
+    expect(idx.get('ns')).toBe('./c.js');
+  });
+
+  it('maps an `import =` binding to its raw require specifier', () => {
+    const sf = ts.createSourceFile(
+      '/proj/app.ts',
+      "import legacy = require('./legacy.js');",
+      ts.ScriptTarget.Latest,
+      true,
+    );
+    const idx = buildImportSpecifierIndex(sf);
+    expect(idx.get('legacy')).toBe('./legacy.js');
   });
 });

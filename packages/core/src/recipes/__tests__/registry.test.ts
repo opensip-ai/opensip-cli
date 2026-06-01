@@ -159,6 +159,34 @@ describe('RecipeRegistry', () => {
       }
     });
 
+    it('{ throwOnDuplicate: true } registers normally when there is no duplicate', () => {
+      reg.register(stub('A', 'alpha'));
+      const fresh = stub('B', 'beta');
+      reg.register(fresh, { throwOnDuplicate: true });
+      expect(reg.getById('B')).toBe(fresh);
+      expect(reg.size).toBe(2);
+    });
+
+    it('{ internal: true } bypasses the duplicate guard and overwrites silently', () => {
+      const first = stub('A', 'alpha', { extra: 'first' });
+      const second = stub('A', 'alpha', { extra: 'second' });
+      reg.register(first, { internal: true });
+      reg.register(second, { internal: true });
+      expect(reg.getById('A')).toBe(second);
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it('{ allowOverwrite: true } with a same id but different name removes the stale name mapping', () => {
+      reg.register(stub('A', 'alpha'));
+      const replacement = stub('A', 'beta');
+      reg.register(replacement, { allowOverwrite: true });
+      expect(reg.getById('A')).toBe(replacement);
+      expect(reg.getByName('beta')).toBe(replacement);
+      // The stale 'alpha' name mapping is gone.
+      expect(reg.getByName('alpha')).toBeUndefined();
+      expect(reg.size).toBe(1);
+    });
+
     it('rejects { allowOverwrite: true, throwOnDuplicate: true } as mutually exclusive', () => {
       // The two flags advertise contradictory semantics; passing both
       // is a programmer error and should throw rather than silently
