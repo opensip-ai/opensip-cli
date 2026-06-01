@@ -62,6 +62,10 @@ function fragment(language: string, ...occs: FunctionOccurrence[]): Catalog {
   };
 }
 
+function crossEdge(catalog: Catalog): CallEdge | undefined {
+  return catalog.functions.caller?.[0]?.calls.find((e) => e.crossShard);
+}
+
 describe('mergeShardFragments', () => {
   it('unions occurrences from every fragment, preserving intra-shard calls', () => {
     const a = fragment('typescript', occ('mainA', 'pkgA/a.ts', 'A', [
@@ -267,3 +271,54 @@ describe('diffCatalogsByEdge', () => {
 // Keep the shard type referenced so the import documents the merge inputs.
 const _exampleShard: Shard = { id: 'pkg:a', rootDir: '/abs/pkgA', files: ['/abs/pkgA/index.ts'] };
 void _exampleShard;
+
+describe('resolveCrossBoundaryCalls — import-constrained (packages/ paths)', () => {
+  function moduleInit(
+    filePath: string,
+    bodyHash: string,
+    deps: readonly { to: readonly string[]; specifier: string }[],
+  ): FunctionOccurrence {
+    return {
+      ...occ(`<module-init:${filePath}>`, filePath, bodyHash),
+      kind: 'module-init',
+      dependencies: deps.map((d) => ({ to: d.to, specifier: d.specifier, line: 1, column: 0 })),
+    };
+  }
+
+  const callerA = occ('caller', 'packages/pkg-a/src/call.ts', 'CALLER');
+  const fA = occ('f', 'packages/pkg-a/src/f.ts', 'FA');
+  const fB = occ('f', 'packages/pkg-b/src/f.ts', 'FB');
+  const gB = occ('g', 'packages/pkg-b/src/g.ts', 'G');
+  const miB = moduleInit('packages/pkg-b/src/index.ts', 'MI_B', []);
+
+  function mergedWith(callerModuleInit: FunctionOccurrence): Catalog {
+    return mergeShardFragments(
+      [
+        fragment('typescript', callerA, fA, callerModuleInit),
+        fragment('typescript', fB, gB, miB),
+      ],
+      ['packages/pkg-a/src/call.ts', 'packages/pkg-b/src/g.ts'],
+    );
+  }
+
+  it("prefers the caller's own package for a same-named callee", () => {
+    const miA = moduleInit('packages/pkg-a/src/call.ts', 'MI_A', [{ to: ['MI_B'], specifier: '@scope/pkgb' }]);
+    const bc: CrossBoundaryCall = { ownerHash: 'CALLER', calleeName: 'f', importSpecifier: '@scope/pkgb', line: 2, column: 0, text: 'f()' };
+    const { catalog } = resolveCrossBoundaryCalls(mergedWith(miA), [bc]);
+    expect(crossEdge(catalog)?.to).toEqual(['FA']); // pkg-a's f, not pkg-b's
+  });
+
+  it('resolves into an imported package for a unique callee', () => {
+    const miA = moduleInit('packages/pkg-a/src/call.ts', 'MI_A', [{ to: ['MI_B'], specifier: '@scope/pkgb' }]);
+    const bc: CrossBoundaryCall = { ownerHash: 'CALLER', calleeName: 'g', importSpecifier: '@scope/pkgb', line: 2, column: 0, text: 'g()' };
+    const { catalog } = resolveCrossBoundaryCalls(mergedWith(miA), [bc]);
+    expect(crossEdge(catalog)?.to).toEqual(['G']);
+  });
+
+  it('declines a callee in a package the caller does not import', () => {
+    const miA = moduleInit('packages/pkg-a/src/call.ts', 'MI_A', []); // imports nothing
+    const bc: CrossBoundaryCall = { ownerHash: 'CALLER', calleeName: 'g', importSpecifier: '@scope/pkgb', line: 2, column: 0, text: 'g()' };
+    const { catalog } = resolveCrossBoundaryCalls(mergedWith(miA), [bc]);
+    expect(crossEdge(catalog)?.to).toEqual([]); // declined — pkg-b not imported
+  });
+});
