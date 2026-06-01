@@ -545,7 +545,7 @@ opensip-tools is distributed on npm; upgrading is your package manager's job —
 npm install -g opensip-tools@latest
 ```
 
-The CLI checks npm for a newer version once a day (non-blocking, TTY-only). When one is available it surfaces it without nagging:
+The CLI checks npm for a newer version once a day (non-blocking, TTY-only). The *check* is rate-limited to once a day, but once a newer version is found the *notice* persists on **every** run until you upgrade — so it's never lost if you miss it once — and disappears on its own the run after you update. When an update is available it surfaces without nagging:
 
 - On the default `mini` banner, the version line shows `(vX.Y.Z available)` and a dim `↑ Update: npm install -g opensip-tools` line prints just below the banner.
 - On the `lg`/`md`/`sm` banners (and the `--json` path, which renders no banner), the same upgrade command is printed as a one-line note on stderr.

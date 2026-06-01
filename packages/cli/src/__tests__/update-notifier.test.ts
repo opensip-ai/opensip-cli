@@ -1,3 +1,7 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 import { maybeNotify, isNewerVersion, checkForUpdate, formatUpdateNag } from '../update-notifier.js';
@@ -5,16 +9,24 @@ import { maybeNotify, isNewerVersion, checkForUpdate, formatUpdateNag } from '..
 const originalEnv = { ...process.env };
 const originalIsTTY = process.stdout.isTTY;
 
+// Per-test isolated sticky-state file so checkForUpdate never touches the
+// developer's real ~/.opensip-tools/update-state.json or leaks across tests.
+let tmpDir: string;
+let stateFile: string;
+
 beforeEach(() => {
   delete process.env.OPENSIP_NO_UPDATE;
   delete process.env.NO_UPDATE_NOTIFIER;
   delete process.env.CI;
+  tmpDir = mkdtempSync(join(tmpdir(), 'osip-upd-'));
+  stateFile = join(tmpDir, 'update-state.json');
 });
 
 afterEach(() => {
   process.env = { ...originalEnv };
   Object.defineProperty(process.stdout, 'isTTY', { value: originalIsTTY, configurable: true });
   vi.restoreAllMocks();
+  rmSync(tmpDir, { recursive: true, force: true });
 });
 
 describe('maybeNotify', () => {
@@ -83,19 +95,23 @@ describe('isNewerVersion', () => {
 describe('checkForUpdate', () => {
   it('returns undefined when opted out via OPENSIP_NO_UPDATE', () => {
     process.env.OPENSIP_NO_UPDATE = '1';
-    expect(checkForUpdate({ name: 'opensip-tools', version: '0.0.1' })).toBeUndefined();
+    expect(checkForUpdate({ name: 'opensip-tools', version: '0.0.1', stateFile })).toBeUndefined();
   });
 
   it('returns undefined when stdout is not a TTY', () => {
     Object.defineProperty(process.stdout, 'isTTY', { value: false, configurable: true });
-    expect(checkForUpdate({ name: 'opensip-tools', version: '0.0.1' })).toBeUndefined();
+    expect(checkForUpdate({ name: 'opensip-tools', version: '0.0.1', stateFile })).toBeUndefined();
   });
 
   it('does not throw on a TTY and returns a string or undefined', () => {
     Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
     // The cached npm result is environment-dependent, so we only assert the
     // contract: best-effort, never throws, narrows to string | undefined.
-    const result = checkForUpdate({ name: 'opensip-tools-test-nonexistent', version: '0.0.1' });
+    const result = checkForUpdate({
+      name: 'opensip-tools-test-nonexistent',
+      version: '0.0.1',
+      stateFile,
+    });
     expect(result === undefined || typeof result === 'string').toBe(true);
   });
 });

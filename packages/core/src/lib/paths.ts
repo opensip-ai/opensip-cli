@@ -129,6 +129,14 @@ export interface UserPaths {
   readonly userHomeDir: string;
   /** ~/.opensip-tools/config.yml — cloud API key + per-user defaults. */
   readonly configFile: string;
+  /**
+   * ~/.opensip-tools/update-state.json — tool-generated cache of the
+   * last-known newer published version, so the "update available" notice can
+   * persist across runs instead of showing once. NOT user-authored: written
+   * by the update notifier, cleared automatically once the running version
+   * catches up. Distinct from `configFile`, which holds user-authored config.
+   */
+  readonly updateStateFile: string;
 }
 
 /** Resolve the user-level path layout. */
@@ -137,5 +145,6 @@ export function resolveUserPaths(): UserPaths {
   return {
     userHomeDir,
     configFile: join(userHomeDir, 'config.yml'),
+    updateStateFile: join(userHomeDir, 'update-state.json'),
   };
 }

@@ -2,16 +2,26 @@
  * @fileoverview Thin wrapper around `update-notifier` that checks npm
  * once a day for a newer version of opensip-tools.
  *
- * Two consumers, one cached check:
+ * `update-notifier` is used purely as the *fetcher* — it runs the throttled
+ * (once-a-day), detached, non-blocking network check. It is NOT used as the
+ * display source, because its `check()` deletes the cached result the instant
+ * it's read, which would make the notice show at most once per 24-hour cycle.
+ * Instead the newest known version is mirrored into a sticky store
+ * (`update-state.ts`) that {@link checkForUpdate} consults on EVERY run, so
+ * the notice persists until the running version catches up. See
+ * `update-state.ts` for the rationale in full.
+ *
+ * Two consumers, one resolved result:
  *   - {@link checkForUpdate} returns the newer version string (if any) so
  *     the `mini` banner can surface it inline as `(vX.Y.Z available)`.
  *   - {@link formatUpdateNag} builds the stderr one-liner shown for the
  *     other banner sizes (which have no version line to annotate).
- * Both read the SAME once-a-day cached result `update-notifier` maintains;
- * the bootstrap calls `checkForUpdate` once and decides which surface to use.
+ * The bootstrap calls `checkForUpdate` once and decides which surface to use.
  *
  * Design goals:
  *   - Silent by default when there's nothing to report.
+ *   - Persistent while a genuinely newer release exists; self-clearing the
+ *     run after the user upgrades.
  *   - Opt-out via OPENSIP_NO_UPDATE (and honours the upstream
  *     NO_UPDATE_NOTIFIER flag for convention).
  *   - Non-blocking: the check runs in a child process; the current
@@ -26,6 +36,8 @@
 
 import updateNotifier, { type UpdateNotifier } from 'update-notifier'
 
+import { clearKnownLatest, readKnownLatest, writeKnownLatest } from './update-state.js'
+
 export interface NotifyOptions {
   readonly name: string
   readonly version: string
@@ -36,6 +48,11 @@ export interface NotifyOptions {
 export interface CheckForUpdateOptions {
   readonly name: string
   readonly version: string
+  /**
+   * Override the sticky update-state file path (for tests). Defaults to
+   * `~/.opensip-tools/update-state.json`.
+   */
+  readonly stateFile?: string
 }
 
 /** Split `2.2.1-beta.1` into `([2,2,1], 'beta.1')`; missing parts → 0 / ''. */
@@ -79,10 +96,16 @@ function shouldSkip(): boolean {
 }
 
 /**
- * Check for a newer published version, scheduling the once-a-day background
- * fetch as a side effect. Returns the newer version string (e.g. `2.3.0`)
- * when npm's `latest` is genuinely newer than what's running, or `undefined`
- * when up-to-date, opted-out, non-TTY, or the cached check hasn't completed.
+ * Resolve whether a newer published version is available, scheduling the
+ * once-a-day background fetch as a side effect. Returns the newer version
+ * string (e.g. `2.3.0`) when one is known, or `undefined` when up-to-date,
+ * opted-out, or non-TTY.
+ *
+ * Unlike `update-notifier`'s own delete-on-read result, this is **sticky**:
+ * the newest version the daily check observes is mirrored into a small store
+ * (`update-state.ts`) that is read on EVERY run, so the notice persists until
+ * the running version catches up — at which point the store is cleared and
+ * the notice stops on its own.
  *
  * Never throws: a malformed cache or notifier failure degrades to "no update
  * known" rather than breaking the command. Callers decide how to surface it
@@ -91,18 +114,33 @@ function shouldSkip(): boolean {
 export function checkForUpdate(opts: CheckForUpdateOptions): string | undefined {
   if (shouldSkip()) return undefined
   try {
+    // Fetcher: schedules the throttled, detached daily network check. On the
+    // run right after that check completes, `notifier.update` is populated
+    // (then update-notifier deletes it from its own cache — hence the mirror).
     const notifier = updateNotifier({
       pkg: { name: opts.name, version: opts.version },
       updateCheckInterval: 1000 * 60 * 60 * 24,
       shouldNotifyInNpmScript: false,
     })
-    const update = notifier.update
-    if (update && isNewerVersion(update.latest, update.current)) {
-      return update.latest
+    const fresh = notifier.update
+    if (fresh && isNewerVersion(fresh.latest, fresh.current)) {
+      writeKnownLatest(fresh.latest, opts.stateFile)
     }
+    // @fitness-ignore-next-line error-handling-quality -- the update fetch is best-effort cosmetic: any failure (corrupt cache, network helper error) must degrade silently, never break the user's command. The sticky store below still drives display from whatever was last known.
   } catch {
-    // @fitness-ignore-next-line error-handling-quality -- the update check is best-effort cosmetic: any failure (corrupt cache, network helper error) must degrade silently to "no update known", never break the user's command.
-    return undefined
+    // Intentionally swallow — see the directive above. Display falls through
+    // to readKnownLatest, so a failed fetch just shows the last known state.
+  }
+
+  // Display: driven entirely by the sticky store so the notice persists across
+  // runs. Clear it once the running version has caught up so it self-stops
+  // after an upgrade.
+  const known = readKnownLatest(opts.stateFile)
+  if (known && isNewerVersion(known, opts.version)) {
+    return known
+  }
+  if (known) {
+    clearKnownLatest(opts.stateFile)
   }
   return undefined
 }
