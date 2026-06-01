@@ -2,9 +2,10 @@
  * App — top-level Ink component that dispatches on CommandResult.type.
  */
 
-import { RunHeader , useTheme , ErrorMessage , Banner , UpdateHint , normalizeBannerSize , ProjectHeader } from '@opensip-tools/cli-ui';
+import { RunHeader , useTheme , ErrorMessage , Banner , UpdateHint , normalizeBannerSize , ProjectHeader , renderToInk } from '@opensip-tools/cli-ui';
 import { Text, Box } from 'ink';
 import React from 'react';
+
 
 
 import { CheckList } from './components/CheckList.js';
@@ -18,13 +19,13 @@ import { PluginFeedback } from './components/PluginFeedback.js';
 import { RecipeList } from './components/RecipeList.js';
 import { ResultsTable } from './components/ResultsTable.js';
 import { Summary } from './components/Summary.js';
+import { resultToView } from './result-to-view.js';
 
 
 import type {
   ClearDoneResult,
   CommandResult,
   ConfigureDoneResult,
-  SimDoneResult,
   UninstallDoneResult,
 } from '@opensip-tools/contracts';
 import type { UiContext } from '@opensip-tools/core';
@@ -93,6 +94,12 @@ export function App({ result, projectHeader, ui }: AppProps): React.ReactElement
  * {@link App}, so no branch renders its own.
  */
 function AppBody({ result }: AppProps): React.ReactElement {
+  // Migrated result types render through the shared view-model so the TTY
+  // (Ink) output is byte-for-byte the same content the piped path produces
+  // via renderToText. Un-migrated types fall through to the legacy switch.
+  const view = resultToView(result);
+  if (view !== null) return renderToInk(view);
+
   switch (result.type) {
     case 'fit-done': {
       return (
@@ -135,10 +142,6 @@ function AppBody({ result }: AppProps): React.ReactElement {
       );
     }
 
-    case 'sim-done': {
-      return <SimDoneSummary result={result} />;
-    }
-
     case 'plugin-list':
     case 'plugin-add':
     case 'plugin-remove':
@@ -162,75 +165,10 @@ function AppBody({ result }: AppProps): React.ReactElement {
       return <HelpText />;
     }
 
-    case 'error': {
-      return <ErrorMessage message={result.message} suggestion={result.suggestion} />;
-    }
-
     default: {
       return <ErrorMessage message="Unknown command result" />;
     }
   }
-}
-
-/**
- * Inline summary for `sim --recipe <name>` runs.
- *
- * Mirrors the fit-done compact summary: one line per scenario, then a
- * pass/fail tally + duration. Detailed per-scenario error messages
- * surface inline when a scenario failed.
- */
-function SimDoneSummary({
-  result,
-}: Readonly<{ result: SimDoneResult }>): React.ReactElement {
-  const theme = useTheme();
-  const ms = result.durationMs;
-  const dur = ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
-
-  return (
-    <Box flexDirection="column">
-      <RunHeader
-        tool={SIMULATION_TOOL_TITLE}
-        description={`Recipe: ${result.recipeName}`}
-      />
-      <Box flexDirection="column" paddingLeft={2} paddingTop={1}>
-        {result.scenarios.length === 0 ? (
-          <Text dimColor>
-            No scenarios matched recipe '{result.recipeName}'. Add one to opensip-tools/sim/scenarios/.
-          </Text>
-        ) : (
-          result.scenarios.map((s) => (
-            <Box key={s.scenarioId} flexDirection="column">
-              <Text>
-                <Text color={s.passed ? theme.success : theme.error}>
-                  {s.passed ? '✓' : '✗'}
-                </Text>
-                {' '}
-                <Text bold>{s.scenarioName}</Text>
-                {' '}
-                <Text dimColor>({s.kind}, {s.durationMs}ms)</Text>
-              </Text>
-              {s.error && (
-                <Box paddingLeft={4}>
-                  <Text color={theme.error}>{s.error}</Text>
-                </Box>
-              )}
-            </Box>
-          ))
-        )}
-      </Box>
-      <Box paddingLeft={2} paddingTop={1}>
-        <Text>
-          <Text bold>{result.passedScenarios}</Text> passed,{' '}
-          <Text bold color={result.failedScenarios > 0 ? theme.error : undefined}>
-            {result.failedScenarios}
-          </Text>{' '}
-          failed
-          {' '}
-          <Text dimColor>| Duration {dur}</Text>
-        </Text>
-      </Box>
-    </Box>
-  );
 }
 
 /**

@@ -87,11 +87,14 @@ function simDoneView(result: SimDoneResult): ViewNode {
  */
 export function resultToView(result: CommandResult): ViewNode | null {
   switch (result.type) {
-    case 'error':
+    case 'error': {
       return errorView(result);
-    case 'sim-done':
+    }
+    case 'sim-done': {
       return simDoneView(result);
-    default:
+    }
+    default: {
       return null;
+    }
   }
 }
