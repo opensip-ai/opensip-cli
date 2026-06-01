@@ -174,22 +174,34 @@ export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
   //    dir) we fall back to the CLI's own install dir so the bundled
   //    deps still resolve.
   const discoveryAnchor = projectDir ?? cliInstallDir();
-  const { totalRegistered: checksRegistered, warnings: packWarnings } = await loadDiscoveredCheckPackages(discoveryAnchor);
+  const { totalRegistered: checksRegistered, warnings: packWarnings, coreMismatchSkips } =
+    await loadDiscoveredCheckPackages(discoveryAnchor);
   for (const w of packWarnings) loadWarnings.push(w);
 
   // 4. No-checks-loaded guard. Silent zero-checks would let a misconfig
   //    or missing dep produce a green run that scanned nothing — the
   //    exact failure mode the CLI exists to prevent. Warn loudly.
   if (checksRegistered === 0) {
-    const msg =
-      'no check packages were loaded. ' +
-      'Install at least one @opensip-tools/checks-* package, ' +
-      'or declare plugins.checkPackages in opensip-tools.config.yml.';
-    loadWarnings.push(msg);
+    // When the run is empty BECAUSE every candidate pack was refused for a
+    // core mismatch, loadDiscoveredCheckPackages already pushed a consolidated
+    // warning explaining it and pointing at `pnpm fit`. The generic "install a
+    // checks-* package" guidance would be actively misleading there (the packs
+    // ARE installed), so only emit it when nothing was skipped for a mismatch.
+    if (coreMismatchSkips.length === 0) {
+      loadWarnings.push(
+        'no check packages were loaded. ' +
+          'Install at least one @opensip-tools/checks-* package, ' +
+          'or declare plugins.checkPackages in opensip-tools.config.yml.',
+      );
+    }
     logger.warn({
       evt: 'cli.check_packages.empty',
       module: 'cli:fit',
-      msg: 'no check packages loaded',
+      msg:
+        coreMismatchSkips.length > 0
+          ? 'no check packages loaded (all candidates skipped: core mismatch)'
+          : 'no check packages loaded',
+      coreMismatchSkips: coreMismatchSkips.length,
     });
   }
 
@@ -255,6 +267,50 @@ function foreignCorePath(packageDir: string): string | undefined {
   }
 }
 
+/** A discovered check package's name + on-disk location. */
+interface DiscoveredPack {
+  readonly name: string;
+  readonly packageDir: string;
+}
+
+/**
+ * Partition discovered packs into those that share this engine's
+ * `@opensip-tools/core` (loadable) and those that resolve a foreign core
+ * (refused by the single-core guard, B). Pure — pushes no warnings.
+ */
+function partitionPacksByCore(packs: readonly DiscoveredPack[]): {
+  sameCore: readonly DiscoveredPack[];
+  coreMismatchSkips: readonly string[];
+  foreignCore: string | undefined;
+} {
+  const coreMismatchSkips: string[] = [];
+  let foreignCore: string | undefined;
+  const sameCore = packs.filter((pkg) => {
+    const foreign = foreignCorePath(pkg.packageDir);
+    if (foreign === undefined) return true;
+    coreMismatchSkips.push(pkg.name);
+    foreignCore = foreign;
+    return false;
+  });
+  return { sameCore, coreMismatchSkips, foreignCore };
+}
+
+/**
+ * One consolidated warning naming every core-mismatch skip (rather than a
+ * verbose paragraph per pack). Returns `[]` when nothing was skipped, so the
+ * caller can spread it unconditionally.
+ */
+function coreMismatchWarning(skips: readonly string[], foreignCore: string | undefined): string[] {
+  if (skips.length === 0) return [];
+  return [
+    `skipped ${String(skips.length)} check package(s) that resolve a different ` +
+      `@opensip-tools/core (${foreignCore ?? '<unknown>'}) than this CLI ` +
+      `(${selfCorePath ?? '<unknown>'}): ${skips.join(', ')}. Loading them would split the run ` +
+      `scope and produce false positives. Run the project's own CLI instead ` +
+      `(e.g. \`pnpm fit\`, or \`npx @opensip-tools/cli fit\` from the project).`,
+  ];
+}
+
 /**
  * Return shape of `loadDiscoveredCheckPackages`. Warnings are returned
  * (rather than written to a module singleton) so direct callers and tests
@@ -264,6 +320,13 @@ function foreignCorePath(packageDir: string): string | undefined {
 export interface LoadDiscoveredResult {
   readonly totalRegistered: number;
   readonly warnings: readonly string[];
+  /**
+   * Names of check packs refused by the single-core guard (B). Lets the
+   * caller tailor the no-checks-loaded message: when the run is empty BECAUSE
+   * packs were skipped for a core mismatch, the generic "install a checks-*
+   * package" guidance is misleading (the packs ARE installed).
+   */
+  readonly coreMismatchSkips: readonly string[];
 }
 
 /**
@@ -306,22 +369,11 @@ export async function loadDiscoveredCheckPackages(projectDir: string): Promise<L
   const warnings: string[] = [];
 
   // Single-core guard (B): drop any pack that resolves a different
-  // @opensip-tools/core than this engine BEFORE the load loop. Loading such a
-  // pack would split the run scope (AsyncLocalStorage) so its checks see
-  // `currentScope() === undefined`, silently degrading content filters to raw
-  // and producing false positives. Done as a pre-pass to keep the load loop's
-  // control flow simple.
-  const sameCorePacks = allPacks.filter((pkg) => {
-    const foreign = foreignCorePath(pkg.packageDir);
-    if (foreign === undefined) return true;
-    warnings.push(
-      `check package ${pkg.name} resolves a different @opensip-tools/core (${foreign}) ` +
-        `than this CLI (${selfCorePath ?? '<unknown>'}); loading it would split the run ` +
-        `scope and produce false positives. Skipping — run the project's own CLI instead ` +
-        `(e.g. \`pnpm fit\`, or \`npx @opensip-tools/cli fit\` from the project).`,
-    );
-    return false;
-  });
+  // @opensip-tools/core than this engine BEFORE the load loop (a split run
+  // scope would silently degrade content filters to raw → false positives).
+  // Partition + warning are extracted to keep this function's control flow flat.
+  const { sameCore: sameCorePacks, coreMismatchSkips, foreignCore } = partitionPacksByCore(allPacks);
+  warnings.push(...coreMismatchWarning(coreMismatchSkips, foreignCore));
 
   for (const pkg of sameCorePacks) {
     const meta = readCheckPackageMetadata(pkg.packageDir);
@@ -380,5 +432,5 @@ export async function loadDiscoveredCheckPackages(projectDir: string): Promise<L
       });
     }
   }
-  return { totalRegistered, warnings };
+  return { totalRegistered, warnings, coreMismatchSkips };
 }

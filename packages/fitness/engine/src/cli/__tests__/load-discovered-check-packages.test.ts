@@ -232,26 +232,39 @@ describe('loadDiscoveredCheckPackages', () => {
     expect(registered).toBe(0);
   });
 
-  it('refuses a pack that resolves a DIFFERENT @opensip-tools/core (single-core guard, B)', async () => {
-    // A pack that ships its own nested @opensip-tools/core resolves a second
-    // core instance. Loading it would split the run scope (AsyncLocalStorage),
+  it('refuses packs that resolve a DIFFERENT @opensip-tools/core, in ONE consolidated warning (single-core guard, B)', async () => {
+    // Packs that ship their own nested @opensip-tools/core resolve a second
+    // core instance. Loading them would split the run scope (AsyncLocalStorage),
     // silently degrading content filters to raw and producing false positives.
-    // The guard refuses it at load time with an actionable warning.
-    const { checkSlug } = writeFixturePack({
-      packageDir: join(testDir, 'node_modules', '@opensip-tools', 'checks-foreigncore'),
-      packageName: '@opensip-tools/checks-foreigncore',
+    // The guard refuses them at load time — and reports all skips in a single
+    // warning that lists each pack, rather than a verbose paragraph per pack.
+    const a = writeFixturePack({
+      packageDir: join(testDir, 'node_modules', '@opensip-tools', 'checks-foreigncore-a'),
+      packageName: '@opensip-tools/checks-foreigncore-a',
+      withForeignCore: true,
+    });
+    const b = writeFixturePack({
+      packageDir: join(testDir, 'node_modules', '@opensip-tools', 'checks-foreigncore-b'),
+      packageName: '@opensip-tools/checks-foreigncore-b',
       withForeignCore: true,
     });
 
-    const { totalRegistered, warnings } = await loadDiscoveredCheckPackages(testDir);
+    const { totalRegistered, warnings, coreMismatchSkips } = await loadDiscoveredCheckPackages(testDir);
 
     expect(totalRegistered).toBe(0);
-    expect(defaultRegistry.getBySlug(checkSlug)).toBeUndefined();
-    expect(
-      warnings.some(
-        (m) => m.includes('@opensip-tools/checks-foreigncore') && m.includes('different @opensip-tools/core'),
-      ),
-    ).toBe(true);
+    expect(defaultRegistry.getBySlug(a.checkSlug)).toBeUndefined();
+    expect(defaultRegistry.getBySlug(b.checkSlug)).toBeUndefined();
+    // Both packs reported via the structured skip list…
+    expect([...coreMismatchSkips].sort()).toEqual([
+      '@opensip-tools/checks-foreigncore-a',
+      '@opensip-tools/checks-foreigncore-b',
+    ]);
+    // …and surfaced in exactly ONE consolidated warning naming both.
+    const mismatchWarnings = warnings.filter((m) => m.includes('different @opensip-tools/core'));
+    expect(mismatchWarnings).toHaveLength(1);
+    expect(mismatchWarnings[0]).toContain('@opensip-tools/checks-foreigncore-a');
+    expect(mismatchWarnings[0]).toContain('@opensip-tools/checks-foreigncore-b');
+    expect(mismatchWarnings[0]).toContain('pnpm fit');
   });
 
   it('still loads a same-core pack that does NOT vendor its own core (no false skip)', async () => {
@@ -263,9 +276,10 @@ describe('loadDiscoveredCheckPackages', () => {
       packageName: '@opensip-tools/checks-samecore',
     });
 
-    const { totalRegistered } = await loadDiscoveredCheckPackages(testDir);
+    const { totalRegistered, coreMismatchSkips } = await loadDiscoveredCheckPackages(testDir);
 
     expect(totalRegistered).toBe(1);
     expect(defaultRegistry.getBySlug(checkSlug)).toBeDefined();
+    expect(coreMismatchSkips).toEqual([]);
   });
 });
