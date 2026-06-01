@@ -20,6 +20,14 @@ import { typescriptGraphAdapter } from '../index.js';
 
 import type { ToolCliContext } from '@opensip-tools/core';
 
+/** Minimal structural view of GraphDoneResult — avoids a contracts dep in this adapter test. */
+interface GraphDoneLike {
+  readonly type: string;
+  readonly reportLines: readonly string[];
+  readonly summary: { readonly passed: number };
+  readonly footerHints: readonly { readonly text: string }[];
+}
+
 const FIXTURE_TSCONFIG = JSON.stringify({
   compilerOptions: {
     target: 'ES2022',
@@ -47,10 +55,13 @@ interface CapturedCli {
   readonly cli: ToolCliContext;
   readonly exitCodes: number[];
   readonly datastore: DataStore;
+  /** Captures the CommandResult(s) executeGraph hands to cli.render(). */
+  readonly render: MockInstance;
 }
 
 function makeCli(): CapturedCli {
   const exitCodes: number[] = [];
+  const render = vi.fn(() => Promise.resolve());
   const datastore = DataStoreFactory.open({ backend: 'memory' });
   const project = {
     cwd: '/test',
@@ -72,7 +83,7 @@ function makeCli(): CapturedCli {
       datastore: () => datastore,
       languages,
     }),
-    render: vi.fn(() => Promise.resolve()),
+    render,
     registerLiveView: vi.fn(),
     renderLive: vi.fn(() => Promise.resolve()),
     maybeOpenDashboard: vi.fn(() => Promise.resolve()),
@@ -85,7 +96,7 @@ function makeCli(): CapturedCli {
     setExitCode: (c: number) => { exitCodes.push(c); },
     emitJson: vi.fn(),
   };
-  return { cli, exitCodes, datastore };
+  return { cli, exitCodes, datastore, render };
 }
 
 describe('executeGraph', () => {
@@ -123,39 +134,37 @@ describe('executeGraph', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it('default mode prints the fit-style summary + footer hint (no detailed report)', async () => {
+  it('default mode produces a graph-done result with summary + footer hint (no detailed body)', async () => {
     setupFixture(dir, {
       'index.ts': `function unused(): number { return 1; }\nexport function main(): void {}\n`,
     });
-    const { cli, exitCodes } = makeCli();
+    const { cli, exitCodes, render } = makeCli();
     await executeGraph({ cwd: dir }, cli);
-    // Default surface mirrors fit's done view: one-line summary + footer hint,
-    // detail behind --verbose.
-    expect(stdout).toContain(' Passed, ');
-    expect(stdout).toContain(' Failed (');
-    expect(stdout).toContain(' Errors, ');
-    expect(stdout).toContain(' Warnings)');
-    expect(stdout).toContain(' | Duration ');
-    expect(stdout).toContain('Use --verbose for detailed results');
-    expect(stdout).not.toContain('== Catalog ==');
-    expect(stdout).not.toContain('== Findings');
+    // executeGraph hands a structured result to the render seam; the
+    // Ink-vs-plain-text rendering is the CLI's concern (covered there).
+    const done = render.mock.calls[0]?.[0] as GraphDoneLike;
+    expect(done.type).toBe('graph-done');
+    expect(typeof done.summary.passed).toBe('number');
+    expect(done.footerHints.some((h) => h.text.includes('Use --verbose for detailed results'))).toBe(true);
+    expect(done.reportLines).toEqual([]);
     expect(exitCodes).toContain(0);
   });
 
-  it('--verbose mode prints the detailed unified text report', async () => {
+  it('--verbose mode produces a graph-done result with the detailed report body', async () => {
     setupFixture(dir, {
       'index.ts': `function unused(): number { return 1; }\nexport function main(): void {}\n`,
     });
-    const { cli, exitCodes } = makeCli();
+    const { cli, exitCodes, render } = makeCli();
     await executeGraph({ cwd: dir, verbose: true }, cli);
-    expect(stdout).toContain('opensip-tools graph');
-    expect(stdout).toContain('== Catalog ==');
-    expect(stdout).toContain('== Findings');
-    expect(stdout).toContain('== Entry points');
-    // The trailing "== Summary ==" block is suppressed in verbose mode;
-    // the fit-style summary line follows the report body.
-    expect(stdout).not.toContain('== Summary ==');
-    expect(stdout).toContain(' Passed, ');
+    const done = render.mock.calls[0]?.[0] as GraphDoneLike;
+    expect(done.type).toBe('graph-done');
+    const body = done.reportLines.join('\n');
+    expect(body).toContain('== Catalog ==');
+    expect(body).toContain('== Findings');
+    expect(body).toContain('== Entry points');
+    // The trailing "== Summary ==" block is suppressed (includeSummary: false).
+    expect(body).not.toContain('== Summary ==');
+    expect(done.footerHints).toEqual([]);
     expect(exitCodes).toContain(0);
   });
 
