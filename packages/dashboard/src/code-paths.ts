@@ -138,7 +138,7 @@ function panelOrchestratorJs(): string {
 // CODE PATHS — CATALOG STATE
 // =======================================================
 let graphCatalog = null;
-let graphIndexes = { byBodyHash: new Map(), bySimpleName: new Map(), callees: new Map(), callers: new Map() };
+let graphIndexes = { byBodyHash: new Map(), occurrencesByHash: new Map(), bySimpleName: new Map(), callees: new Map(), callers: new Map() };
 
 // =======================================================
 // CODE PATHS — CATALOG LOAD

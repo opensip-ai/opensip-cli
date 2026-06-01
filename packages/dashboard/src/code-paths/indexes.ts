@@ -12,17 +12,25 @@ export function dashboardIndexesJs(): string {
   return String.raw`
 function buildIndexes(catalog) {
   const byBodyHash = new Map();
+  // All occurrences per body. byBodyHash keeps only one (last-writer-wins),
+  // collapsing identical bodies across packages; occurrencesByHash preserves
+  // every occurrence so coupling can attribute a callee to the correct
+  // package instead of the collision winner.
+  const occurrencesByHash = new Map();
   const bySimpleName = new Map();
   const callees = new Map();
   const callers = new Map();
   if (!catalog || !catalog.functions) {
-    return { byBodyHash, bySimpleName, callees, callers };
+    return { byBodyHash, occurrencesByHash, bySimpleName, callees, callers };
   }
-  // Pass 1: byBodyHash + bySimpleName.
+  // Pass 1: byBodyHash + occurrencesByHash + bySimpleName.
   for (const name of Object.keys(catalog.functions)) {
     const occs = catalog.functions[name] || [];
     for (const occ of occs) {
       byBodyHash.set(occ.bodyHash, occ);
+      let all = occurrencesByHash.get(occ.bodyHash);
+      if (!all) { all = []; occurrencesByHash.set(occ.bodyHash, all); }
+      all.push(occ);
       let bucket = bySimpleName.get(name);
       if (!bucket) { bucket = []; bySimpleName.set(name, bucket); }
       bucket.push(occ.bodyHash);
@@ -44,7 +52,7 @@ function buildIndexes(catalog) {
     }
     if (out.length > 0) callees.set(occ.bodyHash, out);
   }
-  return { byBodyHash, bySimpleName, callees, callers };
+  return { byBodyHash, occurrencesByHash, bySimpleName, callees, callers };
 }
 `;
 }

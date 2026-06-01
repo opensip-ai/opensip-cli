@@ -38,7 +38,7 @@ views.push({
       const callerPkg = packageOfPath(occ.filePath);
       for (const edge of (occ.calls || [])) {
         for (const target of (edge.to || [])) {
-          const callee = indexes.byBodyHash.get(target);
+          const callee = resolveCalleeOcc(target, occ, indexes);
           if (!callee) continue;
           const calleePkg = packageOfPath(callee.filePath);
           let row = counts.get(callerPkg);
@@ -118,7 +118,7 @@ function openCouplingDrilldown(callerPkg, calleePkg, indexes, filterState) {
     if (packageOfPath(occ.filePath) !== callerPkg) continue;
     for (const edge of (occ.calls || [])) {
       for (const target of (edge.to || [])) {
-        const callee = indexes.byBodyHash.get(target);
+        const callee = resolveCalleeOcc(target, occ, indexes);
         if (!callee) continue;
         if (packageOfPath(callee.filePath) !== calleePkg) continue;
         const item = el('li', {
@@ -136,6 +136,27 @@ function openCouplingDrilldown(callerPkg, calleePkg, indexes, filterState) {
   }
   if (count === 0) list.appendChild(el('li', { class: 'external', text: 'No call sites found.' }));
   card.appendChild(list);
+}
+
+// Resolve a call target (a bodyHash) to the callee occurrence the caller can
+// reach, disambiguating body-hash collisions across packages. byBodyHash
+// keeps only one occurrence per hash (the collision winner), which
+// mis-attributes the callee's package; occurrencesByHash preserves all, so we
+// prefer the caller's own package, else fall back deterministically (lowest
+// qualifiedName). The dashboard catalog carries no import set, so this mirrors
+// the engine's fast-mode (same-package-only) attribution.
+function resolveCalleeOcc(target, callerOcc, indexes) {
+  const candidates = (indexes.occurrencesByHash && indexes.occurrencesByHash.get(target)) || null;
+  if (!candidates || candidates.length === 0) return indexes.byBodyHash.get(target);
+  if (candidates.length === 1) return candidates[0];
+  const callerPkg = packageOfPath(callerOcc.filePath);
+  let samePkg = null;
+  let lowest = candidates[0];
+  for (const c of candidates) {
+    if (!samePkg && packageOfPath(c.filePath) === callerPkg) samePkg = c;
+    if (c.qualifiedName < lowest.qualifiedName) lowest = c;
+  }
+  return samePkg || lowest;
 }
 `;
 }
