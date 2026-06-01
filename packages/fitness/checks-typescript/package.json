@@ -1,6 +1,6 @@
 {
   "name": "@opensip-tools/checks-typescript",
-  "version": "2.2.1",
+  "version": "2.3.0",
   "license": "MIT",
   "description": "TypeScript/Node.js fitness checks for opensip-tools",
   "repository": {

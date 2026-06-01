@@ -4,16 +4,26 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [2.2.1] — 2026-05-31
+## [2.3.0] — 2026-05-31
 
-Adds two dedicated graph export subcommands and rounds out the
-OpenTelemetry tracing so the parallel build path is observable and
-telemetry can never degrade a run. Backward-compatible with 2.1.0 — all
-existing commands, flags, and output are unchanged. (Versioned 2.2.1; there
-is no 2.2.0 release.)
+A compact new CLI banner with an inline upgrade prompt, two dedicated graph
+export subcommands, and rounded-out OpenTelemetry tracing so the parallel
+build path is observable and telemetry can never degrade a run.
+Backward-compatible with 2.1.0 — all existing commands, flags, and output
+are unchanged.
+
+> **Note:** 2.2.0 and 2.2.1 were never released. 2.2.1 was a partial publish
+> (only `core`/`datastore`/`contracts` reached npm before the run failed);
+> those orphaned versions are superseded by 2.3.0, which publishes the full
+> set consistently.
 
 ### Added
 
+- **Compact mini banner is now the default CLI header.** A smaller banner
+  shown across all commands, carrying `www.opensip.ai`. When a newer version
+  is published to npm, it surfaces an inline "update available" notice with
+  the exact upgrade command beneath the banner. The update-notifier no longer
+  nags on a local build that is *ahead* of the published version.
 - **`graph-catalog-export` and `graph-sarif-export` subcommands.** Catalog
   emission (previously reachable only as a `graph --catalog-output` mode)
   and OpenSIP-convention SARIF file output now have dedicated subcommands

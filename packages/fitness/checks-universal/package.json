@@ -1,6 +1,6 @@
 {
   "name": "@opensip-tools/checks-universal",
-  "version": "2.2.1",
+  "version": "2.3.0",
   "license": "MIT",
   "description": "Cross-language fitness checks for opensip-tools",
   "repository": {

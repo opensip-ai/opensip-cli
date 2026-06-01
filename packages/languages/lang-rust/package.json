@@ -1,6 +1,6 @@
 {
   "name": "@opensip-tools/lang-rust",
-  "version": "2.2.1",
+  "version": "2.3.0",
   "license": "MIT",
   "description": "Rust language adapter for opensip-tools",
   "repository": {
