@@ -35,11 +35,13 @@ export type Tone =
   | 'muted'
   | 'default';
 
-/** An inline run of text within a line, optionally toned and/or bold. */
+/** An inline run of text within a line, optionally toned, bold, and/or dimmed. */
 export interface Span {
   readonly text: string;
   readonly tone?: Tone;
   readonly bold?: boolean;
+  /** Render this span muted (Ink `dimColor`). Dropped by the text interpreter. */
+  readonly dim?: boolean;
 }
 
 /** A single hint in a footer strip: its text and which substrings to bold. */

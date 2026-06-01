@@ -43,7 +43,7 @@ function toneColor(theme: Theme, tone: Span['tone']): string | undefined {
 
 function SpanText({ span }: { readonly span: Span }): React.ReactElement {
   const theme = useTheme();
-  return <Text color={toneColor(theme, span.tone)} bold={span.bold}>{span.text}</Text>;
+  return <Text color={toneColor(theme, span.tone)} bold={span.bold} dimColor={span.dim}>{span.text}</Text>;
 }
 
 /** Render one hint, bolding any configured substrings (longest-first). */

@@ -1,25 +1,25 @@
 /**
- * RunSummary — shared one-line PASS/FAIL summary used by every Ink
- * live view in the suite (fitness, graph, sim).
+ * RunSummary — shared one-line PASS/FAIL summary used by every Ink live
+ * view in the suite (fitness, graph, sim).
  *
  * The format is fixed: `{P} Passed, {F} Failed ({E} Errors, {W} Warnings) | Duration {ms}`
- * with per-segment colors driven by the active theme. Counts are
- * rendered with semantically meaningful colors — `theme.error` for
- * nonzero errors, `theme.warning` for nonzero warnings, `theme.muted`
- * when zero — so the eye instantly anchors on the bad numbers without
- * counting digits.
+ * with per-segment colors driven by the active theme. Counts are rendered
+ * with semantically meaningful colors — error for nonzero errors, warning
+ * for nonzero warnings, muted when zero — so the eye anchors on the bad
+ * numbers without counting digits.
  *
- * Every tool maps its own internal summary into the unified shape
- * accepted here. This is the single source of truth for the chrome
- * users see at the bottom of each tool's run; if you find yourself
- * tweaking the format in a tool-specific runner, refactor here
- * instead.
+ * The format lives once, as the `viewRunSummary` view-model producer. The
+ * Ink component is a thin wrapper that renders that view; the
+ * non-interactive (piped/CI) path renders the same view through
+ * `renderToText`, so the two cannot drift. (Previously the plain-text form
+ * was hand-retyped in graph's `writeRunSummaryPlain`.)
  */
 
-import { Box, Text } from 'ink';
+import { Box } from 'ink';
 import React from 'react';
 
-import { useTheme } from './theme.js';
+import { renderToInk } from './render-to-ink.js';
+import { line, type Span, type ViewNode } from './view-model.js';
 
 export interface RunSummaryProps {
   readonly passed: number;
@@ -34,21 +34,29 @@ function formatDuration(ms: number): string {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
-export function RunSummary({ passed, failed, errors, warnings, durationMs }: RunSummaryProps): React.ReactElement {
-  const theme = useTheme();
-  return (
-    <Box paddingTop={1}>
-      <Text>
-        <Text color={theme.success}>{passed} Passed</Text>
-        , <Text color={failed > 0 ? theme.error : theme.muted}>{failed} Failed</Text>
-        {' ('}
-        <Text color={errors > 0 ? theme.error : theme.muted}>{errors} Errors</Text>
-        , <Text color={warnings > 0 ? theme.warning : theme.muted}>{warnings} Warnings</Text>
-        {') '}
-        <Text dimColor>|</Text>
-        {' Duration '}
-        <Text color={theme.info}>{formatDuration(durationMs)}</Text>
-      </Text>
-    </Box>
-  );
+/**
+ * The canonical summary line as a renderer-agnostic view-model node. Span
+ * text concatenates to exactly:
+ *   `{P} Passed, {F} Failed ({E} Errors, {W} Warnings) | Duration {dur}`
+ */
+export function viewRunSummary({ passed, failed, errors, warnings, durationMs }: RunSummaryProps): ViewNode {
+  const spans: Span[] = [
+    { text: `${passed} Passed`, tone: 'success' },
+    { text: ', ' },
+    { text: `${failed} Failed`, tone: failed > 0 ? 'error' : 'muted' },
+    { text: ' (' },
+    { text: `${errors} Errors`, tone: errors > 0 ? 'error' : 'muted' },
+    { text: ', ' },
+    { text: `${warnings} Warnings`, tone: warnings > 0 ? 'warning' : 'muted' },
+    { text: ') ' },
+    { text: '|', dim: true },
+    { text: ' Duration ' },
+    { text: formatDuration(durationMs), tone: 'info' },
+  ];
+  return line(spans);
+}
+
+/** Ink view of {@link viewRunSummary}, with the live-view's top padding. */
+export function RunSummary(props: RunSummaryProps): React.ReactElement {
+  return <Box paddingTop={1}>{renderToInk(viewRunSummary(props))}</Box>;
 }
