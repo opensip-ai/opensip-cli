@@ -4,6 +4,38 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.4.1] — 2026-06-01
+
+### Changed
+
+- **Piped / CI output is now clean plain text.** Every command's human-readable
+  output is defined once as a renderer-agnostic view-model and rendered two
+  ways: Ink (colored) in an interactive terminal, and plain text — **zero ANSI,
+  no banner** — when stdout is piped, redirected, or running in CI. Interactive
+  and non-interactive output now come from a single definition and provably
+  cannot drift (enforced by a cross-renderer equivalence test). The
+  `ℹ Project:` discovery line is preserved in piped output so CI logs still
+  record which root was analyzed; the `--json` contract is unchanged.
+
+### Fixed
+
+- **`fit` / `graph` gate and report output no longer bypass the renderer.**
+  The summary line, footer hints, and graph resolution caveat were previously
+  hand-written to stdout in a separate code path that could drift from the
+  interactive view. They now route through the shared renderer, so piped and
+  interactive output are identical. Removes the hand-maintained plain-text
+  duplicates in the graph CLI.
+- **`performance-anti-patterns` fitness check is now accumulation-specific.**
+  It flagged any spread inside a `for` body, conflating genuine O(n²)
+  accumulation (`acc = [...acc, x]`, `m.set(k, [...m.get(k), x])`) with benign
+  one-time spreads. Defensive copies (`[...arr].sort()`), spread call-arguments
+  (`fn(...args)`), and merges (`[...a, ...b]`) are no longer false-positives —
+  which also resolves a standing collision with eslint's `unicorn/prefer-spread`.
+
+### Internal
+
+- CI: `github/codeql-action` bumped to v4 (Node 24 runtime line).
+
 ## [2.4.0] — 2026-06-01
 
 ### Changed
