@@ -7,12 +7,11 @@
  * on dispatch (json/sarif/catalog-json/packages/report/gate/cloud-report).
  *
  * Owns the catalog-summary, findings-by-rule, entry-points, and summary
- * sections — both as a `string[]` builder (consumed by the Ink view via
- * `buildUnifiedReportLines`) and as a direct stdout writer
- * (`writeUnifiedReport`, used by non-interactive paths).
+ * sections as a `string[]` builder (`buildUnifiedReportLines`). The graph
+ * CLI feeds these lines into a `GraphDoneResult`; the central render seam
+ * turns them into Ink (TTY) or plain text (pipe/CI) — there is no direct
+ * stdout writer here anymore.
  */
-
-import { formatDuration } from '@opensip-tools/core';
 
 import { inferEntryPoints } from '../rules/_entry-points.js';
 import { currentRules } from '../rules/registry.js';
@@ -88,29 +87,8 @@ export function buildUnifiedReportLines(
   ];
 }
 
-export function writeUnifiedReport(input: UnifiedReportInput): void {
-  // `includeSummary: false` — the stdout dispatcher emits the
-  // fit-style one-line summary via `writeRunSummaryPlain` after this,
-  // so the trailing "== Summary ==" block would be redundant.
-  const lines = [
-    'opensip-tools graph',
-    '',
-    ...buildUnifiedReportLines(input, { includeSummary: false }),
-  ];
-  process.stdout.write(`${lines.join('\n')}\n`);
-}
-
-/** Plain-text equivalent of cli-ui's `RunSummary` for the stdout path. */
-export interface RunSummaryPlainInput {
-  readonly passed: number;
-  readonly failed: number;
-  readonly errors: number;
-  readonly warnings: number;
-  readonly durationMs: number;
-}
-
 /**
- * The one-line "approximate edges" banner for a fast-tier catalog. Kept
+ * The one-line "approximate edges" caveat for a fast-tier catalog. Kept
  * factual and non-alarming: fast mode is a legitimate chosen tier, not an
  * error — "you asked for fast; here's the honest caveat."
  */
@@ -119,42 +97,13 @@ function resolutionBanner(): string {
 }
 
 /**
- * Emit the fast-mode approximation banner on the default (non-verbose)
- * stdout path when the rendered catalog is approximate. No-op for exact
- * catalogs, so nothing changes for the common case.
+ * The fast-tier approximation caveat for a catalog, or `undefined` when
+ * the catalog is exact (semantic). Surfaced through `GraphDoneResult` so
+ * the render seam shows it once, themed in Ink and plain in pipes — no
+ * hand-written stdout copy.
  */
-export function writeResolutionBannerPlain(resolutionMode: 'exact' | 'fast' | undefined): void {
-  if (resolutionMode === 'fast') {
-    process.stdout.write(`${resolutionBanner()}\n`);
-  }
-}
-
-/**
- * Emit the one-line PASS/FAIL summary in plain text, matching the
- * format of cli-ui's `RunSummary` Ink component. Used by the
- * non-interactive stdout path so default `pnpm graph <scope>` runs
- * surface the same shape as the Ink live view.
- */
-export function writeRunSummaryPlain(input: RunSummaryPlainInput): void {
-  const { passed, failed, errors, warnings, durationMs } = input;
-  process.stdout.write(
-    `${String(passed)} Passed, ${String(failed)} Failed (${String(errors)} Errors, ${String(warnings)} Warnings) | Duration ${formatDuration(durationMs)}\n`,
-  );
-}
-
-/**
- * Emit the footer hint strip in plain text, matching the cli-ui
- * `RunFooterHints` content the Ink live view shows on a non-verbose
- * done state. Suppressed when the user passed `--verbose`.
- */
-export function writeFooterHintsPlain(): void {
-  process.stdout.write(
-    [
-      '',
-      '  Use --verbose for detailed results | opensip-tools dashboard for HTML report | --report-to <url> to send to OpenSIP',
-      '',
-    ].join('\n'),
-  );
+export function resolutionBannerText(resolutionMode: 'exact' | 'fast' | undefined): string | undefined {
+  return resolutionMode === 'fast' ? resolutionBanner() : undefined;
 }
 
 function renderCatalogSection(catalog: Catalog | null, cacheHit: boolean): readonly string[] {

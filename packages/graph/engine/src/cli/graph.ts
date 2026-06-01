@@ -43,7 +43,7 @@ import { buildCliOutput, buildCliOutputFromFindings, renderJson } from '../rende
 
 import { detectLanguages } from './detect.js';
 import { runCatalogJsonMode, runGateMode, runReportMode } from './graph-modes.js';
-import { writeFooterHintsPlain, writeResolutionBannerPlain, writeRunSummaryPlain, writeUnifiedReport } from './graph-report.js';
+import { buildUnifiedReportLines, resolutionBannerText } from './graph-report.js';
 import { runGraph, runShardedGraph } from './orchestrate.js';
 import { positionalPathLabel, resolvePositionalPaths } from './positional-paths.js';
 import { MemoryPressureError } from './pressure-monitor.js';
@@ -54,7 +54,7 @@ import type { GraphCommandOptions } from './graph-options.js';
 import type { Shard } from './orchestrate/shard-model.js';
 import type { RunGraphResult } from './orchestrate.js';
 import type { Catalog } from '../types.js';
-import type { FindingOutput } from '@opensip-tools/contracts';
+import type { FindingOutput, GraphDoneResult } from '@opensip-tools/contracts';
 import type { LanguageAdapter, Signal, ToolCliContext } from '@opensip-tools/core';
 import type { DataStore } from '@opensip-tools/datastore';
 
@@ -284,7 +284,7 @@ async function dispatchGraphResult(
     logger.info({ evt: EVT_GRAPH_COMPLETE, module: MODULE_GRAPH_CLI });
     return;
   }
-  renderGraphResult(opts, result, startedAt);
+  await renderGraphResult(opts, result, startedAt, cli);
   // `--json` is a peer of --gate-save / --gate-compare / --report-to /
   // --catalog-output: the run's purpose is producing a machine-readable
   // artifact, not populating dashboard session history. Skipping the
@@ -303,11 +303,24 @@ async function dispatchGraphResult(
   });
 }
 
-function renderGraphResult(
+/**
+ * Next-step hint strip for the default (non-verbose) graph report. Kept
+ * identical to the Ink live view's `RunFooterHints` (graph-runner.tsx) so
+ * the report reads the same whether it came from the live view or this
+ * non-interactive path.
+ */
+const GRAPH_FOOTER_HINTS: readonly { readonly text: string; readonly bold?: readonly string[] }[] = [
+  { text: 'Use --verbose for detailed results', bold: ['--verbose'] },
+  { text: 'opensip-tools dashboard for HTML report', bold: ['opensip-tools dashboard'] },
+  { text: '--report-to <url> to send to OpenSIP', bold: ['--report-to <url>'] },
+];
+
+async function renderGraphResult(
   opts: GraphCommandOptions,
   result: Awaited<ReturnType<typeof runGraph>>,
   startedAt: string,
-): void {
+  cli: ToolCliContext,
+): Promise<void> {
   if (opts.json === true) {
     logger.info({ evt: 'graph.render.json.start', module: MODULE_GRAPH_RENDER });
     const out = renderJson(result.signals, {
@@ -321,32 +334,40 @@ function renderGraphResult(
     return;
   }
   logger.info({ evt: 'graph.render.table.start', module: MODULE_GRAPH_RENDER });
-  // Mirror the Ink live-view surface: default shows summary + footer
-  // hint only; `--verbose` opens up the catalog / findings-by-rule /
-  // entry-points report. Both paths emit the fit-style one-line summary
-  // so a default `pnpm graph <scope>` run reads the same as default
-  // `pnpm graph`.
+  // Mirror the Ink live-view surface: default shows summary + footer hint
+  // only; `--verbose` opens up the catalog / findings-by-rule / entry-points
+  // body. The result is handed to the central render seam, which renders it
+  // as Ink (TTY) or plain text (pipe/CI) from one definition — no
+  // hand-maintained plain-text copies of the summary/footer/banner.
   const verbose = opts.verbose === true;
-  if (verbose) {
-    writeUnifiedReport({
-      catalog: result.catalog,
-      indexes: result.indexes,
-      signals: result.signals,
-      cacheHit: result.cacheHit,
-    });
-  }
   const cliOutput = buildCliOutput(result.signals, 'graph', result.catalog?.resolutionMode);
   const durationMs = Math.max(0, Date.now() - Date.parse(startedAt));
-  // Honest-approximation banner on the always-visible default path.
-  writeResolutionBannerPlain(result.catalog?.resolutionMode);
-  writeRunSummaryPlain({
-    passed: cliOutput.summary.passed,
-    failed: cliOutput.summary.failed,
-    errors: cliOutput.summary.errors,
-    warnings: cliOutput.summary.warnings,
+  const reportLines = verbose
+    ? buildUnifiedReportLines(
+        {
+          catalog: result.catalog,
+          indexes: result.indexes,
+          signals: result.signals,
+          cacheHit: result.cacheHit,
+        },
+        { includeSummary: false },
+      )
+    : [];
+  const resolutionBanner = resolutionBannerText(result.catalog?.resolutionMode);
+  const done: GraphDoneResult = {
+    type: 'graph-done',
+    reportLines,
+    ...(resolutionBanner === undefined ? {} : { resolutionBanner }),
+    summary: {
+      passed: cliOutput.summary.passed,
+      failed: cliOutput.summary.failed,
+      errors: cliOutput.summary.errors,
+      warnings: cliOutput.summary.warnings,
+    },
     durationMs,
-  });
-  if (!verbose) writeFooterHintsPlain();
+    footerHints: verbose ? [] : GRAPH_FOOTER_HINTS,
+  };
+  await cli.render(done);
   logger.info({ evt: 'graph.render.table.complete', module: MODULE_GRAPH_RENDER });
 }
 

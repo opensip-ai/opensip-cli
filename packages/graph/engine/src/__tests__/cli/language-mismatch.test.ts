@@ -120,6 +120,7 @@ function mockCli(datastore: DataStore | undefined): MockCli {
     cli: {
       datastore,
       setExitCode,
+      render: () => Promise.resolve(),
       scope: { datastore: () => datastore, languages: new LanguageRegistry() },
     } as unknown as ToolCliContext,
     setExitCode,

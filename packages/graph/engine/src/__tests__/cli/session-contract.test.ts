@@ -84,6 +84,7 @@ function mockCli(datastore: DataStore, languages?: LanguageRegistry): ToolCliCon
   return {
     datastore,
     setExitCode: vi.fn(),
+    render: () => Promise.resolve(),
     scope: {
       datastore: () => datastore,
       languages: languages ?? new LanguageRegistry(),

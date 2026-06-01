@@ -32,6 +32,7 @@ import type {
   WalkOutput,
 } from '../../lang-adapter/types.js';
 import type { Catalog, FunctionOccurrence, Indexes } from '../../types.js';
+import type { GraphDoneResult } from '@opensip-tools/contracts';
 import type {
   LanguageAdapter,
   Signal,
@@ -93,6 +94,8 @@ function fakeAdapter(projectDir: string): GraphLanguageAdapter {
 interface MockCli {
   readonly cli: ToolCliContext;
   readonly setExitCode: MockInstance;
+  /** Captures the CommandResult(s) executeGraph hands to cli.render(). */
+  readonly render: MockInstance;
 }
 
 function mockCli(
@@ -100,14 +103,17 @@ function mockCli(
   languages?: LanguageRegistry,
 ): MockCli {
   const setExitCode = vi.fn();
+  const render = vi.fn(() => Promise.resolve());
   const resolvedLanguages = languages ?? new LanguageRegistry();
   return {
     cli: {
       datastore,
       setExitCode,
+      render,
       scope: { datastore: () => datastore, languages: resolvedLanguages },
     } as unknown as ToolCliContext,
     setExitCode,
+    render,
   };
 }
 
@@ -210,49 +216,36 @@ describe('executeGraph — human / JSON modes', () => {
     datastore.close();
   });
 
-  it('renders the fit-style summary + footer hint on the default (non-verbose) path', async () => {
-    const { cli, setExitCode } = mockCli(datastore);
+  it('produces a graph-done result with summary + footer hint on the default (non-verbose) path', async () => {
+    const { cli, setExitCode, render } = mockCli(datastore);
     await executeGraph({ cwd: projectDir, noCache: true }, cli);
     expect(setExitCode).toHaveBeenCalledWith(0);
-    const out = stdoutSpy.mock.calls.map((c) => String(c[0])).join('');
-    // Default surface: one-line summary + footer hint, no detailed
-    // report blocks (matches fit's done view).
-    // Single fit-style summary line; subtleties of the exact counts
-    // depend on the fixture's rule findings (the .ts fixtures here
-    // emit ~1 warning), so just assert the structural anchors.
-    expect(out).toContain(' Passed, ');
-    expect(out).toContain(' Failed (');
-    expect(out).toContain(' Errors, ');
-    expect(out).toContain(' Warnings)');
-    expect(out).toContain(' | Duration ');
-    expect(out).toContain('Use --verbose for detailed results');
-    expect(out).not.toContain('== Catalog ==');
-    expect(out).not.toContain('== Findings');
+    // executeGraph now hands a structured result to the central render
+    // seam; rendering (Ink vs plain text) is the CLI's concern and is
+    // covered there. Here we assert the result graph produced.
+    const done = render.mock.calls[0]?.[0] as GraphDoneResult;
+    expect(done.type).toBe('graph-done');
+    // Default surface: summary counts + footer hint, no verbose body.
+    expect(typeof done.summary.passed).toBe('number');
+    expect(typeof done.durationMs).toBe('number');
+    expect(done.footerHints.some((h) => h.text.includes('Use --verbose for detailed results'))).toBe(true);
+    expect(done.reportLines).toEqual([]);
   });
 
-  it('renders the unified human report on the --verbose path', async () => {
-    const { cli, setExitCode } = mockCli(datastore);
+  it('produces a verbose graph-done result with the report body and no footer hints', async () => {
+    const { cli, setExitCode, render } = mockCli(datastore);
     await executeGraph({ cwd: projectDir, noCache: true, verbose: true }, cli);
     expect(setExitCode).toHaveBeenCalledWith(0);
-    const out = stdoutSpy.mock.calls.map((c) => String(c[0])).join('');
-    expect(out).toContain('opensip-tools graph');
-    expect(out).toContain('== Catalog ==');
-    expect(out).toContain('== Findings');
-    // The trailing "== Summary ==" block from buildUnifiedReportLines
-    // is suppressed in verbose mode (writeUnifiedReport now passes
-    // includeSummary: false); the fit-style summary line follows
-    // immediately after the report body.
-    expect(out).not.toContain('== Summary ==');
-    // Single fit-style summary line; subtleties of the exact counts
-    // depend on the fixture's rule findings (the .ts fixtures here
-    // emit ~1 warning), so just assert the structural anchors.
-    expect(out).toContain(' Passed, ');
-    expect(out).toContain(' Failed (');
-    expect(out).toContain(' Errors, ');
-    expect(out).toContain(' Warnings)');
-    expect(out).toContain(' | Duration ');
-    // Footer hint is suppressed when verbose, mirroring fit.
-    expect(out).not.toContain('Use --verbose for detailed results');
+    const done = render.mock.calls[0]?.[0] as GraphDoneResult;
+    expect(done.type).toBe('graph-done');
+    const body = done.reportLines.join('\n');
+    expect(body).toContain('== Catalog ==');
+    expect(body).toContain('== Findings');
+    // The trailing "== Summary ==" block is suppressed (includeSummary:
+    // false) — the shared summary line is rendered from done.summary.
+    expect(body).not.toContain('== Summary ==');
+    // Footer hints suppressed in verbose mode, mirroring fit.
+    expect(done.footerHints).toEqual([]);
   });
 
   it('renders JSON when --json is set', async () => {

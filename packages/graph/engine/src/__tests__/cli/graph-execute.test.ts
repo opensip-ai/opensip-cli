@@ -26,6 +26,7 @@ import type {
   WalkOutput,
 } from '../../lang-adapter/types.js';
 import type { FunctionOccurrence } from '../../types.js';
+import type { GraphDoneResult } from '@opensip-tools/contracts';
 import type { ToolCliContext } from '@opensip-tools/core';
 
 function occ(over: Partial<FunctionOccurrence> = {}): FunctionOccurrence {
@@ -76,17 +77,21 @@ function populatedAdapter(): GraphLanguageAdapter {
 interface MockCliBag {
   readonly cli: ToolCliContext;
   readonly setExitCode: MockInstance;
+  readonly render: MockInstance;
 }
 
 function mockCli(datastore?: DataStore): MockCliBag {
   const setExitCode = vi.fn();
+  const render = vi.fn(() => Promise.resolve());
   return {
     cli: {
       setExitCode,
       emitJson: vi.fn(),
+      render,
       scope: { datastore: () => datastore, languages: new LanguageRegistry() },
     } as unknown as ToolCliContext,
     setExitCode,
+    render,
   };
 }
 
@@ -154,29 +159,33 @@ describe('executeGraph — render dispatch', () => {
     }
   });
 
-  it('renders the verbose unified report and the plain one-line summary', async () => {
+  it('produces a verbose graph-done result with the unified report body', async () => {
     currentAdapterRegistry().register(populatedAdapter());
     const datastore = DataStoreFactory.open({ backend: 'memory' });
     try {
-      const { cli, setExitCode } = mockCli(datastore);
+      const { cli, setExitCode, render } = mockCli(datastore);
       await executeGraph({ cwd: projectDir, noCache: true, verbose: true }, cli);
       expect(setExitCode).toHaveBeenCalledWith(0);
-      expect(stdout).toContain('== Catalog ==');
-      expect(stdout).toContain('Passed');
+      const done = render.mock.calls[0]?.[0] as GraphDoneResult;
+      expect(done.type).toBe('graph-done');
+      expect(done.reportLines.join('\n')).toContain('== Catalog ==');
+      expect(typeof done.summary.passed).toBe('number');
     } finally {
       datastore.close();
     }
   });
 
-  it('renders the default (non-verbose) summary + footer hints', async () => {
+  it('produces a default (non-verbose) graph-done result with footer hints and no body', async () => {
     currentAdapterRegistry().register(populatedAdapter());
     const datastore = DataStoreFactory.open({ backend: 'memory' });
     try {
-      const { cli, setExitCode } = mockCli(datastore);
+      const { cli, setExitCode, render } = mockCli(datastore);
       await executeGraph({ cwd: projectDir, noCache: true }, cli);
       expect(setExitCode).toHaveBeenCalledWith(0);
-      expect(stdout).toContain('Use --verbose for detailed results');
-      expect(stdout).not.toContain('== Catalog ==');
+      const done = render.mock.calls[0]?.[0] as GraphDoneResult;
+      expect(done.type).toBe('graph-done');
+      expect(done.footerHints.some((h) => h.text.includes('Use --verbose for detailed results'))).toBe(true);
+      expect(done.reportLines).toEqual([]);
     } finally {
       datastore.close();
     }

@@ -5,17 +5,11 @@
  */
 
 import { runWithScopeSync } from '@opensip-tools/core';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { makeGraphTestScope } from '../../__tests__/test-utils/with-graph-scope.js';
 import { buildIndexes } from '../../pipeline/indexes.js';
-import {
-  buildUnifiedReportLines,
-  writeFooterHintsPlain,
-  writeResolutionBannerPlain,
-  writeRunSummaryPlain,
-  writeUnifiedReport,
-} from '../graph-report.js';
+import { buildUnifiedReportLines, resolutionBannerText } from '../graph-report.js';
 
 import type { Catalog, FunctionOccurrence } from '../../types.js';
 import type { Signal } from '@opensip-tools/core';
@@ -71,24 +65,6 @@ function signal(over: Partial<Signal> = {}): Signal {
   } as Signal;
 }
 
-function captureStdout(fn: () => void): string {
-  let buf = '';
-  const spy = vi.spyOn(process.stdout, 'write').mockImplementation((c: string | Uint8Array) => {
-    buf += typeof c === 'string' ? c : c.toString();
-    return true;
-  });
-  try {
-    fn();
-  } finally {
-    spy.mockRestore();
-  }
-  return buf;
-}
-
-afterEach(() => {
-  vi.restoreAllMocks();
-});
-
 describe('buildUnifiedReportLines', () => {
   it('renders catalog, findings-by-rule, enriched entry points, and summary', () => {
     const catalog = catalogOf([occ()]);
@@ -138,33 +114,10 @@ describe('buildUnifiedReportLines', () => {
   });
 });
 
-describe('writeUnifiedReport', () => {
-  it('writes the report to stdout prefixed with the tool banner', () => {
-    const catalog = catalogOf([occ()]);
-    const indexes = buildIndexes(catalog);
-    const out = runWithScopeSync(makeGraphTestScope(), () =>
-      captureStdout(() => writeUnifiedReport({ catalog, indexes, signals: [], cacheHit: false })),
-    );
-    expect(out.startsWith('opensip-tools graph')).toBe(true);
-  });
-});
-
-describe('plain-text writers', () => {
-  it('writeRunSummaryPlain renders the one-line PASS/FAIL summary', () => {
-    const out = captureStdout(() =>
-      writeRunSummaryPlain({ passed: 3, failed: 1, errors: 1, warnings: 2, durationMs: 1000 }),
-    );
-    expect(out).toContain('3 Passed, 1 Failed (1 Errors, 2 Warnings)');
-    expect(out).toContain('Duration');
-  });
-
-  it('writeResolutionBannerPlain emits only for fast mode', () => {
-    expect(captureStdout(() => writeResolutionBannerPlain('fast'))).toContain('Resolution: fast');
-    expect(captureStdout(() => writeResolutionBannerPlain('exact'))).toBe('');
-    expect(captureStdout(() => writeResolutionBannerPlain(undefined))).toBe('');
-  });
-
-  it('writeFooterHintsPlain emits the hint strip', () => {
-    expect(captureStdout(() => writeFooterHintsPlain())).toContain('Use --verbose for detailed results');
+describe('resolutionBannerText', () => {
+  it('returns the fast-tier caveat only for fast mode', () => {
+    expect(resolutionBannerText('fast')).toContain('Resolution: fast (syntactic)');
+    expect(resolutionBannerText('exact')).toBeUndefined();
+    expect(resolutionBannerText(undefined)).toBeUndefined();
   });
 });
