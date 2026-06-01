@@ -161,12 +161,18 @@ For the TypeScript adapter, a single `ts.Program` is created in `parseProject` a
 
 [`pipeline/indexes.ts`](../../../packages/graph/engine/src/pipeline/indexes.ts) performs a linear scan over the now-complete catalog and builds inverted indexes that rules need:
 
-- `byBodyHash`: bodyHash → occurrence (single-entry lookup for the canonical occurrence)
+- `byBodyHash`: bodyHash → occurrence (single canonical occurrence per body — content-dedup; identical bodies in different packages collapse here)
+- `occurrencesByHash`: bodyHash → **all** occurrences sharing that body (preserves duplicates so a callee can be attributed to the right package)
 - `bySimpleName`: simpleName → bodyHashes (for duplicated-name dispatch resolution)
 - `callees`: bodyHash → bodyHash[] (forward edges; for reachability)
 - `callers`: bodyHash → bodyHash[] (reverse edges; for orphan detection)
+- `importedPackagesByFile`: filePath → package groups the file imports (from module-init `dependencies[]`; empty in `fast` mode)
 
 Indexes are in-memory only — never persisted. They rebuild on every run from the catalog, and the cost (~50ms) is negligible compared to stages 1+2.
+
+#### Cross-package edge attribution
+
+A call edge's target is a `bodyHash` (a content hash), which is **not** a unique occurrence identifier — two functions with identical bodies in different packages share one hash. So a callee must be resolved to the occurrence the caller can actually *reach*, not to whichever occurrence won the `byBodyHash` slot. [`resolveCallee`](../../../packages/graph/engine/src/resolve-callee.ts) disambiguates deterministically: the caller's own package → a package the caller's module imports (`importedPackagesByFile`) → lowest `qualifiedName`. The same constraint is applied at cross-shard boundary resolution ([`cross-shard-resolve.ts`](../../../packages/graph/engine/src/cli/orchestrate/cross-shard-resolve.ts)) — a globally-unique name is **not** resolved into a package the caller never imported; it is declined. This is what keeps the dashboard's package-coupling grid honest: every off-diagonal edge follows a real import. (In `fast` mode there are no `dependencies[]`, so resolution falls back to same-package preference only.)
 
 ### Stage 4 — Rules
 
