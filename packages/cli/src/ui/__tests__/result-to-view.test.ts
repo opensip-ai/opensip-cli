@@ -67,6 +67,14 @@ describe('resultToView', () => {
     expect(out).toContain('  Use --verbose for detailed results');
   });
 
+  it('renders gate-done lines verbatim', () => {
+    const out = textOf({
+      type: 'gate-done',
+      lines: ['opensip-tools gate compare', '', '✓ STABLE — no change'],
+    });
+    expect(out).toBe('opensip-tools gate compare\n\n✓ STABLE — no change');
+  });
+
   it('renders the graph-done verbose body and fast-tier caveat', () => {
     const out = textOf({
       type: 'graph-done',

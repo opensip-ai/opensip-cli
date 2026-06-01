@@ -140,6 +140,7 @@ export type CommandResult =
   | FitDoneResult
   | SimDoneResult
   | GraphDoneResult
+  | GateDoneResult
   | ListChecksResult
   | ListRecipesResult
   | HistoryResult
@@ -255,6 +256,19 @@ export interface GraphDoneResult {
    * Empty to suppress the strip (e.g. in verbose mode).
    */
   readonly footerHints: readonly { readonly text: string; readonly bold?: readonly string[] }[];
+}
+
+/**
+ * Outcome of a `fit --gate-save` / `fit --gate-compare` run on the
+ * non-`--json` path. Carries the already-composed human-readable lines so
+ * the render seam can emit them as Ink (TTY) or plain text (pipe/CI) from
+ * one definition — no direct stdout writes in the gate-mode dispatcher.
+ * The exit code (degraded → 1) is set separately by the caller.
+ */
+export interface GateDoneResult {
+  type: 'gate-done';
+  /** Full gate output, one string per line (save summary or compare report). */
+  readonly lines: readonly string[];
 }
 
 export interface ListChecksResult {

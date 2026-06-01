@@ -19,7 +19,7 @@
 
 import { line, group, viewRunSummary, viewFooterHints, type Span, type ViewNode } from '@opensip-tools/cli-ui';
 
-import type { CommandResult, SimDoneResult, ErrorResult, GraphDoneResult } from '@opensip-tools/contracts';
+import type { CommandResult, SimDoneResult, ErrorResult, GraphDoneResult, GateDoneResult } from '@opensip-tools/contracts';
 
 const SEPARATOR: ViewNode = { kind: 'separator' };
 const SPACER: ViewNode = { kind: 'spacer' };
@@ -104,6 +104,11 @@ function graphDoneView(result: GraphDoneResult): ViewNode {
   return group(children);
 }
 
+/** The gate output: pre-composed lines rendered verbatim through both media. */
+function gateDoneView(result: GateDoneResult): ViewNode {
+  return group(result.lines.map((l) => line([{ text: l }])));
+}
+
 /**
  * Map a result to its view-model node, or `null` if this result type is
  * not yet migrated (the seam then renders it via the legacy Ink App).
@@ -118,6 +123,9 @@ export function resultToView(result: CommandResult): ViewNode | null {
     }
     case 'graph-done': {
       return graphDoneView(result);
+    }
+    case 'gate-done': {
+      return gateDoneView(result);
     }
     default: {
       return null;

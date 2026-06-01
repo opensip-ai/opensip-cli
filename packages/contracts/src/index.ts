@@ -42,6 +42,7 @@ export type {
   FitDoneResult,
   SimDoneResult,
   GraphDoneResult,
+  GateDoneResult,
   ListChecksResult,
   ListRecipesResult,
   HistoryResult,

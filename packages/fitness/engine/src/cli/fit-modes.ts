@@ -141,12 +141,17 @@ export async function runGateMode(args: FitOptions, cli: ToolCliContext): Promis
     if (args.gateSave === true) {
       saveBaseline(output, repo);
       const findingCount = output.checks.reduce((n, c) => n + c.findings.length, 0);
-      process.stdout.write(`Baseline saved (project SQLite store)\n`);
-      process.stdout.write(`  ${output.checks.length} check(s), ${findingCount} finding(s)\n`);
+      await cli.render({
+        type: 'gate-done',
+        lines: [
+          'Baseline saved (project SQLite store)',
+          `  ${output.checks.length} check(s), ${findingCount} finding(s)`,
+        ],
+      });
       return;
     }
     const result = compareToBaseline(output, repo);
-    process.stdout.write(renderGateCompareOutput(result) + '\n');
+    await cli.render({ type: 'gate-done', lines: renderGateCompareOutput(result).split('\n') });
     cli.setExitCode(result.degraded ? 1 : 0);
     return;
   } catch (error) {
