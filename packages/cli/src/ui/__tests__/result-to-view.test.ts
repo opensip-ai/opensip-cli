@@ -54,4 +54,31 @@ describe('resultToView', () => {
     const out = textOf({ ...simBase, scenarios: [], totalScenarios: 0, passedScenarios: 0, failedScenarios: 0 });
     expect(out).toContain("No scenarios matched recipe 'example'");
   });
+
+  it('renders graph-done summary + footer via the shared producers (no banner text)', () => {
+    const out = textOf({
+      type: 'graph-done',
+      reportLines: [],
+      summary: { passed: 3, failed: 0, errors: 0, warnings: 0 },
+      durationMs: 1200,
+      footerHints: [{ text: 'Use --verbose for detailed results', bold: ['--verbose'] }],
+    });
+    expect(out).toContain('3 Passed, 0 Failed (0 Errors, 0 Warnings) | Duration 1.2s');
+    expect(out).toContain('  Use --verbose for detailed results');
+  });
+
+  it('renders the graph-done verbose body and fast-tier caveat', () => {
+    const out = textOf({
+      type: 'graph-done',
+      reportLines: ['== Catalog ==', '5 functions across 2 files (cacheHit=false)'],
+      resolutionBanner: 'Resolution: fast (syntactic) — edges are approximate.',
+      summary: { passed: 1, failed: 1, errors: 0, warnings: 0 },
+      durationMs: 50,
+      footerHints: [],
+    });
+    expect(out).toContain('== Catalog ==');
+    expect(out).toContain('5 functions across 2 files');
+    expect(out).toContain('Resolution: fast (syntactic)');
+    expect(out).toContain('1 Passed, 1 Failed');
+  });
 });

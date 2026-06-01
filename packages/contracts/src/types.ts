@@ -139,6 +139,7 @@ export interface SummaryOptions {
 export type CommandResult =
   | FitDoneResult
   | SimDoneResult
+  | GraphDoneResult
   | ListChecksResult
   | ListRecipesResult
   | HistoryResult
@@ -218,6 +219,42 @@ export interface FitDoneResult {
    * at their own boundary.
    */
   warnings?: readonly string[];
+}
+
+/**
+ * Outcome of a `graph <scope>` run on the non-interactive (non-`--json`)
+ * path. Carries only plain data — pre-rendered report lines, summary
+ * counts, an optional fast-tier caveat, and the footer hint strip — so
+ * `resultToView` (in cli) can express it as a view-model and the render
+ * seam can emit it as Ink (TTY) or plain text (pipe/CI) from one
+ * definition. Graph types (`Catalog`, `Signal`) deliberately do NOT cross
+ * this boundary: contracts sits below graph in the layer graph.
+ */
+export interface GraphDoneResult {
+  type: 'graph-done';
+  /**
+   * Verbose report body (catalog / findings-by-rule / entry-points), one
+   * string per line. Empty unless `--verbose` was passed.
+   */
+  readonly reportLines: readonly string[];
+  /**
+   * Fast-tier approximation caveat to surface, or `undefined` for an exact
+   * (semantic) catalog. Rendered muted.
+   */
+  readonly resolutionBanner?: string;
+  /** Counts for the shared one-line PASS/FAIL summary. */
+  readonly summary: {
+    readonly passed: number;
+    readonly failed: number;
+    readonly errors: number;
+    readonly warnings: number;
+  };
+  readonly durationMs: number;
+  /**
+   * Next-step hint strip. Each hint may bold substrings (flag names).
+   * Empty to suppress the strip (e.g. in verbose mode).
+   */
+  readonly footerHints: readonly { readonly text: string; readonly bold?: readonly string[] }[];
 }
 
 export interface ListChecksResult {

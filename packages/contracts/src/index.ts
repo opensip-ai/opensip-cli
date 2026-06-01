@@ -41,6 +41,7 @@ export type {
   UninstallDoneResult,
   FitDoneResult,
   SimDoneResult,
+  GraphDoneResult,
   ListChecksResult,
   ListRecipesResult,
   HistoryResult,

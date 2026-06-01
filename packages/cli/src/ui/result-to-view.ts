@@ -17,9 +17,9 @@
  * only forbids the reverse — cli-ui must never import contracts.
  */
 
-import { line, group, type Span, type ViewNode } from '@opensip-tools/cli-ui';
+import { line, group, viewRunSummary, viewFooterHints, type Span, type ViewNode } from '@opensip-tools/cli-ui';
 
-import type { CommandResult, SimDoneResult, ErrorResult } from '@opensip-tools/contracts';
+import type { CommandResult, SimDoneResult, ErrorResult, GraphDoneResult } from '@opensip-tools/contracts';
 
 const SEPARATOR: ViewNode = { kind: 'separator' };
 const SPACER: ViewNode = { kind: 'spacer' };
@@ -82,6 +82,29 @@ function simDoneView(result: SimDoneResult): ViewNode {
 }
 
 /**
+ * The graph report: an optional verbose body, an optional fast-tier
+ * caveat, the shared summary line, and the shared footer hints. The
+ * summary/hints reuse the cli-ui producers, so graph's piped and TTY
+ * output match each other and the live view — no hand-maintained
+ * plain-text copies (which previously lived in graph-report.ts).
+ */
+function graphDoneView(result: GraphDoneResult): ViewNode {
+  const children: ViewNode[] = [];
+  if (result.reportLines.length > 0) {
+    for (const l of result.reportLines) children.push(line([{ text: l }]));
+    children.push(SPACER);
+  }
+  if (result.resolutionBanner !== undefined) {
+    children.push(line([{ text: result.resolutionBanner, tone: 'muted' }]));
+  }
+  children.push(viewRunSummary({ ...result.summary, durationMs: result.durationMs }));
+  if (result.footerHints.length > 0) {
+    children.push(viewFooterHints(result.footerHints));
+  }
+  return group(children);
+}
+
+/**
  * Map a result to its view-model node, or `null` if this result type is
  * not yet migrated (the seam then renders it via the legacy Ink App).
  */
@@ -92,6 +115,9 @@ export function resultToView(result: CommandResult): ViewNode | null {
     }
     case 'sim-done': {
       return simDoneView(result);
+    }
+    case 'graph-done': {
+      return graphDoneView(result);
     }
     default: {
       return null;
