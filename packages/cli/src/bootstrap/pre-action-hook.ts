@@ -43,10 +43,14 @@ import {
   getCurrentRegistriesForScope,
   setCurrentRunScope,
 } from '../cli-context.js';
+import { checkForUpdate, formatUpdateNag } from '../update-notifier.js';
 
 import { loadCliDefaults, mergeConfigDefaults } from './cli-defaults.js';
 
 import type { Command } from 'commander';
+
+/** npm package whose version the update check compares against. */
+const CLI_PACKAGE_NAME = '@opensip-tools/cli';
 
 /**
  * Commands that operate WITHOUT requiring a project context. These don't
@@ -279,6 +283,18 @@ export function installPreActionHook(program: Command, version: string): void {
     // action body invoked after this hook sees the same scope without
     // needing a callback wrapper — which Commander does not expose.
     // (Phase 5 deferred Task 5.2 / T1 Item D close-out.)
+    // Resolve presentation + update state once, before the scope is built.
+    // bannerSize: explicit `cli.ui.banner`, else the product default `mini`.
+    // update: the cached newer-version string (best-effort; undefined when
+    // up-to-date / opted-out / non-TTY). The `mini` banner shows it inline;
+    // other sizes — and the banner-less `--json` path — fall back to the
+    // stderr nag so the signal is never silently lost.
+    const bannerSize = cliDefaults.ui?.banner ?? 'mini';
+    const update = checkForUpdate({ name: CLI_PACKAGE_NAME, version });
+    if (update && (bannerSize !== 'mini' || opts.json === true)) {
+      process.stderr.write(formatUpdateNag(version, update));
+    }
+
     const { languages, tools } = getCurrentRegistriesForScope();
     const scope = new RunScope({
       logger,
@@ -300,7 +316,9 @@ export function installPreActionHook(program: Command, version: string): void {
       // cli-ui render sites narrow it with normalizeBannerSize. Product
       // default is 'mini' (the compact identity card) when no
       // `cli.ui.banner` is configured; a user can opt back into lg/md/sm.
-      ui: { bannerSize: cliDefaults.ui?.banner ?? 'mini', version },
+      // `update` is the cached newer-version string (if any); the mini banner
+      // shows it inline, other sizes get the stderr nag emitted below.
+      ui: { bannerSize, version, update },
     });
     // D7: each registered tool contributes its tool-specific subscope
     // (e.g. `scope.simulation`, `scope.graph`) BEFORE the scope is

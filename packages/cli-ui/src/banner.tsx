@@ -160,16 +160,20 @@ function walkedUpSuffix(walkedUp: number | undefined): string {
  * three are always shown; `projectPath` is optional (project-agnostic
  * commands like init/configure have no project root), so the fourth line is
  * omitted while the cup keeps its four rows. `walkedUp` appends the discovery
- * hint to the path line when the project root was found above cwd.
+ * hint to the path line when the project root was found above cwd. `update`,
+ * when set, appends a `(vX.Y.Z available)` flag (in `theme.success`) to the
+ * version line — the in-banner counterpart to the stderr update nag.
  */
 function MiniBanner({
   version,
   projectPath,
   walkedUp,
+  update,
 }: {
   readonly version: string;
   readonly projectPath?: string;
   readonly walkedUp?: number;
+  readonly update?: string;
 }): React.ReactElement {
   const theme = useTheme();
   return (
@@ -189,6 +193,9 @@ function MiniBanner({
           <Text bold>opensip-tools</Text>
           {' '}
           <Text dimColor>v{version}</Text>
+          {update !== undefined && (
+            <Text color={theme.success}>{' '}(v{update} available)</Text>
+          )}
         </Text>
         <Text dimColor>{MINI_TAGLINE}</Text>
         <Text color={theme.brand}>{MINI_URL}</Text>
@@ -255,6 +262,12 @@ export interface BannerProps {
    * the separate `ℹ Project:` line carries for the other sizes.
    */
   readonly walkedUp?: number;
+  /**
+   * Newer published version (e.g. `2.3.0`) when an update is available. The
+   * `mini` card appends `(vX.Y.Z available)` to the version line; other sizes
+   * ignore it (they rely on the stderr update nag).
+   */
+  readonly update?: string;
 }
 
 export function Banner({
@@ -262,6 +275,7 @@ export function Banner({
   version = '',
   projectPath,
   walkedUp,
+  update,
 }: BannerProps = {}): React.ReactElement {
   switch (size) {
     case 'md': {
@@ -271,7 +285,14 @@ export function Banner({
       return <CompactBannerView art={BANNER_SM} />;
     }
     case 'mini': {
-      return <MiniBanner version={version} projectPath={projectPath} walkedUp={walkedUp} />;
+      return (
+        <MiniBanner
+          version={version}
+          projectPath={projectPath}
+          walkedUp={walkedUp}
+          update={update}
+        />
+      );
     }
     default: {
       return <LargeBanner />;

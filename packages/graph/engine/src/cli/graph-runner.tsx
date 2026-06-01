@@ -215,7 +215,7 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
   const bannerSize = normalizeBannerSize(ui?.bannerSize);
   const header = (
     <>
-      <Banner size={bannerSize} version={ui?.version} projectPath={args.cwd} walkedUp={walkedUp} />
+      <Banner size={bannerSize} version={ui?.version} projectPath={args.cwd} walkedUp={walkedUp} update={ui?.update} />
       {bannerSize !== 'mini' && <ProjectHeader root={args.cwd} walkedUp={walkedUp} />}
       <RunHeader tool={GRAPH_TOOL_TITLE} description={GRAPH_TOOL_DESCRIPTION} />
     </>

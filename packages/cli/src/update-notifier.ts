@@ -2,10 +2,16 @@
  * @fileoverview Thin wrapper around `update-notifier` that checks npm
  * once a day for a newer version of @opensip-tools/cli.
  *
+ * Two consumers, one cached check:
+ *   - {@link checkForUpdate} returns the newer version string (if any) so
+ *     the `mini` banner can surface it inline as `(vX.Y.Z available)`.
+ *   - {@link formatUpdateNag} builds the stderr one-liner shown for the
+ *     other banner sizes (which have no version line to annotate).
+ * Both read the SAME once-a-day cached result `update-notifier` maintains;
+ * the bootstrap calls `checkForUpdate` once and decides which surface to use.
+ *
  * Design goals:
  *   - Silent by default when there's nothing to report.
- *   - One line of output when an update exists, printed to stderr so
- *     --json consumers aren't affected.
  *   - Opt-out via OPENSIP_NO_UPDATE (and honours the upstream
  *     NO_UPDATE_NOTIFIER flag for convention).
  *   - Non-blocking: the check runs in a child process; the current
@@ -25,6 +31,11 @@ export interface NotifyOptions {
   readonly version: string
   /** Override stderr writer (for tests). */
   readonly write?: (s: string) => void
+}
+
+export interface CheckForUpdateOptions {
+  readonly name: string
+  readonly version: string
 }
 
 /** Split `2.2.1-beta.1` into `([2,2,1], 'beta.1')`; missing parts → 0 / ''. */
@@ -65,6 +76,49 @@ function shouldSkip(): boolean {
   // keeps the startup path minimal.
   if (!process.stdout.isTTY) return true
   return false
+}
+
+/**
+ * Check for a newer published version, scheduling the once-a-day background
+ * fetch as a side effect. Returns the newer version string (e.g. `2.3.0`)
+ * when npm's `latest` is genuinely newer than what's running, or `undefined`
+ * when up-to-date, opted-out, non-TTY, or the cached check hasn't completed.
+ *
+ * Never throws: a malformed cache or notifier failure degrades to "no update
+ * known" rather than breaking the command. Callers decide how to surface it
+ * (the `mini` banner inline, or {@link formatUpdateNag} on stderr).
+ */
+export function checkForUpdate(opts: CheckForUpdateOptions): string | undefined {
+  if (shouldSkip()) return undefined
+  try {
+    const notifier = updateNotifier({
+      pkg: { name: opts.name, version: opts.version },
+      updateCheckInterval: 1000 * 60 * 60 * 24,
+      shouldNotifyInNpmScript: false,
+    })
+    const update = notifier.update
+    if (update && isNewerVersion(update.latest, update.current)) {
+      return update.latest
+    }
+  } catch {
+    // @fitness-ignore-next-line error-handling-quality -- the update check is best-effort cosmetic: any failure (corrupt cache, network helper error) must degrade silently to "no update known", never break the user's command.
+    return undefined
+  }
+  return undefined
+}
+
+/**
+ * Build the stderr update-nag line for the non-`mini` banner sizes (which
+ * have no version line to annotate inline) and the banner-less `--json` path.
+ * The `mini` banner surfaces the same information in-box, so the bootstrap
+ * skips this for `mini`.
+ */
+export function formatUpdateNag(current: string, latest: string): string {
+  return (
+    `\nopensip-tools ${current} → ${latest} available. ` +
+    `Run \`npm install -g @opensip-tools/cli\` to update.\n` +
+    `(Silence with OPENSIP_NO_UPDATE=1.)\n\n`
+  )
 }
 
 /**

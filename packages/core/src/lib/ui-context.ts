@@ -23,4 +23,12 @@ export interface UiContext {
   readonly bannerSize: string;
   /** CLI version (e.g. `2.2.1`), shown by the `mini` banner. */
   readonly version: string;
+  /**
+   * Newer published version available on npm (e.g. `2.3.0`), or `undefined`
+   * when up-to-date / the check is skipped or hasn't completed. Resolved by
+   * the CLI bootstrap from the cached `update-notifier` result. The `mini`
+   * banner surfaces it inline as `(vX.Y.Z available)`; other sizes rely on
+   * the separate stderr nag.
+   */
+  readonly update?: string;
 }

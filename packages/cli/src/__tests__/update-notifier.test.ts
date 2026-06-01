@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-import { maybeNotify, isNewerVersion } from '../update-notifier.js';
+import { maybeNotify, isNewerVersion, checkForUpdate, formatUpdateNag } from '../update-notifier.js';
 
 const originalEnv = { ...process.env };
 const originalIsTTY = process.stdout.isTTY;
@@ -77,5 +77,34 @@ describe('isNewerVersion', () => {
   it('treats a release as newer than a prerelease of the same core', () => {
     expect(isNewerVersion('2.2.1', '2.2.1-beta.1')).toBe(true);
     expect(isNewerVersion('2.2.1-beta.1', '2.2.1')).toBe(false);
+  });
+});
+
+describe('checkForUpdate', () => {
+  it('returns undefined when opted out via OPENSIP_NO_UPDATE', () => {
+    process.env.OPENSIP_NO_UPDATE = '1';
+    expect(checkForUpdate({ name: '@opensip-tools/cli', version: '0.0.1' })).toBeUndefined();
+  });
+
+  it('returns undefined when stdout is not a TTY', () => {
+    Object.defineProperty(process.stdout, 'isTTY', { value: false, configurable: true });
+    expect(checkForUpdate({ name: '@opensip-tools/cli', version: '0.0.1' })).toBeUndefined();
+  });
+
+  it('does not throw on a TTY and returns a string or undefined', () => {
+    Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
+    // The cached npm result is environment-dependent, so we only assert the
+    // contract: best-effort, never throws, narrows to string | undefined.
+    const result = checkForUpdate({ name: 'opensip-tools-test-nonexistent', version: '0.0.1' });
+    expect(result === undefined || typeof result === 'string').toBe(true);
+  });
+});
+
+describe('formatUpdateNag', () => {
+  it('renders the current → latest line with the install command and silence hint', () => {
+    const nag = formatUpdateNag('2.2.1', '2.3.0');
+    expect(nag).toContain('opensip-tools 2.2.1 → 2.3.0 available');
+    expect(nag).toContain('npm install -g @opensip-tools/cli');
+    expect(nag).toContain('OPENSIP_NO_UPDATE=1');
   });
 });

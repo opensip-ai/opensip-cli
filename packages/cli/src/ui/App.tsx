@@ -76,6 +76,7 @@ export function App({ result, projectHeader, ui }: AppProps): React.ReactElement
           version={ui?.version}
           projectPath={projectHeader?.root}
           walkedUp={projectHeader?.walkedUp}
+          update={ui?.update}
         />
       )}
       {showBanner && showProjectHeader && (

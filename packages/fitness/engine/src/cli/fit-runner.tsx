@@ -173,7 +173,7 @@ function FitRunner({ args, datastore, setExitCode }: FitRunnerProps): React.Reac
     if (item === 'banner') {
       return (
         <React.Fragment key={item}>
-          <Banner size={bannerSize} version={ui?.version} projectPath={args.cwd} walkedUp={walkedUp} />
+          <Banner size={bannerSize} version={ui?.version} projectPath={args.cwd} walkedUp={walkedUp} update={ui?.update} />
           {showProjectHeader && <ProjectHeader root={args.cwd} walkedUp={walkedUp} />}
         </React.Fragment>
       );

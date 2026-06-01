@@ -74,6 +74,21 @@ describe('Banner', () => {
       expect(frame).toContain('www.opensip.ai');
       expect(frame).not.toContain('/home/me');
     });
+
+    it('shows the update flag on the version line when update is set', () => {
+      const frame = render(
+        <Banner size="mini" version="2.2.1" projectPath="/home/me" update="2.3.0" />,
+      ).lastFrame() ?? '';
+      expect(frame).toContain('v2.2.1');
+      expect(frame).toContain('(v2.3.0 available)');
+    });
+
+    it('omits the update flag when update is not set', () => {
+      const frame = render(
+        <Banner size="mini" version="2.2.1" projectPath="/home/me" />,
+      ).lastFrame() ?? '';
+      expect(frame).not.toContain('available');
+    });
   });
 });
 

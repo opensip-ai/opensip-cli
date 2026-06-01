@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-// @fitness-ignore-file detached-promises -- composition root invokes synchronous bootstrap helpers (mountAllToolCommands, registerCliCommands, printWelcome, maybeNotify) that the heuristic mistakes for promise-returning calls
+// @fitness-ignore-file detached-promises -- composition root invokes synchronous bootstrap helpers (mountAllToolCommands, registerCliCommands, printWelcome) that the heuristic mistakes for promise-returning calls
 /**
  * OpenSIP Tools CLI — composition root. Reads top-to-bottom as wiring.
  * Bootstrap, context, command-mount, and error-handling each live in
@@ -30,7 +30,6 @@ import { buildToolCliContext, createLiveViewRegistry, getOrOpenDatastore, setCli
 import { registerCliCommands } from './commands/index.js';
 import { handleFatalBootstrapError, handleParseError } from './error-handler.js';
 import { runWithTelemetryContext, shutdownTelemetry } from './telemetry/sdk-init.js';
-import { maybeNotify } from './update-notifier.js';
 import { printWelcome } from './welcome.js';
 
 export * from './api.js';
@@ -76,9 +75,9 @@ async function main(): Promise<void> {
     datastore: () => getOrOpenDatastore(logger),
   });
 
-  // Bare `opensip-tools` → welcome screen. The update notifier runs
-  // AFTER this short-circuit by design (don't nag on zero-arg runs);
-  // see docs/public/80-implementation/01-cli-dispatch.md.
+  // Bare `opensip-tools` → welcome screen. The update check is owned by the
+  // pre-action hook (which only runs for actual subcommands), so it naturally
+  // skips zero-arg runs without a guard here.
   // Return (not process.exit) so the top-level `finally` still runs the
   // telemetry shutdown flush — consistent with this file's exitCode-over-
   // exit() principle below. Exit code defaults to 0.
@@ -86,7 +85,6 @@ async function main(): Promise<void> {
     printWelcome({ version: program.version() ?? 'dev' });
     return;
   }
-  maybeNotify({ name: '@opensip-tools/cli', version: program.version() ?? '0.0.0' });
 
   // Dispatch inside the telemetry parent context so spans emitted during the
   // run (e.g. graph's per-stage spans) nest under the consumer's TRACEPARENT
