@@ -1,3 +1,4 @@
+// @fitness-ignore-file detached-promises -- async command actions invoke synchronous helpers (runCatalogJsonMode/runSarifExportMode/handleGraphError all return void); the heuristic flags them inside the async handlers. Matches the sibling graph CLI files (graph.ts, graph-modes.ts, orchestrate.ts).
 /**
  * graphTool — graph as a Tool plugin.
  *
