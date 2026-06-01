@@ -65,7 +65,7 @@ related-docs:
      (logs/<YYYY-MM-DD>.jsonl) is opened lazily on first write.
 ```
 
-The whole thing fits in [`packages/cli/src/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.1/packages/cli/src/index.ts) at ~530 lines. Every step is direct — no plugin lifecycle hooks, no startup phases, no DI container. Just static imports and explicit registration calls.
+The whole thing fits in [`packages/cli/src/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.2/packages/cli/src/index.ts) at ~530 lines. Every step is direct — no plugin lifecycle hooks, no startup phases, no DI container. Just static imports and explicit registration calls.
 
 ### Why this order
 
@@ -80,7 +80,7 @@ A few of the constraints that pinned the order:
 
 ## CLI-owned commands
 
-Some commands belong to the CLI itself, not to any Tool. They live under [`packages/cli/src/commands/`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.1/packages/cli/src/commands/) and are mounted directly in `index.ts` (not via the Tool contract):
+Some commands belong to the CLI itself, not to any Tool. They live under [`packages/cli/src/commands/`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.2/packages/cli/src/commands/) and are mounted directly in `index.ts` (not via the Tool contract):
 
 | Command | Owner | Why CLI-owned |
 |---|---|---|
@@ -112,9 +112,9 @@ The `--help` text for the program lists every registered Tool's `commands[]`. Th
 
 ## The welcome screen
 
-When the binary is invoked without arguments (or with bare `--help`), the CLI prints a welcome banner: the version, a short description of what `opensip-tools` does, and a numbered list of common next-step commands. Source: [`packages/cli/src/welcome.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.1/packages/cli/src/welcome.ts).
+When the binary is invoked without arguments (or with bare `--help`), the CLI prints a welcome banner: the version, a short description of what `opensip-tools` does, and a numbered list of common next-step commands. Source: [`packages/cli/src/welcome.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.2/packages/cli/src/welcome.ts).
 
-The update check runs in the **pre-action hook**, so it fires on every command invocation but **not** on bare `opensip-tools` (the hook only runs for an actual subcommand; a zero-arg invocation short-circuits to the welcome screen and never reaches it). The hook calls `checkForUpdate`, which returns the newer published version (if any) from the once-a-day `update-notifier` cache. When the **default `mini` banner** is active, that version is surfaced inline on the banner's version line as `(vX.Y.Z available)` (in `theme.success`); for the other banner sizes — and the banner-less `--json` path — `formatUpdateNag` prints a one-line "update available" message to stderr instead. The check is rate-limited (once per 24 hours; the `update-notifier` npm package owns its cache under `~/.config/configstore/`) and is skipped when stdout isn't a TTY, when `CI` is set, or when `OPENSIP_NO_UPDATE` / `NO_UPDATE_NOTIFIER` is set. See [`packages/cli/src/update-notifier.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.1/packages/cli/src/update-notifier.ts).
+The update check runs in the **pre-action hook**, so it fires on every command invocation but **not** on bare `opensip-tools` (the hook only runs for an actual subcommand; a zero-arg invocation short-circuits to the welcome screen and never reaches it). The hook calls `checkForUpdate`, which returns the newer published version (if any) from the once-a-day `update-notifier` cache. When the **default `mini` banner** is active, that version is surfaced inline on the banner's version line as `(vX.Y.Z available)` (in `theme.success`); for the other banner sizes — and the banner-less `--json` path — `formatUpdateNag` prints a one-line "update available" message to stderr instead. The check is rate-limited (once per 24 hours; the `update-notifier` npm package owns its cache under `~/.config/configstore/`) and is skipped when stdout isn't a TTY, when `CI` is set, or when `OPENSIP_NO_UPDATE` / `NO_UPDATE_NOTIFIER` is set. See [`packages/cli/src/update-notifier.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.2/packages/cli/src/update-notifier.ts).
 
 The banner does not appear when a command is invoked. It's strictly a no-argv affordance — running `opensip-tools fit` skips the welcome and goes straight to the run.
 
@@ -136,7 +136,7 @@ catch (error) {
 }
 ```
 
-The suggestion is a one-line hint — "Run `opensip-tools init` to create one." or "Check `opensip-tools.config.yml` for syntax errors." The mapping is centralized in [`packages/contracts/src/exit-codes.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.1/packages/contracts/src/exit-codes.ts) so the same error message surfaces the same suggestion regardless of which Tool threw it.
+The suggestion is a one-line hint — "Run `opensip-tools init` to create one." or "Check `opensip-tools.config.yml` for syntax errors." The mapping is centralized in [`packages/contracts/src/exit-codes.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.3.2/packages/contracts/src/exit-codes.ts) so the same error message surfaces the same suggestion regardless of which Tool threw it.
 
 This is the polite way the CLI extends Tool errors. The Tool just throws; the CLI does the message-matching and rendering.
 

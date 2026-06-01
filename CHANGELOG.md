@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.3.2] — 2026-05-31
+
+### Changed
+
+- **Clearer messaging when check packs are skipped for a core mismatch.** When
+  a globally-installed CLI runs inside a project that vendors `@opensip-tools`
+  packages, the single-core guard (2.3.1) refuses the project-local packs. That
+  case now reports a single consolidated warning naming every skipped pack
+  (instead of one paragraph per pack), and suppresses the misleading "install a
+  checks-* package" trailer — the packs ARE installed; they were refused.
+- **Mini banner refresh.** The coffee cup now reads as a branded to-go cup: the
+  steam and lid render in the terminal's default foreground (≈white on dark,
+  auto-contrast on light, colorless under `NO_COLOR`) while the cup body and
+  saucer stay brand amber. The steam glyph is finer (`⋮`).
+
 ## [2.3.1] — 2026-05-31
 
 A reliability fix for running a globally-installed `opensip-tools` inside a
