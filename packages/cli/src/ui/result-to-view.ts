@@ -19,6 +19,8 @@
 
 import { line, group, viewRunSummary, viewFooterHints, type Span, type ViewNode } from '@opensip-tools/cli-ui';
 
+import { viewFitDone } from './views/fit-done-view.js';
+
 import type { CommandResult, SimDoneResult, ErrorResult, GraphDoneResult, GateDoneResult } from '@opensip-tools/contracts';
 
 const SEPARATOR: ViewNode = { kind: 'separator' };
@@ -115,6 +117,9 @@ function gateDoneView(result: GateDoneResult): ViewNode {
  */
 export function resultToView(result: CommandResult): ViewNode | null {
   switch (result.type) {
+    case 'fit-done': {
+      return viewFitDone(result);
+    }
     case 'error': {
       return errorView(result);
     }

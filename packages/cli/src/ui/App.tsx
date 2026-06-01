@@ -9,16 +9,12 @@ import React from 'react';
 
 
 import { CheckList } from './components/CheckList.js';
-import { CloudReportStatus } from './components/CloudReportStatus.js';
 import { ExperimentalNotice } from './components/ExperimentalNotice.js';
-import { Findings } from './components/Findings.js';
 import { HelpText } from './components/HelpText.js';
 import { HistoryTable } from './components/HistoryTable.js';
 import { InitFeedback } from './components/InitFeedback.js';
 import { PluginFeedback } from './components/PluginFeedback.js';
 import { RecipeList } from './components/RecipeList.js';
-import { ResultsTable } from './components/ResultsTable.js';
-import { Summary } from './components/Summary.js';
 import { resultToView } from './result-to-view.js';
 
 
@@ -101,17 +97,6 @@ function AppBody({ result }: AppProps): React.ReactElement {
   if (view !== null) return renderToInk(view);
 
   switch (result.type) {
-    case 'fit-done': {
-      return (
-        <Box flexDirection="column">
-          <ResultsTable rows={result.rows} />
-          <Summary {...result.summary} />
-          {result.findings && <Findings checks={result.findings.checks} />}
-          {result.reportStatus && <CloudReportStatus {...result.reportStatus} />}
-        </Box>
-      );
-    }
-
     case 'list-checks': {
       return <CheckList checks={result.checks} totalCount={result.totalCount} />;
     }
