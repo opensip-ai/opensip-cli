@@ -50,6 +50,11 @@ function indentLines(block: string, by: number): string {
     .join('\n');
 }
 
+/**
+ * Render a view-model node to a plain string (no ANSI, no styling). The
+ * non-interactive counterpart to {@link renderToInk}; both consume the
+ * same `ViewNode`, so the piped and TTY forms cannot drift.
+ */
 export function renderToText(node: ViewNode): string {
   switch (node.kind) {
     case 'line': {

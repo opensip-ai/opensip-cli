@@ -26,12 +26,13 @@ const SIMULATION_TOOL_TITLE = 'Simulation';
 // --- list-checks ----------------------------------------------------------
 
 export function viewListChecks(result: ListChecksResult): ViewNode {
-  const tagGroups = new Map<string, ListChecksResult['checks']>();
+  const tagGroups = new Map<string, ListChecksResult['checks'][number][]>();
   for (const check of result.checks) {
     const tags = check.tags.length > 0 ? check.tags : ['untagged'];
     for (const tag of tags) {
-      const list = [...(tagGroups.get(tag) ?? []), check];
-      tagGroups.set(tag, list);
+      const existing = tagGroups.get(tag);
+      if (existing) existing.push(check);
+      else tagGroups.set(tag, [check]);
     }
   }
   const sortedTags = [...tagGroups.entries()].sort(([a], [b]) => a.localeCompare(b));
@@ -41,9 +42,12 @@ export function viewListChecks(result: ListChecksResult): ViewNode {
     SPACER,
   ];
   for (const [tag, tagChecks] of sortedTags) {
-    const sorted = [...tagChecks].sort((a, b) => a.slug.localeCompare(b.slug));
+    // tagChecks is a freshly-built array owned by this function — sort in
+    // place (no copy): avoids both a spread-in-loop (performance-anti-patterns
+    // fitness check) and Array#slice (unicorn/prefer-spread eslint rule).
+    tagChecks.sort((a, b) => a.slug.localeCompare(b.slug));
     const block: ViewNode[] = [line([{ text: tag, tone: 'brand' }, { text: ` (${tagChecks.length})`, dim: true }])];
-    for (const c of sorted) {
+    for (const c of tagChecks) {
       block.push(line([{ text: `    ${c.slug} ` }, { text: `— ${c.description}`, dim: true }]));
     }
     block.push(SPACER);

@@ -9,29 +9,28 @@ import type { PluginInfo, PluginResult } from '@opensip-tools/contracts';
 
 const DOMAINS = ['fit', 'sim'] as const;
 
+function pluginLine(p: PluginInfo): ViewNode {
+  const icon = p.pluginType === 'package' ? '📦' : '📄';
+  return line([{ text: `    ${icon} ${p.namespace}` }, { text: ` (${p.pluginType})`, dim: true }]);
+}
+
+function domainSection(domain: string, plugins: readonly PluginInfo[]): ViewNode[] {
+  const domainPlugins = plugins.filter((p) => p.domain === domain);
+  if (domainPlugins.length === 0) {
+    return [line([{ text: `  ${domain}/`, dim: true }, { text: ' — no plugins installed', dim: true }])];
+  }
+  return [
+    line([{ text: `  ${domain}/`, tone: 'brand' }, { text: ` (${domainPlugins.length})`, dim: true }]),
+    ...domainPlugins.map(pluginLine),
+  ];
+}
+
 function listView(plugins: readonly PluginInfo[], totalCount: number): ViewNode {
-  const byDomain = new Map<string, PluginInfo[]>();
-  for (const p of plugins) {
-    const list = byDomain.get(p.domain) ?? [];
-    list.push(p);
-    byDomain.set(p.domain, list);
-  }
-
-  const children: ViewNode[] = [line([{ text: 'Installed Plugins', bold: true }]), { kind: 'spacer' }];
-
-  for (const domain of DOMAINS) {
-    const domainPlugins = byDomain.get(domain);
-    if (domainPlugins === undefined || domainPlugins.length === 0) {
-      children.push(line([{ text: `  ${domain}/`, dim: true }, { text: ' — no plugins installed', dim: true }]));
-      continue;
-    }
-    children.push(line([{ text: `  ${domain}/`, tone: 'brand' }, { text: ` (${domainPlugins.length})`, dim: true }]));
-    for (const p of domainPlugins) {
-      const icon = p.pluginType === 'package' ? '📦' : '📄';
-      children.push(line([{ text: `    ${icon} ${p.namespace}` }, { text: ` (${p.pluginType})`, dim: true }]));
-    }
-  }
-
+  const children: ViewNode[] = [
+    line([{ text: 'Installed Plugins', bold: true }]),
+    { kind: 'spacer' },
+    ...DOMAINS.flatMap((domain) => domainSection(domain, plugins)),
+  ];
   if (totalCount === 0) {
     children.push(
       { kind: 'spacer' },
@@ -61,17 +60,17 @@ function syncView(
   if (synced.length === 0) {
     return group([line([{ text: 'No plugins declared in opensip-tools.config.yml.', dim: true }])], 2);
   }
-  const children: ViewNode[] = [line([{ text: 'Plugin sync', bold: true }])];
-  for (const entry of synced) {
-    children.push(
+  const children: ViewNode[] = [
+    line([{ text: 'Plugin sync', bold: true }]),
+    ...synced.map((entry) =>
       line([
         { text: entry.installed ? '✔' : '✗', tone: entry.installed ? 'success' : 'error' },
         { text: ' ' },
         { text: `${entry.domain}/`, dim: true },
         { text: entry.package },
       ]),
-    );
-  }
+    ),
+  ];
   if (errors && errors.length > 0) {
     children.push({ kind: 'spacer' }, ...errors.map((m) => line([{ text: m, tone: 'error' }])));
   }

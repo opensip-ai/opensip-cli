@@ -17,6 +17,7 @@
  */
 
 import { line, group, viewRunSummary, viewFooterHints, type Span, type ViewNode } from '@opensip-tools/cli-ui';
+import { formatDuration } from '@opensip-tools/core';
 
 import { viewFitDone } from './views/fit-done-view.js';
 import { viewInit } from './views/init-view.js';
@@ -37,10 +38,6 @@ import type { CommandResult, SimDoneResult, ErrorResult, GraphDoneResult, GateDo
 
 const SEPARATOR: ViewNode = { kind: 'separator' };
 const SPACER: ViewNode = { kind: 'spacer' };
-
-function formatDuration(ms: number): string {
-  return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
-}
 
 /** `✗ <message>` plus an optional dim suggestion — mirrors ErrorMessage. */
 function errorView(result: ErrorResult): ViewNode {

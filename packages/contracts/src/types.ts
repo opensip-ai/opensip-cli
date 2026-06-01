@@ -223,47 +223,27 @@ export interface FitDoneResult {
 }
 
 /**
- * Outcome of a `graph <scope>` run on the non-interactive (non-`--json`)
- * path. Carries only plain data — pre-rendered report lines, summary
- * counts, an optional fast-tier caveat, and the footer hint strip — so
- * `resultToView` (in cli) can express it as a view-model and the render
- * seam can emit it as Ink (TTY) or plain text (pipe/CI) from one
- * definition. Graph types (`Catalog`, `Signal`) deliberately do NOT cross
- * this boundary: contracts sits below graph in the layer graph.
+ * Outcome of a `graph <scope>` run on the non-`--json` path. Carries only
+ * plain data (no graph types — contracts sits below graph) so `resultToView`
+ * can express it as a view-model the render seam emits as Ink or plain text.
  */
 export interface GraphDoneResult {
   type: 'graph-done';
-  /**
-   * Verbose report body (catalog / findings-by-rule / entry-points), one
-   * string per line. Empty unless `--verbose` was passed.
-   */
+  /** Verbose body (catalog/findings/entry-points), one line per string; empty unless `--verbose`. */
   readonly reportLines: readonly string[];
-  /**
-   * Fast-tier approximation caveat to surface, or `undefined` for an exact
-   * (semantic) catalog. Rendered muted.
-   */
+  /** Fast-tier approximation caveat, or `undefined` for an exact catalog. */
   readonly resolutionBanner?: string;
   /** Counts for the shared one-line PASS/FAIL summary. */
-  readonly summary: {
-    readonly passed: number;
-    readonly failed: number;
-    readonly errors: number;
-    readonly warnings: number;
-  };
+  readonly summary: { readonly passed: number; readonly failed: number; readonly errors: number; readonly warnings: number };
   readonly durationMs: number;
-  /**
-   * Next-step hint strip. Each hint may bold substrings (flag names).
-   * Empty to suppress the strip (e.g. in verbose mode).
-   */
+  /** Next-step hint strip (hints may bold substrings); empty to suppress (verbose mode). */
   readonly footerHints: readonly { readonly text: string; readonly bold?: readonly string[] }[];
 }
 
 /**
  * Outcome of a `fit --gate-save` / `fit --gate-compare` run on the
- * non-`--json` path. Carries the already-composed human-readable lines so
- * the render seam can emit them as Ink (TTY) or plain text (pipe/CI) from
- * one definition — no direct stdout writes in the gate-mode dispatcher.
- * The exit code (degraded → 1) is set separately by the caller.
+ * non-`--json` path. Carries the already-composed lines so the render seam
+ * emits them as Ink or plain text. Exit code (degraded → 1) set by the caller.
  */
 export interface GateDoneResult {
   type: 'gate-done';
