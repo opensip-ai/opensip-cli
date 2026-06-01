@@ -38,17 +38,23 @@ export async function renderResult(result: CommandResult): Promise<void> {
       : undefined;
   const ui = scope?.ui;
 
-  // Non-TTY (pipe / redirect / CI): render migrated result types as plain
-  // text with zero ANSI and no banner. Un-migrated types fall through to
-  // the Ink path below until they are migrated.
+  // Non-TTY (pipe / redirect / CI): render as plain text with zero ANSI
+  // from the same view-model the Ink path uses. The ASCII banner is
+  // suppressed (clean logs), but the `ℹ Project:` discovery line is kept
+  // — CI output should still record which root was analyzed and how it was
+  // found. `error` stays terse (no project line), matching the TTY shell.
   if (!process.stdout.isTTY) {
-    const { resultToView } = await import('../ui/result-to-view.js');
-    const view = resultToView(result);
-    if (view !== null) {
-      const { renderToText } = await import('@opensip-tools/cli-ui');
-      process.stdout.write(`${renderToText(view)}\n`);
-      return;
-    }
+    const [{ resultToView }, { renderToText, viewProjectHeader, group }] = await Promise.all([
+      import('../ui/result-to-view.js'),
+      import('@opensip-tools/cli-ui'),
+    ]);
+    const body = resultToView(result);
+    const node =
+      projectHeader !== undefined && result.type !== 'error'
+        ? group([viewProjectHeader(projectHeader), { kind: 'spacer' }, body])
+        : body;
+    process.stdout.write(`${renderToText(node)}\n`);
+    return;
   }
 
   const { renderApp } = await import('../ui/render.js');

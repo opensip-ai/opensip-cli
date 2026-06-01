@@ -6,9 +6,7 @@ import { resultToView } from '../result-to-view.js';
 import type { CommandResult, SimDoneResult } from '@opensip-tools/contracts';
 
 function textOf(result: CommandResult): string {
-  const view = resultToView(result);
-  if (view === null) throw new Error('expected a migrated view');
-  return renderToText(view);
+  return renderToText(resultToView(result));
 }
 
 describe('resultToView', () => {
@@ -70,8 +68,9 @@ describe('resultToView', () => {
     expect(out).toContain('network down');
   });
 
-  it('returns null for not-yet-migrated result types', () => {
-    expect(resultToView({ type: 'help' })).toBeNull();
+  it('renders help and list views (every result type is now total)', () => {
+    expect(renderToText(resultToView({ type: 'help' }))).toContain('Codebase analysis toolkit');
+    expect(renderToText(resultToView({ type: 'list-recipes', recipes: [{ name: 'example', description: 'demo', checkCount: '3 checks' }] }))).toContain('example');
   });
 
   it('renders an error with the ✗ marker and indented suggestion', () => {

@@ -7,10 +7,9 @@
  * (TTY) or `renderToText` (pipe/CI). Because both media consume the same
  * node, interactive and non-interactive output cannot drift.
  *
- * Migration is phased: types not yet expressed here return `null`, and the
- * seam falls back to the legacy Ink `App` for them (TTY only). As types
- * migrate, the fallback shrinks; when the last type is migrated the
- * fallback is removed (plan Phase 5).
+ * This mapping is total — every `CommandResult` variant has a view. The
+ * Ink `App` shell adds only the banner/project chrome around the body this
+ * produces; there is no separate per-type rendering anymore.
  *
  * cli may depend on both `@opensip-tools/contracts` (for `CommandResult`)
  * and `@opensip-tools/cli-ui` (for the view-model). The keystone boundary
@@ -20,6 +19,19 @@
 import { line, group, viewRunSummary, viewFooterHints, type Span, type ViewNode } from '@opensip-tools/cli-ui';
 
 import { viewFitDone } from './views/fit-done-view.js';
+import { viewInit } from './views/init-view.js';
+import {
+  viewListChecks,
+  viewListRecipes,
+  viewHistory,
+  viewExperimental,
+  viewDashboard,
+  viewClearDone,
+  viewConfigureDone,
+  viewUninstallDone,
+  viewHelp,
+} from './views/misc-views.js';
+import { viewPlugin } from './views/plugin-view.js';
 
 import type { CommandResult, SimDoneResult, ErrorResult, GraphDoneResult, GateDoneResult } from '@opensip-tools/contracts';
 
@@ -111,11 +123,8 @@ function gateDoneView(result: GateDoneResult): ViewNode {
   return group(result.lines.map((l) => line([{ text: l }])));
 }
 
-/**
- * Map a result to its view-model node, or `null` if this result type is
- * not yet migrated (the seam then renders it via the legacy Ink App).
- */
-export function resultToView(result: CommandResult): ViewNode | null {
+/** Map any CommandResult to its view-model node (total — every variant covered). */
+export function resultToView(result: CommandResult): ViewNode {
   switch (result.type) {
     case 'fit-done': {
       return viewFitDone(result);
@@ -132,8 +141,41 @@ export function resultToView(result: CommandResult): ViewNode | null {
     case 'gate-done': {
       return gateDoneView(result);
     }
-    default: {
-      return null;
+    case 'list-checks': {
+      return viewListChecks(result);
+    }
+    case 'list-recipes': {
+      return viewListRecipes(result);
+    }
+    case 'history': {
+      return viewHistory(result);
+    }
+    case 'dashboard': {
+      return viewDashboard(result);
+    }
+    case 'init': {
+      return viewInit(result);
+    }
+    case 'experimental': {
+      return viewExperimental(result);
+    }
+    case 'plugin-list':
+    case 'plugin-add':
+    case 'plugin-remove':
+    case 'plugin-sync': {
+      return viewPlugin(result);
+    }
+    case 'clear-done': {
+      return viewClearDone(result);
+    }
+    case 'configure-done': {
+      return viewConfigureDone(result);
+    }
+    case 'uninstall-done': {
+      return viewUninstallDone(result);
+    }
+    case 'help': {
+      return viewHelp();
     }
   }
 }

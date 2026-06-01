@@ -1,29 +1,21 @@
 /**
- * App — top-level Ink component that dispatches on CommandResult.type.
+ * App — top-level Ink shell. Renders the banner + project line, then the
+ * result body via the shared view-model (`resultToView` → `renderToInk`).
+ *
+ * There is no per-result-type rendering here anymore: every CommandResult
+ * is expressed once as a ViewNode by `resultToView`, and the same node is
+ * rendered to plain text on the non-TTY path (bootstrap/render.ts). This
+ * shell owns only the chrome the plain-text path intentionally omits — the
+ * banner and the `ℹ Project:` line.
  */
 
-import { RunHeader , useTheme , ErrorMessage , Banner , UpdateHint , normalizeBannerSize , ProjectHeader , renderToInk } from '@opensip-tools/cli-ui';
-import { Text, Box } from 'ink';
+import { Banner, UpdateHint, normalizeBannerSize, ProjectHeader, renderToInk } from '@opensip-tools/cli-ui';
+import { Box } from 'ink';
 import React from 'react';
 
-
-
-import { CheckList } from './components/CheckList.js';
-import { ExperimentalNotice } from './components/ExperimentalNotice.js';
-import { HelpText } from './components/HelpText.js';
-import { HistoryTable } from './components/HistoryTable.js';
-import { InitFeedback } from './components/InitFeedback.js';
-import { PluginFeedback } from './components/PluginFeedback.js';
-import { RecipeList } from './components/RecipeList.js';
 import { resultToView } from './result-to-view.js';
 
-
-import type {
-  ClearDoneResult,
-  CommandResult,
-  ConfigureDoneResult,
-  UninstallDoneResult,
-} from '@opensip-tools/contracts';
+import type { CommandResult } from '@opensip-tools/contracts';
 import type { UiContext } from '@opensip-tools/core';
 
 /** Project location for the shell's `ℹ Project:` line. */
@@ -48,22 +40,16 @@ export interface AppProps {
  */
 const BANNERLESS_RESULT_TYPES: ReadonlySet<CommandResult['type']> = new Set(['error']);
 
-/** Display title for the simulation tool — shared by its two render branches. */
-const SIMULATION_TOOL_TITLE = 'Simulation';
-
 /**
  * App shell — the single source of truth for banner visibility. Renders
- * the banner once for every human-facing command, then delegates the
- * body to {@link AppBody}. Replaces the prior per-branch `<Banner/>`
- * sprinkling that left `dashboard` (and the list/plugin/configure/
- * uninstall commands) with no banner at all.
+ * the banner once for every human-facing command, then the result body
+ * through the shared view-model.
  */
 export function App({ result, projectHeader, ui }: AppProps): React.ReactElement {
   const showBanner = !BANNERLESS_RESULT_TYPES.has(result.type);
   const bannerSize = normalizeBannerSize(ui?.bannerSize);
   // `mini` carries the project path inside its boxed card, so the separate
   // `ℹ Project:` line would duplicate it — suppress ProjectHeader for mini.
-  // Every other size renders the banner art only, with ProjectHeader below.
   const showProjectHeader = bannerSize !== 'mini' && projectHeader !== undefined;
   return (
     <Box flexDirection="column">
@@ -80,208 +66,7 @@ export function App({ result, projectHeader, ui }: AppProps): React.ReactElement
       {showBanner && showProjectHeader && (
         <ProjectHeader root={projectHeader.root} walkedUp={projectHeader.walkedUp} />
       )}
-      <AppBody result={result} />
+      {renderToInk(resultToView(result))}
     </Box>
   );
 }
-
-/**
- * Dispatches on `CommandResult.type`. Body only — the banner is owned by
- * {@link App}, so no branch renders its own.
- */
-function AppBody({ result }: AppProps): React.ReactElement {
-  // Migrated result types render through the shared view-model so the TTY
-  // (Ink) output is byte-for-byte the same content the piped path produces
-  // via renderToText. Un-migrated types fall through to the legacy switch.
-  const view = resultToView(result);
-  if (view !== null) return renderToInk(view);
-
-  switch (result.type) {
-    case 'list-checks': {
-      return <CheckList checks={result.checks} totalCount={result.totalCount} />;
-    }
-
-    case 'list-recipes': {
-      return <RecipeList recipes={result.recipes} />;
-    }
-
-    case 'history': {
-      return <HistoryTable sessions={result.sessions} />;
-    }
-
-    case 'dashboard': {
-      return <DashboardFeedback path={result.path} opened={result.opened} />;
-    }
-
-    case 'init': {
-      return <InitFeedback {...result} />;
-    }
-
-    case 'experimental': {
-      const toolDesc = 'Run scenario-based tests against your codebase.';
-      return (
-        <Box flexDirection="column">
-          <RunHeader tool={SIMULATION_TOOL_TITLE} description={toolDesc} />
-          <ExperimentalNotice tool={result.tool} cwd={result.cwd} />
-        </Box>
-      );
-    }
-
-    case 'plugin-list':
-    case 'plugin-add':
-    case 'plugin-remove':
-    case 'plugin-sync': {
-      return <PluginFeedback result={result} />;
-    }
-
-    case 'clear-done': {
-      return <ClearDoneSummary result={result} />;
-    }
-
-    case 'configure-done': {
-      return <ConfigureDoneSummary result={result} />;
-    }
-
-    case 'uninstall-done': {
-      return <UninstallDoneSummary result={result} />;
-    }
-
-    case 'help': {
-      return <HelpText />;
-    }
-
-    default: {
-      return <ErrorMessage message="Unknown command result" />;
-    }
-  }
-}
-
-/**
- * Inline summary for `opensip-tools sessions purge` runs.
- *
- * Phase 6 of the Layer 5 plan: this branch was previously dead because
- * `clear.ts` wrote its banner via raw ANSI before returning. Now
- * `executeClear` returns a structured `ClearDoneResult` and Ink owns
- * the entire render — banner, success/cancel/empty messages, and the
- * deletion count.
- */
-function ClearDoneSummary({ result }: Readonly<{ result: ClearDoneResult }>): React.ReactElement {
-  const theme = useTheme();
-  return (
-    <Box flexDirection="column">
-      <Box paddingLeft={2} paddingTop={1}>
-        {result.action === 'empty' && <Text dimColor>No session data to clear.</Text>}
-        {result.action === 'cancelled' && <Text dimColor>Cancelled. No data was deleted.</Text>}
-        {result.action === 'done' && (
-          <Text>
-            <Text color={theme.success}>{'✓'}</Text>
-            {' '}{result.deletedCount} session{result.deletedCount === 1 ? '' : 's'} deleted.
-          </Text>
-        )}
-      </Box>
-    </Box>
-  );
-}
-
-/** Inline summary for `opensip-tools configure` runs. */
-function ConfigureDoneSummary({ result }: Readonly<{ result: ConfigureDoneResult }>): React.ReactElement {
-  const theme = useTheme();
-  if (result.action === 'cancelled') {
-    return (
-      <Box paddingLeft={2}>
-        <Text dimColor>No key provided. Configuration unchanged.</Text>
-      </Box>
-    );
-  }
-  return (
-    <Box flexDirection="column" paddingLeft={2}>
-      <Text>
-        <Text color={theme.success}>{'✓'}</Text>
-        {' '}API key saved to <Text bold>{result.configPath}</Text>
-      </Text>
-      <Text dimColor>
-        {'  '}You can now use --report-to to send results to OpenSIP Cloud.
-      </Text>
-    </Box>
-  );
-}
-
-/**
- * Inline summary for `opensip-tools uninstall` runs.
- *
- * Replaces the prior raw-stdout success line + next-step hint that
- * bypassed the theme. Audit 2026-05-23 G5.
- */
-function UninstallDoneSummary({ result }: Readonly<{ result: UninstallDoneResult }>): React.ReactElement {
-  const theme = useTheme();
-  const sizeText = formatBytes(result.sizeBytes);
-  const targetCount = result.targets.length;
-
-  if (result.action === 'empty') {
-    return (
-      <Box paddingLeft={2}>
-        <Text dimColor>Nothing to remove at {result.rootPath}.</Text>
-      </Box>
-    );
-  }
-
-  if (result.action === 'cancelled') {
-    return (
-      <Box paddingLeft={2}>
-        <Text dimColor>Cancelled. No changes made.</Text>
-      </Box>
-    );
-  }
-
-  if (result.action === 'dry-run') {
-    return (
-      <Box flexDirection="column" paddingLeft={2}>
-        <Text dimColor>
-          [dry-run] No changes made. Re-run without --dry-run to remove
-          {' '}{targetCount} target{targetCount === 1 ? '' : 's'} ({sizeText}).
-        </Text>
-      </Box>
-    );
-  }
-
-  // action === 'removed'
-  const hint = result.mode === 'user'
-    ? 'To remove the CLI itself: npm uninstall -g opensip-tools'
-    : 'To also remove user-level config: opensip-tools uninstall';
-  return (
-    <Box flexDirection="column" paddingLeft={2}>
-      <Text>
-        <Text color={theme.success}>{'✓'}</Text>
-        {' '}Removed {targetCount} target{targetCount === 1 ? '' : 's'}
-        {' '}<Text dimColor>({sizeText})</Text>
-      </Text>
-      <Text dimColor>  {hint}</Text>
-    </Box>
-  );
-}
-
-/** Mirror of `formatUninstallSize` so the renderer doesn't reach into commands/. */
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-  return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
-}
-
-/** Inline dashboard feedback component */
-function DashboardFeedback({ path, opened }: Readonly<{ path: string; opened: boolean }>): React.ReactElement {
-  const theme = useTheme();
-  return (
-    <Box flexDirection="column" paddingLeft={2}>
-      <Text>
-        <Text color={theme.success}>{'\u2713'}</Text>
-        {' '}
-        Report written to <Text bold>{path}</Text>
-      </Text>
-      <Text dimColor>
-        {'  '}{opened ? 'Opened in browser.' : 'Open the file in your browser to view.'}
-      </Text>
-    </Box>
-  );
-}
-
