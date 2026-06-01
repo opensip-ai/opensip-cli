@@ -55,9 +55,18 @@ export function loadFitConfig(
 }
 
 /**
- * Warn loudly when the targets config declares languages with no
- * registered adapter. Silent acceptance would let users ship configs
- * that scan files but skip the language-aware string/comment filtering.
+ * Warn loudly when the targets config declares a `languages:` tag that is
+ * neither backed by a content-filter adapter NOR a recognized non-code
+ * format — i.e. a likely typo. Silent acceptance would let users ship
+ * configs whose files match no check and skip filtering with no signal.
+ *
+ * `languages:` is a *matching dimension* (it routes files to checks via
+ * `findByScope`). A subset of those tags have a registered
+ * {@link LanguageAdapter} that strips strings/comments; another set are
+ * recognized non-code formats (JSON, YAML, Markdown, …) that are valid
+ * matching tags but intentionally have no adapter — files in those scan
+ * raw, which is correct, so they are NOT warned about. Only genuinely
+ * unrecognized tags (e.g. `pythonn`) warn.
  *
  * Returns warning strings (one per unknown-language batch) rather than
  * writing to stderr — stderr writes during the Ink live view desync the
@@ -73,7 +82,7 @@ export function loadFitConfig(
 export async function validateLanguagesAgainstAdapters(
   targetRegistry: LoadedFitConfig['targetRegistry'],
 ): Promise<readonly string[]> {
-  const { currentScope } = await import('@opensip-tools/core');
+  const { currentScope, isRecognizedNonCodeFormat } = await import('@opensip-tools/core');
   const scope = currentScope();
   if (!scope) {
     throw new Error(
@@ -87,7 +96,11 @@ export async function validateLanguagesAgainstAdapters(
   for (const target of targetRegistry.getAll()) {
     const langs = target.config.languages ?? [];
     for (const lang of langs) {
-      if (!knownLanguages.has(lang)) unknownLanguages.add(lang);
+      // A tag is legitimate if it either has a content-filter adapter or
+      // is a recognized adapter-less format (JSON/YAML/Markdown/…). Only
+      // truly unrecognized tags fall through to the warning.
+      if (knownLanguages.has(lang) || isRecognizedNonCodeFormat(lang)) continue;
+      unknownLanguages.add(lang);
     }
   }
   if (unknownLanguages.size === 0) return [];
@@ -100,8 +113,9 @@ export async function validateLanguagesAgainstAdapters(
     known: [...knownLanguages],
   });
   return [
-    `target config declares unknown language(s): ${list}. ` +
-    `Known languages: ${[...knownLanguages].sort().join(', ')}. ` +
-    `Files in unknown languages will scan with no string/comment filtering.`,
+    `target config declares unrecognized language tag(s): ${list}. ` +
+    `These match no content-filter adapter and are not a recognized non-code ` +
+    `format — likely a typo. Known code languages: ${[...knownLanguages].sort().join(', ')}. ` +
+    `Files under an unrecognized tag scan with no string/comment filtering.`,
   ];
 }

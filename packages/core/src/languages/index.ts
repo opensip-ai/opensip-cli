@@ -10,6 +10,7 @@ export {
   getParseTreeForFile,
 } from './parse-cache.js'
 export { applyContentFilter, type ContentFilterMode } from './content-filter-dispatch.js'
+export { RECOGNIZED_NON_CODE_FORMATS, isRecognizedNonCodeFormat } from './non-code-formats.js'
 export {
   applyRegions,
   buildLineStarts,
