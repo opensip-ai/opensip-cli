@@ -20,9 +20,10 @@ const BLAST_MAX_DEPTH = 5;
 /** Builds query-side indexes (by-body-hash, by-simple-name, blast radius) over the catalog. */
 export function buildIndexes(catalog: Catalog): Indexes {
   const byBodyHash = new Map<string, FunctionOccurrence>();
+  const occurrencesByHash = new Map<string, FunctionOccurrence[]>();
   const bySimpleName = new Map<string, string[]>();
   for (const name of Object.keys(catalog.functions)) {
-    indexNameBucket(catalog, name, byBodyHash, bySimpleName);
+    indexNameBucket(catalog, name, byBodyHash, occurrencesByHash, bySimpleName);
   }
   const { callees, callers } = buildAdjacency(byBodyHash);
   const blastRadius = buildBlastRadius(byBodyHash, callers);
@@ -34,13 +35,14 @@ export function buildIndexes(catalog: Catalog): Indexes {
     edges: [...callees.values()].reduce((n, arr) => n + arr.length, 0),
   });
 
-  return { byBodyHash, bySimpleName, callees, callers, blastRadius };
+  return { byBodyHash, occurrencesByHash, bySimpleName, callees, callers, blastRadius };
 }
 
 function indexNameBucket(
   catalog: Catalog,
   name: string,
   byBodyHash: Map<string, FunctionOccurrence>,
+  occurrencesByHash: Map<string, FunctionOccurrence[]>,
   bySimpleName: Map<string, string[]>,
 ): void {
   const occs: readonly FunctionOccurrence[] | undefined = catalog.functions[name];
@@ -48,6 +50,12 @@ function indexNameBucket(
   if (!occs) return;
   for (const o of occs) {
     byBodyHash.set(o.bodyHash, o);
+    let all = occurrencesByHash.get(o.bodyHash);
+    if (!all) {
+      all = [];
+      occurrencesByHash.set(o.bodyHash, all);
+    }
+    all.push(o);
     let names = bySimpleName.get(name);
     if (!names) {
       names = [];

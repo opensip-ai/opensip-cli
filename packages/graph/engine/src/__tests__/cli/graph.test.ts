@@ -148,6 +148,7 @@ function sig(over: { ruleId: string; message: string; filePath: string; line?: n
 function makeIndexes(): Indexes {
   return {
     byBodyHash: new Map(),
+    occurrencesByHash: new Map(),
     bySimpleName: new Map(),
     callees: new Map(),
     callers: new Map(),

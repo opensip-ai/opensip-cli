@@ -291,6 +291,13 @@ export interface BlastScore {
 /** O(1) lookups derived from the catalog. Not persisted. */
 export interface Indexes {
   readonly byBodyHash: ReadonlyMap<string, FunctionOccurrence>;
+  /**
+   * bodyHash → ALL occurrences sharing that body. Unlike `byBodyHash`
+   * (one occurrence per hash, content-dedup), this preserves every
+   * occurrence so a callee whose body is duplicated across packages can be
+   * disambiguated to the correct package. Consumed by `resolveCallee`.
+   */
+  readonly occurrencesByHash: ReadonlyMap<string, readonly FunctionOccurrence[]>;
   readonly bySimpleName: ReadonlyMap<string, readonly string[]>;
   /** bodyHash → bodyHash[] (forward). */
   readonly callees: ReadonlyMap<string, readonly string[]>;
