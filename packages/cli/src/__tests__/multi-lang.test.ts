@@ -82,11 +82,13 @@ describe('CLI multi-language', () => {
     expect(cfg).toContain('languages: [typescript]')
   })
 
-  it('warns loudly when a target declares an unknown language', () => {
+  it('warns loudly when a target declares an unrecognized language tag', () => {
     const result = runIn(UNKNOWN_FIXTURE, 'fit', '--json')
-    // Phase 9 contract: unknown languages produce a stderr warning and
-    // continue running. The fit command does not fail on this.
-    expect(result.stderr).toContain('unknown language')
+    // Phase 9 contract: an unrecognized language tag (here `klingon` —
+    // no content-filter adapter and not a recognized non-code format)
+    // produces a stderr warning and continues running. The fit command
+    // does not fail on this.
+    expect(result.stderr).toContain('unrecognized language tag')
     expect(result.stderr).toContain('klingon')
     // CLI should still complete (exit 0 since no errors fired) and
     // produce valid JSON on stdout.
