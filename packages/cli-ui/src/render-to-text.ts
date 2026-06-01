@@ -52,21 +52,29 @@ function indentLines(block: string, by: number): string {
 
 export function renderToText(node: ViewNode): string {
   switch (node.kind) {
-    case 'line':
+    case 'line': {
       return spansToText(node.spans);
-    case 'heading':
+    }
+    case 'heading': {
       return `== ${node.text} ==`;
-    case 'keyValues':
+    }
+    case 'keyValues': {
       return node.pairs.map((p) => `${p.label}: ${p.value}`).join('\n');
-    case 'table':
+    }
+    case 'table': {
       return tableToText(node.columns, node.rows);
-    case 'hints':
+    }
+    case 'hints': {
       return hintsToText(node.items);
-    case 'separator':
+    }
+    case 'separator': {
       return '─'.repeat(SEPARATOR_WIDTH);
-    case 'spacer':
+    }
+    case 'spacer': {
       return '';
-    case 'group':
+    }
+    case 'group': {
       return indentLines(node.children.map(renderToText).join('\n'), node.indent ?? 0);
+    }
   }
 }

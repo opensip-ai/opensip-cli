@@ -22,15 +22,22 @@ const REGEX_META = /[.*+?^${}()|[\]\\]/g;
 /** Map a semantic tone to a theme color token. `default` → no override. */
 function toneColor(theme: Theme, tone: Span['tone']): string | undefined {
   switch (tone) {
-    case 'brand': return theme.brand;
-    case 'success': return theme.success;
-    case 'error': return theme.error;
-    case 'warning': return theme.warning;
-    case 'info': return theme.info;
-    case 'muted': return theme.muted;
+    case 'brand': { return theme.brand;
+    }
+    case 'success': { return theme.success;
+    }
+    case 'error': { return theme.error;
+    }
+    case 'warning': { return theme.warning;
+    }
+    case 'info': { return theme.info;
+    }
+    case 'muted': { return theme.muted;
+    }
     case 'default':
-    case undefined:
+    case undefined: {
       return undefined;
+    }
   }
 }
 
@@ -57,21 +64,24 @@ function HintText({ item }: { readonly item: HintItem }): React.ReactElement {
 
 function NodeView({ node }: { readonly node: ViewNode }): React.ReactElement | null {
   switch (node.kind) {
-    case 'line':
+    case 'line': {
       return (
         <Text dimColor={node.dim}>
           {node.spans.map((s, i) => <SpanText key={i} span={s} />)}
         </Text>
       );
-    case 'heading':
+    }
+    case 'heading': {
       return <HeadingView text={node.text} tone={node.tone} />;
-    case 'keyValues':
+    }
+    case 'keyValues': {
       return (
         <Box flexDirection="column">
           {node.pairs.map((p, i) => <Text key={i}>{p.label}: {p.value}</Text>)}
         </Box>
       );
-    case 'table':
+    }
+    case 'table': {
       return (
         <Box flexDirection="column">
           <Text>{node.columns.join('  ')}</Text>
@@ -84,7 +94,8 @@ function NodeView({ node }: { readonly node: ViewNode }): React.ReactElement | n
           ))}
         </Box>
       );
-    case 'hints':
+    }
+    case 'hints': {
       return (
         <Box paddingLeft={2}>
           <Text dimColor>
@@ -94,16 +105,20 @@ function NodeView({ node }: { readonly node: ViewNode }): React.ReactElement | n
           </Text>
         </Box>
       );
-    case 'separator':
+    }
+    case 'separator': {
       return <Text dimColor>{'─'.repeat(SEPARATOR_WIDTH)}</Text>;
-    case 'spacer':
+    }
+    case 'spacer': {
       return <Text> </Text>;
-    case 'group':
+    }
+    case 'group': {
       return (
         <Box flexDirection="column" paddingLeft={node.indent ?? 0}>
           {node.children.map((c, i) => <NodeView key={i} node={c} />)}
         </Box>
       );
+    }
   }
 }
 

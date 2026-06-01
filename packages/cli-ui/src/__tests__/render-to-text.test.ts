@@ -4,7 +4,8 @@ import { renderToText } from '../render-to-text.js';
 import { line, group, type ViewNode } from '../view-model.js';
 
 /** Matches any ANSI escape sequence. */
-const ANSI = /\u001b\[/;
+// eslint-disable-next-line no-control-regex -- matches the ESC byte to assert its absence
+const ANSI = /\u001B\[/;
 
 /** One node of every kind — the basis for the no-ANSI invariant. */
 const ALL_KINDS: readonly ViewNode[] = [

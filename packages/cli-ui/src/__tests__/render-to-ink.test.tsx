@@ -6,10 +6,10 @@ import { renderToInk } from '../render-to-ink.js';
 import { ThemeProvider } from '../theme.js';
 import { line, group, type ViewNode } from '../view-model.js';
 
-/** Strip ANSI escapes so we can assert on the visible text only. */
+/** Strip ANSI color sequences so we can assert on the visible text only. */
 function stripAnsi(s: string): string {
-  // eslint-disable-next-line no-control-regex
-  return s.replace(/\[[0-9;]*m/g, '');
+  // eslint-disable-next-line no-control-regex -- strips the ESC-introduced color codes from the Ink frame
+  return s.replaceAll(/\u001B\[[0-9;]*m/g, '');
 }
 
 function frame(node: ViewNode): string {
