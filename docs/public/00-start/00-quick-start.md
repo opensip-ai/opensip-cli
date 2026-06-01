@@ -10,7 +10,7 @@ source-files:
   - packages/cli/src/index.ts
   - packages/cli/src/commands/init.ts
 related-docs:
-  - ./00-what-is-opensip-tools.md
+  - ./01-what-is-opensip-tools.md
   - ./05-vocabulary.md
   - ../70-reference/01-cli-commands.md
 ---
@@ -22,7 +22,7 @@ Four commands from a clean shell to a passing fitness run. The point of this pag
 > - The `opensip-tools` CLI installed.
 > - An `opensip-tools.config.yml` and an `opensip-tools/` directory in a project of your choice.
 > - One passing `fit` run and one passing `sim` run.
-> - Enough mechanical context that [`./00-what-is-opensip-tools.md`](/docs/opensip-tools/00-start/00-what-is-opensip-tools/) lands as *"oh, that's why"* instead of *"wait, what's a recipe?"*
+> - Enough mechanical context that [`./01-what-is-opensip-tools.md`](./01-what-is-opensip-tools.md) lands as *"oh, that's why"* instead of *"wait, what's a recipe?"*
 
 ---
 
@@ -41,7 +41,7 @@ opensip-tools auto-detects your project's language(s) from filesystem markers an
 
 All six get the **90 universal checks** (Docker, `.env`, Sentry, generic structure, dead-code, package conventions). TypeScript additionally gets the deepest treatment through 50 TypeScript-specific checks for typed-inject, drizzle-orm, React patterns, package.json exports, and tsconfig posture.
 
-For the full per-language breakdown, see [`../70-reference/02-package-catalog.md`](/docs/opensip-tools/70-reference/02-package-catalog/).
+For the full per-language breakdown, see [`../70-reference/02-package-catalog.md`](../70-reference/02-package-catalog.md).
 
 ---
 
@@ -73,6 +73,22 @@ opensip-tools sim --recipe example
 ```
 
 If `fit --recipe example` exits 0, the platform is wired correctly end-to-end: language detection picked the right adapter, the plugin loader found the example check, the recipe service matched it, the engine executed it, and the renderer drew the result. Every later doc is depth on one of those steps.
+
+> **Upgrading from `@opensip-tools/cli`?**
+> The CLI was renamed to the unscoped **`opensip-tools`** in v2.4.0 — one command
+> now installs *and* updates the CLI together with every bundled package
+> (language adapters, engine, check packs). Both the old and new packages
+> provide the same `opensip-tools` binary, so npm refuses to overwrite the old
+> global bin with `EEXIST`. **Uninstall the old package first:**
+>
+> ```bash
+> npm uninstall -g @opensip-tools/cli
+> npm install -g opensip-tools@latest
+> ```
+>
+> Nothing else changes — `opensip-tools.config.yml`, the `opensip-tools`
+> command, and every subcommand are identical. From 2.4.0 on, the single
+> `npm install -g opensip-tools@latest` keeps everything current.
 
 ---
 
@@ -123,7 +139,7 @@ opensip-tools fit --json
 opensip-tools graph
 ```
 
-The full command tree is at [`../70-reference/01-cli-commands.md`](/docs/opensip-tools/70-reference/01-cli-commands/).
+The full command tree is at [`../70-reference/01-cli-commands.md`](../70-reference/01-cli-commands.md).
 
 ---
 
@@ -143,11 +159,11 @@ The full command tree is at [`../70-reference/01-cli-commands.md`](/docs/opensip
 
 You've seen the loop run. The rest of this section deepens what you just saw:
 
-1. **[`./02-show-me-the-loops.md`](/docs/opensip-tools/00-start/02-show-me-the-loops/)** — One code sample per tool: a fit check, a sim scenario, a graph rule. See what authoring looks like, now that you know the platform works.
-2. **[`./00-what-is-opensip-tools.md`](/docs/opensip-tools/00-start/00-what-is-opensip-tools/)** — The product, the problem, the philosophy. What you just ran, conceptually.
-3. **[`./05-vocabulary.md`](/docs/opensip-tools/00-start/05-vocabulary/)** — The terms used everywhere: *Tool, recipe, check, scenario, signaler, target, language adapter, plugin, session.*
-4. **[`./06-system-context.md`](/docs/opensip-tools/00-start/06-system-context/)** — Where the binary sits between you, the codebase, CI, and OpenSIP Cloud.
+1. **[`./02-show-me-the-loops.md`](./02-show-me-the-loops.md)** — One code sample per tool: a fit check, a sim scenario, a graph rule. See what authoring looks like, now that you know the platform works.
+2. **[`./01-what-is-opensip-tools.md`](./01-what-is-opensip-tools.md)** — The product, the problem, the philosophy. What you just ran, conceptually.
+3. **[`./05-vocabulary.md`](./05-vocabulary.md)** — The terms used everywhere: *Tool, recipe, check, scenario, signaler, target, language adapter, plugin, session.*
+4. **[`./06-system-context.md`](./06-system-context.md)** — Where the binary sits between you, the codebase, CI, and OpenSIP Cloud.
 
-After this section, the mental-model section ([`../10-concepts/`](/docs/opensip-tools/10-concepts/)) takes you deep — starting with [`01-fitness-loop.md`](/docs/opensip-tools/10-concepts/01-fitness-loop/), which threads one check end-to-end through the system you just ran.
+After this section, the mental-model section ([`../10-concepts/`](../10-concepts/)) takes you deep — starting with [`01-fitness-loop.md`](../10-concepts/01-fitness-loop.md), which threads one check end-to-end through the system you just ran.
 
-Once you've internalized the fitness loop, the tool-specific sections — [`../20-fit/`](/docs/opensip-tools/20-fit/), [`../30-sim/`](/docs/opensip-tools/30-sim/), and [`../40-graph/`](/docs/opensip-tools/40-graph/) — go deep on each first-party tool's pipeline, primitives, and gating model.
+Once you've internalized the fitness loop, the tool-specific sections — [`../20-fit/`](../20-fit/), [`../30-sim/`](../30-sim/), and [`../40-graph/`](../40-graph/) — go deep on each first-party tool's pipeline, primitives, and gating model.

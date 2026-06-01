@@ -22,7 +22,7 @@ These docs are written for engineers fluent in TypeScript and Node tooling. Voic
 
 | If you're … | Read … |
 |---|---|
-| **Evaluating opensip-tools for the first time** | 00 (`00-what-is-opensip-tools` → `02-show-me-the-loops` → `03-vs-other-tools` → `04-faq`). Four short pages, ~10 minutes. Decide if the shape fits before going deeper. |
+| **Evaluating opensip-tools for the first time** | 00 (`01-what-is-opensip-tools` → `02-show-me-the-loops` → `03-vs-other-tools` → `04-faq`). Four short pages, ~10 minutes. Decide if the shape fits before going deeper. |
 | **Looking for a specific check** | 70 (`05-checks-index`) — browsable list of all 145+ built-in checks, grouped by pack and tag. |
 | **Brand new and committed to learning** | 00 → 10 → 20 in order. ~12 docs, ~90 minutes. You'll have a working mental model. |
 | **Writing your first check or recipe** | 60 (`01-write-your-first-check`) — task-led walkthrough. Then 50 (`02-project-local-plugins`) for depth. |
@@ -41,10 +41,10 @@ These docs are written for engineers fluent in TypeScript and Node tooling. Voic
 ## Reading order
 
 ### 00 — Start
-*The single first-touch section. The first three pages decide for you (pitch, install, code samples); the next two compare and clarify (vs. other tools, FAQ); the last two deepen for committed readers (vocabulary, runtime layout).*
+*The single first-touch section. The first three pages decide for you (install, pitch, code samples); the next two compare and clarify (vs. other tools, FAQ); the last two deepen for committed readers (vocabulary, runtime layout).*
 
-0. [**What is opensip-tools?**](/docs/opensip-tools/00-start/00-what-is-opensip-tools/) — Front door: the pitch, the problem, the three loops, the install. Read this even if you read nothing else.
-1. [**Quick start**](/docs/opensip-tools/00-start/01-quick-start/) — Four commands from clean shell to a passing fitness run.
+0. [**Quick start**](/docs/opensip-tools/00-start/00-quick-start/) — Install and go: from a clean shell to a passing fitness run in four commands. Start here. (Already on `@opensip-tools/cli`? The upgrade/migration note lives here too.)
+1. [**What is opensip-tools?**](/docs/opensip-tools/00-start/01-what-is-opensip-tools/) — The pitch, the problem, the three loops. The conceptual front door — read it right after you've run the quick start.
 2. [**Show me each loop**](/docs/opensip-tools/00-start/02-show-me-the-loops/) — One code sample per tool: a fit check, a sim scenario, a graph rule.
 3. [**vs. other tools**](/docs/opensip-tools/00-start/03-vs-other-tools/) — Honest comparison with ESLint, Semgrep, Sonarqube, Snyk. When to use opensip-tools and when not to.
 4. [**FAQ**](/docs/opensip-tools/00-start/04-faq/) — Common questions about adoption, edge cases, and what opensip-tools deliberately doesn't do.

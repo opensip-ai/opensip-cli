@@ -15,19 +15,8 @@
       "purpose": "Teaching path through opensip-tools — what it is, how it thinks, how it runs — plus a lookup-shaped reference catalog."
     },
     {
-      "file": "docs/web-generated/00-start/00-what-is-opensip-tools.md",
-      "path": "/docs/opensip-tools/00-start/00-what-is-opensip-tools/",
-      "section": "00-start",
-      "title": "What is opensip-tools?",
-      "audience": [
-        "getting-started",
-        "contributors"
-      ],
-      "purpose": "The front door — what problem opensip-tools solves, what it does, what it isn't, and how to try it."
-    },
-    {
-      "file": "docs/web-generated/00-start/01-quick-start.md",
-      "path": "/docs/opensip-tools/00-start/01-quick-start/",
+      "file": "docs/web-generated/00-start/00-quick-start.md",
+      "path": "/docs/opensip-tools/00-start/00-quick-start/",
       "section": "00-start",
       "title": "Quick start",
       "audience": [
@@ -37,6 +26,17 @@
         "ci-integrators"
       ],
       "purpose": "Four commands from zero to a passing fitness run. Hands-on before the conceptual material."
+    },
+    {
+      "file": "docs/web-generated/00-start/01-what-is-opensip-tools.md",
+      "path": "/docs/opensip-tools/00-start/01-what-is-opensip-tools/",
+      "section": "00-start",
+      "title": "What is opensip-tools?",
+      "audience": [
+        "getting-started",
+        "contributors"
+      ],
+      "purpose": "The front door — what problem opensip-tools solves, what it does, what it isn't, and how to try it."
     },
     {
       "file": "docs/web-generated/00-start/02-show-me-the-loops.md",
@@ -513,8 +513,8 @@
       "section": "00-start",
       "title": "00 — Start",
       "pages": [
-        "/docs/opensip-tools/00-start/00-what-is-opensip-tools/",
-        "/docs/opensip-tools/00-start/01-quick-start/",
+        "/docs/opensip-tools/00-start/00-quick-start/",
+        "/docs/opensip-tools/00-start/01-what-is-opensip-tools/",
         "/docs/opensip-tools/00-start/02-show-me-the-loops/",
         "/docs/opensip-tools/00-start/03-vs-other-tools/",
         "/docs/opensip-tools/00-start/04-faq/",
@@ -614,8 +614,8 @@
       "audience": "getting-started",
       "title": "Start",
       "pages": [
-        "/docs/opensip-tools/00-start/00-what-is-opensip-tools/",
-        "/docs/opensip-tools/00-start/01-quick-start/",
+        "/docs/opensip-tools/00-start/00-quick-start/",
+        "/docs/opensip-tools/00-start/01-what-is-opensip-tools/",
         "/docs/opensip-tools/00-start/02-show-me-the-loops/",
         "/docs/opensip-tools/00-start/03-vs-other-tools/",
         "/docs/opensip-tools/00-start/04-faq/",
@@ -633,7 +633,7 @@
       "title": "Author plugins",
       "pages": [
         "/docs/opensip-tools/",
-        "/docs/opensip-tools/00-start/01-quick-start/",
+        "/docs/opensip-tools/00-start/00-quick-start/",
         "/docs/opensip-tools/00-start/05-vocabulary/",
         "/docs/opensip-tools/00-start/06-system-context/",
         "/docs/opensip-tools/10-concepts/01-fitness-loop/",
@@ -667,7 +667,7 @@
       "title": "Integrate with CI",
       "pages": [
         "/docs/opensip-tools/",
-        "/docs/opensip-tools/00-start/01-quick-start/",
+        "/docs/opensip-tools/00-start/00-quick-start/",
         "/docs/opensip-tools/00-start/05-vocabulary/",
         "/docs/opensip-tools/00-start/06-system-context/",
         "/docs/opensip-tools/10-concepts/01-fitness-loop/",
@@ -691,8 +691,8 @@
       "title": "Contribute",
       "pages": [
         "/docs/opensip-tools/",
-        "/docs/opensip-tools/00-start/00-what-is-opensip-tools/",
-        "/docs/opensip-tools/00-start/01-quick-start/",
+        "/docs/opensip-tools/00-start/00-quick-start/",
+        "/docs/opensip-tools/00-start/01-what-is-opensip-tools/",
         "/docs/opensip-tools/00-start/05-vocabulary/",
         "/docs/opensip-tools/00-start/06-system-context/",
         "/docs/opensip-tools/10-concepts/01-fitness-loop/",

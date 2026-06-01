@@ -11,7 +11,7 @@ source-files:
   - packages/simulation/engine/src/kinds/load/define.ts
   - packages/graph/engine/src/cli/run.ts
 related-docs:
-  - ./01-quick-start.md
+  - ./00-quick-start.md
   - ../50-extend/01-plugin-authoring.md
   - ../20-fit/01-recipes-and-checks.md
   - ../30-sim/01-scenarios-and-recipes.md
@@ -27,7 +27,7 @@ opensip-tools ships three first-party tools. Each answers a different question s
 | `sim` | "Does it behave correctly under stress?" | A **scenario** — drives traffic against your service and asserts on the result. |
 | `graph` | "What is reachable from where?" | A **rule** over the static call graph — five ship in the box; not user-extensible the same way. |
 
-One concrete sample of each, below. After you've seen them, [quick start](/docs/opensip-tools/00-start/01-quick-start/) shows you how to run them.
+One concrete sample of each, below. After you've seen them, [quick start](/docs/opensip-tools/00-start/00-quick-start/) shows you how to run them.
 
 ---
 
@@ -164,7 +164,7 @@ Each exits `0` when the bar holds, non-zero when it doesn't. Each emits SARIF fo
 
 | If you want to … | Go to … |
 |---|---|
-| Run the four-command smoke right now | [Quick start](/docs/opensip-tools/00-start/01-quick-start/) |
-| Understand the design philosophy | [What is opensip-tools](/docs/opensip-tools/00-start/00-what-is-opensip-tools/) |
+| Run the four-command smoke right now | [Quick start](/docs/opensip-tools/00-start/00-quick-start/) |
+| Understand the design philosophy | [What is opensip-tools](/docs/opensip-tools/00-start/01-what-is-opensip-tools/) |
 | Author a fit check or recipe | [Plugin authoring](/docs/opensip-tools/50-extend/01-plugin-authoring/) |
 | Go deep on one loop | [Fit](/docs/opensip-tools/20-fit/01-recipes-and-checks/) · [Sim](/docs/opensip-tools/30-sim/01-scenarios-and-recipes/) · [Graph](/docs/opensip-tools/40-graph/01-stages-and-catalog/) |

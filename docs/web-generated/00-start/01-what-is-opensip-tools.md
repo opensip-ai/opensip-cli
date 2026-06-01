@@ -11,7 +11,7 @@ source-files:
   - packages/cli/src/ui/components/Summary.tsx
   - packages/core/src/tools/types.ts
 related-docs:
-  - ./01-quick-start.md
+  - ./00-quick-start.md
   - ./02-show-me-the-loops.md
   - ./05-vocabulary.md
   - ./06-system-context.md
@@ -76,7 +76,7 @@ opensip-tools ships three first-party tools, all invoked through the same CLI bi
 
 ### `fit` — fitness checks
 
-The primary loop. *"Is the codebase clean?"* A check runs once per file and returns violations. Checks compose into recipes; recipes drive CI. Project-local checks live as `.mjs` files under `opensip-tools/fit/checks/`; published packs live as npm packages. The whole loop is described in detail in [`../10-concepts/01-fitness-loop.md`](../10-concepts/01-fitness-loop.md), the spine of this doc set.
+The primary loop. *"Is the codebase clean?"* A check runs once per file and returns violations. Checks compose into recipes; recipes drive CI. Project-local checks live as `.mjs` files under `opensip-tools/fit/checks/`; published packs live as npm packages. The whole loop is described in detail in [`../10-concepts/01-fitness-loop.md`](/docs/opensip-tools/10-concepts/01-fitness-loop/), the spine of this doc set.
 
 ### `sim` — simulation scenarios *(experimental)*
 
@@ -86,7 +86,7 @@ The second loop, opt-in. *"Does it behave correctly under stress?"* A scenario s
 
 The third loop. *"What is reachable from where?"* Builds the project's static call graph in five stages and runs six built-in rules over it: `orphan-subtree`, `duplicated-function-body`, `no-side-effect-path`, `test-only-reachable`, `always-throws-branch`, and `high-blast-function` (an informational blast-radius insight, not a gate). Five language adapters ship in v2.0 (TypeScript, Python, Rust, Go, Java). Has its own baseline-gate flow.
 
-The CLI doesn't know what any of these three do internally — they're tools registered against a shared dispatcher. Same model lets a future `audit` or `lint` tool slot in without CLI changes. For the architecture behind that decoupling, see [`../10-concepts/02-tool-plugin-model.md`](../10-concepts/02-tool-plugin-model.md).
+The CLI doesn't know what any of these three do internally — they're tools registered against a shared dispatcher. Same model lets a future `audit` or `lint` tool slot in without CLI changes. For the architecture behind that decoupling, see [`../10-concepts/02-tool-plugin-model.md`](/docs/opensip-tools/10-concepts/02-tool-plugin-model/).
 
 ---
 
@@ -107,8 +107,8 @@ opensip-tools fit --recipe example
 
 | If you want to … | Go to … |
 |---|---|
-| See what real fit / sim / graph code looks like | [Show me each loop](./02-show-me-the-loops.md) |
-| Run the four-command smoke right now | [Quick start](./01-quick-start.md) |
-| Learn the vocabulary used across the docs | [Vocabulary](./05-vocabulary.md) |
-| Understand the runtime layout (what's on disk) | [System context](./06-system-context.md) |
-| Go deeper on the architecture (contributors) | [Mental model](../10-concepts/) → [Architecture index](../README.md) |
+| See what real fit / sim / graph code looks like | [Show me each loop](/docs/opensip-tools/00-start/02-show-me-the-loops/) |
+| Run the four-command smoke right now | [Quick start](/docs/opensip-tools/00-start/00-quick-start/) |
+| Learn the vocabulary used across the docs | [Vocabulary](/docs/opensip-tools/00-start/05-vocabulary/) |
+| Understand the runtime layout (what's on disk) | [System context](/docs/opensip-tools/00-start/06-system-context/) |
+| Go deeper on the architecture (contributors) | [Mental model](/docs/opensip-tools/10-concepts/) → [Architecture index](/docs/opensip-tools/) |

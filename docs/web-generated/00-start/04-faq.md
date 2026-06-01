@@ -9,7 +9,7 @@ source-files:
   - README.md
   - packages/cli/src/index.ts
 related-docs:
-  - ./00-what-is-opensip-tools.md
+  - ./01-what-is-opensip-tools.md
   - ./03-vs-other-tools.md
 ---
 # FAQ
@@ -125,5 +125,5 @@ v2.0 swaps internal runtime persistence from JSON files to SQLite. **v2 ignores 
 |---|---|
 | See how opensip-tools compares to alternatives | [vs. other tools](/docs/opensip-tools/00-start/03-vs-other-tools/) |
 | See concrete code samples | [Show me each loop](/docs/opensip-tools/00-start/02-show-me-the-loops/) |
-| Run the four-command smoke | [Quick start](/docs/opensip-tools/00-start/01-quick-start/) |
+| Run the four-command smoke | [Quick start](/docs/opensip-tools/00-start/00-quick-start/) |
 | Browse all 145+ built-in checks | [Checks reference](/docs/opensip-tools/70-reference/05-checks-index/) |

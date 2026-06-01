@@ -12,7 +12,7 @@ source-files:
   - packages/cli/src/commands/configure.ts
   - packages/contracts/src/exit-codes.ts
 related-docs:
-  - ./00-what-is-opensip-tools.md
+  - ./01-what-is-opensip-tools.md
   - ./05-vocabulary.md
   - ../80-implementation/03-session-and-persistence.md
   - ../70-reference/03-configuration.md

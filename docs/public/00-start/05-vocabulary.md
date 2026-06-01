@@ -15,7 +15,7 @@ source-files:
   - packages/fitness/engine/src/signalers/types.ts
   - packages/fitness/engine/src/targets/types.ts
 related-docs:
-  - ./00-what-is-opensip-tools.md
+  - ./01-what-is-opensip-tools.md
   - ./06-system-context.md
   - ../10-concepts/01-fitness-loop.md
 ---

@@ -35,8 +35,8 @@ type DocManifest = {
 };
 
 type DocPage = {
-  file: string;          // 'docs/web-generated/00-start/01-quick-start.md'
-  path: string;          // '/docs/opensip-tools/00-start/01-quick-start/'
+  file: string;          // 'docs/web-generated/00-start/00-quick-start.md'
+  path: string;          // '/docs/opensip-tools/00-start/00-quick-start/'
   section: string;       // '00-start' (empty string for root README)
   title: string;
   audience?: string[];

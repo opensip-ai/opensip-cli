@@ -15,7 +15,7 @@ source-files:
   - packages/fitness/engine/src/recipes/parallel-execution.ts
   - packages/fitness/engine/src/recipes/sequential-execution.ts
 related-docs:
-  - ../00-start/00-what-is-opensip-tools.md
+  - ../00-start/01-what-is-opensip-tools.md
   - ./02-tool-plugin-model.md
   - ../20-fit/01-recipes-and-checks.md
   - ../20-fit/03-ignore-directives.md
