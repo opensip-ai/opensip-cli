@@ -19,6 +19,7 @@ import { Box } from 'ink';
 import React from 'react';
 
 import { renderToInk } from './render-to-ink.js';
+
 import type { ViewNode } from './view-model.js';
 
 export interface RunFooterHint {

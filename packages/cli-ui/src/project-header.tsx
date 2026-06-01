@@ -10,8 +10,11 @@
  * `--json` and `completion` never render UI, so they never reach here.
  */
 
-import { Text, Box } from 'ink';
+import { Box } from 'ink';
 import React from 'react';
+
+import { renderToInk } from './render-to-ink.js';
+import { line, type ViewNode } from './view-model.js';
 
 export interface ProjectHeaderInput {
   /** Absolute path to the project root. */
@@ -34,11 +37,16 @@ export function formatProjectHeader(input: ProjectHeaderInput): string {
   return `${base}  (found ${walkedUp} ${noun} up)`;
 }
 
-/** Ink view of {@link formatProjectHeader}. Indented to align with RunHeader. */
+/** The project line as a renderer-agnostic view-model node (rendered dim). */
+export function viewProjectHeader(input: ProjectHeaderInput): ViewNode {
+  return line([{ text: formatProjectHeader(input) }], true);
+}
+
+/** Ink view of {@link viewProjectHeader}. Indented to align with RunHeader. */
 export function ProjectHeader({ root, walkedUp }: ProjectHeaderInput): React.ReactElement {
   return (
     <Box paddingLeft={2} paddingTop={1}>
-      <Text dimColor>{formatProjectHeader({ root, walkedUp })}</Text>
+      {renderToInk(viewProjectHeader({ root, walkedUp }))}
     </Box>
   );
 }
