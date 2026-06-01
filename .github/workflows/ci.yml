@@ -58,7 +58,7 @@ jobs:
 
       - name: Upload fit SARIF
         if: always() && hashFiles('fit.sarif') != ''
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: fit.sarif
           category: opensip-tools-fit
