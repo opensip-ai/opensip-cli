@@ -506,6 +506,115 @@ describe('performance-anti-patterns skip paths', () => {
 })
 
 // =============================================================================
+// performance-anti-patterns: spread-ACCUMULATION precision
+//
+// The check must flag genuine O(n^2) accumulation (spreading a collection
+// back into itself each iteration) while NOT flagging benign in-loop spreads
+// — one-time defensive copies, spread call-args, and merges — which were
+// previously false positives (and collided with eslint's prefer-spread).
+// =============================================================================
+
+describe('performance-anti-patterns spread accumulation', () => {
+  let cwd: string
+
+  function spreadSignals(rel: string): Promise<boolean> {
+    return findCheck('performance-anti-patterns')
+      .run(cwd, { targetFiles: [join(cwd, rel)] })
+      .then((r) => r.signals.some((s) => s.message.toLowerCase().includes('spread')))
+  }
+
+  beforeAll(() => {
+    cwd = makeFixtureDir('perf-spread')
+
+    // --- ACCUMULATION (must flag) ---
+    writeFixture(cwd, 'src/acc-array.ts', [
+      'export function f(items: number[]): number[] {',
+      '  let acc: number[] = [];',
+      '  for (const x of items) {',
+      '    acc = [...acc, x];', // self-referential array rebuild — O(n^2)
+      '  }',
+      '  return acc;',
+      '}',
+    ].join('\n'))
+    writeFixture(cwd, 'src/acc-object.ts', [
+      'export function f(keys: string[]): Record<string, boolean> {',
+      '  let state: Record<string, boolean> = {};',
+      '  for (const k of keys) {',
+      '    state = { ...state, [k]: true };', // self-referential object rebuild
+      '  }',
+      '  return state;',
+      '}',
+    ].join('\n'))
+    writeFixture(cwd, 'src/acc-map-slot.ts', [
+      'export function f(rows: { k: string; v: number }[]): Map<string, number[]> {',
+      '  const m = new Map<string, number[]>();',
+      '  for (const r of rows) {',
+      '    m.set(r.k, [...(m.get(r.k) ?? []), r.v]);', // grouping into a Map slot
+      '  }',
+      '  return m;',
+      '}',
+    ].join('\n'))
+
+    // --- BENIGN (must NOT flag) ---
+    writeFixture(cwd, 'src/copy-then-sort.ts', [
+      'export function f(groups: number[][]): number[][] {',
+      '  const out: number[][] = [];',
+      '  for (const g of groups) {',
+      '    const sorted = [...g].sort((a, b) => a - b);', // one-time defensive copy
+      '    out.push(sorted);',
+      '  }',
+      '  return out;',
+      '}',
+    ].join('\n'))
+    writeFixture(cwd, 'src/merge.ts', [
+      'export function f(pairs: [number[], number[]][]): number[][] {',
+      '  const out: number[][] = [];',
+      '  for (const [a, b] of pairs) {',
+      '    const merged = [...a, ...b];', // one-time merge, LHS != either source
+      '    out.push(merged);',
+      '  }',
+      '  return out;',
+      '}',
+    ].join('\n'))
+    writeFixture(cwd, 'src/call-arg.ts', [
+      'export function f(batches: number[][]): number[] {',
+      '  const out: number[] = [];',
+      '  for (const batch of batches) {',
+      '    out.push(...batch);', // spread call-args — the recommended fix, not a smell
+      '  }',
+      '  return out;',
+      '}',
+    ].join('\n'))
+  })
+
+  afterAll(() => rmSync(cwd, { recursive: true, force: true }))
+
+  it('flags self-referential array accumulation (acc = [...acc, x])', async () => {
+    expect(await spreadSignals('src/acc-array.ts')).toBe(true)
+  })
+
+  it('flags self-referential object accumulation (state = { ...state, k })', async () => {
+    expect(await spreadSignals('src/acc-object.ts')).toBe(true)
+  })
+
+  it('flags grouping into a Map slot (m.set(k, [...m.get(k), v]))', async () => {
+    expect(await spreadSignals('src/acc-map-slot.ts')).toBe(true)
+  })
+
+  it('does NOT flag a one-time defensive copy ([...g].sort())', async () => {
+    expect(await spreadSignals('src/copy-then-sort.ts')).toBe(false)
+  })
+
+  it('does NOT flag a one-time merge ([...a, ...b])', async () => {
+    expect(await spreadSignals('src/merge.ts')).toBe(false)
+  })
+
+  it('does NOT flag spread call-arguments (push(...batch))', async () => {
+    expect(await spreadSignals('src/call-arg.ts')).toBe(false)
+  })
+})
+
+// =============================================================================
 // dependency-version-consistency: matching, missing-name, and unparseable
 // =============================================================================
 

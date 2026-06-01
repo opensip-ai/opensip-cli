@@ -60,15 +60,14 @@ const PATTERNS: PatternConfig[] = [
     severity: 'warning',
   },
   {
+    // Coarse context gate: a `for` body that contains *some* `[`/`{`-prefixed
+    // spread. This only decides whether the line is worth inspecting; the
+    // precise accumulation-vs-copy decision is made per-line by
+    // isAccumulatingSpread (which ignores defensive copies and call-args).
     // Bounded to prevent super-linear runtime.
-    // We match `[...` or `(...` or `, ...` so that destructuring rest
-    // (`{ a, ...rest } = obj` and `const [a, ...rest] = arr`) does NOT trigger:
-    // those forms appear after `{`/`[` that immediately follow `const`/`let`/`var`
-    // — the `(...|[...|, ...` shapes here cover spread-in-array-literal,
-    // spread-in-call-args, and spread-in-arg-list-after-comma respectively.
-    pattern: /for\s{0,5}\([^)]{0,200}\)\s{0,5}\{[^}]{0,500}[([,]\s{0,5}\.\.\./,
+    pattern: /for\s{0,5}\([^)]{0,200}\)\s{0,5}\{[^}]{0,500}[[{]\s{0,5}\.\.\./,
     type: ANTI_PATTERN_TYPES.SPREAD_IN_LOOP,
-    message: 'Spread operator in loop - pre-allocate array instead',
+    message: 'Spread-accumulation in a loop — rebuilding a collection by spreading it back into itself is O(n^2); push/assign into the existing collection instead',
     severity: 'warning',
   },
   {
@@ -136,7 +135,7 @@ function checkLineForPerformancePatterns(
       const isSequentialAwait =
         patternConfig.type === ANTI_PATTERN_TYPES.SEQUENTIAL_AWAIT && line.includes('await')
       const isSpreadInLoop =
-        patternConfig.type === ANTI_PATTERN_TYPES.SPREAD_IN_LOOP && isSpreadInCallOrArray(line)
+        patternConfig.type === ANTI_PATTERN_TYPES.SPREAD_IN_LOOP && isAccumulatingSpread(line)
       const isStringConcatInLoop =
         patternConfig.type === ANTI_PATTERN_TYPES.STRING_CONCAT_IN_LOOP &&
         /\+=\s{0,5}['"`]/.test(line)
@@ -164,23 +163,42 @@ function checkLineForPerformancePatterns(
 /* v8 ignore stop */
 
 /**
- * Distinguish spread-in-call / spread-in-array (a real anti-pattern in loops)
- * from rest-destructuring (`{ a, ...rest } = obj`, `const [a, ...rest] = arr`),
- * which is not.
+ * Detect spread-*accumulation* in a loop — the only spread shape that is
+ * actually O(n²). The smell is re-reading a collection and spreading it
+ * back into a new literal that replaces it, so each iteration copies the
+ * whole accumulated collection to append a few elements:
  *
- * Heuristic: a true spread is preceded by `(`, `[`, or `,` (after optional
- * whitespace) — those positions correspond to call args, array literals, and
- * subsequent args. A destructuring rest, while syntactically also `, ...rest`
- * inside `{}`, is always followed by an `=` on the same line (the destructuring
- * assignment), so we exclude lines containing `} =` or `] =`.
+ *   acc = [...acc, x]                 // self-referential array rebuild
+ *   state = { ...state, k: v }        // self-referential object rebuild
+ *   m.set(k, [...m.get(k), x])        // grouping into a Map slot
+ *   obj[k] = [...obj[k], x]           // grouping into an indexed slot
+ *
+ * Spreads that are NOT accumulation are intentionally ignored, because
+ * flagging them produced false positives (and collided with eslint's
+ * `unicorn/prefer-spread`, which prefers `[...x]` over `x.slice()`):
+ *
+ *   const sorted = [...arr].sort()    // one-time defensive copy, O(n)
+ *   fn(...args)                       // spread call-arguments
+ *   const merged = [...a, ...b]       // one-time merge (LHS ≠ either source)
+ *   const { id, ...rest } = row       // rest-destructuring
+ *
+ * Limitation: a copy split across two statements
+ * (`const t = [...acc, x]; acc = t`) is not recognized — detecting that
+ * needs data flow, which this line-oriented check does not do. We prefer
+ * missing those rare cases over emitting false positives on every
+ * defensive copy. All quantifiers are bounded to prevent ReDoS.
  */
-function isSpreadInCallOrArray(line: string): boolean {
+function isAccumulatingSpread(line: string): boolean {
   if (!line.includes('...')) return false
-  // Exclude rest-destructuring: `{ ..., ...rest } = expr` or `[..., ...rest] = expr`
-  // Bounded quantifier prevents catastrophic backtracking.
-  if (/[\]}]\s{0,5}=/.test(line)) return false
-  // Must be `(...`, `[...`, or `, ...` — bounded quantifier keeps this linear.
-  return /[([,]\s{0,5}\.\.\./.test(line)
+  // Self-referential rebuild: `ID = [...ID` / `ID = {...ID` (spread re-reads
+  // the same binding being assigned). The `[^=;]` window allows leading
+  // elements like `x = [first, ...x]`.
+  if (/\b([A-Za-z_$][\w$]*)\s{0,5}=\s{0,5}[[{][^=;]{0,200}\.\.\.\s{0,5}\1\b/.test(line)) return true
+  // Grouping into a Map slot: `X.set(k, [...X.get(...` (read-modify-write).
+  if (/\.set\s{0,5}\([^,;]{0,80},\s{0,5}[[{][^=;]{0,160}\.\.\.[^;]{0,80}\.get\s{0,5}\(/.test(line)) return true
+  // Grouping into an indexed slot: `ID[k] = [...ID[`.
+  if (/\b([A-Za-z_$][\w$]*)\[[^\]]{0,80}\]\s{0,5}=\s{0,5}[[{][^=;]{0,160}\.\.\.\s{0,5}\1\b\[/.test(line)) return true
+  return false
 }
 
 /* v8 ignore start -- switch over anti-pattern types; covered when patterns fire */
@@ -190,7 +208,7 @@ function getPerformanceSuggestion(type: AntiPatternType, defaultMessage: string)
       return 'Collect promises in an array and use Promise.all() to execute them in parallel, e.g.: const results = await Promise.all(items.map(item => fetchItem(item)));'
     }
     case 'spread-in-loop': {
-      return 'Pre-allocate the result array with the known size, then use indexed assignment or push() without spread to avoid O(n^2) complexity'
+      return 'Mutate the existing collection instead of rebuilding it each iteration: array.push(x) (or push(...items)), map.get(k).push(x), or Object.assign(obj, { k: v }) — spreading the accumulator back into a new literal is O(n^2)'
     }
     case 'string-concat-in-loop': {
       return 'Collect strings in an array and call .join("") after the loop completes to avoid O(n^2) string allocation'
@@ -219,7 +237,7 @@ export const performanceAntiPatterns = defineCheck({
 
 **Detects:** Analyzes each file individually. Uses regex patterns with multi-line context to find:
 - \`await\` inside \`for\`, \`while\`, or \`.forEach\` loops (sequential async operations)
-- Spread operator (\`...\`) inside \`for\` loops (O(n^2) array copies)
+- Spread-*accumulation* inside \`for\` loops — rebuilding a collection by spreading it back into itself (\`acc = [...acc, x]\`, \`m.set(k, [...m.get(k), x])\`), which is O(n^2). One-time defensive copies (\`[...arr].sort()\`), spread call-arguments (\`fn(...args)\`), and merges (\`[...a, ...b]\`) are NOT flagged.
 - String concatenation (\`+= '...'\`) inside \`for\` loops (O(n^2) string allocation)
 
 **Why it matters:** These patterns cause quadratic performance degradation that is invisible at small scale but catastrophic with production data volumes.
