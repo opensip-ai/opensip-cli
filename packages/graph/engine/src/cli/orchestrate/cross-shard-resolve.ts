@@ -25,7 +25,7 @@ import { posix } from 'node:path';
 
 import { computeFilesFingerprint } from '../../cache/invalidate.js';
 import { appendEdge, createMutableStats, truncateForCallEdge } from '../../lang-adapter/edge-helpers.js';
-import { packageOf } from '../../pipeline/resolve-callee.js';
+import { packageOf } from '../../resolve-callee.js';
 
 import type { ShardBuildResult } from './shard-model.js';
 import type {

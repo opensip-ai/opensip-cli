@@ -19,11 +19,14 @@
  * edges) lands in Phase 4. `creation` may be added later.
  */
 
+import { resolveCallee } from '../resolve-callee.js';
+
 import {
   deriveOpenSipEdgeId,
   deriveOpenSipModulePath,
   deriveOpenSipSymbolId,
 } from './opensip-id-derivation.js';
+
 
 import type {
   CatalogExport,
@@ -129,12 +132,13 @@ function occurrenceToSymbol(
  */
 function callEdgeToRows(
   fromSymbolId: string,
-  fromFilePath: string,
+  callerOcc: FunctionOccurrence,
   callEdge: CallEdge,
-  byBodyHash: ReadonlyMap<string, FunctionOccurrence>,
+  indexes: Indexes,
   repoId: string,
   gitSha: string,
 ): readonly CatalogExportEdge[] {
+  const fromFilePath = callerOcc.filePath;
   const edgeKind = 'calls';
 
   if (callEdge.to.length === 0) {
@@ -161,7 +165,7 @@ function callEdgeToRows(
 
   const rows: CatalogExportEdge[] = [];
   for (const toBodyHash of callEdge.to) {
-    const target = byBodyHash.get(toBodyHash);
+    const target = resolveCallee(toBodyHash, callerOcc, indexes);
     if (target === undefined) {
       // Engine catalog invariant: every CallEdge.to bodyHash exists in
       // the catalog. A missing target is an engine bug; skip rather
@@ -308,9 +312,9 @@ export function renderCatalogJson(input: RenderCatalogJsonInput): string {
       for (const callEdge of occurrence.calls) {
         const rows = callEdgeToRows(
           symbol.id,
-          occurrence.filePath,
+          occurrence,
           callEdge,
-          indexes.byBodyHash,
+          indexes,
           repoId,
           gitSha,
         );

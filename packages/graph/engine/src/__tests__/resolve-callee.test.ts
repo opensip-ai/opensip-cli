@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 
 import { packageOf, resolveCallee, callerImportedPackages } from '../resolve-callee.js';
 
-import type { FunctionOccurrence, Indexes } from '../../types.js';
+import type { FunctionOccurrence, Indexes } from '../types.js';
 
 function occ(over: Partial<FunctionOccurrence> & { bodyHash: string; filePath: string; qualifiedName: string }): FunctionOccurrence {
   return {

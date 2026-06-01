@@ -12,7 +12,7 @@
  * verbatim in the dashboard's browser-side coupling view.
  */
 
-import type { FunctionOccurrence, Indexes } from '../types.js';
+import type { FunctionOccurrence, Indexes } from './types.js';
 
 const PACKAGE_RE = /^packages\/([^/]+)\//;
 

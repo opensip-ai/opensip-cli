@@ -7,7 +7,7 @@
 
 import { logger } from '@opensip-tools/core';
 
-import { packageOf } from './resolve-callee.js';
+import { packageOf } from '../resolve-callee.js';
 
 import type { BlastScore, Catalog, FunctionOccurrence, Indexes } from '../types.js';
 
