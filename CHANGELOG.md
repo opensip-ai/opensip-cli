@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.4.0] — 2026-06-01
+
+### Changed
+
+- **The CLI now publishes under the unscoped name `opensip-tools`** (was
+  `@opensip-tools/cli`). Install and update with a single, memorable command:
+
+  ```bash
+  npm install -g opensip-tools@latest
+  ```
+
+  This pulls the CLI **and** every bundled `@opensip-tools/*` package (language
+  adapters, engine, check packs) in one shot, so updating the CLI updates
+  everything in lockstep. The package name now matches the `opensip-tools`
+  command and bin. The other 28 packages remain scoped `@opensip-tools/*`.
+
+  **Migration:** `@opensip-tools/cli` is deprecated and points at
+  `opensip-tools`; its last published version (2.3.3) keeps working, but new
+  installs should use `npm i -g opensip-tools`. No code or config changes are
+  required — the `opensip-tools` command, `opensip-tools.config.yml`, and all
+  subcommands are unchanged.
+
 ## [2.3.3] — 2026-05-31
 
 ### Fixed
