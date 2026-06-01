@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-import { maybeNotify } from '../update-notifier.js';
+import { maybeNotify, isNewerVersion } from '../update-notifier.js';
 
 const originalEnv = { ...process.env };
 const originalIsTTY = process.stdout.isTTY;
@@ -54,5 +54,28 @@ describe('maybeNotify', () => {
     // a unit test, but we can assert the call didn't throw and the
     // notifier instance was returned.
     expect(out).toBeDefined();
+  });
+});
+
+describe('isNewerVersion', () => {
+  it('returns true when latest is strictly newer', () => {
+    expect(isNewerVersion('2.2.1', '2.1.0')).toBe(true);
+    expect(isNewerVersion('2.0.0', '1.9.9')).toBe(true);
+    expect(isNewerVersion('1.0.1', '1.0.0')).toBe(true);
+  });
+
+  it('returns false when latest is older — the downgrade bug', () => {
+    // The exact case the user hit: running 2.2.1 against npm latest 2.1.0.
+    expect(isNewerVersion('2.1.0', '2.2.1')).toBe(false);
+    expect(isNewerVersion('1.0.0', '2.0.0')).toBe(false);
+  });
+
+  it('returns false when versions are equal', () => {
+    expect(isNewerVersion('2.2.1', '2.2.1')).toBe(false);
+  });
+
+  it('treats a release as newer than a prerelease of the same core', () => {
+    expect(isNewerVersion('2.2.1', '2.2.1-beta.1')).toBe(true);
+    expect(isNewerVersion('2.2.1-beta.1', '2.2.1')).toBe(false);
   });
 });

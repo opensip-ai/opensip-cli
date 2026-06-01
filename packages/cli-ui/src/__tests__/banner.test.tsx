@@ -49,13 +49,14 @@ describe('Banner', () => {
   });
 
   describe('mini', () => {
-    it('renders a boxed identity card with cup, version, tagline, and path', () => {
+    it('renders a boxed identity card with cup, version, tagline, url, and path', () => {
       const frame = render(
         <Banner size="mini" version="2.2.1" projectPath="/home/me/opensip-tools" />,
       ).lastFrame() ?? '';
       expect(frame).toContain('opensip-tools');
       expect(frame).toContain('v2.2.1');
       expect(frame).toContain('codebase analysis toolkit');
+      expect(frame).toContain('www.opensip.ai');
       expect(frame).toContain('/home/me/opensip-tools');
       // Rounded amber box frames the card.
       expect(frame).toContain('╭');
@@ -66,10 +67,11 @@ describe('Banner', () => {
       expect(frame).not.toContain('░███████████░');
     });
 
-    it('omits the project-path line when no projectPath is given', () => {
+    it('omits the project-path line but keeps the url when no projectPath is given', () => {
       const frame = render(<Banner size="mini" version="2.2.1" />).lastFrame() ?? '';
       expect(frame).toContain('opensip-tools');
       expect(frame).toContain('v2.2.1');
+      expect(frame).toContain('www.opensip.ai');
       expect(frame).not.toContain('/home/me');
     });
   });

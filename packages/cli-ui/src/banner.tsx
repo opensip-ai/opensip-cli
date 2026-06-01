@@ -10,12 +10,12 @@
  *     make it read as a mug).
  *   - `sm` — half-height AND half-width (quarter-block wordmark, smaller mug).
  *   - `mini` — a compact, boxed identity card: a small amber coffee cup on
- *     the left and three info lines on the right (`opensip-tools vX.Y.Z`,
- *     the tagline, and the project path), framed in a rounded amber border.
- *     Modeled on the Claude Code session card. Unlike the wordmark sizes it
- *     carries the version + project path inline, so callers SUPPRESS the
- *     separate `ProjectHeader` line when `mini` is selected (the path would
- *     otherwise render twice).
+ *     the left and four info lines on the right (`opensip-tools vX.Y.Z`,
+ *     the tagline, the `www.opensip.ai` URL, and the project path), framed in
+ *     a rounded amber border. Modeled on the Claude Code session card. Unlike
+ *     the wordmark sizes it carries the version + project path inline, so
+ *     callers SUPPRESS the separate `ProjectHeader` line when `mini` is
+ *     selected (the path would otherwise render twice).
  *
  * In the wordmark sizes (`lg`/`md`/`sm`) OPEN is brand-coloured and SIP is
  * bold, matching `lg`; the cup column and wordmark column are bottom-aligned
@@ -121,15 +121,19 @@ const BANNER_SM: CompactBanner = {
 };
 
 /**
- * `mini` cup art — three rows, bottom-aligned with the three info lines so
- * the steam (` ░ ░`) sits beside the version line and the mug body beside the
- * tagline + path. Rendered entirely in `theme.brand` (amber).
+ * `mini` cup art — four rows (steam, mug rim, mug body, saucer), one per
+ * info line, so the steam sits beside the version line and the saucer beside
+ * the project path. Rendered entirely in `theme.brand` (amber).
  */
 const BANNER_MINI_CUP: readonly string[] = [
   ' ░ ░ ',
   '▟███▙',
-  '▝███▘',
+  '▐███▌',
+  ' ▀▀▀ ',
 ];
+
+/** Marketing URL shown in the `mini` banner — brand-coloured, reads as a link. */
+const MINI_URL = 'www.opensip.ai';
 
 /**
  * The walk-up suffix shown after the project path, e.g. `(found 2 levels up)`.
@@ -152,10 +156,11 @@ function walkedUpSuffix(walkedUp: number | undefined): string {
  * version (`readPackageVersion` would resolve cli-ui's own version) or the
  * project scope — the caller resolves both and passes them in.
  *
- * `projectPath` is optional: project-agnostic commands (init/configure) have
- * no project root, so the third info line is omitted while the cup keeps its
- * three rows. `walkedUp` appends the discovery hint to the path line when the
- * project root was found above cwd.
+ * Info lines: name+version, tagline, marketing URL, project path. The first
+ * three are always shown; `projectPath` is optional (project-agnostic
+ * commands like init/configure have no project root), so the fourth line is
+ * omitted while the cup keeps its four rows. `walkedUp` appends the discovery
+ * hint to the path line when the project root was found above cwd.
  */
 function MiniBanner({
   version,
@@ -186,6 +191,7 @@ function MiniBanner({
           <Text dimColor>v{version}</Text>
         </Text>
         <Text dimColor>{MINI_TAGLINE}</Text>
+        <Text color={theme.brand}>{MINI_URL}</Text>
         {projectPath !== undefined && (
           <Text dimColor>{projectPath}{walkedUpSuffix(walkedUp)}</Text>
         )}
