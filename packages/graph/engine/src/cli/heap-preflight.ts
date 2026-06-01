@@ -47,6 +47,13 @@ export interface PreflightInput {
   readonly cwd: string;
   /** Optional override for the adapter's config-file path. */
   readonly configPathOverride?: string;
+  /**
+   * When true, print the human-facing "elevating heap" line to stderr. Off
+   * by default: the elevation is silent unless `graph --verbose` asked for
+   * detail. The structured `graph.heap.preflight.elevate` log is emitted
+   * either way, so telemetry / log consumers lose nothing when it's off.
+   */
+  readonly verbose?: boolean;
 }
 
 /**
@@ -146,7 +153,7 @@ export async function runHeapPreflight(input: PreflightInput): Promise<boolean> 
   }
 
   /* v8 ignore start */
-  await reExecWithHeap(targetMb, fileCount, currentMb);
+  await reExecWithHeap(targetMb, fileCount, currentMb, input.verbose === true);
   return true;
   /* v8 ignore stop */
 }
@@ -162,6 +169,7 @@ async function reExecWithHeap(
   targetMb: number,
   fileCount: number,
   currentMb: number,
+  verbose: boolean,
 ): Promise<void> {
   const flag = `--max-old-space-size=${String(targetMb)}`;
   const existingNodeOptions = process.env.NODE_OPTIONS ?? '';
@@ -169,6 +177,8 @@ async function reExecWithHeap(
     ? `${existingNodeOptions} ${flag}`
     : flag;
 
+  // Structured log always fires — telemetry/log consumers see every
+  // elevation regardless of verbosity.
   logger.info({
     evt: 'graph.heap.preflight.elevate',
     module: 'graph:cli',
@@ -176,10 +186,14 @@ async function reExecWithHeap(
     targetMb,
     currentMb,
   });
-  process.stderr.write(
-    `graph: ${String(fileCount)} files detected — elevating heap to ${String(targetMb)} MB ` +
-      `(was ${String(currentMb)} MB).\n`,
-  );
+  // Human-facing line only under --verbose: silent heap elevation keeps the
+  // default output clean (the re-exec is an implementation detail).
+  if (verbose) {
+    process.stderr.write(
+      `graph: ${String(fileCount)} files detected — elevating heap to ${String(targetMb)} MB ` +
+        `(was ${String(currentMb)} MB).\n`,
+    );
+  }
 
   const child = spawn(process.execPath, process.argv.slice(1), {
     env: {

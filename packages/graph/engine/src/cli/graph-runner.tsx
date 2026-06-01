@@ -23,6 +23,7 @@ import {
   Banner,
   ClockProvider,
   ErrorMessage,
+  normalizeBannerSize,
   ProjectHeader,
   RunFooterHints,
   RunHeader,
@@ -31,7 +32,7 @@ import {
   useSpinner,
   useTheme,
 } from '@opensip-tools/cli-ui';
-import { formatDuration } from '@opensip-tools/core';
+import { currentScope, formatDuration } from '@opensip-tools/core';
 import { Box, Text, useApp, render } from 'ink';
 import React, { useCallback, useEffect, useState } from 'react';
 
@@ -204,10 +205,18 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
     return () => { cancelled = true; };
   }, []);
 
+  // Presentation settings resolved once in the pre-action hook; the live
+  // view runs inside that scope. `mini` carries the project path in its box,
+  // so the separate ProjectHeader line is dropped for it (matches App.tsx);
+  // walkedUp flows in so mini keeps the "(found N levels up)" hint.
+  const scope = currentScope();
+  const ui = scope?.ui;
+  const walkedUp = scope?.projectContext?.walkedUp;
+  const bannerSize = normalizeBannerSize(ui?.bannerSize);
   const header = (
     <>
-      <Banner />
-      <ProjectHeader root={args.cwd} />
+      <Banner size={bannerSize} version={ui?.version} projectPath={args.cwd} walkedUp={walkedUp} />
+      {bannerSize !== 'mini' && <ProjectHeader root={args.cwd} walkedUp={walkedUp} />}
       <RunHeader tool={GRAPH_TOOL_TITLE} description={GRAPH_TOOL_DESCRIPTION} />
     </>
   );

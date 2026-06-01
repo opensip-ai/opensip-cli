@@ -26,11 +26,16 @@ import type { CommandResult } from '@opensip-tools/contracts';
  * paths with no scope pass `undefined` → no project line.
  */
 export async function renderResult(result: CommandResult): Promise<void> {
-  const project = currentScope()?.projectContext;
+  const scope = currentScope();
+  const project = scope?.projectContext;
   const projectHeader =
     project?.scope === 'project'
       ? { root: project.projectRoot, walkedUp: project.walkedUp }
       : undefined;
+  // Presentation settings (banner size + CLI version) resolved once in the
+  // pre-action hook. Absent only on paths with no entered scope (e.g. a
+  // pre-scope parse error) — App applies its own defaults then.
+  const ui = scope?.ui;
   const { renderApp } = await import('../ui/render.js');
-  await renderApp(result, projectHeader);
+  await renderApp(result, projectHeader, ui);
 }

@@ -2,7 +2,7 @@
  * App — top-level Ink component that dispatches on CommandResult.type.
  */
 
-import { RunHeader , useTheme , ErrorMessage , Banner , ProjectHeader } from '@opensip-tools/cli-ui';
+import { RunHeader , useTheme , ErrorMessage , Banner , normalizeBannerSize , ProjectHeader } from '@opensip-tools/cli-ui';
 import { Text, Box } from 'ink';
 import React from 'react';
 
@@ -27,6 +27,7 @@ import type {
   SimDoneResult,
   UninstallDoneResult,
 } from '@opensip-tools/contracts';
+import type { UiContext } from '@opensip-tools/core';
 
 /** Project location for the shell's `ℹ Project:` line. */
 export interface ProjectHeaderProps {
@@ -38,6 +39,8 @@ export interface AppProps {
   readonly result: CommandResult;
   /** Omitted for project-agnostic commands (init/configure/completion) and scopeless error paths. */
   readonly projectHeader?: ProjectHeaderProps;
+  /** Presentation settings (banner size + version). Omitted on scopeless paths. */
+  readonly ui?: UiContext;
 }
 
 /**
@@ -58,12 +61,24 @@ const SIMULATION_TOOL_TITLE = 'Simulation';
  * sprinkling that left `dashboard` (and the list/plugin/configure/
  * uninstall commands) with no banner at all.
  */
-export function App({ result, projectHeader }: AppProps): React.ReactElement {
+export function App({ result, projectHeader, ui }: AppProps): React.ReactElement {
   const showBanner = !BANNERLESS_RESULT_TYPES.has(result.type);
+  const bannerSize = normalizeBannerSize(ui?.bannerSize);
+  // `mini` carries the project path inside its boxed card, so the separate
+  // `ℹ Project:` line would duplicate it — suppress ProjectHeader for mini.
+  // Every other size renders the banner art only, with ProjectHeader below.
+  const showProjectHeader = bannerSize !== 'mini' && projectHeader !== undefined;
   return (
     <Box flexDirection="column">
-      {showBanner && <Banner />}
-      {showBanner && projectHeader && (
+      {showBanner && (
+        <Banner
+          size={bannerSize}
+          version={ui?.version}
+          projectPath={projectHeader?.root}
+          walkedUp={projectHeader?.walkedUp}
+        />
+      )}
+      {showBanner && showProjectHeader && (
         <ProjectHeader root={projectHeader.root} walkedUp={projectHeader.walkedUp} />
       )}
       <AppBody result={result} />

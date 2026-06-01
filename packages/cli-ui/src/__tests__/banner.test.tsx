@@ -2,7 +2,7 @@ import { render } from 'ink-testing-library';
 import React from 'react';
 import { describe, it, expect } from 'vitest';
 
-import { Banner } from '../banner.js';
+import { Banner, normalizeBannerSize } from '../banner.js';
 
 const widestLine = (frame: string): number =>
   Math.max(...frame.split('\n').map((line) => line.length));
@@ -46,5 +46,46 @@ describe('Banner', () => {
     const sm = render(<Banner size="sm" />).lastFrame() ?? '';
     expect(widestLine(sm)).toBeLessThan(widestLine(md));
     expect(sm).toContain('░'); // steam survives
+  });
+
+  describe('mini', () => {
+    it('renders a boxed identity card with cup, version, tagline, and path', () => {
+      const frame = render(
+        <Banner size="mini" version="2.2.1" projectPath="/home/me/opensip-tools" />,
+      ).lastFrame() ?? '';
+      expect(frame).toContain('opensip-tools');
+      expect(frame).toContain('v2.2.1');
+      expect(frame).toContain('codebase analysis toolkit');
+      expect(frame).toContain('/home/me/opensip-tools');
+      // Rounded amber box frames the card.
+      expect(frame).toContain('╭');
+      expect(frame).toContain('╯');
+      // Cup body present.
+      expect(frame).toContain('███');
+      // No full-size saucer line — this is not the lg banner.
+      expect(frame).not.toContain('░███████████░');
+    });
+
+    it('omits the project-path line when no projectPath is given', () => {
+      const frame = render(<Banner size="mini" version="2.2.1" />).lastFrame() ?? '';
+      expect(frame).toContain('opensip-tools');
+      expect(frame).toContain('v2.2.1');
+      expect(frame).not.toContain('/home/me');
+    });
+  });
+});
+
+describe('normalizeBannerSize', () => {
+  it('passes through every valid size', () => {
+    expect(normalizeBannerSize('lg')).toBe('lg');
+    expect(normalizeBannerSize('md')).toBe('md');
+    expect(normalizeBannerSize('sm')).toBe('sm');
+    expect(normalizeBannerSize('mini')).toBe('mini');
+  });
+
+  it('falls back to lg for unknown or undefined values', () => {
+    expect(normalizeBannerSize('enormous')).toBe('lg');
+    expect(normalizeBannerSize('')).toBe('lg');
+    expect(normalizeBannerSize(undefined)).toBe('lg');
   });
 });

@@ -74,6 +74,12 @@ const CliDefaultsSchema = z.object({
   apiKey:    z.string().min(1).optional(),
   fileTypes: z.array(z.string()).optional(),
   ignore:    z.array(z.string()).optional(),
+  // Presentation settings. `banner` selects the header art shown above each
+  // command: mini (default) | lg | md | sm. Read at render time off
+  // RunScope.ui — it deliberately has no `--banner` flag.
+  ui:        z.object({
+    banner: z.enum(['lg', 'md', 'sm', 'mini']).optional(),
+  }).optional(),
 })
 
 // =============================================================================

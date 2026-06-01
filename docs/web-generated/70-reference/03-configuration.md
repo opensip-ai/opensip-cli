@@ -131,11 +131,14 @@ CLI-wide defaults that act as flag pre-fills. Each project's `cli` section is eq
 | `apiKey` | string | Literal API key. **No `${VAR}` interpolation** — use the env-var or user-level config instead. |
 | `fileTypes` | string[] | Restrict the run to these extensions. |
 | `ignore` | string[] | Additional exclude patterns. |
+| `ui.banner` | `'mini' \| 'lg' \| 'md' \| 'sm'` | Banner art above each command. Default `mini` — a compact boxed card (amber cup + version + tagline + project path). Set `lg`/`md`/`sm` for the full ASCII wordmark. **No CLI flag** — persistent preference. |
 
 ```yaml
 cli:
   recipe: default
   reportTo: 'https://opensip.ai/api'
+  ui:
+    banner: mini   # mini | lg | md | sm
 ```
 
 **API key resolution precedence**: `--api-key` flag > `cli.apiKey` > `OPENSIP_API_KEY` env > `~/.opensip-tools/config.yml`. Project-level wins over the env var, so a committed-into-repo key takes effect even if the env var is set.

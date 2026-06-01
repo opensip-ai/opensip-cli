@@ -46,7 +46,20 @@ export interface CliDefaults {
   readonly fileTypes?: readonly string[];
   readonly ignore?: readonly string[];
   readonly debug?: boolean;
+  /**
+   * Presentation settings (the `cli.ui:` sub-block). Currently just the
+   * banner size shown above each command. Unlike the other defaults this
+   * does NOT map onto a Commander flag — there is no `--banner`; it rides
+   * on `RunScope.ui` and is read by the render paths directly.
+   */
+  readonly ui?: {
+    /** Banner art: `mini` (default) | `lg` | `md` | `sm`. */
+    readonly banner?: 'lg' | 'md' | 'sm' | 'mini';
+  };
 }
+
+/** Valid `ui.banner` values; anything else is dropped (→ default applies). */
+const BANNER_VALUES: ReadonlySet<string> = new Set(['lg', 'md', 'sm', 'mini']);
 
 /**
  * Type guard for permissive YAML reading. We accept anything that
@@ -78,7 +91,18 @@ function projectCliDefaults(raw: Record<string, unknown>): CliDefaults {
   const ignore = asStringArray(raw.ignore);
   if (ignore) out.ignore = ignore;
   if (typeof raw.debug === 'boolean') out.debug = raw.debug;
+  const ui = projectUiDefaults(raw.ui);
+  if (ui) out.ui = ui;
   return out;
+}
+
+/** Project the `cli.ui:` sub-block into the typed shape; drop unknown banner values. */
+function projectUiDefaults(raw: unknown): CliDefaults['ui'] | undefined {
+  if (!isPlainObject(raw)) return undefined;
+  if (typeof raw.banner === 'string' && BANNER_VALUES.has(raw.banner)) {
+    return { banner: raw.banner as NonNullable<CliDefaults['ui']>['banner'] };
+  }
+  return undefined;
 }
 
 /**

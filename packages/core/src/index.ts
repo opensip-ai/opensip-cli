@@ -177,6 +177,11 @@ export type { ProjectPaths, UserPaths, PathDomain, PluginsPathDomain } from './l
 export { resolveProjectContext } from './lib/project-context.js';
 export type { ProjectContext, ResolveProjectContextInput } from './lib/project-context.js';
 
+// Lib — per-invocation presentation settings (banner size + CLI version)
+// read by the render paths off `currentScope()?.ui`. Populated by the CLI
+// bootstrap; absent in tests and non-rendering callers.
+export type { UiContext } from './lib/ui-context.js';
+
 // Lib — config schemaVersion. Permissive top-level field reader +
 // CLI/config compatibility classifier. Used by pre-action-hook for
 // upgrade-mismatch detection.

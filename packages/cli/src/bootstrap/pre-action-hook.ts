@@ -200,8 +200,16 @@ function warnAboutPhantomRuntimes(project: ProjectContext, jsonOutput: boolean):
   }
 }
 
-/** Mount the bootstrap `preAction` hook on the supplied program. */
-export function installPreActionHook(program: Command): void {
+/**
+ * Mount the bootstrap `preAction` hook on the supplied program.
+ *
+ * @param program The root Commander program.
+ * @param version The CLI version (from `readPackageVersion` at the entry
+ *   point). Threaded in rather than re-read here so the `mini` banner shows
+ *   the SAME version `--version` reports — and so the kernel-adjacent hook
+ *   doesn't resolve cli-ui's or its own package version by mistake.
+ */
+export function installPreActionHook(program: Command, version: string): void {
   program.hook('preAction', (_thisCommand, actionCommand) => {
     const runId = generatePrefixedId('run');
 
@@ -209,7 +217,11 @@ export function installPreActionHook(program: Command): void {
     const cwd = (opts.cwd as string) ?? process.cwd();
     const cwdExplicit = actionCommand.getOptionValueSource('cwd') === 'cli';
 
-    mergeConfigDefaults(opts, loadCliDefaults(cwd, opts.config as string | undefined));
+    // Keep the loaded defaults around: `mergeConfigDefaults` only copies the
+    // flag-shaped fields onto opts, but `ui.banner` has no flag — we read it
+    // straight off the config object below to build the UiContext.
+    const cliDefaults = loadCliDefaults(cwd, opts.config as string | undefined);
+    mergeConfigDefaults(opts, cliDefaults);
 
     // Single bootstrap-time configuration of the process-wide logger
     // singleton. Replaces the four prior free mutators (`setSilent`,
@@ -283,6 +295,12 @@ export function installPreActionHook(program: Command): void {
       // (post-action handlers, error printers) that read via
       // `getOrOpenDatastore()` find the same instance.
       datastore: buildDatastoreThunk(project, logger),
+      // Presentation settings the render paths read via currentScope()?.ui.
+      // bannerSize stays an untyped string at the kernel boundary; the
+      // cli-ui render sites narrow it with normalizeBannerSize. Product
+      // default is 'mini' (the compact identity card) when no
+      // `cli.ui.banner` is configured; a user can opt back into lg/md/sm.
+      ui: { bannerSize: cliDefaults.ui?.banner ?? 'mini', version },
     });
     // D7: each registered tool contributes its tool-specific subscope
     // (e.g. `scope.simulation`, `scope.graph`) BEFORE the scope is

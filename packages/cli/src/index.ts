@@ -35,11 +35,13 @@ import { printWelcome } from './welcome.js';
 
 export * from './api.js';
 
+const cliVersion = readPackageVersion(import.meta.url);
+
 const program = new Command('opensip-tools')
   .description('Codebase analysis toolkit — pluggable tools for fitness, simulation, and more')
-  .version(readPackageVersion(import.meta.url));
+  .version(cliVersion);
 
-installPreActionHook(program);
+installPreActionHook(program, cliVersion);
 
 async function main(): Promise<void> {
   // Fresh registries per CLI invocation — the previously-exported

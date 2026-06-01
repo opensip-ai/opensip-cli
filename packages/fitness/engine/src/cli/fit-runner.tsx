@@ -26,6 +26,7 @@ import {
   Banner,
   ClockProvider,
   ErrorMessage,
+  normalizeBannerSize,
   ProjectHeader,
   RunFooterHints,
   RunHeader,
@@ -39,6 +40,7 @@ import {
   type ErrorResult,
   type FitDoneResult,
 } from '@opensip-tools/contracts';
+import { currentScope } from '@opensip-tools/core';
 import { reportToCloud } from '@opensip-tools/reporting';
 import { Box, Static, Text, useApp, render } from 'ink';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -156,12 +158,23 @@ function FitRunner({ args, datastore, setExitCode }: FitRunnerProps): React.Reac
   const checkCount = state.phase === 'running' || state.phase === 'done' ? state.checkCount : null;
   const staticItems = computeStaticItems(args.quiet === true, checkCount);
 
+  // Presentation settings resolved once in the pre-action hook. The live
+  // view runs inside that scope, so it reads the same banner size + version
+  // the static path does. `mini` carries the project path in its box, so we
+  // drop the separate ProjectHeader line for it (matches App.tsx) and pass
+  // the scope's walkedUp so mini keeps the "(found N levels up)" hint.
+  const scope = currentScope();
+  const ui = scope?.ui;
+  const walkedUp = scope?.projectContext?.walkedUp;
+  const bannerSize = normalizeBannerSize(ui?.bannerSize);
+  const showProjectHeader = bannerSize !== 'mini';
+
   const renderStaticItem = (item: 'banner' | 'header'): React.ReactElement => {
     if (item === 'banner') {
       return (
         <React.Fragment key={item}>
-          <Banner />
-          <ProjectHeader root={args.cwd} />
+          <Banner size={bannerSize} version={ui?.version} projectPath={args.cwd} walkedUp={walkedUp} />
+          {showProjectHeader && <ProjectHeader root={args.cwd} walkedUp={walkedUp} />}
         </React.Fragment>
       );
     }

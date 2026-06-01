@@ -211,7 +211,7 @@ function register(cli: ToolCliContext): void {
         opts.workspace === true ||
         typeof opts.language === 'string';
       if (!hasExplicitScope) {
-        const reExecing = await runHeapPreflight({ cwd: opts.cwd });
+        const reExecing = await runHeapPreflight({ cwd: opts.cwd, verbose: opts.verbose === true });
         /* v8 ignore next */
         if (reExecing) return;
       }

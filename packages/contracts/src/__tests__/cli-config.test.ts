@@ -126,4 +126,19 @@ describe('loadCliDefaults', () => {
     const out = loadCliDefaults(testDir);
     expect(out).toEqual({});
   });
+
+  it('reads a valid ui.banner value', () => {
+    writeConfig('cli:\n  ui:\n    banner: mini\n');
+    expect(loadCliDefaults(testDir).ui?.banner).toBe('mini');
+  });
+
+  it('drops an unknown ui.banner value', () => {
+    writeConfig('cli:\n  ui:\n    banner: enormous\n');
+    expect(loadCliDefaults(testDir).ui).toBeUndefined();
+  });
+
+  it('ignores a non-object ui block', () => {
+    writeConfig('cli:\n  ui: "nope"\n');
+    expect(loadCliDefaults(testDir).ui).toBeUndefined();
+  });
 });

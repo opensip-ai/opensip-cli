@@ -14,17 +14,19 @@ import React from 'react';
 import { App, type ProjectHeaderProps } from './App.js';
 
 import type { CommandResult } from '@opensip-tools/contracts';
+import type { UiContext } from '@opensip-tools/core';
 
 /** Render a static command result. */
 export async function renderApp(
   result: CommandResult,
   projectHeader?: ProjectHeaderProps,
+  ui?: UiContext,
 ): Promise<void> {
   const { render } = await import('ink');
 
   const app = render(
     <ThemeProvider>
-      <App result={result} projectHeader={projectHeader} />
+      <App result={result} projectHeader={projectHeader} ui={ui} />
     </ThemeProvider>,
   );
 

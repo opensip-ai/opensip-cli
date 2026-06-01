@@ -29,6 +29,7 @@ import { logger as defaultLogger } from './logger.js';
 import type { Logger, LoggerImpl } from './logger.js';
 import type { ProjectContext } from './project-context.js';
 import type { DataStoreThunk, RecipeCheckConfigSlot, ToolScope } from './scope-types.js';
+import type { UiContext } from './ui-context.js';
 
 // RecipeCheckConfigSlot, DataStoreThunk, ToolScope, and ScopeContribution
 // live in the leaf `scope-types.ts` (audit 2026-05-29, M4) so the `Tool`
@@ -64,6 +65,13 @@ export interface RunScopeOptions {
   readonly datastore?: DataStoreThunk;
   readonly tools?: ToolRegistry;
   readonly languages?: LanguageRegistry;
+  /**
+   * Per-invocation presentation settings (banner size, CLI version) read
+   * by the render paths. Optional: tests and non-rendering callers omit it,
+   * in which case `RunScope.ui` is `undefined` and render sites apply their
+   * own defaults (banner → `lg`, version → empty).
+   */
+  readonly ui?: UiContext;
   /**
    * Correlation id for the current CLI invocation. D7 designates this a
    * KERNEL concern (every invocation has one) — it stays flat on the
@@ -105,6 +113,8 @@ export class RunScope {
   readonly datastore: DataStoreThunk;
   readonly tools: ToolRegistry;
   readonly languages: LanguageRegistry;
+  /** Per-invocation presentation settings; `undefined` outside the CLI render path. */
+  readonly ui: UiContext | undefined;
   /**
    * Correlation id for the current invocation. Read by the logger via
    * `currentScope()?.runId` for event-stamping. Empty string when no
@@ -122,6 +132,7 @@ export class RunScope {
     this.datastore = opts.datastore ?? (() => undefined);
     this.tools = opts.tools ?? new ToolRegistry();
     this.languages = opts.languages ?? new LanguageRegistry();
+    this.ui = opts.ui;
     this.runId = opts.runId ?? '';
   }
 
