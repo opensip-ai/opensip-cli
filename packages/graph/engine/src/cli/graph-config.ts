@@ -36,6 +36,17 @@ function asStringArray(value: unknown): readonly string[] | undefined {
   return value;
 }
 
+/**
+ * Coerce a YAML value into the `cycleSize2Severity` posture if it is one of
+ * the two allowed strings; otherwise drop it. Mirrors `asSeverityOverrides`'s
+ * value-narrowing. (Plan A integration note: if a nested band-table override
+ * shape later lands, add an `asThresholdTable` projector here and switch the
+ * numeric projections to it — Open Question #3. Flat scalars for now.)
+ */
+function asThresholdSeverity(value: unknown): 'off' | 'low' | undefined {
+  return value === 'off' || value === 'low' ? value : undefined;
+}
+
 /** Project the `graph.severityOverrides` sub-block into the typed shape. */
 function asSeverityOverrides(
   value: unknown,
@@ -59,6 +70,25 @@ function projectGraphConfig(raw: Record<string, unknown>): GraphConfig {
   if (minPackages !== undefined) out.minCrossPackageDuplicatePackages = minPackages;
   const entryPointHashes = asStringArray(raw.entryPointHashes);
   if (entryPointHashes) out.entryPointHashes = entryPointHashes;
+  // Structural-rule thresholds (Plan D). Each is permissively projected via
+  // asNumber — missing/malformed values are dropped so the rule falls back to
+  // its in-rule default.
+  const largeWarn = asNumber(raw.largeFunctionWarnLines);
+  if (largeWarn !== undefined) out.largeFunctionWarnLines = largeWarn;
+  const largeError = asNumber(raw.largeFunctionErrorLines);
+  if (largeError !== undefined) out.largeFunctionErrorLines = largeError;
+  const wideWarn = asNumber(raw.wideFunctionWarnParams);
+  if (wideWarn !== undefined) out.wideFunctionWarnParams = wideWarn;
+  const wideError = asNumber(raw.wideFunctionErrorParams);
+  if (wideError !== undefined) out.wideFunctionErrorParams = wideError;
+  const blastWarn = asNumber(raw.highBlastWarnThreshold);
+  if (blastWarn !== undefined) out.highBlastWarnThreshold = blastWarn;
+  const blastError = asNumber(raw.highBlastErrorThreshold);
+  if (blastError !== undefined) out.highBlastErrorThreshold = blastError;
+  const cycleMin = asNumber(raw.cycleMinSize);
+  if (cycleMin !== undefined) out.cycleMinSize = cycleMin;
+  const cycleSize2 = asThresholdSeverity(raw.cycleSize2Severity);
+  if (cycleSize2) out.cycleSize2Severity = cycleSize2;
   const severityOverrides = asSeverityOverrides(raw.severityOverrides);
   if (severityOverrides) out.severityOverrides = severityOverrides;
   return out;
