@@ -8,15 +8,16 @@
 import { createSignal } from '@opensip-tools/core';
 
 import { approximateSuffix } from './_approximation.js';
+import { defineRule } from './define-rule.js';
 import { inferEntryPoints } from './_entry-points.js';
 
 import type { Indexes, Rule } from '../types.js';
 import type { Signal } from '@opensip-tools/core';
 
-export const testOnlyReachableRule: Rule = {
+export const testOnlyReachableRule = defineRule({
   slug: 'graph:test-only-reachable',
   defaultSeverity: 'warning',
-  evaluate(catalog, indexes, _config): readonly Signal[] {
+  evaluate({ catalog, indexes }): readonly Signal[] {
     const productionEntries = computeProductionEntries(catalog, indexes);
     const reachableFromProd = bfsReachable(productionEntries, indexes);
     // Missing prod-caller edges on a fast catalog can fake "test-only".
@@ -57,7 +58,7 @@ export const testOnlyReachableRule: Rule = {
     }
     return signals;
   },
-};
+});
 
 function computeProductionEntries(catalog: Parameters<Rule['evaluate']>[0], indexes: Indexes): Set<string> {
   const out = new Set<string>();

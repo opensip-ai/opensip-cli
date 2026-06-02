@@ -11,15 +11,16 @@
 import { createSignal } from '@opensip-tools/core';
 
 import { approximateSuffix } from './_approximation.js';
+import { defineRule } from './define-rule.js';
 import { inferEntryPoints } from './_entry-points.js';
 
-import type { Catalog, GraphConfig, Indexes, Rule } from '../types.js';
+import type { Catalog, GraphConfig, Indexes } from '../types.js';
 import type { Signal } from '@opensip-tools/core';
 
-export const orphanSubtreeRule: Rule = {
+export const orphanSubtreeRule = defineRule({
   slug: 'graph:orphan-subtree',
   defaultSeverity: 'warning',
-  evaluate(catalog, indexes, config): readonly Signal[] {
+  evaluate({ catalog, indexes, config }): readonly Signal[] {
     const reachable = computeReachable(catalog, indexes, config);
     // On a fast catalog a missing caller-edge can fake an orphan; mark it.
     const caveat = approximateSuffix(catalog);
@@ -64,7 +65,7 @@ export const orphanSubtreeRule: Rule = {
     }
     return orphans;
   },
-};
+});
 
 function computeReachable(catalog: Catalog, indexes: Indexes, config: GraphConfig): Set<string> {
   const entryPoints = inferEntryPoints(catalog, indexes);
