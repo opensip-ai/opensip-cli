@@ -17,21 +17,17 @@
 // architecture audit (F3, deferred items).
 
 import {
-  applyRegions,
+  makeStripper,
   scanBlockCommentNonNesting,
   scanCharLiteral,
   scanLineComment,
   scanRegularString,
   type Region,
+  type ScanResult,
 } from '@opensip-tools/core'
 
-interface Scan {
-  readonly stringRegions: Region[]
-  readonly commentRegions: Region[]
-}
-
 // eslint-disable-next-line sonarjs/cognitive-complexity -- C++ has the largest token-set among the C-family packs (line/block comments, raw strings with optional encoding prefix, regular strings with optional encoding prefix, char literals with five opener forms); splitting the dispatch into per-token helpers would force shared mutable state across them and hurt readability. Suppression measured: 37/15 cognitive-complexity at this writing.
-function scan(src: string): Scan {
+function scan(src: string): ScanResult {
   const stringRegions: Region[] = []
   const commentRegions: Region[] = []
   const len = src.length
@@ -197,14 +193,8 @@ function matchCharLiteralPrefix(src: string, i: number): number {
   return -1
 }
 
+const stripper = makeStripper(scan)
 /** Returns C/C++ source with every string-literal region blanked out. */
-export function stripStrings(content: string): string {
-  const { stringRegions } = scan(content)
-  return applyRegions(content, stringRegions)
-}
-
+export const stripStrings = stripper.stripStrings
 /** Returns C/C++ source with every string-literal AND comment region blanked out. */
-export function stripComments(content: string): string {
-  const { stringRegions, commentRegions } = scan(content)
-  return applyRegions(content, [...stringRegions, ...commentRegions])
-}
+export const stripComments = stripper.stripComments

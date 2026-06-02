@@ -10,21 +10,17 @@
 // (newlines preserved) so line/column positions remain stable.
 
 import {
-  applyRegions,
+  makeStripper,
   scanBlockCommentNonNesting,
   scanCharLiteral,
   scanLineComment,
   scanRegularString,
   type Region,
+  type ScanResult,
 } from '@opensip-tools/core'
 
-interface Scan {
-  readonly stringRegions: Region[]
-  readonly commentRegions: Region[]
-}
-
 // eslint-disable-next-line sonarjs/cognitive-complexity -- token-state-machine: cyclomatic complexity is inherent to lexer-style scanners; splitting hurts readability
-function scan(src: string): Scan {
+function scan(src: string): ScanResult {
   const stringRegions: Region[] = []
   const commentRegions: Region[] = []
   const len = src.length
@@ -94,14 +90,8 @@ function scan(src: string): Scan {
   return { stringRegions, commentRegions }
 }
 
+const stripper = makeStripper(scan)
 /** Replace string literal content with whitespace; preserves length. */
-export function stripStrings(content: string): string {
-  const { stringRegions } = scan(content)
-  return applyRegions(content, stringRegions)
-}
-
+export const stripStrings = stripper.stripStrings
 /** Replace string literals AND comments with whitespace; preserves length. */
-export function stripComments(content: string): string {
-  const { stringRegions, commentRegions } = scan(content)
-  return applyRegions(content, [...stringRegions, ...commentRegions])
-}
+export const stripComments = stripper.stripComments

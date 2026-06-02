@@ -36,6 +36,10 @@
  *  - `buildLineStarts` — precomputes a `lineStarts` index for a source
  *    string. Used by every parser to translate byte offsets into
  *    (line, column) pairs in O(log n) per lookup.
+ *  - `makeStripper` — template-method seam turning a language-specific
+ *    `scan` (a `ScanResult`) into the byte-identical
+ *    `{ stripStrings, stripComments }` pair. Mechanics live here; the
+ *    scanner stays in the adapter.
  *
  * These helpers live in core because:
  *   (a) they are language-agnostic by construction — no string-prefix
@@ -366,6 +370,32 @@ export function applyRegions(src: string, regions: readonly Region[]): string {
     }
   }
   return buf.join('');
+}
+
+/** Scanner→mechanics contract: a source's string + comment regions (the old per-pack `interface Scan`). */
+export interface ScanResult {
+  readonly stringRegions: Region[]
+  readonly commentRegions: Region[]
+}
+
+/** The `{ stripStrings, stripComments }` pair `makeStripper` returns. */
+export interface Stripper {
+  readonly stripStrings: (content: string) => string
+  readonly stripComments: (content: string) => string
+}
+
+/** Bind a language-specific `scan` to the shared strip mechanics (see file header). */
+export function makeStripper(scan: (src: string) => ScanResult): Stripper {
+  return {
+    stripStrings(content: string): string {
+      const { stringRegions } = scan(content)
+      return applyRegions(content, stringRegions)
+    },
+    stripComments(content: string): string {
+      const { stringRegions, commentRegions } = scan(content)
+      return applyRegions(content, [...stringRegions, ...commentRegions])
+    },
+  }
 }
 
 /**

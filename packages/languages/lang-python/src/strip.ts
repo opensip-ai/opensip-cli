@@ -28,12 +28,7 @@
 // `scanQuotedString(quoteChar)` into core; with one consumer it stays
 // here.
 
-import { applyRegions, type Region } from '@opensip-tools/core'
-
-interface Scan {
-  readonly stringRegions: Region[]
-  readonly commentRegions: Region[]
-}
+import { makeStripper, type Region, type ScanResult } from '@opensip-tools/core'
 
 // Allowed Python string prefixes (lowercase). Case-insensitivity is
 // handled at match time by lowercasing the candidate. Two-letter
@@ -189,7 +184,7 @@ function scanSingleString(
   return { contentStart, contentEnd: len, next: len }
 }
 
-function scan(src: string): Scan {
+function scan(src: string): ScanResult {
   const stringRegions: Region[] = []
   const commentRegions: Region[] = []
   const len = src.length
@@ -233,14 +228,8 @@ function scan(src: string): Scan {
   return { stringRegions, commentRegions }
 }
 
+const stripper = makeStripper(scan)
 /** Replace string literal content with whitespace; preserves length. */
-export function stripStrings(content: string): string {
-  const { stringRegions } = scan(content)
-  return applyRegions(content, stringRegions)
-}
-
+export const stripStrings = stripper.stripStrings
 /** Replace string literals AND comments with whitespace; preserves length. */
-export function stripComments(content: string): string {
-  const { stringRegions, commentRegions } = scan(content)
-  return applyRegions(content, [...stringRegions, ...commentRegions])
-}
+export const stripComments = stripper.stripComments

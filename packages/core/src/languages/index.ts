@@ -14,6 +14,7 @@ export { RECOGNIZED_NON_CODE_FORMATS, isRecognizedNonCodeFormat } from './non-co
 export {
   applyRegions,
   buildLineStarts,
+  makeStripper,
   scanBlockCommentNesting,
   scanBlockCommentNonNesting,
   scanCharLiteral,
@@ -23,6 +24,8 @@ export {
 export type {
   Region,
   RegStrResult,
+  ScanResult,
+  Stripper,
   ScanCharLiteralOptions,
   ScanCharLiteralResult,
   ScanCommentResult,
