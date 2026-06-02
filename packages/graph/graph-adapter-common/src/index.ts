@@ -49,4 +49,6 @@ export {
   type SynthesizeModuleInitParams,
   buildNameIndex,
   nameOf,
+  childrenOf,
+  namedChildrenOf,
 } from './walk.js';

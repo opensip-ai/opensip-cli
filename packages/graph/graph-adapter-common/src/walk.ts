@@ -31,7 +31,7 @@ import type {
   WalkInput,
   WalkOutput,
 } from '@opensip-tools/graph';
-import type Parser from 'tree-sitter';
+import type { Node } from 'web-tree-sitter';
 
 // ── output helpers ────────────────────────────────────────────────
 
@@ -170,8 +170,8 @@ export function synthesizeModuleInit<F extends TreeSitterParsedFile>(
 ): FunctionOccurrence {
   const { file, filePathProjectRel, inTestFile, definedInGenerated, digestSyntheticBody, qualifiedName } =
     params;
-  const root: Parser.SyntaxNode = file.tree.rootNode;
-  const topLevelText = root.children
+  const root: Node = file.tree.rootNode;
+  const topLevelText = childrenOf(root)
     .map((c) => file.source.slice(c.startIndex, c.endIndex))
     .join('\n');
   const digest = digestSyntheticBody(`${filePathProjectRel}\n${topLevelText}`);
@@ -206,9 +206,30 @@ export function synthesizeModuleInit<F extends TreeSitterParsedFile>(
  * function / method / class / impl nodes. Hoisted here so the four
  * adapters share one definition.
  */
-export function nameOf(node: Parser.SyntaxNode): string | null {
+export function nameOf(node: Node): string | null {
   const name = node.childForFieldName('name');
   return name ? name.text : null;
+}
+
+/**
+ * `node.children` with the nulls removed.
+ *
+ * web-tree-sitter types `.children` / `.namedChildren` as `(Node | null)[]`
+ * (a null slot is theoretically possible mid-iteration during an
+ * incremental re-parse). For our one-shot `parser.parse(src)` over a
+ * complete buffer the slots are always populated, but rather than scatter
+ * a defensive `if (child)` guard across every adapter's traversal loops we
+ * filter once here and hand back a clean `Node[]`. Keeping this in one
+ * place also means the (unreachable-for-us) null branch is covered by this
+ * package's tests instead of denting every adapter's branch coverage.
+ */
+export function childrenOf(node: Node): Node[] {
+  return node.children.filter((c): c is Node => c !== null);
+}
+
+/** `node.namedChildren` with the nulls removed. See {@link childrenOf}. */
+export function namedChildrenOf(node: Node): Node[] {
+  return node.namedChildren.filter((c): c is Node => c !== null);
 }
 
 // ── resolver helper ───────────────────────────────────────────────

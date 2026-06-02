@@ -10,24 +10,32 @@ import { createDiscover } from '../discover.js';
 import { isReturnValueDiscarded } from '../return-discarded.js';
 import {
   buildNameIndex,
+  childrenOf,
   makeFileClassifier,
+  namedChildrenOf,
   nameOf,
   record,
   synthesizeModuleInit,
 } from '../walk.js';
 
 import type { FunctionOccurrence } from '@opensip-tools/graph';
-import type Parser from 'tree-sitter';
+import type { Node } from 'web-tree-sitter';
 
-// Minimal fake of the tree-sitter `SyntaxNode` shape `isReturnValueDiscarded`
+// Minimal fake of the web-tree-sitter `Node` shape `isReturnValueDiscarded`
 // reads: it only ever inspects `.parent` and `.type`.
 const mk = (type: string, parent: unknown = null): never =>
   ({ type, parent }) as never;
 
 // Minimal fake of the node shape `nameOf` reads: only
 // `childForFieldName('name')` and the returned node's `.text`.
-const mkNameNode = (nameNode: { text: string } | null): Parser.SyntaxNode =>
+const mkNameNode = (nameNode: { text: string } | null): Node =>
   ({ childForFieldName: (f: string) => (f === 'name' ? nameNode : null) }) as never;
+
+// Minimal fake of the node shape `childrenOf` / `namedChildrenOf` read:
+// only `.children` / `.namedChildren` (which web-tree-sitter types as
+// `(Node | null)[]`).
+const mkParent = (children: unknown[], namedChildren: unknown[]): Node =>
+  ({ children, namedChildren }) as never;
 
 describe('skipToEndOfLine', () => {
   it('advances to the next newline', () => {
@@ -65,6 +73,36 @@ describe('nameOf', () => {
 
   it('returns null when there is no `name` field', () => {
     expect(nameOf(mkNameNode(null))).toBeNull();
+  });
+});
+
+describe('childrenOf / namedChildrenOf', () => {
+  // web-tree-sitter types `.children` / `.namedChildren` as `(Node | null)[]`.
+  // The helpers must drop nulls so adapters iterate a clean `Node[]`.
+  it('childrenOf filters out null slots', () => {
+    const a = { type: 'a' };
+    const b = { type: 'b' };
+    const parent = mkParent([a, null, b], []);
+    expect(childrenOf(parent)).toEqual([a, b]);
+  });
+
+  it('childrenOf returns all children when none are null', () => {
+    const a = { type: 'a' };
+    const parent = mkParent([a], []);
+    expect(childrenOf(parent)).toEqual([a]);
+  });
+
+  it('namedChildrenOf filters out null slots', () => {
+    const a = { type: 'a' };
+    const parent = mkParent([], [null, a, null]);
+    expect(namedChildrenOf(parent)).toEqual([a]);
+  });
+
+  it('namedChildrenOf returns all named children when none are null', () => {
+    const a = { type: 'a' };
+    const b = { type: 'b' };
+    const parent = mkParent([], [a, b]);
+    expect(namedChildrenOf(parent)).toEqual([a, b]);
   });
 });
 

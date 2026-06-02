@@ -28,7 +28,7 @@
     "@opensip-tools/core": "workspace:*",
     "@opensip-tools/graph": "workspace:*",
     "glob": "^13.0.0",
-    "tree-sitter": "0.25.0"
+    "web-tree-sitter": "0.25.10"
   },
   "devDependencies": {
     "@types/node": "^22.19.19",
