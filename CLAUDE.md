@@ -352,7 +352,7 @@ workspace root and the run would silently report 0 checks.
 
 ## Documentation
 
-The `docs/` tree has three committed siblings plus one local-only
+The `docs/` tree has five committed siblings plus one local-only
 scratch area, each with a distinct contract:
 
 - **`docs/public/`** — hand-edited source. These are the docs we publish
@@ -363,8 +363,20 @@ scratch area, each with a distinct contract:
   consumable.
 - **`docs/internal/`** — hand-edited, repo-only but committed.
   Contributor-facing awareness that doesn't belong on the website:
-  cross-repo consumer relationships, decision records, operational
-  notes. See `docs/internal/README.md` for the charter.
+  cross-repo consumer relationships, operational notes. See
+  `docs/internal/README.md` for the charter. (Formal decisions live in
+  `docs/decisions/`, not here.)
+- **`docs/decisions/`** — hand-edited, committed. The architecture
+  decision log (ADRs): the durable *why* behind a choice, with
+  alternatives and consequences. One file per `ADR-NNNN-*.md`,
+  **append-only** (supersede via a new ADR; never rewrite). This repo
+  uses `ADR-NNNN`; the parent `opensip` repo uses `DEC-NNN` — cite a
+  parent decision via `related: [DEC-NNN]`. See
+  `docs/decisions/README.md` and `docs/decisions/TEMPLATE.md`.
+- **`docs/specs/`** — hand-edited, committed. Forward-looking
+  implementation specs (the *how* to build a feature), following the
+  spec skill format; they gate planning before code. A spec implements
+  a decision recorded in `docs/decisions/`.
 - **`docs/web-generated/`** — generated output. Never hand-edit. It
   mirrors `docs/public/` rewritten for the website (links resolved to
   pinned GitHub URLs and root-relative website paths; `web:skip` /
@@ -373,15 +385,18 @@ scratch area, each with a distinct contract:
 - **`docs/plans/`** — local-only scratch space, **gitignored**.
   In-progress implementation plans and design notes that don't belong
   in a public OSS repo. Not committed; not visible to external
-  contributors. Anything that matures into a durable record (decision,
-  consumer contract, contributor convention) graduates into
-  `docs/internal/` or `docs/public/`.
+  contributors. Anything that matures into a durable record (decision →
+  `docs/decisions/`, spec → `docs/specs/`, consumer contract →
+  `docs/internal/`, reader-facing fact → `docs/public/`) graduates out
+  of `docs/plans/`.
 
-Boundary rule of thumb: if you can write the fact about opensip-tools
-without naming a specific consumer, it goes in `docs/public/`. If
-naming a specific consumer (or other private context) is load-bearing,
-it goes in `docs/internal/`. If it's pending work or design exploration
-that doesn't need to be visible to external readers, it stays in
+Boundary rule of thumb: a durable *decision* (what we chose + why, with
+alternatives) is an ADR in `docs/decisions/`; the *how to build it* is a
+spec in `docs/specs/`. For prose docs: if you can write the fact about
+opensip-tools without naming a specific consumer, it goes in
+`docs/public/`; if naming a specific consumer (or other private context)
+is load-bearing, it goes in `docs/internal/`; if it's pending work or
+design exploration not yet ready for external readers, it stays in
 `docs/plans/` (local-only).
 
 - **Generator:** `scripts/build-web-docs.mjs`
