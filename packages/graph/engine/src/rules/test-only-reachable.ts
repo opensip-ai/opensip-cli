@@ -11,15 +11,26 @@ import { approximateSuffix } from './_approximation.js';
 import { inferEntryPoints } from './_entry-points.js';
 import { defineRule } from './define-rule.js';
 
-import type { Indexes, Rule } from '../types.js';
+import type { FeatureTable, Indexes, Rule } from '../types.js';
 import type { Signal } from '@opensip-tools/core';
 
 export const testOnlyReachableRule = defineRule({
   slug: 'graph:test-only-reachable',
   defaultSeverity: 'warning',
-  evaluate({ catalog, indexes }): readonly Signal[] {
-    const productionEntries = computeProductionEntries(catalog, indexes);
-    const reachableFromProd = bfsReachable(productionEntries, indexes);
+  featureDeps: ['reachableOnlyFromTests'],
+  evaluate({ catalog, indexes, features }): readonly Signal[] {
+    // The reachableOnlyFromTests feature column folds the not-prod-reachable +
+    // has-callers + all-callers-in-test predicate. When features are absent
+    // (3/4-arg test calls), fall back to the local prod-reachability BFS — the
+    // canonical home is now pipeline/features.ts. Compute the fallback set
+    // ONLY when needed.
+    const reachableFromProd = features
+      ? undefined
+      : bfsReachable(computeProductionEntries(catalog, indexes), indexes);
+    const isTestOnly = (h: string): boolean =>
+      features
+        ? features.function.get(h)?.reachableOnlyFromTests === true
+        : computeTestOnlyLocal(h, indexes, reachableFromProd as ReadonlySet<string>);
     // Missing prod-caller edges on a fast catalog can fake "test-only".
     const caveat = approximateSuffix(catalog);
     const signals: Signal[] = [];
@@ -27,19 +38,10 @@ export const testOnlyReachableRule = defineRule({
       if (occ.kind === 'module-init') continue;
       if (occ.inTestFile) continue;                  // Tests-of-tests are fine.
       if (occ.definedInGenerated) continue;
-      if (reachableFromProd.has(occ.bodyHash)) continue;
-      const callers = indexes.callers.get(occ.bodyHash) ?? [];
-      if (callers.length === 0) continue;            // Orphan — covered by orphan rule.
-      // Reach via tests only? All callers must be in test files AND
-      // none of them can themselves be reachable from prod (covers
-      // the case of a test-helper called only by other test helpers).
-      const allTest = callers.every((h) => {
-        const c = indexes.byBodyHash.get(h);
-        return c?.inTestFile === true;
-      });
-      if (!allTest) continue;
+      if (!isTestOnly(occ.bodyHash)) continue;       // not-prod-reachable + all-test callers
       // Skip exports — they may be intentionally test-callable APIs.
       if (occ.visibility === 'exported') continue;
+      const callers = indexes.callers.get(occ.bodyHash) ?? [];
       signals.push(
         createSignal({
           source: 'graph',
@@ -59,6 +61,23 @@ export const testOnlyReachableRule = defineRule({
     return signals;
   },
 });
+
+/**
+ * Features-absent fallback for the `reachableOnlyFromTests` column: a function
+ * is test-only-reachable when it is NOT reachable from any production entry,
+ * HAS callers, and ALL of its callers live in test files. Byte-equivalent to
+ * the canonical computation in `pipeline/features.ts` (`isReachableOnlyFromTests`).
+ */
+function computeTestOnlyLocal(
+  hash: string,
+  indexes: Indexes,
+  reachableFromProd: ReadonlySet<string>,
+): boolean {
+  if (reachableFromProd.has(hash)) return false;
+  const callers = indexes.callers.get(hash) ?? [];
+  if (callers.length === 0) return false;
+  return callers.every((h) => indexes.byBodyHash.get(h)?.inTestFile === true);
+}
 
 function computeProductionEntries(catalog: Parameters<Rule['evaluate']>[0], indexes: Indexes): Set<string> {
   const out = new Set<string>();
