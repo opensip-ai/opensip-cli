@@ -102,10 +102,21 @@ for blast/SCC/coupling.
   Phase D spec must be reconciled against ADR-0001 before implementation.
 - **Rule slugs / `ruleId`s must stay byte-stable** through the `defineRule`
   refactor (baseline fingerprint identity).
-- **Known gap (decision pending):** `Rule.defaultSeverity` and
-  `GraphConfig.severityOverrides` are declared/loaded today but **never applied**
-  (each rule hardcodes its `createSignal` severity). The config-override story
-  this ADR relies on requires wiring this up; tracked as an open question.
+- **Decision (resolved 2026-06-02): wire the severity-override plumbing as an
+  opt-in clamp.** `Rule.defaultSeverity` and `GraphConfig.severityOverrides` are
+  declared/loaded today but **never applied** — each rule hardcodes its
+  `createSignal` severity (verified: four rules at `low`, `orphan-subtree` at
+  `medium`), while all declare `defaultSeverity: 'warning'`. Per the
+  zero-tech-debt principle this is fixed, not preserved — with a model chosen to
+  be **baseline-neutral by default**: the per-signal severity (the 4-level value
+  a rule emits, including Phase D's multi-band ladders) stays the **base**, and
+  `severityOverrides[slug]` is applied **only when explicitly set** (`error→high`,
+  `warning→medium`) to clamp a rule's emitted severity; `defaultSeverity` remains
+  metadata and the override's default. With no override configured, output is
+  byte-for-byte unchanged → no baseline / Code-Scanning churn (a naive
+  `defaultSeverity→severity` mapping would instead push the four `low` rules to
+  `medium` and churn the baseline — rejected). The wiring lands in **Phase D**
+  (which owns the severity model); Phase B stays identity-preserving.
 - Implemented in four phases (in-progress local plans under
   `docs/plans/specs/`): `01-recipe-substrate-hoist` → `02-graph-rules-symmetry`
   → `03-graph-feature-layer` → `04-graph-structural-rules`. Phase A is a
