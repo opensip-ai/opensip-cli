@@ -8,10 +8,12 @@
 /**
  * View 6 — "Strongly-connected components" (call-graph cycles).
  *
- * Runs Tarjan's SCC algorithm via `findSccs(indexes)`, filters
- * size ≥ 2, sorts by size descending, and renders the full set
- * inside the standard .section + .card shell with sortable headers
- * and pagination at 10 rows/page.
+ * Reads the engine-emitted `catalog.features.scc` rows (Plan C — the
+ * dashboard no longer runs its own Tarjan), filters size ≥ 2, sorts by
+ * size descending, and renders the full set inside the standard .section
+ * + .card shell with sortable headers and pagination at 10 rows/page.
+ * When the catalog carries no `scc` feature (a non-dashboard run) the
+ * view shows a no-data empty state.
  */
 
 export function dashboardViewSccsJs(): string {
@@ -34,8 +36,17 @@ views.push({
       container.appendChild(el('div', { class: 'empty', text: 'No catalog loaded.' }));
       return;
     }
-    const sccs = findSccs(indexes).filter(s => s.length >= 2);
-    sccs.sort((a, b) => b.length - a.length);
+    // SCCs come from the engine 'scc' feature (Plan C); the dashboard no
+    // longer runs its own Tarjan. Each row is { id, members, sccSize,
+    // crossesPackages }; we keep cycles (sccSize >= 2). Absent features ⇒
+    // no-data empty state (a default run does not materialize scc).
+    const sccFeatures = (catalog.features && catalog.features.scc) || null;
+    if (!sccFeatures) {
+      container.appendChild(el('div', { class: 'empty', text: 'No cycle data in this catalog. Re-run the graph for a dashboard to compute strongly-connected components.' }));
+      return;
+    }
+    const sccs = sccFeatures.filter(s => s.sccSize >= 2);
+    sccs.sort((a, b) => b.sccSize - a.sccSize);
     if (sccs.length === 0) {
       container.appendChild(el('div', { class: 'empty', text: 'No call-graph cycles found. The static call graph is a DAG.' }));
       return;
@@ -51,13 +62,13 @@ views.push({
     table.appendChild(thead);
     const tbody = el('tbody');
     for (const scc of sccs) {
-      const members = scc.map(h => indexes.byBodyHash.get(h)).filter(Boolean);
+      const members = scc.members.map(h => indexes.byBodyHash.get(h)).filter(Boolean);
       const previewNames = members.slice(0, 5).map(m => displayName(m.simpleName));
       const previewMore = members.length > 5 ? ', ...' + (members.length - 5) + ' more' : '';
       const previewText = previewNames.join(', ') + previewMore;
       const pkgs = Array.from(new Set(members.map(m => pkgOf(m)))).sort();
       const tr = el('tr', { class: 'clickable', 'data-body-hash': members[0] ? members[0].bodyHash : '' });
-      tr.appendChild(el('td', { text: String(scc.length) }));
+      tr.appendChild(el('td', { text: String(scc.sccSize) }));
       tr.appendChild(el('td', { text: previewText }));
       tr.appendChild(el('td', { text: pkgs.join(', ') }));
       tbody.appendChild(tr);

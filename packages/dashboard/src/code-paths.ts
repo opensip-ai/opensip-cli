@@ -27,7 +27,6 @@ import { dashboardFunctionRowJs } from './code-paths/function-row.js';
 import { dashboardHelpDrawerJs } from './code-paths/help-drawer.js';
 import { dashboardIndexesJs } from './code-paths/indexes.js';
 import { dashboardPathUtilsJs } from './code-paths/path-utils.js';
-import { dashboardSccJs } from './code-paths/scc.js';
 import { dashboardSearchJs } from './code-paths/search.js';
 import { dashboardTraceJs } from './code-paths/trace.js';
 import { dashboardViewBigJs } from './code-paths/view-big.js';
@@ -78,23 +77,22 @@ const RESTRUCTURED_EXPLORE_TABS = false;
  *                        (declared in generator.ts before the script
  *                        block).
  *  5. trace            — declares `findUpstreamTrace`. Uses `indexes`.
- *  6. scc              — declares `findScc`. Uses `indexes`.
- *  7. search           — declares `searchFunctions`. Uses `indexes`,
+ *  6. search           — declares `searchFunctions`. Uses `indexes`,
  *                        `displayName`.
- *  8. function-row     — declares `renderFunctionRows` and the empty
+ *  7. function-row     — declares `renderFunctionRows` and the empty
  *                        states it uses. Calls `el`, `displayName`,
  *                        `packageOfPath`, `passesFilter`.
- *  9. function-card    — declares `openFunctionCard`, `closeFunctionCard`.
+ *  8. function-card    — declares `openFunctionCard`, `closeFunctionCard`.
  *                        Uses `editorLink`, `findUpstreamTrace`, `el`.
- * 10. views-registry   — declares the singleton `views = []` array.
+ *  9. views-registry   — declares the singleton `views = []` array.
  *                        Must come before any view emitter.
- * 11. help-drawer      — declares `openHelpDrawer`. No external deps
+ * 10. help-drawer      — declares `openHelpDrawer`. No external deps
  *                        beyond `el`.
- * 12-18. view-*        — push View descriptors into `views`. Each
+ * 11-17. view-*        — push View descriptors into `views`. Each
  *                        renderer closes over `el`, `passesFilter`,
  *                        `displayName`, `packageOfPath`,
  *                        `renderFunctionRows`, plus its own utilities.
- * 19. panelOrchestrator — top-level `renderCodePathsTab`,
+ * 18. panelOrchestrator — top-level `renderCodePathsTab`,
  *                        `renderCodePathsExplore`, `openCodePathsSession`.
  *                        Uses every name above plus `renderSubtabBar`
  *                        (from shared/) and `registerTabActivator`.
@@ -118,7 +116,6 @@ export function dashboardCodePathsJs(restructured: boolean = RESTRUCTURED_EXPLOR
     dashboardFiltersJs(),
     dashboardEditorLinkJs(),
     dashboardTraceJs(),
-    dashboardSccJs(),
     dashboardSearchJs(),
     dashboardFunctionRowJs(),
     dashboardFunctionCardJs(),

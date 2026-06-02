@@ -11,7 +11,6 @@ import { dashboardFiltersJs } from '../code-paths/filters.js';
 import { dashboardFunctionRowJs } from '../code-paths/function-row.js';
 import { dashboardIndexesJs } from '../code-paths/indexes.js';
 import { dashboardPathUtilsJs } from '../code-paths/path-utils.js';
-import { dashboardSccJs } from '../code-paths/scc.js';
 import { dashboardViewSccsJs } from '../code-paths/view-sccs.js';
 import { dashboardViewsRegistryJs } from '../code-paths/views-registry.js';
 
@@ -50,7 +49,6 @@ return { views, graphCatalog, graphIndexes, filterState };
       + dashboardIndexesJs()
       + dashboardViewsRegistryJs()
       + dashboardFiltersJs()
-      + dashboardSccJs()
       + dashboardFunctionRowJs()
       + dashboardViewSccsJs()
       + tail,
@@ -89,6 +87,21 @@ describe('View 6 — SCCs', () => {
           calls: [{ to: ['b'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'b()' }] })],
         b: [makeOcc({ bodyHash: 'b', simpleName: 'b' })],
       },
+      // Engine emitted an scc feature with no size-≥2 components ⇒ DAG empty state.
+      features: { scc: [] },
+    };
+    const env = loadEnv(catalog);
+    const c = document.createElement('div');
+    env.views.find(v => v.id === 'sccs')!.render(c, env.graphCatalog, env.graphIndexes, env.filterState);
+    expect(c.querySelector('.empty')).not.toBeNull();
+  });
+
+  it('shows the no-data empty state when the catalog carries no scc feature', () => {
+    const catalog: GraphCatalog = {
+      version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now',
+      functions: {
+        a: [makeOcc({ bodyHash: 'a', simpleName: 'a' })],
+      },
     };
     const env = loadEnv(catalog);
     const c = document.createElement('div');
@@ -105,6 +118,8 @@ describe('View 6 — SCCs', () => {
         b: [makeOcc({ bodyHash: 'b', simpleName: 'b', filePath: 'packages/contracts/src/b.ts',
           calls: [{ to: ['a'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'a()' }] })],
       },
+      // The engine 'scc' feature carries the 2-cycle; the view reads it directly.
+      features: { scc: [{ id: 'scc:a', members: ['a', 'b'], sccSize: 2, crossesPackages: true }] },
     };
     const env = loadEnv(catalog);
     const c = document.createElement('div');
