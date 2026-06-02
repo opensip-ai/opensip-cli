@@ -4,7 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [2.5.0] — 2026-06-01
+## [2.5.1] — 2026-06-02
+
+> **Note:** `2.5.0` was never a coordinated release. Only
+> `@opensip-tools/graph-adapter-common@2.5.0` was published — by the one-time
+> trusted-publisher bootstrap that establishes a brand-new package name on npm
+> (predating the consolidation work below). npm versions are immutable, so that
+> stub can't be overwritten; `2.5.1` is the first complete, coordinated publish
+> of everything in this entry.
 
 ### Added
 
@@ -37,14 +44,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   actionable, precise, and bounded — rankings/metrics are dashboard insights,
   not gate signals. `graph:orphan-subtree` was sharpened (twin-aware
   reachability + barrel/visibility precision) from 45 false positives to zero;
-  `no-side-effect-path` / `always-throws-branch` / `test-only-reachable` are
-  unchanged.
+  `no-side-effect-path` now skips void-returning functions (a discarded return
+  value is vacuous for them) and `always-throws-branch` skips test-file
+  occurrences (intentional `expect(...).toThrow()` fixtures), eliminating their
+  remaining false positives; `test-only-reachable` is unchanged.
 - **Blast radius is now a dashboard insight, not a gate rule.** The Hot
   Functions view ranks by the composite blast score (`direct + 0.5 ×
   transitive`); the engine no longer emits per-function blast warnings.
 - **Duplicated code consolidated into shared homes:** language comment/string
   stripping → `@opensip-tools/core` `makeStripper`; plugin-discovery
-  primitives → core; check-pack path/display helpers → the fitness engine.
+  primitives → core; check-pack path/display helpers → the fitness engine;
+  tree-sitter adapter helpers (`nameOf`, `skipBlockComment`,
+  `isReturnValueDiscarded`) → `@opensip-tools/graph-adapter-common`; the
+  `isIdentChar` predicate → core. Surfaced by `graph:duplicated-function-body`
+  itself (cross-package duplicate findings 16 → 12; the remainder are
+  intentional per-package twins).
 - **The "update available" notice persists across runs** until you upgrade,
   instead of showing once and disappearing.
 
@@ -88,6 +102,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   (last-writer-wins) collapse, erasing a losing twin's out-edges, so
   `orphan-subtree` / `test-only-reachable` BFS'd over a lossy graph. It now
   unions edges per occurrence (ADR-0003).
+- **The default/interactive `graph` run now honors the project `graph:` config
+  block.** The Ink live-view path built the catalog without loading config, so
+  bare `graph` / `graph --verbose` silently used rule defaults while
+  `graph --json` (and the gate/report paths) honored the project's `graph:`
+  settings. The two disagreed (e.g. `duplicated-function-body` counts), and a
+  developer's local view diverged from what CI's gate recorded. The config is
+  now loaded once at the dispatch seam and threaded into both paths.
 
 ## [2.4.1] — 2026-06-01
 

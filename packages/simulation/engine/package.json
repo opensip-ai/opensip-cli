@@ -1,6 +1,6 @@
 {
   "name": "@opensip-tools/simulation",
-  "version": "2.5.0",
+  "version": "2.5.1",
   "license": "MIT",
   "description": "Simulation scenarios for OpenSIP Tools",
   "repository": {

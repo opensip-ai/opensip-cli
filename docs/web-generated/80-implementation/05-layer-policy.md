@@ -20,7 +20,7 @@ The five-layer package graph (core → datastore/contracts → tools/libraries/a
 
 For the conceptual layer narrative, see [`../10-concepts/03-modular-monolith.md`](/docs/opensip-tools/10-concepts/03-modular-monolith/).
 
-The literal rules are at [`.dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-tools/blob/v2.5.0/.dependency-cruiser.cjs).
+The literal rules are at [`.dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-tools/blob/v2.5.1/.dependency-cruiser.cjs).
 
 ---
 
