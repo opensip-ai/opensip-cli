@@ -1,3 +1,10 @@
+// DEPRECATED — scheduled for removal with Plan D (graph-structural-rules).
+// The standalone "Cycles / SCCs" tab is folded into the graph topology view
+// as the "Highlight cycles" toggle (view-graph.ts); the server-side SCC code
+// (graph-scc.ts / graph-view-model.ts) is RETAINED. Still concatenated only by
+// the legacy branch of dashboardCodePathsJs (the Plan B default,
+// RESTRUCTURED_EXPLORE_TABS = false). Deleted when Plan D flips that flag and
+// drops the legacy branch. See docs/plans/ready/graph-rules-symmetry/phase-4.
 /**
  * View 6 — "Strongly-connected components" (call-graph cycles).
  *

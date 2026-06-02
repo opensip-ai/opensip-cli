@@ -1,3 +1,9 @@
+// DEPRECATED — scheduled for removal with Plan D (graph-structural-rules).
+// Single-metric ranked tab folded into the ranked-distribution "Functions"
+// affordance (view-distribution.ts) and the rule findings surface. Still
+// concatenated only by the legacy branch of dashboardCodePathsJs (the Plan B
+// default, RESTRUCTURED_EXPLORE_TABS = false). Deleted when Plan D flips that
+// flag and drops the legacy branch. See docs/plans/ready/graph-rules-symmetry/phase-4.
 /**
  * View 5 — "Untested production code".
  *
