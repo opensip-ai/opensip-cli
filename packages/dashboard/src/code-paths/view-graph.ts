@@ -204,7 +204,45 @@ function gvRenderLayoutSelector(host) {
       bar.appendChild(btn);
     })(GV_LAYOUTS[i]);
   }
+  // SCC-highlight toggle (folds the former standalone "Cycles / SCCs" view
+  // into the topology view — cycles are best *seen* on the node-link graph).
+  // When on, cycle members + cycle edges are emphasized and the acyclic
+  // remainder is dimmed, so mutually-recursive clusters pop out.
+  var sccBtn = el('button', {
+    class: 'code-paths-graph-layout-btn code-paths-graph-scc-btn' + (gvSccHighlight ? ' active' : ''),
+    'data-scc-toggle': '1',
+    text: 'Highlight cycles',
+    onclick: function() {
+      gvSccHighlight = !gvSccHighlight;
+      sccBtn.classList.toggle('active', gvSccHighlight);
+      gvApplySccHighlight();
+    },
+  });
+  bar.appendChild(sccBtn);
   host.appendChild(bar);
+}
+
+// Emphasize strongly-connected (cyclic) clusters on the live graph. A node
+// is "in a cycle" when it carries an sccId; an edge when isCycleEdge is set.
+// Toggling off clears the emphasis. Reads the same SCC facets the projector
+// already attached to the view-model (graph-view-model.ts) — no second
+// Tarjan pass in the browser.
+var gvSccHighlight = false;
+
+function gvApplySccHighlight() {
+  if (!gvCy) return;
+  gvCy.batch(function() {
+    gvCy.elements().removeClass('gv-scc-member gv-scc-edge gv-scc-dimmed');
+    if (!gvSccHighlight) return;
+    gvCy.nodes().forEach(function(n) {
+      if (n.data('sccId')) n.addClass('gv-scc-member');
+      else n.addClass('gv-scc-dimmed');
+    });
+    gvCy.edges().forEach(function(ed) {
+      if (ed.data('isCycleEdge')) ed.addClass('gv-scc-edge');
+      else ed.addClass('gv-scc-dimmed');
+    });
+  });
 }
 
 // Breadth-first reach set over one of the graphIndexes adjacency maps
@@ -309,6 +347,7 @@ views.push({
       { heading: 'Why you care', body: 'The seven table views project the graph into rankings and lists. This view shows topology directly — hub functions, tightly cyclic clusters, disconnected islands, and the upstream/downstream radius around a node — which is work to reconstruct from a table.' },
       { heading: 'How to read it', body: 'Node shape encodes kind (diamond=constructor, hexagon=module-init, rounded=method). Border style encodes visibility (solid=exported, dotted=module-local, dashed=private). Edge style encodes call resolution; faded edges are low-confidence. Use the layout selector to switch between layered (dagre), force (cose), and hierarchical (breadthfirst).' },
       { heading: 'What to do', body: 'Pan and zoom to explore. The filter chips above the view tab bar cull nodes here exactly as they cull rows in the table views. Type in the search box to center and highlight a node; non-matches fade. Click a node to trace its upstream/downstream impact.' },
+      { heading: 'Cycles / SCCs', body: 'Strongly-connected components are groups of functions that can all reach each other through call edges (found via Tarjan’s algorithm). Click "Highlight cycles" in the toolbar to emphasize cycle members and cycle edges while dimming the acyclic remainder. Size-2 cycles (direct mutual recursion) are usually fine; larger cycles — especially spanning multiple packages — are a layering smell. Break a cycle by extracting the shared protocol into a third place both sides depend on, or by inverting one call into a callback/event.' },
     ],
   },
   render(container, catalog, indexes, filterState) {
@@ -378,6 +417,9 @@ views.push({
     });
     gvCy.__gvEscHandler = function(e) { if (e.key === 'Escape') gvClearImpact(); };
     document.addEventListener('keydown', gvCy.__gvEscHandler);
+
+    // Re-apply the cycle emphasis if the toggle was left on across a re-render.
+    gvApplySccHighlight();
   },
   onActivate() {
     // The canvas needs a measured size before fit() — defer one frame so

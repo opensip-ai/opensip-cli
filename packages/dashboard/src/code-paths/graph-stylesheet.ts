@@ -93,6 +93,21 @@ export function dashboardViewGraphStylesheetJs(): string {
       selector: '.gv-dimmed',
       style: { 'opacity': 0.1 },
     },
+    // SCC-highlight toggle (folded-in "Cycles / SCCs" affordance). Cycle
+    // members get a bright accent fill; cycle edges turn red and thicken;
+    // the acyclic remainder fades so mutually-recursive clusters stand out.
+    {
+      selector: 'node.gv-scc-member',
+      style: { 'background-color': '#d46a6a', 'border-color': '#fff', 'border-width': 3, 'opacity': 1 },
+    },
+    {
+      selector: 'edge.gv-scc-edge',
+      style: { 'line-color': '#d46a6a', 'target-arrow-color': '#d46a6a', 'width': 2, 'opacity': 1 },
+    },
+    {
+      selector: '.gv-scc-dimmed',
+      style: { 'opacity': 0.08 },
+    },
   ];
 }`;
 }
