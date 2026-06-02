@@ -1,6 +1,6 @@
 {
   "name": "@opensip-tools/lang-java",
-  "version": "2.4.1",
+  "version": "2.4.2",
   "license": "MIT",
   "description": "Java language adapter for opensip-tools",
   "repository": {

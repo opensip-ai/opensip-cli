@@ -1,6 +1,6 @@
 {
   "name": "@opensip-tools/graph",
-  "version": "2.4.1",
+  "version": "2.4.2",
   "license": "MIT",
   "description": "Static call-graph + dead-end analysis (six-stage staged pipeline)",
   "repository": {

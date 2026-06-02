@@ -4,6 +4,34 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.4.2] — 2026-06-01
+
+### Fixed
+
+- **The graph PACKAGE COUPLING grid now follows the real import graph.** It
+  previously showed cross-package call edges that are impossible as imports
+  (`core→fitness`, `fitness→cli`, `cli-ui→fitness`, …) — call-graph
+  attribution artifacts, not real coupling. Two root causes are addressed:
+  (1) a call edge's target is a content `bodyHash`, so functions with
+  identical bodies in different packages collapsed to one occurrence and
+  mis-attributed the callee's package — fixed with an `occurrencesByHash`
+  index and a deterministic, package-aware `resolveCallee` (caller's own
+  package → a package its module imports → lowest qualified name), mirrored in
+  the dashboard's coupling view; and (2) name-based resolution
+  (`resolveByCatalogFallback`, cross-shard recovery) linked a call to a
+  globally-unique name in a package the caller never imports — fixed with a
+  mode-agnostic post-resolution pass (`constrainCrossPackageEdges`) that drops
+  name-guessed edges (resolution `unknown`/`dynamic-string`/`syntactic`) whose
+  target isn't reachable from the caller, while leaving type-checker-backed
+  edges untouched. The import set is derived from each module's `dependencies`
+  specifiers (the resolved targets are empty for workspace imports, which
+  point at built `dist/`). No-op in `fast` mode and non-monorepo repos.
+
+### Changed
+
+- **The "update available" notice persists across runs** until you upgrade,
+  instead of showing once and disappearing.
+
 ## [2.4.1] — 2026-06-01
 
 ### Changed
