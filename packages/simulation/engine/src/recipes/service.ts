@@ -14,7 +14,7 @@
  * RunnableScenario; recipes layer above that.
  */
 
-import { logger } from '@opensip-tools/core';
+import { logger, resolveSelector as resolveSelectorCore, type ResolveSelectorOptions } from '@opensip-tools/core';
 
 import { currentScenarioRegistry } from '../framework/registry.js';
 
@@ -112,33 +112,43 @@ export class SimulationRecipeService {
 function resolveSelector(selector: ScenarioSelector): readonly RunnableScenario[] {
   const all = currentScenarioRegistry().getAll();
 
-  switch (selector.type) {
-    case 'all': {
-      const exclude = new Set(selector.exclude);
-      return all.filter((s) => !exclude.has(s.id) && !exclude.has(s.name));
-    }
-    case 'explicit': {
-      const wanted = new Set(selector.scenarioIds);
-      return all.filter((s) => wanted.has(s.id) || wanted.has(s.name));
-    }
-    case 'tags': {
-      const include = new Set(selector.include);
-      const exclude = new Set(selector.exclude);
-      return all.filter(
-        (s) =>
-          s.tags.some((t) => include.has(t)) &&
-          !exclude.has(s.id) &&
-          !exclude.has(s.name),
-      );
-    }
-    case 'kind': {
-      const kinds = new Set(selector.kinds);
-      const exclude = new Set(selector.exclude);
-      return all.filter(
-        (s) => kinds.has(s.kind) && !exclude.has(s.id) && !exclude.has(s.name),
-      );
-    }
-  }
+  // Sim's selection semantics are id/name-literal everywhere (no glob, no
+  // per-unit config) and its `tags`/`kind` exclude on id/name rather than
+  // tags — all of which differ from core's tag/glob built-in arms. So sim
+  // supplies a predicate for every arm; core's role is the generic
+  // `items.filter(predicate)` dispatch plus the exhaustive-unknown guard,
+  // and it never has to name `ScenarioKind`. Registration order is preserved
+  // by `filter`, matching the previous hand-rolled switch byte-for-byte.
+  const opts: ResolveSelectorOptions<RunnableScenario, ScenarioSelector> = {
+    keysOf: (s) => [s.id, s.name],
+    tagsOf: (s) => s.tags,
+    predicates: {
+      all: (s, sel) => {
+        if (sel.type !== 'all') return false;
+        const exclude = new Set(sel.exclude);
+        return !exclude.has(s.id) && !exclude.has(s.name);
+      },
+      explicit: (s, sel) => {
+        if (sel.type !== 'explicit') return false;
+        const wanted = new Set(sel.scenarioIds);
+        return wanted.has(s.id) || wanted.has(s.name);
+      },
+      tags: (s, sel) => {
+        if (sel.type !== 'tags') return false;
+        const include = new Set(sel.include);
+        const exclude = new Set(sel.exclude);
+        return s.tags.some((t) => include.has(t)) && !exclude.has(s.id) && !exclude.has(s.name);
+      },
+      kind: (s, sel) => {
+        if (sel.type !== 'kind') return false;
+        const kinds = new Set(sel.kinds);
+        const exclude = new Set(sel.exclude);
+        return kinds.has(s.kind) && !exclude.has(s.id) && !exclude.has(s.name);
+      },
+    },
+  };
+
+  return resolveSelectorCore(selector, all, opts);
 }
 
 // =============================================================================

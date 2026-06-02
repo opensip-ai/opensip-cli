@@ -39,7 +39,16 @@ export interface KindScenarioSelector {
   readonly exclude?: readonly string[];
 }
 
-/** Union of every scenario-selector shape used by recipes. */
+/**
+ * Union of every scenario-selector shape used by recipes.
+ *
+ * The `explicit` / `all` / `tags` arms mirror `@opensip-tools/core`'s
+ * `RecipeSelector` shape (keeping sim's historical `scenarioIds` field on
+ * `explicit`); `kind` is a sim-only arm. Resolution delegates to core's
+ * `resolveSelector` via per-arm predicates (see `service.ts`) — sim's
+ * id/name-keyed exclude semantics differ from core's tag/glob built-ins, so
+ * every arm is supplied as a predicate and core never names `ScenarioKind`.
+ */
 export type ScenarioSelector =
   | ExplicitScenarioSelector
   | AllScenarioSelector
