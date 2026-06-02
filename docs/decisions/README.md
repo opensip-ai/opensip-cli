@@ -47,6 +47,9 @@ distinct from:
 - [ADR-0003](./ADR-0003-per-occurrence-edge-keying.md) — A body hash is not an
   occurrence identity: edges (shipped 2.4.2) and reachability adjacency (pending)
   key per occurrence, never the `byBodyHash` winner (body-twin de-union)
+- [ADR-0004](./ADR-0004-opt-in-opentelemetry.md) — Opt-in OpenTelemetry: env-var
+  gate, `@opentelemetry/api` in `core` / SDK only in `cli`, tools instrument via
+  the `withSpan` seam (migrated from `docs/internal/decisions/`)
 
 ### Superseded
 

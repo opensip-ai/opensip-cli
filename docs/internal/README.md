@@ -7,14 +7,14 @@ That distinction matters because the website is the curated story we tell extern
 ## What belongs here
 
 - **`consumers/`** — known downstream consumers of opensip-tools, what they depend on, what contract they expect us to honor, and any operational nits relevant to releases. Naming a specific consumer is load-bearing — that's why these docs aren't public.
-- **`decisions/`** — architectural decision records (ADRs / DECs). One file per decision. Decisions live forever; superseded ones get marked Status: Superseded rather than deleted.
 - **Operational notes** — runbooks, incident postmortems, contributor-only conventions that don't make sense out of context.
 
 ## What does NOT belong here
 
 - **Anything user-facing** — quick-start, API surfaces, configuration reference. That goes in `docs/public/`.
 - **Anything reader-friendly without context** — if a stranger to the project would learn something from it, it's probably public.
-- **Implementation plans for pending work** — those go in `docs/plans/`. Internal decisions record what was *decided*; plans describe what *will be done*.
+- **Formal architecture decisions (ADRs)** — those live in `docs/decisions/` (the append-only `ADR-NNNN` log), *not* here. This directory holds operational color and consumer context, not the decision log.
+- **Implementation plans for pending work** — those go in `docs/plans/`. ADRs in `docs/decisions/` record what was *decided*; plans describe what *will be done*.
 - **Generated output** — nothing in here is auto-generated. If a tool produces it, the tool puts it elsewhere.
 
 ## Boundary rule of thumb
@@ -45,5 +45,3 @@ status: current | superseded | draft
 last_verified: YYYY-MM-DD
 ---
 ```
-
-`decisions/` files additionally carry `decision_date`, `supersedes`, `superseded_by` as applicable.
