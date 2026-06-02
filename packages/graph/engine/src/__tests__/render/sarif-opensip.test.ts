@@ -199,13 +199,18 @@ describe('renderSarifOpenSip — Plan D rules level mapping + multi-language', (
   it('a Python and a TypeScript occurrence of the same rule produce identical SARIF shape', () => {
     const ts = newRuleSignal({ slug: 'graph:large-function', mappedId: 'graph.complexity.large-function', severity: 'high', expectedLevel: 'error', filePath: 'src/x.ts' });
     const py = { ...ts, filePath: 'src/x.py', code: { file: 'src/x.py', line: 10, column: 0 } };
-    const parse = (s: Signal) => JSON.parse(renderSarifOpenSip([s], CONTEXT)) as {
-      runs: { results: { ruleId: string; level: string }[] }[];
-    };
-    const rTs = parse(ts).runs[0].results[0];
-    const rPy = parse(py).runs[0].results[0];
+    const rTs = firstResult(ts);
+    const rPy = firstResult(py);
     // Band logic is language-agnostic: same ruleId + level regardless of path.
     expect(rPy.ruleId).toBe(rTs.ruleId);
     expect(rPy.level).toBe(rTs.level);
   });
 });
+
+/** Render one signal and return its single SARIF result. */
+function firstResult(signal: Signal): { ruleId: string; level: string } {
+  const parsed = JSON.parse(renderSarifOpenSip([signal], CONTEXT)) as {
+    runs: { results: { ruleId: string; level: string }[] }[];
+  };
+  return parsed.runs[0].results[0];
+}

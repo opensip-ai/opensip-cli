@@ -45,9 +45,10 @@ import type { Signal } from '@opensip-tools/core';
 const DEFAULT_MIN_LINES = 5;
 const DEFAULT_MIN_BODY_SIZE = 200;
 const DEFAULT_MIN_CROSS_PACKAGE_PACKAGES = 3;
+const SLUG = 'graph:duplicated-function-body';
 
 export const duplicatedFunctionBodyRule = defineRule({
-  slug: 'graph:duplicated-function-body',
+  slug: SLUG,
   defaultSeverity: 'warning',
   featureDeps: ['bodyLines'],
   evaluate({ catalog, config, features }): readonly Signal[] {
@@ -74,9 +75,9 @@ export const duplicatedFunctionBodyRule = defineRule({
       signals.push(
         createSignal({
           source: 'graph',
-          severity: applySeverityOverride('low', 'graph:duplicated-function-body', config),
+          severity: applySeverityOverride('low', SLUG, config),
           category: 'quality',
-          ruleId: 'graph:duplicated-function-body',
+          ruleId: SLUG,
           message: `This body is duplicated across ${String(packages.length)} packages (${packages.join(', ')}) in ${String(occs.length)} occurrences — hoist it into a shared package.`,
           code: { file: anchor.filePath, line: anchor.line, column: anchor.column },
           suggestion:
@@ -107,9 +108,9 @@ export const duplicatedFunctionBodyRule = defineRule({
         signals.push(
           createSignal({
             source: 'graph',
-            severity: applySeverityOverride('low', 'graph:duplicated-function-body', config),
+            severity: applySeverityOverride('low', SLUG, config),
             category: 'quality',
-            ruleId: 'graph:duplicated-function-body',
+            ruleId: SLUG,
             message: `${occ.simpleName} has the same body as ${primary.qualifiedName} (${primary.filePath}:${String(primary.line)}).`,
             code: { file: occ.filePath, line: occ.line, column: occ.column },
             suggestion:

@@ -19,8 +19,14 @@ import { unexpectedCouplingRule } from '../../rules/unexpected-coupling.js';
 import { makeCatalog, occ } from './_helpers.js';
 
 import type { FeatureTable, GraphConfig, PackageEdgeFeature, SccFeatures } from '../../types.js';
+import type { Signal } from '@opensip-tools/core';
 
 const EMPTY: GraphConfig = {};
+
+/** A baseline-fingerprint stand-in over (ruleId, file, line). */
+function fingerprint(s: Signal): string {
+  return `${s.ruleId}|${s.code?.file ?? ''}|${String(s.code?.line ?? '')}`;
+}
 
 function featureTable(over: Partial<FeatureTable>): FeatureTable {
   return { function: new Map(), package: new Map(), scc: [], edge: [], ...over };
@@ -162,8 +168,8 @@ describe('graph:cycle ↔ graph:unexpected-coupling non-overlap', () => {
     expect(cycleSignals).toHaveLength(1);
     expect(couplingSignals).toHaveLength(1);
 
-    const c = cycleSignals[0]!;
-    const u = couplingSignals[0]!;
+    const c = cycleSignals[0];
+    const u = couplingSignals[0];
 
     // Distinct ruleIds → distinct fingerprints even at the same altitude.
     expect(c.ruleId).toBe('graph:cycle');
@@ -175,8 +181,7 @@ describe('graph:cycle ↔ graph:unexpected-coupling non-overlap', () => {
     expect(u.metadata.relatedSccCount).toBe(1);
 
     // A fingerprint over (ruleId, file, line) differs.
-    const fp = (s: typeof c) => `${s.ruleId}|${s.code?.file ?? ''}|${String(s.code?.line ?? '')}`;
-    expect(fp(c)).not.toBe(fp(u));
+    expect(fingerprint(c)).not.toBe(fingerprint(u));
   });
 
   it('both rules return [] for an empty catalog', () => {
