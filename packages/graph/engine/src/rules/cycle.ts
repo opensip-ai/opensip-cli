@@ -1,0 +1,117 @@
+/**
+ * graph:cycle — flag call-graph cycles (strongly-connected components of size
+ * ≥ 2) at function/SCC granularity. Reads the `scc` feature column (Phase C's
+ * Tarjan; NO in-rule cycle detection). Bounded + actionable per ADR-0001: the
+ * count reaches zero when every cycle is broken; the fix is "invert one
+ * dependency or extract the shared piece."
+ *
+ * Severity ladder (defaults from the dashboard's former SCCs view,
+ * `view-sccs.ts`: "size 2 usually fine; size 3+ spanning packages is a layering
+ * smell"):
+ *   - `sccSize === 1`         → no signal (not a cycle).
+ *   - `crossesPackages`       → base `high` (regardless of size — cross-package
+ *                               cycles are the most expensive to unwind; they
+ *                               win the ladder).
+ *   - `sccSize === 2`         → `config.cycleSize2Severity` (default `'off'` →
+ *                               no signal; `'low'` → base `low`).
+ *   - `sccSize >= cycleMinSize` (default 3) → base `medium`.
+ *
+ * One signal PER SCC (not per member) — anchored on the lowest-`qualifiedName`
+ * member occurrence so a single tangle never produces N findings. This is the
+ * function/SCC-granularity de-dup counterpart to `unexpected-coupling`'s
+ * package granularity (distinct `ruleId` + `code` → distinct fingerprints,
+ * cross-linked via metadata).
+ *
+ * Emitted severity routes through the opt-in `applySeverityOverride` clamp
+ * (ADR-0005).
+ */
+
+import { createSignal } from '@opensip-tools/core';
+
+import { applySeverityOverride } from './_severity-override.js';
+import { defineRule } from './define-rule.js';
+
+import type { FunctionOccurrence, Indexes, SccFeatures } from '../types.js';
+import type { Signal, SignalSeverity } from '@opensip-tools/core';
+
+const DEFAULT_CYCLE_MIN_SIZE = 3;
+
+export const cycleRule = defineRule({
+  slug: 'graph:cycle',
+  defaultSeverity: 'warning',
+  featureDeps: ['scc'],
+  evaluate({ indexes, config, features }): readonly Signal[] {
+    // Absent feature table → emit nothing (SCC detection is Phase C's job;
+    // no in-rule Tarjan).
+    if (!features) return [];
+    const minSize = config.cycleMinSize ?? DEFAULT_CYCLE_MIN_SIZE;
+    const size2 = config.cycleSize2Severity ?? 'off';
+
+    const signals: Signal[] = [];
+    for (const scc of features.scc) {
+      const base = bandFor(scc, minSize, size2);
+      if (base === undefined) continue;
+      const anchor = anchorOccurrence(scc, indexes);
+      /* v8 ignore next */
+      if (!anchor) continue;
+      signals.push(
+        createSignal({
+          source: 'graph',
+          severity: applySeverityOverride(base, 'graph:cycle', config),
+          category: 'architecture',
+          ruleId: 'graph:cycle',
+          message: `${anchor.simpleName} is part of a ${String(scc.sccSize)}-function call cycle${scc.crossesPackages ? ' spanning multiple packages' : ''}.`,
+          code: { file: anchor.filePath, line: anchor.line, column: anchor.column },
+          suggestion: 'Break the cycle: invert one dependency or extract the shared piece.',
+          metadata: {
+            sccId: scc.id,
+            sccSize: scc.sccSize,
+            crossesPackages: scc.crossesPackages,
+            qualifiedName: anchor.qualifiedName,
+            // Cross-linked with graph:unexpected-coupling's per-package-cycle
+            // signal; populated there, not here (this rule is per-SCC).
+            relatedPackageCycle: undefined,
+          },
+        }),
+      );
+    }
+    return signals;
+  },
+});
+
+/**
+ * Resolve the SCC's severity band, or `undefined` for "no signal".
+ *  - size 1 → no signal;
+ *  - crossesPackages → `high` (wins regardless of size);
+ *  - size 2 → the configured size-2 posture (`off` → none, `low` → `low`);
+ *  - size ≥ minSize → `medium`;
+ *  - otherwise (e.g. a size-2 with size2 off, or a sub-minSize size ≥ 3 when
+ *    minSize was raised) → no signal.
+ */
+function bandFor(
+  scc: SccFeatures,
+  minSize: number,
+  size2: 'off' | 'low',
+): SignalSeverity | undefined {
+  if (scc.sccSize <= 1) return undefined;
+  if (scc.crossesPackages) return 'high';
+  if (scc.sccSize === 2) return size2 === 'low' ? 'low' : undefined;
+  if (scc.sccSize >= minSize) return 'medium';
+  return undefined;
+}
+
+/**
+ * The lowest-`qualifiedName` member occurrence of the SCC — the stable anchor
+ * for the one-per-SCC signal (mirrors duplicated-function-body's
+ * `lowestByQualifiedName`). Members are body hashes; resolve each via
+ * `byBodyHash`.
+ */
+function anchorOccurrence(scc: SccFeatures, indexes: Indexes): FunctionOccurrence | undefined {
+  let anchor: FunctionOccurrence | undefined;
+  for (const hash of scc.members) {
+    const occ = indexes.byBodyHash.get(hash);
+    if (!occ) continue;
+    if (!anchor || occ.qualifiedName < anchor.qualifiedName) anchor = occ;
+  }
+  return anchor;
+}
