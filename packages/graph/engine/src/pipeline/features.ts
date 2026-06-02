@@ -261,8 +261,11 @@ interface TarjanFrame {
  * included by the algorithm; each component's members sorted; result ordering
  * preserved (push-on-root-close). Each component is mapped to an `SccFeatures`
  * with a stable member-derived id and `crossesPackages` over the members'
- * resolved packages.
+ * resolved packages. Irreducible iterative Tarjan (no recursion, to survive
+ * deep call graphs); a verbatim port of the dashboard's former client
+ * `scc.ts` — splitting it would obscure the well-known algorithm.
  */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- ported iterative Tarjan, see above
 function computeSccs(indexes: Indexes): SccFeatures[] {
   const result: SccFeatures[] = [];
   const nodes = [...indexes.byBodyHash.keys()];
@@ -278,7 +281,7 @@ function computeSccs(indexes: Indexes): SccFeatures[] {
     if (index.has(start)) continue;
     const work: TarjanFrame[] = [{ v: start, ai: 0 }];
     while (work.length > 0) {
-      const frame = work[work.length - 1] as TarjanFrame;
+      const frame = work.at(-1)!;
       const v = frame.v;
       if (frame.ai === 0) {
         index.set(v, nextIndex);
@@ -290,21 +293,21 @@ function computeSccs(indexes: Indexes): SccFeatures[] {
       const adjV = adj(v);
       let descended = false;
       while (frame.ai < adjV.length) {
-        const w = adjV[frame.ai++] as string;
+        const w = adjV[frame.ai++];
         if (!index.has(w)) {
           work.push({ v: w, ai: 0 });
           descended = true;
           break;
         } else if (onStack.has(w)) {
-          const iw = index.get(w) as number;
-          if (iw < (lowlink.get(v) as number)) lowlink.set(v, iw);
+          const iw = index.get(w)!;
+          if (iw < lowlink.get(v)!) lowlink.set(v, iw);
         }
       }
       if (descended) continue;
       if (lowlink.get(v) === index.get(v)) {
         const members: string[] = [];
         for (;;) {
-          const w = stack.pop() as string;
+          const w = stack.pop()!;
           onStack.delete(w);
           members.push(w);
           if (w === v) break;
@@ -314,9 +317,9 @@ function computeSccs(indexes: Indexes): SccFeatures[] {
       }
       work.pop();
       if (work.length > 0) {
-        const parent = (work[work.length - 1] as TarjanFrame).v;
-        if ((lowlink.get(v) as number) < (lowlink.get(parent) as number)) {
-          lowlink.set(parent, lowlink.get(v) as number);
+        const parent = work.at(-1)!.v;
+        if (lowlink.get(v)! < lowlink.get(parent)!) {
+          lowlink.set(parent, lowlink.get(v)!);
         }
       }
     }
@@ -348,8 +351,10 @@ function toSccFeatures(members: readonly string[], indexes: Indexes): SccFeature
  * (body-hash collision disambiguation), bucket by `(callerPkg, calleePkg)`.
  * Emits the unfiltered whole-graph matrix — the dashboard's `passesFilter` is
  * a UI concern, applied client-side. Self-edges (diagonal) are kept (the
- * matrix counts them).
+ * matrix counts them). Single pass (nested caller→edge→target loops + degree
+ * rollups); a verbatim port of the dashboard's former client coupling view.
  */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- single-pass coupling aggregation, see above
 function computePackageCoupling(indexes: Indexes): {
   package: ReadonlyMap<string, PackageFeatures>;
   edge: readonly PackageEdgeFeature[];

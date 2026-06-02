@@ -22,14 +22,10 @@ export const orphanSubtreeRule = defineRule({
   defaultSeverity: 'warning',
   featureDeps: ['reachableFromEntry'],
   evaluate({ catalog, indexes, config, features }): readonly Signal[] {
-    // Reachability comes from the engine feature column when present; the
-    // local computeReachable is the graceful-degrade fallback (canonical home
-    // is now pipeline/features.ts). Compute the fallback set ONLY when absent.
-    const reachableLocal = features ? undefined : computeReachable(catalog, indexes, config);
-    const isReachable = (h: string): boolean =>
-      features
-        ? features.function.get(h)?.reachableFromEntry === true
-        : (reachableLocal as Set<string>).has(h);
+    // Reachability comes from the engine feature column when present; the local
+    // computeReachable is the graceful-degrade fallback (canonical home is now
+    // pipeline/features.ts). Built once, outside the loop.
+    const isReachable = buildReachablePredicate(catalog, indexes, config, features);
     // On a fast catalog a missing caller-edge can fake an orphan; mark it.
     const caveat = approximateSuffix(catalog);
     const orphans: Signal[] = [];
@@ -74,6 +70,25 @@ export const orphanSubtreeRule = defineRule({
     return orphans;
   },
 });
+
+/**
+ * Reachability predicate for a body hash. Prefers the engine
+ * `reachableFromEntry` feature column (Plan C) when present; otherwise builds
+ * the local reachable set once (the graceful-degrade fallback) and tests
+ * membership.
+ */
+function buildReachablePredicate(
+  catalog: Catalog,
+  indexes: Indexes,
+  config: GraphConfig,
+  features: FeatureTable | undefined,
+): (h: string) => boolean {
+  if (features) {
+    return (h: string): boolean => features.function.get(h)?.reachableFromEntry === true;
+  }
+  const reachable = computeReachable(catalog, indexes, config);
+  return (h: string): boolean => reachable.has(h);
+}
 
 function computeReachable(catalog: Catalog, indexes: Indexes, config: GraphConfig): Set<string> {
   const entryPoints = inferEntryPoints(catalog, indexes);

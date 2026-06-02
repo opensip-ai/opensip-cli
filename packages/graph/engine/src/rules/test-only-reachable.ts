@@ -11,7 +11,7 @@ import { approximateSuffix } from './_approximation.js';
 import { inferEntryPoints } from './_entry-points.js';
 import { defineRule } from './define-rule.js';
 
-import type { FeatureTable, Indexes, Rule } from '../types.js';
+import type { Indexes, Rule } from '../types.js';
 import type { Signal } from '@opensip-tools/core';
 
 export const testOnlyReachableRule = defineRule({
@@ -24,13 +24,13 @@ export const testOnlyReachableRule = defineRule({
     // (3/4-arg test calls), fall back to the local prod-reachability BFS — the
     // canonical home is now pipeline/features.ts. Compute the fallback set
     // ONLY when needed.
-    const reachableFromProd = features
-      ? undefined
+    const reachableFromProd: ReadonlySet<string> = features
+      ? new Set()
       : bfsReachable(computeProductionEntries(catalog, indexes), indexes);
     const isTestOnly = (h: string): boolean =>
       features
         ? features.function.get(h)?.reachableOnlyFromTests === true
-        : computeTestOnlyLocal(h, indexes, reachableFromProd as ReadonlySet<string>);
+        : computeTestOnlyLocal(h, indexes, reachableFromProd);
     // Missing prod-caller edges on a fast catalog can fake "test-only".
     const caveat = approximateSuffix(catalog);
     const signals: Signal[] = [];
