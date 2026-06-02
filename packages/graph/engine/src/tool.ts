@@ -27,11 +27,11 @@ import { ConfigurationError, logger, readPackageVersion, ValidationError } from 
 // (register-graph-adapters.ts). The historical engine-side bootstrap
 // is gone.
 import { exportGraphBaseline } from './cli/baseline-export.js';
+import { buildGraphRecipeCatalog, buildGraphRuleCatalog } from './cli/dashboard-data.js';
 import { runCatalogJsonMode } from './cli/graph-modes.js';
 import { renderGraphLive } from './cli/graph-runner.js';
 import { executeGraph, handleGraphError } from './cli/graph.js';
 import { runHeapPreflight } from './cli/heap-preflight.js';
-import { buildGraphRecipeCatalog, buildGraphRuleCatalog } from './cli/dashboard-data.js';
 import { listGraphRecipes } from './cli/list-graph-recipes.js';
 import { executeLookup } from './cli/lookup.js';
 import { loadGraphConfig, runGraph } from './cli/orchestrate.js';

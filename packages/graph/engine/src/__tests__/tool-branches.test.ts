@@ -249,16 +249,20 @@ describe('catalog-export action branches', () => {
 });
 
 describe('contributeScope + collectDashboardData hooks', () => {
-  it('contributeScope seeds a fresh graph subscope with adapter + rule registries', () => {
+  it('contributeScope seeds a fresh graph subscope with adapter + rule + recipe registries', () => {
     const contribution = graphTool.contributeScope?.() ?? {};
     expect(contribution.graph).toBeDefined();
     expect(contribution.graph?.adapters).toBeDefined();
     expect(contribution.graph?.rules).toBeDefined();
+    expect(contribution.graph?.recipes).toBeDefined();
   });
 
-  it('collectDashboardData returns {} when no datastore is present', () => {
+  it('collectDashboardData returns empty rule/recipe catalogs when no datastore and no graph subscope', () => {
     const scope = { datastore: () => undefined } as unknown as ToolScope;
-    expect(graphTool.collectDashboardData?.(scope)).toEqual({});
+    expect(graphTool.collectDashboardData?.(scope)).toEqual({
+      graphRuleCatalog: [],
+      graphRecipeCatalog: [],
+    });
   });
 
   it('collectDashboardData returns a graphCatalog key when a datastore is present', () => {
