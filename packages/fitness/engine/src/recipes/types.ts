@@ -8,9 +8,9 @@
 
 import os from 'node:os'
 
+import type { DirectiveEntry } from '../framework/directive-inventory.js'
 import type { RecipeUnitConfigMap } from '@opensip-tools/core'
 
-import type { DirectiveEntry } from '../framework/directive-inventory.js'
 
 // =============================================================================
 // CHECK SELECTOR TYPES

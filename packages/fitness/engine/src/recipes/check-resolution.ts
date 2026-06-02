@@ -59,13 +59,11 @@ export function resolveChecks(selector: CheckSelector, registry: CheckRegistry):
     keysOf: (item) => buildMatchTargets(item.id, registry),
     tagsOf: (item) => registry.getBySlug(item.id)?.config.tags ?? [],
     match: (target, pattern) => minimatch(target, pattern, { nocase: false }),
-    resolveExplicit: (id) => {
-      // Bare slug → try registry resolution (handles namespace lookup).
-      if (!id.includes(':') && registry.getBySlug(id)) {
-        return registry.listSlugs().find((s) => s.endsWith(`:${id}`)) ?? id
-      }
-      return undefined
-    },
+    // Bare slug → namespaced-key reverse lookup; otherwise no resolution.
+    resolveExplicit: (id) =>
+      !id.includes(':') && registry.getBySlug(id)
+        ? (registry.listSlugs().find((s) => s.endsWith(`:${id}`)) ?? id)
+        : undefined,
   }
 
   // The core resolver reads the `explicit` arm's request list from `ids`;

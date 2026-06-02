@@ -36,8 +36,8 @@
 
 import { SystemError } from '../lib/errors.js';
 
-import type { Registerable } from '../lib/registry.js';
 import type { RecipeUnitConfigMap } from './unit-config.js';
+import type { Registerable } from '../lib/registry.js';
 
 /** Select an explicit, ordered list of units by id. */
 export interface ExplicitSelector {
@@ -77,6 +77,9 @@ export interface PatternSelector {
  */
 export type RecipeSelector = ExplicitSelector | AllSelector | TagsSelector | PatternSelector;
 
+/** Glob matcher injected by the tool for the `pattern` / `all` arms. */
+type Matcher = (target: string, pattern: string) => boolean;
+
 /**
  * Injected, tool-supplied resolution hooks. Keeping these external is what
  * lets core resolve selectors without naming any tool type.
@@ -87,7 +90,7 @@ export interface ResolveSelectorOptions<T extends Registerable, S extends { read
   /** Tags an item carries — used by the built-in `tags` arm. Defaults to `item.tags ?? []`. */
   readonly tagsOf?: (item: T) => readonly string[];
   /** Glob matcher for `pattern` / `all` exclude matching. Required only if such an arm reaches the resolver. */
-  readonly match?: (target: string, pattern: string) => boolean;
+  readonly match?: Matcher;
   /**
    * Fallback lookup for an `explicit` id that is not itself a primary key
    * — e.g. fitness's bare-slug → namespaced-key resolution. Returns the
@@ -106,17 +109,81 @@ export interface ResolveSelectorOptions<T extends Registerable, S extends { read
 const NO_MATCHER_CODE = 'SYSTEM.CORE.SELECTOR_NO_MATCHER';
 const UNKNOWN_SELECTOR_CODE = 'SYSTEM.CORE.UNKNOWN_SELECTOR';
 
-function requireMatcher<T extends Registerable, S extends { readonly type: string }>(
-  opts: ResolveSelectorOptions<T, S>,
-  arm: string,
-): (target: string, pattern: string) => boolean {
-  if (opts.match === undefined) {
+function requireMatcher(match: Matcher | undefined, arm: string): Matcher {
+  if (match === undefined) {
     // @fitness-ignore-next-line result-pattern-consistency -- programmer error: a pattern/all-exclude arm reached the resolver without an injected matcher
     throw new SystemError(`resolveSelector: '${arm}' selector needs a 'match' matcher but none was supplied`, {
       code: NO_MATCHER_CODE,
     });
   }
-  return opts.match;
+  return match;
+}
+
+/** `explicit`: exact primary-key match then injected fallback; request order; no de-dup. */
+function resolveExplicitArm<T extends Registerable>(
+  ids: readonly string[],
+  items: readonly T[],
+  resolveExplicit: ((id: string, items: readonly T[]) => string | undefined) | undefined,
+): readonly T[] {
+  const byId = new Map<string, T>();
+  for (const item of items) byId.set(item.id, item);
+  const result: T[] = [];
+  for (const id of ids) {
+    let item = byId.get(id);
+    if (item === undefined && resolveExplicit !== undefined) {
+      const key = resolveExplicit(id, items);
+      if (key !== undefined) item = byId.get(key);
+    }
+    if (item !== undefined) result.push(item);
+  }
+  return result;
+}
+
+/** `all`: every item, minus any whose match keys glob-match an exclude pattern. */
+function resolveAllArm<T extends Registerable>(
+  exclude: readonly string[],
+  items: readonly T[],
+  keysOf: (item: T) => readonly string[],
+  match: Matcher | undefined,
+): readonly T[] {
+  if (exclude.length === 0) return items;
+  const matcher = requireMatcher(match, 'all');
+  return items.filter((item) => {
+    const targets = keysOf(item);
+    return !exclude.some((pattern) => targets.some((target) => matcher(target, pattern)));
+  });
+}
+
+/** `tags`: items whose tags intersect `include` and avoid `exclude` (tag-based). */
+function resolveTagsArm<T extends Registerable>(
+  include: readonly string[],
+  exclude: readonly string[],
+  items: readonly T[],
+  tagsOf: (item: T) => readonly string[],
+): readonly T[] {
+  const includeSet = new Set(include);
+  const excludeSet = new Set(exclude);
+  return items.filter((item) => {
+    const tags = tagsOf(item);
+    return tags.some((tag) => includeSet.has(tag)) && !tags.some((tag) => excludeSet.has(tag));
+  });
+}
+
+/** `pattern`: items whose match keys glob-match some `include` and no `exclude`. */
+function resolvePatternArm<T extends Registerable>(
+  include: readonly string[],
+  exclude: readonly string[],
+  items: readonly T[],
+  keysOf: (item: T) => readonly string[],
+  match: Matcher | undefined,
+): readonly T[] {
+  const matcher = requireMatcher(match, 'pattern');
+  return items.filter((item) => {
+    const targets = keysOf(item);
+    const included = include.some((pattern) => targets.some((target) => matcher(target, pattern)));
+    if (!included) return false;
+    return !exclude.some((pattern) => targets.some((target) => matcher(target, pattern)));
+  });
 }
 
 /**
@@ -139,52 +206,16 @@ export function resolveSelector<T extends Registerable, S extends { readonly typ
   const arm = selector as unknown as RecipeSelector;
   switch (arm.type) {
     case 'explicit': {
-      // Mirror fitness `resolveExplicitSelector`: exact primary-key match,
-      // else the injected fallback; preserve request order; no de-dup.
-      const byId = new Map<string, T>();
-      for (const item of items) byId.set(item.id, item);
-      const result: T[] = [];
-      for (const id of arm.ids) {
-        let item = byId.get(id);
-        if (item === undefined && opts.resolveExplicit !== undefined) {
-          const key = opts.resolveExplicit(id, items);
-          if (key !== undefined) item = byId.get(key);
-        }
-        if (item !== undefined) result.push(item);
-      }
-      return result;
+      return resolveExplicitArm(arm.ids, items, opts.resolveExplicit);
     }
     case 'all': {
-      const exclude = arm.exclude ?? [];
-      if (exclude.length === 0) return items;
-      const match = requireMatcher(opts, 'all');
-      return items.filter((item) => {
-        const targets = opts.keysOf(item);
-        const excluded = exclude.some((pattern) => targets.some((target) => match(target, pattern)));
-        return !excluded;
-      });
+      return resolveAllArm(arm.exclude ?? [], items, opts.keysOf, opts.match);
     }
     case 'tags': {
-      const include = new Set(arm.include);
-      const exclude = new Set(arm.exclude ?? []);
-      const tagsOf = opts.tagsOf ?? ((item: T) => item.tags ?? []);
-      return items.filter((item) => {
-        const tags = tagsOf(item);
-        if (!tags.some((tag) => include.has(tag))) return false;
-        if (tags.some((tag) => exclude.has(tag))) return false;
-        return true;
-      });
+      return resolveTagsArm(arm.include, arm.exclude ?? [], items, opts.tagsOf ?? ((item) => item.tags ?? []));
     }
     case 'pattern': {
-      const match = requireMatcher(opts, 'pattern');
-      const exclude = arm.exclude ?? [];
-      return items.filter((item) => {
-        const targets = opts.keysOf(item);
-        const included = arm.include.some((pattern) => targets.some((target) => match(target, pattern)));
-        if (!included) return false;
-        const excluded = exclude.some((pattern) => targets.some((target) => match(target, pattern)));
-        return !excluded;
-      });
+      return resolvePatternArm(arm.include, arm.exclude ?? [], items, opts.keysOf, opts.match);
     }
     /* v8 ignore start -- exhaustive guard: a tool-only arm with no matching predicate lands here */
     default: {

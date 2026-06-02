@@ -27,7 +27,7 @@ import type { Registerable } from '../../lib/registry.js';
 /** Test-only `*`-glob matcher (exact match when the pattern has no `*`). */
 function glob(target: string, pattern: string): boolean {
   if (!pattern.includes('*')) return target === pattern;
-  const escaped = pattern.split('*').map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&'));
+  const escaped = pattern.split('*').map((part) => part.replaceAll(/[.+?^${}()|[\]\\]/g, String.raw`\$&`));
   return new RegExp(`^${escaped.join('.*')}$`).test(target);
 }
 
