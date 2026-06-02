@@ -44,6 +44,15 @@ export {
   discoverPackagesByMarker,
   isMarkerKind,
 } from './marker-discovery.js'
+export {
+  discoverScopedPackages,
+  hasPackageJson,
+  resolvePackageDir,
+} from './node-modules-walk.js'
+export type {
+  DiscoveredScopedPackage,
+  DiscoverScopedPackagesOptions,
+} from './node-modules-walk.js'
 export type {
   MarkerKind,
   MarkerDiscoveryOptions,

@@ -32,10 +32,16 @@
  * expected to be direct dependencies.
  */
 
-import { existsSync, readdirSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 
-import { logger, readYamlFile, resolvePackageEntryPoint, resolveScopes } from '@opensip-tools/core'
+import {
+  discoverScopedPackages,
+  logger,
+  readYamlFile,
+  resolvePackageDir,
+  resolvePackageEntryPoint,
+  resolveScopes,
+} from '@opensip-tools/core'
 
 const CONFIG_FILENAME = 'opensip-tools.config.yml'
 
@@ -108,70 +114,7 @@ export function discoverScenarioPackages(
 
   // Rule 3: auto-discover under default + customer-configured scopes
   const scopes = resolveScopes(DEFAULT_SCOPE, packageScopes, 'plugin.scenario_package.invalid_scope')
-  return autoDiscoverScenarios(projectDir, scopes)
-}
-
-/**
- * Walk up the directory tree from `projectDir` looking for
- * `node_modules/<scope>/` directories under every configured scope,
- * and return all `scenarios-*` package directories found across them.
- * Mirrors Node's module resolution (any ancestor node_modules counts),
- * which handles pnpm hoisting and monorepo layouts where the scope may
- * live in the workspace root.
- */
-// eslint-disable-next-line sonarjs/cognitive-complexity -- ancestor-walk discovery: walks node_modules trees up the directory tree until the filesystem root
-function autoDiscoverScenarios(
-  projectDir: string,
-  scopes: readonly string[],
-): DiscoveredScenarioPackage[] {
-  const seen = new Set<string>()
-  const out: DiscoveredScenarioPackage[] = []
-  let dir = projectDir
-  let prev = ''
-  while (dir !== prev) {
-    for (const scope of scopes) {
-      const scopeDir = join(dir, 'node_modules', scope)
-      if (!existsSync(scopeDir)) continue
-      for (const entry of safeReaddir(scopeDir)) {
-        if (!entry.startsWith(SCENARIOS_PREFIX)) continue
-        const name = `${scope}/${entry}`
-        if (seen.has(name)) continue
-        const packageDir = join(scopeDir, entry)
-        if (!hasPackageJson(packageDir)) continue
-        seen.add(name)
-        out.push({ name, packageDir })
-      }
-    }
-    prev = dir
-    dir = dirname(dir)
-  }
-  return out
-}
-
-function resolvePackageDir(projectDir: string, name: string): string | undefined {
-  let dir = projectDir
-  let prev = ''
-  while (dir !== prev) {
-    const candidate = join(dir, 'node_modules', name)
-    if (hasPackageJson(candidate)) return candidate
-    prev = dir
-    dir = dirname(dir)
-  }
-  return undefined
-}
-
-function hasPackageJson(packageDir: string): boolean {
-  if (!existsSync(packageDir)) return false
-  return existsSync(join(packageDir, 'package.json'))
-}
-
-function safeReaddir(dir: string): string[] {
-  try {
-    return readdirSync(dir)
-  } catch {
-    // @fitness-ignore-next-line error-handling-quality -- filesystem probe; exception → empty array is the function's contract (missing directory or permission denied returns "no entries", same as a genuinely empty dir).
-    return []
-  }
+  return discoverScopedPackages({ projectDir, scopes, prefix: SCENARIOS_PREFIX })
 }
 
 /**

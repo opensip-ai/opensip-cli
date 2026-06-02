@@ -23,10 +23,12 @@
  * respective kinds and adapt the return type.
  */
 
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 import { logger } from '../lib/logger.js';
+
+import { safeReaddir } from './node-modules-walk.js';
 
 const MARKER_KINDS = ['tool', 'fit-pack', 'sim-pack'] as const;
 
@@ -142,14 +144,5 @@ function readMarkerKind(packageDir: string): MarkerKind | undefined {
       error: msg,
     });
     return undefined;
-  }
-}
-
-function safeReaddir(dir: string): string[] {
-  try {
-    return readdirSync(dir);
-  } catch {
-    // @fitness-ignore-next-line error-handling-quality -- filesystem probe; exception → empty array is the function's contract (missing directory or permission denied returns "no entries", same as a genuinely empty dir).
-    return [];
   }
 }
