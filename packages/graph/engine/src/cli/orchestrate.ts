@@ -279,7 +279,10 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
         catalogRepo.replaceAll({ ...catalog, features: persisted });
       } catch {
         /* v8 ignore next */
-        // Non-fatal: already logged by the repo; the run returns the catalog regardless.
+        // @swallow-ok feature materialization is best-effort: CatalogRepo.replaceAll
+        // already logs the failure via its own logger, and the run returns the
+        // catalog (with in-memory features) regardless — re-logging here would
+        // only double-report the same error.
       }
     }
 
