@@ -4,7 +4,56 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [2.4.2] — 2026-06-01
+## [2.5.0] — 2026-06-01
+
+### Added
+
+- **New package `@opensip-tools/graph-adapter-common`** — shared tree-sitter
+  adapter scaffolding (discover / parse / walk / cache-key factories) consumed
+  by the Go, Java, Python, and Rust graph adapters, replacing the boilerplate
+  that was duplicated across all four.
+- **Deterministic cross-package duplication detector.**
+  `graph:duplicated-function-body` gains an aggregate signal: a function body
+  appearing in ≥ N distinct packages (`minCrossPackageDuplicatePackages`,
+  default 3) is reported as a single "hoist to a shared package" finding with
+  **no** per-copy size floor — surfacing small-but-widely-copied code the
+  per-instance thresholds used to hide. Graph rule config is now read from a
+  `graph:` block in `opensip-tools.config.yml`.
+- **Per-occurrence `package` field** on `GraphFunctionOccurrence` (the nearest
+  `package.json` name), so the coupling grid and rules bucket by real package
+  identity. Optional / backward-compatible.
+
+### Changed
+
+- **The coupling grid buckets by real package, not a directory heuristic.** A
+  file's package is its nearest enclosing `package.json` name, falling back to
+  the top-level path segment when there's no manifest. Previously it grouped by
+  the first segment under `packages/`, collapsing the workspace packages into a
+  dozen directory groups and degenerating to a single `<unknown>` bucket on any
+  repo not laid out under `packages/`. The grid now shows real packages and
+  works on any layout (`packages/`, `apps/`+`libs/`, single-package, non-JS).
+- **Graph rules are opinionated, actionable, and low-noise** (see
+  `docs/decisions/ADR-0001`): a rule finding earns a gate signal only if it is
+  actionable, precise, and bounded — rankings/metrics are dashboard insights,
+  not gate signals. `graph:orphan-subtree` was sharpened (twin-aware
+  reachability + barrel/visibility precision) from 45 false positives to zero;
+  `no-side-effect-path` / `always-throws-branch` / `test-only-reachable` are
+  unchanged.
+- **Blast radius is now a dashboard insight, not a gate rule.** The Hot
+  Functions view ranks by the composite blast score (`direct + 0.5 ×
+  transitive`); the engine no longer emits per-function blast warnings.
+- **Duplicated code consolidated into shared homes:** language comment/string
+  stripping → `@opensip-tools/core` `makeStripper`; plugin-discovery
+  primitives → core; check-pack path/display helpers → the fitness engine.
+- **The "update available" notice persists across runs** until you upgrade,
+  instead of showing once and disappearing.
+
+### Removed
+
+- **`graph:high-blast-function` rule** — blast radius is now dashboard-only
+  (above). _Breaking_ for anything consuming that rule's findings.
+- **`BlastScore` type and `Indexes.blastRadius`** from the `@opensip-tools/graph`
+  public surface. _Breaking_ for library consumers importing them.
 
 ### Fixed
 
@@ -23,34 +72,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   mode-agnostic post-resolution pass (`constrainCrossPackageEdges`) that drops
   name-guessed edges (resolution `unknown`/`dynamic-string`/`syntactic`) whose
   target isn't reachable from the caller — including builtin `.map`/`.find`
-  calls mis-resolved into another package's test file, which is never
-  importable — while leaving type-checker-backed edges untouched. The import
-  set is derived from each module's `dependencies`
-  specifiers (the resolved targets are empty for workspace imports, which
-  point at built `dist/`). No-op in `fast` mode and non-monorepo repos.
-
+  calls mis-resolved into another package's test file — while leaving
+  type-checker-backed edges untouched. No-op in `fast` mode and non-monorepo
+  repos.
 - **Call edges are no longer unioned across identical-bodied functions.** A
   call edge was bucketed by its owner's content `bodyHash` alone, so two
   functions with the same body in different files (e.g. `stripStrings`
   duplicated across the language adapters) shared one edge list — each then
   appeared to call every twin's callees, inventing cross-package coupling.
   Edges are now keyed per occurrence (`bodyHash` + `filePath`) end to end
-  (resolver, stitch, incremental merge, dependency attach).
-
-### Changed
-
-- **The coupling grid buckets by real package, not directory.** A file's
-  package is now its nearest enclosing `package.json` name (stamped per
-  occurrence at build time), falling back to the top-level path segment when
-  there's no manifest. Previously it grouped by the first segment under
-  `packages/`, which collapsed the 29 workspace packages into 12 directory
-  groups and degenerated to a single `<unknown>` bucket on any repo not laid
-  out under `packages/`. The grid now shows real packages and works on any
-  layout (`packages/`, `apps/`+`libs/`, single-package, non-JS). The
-  `GraphFunctionOccurrence` contract gains an optional `package` field.
-
-- **The "update available" notice persists across runs** until you upgrade,
-  instead of showing once and disappearing.
+  (resolver, stitch, incremental merge, dependency attach). See
+  `docs/decisions/ADR-0003`.
+- **Reachability rules no longer report false orphans from body-twins.** The
+  `callees`/`callers` adjacency was built from the `byBodyHash`
+  (last-writer-wins) collapse, erasing a losing twin's out-edges, so
+  `orphan-subtree` / `test-only-reachable` BFS'd over a lossy graph. It now
+  unions edges per occurrence (ADR-0003).
 
 ## [2.4.1] — 2026-06-01
 

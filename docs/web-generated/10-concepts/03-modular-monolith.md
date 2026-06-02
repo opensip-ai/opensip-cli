@@ -89,7 +89,7 @@ That's it. Five layers, twenty-nine packages.
 
 ## How the layer rule is enforced
 
-The layer rule — "dependencies flow up only" — is enforced by [dependency-cruiser](https://github.com/opensip-ai/opensip-tools/blob/v2.4.2/.dependency-cruiser.cjs) at lint time. The relevant rules:
+The layer rule — "dependencies flow up only" — is enforced by [dependency-cruiser](https://github.com/opensip-ai/opensip-tools/blob/v2.5.0/.dependency-cruiser.cjs) at lint time. The relevant rules:
 
 ```js
 // core imports nothing else from the workspace.
@@ -121,7 +121,7 @@ The build runs `pnpm depcruise` as part of the standard `pnpm lint` flow. A forb
 
 ## The three documented exceptions
 
-Real codebases have edge cases. This one has three, all written into [`.dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-tools/blob/v2.4.2/.dependency-cruiser.cjs).
+Real codebases have edge cases. This one has three, all written into [`.dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-tools/blob/v2.5.0/.dependency-cruiser.cjs).
 
 ### `lang-typescript` → `fitness`
 

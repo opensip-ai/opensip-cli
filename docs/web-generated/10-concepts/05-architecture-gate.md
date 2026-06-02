@@ -35,7 +35,7 @@ opensip-tools fit --gate-save                 # capture today's reality
 opensip-tools fit --gate-compare              # CI gate from now on
 ```
 
-`--gate-save` runs the configured recipe and writes the resulting findings as a SARIF document into the project's SQLite store (`fit_baseline` table at `<project>/opensip-tools/.runtime/datastore.sqlite`, via [`FitBaselineRepo`](https://github.com/opensip-ai/opensip-tools/blob/v2.4.2/packages/fitness/engine/src/persistence/baseline-repo.ts)). There is **exactly one baseline per project**.
+`--gate-save` runs the configured recipe and writes the resulting findings as a SARIF document into the project's SQLite store (`fit_baseline` table at `<project>/opensip-tools/.runtime/datastore.sqlite`, via [`FitBaselineRepo`](https://github.com/opensip-ai/opensip-tools/blob/v2.5.0/packages/fitness/engine/src/persistence/baseline-repo.ts)). There is **exactly one baseline per project**.
 
 > **v1 → v2 break.** v1 wrote baselines as SARIF *files* (`baseline.sarif`) and let users override the path with `--baseline <path>`. **The `--baseline` flag is gone in v2.** Teams that committed `baseline.sarif` to git for cross-CI gate comparisons should re-run `--gate-save` once on v2, then adopt one of the artifact-based CI patterns below. See [`80-implementation/03-session-and-persistence.md`](/docs/opensip-tools/80-implementation/03-session-and-persistence/) for the schema layout.
 
@@ -75,7 +75,7 @@ function hashViolation(filePath: string, ruleId: string, message: string): strin
 }
 ```
 
-[`packages/fitness/engine/src/gate.ts:243`](https://github.com/opensip-ai/opensip-tools/blob/v2.4.2/packages/fitness/engine/src/gate.ts).
+[`packages/fitness/engine/src/gate.ts:243`](https://github.com/opensip-ai/opensip-tools/blob/v2.5.0/packages/fitness/engine/src/gate.ts).
 
 Three things stay in the hash:
 
@@ -87,13 +87,13 @@ One thing is **deliberately excluded**: the line number. A regex check that flag
 
 The trade-off is symmetric: if a *different* `console.log` is added at the same file with the exact same message, the hash collides and we treat it as unchanged. In practice this hasn't been a problem — messages are usually specific enough that two distinct violations have different messages, and a duplicate-message-same-file pair is rare and benign.
 
-The line-shift invariance is exercised by [`packages/fitness/engine/src/__tests__/gate.test.ts:222`](https://github.com/opensip-ai/opensip-tools/blob/v2.4.2/packages/fitness/engine/src/__tests__/gate.test.ts) with explicit cases for the moved-line scenario and the changed-message scenario.
+The line-shift invariance is exercised by [`packages/fitness/engine/src/__tests__/gate.test.ts:222`](https://github.com/opensip-ai/opensip-tools/blob/v2.5.0/packages/fitness/engine/src/__tests__/gate.test.ts) with explicit cases for the moved-line scenario and the changed-message scenario.
 
 ---
 
 ## What `compareToBaseline` actually does
 
-[`packages/fitness/engine/src/gate.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.4.2/packages/fitness/engine/src/gate.ts):
+[`packages/fitness/engine/src/gate.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.5.0/packages/fitness/engine/src/gate.ts):
 
 ```ts
 export function compareToBaseline(output: CliOutput, repo: FitBaselineRepo): GateCompareResult {
@@ -119,7 +119,7 @@ The `degraded` flag is `added.length > 0`. A run can resolve violations *and* ad
 
 ## Partial-SARIF tolerance
 
-The reader is forgiving. From [`packages/fitness/engine/src/gate.ts:287`](https://github.com/opensip-ai/opensip-tools/blob/v2.4.2/packages/fitness/engine/src/gate.ts) (`extractViolationsFromSarif`):
+The reader is forgiving. From [`packages/fitness/engine/src/gate.ts:287`](https://github.com/opensip-ai/opensip-tools/blob/v2.5.0/packages/fitness/engine/src/gate.ts) (`extractViolationsFromSarif`):
 
 - A run with no `results` array → skipped silently. (Maybe the user removed all findings from a run; that's not a parse error.)
 - A run with `results` but missing `tool.driver` → still parsed, the result entries become violations.
