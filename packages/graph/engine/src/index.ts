@@ -168,4 +168,16 @@ export { duplicatedFunctionBodyRule } from './rules/duplicated-function-body.js'
 export { orphanSubtreeRule } from './rules/orphan-subtree.js';
 export { defineRule } from './rules/define-rule.js';
 export type { RuleDataset, GraphFeatures, DefineRuleConfig } from './rules/define-rule.js';
+// ── Graph recipes (Plan B — symmetric with fitness recipes) ────────
+export { defineGraphRecipe } from './recipes/types.js';
+export type { GraphRecipe, GraphRecipeDefinition, RuleSelector, RuleConfigMap } from './recipes/types.js';
+export {
+  builtInGraphRecipes,
+  builtInGraphRecipesByName,
+  defaultGraphRecipe,
+  deadCodeGraphRecipe,
+  isBuiltInGraphRecipe,
+} from './recipes/built-in-recipes.js';
+export { GraphRecipeRegistry, createRecipeRegistry, currentGraphRecipes } from './recipes/registry.js';
+export { resolveRecipeToRules } from './recipes/resolve.js';
 export { executeGraph } from './cli/graph.js';
