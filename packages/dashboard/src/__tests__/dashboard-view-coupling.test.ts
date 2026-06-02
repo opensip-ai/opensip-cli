@@ -96,6 +96,8 @@ describe('View 4 — Coupling matrix', () => {
         x: [makeOcc({ bodyHash: 'x', simpleName: 'x', filePath: 'packages/contracts/src/x.ts' })],
         y: [makeOcc({ bodyHash: 'y', simpleName: 'y', filePath: 'packages/contracts/src/y.ts' })],
       },
+      // Engine-emitted edge feature: cli→contracts has 3 call sites (a→x, a→y, b→x).
+      features: { edge: [{ callerPackage: 'cli', calleePackage: 'contracts', count: 3 }] },
     };
     const env = loadEnv(catalog);
     const c = document.createElement('div');
@@ -113,6 +115,7 @@ describe('View 4 — Coupling matrix', () => {
           calls: [{ to: ['x'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'x()' }] })],
         x: [makeOcc({ bodyHash: 'x', simpleName: 'x', filePath: 'packages/contracts/src/x.ts' })],
       },
+      features: { edge: [{ callerPackage: 'cli', calleePackage: 'contracts', count: 1 }] },
     };
     const env = loadEnv(catalog);
     const c = document.createElement('div');
@@ -132,6 +135,7 @@ describe('View 4 — Coupling matrix', () => {
           calls: [{ to: ['t1'], line: 7, column: 0, resolution: 'static', confidence: 'high', text: 'target()' }] })],
         target: [makeOcc({ bodyHash: 't1', simpleName: 'target', filePath: 'packages/contracts/src/t.ts' })],
       },
+      features: { edge: [{ callerPackage: 'cli', calleePackage: 'contracts', count: 1 }] },
     };
     const env = loadEnv(catalog);
     const c = document.createElement('div');
@@ -153,6 +157,8 @@ describe('View 4 — Coupling matrix', () => {
           calls: [{ to: ['b'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'b()' }] })],
         b: [makeOcc({ bodyHash: 'b', simpleName: 'b', filePath: 'packages/cli/src/b.ts' })],
       },
+      // Only the cli→cli diagonal edge ⇒ a 1×1 matrix.
+      features: { edge: [{ callerPackage: 'cli', calleePackage: 'cli', count: 1 }] },
     };
     const env = loadEnv(catalog);
     const c = document.createElement('div');

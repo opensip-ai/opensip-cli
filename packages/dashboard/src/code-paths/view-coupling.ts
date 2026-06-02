@@ -1,13 +1,22 @@
 /**
  * View 4 — "Package coupling heat map".
  *
- * Iterates every CallEdge.to in the catalog; for each (caller-pkg,
- * callee-pkg) pair, counts. Renders a per-package N×N table with
- * text-shaded density (CSS custom property --coupling-density).
+ * Reads the engine-emitted `catalog.features.edge` rows (Plan C — the
+ * dashboard no longer re-aggregates call edges client-side); each row is a
+ * { callerPackage, calleePackage, count } directed coupling edge. Renders a
+ * per-package N×N table with text-shaded density (CSS custom property
+ * --coupling-density).
+ *
+ * The matrix is the WHOLE-GRAPH (unfiltered) coupling matrix — the filter
+ * chips no longer narrow it (it is a whole-graph insight). When the catalog
+ * carries no `edge` feature (a non-dashboard run) the view shows a no-data
+ * empty state.
  *
  * Empty cells (no calls in this direction) show '·' and are not
  * clickable. Non-empty cells render the count; click → opens a
- * Function Card list of the actual call sites for that pair.
+ * Function Card list of the actual call sites for that pair (the drilldown
+ * keeps its own per-call-site walk, which the aggregate edge feature can't
+ * provide).
  */
 
 export function dashboardViewCouplingJs(): string {
@@ -30,28 +39,29 @@ views.push({
       container.appendChild(el('div', { class: 'empty', text: 'No catalog loaded.' }));
       return;
     }
-    // Build (caller-pkg, callee-pkg) counts from filtered occurrences.
+    // The coupling matrix is read from the engine-emitted 'edge' feature
+    // (Plan C) — the dashboard no longer re-aggregates call edges client-side.
+    // Each edge is { callerPackage, calleePackage, count } computed via the
+    // canonical resolveCallee. Note: the engine matrix is the WHOLE-GRAPH
+    // (unfiltered) matrix; the filter chips no longer narrow it (the matrix is
+    // a whole-graph insight). Absent features ⇒ no-data empty state (a
+    // non-dashboard run does not materialize coupling).
+    const edges = (catalog.features && catalog.features.edge) || null;
+    if (!edges) {
+      container.appendChild(el('div', { class: 'empty', text: 'No coupling data in this catalog. Re-run the graph for a dashboard to compute the package matrix.' }));
+      return;
+    }
     const counts = new Map();
     let max = 0;
-    for (const occ of indexes.byBodyHash.values()) {
-      if (!passesFilter(occ, filterState)) continue;
-      const callerPkg = pkgOf(occ);
-      for (const edge of (occ.calls || [])) {
-        for (const target of (edge.to || [])) {
-          const callee = resolveCalleeOcc(target, occ, indexes);
-          if (!callee) continue;
-          const calleePkg = pkgOf(callee);
-          let row = counts.get(callerPkg);
-          if (!row) { row = new Map(); counts.set(callerPkg, row); }
-          const c = (row.get(calleePkg) || 0) + 1;
-          row.set(calleePkg, c);
-          if (c > max) max = c;
-        }
-      }
+    for (const e of edges) {
+      let row = counts.get(e.callerPackage);
+      if (!row) { row = new Map(); counts.set(e.callerPackage, row); }
+      row.set(e.calleePackage, e.count);
+      if (e.count > max) max = e.count;
     }
     const pkgs = Array.from(new Set([...counts.keys(), ...[].concat(...Array.from(counts.values(), m => Array.from(m.keys())))])).sort();
     if (pkgs.length === 0) {
-      container.appendChild(el('div', { class: 'empty', text: 'No cross-package calls match the active filters.' }));
+      container.appendChild(el('div', { class: 'empty', text: 'No cross-package calls found.' }));
       return;
     }
     const section = el('div', { class: 'section' });
