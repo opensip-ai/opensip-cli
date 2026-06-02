@@ -153,10 +153,17 @@ graph:
   # floor) and suppresses the per-instance signals for that hash.
   #
   # The default is 3 (safe for arbitrary repos — unambiguous shared infra).
-  # We lower it to 2 HERE because we verified every 2-package duplicate in
-  # this repo is a real consolidation target (plugin-loader fitness<->sim,
-  # createPathMatcher checks-ts<->universal, safeReaddir, etc.) with zero
-  # intended twins — so the local opinion is earned.
+  # We keep it at 2 HERE as a deliberately-aggressive lens: it surfaces
+  # EVERY body shared across two packages so a genuinely-shared helper is
+  # caught the moment it appears. The real shared helpers it found have been
+  # hoisted (nameOf / skipBlockComment / isReturnValueDiscarded ->
+  # graph-adapter-common; isIdentChar -> core). The remainder it reports are
+  # known-intentional and accepted as informational (graph is not a CI gate
+  # here): thin Registry<T>/getter delegators, DataStore DI-constructor
+  # shims, and per-tool plugin-loader state accessors that are deliberately
+  # NOT shared (fitness's load-error state != sim's; see check-loader.ts
+  # header, audit F6). I.e. threshold 2 is a watchdog for NEW duplication,
+  # not an assertion that every current hit is consolidatable.
   minCrossPackageDuplicatePackages: 2
 
 # =============================================================================
