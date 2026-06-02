@@ -8,6 +8,8 @@
 
 import os from 'node:os'
 
+import type { RecipeUnitConfigMap } from '@opensip-tools/core'
+
 import type { DirectiveEntry } from '../framework/directive-inventory.js'
 
 // =============================================================================
@@ -22,7 +24,7 @@ import type { DirectiveEntry } from '../framework/directive-inventory.js'
  * into module-level state before execution so each check can read its slice
  * via `getCheckConfig<T>(slug)`. See `check-config.ts`.
  */
-export type RecipeCheckConfigMap = Readonly<Record<string, Readonly<Record<string, unknown>>>>
+export type RecipeCheckConfigMap = RecipeUnitConfigMap
 
 /** Selector that specifies checks by explicit slug list */
 interface ExplicitCheckSelector {
