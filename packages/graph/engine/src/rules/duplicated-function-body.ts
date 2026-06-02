@@ -36,6 +36,7 @@ import { createSignal } from '@opensip-tools/core';
 
 import { pkgOf } from '../resolve-callee.js';
 
+import { applySeverityOverride } from './_severity-override.js';
 import { defineRule } from './define-rule.js';
 
 import type { Catalog, FeatureTable, FunctionOccurrence } from '../types.js';
@@ -73,7 +74,7 @@ export const duplicatedFunctionBodyRule = defineRule({
       signals.push(
         createSignal({
           source: 'graph',
-          severity: 'low',
+          severity: applySeverityOverride('low', 'graph:duplicated-function-body', config),
           category: 'quality',
           ruleId: 'graph:duplicated-function-body',
           message: `This body is duplicated across ${String(packages.length)} packages (${packages.join(', ')}) in ${String(occs.length)} occurrences — hoist it into a shared package.`,
@@ -106,7 +107,7 @@ export const duplicatedFunctionBodyRule = defineRule({
         signals.push(
           createSignal({
             source: 'graph',
-            severity: 'low',
+            severity: applySeverityOverride('low', 'graph:duplicated-function-body', config),
             category: 'quality',
             ruleId: 'graph:duplicated-function-body',
             message: `${occ.simpleName} has the same body as ${primary.qualifiedName} (${primary.filePath}:${String(primary.line)}).`,

@@ -12,6 +12,7 @@ import { createSignal } from '@opensip-tools/core';
 
 import { approximateSuffix } from './_approximation.js';
 import { inferEntryPoints } from './_entry-points.js';
+import { applySeverityOverride } from './_severity-override.js';
 import { defineRule } from './define-rule.js';
 
 import type { Catalog, FeatureTable, GraphConfig, Indexes } from '../types.js';
@@ -50,7 +51,7 @@ export const orphanSubtreeRule = defineRule({
         createSignal({
           source: 'graph',
           provider: 'opensip-tools',
-          severity: 'medium',
+          severity: applySeverityOverride('medium', 'graph:orphan-subtree', config),
           category: 'quality',
           ruleId: 'graph:orphan-subtree',
           message: `${occ.simpleName} is not reachable from any inferred entry point.${caveat}`,

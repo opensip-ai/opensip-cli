@@ -30,6 +30,7 @@
 
 import { createSignal } from '@opensip-tools/core';
 
+import { applySeverityOverride } from './_severity-override.js';
 import { defineRule } from './define-rule.js';
 
 import type { FeatureTable, FunctionOccurrence, Indexes, RuleHints } from '../types.js';
@@ -72,7 +73,7 @@ export const noSideEffectPathRule = defineRule({
   slug: 'graph:no-side-effect-path',
   defaultSeverity: 'warning',
   featureDeps: ['bodyLines'],
-  evaluate({ indexes, hints, features }): readonly Signal[] {
+  evaluate({ indexes, hints, features, config }): readonly Signal[] {
     const detector = buildSideEffectDetector(hints);
     const sideEffecting = computeSideEffecting(indexes, detector);
     const signals: Signal[] = [];
@@ -85,7 +86,7 @@ export const noSideEffectPathRule = defineRule({
       signals.push(
         createSignal({
           source: 'graph',
-          severity: 'low',
+          severity: applySeverityOverride('low', 'graph:no-side-effect-path', config),
           category: 'quality',
           ruleId: 'graph:no-side-effect-path',
           message: `${occ.simpleName} is pure but at least one caller discards its return value, so the call has no observable effect.`,

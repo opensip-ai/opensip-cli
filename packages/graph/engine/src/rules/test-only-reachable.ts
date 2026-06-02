@@ -9,6 +9,7 @@ import { createSignal } from '@opensip-tools/core';
 
 import { approximateSuffix } from './_approximation.js';
 import { inferEntryPoints } from './_entry-points.js';
+import { applySeverityOverride } from './_severity-override.js';
 import { defineRule } from './define-rule.js';
 
 import type { Indexes, Rule } from '../types.js';
@@ -18,7 +19,7 @@ export const testOnlyReachableRule = defineRule({
   slug: 'graph:test-only-reachable',
   defaultSeverity: 'warning',
   featureDeps: ['reachableOnlyFromTests'],
-  evaluate({ catalog, indexes, features }): readonly Signal[] {
+  evaluate({ catalog, indexes, features, config }): readonly Signal[] {
     // The reachableOnlyFromTests feature column folds the not-prod-reachable +
     // has-callers + all-callers-in-test predicate. When features are absent
     // (3/4-arg test calls), fall back to the local prod-reachability BFS — the
@@ -45,7 +46,7 @@ export const testOnlyReachableRule = defineRule({
       signals.push(
         createSignal({
           source: 'graph',
-          severity: 'low',
+          severity: applySeverityOverride('low', 'graph:test-only-reachable', config),
           category: 'testing',
           ruleId: 'graph:test-only-reachable',
           message: `${occ.simpleName} is reached only from test files.${caveat}`,
