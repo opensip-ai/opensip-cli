@@ -7,7 +7,10 @@
 /**
  * View 2 — "Big functions" (largest body length).
  *
- * Functions sorted by `endLine - line` descending. Filterable; the
+ * Functions sorted by body length descending — read from the engine
+ * `catalog.features.function[bodyHash].bodyLines` column (Plan C) with a
+ * local `endLine − line + 1` fallback when the catalog carries no features.
+ * Filterable; the
  * full ranked set is handed to `renderFunctionRows` which paginates
  * at 10 rows/page.
  *
@@ -30,7 +33,7 @@ export function dashboardViewBigJs(): string {
         { heading: 'What to do', body: 'Pick a top offender, open it (click the row), and look at the Callees in the Function Card. If the body splits cleanly along callee boundaries, that is your refactor seam. If it is mostly inline logic, extract the largest cohesive block first.' },
       ],
     },
-    metric: 'Math.max(0, (occ.endLine || occ.line) - occ.line + 1)',
+    metric: '(function(){ const f = catalog.features && catalog.features.function && catalog.features.function[occ.bodyHash]; return f && typeof f.bodyLines === "number" ? f.bodyLines : Math.max(0, (occ.endLine || occ.line) - occ.line + 1); })()',
     columns: [
       { label: 'Function', value: 'o => displayName(o.simpleName)' },
       { label: 'Lines', value: 'o => o.__metric' },
