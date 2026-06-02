@@ -15,6 +15,7 @@
 import { ConfigurationError, currentScope, resolveSelector, setCurrentRecipeUnitConfig } from '@opensip-tools/core';
 
 import { currentRules } from '../rules/registry.js';
+
 import { currentGraphRecipes } from './registry.js';
 
 import type { RuleSelector } from './types.js';
@@ -35,8 +36,7 @@ interface RuleView {
  * `ConfigurationError` so the CLI's `handleGraphError` maps it to
  * `EXIT_CODES.CONFIGURATION_ERROR`.
  */
-export function resolveRecipeToRules(recipeName: string | undefined): readonly Rule[] {
-  const name = recipeName ?? 'default';
+export function resolveRecipeToRules(name = 'default'): readonly Rule[] {
   const recipes = currentGraphRecipes();
   const recipe = recipes.loadRecipe(name);
   if (!recipe) {

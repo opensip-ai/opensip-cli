@@ -177,6 +177,7 @@ describe('graphTool.register', () => {
       'graph-baseline-export',
       'catalog-export',
       'sarif-export',
+      'graph-recipes',
     ]);
   });
 

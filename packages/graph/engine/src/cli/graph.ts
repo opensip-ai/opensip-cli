@@ -38,6 +38,7 @@ import { SessionRepo } from '@opensip-tools/session-store';
 import { pickAdapter } from '../lang-adapter/registry.js';
 import { CatalogRepo } from '../persistence/catalog-repo.js';
 import { buildGraphSessionPayload } from '../persistence/session-payload.js';
+import { resolveRecipeToRules } from '../recipes/resolve.js';
 import { buildCliOutput, buildCliOutputFromFindings, renderJson } from '../render/json.js';
 
 
@@ -47,7 +48,6 @@ import { buildUnifiedReportLines, countFiles, resolutionBannerText } from './gra
 import { loadGraphConfig, runGraph, runShardedGraph } from './orchestrate.js';
 import { positionalPathLabel, resolvePositionalPaths } from './positional-paths.js';
 import { MemoryPressureError } from './pressure-monitor.js';
-import { resolveRecipeToRules } from '../recipes/resolve.js';
 import { renderWorkspaceJson, writeWorkspaceReport } from './workspace-report.js';
 import { discoverPolyglotUnits, runWorkspaceUnitsInParallel } from './workspace-runner.js';
 

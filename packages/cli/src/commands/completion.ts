@@ -36,6 +36,7 @@ export const SUBCOMMANDS: readonly string[] = [
   'graph-lookup',
   'graph-symbol-index',
   'graph-baseline-export',
+  'graph-recipes',
   'init',
   'dashboard',
   'plugin',

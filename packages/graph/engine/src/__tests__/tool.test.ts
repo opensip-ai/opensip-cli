@@ -45,6 +45,7 @@ describe('graphTool contract conformance (AC-2)', () => {
       'graph-shard-worker',
       'catalog-export',
       'sarif-export',
+      'graph-recipes',
     ]);
   });
 

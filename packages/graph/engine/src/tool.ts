@@ -31,6 +31,7 @@ import { runCatalogJsonMode } from './cli/graph-modes.js';
 import { renderGraphLive } from './cli/graph-runner.js';
 import { executeGraph, handleGraphError } from './cli/graph.js';
 import { runHeapPreflight } from './cli/heap-preflight.js';
+import { listGraphRecipes } from './cli/list-graph-recipes.js';
 import { executeLookup } from './cli/lookup.js';
 import { loadGraphConfig, runGraph } from './cli/orchestrate.js';
 import { runSarifExportMode } from './cli/sarif-export.js';
@@ -100,6 +101,12 @@ const GRAPH_SARIF_EXPORT: ToolCommandDescriptor = {
   name: 'sarif-export',
   description:
     'Run graph analysis and write OpenSIP-convention SARIF v2.1.0 findings to a file',
+};
+
+const GRAPH_RECIPES: ToolCommandDescriptor = {
+  name: 'graph-recipes',
+  description: 'List available graph recipes',
+  aliases: ['list-graph-recipes'],
 };
 
 // Shared --cwd option flag + description (the `graph`, symbol-index,
@@ -472,6 +479,23 @@ function register(cli: ToolCliContext): void {
         handleGraphError('sarif-export', error, cli);
       }
     });
+
+  // graph-recipes — list available graph recipes (mirrors fit-recipes).
+  // Reuses the shared ListRecipesResult contract + viewListRecipes renderer.
+  const graphRecipesCmd = program
+    .command(GRAPH_RECIPES.name)
+    .description(GRAPH_RECIPES.description);
+  for (const alias of GRAPH_RECIPES.aliases ?? []) graphRecipesCmd.alias(alias);
+  graphRecipesCmd
+    .option('--json', 'Output structured JSON', false)
+    .action(async (opts: { json?: boolean }) => {
+      const result = await listGraphRecipes();
+      if (opts.json === true) {
+        cli.emitJson(result);
+        return;
+      }
+      await cli.render(result);
+    });
 }
 
 /**
@@ -532,7 +556,7 @@ export const graphTool: Tool = {
     version: readPackageVersion(import.meta.url),
     description: 'Static call-graph + dead-end analysis',
   },
-  commands: [GRAPH, GRAPH_LOOKUP, GRAPH_SYMBOL_INDEX, GRAPH_BASELINE_EXPORT, GRAPH_SHARD_WORKER, GRAPH_CATALOG_EXPORT, GRAPH_SARIF_EXPORT],
+  commands: [GRAPH, GRAPH_LOOKUP, GRAPH_SYMBOL_INDEX, GRAPH_BASELINE_EXPORT, GRAPH_SHARD_WORKER, GRAPH_CATALOG_EXPORT, GRAPH_SARIF_EXPORT, GRAPH_RECIPES],
   register,
   contributeScope,
   collectDashboardData,
