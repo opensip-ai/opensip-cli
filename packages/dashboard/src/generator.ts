@@ -47,6 +47,13 @@ export interface DashboardInput {
   checkCatalog?: readonly unknown[];
   recipeCatalog?: readonly unknown[];
   graphCatalog?: GraphCatalog | null;
+  // Graph-owned catalog data (Plan B). DISTINCT keys from fitness's
+  // `checkCatalog`/`recipeCatalog` because the CLI merges every tool's
+  // contribution via Object.assign — same key would clobber fitness. The
+  // dashboard reads them structurally (entry shapes are graph domain
+  // vocabulary owned by @opensip-tools/graph, not contracts).
+  graphRuleCatalog?: readonly unknown[];
+  graphRecipeCatalog?: readonly unknown[];
   editorProtocol?: string | null;
 }
 
@@ -107,6 +114,8 @@ export function generateDashboardHtml(input: DashboardInput): string {
     checkCatalog = [],
     recipeCatalog = [],
     graphCatalog = null,
+    graphRuleCatalog = [],
+    graphRecipeCatalog = [],
     editorProtocol = null,
   } = input;
 
@@ -120,6 +129,8 @@ export function generateDashboardHtml(input: DashboardInput): string {
   const safeDataJson = escapeForScriptContext(JSON.stringify(sessions))
   const safeCatalogJson = escapeForScriptContext(JSON.stringify(checkCatalog))
   const safeRecipeJson = escapeForScriptContext(JSON.stringify(recipeCatalog))
+  const safeGraphRuleCatalogJson = escapeForScriptContext(JSON.stringify(graphRuleCatalog))
+  const safeGraphRecipeCatalogJson = escapeForScriptContext(JSON.stringify(graphRecipeCatalog))
   const graphCatalogBlock = serializeOptionalBlob('graph-catalog', graphCatalog, 'json')
   // The Graph view (view-graph.ts) consumes a slim, pre-projected view-model
   // rather than the raw catalog: projection (degrees, SCCs, centrality
@@ -182,6 +193,8 @@ ${graphViewModelBlock}
 const sessions = ${safeDataJson};
 const checkCatalog = ${safeCatalogJson};
 const recipeCatalog = ${safeRecipeJson};
+const graphRuleCatalog = ${safeGraphRuleCatalogJson};
+const graphRecipeCatalog = ${safeGraphRecipeCatalogJson};
 ${editorProtocolJs}
 const fitSessions = sessions.filter(s => s.tool === 'fit');
 const simSessions = sessions.filter(s => s.tool === 'sim');
