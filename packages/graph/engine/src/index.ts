@@ -58,6 +58,15 @@ export type {
   ResolutionMode,
   CrossBoundaryCall,
   Visibility,
+  FeatureTable,
+  FunctionFeatures,
+  PackageFeatures,
+  SccFeatures,
+  PackageEdgeFeature,
+  BlastScore,
+  FeatureColumn,
+  PersistedFeatures,
+  PersistedFunctionFeatures,
 } from './types.js';
 export type { Renderer, RenderContext } from './render/types.js';
 export type { Shard, ShardBuildResult } from './cli/orchestrate/shard-model.js';

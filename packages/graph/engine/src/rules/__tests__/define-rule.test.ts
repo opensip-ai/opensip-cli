@@ -4,7 +4,8 @@
  *  (a) the returned object satisfies the `Rule` interface;
  *  (b) `evaluate` is callable positionally `(catalog, indexes, config, hints)`
  *      — the orchestrator boundary — and the dataset object reaches the author;
- *  (c) the dataset's `features` slot is `undefined` in Plan B;
+ *  (c) the dataset's `features` slot is `undefined` on a 4-arg call and
+ *      carries the threaded FeatureTable on a 5-arg call (Plan C);
  *  (d) invalid metadata (bad slug / bad defaultSeverity / non-function evaluate)
  *      throws `ValidationError`.
  */
@@ -14,7 +15,7 @@ import { describe, expect, it } from 'vitest';
 
 import { defineRule } from '../define-rule.js';
 
-import type { Catalog, GraphConfig, Indexes, RuleHints } from '../../types.js';
+import type { Catalog, FeatureTable, GraphConfig, Indexes, RuleHints } from '../../types.js';
 import type { RuleDataset } from '../define-rule.js';
 import type { Signal } from '@opensip-tools/core';
 
@@ -49,19 +50,41 @@ describe('defineRule', () => {
     expect(received?.hints).toBe(hints);
   });
 
-  it('leaves the dataset features slot undefined in Plan B', () => {
+  it('leaves the dataset features slot undefined on a 4-arg call', () => {
     let received: unknown;
     const rule = defineRule({
       slug: 'graph:demo',
       defaultSeverity: 'warning',
       evaluate: (data) => {
-        // Reading the forward-compat slot compiles and is undefined at runtime.
-        received = data.features?.anything;
+        received = data.features;
         return [];
       },
     });
     rule.evaluate(CATALOG, INDEXES, CONFIG, undefined);
     expect(received).toBeUndefined();
+  });
+
+  it('threads the positional 5th features arg into the dataset (Plan C)', () => {
+    let received: FeatureTable | undefined;
+    const rule = defineRule({
+      slug: 'graph:demo',
+      defaultSeverity: 'warning',
+      featureDeps: ['bodyLines'],
+      evaluate: (data) => {
+        received = data.features;
+        return [];
+      },
+    });
+    const features: FeatureTable = {
+      function: new Map([['h1', { bodyLines: 7 }]]),
+      package: new Map(),
+      scc: [],
+      edge: [],
+    };
+    rule.evaluate(CATALOG, INDEXES, CONFIG, undefined, features);
+    expect(received).toBe(features);
+    expect(received?.function.get('h1')?.bodyLines).toBe(7);
+    expect(rule.featureDeps).toEqual(['bodyLines']);
   });
 
   it('passes through the signals the author returns', () => {
