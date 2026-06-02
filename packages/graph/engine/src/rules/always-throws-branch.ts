@@ -25,6 +25,7 @@
 
 import { createSignal } from '@opensip-tools/core';
 
+import { applySeverityOverride } from './_severity-override.js';
 import { defineRule } from './define-rule.js';
 
 import type { Signal } from '@opensip-tools/core';
@@ -34,7 +35,7 @@ const TYPESCRIPT_FALLBACK_THROW_REGEX = /^\s*throw\s+(?:new\s+)?[A-Z]\w*/;
 export const alwaysThrowsBranchRule = defineRule({
   slug: 'graph:always-throws-branch',
   defaultSeverity: 'warning',
-  evaluate({ indexes, hints }): readonly Signal[] {
+  evaluate({ indexes, hints, config }): readonly Signal[] {
     const throwRegex = hints?.throwSyntaxRegex ?? TYPESCRIPT_FALLBACK_THROW_REGEX;
     const signals: Signal[] = [];
     for (const occ of indexes.byBodyHash.values()) {
@@ -53,7 +54,7 @@ export const alwaysThrowsBranchRule = defineRule({
       signals.push(
         createSignal({
           source: 'graph',
-          severity: 'low',
+          severity: applySeverityOverride('low', 'graph:always-throws-branch', config),
           category: 'quality',
           ruleId: 'graph:always-throws-branch',
           message: `${occ.simpleName} appears to always throw.`,
