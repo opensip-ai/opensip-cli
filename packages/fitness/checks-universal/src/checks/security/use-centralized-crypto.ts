@@ -4,9 +4,7 @@
  */
 
 import { logger } from '@opensip-tools/core'
-import { defineCheck, isCommentLine, type CheckViolation } from '@opensip-tools/fitness'
-
-import { createPathMatcher } from '../../utils/index.js'
+import { createPathMatcher, defineCheck, isCommentLine, type CheckViolation } from '@opensip-tools/fitness'
 
 /**
  * Pattern configuration for detecting direct crypto usage

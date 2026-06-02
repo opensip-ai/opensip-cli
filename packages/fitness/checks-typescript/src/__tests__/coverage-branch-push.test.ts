@@ -1175,7 +1175,7 @@ describe('broad fixture — many checks', () => {
 
 describe('path-matching utility — branches', () => {
   it('exercises string includes and regex test patterns', async () => {
-    const { createPathMatcher } = await import('../utils/path-matching.js')
+    const { createPathMatcher } = await import('@opensip-tools/fitness')
     const stringOnly = createPathMatcher(['/__tests__/'])
     expect(stringOnly('/src/__tests__/foo.ts')).toBe(true)
     expect(stringOnly('/src/main.ts')).toBe(false)

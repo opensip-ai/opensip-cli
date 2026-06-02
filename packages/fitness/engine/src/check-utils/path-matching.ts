@@ -1,9 +1,11 @@
 /**
- * @fileoverview Path matching utilities for fitness checks
- * @version 1.0.0
+ * @fileoverview Path matching utilities for fitness checks.
  *
- * Factory functions for creating path matchers that can work with
- * both string patterns (using includes) and RegExp patterns (using test).
+ * Factory function for creating path matchers that work with both string
+ * patterns (using `includes`) and RegExp patterns (using `test`). Previously
+ * each check pack carried a byte-identical copy of this helper — surfaced by
+ * the graph tool's duplicated-function-body rule. Both packs depend on
+ * @opensip-tools/fitness, so the engine is the natural shared home.
  */
 
 /**

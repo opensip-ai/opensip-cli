@@ -141,5 +141,17 @@ export { FitBaselineRepo } from './persistence/baseline-repo.js';
 // from @opensip-tools/contracts.
 
 // Shared utilities for check authors (extracted from per-pack copies).
-export { isCommentLine, isTestFile, getCheckDisplayName, getCheckIcon } from './check-utils/index.js';
-export type { IsCommentLineOptions, IsTestFileOptions } from './check-utils/index.js';
+export {
+  isCommentLine,
+  isTestFile,
+  getCheckDisplayName,
+  getCheckIcon,
+  makeDisplayHelpers,
+  createPathMatcher,
+} from './check-utils/index.js';
+export type {
+  IsCommentLineOptions,
+  IsTestFileOptions,
+  DisplayHelpers,
+  PathPattern,
+} from './check-utils/index.js';

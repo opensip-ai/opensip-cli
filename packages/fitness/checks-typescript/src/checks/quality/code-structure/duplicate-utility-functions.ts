@@ -98,9 +98,6 @@ const DOMAIN_SPECIFIC_FUNCTIONS = new Set([
   'validateSchema',
   // Common error-message helper
   'getErrorMessage',
-  // Display-helper wrappers (each check pack closes over its own CHECK_DISPLAY)
-  'getCheckIcon',
-  'getCheckDisplayName',
   // AST predicates / shared kernel helpers — each layer (engine, lang adapter,
   // graph adapter) legitimately defines its own implementation tuned to its
   // node shape; the architecture rules prevent cross-layer imports.

@@ -5,11 +5,9 @@
  */
 
 
-import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
+import { createPathMatcher, defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 import { getSharedSourceFile } from '@opensip-tools/lang-typescript'
 import * as ts from 'typescript'
-
-import { createPathMatcher } from '../../../utils/index.js'
 
 /**
  * Paths that should be excluded from validation check

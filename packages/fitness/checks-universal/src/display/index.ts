@@ -9,7 +9,7 @@
  * to it.
  */
 
-import { getCheckDisplayName as getCheckDisplayNameImpl, getCheckIcon as getCheckIconImpl } from '@opensip-tools/fitness'
+import { makeDisplayHelpers } from '@opensip-tools/fitness'
 
 import { ARCHITECTURE_DISPLAY, DOCUMENTATION_DISPLAY } from './architecture.js'
 import { QUALITY_DISPLAY } from './quality.js'
@@ -17,8 +17,6 @@ import { RESILIENCE_DISPLAY } from './resilience.js'
 import { SECURITY_DISPLAY, TESTING_DISPLAY } from './security-testing.js'
 
 import type { CheckDisplayEntry } from './types.js'
-
-
 
 /** Combined check display configuration */
 export const CHECK_DISPLAY = Object.freeze<Record<string, CheckDisplayEntry>>({
@@ -30,16 +28,10 @@ export const CHECK_DISPLAY = Object.freeze<Record<string, CheckDisplayEntry>>({
   ...TESTING_DISPLAY,
 })
 
+/**
+ * Slug-only display lookups bound to this pack's CHECK_DISPLAY map. The lookup
+ * logic lives in @opensip-tools/fitness; this file owns only the data.
+ */
+export const { getCheckIcon, getCheckDisplayName } = makeDisplayHelpers(CHECK_DISPLAY)
 
-
-/** Get the icon for a check by slug. Falls back to magnifying glass. */
-export function getCheckIcon(checkSlug: string): string {
-  return getCheckIconImpl(CHECK_DISPLAY, checkSlug)
-}
-
-/** Get the display name for a check by slug. Falls back to kebab-to-title-case. */
-export function getCheckDisplayName(checkSlug: string): string {
-  return getCheckDisplayNameImpl(CHECK_DISPLAY, checkSlug)
-}
-
-export {type CheckDisplayEntry} from './types.js'
+export { type CheckDisplayEntry } from './types.js'

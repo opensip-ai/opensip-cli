@@ -39,3 +39,31 @@ export function getCheckDisplayName(
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ')
 }
+
+/**
+ * Display helpers bound to a single check pack's display map.
+ */
+export interface DisplayHelpers {
+  /** Get the icon for a check by slug. Falls back to the magnifying-glass emoji. */
+  getCheckIcon: (checkSlug: string) => string
+  /** Get the display name for a check by slug. Falls back to kebab-to-title-case. */
+  getCheckDisplayName: (checkSlug: string) => string
+}
+
+/**
+ * Binds the shared display-lookup logic to a per-pack `CHECK_DISPLAY` map,
+ * returning slug-only `getCheckIcon` / `getCheckDisplayName` closures.
+ *
+ * Each check pack owns its own display data but the binding wrapper was
+ * previously byte-identical across packs (flagged by the graph tool's
+ * duplicated-function-body rule); this factory keeps the data/logic split
+ * intact while erasing the wrapper twin.
+ */
+export function makeDisplayHelpers(
+  displayMap: Readonly<Record<string, CheckDisplayEntry>>,
+): DisplayHelpers {
+  return {
+    getCheckIcon: (checkSlug) => getCheckIcon(displayMap, checkSlug),
+    getCheckDisplayName: (checkSlug) => getCheckDisplayName(displayMap, checkSlug),
+  }
+}

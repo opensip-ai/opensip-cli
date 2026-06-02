@@ -9,7 +9,8 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { getCheckIcon, getCheckDisplayName } from '../check-utils/display.js'
+import { getCheckIcon, getCheckDisplayName, makeDisplayHelpers } from '../check-utils/display.js'
+import { createPathMatcher } from '../check-utils/path-matching.js'
 import { isCommentLine } from '../check-utils/source-analysis.js'
 import { isTestFile } from '../check-utils/test-helpers.js'
 
@@ -56,6 +57,48 @@ describe('getCheckDisplayName', () => {
 
   it('handles empty slug', () => {
     expect(getCheckDisplayName({}, '')).toBe('')
+  })
+})
+
+describe('makeDisplayHelpers', () => {
+  const map: Record<string, CheckDisplayEntry> = {
+    'no-console-log': ['🚫', 'No Console Log'],
+  }
+  const { getCheckIcon: icon, getCheckDisplayName: name } = makeDisplayHelpers(map)
+
+  it('binds the icon lookup to the supplied map', () => {
+    expect(icon('no-console-log')).toBe('🚫')
+    expect(icon('unknown-check')).toBe('🔍')
+  })
+
+  it('binds the display-name lookup to the supplied map', () => {
+    expect(name('no-console-log')).toBe('No Console Log')
+    expect(name('a-b-c')).toBe('A B C')
+  })
+})
+
+describe('createPathMatcher', () => {
+  it('matches string patterns using includes', () => {
+    const stringOnly = createPathMatcher(['/__tests__/'])
+    expect(stringOnly('/src/__tests__/foo.ts')).toBe(true)
+    expect(stringOnly('/src/main.ts')).toBe(false)
+  })
+
+  it('matches RegExp patterns using test', () => {
+    const regexOnly = createPathMatcher([/\.test\.ts$/])
+    expect(regexOnly('foo.test.ts')).toBe(true)
+    expect(regexOnly('foo.ts')).toBe(false)
+  })
+
+  it('matches mixed string and RegExp patterns', () => {
+    const mixed = createPathMatcher(['/dist/', /node_modules/])
+    expect(mixed('/proj/dist/x.js')).toBe(true)
+    expect(mixed('/proj/node_modules/lib/index.js')).toBe(true)
+    expect(mixed('/proj/src/x.ts')).toBe(false)
+  })
+
+  it('returns false for an empty pattern list', () => {
+    expect(createPathMatcher([])('/anything')).toBe(false)
   })
 })
 
