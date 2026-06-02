@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   applyRegions,
   buildLineStarts,
+  isIdentChar,
   makeStripper,
   scanBlockCommentNesting,
   scanBlockCommentNonNesting,
@@ -17,6 +18,32 @@ import {
 function fakeScan(_src: string): ScanResult {
   return { stringRegions: [{ start: 0, end: 3 }], commentRegions: [{ start: 4, end: 7 }] };
 }
+
+describe('isIdentChar', () => {
+  it('returns false for undefined and empty input (the !ch guard)', () => {
+    expect(isIdentChar(undefined)).toBe(false);
+    expect(isIdentChar('')).toBe(false);
+  });
+
+  it('returns true for an ASCII letter (upper and lower case)', () => {
+    expect(isIdentChar('A')).toBe(true);
+    expect(isIdentChar('z')).toBe(true);
+  });
+
+  it('returns true for an ASCII digit', () => {
+    expect(isIdentChar('0')).toBe(true);
+    expect(isIdentChar('9')).toBe(true);
+  });
+
+  it('returns true for underscore', () => {
+    expect(isIdentChar('_')).toBe(true);
+  });
+
+  it('returns false for a non-identifier character', () => {
+    expect(isIdentChar('-')).toBe(false);
+    expect(isIdentChar(' ')).toBe(false);
+  });
+});
 
 describe('makeStripper', () => {
   it('stripStrings blanks only string regions; stripComments blanks both', () => {

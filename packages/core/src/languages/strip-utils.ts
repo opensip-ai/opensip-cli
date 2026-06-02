@@ -415,3 +415,26 @@ export function buildLineStarts(src: string): readonly number[] {
   }
   return starts;
 }
+
+/**
+ * Identifier-character predicate over the C-identifier char class:
+ * ASCII letters (`A-Z`, `a-z`), ASCII digits (`0-9`), and `_`. Returns
+ * `false` for `undefined`/empty input.
+ *
+ * Used by the C-family strip lexers' prefix-anchor guards: if the
+ * character before a candidate string/char-literal prefix is an
+ * identifier character, the candidate is actually the middle/end of an
+ * identifier (e.g. `abcL"foo"` — the `L` is not a wide-string prefix
+ * here), so the prefix matchers must reject. Shared across lang-cpp and
+ * lang-python (which both anchor prefixes on identifier boundaries).
+ */
+export function isIdentChar(ch: string | undefined): boolean {
+  if (!ch) return false;
+  const code = ch.codePointAt(0) ?? 0;
+  return (
+    (code >= 0x41 && code <= 0x5A) ||
+    (code >= 0x61 && code <= 0x7A) ||
+    (code >= 0x30 && code <= 0x39) ||
+    ch === '_'
+  );
+}

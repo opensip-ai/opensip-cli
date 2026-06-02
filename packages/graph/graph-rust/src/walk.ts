@@ -47,6 +47,7 @@ import { relative, sep } from 'node:path';
 
 import {
   makeFileClassifier,
+  nameOf,
   record,
   runWalk,
   synthesizeModuleInit as buildModuleInit,
@@ -587,11 +588,6 @@ function buildClosureOccurrence(
 }
 
 // ── helpers ───────────────────────────────────────────────────────
-
-function nameOf(node: Parser.SyntaxNode): string | null {
-  const name = node.childForFieldName('name');
-  return name ? name.text : null;
-}
 
 function implTargetName(node: Parser.SyntaxNode): string {
   const ty = node.childForFieldName('type');

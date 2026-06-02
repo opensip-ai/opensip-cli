@@ -196,6 +196,21 @@ export function synthesizeModuleInit<F extends TreeSitterParsedFile>(
   };
 }
 
+// ── node helpers ──────────────────────────────────────────────────
+
+/**
+ * Read the text of a node's `name` field, or `null` when absent.
+ *
+ * Byte-identical across the tree-sitter adapters (go/java/python/rust):
+ * every grammar exposes the declared name via a `name` field on
+ * function / method / class / impl nodes. Hoisted here so the four
+ * adapters share one definition.
+ */
+export function nameOf(node: Parser.SyntaxNode): string | null {
+  const name = node.childForFieldName('name');
+  return name ? name.text : null;
+}
+
 // ── resolver helper ───────────────────────────────────────────────
 
 /**

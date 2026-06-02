@@ -34,7 +34,7 @@ export {
   makeConfigCacheKey,
 } from './cache-key.js';
 
-export { skipToEndOfLine } from './body-digest.js';
+export { skipToEndOfLine, skipBlockComment } from './body-digest.js';
 
 export { isReturnValueDiscarded } from './return-discarded.js';
 
@@ -48,4 +48,5 @@ export {
   synthesizeModuleInit,
   type SynthesizeModuleInitParams,
   buildNameIndex,
+  nameOf,
 } from './walk.js';

@@ -14,6 +14,7 @@ export { RECOGNIZED_NON_CODE_FORMATS, isRecognizedNonCodeFormat } from './non-co
 export {
   applyRegions,
   buildLineStarts,
+  isIdentChar,
   makeStripper,
   scanBlockCommentNesting,
   scanBlockCommentNonNesting,

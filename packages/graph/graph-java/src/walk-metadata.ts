@@ -10,11 +10,6 @@ import type { JavaParsedFile } from './parse.js';
 import type { FunctionOccurrence } from '@opensip-tools/graph';
 import type Parser from 'tree-sitter';
 
-export function nameOf(node: Parser.SyntaxNode): string | null {
-  const name = node.childForFieldName('name');
-  return name ? name.text : null;
-}
-
 export function packageQualifier(packageName: string, filePathProjectRel: string): string {
   if (packageName.length > 0) return packageName;
   // Fallback: derive a path-based qualifier (e.g. `src/main/java/Foo.java` →

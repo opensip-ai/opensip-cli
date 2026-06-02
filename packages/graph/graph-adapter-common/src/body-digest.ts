@@ -17,3 +17,22 @@ export function skipToEndOfLine(text: string, start: number): number {
   while (i < text.length && text[i] !== '\n') i++;
   return i;
 }
+
+/**
+ * Skip a NON-nesting C-style block comment: from `start` (just past the
+ * opening `/*`), scan to and past the first `*\/`. Returns the index
+ * immediately after the closing delimiter, or end-of-text if unterminated.
+ *
+ * This is the Go / Java / C-style form, where block comments do NOT nest.
+ * Languages whose block comments DO nest (e.g. Rust's `/* /* *\/ *\/`)
+ * need their own depth-tracking variant and must not use this one.
+ */
+export function skipBlockComment(text: string, start: number): number {
+  let i = start;
+  while (i < text.length) {
+    if (text.slice(i, i + 2) === '*/') return i + 2;
+    i++;
+  }
+  /* v8 ignore next */
+  return i;
+}

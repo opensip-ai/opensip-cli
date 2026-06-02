@@ -17,6 +17,7 @@
 // architecture audit (F3, deferred items).
 
 import {
+  isIdentChar,
   makeStripper,
   scanBlockCommentNonNesting,
   scanCharLiteral,
@@ -135,24 +136,6 @@ function matchRawStringPrefix(src: string, i: number): number {
   if (src[i] === 'u' && src[i + 1] === '8' && src[i + 2] === 'R') return 3
   if ((src[i] === 'u' || src[i] === 'U' || src[i] === 'L') && src[i + 1] === 'R') return 2
   return 0
-}
-
-/**
- * Identifier-character predicate for prefix-anchor guards. C/C++
- * identifiers are `[A-Za-z0-9_]+`; if `prev` is one of those, then the
- * candidate "prefix" character is actually the middle/end of an
- * identifier (e.g. `abcL"foo"` — `L` is not a string prefix here), so
- * the prefix matchers must reject.
- */
-function isIdentChar(ch: string | undefined): boolean {
-  if (!ch) return false
-  const code = ch.codePointAt(0) ?? 0
-  return (
-    (code >= 0x41 && code <= 0x5A) ||
-    (code >= 0x61 && code <= 0x7A) ||
-    (code >= 0x30 && code <= 0x39) ||
-    ch === '_'
-  )
 }
 
 /**

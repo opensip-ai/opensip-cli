@@ -40,6 +40,7 @@ import { relative, sep } from 'node:path';
 
 import {
   makeFileClassifier,
+  nameOf,
   record,
   runWalk,
   synthesizeModuleInit as buildModuleInit,
@@ -283,11 +284,6 @@ function visitLambda(
 }
 
 // ── helpers ───────────────────────────────────────────────────────
-
-function nameOf(node: Parser.SyntaxNode): string | null {
-  const name = node.childForFieldName('name');
-  return name ? name.text : null;
-}
 
 function extractParams(node: Parser.SyntaxNode): readonly { name: string; optional: boolean; rest: boolean }[] {
   return extractParamsFromField(node, 'parameters');

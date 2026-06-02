@@ -45,6 +45,7 @@ import { relative, sep } from 'node:path';
 
 import {
   makeFileClassifier,
+  nameOf,
   record,
   runWalk,
   synthesizeModuleInit as buildModuleInit,
@@ -57,7 +58,6 @@ import {
   extractPackageName,
   extractParams,
   extractReceiverType,
-  nameOf,
 } from './walk-metadata.js';
 
 import type { GoParsedFile, GoParsedProject } from './parse.js';

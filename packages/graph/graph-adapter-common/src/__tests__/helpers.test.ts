@@ -4,23 +4,30 @@ import { join } from 'node:path';
 
 import { describe, expect, it, afterEach, beforeEach } from 'vitest';
 
-import { skipToEndOfLine } from '../body-digest.js';
+import { skipBlockComment, skipToEndOfLine } from '../body-digest.js';
 import { hashConfig, makeConfigCacheKey } from '../cache-key.js';
 import { createDiscover } from '../discover.js';
 import { isReturnValueDiscarded } from '../return-discarded.js';
 import {
   buildNameIndex,
   makeFileClassifier,
+  nameOf,
   record,
   synthesizeModuleInit,
 } from '../walk.js';
 
 import type { FunctionOccurrence } from '@opensip-tools/graph';
+import type Parser from 'tree-sitter';
 
 // Minimal fake of the tree-sitter `SyntaxNode` shape `isReturnValueDiscarded`
 // reads: it only ever inspects `.parent` and `.type`.
 const mk = (type: string, parent: unknown = null): never =>
   ({ type, parent }) as never;
+
+// Minimal fake of the node shape `nameOf` reads: only
+// `childForFieldName('name')` and the returned node's `.text`.
+const mkNameNode = (nameNode: { text: string } | null): Parser.SyntaxNode =>
+  ({ childForFieldName: (f: string) => (f === 'name' ? nameNode : null) }) as never;
 
 describe('skipToEndOfLine', () => {
   it('advances to the next newline', () => {
@@ -29,6 +36,35 @@ describe('skipToEndOfLine', () => {
 
   it('advances to end of text when no newline', () => {
     expect(skipToEndOfLine('abc', 1)).toBe(3);
+  });
+});
+
+describe('skipBlockComment', () => {
+  it('returns the index just past the first `*/` (non-nesting)', () => {
+    // `/*ab*/cd` — start scanning at index 2 (past the opening `/*`);
+    // the closing `*/` ends at index 6.
+    expect(skipBlockComment('/*ab*/cd', 2)).toBe(6);
+  });
+
+  it('does NOT nest — stops at the first `*/`, leaving an inner close dangling', () => {
+    // `/* /* */ */` — start at 2. The first `*/` is the inner one at
+    // index 6, so the scan returns 8, NOT the outer close. This is the
+    // Go/Java/C-style non-nesting behavior.
+    expect(skipBlockComment('/* /* */ */', 2)).toBe(8);
+  });
+
+  it('returns end-of-text for an unterminated block comment', () => {
+    expect(skipBlockComment('/*abc', 2)).toBe(5);
+  });
+});
+
+describe('nameOf', () => {
+  it("returns the `name` field's text when present", () => {
+    expect(nameOf(mkNameNode({ text: 'doThing' }))).toBe('doThing');
+  });
+
+  it('returns null when there is no `name` field', () => {
+    expect(nameOf(mkNameNode(null))).toBeNull();
   });
 });
 

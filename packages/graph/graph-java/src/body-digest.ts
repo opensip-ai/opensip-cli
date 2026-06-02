@@ -15,7 +15,7 @@
  */
 
 import { hashBody, normalizeWhitespace, type BodyDigest } from '@opensip-tools/graph';
-import { skipToEndOfLine } from '@opensip-tools/graph-adapter-common';
+import { skipBlockComment, skipToEndOfLine } from '@opensip-tools/graph-adapter-common';
 
 export function digestJavaBody(text: string): BodyDigest {
   return hashBody(normalizeWhitespace(stripJavaComments(text)));
@@ -67,17 +67,6 @@ function stripJavaComments(text: string): string {
     i++;
   }
   return out;
-}
-
-function skipBlockComment(text: string, start: number): number {
-  // Java block comments do NOT nest. Scan to the first `*/`.
-  let i = start;
-  while (i < text.length) {
-    if (text.slice(i, i + 2) === '*/') return i + 2;
-    i++;
-  }
-  /* v8 ignore next */
-  return i;
 }
 
 function consumeStringLiteral(

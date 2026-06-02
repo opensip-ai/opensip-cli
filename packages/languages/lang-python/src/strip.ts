@@ -28,7 +28,7 @@
 // `scanQuotedString(quoteChar)` into core; with one consumer it stays
 // here.
 
-import { makeStripper, type Region, type ScanResult } from '@opensip-tools/core'
+import { isIdentChar, makeStripper, type Region, type ScanResult } from '@opensip-tools/core'
 
 // Allowed Python string prefixes (lowercase). Case-insensitivity is
 // handled at match time by lowercasing the candidate. Two-letter
@@ -40,17 +40,6 @@ function isAsciiLetter(ch: string | undefined): boolean {
   if (!ch) return false
   const code = ch.codePointAt(0) ?? 0
   return (code >= 0x41 && code <= 0x5A) || (code >= 0x61 && code <= 0x7A)
-}
-
-function isIdentChar(ch: string | undefined): boolean {
-  if (!ch) return false
-  const code = ch.codePointAt(0) ?? 0
-  return (
-    (code >= 0x41 && code <= 0x5A) ||
-    (code >= 0x61 && code <= 0x7A) ||
-    (code >= 0x30 && code <= 0x39) ||
-    ch === '_'
-  )
 }
 
 /**

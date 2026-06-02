@@ -23,7 +23,7 @@ import { describe, expect, it } from 'vitest';
 import { digestJavaBody } from '../body-digest.js';
 import { resolveDependencies } from '../resolve-dependencies.js';
 import { resolveCallSites } from '../resolve.js';
-import { extractLambdaParams, extractParams, nameOf } from '../walk-metadata.js';
+import { extractLambdaParams, extractParams } from '../walk-metadata.js';
 import { walkProject } from '../walk.js';
 
 import type { JavaParsedFile, JavaParsedProject } from '../parse.js';
@@ -169,15 +169,6 @@ describe('graph-java walk-metadata param extraction', () => {
     const lambda = findNode(root, 'lambda_expression');
     expect(lambda).not.toBeNull();
     expect(extractLambdaParams(lambda!)).toEqual([]);
-  });
-
-  it('nameOf returns null for a node with no `name` field', () => {
-    // A `block` node carries no `name` field, so the `name ? : null`
-    // conditional falls to its null arm.
-    const root = parseRoot('class A { void m() { foo(); } }');
-    const block = findNode(root, 'block');
-    expect(block).not.toBeNull();
-    expect(nameOf(block!)).toBeNull();
   });
 
   it('extractParams returns [] for a node with no `parameters` field', () => {

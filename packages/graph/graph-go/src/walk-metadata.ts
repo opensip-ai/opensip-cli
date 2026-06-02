@@ -13,11 +13,6 @@ import type { GoParsedFile } from './parse.js';
 import type { FunctionOccurrence } from '@opensip-tools/graph';
 import type Parser from 'tree-sitter';
 
-export function nameOf(node: Parser.SyntaxNode): string | null {
-  const name = node.childForFieldName('name');
-  return name ? name.text : null;
-}
-
 export function extractPackageName(file: GoParsedFile): string {
   for (const child of file.tree.rootNode.children) {
     if (child.type === 'package_clause') {

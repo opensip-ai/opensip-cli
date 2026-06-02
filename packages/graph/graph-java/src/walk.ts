@@ -57,6 +57,7 @@ import { relative, sep } from 'node:path';
 
 import {
   makeFileClassifier,
+  nameOf,
   record,
   runWalk,
   synthesizeModuleInit as buildModuleInit,
@@ -71,7 +72,6 @@ import {
   extractPackageName,
   extractParams,
   hasTestAnnotation,
-  nameOf,
   packageQualifier,
 } from './walk-metadata.js';
 
