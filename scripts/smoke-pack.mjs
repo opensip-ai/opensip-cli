@@ -50,6 +50,11 @@ const TARBALL_PREFIX = 'opensip-tools-';
 // Arg parsing
 // ---------------------------------------------------------------------
 
+// The default is the agreed handoff path with release.yml's pack step
+// (`pnpm pack --pack-destination /tmp/tarballs`). The publicly-writable-dir
+// concern doesn't apply: this is a release smoke test that runs only in an
+// ephemeral, single-tenant CI runner, and the path is overridable with --dir.
+// eslint-disable-next-line sonarjs/publicly-writable-directories
 let tarballDir = '/tmp/tarballs';
 let expectedVersion = null;
 const argv = process.argv.slice(2);
@@ -150,8 +155,8 @@ const runCli = (bin, cliArgs, label) => {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
     });
-  } catch (err) {
-    const childErr = (err.stderr || err.stdout || err.message || '').toString().trim();
+  } catch (error) {
+    const childErr = (error.stderr || error.stdout || error.message || '').toString().trim();
     fail(`${label} failed — the packed artifacts do not load together:\n${childErr}`);
   }
 };

@@ -50,8 +50,8 @@ function main() {
       { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 },
     );
     json = JSON.parse(out);
-  } catch (err) {
-    console.error('verify-gate-live: failed to run/parse depcruise:', err.message);
+  } catch (error) {
+    console.error('verify-gate-live: failed to run/parse depcruise:', error.message);
     process.exit(2);
   }
 

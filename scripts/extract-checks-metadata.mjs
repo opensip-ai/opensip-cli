@@ -14,7 +14,7 @@
 //
 
 import { promises as fs } from 'node:fs';
-import { dirname, basename, relative } from 'node:path';
+import { dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -120,15 +120,15 @@ async function main() {
         for (const b of blocks) {
           all.push({ ...b, pack });
         }
-      } catch (e) {
-        process.stderr.write(`warn: could not read ${f}: ${e.message}\n`);
+      } catch (error) {
+        process.stderr.write(`warn: could not read ${f}: ${error.message}\n`);
       }
     }
   }
   process.stdout.write(JSON.stringify(all, null, 2) + '\n');
 }
 
-main().catch((e) => {
-  process.stderr.write(`error: ${e.message}\n`);
+main().catch((error) => {
+  process.stderr.write(`error: ${error.message}\n`);
   process.exit(1);
 });

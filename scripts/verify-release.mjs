@@ -125,7 +125,10 @@ if (versions.size === 1) {
   pass(1, `all ${pkgs.length} @opensip-tools/* packages at ${consensusVersion}.`);
 } else {
   const grouped = {};
-  for (const p of pkgs) (grouped[p.version] ??= []).push(p.name);
+  for (const p of pkgs) {
+    grouped[p.version] ??= [];
+    grouped[p.version].push(p.name);
+  }
   const detail = Object.entries(grouped)
     .map(([v, names]) => `    ${v}: ${names.join(', ')}`)
     .join('\n');
@@ -174,10 +177,10 @@ try {
     stdio: 'pipe',
   });
   pass(4, 'docs/web-generated/ is in sync with docs/public/.');
-} catch (err) {
-  const stderr = err.stderr?.toString() ?? '';
-  const stdout = err.stdout?.toString() ?? '';
-  fail(4, `docs/web-generated/ is stale. Run \`pnpm docs:build\` to regenerate.\n${stdout.trim() || stderr.trim() || err.message}`);
+} catch (error) {
+  const stderr = error.stderr?.toString() ?? '';
+  const stdout = error.stdout?.toString() ?? '';
+  fail(4, `docs/web-generated/ is stale. Run \`pnpm docs:build\` to regenerate.\n${stdout.trim() || stderr.trim() || error.message}`);
 }
 
 // 5 — Cross-package deps consistent

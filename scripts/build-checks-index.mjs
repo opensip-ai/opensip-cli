@@ -70,7 +70,7 @@ function primaryTag(check) {
 function escapeMd(s) {
   if (!s) return '';
   // Escape pipe and backtick within table cells; collapse newlines.
-  return s.replace(/\|/g, '\\|').replace(/\n/g, ' ').trim();
+  return s.replaceAll('|', String.raw`\|`).replaceAll('\n', ' ').trim();
 }
 
 function checkLabel(count) {
@@ -100,45 +100,17 @@ async function main() {
 
   const today = new Date().toISOString().slice(0, 10);
 
-  const out = [];
-  out.push('---');
-  out.push('status: current');
-  out.push(`last_verified: ${today}`);
-  out.push('release: v2.0.x');
-  out.push('title: "Checks reference"');
-  out.push('audience: [getting-started, ci-integrators, plugin-authors]');
-  out.push('purpose: "Browsable index of every built-in fit check, grouped by pack and primary tag. Auto-generated from source by scripts/build-checks-index.mjs."');
-  out.push('source-files:');
-  out.push('  - packages/fitness/checks-universal/src/checks/');
-  out.push('  - packages/fitness/checks-typescript/src/checks/');
-  out.push('  - packages/fitness/checks-python/src/checks/');
-  out.push('  - packages/fitness/checks-go/src/checks/');
-  out.push('  - packages/fitness/checks-java/src/checks/');
-  out.push('  - packages/fitness/checks-cpp/src/checks/');
-  out.push('  - packages/fitness/checks-rust/src/checks/');
-  out.push('related-docs:');
-  out.push('  - ../00-start/02-show-me-the-loops.md');
-  out.push('  - ../50-extend/01-plugin-authoring.md');
-  out.push('  - ../50-extend/04-check-pack-architecture.md');
-  out.push('---');
-  out.push('# Checks reference');
-  out.push('');
-  out.push(`opensip-tools ships **${total}+ built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from \`defineCheck\`.`);
-  out.push('');
-  out.push('> This page is **auto-generated** from the source by [`scripts/build-checks-index.mjs`](https://github.com/opensip-ai/opensip-tools/blob/main/scripts/build-checks-index.mjs). Do not edit it by hand — edit the check\'s source file (the link in each row), then re-run the generator.');
-  out.push('');
+  const out = [ '---', 'status: current', `last_verified: ${today}`, 'release: v2.0.x', 'title: "Checks reference"', 'audience: [getting-started, ci-integrators, plugin-authors]', 'purpose: "Browsable index of every built-in fit check, grouped by pack and primary tag. Auto-generated from source by scripts/build-checks-index.mjs."', 'source-files:', '  - packages/fitness/checks-universal/src/checks/', '  - packages/fitness/checks-typescript/src/checks/', '  - packages/fitness/checks-python/src/checks/', '  - packages/fitness/checks-go/src/checks/', '  - packages/fitness/checks-java/src/checks/', '  - packages/fitness/checks-cpp/src/checks/', '  - packages/fitness/checks-rust/src/checks/', 'related-docs:', '  - ../00-start/02-show-me-the-loops.md', '  - ../50-extend/01-plugin-authoring.md', '  - ../50-extend/04-check-pack-architecture.md', '---', '# Checks reference', '', `opensip-tools ships **${total}+ built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from \`defineCheck\`.`, '', '> This page is **auto-generated** from the source by [`scripts/build-checks-index.mjs`](https://github.com/opensip-ai/opensip-tools/blob/main/scripts/build-checks-index.mjs). Do not edit it by hand — edit the check\'s source file (the link in each row), then re-run the generator.', ''];
 
   // Per-pack section
   for (const pack of PACK_ORDER) {
     const inPack = checks.filter((c) => c.pack === pack);
     if (inPack.length === 0) continue;
     const display = PACK_DISPLAY[pack];
-    out.push('---');
-    out.push('');
-    out.push(`## ${display.title}  *(${inPack.length} ${checkLabel(inPack.length)})*`);
-    out.push('');
-    out.push(display.scope);
-    out.push('');
+    out.push(
+      '---', '',
+      `## ${display.title}  *(${inPack.length} ${checkLabel(inPack.length)})*`, '', display.scope, '',
+    );
 
     // Group by primary tag
     const byTag = new Map();
@@ -152,10 +124,7 @@ async function main() {
 
     for (const tag of tagOrder) {
       const items = byTag.get(tag).sort((a, b) => a.slug.localeCompare(b.slug));
-      out.push(`### ${tag.charAt(0).toUpperCase()}${tag.slice(1)}  *(${items.length})*`);
-      out.push('');
-      out.push('| Slug | Description |');
-      out.push('|---|---|');
+      out.push(`### ${tag.charAt(0).toUpperCase()}${tag.slice(1)}  *(${items.length})*`, '', '| Slug | Description |', '|---|---|');
       for (const c of items) {
         const slugCell = `[\`${c.slug}\`](https://github.com/opensip-ai/opensip-tools/blob/main/${c.file})`;
         const descCell = escapeMd(c.description ?? '*(no description; see source)*');
@@ -165,21 +134,7 @@ async function main() {
     }
   }
 
-  out.push('---');
-  out.push('');
-  out.push('## How to use a check');
-  out.push('');
-  out.push('Every check above is loaded automatically when its pack is in your project\'s `node_modules/`. To target one explicitly:');
-  out.push('');
-  out.push('```bash');
-  out.push('opensip-tools fit --check <slug>           # run one check');
-  out.push('opensip-tools fit --tags security          # run all checks tagged security');
-  out.push('opensip-tools fit --recipe quick-smoke     # run a named lineup');
-  out.push('```');
-  out.push('');
-  out.push('Per-check parameter overrides go in your recipe under `config:` — see [recipes and checks](../20-fit/01-recipes-and-checks.md).');
-  out.push('');
-  out.push('To write your own check, see [plugin authoring](../50-extend/01-plugin-authoring.md).');
+  out.push('---', '', '## How to use a check', '', 'Every check above is loaded automatically when its pack is in your project\'s `node_modules/`. To target one explicitly:', '', '```bash', 'opensip-tools fit --check <slug>           # run one check', 'opensip-tools fit --tags security          # run all checks tagged security', 'opensip-tools fit --recipe quick-smoke     # run a named lineup', '```', '', 'Per-check parameter overrides go in your recipe under `config:` — see [recipes and checks](../20-fit/01-recipes-and-checks.md).', '', 'To write your own check, see [plugin authoring](../50-extend/01-plugin-authoring.md).');
 
   const generated = out.join('\n') + '\n';
 
@@ -210,7 +165,7 @@ async function main() {
   process.stdout.write(generated);
 }
 
-main().catch((e) => {
-  process.stderr.write(`error: ${e.message}\n`);
+main().catch((error) => {
+  process.stderr.write(`error: ${error.message}\n`);
   process.exit(1);
 });

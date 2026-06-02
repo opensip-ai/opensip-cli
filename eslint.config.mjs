@@ -300,4 +300,46 @@ export default tseslint.config(
     files: ['**/*.js', '**/*.cjs', '**/*.mjs'],
     ...tseslint.configs.disableTypeChecked,
   },
+
+  // ---------------------------------------------------------------------------
+  // Build/release scripts (scripts/*.mjs) + root config files (*.cjs, *.mjs).
+  //
+  // These are Node programs, not product code. The big tuning block above is
+  // scoped to `**/*.{ts,tsx}`, so these files used to fall through to the raw
+  // recommended rulesets with NO Node globals — flagging `process`/`console`
+  // as undefined and re-raising the abbreviation/null/import-style opinions the
+  // TS profile deliberately turns off. Give them Node globals and the same
+  // opinion relaxations, plus build-script pragmatics (CommonJS `require`,
+  // PATH-resolved tools like git/npm/node, procedural complexity). The
+  // genuinely valuable rules (unused code, ReDoS, bug detection) stay on and
+  // are fixed in the scripts themselves.
+  // ---------------------------------------------------------------------------
+  {
+    files: ['scripts/**/*.{mjs,js}', '*.{mjs,cjs,js}'],
+    languageOptions: {
+      globals: { ...globals.node },
+    },
+    rules: {
+      // Match the TS profile's file-agnostic opinion overrides (those are
+      // .ts-scoped above; mirror them here so the rulesets stay consistent).
+      'unicorn/prevent-abbreviations': 'off',
+      'unicorn/no-null': 'off',
+      'unicorn/import-style': 'off',
+      'unicorn/no-array-sort': 'off',
+      'sonarjs/no-os-command-from-path': 'off',
+      'sonarjs/todo-tag': 'off',
+      'sonarjs/pseudo-random': 'off',
+      // ReDoS hotspot. These scripts only ever run regexes against the repo's
+      // own committed content (docs, check source) at build time — the threat
+      // model (super-linear backtracking on attacker-controlled input) does
+      // not apply to trusted build-time input. Same posture as the
+      // server-side-only no-os-command-from-path rule above.
+      'sonarjs/slow-regex': 'off',
+      // Build-script pragmatics.
+      'sonarjs/fixme-tag': 'off',              // tracked by fitness's todo-comments check, like todo-tag
+      'sonarjs/cognitive-complexity': 'off',   // procedural one-shot build scripts
+      'unicorn/prefer-top-level-await': 'off', // .cjs can't TLA; .mjs scripts use an async main() by choice
+      '@typescript-eslint/no-require-imports': 'off', // .cjs config files require() by definition
+    },
+  },
 );

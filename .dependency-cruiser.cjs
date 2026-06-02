@@ -62,8 +62,8 @@ module.exports = {
       name: 'not-to-spec',
       severity: 'error',
       comment: "Production code must not import test specs",
-      from: { pathNot: ['/__tests__/', '\\.test\\.(ts|tsx)$'] },
-      to: { path: ['/__tests__/', '\\.test\\.(ts|tsx)$'] },
+      from: { pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`] },
+      to: { path: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`] },
     },
     {
       name: 'not-to-dev-dep',
@@ -73,7 +73,7 @@ module.exports = {
         "dependencies or refactor the import out of source.",
       from: {
         path: '^packages/',
-        pathNot: ['/__tests__/', '\\.test\\.(ts|tsx)$'],
+        pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`],
       },
       to: { dependencyTypes: ['npm-dev'] },
     },
@@ -561,7 +561,7 @@ module.exports = {
         '@opensip-tools/contracts (audit 2026-05-29, M1).',
       from: {
         path: '^packages/graph/',
-        pathNot: ['/__tests__/', '\\.test\\.(ts|tsx)$'],
+        pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`],
       },
       to: { path: '^packages/fitness/engine/' },
     },
@@ -583,7 +583,7 @@ module.exports = {
         'its own dashboard data via the Tool.collectDashboardData seam.',
       from: {
         path: '^packages/fitness/',
-        pathNot: ['/__tests__/', '\\.test\\.(ts|tsx)$'],
+        pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`],
       },
       to: { path: '^packages/graph/engine/' },
     },
@@ -631,11 +631,11 @@ module.exports = {
         'and contains no view registration of its own.',
       from: {
         path: '^packages/dashboard/src/code-paths/view-',
-        pathNot: '^packages/dashboard/src/code-paths/view-template\\.ts$',
+        pathNot: String.raw`^packages/dashboard/src/code-paths/view-template\.ts$`,
       },
       to: {
         path: '^packages/dashboard/src/code-paths/view-',
-        pathNot: '^packages/dashboard/src/code-paths/view-template\\.ts$',
+        pathNot: String.raw`^packages/dashboard/src/code-paths/view-template\.ts$`,
       },
     },
     {
@@ -644,8 +644,8 @@ module.exports = {
       comment:
         'MI-3: pure-algorithm modules (scc, search, trace) must not import ' +
         'view files or function-card.',
-      from: { path: '^packages/dashboard/src/code-paths/(scc|search|trace)\\.ts$' },
-      to: { path: '^packages/dashboard/src/code-paths/(view-|function-card\\.ts)' },
+      from: { path: String.raw`^packages/dashboard/src/code-paths/(scc|search|trace)\.ts$` },
+      to: { path: String.raw`^packages/dashboard/src/code-paths/(view-|function-card\.ts)` },
     },
     {
       name: 'dashboard-no-side-stylesheets',
@@ -654,7 +654,7 @@ module.exports = {
         'AI-4: new CSS must extend dashboard/css.ts. No external .css imports ' +
         'inside the dashboard package.',
       from: { path: '^packages/dashboard/src/' },
-      to: { path: '\\.css$' },
+      to: { path: String.raw`\.css$` },
     },
     {
       name: 'dashboard-no-ui-framework',
@@ -670,7 +670,7 @@ module.exports = {
 
   options: {
     doNotFollow: {
-      path: ['node_modules', 'dist', '\\.turbo'],
+      path: ['node_modules', 'dist', String.raw`\.turbo`],
     },
 
     // Treat workspace package names as workspace-internal (not 'npm') so the
@@ -708,7 +708,7 @@ module.exports = {
       path: [
         '^packages/[^/]+/[^/]+/dist/',
         '^packages/[^/]+/dist/',
-        '\\.test\\.(ts|tsx)$',
+        String.raw`\.test\.(ts|tsx)$`,
         '/__tests__/',
         '/__fixtures__/',
       ],

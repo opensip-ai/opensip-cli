@@ -284,7 +284,7 @@ const parseFrontmatter = (text) => {
     if (value.startsWith('[') && value.endsWith(']')) {
       try {
         // Convert YAML inline array to JSON: single-quoted -> double, no quotes around bare words
-        const jsonish = value.replace(/'/g, '"').replace(/([A-Za-z_-][\w-]*)/g, (m) =>
+        const jsonish = value.replaceAll('\'', '"').replaceAll(/([A-Za-z_-][\w-]*)/g, (m) =>
           /^(true|false|null)$/.test(m) ? m : `"${m}"`
         );
         out[key] = JSON.parse(jsonish);
@@ -357,9 +357,9 @@ const collectMarkdownFiles = async (dir) => {
     let entries;
     try {
       entries = await fs.readdir(d, { withFileTypes: true });
-    } catch (e) {
-      if (e.code === 'ENOENT') return;
-      throw e;
+    } catch (error) {
+      if (error.code === 'ENOENT') return;
+      throw error;
     }
     for (const ent of entries) {
       const full = join(d, ent.name);
@@ -385,12 +385,12 @@ const transformDoc = (source, srcRel, releaseRef) => {
 
 const applyWebMarkers = (text) => {
   // Remove web:skip blocks entirely
-  text = text.replace(
+  text = text.replaceAll(
     /<!--\s*web:skip\s*-->[\s\S]*?<!--\s*\/web:skip\s*-->\n?/g,
     ''
   );
   // Unwrap web:only blocks (keep content, drop markers)
-  text = text.replace(
+  text = text.replaceAll(
     /<!--\s*web:only\s*-->\n?([\s\S]*?)\n?<!--\s*\/web:only\s*-->\n?/g,
     '$1'
   );
@@ -415,7 +415,7 @@ const rewriteLinks = (text, srcRel, releaseRef) => {
 const rewriteLineLinks = (line, srcRel, releaseRef) => {
   // Match Markdown link syntax: [label](target).
   // Captures label (preserving square brackets) and target.
-  return line.replace(/(\[[^\]]+\])\(([^)]+)\)/g, (match, label, target) => {
+  return line.replaceAll(/(\[[^\]]+\])\(([^)]+)\)/g, (match, label, target) => {
     const newTarget = rewriteTarget(target.trim(), srcRel, releaseRef);
     return `${label}(${newTarget})`;
   });
@@ -428,8 +428,8 @@ const rewriteTarget = (target, srcRel, releaseRef) => {
 
   // Split off anchor and any trailing query (we ignore queries for now)
   const hashIdx = target.indexOf('#');
-  const pathPart = hashIdx >= 0 ? target.slice(0, hashIdx) : target;
-  const anchor = hashIdx >= 0 ? target.slice(hashIdx) : '';
+  const pathPart = hashIdx === -1 ? target : target.slice(0, hashIdx);
+  const anchor = hashIdx === -1 ? '' : target.slice(hashIdx);
 
   if (pathPart === '') return target; // pure anchor link, already handled above
 
@@ -497,7 +497,7 @@ const warnIfMermaid = (text, srcRel) => {
 const log = (msg) => console.error(`[build-web-docs] ${msg}`);
 const err = (msg) => console.error(`[build-web-docs] ${msg}`);
 
-main().catch((e) => {
-  console.error(e);
+main().catch((error) => {
+  console.error(error);
   process.exit(1);
 });
