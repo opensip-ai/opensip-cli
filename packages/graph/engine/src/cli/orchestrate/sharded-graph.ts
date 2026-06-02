@@ -14,7 +14,9 @@
 
 import { logger, withSpanAsync, type Signal, type Span } from '@opensip-tools/core';
 
+import { constrainCrossPackageEdges } from '../../pipeline/constrain-edges.js';
 import { buildIndexes } from '../../pipeline/indexes.js';
+import { buildPackageGroupMap } from '../../pipeline/workspace-package-map.js';
 import { currentRules } from '../../rules/registry.js';
 import { GRAPH_TRACER } from '../graph-tracer.js';
 
@@ -104,7 +106,11 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
   // 3. Merge cached + freshly-built fragments and recover cross-package edges.
   const fragments = [...plan.cached, ...built.fragments];
   const allFiles = shards.flatMap((s) => s.files);
-  const { catalog, boundaryStats } = mergeAndResolveShards(fragments, allFiles);
+  const { catalog: merged, boundaryStats } = mergeAndResolveShards(fragments, allFiles);
+  // Drop name-guessed cross-package edges that contradict the import graph —
+  // the same correction applied to the single-program path, so the persisted
+  // catalog (and the coupling grid) is import-consistent in both build modes.
+  const catalog = constrainCrossPackageEdges(merged, buildPackageGroupMap(projectRoot));
 
   // 4. Persist: each rebuilt shard's fragment, prune removed shards, and the
   //    unified full catalog (so whole-catalog consumers still work).

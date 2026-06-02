@@ -19,14 +19,33 @@ import type { BlastScore, Catalog, FunctionOccurrence, Indexes } from '../types.
  */
 const BLAST_MAX_DEPTH = 5;
 
-/** Builds query-side indexes (by-body-hash, by-simple-name, blast radius) over the catalog. */
-export function buildIndexes(catalog: Catalog): Indexes {
+/** The three content-keyed maps a single linear scan of the catalog produces. */
+export interface HashMaps {
+  readonly byBodyHash: Map<string, FunctionOccurrence>;
+  readonly occurrencesByHash: Map<string, FunctionOccurrence[]>;
+  readonly bySimpleName: Map<string, string[]>;
+}
+
+/**
+ * One linear pass over `catalog.functions` producing the content-keyed maps:
+ * `byBodyHash` (last-writer-wins, content-dedup), `occurrencesByHash` (all
+ * occurrences per hash — collision-preserving), and `bySimpleName`. Shared by
+ * `buildIndexes` and the cross-package edge-constraint pass so both derive
+ * package identity from the same scan.
+ */
+export function buildHashMaps(catalog: Catalog): HashMaps {
   const byBodyHash = new Map<string, FunctionOccurrence>();
   const occurrencesByHash = new Map<string, FunctionOccurrence[]>();
   const bySimpleName = new Map<string, string[]>();
   for (const name of Object.keys(catalog.functions)) {
     indexNameBucket(catalog, name, byBodyHash, occurrencesByHash, bySimpleName);
   }
+  return { byBodyHash, occurrencesByHash, bySimpleName };
+}
+
+/** Builds query-side indexes (by-body-hash, by-simple-name, blast radius) over the catalog. */
+export function buildIndexes(catalog: Catalog): Indexes {
+  const { byBodyHash, occurrencesByHash, bySimpleName } = buildHashMaps(catalog);
   const { callees, callers } = buildAdjacency(byBodyHash);
   const blastRadius = buildBlastRadius(byBodyHash, callers);
   const importedPackagesByFile = buildImportedPackagesByFile(occurrencesByHash, byBodyHash);

@@ -13,6 +13,7 @@ import {
   classifyCatalog,
   computeFilesFingerprint,
 } from '../../cache/invalidate.js';
+import { constrainCrossPackageEdges } from '../../pipeline/constrain-edges.js';
 
 import {
   buildAndResolveCatalog,
@@ -38,6 +39,9 @@ export interface ObtainCatalogInput {
   /** Active resolution tier. Folded into the cacheKey so fast/exact
    *  catalogs never collide, and forwarded into the build path. */
   readonly resolutionMode: ResolutionMode;
+  /** Workspace package name → coupling group, for the cross-package edge
+   *  constraint (see `constrainCrossPackageEdges`). Empty in non-monorepos. */
+  readonly packageGroupMap: ReadonlyMap<string, string>;
   readonly onProgress?: GraphProgressCallback;
   readonly monitor?: PressureMonitor;
 }
@@ -98,10 +102,13 @@ export function obtainCatalog(input: ObtainCatalogInput): ObtainCatalogOutput {
         input.monitor,
       );
 
-  const catalog: Catalog = {
-    ...built.catalog,
-    filesFingerprint: computeFilesFingerprint(input.discovery.files),
-  };
+  const catalog: Catalog = constrainCrossPackageEdges(
+    {
+      ...built.catalog,
+      filesFingerprint: computeFilesFingerprint(input.discovery.files),
+    },
+    input.packageGroupMap,
+  );
   if (input.useCache && input.catalogRepo) {
     try {
       input.catalogRepo.replaceAll(catalog);

@@ -28,6 +28,7 @@ import { withSpan, type Attributes, type Signal } from '@opensip-tools/core';
 import { currentAdapterRegistry, pickAdapter } from '../lang-adapter/registry.js';
 import { CatalogRepo } from '../persistence/catalog-repo.js';
 import { buildIndexes } from '../pipeline/indexes.js';
+import { buildPackageGroupMap } from '../pipeline/workspace-package-map.js';
 import { currentRules } from '../rules/registry.js';
 
 import { GRAPH_TRACER } from './graph-tracer.js';
@@ -190,6 +191,7 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
       catalogRepo,
       useCache: input.noCache !== true,
       resolutionMode,
+      packageGroupMap: buildPackageGroupMap(input.cwd),
       onProgress: input.onProgress,
       monitor,
     });
