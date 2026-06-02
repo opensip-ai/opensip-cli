@@ -28,13 +28,17 @@ export type {
   ToolOptions,
 } from './types.js';
 
-// Output and result types
+// Output types (the structured JSON shape and its parts)
 export type {
   CliOutput,
   CheckOutput,
   FindingOutput,
   TableRow,
   SummaryOptions,
+} from './types.js';
+
+// Command result types (the CommandResult union + per-command variants)
+export type {
   CommandResult,
   ClearDoneResult,
   ConfigureDoneResult,
@@ -43,6 +47,7 @@ export type {
   SimDoneResult,
   GraphDoneResult,
   GateDoneResult,
+  GraphStatusResult,
   ListChecksResult,
   ListRecipesResult,
   HistoryResult,
@@ -55,7 +60,7 @@ export type {
   SyncEntry,
   HelpResult,
   ErrorResult,
-} from './types.js';
+} from './command-results.js';
 
 // Canonical pass-rate (`score`) computation — shared by every tool that
 // builds a CliOutput so the dashboard "PASS RATE" stays consistent across
