@@ -77,9 +77,28 @@ export function dashboardCssCodePaths(): string {
 /* Coupling heat map cell shading — set --coupling-density per cell */
 .coupling-cell { background: color-mix(in srgb, var(--bg-surface), var(--accent) calc(var(--coupling-density, 0) * 60%)); cursor: pointer; }
 .coupling-cell.empty { color: var(--text-dim); cursor: default; }
-.coupling-table { width: auto; border-collapse: collapse; font-size: 12px; }
-.coupling-table th, .coupling-table td { border: 1px solid var(--border); padding: 4px 8px; text-align: center; min-width: 36px; }
+
+/* Bounded, scrollable viewport so a large N×N matrix stays on the page —
+   gives both a vertical and a horizontal scrollbar instead of overflowing. */
+.coupling-scroll { overflow: auto; max-height: 70vh; max-width: 100%; }
+
+/* border-collapse:separate (not collapse) so sticky cells keep their borders
+   while scrolling — collapsed borders detach from sticky elements. Cells carry
+   only right+bottom borders to avoid doubling; the first row/column add the
+   top/left outer edges. */
+.coupling-table { width: auto; border-collapse: separate; border-spacing: 0; font-size: 12px; }
+.coupling-table th, .coupling-table td { border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 4px 8px; text-align: center; min-width: 36px; }
+.coupling-table thead th { border-top: 1px solid var(--border); }
+.coupling-table tr > :first-child { border-left: 1px solid var(--border); }
 .coupling-table th { color: var(--text-muted); background: var(--bg-surface); }
 .coupling-table th.row-label { text-align: right; padding-right: 10px; }
+
+/* Pin the header row (survives vertical scroll) and the label column (survives
+   horizontal scroll); the top-left corner is pinned on both axes and layered
+   above both. Sticky cells need an opaque background — the th rule above
+   supplies one — so scrolling content doesn't bleed through. */
+.coupling-table thead th { position: sticky; top: 0; z-index: 2; }
+.coupling-table th.row-label { position: sticky; left: 0; z-index: 1; }
+.coupling-table thead th.row-label { z-index: 3; }
 `;
 }

@@ -89,7 +89,12 @@ views.push({
       tbody.appendChild(row);
     }
     table.appendChild(tbody);
-    card.appendChild(table);
+    // Bounded, scrollable viewport: a large N×N matrix would otherwise run off
+    // the page. overflow:auto gives both scrollbars; the sticky header/label
+    // styling (see code-paths.css .coupling-scroll) keeps the axes readable.
+    const scroll = el('div', { class: 'coupling-scroll' });
+    scroll.appendChild(table);
+    card.appendChild(scroll);
     section.appendChild(card);
     container.appendChild(section);
   },

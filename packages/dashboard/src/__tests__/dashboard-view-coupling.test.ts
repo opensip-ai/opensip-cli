@@ -105,6 +105,25 @@ describe('View 4 — Coupling matrix', () => {
     expect(cliRow!.textContent).toBe('3'); // a→x, a→y, b→x
   });
 
+  it('wraps the table in a bounded scroll container so a large matrix stays on the page', () => {
+    const catalog: GraphCatalog = {
+      version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now',
+      functions: {
+        a: [makeOcc({ bodyHash: 'a', simpleName: 'a', filePath: 'packages/cli/src/a.ts',
+          calls: [{ to: ['x'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'x()' }] })],
+        x: [makeOcc({ bodyHash: 'x', simpleName: 'x', filePath: 'packages/contracts/src/x.ts' })],
+      },
+    };
+    const env = loadEnv(catalog);
+    const c = document.createElement('div');
+    env.views.find(v => v.id === 'coupling')!.render(c, env.graphCatalog, env.graphIndexes, env.filterState);
+    const scroll = c.querySelector('.coupling-scroll');
+    expect(scroll).not.toBeNull();
+    // The table must live *inside* the scroll container — that's what gives it
+    // both scrollbars instead of overflowing the page.
+    expect(scroll!.querySelector('table.coupling-table')).not.toBeNull();
+  });
+
   it('opens a drilldown card listing the call sites when a cell is clicked', () => {
     const catalog: GraphCatalog = {
       version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now',
