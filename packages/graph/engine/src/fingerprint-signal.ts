@@ -16,9 +16,10 @@ import type { Signal } from '@opensip-tools/core';
  *
  * Deliberately excludes `message`. A fingerprint is an *identity*, and
  * several rules embed run-varying values in their message text — e.g.
- * `graph:high-blast-function` reports the blast radius score, which
- * shifts whenever the call graph changes transitively anywhere in the
- * repo, even when this finding's underlying condition is unchanged.
+ * `graph:duplicated-function-body` reports how many other functions
+ * share the same body, a count that shifts whenever a duplicate is
+ * added or removed anywhere in the repo, even when this finding's
+ * underlying condition is unchanged.
  * Hashing the message made the same logical finding fingerprint
  * differently across runs, so the gate reported it as simultaneously
  * "resolved" (old text) and "new" (new text) — a spurious regression.

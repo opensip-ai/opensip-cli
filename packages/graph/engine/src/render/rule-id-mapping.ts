@@ -5,12 +5,12 @@
  * `graph:orphan-subtree`) per `engine/src/types.ts`. OpenSIP's rule-ID
  * convention is `<package>.<rule-family>.<rule-id>` — a three-segment
  * dot-separated form that lets the reconciler classify findings by family
- * (dead-code vs complexity vs safety, etc.) without parsing message text.
+ * (dead-code vs duplication vs safety, etc.) without parsing message text.
  *
  * For graph-emitted findings, the first segment is always `graph` (the
  * source package). The second segment is the rule family the engine rule
- * belongs to (`dead-code`, `complexity`, `duplication`, `safety`). The
- * third segment is the specific rule.
+ * belongs to (`dead-code`, `duplication`, `safety`). The third segment
+ * is the specific rule.
  *
  * The mapping is a frozen constant — adding a new rule to the engine
  * requires updating this table explicitly. An unknown slug throws a typed
@@ -32,7 +32,6 @@ import { ValidationError } from '@opensip-tools/core';
  */
 export const RULE_ID_MAPPING: Readonly<Record<string, string>> = Object.freeze({
   'graph:orphan-subtree': 'graph.dead-code.orphan-subtree',
-  'graph:high-blast-function': 'graph.complexity.high-blast-function',
   'graph:duplicated-function-body': 'graph.duplication.duplicated-function-body',
   'graph:no-side-effect-path': 'graph.dead-code.no-side-effect-path',
   'graph:always-throws-branch': 'graph.safety.always-throws-branch',

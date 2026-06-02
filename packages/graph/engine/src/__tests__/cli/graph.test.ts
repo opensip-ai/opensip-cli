@@ -153,7 +153,6 @@ function makeIndexes(): Indexes {
     bySimpleName: new Map(),
     callees: new Map(),
     callers: new Map(),
-    blastRadius: new Map(),
   };
 }
 

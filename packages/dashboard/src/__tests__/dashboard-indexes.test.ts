@@ -12,12 +12,19 @@ import { dashboardIndexesJs } from '../code-paths/indexes.js';
 
 import type { GraphCatalog, GraphFunctionOccurrence } from '@opensip-tools/contracts';
 
+interface BlastScore { direct: number; transitive: number; score: number }
+
 type BuildIndexesFn = (catalog: GraphCatalog | null) => {
   byBodyHash: Map<string, GraphFunctionOccurrence>;
   bySimpleName: Map<string, string[]>;
   callees: Map<string, string[]>;
   callers: Map<string, string[]>;
+  blastRadius: Map<string, BlastScore>;
 };
+
+function staticCall(to: string): GraphFunctionOccurrence['calls'][number] {
+  return { to: [to], line: 1, column: 0, resolution: 'static', confidence: 'high', text: `${to}()` };
+}
 
 function loadBuildIndexes(): BuildIndexesFn {
   // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Sandbox-evaluating the emitted JS string is the test contract; trusted source.
@@ -134,5 +141,52 @@ describe('buildIndexes (browser-side)', () => {
     };
     const idx = buildIndexes(cat);
     expect(idx.bySimpleName.get('format')).toEqual(['h1', 'h2']);
+  });
+});
+
+/**
+ * Blast-radius coverage — moved here from the engine when the
+ * `graph:high-blast-function` rule was demoted to a dashboard-only
+ * insight. These validate the `bfsBlast`/`buildBlastRadius` formula
+ * (`direct + 0.5 × transitive`, bounded reverse BFS) ported verbatim
+ * into the browser mirror, now exposed via the lazy `blastRadius` getter.
+ */
+describe('buildIndexes — blastRadius (browser-side)', () => {
+  it('populates blastRadius for every occurrence after buildIndexes', () => {
+    const buildIndexes = loadBuildIndexes();
+    const cat: GraphCatalog = {
+      version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now',
+      functions: {
+        leaf: [occ({ bodyHash: 'leaf', simpleName: 'leaf' })],
+        mid: [occ({ bodyHash: 'mid', simpleName: 'mid', calls: [staticCall('leaf')] })],
+        top: [occ({ bodyHash: 'top', simpleName: 'top', calls: [staticCall('mid')] })],
+      },
+    };
+    const idx = buildIndexes(cat);
+
+    const leafScore = idx.blastRadius.get('leaf');
+    expect(leafScore).toBeDefined();
+    expect(leafScore?.direct).toBe(1);       // mid → leaf
+    expect(leafScore?.transitive).toBe(1);   // top reaches leaf via mid
+    expect(leafScore?.score).toBeCloseTo(1 + 0.5 * 1);
+
+    const topScore = idx.blastRadius.get('top');
+    expect(topScore?.direct).toBe(0);
+    expect(topScore?.transitive).toBe(0);
+  });
+
+  it('handles caller cycles without inflating counts', () => {
+    const buildIndexes = loadBuildIndexes();
+    const cat: GraphCatalog = {
+      version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now',
+      functions: {
+        a: [occ({ bodyHash: 'a', simpleName: 'a', calls: [staticCall('b')] })],
+        b: [occ({ bodyHash: 'b', simpleName: 'b', calls: [staticCall('a')] })],
+      },
+    };
+    const idx = buildIndexes(cat);
+    const aScore = idx.blastRadius.get('a');
+    expect(aScore?.direct).toBe(1);     // b → a
+    expect(aScore?.transitive).toBe(0); // a would re-reach itself; the visited set prevents that
   });
 });

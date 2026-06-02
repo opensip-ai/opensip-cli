@@ -56,6 +56,5 @@ describe('rules registry conformance', () => {
     expect(slugs).toContain('graph:no-side-effect-path');
     expect(slugs).toContain('graph:test-only-reachable');
     expect(slugs).toContain('graph:always-throws-branch');
-    expect(slugs).toContain('graph:high-blast-function');
   });
 });

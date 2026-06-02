@@ -84,7 +84,7 @@ The second loop, opt-in. *"Does it behave correctly under stress?"* A scenario s
 
 ### `graph` — static call-graph analysis
 
-The third loop. *"What is reachable from where?"* Builds the project's static call graph in five stages and runs six built-in rules over it: `orphan-subtree`, `duplicated-function-body`, `no-side-effect-path`, `test-only-reachable`, `always-throws-branch`, and `high-blast-function` (an informational blast-radius insight, not a gate). Five language adapters ship in v2.0 (TypeScript, Python, Rust, Go, Java). Has its own baseline-gate flow.
+The third loop. *"What is reachable from where?"* Builds the project's static call graph in five stages and runs five built-in rules over it: `orphan-subtree`, `duplicated-function-body`, `no-side-effect-path`, `test-only-reachable`, and `always-throws-branch`. (Blast radius is a dashboard insight, not a gate rule — the dashboard's Hot Functions view ranks functions by it.) Five language adapters ship in v2.0 (TypeScript, Python, Rust, Go, Java). Has its own baseline-gate flow.
 
 The CLI doesn't know what any of these three do internally — they're tools registered against a shared dispatcher. Same model lets a future `audit` or `lint` tool slot in without CLI changes. For the architecture behind that decoupling, see [`../10-concepts/02-tool-plugin-model.md`](../10-concepts/02-tool-plugin-model.md).
 

@@ -46,7 +46,6 @@ export type {
   DependencyEdge,
   Param,
   Indexes,
-  BlastScore,
   Rule,
   RuleHints,
   GraphConfig,

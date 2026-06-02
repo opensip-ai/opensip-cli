@@ -1,15 +1,14 @@
 /**
- * Behavioral coverage for three structural rules driven through real
+ * Behavioral coverage for the structural rules driven through real
  * indexes (`buildIndexes`): no-side-effect-path (adapter-primitive and
- * regex-fallback detectors + discarded-caller logic), high-blast-function
- * (percentile + absolute-floor surfacing), and orphan-subtree
- * (entry-point reachability + config.entryPointHashes seeding).
+ * regex-fallback detectors + discarded-caller logic), orphan-subtree
+ * (entry-point reachability + config.entryPointHashes seeding), and
+ * test-only-reachable.
  */
 
 import { describe, expect, it } from 'vitest';
 
 import { buildIndexes } from '../../pipeline/indexes.js';
-import { highBlastFunctionRule } from '../high-blast-function.js';
 import { noSideEffectPathRule } from '../no-side-effect-path.js';
 import { orphanSubtreeRule } from '../orphan-subtree.js';
 import { testOnlyReachableRule } from '../test-only-reachable.js';
@@ -117,26 +116,6 @@ describe('noSideEffectPathRule', () => {
     ]);
     const signals = noSideEffectPathRule.evaluate(catalog, buildIndexes(catalog), EMPTY_CONFIG, undefined);
     expect(signals).toEqual([]);
-  });
-});
-
-describe('highBlastFunctionRule', () => {
-  it('surfaces a function whose blast radius clears the absolute floor', () => {
-    // One hot target called directly by 6 callers → direct blast 6 ≥ floor (5).
-    const hot = occ({ bodyHash: 'HOT', simpleName: 'sharedPrimitive' });
-    const callers = Array.from({ length: 6 }, (_v, i) =>
-      occ({ bodyHash: `C${String(i)}`, simpleName: `caller${String(i)}`, calls: [edge('HOT')] }),
-    );
-    const catalog = catalogOf([hot, ...callers]);
-    const signals = highBlastFunctionRule.evaluate(catalog, buildIndexes(catalog), EMPTY_CONFIG, undefined);
-    const hotSignal = signals.find((s) => s.message.includes('sharedPrimitive'));
-    expect(hotSignal).toBeDefined();
-    expect(hotSignal?.ruleId).toBe('graph:high-blast-function');
-  });
-
-  it('emits nothing for an empty catalog', () => {
-    const catalog = catalogOf([]);
-    expect(highBlastFunctionRule.evaluate(catalog, buildIndexes(catalog), EMPTY_CONFIG, undefined)).toEqual([]);
   });
 });
 

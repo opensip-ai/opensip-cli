@@ -35,9 +35,6 @@ describe('mapEngineSlugToOpenSipRuleId', () => {
     expect(mapEngineSlugToOpenSipRuleId('graph:orphan-subtree')).toBe(
       'graph.dead-code.orphan-subtree',
     );
-    expect(mapEngineSlugToOpenSipRuleId('graph:high-blast-function')).toBe(
-      'graph.complexity.high-blast-function',
-    );
     expect(mapEngineSlugToOpenSipRuleId('graph:duplicated-function-body')).toBe(
       'graph.duplication.duplicated-function-body',
     );

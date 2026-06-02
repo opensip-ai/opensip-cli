@@ -35,13 +35,13 @@ describe('gate fingerprintSignal', () => {
   });
 
   it('is stable across a changed message at the same location', () => {
-    // Regression guard: rules like graph:high-blast-function embed
-    // run-varying numbers in their message. The fingerprint must not
+    // Regression guard: rules like graph:duplicated-function-body embed
+    // run-varying counts in their message. The fingerprint must not
     // change when only the message text does, or the gate flips a stable
     // finding between "resolved" and "new".
-    const base = { ruleId: 'graph:high-blast-function', filePath: 'src/a.ts', line: 7 };
-    const before = sig({ ...base, message: 'f has a blast radius of 12.0 (direct=3, transitive=9).' });
-    const after = sig({ ...base, message: 'f has a blast radius of 14.0 (direct=4, transitive=10).' });
+    const base = { ruleId: 'graph:duplicated-function-body', filePath: 'src/a.ts', line: 7 };
+    const before = sig({ ...base, message: 'f has the same body as 3 other functions.' });
+    const after = sig({ ...base, message: 'f has the same body as 5 other functions.' });
     expect(fingerprintSignal(after)).toBe(fingerprintSignal(before));
   });
 });
@@ -60,11 +60,11 @@ describe('gate stability against volatile rule messages', () => {
   });
 
   it('does not flag a regression when only a finding message changes', () => {
-    const base = { ruleId: 'graph:high-blast-function', filePath: 'src/a.ts', line: 7 };
-    saveBaseline([sig({ ...base, message: 'blast radius of 12.0 (direct=3, transitive=9).' })], repo);
+    const base = { ruleId: 'graph:duplicated-function-body', filePath: 'src/a.ts', line: 7 };
+    saveBaseline([sig({ ...base, message: 'same body as 3 other functions.' })], repo);
     // Same finding, message text drifted because the graph changed elsewhere.
     const result = compareToBaseline(
-      [sig({ ...base, message: 'blast radius of 18.0 (direct=5, transitive=13).' })],
+      [sig({ ...base, message: 'same body as 5 other functions.' })],
       repo,
     );
     expect(result.degraded).toBe(false);

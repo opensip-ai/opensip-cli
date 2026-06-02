@@ -2,7 +2,7 @@
  * Golden-fixture tests for the OpenSIP SARIF emitter.
  *
  * Phase 2 Task 2.3 (DEC-498). Locks the SARIF wire format for each of
- * the six built-in engine rules. A change to the emitter's output for
+ * the five built-in engine rules. A change to the emitter's output for
  * any rule breaks the matching fixture; intentional changes are
  * recorded by deleting + regenerating the fixture file.
  *
@@ -42,14 +42,6 @@ const RULE_FIXTURES: readonly RuleFixture[] = [
     message: "Function 'processOrder' appears unreachable from any entry point.",
     filePath: 'src/order/process.ts',
     line: 42,
-  },
-  {
-    slug: 'graph:high-blast-function',
-    severity: 'low',
-    message: "Function 'parseConfig' has 47 transitive callers (blast radius).",
-    filePath: 'src/config/parser.ts',
-    line: 12,
-    column: 8,
   },
   {
     slug: 'graph:duplicated-function-body',

@@ -282,20 +282,6 @@ export interface Catalog {
   readonly functions: Readonly<Record<string, readonly FunctionOccurrence[]>>;
 }
 
-/**
- * Per-function reverse-reachability score. `direct` is the count of
- * functions whose `calls[]` references this function. `transitive` is
- * the count of distinct functions that can reach this one through any
- * caller chain of length 2..BLAST_MAX_DEPTH (exclusive of the direct
- * set). `score = direct + 0.5 × transitive` — a function-level analogue
- * of codeindex's file-level blast metric.
- */
-export interface BlastScore {
-  readonly direct: number;
-  readonly transitive: number;
-  readonly score: number;
-}
-
 /** O(1) lookups derived from the catalog. Not persisted. */
 export interface Indexes {
   readonly byBodyHash: ReadonlyMap<string, FunctionOccurrence>;
@@ -320,8 +306,6 @@ export interface Indexes {
   readonly callees: ReadonlyMap<string, readonly string[]>;
   /** bodyHash → bodyHash[] (reverse). */
   readonly callers: ReadonlyMap<string, readonly string[]>;
-  /** bodyHash → BlastScore (bounded-depth reverse reachability). */
-  readonly blastRadius: ReadonlyMap<string, BlastScore>;
 }
 
 /** Per-rule and overall configuration knobs. */

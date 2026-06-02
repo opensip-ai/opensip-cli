@@ -9,15 +9,7 @@ import { logger } from '@opensip-tools/core';
 
 import { pkgOf } from '../resolve-callee.js';
 
-import type { BlastScore, Catalog, FunctionOccurrence, Indexes } from '../types.js';
-
-/**
- * Maximum BFS depth used when computing per-function blast radius.
- * Bounded per design choice 2026-05-25 (graph + codeindex parity work)
- * — predictable O(N·k^d) cost, slight under-count for deep chains is
- * acceptable for a "what's risky to touch" heuristic.
- */
-const BLAST_MAX_DEPTH = 5;
+import type { Catalog, FunctionOccurrence, Indexes } from '../types.js';
 
 /** The three content-keyed maps a single linear scan of the catalog produces. */
 export interface HashMaps {
@@ -43,11 +35,10 @@ export function buildHashMaps(catalog: Catalog): HashMaps {
   return { byBodyHash, occurrencesByHash, bySimpleName };
 }
 
-/** Builds query-side indexes (by-body-hash, by-simple-name, blast radius) over the catalog. */
+/** Builds query-side indexes (by-body-hash, by-simple-name, adjacency) over the catalog. */
 export function buildIndexes(catalog: Catalog): Indexes {
   const { byBodyHash, occurrencesByHash, bySimpleName } = buildHashMaps(catalog);
   const { callees, callers } = buildAdjacency(occurrencesByHash, byBodyHash);
-  const blastRadius = buildBlastRadius(byBodyHash, callers);
   const importedPackagesByFile = buildImportedPackagesByFile(occurrencesByHash, byBodyHash);
 
   logger.info({
@@ -57,7 +48,7 @@ export function buildIndexes(catalog: Catalog): Indexes {
     edges: [...callees.values()].reduce((n, arr) => n + arr.length, 0),
   });
 
-  return { byBodyHash, occurrencesByHash, importedPackagesByFile, bySimpleName, callees, callers, blastRadius };
+  return { byBodyHash, occurrencesByHash, importedPackagesByFile, bySimpleName, callees, callers };
 }
 
 /**
@@ -181,50 +172,4 @@ function pushCaller(callers: Map<string, Set<string>>, target: string, caller: s
     callers.set(target, inb);
   }
   inb.add(caller);
-}
-
-/**
- * Compute per-function blast scores via bounded reverse BFS.
- *
- * For each function, walk the `callers` adjacency up to BLAST_MAX_DEPTH
- * hops. Depth-1 reaches are "direct"; depth-2..BLAST_MAX_DEPTH reaches
- * are "transitive" (set-deduplicated). The visited set is per-source so
- * cycles short-circuit without inflating counts.
- */
-function buildBlastRadius(
-  byBodyHash: ReadonlyMap<string, FunctionOccurrence>,
-  callers: ReadonlyMap<string, readonly string[]>,
-): Map<string, BlastScore> {
-  const out = new Map<string, BlastScore>();
-  for (const target of byBodyHash.keys()) {
-    out.set(target, bfsBlast(target, callers));
-  }
-  return out;
-}
-
-function bfsBlast(
-  start: string,
-  callers: ReadonlyMap<string, readonly string[]>,
-): BlastScore {
-  const directCallers = callers.get(start) ?? [];
-  const directSet = new Set<string>(directCallers);
-  const visited = new Set<string>([start, ...directSet]);
-  const transitiveSet = new Set<string>();
-  let frontier: readonly string[] = [...directSet];
-  for (let depth = 2; depth <= BLAST_MAX_DEPTH && frontier.length > 0; depth++) {
-    const next: string[] = [];
-    for (const node of frontier) {
-      const parents = callers.get(node) ?? [];
-      for (const parent of parents) {
-        if (visited.has(parent)) continue;
-        visited.add(parent);
-        transitiveSet.add(parent);
-        next.push(parent);
-      }
-    }
-    frontier = next;
-  }
-  const direct = directSet.size;
-  const transitive = transitiveSet.size;
-  return { direct, transitive, score: direct + 0.5 * transitive };
 }

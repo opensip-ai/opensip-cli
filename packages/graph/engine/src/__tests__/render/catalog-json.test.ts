@@ -137,7 +137,6 @@ const FIXTURE_INDEXES: Indexes = {
   ]),
   callees: new Map(),
   callers: new Map(),
-  blastRadius: new Map(),
 };
 
 describe('renderCatalogJson — golden fixture', () => {
@@ -427,7 +426,6 @@ const FIXTURE_INDEXES_WITH_DEPS: Indexes = {
   bySimpleName: new Map(),
   callees: new Map(),
   callers: new Map(),
-  blastRadius: new Map(),
 };
 
 describe('renderCatalogJson — dependency edges (Phase 4)', () => {
