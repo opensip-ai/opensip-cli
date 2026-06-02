@@ -112,6 +112,17 @@ Imports every layer below. The published binary.
 |---|---|---|---|
 | `opensip-tools` | `packages/cli/` | The `opensip-tools` command-line binary; argv parsing, Tool registration, top-level commands | `bin/opensip-tools`, `decideOpen`, `launchBrowser`, `printWelcome`, `executeUninstall`, `getErrorSuggestion` (re-export) |
 
+> **Folder name vs. package name.** The directory is `packages/cli/`, but the
+> published npm package is the **unscoped `opensip-tools`** — the single package
+> end-users install (`npm i -g opensip-tools`). It is the *only* unscoped
+> package; every other package is `@opensip-tools/*`. It was renamed from
+> `@opensip-tools/cli` to `opensip-tools` in v2.4.0 so the install command is
+> just `opensip-tools@latest`; the directory deliberately kept its historical
+> `cli` name to avoid churning every import path, workspace glob, and
+> dependency-cruiser rule for a cosmetic rename. The old `@opensip-tools/cli`
+> name is frozen at `2.3.3` and deprecated on npm with a migration message — see
+> the upgrade note in [`../00-start/00-quick-start.md`](../00-start/00-quick-start.md).
+
 ## Adding a new package
 
 1. **Decide the layer.** Apply the rules in [`../10-concepts/03-modular-monolith.md`](../10-concepts/03-modular-monolith.md): kernel = zero tool knowledge; contracts = used by every tool; tools = own a Tool contract; language adapters = implement `LanguageAdapter`; check packs = ship `Check[]`; cli = composition root only.
