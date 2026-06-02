@@ -14,19 +14,27 @@ import { approximateSuffix } from './_approximation.js';
 import { inferEntryPoints } from './_entry-points.js';
 import { defineRule } from './define-rule.js';
 
-import type { Catalog, GraphConfig, Indexes } from '../types.js';
+import type { Catalog, FeatureTable, GraphConfig, Indexes } from '../types.js';
 import type { Signal } from '@opensip-tools/core';
 
 export const orphanSubtreeRule = defineRule({
   slug: 'graph:orphan-subtree',
   defaultSeverity: 'warning',
-  evaluate({ catalog, indexes, config }): readonly Signal[] {
-    const reachable = computeReachable(catalog, indexes, config);
+  featureDeps: ['reachableFromEntry'],
+  evaluate({ catalog, indexes, config, features }): readonly Signal[] {
+    // Reachability comes from the engine feature column when present; the
+    // local computeReachable is the graceful-degrade fallback (canonical home
+    // is now pipeline/features.ts). Compute the fallback set ONLY when absent.
+    const reachableLocal = features ? undefined : computeReachable(catalog, indexes, config);
+    const isReachable = (h: string): boolean =>
+      features
+        ? features.function.get(h)?.reachableFromEntry === true
+        : (reachableLocal as Set<string>).has(h);
     // On a fast catalog a missing caller-edge can fake an orphan; mark it.
     const caveat = approximateSuffix(catalog);
     const orphans: Signal[] = [];
     for (const occ of indexes.byBodyHash.values()) {
-      if (reachable.has(occ.bodyHash)) continue;
+      if (isReachable(occ.bodyHash)) continue;
       // module-init occurrences are entry points themselves; never orphan.
       if (occ.kind === 'module-init') continue;
       // Skip occurrences with empty filePath (defensive — shouldn't happen).
