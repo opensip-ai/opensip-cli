@@ -169,4 +169,21 @@ describe('View 4 — Coupling matrix', () => {
     expect(cells.length).toBe(1);
     expect(cells[0].textContent).toBe('1');
   });
+
+  it('shows the no-data empty state when the catalog carries no edge feature', () => {
+    const catalog: GraphCatalog = {
+      version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now',
+      functions: {
+        a: [makeOcc({ bodyHash: 'a', simpleName: 'a', filePath: 'packages/cli/src/a.ts',
+          calls: [{ to: ['x'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'x()' }] })],
+        x: [makeOcc({ bodyHash: 'x', simpleName: 'x', filePath: 'packages/contracts/src/x.ts' })],
+      },
+      // No features blob (a non-dashboard run) ⇒ no client recompute, no-data state.
+    };
+    const env = loadEnv(catalog);
+    const c = document.createElement('div');
+    env.views.find(v => v.id === 'coupling')!.render(c, env.graphCatalog, env.graphIndexes, env.filterState);
+    expect(c.querySelector('.empty')).not.toBeNull();
+    expect(c.querySelector('td.coupling-cell')).toBeNull();
+  });
 });

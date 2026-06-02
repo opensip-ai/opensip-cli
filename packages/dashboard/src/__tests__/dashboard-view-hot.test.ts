@@ -147,4 +147,32 @@ describe('View 1 — Hot functions', () => {
     // 'a' is in cli (filtered out); the only candidate ('a') is gone, expect empty state.
     expect(c.querySelector('.empty')).not.toBeNull();
   });
+
+  it('ranks by the engine blast.score feature when present (not raw callers)', () => {
+    // 'lo' has 1 caller; 'hi' has 2 callers. By raw callers 'hi' ranks first.
+    // The engine blast feature gives 'lo' a much higher score, so it must rank
+    // first — proving the view reads catalog.features.function[h].blast.score.
+    const catalog: GraphCatalog = {
+      version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now',
+      functions: {
+        lo: [makeOcc({ bodyHash: 'lo', simpleName: 'lo' })],
+        hi: [makeOcc({ bodyHash: 'hi', simpleName: 'hi' })],
+        c1: [makeOcc({ bodyHash: 'c1', simpleName: 'c1', calls: [{ to: ['lo'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'lo()' }] })],
+        c2: [makeOcc({ bodyHash: 'c2', simpleName: 'c2', calls: [{ to: ['hi'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'hi()' }] })],
+        c3: [makeOcc({ bodyHash: 'c3', simpleName: 'c3', calls: [{ to: ['hi'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'hi()' }] })],
+      },
+      features: {
+        function: {
+          lo: { bodyLines: 5, blast: { direct: 1, transitive: 0, score: 100 } },
+          hi: { bodyLines: 5, blast: { direct: 2, transitive: 0, score: 2 } },
+        },
+      },
+    };
+    const env = loadEnv(catalog);
+    const c = document.createElement('div');
+    env.views.find(v => v.id === 'hot')!.render(c, env.graphCatalog, env.graphIndexes, env.filterState);
+    const rows = c.querySelectorAll('tr.clickable');
+    expect(rows[0].children[0].textContent).toBe('lo'); // high blast.score wins over raw callers
+    expect(rows[0].children[1].textContent).toBe('100'); // Blast column shows the score
+  });
 });
