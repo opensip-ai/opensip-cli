@@ -19,6 +19,7 @@ export type GraphStage =
   | 'walk'
   | 'resolve'
   | 'index'
+  | 'features'
   | 'rules';
 
 /** Stage order — consumed by the live view to render the checklist. */
@@ -28,6 +29,7 @@ export const GRAPH_STAGES: readonly GraphStage[] = [
   'walk',
   'resolve',
   'index',
+  'features',
   'rules',
 ];
 

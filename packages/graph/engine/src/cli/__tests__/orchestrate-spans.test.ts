@@ -77,8 +77,8 @@ describe('graph stage spans — standalone no-op invariant', () => {
     rmSync(projectDir, { recursive: true, force: true });
   });
 
-  it('GRAPH_STAGES is the canonical six-stage set the spans are named after', () => {
-    expect(GRAPH_STAGES).toEqual(['discover', 'parse', 'walk', 'resolve', 'index', 'rules']);
+  it('GRAPH_STAGES is the canonical seven-stage set the spans are named after', () => {
+    expect(GRAPH_STAGES).toEqual(['discover', 'parse', 'walk', 'resolve', 'index', 'features', 'rules']);
   });
 
   it('runGraph completes normally and the stage spans are non-recording (emit nothing) with no SDK', async () => {

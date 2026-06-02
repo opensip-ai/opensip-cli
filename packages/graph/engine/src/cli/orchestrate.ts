@@ -27,6 +27,12 @@ import { withSpan, type Attributes, type Signal } from '@opensip-tools/core';
 
 import { currentAdapterRegistry, pickAdapter } from '../lang-adapter/registry.js';
 import { CatalogRepo } from '../persistence/catalog-repo.js';
+import { unionFeatureDeps } from '../pipeline/feature-deps.js';
+import {
+  buildFeatures,
+  isPersistedFeaturesEmpty,
+  toPersistedFeatures,
+} from '../pipeline/features.js';
 import { buildIndexes } from '../pipeline/indexes.js';
 import { currentRules } from '../rules/registry.js';
 
@@ -36,6 +42,8 @@ import { createPressureMonitor, type PressureMonitor } from './pressure-monitor.
 
 import type {
   Catalog,
+  FeatureColumn,
+  FeatureTable,
   GraphConfig,
   Indexes,
   ResolutionMode,
@@ -110,6 +118,14 @@ export interface RunGraphInput {
    * without a DataStore — the catalog will be rebuilt every run.
    */
   readonly datastore?: DataStore;
+  /**
+   * Columns to materialize into the persisted catalog for the decoupled
+   * dashboard (ADR-0006). Absent/empty ⇒ no features persisted. The standard
+   * interactive run requests `['blast','scc','packageCoupling']`; export-only
+   * paths omit it. Unioned with every enabled rule's `featureDeps` to decide
+   * what the features stage computes.
+   */
+  readonly emitFeatures?: readonly FeatureColumn[];
 }
 
 /** Output of {@link runGraph}: catalog, indexes, signals, resolution stats, and cache state. */
@@ -119,6 +135,9 @@ export interface RunGraphResult {
   readonly signals: readonly Signal[];
   readonly resolutionStats: ResolutionStats | null;
   readonly cacheHit: boolean;
+  /** The engine-computed feature table for this run (only the requested
+   *  columns are populated). `null` only on a path that produced no catalog. */
+  readonly features: FeatureTable | null;
 }
 
 function runStage<T>(
@@ -165,6 +184,7 @@ function runStage<T>(
 export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
   const config: GraphConfig = input.config ?? {};
   const ruleSet: readonly Rule[] = input.rules ?? currentRules();
+  const requestedColumns = unionFeatureDeps(ruleSet, input.emitFeatures);
   const catalogRepo = input.datastore ? new CatalogRepo(input.datastore) : null;
   // Normalize the tier once at the boundary; absence ⇒ exact (historical).
   const resolutionMode: ResolutionMode = input.resolution ?? 'exact';
@@ -208,6 +228,21 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
       () => ({ 'opensip_tools.graph.cache_hit': cacheHit }),
     );
 
+    // Stage 3.5 — feature derivation. Runs after index / before rules so rules
+    // consume the columns as a plain view (ADR-0006). Computes only the union
+    // of the rule set's featureDeps + the caller's emitFeatures.
+    const features: FeatureTable = runStage(
+      'features',
+      input.onProgress,
+      monitor,
+      () => buildFeatures(catalog, indexes, config, requestedColumns),
+      undefined,
+      (f) => ({
+        'opensip_tools.graph.feature_columns': requestedColumns.length,
+        'opensip_tools.graph.scc_count': f.scc.length,
+      }),
+    );
+
     const signals: Signal[] = runStage(
       'rules',
       input.onProgress,
@@ -220,7 +255,8 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
           // syntax, generated-file globs, and isTestFile predicate.
           // Without this, rules that consult `hints` silently fall
           // back to TypeScript-shaped regex on every other language.
-          const out = rule.evaluate(catalog, indexes, config, adapter.ruleHints);
+          // The 5th arg is the engine-computed feature table (Plan C).
+          const out = rule.evaluate(catalog, indexes, config, adapter.ruleHints, features);
           collected.push(...out);
         }
         return collected;
@@ -232,12 +268,28 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
       }),
     );
 
+    // Materialize the requested dashboard columns into the persisted catalog
+    // (ADR-0006). obtainCatalog already wrote the feature-LESS catalog; a
+    // second persist attaches features ONLY when columns were requested and
+    // the projection is non-empty (a lean default-run persists no blob).
+    const persistedFeatures = toPersistedFeatures(features, requestedColumns);
+    const persisted = isPersistedFeaturesEmpty(persistedFeatures) ? undefined : persistedFeatures;
+    if (persisted && catalogRepo) {
+      try {
+        catalogRepo.replaceAll({ ...catalog, features: persisted });
+      } catch {
+        /* v8 ignore next */
+        // Non-fatal: already logged by the repo; the run returns the catalog regardless.
+      }
+    }
+
     return {
-      catalog,
+      catalog: persisted ? { ...catalog, features: persisted } : catalog,
       indexes,
       signals,
       resolutionStats,
       cacheHit,
+      features,
     };
   } finally {
     monitor.dispose();

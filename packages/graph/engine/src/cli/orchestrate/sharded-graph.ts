@@ -16,6 +16,12 @@ import { logger, withSpanAsync, type Signal, type Span } from '@opensip-tools/co
 
 import { assignPackages } from '../../pipeline/assign-packages.js';
 import { constrainCrossPackageEdges } from '../../pipeline/constrain-edges.js';
+import { unionFeatureDeps } from '../../pipeline/feature-deps.js';
+import {
+  buildFeatures,
+  isPersistedFeaturesEmpty,
+  toPersistedFeatures,
+} from '../../pipeline/features.js';
 import { buildIndexes } from '../../pipeline/indexes.js';
 import { currentRules } from '../../rules/registry.js';
 import { GRAPH_TRACER } from '../graph-tracer.js';
@@ -26,7 +32,16 @@ import { planShardWork, runShardsInParallel } from './shard-runner.js';
 import type { Shard } from './shard-model.js';
 import type { GraphLanguageAdapter } from '../../lang-adapter/types.js';
 import type { CatalogRepo } from '../../persistence/catalog-repo.js';
-import type { Catalog, GraphConfig, Indexes, ResolutionMode, ResolutionStats, Rule } from '../../types.js';
+import type {
+  Catalog,
+  FeatureColumn,
+  FeatureTable,
+  GraphConfig,
+  Indexes,
+  ResolutionMode,
+  ResolutionStats,
+  Rule,
+} from '../../types.js';
 
 /**
  * Input to {@link runShardedGraph}: the planned shards plus the shared build
@@ -46,6 +61,13 @@ export interface RunShardedInput {
   readonly catalogRepo: CatalogRepo | null;
   readonly config?: GraphConfig;
   readonly rules?: readonly Rule[];
+  /**
+   * Dashboard feature columns to materialize into the persisted catalog
+   * (ADR-0006). The sharded build is the producing run for multi-package
+   * repos, so it persists the same columns as the single path. Unioned with
+   * the rule set's `featureDeps`.
+   */
+  readonly emitFeatures?: readonly FeatureColumn[];
 }
 
 /**
@@ -63,6 +85,9 @@ export interface RunShardedResult {
   readonly cacheHit: boolean;
   /** Shard ids whose worker failed (build proceeds with the rest). */
   readonly failedShardIds: readonly string[];
+  /** Engine-computed feature table over the merged global catalog (only the
+   *  requested columns populated). */
+  readonly features: FeatureTable;
 }
 
 /** Run the full sharded build and return a unified RunGraphResult-shaped value. */
@@ -113,15 +138,30 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
   // import-consistent in both build modes.
   const catalog = constrainCrossPackageEdges(assignPackages(merged, projectRoot));
 
-  // 4. Persist: each rebuilt shard's fragment, prune removed shards, and the
-  //    unified full catalog (so whole-catalog consumers still work).
+  // 4. Derive indexes + features over the unified catalog. Features run once
+  //    here on the merged global catalog (not per shard), after merge / before
+  //    rules — the same stage order as the single-program path.
+  const indexes = buildIndexes(catalog);
+  const ruleSet = input.rules ?? currentRules();
+  const config: GraphConfig = input.config ?? {};
+  const requestedColumns = unionFeatureDeps(ruleSet, input.emitFeatures);
+  const features = buildFeatures(catalog, indexes, config, requestedColumns);
+  const persistedFeatures = toPersistedFeatures(features, requestedColumns);
+  const persisted = isPersistedFeaturesEmpty(persistedFeatures) ? undefined : persistedFeatures;
+  // The catalog persisted (and returned) carries the materialized dashboard
+  // columns when requested; otherwise the bare catalog (lean default).
+  const catalogToPersist: Catalog = persisted ? { ...catalog, features: persisted } : catalog;
+
+  // 5. Persist: each rebuilt shard's fragment, prune removed shards, and the
+  //    unified full catalog (with materialized features when requested) so
+  //    whole-catalog consumers (incl. the dashboard) still work.
   if (useCache && catalogRepo) {
     // @fitness-ignore-next-line detached-promises -- CatalogRepo is synchronous (better-sqlite3/Drizzle); upsertShardFragment returns void, not a Promise.
     for (const fragment of built.fragments) catalogRepo.upsertShardFragment(fragment);
     // @fitness-ignore-next-line detached-promises -- CatalogRepo is synchronous (better-sqlite3/Drizzle); pruneShardFragmentsExcept returns void, not a Promise.
     catalogRepo.pruneShardFragmentsExcept(shards.map((s) => s.id));
     try {
-      catalogRepo.replaceAll(catalog);
+      catalogRepo.replaceAll(catalogToPersist);
     } catch (error) {
       /* v8 ignore next */
       // Best-effort write: the freshly-built catalog is returned regardless.
@@ -135,15 +175,12 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
     }
   }
 
-  // 5. Derive indexes + run rules over the unified catalog.
-  const indexes = buildIndexes(catalog);
-  const ruleSet = input.rules ?? currentRules();
-  const config: GraphConfig = input.config ?? {};
+  // 6. Run rules over the unified catalog, threading the feature table (5th arg).
   const signals: Signal[] = [];
   for (const rule of ruleSet) {
     // Indexed append rather than spread-in-loop — avoids re-allocating the
     // accumulator on every rule (O(n²)) over a potentially large rule set.
-    const ruleSignals = rule.evaluate(catalog, indexes, config, adapter.ruleHints);
+    const ruleSignals = rule.evaluate(catalog, indexes, config, adapter.ruleHints, features);
     for (const signal of ruleSignals) signals.push(signal);
   }
 
@@ -153,11 +190,12 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
     'opensip_tools.graph.shards_failed': built.failures.length,
   });
   return {
-    catalog,
+    catalog: catalogToPersist,
     indexes,
     signals,
     resolutionStats: boundaryStats,
     cacheHit: plan.toBuild.length === 0,
     failedShardIds: built.failures.map((f) => f.shardId),
+    features,
   };
 }

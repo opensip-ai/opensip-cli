@@ -156,6 +156,7 @@ describe('runGraph orchestrator', () => {
       'stage-start:walk',
       'stage-start:resolve',
       'stage-start:index',
+      'stage-start:features',
       'stage-start:rules',
     ]);
     expect(stageDones).toEqual([
@@ -164,6 +165,7 @@ describe('runGraph orchestrator', () => {
       'stage-done:walk',
       'stage-done:resolve',
       'stage-done:index',
+      'stage-done:features',
       'stage-done:rules',
     ]);
   });

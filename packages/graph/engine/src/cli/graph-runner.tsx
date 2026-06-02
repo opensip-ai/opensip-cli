@@ -67,6 +67,7 @@ const STAGE_LABELS: Readonly<Record<GraphStage, string>> = {
   walk: 'Walk catalog',
   resolve: 'Resolve call sites',
   index: 'Build indexes',
+  features: 'Derive features',
   rules: 'Evaluate rules',
 };
 
@@ -76,6 +77,7 @@ const STAGE_RUNNING_DETAIL: Readonly<Record<GraphStage, string>> = {
   walk: 'Walking files for occurrences...',
   resolve: 'Binding symbols to edges...',
   index: 'Computing reverse indexes...',
+  features: 'Computing feature columns...',
   rules: 'Evaluating rule set...',
 };
 

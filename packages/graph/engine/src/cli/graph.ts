@@ -54,7 +54,7 @@ import { discoverPolyglotUnits, runWorkspaceUnitsInParallel } from './workspace-
 import type { GraphCommandOptions } from './graph-options.js';
 import type { Shard } from './orchestrate/shard-model.js';
 import type { RunGraphResult } from './orchestrate.js';
-import type { Catalog, GraphConfig, Rule } from '../types.js';
+import type { Catalog, FeatureColumn, GraphConfig, Rule } from '../types.js';
 import type { FindingOutput, GraphDoneResult } from '@opensip-tools/contracts';
 import type { LanguageAdapter, Signal, ToolCliContext } from '@opensip-tools/core';
 import type { DataStore } from '@opensip-tools/datastore';
@@ -68,6 +68,14 @@ export type { UnifiedReportInput } from './graph-report.js';
 const EVT_GRAPH_COMPLETE = 'graph.cli.graph.complete';
 const MODULE_GRAPH_CLI = 'graph:cli';
 const MODULE_GRAPH_RENDER = 'graph:render';
+
+/**
+ * The feature columns the decoupled dashboard renders (ADR-0006): only these
+ * are materialized into the persisted catalog, and only on the standard
+ * (catalog-producing) `graph` run. Export-only paths (sarif/catalog export)
+ * do not go through this dispatch, so they stay lean (no features persisted).
+ */
+const DASHBOARD_FEATURE_COLUMNS: readonly FeatureColumn[] = ['blast', 'scc', 'packageCoupling'];
 
 export async function executeGraph(
   opts: GraphCommandOptions,
@@ -113,6 +121,7 @@ export async function executeGraph(
           config,
           rules,
           datastore: cli.scope.datastore() as DataStore | undefined,
+          emitFeatures: DASHBOARD_FEATURE_COLUMNS,
         });
     enforceLanguageMismatchPolicy(opts, result.catalog, [runCwd]);
     await dispatchGraphResult(opts, result, cli, startedAt);
@@ -180,6 +189,7 @@ async function runShardedBuild(
     config,
     rules,
     catalogRepo: datastore ? new CatalogRepo(datastore) : null,
+    emitFeatures: DASHBOARD_FEATURE_COLUMNS,
   });
   return {
     catalog: sharded.catalog,
@@ -187,6 +197,7 @@ async function runShardedBuild(
     signals: sharded.signals,
     resolutionStats: sharded.resolutionStats,
     cacheHit: sharded.cacheHit,
+    features: sharded.features,
   };
 }
 
@@ -247,6 +258,7 @@ async function executeMultiPathGraph(
       config,
       rules,
       datastore: cli.scope.datastore() as DataStore | undefined,
+      emitFeatures: DASHBOARD_FEATURE_COLUMNS,
     });
     lastResult = r;
     allSignals.push(...r.signals);
@@ -271,6 +283,7 @@ async function executeMultiPathGraph(
     signals: allSignals as readonly Signal[],
     resolutionStats: lastResult.resolutionStats,
     cacheHit: lastResult.cacheHit,
+    features: lastResult.features,
   };
   await dispatchGraphResult(opts, combined, cli, startedAt);
 }
