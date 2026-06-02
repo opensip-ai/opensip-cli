@@ -36,6 +36,12 @@ export const RULE_ID_MAPPING: Readonly<Record<string, string>> = Object.freeze({
   'graph:no-side-effect-path': 'graph.dead-code.no-side-effect-path',
   'graph:always-throws-branch': 'graph.safety.always-throws-branch',
   'graph:test-only-reachable': 'graph.dead-code.test-only-reachable',
+  // Plan D structural rules (new slugs → reversible naming pre-baseline).
+  'graph:large-function': 'graph.complexity.large-function',
+  'graph:wide-function': 'graph.complexity.wide-function',
+  'graph:high-blast-untested': 'graph.coverage.high-blast-untested',
+  'graph:cycle': 'graph.architecture.cycle',
+  'graph:unexpected-coupling': 'graph.architecture.unexpected-coupling',
 });
 
 /**

@@ -20,10 +20,15 @@
 import { Registry, currentScope, type Registerable } from '@opensip-tools/core';
 
 import { alwaysThrowsBranchRule } from './always-throws-branch.js';
+import { cycleRule } from './cycle.js';
 import { duplicatedFunctionBodyRule } from './duplicated-function-body.js';
+import { highBlastUntestedRule } from './high-blast-untested.js';
+import { largeFunctionRule } from './large-function.js';
 import { noSideEffectPathRule } from './no-side-effect-path.js';
 import { orphanSubtreeRule } from './orphan-subtree.js';
 import { testOnlyReachableRule } from './test-only-reachable.js';
+import { unexpectedCouplingRule } from './unexpected-coupling.js';
+import { wideFunctionRule } from './wide-function.js';
 
 import type { Rule } from '../types.js';
 
@@ -42,6 +47,12 @@ const BUILT_IN_RULES: readonly Rule[] = [
   noSideEffectPathRule,
   testOnlyReachableRule,
   alwaysThrowsBranchRule,
+  // Plan D structural rules, in stable order.
+  largeFunctionRule,
+  wideFunctionRule,
+  highBlastUntestedRule,
+  cycleRule,
+  unexpectedCouplingRule,
 ];
 
 /**
