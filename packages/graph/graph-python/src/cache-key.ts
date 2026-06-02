@@ -4,24 +4,24 @@
  *
  * Produces `py-${pythonVersion}-${pyprojectContentHash || 'no-config'}`.
  *
- * The "Python version" is best-effort: we look for a `requires-python`
- * line in `pyproject.toml` (PEP 621) — this is a string like
- * `>=3.10,<4.0` — and emit it verbatim. If we can't find one we fall
- * back to the literal `unknown`. This is a CACHE INVALIDATION key, not
- * a source-of-truth — its only job is to flip when the toolchain
- * intent changes.
+ * The content-fingerprint half (`no-config` / `missing:` / `unreadable:` /
+ * sha256-prefix) is the byte-identical `hashConfig` contract shared with
+ * go/java/rust; Python imports it from
+ * `@opensip-tools/graph-adapter-common` and layers a best-effort
+ * "Python version" on top (DEC-4). The version comes from a
+ * `requires-python` line in `pyproject.toml` (PEP 621) — a string like
+ * `>=3.10,<4.0`, sanitized; absent → the literal `unknown`. It is a CACHE
+ * INVALIDATION key, not a source of truth — its only job is to flip when
+ * the toolchain intent changes.
  *
- * Per contract invariant I-6 (cacheKey is stable for stable input AND
- * changes when the language config changes): the function is purely a
- * function of `(pyproject content)`. Two calls without any pyproject
- * file produce the same `py-unknown-no-config` key.
- *
- * Per I-8 (different adapter prefixes): we emit `py-`, distinct from
- * the TypeScript adapter's `ts-` and the Rust adapter's `rs-`.
+ * Per contract invariant I-6 the function is purely a function of
+ * `(pyproject content)`. Per I-8 we emit `py-`, distinct from the other
+ * adapters' prefixes.
  */
 
-import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
+
+import { hashConfig } from '@opensip-tools/graph-adapter-common';
 
 import type { CacheKeyInput } from '@opensip-tools/graph';
 
@@ -31,31 +31,23 @@ import type { CacheKeyInput } from '@opensip-tools/graph';
 const REQUIRES_PYTHON_RE = /^[\t ]*requires-python[\t ]*=[\t ]*["']([^"'\n]+)["']/m;
 
 export function cacheKey(input: CacheKeyInput): string {
-  const { pythonVersion, configHash } = readConfig(input.configPathAbs);
+  const configHash = hashConfig(input.configPathAbs);
+  const pythonVersion = readPythonVersion(input.configPathAbs);
   return `py-${pythonVersion}-${configHash}`;
 }
 
-function readConfig(configPathAbs: string | undefined): {
-  readonly pythonVersion: string;
-  readonly configHash: string;
-} {
-  if (configPathAbs === undefined || configPathAbs.length === 0) {
-    return { pythonVersion: 'unknown', configHash: 'no-config' };
-  }
-  if (!existsSync(configPathAbs)) {
-    return { pythonVersion: 'unknown', configHash: `missing:${configPathAbs}` };
-  }
+function readPythonVersion(configPathAbs: string | undefined): string {
+  if (configPathAbs === undefined || configPathAbs.length === 0) return 'unknown';
+  if (!existsSync(configPathAbs)) return 'unknown';
   let content: string;
   try {
     content = readFileSync(configPathAbs, 'utf8');
   } catch {
     /* v8 ignore next */
-    return { pythonVersion: 'unknown', configHash: `unreadable:${configPathAbs}` };
+    return 'unknown';
   }
   const match = REQUIRES_PYTHON_RE.exec(content);
-  const pythonVersion = match ? sanitize(match[1] ?? 'unknown') : 'unknown';
-  const configHash = createHash('sha256').update(content).digest('hex').slice(0, 16);
-  return { pythonVersion, configHash };
+  return match ? sanitize(match[1] ?? 'unknown') : 'unknown';
 }
 
 function sanitize(s: string): string {

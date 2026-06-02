@@ -15,6 +15,7 @@
  */
 
 import { hashBody, normalizeWhitespace, type BodyDigest } from '@opensip-tools/graph';
+import { skipToEndOfLine } from '@opensip-tools/graph-adapter-common';
 
 export function digestJavaBody(text: string): BodyDigest {
   return hashBody(normalizeWhitespace(stripJavaComments(text)));
@@ -66,12 +67,6 @@ function stripJavaComments(text: string): string {
     i++;
   }
   return out;
-}
-
-function skipToEndOfLine(text: string, start: number): number {
-  let i = start;
-  while (i < text.length && text[i] !== '\n') i++;
-  return i;
 }
 
 function skipBlockComment(text: string, start: number): number {

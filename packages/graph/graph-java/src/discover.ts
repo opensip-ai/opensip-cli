@@ -1,5 +1,3 @@
-// @fitness-ignore-file error-handling-quality -- realpathSync probe for symlink dedup; exception → fall through with the original path (file might be in a symlinked dir or have been unlinked), already marked v8-ignore as effectively unreachable on real input.
-// @fitness-ignore-file batch-operation-limits -- iterates bounded collection (Java source roots resolved from build files within a project)
 /**
  * Java file discovery.
  *
@@ -22,17 +20,12 @@
  *   - `node_modules/` — defensive
  *   - `.git/`         — VCS metadata
  *
- * Returns absolute, realpath-normalized, sorted, deduped paths so I-9
- * holds across runs.
+ * The collect-loop / realpath-dedup / config-precedence scaffolding lives
+ * in `@opensip-tools/graph-adapter-common`; this module supplies only the
+ * Java-specific inputs.
  */
 
-import { existsSync, realpathSync } from 'node:fs';
-import { resolve, sep } from 'node:path';
-
-import { logger } from '@opensip-tools/core';
-import { glob } from 'glob';
-
-import type { DiscoverInput, DiscoverOutput } from '@opensip-tools/graph';
+import { createDiscover } from '@opensip-tools/graph-adapter-common';
 
 const EXCLUDED_DIR_GLOBS: readonly string[] = [
   '**/target/**',
@@ -52,92 +45,9 @@ const CONFIG_CANDIDATES: readonly string[] = [
   'build.gradle',
 ];
 
-export function discoverFiles(input: DiscoverInput): DiscoverOutput {
-  logger.info({
-    evt: 'graph.discover.start',
-    module: 'graph:discover:java',
-    projectDir: input.cwd,
-  });
-
-  const projectDirAbs = normalizeProjectDir(input.cwd);
-  const configPathAbs = resolveConfigPath(projectDirAbs, input.configPathOverride);
-  const files = collectJavaFiles(projectDirAbs);
-
-  logger.info({
-    evt: 'graph.discover.complete',
-    module: 'graph:discover:java',
-    projectDir: projectDirAbs,
-    configPath: configPathAbs ?? '(none)',
-    fileCount: files.length,
-  });
-
-  const out: DiscoverOutput = configPathAbs === undefined
-    ? { projectDirAbs, files }
-    : { projectDirAbs, files, configPathAbs };
-  return out;
-}
-
-/* v8 ignore start */
-function normalizeProjectDir(projectDir: string): string {
-  const abs = resolve(projectDir);
-  try {
-    return realpathSync(abs);
-  } catch {
-    return abs;
-  }
-}
-/* v8 ignore stop */
-
-function resolveConfigPath(
-  projectDirAbs: string,
-  override: string | undefined,
-): string | undefined {
-  if (override !== undefined && override.length > 0) {
-    const abs = resolve(projectDirAbs, override);
-    return existsSync(abs) ? realpathOrPath(abs) : abs;
-  }
-  for (const candidate of CONFIG_CANDIDATES) {
-    const path = resolve(projectDirAbs, candidate);
-    if (existsSync(path)) return realpathOrPath(path);
-  }
-  return undefined;
-}
-
-/* v8 ignore start */
-function realpathOrPath(p: string): string {
-  try {
-    return realpathSync(p);
-  } catch {
-    return p;
-  }
-}
-/* v8 ignore stop */
-
-function collectJavaFiles(projectDirAbs: string): readonly string[] {
-  const matches: string[] = glob.sync('**/*.java', {
-    cwd: projectDirAbs,
-    absolute: true,
-    ignore: [...EXCLUDED_DIR_GLOBS],
-    nodir: true,
-    follow: false,
-    dot: false,
-  });
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const m of matches) {
-    let real: string = m;
-    /* v8 ignore start */
-    try {
-      real = realpathSync(m);
-    } catch {
-      // fall through with original
-    }
-    /* v8 ignore stop */
-    const key = real.split(sep).join('/');
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(real);
-  }
-  out.sort();
-  return out;
-}
+export const discoverFiles = createDiscover({
+  extension: 'java',
+  excludedDirGlobs: EXCLUDED_DIR_GLOBS,
+  configCandidates: CONFIG_CANDIDATES,
+  languageId: 'java',
+});

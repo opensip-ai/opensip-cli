@@ -55,6 +55,13 @@
 
 import { relative, sep } from 'node:path';
 
+import {
+  makeFileClassifier,
+  record,
+  runWalk,
+  synthesizeModuleInit as buildModuleInit,
+} from '@opensip-tools/graph-adapter-common';
+
 import { digestJavaBody, digestSyntheticBody } from './body-digest.js';
 import { collectDependencySites } from './walk-dependencies.js';
 import {
@@ -73,7 +80,6 @@ import type {
   CallSiteRecord,
   DependencySiteRecord,
   FunctionOccurrence,
-  ParseError,
   WalkInput,
   WalkOutput,
 } from '@opensip-tools/graph';
@@ -82,6 +88,14 @@ import type Parser from 'tree-sitter';
 const TEST_PATH_RE = /(?:^|\/)test\//;
 const TEST_FILE_NAME_RE = /(?:^|\/)[^/]*(?:Test|Tests|IT)\.java$/;
 const GENERATED_PATH_RE = /(?:\b(?:target|build|out|generated|generated-sources)\/)|(?:\$Pb\.java$)/;
+
+const { isTestFile, isGeneratedFile } = makeFileClassifier({
+  testRe: TEST_FILE_NAME_RE,
+  generatedRe: GENERATED_PATH_RE,
+  testPathRe: TEST_PATH_RE,
+});
+
+export { isTestFile };
 
 // Type declarations that introduce an enclosing-class context for the
 // methods/constructors inside them.
@@ -101,30 +115,7 @@ const CALL_NODES: ReadonlySet<string> = new Set([
 ]);
 
 export function walkProject(input: WalkInput<JavaParsedProject>): WalkOutput {
-  const occurrences: Record<string, FunctionOccurrence[]> = Object.create(null) as Record<
-    string,
-    FunctionOccurrence[]
-  >;
-  const callSites: CallSiteRecord[] = [];
-  const dependencySites: DependencySiteRecord[] = [];
-  const parseErrors: ParseError[] = [];
-
-  const sortedPaths = [...input.files].filter((p) => input.project.files.has(p)).sort();
-
-  for (const path of sortedPaths) {
-    const file = input.project.files.get(path);
-    if (!file) continue;
-    try {
-      walkFile(path, file, input.projectDirAbs, occurrences, callSites, dependencySites);
-    } catch (error) {
-      parseErrors.push({
-        filePath: relative(input.projectDirAbs, path),
-        message: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }
-
-  return { occurrences, callSites, dependencySites, parseErrors };
+  return runWalk({ input, walkFile });
 }
 
 function walkFile(
@@ -140,13 +131,14 @@ function walkFile(
   const definedInGenerated = isGeneratedFile(filePathProjectRel);
   const packageName = extractPackageName(file);
 
-  const moduleInit = synthesizeModuleInit(
+  const moduleInit = buildModuleInit({
     file,
     filePathProjectRel,
-    packageName,
     inTestFile,
     definedInGenerated,
-  );
+    digestSyntheticBody,
+    qualifiedName: `${packageQualifier(packageName, filePathProjectRel)}.<module-init>`,
+  });
   record(out, moduleInit);
 
   // Phase 4 (DEC-498): walk top-level `import` declarations as dependency
@@ -322,54 +314,3 @@ function buildLambdaOccurrence(
   };
 }
 
-function synthesizeModuleInit(
-  file: JavaParsedFile,
-  filePathProjectRel: string,
-  packageName: string,
-  inTestFile: boolean,
-  definedInGenerated: boolean,
-): FunctionOccurrence {
-  const root = file.tree.rootNode;
-  const topLevelText = root.children
-    .map((c) => file.source.slice(c.startIndex, c.endIndex))
-    .join('\n');
-  const digest = digestSyntheticBody(`${filePathProjectRel}\n${topLevelText}`);
-  const simpleName = `<module-init:${filePathProjectRel}>`;
-  const qualifiedBase = packageQualifier(packageName, filePathProjectRel);
-  return {
-    bodyHash: digest.hash,
-    bodySize: digest.size,
-    simpleName,
-    qualifiedName: `${qualifiedBase}.<module-init>`,
-    filePath: filePathProjectRel,
-    line: 1,
-    column: 0,
-    endLine: root.endPosition.row + 1,
-    kind: 'module-init',
-    params: [],
-    returnType: null,
-    enclosingClass: null,
-    decorators: [],
-    visibility: 'module-local',
-    inTestFile,
-    definedInGenerated,
-    calls: [],
-  };
-}
-
-
-// ── output helpers ────────────────────────────────────────────────
-
-function record(out: Record<string, FunctionOccurrence[]>, occ: FunctionOccurrence): void {
-  const list = out[occ.simpleName];
-  if (list) list.push(occ);
-  else out[occ.simpleName] = [occ];
-}
-
-export function isTestFile(rel: string): boolean {
-  return TEST_PATH_RE.test(rel) || TEST_FILE_NAME_RE.test(rel);
-}
-
-function isGeneratedFile(rel: string): boolean {
-  return GENERATED_PATH_RE.test(rel);
-}

@@ -58,6 +58,11 @@ opensip-tools/
 │   ├── graph/                   # graph namespace
 │   │   ├── engine/              # @opensip-tools/graph — language-agnostic
 │   │   │                        #   graph kernel; depends on no parser
+│   │   ├── graph-adapter-common/# @opensip-tools/graph-adapter-common —
+│   │   │                        #   shared scaffolding (discover/parse/walk/
+│   │   │                        #   cache-key factories) for the tree-sitter
+│   │   │                        #   adapters; downstream of the engine,
+│   │   │                        #   upstream of go/java/python/rust
 │   │   ├── graph-typescript/    # @opensip-tools/graph-typescript — TS adapter
 │   │   ├── graph-python/        # @opensip-tools/graph-python — Python adapter
 │   │   └── graph-rust/          # @opensip-tools/graph-rust — Rust adapter

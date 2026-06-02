@@ -38,6 +38,7 @@ import {
   pushCreationEdge,
   truncateForCallEdge,
 } from '@opensip-tools/graph';
+import { buildNameIndex } from '@opensip-tools/graph-adapter-common';
 
 import type { GoParsedFile, GoParsedProject } from './parse.js';
 import type {
@@ -45,7 +46,6 @@ import type {
   CallEdge,
   DependencyEdge,
   DependencySiteRecord,
-  FunctionOccurrence,
   MutableStats,
   ResolutionStats,
   ResolveInput,
@@ -255,20 +255,6 @@ function collectGoPackageMembers(
     const dir = posix.dirname(filePath);
     const normalizedDir = dir === '.' ? '' : dir;
     if (normalizedDir === packageDir) out.push(hash);
-  }
-  return out;
-}
-
-function buildNameIndex(
-  functions: Readonly<Record<string, readonly FunctionOccurrence[]>>,
-): ReadonlyMap<string, readonly string[]> {
-  const out = new Map<string, string[]>();
-  for (const [name, occs] of Object.entries(functions)) {
-    if (!occs) continue;
-    if (name.startsWith('<')) continue;
-    const list: string[] = out.get(name) ?? [];
-    for (const o of occs) list.push(o.bodyHash);
-    if (list.length > 0) out.set(name, list);
   }
   return out;
 }

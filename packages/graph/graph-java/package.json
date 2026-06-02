@@ -30,7 +30,7 @@
   "dependencies": {
     "@opensip-tools/core": "workspace:*",
     "@opensip-tools/graph": "workspace:*",
-    "glob": "^13.0.0",
+    "@opensip-tools/graph-adapter-common": "workspace:*",
     "tree-sitter": "0.25.0",
     "tree-sitter-java": "0.23.5"
   },

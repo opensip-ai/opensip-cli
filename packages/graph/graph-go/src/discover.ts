@@ -1,5 +1,3 @@
-// @fitness-ignore-file error-handling-quality -- realpathSync probe for symlink dedup; exception → fall through with the original path (file might be in a symlinked dir or have been unlinked), already marked v8-ignore as effectively unreachable on real input.
-// @fitness-ignore-file batch-operation-limits -- iterates bounded collection (Go module/package directories within a project root)
 /**
  * Go file discovery.
  *
@@ -18,17 +16,12 @@
  *   - `node_modules/` — rare in Go projects but defensive.
  *   - `.git/` — VCS metadata.
  *
- * Returns absolute, realpath-normalized, sorted, deduped paths so I-9
- * (referential transparency of discoverFiles) holds across runs.
+ * The collect-loop / realpath-dedup / config-precedence scaffolding lives
+ * in `@opensip-tools/graph-adapter-common`; this module supplies only the
+ * Go-specific inputs (extension, excludes, config precedence, log tag).
  */
 
-import { existsSync, realpathSync } from 'node:fs';
-import { resolve, sep } from 'node:path';
-
-import { logger } from '@opensip-tools/core';
-import { glob } from 'glob';
-
-import type { DiscoverInput, DiscoverOutput } from '@opensip-tools/graph';
+import { createDiscover } from '@opensip-tools/graph-adapter-common';
 
 const EXCLUDED_DIR_GLOBS: readonly string[] = [
   '**/vendor/**',
@@ -36,93 +29,12 @@ const EXCLUDED_DIR_GLOBS: readonly string[] = [
   '**/.git/**',
 ];
 
-export function discoverFiles(input: DiscoverInput): DiscoverOutput {
-  logger.info({
-    evt: 'graph.discover.start',
-    module: 'graph:discover:go',
-    projectDir: input.cwd,
-  });
+// Prefer go.sum (resolved deps with hashes) over go.mod (intent).
+const CONFIG_CANDIDATES: readonly string[] = ['go.sum', 'go.mod'];
 
-  const projectDirAbs = normalizeProjectDir(input.cwd);
-  const configPathAbs = resolveConfigPath(projectDirAbs, input.configPathOverride);
-  const files = collectGoFiles(projectDirAbs);
-
-  logger.info({
-    evt: 'graph.discover.complete',
-    module: 'graph:discover:go',
-    projectDir: projectDirAbs,
-    configPath: configPathAbs ?? '(none)',
-    fileCount: files.length,
-  });
-
-  const out: DiscoverOutput = configPathAbs === undefined
-    ? { projectDirAbs, files }
-    : { projectDirAbs, files, configPathAbs };
-  return out;
-}
-
-/* v8 ignore start */
-function normalizeProjectDir(projectDir: string): string {
-  const abs = resolve(projectDir);
-  try {
-    return realpathSync(abs);
-  } catch {
-    return abs;
-  }
-}
-/* v8 ignore stop */
-
-function resolveConfigPath(
-  projectDirAbs: string,
-  override: string | undefined,
-): string | undefined {
-  if (override !== undefined && override.length > 0) {
-    const abs = resolve(projectDirAbs, override);
-    return existsSync(abs) ? realpathOrPath(abs) : abs;
-  }
-  // Prefer go.sum (resolved deps with hashes) over go.mod (intent).
-  const sum = resolve(projectDirAbs, 'go.sum');
-  if (existsSync(sum)) return realpathOrPath(sum);
-  const mod = resolve(projectDirAbs, 'go.mod');
-  if (existsSync(mod)) return realpathOrPath(mod);
-  return undefined;
-}
-
-/* v8 ignore start */
-function realpathOrPath(p: string): string {
-  try {
-    return realpathSync(p);
-  } catch {
-    return p;
-  }
-}
-/* v8 ignore stop */
-
-function collectGoFiles(projectDirAbs: string): readonly string[] {
-  const matches: string[] = glob.sync('**/*.go', {
-    cwd: projectDirAbs,
-    absolute: true,
-    ignore: [...EXCLUDED_DIR_GLOBS],
-    nodir: true,
-    follow: false,
-    dot: false,
-  });
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const m of matches) {
-    let real: string = m;
-    /* v8 ignore start */
-    try {
-      real = realpathSync(m);
-    } catch {
-      // fall through with original
-    }
-    /* v8 ignore stop */
-    const key = real.split(sep).join('/');
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(real);
-  }
-  out.sort();
-  return out;
-}
+export const discoverFiles = createDiscover({
+  extension: 'go',
+  excludedDirGlobs: EXCLUDED_DIR_GLOBS,
+  configCandidates: CONFIG_CANDIDATES,
+  languageId: 'go',
+});

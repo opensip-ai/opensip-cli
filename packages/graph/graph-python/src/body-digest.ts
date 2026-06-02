@@ -14,6 +14,7 @@
  */
 
 import { hashBody, normalizeWhitespace, type BodyDigest } from '@opensip-tools/graph';
+import { skipToEndOfLine } from '@opensip-tools/graph-adapter-common';
 
 export function digestPythonBody(text: string): BodyDigest {
   return hashBody(normalizePythonBody(text));
@@ -59,12 +60,6 @@ function stripPythonComments(text: string): string {
 }
 
 /* v8 ignore start */
-function skipToEndOfLine(text: string, start: number): number {
-  let i = start;
-  while (i < text.length && text[i] !== '\n') i++;
-  return i;
-}
-
 function consumeStringLiteral(
   text: string,
   start: number,

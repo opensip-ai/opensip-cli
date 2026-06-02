@@ -39,6 +39,7 @@ import {
   pushCreationEdge,
   truncateForCallEdge,
 } from '@opensip-tools/graph';
+import { buildNameIndex } from '@opensip-tools/graph-adapter-common';
 
 import type { PythonParsedFile, PythonParsedProject } from './parse.js';
 import type {
@@ -46,7 +47,6 @@ import type {
   CallEdge,
   DependencyEdge,
   DependencySiteRecord,
-  FunctionOccurrence,
   MutableStats,
   ResolutionStats,
   ResolveInput,
@@ -281,22 +281,6 @@ function lookupModuleCandidates(
     if (hash !== undefined) return [hash];
   }
   return [];
-}
-
-function buildNameIndex(
-  functions: Readonly<Record<string, readonly FunctionOccurrence[]>>,
-): ReadonlyMap<string, readonly string[]> {
-  const out = new Map<string, string[]>();
-  for (const [name, occs] of Object.entries(functions)) {
-    if (!occs) continue;
-    // Skip module-init / synthetic arrow names; only real names are
-    // resolution targets.
-    if (name.startsWith('<')) continue;
-    const list: string[] = out.get(name) ?? [];
-    for (const o of occs) list.push(o.bodyHash);
-    if (list.length > 0) out.set(name, list);
-  }
-  return out;
 }
 
 function pushCallEdge(

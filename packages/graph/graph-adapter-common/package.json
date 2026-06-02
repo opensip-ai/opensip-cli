@@ -1,12 +1,12 @@
 {
-  "name": "@opensip-tools/graph-python",
+  "name": "@opensip-tools/graph-adapter-common",
   "version": "2.4.2",
   "license": "MIT",
-  "description": "Python language adapter for the opensip-tools graph engine",
+  "description": "Shared scaffolding for the tree-sitter graph language adapters (go, java, python, rust)",
   "repository": {
     "type": "git",
     "url": "https://github.com/opensip-ai/opensip-tools.git",
-    "directory": "packages/graph/graph-python"
+    "directory": "packages/graph/graph-adapter-common"
   },
   "homepage": "https://github.com/opensip-ai/opensip-tools",
   "bugs": {
@@ -18,9 +18,6 @@
   "exports": {
     ".": "./dist/index.js"
   },
-  "opensipTools": {
-    "kind": "graph-adapter"
-  },
   "scripts": {
     "build": "tsc",
     "test": "vitest run --passWithNoTests",
@@ -30,9 +27,8 @@
   "dependencies": {
     "@opensip-tools/core": "workspace:*",
     "@opensip-tools/graph": "workspace:*",
-    "@opensip-tools/graph-adapter-common": "workspace:*",
-    "tree-sitter": "0.25.0",
-    "tree-sitter-python": "0.25.0"
+    "glob": "^13.0.0",
+    "tree-sitter": "0.25.0"
   },
   "devDependencies": {
     "@types/node": "^22.19.19",

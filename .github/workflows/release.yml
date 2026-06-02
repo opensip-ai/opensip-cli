@@ -80,6 +80,7 @@ jobs:
             lang-typescript lang-rust lang-python lang-go lang-java lang-cpp \
             dashboard \
             fitness simulation graph \
+            graph-adapter-common \
             graph-typescript graph-python graph-rust graph-go graph-java \
             checks-universal checks-typescript checks-python checks-go checks-java checks-cpp checks-rust ; do
             name="@opensip-tools/$pkg"
@@ -133,7 +134,9 @@ jobs:
           pnpm --filter @opensip-tools/fitness          pack --pack-destination /tmp/tarballs
           pnpm --filter @opensip-tools/simulation       pack --pack-destination /tmp/tarballs
           pnpm --filter @opensip-tools/graph            pack --pack-destination /tmp/tarballs
-          # Layer 3.5 — graph adapter packs (depend on graph engine)
+          # Layer 3.5 — shared tree-sitter adapter scaffolding (depends on graph engine; consumed by the 4 tree-sitter packs)
+          pnpm --filter @opensip-tools/graph-adapter-common pack --pack-destination /tmp/tarballs
+          # Layer 3.6 — graph adapter packs (depend on graph engine; tree-sitter packs also depend on graph-adapter-common)
           pnpm --filter @opensip-tools/graph-typescript pack --pack-destination /tmp/tarballs
           pnpm --filter @opensip-tools/graph-python    pack --pack-destination /tmp/tarballs
           pnpm --filter @opensip-tools/graph-rust      pack --pack-destination /tmp/tarballs
@@ -236,7 +239,9 @@ jobs:
           publish_if_new fitness
           publish_if_new simulation
           publish_if_new graph
-          # Layer 3.5 — graph adapter packs (depend on graph engine)
+          # Layer 3.5 — shared tree-sitter adapter scaffolding (before the 4 tree-sitter packs that depend on it)
+          publish_if_new graph-adapter-common
+          # Layer 3.6 — graph adapter packs (depend on graph engine)
           publish_if_new graph-typescript
           publish_if_new graph-python
           publish_if_new graph-rust

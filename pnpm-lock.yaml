@@ -553,7 +553,7 @@ importers:
         specifier: ^4.1.7
         version: 4.1.7(@opentelemetry/api@1.9.1)(@types/node@22.19.19)(@vitest/coverage-v8@4.1.7)(jsdom@29.1.1)(vite@7.3.3(@types/node@22.19.19)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.22.3)(yaml@2.9.0))
 
-  packages/graph/graph-go:
+  packages/graph/graph-adapter-common:
     dependencies:
       '@opensip-tools/core':
         specifier: workspace:*
@@ -564,6 +564,28 @@ importers:
       glob:
         specifier: ^13.0.0
         version: 13.0.6
+      tree-sitter:
+        specifier: 0.25.0
+        version: 0.25.0
+    devDependencies:
+      '@types/node':
+        specifier: ^22.19.19
+        version: 22.19.19
+      vitest:
+        specifier: ^4.1.7
+        version: 4.1.7(@opentelemetry/api@1.9.1)(@types/node@22.19.19)(@vitest/coverage-v8@4.1.7)(jsdom@29.1.1)(vite@7.3.3(@types/node@22.19.19)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.22.3)(yaml@2.9.0))
+
+  packages/graph/graph-go:
+    dependencies:
+      '@opensip-tools/core':
+        specifier: workspace:*
+        version: link:../../core
+      '@opensip-tools/graph':
+        specifier: workspace:*
+        version: link:../engine
+      '@opensip-tools/graph-adapter-common':
+        specifier: workspace:*
+        version: link:../graph-adapter-common
       tree-sitter:
         specifier: 0.25.0
         version: 0.25.0
@@ -586,9 +608,9 @@ importers:
       '@opensip-tools/graph':
         specifier: workspace:*
         version: link:../engine
-      glob:
-        specifier: ^13.0.0
-        version: 13.0.6
+      '@opensip-tools/graph-adapter-common':
+        specifier: workspace:*
+        version: link:../graph-adapter-common
       tree-sitter:
         specifier: 0.25.0
         version: 0.25.0
@@ -611,9 +633,9 @@ importers:
       '@opensip-tools/graph':
         specifier: workspace:*
         version: link:../engine
-      glob:
-        specifier: ^13.0.0
-        version: 13.0.6
+      '@opensip-tools/graph-adapter-common':
+        specifier: workspace:*
+        version: link:../graph-adapter-common
       tree-sitter:
         specifier: 0.25.0
         version: 0.25.0
@@ -636,9 +658,9 @@ importers:
       '@opensip-tools/graph':
         specifier: workspace:*
         version: link:../engine
-      glob:
-        specifier: ^13.0.0
-        version: 13.0.6
+      '@opensip-tools/graph-adapter-common':
+        specifier: workspace:*
+        version: link:../graph-adapter-common
       tree-sitter:
         specifier: 0.25.0
         version: 0.25.0

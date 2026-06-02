@@ -16,6 +16,7 @@
  */
 
 import { hashBody, normalizeWhitespace, type BodyDigest } from '@opensip-tools/graph';
+import { skipToEndOfLine } from '@opensip-tools/graph-adapter-common';
 
 export function digestGoBody(text: string): BodyDigest {
   return hashBody(normalizeWhitespace(stripGoComments(text)));
@@ -67,12 +68,6 @@ function stripGoComments(text: string): string {
     i++;
   }
   return out;
-}
-
-function skipToEndOfLine(text: string, start: number): number {
-  let i = start;
-  while (i < text.length && text[i] !== '\n') i++;
-  return i;
 }
 
 function skipBlockComment(text: string, start: number): number {

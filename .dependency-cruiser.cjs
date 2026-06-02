@@ -481,7 +481,39 @@ module.exports = {
       },
       to: {
         path: '^packages/graph/graph-[a-z0-9-]+/',
-        pathNot: '^packages/graph/$1/',
+        // Exclude self-imports ($1) AND the sanctioned shared scaffolding
+        // package. graph-adapter-common is named `graph-adapter-common`
+        // so it matches the `graph-[a-z0-9-]+` pattern, but it is the one
+        // well-known upstream every tree-sitter adapter is *meant* to
+        // consume (engine → graph-adapter-common → adapters). The disjoint
+        // rule's intent is "adapters don't couple to each other's LANGUAGE
+        // code"; importing the shared scaffolding layer doesn't violate
+        // that, so it is carved out precisely (DEC-1 / DEC-8). The
+        // back-edge (common → a specific adapter) is forbidden separately
+        // by `graph-common-no-adapters` below.
+        pathNot: ['^packages/graph/$1/', '^packages/graph/graph-adapter-common/'],
+      },
+    },
+    {
+      // Shared-scaffolding layering guard (DEC-8 #2). The common package
+      // is the upstream every tree-sitter adapter consumes; it must NEVER
+      // reach back DOWN into a specific language adapter (that would invert
+      // the engine → common → adapters layering and re-couple the
+      // ecosystems the disjoint rule keeps apart). It may depend only on
+      // the engine (`@opensip-tools/graph`, no hyphen suffix → does not
+      // match `graph-[a-z0-9-]+`), core, glob, and tree-sitter.
+      name: 'graph-common-no-adapters',
+      severity: 'error',
+      comment:
+        '@opensip-tools/graph-adapter-common must not import any ' +
+        'graph-* adapter pack. It is upstream of the adapters (engine → ' +
+        'common → adapters); a back-edge would invert the layering.',
+      from: { path: '^packages/graph/graph-adapter-common/src/' },
+      to: {
+        path: '^packages/graph/graph-[a-z0-9-]+/',
+        // Relative self-imports (./parse.js → src/parse.ts) match the
+        // graph-* pattern too; exclude the package's own tree.
+        pathNot: '^packages/graph/graph-adapter-common/',
       },
     },
     {

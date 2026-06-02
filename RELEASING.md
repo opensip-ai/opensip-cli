@@ -2,12 +2,12 @@
 
 Releases are tag-driven. Pushing a tag matching `v*` triggers
 `.github/workflows/release.yml`, which builds, tests, packs, and
-publishes all 29 packages to npm via OIDC trusted publishing — no
-`NPM_TOKEN` required. (28 are scoped `@opensip-tools/*`; the CLI itself
+publishes all 30 packages to npm via OIDC trusted publishing — no
+`NPM_TOKEN` required. (29 are scoped `@opensip-tools/*`; the CLI itself
 publishes under the unscoped name **`opensip-tools`** — the one package
 end-users install directly, via `npm i -g opensip-tools`.)
 
-## The 29 packages
+## The 30 packages
 
 | Layer | Package | Path |
 |-------|---------|------|
@@ -26,6 +26,7 @@ end-users install directly, via `npm i -g opensip-tools`.)
 | Tools | `@opensip-tools/fitness` | `packages/fitness/engine` |
 | Tools | `@opensip-tools/simulation` | `packages/simulation/engine` |
 | Tools | `@opensip-tools/graph` | `packages/graph/engine` |
+| Graph adapters | `@opensip-tools/graph-adapter-common` | `packages/graph/graph-adapter-common` |
 | Graph adapters | `@opensip-tools/graph-typescript` | `packages/graph/graph-typescript` |
 | Graph adapters | `@opensip-tools/graph-python` | `packages/graph/graph-python` |
 | Graph adapters | `@opensip-tools/graph-rust` | `packages/graph/graph-rust` |
@@ -41,7 +42,7 @@ end-users install directly, via `npm i -g opensip-tools`.)
 | Check packs | `@opensip-tools/checks-rust` | `packages/fitness/checks-rust` |
 | CLI | `opensip-tools` (unscoped) | `packages/cli` |
 
-All 29 share the same version. The release workflow publishes them in
+All 30 share the same version. The release workflow publishes them in
 dependency order; downstream packages reference upstream versions in
 their `dependencies`.
 
@@ -83,7 +84,7 @@ their `dependencies`.
 6. Verify on npm:
    ```bash
    for p in core datastore contracts session-store reporting cli-ui fitness simulation graph dashboard \
-            graph-typescript graph-python graph-rust graph-go graph-java \
+            graph-adapter-common graph-typescript graph-python graph-rust graph-go graph-java \
             lang-typescript lang-rust lang-python lang-go lang-java lang-cpp \
             checks-typescript checks-universal checks-python checks-go checks-java checks-cpp checks-rust; do
      printf '%-40s %s\n' "@opensip-tools/$p" "$(npm view "@opensip-tools/$p" version 2>/dev/null || echo MISSING)"
@@ -129,16 +130,26 @@ Order:
 10. **`@opensip-tools/simulation`** — depends on core, contracts, datastore.
 11. **`@opensip-tools/graph`** — depends on core, contracts, datastore,
     session-store, reporting, and cli-ui.
+11.5 **`@opensip-tools/graph-adapter-common`** — shared scaffolding for the
+    tree-sitter adapters (discover/parse/walk/cache-key factories). Depends
+    on the engine (`@opensip-tools/graph`) and core. **Published AFTER the
+    engine and BEFORE the four tree-sitter adapter packs**, which all
+    declare it in `dependencies`. It is a library, not a discoverable
+    adapter (`opensipTools.kind` is absent) and exports no `adapter`; it is
+    pulled in transitively by graph-go/java/python/rust, never installed
+    directly. (graph-typescript does NOT depend on it — it is
+    TS-compiler-backed, not tree-sitter.)
 12. **Graph adapter packs** — `@opensip-tools/graph-typescript`,
     `graph-python`, `graph-rust`, `graph-go`, `graph-java`. Each
     depends on the engine (`@opensip-tools/graph`) plus its parser
-    (typescript / tree-sitter-*). Independent of each other; published
-    in any order within the group. All five are first-party CLI
-    dependencies — the CLI bundles every graph adapter it loads by
-    default (see step 14), so installing `opensip-tools` pulls
-    them all in. (Only *third-party* `@opensip-tools/graph-*` adapters
-    are opt-in: they're discovered by name pattern and installed
-    explicitly.)
+    (typescript / tree-sitter-*); the four tree-sitter packs additionally
+    depend on `@opensip-tools/graph-adapter-common` (step 11.5).
+    Independent of each other; published in any order within the group.
+    All five are first-party CLI dependencies — the CLI bundles every
+    graph adapter it loads by default (see step 14), so installing
+    `opensip-tools` pulls them all in. (Only *third-party*
+    `@opensip-tools/graph-*` adapters are opt-in: they're discovered by
+    name pattern and installed explicitly.)
 13. **Check packs** (any order within this group):
     `checks-typescript`, `checks-universal`, `checks-python`,
     `checks-go`, `checks-java`, `checks-cpp`, `checks-rust` — all
@@ -154,7 +165,7 @@ Order:
 ## Prerequisites (one-time setup)
 
 - **npm Trusted Publishers** must be configured per-package on
-  npmjs.com → package settings → Publishing access. Each of the 29
+  npmjs.com → package settings → Publishing access. Each of the 30
   packages needs an entry pointing to:
   - Organization: `opensip-ai`
   - Repository: `opensip-tools`
@@ -176,6 +187,11 @@ auth through the trusted publisher entry; with no entry registered for
 the package name, npm responds 404. The release workflow's preflight
 step warns about this case before publishing starts.
 
+> **Current brand-new package:** `@opensip-tools/graph-adapter-common`
+> (added with the tree-sitter adapter scaffolding extraction). The first
+> release after that change lands will 404 on this name until its trusted
+> publisher exists — run the bootstrap path below once to create it.
+
 To unblock:
 
 1. Generate a short-lived granular access token on npmjs.com (scope
@@ -187,7 +203,7 @@ To unblock:
    ```
 
    The script is **namespace-creation only** and **idempotent**. It
-   iterates the 29 packages in dependency order, skips any whose NAME
+   iterates the 30 packages in dependency order, skips any whose NAME
    already exists on npm (those get v`X.Y.Z` via the OIDC tagged
    release, with provenance), packs and publishes only the brand-new
    names using the token, and at the end prints a list of newly-created

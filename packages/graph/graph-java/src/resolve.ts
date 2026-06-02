@@ -34,13 +34,13 @@ import {
   pushCreationEdge,
   truncateForCallEdge,
 } from '@opensip-tools/graph';
+import { buildNameIndex } from '@opensip-tools/graph-adapter-common';
 
 import { resolveDependencies } from './resolve-dependencies.js';
 
 import type { JavaParsedFile, JavaParsedProject } from './parse.js';
 import type {
   CallEdge,
-  FunctionOccurrence,
   MutableStats,
   ResolutionStats,
   ResolveInput,
@@ -99,20 +99,6 @@ export function resolveCallSites(input: ResolveInput<JavaParsedProject>): Resolv
     : { edgesByOwner, dependenciesByOwner, stats: finalStats };
 }
 
-
-function buildNameIndex(
-  functions: Readonly<Record<string, readonly FunctionOccurrence[]>>,
-): ReadonlyMap<string, readonly string[]> {
-  const out = new Map<string, string[]>();
-  for (const [name, occs] of Object.entries(functions)) {
-    if (!occs) continue;
-    if (name.startsWith('<')) continue;
-    const list: string[] = out.get(name) ?? [];
-    for (const o of occs) list.push(o.bodyHash);
-    if (list.length > 0) out.set(name, list);
-  }
-  return out;
-}
 
 function pushCallEdge(
   node: Parser.SyntaxNode,
