@@ -4,29 +4,43 @@ last_verified: 2026-06-01
 owner: opensip-tools
 ---
 
-# ADR-0003: Call/dependency edges are keyed per occurrence, not per body hash
+# ADR-0003: A body hash is not an occurrence identity — edges and reachability key per occurrence
 
 ```yaml
 id: ADR-0003
-title: Call/dependency edges are keyed per occurrence, not per body hash
+title: A body hash is not an occurrence identity — edges and reachability key per occurrence
 date: 2026-06-01
 status: active            # active | superseded | deferred
 supersedes: []
 superseded_by: null
 related: [ADR-0002]
-tags: [graph, edges, catalog, correctness]
+tags: [graph, edges, reachability, adjacency, catalog, correctness]
 enforcement: not-mechanizable
 enforcement-reason: >
-  An identity/keying invariant in the edge-stitch pipeline; guarded by tests
-  (body-twin regression), not a lintable pattern.
+  An identity invariant across the catalog's derived graphs; guarded by tests
+  (body-twin regressions), not a lintable pattern.
 ```
 
-**Decision:** Call and dependency edges are bucketed by their **owning occurrence**
-— `ownerEdgeKey(bodyHash, filePath)` — not by `bodyHash` alone, at every point in
-the resolve→stitch pipeline: the TypeScript resolver (`edges.ts`), the engine
-`stitchEdges`, the adapter `rebuildCatalog`/`collectByOwner`, the incremental
-merge, and dependency attachment. The `filePath` component is byte-identical to
-`FunctionOccurrence.filePath` so the stitch lookup hits.
+**Decision:** A content `bodyHash` identifies a *body*, not an *occurrence* —
+identical bodies in different files (a "body-twin") share one hash by design (it
+is what `duplicated-function-body` relies on). Therefore **no derived graph may be
+keyed or built off the `byBodyHash` (last-writer-wins) collapse**; anything that
+attributes edges to, or traverses edges from, a function must operate per
+occurrence. Two concrete applications:
+
+1. **Edge stitching** (shipped 2.4.2). Call/dependency edges are bucketed by their
+   owning occurrence — `ownerEdgeKey(bodyHash, filePath)`, not `bodyHash` alone —
+   at every stitch point: the TypeScript resolver (`edges.ts`), the engine
+   `stitchEdges`, the adapter `rebuildCatalog`/`collectByOwner`, the incremental
+   merge, and dependency attachment. The `filePath` component is byte-identical to
+   `FunctionOccurrence.filePath` so the lookup hits.
+2. **Reachability adjacency** (specced, pending — `orphan-subtree-sharpening`). The
+   `callees`/`callers` adjacency in `buildAdjacency` is built from
+   `byBodyHash.values()` (one *winner* occurrence per hash), so a losing twin's
+   out-edges are erased from the graph. Reachability rules (`orphan-subtree`,
+   `test-only-reachable`) then BFS over a lossy graph and report **false orphans**.
+   The fix: build adjacency by **unioning every occurrence's out-edges per hash**
+   (from `occurrencesByHash`), not the winner's only.
 
 **Alternatives:**
 - **(A) Key by `bodyHash` alone (prior behavior).** Rejected: two functions with
@@ -43,17 +57,32 @@ merge, and dependency attachment. The `filePath` component is byte-identical to
   occurrence's `[line, endLine]`. Rejected as a band-aid: heuristic (fails when
   two twins start at the same absolute line) and doesn't fix the root keying.
 
+- **(D) Build reachability adjacency from `byBodyHash` winners (prior behavior).**
+  Rejected for application 2: it silently drops losing twins' out-edges. Proven on
+  this repo — `analyze` in `api-contract-validation.ts` is a body-twin with
+  `api-response-validation.ts`; `byBodyHash` kept the latter, so the former's
+  `analyze → analyzeFile → …` chain is invisible and ~16 functions in that one
+  file are reported as false orphans (plus the `lang-*` `scan`/strip body-twins).
+  Unioning all twins' out-edges per hash over-approximates reachability, which is
+  the *safe* direction for orphan detection (fewer false positives).
+
 **Rationale:** A content hash is not an occurrence identity by design (identical
-bodies share it, which `duplicated-function-body` relies on). Edge ownership must
-therefore key on `(bodyHash, filePath)`, the minimal unique occurrence key, so an
-occurrence carries only its own edges. Cross-shard merge already deduped by
-`(bodyHash, filePath, line)`, so only the single-program stitch path needed the
-fix.
+bodies share it, which `duplicated-function-body` relies on). So both *writing*
+edges (which occurrence owns this edge) and *reading* edges (which edges leave
+this occurrence) must be per occurrence — `(bodyHash, filePath)` for stitching,
+and a per-occurrence union for adjacency — never the `byBodyHash` winner. The same
+single root cause (collapse loses twins) produced two visible bugs: phantom
+cross-package coupling edges, and false orphans.
 
 **Consequences:**
-- `ownerEdgeKey` helper in the engine, used consistently at all stitch points.
-- Regression covered by `body-twin-edges.test.ts` (a twin keeps only its own
-  callee edge).
-- Shipped in 2.4.2 alongside per-package bucketing ([ADR-0002]), which made the
-  artifact visible. Specced in
+- **Edge stitching:** `ownerEdgeKey` helper, used at all stitch points; regression
+  covered by `body-twin-edges.test.ts`. Shipped in 2.4.2 alongside per-package
+  bucketing ([ADR-0002]). Specced in
   [`graph-per-package-coupling`](../specs/graph-per-package-coupling.md).
+- **Reachability adjacency (pending):** `buildAdjacency` must union per occurrence
+  (from `occurrencesByHash`), not iterate `byBodyHash.values()`. This fixes
+  `graph:orphan-subtree` *and* `graph:test-only-reachable` (shared machinery).
+  Specced in
+  [`orphan-subtree-sharpening`](../specs/orphan-subtree-sharpening.md).
+- Cross-shard merge already deduped occurrences by `(bodyHash, filePath, line)`,
+  so it is unaffected by either application.

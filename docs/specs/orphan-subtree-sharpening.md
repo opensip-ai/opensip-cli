@@ -1,272 +1,244 @@
 # Spec: Sharpen `graph:orphan-subtree` to surface only genuine dead code
 
-> Status: **PROPOSED** (2026-06-01).
+> Status: **PROPOSED** (2026-06-01; revised after empirical investigation).
+> Implements [ADR-0001](../decisions/ADR-0001-graph-rules-actionable-precise-bounded.md)
+> (actionable/precise/bounded) and the reachability application of
+> [ADR-0003](../decisions/ADR-0003-per-occurrence-edge-keying.md) (a body hash
+> is not an occurrence identity).
 > Related: [graph-per-package-coupling.md](./graph-per-package-coupling.md),
-> [graph-edge-import-constraint.md](./graph-edge-import-constraint.md),
-> [graph-cross-package-edge-attribution.md](./graph-cross-package-edge-attribution.md).
+> [graph-edge-import-constraint.md](./graph-edge-import-constraint.md).
 
 ## Objective
 
-`graph:orphan-subtree` emits **45 findings on this repo**, all at `'medium'`
-severity. **Every one is a false positive.** The rule's reachability model
-("not reachable from any inferred entry point") flags three things that are
-not dead code:
+`graph:orphan-subtree` emits **45 findings on this repo**, all `'medium'`, and
+**every one is a false positive** (verified by classifying all 45 against the
+catalog). The dominant cause is not what a first read suggests — it is the
+**body-hash collapse in the reachability adjacency**, the same root cause as the
+coupling/edge-keying work (ADR-0003), now striking a different derived graph.
 
-1. **Public API surface** — functions exported from a package barrel that
-   have no caller *inside* their own package (the only caller lives in
-   another package, and cross-package call edges don't resolve here — the
-   known `dependencies[].to`-empty-for-`@scope/*` gap).
-2. **Callees of public API** — module-local helpers reached only *through*
-   such an exported barrel function, which is therefore never itself reached.
-3. **Dynamic-dispatch / plugin-contract reachable** — helpers called only
-   from inside a closure passed to `defineCheck(...)`/`defineTool(...)` (the
-   plugin contract), where the closure→helper edge is the live path but the
-   closure itself is never an entry point.
-4. **Test-only-reachable** — a `module-local` helper called only from a
-   `*.test.ts`. (Strictly the domain of the sibling `test-only-reachable`
-   rule, but orphan-subtree currently double-flags them.)
+### Root cause (proven)
 
-This spec sharpens the rule so it earns a gate signal only when a finding is
-**actionable** (a concrete fix exists: delete the function), **precise**
-(remaining findings are real dead code, not intended public surface), and
-**bounded** (a handful, not 45). Target: **45 → a small set of genuine
-deletions** (expected 0–3 on this repo; see Success Criteria).
+`computeReachable` (`rules/orphan-subtree.ts`) BFS-walks `indexes.callees`.
+`callees`/`callers` are built by `buildAdjacency` (`pipeline/indexes.ts:115-151`),
+which iterates **`byBodyHash.values()`** — i.e. **one *winner* occurrence per
+body hash** (last-writer-wins). So when two functions are **body-twins**
+(identical bodies, different files), only the winner's out-edges enter the
+graph; the loser's are erased.
+
+Concrete proof on this repo: `analyze` in
+`packages/fitness/checks-typescript/src/checks/quality/api/api-contract-validation.ts`
+shares its body hash (`fc0d0d`) with `api-response-validation.ts`'s `analyze`.
+`byBodyHash` kept the **api-response** copy, so `callees.get(fc0d0d)` is
+api-response's callees — **not** api-contract's `analyze → analyzeFile`. The
+module-init *is* a seed and *does* reach the `analyze` hash, but then follows the
+wrong twin's edges. api-contract's `analyzeFile` shows **0 callers** in the
+adjacency (its real caller, the losing twin, was collapsed out), so it and its
+entire transitive helper chain (`getFunctionName`, `checkFunctionContract`, the
+`visit` arrows, …) become **false orphans**. The `lang-*` `strip.ts` cluster is
+the same mechanism (`stripStrings` and `scan` are 5-way body-twins).
+
+This sharpens the rule so it earns a gate signal only when **actionable** (the
+fix is "delete it"), **precise** (remaining findings are real dead code, not
+intended public surface or twin-collapse artifacts), and **bounded** (a handful,
+not 45). Target: **45 → 0–3 genuine deletions** (see Success Criteria).
 
 ## Scope
 
 ### In
 
-- Expanding `inferEntryPoints` (`packages/graph/engine/src/rules/_entry-points.ts`)
-  so the seed set covers barrel/public-API exports, plugin-contract closures,
-  and decorated entries — fixing reachability for **all** absence-based rules
-  (orphan-subtree *and* test-only-reachable) in one place.
-- Adding a precision filter in `orphanSubtreeRule.evaluate`
-  (`packages/graph/engine/src/rules/orphan-subtree.ts`) so it flags only
-  `module-local`/`private`, non-test, zero-caller, non-entry functions.
-- New `GraphConfig` knobs for the sharpening behavior, with opinionated
-  defaults.
-- Unit + fixture tests proving the four buckets are no longer flagged and a
-  genuinely-dead private helper still is.
+- **Twin-aware reachability adjacency (the root fix).** Build `callees`/`callers`
+  by **unioning every occurrence's out-edges per body hash** (from
+  `occurrencesByHash`), instead of iterating `byBodyHash.values()`
+  (`pipeline/indexes.ts` `buildAdjacency`/`collectOutgoing`). Over-approximating
+  reachability this way is the *safe* direction for orphan detection (fewer false
+  positives). Fixes `orphan-subtree` **and** `test-only-reachable` (shared
+  machinery) in one place.
+- **Re-measure, then handle the genuine residual.** After the adjacency fix,
+  re-run and classify what remains. The expected residual is the **cross-package
+  public-API** class (`cli-ui`'s `renderToText` exported and consumed only by
+  `cli`, where the cross-package call edge doesn't resolve — the known
+  `dependencies[].to`-empty-for-`@scope/*` gap). Handle it with the existing
+  `no-callers-exported` entry-point reason, extended to `barrel-export` only if
+  re-measure shows `no-callers-exported` is insufficient.
+- **Rule-level precision filter** (D3) as the last-mile gate: flag only
+  `module-local`/`private`, non-test, non-decorated, zero-caller, non-entry
+  functions.
+- Config knobs with opinionated (quiet) defaults; unit + fixture tests including
+  a body-twin reachability regression and a genuinely-dead private helper that
+  still fires.
 
 ### Out
 
+- The risky `plugin-contract-closure` seeding from the earlier draft is
+  **dropped** — the investigation showed it is unnecessary. The `defineCheck`
+  closures' callees become reachable for free once the adjacency unions twins
+  (the module-init→closure creation edge already exists; only the twin collapse
+  hid the closure's own out-edges). No walker/inventory change is needed.
 - Fixing the underlying **workspace import resolution** (`dependencies[].to`
-  empty for `@scope/*`, resolver points at `dist`) — tracked in
-  `graph-edge-import-constraint.md`. This spec works *around* it by treating
-  unresolved-export-with-no-internal-caller as a live entry point, exactly
-  the conservative move that gap demands.
-- Changing the `test-only-reachable` rule's own output. Expanding
-  `inferEntryPoints` benefits it for free, but its semantics are unchanged.
-- Raising/lowering `defaultSeverity` (stays `'warning'`; the emitted
-  `severity` stays `'medium'`).
-- Cross-package edge recovery for the sharded build (`crossShard` edges
-  already exist; this spec doesn't touch the resolver).
+  empty for `@scope/*`) — tracked in `graph-edge-import-constraint.md`. This spec
+  works around it via the export-based seeding.
+- Changing `test-only-reachable`'s own semantics (it benefits from the shared
+  adjacency fix for free).
+- `defaultSeverity` stays `'warning'` / emitted `severity` stays `'medium'`.
 
 ## Technical Context (real refs)
 
-- **The rule.** `packages/graph/engine/src/rules/orphan-subtree.ts`.
-  `computeReachable` (L59–78) BFS-seeds from `inferEntryPoints(catalog,
-  indexes)` (L60) ∪ `config.entryPointHashes` (L63), walking
-  `indexes.callees` (forward, L72). Any `byBodyHash` occurrence not visited
-  is emitted (L27–54), except `kind === 'module-init'` (L30) and empty
-  `filePath` (L33). Emitted `severity: 'medium'` (L38),
-  `category: 'quality'`, suggestion at L43. `approximateSuffix(catalog)`
-  (L24) appends a fast-mode caveat.
-- **Entry-point inference.** `packages/graph/engine/src/rules/_entry-points.ts`.
-  `classify` (L46–65) returns one of three reasons: `module-init` (L58,
-  every file's init), `name-match` (L59, against `NAME_HEURISTICS` =
-  `{main,run,start,register,initialize,init,bootstrap}`, L18–26), and
-  `no-callers-exported` (L60–63: `visibility === 'exported'` AND
-  `indexes.callers.get(hash)?.length === 0`). The header comment (L1–14)
-  explicitly notes bin-entry and Tool-`commands`-handler inference (#1, #2)
-  are **deferred** "until cross-package call resolution is reliable."
-- **The occurrence shape.** `packages/graph/engine/src/types.ts`,
-  `FunctionOccurrence` (L150–203). Levers for precision:
-  `visibility: 'exported' | 'module-local' | 'private'` (L186, L81–82),
-  `package?: string` (L175, stamped by `assignPackages`),
-  `inTestFile: boolean` (L187), `decorators: readonly string[]` (L185),
-  `kind: FunctionKind` (L181). `byBodyHash` is **content-deduped** (one
-  occurrence per hash; `Indexes` L301); `occurrencesByHash` (L308) preserves
-  all twins — relevant to the body-twin orphan class below.
-- **Package stamping.** `packages/graph/engine/src/pipeline/assign-packages.ts`
-  (`assignPackages`, L26) sets `occurrence.package` to the nearest
-  `package.json` `name`. Per-package barrel = the package's `index.ts` /
-  `main` entry — i.e. the public surface boundary.
-- **Plugin contract.** `defineCheck` is
-  `packages/fitness/engine/src/framework/define-check.ts:221`; the closure
-  passed as `analyze(content, filePath)` is the live dispatch path.
-  Tool `register(cli)` lives at `packages/graph/engine/src/tool.ts:114`,
-  `packages/simulation/engine/src/tool.ts:27`, invoked dynamically by
-  `packages/cli/src/bootstrap/register-tools.ts:96`. `register` is already a
-  `NAME_HEURISTICS` match, but the *callees of the closure body* are not.
-- **Tests.** `packages/graph/engine/src/__tests__/rules/_entry-points.test.ts`
-  (5 cases over the 3 reasons), `.../orphan-subtree-config.test.ts`
-  (`entryPointHashes` override, empty-filePath, module-init),
-  `packages/graph/graph-typescript/src/__tests__/rules/orphan-subtree.test.ts`
-  (end-to-end fixture: `unusedHelper` flagged, `helper`/`entry` not). Test
-  helpers: `.../rules/_helpers.ts` (`occ`, `staticCall`, `makeCatalog`).
+- **The lossy adjacency (root).** `buildAdjacency`
+  (`pipeline/indexes.ts:115-125`) iterates `byBodyHash.values()`;
+  `collectOutgoing` (`:127-142`) reads each *winner* occurrence's `calls`.
+  `occurrencesByHash` (`types.ts` `Indexes`; built in `buildHashMaps`,
+  `pipeline/indexes.ts`) already preserves **all** occurrences per hash — the
+  data the twin-aware build needs; no new index required.
+- **The rule.** `rules/orphan-subtree.ts`: `computeReachable` seeds from
+  `inferEntryPoints(catalog, indexes)` ∪ `config.entryPointHashes`, BFS over
+  `indexes.callees`; emits any `byBodyHash` occurrence not visited, except
+  `kind==='module-init'` and empty `filePath`, at `severity:'medium'`.
+- **Entry-point inference.** `rules/_entry-points.ts` `classify`: `module-init`
+  (every file's init), `name-match` (`{main,run,start,register,initialize,init,
+  bootstrap}`), `no-callers-exported` (`visibility==='exported'` AND 0 callers).
+  No change needed for the root fix; `no-callers-exported` already targets the
+  cross-package-export residual.
+- **Occurrence levers for D3.** `FunctionOccurrence`
+  (`types.ts`): `visibility: 'exported'|'module-local'|'private'`,
+  `inTestFile`, `decorators`, `kind`, `package?` (stamped by `assignPackages`).
+- **Tests.** `__tests__/rules/_entry-points.test.ts`,
+  `__tests__/rules/orphan-subtree-config.test.ts`,
+  `graph-typescript/.../rules/orphan-subtree.test.ts`. Helpers:
+  `rules/_helpers.ts` (`occ`, `staticCall`, `makeCatalog`).
 
-### The 45, classified (empirical, `graph --json` on this repo)
+### The 45, re-classified (empirical, `graph --json`)
 
-| Bucket | Count | Representative | Why it's a false positive |
-|---|---|---|---|
-| **defineCheck-closure-reachable** | 18 | `analyzeFile` / `checkFunctionContract` / `getFunctionName` @ `packages/fitness/checks-typescript/src/checks/quality/api/api-contract-validation.ts` (L59, L216, L292) | All called from the `analyze(content,filePath)` closure passed to `defineCheck` (L347, `return analyzeFile(...)` L355). The closure arrow is never an entry; its callees never get reached. |
-| **callees-of-exported-barrel** | 12 | `scan`/`isAsciiLetter`/`isIdentChar` @ `packages/languages/lang-python/src/strip.ts` (L192, L44, L50) | `scan` is called by exported `stripStrings`/`stripComments` (L237/L243). Those are `no-callers-exported` entry points — but their callees aren't reached. Compounded by body-twins: `scan` is duplicated across `lang-{cpp,go,java,python}/src/strip.ts`, deduped in `byBodyHash`. |
-| **exported barrel + its private helpers** | 11 | `renderToText` + `spansToText`/`hintsToText`/`indentLines` @ `packages/cli-ui/src/render-to-text.ts` (L58, L22, L26, L44) | `renderToText` is in the cli-ui barrel (`packages/cli-ui/src/index.ts:33`) and called cross-package from `packages/cli/src/bootstrap/render.ts:56` — a real public API. The cross-package edge doesn't resolve, so `renderToText` AND its file-local helpers all look orphaned. |
-| **test-only-reachable** | 4 | `analyze` @ `.../data-integrity/__tests__/null-safety-fp.test.ts:19` (calls exported `analyzeNullSafety`) | Module-local helper inside a `*.test.ts`. Belongs to the `test-only-reachable` rule, not orphan-subtree. |
+| Bucket | ~Count | Root cause | Fixed by |
+|---|---:|---|---|
+| **api-contract-validation.ts cluster** (`analyze`, `analyzeFile`, `getFunctionName`, `checkFunctionContract`, the `visit` arrows, …) | ~16 | **Reachability adjacency collapse** — `analyze` is a body-twin; winner's edges followed, this file's chain erased. | **Twin-aware adjacency** |
+| **`lang-*/strip.ts` cluster** (`scan`, `isIdentChar`, `match*`, `scan*String`) | ~12 | Same — `stripStrings`/`scan` are 5-way body-twins; losers' edges erased. | **Twin-aware adjacency** |
+| **`cli-ui/render-to-text.ts`** (`renderToText` + private helpers) | ~10 | **Cross-package export gap** — exported, consumed only by `cli`; that call edge doesn't resolve (`dist` gap). | `no-callers-exported`/`barrel-export` seeding (residual) |
+| **test-only helpers** | ~4 | Module-local helper in a `*.test.ts`. | D3 filter (`!inTestFile`) |
 
-**0 of the 45 are genuine dead code.** That is the noise to eliminate.
+**0 of the 45 are genuine dead code.** The first two buckets (~28) are the
+ADR-0003 reachability collapse and clear once adjacency is twin-aware.
 
 ## Design Decisions
 
-### D1 — Where to fix: expand inferEntryPoints AND filter-in-rule (both)
+### D0 — Twin-aware reachability adjacency (root fix, ADR-0003)
 
-| Option | Pros | Cons | Verdict |
-|---|---|---|---|
-| (a) Only expand `inferEntryPoints` | Single source of truth; fixes test-only-reachable too; reachability stays the model | Doesn't stop the rule re-flagging test-only helpers (their own concern); a barrel export with a real internal-only-dead callee still slips if seeding is imperfect | Necessary, not sufficient |
-| (b) Only filter in the rule | Cheap, local | Duplicates intent across every absence-based rule; doesn't help test-only-reachable; filtering by visibility alone can't tell "exported public API" from "exported but truly dead" | Insufficient |
-| **(c) Both** (chosen) | Seeding fixes transitive reachability for all rules; the rule-level filter is the last-mile precision gate (only `module-local`/`private`, non-test, zero-caller, non-entry survive) | Two touch points | **Chosen** — defense in depth; each layer earns its keep |
+Build `callees`/`callers` by unioning **every** occurrence's out-edges per body
+hash (iterate `occurrencesByHash`), not the `byBodyHash` winner only. A
+losing-twin's out-edges rejoin the graph, so reachability stops erasing them.
+Over-approximation (a hash's callees = union of all its twins' callees) is the
+correct, safe bias for orphan detection. This is the single change that clears
+buckets 1–2 and the only one that *can* — no amount of extra seeding fixes a
+lossy adjacency (the seeds already reach the collapsed hash).
 
-**Rationale.** Seeding (`inferEntryPoints`) fixes buckets 1–3 *transitively*
-(seed the closure / the barrel export → BFS reaches its callees). The
-rule-level filter (D3) hard-excludes bucket 4 (test) and guarantees we never
-flag intended public surface even if seeding misses an edge.
+| Option | Verdict |
+|---|---|
+| (a) Keep `byBodyHash` adjacency, fix via more seeding | **Rejected** — treats symptoms; can't reach a loser-twin's callees that aren't in the graph at all. |
+| (b) Union per occurrence from `occurrencesByHash` (chosen) | **Chosen** — root fix; shared by `test-only-reachable`; small, contained change to `buildAdjacency`. |
+| (c) Switch reachability to occurrence-id nodes (not hashes) | Cleaner in theory; larger change to the `Indexes` model and every consumer. Deferred — (b) achieves correctness within the existing hash-keyed shape. |
 
-### D2 — New entry-point reasons (in `inferEntryPoints`)
+### D1 — Re-measure before designing residual seeding
 
-Add to `EntryPoint['reason']` and `classify`:
+After D0, re-run `graph --json` and re-classify. Only then finalize the
+residual seeding (below). Do **not** pre-build seeding for buckets that D0 may
+already clear. (Evidence-driven; the earlier draft over-built seeding against a
+mis-diagnosed root cause.)
 
-| Reason | Predicate | Fixes |
+### D2 — Residual: cross-package public API
+
+Expected residual = bucket 3 (`renderToText`). `no-callers-exported` already
+classifies "exported + 0 in-project callers" as an entry point; confirm it
+seeds `renderToText` post-D0. If a real barrel export is missed (e.g. it has a
+stray same-package caller that is itself dead), add a `barrel-export` reason to
+`inferEntryPoints`: `visibility==='exported'` AND the file is the package's
+public barrel (basename `index.{ts,tsx}`, package via `occurrence.package`).
+Decide based on the re-measure, not upfront.
+
+### D3 — Rule-level precision filter
+
+Emit only if: not reachable (existing); `kind!=='module-init'` (existing);
+`filePath` non-empty (existing); **`visibility!=='exported'`** (public surface is
+not dead for lack of an internal caller; configurable via `flagExportedOrphans`,
+default `false`); **`!occ.inTestFile`** (`test-only-reachable`'s job;
+`flagTestOrphans`, default `false`); **`occ.decorators.length===0`**
+(framework-dispatched).
+
+### D4 — Config knobs (`GraphConfig`)
+
+| Knob | Default | Meaning |
 |---|---|---|
-| `barrel-export` | `visibility === 'exported'` AND the occurrence's file is its package's public barrel (file basename `index.ts`/`index.tsx`, or matches the package's `main`/`exports` entry; package known via `occurrence.package`). | Bucket 3 (`renderToText`) + transitively its helpers. Distinct from `no-callers-exported` so it fires even when a *same-package* caller exists but the real consumer is cross-package. |
-| `plugin-contract-closure` | The occurrence is an arrow/function-expression passed as a property (`analyze`, `commands`, `run`, `register`, `scenario`) into a call to a known contract factory (`defineCheck`/`defineTool`/`defineScenario`/`defineToolTab`) — detected via the enclosing call expression captured at inventory time. | Bucket 1 (`api-contract-validation` helpers) transitively. |
-| `decorated` | `occ.decorators.length > 0` (e.g. DI `@injectable`, framework route decorators — invoked by a framework, not a named caller). | Future-proofs decorated entry points; defensible default given the rubric ("dynamic dispatch ≠ unused"). |
+| `flagExportedOrphans` | `false` | Allow flagging exported zero-caller functions (for repos with trustworthy cross-package resolution). |
+| `flagTestOrphans` | `false` | Allow flagging `inTestFile` orphans (overlaps `test-only-reachable`). |
 
-**Note on detection feasibility.** `barrel-export` and `decorated` are pure
-catalog reads (`package`, `filePath`, `decorators`) — no new inventory data.
-`plugin-contract-closure` needs the enclosing-call name at the closure's
-declaration site. If that is not already derivable from the catalog, the
-fallback (recorded, not deferred silently) is to rely on D3's filter +
-transitive seeding from the surrounding `defineCheck` *call statement*'s
-module-init reachability; see Open Questions Q1.
-
-### D3 — Rule-level precision filter (in `orphanSubtreeRule.evaluate`)
-
-A function is emitted **only if all** hold:
-
-- not reachable (existing);
-- `kind !== 'module-init'` (existing, L30);
-- `filePath` non-empty (existing, L33);
-- **`visibility !== 'exported'`** — an exported symbol is public surface;
-  absence of an *internal* caller is not evidence of death (cross-package
-  resolution gap). Configurable via `flagExportedOrphans` (D4), default
-  `false`;
-- **`!occ.inTestFile`** — test-only helpers are the `test-only-reachable`
-  rule's job. Configurable via `flagTestOrphans`, default `false`;
-- **`occ.decorators.length === 0`** — decorated = framework-dispatched.
-
-### D4 — Config knobs (added to `GraphConfig`, `types.ts` L327)
-
-| Knob | Type | Default | Meaning |
-|---|---|---|---|
-| `flagExportedOrphans` | `boolean` | `false` | When `true`, exported functions with zero callers are eligible to be flagged (the old behavior, for repos where cross-package resolution is trustworthy). |
-| `flagTestOrphans` | `boolean` | `false` | When `true`, `inTestFile` orphans are eligible (overlaps `test-only-reachable`; off by default to avoid double-reporting). |
-| `extraContractFactories` | `readonly string[]` | `[]` | Additional `defineX`-style factory names whose closure args seed entry points (user plugin contracts). |
-
-Existing `entryPointHashes` (L338) is unchanged and still the manual escape
-hatch the suggestion text points at. **Opinionated default:** all three new
-knobs default to the *quiet, precise* setting — the platform's contract is
-"a finding means delete it," so the burden of proof is on the rule.
+Opinionated default: both quiet — the platform's contract is "a finding means
+delete it," so the burden of proof is on the rule. `entryPointHashes` (existing)
+remains the manual escape hatch.
 
 ### D5 — Severity unchanged
 
-Stays `'medium'` / `defaultSeverity: 'warning'`. The fix is precision, not
-loudness. Once the rule is precise, `'medium'` correctly reads as "we are
-fairly confident this is deletable."
+`'medium'` / `defaultSeverity:'warning'`. The fix is precision, not loudness.
 
 ## Success Criteria (testable)
 
-- [ ] **Unit (`_entry-points.test.ts`):** a `barrel-export` occurrence
-      (`visibility: 'exported'`, `filePath` ending `index.ts`, `package` set)
-      classifies as `barrel-export`; a closure passed to `defineCheck`
-      classifies as `plugin-contract-closure`; a decorated occurrence
-      classifies as `decorated`. Existing 5 cases stay green.
-- [ ] **Unit (`orphan-subtree-config.test.ts`):**
-      - a `module-local`, zero-caller, non-test, non-decorated function **IS**
-        flagged (the genuine-dead case must survive — guards against
-        over-suppression);
-      - an `exported` barrel function with no internal caller is **NOT**
-        flagged (default `flagExportedOrphans: false`); its `module-local`
-        callees are **NOT** flagged (reached transitively from the seed);
-      - a function reachable only via a `defineCheck` closure is **NOT**
-        flagged;
-      - an `inTestFile` helper is **NOT** flagged by default; **IS** eligible
-        with `flagTestOrphans: true`;
-      - `flagExportedOrphans: true` restores flagging of the exported-orphan.
-- [ ] **Fixture (`graph-typescript/.../orphan-subtree.test.ts`):** extend the
-      fixture so `unusedHelper` (module-local, truly dead) is still flagged;
-      add a barrel `index.ts` re-exporting an `exportedButExternal` fn whose
-      only caller is a sibling file importing via the barrel — assert it is
-      **NOT** flagged.
-- [ ] **This repo:** `node packages/cli/dist/index.js graph --json` →
-      `graph:orphan-subtree.violationCount` drops from **45** to a small set
-      that, on manual spot-check, is **all genuine dead code** (expected
-      **0–3**; if 0, the rule reports clean and that is the correct answer for
-      this repo today). Each of the four documented buckets contributes **0**.
-- [ ] **Gates green:** `pnpm typecheck && pnpm test && pnpm lint`
-      (ESLint + dependency-cruiser, 0-error). `pnpm fit:ci` produces no
-      net-new Code Scanning alerts. SARIF fixture
-      `.../render/__fixtures__/sarif/orphan-subtree.json` regenerated if the
-      message/metadata shape changes.
+- [ ] **Twin-aware adjacency unit test** (`pipeline/indexes` test): two
+      occurrences share a body hash but have **different** out-edges (twin A →
+      X, twin B → Y); `callees.get(hash)` contains **both** X and Y. (Guards the
+      ADR-0003 reachability invariant.)
+- [ ] **Body-twin reachability regression** (`orphan-subtree` test): a fixture
+      mirroring the `analyze`/`analyzeFile` shape — an entry reaches one twin's
+      chain; the *other* twin's private callee is **NOT** orphaned after D0
+      (was, before).
+- [ ] **Genuine dead code still fires:** a `module-local`, zero-caller,
+      non-test, non-decorated function **IS** flagged (guards against
+      over-suppression).
+- [ ] **D3 filter:** exported barrel fn with no internal caller is **NOT**
+      flagged (default); `inTestFile` helper **NOT** flagged (default), **IS**
+      with `flagTestOrphans:true`; `flagExportedOrphans:true` restores the
+      exported case.
+- [ ] **This repo:** `graph:orphan-subtree.violationCount` drops **45 → 0–3**,
+      each remaining finding genuine dead code on manual spot-check; buckets 1–2
+      contribute **0** after D0; bucket 3 contributes 0 after D2; bucket 4
+      (test) contributes 0 via D3.
+- [ ] **`test-only-reachable` not regressed** by the shared adjacency change
+      (its own tests pass; re-measure its count).
+- [ ] **Gates green:** `pnpm typecheck && pnpm test && pnpm lint`; `pnpm fit:ci`
+      produces no net-new Code Scanning alerts; regenerate the orphan-subtree
+      SARIF fixture if message/metadata shape changes.
 
 ## Boundaries
 
-- **No source edits in this spec** — design only.
-- The `package` field is optional in the contract (`types.ts` L175); the
-  `barrel-export` predicate MUST fall back gracefully when `package` is
-  absent (treat basename `index.ts` as a barrel regardless), so the rule
-  degrades on pre-`assignPackages` catalogs rather than crashing — mirroring
-  the optional-field discipline in `graph-per-package-coupling.md`.
-- Must not import from `lang-*` inside `rules/` (dep-cruiser
-  `graph-pipeline-no-lang-import`); all signals come from the catalog/indexes
-  already in scope.
-- The body-twin compounding (bucket 2) is **mitigated, not solved** here:
-  seeding the exported barrel fn reaches the deduped `scan` occurrence, which
-  is sufficient to clear all twins because `byBodyHash` is what the rule
-  iterates. If a future change makes the rule iterate `occurrencesByHash`,
-  this assumption must be revisited.
+- **Always:** build reachability adjacency per occurrence (union per hash), not
+  off `byBodyHash` winners (ADR-0003); over-approximate reachability (safe for
+  orphan detection); D3 defaults quiet; `.js` ESM; pure data→data over frozen
+  `catalog`/`indexes`/`config`.
+- **Ask first:** adding a `barrel-export` entry-point reason (only if re-measure
+  shows it's needed); changing `defaultSeverity`; switching reachability to
+  occurrence-id nodes (D0c).
+- **Never:** flag intended public API or framework-dispatched entries as dead;
+  import `lang-*` from `rules/` (dep-cruiser `graph-pipeline-no-lang-import`);
+  reintroduce the `byBodyHash`-winner adjacency; non-deterministic ordering.
 
 ## Open Questions
 
-1. **Closure→factory linkage.** Can the catalog already tell that an arrow is
-   the `analyze` property of a `defineCheck(...)` call at the closure's
-   declaration site? If not, what is the cheapest inventory addition
-   (enclosing-call-callee-name on the occurrence)? Fallback if too costly:
-   treat any closure whose immediate enclosing call's callee name is in
-   `{defineCheck, defineTool, defineScenario, defineToolTab,
-   ...extraContractFactories}` as a seed — requires that one field.
-2. **Barrel detection fidelity.** Is basename `index.{ts,tsx}` + `package`
-   sufficient, or must we read each package's `package.json` `exports`/`main`
-   to catch non-`index` barrels? Proposal: ship the basename heuristic
-   (covers all 29 packages here), record `exports`-aware detection as a
-   follow-up if a real barrel is missed.
-3. **Overlap policy with `test-only-reachable`.** Default `flagTestOrphans:
-   false` means orphan-subtree is silent on test helpers. Confirm
-   `test-only-reachable` actually covers the 4 test cases so they aren't
-   dropped entirely. (Quick check: run that rule's output on this repo.)
+1. **Does `no-callers-exported` already seed `renderToText` after D0?** Resolve
+   by re-measure (D1). If yes, no `barrel-export` reason is needed at all.
+2. **Adjacency over-approximation scope.** Unioning twins' callees slightly
+   over-approximates reachability for *every* reachability consumer. Confirm
+   that's acceptable for `test-only-reachable` too (it is — over-approx → fewer
+   false "test-only" flags, the safe direction).
+3. **`buildBlastRadius` interaction.** Blast also consumes `callers`; but
+   `high-blast` is being removed and the blast metric moves to the dashboard
+   ([`high-blast-dashboard-only.md`](./high-blast-dashboard-only.md)), so the
+   engine `callers` change has no blast consumer to regress. Confirm ordering if
+   both land in the same release.
 
 ## Applicable Conventions
 
+- ADR-0003 reachability invariant; ADR-0001 rubric.
 - Optional, forward-compatible contract fields with documented absent-value
-  semantics (`types.ts` L160, L175, L202; this spec's D4 knobs).
-- Rules read only frozen `catalog`/`indexes`/`config`; no module-level
-  mutable state (CLAUDE.md "Per-run state lives on `RunScope`").
-- `rules/` may not reach into `lang-*` (dep-cruiser
-  `graph-pipeline-no-lang-import`).
-- Tests are Vitest `*.test.ts` beside source; reuse `_helpers.ts`
-  (`occ`/`makeCatalog`/`staticCall`).
-- `defineX(...)` returns a value; registration is explicit — no import
-  side effects (CLAUDE.md).
-- Spec lives in `docs/specs/`; if any reader-facing rule behavior changes,
-  update `docs/public/40-graph/*` and run `pnpm docs:build` in the
-  implementing PR.
+  semantics (the D4 knobs; `occurrence.package` fallback).
+- Rules read only frozen `catalog`/`indexes`/`config`; no module-level mutable
+  state.
+- `rules/` may not reach into `lang-*` (dep-cruiser).
+- Tests are Vitest `*.test.ts` beside source; reuse `_helpers.ts`.
+- If reader-facing rule behavior changes, update `docs/public/40-graph/*` and run
+  `pnpm docs:build` in the implementing PR.

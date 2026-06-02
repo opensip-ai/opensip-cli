@@ -44,9 +44,9 @@ distinct from:
 - [ADR-0002](./ADR-0002-coupling-bucketing-by-nearest-package.md) — Coupling
   buckets by nearest `package.json`, not a path heuristic (per-package `package`
   field; shipped 2.4.2)
-- [ADR-0003](./ADR-0003-per-occurrence-edge-keying.md) — Call/dependency edges are
-  keyed per occurrence (`ownerEdgeKey`), not per body hash (body-twin de-union;
-  shipped 2.4.2)
+- [ADR-0003](./ADR-0003-per-occurrence-edge-keying.md) — A body hash is not an
+  occurrence identity: edges (shipped 2.4.2) and reachability adjacency (pending)
+  key per occurrence, never the `byBodyHash` winner (body-twin de-union)
 
 ### Superseded
 

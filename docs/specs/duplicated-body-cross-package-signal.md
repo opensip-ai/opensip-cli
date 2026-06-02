@@ -296,11 +296,15 @@ disable the rule.
 
 ## Open Questions
 
-- [ ] **N default — 3 vs 2?** This spec proposes **3** (clear "shared infra,"
-      low false-positive rate on arbitrary repos) with a configurable floor
-      down to 2. If the consolidation team wants the 2-package twins surfaced
-      too (e.g. the migration shims), flip the default to 2 in planning —
-      it's a one-line default change plus a test-expectation update.
+- [x] **N default — 3 vs 2?** **RESOLVED:** ship the default at **3** (safe for
+      arbitrary repos — unambiguous shared infra, low false-positive rate), and
+      **set `minCrossPackageDuplicatePackages: 2` in this repo's
+      `opensip-tools.config.yml`** — we verified every 2-package duplicate here
+      is a real consolidation target (plugin-loader fitness↔simulation,
+      `createPathMatcher` checks-ts↔universal, `safeReaddir`), with zero intended
+      twins, so the local opinion is earned. Clean split: conservative default,
+      opinionated local override. The implementation plan must add the config
+      line + a note in the config reference.
 - [ ] **Should the aggregate path also cover large within-package N-copy
       dups** (same body, ≥N occurrences, 1 package), reporting them as one
       aggregate instead of N-1 per-instance signals? Out of scope here, but

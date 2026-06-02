@@ -26,15 +26,24 @@ rubric for what earns a gate signal — a finding qualifies only if it is:
    zero (lowering one function promotes the next). That is the definition
    of a dashboard insight, not a rule.
 
-The underlying **blast metric survives unchanged**: `indexes.blastRadius`
-is computed in Stage 3 by `buildBlastRadius`
-([`pipeline/indexes.ts:50,180-216`](../../packages/graph/engine/src/pipeline/indexes.ts)),
-independent of the rule — the rule only *reads* it. Only the per-function
-gate signals go away.
+The blast metric **moves from the engine (gate) to the dashboard (insight)**
+— decision (a). The rule is `indexes.blastRadius`'s *only* consumer
+(confirmed: a grep finds no other engine/CLI/render reader, and it is not in
+the `GraphCatalog` contract), so simply deleting the rule would leave the
+engine computing a score nothing reads and orphan the `BlastScore` export.
+Instead: **remove** the engine blast computation, and **compute the composite
+score in the dashboard's browser-side index mirror** so the *Hot Functions*
+view can rank by it. The dashboard already rebuilds its own indexes from the
+catalog JSON (`code-paths/indexes.ts`); blast is a pure function of the
+`callers` adjacency it already builds, so this is a contract-free mirror — the
+same pattern used for `buildIndexes`. Net: "dashboard-only" becomes literally
+true, the richer transitive metric (`direct + 0.5 × transitive`) gets a real
+home, and no engine code is left orphaned.
 
-**Success:** a `graph` run emits **0** `graph:high-blast-function` signals;
-the blast metric is still computed and still surfaced in the dashboard; all
-gates green; no orphaned code per knip; no stale docs per `docs:check`.
+**Success:** a `graph` run emits **0** `graph:high-blast-function` signals; the
+engine no longer computes/exports blast (no orphan per knip); the *Hot
+Functions* dashboard view ranks by the composite `blastRadius.score`; all gates
+green; no stale docs per `docs:check`.
 
 ## Scope
 
@@ -52,17 +61,36 @@ gates green; no orphaned code per knip; no stale docs per `docs:check`.
 - Delete the per-rule SARIF fixture
   [`__fixtures__/sarif/high-blast-function.json`](../../packages/graph/engine/src/__tests__/render/__fixtures__/sarif/high-blast-function.json)
   and drop its `RULE_FIXTURES` entry.
-- **Preserve** the metric-population tests (they validate `blastRadius`,
-  not the rule) by relocating them to an indexes-level test.
+- **Remove the now-orphaned engine blast computation** (the rule was its only
+  reader): `buildBlastRadius`/`bfsBlast` and the `blastRadius` field on
+  `Indexes` ([`pipeline/indexes.ts:50,60,180-216`](../../packages/graph/engine/src/pipeline/indexes.ts),
+  [`types.ts:323-324`](../../packages/graph/engine/src/types.ts)), and the
+  `BlastScore` type + barrel export
+  ([`types.ts:293`](../../packages/graph/engine/src/types.ts),
+  [`index.ts:49`](../../packages/graph/engine/src/index.ts)). The two
+  `blastRadius`-only metric tests move to the dashboard mirror (below), not an
+  engine indexes test.
+- **Port the blast computation into the dashboard browser-side mirror**
+  ([`code-paths/indexes.ts`](../../packages/dashboard/src/code-paths/indexes.ts)):
+  add `bfsBlast`/`buildBlastRadius` (verbatim formula — pure function of the
+  `callers` adjacency the mirror already builds) and rank the **Hot Functions**
+  view ([`code-paths/view-hot.ts:28`](../../packages/dashboard/src/code-paths/view-hot.ts))
+  by the composite `blastRadius.score` (`direct + 0.5 × transitive`) — either as
+  the new default sort or a Callers ↔ Blast toggle. Compute lazily on panel
+  init, like the mirror's other derived data.
 - Update public docs + regenerate `docs/web-generated/`.
 
 ### Out of scope
 
-- Changing how `blastRadius` is computed (BFS depth, the `direct + 0.5 ×
-  transitive` formula). Untouched.
-- Adding a *new* dashboard view for the composite blast score. The Hot
-  Functions view already covers the user-facing need (see DEC-4); a
-  composite-score view is a separate, optional follow-up.
+- Changing the blast **formula** (BFS depth `BLAST_MAX_DEPTH = 5`, the
+  `direct + 0.5 × transitive` weighting). It is ported to the dashboard mirror
+  verbatim, not redesigned.
+- Carrying `blastRadius` in the `GraphCatalog` contract so the dashboard reads
+  it instead of recomputing. Rejected: a contract change for a value the
+  browser mirror can derive for free from `callers` (the dashboard already
+  recomputes all its indexes this way). The mirror keeps it contract-free.
+- A *separate* new dashboard panel for blast — we reuse the existing **Hot
+  Functions** view (switch/augment its sort), not add a panel.
 - Any change to the other five graph rules or the gate workflow itself.
 - The historical spec reference in
   [`graph-cross-package-edge-attribution.md:38`](./graph-cross-package-edge-attribution.md)
@@ -89,18 +117,24 @@ gates green; no orphaned code per knip; no stale docs per `docs:check`.
   docstring says "seeded with the **six** built-in rules" / "v0.2 shipped
   with **six** built-in rules" → update to "five".
 
-### The metric survives (confirmed)
+### The blast computation moves engine → dashboard (decision (a))
 
-- [`pipeline/indexes.ts:50`](../../packages/graph/engine/src/pipeline/indexes.ts) —
-  `const blastRadius = buildBlastRadius(byBodyHash, callers);` inside
-  `buildIndexes`, unconditional.
-- [`pipeline/indexes.ts:60`](../../packages/graph/engine/src/pipeline/indexes.ts) —
-  `blastRadius` returned in the `Indexes` object.
+The engine blast computation is read **only** by the rule being deleted
+(grep-confirmed: no other engine/CLI/render consumer; not in `GraphCatalog`).
+So it is **removed from the engine** and **ported to the dashboard mirror**:
+
+- [`pipeline/indexes.ts:50,60`](../../packages/graph/engine/src/pipeline/indexes.ts) —
+  the `const blastRadius = buildBlastRadius(...)` line and the `blastRadius`
+  field in the returned `Indexes` object → **removed**.
 - [`pipeline/indexes.ts:180-216`](../../packages/graph/engine/src/pipeline/indexes.ts) —
-  `buildBlastRadius` / `bfsBlast` (bounded reverse BFS, `BLAST_MAX_DEPTH =
-  5`). No dependency on the rule. **The metric is unaffected by this work.**
-- `BlastScore` type is exported from the engine barrel
-  ([`index.ts:49`](../../packages/graph/engine/src/index.ts)) and stays.
+  `buildBlastRadius` / `bfsBlast` (bounded reverse BFS, `BLAST_MAX_DEPTH = 5`,
+  `direct + 0.5 × transitive`) → **deleted from the engine, ported verbatim to
+  the dashboard mirror** `code-paths/indexes.ts`.
+- [`types.ts:293,323-324`](../../packages/graph/engine/src/types.ts),
+  [`index.ts:49`](../../packages/graph/engine/src/index.ts) — `BlastScore` type
+  + `Indexes.blastRadius` field + barrel export → **removed** (no remaining
+  consumer once the rule and engine field are gone; leaving them orphans the
+  export per knip).
 
 ### Barrel — NOT a cleanup site (confirmed)
 
@@ -112,24 +146,25 @@ re-exports `alwaysThrowsBranchRule`, `noSideEffectPathRule`,
 needed. The only importers of `./high-blast-function.js` are
 `registry.ts` and two test files (below).
 
-### Dashboard "Hot Functions" — already covers the user need (with a nuance)
+### Dashboard "Hot Functions" — the new home for blast (decision (a))
 
-- [`code-paths/view-hot.ts`](../../packages/dashboard/src/code-paths/view-hot.ts)
-  — the Hot Functions view. **It ranks by raw inbound caller count**
-  (`metric: (indexes.callers.get(occ.bodyHash) || []).length`,
-  [line 28](../../packages/dashboard/src/code-paths/view-hot.ts)), **not**
-  by the composite `blastRadius.score` (`direct + 0.5 × transitive`). Its
-  help text already frames the top rows as "your blast-radius candidates"
-  ([line 24](../../packages/dashboard/src/code-paths/view-hot.ts)).
-- **Nuance / honest gap:** "dashboard-only" needs **no new dashboard work**
-  to be correct — direct caller count is a faithful, more legible proxy for
-  blast and is what users already see. The dashboard does **not** today
-  render the composite `blastRadius.score`. Surfacing that exact composite
-  is the optional follow-up noted in Out of Scope; this spec does not
-  require it. (Confirmed: a grep for `blastRadius`/`blastScore` across
-  `packages/dashboard/src` and the graph CLI/render code returns **zero**
-  non-test hits — the composite score has no consumer other than the rule
-  being deleted.)
+- [`code-paths/view-hot.ts:28`](../../packages/dashboard/src/code-paths/view-hot.ts)
+  — the view today ranks by **raw inbound caller count**
+  (`metric: (indexes.callers.get(occ.bodyHash) || []).length`); its help text
+  already frames the top rows as "your blast-radius candidates"
+  ([line 24](../../packages/dashboard/src/code-paths/view-hot.ts)) — but the
+  number behind that label is caller count, not blast. This spec **wires it to
+  the composite `blastRadius.score`** so the label becomes honest.
+- [`code-paths/indexes.ts`](../../packages/dashboard/src/code-paths/indexes.ts)
+  — the browser mirror builds `byBodyHash`/`occurrencesByHash`/`bySimpleName`/
+  `callees`/`callers` from the catalog JSON but **no blast today**. Add
+  `bfsBlast`/`buildBlastRadius` here (verbatim from the engine; pure over the
+  `callers` map it already builds) and expose `blastRadius` on the mirror's
+  index object, so `view-hot` can rank by `blastRadius.get(hash)?.score`.
+- The composite score has **no other consumer** (grep-confirmed), so moving it
+  here — rather than leaving it computed-but-unread in the engine — is what
+  makes the demotion clean (no orphan) and the "dashboard insight" framing
+  literally true.
 
 ### Cleanup sites — all references
 
@@ -226,9 +261,9 @@ Docs (hand-edited `docs/public/`; regenerate `docs/web-generated/` after):
 | Decision | Choice | Alternatives considered | Rationale |
 |---|---|---|---|
 | Rule fate | **Delete** the rule file + unregister. | (a) Keep file, just remove from `BUILT_IN_RULES` (unregister-only). | Nothing imports the rule except `registry.ts` and two test files (no barrel export — confirmed). An unregistered-but-present file is dead code → knip flags it / violates zero-tech-debt. Delete is the clean state. |
-| Blast metric | **Keep** `indexes.blastRadius` exactly as-is. | (a) Remove the metric too (dead now that its only reader is gone). | The metric is the durable, portable artifact; the dashboard's user need (and the optional composite-score view) reads from it. Removing it would discard the only correct part of the feature. The brief mandates "the METRIC survives demotion." |
-| Dashboard work | **None required.** Hot Functions already ranks by caller count and frames it as blast-radius. | (a) Add a new view ranked by composite `blastRadius.score`. | "Dashboard-only" is already satisfied — users see the ranking today. A composite-score view is a discretionary enhancement, deferred to Out of Scope to keep this change a pure demotion. |
-| Metric tests | **Relocate** the two `blastRadius`-only cases to an indexes test; delete the rule cases. | (a) Delete the whole `high-blast-function.test.ts` file. | The metric still ships and must stay covered. Deleting all of it would drop coverage of `buildBlastRadius` (direct/transitive/cycle handling) — a regression in test discipline. |
+| Blast metric (decision (a)) | **Move** the computation engine → dashboard: remove `indexes.blastRadius`/`buildBlastRadius`/`BlastScore` from the engine; recompute it in the dashboard browser mirror. | (b) Keep the engine copy and carry `blastRadius` into the `GraphCatalog` contract for the dashboard to read. (c) Keep the engine copy unread. (d) Delete blast entirely. | The rule is the engine copy's only reader, and the dashboard rebuilds its own indexes from the catalog — so the metric's natural home is the mirror. (b) adds a contract change for a value the mirror derives for free; (c) leaves computed-but-unread code + an orphaned `BlastScore` export (knip); (d) discards the insight the user chose to keep. Move = clean + contract-free + "dashboard-only" literally true. |
+| Dashboard work | **Wire Hot Functions to the composite `blastRadius.score`** via the browser mirror (new default sort or a Callers ↔ Blast toggle). | (a) Leave it ranked by raw caller count. | The view's help already calls the top rows "blast-radius candidates"; today the number is caller count, so the label is slightly dishonest. Ranking by the real composite (`direct + 0.5 × transitive`) makes it accurate and gives the moved metric its consumer. Caller-count-only would re-open the orphan problem. |
+| Metric tests | **Move** the two `blastRadius`-only cases to the **dashboard mirror** tests (they now validate the browser blast computation); delete the rule-`evaluate` cases. | (a) Relocate to an engine indexes test; (b) delete them all. | The computation still ships — now in the mirror — so its direct/transitive/cycle coverage moves with it. An engine indexes test would cover code that no longer exists; deleting all coverage is a test-discipline regression. |
 | `complexity` family | **Retire** it — `high-blast` is its only member; remove the mapping entry, leaving five families (`dead-code`, `duplication`, `safety`). | (a) Keep `complexity` as a documented-but-unused family. | The `OPENSIP_RULE_ID_REGEX` is generic (`graph.<seg>.<seg>`), so no code enforces the family list; an empty family is just documentation drift. Remove it. |
 | `fingerprint-signal` / `gate.test` example slug | **Reword** to a surviving slug. | (a) Leave the stale example. | Comments referencing a deleted rule are misleading. Cheap reword; zero-tech-debt. Functionally inert either way. |
 
@@ -241,12 +276,15 @@ Docs (hand-edited `docs/public/`; regenerate `docs/web-generated/` after):
       `'graph:high-blast-function'` (registry test updated).
 - [ ] `RULE_ID_MAPPING` has **5** entries; the "no extras beyond registered
       rules" test (rule-id-mapping.test.ts) passes.
-- [ ] `indexes.blastRadius` is still populated for every occurrence after
-      `buildIndexes` (relocated metric test passes); `BlastScore` still
-      exported from the engine barrel.
-- [ ] Blast radius is still visible in the dashboard: the Hot Functions
-      view renders unchanged (its test
-      `dashboard-view-hot.test.ts` passes).
+- [ ] The engine no longer computes or exports blast: `Indexes` has no
+      `blastRadius` field, and `buildBlastRadius`/`bfsBlast`/`BlastScore` are
+      gone from `pipeline/indexes.ts`, `types.ts`, and the barrel — with no
+      orphan (knip clean).
+- [ ] Blast is now a dashboard insight: the browser mirror
+      (`code-paths/indexes.ts`) computes `blastRadius` (ported `bfsBlast`), and
+      the **Hot Functions** view ranks by the composite `blastRadius.score`
+      (`direct + 0.5 × transitive`). The two moved blast cases pass as
+      dashboard-mirror tests; the view's test reflects the new ranking.
 - [ ] `packages/graph/engine/src/rules/high-blast-function.ts` and
       `__fixtures__/sarif/high-blast-function.json` no longer exist; a repo
       grep for `highBlastFunction` / `high-blast-function` returns only the
@@ -274,19 +312,23 @@ Docs (hand-edited `docs/public/`; regenerate `docs/web-generated/` after):
 
 ## Open Questions
 
-1. **Composite-score dashboard view** — should a follow-up add a Hot
-   Functions variant ranked by `blastRadius.score` (which weights
-   transitive reach at 0.5×) rather than raw caller count? *Proposed:* file
-   as a discretionary enhancement; raw caller count is the more legible
-   default and already labeled "blast-radius candidates."
-2. **Relocation target for metric tests** — fold the two preserved cases
-   into an existing `pipeline/indexes` test file vs. a new
-   `indexes-blast.test.ts`? *Proposed:* co-locate with other `buildIndexes`
-   coverage to keep the metric's tests next to its producer.
-3. **Reword vs. leave the illustrative example** in `fingerprint-signal.ts`
-   and `gate.test.ts`? *Proposed:* reword to `duplicated-function-body`
-   (also has a run-varying count in its message) so the rationale stays
-   accurate.
+1. ~~Composite-score dashboard view~~ — **RESOLVED (decision (a)):** the
+   composite `blastRadius.score` is the dashboard's ranking metric; the engine
+   copy is removed and the score is computed in the browser mirror. In scope.
+2. ~~Relocation target for engine metric tests~~ — **RESOLVED:** moot. The
+   engine metric is removed; the blast cases move to the **dashboard mirror**
+   tests (validating the ported `bfsBlast`), not an engine indexes test.
+3. **Sort default vs. toggle** in Hot Functions — make `blastRadius.score` the
+   default sort, or add a Callers ↔ Blast toggle and keep callers default?
+   *Proposed:* default to blast score (the view's help already promises
+   "blast-radius candidates"), keep callers available as a secondary sort.
+4. **Browser-side blast cost** — `bfsBlast` is bounded (`BLAST_MAX_DEPTH = 5`)
+   but runs over ~12k nodes in the page. *Proposed:* compute lazily on Hot
+   Functions panel init (the mirror already defers derived data), and confirm
+   it's imperceptible on this repo's catalog before shipping.
+5. **Reword vs. leave the illustrative example** in `fingerprint-signal.ts`
+   and `gate.test.ts`? *Proposed:* reword to `duplicated-function-body` (also
+   has a run-varying count) so the rationale stays accurate.
 
 ## Applicable Conventions (from CLAUDE.md)
 
