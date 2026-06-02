@@ -1,84 +1,25 @@
-// @fitness-ignore-file batch-operation-limits -- iterates bounded collections (config entries, registry items, or small analysis results)
+// @fitness-ignore-file batch-operation-limits -- iterates bounded collections (registry items / small analysis results)
 /**
- * @fileoverview Check resolution for fitness recipes
+ * @fileoverview Check resolution for fitness recipes.
  *
- * Resolves recipe check selectors (explicit, category, pattern, all)
- * into concrete check slug lists using the check registry.
+ * Resolves recipe check selectors (explicit / pattern / tags / all) into
+ * concrete check-key lists. The selection algorithm itself lives once in
+ * `@opensip-tools/core` (`resolveSelector`); this module wires fitness's
+ * registry, `minimatch`, and namespaced-slug reverse-lookup into it. The
+ * per-arm semantics are unchanged from the previous hand-rolled switch.
  */
 
-import { SystemError } from '@opensip-tools/core'
+import { resolveSelector, type ResolveSelectorOptions } from '@opensip-tools/core'
 import { minimatch } from 'minimatch'
 
 import type { CheckSelector } from './types.js'
 import type { CheckRegistry } from '../framework/registry.js'
 
-
 /**
- * Resolve a CheckSelector to a list of check slugs from the registry.
- *
- * The `switch` over `selector.type` is intentional, not a string-keyed
- * dispatch waiting to be tabularized. Each arm needs different fields
- * from the discriminated union (e.g. `pattern` reads `include`/
- * `exclude`; `tags` reads tag arrays; `all` only `exclude`), so the
- * compiler-checked exhaustive switch is the type-safe shape: a
- * `Record<CheckSelector['type'], (sel) => string[]>` would either
- * widen the argument type or require per-arm narrowing inside the
- * handlers, defeating the purpose. The `_exhaustive: never` default
- * guarantees that adding a new selector type without a matching arm is
- * a compile-time error.
+ * Build the glob match targets for a check key: the key itself, its bare
+ * slug (namespace stripped), and `tag/bareSlug` targets for each of the
+ * check's tags. This is fitness's `keysOf` accessor for the core resolver.
  */
-export function resolveChecks(selector: CheckSelector, registry: CheckRegistry): readonly string[] {
-  const allCheckSlugs = registry.listSlugs()
-
-  switch (selector.type) {
-    case 'explicit': {
-      return resolveExplicitSelector(selector.checkIds, allCheckSlugs, registry)
-    }
-    case 'pattern': {
-      return resolvePatternSelector(selector.include, selector.exclude ?? [], allCheckSlugs, registry)
-    }
-    case 'tags': {
-      return resolveTagsSelector(selector.include, selector.exclude ?? [], registry)
-    }
-    case 'all': {
-      return resolveAllSelector(selector.exclude ?? [], allCheckSlugs, registry)
-    }
-    /* v8 ignore start -- exhaustive check: CheckSelector is a closed union; this fires only if a new selector type is added without updating this switch */
-    default: {
-      const _exhaustive: never = selector
-      throw new SystemError(`Unknown selector type: ${JSON.stringify(_exhaustive)}`, { code: 'SYSTEM.FITNESS.UNKNOWN_SELECTOR' })
-    }
-    /* v8 ignore stop */
-  }
-}
-
-function resolveExplicitSelector(
-  checkIds: readonly string[],
-  allCheckSlugs: readonly string[],
-  registry?: CheckRegistry,
-): readonly string[] {
-  const existingIds = new Set(allCheckSlugs)
-  const result: string[] = []
-
-  for (const id of checkIds) {
-    // Exact match (works for both namespaced and bare slugs already in registry)
-    if (existingIds.has(id)) {
-      result.push(id)
-      continue
-    }
-    // Bare slug → try registry resolution (handles namespace lookup)
-    if (registry && !id.includes(':')) {
-      const check = registry.getBySlug(id)
-      if (check) {
-        // Find the namespaced key for this check
-        const key = allCheckSlugs.find(s => s.endsWith(`:${id}`)) ?? id
-        result.push(key)
-      }
-    }
-  }
-  return result
-}
-
 function buildMatchTargets(slug: string, registry?: CheckRegistry): string[] {
   const targets = [slug]
   // Extract bare slug from namespaced key (e.g., 'builtin:no-eval' → 'no-eval')
@@ -96,62 +37,44 @@ function buildMatchTargets(slug: string, registry?: CheckRegistry): string[] {
   return targets
 }
 
-function resolvePatternSelector(
-  includePatterns: readonly string[],
-  excludePatterns: readonly string[],
-  allCheckSlugs: readonly string[],
-  registry?: CheckRegistry,
-): readonly string[] {
-  return allCheckSlugs.filter((slug) => {
-    const matchTargets = buildMatchTargets(slug, registry)
+/**
+ * Resolve a CheckSelector to a list of check keys from the registry.
+ *
+ * Delegates to core's generic `resolveSelector`, supplying fitness's
+ * registry-backed hooks:
+ * - the universe is `registry.listSlugs()` (each key becomes a Registerable item);
+ * - `keysOf` is `buildMatchTargets` (key + bare slug + tag/slug targets);
+ * - the `pattern` / `all` matcher is `minimatch` (kept a fitness dependency);
+ * - `resolveExplicit` is the bare-slug → namespaced-key reverse lookup
+ *   (mirrors the previous `resolveExplicitSelector`: exact key first, then
+ *   `getBySlug` + `endsWith(':'+id)`);
+ * - the `tags` arm routes through core's built-in tag-set intersection over
+ *   `check.config.tags` (`tagsOf` reads the registry), matching the previous
+ *   `resolveTagsSelector` exactly.
+ */
+export function resolveChecks(selector: CheckSelector, registry: CheckRegistry): readonly string[] {
+  const items = registry.listSlugs().map((key) => ({ id: key, name: key }))
 
-    const included = includePatterns.some((pattern) =>
-      matchTargets.some((target) => minimatch(target, pattern, { nocase: false })),
-    )
-    if (!included) return false
+  const opts: ResolveSelectorOptions<(typeof items)[number], CheckSelector> = {
+    keysOf: (item) => buildMatchTargets(item.id, registry),
+    tagsOf: (item) => registry.getBySlug(item.id)?.config.tags ?? [],
+    match: (target, pattern) => minimatch(target, pattern, { nocase: false }),
+    resolveExplicit: (id) => {
+      // Bare slug → try registry resolution (handles namespace lookup).
+      if (!id.includes(':') && registry.getBySlug(id)) {
+        return registry.listSlugs().find((s) => s.endsWith(`:${id}`)) ?? id
+      }
+      return undefined
+    },
+  }
 
-    const excluded = excludePatterns.some((pattern) =>
-      matchTargets.some((target) => minimatch(target, pattern, { nocase: false })),
-    )
-    return !excluded
-  })
-}
+  // The core resolver reads the `explicit` arm's request list from `ids`;
+  // fitness's historical field is `checkIds`. Normalize at the boundary so
+  // recipe literals (`{ type: 'explicit', checkIds: [...] }`) stay valid.
+  const normalized =
+    selector.type === 'explicit' ? { ...selector, ids: selector.checkIds } : selector
 
-function resolveTagsSelector(
-  includeTags: readonly string[],
-  excludeTags: readonly string[],
-  registry: CheckRegistry,
-): readonly string[] {
-  const includeSet = new Set(includeTags)
-  const excludeSet = new Set(excludeTags)
-  const allSlugs = registry.listSlugs()
-
-  return allSlugs.filter((key) => {
-    const check = registry.getBySlug(key)
-    if (!check) return false
-    const tags = check.config.tags ?? []
-    const hasInclude = tags.some((tag) => includeSet.has(tag))
-    if (!hasInclude) return false
-    const hasExclude = tags.some((tag) => excludeSet.has(tag))
-    return !hasExclude
-  })
-}
-
-function resolveAllSelector(
-  excludePatterns: readonly string[],
-  allCheckSlugs: readonly string[],
-  registry?: CheckRegistry,
-): readonly string[] {
-  if (excludePatterns.length === 0) return allCheckSlugs
-
-  return allCheckSlugs.filter((slug) => {
-    const matchTargets = buildMatchTargets(slug, registry)
-
-    const excluded = excludePatterns.some((pattern) =>
-      matchTargets.some((target) => minimatch(target, pattern, { nocase: false })),
-    )
-    return !excluded
-  })
+  return resolveSelector(normalized as CheckSelector, items, opts).map((item) => item.id)
 }
 
 /** Result of validating check references against the registry */
@@ -179,4 +102,3 @@ export function validateCheckReferences(
 
   return { valid, missing }
 }
-
