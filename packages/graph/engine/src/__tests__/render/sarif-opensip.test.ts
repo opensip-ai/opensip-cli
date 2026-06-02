@@ -140,3 +140,72 @@ describe('renderSarifOpenSip — invariants', () => {
     expect(driverRuleIds.size).toBe(RULE_FIXTURES.length);
   });
 });
+
+// ── Plan D structural rules — SARIF level mapping + multi-language ──
+
+interface NewRuleCase {
+  readonly slug: string;
+  readonly mappedId: string;
+  readonly severity: SignalSeverity;
+  readonly expectedLevel: 'error' | 'warning' | 'note';
+  readonly filePath: string;
+}
+
+/** One case per (new rule × severity band) plus non-TS file paths. */
+const NEW_RULE_CASES: readonly NewRuleCase[] = [
+  { slug: 'graph:large-function', mappedId: 'graph.complexity.large-function', severity: 'high', expectedLevel: 'error', filePath: 'src/big.ts' },
+  { slug: 'graph:large-function', mappedId: 'graph.complexity.large-function', severity: 'medium', expectedLevel: 'warning', filePath: 'pkg/mod.py' },
+  { slug: 'graph:wide-function', mappedId: 'graph.complexity.wide-function', severity: 'high', expectedLevel: 'error', filePath: 'src/lib.rs' },
+  { slug: 'graph:wide-function', mappedId: 'graph.complexity.wide-function', severity: 'medium', expectedLevel: 'warning', filePath: 'src/wide.ts' },
+  { slug: 'graph:high-blast-untested', mappedId: 'graph.coverage.high-blast-untested', severity: 'high', expectedLevel: 'error', filePath: 'app/service.go' },
+  { slug: 'graph:high-blast-untested', mappedId: 'graph.coverage.high-blast-untested', severity: 'medium', expectedLevel: 'warning', filePath: 'src/hot.ts' },
+  { slug: 'graph:cycle', mappedId: 'graph.architecture.cycle', severity: 'high', expectedLevel: 'error', filePath: 'src/cycle.py' },
+  { slug: 'graph:cycle', mappedId: 'graph.architecture.cycle', severity: 'medium', expectedLevel: 'warning', filePath: 'src/cycle.ts' },
+  { slug: 'graph:cycle', mappedId: 'graph.architecture.cycle', severity: 'low', expectedLevel: 'note', filePath: 'src/mutual.ts' },
+  { slug: 'graph:unexpected-coupling', mappedId: 'graph.architecture.unexpected-coupling', severity: 'high', expectedLevel: 'error', filePath: 'crate/src/lib.rs' },
+];
+
+function newRuleSignal(c: NewRuleCase): Signal {
+  return {
+    id: 'sig_new',
+    source: 'graph',
+    provider: 'opensip-tools',
+    severity: c.severity,
+    category: 'quality',
+    ruleId: c.slug,
+    message: `${c.slug} finding`,
+    filePath: c.filePath,
+    line: 10,
+    column: 0,
+    code: { file: c.filePath, line: 10, column: 0 },
+    metadata: {},
+    createdAt: '2026-06-02T00:00:00.000Z',
+  };
+}
+
+describe('renderSarifOpenSip — Plan D rules level mapping + multi-language', () => {
+  for (const c of NEW_RULE_CASES) {
+    it(`${c.slug} (${c.severity}) → level ${c.expectedLevel}, ruleId ${c.mappedId} [${c.filePath}]`, () => {
+      const parsed = JSON.parse(renderSarifOpenSip([newRuleSignal(c)], CONTEXT)) as {
+        runs: { results: { ruleId: string; level: string }[] }[];
+      };
+      const result = parsed.runs[0].results[0];
+      expect(result.ruleId).toBe(c.mappedId);
+      expect(result.ruleId).toMatch(OPENSIP_RULE_ID_REGEX);
+      expect(result.level).toBe(c.expectedLevel);
+    });
+  }
+
+  it('a Python and a TypeScript occurrence of the same rule produce identical SARIF shape', () => {
+    const ts = newRuleSignal({ slug: 'graph:large-function', mappedId: 'graph.complexity.large-function', severity: 'high', expectedLevel: 'error', filePath: 'src/x.ts' });
+    const py = { ...ts, filePath: 'src/x.py', code: { file: 'src/x.py', line: 10, column: 0 } };
+    const parse = (s: Signal) => JSON.parse(renderSarifOpenSip([s], CONTEXT)) as {
+      runs: { results: { ruleId: string; level: string }[] }[];
+    };
+    const rTs = parse(ts).runs[0].results[0];
+    const rPy = parse(py).runs[0].results[0];
+    // Band logic is language-agnostic: same ruleId + level regardless of path.
+    expect(rPy.ruleId).toBe(rTs.ruleId);
+    expect(rPy.level).toBe(rTs.level);
+  });
+});
