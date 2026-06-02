@@ -46,7 +46,7 @@ export function buildHashMaps(catalog: Catalog): HashMaps {
 /** Builds query-side indexes (by-body-hash, by-simple-name, blast radius) over the catalog. */
 export function buildIndexes(catalog: Catalog): Indexes {
   const { byBodyHash, occurrencesByHash, bySimpleName } = buildHashMaps(catalog);
-  const { callees, callers } = buildAdjacency(byBodyHash);
+  const { callees, callers } = buildAdjacency(occurrencesByHash, byBodyHash);
   const blastRadius = buildBlastRadius(byBodyHash, callers);
   const importedPackagesByFile = buildImportedPackagesByFile(occurrencesByHash, byBodyHash);
 
@@ -131,42 +131,56 @@ function pushTo<K, V>(map: Map<K, V[]>, key: K, value: V): void {
   arr.push(value);
 }
 
+/**
+ * Build the callees/callers adjacency, **twin-aware** (ADR-0003): a body hash's
+ * out-edges are the UNION of every occurrence sharing that hash, deduplicated to
+ * distinct neighbors. Iterating `byBodyHash` winners instead (last-writer-wins)
+ * would erase losing body-twins' out-edges from the graph — which made
+ * reachability rules (`orphan-subtree`, `test-only-reachable`) report false
+ * orphans for any function reached only through a twin that lost the slot.
+ */
 function buildAdjacency(
+  occurrencesByHash: ReadonlyMap<string, readonly FunctionOccurrence[]>,
   byBodyHash: ReadonlyMap<string, FunctionOccurrence>,
 ): { callees: Map<string, string[]>; callers: Map<string, string[]> } {
   const callees = new Map<string, string[]>();
-  const callers = new Map<string, string[]>();
-  for (const occ of byBodyHash.values()) {
-    const out = collectOutgoing(occ, byBodyHash, callers);
-    if (out.length > 0) callees.set(occ.bodyHash, out);
+  const callerSets = new Map<string, Set<string>>();
+  for (const [ownerHash, occs] of occurrencesByHash) {
+    const out = collectOutgoing(occs, byBodyHash);
+    if (out.size === 0) continue;
+    callees.set(ownerHash, [...out]);
+    for (const target of out) pushCaller(callerSets, target, ownerHash);
   }
+  const callers = new Map<string, string[]>();
+  for (const [target, owners] of callerSets) callers.set(target, [...owners]);
   return { callees, callers };
 }
 
+/** Distinct in-catalog call targets across every occurrence sharing a body hash. */
 function collectOutgoing(
-  occ: FunctionOccurrence,
+  occs: readonly FunctionOccurrence[],
   byBodyHash: ReadonlyMap<string, FunctionOccurrence>,
-  callers: Map<string, string[]>,
-): string[] {
-  const out: string[] = [];
-  for (const edge of occ.calls) {
-    for (const target of edge.to) {
-      /* v8 ignore next */
-      if (!byBodyHash.has(target)) continue;
-      out.push(target);
-      pushCaller(callers, target, occ.bodyHash);
+): Set<string> {
+  const out = new Set<string>();
+  for (const occ of occs) {
+    for (const edge of occ.calls) {
+      for (const target of edge.to) {
+        /* v8 ignore next */
+        if (!byBodyHash.has(target)) continue;
+        out.add(target);
+      }
     }
   }
   return out;
 }
 
-function pushCaller(callers: Map<string, string[]>, target: string, caller: string): void {
+function pushCaller(callers: Map<string, Set<string>>, target: string, caller: string): void {
   let inb = callers.get(target);
   if (!inb) {
-    inb = [];
+    inb = new Set<string>();
     callers.set(target, inb);
   }
-  inb.push(caller);
+  inb.add(caller);
 }
 
 /**
