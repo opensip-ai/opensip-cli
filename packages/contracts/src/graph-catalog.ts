@@ -84,6 +84,63 @@ export interface GraphFunctionOccurrence {
   readonly calls: readonly GraphCallEdge[];
 }
 
+// ── Derived feature columns (Plan C) ───────────────────────────────
+//
+// Structural mirror of the engine `PersistedFeatures` (the records/arrays
+// persisted JSON shape, NOT the in-memory `FeatureTable` Maps). Kept in sync
+// with the engine types; duplicated intentionally so the dashboard reads
+// features without importing `@opensip-tools/graph`.
+
+/** Mirror of the engine `BlastScore`. */
+export interface GraphBlastScore {
+  readonly direct: number;
+  readonly transitive: number;
+  readonly score: number;
+}
+
+/** Mirror of the engine `FunctionFeatures` (per-function columns). */
+export interface GraphFunctionFeatures {
+  readonly bodyLines: number;
+  readonly blast?: GraphBlastScore;
+  readonly reachableFromEntry?: boolean;
+  readonly testReachable?: boolean;
+  readonly reachableOnlyFromTests?: boolean;
+}
+
+/** Mirror of the engine `PackageFeatures` (per-package coupling degrees). */
+export interface GraphPackageFeatures {
+  readonly couplingOut: number;
+  readonly couplingIn: number;
+}
+
+/** Mirror of the engine `SccFeatures` (one strongly-connected component). */
+export interface GraphSccFeatures {
+  readonly id: string;
+  readonly members: readonly string[];
+  readonly sccSize: number;
+  readonly crossesPackages: boolean;
+}
+
+/** Mirror of the engine `PackageEdgeFeature` (one directed coupling edge). */
+export interface GraphPackageEdgeFeature {
+  readonly callerPackage: string;
+  readonly calleePackage: string;
+  readonly count: number;
+}
+
+/**
+ * Structural mirror of the engine `PersistedFeatures`. Every entity is
+ * optional — only the columns a dashboard-bound run materialized are present.
+ * The dashboard reads these instead of recomputing blast / SCC / coupling
+ * client-side.
+ */
+export interface GraphFeatures {
+  readonly function?: Readonly<Record<string, GraphFunctionFeatures>>;
+  readonly package?: Readonly<Record<string, GraphPackageFeatures>>;
+  readonly scc?: readonly GraphSccFeatures[];
+  readonly edge?: readonly GraphPackageEdgeFeature[];
+}
+
 /**
  * Public catalog shape consumed by the dashboard.
  *
@@ -109,4 +166,11 @@ export interface GraphCatalog {
    *  (historical behavior). Mirrors the engine `Catalog.resolutionMode`. */
   readonly resolutionMode?: GraphResolutionMode;
   readonly functions: Readonly<Record<string, readonly GraphFunctionOccurrence[]>>;
+  /**
+   * Derived feature columns (blast / SCC / package coupling). Present only on
+   * catalogs produced by a dashboard-bound run (ADR-0006); the dashboard falls
+   * back to a no-data state when absent. Mirrors the engine
+   * `Catalog.features` so `loadCatalogContract` stays a cast-free widening.
+   */
+  readonly features?: GraphFeatures;
 }

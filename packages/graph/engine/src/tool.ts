@@ -532,6 +532,14 @@ function contributeScope(): ScopeContribution {
  * consumes. Best-effort — a missing/empty catalog yields no contribution
  * and the panel renders a no-data state. This is what lets the CLI
  * compose the cross-tool dashboard without fitness reaching into graph.
+ *
+ * The returned `graphCatalog.features` (Plan C) is populated when the
+ * producing `graph` run requested the dashboard columns
+ * (`['blast','scc','packageCoupling']`, see `executeGraph`); it rides on the
+ * loaded contract for free via `loadCatalogContract`. This stays a pure read
+ * — no on-demand engine compute at dashboard-compose time (ADR-0006). When a
+ * catalog was produced by a non-dashboard run, `features` is absent and the
+ * panel renders a no-data state.
  */
 function collectDashboardData(scope: ToolScope): Record<string, unknown> {
   // Rule + recipe catalogs are cheap, scope-only reads (no I/O). A run

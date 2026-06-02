@@ -17,7 +17,7 @@ import { sql } from 'drizzle-orm';
 import { graphCatalog, graphShardFragment } from './schema.js';
 
 import type { ShardBuildResult } from '../cli/orchestrate/shard-model.js';
-import type { Catalog, ResolutionMode } from '../types.js';
+import type { Catalog, PersistedFeatures, ResolutionMode } from '../types.js';
 import type { GraphCatalog } from '@opensip-tools/contracts';
 import type { DataStore } from '@opensip-tools/datastore';
 
@@ -39,6 +39,12 @@ interface CatalogRowPayload {
    */
   readonly resolutionMode?: ResolutionMode;
   readonly functions: Catalog['functions'];
+  /**
+   * Materialized dashboard columns (ADR-0006); present ONLY when the producing
+   * run requested `emitFeatures`. A lean default run omits this key entirely,
+   * so the stored payload stays byte-unchanged for non-dashboard builds.
+   */
+  readonly features?: PersistedFeatures;
 }
 
 /**
@@ -68,6 +74,9 @@ export class CatalogRepo {
         filesFingerprint: catalog.filesFingerprint,
         resolutionMode: catalog.resolutionMode,
         functions: catalog.functions,
+        // Carries through whatever the caller attached; `undefined` when none
+        // (a lean run) so the key is omitted from the persisted JSON.
+        features: catalog.features,
       };
       this.datastore.db
         .insert(graphCatalog)
@@ -142,6 +151,7 @@ export class CatalogRepo {
         filesFingerprint: payload.filesFingerprint,
         resolutionMode: payload.resolutionMode,
         functions: payload.functions,
+        features: payload.features,
       };
     } catch (error) {
       /* v8 ignore start */

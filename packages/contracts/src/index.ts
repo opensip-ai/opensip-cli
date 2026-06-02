@@ -97,6 +97,12 @@ export type {
   GraphCallConfidence,
   GraphResolutionMode,
   GraphVisibility,
+  GraphFeatures,
+  GraphFunctionFeatures,
+  GraphPackageFeatures,
+  GraphSccFeatures,
+  GraphPackageEdgeFeature,
+  GraphBlastScore,
 } from './graph-catalog.js';
 
 // SARIF + cloud reporting moved to @opensip-tools/reporting (audit
