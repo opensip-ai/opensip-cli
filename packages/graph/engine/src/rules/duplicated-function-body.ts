@@ -36,17 +36,19 @@ import { createSignal } from '@opensip-tools/core';
 
 import { pkgOf } from '../resolve-callee.js';
 
-import type { Catalog, FunctionOccurrence, GraphConfig, Rule } from '../types.js';
+import { defineRule } from './define-rule.js';
+
+import type { Catalog, FunctionOccurrence } from '../types.js';
 import type { Signal } from '@opensip-tools/core';
 
 const DEFAULT_MIN_LINES = 5;
 const DEFAULT_MIN_BODY_SIZE = 200;
 const DEFAULT_MIN_CROSS_PACKAGE_PACKAGES = 3;
 
-export const duplicatedFunctionBodyRule: Rule = {
+export const duplicatedFunctionBodyRule = defineRule({
   slug: 'graph:duplicated-function-body',
   defaultSeverity: 'warning',
-  evaluate(catalog, _indexes, config: GraphConfig): readonly Signal[] {
+  evaluate({ catalog, config }): readonly Signal[] {
     const minLines = config.minDuplicateBodyLines ?? DEFAULT_MIN_LINES;
     const minBodySize = config.minDuplicateBodySize ?? DEFAULT_MIN_BODY_SIZE;
     const minPackages =
@@ -121,7 +123,7 @@ export const duplicatedFunctionBodyRule: Rule = {
     }
     return signals;
   },
-};
+});
 
 function groupByHash(
   catalog: Catalog,

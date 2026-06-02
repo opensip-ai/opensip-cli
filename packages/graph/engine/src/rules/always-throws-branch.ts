@@ -25,15 +25,16 @@
 
 import { createSignal } from '@opensip-tools/core';
 
-import type { Rule } from '../types.js';
+import { defineRule } from './define-rule.js';
+
 import type { Signal } from '@opensip-tools/core';
 
 const TYPESCRIPT_FALLBACK_THROW_REGEX = /^\s*throw\s+(?:new\s+)?[A-Z]\w*/;
 
-export const alwaysThrowsBranchRule: Rule = {
+export const alwaysThrowsBranchRule = defineRule({
   slug: 'graph:always-throws-branch',
   defaultSeverity: 'warning',
-  evaluate(_catalog, indexes, _config, hints): readonly Signal[] {
+  evaluate({ indexes, hints }): readonly Signal[] {
     const throwRegex = hints?.throwSyntaxRegex ?? TYPESCRIPT_FALLBACK_THROW_REGEX;
     const signals: Signal[] = [];
     for (const occ of indexes.byBodyHash.values()) {
@@ -67,4 +68,4 @@ export const alwaysThrowsBranchRule: Rule = {
     }
     return signals;
   },
-};
+});

@@ -30,7 +30,9 @@
 
 import { createSignal } from '@opensip-tools/core';
 
-import type { FunctionOccurrence, Indexes, Rule, RuleHints } from '../types.js';
+import { defineRule } from './define-rule.js';
+
+import type { FunctionOccurrence, Indexes, RuleHints } from '../types.js';
 import type { Signal } from '@opensip-tools/core';
 
 const TYPESCRIPT_FALLBACK_REGEX =
@@ -66,10 +68,10 @@ function buildSideEffectDetector(hints: RuleHints | undefined): SideEffectDetect
   };
 }
 
-export const noSideEffectPathRule: Rule = {
+export const noSideEffectPathRule = defineRule({
   slug: 'graph:no-side-effect-path',
   defaultSeverity: 'warning',
-  evaluate(_catalog, indexes, _config, hints): readonly Signal[] {
+  evaluate({ indexes, hints }): readonly Signal[] {
     const detector = buildSideEffectDetector(hints);
     const sideEffecting = computeSideEffecting(indexes, detector);
     const signals: Signal[] = [];
@@ -97,7 +99,7 @@ export const noSideEffectPathRule: Rule = {
     }
     return signals;
   },
-};
+});
 
 /**
  * True when at least one caller invokes this function as an

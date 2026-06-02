@@ -11,8 +11,8 @@
 import { createSignal } from '@opensip-tools/core';
 
 import { approximateSuffix } from './_approximation.js';
-import { defineRule } from './define-rule.js';
 import { inferEntryPoints } from './_entry-points.js';
+import { defineRule } from './define-rule.js';
 
 import type { Catalog, GraphConfig, Indexes } from '../types.js';
 import type { Signal } from '@opensip-tools/core';
