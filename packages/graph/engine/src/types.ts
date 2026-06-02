@@ -495,6 +495,53 @@ export interface GraphConfig {
    * over-trigger on test-only helpers.
    */
   readonly flagTestOrphans?: boolean;
+  /**
+   * `graph:large-function` warn-band threshold (in body lines). A function
+   * whose `bodyLines` exceeds this (but not the error threshold) emits a
+   * `medium` signal. In-rule default: 80.
+   */
+  readonly largeFunctionWarnLines?: number;
+  /**
+   * `graph:large-function` error-band threshold (in body lines). A function
+   * whose `bodyLines` exceeds this emits a `high` signal. In-rule default: 150.
+   */
+  readonly largeFunctionErrorLines?: number;
+  /**
+   * `graph:wide-function` warn-band threshold (parameter count). A function
+   * with more than this many params (but not more than the error threshold)
+   * emits a `medium` signal. In-rule default: 4.
+   */
+  readonly wideFunctionWarnParams?: number;
+  /**
+   * `graph:wide-function` error-band threshold (parameter count). A function
+   * with more than this many params emits a `high` signal. In-rule default: 7.
+   */
+  readonly wideFunctionErrorParams?: number;
+  /**
+   * `graph:high-blast-untested` warn-band threshold — the minimum
+   * `blast.score` (an **ABSOLUTE** count, never a percentile — ADR-0001) for an
+   * untested function to emit a `medium` signal. In-rule default: 8.
+   */
+  readonly highBlastWarnThreshold?: number;
+  /**
+   * `graph:high-blast-untested` error-band threshold — the minimum
+   * `blast.score` (an **ABSOLUTE** count, never a percentile — ADR-0001) for an
+   * untested function to emit a `high` signal. In-rule default: 20.
+   */
+  readonly highBlastErrorThreshold?: number;
+  /**
+   * `graph:cycle` minimum SCC size that emits a `medium` signal. A
+   * strongly-connected component with `sccSize >= cycleMinSize` (and not
+   * crossing packages, which always wins `high`) emits `medium`. The size-2
+   * band is gated separately by `cycleSize2Severity`. In-rule default: 3.
+   */
+  readonly cycleMinSize?: number;
+  /**
+   * `graph:cycle` posture for the size-2 band (a 2-member cycle, often
+   * legitimate mutual recursion). `'off'` → no signal; `'low'` → a `low`
+   * signal. In-rule default: `'off'` (ADR-0001 / Open Question #6).
+   */
+  readonly cycleSize2Severity?: 'off' | 'low';
   /** Per-rule severity overrides. */
   readonly severityOverrides?: Readonly<Record<string, 'error' | 'warning'>>;
 }
