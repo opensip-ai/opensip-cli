@@ -197,13 +197,15 @@ opensip-tools graph --packages         # fan across every workspace package in p
 
 The `--package` flag accepts either a workspace-package basename (searched under `packages/**`) or an explicit directory path. Useful on monorepos where a global run is slow: per-package runs typically complete in seconds and fit easily in the default Node heap. The trade-off is fidelity — call sites that cross package boundaries become unresolved, so the orphan-subtree and other reachability rules report against the in-scope package only.
 
-Python projects are also supported (lower fidelity, name-based resolution): the Python adapter detects projects with `pyproject.toml` / `setup.py` and uses tree-sitter for parsing. Call edges resolve by simple name and carry `confidence: 'medium'` (or `'low'` for ambiguous matches). Rust support landed alongside it via tree-sitter-rust. The `--package` / `--packages` flags are TypeScript-only today; for Python and Rust, run `graph` from the project root.
+Python, Rust, Go, and Java projects are also supported (lower fidelity, name-based resolution) via tree-sitter adapters that share the `@opensip-tools/graph-adapter-common` scaffolding. The Python adapter detects projects with `pyproject.toml` / `setup.py`; call edges resolve by simple name and carry `confidence: 'medium'` (or `'low'` for ambiguous matches). The `--package` / `--packages` flags are TypeScript-only today; for the tree-sitter languages, run `graph` from the project root.
 
-The `--packages` flag fans out across every workspace package under `packages/**` that has a `tsconfig.json`, running one child process per package with concurrency `cpus()-1`. Same fidelity as `--package` (cross-package edges remain unresolved per child), but covers the whole repo. Tune the concurrency with `--packages-concurrency <n>`. On opensip-tools (19 packages) this is ~2.3× faster than the global run; on monorepos with many packages the speedup grows linearly with cores.
+The `--packages` flag fans out across every workspace package under `packages/**` that has a `tsconfig.json`, running one child process per package with concurrency `cpus()-1`. Same fidelity as `--package` (cross-package edges remain unresolved per child), but covers the whole repo. Tune the concurrency with `--packages-concurrency <n>`. On opensip-tools's TypeScript workspace packages this is roughly 2× faster than the global run; on monorepos with many packages the speedup grows linearly with cores.
 
 For users who prefer external orchestration, `xargs -P 8 -I {} opensip-tools graph --package {}` over a list of package paths achieves the same effect.
 
-Five rules ship today: `orphan-subtree`, `duplicated-function-body`, `no-side-effect-path`, `test-only-reachable`, `always-throws-branch`. Output is grouped by rule with the top 10 findings per rule plus a summary; the full set is always available via `--json`. See [the graph loop docs](./docs/public/40-graph/) for what each rule detects and how the gate workflow integrates with CI.
+Five rules ship today: `orphan-subtree`, `duplicated-function-body`, `no-side-effect-path`, `test-only-reachable`, `always-throws-branch`. The rules are deliberately opinionated and low-noise — each is meant to surface an *actionable* finding rather than raw graph trivia. `duplicated-function-body` flags functions whose bodies are byte-identical across **different packages** as consolidation candidates (a `minCrossPackageDuplicatePackages` knob tunes the threshold); `orphan-subtree` reports whole unreachable subtrees rather than every individually-unreferenced function. Output is grouped by rule with the top 10 findings per rule plus a summary; the full set is always available via `--json`. See [the graph loop docs](./docs/public/40-graph/) for what each rule detects and how the gate workflow integrates with CI.
+
+Exploratory insights that are *not* gating rules — the per-package coupling grid, blast radius (most-depended-upon functions), strongly-connected components, and an interactive node-link visualizer — live in the dashboard's **Code Paths** views (see [Dashboard](#dashboard)), built from the same catalog.
 
 #### Heap sizing on large monorepos
 
@@ -214,7 +216,7 @@ NODE_OPTIONS=--max-old-space-size=8192 opensip-tools graph     # most monorepos
 NODE_OPTIONS=--max-old-space-size=12288 opensip-tools graph    # very large repos
 ```
 
-Measured: a 5476-file repo OOM'd at 4 GB after ~17 min, completed at 12 GB in ~25 min with ~4.2 GB peak resident. The 8 GB setting is the recommended default once you cross the threshold. (Heap pressure is most acute for the TypeScript adapter; the Python and Rust tree-sitter adapters parse files lazily and use far less memory.)
+Measured: a 5476-file repo OOM'd at 4 GB after ~17 min, completed at 12 GB in ~25 min with ~4.2 GB peak resident. The 8 GB setting is the recommended default once you cross the threshold. (Heap pressure is most acute for the TypeScript adapter; the tree-sitter adapters parse files lazily and use far less memory.)
 
 #### Incremental rebuild
 
@@ -437,10 +439,10 @@ won't need to.
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "peerDependencies": {
-    "@opensip-tools/fitness": "^1.0.0"
+    "@opensip-tools/fitness": "^2.0.0"
   },
   "devDependencies": {
-    "@opensip-tools/fitness": "^1.0.0",
+    "@opensip-tools/fitness": "^2.0.0",
     "typescript": "^5.7.0"
   }
 }
@@ -624,6 +626,10 @@ The dashboard shows:
 - Per-check results and pass rates
 - Check catalog with tags and confidence levels
 - Recipe catalog
+- **Code Paths** — call-graph views built from the `graph` catalog: a
+  per-package coupling grid, blast radius (most-depended-upon functions),
+  hot/wide/big function lists, strongly-connected components, untested
+  reachable code, and an interactive node-link graph visualizer
 
 ## Session Management
 
@@ -752,11 +758,13 @@ packages/
 
   graph/                   # @opensip-tools/graph namespace
     engine/                # @opensip-tools/graph — language-agnostic graph kernel
-    graph-typescript/      # TS call-graph adapter
-    graph-python/          # Python call-graph adapter
-    graph-rust/            # Rust call-graph adapter
-    graph-go/              # Go call-graph adapter
-    graph-java/            # Java call-graph adapter
+    graph-adapter-common/  # shared tree-sitter scaffolding (discover/parse/walk/
+                           #   cache-key) for the go/java/python/rust adapters
+    graph-typescript/      # TS call-graph adapter (TypeScript compiler API)
+    graph-python/          # Python call-graph adapter (tree-sitter)
+    graph-rust/            # Rust call-graph adapter (tree-sitter)
+    graph-go/              # Go call-graph adapter (tree-sitter)
+    graph-java/            # Java call-graph adapter (tree-sitter)
 
   simulation/              # @opensip-tools/simulation namespace
     engine/                # @opensip-tools/simulation — sim command + scenarios
