@@ -32,6 +32,7 @@ import { dashboardSearchJs } from './code-paths/search.js';
 import { dashboardTraceJs } from './code-paths/trace.js';
 import { dashboardViewBigJs } from './code-paths/view-big.js';
 import { dashboardViewCouplingJs } from './code-paths/view-coupling.js';
+import { dashboardViewDistributionJs } from './code-paths/view-distribution.js';
 import { dashboardViewGraphJs } from './code-paths/view-graph.js';
 import { dashboardViewHotJs } from './code-paths/view-hot.js';
 import { dashboardViewSccsJs } from './code-paths/view-sccs.js';
@@ -39,6 +40,27 @@ import { dashboardViewSearchJs } from './code-paths/view-search.js';
 import { dashboardViewUntestedJs } from './code-paths/view-untested.js';
 import { dashboardViewWideJs } from './code-paths/view-wide.js';
 import { dashboardViewsRegistryJs } from './code-paths/views-registry.js';
+
+/**
+ * Build flag for the Plan B Code Paths explore-tab restructure.
+ *
+ * `false` (Plan B default): the legacy seven views — hot / big / wide /
+ * coupling / untested / sccs / search / graph — exactly as today. Byte-
+ * identical Code Paths surface, because the removed-view single-metric tabs
+ * presuppose Plan D rules cover their signal and Plan C feeds the kept
+ * coupling/graph views engine features (spec Open Question "Tab-removal
+ * sequencing").
+ *
+ * `true` (flipped by Plan D): the restructured set — graph (with SCC-highlight
+ * fold) / coupling / search + the ranked-distribution "Functions" affordance.
+ * `view-big/hot/wide/untested/sccs` are dropped; `view-sccs`'s signal lives on
+ * as the graph view's "Highlight cycles" toggle.
+ *
+ * This is a build-time, server-side seam — no runtime toggle in the page. The
+ * Phase 5 dashboard test forces it `true` to assert the restructured emitter
+ * registers exactly the kept views + distribution.
+ */
+const RESTRUCTURED_EXPLORE_TABS = false;
 
 /**
  * Concatenation order is load-bearing — each emitter declares
@@ -81,7 +103,9 @@ import { dashboardViewsRegistryJs } from './code-paths/views-registry.js';
  * a `{ id, deps, emit }` topological sort.
  */
 export function dashboardCodePathsJs(): string {
-  return [
+  // Shared prelude — utilities + the views registry + help drawer. Identical
+  // in both branches; every view emitter depends on these top-level names.
+  const prelude = [
     // 0. cytoscape vendor — defines the `cytoscape` / `cytoscapeDagre`
     //    browser globals the Graph view consumes. MUST precede any view
     //    emitter that references them. No deps of its own.
@@ -97,16 +121,33 @@ export function dashboardCodePathsJs(): string {
     dashboardFunctionCardJs(),
     dashboardViewsRegistryJs(),
     dashboardHelpDrawerJs(),
-    dashboardViewHotJs(),
-    dashboardViewBigJs(),
-    dashboardViewWideJs(),
-    dashboardViewCouplingJs(),
-    dashboardViewUntestedJs(),
-    dashboardViewSccsJs(),
-    dashboardViewSearchJs(),
-    dashboardViewGraphJs(),
-    panelOrchestratorJs(),
-  ].join('\n');
+  ];
+
+  // The view-emitter set is the flag seam: which `views.push(...)` calls run
+  // determines the chip bar (renderCodePathsExplore iterates `views`).
+  const views = RESTRUCTURED_EXPLORE_TABS
+    ? [
+        // Restructured (Plan D default): kept visualizations + the ranked-
+        // distribution affordance. SCCs fold into the graph view; the four
+        // single-metric tabs are dropped.
+        dashboardViewGraphJs(),
+        dashboardViewCouplingJs(),
+        dashboardViewSearchJs(),
+        dashboardViewDistributionJs(),
+      ]
+    : [
+        // Legacy (Plan B default): the current seven views, unchanged.
+        dashboardViewHotJs(),
+        dashboardViewBigJs(),
+        dashboardViewWideJs(),
+        dashboardViewCouplingJs(),
+        dashboardViewUntestedJs(),
+        dashboardViewSccsJs(),
+        dashboardViewSearchJs(),
+        dashboardViewGraphJs(),
+      ];
+
+  return [...prelude, ...views, panelOrchestratorJs()].join('\n');
 }
 
 /**
