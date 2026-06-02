@@ -50,6 +50,14 @@ distinct from:
 - [ADR-0004](./ADR-0004-opt-in-opentelemetry.md) — Opt-in OpenTelemetry: env-var
   gate, `@opentelemetry/api` in `core` / SDK only in `cli`, tools instrument via
   the `withSpan` seam (migrated from `docs/internal/decisions/`)
+- [ADR-0005](./ADR-0005-symmetric-tool-architecture-graph-rules-as-dataset-queries.md)
+  — Symmetric tool architecture: `graph` reaches parity with `fitness`
+  (`defineRule` ↔ `defineCheck`, shared recipe substrate hoisted to `core`,
+  sessions + dashboard, an engine feature layer); rules are dataset-queries
+  (ships v2.6.0)
+- [ADR-0006](./ADR-0006-derived-data-persistence-policy.md) — Derived-data
+  persistence policy: recomputed view by default, materialize only when recompute
+  is expensive or a decoupled consumer can't run the query (no SQL/DB views)
 
 ### Superseded
 

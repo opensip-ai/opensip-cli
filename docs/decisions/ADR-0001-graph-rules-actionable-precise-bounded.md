@@ -1,6 +1,6 @@
 ---
 status: active
-last_verified: 2026-06-01
+last_verified: 2026-06-02
 owner: opensip-tools
 ---
 
@@ -13,7 +13,7 @@ date: 2026-06-01
 status: active            # active | superseded | deferred
 supersedes: []
 superseded_by: null
-related: []
+related: [ADR-0005]
 tags: [graph, rules, signal-quality, gate]
 enforcement: not-mechanizable
 enforcement-reason: >
@@ -41,6 +41,18 @@ coupling counts, any "top N" / percentile) are **dashboard insights**, not gate
 rules. The dashboard is for exploration and ranking; the gate is for actionable
 defects whose count can hit zero. A percentile rule structurally fails criterion
 3 and must not gate — build a dashboard view for it instead.
+
+**Clarification (2026-06-02, see [ADR-0005](./ADR-0005-symmetric-tool-architecture-graph-rules-as-dataset-queries.md)):**
+the bar is *bounded gating*, not the metric itself. A raw metric (blast radius,
+coupling) may legitimately gate when used as an **absolute-threshold input to a
+bounded, actionable predicate** whose finding count can reach zero — e.g.
+`graph:high-blast-untested` gates on `blast ≥ N && !testReachable` (fixable by
+adding a test; reaches zero once every high-blast function is covered). What
+stays forbidden is gating by **ranking / percentile** ("top N%"), which can never
+reach zero by construction. So: blast-*as-a-ranking* is a dashboard insight;
+blast-*as-an-absolute-threshold-input* to a bounded predicate may gate. By the
+same line, statistical "outlier" coupling (a relative ranking) stays
+dashboard-only, while package **cycles** (bounded, breakable) may gate.
 
 (Graph rules are distinct from the ~145 `defineCheck` **fitness checks**, which
 are file-scoped `analyze(content, filePath)` checks. This ADR governs graph
