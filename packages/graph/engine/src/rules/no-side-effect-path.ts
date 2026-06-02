@@ -142,6 +142,46 @@ function hasDiscardedCaller(occ: FunctionOccurrence, indexes: Indexes): boolean 
   return scan.sawMatchingEdge && !scan.sawDiscardedField;
 }
 
+/**
+ * Declared return types that mean "this function yields no value." A
+ * void-like return type covers every language the graph tool ingests:
+ * `void`/`undefined`/`never` (TS), `Promise<void>` (async TS that
+ * resolves nothing), `()` (Rust unit), `None` (Python).
+ *
+ * Matched case-insensitively after trimming.
+ */
+const VOID_LIKE_RETURN_TYPES: ReadonlySet<string> = new Set([
+  'void',
+  'undefined',
+  'never',
+  'promise<void>',
+  '()',
+  'none',
+]);
+
+/**
+ * True when the function's DECLARED return type proves it has no return
+ * value to discard.
+ *
+ * The rule's whole actionable premise is "a caller is throwing away a
+ * return value, so the call is dead computation." For a function declared
+ * `: void` (or any void-like type) there is no value to throw away — the
+ * function exists for its effect, not its result. The textual purity
+ * heuristic (`textualSideEffect`) cannot see effects like closure-binding
+ * reassignment, throw-delegation, or out-parameter mutation, so such
+ * effect-only functions look "pure" and get flagged falsely. Rejecting
+ * void-like return types makes the premise non-vacuous.
+ *
+ * IMPORTANT: a `null` return type means "unknown / not annotated", NOT
+ * "void". Rejecting `null` would introduce false negatives on genuinely
+ * pure, un-annotated functions whose result is dropped — so `null` passes
+ * through. Only the explicit void-like strings are rejected.
+ */
+function returnsNoValue(returnType: string | null): boolean {
+  if (returnType === null) return false;
+  return VOID_LIKE_RETURN_TYPES.has(returnType.trim().toLowerCase());
+}
+
 /** Filters out occurrences we never want to flag — short, test-only, has unresolved edges, etc. */
 function isPureCandidate(occ: FunctionOccurrence, sideEffecting: ReadonlySet<string>): boolean {
   if (occ.kind === 'module-init') return false;
@@ -152,6 +192,9 @@ function isPureCandidate(occ: FunctionOccurrence, sideEffecting: ReadonlySet<str
   if (occ.calls.some((e) => e.to.length === 0)) return false;
   if (sideEffecting.has(occ.bodyHash)) return false;
   if (occ.visibility !== 'exported') return false;
+  // Effect-only functions (void-like return type) have no return value to
+  // discard, so the "discarded return value" signal is vacuous for them.
+  if (returnsNoValue(occ.returnType)) return false;
   return true;
 }
 

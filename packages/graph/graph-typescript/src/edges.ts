@@ -335,7 +335,7 @@ function dispatchCall(
  * `await foo()` and `(foo())` wrappers are unwrapped so the underlying
  * intent is preserved.
  */
-function isReturnValueDiscarded(node: ts.Node): boolean {
+export function isReturnValueDiscarded(node: ts.Node): boolean {
   let parent: ts.Node | undefined = node.parent;
   while (parent) {
     if (ts.isParenthesizedExpression(parent) || ts.isAwaitExpression(parent)) {

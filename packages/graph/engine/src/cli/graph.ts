@@ -43,7 +43,7 @@ import { buildCliOutput, buildCliOutputFromFindings, renderJson } from '../rende
 
 import { detectLanguages } from './detect.js';
 import { runCatalogJsonMode, runGateMode, runReportMode } from './graph-modes.js';
-import { buildUnifiedReportLines, resolutionBannerText } from './graph-report.js';
+import { buildUnifiedReportLines, countFiles, resolutionBannerText } from './graph-report.js';
 import { loadGraphConfig, runGraph, runShardedGraph } from './orchestrate.js';
 import { positionalPathLabel, resolvePositionalPaths } from './positional-paths.js';
 import { MemoryPressureError } from './pressure-monitor.js';
@@ -67,16 +67,6 @@ export type { UnifiedReportInput } from './graph-report.js';
 const EVT_GRAPH_COMPLETE = 'graph.cli.graph.complete';
 const MODULE_GRAPH_CLI = 'graph:cli';
 const MODULE_GRAPH_RENDER = 'graph:render';
-
-function countFiles(catalog: Catalog): number {
-  const files = new Set<string>();
-  for (const name of Object.keys(catalog.functions)) {
-    const occs = catalog.functions[name];
-    if (!occs) continue;
-    for (const o of occs) files.add(o.filePath);
-  }
-  return files.size;
-}
 
 export async function executeGraph(
   opts: GraphCommandOptions,

@@ -232,4 +232,83 @@ describe('no-side-effect-path rule', () => {
     const signals = noSideEffectPathRule.evaluate(catalog, indexes, {});
     expect(signals.some((s) => s.message.includes('unused'))).toBe(false);
   });
+
+  // Regression guard for the false positives: an effect-only function
+  // declared `: void` (or `Promise<void>`) has no return value to discard,
+  // so the "discarded return value" premise is vacuous. Its real effect
+  // (closure rebind / throw-delegation / out-param mutation) is invisible
+  // to the textual purity heuristic, which is exactly why it looked "pure".
+  it.each(['void', 'Promise<void>'])(
+    'does not flag a void-like (%s) effect-only function whose caller discards the call',
+    (returnType) => {
+      const helperA = occ({ bodyHash: 'ha', simpleName: 'helperA', ...exportedDefaults });
+      const helperB = occ({ bodyHash: 'hb', simpleName: 'helperB', ...exportedDefaults });
+      const effectOnly = occ({
+        bodyHash: 'p',
+        simpleName: 'rebuildLookups',
+        ...exportedDefaults,
+        returnType,
+        calls: [ed('helperA()', ['ha']), ed('helperB()', ['hb'])],
+      });
+      const caller = occ({
+        bodyHash: 'c',
+        simpleName: 'caller',
+        ...exportedDefaults,
+        calls: [ed('rebuildLookups()', ['p'], true)],
+      });
+      const catalog = makeCatalog([effectOnly, helperA, helperB, caller]);
+      const indexes = buildIndexes(catalog);
+      const signals = noSideEffectPathRule.evaluate(catalog, indexes, {});
+      expect(signals.some((s) => s.message.includes('rebuildLookups'))).toBe(false);
+    },
+  );
+
+  // True positive preserved: a value-returning pure function whose result
+  // is thrown away is still dead computation and must still flag.
+  it('still flags a value-returning (number) pure function whose caller discards its return', () => {
+    const helperA = occ({ bodyHash: 'ha', simpleName: 'helperA', ...exportedDefaults });
+    const helperB = occ({ bodyHash: 'hb', simpleName: 'helperB', ...exportedDefaults });
+    const pure = occ({
+      bodyHash: 'p',
+      simpleName: 'computeTotal',
+      ...exportedDefaults,
+      returnType: 'number',
+      calls: [ed('helperA()', ['ha']), ed('helperB()', ['hb'])],
+    });
+    const caller = occ({
+      bodyHash: 'c',
+      simpleName: 'caller',
+      ...exportedDefaults,
+      calls: [ed('computeTotal()', ['p'], true)],
+    });
+    const catalog = makeCatalog([pure, helperA, helperB, caller]);
+    const indexes = buildIndexes(catalog);
+    const signals = noSideEffectPathRule.evaluate(catalog, indexes, {});
+    expect(signals.some((s) => s.message.includes('computeTotal'))).toBe(true);
+  });
+
+  // Unknown return type (null = unannotated/inferred) must NOT be
+  // over-rejected: a genuinely-pure un-annotated function whose result is
+  // dropped is still a real finding. Rejecting null would be a false negative.
+  it('still flags a pure function with a null (unknown) return type whose caller discards it', () => {
+    const helperA = occ({ bodyHash: 'ha', simpleName: 'helperA', ...exportedDefaults });
+    const helperB = occ({ bodyHash: 'hb', simpleName: 'helperB', ...exportedDefaults });
+    const pure = occ({
+      bodyHash: 'p',
+      simpleName: 'inferredPure',
+      ...exportedDefaults,
+      returnType: null,
+      calls: [ed('helperA()', ['ha']), ed('helperB()', ['hb'])],
+    });
+    const caller = occ({
+      bodyHash: 'c',
+      simpleName: 'caller',
+      ...exportedDefaults,
+      calls: [ed('inferredPure()', ['p'], true)],
+    });
+    const catalog = makeCatalog([pure, helperA, helperB, caller]);
+    const indexes = buildIndexes(catalog);
+    const signals = noSideEffectPathRule.evaluate(catalog, indexes, {});
+    expect(signals.some((s) => s.message.includes('inferredPure'))).toBe(true);
+  });
 });

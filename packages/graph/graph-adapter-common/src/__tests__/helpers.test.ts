@@ -7,6 +7,7 @@ import { describe, expect, it, afterEach, beforeEach } from 'vitest';
 import { skipToEndOfLine } from '../body-digest.js';
 import { hashConfig, makeConfigCacheKey } from '../cache-key.js';
 import { createDiscover } from '../discover.js';
+import { isReturnValueDiscarded } from '../return-discarded.js';
 import {
   buildNameIndex,
   makeFileClassifier,
@@ -16,6 +17,11 @@ import {
 
 import type { FunctionOccurrence } from '@opensip-tools/graph';
 
+// Minimal fake of the tree-sitter `SyntaxNode` shape `isReturnValueDiscarded`
+// reads: it only ever inspects `.parent` and `.type`.
+const mk = (type: string, parent: unknown = null): never =>
+  ({ type, parent }) as never;
+
 describe('skipToEndOfLine', () => {
   it('advances to the next newline', () => {
     expect(skipToEndOfLine('abc\ndef', 0)).toBe(3);
@@ -23,6 +29,32 @@ describe('skipToEndOfLine', () => {
 
   it('advances to end of text when no newline', () => {
     expect(skipToEndOfLine('abc', 1)).toBe(3);
+  });
+});
+
+describe('isReturnValueDiscarded', () => {
+  it('returns true when the enclosing parent is an expression_statement', () => {
+    const stmt = mk('expression_statement');
+    const node = mk('call_expression', stmt);
+    expect(isReturnValueDiscarded(node)).toBe(true);
+  });
+
+  it('returns false when the enclosing parent is a value-consuming node', () => {
+    const parent = mk('assignment_expression');
+    const node = mk('call_expression', parent);
+    expect(isReturnValueDiscarded(node)).toBe(false);
+  });
+
+  it('walks transparently through parenthesized_expression wrappers', () => {
+    const stmt = mk('expression_statement');
+    const paren = mk('parenthesized_expression', stmt);
+    const node = mk('call_expression', paren);
+    expect(isReturnValueDiscarded(node)).toBe(true);
+  });
+
+  it('returns false when no enclosing parent exists (loop exit)', () => {
+    const node = mk('call_expression', null);
+    expect(isReturnValueDiscarded(node)).toBe(false);
   });
 });
 

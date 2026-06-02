@@ -38,6 +38,12 @@ export const alwaysThrowsBranchRule: Rule = {
     const signals: Signal[] = [];
     for (const occ of indexes.byBodyHash.values()) {
       if (occ.kind === 'module-init') continue;
+      // An always-throwing arrow in a test file is an intentional
+      // `expect(...).toThrow()` fixture (`() => { throw boom }`), not a
+      // production control-flow smell. This rule targets production code,
+      // so skip test-file occurrences — same guard the no-side-effect-path
+      // rule applies.
+      if (occ.inTestFile) continue;
       if (occ.calls.length === 0) continue;
       // All edges look like throw shapes — every documented call site
       // is a throw / raise / panic per the adapter's regex.

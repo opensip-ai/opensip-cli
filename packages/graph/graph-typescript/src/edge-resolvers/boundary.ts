@@ -17,12 +17,14 @@
  * cross-shard edge.
  */
 
-import ts from 'typescript';
+
+import { isReturnValueDiscarded } from '../edges.js';
 
 import { calleeSimpleName, buildImportSpecifierIndex } from './syntactic.js';
 
 import type { CallSiteRecord } from '../walk.js';
 import type { Catalog, CrossBoundaryCall } from '@opensip-tools/graph';
+import type ts from 'typescript';
 
 /** Max length of the descriptor's display text — the CallEdge.text contract. */
 const TEXT_MAX = 80;
@@ -72,6 +74,10 @@ export function extractBoundaryCalls(
   return out;
 }
 
+/* `isReturnValueDiscarded` is imported from `../edges.js` so recovered
+ * boundary edges carry the same `discarded` semantics as edges resolved
+ * inline by the main Stage 2 pass. */
+
 function positionOf(
   node: ts.Node,
   sourceFile: ts.SourceFile,
@@ -84,21 +90,4 @@ function positionOf(
     column: lc.character,
     text: raw.length > TEXT_MAX ? `${raw.slice(0, TEXT_MAX - 3)}...` : raw,
   };
-}
-
-/**
- * The call's return value is discarded when it is the whole expression of
- * an ExpressionStatement (`foo();`). Mirrors `edges.ts:isReturnValueDiscarded`
- * so recovered boundary edges carry the same `discarded` semantics.
- */
-function isReturnValueDiscarded(node: ts.Node): boolean {
-  let parent: ts.Node | undefined = node.parent;
-  while (parent) {
-    if (ts.isParenthesizedExpression(parent) || ts.isAwaitExpression(parent)) {
-      parent = parent.parent;
-      continue;
-    }
-    return ts.isExpressionStatement(parent);
-  }
-  return false;
 }

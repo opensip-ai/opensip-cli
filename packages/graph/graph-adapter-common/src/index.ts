@@ -36,6 +36,8 @@ export {
 
 export { skipToEndOfLine } from './body-digest.js';
 
+export { isReturnValueDiscarded } from './return-discarded.js';
+
 export {
   record,
   makeFileClassifier,

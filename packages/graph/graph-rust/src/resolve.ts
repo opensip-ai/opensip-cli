@@ -47,6 +47,7 @@ import {
   pushCreationEdge,
   truncateForCallEdge,
 } from '@opensip-tools/graph';
+import { isReturnValueDiscarded } from '@opensip-tools/graph-adapter-common';
 
 import { resolveDependencies } from './resolve-dependencies.js';
 
@@ -286,20 +287,4 @@ function resolveTarget(
     text: loc.text,
     discarded: loc.discarded,
   };
-}
-
-/**
- * The call's return value is discarded when the call expression is the
- * entire expression of an expression_statement.
- */
-function isReturnValueDiscarded(node: Parser.SyntaxNode): boolean {
-  let parent: Parser.SyntaxNode | null = node.parent;
-  while (parent) {
-    if (parent.type === 'parenthesized_expression') {
-      parent = parent.parent;
-      continue;
-    }
-    return parent.type === 'expression_statement';
-  }
-  return false;
 }

@@ -30,7 +30,7 @@ export interface UnifiedReportInput {
   readonly cacheHit: boolean;
 }
 
-function countFiles(catalog: Catalog): number {
+export function countFiles(catalog: Catalog): number {
   const files = new Set<string>();
   for (const name of Object.keys(catalog.functions)) {
     const occs = catalog.functions[name];

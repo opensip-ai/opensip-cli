@@ -34,7 +34,7 @@ import {
   pushCreationEdge,
   truncateForCallEdge,
 } from '@opensip-tools/graph';
-import { buildNameIndex } from '@opensip-tools/graph-adapter-common';
+import { buildNameIndex, isReturnValueDiscarded } from '@opensip-tools/graph-adapter-common';
 
 import { resolveDependencies } from './resolve-dependencies.js';
 
@@ -189,21 +189,4 @@ function decodeTypeName(node: Parser.SyntaxNode): string | null {
   }
   /* v8 ignore next */
   return null;
-}
-
-/**
- * The call's return value is discarded when its parent is an
- * expression_statement.
- */
-function isReturnValueDiscarded(node: Parser.SyntaxNode): boolean {
-  let parent: Parser.SyntaxNode | null = node.parent;
-  while (parent) {
-    if (parent.type === 'parenthesized_expression') {
-      parent = parent.parent;
-      continue;
-    }
-    return parent.type === 'expression_statement';
-  }
-  /* v8 ignore next */
-  return false;
 }

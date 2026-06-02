@@ -79,6 +79,36 @@ describe('always-throws-branch rule', () => {
     expect(signals).toHaveLength(0);
   });
 
+  it('does not flag a test-file occurrence whose every call is a throw', () => {
+    // `() => { throw boom }` passed to `expect(...).toThrow(...)` exists to
+    // throw by design; flagging it is noise. Test-file occurrences are
+    // excluded from this production-code rule.
+    const a = occ({
+      bodyHash: 'a',
+      simpleName: 'toThrowFixture',
+      inTestFile: true,
+      calls: [edge('throw new Error("boom")'), edge('throw new TypeError("nope")')],
+    });
+    const catalog = makeCatalog([a]);
+    const indexes = buildIndexes(catalog);
+    const signals = alwaysThrowsBranchRule.evaluate(catalog, indexes, {});
+    expect(signals).toHaveLength(0);
+  });
+
+  it('still flags the same always-throw shape when not in a test file', () => {
+    const a = occ({
+      bodyHash: 'a',
+      simpleName: 'toThrowFixture',
+      inTestFile: false,
+      calls: [edge('throw new Error("boom")'), edge('throw new TypeError("nope")')],
+    });
+    const catalog = makeCatalog([a]);
+    const indexes = buildIndexes(catalog);
+    const signals = alwaysThrowsBranchRule.evaluate(catalog, indexes, {});
+    expect(signals).toHaveLength(1);
+    expect(signals[0]?.message).toContain('toThrowFixture');
+  });
+
   it('does not match non-throw expressions starting with a capitalized identifier', () => {
     const a = occ({
       bodyHash: 'a',
