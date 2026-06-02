@@ -72,9 +72,9 @@ describe('generateDashboardHtml — graph catalog wiring', () => {
     expect(html).toContain('const EDITOR_PROTOCOL = "vscode";');
   });
 
-  it('embeds the seven view ids via the views[] registry', () => {
+  it('embeds the restructured view ids via the views[] registry', () => {
     const html = generateDashboardHtml({ sessions: [], graphCatalog: minimalCatalog });
-    for (const id of ['hot', 'big', 'wide', 'coupling', 'untested', 'sccs', 'search']) {
+    for (const id of ['graph', 'coupling', 'search', 'distribution']) {
       expect(html).toContain(`id: '${id}'`);
     }
   });

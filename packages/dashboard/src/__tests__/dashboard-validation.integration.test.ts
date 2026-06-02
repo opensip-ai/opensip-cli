@@ -96,12 +96,17 @@ describe.runIf(existsSync(REPORT))('Phase V — dashboard end-to-end validation'
     expect(reportHtml).toContain('id="graph-catalog"');
   });
 
-  it('boots without throwing and registers all 8 Code Paths views', () => {
+  it('boots without throwing and registers the 4 restructured Code Paths views', () => {
     if (!env) { expect(true).toBe(true); return; }
     expect(env.views).toBeDefined();
-    // 7 ranked/explore views (hot, big, wide, coupling, untested, sccs,
-    // search) + the graph node-link view (view 8).
-    expect(env.views.length).toBe(8);
+    // The restructured explore set: graph (node-link, with the SCC cycle
+    // highlight fold) / coupling / search / distribution. The single-metric
+    // views (hot/big/wide/untested) and the standalone SCCs view were dropped
+    // once their signal moved into the engine gate rules.
+    expect(env.views.length).toBe(4);
+    expect(new Set(env.views.map((v) => v.id))).toEqual(
+      new Set(['graph', 'coupling', 'search', 'distribution']),
+    );
   });
 
   it('Code Paths panel hosts Sessions and Explore subtabs', () => {
@@ -126,7 +131,7 @@ describe.runIf(existsSync(REPORT))('Phase V — dashboard end-to-end validation'
   it('every Explore view container exists and the active one renders something', () => {
     if (!env) { expect(true).toBe(true); return; }
     activateExploreSubtab();
-    for (const id of ['hot', 'big', 'wide', 'coupling', 'untested', 'sccs', 'search']) {
+    for (const id of ['graph', 'coupling', 'search', 'distribution']) {
       const c = document.querySelector('#code-paths-view-' + id);
       expect(c).not.toBeNull();
     }
@@ -137,11 +142,11 @@ describe.runIf(existsSync(REPORT))('Phase V — dashboard end-to-end validation'
     expect(Boolean(hasRows) || Boolean(hasEmpty)).toBe(true);
   });
 
-  it('Function Card overlay opens for the first row of the hot view', () => {
+  it('Function Card overlay opens for the first row of the distribution view', () => {
     if (!env) { expect(true).toBe(true); return; }
     activateExploreSubtab();
-    env.activateView('hot');
-    const firstRow = document.querySelector('#code-paths-view-hot [data-body-hash]');
+    env.activateView('distribution');
+    const firstRow = document.querySelector('#code-paths-view-distribution [data-body-hash]');
     if (!firstRow) { expect(true).toBe(true); return; }
     env.openFunctionCard((firstRow as HTMLElement).dataset.bodyHash!);
     const overlays = document.querySelectorAll('.function-card-overlay');
@@ -165,13 +170,13 @@ describe.runIf(existsSync(REPORT))('Phase V — dashboard end-to-end validation'
   it('the active view section heading exposes an info button that opens the help drawer', () => {
     if (!env) { expect(true).toBe(true); return; }
     activateExploreSubtab();
-    env.activateView('hot');
-    const info = document.querySelector<HTMLButtonElement>('#code-paths-view-hot .section-info');
+    env.activateView('distribution');
+    const info = document.querySelector<HTMLButtonElement>('#code-paths-view-distribution .section-info');
     expect(info).not.toBeNull();
     info!.click();
     const drawer = document.querySelector('.help-drawer');
     expect(drawer).not.toBeNull();
-    expect(drawer!.querySelector('h3')!.textContent).toBe('Hot functions');
+    expect(drawer!.querySelector('h3')!.textContent).toBe('Functions (distribution)');
     // Close.
     document.querySelector<HTMLElement>('.help-drawer-close')!.click();
     expect(document.querySelector('.help-drawer-overlay')).toBeNull();

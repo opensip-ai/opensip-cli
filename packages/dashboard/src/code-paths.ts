@@ -3,13 +3,15 @@
  * Dashboard Code Paths panel — graph-tool surface with two subtabs:
  *   1. Sessions — recent graph runs and their per-rule findings
  *      (uses the shared renderSessionTable from sessions.ts).
- *   2. Explore — interactive seven-views catalog browser
- *      (Hot, Big, Wide, Coupling, Untested, SCCs, Search).
+ *   2. Explore — interactive catalog browser with four views
+ *      (Graph, Coupling, Search, Functions/distribution). The Graph
+ *      view carries the SCC cycle highlight that the standalone SCCs
+ *      view used to own.
  *
  * Architecture: vanilla DOM, no framework. Each view-*.ts emits a
  * JS string that pushes a `View` literal into the singleton `views`
  * registry. The Explore subtab renders filter chips + view tab bar
- * + seven view containers; Sessions subtab renders the standard
+ * + one container per view; Sessions subtab renders the standard
  * session table.
  *
  * The file imports JS-string emitters from sibling modules under
@@ -29,37 +31,30 @@ import { dashboardIndexesJs } from './code-paths/indexes.js';
 import { dashboardPathUtilsJs } from './code-paths/path-utils.js';
 import { dashboardSearchJs } from './code-paths/search.js';
 import { dashboardTraceJs } from './code-paths/trace.js';
-import { dashboardViewBigJs } from './code-paths/view-big.js';
 import { dashboardViewCouplingJs } from './code-paths/view-coupling.js';
 import { dashboardViewDistributionJs } from './code-paths/view-distribution.js';
 import { dashboardViewGraphJs } from './code-paths/view-graph.js';
-import { dashboardViewHotJs } from './code-paths/view-hot.js';
-import { dashboardViewSccsJs } from './code-paths/view-sccs.js';
 import { dashboardViewSearchJs } from './code-paths/view-search.js';
-import { dashboardViewUntestedJs } from './code-paths/view-untested.js';
-import { dashboardViewWideJs } from './code-paths/view-wide.js';
 import { dashboardViewsRegistryJs } from './code-paths/views-registry.js';
 
 /**
- * Build flag for the Plan B Code Paths explore-tab restructure.
+ * Build flag for the Code Paths explore-tab restructure.
  *
- * `false` (Plan B default): the legacy seven views — hot / big / wide /
- * coupling / untested / sccs / search / graph — exactly as today. Byte-
- * identical Code Paths surface, because the removed-view single-metric tabs
- * presuppose Plan D rules cover their signal and Plan C feeds the kept
- * coupling/graph views engine features (spec Open Question "Tab-removal
- * sequencing").
+ * `true` (Plan D default, current): the restructured set — graph (with the
+ * SCC-highlight fold) / coupling / search + the ranked-distribution
+ * "Functions" affordance. The legacy single-metric views
+ * (`view-big/hot/wide/untested/sccs`) were deleted in Plan D once their
+ * signal moved into the engine gate rules (`graph:large-function`,
+ * `graph:wide-function`, `graph:high-blast-untested`, `graph:cycle`); the
+ * standalone SCCs view's signal lives on as the graph view's cycle highlight.
  *
- * `true` (flipped by Plan D): the restructured set — graph (with SCC-highlight
- * fold) / coupling / search + the ranked-distribution "Functions" affordance.
- * `view-big/hot/wide/untested/sccs` are dropped; `view-sccs`'s signal lives on
- * as the graph view's "Highlight cycles" toggle.
+ * `false`: there is no legacy branch anymore — the constant is retained only
+ * as the default for the `dashboardCodePathsJs(restructured)` test seam, which
+ * always exercises the restructured set.
  *
- * This is a build-time, server-side seam — no runtime toggle in the page. The
- * Phase 5 dashboard test forces it `true` to assert the restructured emitter
- * registers exactly the kept views + distribution.
+ * This is a build-time, server-side seam — no runtime toggle in the page.
  */
-const RESTRUCTURED_EXPLORE_TABS = false;
+const RESTRUCTURED_EXPLORE_TABS = true;
 
 /**
  * Concatenation order is load-bearing — each emitter declares
@@ -88,11 +83,12 @@ const RESTRUCTURED_EXPLORE_TABS = false;
  *                        Must come before any view emitter.
  * 10. help-drawer      — declares `openHelpDrawer`. No external deps
  *                        beyond `el`.
- * 11-17. view-*        — push View descriptors into `views`. Each
- *                        renderer closes over `el`, `passesFilter`,
- *                        `displayName`, `packageOfPath`,
- *                        `renderFunctionRows`, plus its own utilities.
- * 18. panelOrchestrator — top-level `renderCodePathsTab`,
+ * 11-14. view-*        — push View descriptors into `views` (graph /
+ *                        coupling / search / distribution). Each renderer
+ *                        closes over `el`, `passesFilter`, `displayName`,
+ *                        `packageOfPath`, `renderFunctionRows`, plus its own
+ *                        utilities.
+ * 15. panelOrchestrator — top-level `renderCodePathsTab`,
  *                        `renderCodePathsExplore`, `openCodePathsSession`.
  *                        Uses every name above plus `renderSubtabBar`
  *                        (from shared/) and `registerTabActivator`.
@@ -100,12 +96,13 @@ const RESTRUCTURED_EXPLORE_TABS = false;
  * If the list grows past ~30 entries, replace this manual order with
  * a `{ id, deps, emit }` topological sort.
  */
-export function dashboardCodePathsJs(restructured: boolean = RESTRUCTURED_EXPLORE_TABS): string {
-  // `restructured` defaults to the build-time flag; the Phase 5 dashboard test
-  // forces it `true` to assert the restructured emitter set without flipping
-  // the shipped default.
-  // Shared prelude — utilities + the views registry + help drawer. Identical
-  // in both branches; every view emitter depends on these top-level names.
+export function dashboardCodePathsJs(_restructured: boolean = RESTRUCTURED_EXPLORE_TABS): string {
+  // The explore-tab restructure has shipped: there is one view set (graph /
+  // coupling / search / distribution). The `_restructured` parameter is kept
+  // for the test seam's call-shape compatibility but no longer selects a
+  // legacy branch (the single-metric view emitters were deleted in Plan D).
+  // Shared prelude — utilities + the views registry + help drawer. Every view
+  // emitter depends on these top-level names.
   const prelude = [
     // 0. cytoscape vendor — defines the `cytoscape` / `cytoscapeDagre`
     //    browser globals the Graph view consumes. MUST precede any view
@@ -123,29 +120,16 @@ export function dashboardCodePathsJs(restructured: boolean = RESTRUCTURED_EXPLOR
     dashboardHelpDrawerJs(),
   ];
 
-  // The view-emitter set is the flag seam: which `views.push(...)` calls run
-  // determines the chip bar (renderCodePathsExplore iterates `views`).
-  const views = restructured
-    ? [
-        // Restructured (Plan D default): kept visualizations + the ranked-
-        // distribution affordance. SCCs fold into the graph view; the four
-        // single-metric tabs are dropped.
-        dashboardViewGraphJs(),
-        dashboardViewCouplingJs(),
-        dashboardViewSearchJs(),
-        dashboardViewDistributionJs(),
-      ]
-    : [
-        // Legacy (Plan B default): the current seven views, unchanged.
-        dashboardViewHotJs(),
-        dashboardViewBigJs(),
-        dashboardViewWideJs(),
-        dashboardViewCouplingJs(),
-        dashboardViewUntestedJs(),
-        dashboardViewSccsJs(),
-        dashboardViewSearchJs(),
-        dashboardViewGraphJs(),
-      ];
+  // The kept visualizations + the ranked-distribution affordance. SCCs fold
+  // into the graph view's cycle highlight; the single-metric tabs were dropped
+  // (their signal moved into the engine gate rules). `renderCodePathsExplore`
+  // iterates `views` to build the chip bar.
+  const views = [
+    dashboardViewGraphJs(),
+    dashboardViewCouplingJs(),
+    dashboardViewSearchJs(),
+    dashboardViewDistributionJs(),
+  ];
 
   return [...prelude, ...views, panelOrchestratorJs()].join('\n');
 }

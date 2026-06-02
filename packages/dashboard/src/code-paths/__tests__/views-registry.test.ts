@@ -1,15 +1,11 @@
 /**
- * @fileoverview Restructured Code Paths explore-tab set (Plan B, Phase 5 Task 5.4).
+ * @fileoverview Restructured Code Paths explore-tab set (Plan D — shipped).
  *
- * The build ships with RESTRUCTURED_EXPLORE_TABS = false (legacy seven views).
- * This test forces the flag `true` via the `dashboardCodePathsJs(restructured)`
- * test seam and asserts the emitted JS registers exactly the kept views
- * (graph / coupling / search) plus the ranked-distribution affordance, and does
- * NOT emit the removed single-metric / standalone-SCC views.
- *
- * The file-absence half (deleting view-big/hot/wide/untested/sccs.ts) lands
- * with Plan D when the flag default flips; Plan B retains the files for the
- * legacy branch.
+ * The explore-tab restructure has shipped: `dashboardCodePathsJs` emits exactly
+ * the kept views (graph / coupling / search) plus the ranked-distribution
+ * affordance, and the single-metric / standalone-SCC view sources were deleted.
+ * The emitter no longer has a legacy branch — the `restructured` parameter is a
+ * vestigial test-seam arg that always yields the restructured set.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -30,18 +26,13 @@ function registeredViewIds(js: string): string[] {
 }
 
 describe('Code Paths explore-tab set', () => {
-  it('default (legacy) emitter registers the seven current views', () => {
-    const ids = registeredViewIds(dashboardCodePathsJs(false));
-    expect(new Set(ids)).toEqual(new Set(['hot', 'big', 'wide', 'coupling', 'untested', 'sccs', 'search', 'graph']));
-  });
-
-  it('restructured emitter registers exactly {graph, coupling, search, distribution}', () => {
-    const ids = registeredViewIds(dashboardCodePathsJs(true));
+  it('emitter registers exactly {graph, coupling, search, distribution}', () => {
+    const ids = registeredViewIds(dashboardCodePathsJs());
     expect(new Set(ids)).toEqual(new Set(['graph', 'coupling', 'search', 'distribution']));
   });
 
-  it('restructured emitter drops the single-metric + standalone-SCC views', () => {
-    const ids = registeredViewIds(dashboardCodePathsJs(true));
+  it('drops the single-metric + standalone-SCC views', () => {
+    const ids = registeredViewIds(dashboardCodePathsJs());
     for (const removed of ['big', 'hot', 'wide', 'untested', 'sccs']) {
       expect(ids).not.toContain(removed);
     }

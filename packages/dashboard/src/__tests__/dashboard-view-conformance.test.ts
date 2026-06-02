@@ -5,7 +5,7 @@
  * View conformance — §10.1 invariant asserted at runtime.
  *
  * Every registered View must have:
- *  - id ∈ {hot, big, wide, coupling, untested, sccs, search, graph}
+ *  - id ∈ {graph, coupling, search, distribution}
  *  - label: non-empty string
  *  - render: a function
  */
@@ -14,16 +14,7 @@ import { describe, expect, it } from 'vitest';
 
 import { dashboardCodePathsJs } from '../code-paths.js';
 
-const expectedIds = new Set([
-  'hot',
-  'big',
-  'wide',
-  'coupling',
-  'untested',
-  'sccs',
-  'search',
-  'graph',
-]);
+const expectedIds = new Set(['graph', 'coupling', 'search', 'distribution']);
 
 interface Probe {
   views: { id: string; label: string; render: unknown }[];
@@ -53,9 +44,9 @@ return { views };
 }
 
 describe('view conformance — §10.1', () => {
-  it('exactly eight views are registered', () => {
+  it('exactly four views are registered', () => {
     const views = loadViews();
-    expect(views.length).toBe(8);
+    expect(views.length).toBe(4);
   });
 
   it('every view has a known id, non-empty label, and a render function', () => {
