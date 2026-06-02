@@ -21,6 +21,10 @@
   "opensipTools": {
     "kind": "graph-adapter"
   },
+  "files": [
+    "dist",
+    "wasm"
+  ],
   "scripts": {
     "build": "tsc",
     "test": "vitest run --passWithNoTests",
@@ -31,8 +35,7 @@
     "@opensip-tools/core": "workspace:*",
     "@opensip-tools/graph": "workspace:*",
     "@opensip-tools/graph-adapter-common": "workspace:*",
-    "tree-sitter": "0.25.0",
-    "tree-sitter-rust": "0.24.0"
+    "web-tree-sitter": "0.25.10"
   },
   "devDependencies": {
     "@types/node": "^22.19.19",

@@ -46,7 +46,9 @@
 import { relative, sep } from 'node:path';
 
 import {
+  childrenOf,
   makeFileClassifier,
+  namedChildrenOf,
   nameOf,
   record,
   runWalk,
@@ -63,7 +65,7 @@ import type {
   WalkInput,
   WalkOutput,
 } from '@opensip-tools/graph';
-import type Parser from 'tree-sitter';
+import type { Node } from 'web-tree-sitter';
 
 
 const TEST_PATH_RE = /(?:^|\/)tests?\//;
@@ -120,7 +122,7 @@ function walkFile(
   };
   const initialFrame: Frame = { ownerHash: moduleInit.bodyHash, enclosingImpl: null };
 
-  for (const child of file.tree.rootNode.children) visit(child, initialFrame, ctx);
+  for (const child of childrenOf(file.tree.rootNode)) visit(child, initialFrame, ctx);
 }
 
 /**
@@ -163,7 +165,7 @@ function collectDependencySites(
   moduleInitHash: string,
   out: DependencySiteRecord[],
 ): void {
-  for (const stmt of file.tree.rootNode.namedChildren) {
+  for (const stmt of namedChildrenOf(file.tree.rootNode)) {
     if (stmt.type === 'use_declaration') {
       collectFromUseDeclaration(stmt, file, moduleInitHash, out);
     } else if (stmt.type === 'extern_crate_declaration') {
@@ -173,7 +175,7 @@ function collectDependencySites(
 }
 
 function collectFromUseDeclaration(
-  decl: Parser.SyntaxNode,
+  decl: Node,
   file: RustParsedFile,
   ownerHash: string,
   out: DependencySiteRecord[],
@@ -187,7 +189,7 @@ function collectFromUseDeclaration(
   emitFromUseSegment(body, [], file, ownerHash, line, column, out);
 }
 
-function pickUsePathNode(decl: Parser.SyntaxNode): Parser.SyntaxNode | null {
+function pickUsePathNode(decl: Node): Node | null {
   // Walk named children in reverse, taking the first non-visibility node.
   for (let i = decl.namedChildCount - 1; i >= 0; i--) {
     const c = decl.namedChild(i);
@@ -206,7 +208,7 @@ function pickUsePathNode(decl: Parser.SyntaxNode): Parser.SyntaxNode | null {
  * `DependencySiteRecord` per terminal path.
  */
 function emitFromUseSegment(
-  node: Parser.SyntaxNode,
+  node: Node,
   prefix: readonly string[],
   file: RustParsedFile,
   ownerHash: string,
@@ -249,7 +251,7 @@ function emitFromUseSegment(
 }
 
 function emitFromPathLeaf(
-  node: Parser.SyntaxNode,
+  node: Node,
   prefix: readonly string[],
   file: RustParsedFile,
   ownerHash: string,
@@ -262,7 +264,7 @@ function emitFromPathLeaf(
 }
 
 function emitFromUseAsClause(
-  node: Parser.SyntaxNode,
+  node: Node,
   prefix: readonly string[],
   file: RustParsedFile,
   ownerHash: string,
@@ -278,7 +280,7 @@ function emitFromUseAsClause(
 }
 
 function emitFromUseWildcard(
-  node: Parser.SyntaxNode,
+  node: Node,
   prefix: readonly string[],
   file: RustParsedFile,
   ownerHash: string,
@@ -295,7 +297,7 @@ function emitFromUseWildcard(
 }
 
 function emitFromScopedUseList(
-  node: Parser.SyntaxNode,
+  node: Node,
   prefix: readonly string[],
   file: RustParsedFile,
   ownerHash: string,
@@ -313,11 +315,11 @@ function emitFromScopedUseList(
 }
 
 function splitScopedUseListChildren(
-  node: Parser.SyntaxNode,
-): { readonly pathSegs: readonly string[]; readonly list: Parser.SyntaxNode | null } {
+  node: Node,
+): { readonly pathSegs: readonly string[]; readonly list: Node | null } {
   let pathSegs: readonly string[] = [];
-  let list: Parser.SyntaxNode | null = null;
-  for (const c of node.namedChildren) {
+  let list: Node | null = null;
+  for (const c of namedChildrenOf(node)) {
     if (c.type === 'use_list') {
       list = c;
     } else if (list === null) {
@@ -328,7 +330,7 @@ function splitScopedUseListChildren(
 }
 
 function emitFromUseList(
-  node: Parser.SyntaxNode,
+  node: Node,
   prefix: readonly string[],
   file: RustParsedFile,
   ownerHash: string,
@@ -341,7 +343,7 @@ function emitFromUseList(
 }
 
 function emitUseListItems(
-  list: Parser.SyntaxNode,
+  list: Node,
   prefix: readonly string[],
   file: RustParsedFile,
   ownerHash: string,
@@ -349,7 +351,7 @@ function emitUseListItems(
   column: number,
   out: DependencySiteRecord[],
 ): void {
-  for (const item of list.namedChildren) {
+  for (const item of namedChildrenOf(list)) {
     if (item.type === 'self') {
       // `use a::b::{self, X}` — `self` refers to the parent path,
       // i.e. emit the prefix itself.
@@ -362,7 +364,7 @@ function emitUseListItems(
 
 /* v8 ignore start */
 function emitFromUnknownUseShape(
-  node: Parser.SyntaxNode,
+  node: Node,
   prefix: readonly string[],
   file: RustParsedFile,
   ownerHash: string,
@@ -384,13 +386,13 @@ function emitFromUnknownUseShape(
  * Accepts `scoped_identifier` (recursive), `identifier`, `crate`,
  * `super`, `self`. Returns `[]` for unknown shapes (caller skips).
  */
-function decodePathSegments(node: Parser.SyntaxNode): readonly string[] {
+function decodePathSegments(node: Node): readonly string[] {
   if (node.type === 'identifier' || node.type === 'crate' || node.type === 'super' || node.type === 'self') {
     return [node.text];
   }
   if (node.type === 'scoped_identifier') {
     const out: string[] = [];
-    for (const c of node.namedChildren) {
+    for (const c of namedChildrenOf(node)) {
       out.push(...decodePathSegments(c));
     }
     return out;
@@ -401,7 +403,7 @@ function decodePathSegments(node: Parser.SyntaxNode): readonly string[] {
 
 function pushDepSite(
   segments: readonly string[],
-  node: Parser.SyntaxNode,
+  node: Node,
   file: RustParsedFile,
   ownerHash: string,
   line: number,
@@ -423,14 +425,14 @@ function pushDepSite(
 }
 
 function collectFromExternCrate(
-  decl: Parser.SyntaxNode,
+  decl: Node,
   file: RustParsedFile,
   ownerHash: string,
   out: DependencySiteRecord[],
 ): void {
   // `extern crate <name>;` or `extern crate <name> as <alias>;`. The
   // crate name is the first identifier (not the `crate` keyword token).
-  for (const c of decl.namedChildren) {
+  for (const c of namedChildrenOf(decl)) {
     if (c.type === 'identifier') {
       out.push({
         nodeRef: decl,
@@ -460,7 +462,7 @@ interface WalkCtx {
   readonly callSites: CallSiteRecord[];
 }
 
-function visit(node: Parser.SyntaxNode, frame: Frame, ctx: WalkCtx): void {
+function visit(node: Node, frame: Frame, ctx: WalkCtx): void {
   if (node.type === 'impl_item') {
     visitImpl(node, frame, ctx);
     return;
@@ -480,30 +482,30 @@ function visit(node: Parser.SyntaxNode, frame: Frame, ctx: WalkCtx): void {
       kind: 'call',
     });
   }
-  for (const child of node.children) visit(child, frame, ctx);
+  for (const child of childrenOf(node)) visit(child, frame, ctx);
 }
 
-function visitImpl(node: Parser.SyntaxNode, frame: Frame, ctx: WalkCtx): void {
+function visitImpl(node: Node, frame: Frame, ctx: WalkCtx): void {
   const typeName = implTargetName(node);
   // Don't emit a function for the `impl` block itself — its body is a
   // declaration list whose function_items are emitted as methods. Keep
   // module-init as the owner; descend with impl context.
   const childFrame: Frame = { ownerHash: frame.ownerHash, enclosingImpl: typeName };
-  for (const child of node.children) visit(child, childFrame, ctx);
+  for (const child of childrenOf(node)) visit(child, childFrame, ctx);
 }
 
-function visitFunction(node: Parser.SyntaxNode, frame: Frame, ctx: WalkCtx): void {
+function visitFunction(node: Node, frame: Frame, ctx: WalkCtx): void {
   const occ = buildFunctionOccurrence(node, frame, ctx);
   if (!occ) return;
   record(ctx.out, occ);
   const childFrame: Frame = { ownerHash: occ.bodyHash, enclosingImpl: null };
   const body = node.childForFieldName('body');
   if (body) {
-    for (const child of body.children) visit(child, childFrame, ctx);
+    for (const child of childrenOf(body)) visit(child, childFrame, ctx);
   }
 }
 
-function visitClosure(node: Parser.SyntaxNode, frame: Frame, ctx: WalkCtx): boolean {
+function visitClosure(node: Node, frame: Frame, ctx: WalkCtx): boolean {
   const occ = buildClosureOccurrence(node, ctx);
   if (!occ) return false;
   record(ctx.out, occ);
@@ -524,7 +526,7 @@ function visitClosure(node: Parser.SyntaxNode, frame: Frame, ctx: WalkCtx): bool
 }
 
 function buildFunctionOccurrence(
-  node: Parser.SyntaxNode,
+  node: Node,
   frame: Frame,
   ctx: WalkCtx,
 ): FunctionOccurrence | null {
@@ -558,7 +560,7 @@ function buildFunctionOccurrence(
 }
 
 function buildClosureOccurrence(
-  node: Parser.SyntaxNode,
+  node: Node,
   ctx: WalkCtx,
 ): FunctionOccurrence | null {
   const digest = digestRustBody(ctx.file.source.slice(node.startIndex, node.endIndex));
@@ -589,28 +591,28 @@ function buildClosureOccurrence(
 
 // ── helpers ───────────────────────────────────────────────────────
 
-function implTargetName(node: Parser.SyntaxNode): string {
+function implTargetName(node: Node): string {
   const ty = node.childForFieldName('type');
   if (ty) return ty.text;
   /* v8 ignore start -- defensive: tree-sitter-rust always exposes the `type`
      field on a well-formed impl_item, so these fallbacks fire only on
      malformed/partial ASTs that valid Rust source doesn't produce. */
   // Fallback: first type_identifier child.
-  for (const c of node.namedChildren) {
+  for (const c of namedChildrenOf(node)) {
     if (c.type === 'type_identifier' || c.type === 'generic_type') return c.text;
   }
   return '<anon-impl>';
   /* v8 ignore stop */
 }
 
-function classifyVisibility(node: Parser.SyntaxNode): FunctionOccurrence['visibility'] {
-  for (const c of node.children) {
+function classifyVisibility(node: Node): FunctionOccurrence['visibility'] {
+  for (const c of childrenOf(node)) {
     if (c.type === 'visibility_modifier') return 'exported';
   }
   return 'module-local';
 }
 
-function extractParams(node: Parser.SyntaxNode): readonly { name: string; optional: boolean; rest: boolean }[] {
+function extractParams(node: Node): readonly { name: string; optional: boolean; rest: boolean }[] {
   const params = node.childForFieldName('parameters');
   if (!params) return [];
   return collectParamEntries(params);
@@ -621,16 +623,16 @@ function extractParams(node: Parser.SyntaxNode): readonly { name: string; option
 // (sonarjs/no-identical-functions).
 const extractClosureParams = extractParams;
 
-function collectParamEntries(params: Parser.SyntaxNode): readonly { name: string; optional: boolean; rest: boolean }[] {
+function collectParamEntries(params: Node): readonly { name: string; optional: boolean; rest: boolean }[] {
   const out: { name: string; optional: boolean; rest: boolean }[] = [];
-  for (const child of params.namedChildren) {
+  for (const child of namedChildrenOf(params)) {
     const param = decodeParam(child);
     if (param) out.push(param);
   }
   return out;
 }
 
-function decodeParam(child: Parser.SyntaxNode): { name: string; optional: boolean; rest: boolean } | null {
+function decodeParam(child: Node): { name: string; optional: boolean; rest: boolean } | null {
   switch (child.type) {
     case 'self_parameter': {
       return { name: 'self', optional: false, rest: false };
@@ -655,14 +657,14 @@ function decodeParam(child: Parser.SyntaxNode): { name: string; optional: boolea
   }
 }
 
-function extractAttributes(node: Parser.SyntaxNode): readonly string[] {
+function extractAttributes(node: Node): readonly string[] {
   const out: string[] = [];
   // Attributes precede the function_item as siblings inside the parent.
   // tree-sitter-rust models them as `attribute_item` nodes preceding
   // the function_item, OR (more commonly in practice) as
   // `attribute_item` children of the function_item's parent that
   // appear before the function_item by source position.
-  for (const c of node.children) {
+  for (const c of childrenOf(node)) {
     if (c.type === 'attribute_item' || c.type === 'inner_attribute_item') {
       out.push(c.text.trim());
     }
@@ -672,7 +674,12 @@ function extractAttributes(node: Parser.SyntaxNode): readonly string[] {
   const parent = node.parent;
   if (parent) {
     for (const sib of parent.children) {
-      if (sib === node) break;
+      // web-tree-sitter returns fresh Node wrappers per access, so the
+      // `node` handle passed in is never reference-identical to its twin
+      // in `parent.children`. Compare by stable byte offset instead of
+      // `===` (which would never match → scan past `node` and wrongly
+      // attribute later siblings' attributes to it).
+      if (sib === null || sib.startIndex >= node.startIndex) break;
       if (sib.type === 'attribute_item' || sib.type === 'inner_attribute_item') {
         out.push(sib.text.trim());
       }
@@ -682,7 +689,7 @@ function extractAttributes(node: Parser.SyntaxNode): readonly string[] {
   return [...new Set(out)];
 }
 
-function hasTestAttribute(node: Parser.SyntaxNode): boolean {
+function hasTestAttribute(node: Node): boolean {
   const attrs = extractAttributes(node);
   for (const a of attrs) {
     if (a.includes('#[test]')) return true;

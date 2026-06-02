@@ -22,16 +22,18 @@
  *     top-level imports are emitted).
  */
 
+import { childrenOf, namedChildrenOf } from '@opensip-tools/graph-adapter-common';
+
 import type { PythonParsedFile } from './parse.js';
 import type { DependencySiteRecord } from '@opensip-tools/graph';
-import type Parser from 'tree-sitter';
+import type { Node } from 'web-tree-sitter';
 
 export function collectDependencySites(
   file: PythonParsedFile,
   moduleInitHash: string,
   out: DependencySiteRecord[],
 ): void {
-  for (const stmt of file.tree.rootNode.namedChildren) {
+  for (const stmt of namedChildrenOf(file.tree.rootNode)) {
     if (stmt.type === 'import_statement') {
       collectFromImportStatement(stmt, file, moduleInitHash, out);
     } else if (stmt.type === 'import_from_statement') {
@@ -47,12 +49,12 @@ export function collectDependencySites(
  * comma-separated target.
  */
 function collectFromImportStatement(
-  stmt: Parser.SyntaxNode,
+  stmt: Node,
   file: PythonParsedFile,
   moduleInitHash: string,
   out: DependencySiteRecord[],
 ): void {
-  for (const child of stmt.namedChildren) {
+  for (const child of namedChildrenOf(stmt)) {
     const dotted = resolveImportedNameDotted(child);
     if (!dotted) continue;
     pushDependencySite(stmt, file, moduleInitHash, dotted.text, out);
@@ -79,7 +81,7 @@ function collectFromImportStatement(
  * emit ONE dep site with the raw relative-import text as specifier.
  */
 function collectFromImportFromStatement(
-  stmt: Parser.SyntaxNode,
+  stmt: Node,
   file: PythonParsedFile,
   moduleInitHash: string,
   out: DependencySiteRecord[],
@@ -106,8 +108,8 @@ function collectFromImportFromStatement(
  *     → ONE dep site PER imported name, specifier `prefix + name`.
  */
 function collectFromRelativeImport(
-  stmt: Parser.SyntaxNode,
-  moduleNameField: Parser.SyntaxNode,
+  stmt: Node,
+  moduleNameField: Node,
   file: PythonParsedFile,
   moduleInitHash: string,
   out: DependencySiteRecord[],
@@ -121,8 +123,11 @@ function collectFromRelativeImport(
   }
   // `from . import sibling, other` — one site PER imported name,
   // specifier = `.sibling`, `.other`.
-  for (const named of stmt.namedChildren) {
-    if (named === moduleNameField) continue;
+  for (const named of namedChildrenOf(stmt)) {
+    // web-tree-sitter returns fresh Node wrappers per access, so `named`
+    // is never reference-identical to `moduleNameField`; skip the module
+    // node by its stable byte span instead of `===`.
+    if (named.startIndex === moduleNameField.startIndex) continue;
     const dotted = resolveImportedNameDotted(named);
     if (!dotted) continue;
     pushDependencySite(stmt, file, moduleInitHash, prefix + dotted.text, out);
@@ -135,7 +140,7 @@ function collectFromRelativeImport(
  * `name` field is a `dotted_name`. Returns null for anything else
  * (e.g. punctuation, comments).
  */
-function resolveImportedNameDotted(named: Parser.SyntaxNode): Parser.SyntaxNode | null {
+function resolveImportedNameDotted(named: Node): Node | null {
   if (named.type === 'dotted_name') return named;
   if (named.type === 'aliased_import') {
     const nameField = named.childForFieldName('name');
@@ -144,24 +149,24 @@ function resolveImportedNameDotted(named: Parser.SyntaxNode): Parser.SyntaxNode 
   return null;
 }
 
-function relativeImportPrefix(node: Parser.SyntaxNode): string {
+function relativeImportPrefix(node: Node): string {
   // The `import_prefix` child carries the leading dots as raw text.
-  for (const child of node.children) {
+  for (const child of childrenOf(node)) {
     if (child.type === 'import_prefix') return child.text;
   }
   /* v8 ignore next */
   return '';
 }
 
-function relativeImportInnerDotted(node: Parser.SyntaxNode): string | null {
-  for (const child of node.namedChildren) {
+function relativeImportInnerDotted(node: Node): string | null {
+  for (const child of namedChildrenOf(node)) {
     if (child.type === 'dotted_name') return child.text;
   }
   return null;
 }
 
 function pushDependencySite(
-  stmt: Parser.SyntaxNode,
+  stmt: Node,
   file: PythonParsedFile,
   ownerHash: string,
   specifier: string,

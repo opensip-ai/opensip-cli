@@ -9,15 +9,17 @@
  * state, so they are safely free-standing helpers.
  */
 
+import { childrenOf, namedChildrenOf } from '@opensip-tools/graph-adapter-common';
+
 import type { GoParsedFile } from './parse.js';
 import type { FunctionOccurrence } from '@opensip-tools/graph';
-import type Parser from 'tree-sitter';
+import type { Node } from 'web-tree-sitter';
 
 export function extractPackageName(file: GoParsedFile): string {
-  for (const child of file.tree.rootNode.children) {
+  for (const child of childrenOf(file.tree.rootNode)) {
     if (child.type === 'package_clause') {
       // package_clause: `package` keyword followed by identifier
-      for (const c of child.children) {
+      for (const c of childrenOf(child)) {
         if (c.type === 'package_identifier' || c.type === 'identifier') return c.text;
       }
     }
@@ -26,13 +28,13 @@ export function extractPackageName(file: GoParsedFile): string {
   return 'main';
 }
 
-export function extractReceiverType(node: Parser.SyntaxNode): string | null {
+export function extractReceiverType(node: Node): string | null {
   // method_declaration has a `receiver` field of type parameter_list
   // containing one parameter_declaration. The declaration's `type`
   // is either pointer_type (e.g. `*Foo`) or type_identifier (`Foo`).
   const receiver = node.childForFieldName('receiver');
   if (!receiver) return null;
-  for (const param of receiver.namedChildren) {
+  for (const param of namedChildrenOf(receiver)) {
     if (param.type !== 'parameter_declaration') continue;
     const ty = param.childForFieldName('type') ?? param.namedChild(param.namedChildCount - 1);
     if (!ty) continue;
@@ -42,7 +44,7 @@ export function extractReceiverType(node: Parser.SyntaxNode): string | null {
   return null;
 }
 
-function decodeReceiverTypeNode(node: Parser.SyntaxNode): string | null {
+function decodeReceiverTypeNode(node: Node): string | null {
   if (node.type === 'pointer_type') {
     // *Foo or *Foo[T] — descend through the pointer to the named type.
     const inner = node.namedChild(0);
@@ -70,7 +72,7 @@ export function classifyVisibility(name: string): FunctionOccurrence['visibility
 }
 
 export function extractParams(
-  node: Parser.SyntaxNode,
+  node: Node,
 ): readonly { name: string; optional: boolean; rest: boolean }[] {
   const params = node.childForFieldName('parameters');
   if (!params) return [];
@@ -81,10 +83,10 @@ export function extractParams(
 export const extractClosureParams = extractParams;
 
 function collectParamEntries(
-  params: Parser.SyntaxNode,
+  params: Node,
 ): readonly { name: string; optional: boolean; rest: boolean }[] {
   const out: { name: string; optional: boolean; rest: boolean }[] = [];
-  for (const child of params.namedChildren) {
+  for (const child of namedChildrenOf(params)) {
     if (child.type !== 'parameter_declaration' && child.type !== 'variadic_parameter_declaration') {
       continue;
     }
@@ -92,7 +94,7 @@ function collectParamEntries(
     // A parameter_declaration may bind multiple names to one type:
     // `func f(a, b int)` produces a single declaration node with two
     // `name` children. Iterate the named identifiers.
-    for (const inner of child.namedChildren) {
+    for (const inner of namedChildrenOf(child)) {
       if (inner.type === 'identifier') {
         out.push({ name: inner.text, optional: false, rest: isRest });
       }

@@ -63,12 +63,7 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
-      "better-sqlite3",
-      "tree-sitter",
-      "tree-sitter-go",
-      "tree-sitter-java",
-      "tree-sitter-python",
-      "tree-sitter-rust"
+      "better-sqlite3"
     ],
     "injectWorkspacePackages": true,
     "overrides": {

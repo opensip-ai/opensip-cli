@@ -44,7 +44,9 @@
 import { relative, sep } from 'node:path';
 
 import {
+  childrenOf,
   makeFileClassifier,
+  namedChildrenOf,
   nameOf,
   record,
   runWalk,
@@ -68,7 +70,7 @@ import type {
   WalkInput,
   WalkOutput,
 } from '@opensip-tools/graph';
-import type Parser from 'tree-sitter';
+import type { Node } from 'web-tree-sitter';
 
 const TEST_FILE_NAME_RE = /(?:^|\/)[^/]+_test\.go$/;
 const GENERATED_PATH_RE = /\bvendor\/|\.pb\.go$|_generated\.go$|\.gen\.go$|zz_generated_/;
@@ -124,7 +126,7 @@ function walkFile(
   };
   const initialFrame: Frame = { ownerHash: moduleInit.bodyHash };
 
-  for (const child of file.tree.rootNode.children) visit(child, initialFrame, ctx);
+  for (const child of childrenOf(file.tree.rootNode)) visit(child, initialFrame, ctx);
 }
 
 /**
@@ -150,23 +152,23 @@ function collectDependencySites(
   moduleInitHash: string,
   out: DependencySiteRecord[],
 ): void {
-  for (const stmt of file.tree.rootNode.namedChildren) {
+  for (const stmt of namedChildrenOf(file.tree.rootNode)) {
     if (stmt.type !== 'import_declaration') continue;
     collectFromImportDeclaration(stmt, file, moduleInitHash, out);
   }
 }
 
 function collectFromImportDeclaration(
-  decl: Parser.SyntaxNode,
+  decl: Node,
   file: GoParsedFile,
   moduleInitHash: string,
   out: DependencySiteRecord[],
 ): void {
-  for (const child of decl.namedChildren) {
+  for (const child of namedChildrenOf(decl)) {
     if (child.type === 'import_spec') {
       pushImportSpec(child, file, moduleInitHash, out);
     } else if (child.type === 'import_spec_list') {
-      for (const spec of child.namedChildren) {
+      for (const spec of namedChildrenOf(child)) {
         if (spec.type === 'import_spec') {
           pushImportSpec(spec, file, moduleInitHash, out);
         }
@@ -176,7 +178,7 @@ function collectFromImportDeclaration(
 }
 
 function pushImportSpec(
-  spec: Parser.SyntaxNode,
+  spec: Node,
   file: GoParsedFile,
   ownerHash: string,
   out: DependencySiteRecord[],
@@ -197,9 +199,9 @@ function pushImportSpec(
   });
 }
 
-function findInterpretedString(node: Parser.SyntaxNode): Parser.SyntaxNode | null {
+function findInterpretedString(node: Node): Node | null {
   /* v8 ignore start */
-  for (const child of node.namedChildren) {
+  for (const child of namedChildrenOf(node)) {
     if (child.type === 'interpreted_string_literal') return child;
   }
   return null;
@@ -230,7 +232,7 @@ interface WalkCtx {
   readonly callSites: CallSiteRecord[];
 }
 
-function visit(node: Parser.SyntaxNode, frame: Frame, ctx: WalkCtx): void {
+function visit(node: Node, frame: Frame, ctx: WalkCtx): void {
   if (node.type === 'function_declaration') {
     visitFunction(node, frame, ctx, null);
     return;
@@ -251,11 +253,11 @@ function visit(node: Parser.SyntaxNode, frame: Frame, ctx: WalkCtx): void {
       kind: 'call',
     });
   }
-  for (const child of node.children) visit(child, frame, ctx);
+  for (const child of childrenOf(node)) visit(child, frame, ctx);
 }
 
 function visitFunction(
-  node: Parser.SyntaxNode,
+  node: Node,
   frame: Frame,
   ctx: WalkCtx,
   receiverType: string | null,
@@ -266,11 +268,11 @@ function visitFunction(
   const childFrame: Frame = { ownerHash: occ.bodyHash };
   const body = node.childForFieldName('body');
   if (body) {
-    for (const child of body.children) visit(child, childFrame, ctx);
+    for (const child of childrenOf(body)) visit(child, childFrame, ctx);
   }
 }
 
-function visitClosure(node: Parser.SyntaxNode, frame: Frame, ctx: WalkCtx): boolean {
+function visitClosure(node: Node, frame: Frame, ctx: WalkCtx): boolean {
   const occ = buildClosureOccurrence(node, ctx);
   if (!occ) return false;
   record(ctx.out, occ);
@@ -291,7 +293,7 @@ function visitClosure(node: Parser.SyntaxNode, frame: Frame, ctx: WalkCtx): bool
 }
 
 function buildFunctionOccurrence(
-  node: Parser.SyntaxNode,
+  node: Node,
   ctx: WalkCtx,
   receiverType: string | null,
 ): FunctionOccurrence | null {
@@ -324,7 +326,7 @@ function buildFunctionOccurrence(
 }
 
 function buildClosureOccurrence(
-  node: Parser.SyntaxNode,
+  node: Node,
   ctx: WalkCtx,
 ): FunctionOccurrence | null {
   const digest = digestGoBody(ctx.file.source.slice(node.startIndex, node.endIndex));

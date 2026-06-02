@@ -6,9 +6,11 @@
  * extraction — pure functions over tree-sitter nodes, no walker state.
  */
 
+import { childrenOf, namedChildrenOf } from '@opensip-tools/graph-adapter-common';
+
 import type { JavaParsedFile } from './parse.js';
 import type { FunctionOccurrence } from '@opensip-tools/graph';
-import type Parser from 'tree-sitter';
+import type { Node } from 'web-tree-sitter';
 
 export function packageQualifier(packageName: string, filePathProjectRel: string): string {
   if (packageName.length > 0) return packageName;
@@ -19,10 +21,10 @@ export function packageQualifier(packageName: string, filePathProjectRel: string
 }
 
 export function extractPackageName(file: JavaParsedFile): string {
-  for (const child of file.tree.rootNode.children) {
+  for (const child of childrenOf(file.tree.rootNode)) {
     if (child.type === 'package_declaration') {
       // package_declaration: `package` keyword + scoped/qualified identifier + `;`
-      for (const c of child.namedChildren) {
+      for (const c of namedChildrenOf(child)) {
         if (c.type === 'scoped_identifier' || c.type === 'identifier') return c.text;
       }
     }
@@ -37,14 +39,14 @@ export function extractPackageName(file: JavaParsedFile): string {
  * type `modifiers`, NOT as a named field. `childForFieldName('modifiers')`
  * returns null — only iteration works.
  */
-function findModifiersNode(node: Parser.SyntaxNode): Parser.SyntaxNode | null {
-  for (const c of node.children) {
+function findModifiersNode(node: Node): Node | null {
+  for (const c of childrenOf(node)) {
     if (c.type === 'modifiers') return c;
   }
   return null;
 }
 
-export function classifyVisibility(node: Parser.SyntaxNode): FunctionOccurrence['visibility'] {
+export function classifyVisibility(node: Node): FunctionOccurrence['visibility'] {
   // Visibility keywords appear inside the `modifiers` node as anonymous
   // children with type === 'public' / 'protected' / 'private'.
   //   public / protected  → 'exported'
@@ -52,7 +54,7 @@ export function classifyVisibility(node: Parser.SyntaxNode): FunctionOccurrence[
   //   none                → 'module-local' (package-private)
   const modifiers = findModifiersNode(node);
   if (modifiers) {
-    for (const c of modifiers.children) {
+    for (const c of childrenOf(modifiers)) {
       if (c.type === 'public' || c.type === 'protected') return 'exported';
       if (c.type === 'private') return 'module-local';
     }
@@ -60,11 +62,11 @@ export function classifyVisibility(node: Parser.SyntaxNode): FunctionOccurrence[
   return 'module-local';
 }
 
-export function extractAnnotations(node: Parser.SyntaxNode): readonly string[] {
+export function extractAnnotations(node: Node): readonly string[] {
   const out: string[] = [];
   const modifiers = findModifiersNode(node);
   if (!modifiers) return out;
-  for (const c of modifiers.children) {
+  for (const c of childrenOf(modifiers)) {
     if (c.type === 'annotation' || c.type === 'marker_annotation') {
       out.push(c.text.trim());
     }
@@ -83,12 +85,12 @@ export function hasTestAnnotation(decorators: readonly string[]): boolean {
 }
 
 export function extractParams(
-  node: Parser.SyntaxNode,
+  node: Node,
 ): readonly { name: string; optional: boolean; rest: boolean }[] {
   const params = node.childForFieldName('parameters');
   if (!params) return [];
   const out: { name: string; optional: boolean; rest: boolean }[] = [];
-  for (const child of params.namedChildren) {
+  for (const child of namedChildrenOf(params)) {
     if (child.type === 'formal_parameter' || child.type === 'spread_parameter') {
       const nameNode = child.childForFieldName('name') ?? findIdentifierChild(child);
       if (!nameNode) continue;
@@ -103,7 +105,7 @@ export function extractParams(
 }
 
 export function extractLambdaParams(
-  node: Parser.SyntaxNode,
+  node: Node,
 ): readonly { name: string; optional: boolean; rest: boolean }[] {
   // tree-sitter-java's lambda_expression `parameters` can be:
   //   - identifier               — `x -> x + 1`
@@ -116,7 +118,7 @@ export function extractLambdaParams(
   }
   if (params.type === 'inferred_parameters') {
     const out: { name: string; optional: boolean; rest: boolean }[] = [];
-    for (const c of params.namedChildren) {
+    for (const c of namedChildrenOf(params)) {
       if (c.type === 'identifier') out.push({ name: c.text, optional: false, rest: false });
     }
     return out;
@@ -128,8 +130,8 @@ export function extractLambdaParams(
   /* v8 ignore stop */
 }
 
-function findIdentifierChild(node: Parser.SyntaxNode): Parser.SyntaxNode | null {
-  for (const c of node.namedChildren) {
+function findIdentifierChild(node: Node): Node | null {
+  for (const c of namedChildrenOf(node)) {
     if (c.type === 'identifier') return c;
   }
   /* v8 ignore next */

@@ -20,16 +20,18 @@
  *     synthesize them.
  */
 
+import { namedChildrenOf } from '@opensip-tools/graph-adapter-common';
+
 import type { JavaParsedFile } from './parse.js';
 import type { DependencySiteRecord } from '@opensip-tools/graph';
-import type Parser from 'tree-sitter';
+import type { Node } from 'web-tree-sitter';
 
 export function collectDependencySites(
   file: JavaParsedFile,
   moduleInitHash: string,
   out: DependencySiteRecord[],
 ): void {
-  for (const stmt of file.tree.rootNode.namedChildren) {
+  for (const stmt of namedChildrenOf(file.tree.rootNode)) {
     if (stmt.type !== 'import_declaration') continue;
     const specifier = decodeImportSpecifier(stmt);
     if (specifier === null) continue;
@@ -44,7 +46,7 @@ export function collectDependencySites(
   }
 }
 
-function decodeImportSpecifier(decl: Parser.SyntaxNode): string | null {
+function decodeImportSpecifier(decl: Node): string | null {
   // `static` is an anonymous keyword child; scan all children (named +
   // anonymous) for it.
   let isStatic = false;
@@ -59,7 +61,7 @@ function decodeImportSpecifier(decl: Parser.SyntaxNode): string | null {
   // the optional `asterisk` wildcard. Scan in order.
   let path: string | null = null;
   let wildcard = false;
-  for (const c of decl.namedChildren) {
+  for (const c of namedChildrenOf(decl)) {
     if (c.type === 'scoped_identifier' || c.type === 'identifier') {
       path = c.text;
     } else if (c.type === 'asterisk') {

@@ -16,9 +16,10 @@
  *     non-module-init occurrence early-return, and the falsy occs guard.
  */
 
-import Parser from 'tree-sitter';
-import Java from 'tree-sitter-java';
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
+import { Parser, Language, type Node } from 'web-tree-sitter';
 
 import { digestJavaBody } from '../body-digest.js';
 import { resolveDependencies } from '../resolve-dependencies.js';
@@ -35,15 +36,25 @@ import type {
   ResolveInput,
 } from '@opensip-tools/graph';
 
-function parseRoot(src: string): Parser.SyntaxNode {
+// web-tree-sitter needs a one-time async init + grammar load. Top-level
+// await runs once before any test body (vitest evaluates the module first).
+await Parser.init();
+const Java = await Language.load(
+  fileURLToPath(new URL('../../wasm/tree-sitter-java.wasm', import.meta.url)),
+);
+
+function parseRoot(src: string): Node {
   const parser = new Parser();
-  parser.setLanguage(Java as unknown as Parser.Language);
-  return parser.parse(src).rootNode;
+  parser.setLanguage(Java);
+  const tree = parser.parse(src);
+  if (tree === null) throw new Error('parse returned no tree');
+  return tree.rootNode;
 }
 
-function findNode(node: Parser.SyntaxNode, type: string): Parser.SyntaxNode | null {
+function findNode(node: Node, type: string): Node | null {
   if (node.type === type) return node;
   for (const child of node.children) {
+    if (!child) continue;
     const found = findNode(child, type);
     if (found) return found;
   }

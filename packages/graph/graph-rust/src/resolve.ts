@@ -60,7 +60,7 @@ import type {
   ResolveInput,
   ResolveOutput,
 } from '@opensip-tools/graph';
-import type Parser from 'tree-sitter';
+import type { Node } from 'web-tree-sitter';
 
 interface NameIndex {
   /** All occurrences keyed by simple name (excludes module-init / arrow synthetics). */
@@ -69,7 +69,7 @@ interface NameIndex {
   readonly methods: ReadonlyMap<string, readonly FunctionOccurrence[]>;
 }
 
-function rustPosition(node: Parser.SyntaxNode, file: RustParsedFile): {
+function rustPosition(node: Node, file: RustParsedFile): {
   readonly line: number;
   readonly column: number;
   readonly text: string;
@@ -88,7 +88,7 @@ export function resolveCallSites(input: ResolveInput<RustParsedProject>): Resolv
   const stats = createMutableStats();
 
   for (const r of input.callSites) {
-    const node = r.nodeRef as Parser.SyntaxNode;
+    const node = r.nodeRef as Node;
     const file = r.sourceFileRef as RustParsedFile;
     if (r.kind === 'creation') {
       if (r.childHash === undefined) continue;
@@ -147,7 +147,7 @@ function buildIndex(
 }
 
 function pushCallEdge(
-  node: Parser.SyntaxNode,
+  node: Node,
   file: RustParsedFile,
   ownerHash: string,
   index: NameIndex,
@@ -179,7 +179,7 @@ interface CallTarget {
   readonly isMacro: boolean;
 }
 
-function decodeCallTarget(node: Parser.SyntaxNode): CallTarget | null {
+function decodeCallTarget(node: Node): CallTarget | null {
   if (node.type === 'macro_invocation') {
     const m = node.childForFieldName('macro') ?? node.namedChild(0);
     if (!m) return null;
@@ -206,7 +206,7 @@ function decodeCallTarget(node: Parser.SyntaxNode): CallTarget | null {
   return null;
 }
 
-function decodeReceiverPath(path: Parser.SyntaxNode | null): string | null {
+function decodeReceiverPath(path: Node | null): string | null {
   if (!path) return null;
   // For `Type::name`, path is a `type_identifier` or `identifier`.
   // For `mod::Type::name`, path is a `scoped_identifier` whose own

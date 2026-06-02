@@ -39,7 +39,9 @@
 import { relative, sep } from 'node:path';
 
 import {
+  childrenOf,
   makeFileClassifier,
+  namedChildrenOf,
   nameOf,
   record,
   runWalk,
@@ -57,7 +59,7 @@ import type {
   WalkInput,
   WalkOutput,
 } from '@opensip-tools/graph';
-import type Parser from 'tree-sitter';
+import type { Node } from 'web-tree-sitter';
 
 const TEST_PATH_RE = /(?:^|\/)tests?\//;
 const TEST_FILE_NAME_RE = /(?:^|\/)test_[^/]+\.py$|_test\.py$/;
@@ -116,7 +118,7 @@ function walkFile(
     callSites,
   };
 
-  for (const child of file.tree.rootNode.children) visit(child, initialFrame, ctx);
+  for (const child of childrenOf(file.tree.rootNode)) visit(child, initialFrame, ctx);
 }
 
 
@@ -134,7 +136,7 @@ interface WalkCtx {
   readonly callSites: CallSiteRecord[];
 }
 
-function visit(node: Parser.SyntaxNode, frame: Frame, ctx: WalkCtx): void {
+function visit(node: Node, frame: Frame, ctx: WalkCtx): void {
   if (node.type === 'class_definition') {
     visitClass(node, frame, ctx);
     return;
@@ -154,20 +156,20 @@ function visit(node: Parser.SyntaxNode, frame: Frame, ctx: WalkCtx): void {
       kind: 'call',
     });
   }
-  for (const child of node.children) visit(child, frame, ctx);
+  for (const child of childrenOf(node)) visit(child, frame, ctx);
 }
 
-function visitClass(node: Parser.SyntaxNode, frame: Frame, ctx: WalkCtx): void {
+function visitClass(node: Node, frame: Frame, ctx: WalkCtx): void {
   const className = nameOf(node) ?? '<anon-class>';
   // Don't emit a function for the class itself — Python classes are
   // declarations whose top-level statements run at module load. Keep
   // the module-init as the owner; descend with class context for
   // nested function_definitions to be tagged as methods.
   const childFrame: Frame = { ownerHash: frame.ownerHash, enclosingClass: className };
-  for (const child of node.children) visit(child, childFrame, ctx);
+  for (const child of childrenOf(node)) visit(child, childFrame, ctx);
 }
 
-function visitFunction(node: Parser.SyntaxNode, frame: Frame, ctx: WalkCtx): void {
+function visitFunction(node: Node, frame: Frame, ctx: WalkCtx): void {
   const occ = visitFunctionDefinition(
     node,
     ctx.file,
@@ -181,11 +183,11 @@ function visitFunction(node: Parser.SyntaxNode, frame: Frame, ctx: WalkCtx): voi
   const childFrame: Frame = { ownerHash: occ.bodyHash, enclosingClass: null };
   const body = node.childForFieldName('body');
   if (body) {
-    for (const child of body.children) visit(child, childFrame, ctx);
+    for (const child of childrenOf(body)) visit(child, childFrame, ctx);
   }
 }
 
-function visitLambdaNode(node: Parser.SyntaxNode, frame: Frame, ctx: WalkCtx): boolean {
+function visitLambdaNode(node: Node, frame: Frame, ctx: WalkCtx): boolean {
   const occ = visitLambda(node, ctx.file, ctx.filePathProjectRel, ctx.inTestFile, ctx.definedInGenerated);
   if (!occ) return false;
   record(ctx.out, occ);
@@ -206,7 +208,7 @@ function visitLambdaNode(node: Parser.SyntaxNode, frame: Frame, ctx: WalkCtx): b
 }
 
 function visitFunctionDefinition(
-  node: Parser.SyntaxNode,
+  node: Node,
   file: PythonParsedFile,
   filePathProjectRel: string,
   enclosingClass: string | null,
@@ -251,7 +253,7 @@ function classifyFunctionKind(
 }
 
 function visitLambda(
-  node: Parser.SyntaxNode,
+  node: Node,
   file: PythonParsedFile,
   filePathProjectRel: string,
   inTestFile: boolean,
@@ -285,25 +287,25 @@ function visitLambda(
 
 // ── helpers ───────────────────────────────────────────────────────
 
-function extractParams(node: Parser.SyntaxNode): readonly { name: string; optional: boolean; rest: boolean }[] {
+function extractParams(node: Node): readonly { name: string; optional: boolean; rest: boolean }[] {
   return extractParamsFromField(node, 'parameters');
 }
 
 function extractParamsFromField(
-  node: Parser.SyntaxNode,
+  node: Node,
   fieldName: string,
 ): readonly { name: string; optional: boolean; rest: boolean }[] {
   const params = node.childForFieldName(fieldName);
   if (!params) return [];
   const out: { name: string; optional: boolean; rest: boolean }[] = [];
-  for (const child of params.namedChildren) {
+  for (const child of namedChildrenOf(params)) {
     const param = extractParam(child);
     if (param) out.push(param);
   }
   return out;
 }
 
-function extractParam(child: Parser.SyntaxNode): { name: string; optional: boolean; rest: boolean } | null {
+function extractParam(child: Node): { name: string; optional: boolean; rest: boolean } | null {
   switch (child.type) {
     case 'identifier': {
       return { name: child.text, optional: false, rest: false };
@@ -333,14 +335,14 @@ function extractParam(child: Parser.SyntaxNode): { name: string; optional: boole
   }
 }
 
-function extractDecorators(node: Parser.SyntaxNode): readonly string[] {
+function extractDecorators(node: Node): readonly string[] {
   // tree-sitter-python wraps a function_definition in a `decorated_definition`
   // node when decorators are present. The decorators are siblings of the
   // function_definition inside that wrapper.
   if (node.parent?.type !== 'decorated_definition') return [];
   /* v8 ignore start */
   const out: string[] = [];
-  for (const child of node.parent.namedChildren) {
+  for (const child of namedChildrenOf(node.parent)) {
     if (child.type === 'decorator') {
       // Decorator text is `@expr`; trim the leading `@`.
       const text = child.text.trim();

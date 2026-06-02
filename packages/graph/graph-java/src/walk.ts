@@ -56,6 +56,7 @@
 import { relative, sep } from 'node:path';
 
 import {
+  childrenOf,
   makeFileClassifier,
   nameOf,
   record,
@@ -83,7 +84,7 @@ import type {
   WalkInput,
   WalkOutput,
 } from '@opensip-tools/graph';
-import type Parser from 'tree-sitter';
+import type { Node } from 'web-tree-sitter';
 
 const TEST_PATH_RE = /(?:^|\/)test\//;
 const TEST_FILE_NAME_RE = /(?:^|\/)[^/]*(?:Test|Tests|IT)\.java$/;
@@ -158,7 +159,7 @@ function walkFile(
   };
   const initialFrame: Frame = { ownerHash: moduleInit.bodyHash, enclosingClass: null };
 
-  for (const child of file.tree.rootNode.children) visit(child, initialFrame, ctx);
+  for (const child of childrenOf(file.tree.rootNode)) visit(child, initialFrame, ctx);
 }
 
 
@@ -177,7 +178,7 @@ interface WalkCtx {
   readonly callSites: CallSiteRecord[];
 }
 
-function visit(node: Parser.SyntaxNode, frame: Frame, ctx: WalkCtx): void {
+function visit(node: Node, frame: Frame, ctx: WalkCtx): void {
   if (TYPE_DECL_NODES.has(node.type)) {
     visitTypeDeclaration(node, frame, ctx);
     return;
@@ -201,19 +202,19 @@ function visit(node: Parser.SyntaxNode, frame: Frame, ctx: WalkCtx): void {
       kind: 'call',
     });
   }
-  for (const child of node.children) visit(child, frame, ctx);
+  for (const child of childrenOf(node)) visit(child, frame, ctx);
 }
 
-function visitTypeDeclaration(node: Parser.SyntaxNode, frame: Frame, ctx: WalkCtx): void {
+function visitTypeDeclaration(node: Node, frame: Frame, ctx: WalkCtx): void {
   const typeName = nameOf(node) ?? '<anon-type>';
   // Type declarations don't emit a function — their bodies' methods do.
   // Keep the same owner hash but update enclosingClass for children.
   const childFrame: Frame = { ownerHash: frame.ownerHash, enclosingClass: typeName };
-  for (const child of node.children) visit(child, childFrame, ctx);
+  for (const child of childrenOf(node)) visit(child, childFrame, ctx);
 }
 
 function visitMethodOrConstructor(
-  node: Parser.SyntaxNode,
+  node: Node,
   frame: Frame,
   ctx: WalkCtx,
   kind: 'method' | 'constructor',
@@ -224,11 +225,11 @@ function visitMethodOrConstructor(
   const childFrame: Frame = { ownerHash: occ.bodyHash, enclosingClass: null };
   const body = node.childForFieldName('body');
   if (body) {
-    for (const child of body.children) visit(child, childFrame, ctx);
+    for (const child of childrenOf(body)) visit(child, childFrame, ctx);
   }
 }
 
-function visitLambda(node: Parser.SyntaxNode, frame: Frame, ctx: WalkCtx): boolean {
+function visitLambda(node: Node, frame: Frame, ctx: WalkCtx): boolean {
   const occ = buildLambdaOccurrence(node, ctx);
   if (!occ) return false;
   record(ctx.out, occ);
@@ -249,7 +250,7 @@ function visitLambda(node: Parser.SyntaxNode, frame: Frame, ctx: WalkCtx): boole
 }
 
 function buildMethodOccurrence(
-  node: Parser.SyntaxNode,
+  node: Node,
   frame: Frame,
   ctx: WalkCtx,
   kind: 'method' | 'constructor',
@@ -285,7 +286,7 @@ function buildMethodOccurrence(
 }
 
 function buildLambdaOccurrence(
-  node: Parser.SyntaxNode,
+  node: Node,
   ctx: WalkCtx,
 ): FunctionOccurrence | null {
   const digest = digestJavaBody(ctx.file.source.slice(node.startIndex, node.endIndex));

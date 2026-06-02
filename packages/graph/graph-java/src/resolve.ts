@@ -46,9 +46,9 @@ import type {
   ResolveInput,
   ResolveOutput,
 } from '@opensip-tools/graph';
-import type Parser from 'tree-sitter';
+import type { Node } from 'web-tree-sitter';
 
-function javaPosition(node: Parser.SyntaxNode, file: JavaParsedFile): {
+function javaPosition(node: Node, file: JavaParsedFile): {
   readonly line: number;
   readonly column: number;
   readonly text: string;
@@ -67,7 +67,7 @@ export function resolveCallSites(input: ResolveInput<JavaParsedProject>): Resolv
   const stats = createMutableStats();
 
   for (const r of input.callSites) {
-    const node = r.nodeRef as Parser.SyntaxNode;
+    const node = r.nodeRef as Node;
     const file = r.sourceFileRef as JavaParsedFile;
     if (r.kind === 'creation') {
       if (r.childHash === undefined) continue;
@@ -101,7 +101,7 @@ export function resolveCallSites(input: ResolveInput<JavaParsedProject>): Resolv
 
 
 function pushCallEdge(
-  node: Parser.SyntaxNode,
+  node: Node,
   file: JavaParsedFile,
   ownerHash: string,
   byName: ReadonlyMap<string, readonly string[]>,
@@ -153,7 +153,7 @@ function buildJavaCallEdge(
  * Decode a Java call-site node's target into a simple name. Returns
  * null when the shape isn't one we recognize.
  */
-function extractCallTargetName(node: Parser.SyntaxNode): string | null {
+function extractCallTargetName(node: Node): string | null {
   if (node.type === 'method_invocation') {
     const name = node.childForFieldName('name');
     return name ? name.text : null;
@@ -176,7 +176,7 @@ function extractCallTargetName(node: Parser.SyntaxNode): string | null {
   return null;
 }
 
-function decodeTypeName(node: Parser.SyntaxNode): string | null {
+function decodeTypeName(node: Node): string | null {
   if (node.type === 'type_identifier') return node.text;
   if (node.type === 'generic_type') {
     const inner = node.childForFieldName('type') ?? node.namedChild(0);

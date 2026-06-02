@@ -52,9 +52,9 @@ import type {
   ResolveInput,
   ResolveOutput,
 } from '@opensip-tools/graph';
-import type Parser from 'tree-sitter';
+import type { Node } from 'web-tree-sitter';
 
-function pythonPosition(node: Parser.SyntaxNode, file: PythonParsedFile): {
+function pythonPosition(node: Node, file: PythonParsedFile): {
   readonly line: number;
   readonly column: number;
   readonly text: string;
@@ -73,7 +73,7 @@ export function resolveCallSites(input: ResolveInput<PythonParsedProject>): Reso
   const stats = createMutableStats();
 
   for (const r of input.callSites) {
-    const node = r.nodeRef as Parser.SyntaxNode;
+    const node = r.nodeRef as Node;
     const file = r.sourceFileRef as PythonParsedFile;
     if (r.kind === 'creation') {
       if (r.childHash === undefined) continue;
@@ -284,7 +284,7 @@ function lookupModuleCandidates(
 }
 
 function pushCallEdge(
-  node: Parser.SyntaxNode,
+  node: Node,
   file: PythonParsedFile,
   ownerHash: string,
   byName: ReadonlyMap<string, readonly string[]>,
@@ -337,7 +337,7 @@ function buildPythonCallEdge(
  * we don't recognize the shape (subscript call, lambda call, etc.) —
  * those become unresolved edges.
  */
-function extractCallTargetName(node: Parser.SyntaxNode): string | null {
+function extractCallTargetName(node: Node): string | null {
   // tree-sitter-python `call` has a `function` field for the callee.
   const fn = node.childForFieldName('function');
   if (!fn) return null;
@@ -354,8 +354,8 @@ function extractCallTargetName(node: Parser.SyntaxNode): string | null {
  * the entire expression of an expression_statement. Mirrors
  * lang-typescript's logic for the `no-side-effect-path` rule.
  */
-function isReturnValueDiscarded(node: Parser.SyntaxNode): boolean {
-  let parent: Parser.SyntaxNode | null = node.parent;
+function isReturnValueDiscarded(node: Node): boolean {
+  let parent: Node | null = node.parent;
   while (parent) {
     if (parent.type === 'parenthesized_expression' || parent.type === 'await') {
       parent = parent.parent;

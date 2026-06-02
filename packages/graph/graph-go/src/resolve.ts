@@ -51,9 +51,9 @@ import type {
   ResolveInput,
   ResolveOutput,
 } from '@opensip-tools/graph';
-import type Parser from 'tree-sitter';
+import type { Node } from 'web-tree-sitter';
 
-function goPosition(node: Parser.SyntaxNode, file: GoParsedFile): {
+function goPosition(node: Node, file: GoParsedFile): {
   readonly line: number;
   readonly column: number;
   readonly text: string;
@@ -72,7 +72,7 @@ export function resolveCallSites(input: ResolveInput<GoParsedProject>): ResolveO
   const stats = createMutableStats();
 
   for (const r of input.callSites) {
-    const node = r.nodeRef as Parser.SyntaxNode;
+    const node = r.nodeRef as Node;
     const file = r.sourceFileRef as GoParsedFile;
     if (r.kind === 'creation') {
       if (r.childHash === undefined) continue;
@@ -260,7 +260,7 @@ function collectGoPackageMembers(
 }
 
 function pushCallEdge(
-  node: Parser.SyntaxNode,
+  node: Node,
   file: GoParsedFile,
   ownerHash: string,
   byName: ReadonlyMap<string, readonly string[]>,
@@ -313,7 +313,7 @@ function buildGoCallEdge(
  * null when we don't recognize the shape (e.g. type assertion call,
  * map index call) — those become unresolved edges.
  */
-function extractCallTargetName(node: Parser.SyntaxNode): string | null {
+function extractCallTargetName(node: Node): string | null {
   // tree-sitter-go `call_expression` has a `function` field for the callee.
   const fn = node.childForFieldName('function');
   if (!fn) return null;
@@ -332,8 +332,8 @@ function extractCallTargetName(node: Parser.SyntaxNode): string | null {
  * the entire expression of an expression_statement. Go's `go foo()`
  * and `defer foo()` statements also discard the return.
  */
-function isReturnValueDiscarded(node: Parser.SyntaxNode): boolean {
-  let parent: Parser.SyntaxNode | null = node.parent;
+function isReturnValueDiscarded(node: Node): boolean {
+  let parent: Node | null = node.parent;
   while (parent) {
     if (parent.type === 'parenthesized_expression') {
       parent = parent.parent;
