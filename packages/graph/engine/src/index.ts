@@ -166,4 +166,6 @@ export { alwaysThrowsBranchRule } from './rules/always-throws-branch.js';
 export { noSideEffectPathRule } from './rules/no-side-effect-path.js';
 export { duplicatedFunctionBodyRule } from './rules/duplicated-function-body.js';
 export { orphanSubtreeRule } from './rules/orphan-subtree.js';
+export { defineRule } from './rules/define-rule.js';
+export type { RuleDataset, GraphFeatures, DefineRuleConfig } from './rules/define-rule.js';
 export { executeGraph } from './cli/graph.js';
