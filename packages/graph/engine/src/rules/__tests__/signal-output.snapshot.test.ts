@@ -57,9 +57,8 @@ describe('rule signal-output snapshot', () => {
     for (const rule of RULES) {
       signals.push(...rule.evaluate(catalog, indexes, EMPTY_CONFIG, undefined));
     }
-    const sorted = signals
-      .map(stable)
-      .sort((a, b) => `${a.ruleId}|${a.filePath}|${a.line}`.localeCompare(`${b.ruleId}|${b.filePath}|${b.line}`));
+    const sortKey = (s: Signal): string => `${s.ruleId}|${s.filePath}|${String(s.line ?? 0)}`;
+    const sorted = [...signals].sort((a, b) => sortKey(a).localeCompare(sortKey(b))).map(stable);
     expect(sorted).toMatchSnapshot();
   });
 });

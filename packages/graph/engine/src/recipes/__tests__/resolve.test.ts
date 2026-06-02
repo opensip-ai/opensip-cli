@@ -18,7 +18,8 @@ describe('resolveRecipeToRules', () => {
   it('no recipe (undefined) == --recipe default == all rules, in registration order', () => {
     runWithScopeSync(makeGraphTestScope(), () => {
       const allSlugs = currentRules().map((r) => r.slug);
-      const undefSlugs = resolveRecipeToRules(undefined).map((r) => r.slug);
+      // No argument exercises the `--recipe`-absent path (param default = 'default').
+      const undefSlugs = resolveRecipeToRules().map((r) => r.slug);
       const defaultSlugs = resolveRecipeToRules('default').map((r) => r.slug);
       expect(undefSlugs).toEqual(allSlugs);
       expect(defaultSlugs).toEqual(allSlugs);

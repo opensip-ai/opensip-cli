@@ -24,8 +24,8 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { buildIndexes } from '../../pipeline/indexes.js';
 import { fingerprintSignal } from '../../fingerprint-signal.js';
+import { buildIndexes } from '../../pipeline/indexes.js';
 import { alwaysThrowsBranchRule } from '../always-throws-branch.js';
 import { duplicatedFunctionBodyRule } from '../duplicated-function-body.js';
 import { noSideEffectPathRule } from '../no-side-effect-path.js';
@@ -65,7 +65,7 @@ function allFingerprints(): string[] {
 describe('golden-fingerprint snapshot (slug/location identity)', () => {
   it('the emitted fingerprint multiset equals the checked-in golden baseline', () => {
     const expected = JSON.parse(readFileSync(BASELINE_PATH, 'utf8')) as string[];
-    expect(allFingerprints()).toEqual(expected.slice().sort());
+    expect(allFingerprints()).toEqual([...expected].sort());
   });
 
   it('mutating a slug breaks the snapshot (the guard has teeth)', () => {
@@ -75,6 +75,6 @@ describe('golden-fingerprint snapshot (slug/location identity)', () => {
     // changed ruleId would diverge from the golden set.
     const golden = JSON.parse(readFileSync(BASELINE_PATH, 'utf8')) as string[];
     const tampered = golden.map((fp) => fp.replace('graph:orphan-subtree', 'graph:orphan-RENAMED'));
-    expect(tampered.slice().sort()).not.toEqual(golden.slice().sort());
+    expect([...tampered].sort()).not.toEqual([...golden].sort());
   });
 });

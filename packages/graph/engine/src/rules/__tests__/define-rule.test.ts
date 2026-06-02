@@ -14,8 +14,8 @@ import { describe, expect, it } from 'vitest';
 
 import { defineRule } from '../define-rule.js';
 
-import type { RuleDataset } from '../define-rule.js';
 import type { Catalog, GraphConfig, Indexes, RuleHints } from '../../types.js';
+import type { RuleDataset } from '../define-rule.js';
 import type { Signal } from '@opensip-tools/core';
 
 const CATALOG = { functions: {} } as unknown as Catalog;
@@ -56,7 +56,7 @@ describe('defineRule', () => {
       defaultSeverity: 'warning',
       evaluate: (data) => {
         // Reading the forward-compat slot compiles and is undefined at runtime.
-        received = data.features?.['anything'];
+        received = data.features?.anything;
         return [];
       },
     });

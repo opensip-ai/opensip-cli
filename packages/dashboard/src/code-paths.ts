@@ -102,7 +102,10 @@ const RESTRUCTURED_EXPLORE_TABS = false;
  * If the list grows past ~30 entries, replace this manual order with
  * a `{ id, deps, emit }` topological sort.
  */
-export function dashboardCodePathsJs(): string {
+export function dashboardCodePathsJs(restructured: boolean = RESTRUCTURED_EXPLORE_TABS): string {
+  // `restructured` defaults to the build-time flag; the Phase 5 dashboard test
+  // forces it `true` to assert the restructured emitter set without flipping
+  // the shipped default.
   // Shared prelude — utilities + the views registry + help drawer. Identical
   // in both branches; every view emitter depends on these top-level names.
   const prelude = [
@@ -125,7 +128,7 @@ export function dashboardCodePathsJs(): string {
 
   // The view-emitter set is the flag seam: which `views.push(...)` calls run
   // determines the chip bar (renderCodePathsExplore iterates `views`).
-  const views = RESTRUCTURED_EXPLORE_TABS
+  const views = restructured
     ? [
         // Restructured (Plan D default): kept visualizations + the ranked-
         // distribution affordance. SCCs fold into the graph view; the four
