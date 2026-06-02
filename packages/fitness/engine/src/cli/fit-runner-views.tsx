@@ -9,7 +9,7 @@
  * here.
  */
 
-import { useTheme } from '@opensip-tools/cli-ui';
+import { useTheme, sortFitRowPriority, parseValidatedCount } from '@opensip-tools/cli-ui';
 import {
   type CheckOutput,
   type FitDoneResult,
@@ -41,12 +41,6 @@ function statusColor(theme: ReturnType<typeof useTheme>, status: TableRow['statu
   return theme.statusPass;
 }
 
-function parseValidatedCount(validated: string): number {
-  if (validated === '—') return 0;
-  const match = /^(\d+)/.exec(validated);
-  return match ? Number.parseInt(match[1], 10) : 0;
-}
-
 function ignoredColor(theme: ReturnType<typeof useTheme>, ignored: number, validated: string): string {
   const total = parseValidatedCount(validated);
   if (total === 0 || ignored === 0) return theme.muted;
@@ -62,17 +56,10 @@ function durationColor(theme: ReturnType<typeof useTheme>, ms: number): string {
   return theme.success;
 }
 
-function sortPriority(r: TableRow): number {
-  if (r.status === 'TIMEOUT') return 0;
-  if (r.status === 'FAIL') return 1;
-  if (r.warnings > 0) return 2;
-  return 3;
-}
-
 export function ResultsTable({ rows }: { readonly rows: readonly TableRow[] }): React.ReactElement | null {
   const theme = useTheme();
   if (rows.length === 0) return null;
-  const sorted = [...rows].sort((a, b) => sortPriority(a) - sortPriority(b));
+  const sorted = [...rows].sort((a, b) => sortFitRowPriority(a) - sortFitRowPriority(b));
   const maxCheckWidth = Math.max(40, ...sorted.map((r) => r.check.length));
   const widths = { status: 7, errors: 6, warnings: 8, validated: 12, ignored: 7, duration: 10 };
   const headerCells = [
