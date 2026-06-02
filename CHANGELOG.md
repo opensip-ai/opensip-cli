@@ -22,8 +22,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   globally-unique name in a package the caller never imports — fixed with a
   mode-agnostic post-resolution pass (`constrainCrossPackageEdges`) that drops
   name-guessed edges (resolution `unknown`/`dynamic-string`/`syntactic`) whose
-  target isn't reachable from the caller, while leaving type-checker-backed
-  edges untouched. The import set is derived from each module's `dependencies`
+  target isn't reachable from the caller — including builtin `.map`/`.find`
+  calls mis-resolved into another package's test file, which is never
+  importable — while leaving type-checker-backed edges untouched. The import
+  set is derived from each module's `dependencies`
   specifiers (the resolved targets are empty for workspace imports, which
   point at built `dist/`). No-op in `fast` mode and non-monorepo repos.
 

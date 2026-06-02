@@ -131,11 +131,12 @@ function constrainOccurrence(
   importedPackagesByFile: ReadonlyMap<string, ReadonlySet<string>>,
 ): FunctionOccurrence {
   if (occ.calls.length === 0) return occ;
+  const callerPkg = packageOf(occ.filePath);
   const reachable = reachablePackages(occ, importedPackagesByFile);
 
   let changed = false;
   const calls = occ.calls.map((edge) => {
-    const constrained = constrainEdge(edge, reachable, occurrencesByHash);
+    const constrained = constrainEdge(edge, reachable, callerPkg, occurrencesByHash);
     if (constrained !== edge) changed = true;
     return constrained;
   });
@@ -156,19 +157,33 @@ function reachablePackages(
 function constrainEdge(
   edge: CallEdge,
   reachable: ReadonlySet<string>,
+  callerPkg: string,
   occurrencesByHash: ReadonlyMap<string, readonly FunctionOccurrence[]>,
 ): CallEdge {
   if (!NAME_GUESSED.has(edge.resolution) || edge.to.length === 0) return edge;
-  const kept = edge.to.filter((hash) => targetIsReachable(hash, reachable, occurrencesByHash));
+  const kept = edge.to.filter((hash) =>
+    targetIsReachable(hash, reachable, callerPkg, occurrencesByHash),
+  );
   return kept.length === edge.to.length ? edge : { ...edge, to: kept };
 }
 
-/** A target hash is reachable if any occurrence sharing it lives in a reachable package. */
+/**
+ * A target hash is reachable if some occurrence sharing it is a valid callee
+ * for this caller: in a reachable package (own ∪ imported) and not another
+ * package's **test file**. A cross-package test file is never importable, so a
+ * name-guessed edge into one (a builtin `.map`/`.find` colliding with a
+ * test-local arrow named `map`/`find`) is an artifact, not real coupling.
+ */
 function targetIsReachable(
   hash: string,
   reachable: ReadonlySet<string>,
+  callerPkg: string,
   occurrencesByHash: ReadonlyMap<string, readonly FunctionOccurrence[]>,
 ): boolean {
   const candidates = occurrencesByHash.get(hash) ?? [];
-  return candidates.some((c) => reachable.has(packageOf(c.filePath)));
+  return candidates.some((c) => {
+    const pkg = packageOf(c.filePath);
+    if (!reachable.has(pkg)) return false;
+    return !(c.inTestFile && pkg !== callerPkg);
+  });
 }

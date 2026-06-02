@@ -124,6 +124,26 @@ describe('constrainCrossPackageEdges', () => {
     expect(out.functions.callC[0].calls[0].to).toEqual(['Hc']); // pkg-c imported ⇒ kept
   });
 
+  it('drops a name-guessed edge into another package’s test file (builtin .map/.find collision)', () => {
+    // Imported package, but the only candidate is a TEST-file arrow named `map`
+    // (a builtin Array.map name-guessed across the boundary) — not importable.
+    const testArrow = occ({ bodyHash: 'H', filePath: 'packages/pkg-b/src/__tests__/x.test.ts', simpleName: 'map', inTestFile: true });
+    const caller = occ({ bodyHash: 'C', filePath: A, simpleName: 'caller', calls: [edge({ to: ['H'], text: 'xs.map(...)' })] });
+    const mi = moduleInit(A, ['@scope/pkgb']); // pkg-a DOES import pkg-b
+    const out = constrainCrossPackageEdges(
+      catalogOf({ f: [testArrow], caller: [caller], '<module-init>': [mi] }),
+      PKG_MAP,
+    );
+    expect(out.functions.caller[0].calls[0].to).toEqual([]); // cross-package test callee dropped
+  });
+
+  it('keeps a same-package test-file callee (test calling its own package’s test helper)', () => {
+    const testHelper = occ({ bodyHash: 'H', filePath: 'packages/pkg-a/src/__tests__/helper.test.ts', inTestFile: true });
+    const caller = occ({ bodyHash: 'C', filePath: 'packages/pkg-a/src/__tests__/x.test.ts', simpleName: 'caller', inTestFile: true, calls: [edge({ to: ['H'] })] });
+    const out = constrainCrossPackageEdges(catalogOf({ f: [testHelper], caller: [caller] }), PKG_MAP);
+    expect(out.functions.caller[0].calls[0].to).toEqual(['H']); // same package ⇒ kept
+  });
+
   it('returns the catalog untouched in fast mode (no import set)', () => {
     const target = occ({ bodyHash: 'H', filePath: 'packages/pkg-b/src/f.ts' });
     const caller = occ({ bodyHash: 'C', filePath: A, simpleName: 'caller', calls: [edge({ to: ['H'] })] });
