@@ -59,6 +59,9 @@ export function dashboardCssCodePaths(): string {
 .code-paths-graph-layout-btn { font-size: 12px; padding: 4px 10px; border-radius: var(--radius-sm); cursor: pointer; background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-muted); font-family: var(--font); user-select: none; }
 .code-paths-graph-layout-btn:hover { background: var(--bg-hover); color: var(--text); }
 .code-paths-graph-layout-btn.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+.code-paths-graph-scc-btn { font-size: 12px; padding: 4px 10px; border-radius: var(--radius-sm); cursor: pointer; background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-muted); font-family: var(--font); user-select: none; margin-left: 12px; }
+.code-paths-graph-scc-btn:hover { background: var(--bg-hover); color: var(--text); }
+.code-paths-graph-scc-btn.active { background: #d46a6a; color: var(--bg); border-color: #d46a6a; }
 .code-paths-graph-banner { font-size: 12px; color: var(--text-muted); background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 10px; margin-bottom: 10px; }
 .code-paths-graph-search { width: 320px; margin-bottom: 10px; display: block; }
 .code-paths-graph-canvas { width: 100%; height: 640px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); }

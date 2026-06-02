@@ -173,6 +173,19 @@ describe('View 8 — Graph', () => {
     ).toBe('dagre');
   });
 
+  it('renders the folded SCC "Highlight cycles" toggle in the graph toolbar', () => {
+    const env = loadEnv(true);
+    embedViewModel(SAMPLE_VM);
+    const c = document.createElement('div');
+    document.body.append(c);
+    env.views.find(v => v.id === 'graph')!.render(c, null, null, null);
+    const sccBtn = c.querySelector<HTMLElement>('.code-paths-graph-scc-btn');
+    expect(sccBtn).not.toBeNull();
+    expect(sccBtn!.textContent).toContain('Highlight cycles');
+    // The toggle is NOT a layout button — keeps the layout-selector set clean.
+    expect(sccBtn!.classList.contains('code-paths-graph-layout-btn')).toBe(false);
+  });
+
   it('mounts a cytoscape canvas when the renderer is present', () => {
     const env = loadEnv(true);
     embedViewModel(SAMPLE_VM);

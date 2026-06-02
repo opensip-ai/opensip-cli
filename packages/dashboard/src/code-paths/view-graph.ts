@@ -209,7 +209,7 @@ function gvRenderLayoutSelector(host) {
   // When on, cycle members + cycle edges are emphasized and the acyclic
   // remainder is dimmed, so mutually-recursive clusters pop out.
   var sccBtn = el('button', {
-    class: 'code-paths-graph-layout-btn code-paths-graph-scc-btn' + (gvSccHighlight ? ' active' : ''),
+    class: 'code-paths-graph-scc-btn' + (gvSccHighlight ? ' active' : ''),
     'data-scc-toggle': '1',
     text: 'Highlight cycles',
     onclick: function() {
