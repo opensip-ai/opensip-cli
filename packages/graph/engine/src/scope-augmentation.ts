@@ -27,6 +27,7 @@
  */
 
 import type { GraphAdapterRegistry } from './lang-adapter/registry.js';
+import type { GraphRecipeRegistry } from './recipes/registry.js';
 import type { GraphRulesRegistry } from './rules/registry.js';
 
 /**
@@ -40,6 +41,8 @@ export interface GraphSubscope {
   readonly adapters: GraphAdapterRegistry;
   /** Rule registry — pre-seeded with the six built-in rules. */
   readonly rules: GraphRulesRegistry;
+  /** Recipe registry — pre-seeded with the built-in graph recipes. */
+  readonly recipes: GraphRecipeRegistry;
 }
 
 declare module '@opensip-tools/core' {

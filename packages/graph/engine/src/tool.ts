@@ -38,6 +38,7 @@ import { executeShardWorker } from './cli/shard-worker.js';
 import { executeSymbolIndex } from './cli/symbol-index.js';
 import { createAdapterRegistry, getDiscoveredAdapters } from './lang-adapter/registry.js';
 import { CatalogRepo } from './persistence/catalog-repo.js';
+import { createRecipeRegistry } from './recipes/registry.js';
 import { createRulesRegistry } from './rules/registry.js';
 // Side-effect import: ensures the RunScope.graph augmentation is
 // loaded so `scope.graph` is correctly-typed here.
@@ -483,6 +484,7 @@ function contributeScope(): ScopeContribution {
     graph: {
       adapters,
       rules: createRulesRegistry(),
+      recipes: createRecipeRegistry(),
     },
   };
 }
