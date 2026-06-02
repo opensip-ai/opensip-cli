@@ -4,6 +4,41 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.5.2] — 2026-06-02
+
+### Added
+
+- **All non-interactive CLI output now flows through the central render seam.**
+  Graph's `--gate-save` / `--gate-compare`, the `--report-to` status line,
+  `graph-lookup`, and the `--workspace` report previously wrote human-readable
+  text straight to stdout; they now render through the same view-model seam as
+  the main report (via the existing `gate-done` result and a new generic
+  `graph-status` result), so their output is consistent between a TTY and a
+  pipe / CI. The `--json` machine paths are unchanged.
+
+### Changed
+
+- **`graph` and `fit` render the static report — not the animated live view —
+  when stdout is not a TTY.** The Ink live view is a TTY-only affordance; in a
+  pipe, CI, or redirected run, both commands now fall through to the static
+  `graph-done` / `fit-done` path, dual-rendered as plain text (the same content
+  a TTY user's final frame shows). This replaces the prior behavior where the
+  live view ran regardless of TTY and could emit garbled or empty frames into a
+  pipe.
+
+### Internal
+
+- Split two over-length source files behind re-export barrels (no public API
+  change): the `CommandResult` union + variant interfaces moved from
+  `@opensip-tools/contracts` `types.ts` into `command-results.ts`, and the strip
+  scanner primitives moved from `@opensip-tools/core` `strip-utils.ts` into
+  `strip-scanners.ts`. Both files re-export the extracted half, so package
+  import surfaces are unchanged.
+- Hoisted the shared fitness results-table helpers (`sortFitRowPriority`,
+  `parseValidatedCount`) into `@opensip-tools/cli-ui` so the live and static fit
+  views share one implementation — clearing the genuine cross-package
+  duplication the `graph:duplicated-function-body` watchdog flagged.
+
 ## [2.5.1] — 2026-06-02
 
 > **Note:** `2.5.0` was never a coordinated release. Only
