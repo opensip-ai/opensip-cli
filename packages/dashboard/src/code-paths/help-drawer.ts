@@ -6,6 +6,13 @@
  * Clicking the ⓘ icon next to a tab opens this drawer with that
  * view's help. Clicking the backdrop, the × button, or pressing
  * Escape closes it. There is one drawer at a time.
+ *
+ * The drawer resolves help dynamically via `getView(viewId).help` — there is
+ * NO static per-view help map. So the Plan B Code Paths restructure
+ * (dropping `big`/`hot`/`wide`/`untested`/`sccs` and folding cycle guidance
+ * into the graph view's help) needs no edit here: the drawer simply renders
+ * whatever views are registered. The SCC explanation now lives on the graph
+ * view's `help` ("Cycles / SCCs" section, view-graph.ts).
  */
 
 export function dashboardHelpDrawerJs(): string {
