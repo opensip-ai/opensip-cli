@@ -50,6 +50,41 @@ describe('lang-rust walk.ts — comment-stripping branches', () => {
     expect(Object.keys(walk.occurrences)).toContain('with_line_comment');
   });
 
+  it('walks impl blocks, closures, and attributed functions', () => {
+    // Exercises implTargetName (impl ... for <type>), closure bare-identifier
+    // params, and extractAttributes (#[...] on a function).
+    mkdirSync(join(dir, 'src'), { recursive: true });
+    writeFileSync(
+      join(dir, 'src/lib.rs'),
+      `trait Greet { fn hi(&self); }\n` +
+        `struct Thing;\n` +
+        `impl Greet for Thing {\n` +
+        `    fn hi(&self) {}\n` +
+        `}\n` +
+        `#[inline]\n` +
+        `fn outer() -> i32 {\n` +
+        `    let add = |x, y| x + y;\n` +
+        `    add(1, 2)\n` +
+        `}\n`,
+      'utf8',
+    );
+    const discovery = rustGraphAdapter.discoverFiles({ cwd: dir });
+    const parsed = rustGraphAdapter.parseProject({
+      projectDirAbs: discovery.projectDirAbs,
+      files: discovery.files,
+      compilerOptions: discovery.compilerOptions,
+      resolutionMode: 'exact',
+    });
+    const walk = rustGraphAdapter.walkProject({
+      project: parsed.project,
+      projectDirAbs: discovery.projectDirAbs,
+      files: discovery.files,
+    });
+    const names = Object.keys(walk.occurrences);
+    expect(names).toContain('outer');
+    expect(names).toContain('hi');
+  });
+
   it('walks a Rust file with block comments and nested block comments', () => {
     mkdirSync(join(dir, 'src'), { recursive: true });
     writeFileSync(

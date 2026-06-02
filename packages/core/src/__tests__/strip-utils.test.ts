@@ -3,13 +3,28 @@ import { describe, expect, it } from 'vitest';
 import {
   applyRegions,
   buildLineStarts,
+  makeStripper,
   scanBlockCommentNesting,
   scanBlockCommentNonNesting,
   scanCharLiteral,
   scanLineComment,
   scanRegularString,
   type Region,
+  type ScanResult,
 } from '../languages/strip-utils.js';
+
+// A fake language scanner: chars 0-2 are a "string", chars 4-6 a "comment".
+function fakeScan(_src: string): ScanResult {
+  return { stringRegions: [{ start: 0, end: 3 }], commentRegions: [{ start: 4, end: 7 }] };
+}
+
+describe('makeStripper', () => {
+  it('stripStrings blanks only string regions; stripComments blanks both', () => {
+    const stripper = makeStripper(fakeScan);
+    expect(stripper.stripStrings('AAA-BBB-CC')).toBe('   -BBB-CC');
+    expect(stripper.stripComments('AAA-BBB-CC')).toBe('   -   -CC');
+  });
+});
 
 describe('scanRegularString', () => {
   it('returns the closing quote position for a simple terminated string', () => {

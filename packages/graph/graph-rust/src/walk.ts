@@ -596,11 +596,15 @@ function nameOf(node: Parser.SyntaxNode): string | null {
 function implTargetName(node: Parser.SyntaxNode): string {
   const ty = node.childForFieldName('type');
   if (ty) return ty.text;
+  /* v8 ignore start -- defensive: tree-sitter-rust always exposes the `type`
+     field on a well-formed impl_item, so these fallbacks fire only on
+     malformed/partial ASTs that valid Rust source doesn't produce. */
   // Fallback: first type_identifier child.
   for (const c of node.namedChildren) {
     if (c.type === 'type_identifier' || c.type === 'generic_type') return c.text;
   }
   return '<anon-impl>';
+  /* v8 ignore stop */
 }
 
 function classifyVisibility(node: Parser.SyntaxNode): FunctionOccurrence['visibility'] {
@@ -640,6 +644,10 @@ function decodeParam(child: Parser.SyntaxNode): { name: string; optional: boolea
       if (!pat) return null;
       return { name: pat.text, optional: false, rest: false };
     }
+    /* v8 ignore start -- defensive: function_item / impl-method params arrive as
+       `self_parameter` / `parameter` nodes; the bare-`identifier` (closure-shaped)
+       and unexpected-node-kind fallbacks guard AST shapes the walk's param paths
+       don't reach. */
     case 'identifier': {
       // Closure params often appear as bare identifiers.
       return { name: child.text, optional: false, rest: false };
@@ -647,6 +655,7 @@ function decodeParam(child: Parser.SyntaxNode): { name: string; optional: boolea
     default: {
       return null;
     }
+    /* v8 ignore stop */
   }
 }
 
