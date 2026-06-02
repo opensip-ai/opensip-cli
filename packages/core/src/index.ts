@@ -81,6 +81,25 @@ export type {
   RecipeRegistryOptions,
 } from './recipes/registry.js';
 
+// Recipes — generic selector union + resolver (selection half of the
+// substrate; execution stays tool-owned).
+export { resolveSelector } from './recipes/selector.js';
+export type {
+  RecipeSelector,
+  ExplicitSelector,
+  AllSelector,
+  TagsSelector,
+  PatternSelector,
+  ResolveSelectorOptions,
+} from './recipes/selector.js';
+// Recipes — per-unit config-override accessors + map type.
+export {
+  getUnitConfig,
+  setCurrentRecipeUnitConfig,
+  clearCurrentRecipeUnitConfig,
+} from './recipes/unit-config.js';
+export type { RecipeUnitConfigMap } from './recipes/unit-config.js';
+
 // Generic `Registry<T>` — the unified base for every registry in the
 // workspace. Replaces the ten registry classes catalogued in the
 // runscope+registry plan's Phase 0. See `lib/registry.ts` for the
