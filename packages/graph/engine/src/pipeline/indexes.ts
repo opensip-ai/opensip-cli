@@ -1,3 +1,4 @@
+// @fitness-ignore-file batch-operation-limits -- pure in-memory linear scans over the already-materialized catalog (bounded by repo size); the for-of loops build data→data indexes, with no DB/IO/unbounded-async to batch or paginate.
 /**
  * Stage 3 — Index build.
  *

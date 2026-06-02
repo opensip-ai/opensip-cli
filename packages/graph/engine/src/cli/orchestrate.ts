@@ -67,6 +67,7 @@ export type {
 // orchestration facade so dispatchers reach both `runGraph` and
 // `runShardedGraph` through one entry point.
 export { runShardedGraph } from './orchestrate/sharded-graph.js';
+export { loadGraphConfig } from './graph-config.js';
 export type { RunShardedInput, RunShardedResult } from './orchestrate/sharded-graph.js';
 
 /** Input bundle for {@link runGraph}: project scope, optional overrides, and progress callback. */

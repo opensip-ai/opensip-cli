@@ -42,10 +42,9 @@ import { buildCliOutput, buildCliOutputFromFindings, renderJson } from '../rende
 
 
 import { detectLanguages } from './detect.js';
-import { loadGraphConfig } from './graph-config.js';
 import { runCatalogJsonMode, runGateMode, runReportMode } from './graph-modes.js';
 import { buildUnifiedReportLines, resolutionBannerText } from './graph-report.js';
-import { runGraph, runShardedGraph } from './orchestrate.js';
+import { loadGraphConfig, runGraph, runShardedGraph } from './orchestrate.js';
 import { positionalPathLabel, resolvePositionalPaths } from './positional-paths.js';
 import { MemoryPressureError } from './pressure-monitor.js';
 import { renderWorkspaceJson, writeWorkspaceReport } from './workspace-report.js';

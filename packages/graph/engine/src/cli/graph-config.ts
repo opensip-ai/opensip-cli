@@ -15,7 +15,7 @@
  * validation is not this loader's job.
  */
 
-import { readYamlFile, resolveProjectConfigPath } from '@opensip-tools/core';
+import { logger, readYamlFile, resolveProjectConfigPath } from '@opensip-tools/core';
 
 import type { GraphConfig } from '../types.js';
 
@@ -78,7 +78,14 @@ export function loadGraphConfig(cwd: string, explicitPath?: string): GraphConfig
   let filePath: string;
   try {
     filePath = resolveProjectConfigPath(cwd, explicitPath);
-  } catch {
+  } catch (error) {
+    // No config file found — expected; the graph rules use their in-rule
+    // defaults. Debug-only so it never adds noise on config-less projects.
+    logger.debug({
+      evt: 'graph.config.not_found',
+      module: 'graph:config',
+      err: error instanceof Error ? error.message : String(error),
+    });
     return {};
   }
   const doc = readYamlFile(filePath);
