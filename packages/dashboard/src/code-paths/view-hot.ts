@@ -12,8 +12,10 @@
  * filtered by `filterState`, rendered through `renderFunctionRows`
  * which paginates at 10 rows/page (no slice cap — pagination shows
  * everything). The raw inbound Callers count stays available as a
- * column. Blast is computed lazily by the browser mirror's `buildIndexes`
- * (`indexes.blastRadius` getter) on first read — i.e. on this panel's init.
+ * column. Blast is read from the engine-emitted
+ * `catalog.features.function[bodyHash].blast.score` (Plan C); when the
+ * catalog carries no features the view falls back to the raw inbound
+ * Callers count for ranking.
  *
  * Implemented via `defineRankedView` — the rank-and-render skeleton
  * lives in `view-template.ts`; this file is the declarative config.
@@ -34,7 +36,7 @@ export function dashboardViewHotJs(): string {
         { heading: 'What to do', body: 'For the top 5–10: confirm test coverage, watch them on PR reviews, and resist adding incidental responsibilities. If a high-blast function is also wide (many parameters) or big (many lines), that combination is a refactor signal.' },
       ],
     },
-    metric: '(function(){ const b = indexes.blastRadius && indexes.blastRadius.get(occ.bodyHash); const callers = (indexes.callers.get(occ.bodyHash) || []).length; if (callers === 0) return false; return b ? b.score : callers; })()',
+    metric: '(function(){ const f = catalog.features && catalog.features.function && catalog.features.function[occ.bodyHash]; const b = f && f.blast; const callers = (indexes.callers.get(occ.bodyHash) || []).length; if (callers === 0) return false; return b ? b.score : callers; })()',
     rowExtras: '(function(){ return { __callers: (indexes.callers.get(occ.bodyHash) || []).length }; })()',
     columns: [
       { label: 'Function', value: 'o => displayName(o.simpleName)' },
