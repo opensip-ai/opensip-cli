@@ -32,7 +32,7 @@ import { createSignal } from '@opensip-tools/core';
 
 import { defineRule } from './define-rule.js';
 
-import type { FunctionOccurrence, Indexes, RuleHints } from '../types.js';
+import type { FeatureTable, FunctionOccurrence, Indexes, RuleHints } from '../types.js';
 import type { Signal } from '@opensip-tools/core';
 
 const TYPESCRIPT_FALLBACK_REGEX =
@@ -71,12 +71,13 @@ function buildSideEffectDetector(hints: RuleHints | undefined): SideEffectDetect
 export const noSideEffectPathRule = defineRule({
   slug: 'graph:no-side-effect-path',
   defaultSeverity: 'warning',
-  evaluate({ indexes, hints }): readonly Signal[] {
+  featureDeps: ['bodyLines'],
+  evaluate({ indexes, hints, features }): readonly Signal[] {
     const detector = buildSideEffectDetector(hints);
     const sideEffecting = computeSideEffecting(indexes, detector);
     const signals: Signal[] = [];
     for (const occ of indexes.byBodyHash.values()) {
-      if (!isPureCandidate(occ, sideEffecting)) continue;
+      if (!isPureCandidate(occ, sideEffecting, features)) continue;
       const reachable = transitiveCallees(occ, indexes);
       const anyEffecting = [...reachable].some((h) => sideEffecting.has(h));
       if (anyEffecting) continue;
@@ -185,11 +186,18 @@ function returnsNoValue(returnType: string | null): boolean {
 }
 
 /** Filters out occurrences we never want to flag — short, test-only, has unresolved edges, etc. */
-function isPureCandidate(occ: FunctionOccurrence, sideEffecting: ReadonlySet<string>): boolean {
+function isPureCandidate(
+  occ: FunctionOccurrence,
+  sideEffecting: ReadonlySet<string>,
+  features: FeatureTable | undefined,
+): boolean {
   if (occ.kind === 'module-init') return false;
   if (occ.inTestFile) return false;
   if (occ.calls.length < 2) return false;
-  const span = occ.endLine - occ.line + 1;
+  // bodyLines feature column is the canonical span; the inline
+  // `endLine − line + 1` is the single sanctioned graceful-degrade fallback
+  // for features-absent calls, not a duplicate of the engine derivation.
+  const span = features?.function.get(occ.bodyHash)?.bodyLines ?? (occ.endLine - occ.line + 1);
   if (span < 10) return false;
   if (occ.calls.some((e) => e.to.length === 0)) return false;
   if (sideEffecting.has(occ.bodyHash)) return false;

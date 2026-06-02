@@ -38,7 +38,7 @@ import { pkgOf } from '../resolve-callee.js';
 
 import { defineRule } from './define-rule.js';
 
-import type { Catalog, FunctionOccurrence } from '../types.js';
+import type { Catalog, FeatureTable, FunctionOccurrence } from '../types.js';
 import type { Signal } from '@opensip-tools/core';
 
 const DEFAULT_MIN_LINES = 5;
@@ -48,7 +48,8 @@ const DEFAULT_MIN_CROSS_PACKAGE_PACKAGES = 3;
 export const duplicatedFunctionBodyRule = defineRule({
   slug: 'graph:duplicated-function-body',
   defaultSeverity: 'warning',
-  evaluate({ catalog, config }): readonly Signal[] {
+  featureDeps: ['bodyLines'],
+  evaluate({ catalog, config, features }): readonly Signal[] {
     const minLines = config.minDuplicateBodyLines ?? DEFAULT_MIN_LINES;
     const minBodySize = config.minDuplicateBodySize ?? DEFAULT_MIN_BODY_SIZE;
     const minPackages =
@@ -91,7 +92,7 @@ export const duplicatedFunctionBodyRule = defineRule({
 
     // Per-instance path: size-gated groups, skipping any hash already
     // claimed by an aggregate signal so a group never double-reports.
-    const groups = groupByHash(catalog, minLines, minBodySize);
+    const groups = groupByHash(catalog, minLines, minBodySize, features);
     for (const group of groups) {
       if (group.length < 2) continue;
       const primary = group[0];
@@ -129,6 +130,7 @@ function groupByHash(
   catalog: Catalog,
   minLines: number,
   minBodySize: number,
+  features: FeatureTable | undefined,
 ): readonly (readonly FunctionOccurrence[])[] {
   // Walk the catalog directly; the byBodyHash index dedupes by hash,
   // which is exactly what we need to NOT do here.
@@ -138,7 +140,7 @@ function groupByHash(
     /* v8 ignore next */
     if (!occs) continue;
     for (const occ of occs) {
-      if (!isInterestingForDup(occ, minLines, minBodySize)) continue;
+      if (!isInterestingForDup(occ, minLines, minBodySize, features)) continue;
       let bucket = buckets.get(occ.bodyHash);
       if (!bucket) {
         bucket = [];
@@ -210,9 +212,14 @@ function isInterestingForDup(
   occ: FunctionOccurrence,
   minLines: number,
   minBodySize: number,
+  features: FeatureTable | undefined,
 ): boolean {
   if (!isEligibleKind(occ)) return false;
-  const span = occ.endLine - occ.line + 1;
+  // The bodyLines feature column is the canonical span (computed once in
+  // pipeline/features.ts). The inline `endLine − line + 1` here is the single
+  // sanctioned graceful-degrade fallback for features-absent calls (3/4-arg
+  // test evaluate), not a duplicate of the engine derivation.
+  const span = features?.function.get(occ.bodyHash)?.bodyLines ?? (occ.endLine - occ.line + 1);
   if (span < minLines) return false;
   if (occ.bodySize !== undefined && occ.bodySize < minBodySize) return false;
   return true;
