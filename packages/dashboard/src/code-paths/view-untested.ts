@@ -32,7 +32,7 @@ export function dashboardViewUntestedJs(): string {
     },
     predicate: `(function(){
       if (occ.inTestFile) return false;
-      if (filterState.packages.size > 0 && !filterState.packages.has(packageOfPath(occ.filePath))) return false;
+      if (filterState.packages.size > 0 && !filterState.packages.has(pkgOf(occ))) return false;
       if (filterState.kinds.size > 0 && !filterState.kinds.has(occ.kind)) return false;
       const callerHashes = indexes.callers.get(occ.bodyHash) || [];
       for (const h of callerHashes) {
@@ -46,7 +46,7 @@ export function dashboardViewUntestedJs(): string {
       { label: 'Function', value: 'o => displayName(o.simpleName)' },
       { label: 'Prod callers', value: 'o => o.__metric' },
       { label: 'Kind', value: 'o => o.kind' },
-      { label: 'Package', value: 'o => packageOfPath(o.filePath)' },
+      { label: 'Package', value: 'o => pkgOf(o)' },
       { label: 'File', value: 'o => o.filePath + \':\' + o.line' },
     ],
     headingText: 'Untested production code',

@@ -29,6 +29,7 @@
 
 import { relative, sep } from 'node:path';
 
+import { ownerEdgeKey } from '@opensip-tools/graph';
 import ts from 'typescript';
 
 import { cacheKey as typescriptCacheKey } from './cache-key.js';
@@ -353,9 +354,12 @@ function resolveDependencies(
       column: site.column,
       specifier: site.specifier,
     };
-    const existing = out.get(site.ownerHash);
+    // Key per owner OCCURRENCE (module-init bodyHash + file) to match
+    // stitchEdges; module-init bodies can collide across trivial files.
+    const ownerKey = ownerEdgeKey(site.ownerHash, relative(projectDirAbs, site.sourceFile.fileName));
+    const existing = out.get(ownerKey);
     if (existing === undefined) {
-      out.set(site.ownerHash, [edge]);
+      out.set(ownerKey, [edge]);
     } else {
       existing.push(edge);
     }
@@ -377,7 +381,7 @@ function collectByOwner(
     if (!arr) continue;
     for (const o of arr) {
       if (o.calls.length === 0) continue;
-      out.set(o.bodyHash, o.calls);
+      out.set(ownerEdgeKey(o.bodyHash, o.filePath), o.calls);
     }
   }
   return out;

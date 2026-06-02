@@ -11,6 +11,8 @@ import { join, relative, sep } from 'node:path';
 
 import { logger } from '@opensip-tools/core';
 
+import { ownerEdgeKey } from '../../owner-key.js';
+
 import type {
   GraphLanguageAdapter,
   DiscoverOutput,
@@ -258,10 +260,10 @@ export function mergeResolvedAndCachedEdges(
   // Build a quick index of cached occurrences by bodyHash so we can
   // look up the right cached calls without scanning the catalog
   // per-occurrence.
-  const cachedByHash = new Map<string, FunctionOccurrence>();
+  const cachedByOwner = new Map<string, FunctionOccurrence>();
   for (const occs of Object.values(cached.functions)) {
     if (!occs) continue;
-    for (const o of occs) cachedByHash.set(o.bodyHash, o);
+    for (const o of occs) cachedByOwner.set(ownerEdgeKey(o.bodyHash, o.filePath), o);
   }
   const out: Record<string, FunctionOccurrence[]> = Object.create(null) as Record<
     string,
@@ -271,14 +273,15 @@ export function mergeResolvedAndCachedEdges(
     if (!occs) continue;
     const arr: FunctionOccurrence[] = [];
     for (const o of occs) {
+      const ownerKey = ownerEdgeKey(o.bodyHash, o.filePath);
       if (closureRel.has(o.filePath)) {
         // Closure files keep their freshly-resolved edges.
-        arr.push({ ...o, calls: edgesByOwner.get(o.bodyHash) ?? [] });
+        arr.push({ ...o, calls: edgesByOwner.get(ownerKey) ?? [] });
       } else {
-        // Unchanged files: restore cached calls. The hash matched
+        // Unchanged files: restore cached calls. The key matched
         // because we lifted the cached occurrence into the merged
         // catalog before resolver dispatch.
-        const cachedOcc = cachedByHash.get(o.bodyHash);
+        const cachedOcc = cachedByOwner.get(ownerKey);
         arr.push({ ...o, calls: cachedOcc?.calls ?? [] });
       }
     }

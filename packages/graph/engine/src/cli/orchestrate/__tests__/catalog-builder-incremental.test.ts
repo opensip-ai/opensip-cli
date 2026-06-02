@@ -10,6 +10,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { ownerEdgeKey } from '../../../owner-key.js';
 import { buildAndResolveCatalogIncremental } from '../catalog-builder.js';
 
 import type {
@@ -121,7 +122,7 @@ describe('buildAndResolveCatalogIncremental', () => {
     };
     const adapter = incrementalAdapter({
       walked: { 'a.ts': [occ('a', 'a.ts', 'A2')] },
-      edges: new Map([['A2', [freshEdge]]]),
+      edges: new Map([[ownerEdgeKey('A2', 'a.ts'), [freshEdge]]]),
     });
 
     const { catalog, resolutionStats } = buildAndResolveCatalogIncremental(
@@ -146,7 +147,7 @@ describe('buildAndResolveCatalogIncremental', () => {
     const adapter = incrementalAdapter({
       walked: { 'a.ts': [occ('mod', 'a.ts', 'M1')] },
       edges: new Map(),
-      deps: new Map([['M1', [dep]]]),
+      deps: new Map([[ownerEdgeKey('M1', 'a.ts'), [dep]]]),
     });
 
     const { catalog } = buildAndResolveCatalogIncremental(

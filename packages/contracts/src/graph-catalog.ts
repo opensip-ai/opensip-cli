@@ -62,6 +62,14 @@ export interface GraphFunctionOccurrence {
   readonly simpleName: string;
   readonly qualifiedName: string;
   readonly filePath: string;
+  /**
+   * The package this occurrence belongs to — the `name` of its nearest
+   * enclosing `package.json` (e.g. `@opensip-tools/fitness`), or the
+   * top-level path segment when there is no manifest. Computed at build
+   * time (the dashboard has no filesystem access). Absent on pre-2.4.2
+   * catalogs; consumers fall back to deriving it from `filePath`.
+   */
+  readonly package?: string;
   readonly line: number;
   readonly column: number;
   readonly endLine: number;

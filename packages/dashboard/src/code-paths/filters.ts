@@ -32,7 +32,7 @@ function packagesInCatalog(catalog) {
   if (!catalog || !catalog.functions) return [];
   for (const name of Object.keys(catalog.functions)) {
     for (const occ of (catalog.functions[name] || [])) {
-      pkgs.add(packageOfPath(occ.filePath));
+      pkgs.add(pkgOf(occ));
     }
   }
   return Array.from(pkgs).sort();
@@ -40,7 +40,7 @@ function packagesInCatalog(catalog) {
 
 function passesFilter(occ, fs) {
   if (!fs.includeTests && occ.inTestFile) return false;
-  if (fs.packages.size > 0 && !fs.packages.has(packageOfPath(occ.filePath))) return false;
+  if (fs.packages.size > 0 && !fs.packages.has(pkgOf(occ))) return false;
   if (fs.kinds.size > 0 && !fs.kinds.has(occ.kind)) return false;
   return true;
 }

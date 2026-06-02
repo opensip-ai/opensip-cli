@@ -35,12 +35,12 @@ views.push({
     let max = 0;
     for (const occ of indexes.byBodyHash.values()) {
       if (!passesFilter(occ, filterState)) continue;
-      const callerPkg = packageOfPath(occ.filePath);
+      const callerPkg = pkgOf(occ);
       for (const edge of (occ.calls || [])) {
         for (const target of (edge.to || [])) {
           const callee = resolveCalleeOcc(target, occ, indexes);
           if (!callee) continue;
-          const calleePkg = packageOfPath(callee.filePath);
+          const calleePkg = pkgOf(callee);
           let row = counts.get(callerPkg);
           if (!row) { row = new Map(); counts.set(callerPkg, row); }
           const c = (row.get(calleePkg) || 0) + 1;
@@ -115,12 +115,12 @@ function openCouplingDrilldown(callerPkg, calleePkg, indexes, filterState) {
   let count = 0;
   for (const occ of indexes.byBodyHash.values()) {
     if (!passesFilter(occ, filterState)) continue;
-    if (packageOfPath(occ.filePath) !== callerPkg) continue;
+    if (pkgOf(occ) !== callerPkg) continue;
     for (const edge of (occ.calls || [])) {
       for (const target of (edge.to || [])) {
         const callee = resolveCalleeOcc(target, occ, indexes);
         if (!callee) continue;
-        if (packageOfPath(callee.filePath) !== calleePkg) continue;
+        if (pkgOf(callee) !== calleePkg) continue;
         const item = el('li', {
           'data-body-hash': occ.bodyHash,
           text: displayName(occ.simpleName) + '  →  ' + displayName(callee.simpleName) + '   (' + occ.filePath + ':' + edge.line + ')',
@@ -149,11 +149,11 @@ function resolveCalleeOcc(target, callerOcc, indexes) {
   const candidates = (indexes.occurrencesByHash && indexes.occurrencesByHash.get(target)) || null;
   if (!candidates || candidates.length === 0) return indexes.byBodyHash.get(target);
   if (candidates.length === 1) return candidates[0];
-  const callerPkg = packageOfPath(callerOcc.filePath);
+  const callerPkg = pkgOf(callerOcc);
   let samePkg = null;
   let lowest = candidates[0];
   for (const c of candidates) {
-    if (!samePkg && packageOfPath(c.filePath) === callerPkg) samePkg = c;
+    if (!samePkg && pkgOf(c) === callerPkg) samePkg = c;
     if (c.qualifiedName < lowest.qualifiedName) lowest = c;
   }
   return samePkg || lowest;

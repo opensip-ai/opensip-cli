@@ -9,6 +9,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { ownerEdgeKey } from '../../../owner-key.js';
 import {
   expandClosureToFixpoint,
   mergeOccurrences,
@@ -89,7 +90,9 @@ describe('mergeResolvedAndCachedEdges', () => {
     const cached = catalogOf(occ('a', 'a.ts', 'A1', [cachedEdge]), occ('b', 'b.ts', 'B1'));
     // Merged catalog: a.ts (closure, hash A1) + unchanged b.ts (B1).
     const merged = catalogOf(occ('a', 'a.ts', 'A1'), occ('b', 'b.ts', 'B1'));
-    const edgesByOwner = new Map<string, readonly CallEdge[]>([['A1', [freshEdge]]]);
+    const edgesByOwner = new Map<string, readonly CallEdge[]>([
+      [ownerEdgeKey('A1', 'a.ts'), [freshEdge]],
+    ]);
 
     const out = mergeResolvedAndCachedEdges(merged, cached, edgesByOwner, new Set(['a.ts']));
     // a.ts in closure → fresh edge (line 3); b.ts unchanged → cached calls ([] here).

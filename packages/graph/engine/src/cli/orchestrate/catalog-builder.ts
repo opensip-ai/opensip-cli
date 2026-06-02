@@ -10,6 +10,8 @@
  * the progress/pressure-monitor wrapper here.
  */
 
+import { ownerEdgeKey } from '../../owner-key.js';
+
 import {
   expandClosureToFixpoint,
   mergeOccurrences,
@@ -264,7 +266,7 @@ function attachDependenciesIncremental(
   >;
   for (const [name, occs] of Object.entries(functions)) {
     out[name] = occs.map((o) => {
-      const deps = dependenciesByOwner.get(o.bodyHash);
+      const deps = dependenciesByOwner.get(ownerEdgeKey(o.bodyHash, o.filePath));
       return deps === undefined ? o : { ...o, dependencies: deps };
     });
   }
@@ -326,8 +328,9 @@ function stitchEdges(
   for (const [name, occs] of Object.entries(initial.functions)) {
     if (!occs) continue;
     next[name] = occs.map((o) => {
-      const calls = edgesByOwner.get(o.bodyHash) ?? [];
-      const dependencies = dependenciesByOwner?.get(o.bodyHash);
+      const ownerKey = ownerEdgeKey(o.bodyHash, o.filePath);
+      const calls = edgesByOwner.get(ownerKey) ?? [];
+      const dependencies = dependenciesByOwner?.get(ownerKey);
       // Omit `dependencies` entirely when no edges resolved — the
       // optional field stays absent, matching the pre-Phase-4 wire
       // shape for adapters that don't emit dependency sites.

@@ -29,7 +29,7 @@ export function dashboardViewBigJs(): string {
       { label: 'Function', value: 'o => displayName(o.simpleName)' },
       { label: 'Lines', value: 'o => o.__metric' },
       { label: 'Kind', value: 'o => o.kind' },
-      { label: 'Package', value: 'o => packageOfPath(o.filePath)' },
+      { label: 'Package', value: 'o => pkgOf(o)' },
       { label: 'File', value: 'o => o.filePath + \':\' + o.line' },
     ],
     headingText: 'Big functions',

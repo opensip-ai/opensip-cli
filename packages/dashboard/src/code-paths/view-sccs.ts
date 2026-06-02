@@ -48,7 +48,7 @@ views.push({
       const previewNames = members.slice(0, 5).map(m => displayName(m.simpleName));
       const previewMore = members.length > 5 ? ', ...' + (members.length - 5) + ' more' : '';
       const previewText = previewNames.join(', ') + previewMore;
-      const pkgs = Array.from(new Set(members.map(m => packageOfPath(m.filePath)))).sort();
+      const pkgs = Array.from(new Set(members.map(m => pkgOf(m)))).sort();
       const tr = el('tr', { class: 'clickable', 'data-body-hash': members[0] ? members[0].bodyHash : '' });
       tr.appendChild(el('td', { text: String(scc.length) }));
       tr.appendChild(el('td', { text: previewText }));

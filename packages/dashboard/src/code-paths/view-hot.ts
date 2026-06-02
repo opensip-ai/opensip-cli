@@ -29,7 +29,7 @@ export function dashboardViewHotJs(): string {
     columns: [
       { label: 'Function', value: 'o => displayName(o.simpleName)' },
       { label: 'Callers', value: 'o => o.__metric' },
-      { label: 'Package', value: 'o => packageOfPath(o.filePath)' },
+      { label: 'Package', value: 'o => pkgOf(o)' },
       { label: 'File', value: 'o => o.filePath + \':\' + o.line' },
     ],
     headingText: 'Hot functions',

@@ -47,7 +47,8 @@ import { dashboardViewsRegistryJs } from './code-paths/views-registry.js';
  * `<name> is not defined`. Free-identifier dependencies of each
  * emitter, listed against the emitter that supplies them:
  *
- *  1. path-utils       — declares `displayName`, `packageOfPath`.
+ *  1. path-utils       — declares `displayName`, `packageOfPath`, `pkgOf`,
+ *                        `shortPkg`.
  *  2. indexes          — declares `buildIndexes`. No external deps.
  *  3. filters          — declares `filterState`, `passesFilter`,
  *                        `renderFilterChips`. No external deps.

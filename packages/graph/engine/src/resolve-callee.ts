@@ -27,6 +27,16 @@ export function packageOf(filePath: string): string {
   return m ? m[1] : '<unknown>';
 }
 
+/**
+ * The package an occurrence belongs to. Prefers the build-time-stamped
+ * `occurrence.package` (nearest `package.json` name — accurate for any repo
+ * layout); falls back to the `packages/<segment>` path heuristic for
+ * pre-2.4.2 catalogs that predate the stamp.
+ */
+export function pkgOf(occ: Pick<FunctionOccurrence, 'package' | 'filePath'>): string {
+  return occ.package ?? packageOf(occ.filePath);
+}
+
 /** The package groups the caller's module imports (empty in fast mode). */
 export function callerImportedPackages(
   callerOcc: FunctionOccurrence,
@@ -55,13 +65,13 @@ export function resolveCallee(
   if (!candidates || candidates.length === 0) return undefined;
   if (candidates.length === 1) return candidates[0];
 
-  const callerPkg = packageOf(callerOcc.filePath);
-  const samePackage = candidates.filter((c) => packageOf(c.filePath) === callerPkg);
+  const callerPkg = pkgOf(callerOcc);
+  const samePackage = candidates.filter((c) => pkgOf(c) === callerPkg);
   if (samePackage.length > 0) return lowestByQualifiedName(samePackage);
 
   const imported = callerImportedPackages(callerOcc, indexes);
   if (imported.size > 0) {
-    const inImported = candidates.filter((c) => imported.has(packageOf(c.filePath)));
+    const inImported = candidates.filter((c) => imported.has(pkgOf(c)));
     if (inImported.length > 0) return lowestByQualifiedName(inImported);
   }
 

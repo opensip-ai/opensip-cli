@@ -59,7 +59,7 @@ function openFunctionCard(bodyHash) {
     for (const h of callerHashes) {
       const c = graphIndexes.byBodyHash.get(h);
       if (!c) continue;
-      const pkg = packageOfPath(c.filePath);
+      const pkg = pkgOf(c);
       let bucket = grouped.get(pkg);
       if (!bucket) { bucket = []; grouped.set(pkg, bucket); }
       bucket.push(c);

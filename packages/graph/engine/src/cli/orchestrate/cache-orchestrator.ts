@@ -13,6 +13,7 @@ import {
   classifyCatalog,
   computeFilesFingerprint,
 } from '../../cache/invalidate.js';
+import { assignPackages } from '../../pipeline/assign-packages.js';
 import { constrainCrossPackageEdges } from '../../pipeline/constrain-edges.js';
 
 import {
@@ -39,9 +40,9 @@ export interface ObtainCatalogInput {
   /** Active resolution tier. Folded into the cacheKey so fast/exact
    *  catalogs never collide, and forwarded into the build path. */
   readonly resolutionMode: ResolutionMode;
-  /** Workspace package name → coupling group, for the cross-package edge
-   *  constraint (see `constrainCrossPackageEdges`). Empty in non-monorepos. */
-  readonly packageGroupMap: ReadonlyMap<string, string>;
+  /** Absolute project root — used to stamp each occurrence's package via its
+   *  nearest `package.json` (see `assignPackages`). */
+  readonly projectRoot: string;
   readonly onProgress?: GraphProgressCallback;
   readonly monitor?: PressureMonitor;
 }
@@ -102,13 +103,17 @@ export function obtainCatalog(input: ObtainCatalogInput): ObtainCatalogOutput {
         input.monitor,
       );
 
-  const catalog: Catalog = constrainCrossPackageEdges(
+  // Stamp packages (nearest package.json), then drop name-guessed edges that
+  // contradict the import graph. Order matters: the constraint reads the
+  // stamped `occurrence.package`.
+  const stamped = assignPackages(
     {
       ...built.catalog,
       filesFingerprint: computeFilesFingerprint(input.discovery.files),
     },
-    input.packageGroupMap,
+    input.projectRoot,
   );
+  const catalog: Catalog = constrainCrossPackageEdges(stamped);
   if (input.useCache && input.catalogRepo) {
     try {
       input.catalogRepo.replaceAll(catalog);

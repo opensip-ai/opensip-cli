@@ -29,7 +29,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   specifiers (the resolved targets are empty for workspace imports, which
   point at built `dist/`). No-op in `fast` mode and non-monorepo repos.
 
+- **Call edges are no longer unioned across identical-bodied functions.** A
+  call edge was bucketed by its owner's content `bodyHash` alone, so two
+  functions with the same body in different files (e.g. `stripStrings`
+  duplicated across the language adapters) shared one edge list — each then
+  appeared to call every twin's callees, inventing cross-package coupling.
+  Edges are now keyed per occurrence (`bodyHash` + `filePath`) end to end
+  (resolver, stitch, incremental merge, dependency attach).
+
 ### Changed
+
+- **The coupling grid buckets by real package, not directory.** A file's
+  package is now its nearest enclosing `package.json` name (stamped per
+  occurrence at build time), falling back to the top-level path segment when
+  there's no manifest. Previously it grouped by the first segment under
+  `packages/`, which collapsed the 29 workspace packages into 12 directory
+  groups and degenerated to a single `<unknown>` bucket on any repo not laid
+  out under `packages/`. The grid now shows real packages and works on any
+  layout (`packages/`, `apps/`+`libs/`, single-package, non-JS). The
+  `GraphFunctionOccurrence` contract gains an optional `package` field.
 
 - **The "update available" notice persists across runs** until you upgrade,
   instead of showing once and disappearing.

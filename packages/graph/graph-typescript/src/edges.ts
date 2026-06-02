@@ -19,6 +19,7 @@ import { logger } from '@opensip-tools/core';
 import {
   appendEdge,
   createMutableStats,
+  ownerEdgeKey,
   pushCreationEdge as pushSharedCreationEdge,
   truncateForCallEdge,
 } from '@opensip-tools/graph';
@@ -96,12 +97,16 @@ export function resolveEdgesFromRecords(
   const stats = createMutableStats();
 
   for (const r of input.callSites) {
+    // Bucket edges per OWNER OCCURRENCE (bodyHash + file), not bodyHash alone:
+    // body-twin functions in different files share a hash, and a hash-only
+    // bucket would union their edges into phantom cross-package calls.
+    const ownerKey = ownerEdgeKey(r.ownerHash, relative(input.projectDirAbs, r.sourceFile.fileName));
     if (r.kind === 'creation') {
       if (r.childHash === undefined) continue;
       pushSharedCreationEdge(
         r.node,
         r.sourceFile,
-        r.ownerHash,
+        ownerKey,
         r.childHash,
         callsByHash,
         stats,
@@ -118,7 +123,7 @@ export function resolveEdgesFromRecords(
     };
     const verdict = computeVerdict(r.node, ctx);
     if (verdict === null) continue;
-    pushCallEdge(r.node, r.sourceFile, verdict, r.ownerHash, callsByHash, stats);
+    pushCallEdge(r.node, r.sourceFile, verdict, ownerKey, callsByHash, stats);
   }
 
   const newCatalog = rebuildCatalog(input.catalog, callsByHash);
@@ -166,12 +171,14 @@ export function resolveEdgesSyntactic(
   const importIndexByFile = new Map<ts.SourceFile, ImportIndex>();
 
   for (const r of input.callSites) {
+    // Per-owner-occurrence bucket key (see resolveEdgesFromRecords).
+    const ownerKey = ownerEdgeKey(r.ownerHash, relative(input.projectDirAbs, r.sourceFile.fileName));
     if (r.kind === 'creation') {
       if (r.childHash === undefined) continue;
       pushSharedCreationEdge(
         r.node,
         r.sourceFile,
-        r.ownerHash,
+        ownerKey,
         r.childHash,
         callsByHash,
         stats,
@@ -193,7 +200,7 @@ export function resolveEdgesSyntactic(
       importIndex,
     });
     if (verdict === null) continue;
-    pushCallEdge(r.node, r.sourceFile, verdict, r.ownerHash, callsByHash, stats);
+    pushCallEdge(r.node, r.sourceFile, verdict, ownerKey, callsByHash, stats);
   }
 
   const newCatalog = rebuildCatalog(input.catalog, callsByHash);
@@ -220,7 +227,7 @@ function pushCallEdge(
   node: ts.Node,
   sourceFile: ts.SourceFile,
   verdict: ResolverVerdict,
-  ownerHash: string,
+  ownerKey: string,
   callsByHash: Map<string, CallEdge[]>,
   stats: MutableStats,
 ): void {
@@ -235,7 +242,7 @@ function pushCallEdge(
     text: truncateForCallEdge(pos.text),
     discarded: isReturnValueDiscarded(node),
   };
-  appendEdge(callsByHash, ownerHash, edge);
+  appendEdge(callsByHash, ownerKey, edge);
   stats.apply(edge);
 }
 
@@ -353,7 +360,7 @@ function rebuildCatalog(
     if (!occs) continue;
     functions[name] = occs.map((o) => ({
       ...o,
-      calls: callsByHash.get(o.bodyHash) ?? [],
+      calls: callsByHash.get(ownerEdgeKey(o.bodyHash, o.filePath)) ?? [],
     }));
   }
   return { ...catalog, functions };

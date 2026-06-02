@@ -1,7 +1,10 @@
 /**
  * Path / name display helpers shared across the Explore views.
  *
- * - packageOfPath: derive the package name from a project-relative path.
+ * - pkgOf:         the package an occurrence belongs to — prefers the
+ *   build-time-stamped `occurrence.package` (nearest package.json name, shown
+ *   scope-stripped), falling back to the path heuristic for old catalogs.
+ * - packageOfPath: path-only fallback (first segment under packages/).
  * - displayName:   collapse synthetic graph names like
  *   "<arrow:packages/.../foo.ts:234:45>" into a short tag the table
  *   can render without horizontal overflow. The underlying simpleName
@@ -15,6 +18,20 @@ function packageOfPath(filePath) {
   if (typeof filePath !== 'string' || filePath.length === 0) return '<unknown>';
   const m = /^packages\/([^/]+)\//.exec(filePath);
   return m ? m[1] : '<unknown>';
+}
+
+// Strip an npm scope for display: "@opensip-tools/lang-typescript" -> "lang-typescript".
+function shortPkg(name) {
+  if (typeof name !== 'string') return '<unknown>';
+  return name.charCodeAt(0) === 64 /* @ */ ? name.slice(name.indexOf('/') + 1) : name;
+}
+
+// The package an occurrence belongs to. Prefers the build-time-stamped
+// occurrence.package (accurate for any repo layout); falls back to the path
+// heuristic for pre-2.4.2 catalogs. Scope-stripped for compact display.
+function pkgOf(occ) {
+  if (occ && typeof occ.package === 'string' && occ.package.length > 0) return shortPkg(occ.package);
+  return packageOfPath(occ ? occ.filePath : '');
 }
 
 function displayName(simpleName) {

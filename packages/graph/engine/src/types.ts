@@ -165,6 +165,14 @@ export interface FunctionOccurrence {
   readonly qualifiedName: string;
   /** Project-relative path. */
   readonly filePath: string;
+  /**
+   * The package this occurrence belongs to — the `name` of its nearest
+   * enclosing `package.json`, else the top-level path segment. Assigned by
+   * `assignPackages` at build time so consumers (coupling grid, edge
+   * constraint) bucket by real package boundary, not a path heuristic.
+   * Optional for forward-compat; absent ⇒ derive from `filePath`.
+   */
+  readonly package?: string;
   /** 1-based line where the function declaration begins. */
   readonly line: number;
   /** 0-based column. */

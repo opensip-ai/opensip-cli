@@ -7,7 +7,7 @@
 
 import { logger } from '@opensip-tools/core';
 
-import { packageOf } from '../resolve-callee.js';
+import { pkgOf } from '../resolve-callee.js';
 
 import type { BlastScore, Catalog, FunctionOccurrence, Indexes } from '../types.js';
 
@@ -89,7 +89,7 @@ function importedPackagesOf(
   for (const dep of occ.dependencies ?? []) {
     for (const targetHash of dep.to) {
       const target = byBodyHash.get(targetHash);
-      if (target) set.add(packageOf(target.filePath));
+      if (target) set.add(pkgOf(target));
     }
   }
   return set;

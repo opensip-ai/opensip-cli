@@ -162,6 +162,7 @@ export type {
 // the graph-typescript test suite without forcing it to deep-import
 // engine internals.
 export { buildIndexes } from './pipeline/indexes.js';
+export { ownerEdgeKey } from './owner-key.js';
 export { alwaysThrowsBranchRule } from './rules/always-throws-branch.js';
 export { noSideEffectPathRule } from './rules/no-side-effect-path.js';
 export { duplicatedFunctionBodyRule } from './rules/duplicated-function-body.js';

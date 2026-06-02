@@ -11,21 +11,21 @@
  * This pass drops the false edges that the name-based resolvers invent:
  * for every **name-guessed** edge (`resolution` ∈ {unknown, dynamic-string,
  * syntactic}) it keeps only the targets whose body hash has at least one
- * occurrence in a package the caller can reach — the caller's own package, or
- * one its module imports. Type-checker-backed edges (`static`,
- * `method-dispatch`, `jsx`, `constructor`) are left untouched, so legitimate
- * edges — including re-export indirection the import set wouldn't capture —
- * are never dropped.
+ * occurrence that is a valid callee for this caller — in a package the caller
+ * can reach (own ∪ imported) and not another package's test file (a
+ * cross-package test file is never importable). Type-checker-backed edges
+ * (`static`, `method-dispatch`, `jsx`, `constructor`) are left untouched, so
+ * legitimate edges — including re-export indirection — are never dropped.
  *
- * The caller's import set is derived from each module's `dependencies[]`
- * **specifiers** (not their resolved `to`, which is empty for workspace
- * imports — the TS resolver points them at built `dist/*.d.ts` outside the
- * catalog) mapped through `packageGroupMap`. With no package map (non-monorepo
- * repos) or in `fast` mode (no `dependencies[]`), the catalog is returned
- * unchanged.
+ * Package identity comes from `occurrence.package` (the nearest-`package.json`
+ * name stamped by `assignPackages`); the caller's import set is the set of
+ * package names its module's `dependencies[]` specifiers refer to — which, for
+ * a workspace import, IS the imported package's name, so no separate lookup is
+ * needed. No-op in `fast` mode (no `dependencies[]`). Must run after
+ * `assignPackages`.
  */
 
-import { packageOf } from '../resolve-callee.js';
+import { pkgOf } from '../resolve-callee.js';
 
 import { buildHashMaps } from './indexes.js';
 
@@ -47,55 +47,45 @@ const EMPTY_SET: ReadonlySet<string> = new Set<string>();
 /**
  * Drop name-guessed call-edge targets that point into a package the caller
  * cannot reach. Returns a new catalog (occurrences/edges rebuilt only where a
- * target was removed). No-op in `fast` mode or when `packageGroupMap` is empty.
+ * target was removed). No-op in `fast` mode.
  */
-export function constrainCrossPackageEdges(
-  catalog: Catalog,
-  packageGroupMap: ReadonlyMap<string, string>,
-): Catalog {
-  if (catalog.resolutionMode === 'fast' || packageGroupMap.size === 0) return catalog;
+export function constrainCrossPackageEdges(catalog: Catalog): Catalog {
+  if (catalog.resolutionMode === 'fast') return catalog;
 
   const { occurrencesByHash } = buildHashMaps(catalog);
-  const importedPackagesByFile = buildImportedPackagesByFile(catalog, packageGroupMap);
+  const importedByFile = buildImportedPackagesByFile(catalog);
 
   const functions: Record<string, FunctionOccurrence[]> = {};
   for (const [name, occs] of Object.entries(catalog.functions)) {
-    functions[name] = occs.map((occ) =>
-      constrainOccurrence(occ, occurrencesByHash, importedPackagesByFile),
-    );
+    functions[name] = occs.map((occ) => constrainOccurrence(occ, occurrencesByHash, importedByFile));
   }
   return { ...catalog, functions };
 }
 
 /**
- * filePath → set of package groups it imports, derived from each module-init's
- * `dependencies[]` specifiers (the reliable signal — see file header).
+ * filePath → set of package names it imports, from each module-init's
+ * `dependencies[]` specifiers. A workspace import specifier IS the imported
+ * package's name (`@scope/pkg`), so it compares directly to `occurrence.package`.
  */
-function buildImportedPackagesByFile(
-  catalog: Catalog,
-  packageGroupMap: ReadonlyMap<string, string>,
-): Map<string, Set<string>> {
+function buildImportedPackagesByFile(catalog: Catalog): Map<string, Set<string>> {
   const out = new Map<string, Set<string>>();
   for (const occs of Object.values(catalog.functions)) {
     for (const occ of occs) {
       if (occ.kind !== 'module-init') continue;
-      addImportedGroups(out, occ, packageGroupMap);
+      addImportedNames(out, occ);
     }
   }
   return out;
 }
 
-function addImportedGroups(
-  out: Map<string, Set<string>>,
-  occ: FunctionOccurrence,
-  packageGroupMap: ReadonlyMap<string, string>,
-): void {
+function addImportedNames(out: Map<string, Set<string>>, occ: FunctionOccurrence): void {
   let set: Set<string> | undefined;
   for (const dep of occ.dependencies ?? []) {
-    const group = specifierGroup(dep.specifier, packageGroupMap);
-    if (group === undefined) continue;
+    // Relative imports stay within the caller's own package (covered by the
+    // own-package allowance) — only bare/scoped specifiers name another package.
+    if (dep.specifier.startsWith('.')) continue;
     set ??= getOrCreate(out, occ.filePath);
-    set.add(group);
+    set.add(packageNameOf(dep.specifier));
   }
 }
 
@@ -108,17 +98,6 @@ function getOrCreate(map: Map<string, Set<string>>, key: string): Set<string> {
   return set;
 }
 
-/** Map an import specifier to its workspace package group, or undefined. */
-function specifierGroup(
-  specifier: string,
-  packageGroupMap: ReadonlyMap<string, string>,
-): string | undefined {
-  // Relative imports stay within the caller's own package group, which the
-  // own-package allowance already covers — skip them here.
-  if (specifier.startsWith('.')) return undefined;
-  return packageGroupMap.get(packageNameOf(specifier));
-}
-
 /** `@scope/name/sub` → `@scope/name`; `name/sub` → `name`. */
 function packageNameOf(specifier: string): string {
   const parts = specifier.split('/');
@@ -128,11 +107,11 @@ function packageNameOf(specifier: string): string {
 function constrainOccurrence(
   occ: FunctionOccurrence,
   occurrencesByHash: ReadonlyMap<string, readonly FunctionOccurrence[]>,
-  importedPackagesByFile: ReadonlyMap<string, ReadonlySet<string>>,
+  importedByFile: ReadonlyMap<string, ReadonlySet<string>>,
 ): FunctionOccurrence {
   if (occ.calls.length === 0) return occ;
-  const callerPkg = packageOf(occ.filePath);
-  const reachable = reachablePackages(occ, importedPackagesByFile);
+  const callerPkg = pkgOf(occ);
+  const reachable = reachablePackages(occ, callerPkg, importedByFile);
 
   let changed = false;
   const calls = occ.calls.map((edge) => {
@@ -143,14 +122,15 @@ function constrainOccurrence(
   return changed ? { ...occ, calls } : occ;
 }
 
-/** The set of package groups a caller occurrence can reach (own ∪ imported). */
+/** The set of packages a caller occurrence can reach (own ∪ imported). */
 function reachablePackages(
   occ: FunctionOccurrence,
-  importedPackagesByFile: ReadonlyMap<string, ReadonlySet<string>>,
+  callerPkg: string,
+  importedByFile: ReadonlyMap<string, ReadonlySet<string>>,
 ): ReadonlySet<string> {
-  const imported = importedPackagesByFile.get(occ.filePath) ?? EMPTY_SET;
+  const imported = importedByFile.get(occ.filePath) ?? EMPTY_SET;
   const reachable = new Set<string>(imported);
-  reachable.add(packageOf(occ.filePath));
+  reachable.add(callerPkg);
   return reachable;
 }
 
@@ -182,7 +162,7 @@ function targetIsReachable(
 ): boolean {
   const candidates = occurrencesByHash.get(hash) ?? [];
   return candidates.some((c) => {
-    const pkg = packageOf(c.filePath);
+    const pkg = pkgOf(c);
     if (!reachable.has(pkg)) return false;
     return !(c.inTestFile && pkg !== callerPkg);
   });

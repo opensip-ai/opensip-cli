@@ -36,7 +36,7 @@ export function dashboardViewWideJs(): string {
       { label: 'Function', value: 'o => displayName(o.simpleName)' },
       { label: 'Params', value: 'o => o.__metric' },
       { label: 'Signature', value: 'o => o.__thumb' },
-      { label: 'Package', value: 'o => packageOfPath(o.filePath)' },
+      { label: 'Package', value: 'o => pkgOf(o)' },
       { label: 'File', value: 'o => o.filePath + \':\' + o.line' },
     ],
     headingText: 'Wide functions',
