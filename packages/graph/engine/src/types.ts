@@ -318,6 +318,16 @@ export interface GraphConfig {
    * whose duplication is structural, not actionable. Default: 200.
    */
   readonly minDuplicateBodySize?: number;
+  /**
+   * Minimum number of DISTINCT packages a body hash must appear in to
+   * trigger the aggregate cross-package duplication signal for the
+   * duplicated-function-body rule. The aggregate path applies NO per-copy
+   * size/line floor — a small body copied across many packages is a real
+   * consolidation target. When a body hash qualifies here, the single
+   * aggregate signal is emitted and the per-instance signals for that hash
+   * are suppressed. Default: 3.
+   */
+  readonly minCrossPackageDuplicatePackages?: number;
   /** Override the inferred entry-point list. */
   readonly entryPointHashes?: readonly string[];
   /**

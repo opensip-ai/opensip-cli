@@ -75,9 +75,23 @@ The rule does a forward BFS from the entry-point seeds (computed by [`_entry-poi
 
 ### `graph:duplicated-function-body`
 
-[`rules/duplicated-function-body.ts`](../../../packages/graph/engine/src/rules/duplicated-function-body.ts) — group catalog entries by `bodyHash`; report any group with more than one occurrence (above a minimum-line threshold to skip trivial bodies like `return null`).
+[`rules/duplicated-function-body.ts`](../../../packages/graph/engine/src/rules/duplicated-function-body.ts) — group catalog entries by `bodyHash`. The rule has two complementary code paths under one slug:
 
-**False-positive shape**: the rule matches function bodies *textually* and does not currently resolve called identifiers through lexical scope. Thin wrapper functions are suppressed by a `minDuplicateBodySize` threshold (default 200 normalized characters), but two larger functions with identical text and different lexical bindings can still look like duplicates. Cross-package duplications are the high-signal subset.
+1. **Per-instance (size-gated).** Report any group with more than one occurrence whose source span clears `minDuplicateBodyLines` (default 5) **and** whose normalized body clears `minDuplicateBodySize` (default 200 characters). This is the "two big functions someone should extract" case. It emits N-1 signals per group (one per non-primary copy).
+
+2. **Aggregate (cross-package, no size floor).** A *small* body copied across *many* packages is the most expensive class of duplication, and the per-instance size floor is exactly what hides it (e.g. `stripStrings`/`stripComments` copied across five language adapters, each copy below the 200-character floor). For each body hash present in **≥ `minCrossPackageDuplicatePackages`** (default 3) *distinct* packages — identified via the same package-boundary the coupling grid uses — the rule emits **one** aggregate signal naming the sorted package list and the occurrence count, with **no** per-copy size or line floor. When a hash qualifies here, the per-instance signals for that same hash are **suppressed**, so a single duplicate group never double-reports. Bodies that don't reach N packages flow through path (1) unchanged.
+
+Both paths apply the same exclusions: `arrow` / `function-expression` / `module-init` kinds and test-file occurrences are skipped. The aggregate signal carries `metadata: { packages, packageCount, occurrenceCount, bodyHash }` and is anchored at the lexicographically-lowest qualified name for a stable fingerprint.
+
+**Config** ([`GraphConfig`](../../../packages/graph/engine/src/types.ts)), read from the `graph:` block of `opensip-tools.config.yml`:
+
+| Knob | Default | Effect |
+| --- | --- | --- |
+| `minDuplicateBodyLines` | 5 | Per-instance: minimum source-span lines. |
+| `minDuplicateBodySize` | 200 | Per-instance: minimum normalized body characters. |
+| `minCrossPackageDuplicatePackages` | 3 | Aggregate: minimum distinct packages a body hash must span to fire one aggregate signal (and suppress its per-instance copies). Lower to **2** for a repo where every two-package duplicate is a real hoist target; raise it to quiet a noisy repo. |
+
+**False-positive shape**: the rule matches function bodies *textually* and does not currently resolve called identifiers through lexical scope. On the per-instance path, thin wrapper functions are suppressed by `minDuplicateBodySize`, but two larger functions with identical text and different lexical bindings can still look like duplicates. The aggregate cross-package path is the high-signal subset: ≥3 distinct packages is unambiguously shared infra that should be hoisted into a common package.
 
 ### `graph:no-side-effect-path`
 

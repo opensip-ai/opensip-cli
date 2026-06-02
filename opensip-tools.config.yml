@@ -140,6 +140,26 @@ checkOverrides:
   file-length-limit: [backend, cli]
 
 # =============================================================================
+# Graph Configuration
+# =============================================================================
+#
+# Per-rule knobs for the `graph` tool's static call-graph rules. Each field
+# overrides the corresponding in-rule default.
+
+graph:
+  # graph:duplicated-function-body — aggregate cross-package code path.
+  # A body hash appearing in >= this many DISTINCT packages emits a single
+  # aggregate "hoist to a shared package" signal (with no per-copy size
+  # floor) and suppresses the per-instance signals for that hash.
+  #
+  # The default is 3 (safe for arbitrary repos — unambiguous shared infra).
+  # We lower it to 2 HERE because we verified every 2-package duplicate in
+  # this repo is a real consolidation target (plugin-loader fitness<->sim,
+  # createPathMatcher checks-ts<->universal, safeReaddir, etc.) with zero
+  # intended twins — so the local opinion is earned.
+  minCrossPackageDuplicatePackages: 2
+
+# =============================================================================
 # Fitness Configuration
 # =============================================================================
 

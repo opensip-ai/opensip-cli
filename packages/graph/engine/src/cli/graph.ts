@@ -42,6 +42,7 @@ import { buildCliOutput, buildCliOutputFromFindings, renderJson } from '../rende
 
 
 import { detectLanguages } from './detect.js';
+import { loadGraphConfig } from './graph-config.js';
 import { runCatalogJsonMode, runGateMode, runReportMode } from './graph-modes.js';
 import { buildUnifiedReportLines, resolutionBannerText } from './graph-report.js';
 import { runGraph, runShardedGraph } from './orchestrate.js';
@@ -53,7 +54,7 @@ import { discoverPolyglotUnits, runWorkspaceUnitsInParallel } from './workspace-
 import type { GraphCommandOptions } from './graph-options.js';
 import type { Shard } from './orchestrate/shard-model.js';
 import type { RunGraphResult } from './orchestrate.js';
-import type { Catalog } from '../types.js';
+import type { Catalog, GraphConfig } from '../types.js';
 import type { FindingOutput, GraphDoneResult } from '@opensip-tools/contracts';
 import type { LanguageAdapter, Signal, ToolCliContext } from '@opensip-tools/core';
 import type { DataStore } from '@opensip-tools/datastore';
@@ -96,18 +97,23 @@ export async function executeGraph(
       return;
     }
     const runCwd = positionalPaths[0] ?? opts.cwd;
+    // Honor the project's `graph:` config block (rule knobs like
+    // minCrossPackageDuplicatePackages). Resolved from the original cwd so a
+    // positional subtree run still picks up the project-root config.
+    const config = loadGraphConfig(opts.cwd);
     // Auto-shard a multi-package project (bare `graph`, no explicit subtree):
     // build packages in parallel and recover cross-package edges. Falls back
     // to the single-process build for one-package repos or when sharding
     // can't engage (no worker script, discovery failure).
     const shards = positionalPaths.length === 0 ? await resolveShards(opts, cli) : [];
     const result = shards.length > 1
-      ? await runShardedBuild(opts, shards, runCwd, cli)
+      ? await runShardedBuild(opts, shards, runCwd, cli, config)
       : await runGraph({
           cwd: runCwd,
           noCache: opts.noCache,
           resolution: opts.resolution,
           language: opts.language,
+          config,
           datastore: cli.scope.datastore() as DataStore | undefined,
         });
     enforceLanguageMismatchPolicy(opts, result.catalog, [runCwd]);
@@ -161,6 +167,7 @@ async function runShardedBuild(
   shards: readonly Shard[],
   projectRoot: string,
   cli: ToolCliContext,
+  config: GraphConfig,
 ): Promise<RunGraphResult> {
   const datastore = cli.scope.datastore() as DataStore | undefined;
   const sharded = await runShardedGraph({
@@ -171,6 +178,7 @@ async function runShardedBuild(
     resolutionMode: opts.resolution ?? 'exact',
     concurrency: opts.concurrency,
     useCache: opts.noCache !== true,
+    config,
     catalogRepo: datastore ? new CatalogRepo(datastore) : null,
   });
   return {
@@ -228,12 +236,14 @@ async function executeMultiPathGraph(
   const allSignals: Signal[] = [];
   let combinedFiles = 0;
   let lastResult: Awaited<ReturnType<typeof runGraph>> | null = null;
+  const config = loadGraphConfig(opts.cwd);
   for (const p of paths) {
     const r = await runGraph({
       cwd: p,
       noCache: opts.noCache,
       resolution: opts.resolution,
       language: opts.language,
+      config,
       datastore: cli.scope.datastore() as DataStore | undefined,
     });
     lastResult = r;
