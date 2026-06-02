@@ -4,7 +4,7 @@ last_verified: 2026-05-26
 release: v2.0.x
 title: "Rules and gating (graph)"
 audience: [contributors, plugin-authors, ci-integrators]
-purpose: "The five graph rules, what each one detects, and how the save/compare gate flow integrates with CI."
+purpose: "The ten graph rules, what each one detects, and how the save/compare gate flow integrates with CI."
 source-files:
   - packages/graph/engine/src/rules/registry.ts
   - packages/graph/engine/src/rules/orphan-subtree.ts
@@ -12,6 +12,12 @@ source-files:
   - packages/graph/engine/src/rules/no-side-effect-path.ts
   - packages/graph/engine/src/rules/test-only-reachable.ts
   - packages/graph/engine/src/rules/always-throws-branch.ts
+  - packages/graph/engine/src/rules/large-function.ts
+  - packages/graph/engine/src/rules/wide-function.ts
+  - packages/graph/engine/src/rules/high-blast-untested.ts
+  - packages/graph/engine/src/rules/cycle.ts
+  - packages/graph/engine/src/rules/unexpected-coupling.ts
+  - packages/graph/engine/src/rules/_severity-override.ts
   - packages/graph/engine/src/rules/_entry-points.ts
   - packages/graph/engine/src/gate.ts
   - packages/graph/engine/src/render/sarif.ts
@@ -24,10 +30,10 @@ related-docs:
 ---
 # Rules and gating (graph)
 
-[`01-stages-and-catalog.md`](./01-stages-and-catalog.md) explained how `graph` builds its picture of the codebase. This doc covers what happens at stage 4 — the five rules that turn that picture into actionable findings — and the gate workflow that lets you keep new regressions out of `main` without forcing a clean-up of everything that exists today.
+[`01-stages-and-catalog.md`](./01-stages-and-catalog.md) explained how `graph` builds its picture of the codebase. This doc covers what happens at stage 4 — the ten rules that turn that picture into actionable findings — and the gate workflow that lets you keep new regressions out of `main` without forcing a clean-up of everything that exists today.
 
 > **What you'll understand after this:**
-> - The five rules graph ships with, what each detects, and the false-positive shape of each.
+> - The ten rules graph ships with, what each detects, and the false-positive shape of each.
 > - The gate save/compare model and how it differs from `fit`'s architecture gate.
 > - How graph's SARIF output integrates with the same CI infrastructure `fit` uses.
 
@@ -51,11 +57,11 @@ interface Rule {
 
 A rule receives frozen inputs (the catalog from stages 1+2, the indexes from stage 3) and returns a list of typed `Signal`s. It cannot import the parser, cannot import another rule, cannot read files. That isolation makes rules unit-testable in ten lines and lets us replace any one of them without touching the rest.
 
-The five rules below are registered in [`rules/registry.ts`](../../../packages/graph/engine/src/rules/registry.ts) and run on every `graph` invocation unless the caller filters with `--check <slug>` (planned, not yet shipped) or `--no-check <slug>` (also planned).
+The ten rules below are registered in [`rules/registry.ts`](../../../packages/graph/engine/src/rules/registry.ts) and run on every `graph` invocation (the default recipe is "run all rules") unless a `--recipe` narrows the set.
 
 ---
 
-## The five rules
+## The five core rules
 
 ### `graph:orphan-subtree`
 
@@ -111,13 +117,73 @@ This is the rule for catching "production helper that's only exercised by tests"
 
 This catches the common case — a function whose body is a precondition wall — but it is not full control-flow analysis. Functions that throw under most, but not all, branches may be missed.
 
-> **Blast radius is a dashboard insight, not a rule.** A function's
-> blast radius (`direct + 0.5 × transitive` callers, bounded reverse BFS)
-> is a *ranking*, not a defect predicate — a top-percentile cut can never
-> reach zero, so it was never a gate. It now lives only in the dashboard's
-> **Hot Functions** view, which ranks functions by their composite blast
-> score. There is no `graph:high-blast-function` rule and it emits no gate
-> signals.
+> **Blast radius as a *ranking* is a dashboard insight, not a rule.** A
+> function's blast radius (`direct + 0.5 × transitive` callers, bounded
+> reverse BFS) is a *ranking*, so a top-percentile cut can never reach zero
+> and never gates. The ranking lives only in the dashboard's coupling /
+> distribution views. Note the distinct gate rule below,
+> [`graph:high-blast-untested`](#graphhigh-blast-untested), which uses blast as
+> an **absolute** threshold combined with `!testReachable` — a bounded,
+> actionable predicate (add a test) that *can* reach zero. There is no
+> `graph:high-blast-function` rule.
+
+## The five structural rules
+
+Five additional rules gate **structural** properties — function size, parameter
+count, untested high-reach functions, and call-graph / package cycles. Each is a
+thin declarative predicate over the engine's derived **feature columns**
+(`bodyLines`, `blast`, `testReachable`, `sccSize`, `crossesPackages`, package
+coupling edges); none re-implements a traversal. All are **on** in the default
+recipe. Thresholds are opinionated in-rule defaults, overridable via the
+`graph:` config block.
+
+### `graph:large-function`
+
+[`rules/large-function.ts`](../../../packages/graph/engine/src/rules/large-function.ts) — flag functions whose body is large enough to be worth splitting. Two bands over the `bodyLines` feature column (`endLine − line + 1`):
+
+- `> largeFunctionWarnLines` (default **80**) → `medium`.
+- `> largeFunctionErrorLines` (default **150**) → `high`.
+
+Actionable ("split it"), precise (a 200-line function is rarely intended), bounded (count reaches zero once every function is under the limit).
+
+### `graph:wide-function`
+
+[`rules/wide-function.ts`](../../../packages/graph/engine/src/rules/wide-function.ts) — flag functions with too many parameters, read directly from `params.length` (raw catalog data, no feature column):
+
+- `> wideFunctionWarnParams` (default **4**) → `medium`.
+- `> wideFunctionErrorParams` (default **7**) → `high`.
+
+Suggestion: group related parameters into an options object, or split the function.
+
+### `graph:high-blast-untested`
+
+[`rules/high-blast-untested.ts`](../../../packages/graph/engine/src/rules/high-blast-untested.ts) — the flagship combination gate: a high-reach function that **no test exercises**. The predicate is `blast.score >= threshold && !testReachable` — an **absolute** blast threshold (never a percentile), so the count reaches zero once every high-blast function is test-covered. This is exactly the bounded-gating shape [ADR-0001](../../decisions/ADR-0001-graph-rules-actionable-precise-bounded.md) sanctions for a metric: it gates as an absolute-threshold input to an actionable, bounded predicate.
+
+- `blast.score >= highBlastWarnThreshold` (default **8**) and untested → `medium`.
+- `blast.score >= highBlastErrorThreshold` (default **20**) and untested → `high`.
+
+A high-blast **tested** function and a **low-blast** untested function both emit nothing. The fix is one verb: add a test. Precision tracks edge-resolution fidelity (blast is computed over resolved call edges).
+
+### `graph:cycle`
+
+[`rules/cycle.ts`](../../../packages/graph/engine/src/rules/cycle.ts) — flag call-graph cycles (strongly-connected components of size ≥ 2), read from the `scc` feature column (engine-side Tarjan; no in-rule cycle detection). One signal **per SCC**, anchored on the lowest-qualified-name member. The severity ladder:
+
+- `sccSize === 1` → no signal (not a cycle).
+- `crossesPackages` → `high` (wins regardless of size — cross-package cycles are the most expensive to unwind).
+- `sccSize === 2` → `cycleSize2Severity` (default **`off`** — legitimate mutual recursion is common; set `low` to surface them as notes).
+- `sccSize >= cycleMinSize` (default **3**) → `medium`.
+
+### `graph:unexpected-coupling`
+
+[`rules/unexpected-coupling.ts`](../../../packages/graph/engine/src/rules/unexpected-coupling.ts) — flag **package dependency cycles** (A→B→A), read from the package coupling edge column. One `high` signal per unordered package pair that forms a cycle. Bounded (reaches zero when the cycle is broken) and project-agnostic — it bakes in **no** layer names and reads no declared-layering input.
+
+> **ADR-0001 boundary.** `unexpected-coupling` gates package **cycles** only. The statistical "coupling outlier" (a package-pair edge count far above the distribution) is a *ranking* → a **dashboard insight, not a gate rule** — it surfaces on the coupling view, never as a gate signal.
+
+It de-dups with `graph:cycle`: that rule reports per-SCC at function granularity, this one reports per-package-pair at package granularity. Distinct `ruleId` + location → distinct fingerprints; the two are cross-linked via metadata (`relatedSccCount` ↔ `relatedPackageCycle`).
+
+### Opinionated default, overridable severity (the clamp)
+
+A rule's per-occurrence severity (including the multi-band ladders above) is the **base**. The `graph.severityOverrides` config block ([`_severity-override.ts`](../../../packages/graph/engine/src/rules/_severity-override.ts)) is an **opt-in clamp**: setting `severityOverrides: { 'graph:<slug>': error }` forces every signal from that rule to `high` (`warning` → `medium`). It is **baseline-neutral when unset** — with no override configured, every rule emits exactly its base severity, so the gate baseline never churns from this wiring. `defaultSeverity` stays metadata, never the emitted value.
 
 ### Entry-point inference
 
@@ -144,6 +210,11 @@ The fidelity matrix:
 | `no-side-effect-path` | High — accurate edges + side-effect primitive list | Low — edge inaccuracy compounds; the side-effect primitives list is per-adapter via `ruleHints.sideEffectPrimitives` |
 | `test-only-reachable` | High — symbol resolution makes "callable from test only" precise | Low — same fidelity issue as no-side-effect-path |
 | `always-throws-branch` | Medium — textual heuristic on `CallEdge.text`, language-agnostic | Medium — same heuristic, different syntax via `ruleHints.throwSyntaxRegex` |
+| `large-function` | High — `bodyLines` is `endLine − line + 1`, emitted by every adapter | High — same (line spans are language-agnostic) |
+| `wide-function` | High — `params` is raw catalog data in every adapter | High — same |
+| `high-blast-untested` | High — blast + test reachability over accurate edges | Medium — precision tracks edge-resolution fidelity (blast over resolved edges) |
+| `cycle` | High — SCCs over accurate call edges | Medium — name-based edges may merge/miss cycles |
+| `unexpected-coupling` | High — package edges over accurate cross-package resolution | Medium — same edge-fidelity dependence |
 
 The `ruleHints` surface ([`lang-adapter/types.ts`](../../../packages/graph/engine/src/lang-adapter/types.ts)) is how an adapter customises the per-rule inputs without changing rule logic: `isTestFile` for `test-only-reachable`, `sideEffectPrimitives` for `no-side-effect-path`, `throwSyntaxRegex` for `always-throws-branch`. An adapter that doesn't supply hints gets the engine's defaults and the corresponding rules silently degrade in precision rather than failing.
 

@@ -246,7 +246,7 @@
         "plugin-authors",
         "ci-integrators"
       ],
-      "purpose": "The five graph rules, what each one detects, and how the save/compare gate flow integrates with CI."
+      "purpose": "The ten graph rules, what each one detects, and how the save/compare gate flow integrates with CI."
     },
     {
       "file": "docs/web-generated/40-graph/03-adding-a-language.md",
