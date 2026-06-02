@@ -12,8 +12,9 @@ so a future contributor can reconstruct the reasoning instead of re-litigating i
 
 ADRs are the **decision log** (the durable *why*). They complement, but are
 distinct from:
-- **`docs/specs/`** — forward-looking *how to build it* specs (an ADR records the
-  decision; a spec implements it).
+- **`docs/plans/specs/`** — forward-looking *how to build it* specs, **local-only
+  (gitignored, under `docs/plans/`)** (an ADR records the decision; a spec
+  implements it).
 - **`docs/internal/`** — looser contributor notes, operational awareness,
   cross-repo relationships.
 - **`docs/public/`** — reader-facing product/usage docs.

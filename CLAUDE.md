@@ -378,10 +378,13 @@ scratch area, each with a distinct contract:
   uses `ADR-NNNN`; the parent `opensip` repo uses `DEC-NNN` — cite a
   parent decision via `related: [DEC-NNN]`. See
   `docs/decisions/README.md` and `docs/decisions/TEMPLATE.md`.
-- **`docs/specs/`** — hand-edited, committed. Forward-looking
-  implementation specs (the *how* to build a feature), following the
-  spec skill format; they gate planning before code. A spec implements
-  a decision recorded in `docs/decisions/`.
+- **`docs/plans/specs/`** — hand-edited, **local-only (gitignored,
+  lives under `docs/plans/`)**. Forward-looking implementation specs
+  (the *how* to build a feature), following the spec skill format; they
+  gate planning before code. A spec implements a decision recorded in
+  `docs/decisions/`. NOTE: this deliberately overrides the spec skill's
+  default `docs/specs/` output — author all specs under
+  `docs/plans/specs/`.
 - **`docs/web-generated/`** — generated output. Never hand-edit. It
   mirrors `docs/public/` rewritten for the website (links resolved to
   pinned GitHub URLs and root-relative website paths; `web:skip` /
@@ -391,13 +394,13 @@ scratch area, each with a distinct contract:
   In-progress implementation plans and design notes that don't belong
   in a public OSS repo. Not committed; not visible to external
   contributors. Anything that matures into a durable record (decision →
-  `docs/decisions/`, spec → `docs/specs/`, consumer contract →
+  `docs/decisions/`, consumer contract →
   `docs/internal/`, reader-facing fact → `docs/public/`) graduates out
   of `docs/plans/`.
 
 Boundary rule of thumb: a durable *decision* (what we chose + why, with
 alternatives) is an ADR in `docs/decisions/`; the *how to build it* is a
-spec in `docs/specs/`. For prose docs: if you can write the fact about
+spec in `docs/plans/specs/` (local-only). For prose docs: if you can write the fact about
 opensip-tools without naming a specific consumer, it goes in
 `docs/public/`; if naming a specific consumer (or other private context)
 is load-bearing, it goes in `docs/internal/`; if it's pending work or
