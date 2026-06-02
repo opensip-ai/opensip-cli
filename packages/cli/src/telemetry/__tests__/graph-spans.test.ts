@@ -7,12 +7,13 @@
  * `@opensip-tools/graph` tool package. We register an in-memory provider, run
  * `runGraph` over a synthetic fixture, and assert:
  *
- *   1. enabled ⇒ the six `opensip_tools.graph.<stage>` spans are produced, in
- *      GRAPH_STAGES order, each carrying the `opensip_tools.graph.stage`
- *      attribute, plus the orchestrator-level attributes (file_count on
- *      discover, cache_hit on index, rule/signal counts on rules);
- *   2. parent nesting ⇒ under an active parent context, all six spans share the
- *      parent's trace id (proving consumer TRACEPARENT propagation works);
+ *   1. enabled ⇒ one `opensip_tools.graph.<stage>` span per GRAPH_STAGES entry
+ *      is produced, in GRAPH_STAGES order, each carrying the
+ *      `opensip_tools.graph.stage` attribute, plus the orchestrator-level
+ *      attributes (file_count on discover, cache_hit on index, rule/signal
+ *      counts on rules);
+ *   2. parent nesting ⇒ under an active parent context, all stage spans share
+ *      the parent's trace id (proving consumer TRACEPARENT propagation works);
  *   3. disabled (no provider) ⇒ a run produces zero spans (standalone no-op).
  *
  * What this validates IN-PROCESS vs what a real collector still needs:
@@ -116,7 +117,7 @@ describe('graph stage spans — in-process capture (in-memory exporter)', () => 
     exporter.reset();
   });
 
-  it('produces the six stage spans in canonical order with the stage attribute', async () => {
+  it('produces one stage span per GRAPH_STAGES entry in canonical order with the stage attribute', async () => {
     await runOverFixture();
 
     const spans = exporter.getFinishedSpans();
@@ -143,7 +144,7 @@ describe('graph stage spans — in-process capture (in-memory exporter)', () => 
     expect(byName.get('opensip_tools.graph.rules')?.['opensip_tools.graph.signal_count']).toBe(0);
   });
 
-  it('nests all six stage spans under a parent trace (TRACEPARENT propagation)', async () => {
+  it('nests every stage span under a parent trace (TRACEPARENT propagation)', async () => {
     // Simulate the embedding consumer's TRACEPARENT.
     const traceparent = '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01';
     const parent = new W3CTraceContextPropagator().extract(
@@ -157,7 +158,7 @@ describe('graph stage spans — in-process capture (in-memory exporter)', () => 
     const stageSpans = exporter
       .getFinishedSpans()
       .filter((s) => s.name.startsWith(GRAPH_TRACER_PREFIX));
-    expect(stageSpans).toHaveLength(6);
+    expect(stageSpans).toHaveLength(GRAPH_STAGES.length);
     for (const span of stageSpans) {
       expect(span.spanContext().traceId).toBe('4bf92f3577b34da6a3ce929d0e0e4736');
     }
