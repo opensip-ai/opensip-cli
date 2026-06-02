@@ -28,6 +28,8 @@
 
 import { createSignal } from '@opensip-tools/core';
 
+import { pkgOf } from '../resolve-callee.js';
+
 import { applySeverityOverride } from './_severity-override.js';
 import { defineRule } from './define-rule.js';
 
@@ -54,6 +56,10 @@ export const cycleRule = defineRule({
       const anchor = anchorOccurrence(scc, indexes);
       /* v8 ignore next */
       if (!anchor) continue;
+      // The distinct packages this SCC spans — the cross-link to
+      // graph:unexpected-coupling's per-package-pair-cycle signal. Only
+      // meaningful (more than one package) when the SCC crosses packages.
+      const spannedPackages = scc.crossesPackages ? packagesOf(scc, indexes) : undefined;
       signals.push(
         createSignal({
           source: 'graph',
@@ -68,9 +74,10 @@ export const cycleRule = defineRule({
             sccSize: scc.sccSize,
             crossesPackages: scc.crossesPackages,
             qualifiedName: anchor.qualifiedName,
-            // Cross-linked with graph:unexpected-coupling's per-package-cycle
-            // signal; populated there, not here (this rule is per-SCC).
-            relatedPackageCycle: undefined,
+            // Cross-link to graph:unexpected-coupling's per-package-pair-cycle
+            // signal: the distinct packages this cross-package SCC spans
+            // (undefined for an intra-package cycle).
+            relatedPackageCycle: spannedPackages,
           },
         }),
       );
@@ -114,4 +121,14 @@ function anchorOccurrence(scc: SccFeatures, indexes: Indexes): FunctionOccurrenc
     if (!anchor || occ.qualifiedName < anchor.qualifiedName) anchor = occ;
   }
   return anchor;
+}
+
+/** The sorted distinct packages an SCC's resolvable members belong to. */
+function packagesOf(scc: SccFeatures, indexes: Indexes): readonly string[] {
+  const packages = new Set<string>();
+  for (const hash of scc.members) {
+    const occ = indexes.byBodyHash.get(hash);
+    if (occ) packages.add(pkgOf(occ));
+  }
+  return [...packages].sort();
 }
