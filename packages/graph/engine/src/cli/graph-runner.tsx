@@ -43,7 +43,7 @@ import { buildUnifiedReportLines, persistSession } from './graph.js';
 import { GRAPH_STAGES, runGraph } from './orchestrate.js';
 
 import type { GraphProgressEvent, GraphStage, RunGraphResult } from './orchestrate.js';
-import type { GraphConfig, ResolutionMode } from '../types.js';
+import type { GraphConfig, ResolutionMode, Rule } from '../types.js';
 import type { DataStore } from '@opensip-tools/datastore';
 
 const GRAPH_TOOL_TITLE = 'Code Graph';
@@ -123,6 +123,14 @@ interface GraphRunnerArgs {
    * so bare `graph` / `graph --verbose` disagreed with `graph --json`.
    */
   readonly config?: GraphConfig;
+  /**
+   * `--recipe`: the resolved rule subset for this run. Resolved on the
+   * dispatch seam (`tool.ts`, inside the entered RunScope) and forwarded
+   * to `runGraph` so the interactive path honors `--recipe` for parity
+   * with `executeGraph`. Absent ⇒ `runGraph` falls back to `currentRules()`
+   * (the default recipe = all rules).
+   */
+  readonly rules?: readonly Rule[];
 }
 
 interface GraphRunnerProps {
@@ -166,6 +174,7 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
           noCache: args.noCache,
           resolution: args.resolution,
           config: args.config,
+          rules: args.rules,
           onProgress,
           datastore,
         });

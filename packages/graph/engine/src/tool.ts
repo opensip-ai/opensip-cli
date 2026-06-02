@@ -39,12 +39,13 @@ import { executeSymbolIndex } from './cli/symbol-index.js';
 import { createAdapterRegistry, getDiscoveredAdapters } from './lang-adapter/registry.js';
 import { CatalogRepo } from './persistence/catalog-repo.js';
 import { createRecipeRegistry } from './recipes/registry.js';
+import { resolveRecipeToRules } from './recipes/resolve.js';
 import { createRulesRegistry } from './rules/registry.js';
 // Side-effect import: ensures the RunScope.graph augmentation is
 // loaded so `scope.graph` is correctly-typed here.
 import './scope-augmentation.js';
 
-import type { GraphConfig, ResolutionMode } from './types.js';
+import type { GraphConfig, ResolutionMode, Rule } from './types.js';
 import type { ScopeContribution, Tool, ToolCliContext, ToolCommandDescriptor, ToolScope } from '@opensip-tools/core';
 import type { DataStore } from '@opensip-tools/datastore';
 
@@ -143,6 +144,7 @@ function register(cli: ToolCliContext): void {
         resolution?: ResolutionMode;
         verbose?: boolean;
         config?: GraphConfig;
+        rules?: readonly Rule[];
       },
       cli.scope.datastore() as DataStore | undefined,
       { setExitCode: cli.setExitCode },
@@ -161,6 +163,7 @@ function register(cli: ToolCliContext): void {
       'Edge resolution tier: exact (semantic) or fast (syntactic, no type checker)',
       'exact',
     )
+    .option('--recipe <name>', 'Run a named recipe (a subset of graph rules). Default: all rules')
     .option('--gate-save', 'Save current Signal set as the gate baseline', false)
     .option('--gate-compare', 'Compare current Signals to the gate baseline', false)
     .option('--baseline <path>', 'Override the default baseline path')
@@ -189,6 +192,7 @@ function register(cli: ToolCliContext): void {
       cwd: string;
       json?: boolean;
       cache?: boolean;
+      recipe?: string;
       gateSave?: boolean;
       gateCompare?: boolean;
       baseline?: string;
@@ -246,6 +250,12 @@ function register(cli: ToolCliContext): void {
           noCache: opts.cache === false,
           verbose: opts.verbose === true,
           resolution,
+          // Resolve `--recipe` here (the action runs inside the entered
+          // RunScope via the pre-action hook) and pass the rule subset into
+          // the live path for parity with `executeGraph`. Avoids a second
+          // scope read inside the React tree. An unknown name throws a
+          // ConfigurationError, caught by the dispatcher.
+          rules: resolveRecipeToRules(opts.recipe),
           // Honor the project's `graph:` config block in the interactive
           // path too — parity with `executeGraph` (graph.ts), which loads
           // it via the same helper. Loading here (not inside the React
@@ -261,6 +271,7 @@ function register(cli: ToolCliContext): void {
           json: opts.json,
           noCache: opts.cache === false,
           resolution,
+          recipe: opts.recipe,
           gateSave: opts.gateSave,
           gateCompare: opts.gateCompare,
           baseline: opts.baseline,

@@ -47,13 +47,14 @@ import { buildUnifiedReportLines, countFiles, resolutionBannerText } from './gra
 import { loadGraphConfig, runGraph, runShardedGraph } from './orchestrate.js';
 import { positionalPathLabel, resolvePositionalPaths } from './positional-paths.js';
 import { MemoryPressureError } from './pressure-monitor.js';
+import { resolveRecipeToRules } from '../recipes/resolve.js';
 import { renderWorkspaceJson, writeWorkspaceReport } from './workspace-report.js';
 import { discoverPolyglotUnits, runWorkspaceUnitsInParallel } from './workspace-runner.js';
 
 import type { GraphCommandOptions } from './graph-options.js';
 import type { Shard } from './orchestrate/shard-model.js';
 import type { RunGraphResult } from './orchestrate.js';
-import type { Catalog, GraphConfig } from '../types.js';
+import type { Catalog, GraphConfig, Rule } from '../types.js';
 import type { FindingOutput, GraphDoneResult } from '@opensip-tools/contracts';
 import type { LanguageAdapter, Signal, ToolCliContext } from '@opensip-tools/core';
 import type { DataStore } from '@opensip-tools/datastore';
@@ -76,13 +77,20 @@ export async function executeGraph(
   const startedAt = new Date().toISOString();
   try {
     validateMutuallyExclusiveFlags(opts);
+    // Resolve `--recipe` once at the top of the run (CLI layer owns
+    // selection; the engine stays recipe-agnostic). Threaded into every
+    // build path as `RunGraphInput.rules`. An unknown name throws a
+    // ConfigurationError here, caught below by handleGraphError. For the
+    // `--workspace` path the parent resolves only to validate the name
+    // (fail-fast); children re-resolve `--recipe` in their own scope.
+    const rules = resolveRecipeToRules(opts.recipe);
     if (opts.workspace === true) {
       await executeWorkspaceGraph(opts, cli);
       return;
     }
     const positionalPaths = resolvePositionalScope(opts);
     if (positionalPaths.length > 1) {
-      await executeMultiPathGraph(opts, positionalPaths, cli, startedAt);
+      await executeMultiPathGraph(opts, positionalPaths, cli, startedAt, rules);
       return;
     }
     const runCwd = positionalPaths[0] ?? opts.cwd;
@@ -96,13 +104,14 @@ export async function executeGraph(
     // can't engage (no worker script, discovery failure).
     const shards = positionalPaths.length === 0 ? await resolveShards(opts, cli) : [];
     const result = shards.length > 1
-      ? await runShardedBuild(opts, shards, runCwd, cli, config)
+      ? await runShardedBuild(opts, shards, runCwd, cli, config, rules)
       : await runGraph({
           cwd: runCwd,
           noCache: opts.noCache,
           resolution: opts.resolution,
           language: opts.language,
           config,
+          rules,
           datastore: cli.scope.datastore() as DataStore | undefined,
         });
     enforceLanguageMismatchPolicy(opts, result.catalog, [runCwd]);
@@ -157,6 +166,7 @@ async function runShardedBuild(
   projectRoot: string,
   cli: ToolCliContext,
   config: GraphConfig,
+  rules: readonly Rule[],
 ): Promise<RunGraphResult> {
   const datastore = cli.scope.datastore() as DataStore | undefined;
   const sharded = await runShardedGraph({
@@ -168,6 +178,7 @@ async function runShardedBuild(
     concurrency: opts.concurrency,
     useCache: opts.noCache !== true,
     config,
+    rules,
     catalogRepo: datastore ? new CatalogRepo(datastore) : null,
   });
   return {
@@ -221,6 +232,7 @@ async function executeMultiPathGraph(
   paths: readonly string[],
   cli: ToolCliContext,
   startedAt: string,
+  rules: readonly Rule[],
 ): Promise<void> {
   const allSignals: Signal[] = [];
   let combinedFiles = 0;
@@ -233,6 +245,7 @@ async function executeMultiPathGraph(
       resolution: opts.resolution,
       language: opts.language,
       config,
+      rules,
       datastore: cli.scope.datastore() as DataStore | undefined,
     });
     lastResult = r;
@@ -404,6 +417,7 @@ async function executeWorkspaceGraph(
     concurrency: opts.concurrency,
     noCache: opts.noCache,
     resolution: opts.resolution,
+    recipe: opts.recipe,
   });
   const durationMs = Date.now() - startedAt;
 

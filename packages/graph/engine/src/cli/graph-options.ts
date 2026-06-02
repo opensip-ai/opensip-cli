@@ -33,6 +33,14 @@ export interface GraphCommandOptions {
    * normalizes a missing value to `'exact'`.
    */
   readonly resolution?: ResolutionMode;
+  /**
+   * `--recipe <name>`: select a named subset of graph rules to evaluate.
+   * Absent ⇒ the built-in `default` recipe (all rules, registration order
+   * — identical to the historical behavior). Resolved to a `readonly Rule[]`
+   * in the CLI layer and threaded into every run path as `RunGraphInput.rules`;
+   * an unknown name raises a `ConfigurationError`.
+   */
+  readonly recipe?: string;
   readonly gateSave?: boolean;
   readonly gateCompare?: boolean;
   readonly baseline?: string;

@@ -74,6 +74,14 @@ export interface RunWorkspaceUnitsInput {
    * not silently exact. Omitted/`'exact'` ⇒ children use their default.
    */
   readonly resolution?: ResolutionMode
+  /**
+   * `--recipe <name>`: forwarded to each child as `--recipe <name>` so a
+   * `--workspace --recipe <name>` run selects the same rule subset per
+   * unit. Children re-resolve the recipe in their own scope (resolved
+   * `Rule` objects can't cross the process boundary). Omitted ⇒ children
+   * use the default recipe.
+   */
+  readonly recipe?: string
 }
 
 /**
@@ -139,6 +147,7 @@ export async function runWorkspaceUnitsInParallel(
       cwd: input.cwd,
       noCache: input.noCache === true,
       resolution: input.resolution,
+      recipe: input.recipe,
     }),
   )
   const anyChildFailed = results.some((r) => r.exitCode !== 0)
@@ -163,6 +172,7 @@ interface SpawnInput {
   readonly cwd: string
   readonly noCache: boolean
   readonly resolution?: ResolutionMode
+  readonly recipe?: string
 }
 
 function spawnGraphChild(input: SpawnInput): Promise<WorkspaceUnitRunResult> {
@@ -170,6 +180,7 @@ function spawnGraphChild(input: SpawnInput): Promise<WorkspaceUnitRunResult> {
     const args: string[] = [input.cliScript, 'graph', input.unit.rootDir, '--json']
     if (input.noCache) args.push('--no-cache')
     if (input.resolution !== undefined) args.push('--resolution', input.resolution)
+    if (input.recipe !== undefined) args.push('--recipe', input.recipe)
 
     const child = spawn(process.execPath, args, {
       cwd: input.cwd,
