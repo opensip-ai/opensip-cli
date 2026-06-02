@@ -336,6 +336,21 @@ export interface GraphConfig {
   readonly minDuplicateBodySize?: number;
   /** Override the inferred entry-point list. */
   readonly entryPointHashes?: readonly string[];
+  /**
+   * `graph:orphan-subtree`: allow flagging exported, zero-caller functions
+   * as orphans. Default `false` — public surface is not "dead" merely
+   * because it lacks an in-project caller (it may be consumed across a
+   * package boundary the call graph cannot resolve). Enable only for repos
+   * with trustworthy cross-package call resolution.
+   */
+  readonly flagExportedOrphans?: boolean;
+  /**
+   * `graph:orphan-subtree`: allow flagging functions declared in test
+   * files as orphans. Default `false` — test-file reachability is the job
+   * of `graph:test-only-reachable`; flagging here would double-report and
+   * over-trigger on test-only helpers.
+   */
+  readonly flagTestOrphans?: boolean;
   /** Per-rule severity overrides. */
   readonly severityOverrides?: Readonly<Record<string, 'error' | 'warning'>>;
 }

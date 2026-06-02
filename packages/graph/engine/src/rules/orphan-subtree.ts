@@ -31,6 +31,16 @@ export const orphanSubtreeRule: Rule = {
       // Skip occurrences with empty filePath (defensive — shouldn't happen).
       /* v8 ignore next */
       if (!occ.filePath) continue;
+      // Precision filter (D3): a finding must be actionable ("delete it").
+      // Exported surface is not dead for lack of an internal caller — it
+      // may be consumed across a package boundary the graph can't resolve.
+      if (occ.visibility === 'exported' && !config.flagExportedOrphans) continue;
+      // Test-file reachability is graph:test-only-reachable's job; flagging
+      // here would double-report and over-trigger on test-only helpers.
+      if (occ.inTestFile && !config.flagTestOrphans) continue;
+      // Decorated functions are framework-dispatched (DI, routes, CLI
+      // commands), not called by name — a missing caller edge is expected.
+      if (occ.decorators.length > 0) continue;
       orphans.push(
         createSignal({
           source: 'graph',

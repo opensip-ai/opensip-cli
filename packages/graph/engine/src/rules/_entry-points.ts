@@ -7,7 +7,14 @@
  *  2. It's a Tool registration's commands handler.
  *  3. Its name matches a heuristic list (main, start, register, init, etc.).
  *  4. Its `<module-init>` is reachable (top-level statements always run).
- *  5. It has no callers AND is exported (someone outside might call it).
+ *  5. It's exported AND has no *external* in-project caller (someone
+ *     outside the project might call it). A self-recursive edge does not
+ *     count as a caller here: an exported public function whose only
+ *     in-project caller is itself (e.g. a recursive renderer consumed
+ *     only across a package boundary, where the cross-package call edge
+ *     does not resolve) is still an external entry point — counting its
+ *     own recursion as a "caller" would wrongly hide it (and its whole
+ *     file-local helper subtree) as an orphan.
  *
  * v0.2 ships heuristics 3, 4, 5; 1 and 2 are project-specific and
  * deferred until cross-package call resolution is reliable.
@@ -57,9 +64,26 @@ function classify(
   // referenced as values.
   if (occ.kind === 'module-init') return 'module-init';
   if (NAME_HEURISTICS.has(occ.simpleName)) return 'name-match';
-  if (occ.visibility === 'exported' && (indexes.callers.get(occ.bodyHash)?.length ?? 0) === 0) {
-    // Exported but no caller in-project — likely an external entry point.
+  if (occ.visibility === 'exported' && !hasExternalCaller(occ, indexes)) {
+    // Exported but no *external* in-project caller — likely an external
+    // entry point (consumed cross-package, where the call edge may not
+    // resolve). Self-recursion does not count as an external caller.
     return 'no-callers-exported';
   }
   return null;
+}
+
+/**
+ * True iff some in-project occurrence other than `occ` itself calls it.
+ * A self-recursive edge (`callers` contains `occ.bodyHash`) is excluded:
+ * recursion does not make a function reachable, so an otherwise-uncalled
+ * exported function must still be treated as an external entry point.
+ */
+function hasExternalCaller(occ: FunctionOccurrence, indexes: Indexes): boolean {
+  const callers = indexes.callers.get(occ.bodyHash);
+  if (callers === undefined) return false;
+  for (const caller of callers) {
+    if (caller !== occ.bodyHash) return true;
+  }
+  return false;
 }

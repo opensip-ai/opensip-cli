@@ -63,7 +63,15 @@ The six rules below are registered in [`rules/registry.ts`](../../../packages/gr
 
 The rule does a forward BFS from the entry-point seeds (computed by [`_entry-points.ts`](../../../packages/graph/engine/src/rules/_entry-points.ts), plus `config.entryPointHashes`) across `indexes.callees`. Any `FunctionOccurrence` not visited is flagged. This is *transitive* reachability, not a direct in-degree check — an entire chain of mutually-recursive helpers that nobody outside the chain calls is a single connected orphan subtree.
 
-**False-positive shape**: anything graph can't see is an unrecognized entry point. Today the inference recognizes `module-init`, `name-match` (`main`/`run`/`start`/`register`/`init`/`bootstrap`/`initialize`), and `no-callers-exported`. It does not recognize `bin`-field entries from `package.json`, framework route handlers, or hand-registered scenario/check entry points unless they are declared via config.
+**Precision filter.** A finding is meant to be actionable — "delete it." To keep the signal that crisp, an unreachable occurrence is only flagged when all of the following hold (each is configurable):
+
+- It is **not exported** (`visibility !== 'exported'`). Public surface is not dead merely because it lacks an *in-project* caller — it may be consumed across a package boundary the call graph cannot resolve. Override with `flagExportedOrphans: true`.
+- It is **not in a test file** (`!inTestFile`). Test-file reachability is [`graph:test-only-reachable`](#graphtest-only-reachable)'s job; flagging here would double-report. Override with `flagTestOrphans: true`.
+- It has **no decorators** (`decorators.length === 0`). Decorated functions (DI providers, route handlers, CLI commands) are framework-dispatched, not called by name, so a missing caller edge is expected.
+
+(`module-init` occurrences are always entry points and are never flagged.)
+
+**False-positive shape**: anything graph can't see is an unrecognized entry point. Today the inference recognizes `module-init`, `name-match` (`main`/`run`/`start`/`register`/`init`/`bootstrap`/`initialize`), and `no-callers-exported`. The `no-callers-exported` reason treats a **self-recursive** edge as *not* a caller — an exported recursive function whose only in-project caller is itself (e.g. a recursive renderer consumed only across a package boundary) is still an external entry point, so it and its file-local helper subtree stay reachable. The inference does not recognize `bin`-field entries from `package.json`, framework route handlers, or hand-registered scenario/check entry points unless they are declared via config (`entryPointHashes`).
 
 ### `graph:duplicated-function-body`
 
