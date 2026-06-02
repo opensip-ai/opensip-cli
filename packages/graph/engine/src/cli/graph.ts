@@ -413,7 +413,7 @@ async function executeWorkspaceGraph(
   if (opts.json === true) {
     process.stdout.write(`${renderWorkspaceJson(result.perUnit, durationMs)}\n`);
   } else {
-    writeWorkspaceReport(result.perUnit, durationMs);
+    await writeWorkspaceReport(result.perUnit, durationMs, cli);
     // Persist exactly one aggregate session for the whole --workspace
     // invocation. Matches the contract "one human-facing CLI invocation
     // = one session" that fitness/sim already follow; the per-unit

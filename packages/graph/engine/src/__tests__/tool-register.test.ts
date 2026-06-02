@@ -112,6 +112,7 @@ interface MockCliBag {
   readonly emitJson: MockInstance;
   readonly registerLiveView: MockInstance;
   readonly renderLive: MockInstance;
+  readonly render: MockInstance;
 }
 
 function makeMockCli(datastore?: DataStore): MockCliBag {
@@ -120,10 +121,11 @@ function makeMockCli(datastore?: DataStore): MockCliBag {
   const emitJson = vi.fn();
   const registerLiveView = vi.fn();
   const renderLive = vi.fn().mockResolvedValue(undefined);
+  const render = vi.fn().mockResolvedValue(undefined);
   const cli = {
     program,
     project: { scope: 'none' },
-    render: vi.fn(),
+    render,
     registerLiveView,
     renderLive,
     maybeOpenDashboard: vi.fn(),
@@ -133,7 +135,14 @@ function makeMockCli(datastore?: DataStore): MockCliBag {
     datastore,
     scope: { datastore: () => datastore, languages: new LanguageRegistry() },
   } as unknown as ToolCliContext;
-  return { cli, program, setExitCode, emitJson, registerLiveView, renderLive };
+  return { cli, program, setExitCode, emitJson, registerLiveView, renderLive, render };
+}
+
+/** Concatenated text of every lines-bearing result handed to cli.render(). */
+function renderedLines(render: MockInstance): string {
+  return (render.mock.calls as unknown as readonly [{ lines?: readonly string[] }][])
+    .map((c) => c[0].lines?.join('\n') ?? '')
+    .join('\n');
 }
 
 let stdoutSpy: MockInstance<typeof process.stdout.write>;
@@ -211,11 +220,16 @@ describe('graphTool.register', () => {
         // touching the file system.
         const prev = process.env.OPENSIP_HEAP_ELEVATED;
         process.env.OPENSIP_HEAP_ELEVATED = '1';
+        // The animated live view is taken only on a TTY; vitest's stdout is
+        // not a TTY, so force it for this assertion.
+        const prevTTY = process.stdout.isTTY;
+        Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
         try {
           await program.parseAsync(['graph'], { from: 'user' });
         } finally {
           if (prev === undefined) delete process.env.OPENSIP_HEAP_ELEVATED;
           else process.env.OPENSIP_HEAP_ELEVATED = prev;
+          Object.defineProperty(process.stdout, 'isTTY', { value: prevTTY, configurable: true });
         }
         expect(renderLive.mock.calls.length).toBe(1);
         expect(renderLive.mock.calls[0]?.[0]).toBe('graph');
@@ -230,12 +244,12 @@ describe('graphTool.register', () => {
       const datastore = DataStoreFactory.open({ backend: 'memory' });
       try {
         seedCatalog(datastore, [makeOcc({ simpleName: 'saveBaseline', bodyHash: 'h1' })]);
-        const { cli, program, setExitCode } = makeMockCli(datastore);
+        const { cli, program, setExitCode, render } = makeMockCli(datastore);
         graphTool.register(cli);
         await program.parseAsync(['graph-lookup', 'saveBaseline'], { from: 'user' });
         expect(setExitCode).toHaveBeenCalledWith(0);
-        const out = stdoutSpy.mock.calls.map((c) => String(c[0])).join('');
-        expect(out).toContain('saveBaseline');
+        // Human lookup output flows through the render seam, not stdout.
+        expect(renderedLines(render)).toContain('saveBaseline');
       } finally {
         datastore.close();
       }

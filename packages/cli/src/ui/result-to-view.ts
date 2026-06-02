@@ -34,7 +34,7 @@ import {
 } from './views/misc-views.js';
 import { viewPlugin } from './views/plugin-view.js';
 
-import type { CommandResult, SimDoneResult, ErrorResult, GraphDoneResult, GateDoneResult } from '@opensip-tools/contracts';
+import type { CommandResult, SimDoneResult, ErrorResult, GraphDoneResult } from '@opensip-tools/contracts';
 
 const SEPARATOR: ViewNode = { kind: 'separator' };
 const SPACER: ViewNode = { kind: 'spacer' };
@@ -115,9 +115,9 @@ function graphDoneView(result: GraphDoneResult): ViewNode {
   return group(children);
 }
 
-/** The gate output: pre-composed lines rendered verbatim through both media. */
-function gateDoneView(result: GateDoneResult): ViewNode {
-  return group(result.lines.map((l) => line([{ text: l }])));
+/** Pre-composed lines rendered verbatim through both media (gate output, graph status). */
+function linesView(lines: readonly string[]): ViewNode {
+  return group(lines.map((l) => line([{ text: l }])));
 }
 
 /** Map any CommandResult to its view-model node (total — every variant covered). */
@@ -136,7 +136,10 @@ export function resultToView(result: CommandResult): ViewNode {
       return graphDoneView(result);
     }
     case 'gate-done': {
-      return gateDoneView(result);
+      return linesView(result.lines);
+    }
+    case 'graph-status': {
+      return linesView(result.lines);
     }
     case 'list-checks': {
       return viewListChecks(result);

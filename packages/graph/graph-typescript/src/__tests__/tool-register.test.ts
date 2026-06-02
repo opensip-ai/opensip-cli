@@ -229,9 +229,17 @@ describe('graphTool action handler — end-to-end via Commander', () => {
         registerLiveView: vi.fn(),
       };
       graphTool.register(cli);
-      // No --json/--gate-*/--report-to/--package: this is the
-      // interactive default path, which delegates to renderLive.
-      await program.parseAsync(['graph', '--cwd', dir], { from: 'user' });
+      // No --json/--gate-*/--report-to/--package: this is the interactive
+      // default path, which delegates to renderLive — but only on a TTY (a
+      // non-TTY run falls back to the static render seam). vitest's stdout is
+      // not a TTY, so force it for this assertion.
+      const prevTTY = process.stdout.isTTY;
+      Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
+      try {
+        await program.parseAsync(['graph', '--cwd', dir], { from: 'user' });
+      } finally {
+        Object.defineProperty(process.stdout, 'isTTY', { value: prevTTY, configurable: true });
+      }
       expect(renderLive).toHaveBeenCalledOnce();
       expect(renderLive).toHaveBeenCalledWith('graph', expect.objectContaining({ cwd: dir }));
     } finally {

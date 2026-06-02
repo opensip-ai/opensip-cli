@@ -141,6 +141,7 @@ export type CommandResult =
   | SimDoneResult
   | GraphDoneResult
   | GateDoneResult
+  | GraphStatusResult
   | ListChecksResult
   | ListRecipesResult
   | HistoryResult
@@ -248,6 +249,21 @@ export interface GraphDoneResult {
 export interface GateDoneResult {
   type: 'gate-done';
   /** Full gate output, one string per line (save summary or compare report). */
+  readonly lines: readonly string[];
+}
+
+/**
+ * Generic carrier for graph's line-oriented mode output that has no Ink
+ * component twin: `graph-lookup`, `--workspace`, and the `--report-to` status
+ * line. Carries pre-composed plain lines (no graph types — contracts sits
+ * below graph) so the render seam emits them as Ink or plain text instead of
+ * the command writing to stdout directly. The `--json` paths for these
+ * commands are unaffected and still write their machine output at their own
+ * boundary.
+ */
+export interface GraphStatusResult {
+  type: 'graph-status';
+  /** Pre-composed report lines, one string per line. */
   readonly lines: readonly string[];
 }
 

@@ -234,7 +234,12 @@ function register(cli: ToolCliContext): void {
         /* v8 ignore next */
         && typeof opts.language !== 'string';
 
-      if (isInteractiveDefault) {
+      // The animated live view is a TTY-only affordance (frame-driven Ink).
+      // In a pipe / CI / redirected run (non-TTY) it would emit garbled or
+      // empty frames, so fall through to the static `executeGraph` path, whose
+      // `graph-done` result is dual-rendered through the seam (`renderToText`)
+      // — the same report content, consistent with the TTY final frame.
+      if (isInteractiveDefault && process.stdout.isTTY === true) {
         await cli.renderLive(GRAPH_LIVE_VIEW_KEY, {
           cwd: opts.cwd,
           noCache: opts.cache === false,
@@ -275,8 +280,8 @@ function register(cli: ToolCliContext): void {
     .description(GRAPH_LOOKUP.description)
     .argument('<name>', 'Function simple name to look up (e.g. "saveBaseline")')
     .option('--json', 'Output structured JSON', false)
-    .action((name: string, opts: { json?: boolean }) => {
-      executeLookup({ name, json: opts.json }, cli);
+    .action(async (name: string, opts: { json?: boolean }) => {
+      await executeLookup({ name, json: opts.json }, cli);
     });
 
   program

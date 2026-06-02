@@ -95,6 +95,13 @@ function mockCli(datastore?: DataStore): MockCliBag {
   };
 }
 
+/** Concatenated text of every `gate-done` result handed to cli.render(). */
+function renderedLines(render: MockInstance): string {
+  return (render.mock.calls as unknown as readonly [{ lines?: readonly string[] }][])
+    .map((c) => c[0].lines?.join('\n') ?? '')
+    .join('\n');
+}
+
 let stdoutSpy: MockInstance<typeof process.stdout.write>;
 let stderrSpy: MockInstance<typeof process.stderr.write>;
 let projectDir: string;
@@ -220,10 +227,10 @@ describe('executeGraph — gate dispatch', () => {
     currentAdapterRegistry().register(populatedAdapter());
     const datastore = DataStoreFactory.open({ backend: 'memory' });
     try {
-      const { cli, setExitCode } = mockCli(datastore);
+      const { cli, setExitCode, render } = mockCli(datastore);
       await executeGraph({ cwd: projectDir, noCache: true, gateSave: true }, cli);
       expect(setExitCode).toHaveBeenCalledWith(0);
-      expect(stdout).toContain('Graph baseline saved');
+      expect(renderedLines(render)).toContain('Graph baseline saved');
     } finally {
       datastore.close();
     }
@@ -238,7 +245,7 @@ describe('executeGraph — gate dispatch', () => {
       const compare = mockCli(datastore);
       await executeGraph({ cwd: projectDir, noCache: true, gateCompare: true }, compare.cli);
       expect(compare.setExitCode).toHaveBeenCalledWith(0);
-      expect(stdout).toContain('Graph gate PASS');
+      expect(renderedLines(compare.render)).toContain('Graph gate PASS');
     } finally {
       datastore.close();
     }

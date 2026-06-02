@@ -63,6 +63,10 @@ const FIXTURES: Readonly<Record<string, CommandResult>> = {
     footerHints: [{ text: 'Use --verbose for detailed results', bold: ['--verbose'] }],
   },
   'gate-done': { type: 'gate-done', lines: ['opensip-tools gate compare', '', '✓ STABLE — no change'] },
+  'graph-status': {
+    type: 'graph-status',
+    lines: ['saveBaseline — 1 occurrence(s)', '  saveBaseline (function)', '    src/gate.ts:12:0'],
+  },
   'fit-done': {
     type: 'fit-done',
     label: 'fit',

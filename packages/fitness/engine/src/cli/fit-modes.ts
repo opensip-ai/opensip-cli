@@ -96,7 +96,27 @@ export async function runLiveMode(
   liveViewKey: string,
   openRequested: boolean,
 ): Promise<void> {
-  await cli.renderLive(liveViewKey, args);
+  if (process.stdout.isTTY === true) {
+    await cli.renderLive(liveViewKey, args);
+  } else {
+    // Non-TTY (pipe / CI / redirect): the animated Ink live view is a TTY-only
+    // affordance and would emit garbled frames. Run the engine and emit the
+    // static `fit-done` result through the seam, which dual-renders it as plain
+    // text (`renderToText`) — the same content the TTY user's final frame
+    // shows. Exit-code policy mirrors the live runner (fit-runner.tsx): an
+    // error result carries its own code; a passing run that breached the fail
+    // threshold exits RUNTIME_ERROR. Warnings are rendered inline by the
+    // fit-done view, so we don't also write them to stderr here.
+    const fitResult = await executeFit(args, {
+      datastore: cli.scope.datastore() as DataStore | undefined,
+    });
+    if (fitResult.result.type === 'error') {
+      cli.setExitCode(fitResult.result.exitCode);
+    } else if (fitResult.result.shouldFail === true) {
+      cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
+    }
+    await cli.render(fitResult.result);
+  }
   await cli.maybeOpenDashboard({
     openRequested,
     jsonOutput: Boolean(args.json),

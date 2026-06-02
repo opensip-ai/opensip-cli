@@ -5,7 +5,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { renderWorkspaceJson, writeWorkspaceReport } from '../workspace-report.js';
+import { renderWorkspaceJson, workspaceReportLines } from '../workspace-report.js';
 
 import type { WorkspaceUnitRunResult } from '../workspace-runner.js';
 import type { FindingOutput } from '@opensip-tools/contracts';
@@ -33,31 +33,20 @@ function unit(over: Partial<WorkspaceUnitRunResult> = {}): WorkspaceUnitRunResul
   };
 }
 
-function captureStdout(fn: () => void): string {
-  let buf = '';
-  const spy = vi
-    .spyOn(process.stdout, 'write')
-    .mockImplementation((chunk: string | Uint8Array): boolean => {
-      buf += typeof chunk === 'string' ? chunk : chunk.toString();
-      return true;
-    });
-  try {
-    fn();
-  } finally {
-    spy.mockRestore();
-  }
-  return buf;
-}
-
 afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('writeWorkspaceReport', () => {
+// The human report is composed as plain lines (workspaceReportLines) and then
+// emitted through the render seam by writeWorkspaceReport; cross-renderer
+// equivalence is covered in the cli's renderer tests. Here we assert the
+// content composition directly.
+const text = (perUnit: readonly WorkspaceUnitRunResult[], durationMs: number): string =>
+  workspaceReportLines(perUnit, durationMs).join('\n');
+
+describe('workspaceReportLines', () => {
   it('renders an ok unit with its finding count and project-relative display path', () => {
-    const out = captureStdout(() =>
-      writeWorkspaceReport([unit({ findings: [finding()] })], 1234),
-    );
+    const out = text([unit({ findings: [finding()] })], 1234);
     expect(out).toContain('opensip-tools graph --workspace');
     expect(out).toContain('== Units (1) ==');
     expect(out).toContain('packages/core: 1 finding(s) — ok');
@@ -67,11 +56,9 @@ describe('writeWorkspaceReport', () => {
   });
 
   it('marks a failed unit and includes a truncated stderr preview', () => {
-    const out = captureStdout(() =>
-      writeWorkspaceReport(
-        [unit({ exitCode: 2, stderr: 'line1\nline2\nline3\nline4\nline5' })],
-        5,
-      ),
+    const out = text(
+      [unit({ exitCode: 2, stderr: 'line1\nline2\nline3\nline4\nline5' })],
+      5,
     );
     expect(out).toContain('FAILED (exit 2)');
     expect(out).toContain('stderr: line1');
@@ -81,16 +68,12 @@ describe('writeWorkspaceReport', () => {
   });
 
   it('falls back to rootDir when displayPath is empty', () => {
-    const out = captureStdout(() =>
-      writeWorkspaceReport([unit({ displayPath: '', findings: [finding()] })], 1),
-    );
+    const out = text([unit({ displayPath: '', findings: [finding()] })], 1);
     expect(out).toContain('/abs/packages/core: 1 finding(s)');
   });
 
   it('omits the line suffix when a finding has no line number', () => {
-    const out = captureStdout(() =>
-      writeWorkspaceReport([unit({ findings: [finding({ line: undefined })] })], 1),
-    );
+    const out = text([unit({ findings: [finding({ line: undefined })] })], 1);
     expect(out).toContain('src/a.ts — cyclic dependency');
     expect(out).not.toContain('src/a.ts: ');
   });
@@ -99,7 +82,7 @@ describe('writeWorkspaceReport', () => {
     const many = Array.from({ length: 13 }, (_v, i) =>
       finding({ message: `m${String(i)}`, line: i + 1 }),
     );
-    const out = captureStdout(() => writeWorkspaceReport([unit({ findings: many })], 1));
+    const out = text([unit({ findings: many })], 1);
     expect(out).toContain('... 3 more (use --json for full list)');
     expect(out).toContain('13 total finding(s)');
   });

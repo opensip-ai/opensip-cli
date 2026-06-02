@@ -55,6 +55,8 @@ interface MockCliBag {
   readonly cli: ToolCliContext;
   readonly program: Command;
   readonly setExitCode: MockInstance;
+  readonly renderLive: MockInstance;
+  readonly render: MockInstance;
 }
 
 function makeMockCli(datastore?: DataStore): MockCliBag {
@@ -62,16 +64,30 @@ function makeMockCli(datastore?: DataStore): MockCliBag {
   // Don't let commander call process.exit when an action throws a parse error.
   program.exitOverride();
   const setExitCode = vi.fn();
+  const renderLive = vi.fn().mockResolvedValue(undefined);
+  const render = vi.fn().mockResolvedValue(undefined);
   const cli = {
     program,
     registerLiveView: vi.fn(),
-    renderLive: vi.fn().mockResolvedValue(undefined),
+    renderLive,
+    render,
     setExitCode,
     emitJson: vi.fn(),
     datastore,
     scope: { datastore: () => datastore, languages: new LanguageRegistry() },
   } as unknown as ToolCliContext;
-  return { cli, program, setExitCode };
+  return { cli, program, setExitCode, renderLive, render };
+}
+
+/** Force `process.stdout.isTTY` for one test, restoring the prior value after. */
+async function withTTY(value: boolean | undefined, fn: () => Promise<unknown>): Promise<void> {
+  const prev = process.stdout.isTTY;
+  Object.defineProperty(process.stdout, 'isTTY', { value, configurable: true });
+  try {
+    await fn();
+  } finally {
+    Object.defineProperty(process.stdout, 'isTTY', { value: prev, configurable: true });
+  }
 }
 
 let stdoutSpy: MockInstance<typeof process.stdout.write>;
@@ -126,7 +142,7 @@ describe('--resolution validation', () => {
 });
 
 describe('interactive default path honors graph config', () => {
-  it('loads opensip-tools.config.yml graph block and forwards it to renderLive', async () => {
+  it('loads opensip-tools.config.yml graph block and forwards it to renderLive (TTY)', async () => {
     // Regression: the interactive live-view path (bare `graph`) used to
     // call runGraph with no config, silently ignoring the project's
     // `graph:` block — so `graph --verbose` disagreed with `graph --json`.
@@ -136,15 +152,33 @@ describe('interactive default path honors graph config', () => {
       'graph:\n  minCrossPackageDuplicatePackages: 2\n',
       'utf8',
     );
-    const { cli, program } = makeMockCli();
+    const { cli, program, renderLive } = makeMockCli();
     graphTool.register(cli);
 
-    await program.parseAsync(['graph', '--cwd', workDir], { from: 'user' });
+    // The animated live view is taken only on a TTY.
+    await withTTY(true, () => program.parseAsync(['graph', '--cwd', workDir], { from: 'user' }));
 
-    const renderLive = cli.renderLive as unknown as MockInstance;
     expect(renderLive).toHaveBeenCalledTimes(1);
     const [, args] = renderLive.mock.calls[0] as [string, { config?: { minCrossPackageDuplicatePackages?: number } }];
     expect(args.config?.minCrossPackageDuplicatePackages).toBe(2);
+  });
+
+  it('falls back to the static render seam (not the live view) when stdout is not a TTY', async () => {
+    // Pipe / CI / redirect: the animated Ink live view is TTY-only, so a bare
+    // `graph` run must route through executeGraph and emit its result through
+    // the render seam (dual-rendered as plain text), never renderLive.
+    currentAdapterRegistry().register(fakeAdapter(workDir));
+    const { cli, program, renderLive, render } = makeMockCli(
+      DataStoreFactory.open({ backend: 'memory' }),
+    );
+    graphTool.register(cli);
+
+    await withTTY(false, () => program.parseAsync(['graph', '--cwd', workDir], { from: 'user' }));
+
+    expect(renderLive).not.toHaveBeenCalled();
+    expect(render).toHaveBeenCalledTimes(1);
+    const [result] = render.mock.calls[0] as [{ type?: string }];
+    expect(result.type).toBe('graph-done');
   });
 });
 

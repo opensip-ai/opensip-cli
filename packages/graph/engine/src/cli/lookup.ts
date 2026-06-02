@@ -25,7 +25,7 @@ export interface LookupCommandOptions {
   readonly json?: boolean;
 }
 
-export function executeLookup(opts: LookupCommandOptions, cli: ToolCliContext): void {
+export async function executeLookup(opts: LookupCommandOptions, cli: ToolCliContext): Promise<void> {
   logger.info({ evt: 'graph.cli.lookup.start', module: 'graph:cli', name: opts.name });
   try {
     const datastore = cli.scope.datastore() as DataStore | undefined;
@@ -42,11 +42,15 @@ export function executeLookup(opts: LookupCommandOptions, cli: ToolCliContext): 
     // Absent ⇒ exact (historical catalogs predate the marker).
     const resolutionMode = catalog.resolutionMode ?? 'exact';
     if (opts.json === true) {
+      // --json is the machine path: structured output straight to stdout,
+      // intentionally bypassing the human render seam.
       process.stdout.write(
         `${JSON.stringify({ name: opts.name, resolutionMode, matches }, null, 2)}\n`,
       );
     } else {
-      writeHumanReport(opts.name, matches, resolutionMode);
+      // Human path flows through the render seam (Ink on TTY, plain text in
+      // pipes/CI) rather than writing to stdout directly.
+      await cli.render({ type: 'graph-status', lines: humanReportLines(opts.name, matches, resolutionMode) });
     }
     cli.setExitCode(EXIT_CODES.SUCCESS);
     logger.info({
@@ -76,30 +80,32 @@ function collectMatches(catalog: Catalog, name: string): readonly FunctionOccurr
   return bucket ?? [];
 }
 
-function writeHumanReport(
+function humanReportLines(
   name: string,
   matches: readonly FunctionOccurrence[],
   resolutionMode: 'exact' | 'fast',
-): void {
+): readonly string[] {
+  const lines: string[] = [];
   // Honest caveat: a fast catalog's edges (callers/callees this command
   // reflects) are approximate, so the reader knows not to treat them as
   // ground truth.
   if (resolutionMode === 'fast') {
-    process.stdout.write(
+    lines.push(
       'Note: catalog built in fast mode — edges are approximate (syntactic). ' +
-        'Re-run `graph --resolution exact` for semantic precision.\n',
+        'Re-run `graph --resolution exact` for semantic precision.',
     );
   }
   if (matches.length === 0) {
-    process.stdout.write(`No function named '${name}' in the catalog.\n`);
-    return;
+    lines.push(`No function named '${name}' in the catalog.`);
+    return lines;
   }
-  process.stdout.write(`${name} — ${String(matches.length)} occurrence(s)\n`);
+  lines.push(`${name} — ${String(matches.length)} occurrence(s)`);
   for (const m of matches) {
-    process.stdout.write(`  ${m.qualifiedName} (${m.kind})\n`);
-    process.stdout.write(
-      `    ${m.filePath}:${String(m.line)}:${String(m.column)}\n`,
+    lines.push(
+      `  ${m.qualifiedName} (${m.kind})`,
+      `    ${m.filePath}:${String(m.line)}:${String(m.column)}`,
+      `    bodyHash: ${m.bodyHash.slice(0, 12)}…`,
     );
-    process.stdout.write(`    bodyHash: ${m.bodyHash.slice(0, 12)}…\n`);
   }
+  return lines;
 }

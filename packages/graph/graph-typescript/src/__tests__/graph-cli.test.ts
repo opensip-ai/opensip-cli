@@ -99,6 +99,17 @@ function makeCli(): CapturedCli {
   return { cli, exitCodes, datastore, render };
 }
 
+/**
+ * Concatenated text of every `gate-done` / `graph-status` result handed to
+ * cli.render() — gate, report, and workspace human output flow through the
+ * render seam rather than direct stdout writes.
+ */
+function renderedLines(render: MockInstance): string {
+  return (render.mock.calls as unknown as readonly [{ lines?: readonly string[] }][])
+    .map((c) => c[0].lines?.join('\n') ?? '')
+    .join('\n');
+}
+
 describe('executeGraph', () => {
   let dir: string;
   let stdoutSpy: MockInstance<typeof process.stdout.write>;
@@ -183,9 +194,9 @@ describe('executeGraph', () => {
     setupFixture(dir, {
       'index.ts': `function unused(): number { return 1; }\nexport function main(): void {}\n`,
     });
-    const { cli, exitCodes } = makeCli();
+    const { cli, exitCodes, render } = makeCli();
     await executeGraph({ cwd: dir, gateSave: true }, cli);
-    expect(stdout).toContain(`Graph baseline saved`);
+    expect(renderedLines(render)).toContain(`Graph baseline saved`);
     expect(exitCodes).toContain(0);
   });
 
@@ -195,9 +206,9 @@ describe('executeGraph', () => {
     });
     const shared = makeCli();
     await executeGraph({ cwd: dir, gateSave: true }, shared.cli);
-    stdout = '';
+    shared.render.mockClear();
     await executeGraph({ cwd: dir, gateCompare: true }, shared.cli);
-    expect(stdout).toContain('Graph gate PASS');
+    expect(renderedLines(shared.render)).toContain('Graph gate PASS');
     expect(shared.exitCodes).toContain(0);
   });
 
@@ -209,9 +220,9 @@ describe('executeGraph', () => {
     await executeGraph({ cwd: dir, gateSave: true }, shared.cli);
     // Mutate fixture to add an orphan
     writeFileSync(join(dir, 'index.ts'), `function unused(): number { return 1; }\nexport function main(): void {}\n`, 'utf8');
-    stdout = '';
+    shared.render.mockClear();
     await executeGraph({ cwd: dir, gateCompare: true, noCache: true }, shared.cli);
-    expect(stdout).toContain('Graph gate FAILED');
+    expect(renderedLines(shared.render)).toContain('Graph gate FAILED');
     expect(shared.exitCodes).toContain(1);
   });
 
@@ -301,11 +312,11 @@ describe('executeGraph', () => {
   it('--report-to with no findings short-circuits to success', async () => {
     // No findings — reportToCloud short-circuits and returns success.
     setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });
-    const { cli, exitCodes } = makeCli();
+    const { cli, exitCodes, render } = makeCli();
     await executeGraph({ cwd: dir, reportTo: 'http://127.0.0.1:1' }, cli);
     // Should succeed because the "no findings" short-circuit doesn't
     // attempt the network request.
-    expect(stdout).toContain('Graph report sent');
+    expect(renderedLines(render)).toContain('Graph report sent');
     expect(exitCodes).toContain(0);
   });
 
@@ -376,15 +387,16 @@ describe('executeGraph', () => {
         `process.exit(0);\n`,
       'utf8',
     );
-    const { cli, exitCodes } = makeCli();
+    const { cli, exitCodes, render } = makeCli();
     await executeGraph(
       { cwd: dir, workspace: true, cliScript: helper, concurrency: 1 },
       cli,
     );
-    expect(stdout).toContain('opensip-tools graph --workspace');
-    expect(stdout).toContain('== Units');
-    expect(stdout).toContain('== Findings ==');
-    expect(stdout).toContain('orphan x');
+    const out = renderedLines(render);
+    expect(out).toContain('opensip-tools graph --workspace');
+    expect(out).toContain('== Units');
+    expect(out).toContain('== Findings ==');
+    expect(out).toContain('orphan x');
     expect(exitCodes).toContain(0);
   });
 

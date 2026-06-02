@@ -62,28 +62,33 @@ export async function runGateMode(
   const repo = new GraphBaselineRepo(datastore);
   if (opts.gateSave === true) {
     saveBaseline(signals, repo);
-    process.stdout.write(`Graph baseline saved (${String(signals.length)} signals)\n`);
     cli.setExitCode(EXIT_CODES.SUCCESS);
+    await cli.render({
+      type: 'gate-done',
+      lines: [`Graph baseline saved (${String(signals.length)} signals)`],
+    });
     return;
   }
   // gate-compare
   const result = compareToBaseline(signals, repo);
   if (result.degraded) {
     cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
-    process.stdout.write(
-      `Graph gate FAILED: ${String(result.newSignals.length)} new finding(s) since baseline.\n`,
-    );
-    for (const s of result.newSignals) {
-      process.stdout.write(`  + ${fingerprintSignal(s)}\n`);
-    }
+    await cli.render({
+      type: 'gate-done',
+      lines: [
+        `Graph gate FAILED: ${String(result.newSignals.length)} new finding(s) since baseline.`,
+        ...result.newSignals.map((s) => `  + ${fingerprintSignal(s)}`),
+      ],
+    });
   } else {
     cli.setExitCode(EXIT_CODES.SUCCESS);
-    process.stdout.write(
-      `Graph gate PASS: no regressions (${String(result.resolvedFingerprints.length)} resolved since baseline).\n`,
-    );
+    await cli.render({
+      type: 'gate-done',
+      lines: [
+        `Graph gate PASS: no regressions (${String(result.resolvedFingerprints.length)} resolved since baseline).`,
+      ],
+    });
   }
-  // Defer-await is fine; nothing else to do.
-  await Promise.resolve();
 }
 
 export async function runReportMode(
@@ -108,9 +113,12 @@ export async function runReportMode(
     return;
   }
   cli.setExitCode(EXIT_CODES.SUCCESS);
-  process.stdout.write(
-    `Graph report sent to ${url} (${String(signals.length)} signals, ${sarif.length} bytes).\n`,
-  );
+  await cli.render({
+    type: 'graph-status',
+    lines: [
+      `Graph report sent to ${url} (${String(signals.length)} signals, ${sarif.length} bytes).`,
+    ],
+  });
 }
 
 /**

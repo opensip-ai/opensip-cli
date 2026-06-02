@@ -117,6 +117,17 @@ function mockCli(
   };
 }
 
+/**
+ * Concatenated text of every `gate-done` / `graph-status` result handed to
+ * cli.render() — gate and workspace human output now flow through the render
+ * seam rather than direct stdout writes.
+ */
+function renderedLines(render: MockInstance): string {
+  return (render.mock.calls as unknown as readonly [{ lines?: readonly string[] }][])
+    .map((c) => c[0].lines?.join('\n') ?? '')
+    .join('\n');
+}
+
 function makeWorkspaceLangRegistry(
   units: readonly WorkspaceUnit[],
 ): LanguageRegistry {
@@ -396,20 +407,18 @@ describe('executeGraph — gate modes', () => {
   it('--gate-compare PASS after a --gate-save with matching state', async () => {
     const { cli: saveCli } = mockCli(datastore);
     await executeGraph({ cwd: projectDir, noCache: true, gateSave: true }, saveCli);
-    const { cli, setExitCode } = mockCli(datastore);
+    const { cli, setExitCode, render } = mockCli(datastore);
     await executeGraph({ cwd: projectDir, noCache: true, gateCompare: true }, cli);
     expect(setExitCode).toHaveBeenCalledWith(0);
-    const out = stdoutSpy.mock.calls.map((c) => String(c[0])).join('');
-    expect(out).toContain('Graph gate PASS');
+    expect(renderedLines(render)).toContain('Graph gate PASS');
   });
 
   it('--gate-compare FAIL when current findings exceed baseline', async () => {
     saveBaseline([], new GraphBaselineRepo(datastore));
-    const { cli, setExitCode } = mockCli(datastore);
+    const { cli, setExitCode, render } = mockCli(datastore);
     await executeGraph({ cwd: projectDir, noCache: true, gateCompare: true }, cli);
     expect(setExitCode).toHaveBeenCalledWith(1);
-    const out = stdoutSpy.mock.calls.map((c) => String(c[0])).join('');
-    expect(out).toContain('Graph gate FAILED');
+    expect(renderedLines(render)).toContain('Graph gate FAILED');
   });
 
   it('throws ConfigurationError if --gate-save is used without a datastore', async () => {
@@ -537,7 +546,7 @@ process.exit(0);
       { id: 'a', rootDir: pkgA, configPath: join(pkgA, 'tsconfig.json') },
       { id: 'b', rootDir: pkgB, configPath: join(pkgB, 'tsconfig.json') },
     ];
-    const { cli, setExitCode } = mockCli(datastore, makeWorkspaceLangRegistry(units));
+    const { cli, setExitCode, render } = mockCli(datastore, makeWorkspaceLangRegistry(units));
     await executeGraph(
       {
         cwd: workDir,
@@ -549,7 +558,7 @@ process.exit(0);
       cli,
     );
     expect(setExitCode).toHaveBeenCalledWith(0);
-    const out = stdoutSpy.mock.calls.map((c) => String(c[0])).join('');
+    const out = renderedLines(render);
     expect(out).toContain('opensip-tools graph --workspace');
     expect(out).toContain('== Units (2)');
   });

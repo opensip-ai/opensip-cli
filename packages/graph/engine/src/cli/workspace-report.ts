@@ -6,18 +6,20 @@
  */
 
 import type { WorkspaceUnitRunResult } from './workspace-runner.js'
+import type { ToolCliContext } from '@opensip-tools/core'
 
 const FINDINGS_PREVIEW = 10
 
 /**
- * Write the human-readable workspace report to stdout.
+ * Compose the human-readable workspace report as plain lines (no Ink twin),
+ * for the render seam.
  */
-export function writeWorkspaceReport(
+export function workspaceReportLines(
   perUnit: readonly WorkspaceUnitRunResult[],
   durationMs: number,
-): void {
+): readonly string[] {
   const totalFindings = perUnit.reduce((n, r) => n + r.findings.length, 0)
-  const lines: string[] = [
+  return [
     'opensip-tools graph --workspace',
     '',
     `== Units (${String(perUnit.length)}) ==`,
@@ -28,7 +30,18 @@ export function writeWorkspaceReport(
     '== Summary ==',
     `${String(totalFindings)} total finding(s) across ${String(perUnit.length)} unit(s) in ${String(durationMs)} ms.`,
   ]
-  process.stdout.write(`${lines.join('\n')}\n`)
+}
+
+/**
+ * Render the human-readable workspace report through the seam (Ink on TTY,
+ * plain text in pipes/CI) rather than writing to stdout directly.
+ */
+export async function writeWorkspaceReport(
+  perUnit: readonly WorkspaceUnitRunResult[],
+  durationMs: number,
+  cli: ToolCliContext,
+): Promise<void> {
+  await cli.render({ type: 'graph-status', lines: workspaceReportLines(perUnit, durationMs) })
 }
 
 /**
