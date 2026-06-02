@@ -31,6 +31,7 @@ import { runCatalogJsonMode } from './cli/graph-modes.js';
 import { renderGraphLive } from './cli/graph-runner.js';
 import { executeGraph, handleGraphError } from './cli/graph.js';
 import { runHeapPreflight } from './cli/heap-preflight.js';
+import { buildGraphRecipeCatalog, buildGraphRuleCatalog } from './cli/dashboard-data.js';
 import { listGraphRecipes } from './cli/list-graph-recipes.js';
 import { executeLookup } from './cli/lookup.js';
 import { loadGraphConfig, runGraph } from './cli/orchestrate.js';
@@ -533,10 +534,21 @@ function contributeScope(): ScopeContribution {
  * compose the cross-tool dashboard without fitness reaching into graph.
  */
 function collectDashboardData(scope: ToolScope): Record<string, unknown> {
+  // Rule + recipe catalogs are cheap, scope-only reads (no I/O). A run
+  // without the graph subscope yields empty arrays, not a throw. These use
+  // DISTINCT keys from fitness's `checkCatalog`/`recipeCatalog` (which the
+  // CLI merges via Object.assign) so graph never clobbers fitness.
+  const graphRuleCatalog = buildGraphRuleCatalog(scope);
+  const graphRecipeCatalog = buildGraphRecipeCatalog(scope);
+
   const datastore = scope.datastore() as DataStore | undefined;
-  if (!datastore) return {};
+  if (!datastore) return { graphRuleCatalog, graphRecipeCatalog };
   try {
-    return { graphCatalog: new CatalogRepo(datastore).loadCatalogContract() };
+    return {
+      graphCatalog: new CatalogRepo(datastore).loadCatalogContract(),
+      graphRuleCatalog,
+      graphRecipeCatalog,
+    };
   } catch (error) {
     // No catalog (or an unreadable one) → the panel renders its no-data
     // state. Log at debug so the empty-result path is traceable rather
@@ -546,7 +558,7 @@ function collectDashboardData(scope: ToolScope): Record<string, unknown> {
       module: 'graph:tool',
       err: error instanceof Error ? error.message : String(error),
     });
-    return {};
+    return { graphRuleCatalog, graphRecipeCatalog };
   }
 }
 
