@@ -1,9 +1,11 @@
 import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { buildFeatures, toPersistedFeatures } from '../../pipeline/features.js';
+import { buildIndexes } from '../../pipeline/indexes.js';
 import { CatalogRepo } from '../../persistence/catalog-repo.js';
 
-import type { Catalog } from '../../types.js';
+import type { Catalog, FunctionOccurrence, PersistedFeatures } from '../../types.js';
 
 function makeCatalog(over: Partial<Catalog> = {}): Catalog {
   return {
@@ -93,5 +95,74 @@ describe('CatalogRepo', () => {
   it('loadFullCatalog error branch propagates after datastore close', () => {
     datastore.close();
     expect(() => repo.loadFullCatalog()).toThrow();
+  });
+});
+
+function fnOcc(over: Partial<FunctionOccurrence> & { bodyHash: string; simpleName: string }): FunctionOccurrence {
+  return {
+    qualifiedName: over.simpleName,
+    filePath: `packages/core/src/${over.simpleName}.ts`,
+    line: 1,
+    column: 0,
+    endLine: 5,
+    kind: 'function-declaration',
+    params: [],
+    returnType: null,
+    enclosingClass: null,
+    decorators: [],
+    visibility: 'module-local',
+    inTestFile: false,
+    definedInGenerated: false,
+    calls: [],
+    ...over,
+  };
+}
+
+describe('CatalogRepo — features (Plan C)', () => {
+  function featuresPayload(): PersistedFeatures {
+    const functions = {
+      a: [fnOcc({ bodyHash: 'a', simpleName: 'a', endLine: 12,
+        calls: [{ to: ['b'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'b()' }] })],
+      b: [fnOcc({ bodyHash: 'b', simpleName: 'b' })],
+    };
+    const catalog = makeCatalog({ functions });
+    const indexes = buildIndexes(catalog);
+    const requested = ['bodyLines', 'blast', 'scc', 'packageCoupling'] as const;
+    const table = buildFeatures(catalog, indexes, {}, requested);
+    return toPersistedFeatures(table, requested);
+  }
+
+  it('round-trips a features payload (Maps→records intact)', () => {
+    const features = featuresPayload();
+    repo.replaceAll(makeCatalog({
+      functions: {
+        a: [fnOcc({ bodyHash: 'a', simpleName: 'a', endLine: 12,
+          calls: [{ to: ['b'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'b()' }] })],
+        b: [fnOcc({ bodyHash: 'b', simpleName: 'b' })],
+      },
+      features,
+    }));
+    const loaded = repo.loadFullCatalog();
+    expect(loaded?.features).toEqual(features);
+    expect(loaded?.features?.function?.['a']?.bodyLines).toBe(12);
+  });
+
+  it('exposes the same features through the GraphCatalog contract', () => {
+    const features = featuresPayload();
+    repo.replaceAll(makeCatalog({
+      functions: {
+        a: [fnOcc({ bodyHash: 'a', simpleName: 'a', endLine: 12,
+          calls: [{ to: ['b'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'b()' }] })],
+        b: [fnOcc({ bodyHash: 'b', simpleName: 'b' })],
+      },
+      features,
+    }));
+    const contract = repo.loadCatalogContract();
+    expect(contract?.features).toEqual(features);
+  });
+
+  it('lean default: a catalog without features reloads with features === undefined', () => {
+    repo.replaceAll(makeCatalog());
+    expect(repo.loadFullCatalog()?.features).toBeUndefined();
   });
 });
