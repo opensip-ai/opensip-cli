@@ -43,7 +43,7 @@ import { buildUnifiedReportLines, persistSession } from './graph.js';
 import { GRAPH_STAGES, runGraph } from './orchestrate.js';
 
 import type { GraphProgressEvent, GraphStage, RunGraphResult } from './orchestrate.js';
-import type { ResolutionMode } from '../types.js';
+import type { GraphConfig, ResolutionMode } from '../types.js';
 import type { DataStore } from '@opensip-tools/datastore';
 
 const GRAPH_TOOL_TITLE = 'Code Graph';
@@ -114,6 +114,15 @@ interface GraphRunnerArgs {
    * summary line + footer hint only, matching fit's default surface.
    */
   readonly verbose?: boolean;
+  /**
+   * The project's `graph:` config block (rule knobs like
+   * `minCrossPackageDuplicatePackages`, `minDuplicateBodyLines`,
+   * `entryPointHashes`). Forwarded to `runGraph` so the interactive
+   * default path honors the SAME config as the `executeGraph` dispatch
+   * path. Without it the live view silently fell back to rule defaults,
+   * so bare `graph` / `graph --verbose` disagreed with `graph --json`.
+   */
+  readonly config?: GraphConfig;
 }
 
 interface GraphRunnerProps {
@@ -156,6 +165,7 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
           cwd: args.cwd,
           noCache: args.noCache,
           resolution: args.resolution,
+          config: args.config,
           onProgress,
           datastore,
         });

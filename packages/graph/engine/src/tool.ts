@@ -32,7 +32,7 @@ import { renderGraphLive } from './cli/graph-runner.js';
 import { executeGraph, handleGraphError } from './cli/graph.js';
 import { runHeapPreflight } from './cli/heap-preflight.js';
 import { executeLookup } from './cli/lookup.js';
-import { runGraph } from './cli/orchestrate.js';
+import { loadGraphConfig, runGraph } from './cli/orchestrate.js';
 import { runSarifExportMode } from './cli/sarif-export.js';
 import { executeShardWorker } from './cli/shard-worker.js';
 import { executeSymbolIndex } from './cli/symbol-index.js';
@@ -43,7 +43,7 @@ import { createRulesRegistry } from './rules/registry.js';
 // loaded so `scope.graph` is correctly-typed here.
 import './scope-augmentation.js';
 
-import type { ResolutionMode } from './types.js';
+import type { GraphConfig, ResolutionMode } from './types.js';
 import type { ScopeContribution, Tool, ToolCliContext, ToolCommandDescriptor, ToolScope } from '@opensip-tools/core';
 import type { DataStore } from '@opensip-tools/datastore';
 
@@ -136,7 +136,13 @@ function register(cli: ToolCliContext): void {
   // requires zero CLI edits.
   cli.registerLiveView(GRAPH_LIVE_VIEW_KEY, async (args) => {
     await renderGraphLive(
-      args as { cwd: string; noCache?: boolean; resolution?: ResolutionMode },
+      args as {
+        cwd: string;
+        noCache?: boolean;
+        resolution?: ResolutionMode;
+        verbose?: boolean;
+        config?: GraphConfig;
+      },
       cli.scope.datastore() as DataStore | undefined,
       { setExitCode: cli.setExitCode },
     );
@@ -234,6 +240,11 @@ function register(cli: ToolCliContext): void {
           noCache: opts.cache === false,
           verbose: opts.verbose === true,
           resolution,
+          // Honor the project's `graph:` config block in the interactive
+          // path too — parity with `executeGraph` (graph.ts), which loads
+          // it via the same helper. Loading here (not inside the React
+          // runner) keeps the fs read on the dispatch seam.
+          config: loadGraphConfig(opts.cwd),
         });
         return;
       }

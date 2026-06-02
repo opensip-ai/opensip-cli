@@ -125,6 +125,29 @@ describe('--resolution validation', () => {
   });
 });
 
+describe('interactive default path honors graph config', () => {
+  it('loads opensip-tools.config.yml graph block and forwards it to renderLive', async () => {
+    // Regression: the interactive live-view path (bare `graph`) used to
+    // call runGraph with no config, silently ignoring the project's
+    // `graph:` block — so `graph --verbose` disagreed with `graph --json`.
+    currentAdapterRegistry().register(fakeAdapter(workDir));
+    writeFileSync(
+      join(workDir, 'opensip-tools.config.yml'),
+      'graph:\n  minCrossPackageDuplicatePackages: 2\n',
+      'utf8',
+    );
+    const { cli, program } = makeMockCli();
+    graphTool.register(cli);
+
+    await program.parseAsync(['graph', '--cwd', workDir], { from: 'user' });
+
+    const renderLive = cli.renderLive as unknown as MockInstance;
+    expect(renderLive).toHaveBeenCalledTimes(1);
+    const [, args] = renderLive.mock.calls[0] as [string, { config?: { minCrossPackageDuplicatePackages?: number } }];
+    expect(args.config?.minCrossPackageDuplicatePackages).toBe(2);
+  });
+});
+
 describe('graph-shard-worker action', () => {
   it('routes the specPath argument to executeShardWorker (exit 0 on a valid spec)', async () => {
     currentAdapterRegistry().register(fakeAdapter(workDir));
