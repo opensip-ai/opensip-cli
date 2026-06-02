@@ -250,7 +250,7 @@ function referenceSccs(indexes: Indexes): string[][] {
     if (index.has(start)) continue;
     const work: { v: string; ai: number }[] = [{ v: start, ai: 0 }];
     while (work.length > 0) {
-      const frame = work[work.length - 1]!;
+      const frame = work.at(-1)!;
       const v = frame.v;
       if (frame.ai === 0) {
         index.set(v, nextIndex);
@@ -262,14 +262,12 @@ function referenceSccs(indexes: Indexes): string[][] {
       const adjV = adj(v);
       let descended = false;
       while (frame.ai < adjV.length) {
-        const w = adjV[frame.ai++]!;
+        const w = adjV[frame.ai++];
         if (!index.has(w)) {
           work.push({ v: w, ai: 0 });
           descended = true;
           break;
-        } else if (onStack.has(w)) {
-          if (index.get(w)! < lowlink.get(v)!) lowlink.set(v, index.get(w)!);
-        }
+        } else if (onStack.has(w) && index.get(w)! < lowlink.get(v)!) lowlink.set(v, index.get(w)!);
       }
       if (descended) continue;
       if (lowlink.get(v) === index.get(v)) {
@@ -285,12 +283,17 @@ function referenceSccs(indexes: Indexes): string[][] {
       }
       work.pop();
       if (work.length > 0) {
-        const parent = work[work.length - 1]!.v;
+        const parent = work.at(-1)!.v;
         if (lowlink.get(v)! < lowlink.get(parent)!) lowlink.set(parent, lowlink.get(v)!);
       }
     }
   }
   return result;
+}
+
+/** Normalize SCC member sets for order-insensitive comparison. */
+function normSccMembers(members: readonly string[][]): string[][] {
+  return members.map((m) => [...m].sort()).sort((a, b) => (a[0] ?? '').localeCompare(b[0] ?? ''));
 }
 
 describe('buildFeatures — parity vs prior dashboard outputs', () => {
@@ -305,10 +308,8 @@ describe('buildFeatures — parity vs prior dashboard outputs', () => {
   it('scc member sets equal the reference findSccs (normalized)', () => {
     const { catalog, indexes } = makeFixture();
     const f = buildFeatures(catalog, indexes, CONFIG, ['scc']);
-    const norm = (members: readonly string[][]): string[][] =>
-      members.map((m) => [...m].sort()).sort((a, b) => (a[0] ?? '').localeCompare(b[0] ?? ''));
-    const engine = norm(f.scc.map((s) => [...s.members]));
-    const reference = norm(referenceSccs(indexes));
+    const engine = normSccMembers(f.scc.map((s) => [...s.members]));
+    const reference = normSccMembers(referenceSccs(indexes));
     expect(engine).toEqual(reference);
   });
 });

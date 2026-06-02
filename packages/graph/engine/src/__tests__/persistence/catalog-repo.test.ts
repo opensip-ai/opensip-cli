@@ -1,9 +1,9 @@
 import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { CatalogRepo } from '../../persistence/catalog-repo.js';
 import { buildFeatures, toPersistedFeatures } from '../../pipeline/features.js';
 import { buildIndexes } from '../../pipeline/indexes.js';
-import { CatalogRepo } from '../../persistence/catalog-repo.js';
 
 import type { Catalog, FunctionOccurrence, PersistedFeatures } from '../../types.js';
 
@@ -118,20 +118,20 @@ function fnOcc(over: Partial<FunctionOccurrence> & { bodyHash: string; simpleNam
   };
 }
 
-describe('CatalogRepo — features (Plan C)', () => {
-  function featuresPayload(): PersistedFeatures {
-    const functions = {
-      a: [fnOcc({ bodyHash: 'a', simpleName: 'a', endLine: 12,
-        calls: [{ to: ['b'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'b()' }] })],
-      b: [fnOcc({ bodyHash: 'b', simpleName: 'b' })],
-    };
-    const catalog = makeCatalog({ functions });
-    const indexes = buildIndexes(catalog);
-    const requested = ['bodyLines', 'blast', 'scc', 'packageCoupling'] as const;
-    const table = buildFeatures(catalog, indexes, {}, requested);
-    return toPersistedFeatures(table, requested);
-  }
+function featuresPayload(): PersistedFeatures {
+  const functions = {
+    a: [fnOcc({ bodyHash: 'a', simpleName: 'a', endLine: 12,
+      calls: [{ to: ['b'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'b()' }] })],
+    b: [fnOcc({ bodyHash: 'b', simpleName: 'b' })],
+  };
+  const catalog = makeCatalog({ functions });
+  const indexes = buildIndexes(catalog);
+  const requested = ['bodyLines', 'blast', 'scc', 'packageCoupling'] as const;
+  const table = buildFeatures(catalog, indexes, {}, requested);
+  return toPersistedFeatures(table, requested);
+}
 
+describe('CatalogRepo — features (Plan C)', () => {
   it('round-trips a features payload (Maps→records intact)', () => {
     const features = featuresPayload();
     repo.replaceAll(makeCatalog({
@@ -144,7 +144,7 @@ describe('CatalogRepo — features (Plan C)', () => {
     }));
     const loaded = repo.loadFullCatalog();
     expect(loaded?.features).toEqual(features);
-    expect(loaded?.features?.function?.['a']?.bodyLines).toBe(12);
+    expect(loaded?.features?.function?.a?.bodyLines).toBe(12);
   });
 
   it('exposes the same features through the GraphCatalog contract', () => {
