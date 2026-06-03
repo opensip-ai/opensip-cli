@@ -86,14 +86,14 @@ function gvLoadViewModel() {
   try { return JSON.parse(blob.textContent); } catch (e) { return null; }
 }
 
-// notifyViews() (and the init loop) fan render() out to EVERY Code Graph
-// panel, not just the active one — the row-table views re-render in O(rows),
-// but a full Cytoscape mount + dagre layout is far from free. Defer that work
-// until this panel is actually visible: the panel orchestrator toggles an
-// 'active' class on the live '.code-paths-view' panel. A container that is a
-// panel but not active is hidden → skip the mount (it runs on activation). A
-// container that is NOT a panel (e.g. a unit-test harness div) is treated as
-// visible so direct render() calls mount.
+// The init loop renders EVERY Code Graph panel, not just the active one — the
+// row-table views re-render in O(rows), but a full Cytoscape mount + dagre
+// layout is far from free. Defer that work until this panel is actually
+// visible: the panel orchestrator toggles an 'active' class on the live
+// '.code-paths-view' panel. A container that is a panel but not active is
+// hidden → skip the mount (it runs on activation). A container that is NOT a
+// panel (e.g. a unit-test harness div) is treated as visible so direct
+// render() calls mount.
 function gvPanelHidden(container) {
   return !!(container && container.classList &&
     container.classList.contains('code-paths-view') &&
@@ -158,44 +158,10 @@ function gvRunLayout(layoutId) {
   layout.run();
 }
 
-function gvRenderLayoutSelector(host) {
-  var bar = el('div', { class: 'code-paths-graph-toolbar' });
-  bar.appendChild(el('span', { class: 'code-paths-graph-toolbar-label', text: 'Layout' }));
-  for (var i = 0; i < GV_LAYOUTS.length; i++) {
-    (function(layout) {
-      var btn = el('button', {
-        class: 'code-paths-graph-layout-btn' + (layout.id === gvCurrentLayout ? ' active' : ''),
-        'data-layout': layout.id,
-        text: layout.label,
-        onclick: function() {
-          gvRunLayout(layout.id);
-          var btns = host.querySelectorAll('.code-paths-graph-layout-btn');
-          for (var k = 0; k < btns.length; k++) {
-            btns[k].classList.toggle('active', btns[k].dataset.layout === layout.id);
-          }
-        },
-      });
-      bar.appendChild(btn);
-    })(GV_LAYOUTS[i]);
-  }
-  // Cross-package-cycle highlight toggle. When on, packages in a multi-package
-  // cycle + the edges between them are emphasized and the acyclic remainder is
-  // dimmed, so circular package dependencies pop out. Reads the same SCC facets
-  // the projector already attached to the view-model (graph-view-model.ts) — no
-  // second Tarjan pass in the browser.
-  var sccBtn = el('button', {
-    class: 'code-paths-graph-scc-btn' + (gvSccHighlight ? ' active' : ''),
-    'data-scc-toggle': '1',
-    text: 'Highlight cycles',
-    onclick: function() {
-      gvSccHighlight = !gvSccHighlight;
-      sccBtn.classList.toggle('active', gvSccHighlight);
-      gvApplySccHighlight();
-    },
-  });
-  bar.appendChild(sccBtn);
-  host.appendChild(bar);
-}
+// The Layout selector and the "Highlight cycles" toggle now live in the single
+// control toolbar built by gvRenderControls (graph-controls.ts) — Layout as a
+// dropdown matching the other controls. gvRunLayout / gvSccHighlight /
+// gvApplySccHighlight (below) are the shared handlers those controls call.
 
 // Emphasize cross-package cyclic clusters on the live graph. A node is "in a
 // cycle" when it carries an sccId; an edge when isCycleEdge is set. Toggling
@@ -308,7 +274,6 @@ function gvRenderGraph(container, catalog, indexes) {
   if (gvPanelHidden(container)) return;
 
   gvRenderControls(container, catalog, indexes);
-  gvRenderLayoutSelector(container);
   gvRenderSearchBox(container);
 
   var elements;

@@ -20,7 +20,8 @@
  *
  * Free identifiers (supplied by earlier prelude emitters / the host template):
  * `el`, `pkgOf`, `displayName`, `resolveCalleeOcc`, `packagesInCatalog`,
- * `KIND_LIST`, `gvRenderGraph`, and the `gv*` control-state vars.
+ * `KIND_LIST`, `gvRenderGraph`, `GV_LAYOUTS`, `gvRunLayout`, `gvSccHighlight`,
+ * `gvApplySccHighlight`, and the `gv*` control-state vars.
  */
 export function dashboardGraphControlsJs(): string {
   return String.raw`
@@ -33,12 +34,13 @@ function gvAddOptions(sel, pairs, current) {
   }
 }
 
-// The view's own control toolbar (Level / Scope / Package / Kind / Edges).
-// This is deliberately self-contained — the shared Explore filter chips govern
-// the Functions table, not this view. The Level dropdown decides what the graph
-// shows; Package + Kind only apply at function level, so they are DISABLED at
-// package level (faded, not hidden) to make that scoping legible. Every change
-// re-renders the graph in place via gvRenderGraph(host, catalog, indexes).
+// The view's own single-row control toolbar: Level / Scope / Package / Kind /
+// Edges / Layout dropdowns + a "Highlight cycles" toggle. Self-contained (the
+// shared Explore filter bar was removed). The Level dropdown decides what the
+// graph shows; Package + Kind only apply at function level, so they are
+// DISABLED at package level (faded, not hidden) to make that scoping legible.
+// Most changes re-render the graph in place via gvRenderGraph; the Layout
+// change re-runs the layout on the live graph without a remount.
 function gvRenderControls(host, catalog, indexes) {
   var bar = el('div', { class: 'code-paths-graph-toolbar code-paths-graph-controls' });
   function label(t) { bar.appendChild(el('span', { class: 'code-paths-graph-toolbar-label', text: t })); }
@@ -69,22 +71,18 @@ function gvRenderControls(host, catalog, indexes) {
   pkgSel.addEventListener('change', function(e) { gvSelectedPackage = e.target.value || null; rerender(); });
   bar.appendChild(pkgSel);
 
-  // Kind — multi-select; function level only (disabled at package level).
+  // Kind — multi-select dropdown; function level only (disabled at package
+  // level). A custom checkbox popover (gvMultiSelect) rather than a native
+  // <select multiple> listbox, which renders as an always-open box.
   label('Kind');
-  var kindSel = el('select', { class: 'code-paths-graph-select code-paths-graph-multi', 'data-control': 'kind', multiple: 'multiple' });
-  var kinds = (typeof KIND_LIST !== 'undefined') ? KIND_LIST : [];
-  for (var k = 0; k < kinds.length; k++) {
-    var kopt = el('option', { value: kinds[k], text: kinds[k] });
-    if (gvKinds.indexOf(kinds[k]) >= 0) kopt.selected = true;
-    kindSel.appendChild(kopt);
-  }
-  kindSel.disabled = !fnLevel;
-  kindSel.addEventListener('change', function(e) {
-    var sel = e.target.selectedOptions || [];
-    gvKinds = Array.prototype.slice.call(sel).map(function(o) { return o.value; });
-    rerender();
-  });
-  bar.appendChild(kindSel);
+  bar.appendChild(gvMultiSelect({
+    id: 'kind',
+    items: (typeof KIND_LIST !== 'undefined') ? KIND_LIST : [],
+    selected: gvKinds,
+    allLabel: 'All kinds',
+    disabled: !fnLevel,
+    onClose: function(sel) { gvKinds = sel; rerender(); },
+  }));
 
   // Edges — function level only: intra-package (default) vs + cross-package.
   if (fnLevel) {
@@ -95,7 +93,84 @@ function gvRenderControls(host, catalog, indexes) {
     bar.appendChild(edgeSel);
   }
 
+  // Layout — a dropdown (matches the other controls; was a button group).
+  // Changing layout re-runs the layout on the live graph (no full remount).
+  label('Layout');
+  var layoutSel = el('select', { class: 'code-paths-graph-select', 'data-control': 'layout' });
+  gvAddOptions(layoutSel, GV_LAYOUTS.map(function(l) { return [l.id, l.label]; }), gvCurrentLayout);
+  layoutSel.addEventListener('change', function(e) { gvRunLayout(e.target.value); });
+  bar.appendChild(layoutSel);
+
+  // Cross-package-cycle highlight toggle (package-level SCC emphasis).
+  var sccBtn = el('button', {
+    class: 'code-paths-graph-scc-btn' + (gvSccHighlight ? ' active' : ''),
+    'data-scc-toggle': '1',
+    text: 'Highlight cycles',
+    onclick: function() {
+      gvSccHighlight = !gvSccHighlight;
+      sccBtn.classList.toggle('active', gvSccHighlight);
+      gvApplySccHighlight();
+    },
+  });
+  bar.appendChild(sccBtn);
+
   host.appendChild(bar);
+}
+
+// A compact multi-select dropdown: a trigger button + a checkbox popover.
+// Native <select multiple> renders an ugly always-open listbox, so we roll a
+// small popover instead. Checkboxes toggle the selection live and update the
+// trigger label; the graph re-renders only when the panel CLOSES (trigger
+// re-click or outside click) so a remount doesn't fire on every checkbox.
+//   opts: { id, items:[string], selected:[string], allLabel, disabled, onClose }
+function gvMultiSelect(opts) {
+  var wrap = el('div', { class: 'code-paths-graph-ms' });
+  var selected = opts.selected.slice();
+  function triggerLabel() {
+    if (selected.length === 0) return opts.allLabel;
+    if (selected.length === 1) return selected[0];
+    return selected.length + ' selected';
+  }
+  var trigger = el('button', { class: 'code-paths-graph-select code-paths-graph-ms-trigger', 'data-control': opts.id, text: triggerLabel() + ' ▾' });
+  trigger.disabled = !!opts.disabled;
+  var panel = el('div', { class: 'code-paths-graph-ms-panel' });
+  panel.style.display = 'none';
+  var open = false;
+  var docHandler = null;
+  function close() {
+    if (!open) return;
+    open = false;
+    panel.style.display = 'none';
+    if (docHandler) { document.removeEventListener('mousedown', docHandler); docHandler = null; }
+    opts.onClose(selected.slice());
+  }
+  function openPanel() {
+    if (open || opts.disabled) return;
+    open = true;
+    panel.style.display = 'block';
+    docHandler = function(e) { if (!wrap.contains(e.target)) close(); };
+    document.addEventListener('mousedown', docHandler);
+  }
+  trigger.addEventListener('click', function() { if (open) close(); else openPanel(); });
+  for (var i = 0; i < opts.items.length; i++) {
+    (function(item) {
+      var row = el('label', { class: 'code-paths-graph-ms-item' });
+      var cb = el('input', { type: 'checkbox' });
+      cb.checked = selected.indexOf(item) >= 0;
+      cb.addEventListener('change', function() {
+        var ix = selected.indexOf(item);
+        if (cb.checked && ix < 0) selected.push(item);
+        else if (!cb.checked && ix >= 0) selected.splice(ix, 1);
+        trigger.textContent = triggerLabel() + ' ▾';
+      });
+      row.appendChild(cb);
+      row.appendChild(document.createTextNode(' ' + item));
+      panel.appendChild(row);
+    })(opts.items[i]);
+  }
+  wrap.appendChild(trigger);
+  wrap.appendChild(panel);
+  return wrap;
 }
 
 // Project the function-level graph for a single package, client-side from the

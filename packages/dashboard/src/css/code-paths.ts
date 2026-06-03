@@ -9,33 +9,8 @@ export function dashboardCssCodePaths(): string {
   return String.raw`
 /* ====== Code Paths panel (v0.3) ====== */
 .code-paths-search { width: 320px; margin-bottom: 12px; display: block; }
-.code-paths-filter-chips { display: block; margin-bottom: 12px; }
-.code-paths-chip { font-size: 12px; padding: 3px 10px; border-radius: 12px; cursor: pointer; background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-muted); user-select: none; display: inline-block; }
-.code-paths-chip:hover { background: var(--bg-hover); color: var(--text); }
-.code-paths-chip.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
-
-/* Collapsible filter drawer header */
-.code-paths-filter-header { display: flex; align-items: center; gap: 12px; }
-.code-paths-filter-toggle { background: var(--bg-surface); border: 1px solid var(--border); color: var(--text); padding: 5px 12px; border-radius: var(--radius-sm); font-size: 12px; font-family: var(--font); cursor: pointer; user-select: none; }
-.code-paths-filter-toggle:hover { background: var(--bg-hover); border-color: var(--border-light); }
-.code-paths-filter-toggle.open { border-color: var(--accent); color: var(--accent); }
-.code-paths-filter-count { font-size: 12px; color: var(--text-dim); }
-.code-paths-filter-count.active { color: var(--accent); }
-.code-paths-filter-clear { margin-left: auto; background: none; border: none; color: var(--text-dim); font-size: 12px; cursor: pointer; padding: 4px 8px; border-radius: var(--radius-sm); }
-.code-paths-filter-clear:hover { color: var(--text); background: var(--bg-hover); }
-
-/* Filter drawer body — labeled rows */
-.code-paths-filter-body { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; margin-top: 8px; }
-.code-paths-filter-row { display: flex; gap: 12px; align-items: flex-start; padding: 6px 0; }
-.code-paths-filter-row + .code-paths-filter-row { border-top: 1px solid var(--border); margin-top: 4px; padding-top: 10px; }
-.code-paths-filter-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; min-width: 70px; padding-top: 4px; }
-.code-paths-filter-chips-wrap { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; }
-.code-paths-filter-scope { display: flex; gap: 16px; }
-.code-paths-filter-radio { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; user-select: none; padding: 4px 0; }
-.code-paths-filter-radio:hover { color: var(--text); }
-.code-paths-filter-radio.active { color: var(--text); }
-.code-paths-filter-radio-dot { width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--border-light); background: transparent; display: inline-block; }
-.code-paths-filter-radio-dot.active { border-color: var(--accent); background: radial-gradient(circle, var(--accent) 0 4px, transparent 5px); }
+/* (The shared filter chip bar / collapsible filter drawer was removed — the
+   Visualization view owns its own controls and the other views don't need it.) */
 .code-paths-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 16px; flex-wrap: wrap; }
 .code-paths-tab { padding: 8px 16px; cursor: pointer; color: var(--text-dim); font-size: 13px; font-weight: 500; border-bottom: 2px solid transparent; transition: color 0.15s, border-color 0.15s; user-select: none; }
 .code-paths-tab:hover { color: var(--text-secondary); }
@@ -56,20 +31,24 @@ export function dashboardCssCodePaths(): string {
 /* ====== Code Paths Graph view (Cytoscape) ====== */
 .code-paths-graph-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
 .code-paths-graph-toolbar-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
-.code-paths-graph-layout-btn { font-size: 12px; padding: 4px 10px; border-radius: var(--radius-sm); cursor: pointer; background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-muted); font-family: var(--font); user-select: none; }
-.code-paths-graph-layout-btn:hover { background: var(--bg-hover); color: var(--text); }
-.code-paths-graph-layout-btn.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
-.code-paths-graph-scc-btn { font-size: 12px; padding: 4px 10px; border-radius: var(--radius-sm); cursor: pointer; background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-muted); font-family: var(--font); user-select: none; margin-left: 12px; }
+.code-paths-graph-scc-btn { font-size: 12px; padding: 4px 10px; border-radius: var(--radius-sm); cursor: pointer; background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-muted); font-family: var(--font); user-select: none; height: 30px; box-sizing: border-box; }
 .code-paths-graph-scc-btn:hover { background: var(--bg-hover); color: var(--text); }
 .code-paths-graph-scc-btn.active { background: #d46a6a; color: var(--bg); border-color: #d46a6a; }
-/* Visualization control toolbar (Level / Scope / Package / Kind / Edges).
-   Self-contained to the view (not the shared Explore filter bar): the
-   Package/Kind selects are disabled at package level and enabled at function
-   level, so they fade rather than vanish. */
-.code-paths-graph-controls { gap: 6px; }
-.code-paths-graph-select { font-size: 12px; padding: 3px 8px; border-radius: var(--radius-sm); background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-muted); font-family: var(--font); }
+/* Visualization control toolbar — one symmetric row of dropdowns (Level /
+   Scope / Package / Kind / Edges / Layout) + a Highlight-cycles toggle. The
+   Package/Kind controls are disabled at package level (they only apply at
+   function level), so they fade rather than vanish. Uniform select min-width
+   keeps the row aligned. */
+.code-paths-graph-controls { gap: 8px 10px; row-gap: 8px; }
+.code-paths-graph-select { font-size: 12px; padding: 4px 8px; border-radius: var(--radius-sm); background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-muted); font-family: var(--font); min-width: 150px; height: 30px; box-sizing: border-box; }
 .code-paths-graph-select:disabled { opacity: 0.4; cursor: not-allowed; }
-.code-paths-graph-multi { min-width: 150px; height: 64px; vertical-align: middle; }
+/* Kind multi-select: a trigger button + a checkbox popover (native
+   <select multiple> renders an always-open listbox, which looked wrong). */
+.code-paths-graph-ms { position: relative; display: inline-block; }
+.code-paths-graph-ms-trigger { cursor: pointer; text-align: left; }
+.code-paths-graph-ms-panel { position: absolute; z-index: 30; top: calc(100% + 4px); left: 0; min-width: 190px; max-height: 230px; overflow-y: auto; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 4px; box-shadow: 0 6px 18px rgba(0,0,0,0.45); }
+.code-paths-graph-ms-item { display: flex; align-items: center; gap: 6px; padding: 4px 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; white-space: nowrap; border-radius: 3px; }
+.code-paths-graph-ms-item:hover { background: var(--bg-hover); color: var(--text); }
 .code-paths-graph-banner { font-size: 12px; color: var(--text-muted); background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 10px; margin-bottom: 10px; }
 .code-paths-graph-search { width: 320px; margin-bottom: 10px; display: block; }
 .code-paths-graph-canvas { width: 100%; height: 640px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); }

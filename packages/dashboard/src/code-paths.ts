@@ -11,9 +11,9 @@
  *
  * Architecture: vanilla DOM, no framework. Each view-*.ts emits a
  * JS string that pushes a `View` literal into the singleton `views`
- * registry. The Explore subtab renders filter chips + view tab bar
- * + one container per view; Sessions subtab renders the standard
- * session table.
+ * registry. The Explore subtab renders the view tab bar + one
+ * container per view; Sessions subtab renders the standard session
+ * table.
  *
  * The file imports JS-string emitters from sibling modules under
  * `code-paths/`. It MUST NOT import from `@opensip-tools/graph` —
@@ -68,8 +68,9 @@ const RESTRUCTURED_EXPLORE_TABS = true;
  *                        `shortPkg`.
  *  2. indexes          — declares `buildIndexes`, `resolveCalleeOcc`. Uses
  *                        `pkgOf` (path-utils, above).
- *  3. filters          — declares `filterState`, `passesFilter`,
- *                        `renderFilterChips`. No external deps.
+ *  3. filters          — declares `filterState` (default, non-interactive),
+ *                        `passesFilter`, `packagesInCatalog`, `KIND_LIST`.
+ *                        Uses `pkgOf` (path-utils, above).
  *  4. editor-link      — declares `editorLink`. Reads `EDITOR_PROTOCOL`
  *                        (declared in generator.ts before the script
  *                        block).
@@ -151,9 +152,9 @@ export function dashboardCodePathsJs(_restructured: boolean = RESTRUCTURED_EXPLO
  *      `<script id="graph-catalog">` blob.
  *   3. PANEL ENTRY — `renderCodePathsTab` mounts the Sessions /
  *      Explore subtabs via `renderSubtabBar` (F2).
- *   4. EXPLORE BODY — `renderCodePathsExplore` builds chips, view
- *      tab bar, view containers, row-click delegation, escape
- *      handler, and runs each view's initial render.
+ *   4. EXPLORE BODY — `renderCodePathsExplore` builds the view tab
+ *      bar, view containers, row-click delegation, escape handler,
+ *      and runs each view's initial render.
  *   5. HASH ROUTE — `readViewIdFromHash` parses `#code-paths/<id>`
  *      for deep-link initial view.
  *   6. CROSS-TAB NAV — `openCodePathsSession` is the activator
@@ -318,15 +319,13 @@ function renderGraphRecipeCatalog(container, recipesData) {
 }
 
 // =======================================================
-// CODE PATHS — EXPLORE BODY (chips + view tab bar + view stack)
+// CODE PATHS — EXPLORE BODY (view tab bar + view stack)
 // =======================================================
 function renderCodePathsExplore(host) {
   graphIndexes = buildIndexes(graphCatalog);
 
-  // Filter chip bar.
-  const chips = el('div', { class: 'code-paths-filter-chips', id: 'code-paths-filter-chips' });
-  host.appendChild(chips);
-  renderFilterChips(chips, graphCatalog);
+  // (No shared filter chip bar — the Visualization view owns its own controls;
+  // the Functions table reads the default filterState via passesFilter.)
 
   // View tab bar — built from the registered views.
   const tabBar = el('div', { class: 'code-paths-tabs', id: 'code-paths-tabs' });

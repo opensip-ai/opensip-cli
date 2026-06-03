@@ -133,18 +133,19 @@ describe('View 8 — Visualization', () => {
     expect(c.querySelector('#code-paths-graph-canvas')).toBeNull();
   });
 
-  it('renders the layout selector with dagre/cose/breadthfirst', () => {
+  it('renders the layout selector as a dropdown with dagre/cose/breadthfirst', () => {
     const env = loadEnv(true);
     embedViewModel(SAMPLE_VM);
     const c = document.createElement('div');
     document.body.append(c);
     env.views.find(v => v.id === 'graph')!.render(c, null, null, null);
-    const btns = [...c.querySelectorAll<HTMLElement>('.code-paths-graph-layout-btn')].map(b => b.dataset.layout);
-    expect(btns).toEqual(['dagre', 'cose', 'breadthfirst']);
-    expect(c.querySelector<HTMLElement>('.code-paths-graph-layout-btn.active')!.dataset.layout).toBe('dagre');
+    const layout = c.querySelector<HTMLSelectElement>('select[data-control="layout"]');
+    expect(layout).not.toBeNull();
+    expect([...layout!.options].map(o => o.value)).toEqual(['dagre', 'cose', 'breadthfirst']);
+    expect(layout!.value).toBe('dagre'); // default
   });
 
-  it('renders the "Highlight cycles" toggle in the toolbar', () => {
+  it('renders the "Highlight cycles" toggle in the control toolbar', () => {
     const env = loadEnv(true);
     embedViewModel(SAMPLE_VM);
     const c = document.createElement('div');
@@ -153,7 +154,6 @@ describe('View 8 — Visualization', () => {
     const sccBtn = c.querySelector<HTMLElement>('.code-paths-graph-scc-btn');
     expect(sccBtn).not.toBeNull();
     expect(sccBtn!.textContent).toContain('Highlight cycles');
-    expect(sccBtn!.classList.contains('code-paths-graph-layout-btn')).toBe(false);
   });
 
   it('mounts a cytoscape canvas when the renderer is present', () => {
@@ -209,17 +209,58 @@ describe('View 8 — Visualization', () => {
     const c = document.createElement('div');
     document.body.append(c);
     env.views.find(v => v.id === 'graph')!.render(c, null, null, null);
-    const level = c.querySelector<HTMLSelectElement>('[data-control="level"]');
-    const scope = c.querySelector<HTMLSelectElement>('[data-control="scope"]');
-    const pkg = c.querySelector<HTMLSelectElement>('[data-control="package"]');
-    const kind = c.querySelector<HTMLSelectElement>('[data-control="kind"]');
+    const level = c.querySelector<HTMLSelectElement>('select[data-control="level"]');
+    const scope = c.querySelector<HTMLSelectElement>('select[data-control="scope"]');
+    const pkg = c.querySelector<HTMLSelectElement>('select[data-control="package"]');
+    // Kind is a custom multi-select dropdown (trigger button + checkbox panel),
+    // not a native <select multiple>.
+    const kind = c.querySelector<HTMLButtonElement>('button[data-control="kind"]');
     expect(level).not.toBeNull();
     expect(scope).not.toBeNull();
     expect(level!.value).toBe('package'); // default
+    expect(kind).not.toBeNull();
+    expect(kind!.classList.contains('code-paths-graph-ms-trigger')).toBe(true);
     // Package + Kind only apply at function level → disabled at package level.
     expect(pkg!.disabled).toBe(true);
     expect(kind!.disabled).toBe(true);
-    expect(kind!.multiple).toBe(true);
+  });
+
+  it('Kind multi-select enables at function level and updates the graph on close', () => {
+    const occA = { bodyHash: 'A', simpleName: 'a', filePath: 'packages/pkg-a/src/a.ts', kind: 'function-declaration', inTestFile: false, qualifiedName: 'a' };
+    const occB = { bodyHash: 'B', simpleName: 'b', filePath: 'packages/pkg-a/src/b.ts', kind: 'method', inTestFile: false, qualifiedName: 'b' };
+    const indexes = {
+      byBodyHash: new Map<string, unknown>([['A', occA], ['B', occB]]),
+      occurrencesByHash: new Map<string, unknown[]>([['A', [occA]], ['B', [occB]]]),
+      bySimpleName: new Map(),
+      callees: new Map<string, string[]>([['A', ['B']]]),
+      callers: new Map<string, string[]>([['B', ['A']]]),
+    };
+    const catalog = { version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now', functions: { a: [occA], b: [occB] } };
+    const env = loadEnv(true);
+    const c = document.createElement('div');
+    document.body.append(c);
+    env.views.find(v => v.id === 'graph')!.render(c, catalog, indexes, null);
+
+    // Switch to function level + pick pkg-a so Kind becomes enabled.
+    const level = c.querySelector<HTMLSelectElement>('select[data-control="level"]')!;
+    level.value = 'function';
+    level.dispatchEvent(new Event('change'));
+    const pkg = c.querySelector<HTMLSelectElement>('select[data-control="package"]')!;
+    pkg.value = 'pkg-a';
+    pkg.dispatchEvent(new Event('change'));
+
+    const kindTrigger = c.querySelector<HTMLButtonElement>('button[data-control="kind"]')!;
+    expect(kindTrigger.disabled).toBe(false);
+    expect(kindTrigger.textContent).toContain('All kinds');
+    // Open the popover, check one kind, close → graph re-renders, canvas present.
+    kindTrigger.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    const boxes = c.querySelectorAll<HTMLInputElement>('.code-paths-graph-ms-panel input[type="checkbox"]');
+    expect(boxes.length).toBeGreaterThan(0);
+    boxes[0].checked = true;
+    boxes[0].dispatchEvent(new Event('change'));
+    // Closing (re-click) applies the selection and re-renders.
+    c.querySelector<HTMLButtonElement>('button[data-control="kind"]')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(c.querySelector('#code-paths-graph-canvas')).not.toBeNull();
   });
 
   it('projects a single package\'s function graph at function level (intra-package)', () => {
