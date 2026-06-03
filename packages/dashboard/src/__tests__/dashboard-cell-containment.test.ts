@@ -17,7 +17,7 @@ import { dashboardCss } from '../css.js';
 import { generateDashboardHtml } from '../generator.js';
 
 // Collapse whitespace so the assertions don't depend on formatting.
-const css = dashboardCss().replace(/\s+/g, ' ');
+const css = dashboardCss().replaceAll(/\s+/g, ' ');
 
 describe('data-table cell containment contract', () => {
   it('body cells wrap and break long unbreakable tokens by default', () => {
@@ -43,5 +43,14 @@ describe('data-table cell containment contract', () => {
     // must stay on one line under the wrap-by-default contract.
     const html = generateDashboardHtml({ sessions: [] });
     expect(html).toContain("class:'cell-nowrap'");
+  });
+
+  it('the coupling matrix (the one non-.data-table table) stays contained by its own scroll wrapper', () => {
+    // The coupling grid deliberately opts out of the .data-table contract
+    // (it is a wide 2D matrix, not free-text rows). Its containment relies
+    // on .coupling-scroll bounding it to the card instead of bleeding past
+    // the page. Pin that so the opt-out keeps its own safety net.
+    expect(css).toContain('.coupling-scroll { overflow: auto;');
+    expect(css).toContain('max-width: 100%;');
   });
 });

@@ -62,12 +62,14 @@ describe('dashboard graph-tab — rule/recipe catalog wiring', () => {
   });
 
   it('gives .data-table td a shared font baseline (standard site font, 13px)', () => {
-    expect(html).toContain('.data-table td {');
-    // The shared cell rule carries both the size and the site font family.
-    const tdRule = html.slice(html.indexOf('.data-table td {'));
-    const firstRule = tdRule.slice(0, tdRule.indexOf('}'));
-    expect(firstRule).toContain('font-size: 13px');
-    expect(firstRule).toContain('font-family: var(--font)');
+    // There are several `.data-table td` rules (containment default,
+    // font baseline, …). Assert that the font baseline lives on one of
+    // them rather than assuming a single rule / source order.
+    const baselineRule = html
+      .split('.data-table td')
+      .find(seg => seg.startsWith(' {') && seg.slice(0, seg.indexOf('}')).includes('font-size: 13px'));
+    expect(baselineRule).toBeDefined();
+    expect(baselineRule).toContain('font-family: var(--font)');
   });
 
   it('@opensip-tools/dashboard declares no @opensip-tools/graph dependency (decoupled)', () => {
