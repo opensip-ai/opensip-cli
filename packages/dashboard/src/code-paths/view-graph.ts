@@ -278,8 +278,11 @@ function gvRenderGraph(container, catalog, indexes) {
   // this view's id, which surfaces the 'graph' view's help sections).
   container.appendChild(makeSectionHeading('Visualization', 'graph'));
   gvRenderControls(container, catalog, indexes);
-  gvRenderSearchBox(container);
-  gvRenderCyclesToggle(container);
+  // Row 3: the name search box and the Highlight-cycles checkbox share one row.
+  var searchRow = el('div', { class: 'code-paths-graph-searchrow' });
+  gvRenderSearchBox(searchRow);
+  gvRenderCyclesToggle(searchRow);
+  container.appendChild(searchRow);
 
   var elements;
   if (gvLevel === 'function') {

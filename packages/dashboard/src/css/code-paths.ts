@@ -41,17 +41,20 @@ export function dashboardCssCodePaths(): string {
    read as separate. The Package/Kind controls are disabled at package level
    (they only apply at function level), so they fade rather than vanish. */
 .code-paths-graph-grid { display: grid; grid-template-columns: auto 190px auto 190px auto 190px auto 190px; gap: 8px 6px; align-items: center; margin-bottom: 10px; }
-.code-paths-graph-grid .code-paths-graph-toolbar-label { justify-self: start; }
+/* Labels are RIGHT-aligned within their (fixed-width) column so each label
+   hugs its own dropdown (a short label like LEVEL no longer floats far from
+   its control); the dropdown columns still line up. */
+.code-paths-graph-grid .code-paths-graph-toolbar-label { justify-self: end; }
 /* Group-start labels (Scope/Package/Kind/Edges) get a left margin so a group
-   reads as separate from the previous control while its own dropdown stays
-   tight beside it. */
+   reads as separate from the previous control. */
 .code-paths-graph-grid-group { margin-left: 16px; }
 /* The Level label forces a fresh grid row (row 1 leaves cols 5-8 empty). */
 .code-paths-graph-grid-break { grid-column: 1; }
 .code-paths-graph-checkbox { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; user-select: none; height: 30px; }
 .code-paths-graph-checkbox input { cursor: pointer; }
-/* The Highlight-cycles checkbox sits on its own line below the search box. */
-.code-paths-graph-cycles-row { margin-bottom: 12px; }
+/* Row 3: the name search box and the Highlight-cycles checkbox share one row. */
+.code-paths-graph-searchrow { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; }
+.code-paths-graph-searchrow .code-paths-graph-search { margin-bottom: 0; }
 /* Functions view controls row (Kind · Package · search). */
 .code-paths-ranked-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; margin-bottom: 12px; }
 .code-paths-ranked-controls .code-paths-search { margin-bottom: 0; }

@@ -118,11 +118,11 @@ function gvRenderControls(host, catalog, indexes) {
   host.appendChild(grid);
 }
 
-// The "Highlight cycles" checkbox — rendered on its own line BELOW the search
-// box (row 3+), not in the control grid. Package-level SCC emphasis; toggles
+// The "Highlight cycles" checkbox — rendered into the row-3 search row (beside
+// the search box), not in the control grid. Package-level SCC emphasis; toggles
 // the emphasis on the live graph in place (no re-render).
 function gvRenderCyclesToggle(host) {
-  var sccToggle = el('label', { class: 'code-paths-graph-checkbox code-paths-graph-cycles-row' });
+  var sccToggle = el('label', { class: 'code-paths-graph-checkbox' });
   var sccCb = el('input', { type: 'checkbox', 'data-scc-toggle': '1' });
   sccCb.checked = gvSccHighlight;
   sccCb.addEventListener('change', function() { gvSccHighlight = sccCb.checked; gvApplySccHighlight(); });
