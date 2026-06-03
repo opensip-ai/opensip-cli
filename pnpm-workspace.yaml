@@ -6,3 +6,32 @@ packages:
   - "packages/simulation/*"
   - "packages/languages/*"
   - "packages/graph/*"
+
+# --- Settings migrated from the package.json "pnpm" field ---
+# pnpm 11 no longer reads `pnpm.*` in package.json; this is the new home.
+
+# Inject workspace packages as hard-linked copies (not symlinks) so the
+# node_modules discovery walker finds the bundled check packs. Without this,
+# `pnpm fit` discovers 0 checks. See CLAUDE.md "Dogfood Gate".
+injectWorkspacePackages: true
+
+# Supply-chain guard: only these dependencies may run install/build scripts
+# (pnpm 11 renamed the array `onlyBuiltDependencies` to the `allowBuilds` map).
+# better-sqlite3 needs its native binary built/fetched; esbuild and
+# unrs-resolver ship their binaries via platform optional-deps and never needed
+# their own postinstall (they ran fine excluded under pnpm 10).
+allowBuilds:
+  better-sqlite3: true
+  esbuild: false
+  unrs-resolver: false
+
+# Security pins — transitive-dependency version floors.
+overrides:
+  "postcss@<8.5.10": ">=8.5.10"
+  "ws@<8.21.0": ">=8.21.0"
+  "brace-expansion@1": "^1.1.12"
+  "brace-expansion@2": "^2.0.2"
+  "brace-expansion@4": "^4.0.2"
+  "brace-expansion@5": "^5.0.6"
+  "esbuild@<0.25.0": ">=0.25.0"
+  "vite@5": "^7.1.0"
