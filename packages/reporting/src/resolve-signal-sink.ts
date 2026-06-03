@@ -8,6 +8,9 @@
  * the first `emit` (and is cached), so only signal-producing runs incur it, and
  * a revoked plan (401/403) busts the entitlement cache so it stops within one run.
  */
+import { access, mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
 import { logger, noopSignalSink } from '@opensip-tools/core';
 
 import { createCloudSignalSink } from './cloud-signal-sink.js';
@@ -28,6 +31,32 @@ export interface ResolveSignalSinkInput {
   /** Directory for the entitlement cache (user-level). */
   readonly cacheDir: string;
   readonly fetchImpl?: typeof fetch;
+}
+
+/**
+ * One-time privacy notice the first time the cloud sink goes active, telling
+ * the user what is synced and how to opt out (ADR-0008). Marker lives in the
+ * entitlement cache dir; best-effort — a failure just shows it again next run.
+ */
+async function maybeShowFirstRunNotice(cacheDir: string): Promise<void> {
+  const marker = join(cacheDir, 'signal-sync-notice');
+  try {
+    await access(marker);
+    return; // already shown
+  } catch {
+    /* not shown yet */
+  }
+  try {
+    await mkdir(cacheDir, { recursive: true });
+    await writeFile(marker, new Date().toISOString());
+    process.stderr.write(
+      'OpenSIP Cloud signal sync is on: each run sends its signals (file paths,\n' +
+        'messages, suggestions, code-location hints) to your OpenSIP Cloud account.\n' +
+        'Local results are unaffected. Disable with --no-cloud or `cloud.sync: false`.\n',
+    );
+  } catch {
+    /* best-effort */
+  }
 }
 
 export function resolveSignalSink(input: ResolveSignalSinkInput): SignalSink {
@@ -58,6 +87,7 @@ export function resolveSignalSink(input: ResolveSignalSinkInput): SignalSink {
         });
         if (!ent.entitled) return { accepted: 0, authRejected: false };
 
+        await maybeShowFirstRunNotice(input.cacheDir);
         const result = await cloudSink.emit(batch);
         if (result.authRejected) {
           await invalidateEntitlement({ apiKey, cacheDir: input.cacheDir });

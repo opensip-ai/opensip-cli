@@ -35,7 +35,7 @@ opensip-tools --help                     # print full help, exit
 opensip-tools <command> --help           # per-command help
 ```
 
-Per-command flags that appear on most subcommands (registered individually by each Tool / each top-level command — there are no `program`-level Commander options beyond `--version`):
+Per-command flags that appear on most subcommands (registered individually by each Tool / each top-level command). The only `program`-level Commander options are `--version` and `--no-cloud`:
 
 | Flag | Effect |
 |---|---|
@@ -43,6 +43,36 @@ Per-command flags that appear on most subcommands (registered individually by ea
 | `--quiet` | Suppress banner / boxes; print only the pass/fail summary line. (Where supported.) |
 | `--cwd <path>` | Override the project root (default: `process.cwd()`). Registered on `init`, `fit`, `sim`, `graph`, `dashboard`, `plugin <subcmd>`. |
 | `--json` | Emit structured JSON on stdout instead of the table renderer. (Per-command — `init`, `fit`, `sim`, `graph`.) |
+| `--no-cloud` | Disable OpenSIP Cloud signal sync for this run (program-level). See below. |
+
+### OpenSIP Cloud signal sync
+
+If you have configured an OpenSIP API key (`opensip-tools configure` or
+`OPENSIP_API_KEY`) **and** are entitled to the cloud storage tier, each `fit`
+and `graph` run additionally emits its **signals** (the findings it already
+produces) to OpenSIP Cloud, where they are stored for you. This is **additive
+and best-effort**: results are always written to the local SQLite store first,
+and a cloud failure never blocks, slows, or fails a run. On a successful sync
+you'll see `✓ Sent N signals to OpenSIP Cloud`.
+
+What is sent: each signal's file path, message, suggestion, code-location
+hints, and rule metadata. Nothing is sent for users without an API key or
+without the entitlement.
+
+Configure or opt out via `~/.opensip-tools/config.yml`:
+
+```yaml
+cli:
+  cloud:
+    sync: true              # default true when entitled; false to opt out
+    endpoint: https://...   # optional https override of the built-in URL
+```
+
+Or opt out per-run with `--no-cloud`.
+
+This is distinct from `--report-to`: that path explicitly POSTs **SARIF** to
+**any** receiver (and can fail a CI build via exit 4), whereas cloud sync emits
+**native signals** to **OpenSIP Cloud** automatically and best-effort.
 
 ---
 

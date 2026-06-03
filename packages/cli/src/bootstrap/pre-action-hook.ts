@@ -305,7 +305,8 @@ export function installPreActionHook(program: Command, version: string): void {
     const signalSink = resolveSignalSink({
       apiKey: opts.apiKey as string | undefined,
       cloud: cliDefaults.cloud,
-      noCloud: opts.cloud === false,
+      // `--no-cloud` is a global flag, so read it through optsWithGlobals().
+      noCloud: actionCommand.optsWithGlobals().cloud === false,
       cacheDir: join(resolveUserPaths().userHomeDir, 'cache'),
     });
 
