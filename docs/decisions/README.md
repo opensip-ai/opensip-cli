@@ -59,6 +59,10 @@ distinct from:
 - [ADR-0006](./ADR-0006-derived-data-persistence-policy.md) — Derived-data
   persistence policy: recomputed view by default, materialize only when recompute
   is expensive or a decoupled consumer can't run the query (no SQL/DB views)
+- [ADR-0007](./ADR-0007-marker-canonical-plugin-discovery.md) — The
+  `opensipTools.kind` marker is the canonical plugin-discovery contract; the
+  `checks-*`/`graph-*` name-prefix scans are demoted to deprecated fallbacks
+  (removal next major), enforced by a workspace-invariant test
 
 ### Superseded
 
