@@ -56,6 +56,11 @@ export const cycleRule = defineRule({
       const anchor = anchorOccurrence(scc, indexes);
       /* v8 ignore next */
       if (!anchor) continue;
+      // Skip a cycle whose members are ALL in test files — a recursive test
+      // helper or mutually-recursive fixtures are test code, not a production
+      // architecture concern (consistent with the test-file skip in the other
+      // graph rules). A cycle that includes ANY production member is kept.
+      if (isTestOnlyScc(scc, indexes)) continue;
       // The distinct packages this SCC spans — the cross-link to
       // graph:unexpected-coupling's per-package-pair-cycle signal. Only
       // meaningful (more than one package) when the SCC crosses packages.
@@ -121,6 +126,22 @@ function anchorOccurrence(scc: SccFeatures, indexes: Indexes): FunctionOccurrenc
     if (!anchor || occ.qualifiedName < anchor.qualifiedName) anchor = occ;
   }
   return anchor;
+}
+
+/**
+ * True when EVERY resolvable member of the SCC lives in a test file (a cycle
+ * entirely within test code). Returns false the moment any member is a
+ * production occurrence, so a cycle that touches production is still reported.
+ */
+function isTestOnlyScc(scc: SccFeatures, indexes: Indexes): boolean {
+  let sawMember = false;
+  for (const hash of scc.members) {
+    const occ = indexes.byBodyHash.get(hash);
+    if (!occ) continue;
+    sawMember = true;
+    if (!occ.inTestFile) return false;
+  }
+  return sawMember;
 }
 
 /** The sorted distinct packages an SCC's resolvable members belong to. */

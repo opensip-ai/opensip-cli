@@ -35,6 +35,7 @@ describe('loadGraphConfig', () => {
         '  minDuplicateBodyLines: 8',
         '  minDuplicateBodySize: 120',
         '  minCrossPackageDuplicatePackages: 2',
+        '  minCrossPackageDuplicateBodySize: 150',
         '  entryPointHashes:',
         '    - abc',
         '    - def',
@@ -47,6 +48,7 @@ describe('loadGraphConfig', () => {
     expect(config.minDuplicateBodyLines).toBe(8);
     expect(config.minDuplicateBodySize).toBe(120);
     expect(config.minCrossPackageDuplicatePackages).toBe(2);
+    expect(config.minCrossPackageDuplicateBodySize).toBe(150);
     expect(config.entryPointHashes).toEqual(['abc', 'def']);
     // Only valid 'error'/'warning' values survive the projection.
     expect(config.severityOverrides).toEqual({ 'graph:orphan-subtree': 'error' });

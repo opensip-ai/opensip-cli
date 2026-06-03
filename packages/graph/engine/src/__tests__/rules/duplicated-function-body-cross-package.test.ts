@@ -80,6 +80,33 @@ describe('duplicated-function-body aggregate cross-package path', () => {
     expect(evaluate(catalog, buildIndexes(catalog), {})).toHaveLength(0);
   });
 
+  it('DOES fire for a small-but-non-trivial body (between the aggregate and per-instance floors)', () => {
+    // 120 chars / 2 lines: above the aggregate floor (80) but below the
+    // per-instance floor (200). The per-instance path would stay silent; the
+    // aggregate path catches it — its whole purpose (small shared utility
+    // copied across packages).
+    const smallReal = { bodySize: 120, line: 1, endLine: 2 };
+    const a = occ({ bodyHash: 'h', simpleName: 'parseRange', package: 'pkg-a', ...smallReal });
+    const b = occ({ bodyHash: 'h', simpleName: 'parseRange', package: 'pkg-b', filePath: 'src/b.ts', qualifiedName: 'src/b.parseRange', ...smallReal });
+    const c = occ({ bodyHash: 'h', simpleName: 'parseRange', package: 'pkg-c', filePath: 'src/c.ts', qualifiedName: 'src/c.parseRange', ...smallReal });
+    const catalog = makeCatalog([a, b, c]);
+    const signals = evaluate(catalog, buildIndexes(catalog), {});
+    expect(aggregates(signals)).toHaveLength(1);
+    expect(perInstance(signals)).toHaveLength(0);
+  });
+
+  it('honors a custom minCrossPackageDuplicateBodySize override', () => {
+    const body90 = { bodySize: 90, line: 1, endLine: 2 };
+    const a = occ({ bodyHash: 'h', simpleName: 'a', package: 'pkg-a', ...body90 });
+    const b = occ({ bodyHash: 'h', simpleName: 'b', package: 'pkg-b', filePath: 'src/b.ts', qualifiedName: 'src/b.b', ...body90 });
+    const c = occ({ bodyHash: 'h', simpleName: 'c', package: 'pkg-c', filePath: 'src/c.ts', qualifiedName: 'src/c.c', ...body90 });
+    const catalog = makeCatalog([a, b, c]);
+    // Default floor (80): 90 ≥ 80 → fires.
+    expect(aggregates(evaluate(catalog, buildIndexes(catalog), {}))).toHaveLength(1);
+    // Raised to 100: 90 < 100 → suppressed.
+    expect(evaluate(catalog, buildIndexes(catalog), { minCrossPackageDuplicateBodySize: 100 })).toHaveLength(0);
+  });
+
   it('does NOT fire for a within-package small dup (1 package)', () => {
     const small = { bodySize: 50, line: 1, endLine: 2, package: 'pkg-a' };
     const a = occ({ bodyHash: 'h', simpleName: 'a', ...small });

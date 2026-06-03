@@ -28,12 +28,13 @@
  *      (no double-reporting). Bodies that don't reach N packages flow
  *      through path (1) unchanged.
  *
- *      This path applies the SAME size floor as path (1) — a trivial body
- *      (an empty DI-constructor shim, a one-line getter, a thin
- *      delegator) copied across packages is not an actionable hoist target,
- *      and flagging it just produces noise. The genuinely-shared helpers
- *      this path was built to surface have already been hoisted; the floor
- *      keeps it a watchdog for *substantial* new cross-package duplication.
+ *      This path applies a LIGHTER, body-size-only floor
+ *      (`minCrossPackageDuplicateBodySize`, default 80 chars — no line floor)
+ *      rather than the per-instance floor: a *small* body copied across
+ *      packages is exactly what this path exists to catch, so the floor is
+ *      tuned only to drop TRIVIAL bodies (empty DI-constructor shims,
+ *      one-line getters, thin delegators) that are never consolidation
+ *      targets, while keeping genuinely-small shared utilities visible.
  */
 
 import { createSignal } from '@opensip-tools/core';
@@ -49,6 +50,11 @@ import type { Signal } from '@opensip-tools/core';
 const DEFAULT_MIN_LINES = 5;
 const DEFAULT_MIN_BODY_SIZE = 200;
 const DEFAULT_MIN_CROSS_PACKAGE_PACKAGES = 3;
+// Lighter than DEFAULT_MIN_BODY_SIZE (the per-instance floor) and applied with
+// NO line floor: the aggregate path is meant to catch genuinely-small shared
+// utilities copied across packages, so its floor only drops trivial bodies
+// (empty DI shims, one-line getters/delegators).
+const DEFAULT_MIN_CROSS_PACKAGE_BODY_SIZE = 80;
 const SLUG = 'graph:duplicated-function-body';
 
 export const duplicatedFunctionBodyRule = defineRule({
@@ -60,12 +66,14 @@ export const duplicatedFunctionBodyRule = defineRule({
     const minBodySize = config.minDuplicateBodySize ?? DEFAULT_MIN_BODY_SIZE;
     const minPackages =
       config.minCrossPackageDuplicatePackages ?? DEFAULT_MIN_CROSS_PACKAGE_PACKAGES;
+    const minCrossPackageBodySize =
+      config.minCrossPackageDuplicateBodySize ?? DEFAULT_MIN_CROSS_PACKAGE_BODY_SIZE;
 
     const signals: Signal[] = [];
 
     // Aggregate path first: group every kind/test-eligible occurrence by
-    // body hash (no size/line floor) so we can detect cross-package spread
-    // and decide which hashes to suppress on the per-instance path below.
+    // body hash (no line floor) so we can detect cross-package spread and
+    // decide which hashes to suppress on the per-instance path below.
     const aggregateBuckets = groupByHashUnfloored(catalog);
     const suppressedHashes = new Set<string>();
 
@@ -73,12 +81,13 @@ export const duplicatedFunctionBodyRule = defineRule({
       const packages = [...new Set(occs.map((o) => pkgOf(o)))].sort();
       if (packages.length < minPackages) continue;
       const anchor = lowestByQualifiedName(occs);
-      // Size floor (the same gate the per-instance path applies): a trivial
-      // body — an empty DI constructor, a one-line getter, a thin delegator —
-      // copied across packages is not an actionable hoist target. Skip it; it
-      // won't be picked up by the per-instance path either (also floored), so
-      // there is nothing to suppress.
-      if (!isInterestingForDup(anchor, minLines, minBodySize, features)) continue;
+      // Lighter, body-size-only floor (NO line floor): keeps the aggregate
+      // path catching genuinely-small shared utilities copied across packages,
+      // while dropping trivial bodies — empty DI-constructor shims, one-line
+      // getters, thin delegators — that are not consolidation targets. A body
+      // that fails this won't surface on the per-instance path either (its
+      // 200-char floor is stricter), so there is nothing to suppress.
+      if (anchor.bodySize !== undefined && anchor.bodySize < minCrossPackageBodySize) continue;
       // This hash is owned by the aggregate path; suppress its per-instance
       // signals so a single duplicate group never double-reports.
       suppressedHashes.add(bodyHash);

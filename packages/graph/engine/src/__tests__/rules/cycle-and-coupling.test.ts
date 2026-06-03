@@ -87,6 +87,30 @@ describe('graph:cycle bands', () => {
   });
 });
 
+describe('graph:cycle test-file exclusion', () => {
+  const EMPTY: GraphConfig = {};
+  // t1/t2/t3 live in test files; p1 is production.
+  const catalog = makeCatalog([
+    occ({ bodyHash: 't1', simpleName: 't1', qualifiedName: 't1', filePath: 'src/a.test.ts', inTestFile: true }),
+    occ({ bodyHash: 't2', simpleName: 't2', qualifiedName: 't2', filePath: 'src/b.test.ts', inTestFile: true }),
+    occ({ bodyHash: 't3', simpleName: 't3', qualifiedName: 't3', filePath: 'src/c.test.ts', inTestFile: true }),
+    occ({ bodyHash: 'p1', simpleName: 'p1', qualifiedName: 'p1', filePath: 'src/p.ts', inTestFile: false }),
+  ]);
+  const indexes = buildIndexes(catalog);
+  const run = (scc: SccFeatures) =>
+    cycleRule.evaluate(catalog, indexes, EMPTY, undefined, featureTable({ scc: [scc] }));
+
+  it('emits nothing for a cycle whose members are ALL in test files', () => {
+    expect(run(sccFixture(['t1', 't2', 't3'], false))).toEqual([]);
+  });
+
+  it('still emits for a cycle that includes a production member', () => {
+    const signals = run(sccFixture(['t1', 't2', 'p1'], false));
+    expect(signals).toHaveLength(1);
+    expect(signals[0]?.metadata.sccSize).toBe(3);
+  });
+});
+
 describe('graph:unexpected-coupling package cycles', () => {
   // Two packages A and B with occurrences (so the rule can anchor a location).
   const catalog = makeCatalog([

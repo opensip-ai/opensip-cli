@@ -3,8 +3,8 @@
  * into a {@link GraphConfig}.
  *
  * The graph rule knobs (`minDuplicateBodyLines`, `minDuplicateBodySize`,
- * `minCrossPackageDuplicatePackages`, `entryPointHashes`,
- * `severityOverrides`) are owned by the graph tool, so the graph engine
+ * `minCrossPackageDuplicatePackages`, `minCrossPackageDuplicateBodySize`,
+ * `entryPointHashes`, `severityOverrides`) are owned by the graph tool, so the graph engine
  * reads its own config block — mirroring the way fitness owns its
  * sections and the CLI seam owns the `cli:` block
  * (`@opensip-tools/contracts` `loadCliDefaults`).
@@ -68,6 +68,8 @@ function projectGraphConfig(raw: Record<string, unknown>): GraphConfig {
   if (minSize !== undefined) out.minDuplicateBodySize = minSize;
   const minPackages = asNumber(raw.minCrossPackageDuplicatePackages);
   if (minPackages !== undefined) out.minCrossPackageDuplicatePackages = minPackages;
+  const minCrossPkgBodySize = asNumber(raw.minCrossPackageDuplicateBodySize);
+  if (minCrossPkgBodySize !== undefined) out.minCrossPackageDuplicateBodySize = minCrossPkgBodySize;
   const entryPointHashes = asStringArray(raw.entryPointHashes);
   if (entryPointHashes) out.entryPointHashes = entryPointHashes;
   // Structural-rule thresholds (Plan D). Each is permissively projected via

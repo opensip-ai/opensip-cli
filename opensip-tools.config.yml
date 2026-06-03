@@ -148,23 +148,27 @@ checkOverrides:
 
 graph:
   # graph:duplicated-function-body — aggregate cross-package code path.
-  # A body hash appearing in >= this many DISTINCT packages — that ALSO
-  # clears the same size floor as the per-instance path (minDuplicateBodyLines
-  # / minDuplicateBodySize) — emits a single aggregate "hoist to a shared
-  # package" signal and suppresses the per-instance signals for that hash.
+  # A body hash appearing in >= minCrossPackageDuplicatePackages DISTINCT
+  # packages — that ALSO clears minCrossPackageDuplicateBodySize (chars) —
+  # emits a single aggregate "hoist to a shared package" signal and
+  # suppresses the per-instance signals for that hash.
   #
-  # The default is 3 (safe for arbitrary repos — unambiguous shared infra).
-  # We keep it at 2 HERE as a deliberately-aggressive lens: it surfaces every
-  # SUBSTANTIAL body shared across two packages so a genuinely-shared helper
-  # is caught the moment it appears. The real shared helpers it found were
-  # hoisted (nameOf / skipBlockComment / isReturnValueDiscarded ->
-  # graph-adapter-common; isIdentChar -> core). The trivial remainder it used
-  # to report — thin Registry<T>/getter delegators, DataStore DI-constructor
-  # shims, per-tool plugin-loader state accessors deliberately NOT shared
-  # (fitness's load-error state != sim's; see check-loader.ts header, audit
-  # F6) — now falls below the size floor and no longer surfaces. So threshold
-  # 2 is a clean watchdog for NEW substantial duplication.
+  # Package threshold: default 3 (safe for arbitrary repos). We keep it at 2
+  # HERE as a deliberately-aggressive lens — a genuinely-shared helper is
+  # caught the moment it appears across two packages. The real shared helpers
+  # it found were hoisted (nameOf / skipBlockComment / isReturnValueDiscarded
+  # -> graph-adapter-common; isIdentChar -> core).
+  #
+  # Body-size floor: the ENGINE default is 80 chars (a customer-friendly
+  # watchdog that still catches small shared utilities). We raise it to 200
+  # HERE because our remaining cross-package bodies in the 80-200 band are
+  # KNOWN-INTENTIONAL and deliberately NOT shared — thin Registry<T>/getter
+  # delegators, DataStore DI-constructor shims, per-tool plugin-loader state
+  # accessors (fitness's load-error state != sim's; see check-loader.ts
+  # header, audit F6). At 200 the lens stays a clean watchdog for NEW
+  # SUBSTANTIAL cross-package duplication without re-flagging that boilerplate.
   minCrossPackageDuplicatePackages: 2
+  minCrossPackageDuplicateBodySize: 200
 
 # =============================================================================
 # Fitness Configuration

@@ -471,13 +471,23 @@ export interface GraphConfig {
   /**
    * Minimum number of DISTINCT packages a body hash must appear in to
    * trigger the aggregate cross-package duplication signal for the
-   * duplicated-function-body rule. The aggregate path applies NO per-copy
-   * size/line floor — a small body copied across many packages is a real
-   * consolidation target. When a body hash qualifies here, the single
-   * aggregate signal is emitted and the per-instance signals for that hash
-   * are suppressed. Default: 3.
+   * duplicated-function-body rule. When a body hash qualifies here (and
+   * clears `minCrossPackageDuplicateBodySize`), the single aggregate signal
+   * is emitted and the per-instance signals for that hash are suppressed.
+   * Default: 3.
    */
   readonly minCrossPackageDuplicatePackages?: number;
+  /**
+   * Normalized-body-size floor (chars) for the aggregate cross-package
+   * duplication path. Deliberately LIGHTER than `minDuplicateBodySize` (the
+   * per-instance floor) so the aggregate path keeps catching genuinely-small
+   * shared utilities copied across packages — its original purpose — while
+   * still dropping trivial bodies (empty DI-constructor shims, one-line
+   * getters, thin delegators) that are not consolidation targets. Unlike the
+   * per-instance path there is NO line floor here. Occurrences whose catalog
+   * predates `bodySize` skip this check. Default: 80.
+   */
+  readonly minCrossPackageDuplicateBodySize?: number;
   /** Override the inferred entry-point list. */
   readonly entryPointHashes?: readonly string[];
   /**
