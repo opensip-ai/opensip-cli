@@ -56,6 +56,17 @@ export interface CliDefaults {
     /** Banner art: `mini` (default) | `lg` | `md` | `sm`. */
     readonly banner?: 'lg' | 'md' | 'sm' | 'mini';
   };
+  /**
+   * OpenSIP Cloud signal sync (ADR-0008). When the customer has an API key
+   * and is entitled to the storage tier, each run additionally emits its
+   * signals to OpenSIP Cloud (best-effort; local SQLite is unaffected).
+   * `sync` defaults to `true` when entitled — set `false` to opt out.
+   * `endpoint` overrides the built-in OpenSIP Cloud URL (must be https).
+   */
+  readonly cloud?: {
+    readonly sync?: boolean;
+    readonly endpoint?: string;
+  };
 }
 
 /** Valid `ui.banner` values; anything else is dropped (→ default applies). */
@@ -93,7 +104,18 @@ function projectCliDefaults(raw: Record<string, unknown>): CliDefaults {
   if (typeof raw.debug === 'boolean') out.debug = raw.debug;
   const ui = projectUiDefaults(raw.ui);
   if (ui) out.ui = ui;
+  const cloud = projectCloudDefaults(raw.cloud);
+  if (cloud) out.cloud = cloud;
   return out;
+}
+
+/** Project the `cli.cloud:` sub-block (sync flag + endpoint override) into the typed shape. */
+function projectCloudDefaults(raw: unknown): CliDefaults['cloud'] | undefined {
+  if (!isPlainObject(raw)) return undefined;
+  const out: { -readonly [K in keyof NonNullable<CliDefaults['cloud']>]: NonNullable<CliDefaults['cloud']>[K] } = {};
+  if (typeof raw.sync === 'boolean') out.sync = raw.sync;
+  if (typeof raw.endpoint === 'string') out.endpoint = raw.endpoint;
+  return out.sync === undefined && out.endpoint === undefined ? undefined : out;
 }
 
 /** Project the `cli.ui:` sub-block into the typed shape; drop unknown banner values. */
