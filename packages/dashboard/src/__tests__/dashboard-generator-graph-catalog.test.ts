@@ -74,7 +74,7 @@ describe('generateDashboardHtml — graph catalog wiring', () => {
 
   it('embeds the restructured view ids via the views[] registry', () => {
     const html = generateDashboardHtml({ sessions: [], graphCatalog: minimalCatalog });
-    for (const id of ['graph', 'coupling', 'search', 'distribution']) {
+    for (const id of ['graph', 'coupling', 'distribution']) {
       expect(html).toContain(`id: '${id}'`);
     }
   });

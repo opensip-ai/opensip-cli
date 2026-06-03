@@ -58,5 +58,8 @@ export function dashboardViewDistributionJs(): string {
     ],
     headingText: 'Functions',
     emptyMessage: 'No functions match the active filters.',
+    // Absorbs the former standalone Search subtab: a name filter above
+    // the table, re-filtering rows in place by function simple-name.
+    searchByName: true,
   });
 }

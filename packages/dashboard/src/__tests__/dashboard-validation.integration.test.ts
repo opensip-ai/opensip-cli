@@ -96,16 +96,17 @@ describe.runIf(existsSync(REPORT))('Phase V — dashboard end-to-end validation'
     expect(reportHtml).toContain('id="graph-catalog"');
   });
 
-  it('boots without throwing and registers the 4 restructured Code Paths views', () => {
+  it('boots without throwing and registers the 3 restructured Code Paths views', () => {
     if (!env) { expect(true).toBe(true); return; }
     expect(env.views).toBeDefined();
     // The restructured explore set: graph (node-link, with the SCC cycle
-    // highlight fold) / coupling / search / distribution. The single-metric
-    // views (hot/big/wide/untested) and the standalone SCCs view were dropped
-    // once their signal moved into the engine gate rules.
-    expect(env.views.length).toBe(4);
+    // highlight fold) / coupling / distribution. The single-metric views
+    // (hot/big/wide/untested) and the standalone SCCs view were dropped
+    // once their signal moved into the engine gate rules; the standalone
+    // Search subtab was folded into the Functions (distribution) view.
+    expect(env.views.length).toBe(3);
     expect(new Set(env.views.map((v) => v.id))).toEqual(
-      new Set(['graph', 'coupling', 'search', 'distribution']),
+      new Set(['graph', 'coupling', 'distribution']),
     );
   });
 
@@ -117,21 +118,20 @@ describe.runIf(existsSync(REPORT))('Phase V — dashboard end-to-end validation'
     expect(document.querySelector('#panel-code-paths .subtab[data-subtab="explore"]')).not.toBeNull();
   });
 
-  it('renders the search input inside the Search view (not above the tab bar)', () => {
+  it('renders the name-filter search input inside the Functions (distribution) view', () => {
     if (!env) { expect(true).toBe(true); return; }
     activateExploreSubtab();
-    env.activateView('search');
-    const inSearchTab = document.querySelector('#code-paths-view-search #code-paths-search-input');
-    expect(inSearchTab).not.toBeNull();
-    // And it must NOT exist outside the Search view.
-    const allInputs = document.querySelectorAll('#code-paths-search-input');
-    expect(allInputs.length).toBe(1);
+    env.activateView('distribution');
+    const input = document.querySelector('#code-paths-view-distribution #code-paths-search-distribution');
+    expect(input).not.toBeNull();
+    // The standalone Search view is gone — no #code-paths-view-search container.
+    expect(document.querySelector('#code-paths-view-search')).toBeNull();
   });
 
   it('every Explore view container exists and the active one renders something', () => {
     if (!env) { expect(true).toBe(true); return; }
     activateExploreSubtab();
-    for (const id of ['graph', 'coupling', 'search', 'distribution']) {
+    for (const id of ['graph', 'coupling', 'distribution']) {
       const c = document.querySelector('#code-paths-view-' + id);
       expect(c).not.toBeNull();
     }
@@ -153,18 +153,24 @@ describe.runIf(existsSync(REPORT))('Phase V — dashboard end-to-end validation'
     expect(overlays.length).toBe(1);
   });
 
-  it('typing into the search input renders results in place', () => {
+  it('typing into the Functions name filter re-filters the table in place', () => {
     if (!env) { expect(true).toBe(true); return; }
     activateExploreSubtab();
-    env.activateView('search');
-    const input = document.querySelector('#code-paths-view-search #code-paths-search-input')!;
-    (input as HTMLInputElement).value = 'logger';
+    env.activateView('distribution');
+    const view = document.querySelector('#code-paths-view-distribution')!;
+    const allRowsBefore = view.querySelectorAll('[data-body-hash]').length;
+    const input = view.querySelector('#code-paths-search-distribution')!;
+    // A query that should match nothing collapses to the empty state.
+    (input as HTMLInputElement).value = 'zzz_no_such_function_xyzzy';
     input.dispatchEvent(new Event('input', { bubbles: true }));
-    const search = document.querySelector('#code-paths-view-search')!;
-    expect(search.classList.contains('active')).toBe(true);
-    const hasRows = search.querySelector('[data-body-hash]');
-    const hasEmpty = search.querySelector('.code-paths-search-results .empty');
-    expect(Boolean(hasRows) || Boolean(hasEmpty)).toBe(true);
+    const afterNoMatch = view.querySelectorAll('[data-body-hash]').length;
+    const hasEmpty = view.querySelector('.empty');
+    expect(afterNoMatch === 0 || Boolean(hasEmpty)).toBe(true);
+    // Clearing the query restores the full distribution.
+    (input as HTMLInputElement).value = '';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    const afterClear = view.querySelectorAll('[data-body-hash]').length;
+    expect(afterClear).toBe(allRowsBefore);
   });
 
   it('the active view section heading exposes an info button that opens the help drawer', () => {

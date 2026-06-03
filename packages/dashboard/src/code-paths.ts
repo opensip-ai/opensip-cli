@@ -3,10 +3,11 @@
  * Dashboard Code Paths panel — graph-tool surface with two subtabs:
  *   1. Sessions — recent graph runs and their per-rule findings
  *      (uses the shared renderSessionTable from sessions.ts).
- *   2. Explore — interactive catalog browser with four views
- *      (Graph, Coupling, Search, Functions/distribution). The Graph
- *      view carries the SCC cycle highlight that the standalone SCCs
- *      view used to own.
+ *   2. Explore — interactive catalog browser with three views
+ *      (Graph, Coupling, Functions/distribution). The Graph view
+ *      carries the SCC cycle highlight that the standalone SCCs view
+ *      used to own. The Functions view absorbs the former standalone
+ *      Search subtab via an in-table name filter.
  *
  * Architecture: vanilla DOM, no framework. Each view-*.ts emits a
  * JS string that pushes a `View` literal into the singleton `views`
@@ -34,15 +35,15 @@ import { dashboardTraceJs } from './code-paths/trace.js';
 import { dashboardViewCouplingJs } from './code-paths/view-coupling.js';
 import { dashboardViewDistributionJs } from './code-paths/view-distribution.js';
 import { dashboardViewGraphJs } from './code-paths/view-graph.js';
-import { dashboardViewSearchJs } from './code-paths/view-search.js';
 import { dashboardViewsRegistryJs } from './code-paths/views-registry.js';
 
 /**
  * Build flag for the Code Paths explore-tab restructure.
  *
  * `true` (Plan D default, current): the restructured set — graph (with the
- * SCC-highlight fold) / coupling / search + the ranked-distribution
- * "Functions" affordance. The legacy single-metric views
+ * SCC-highlight fold) / coupling + the ranked-distribution "Functions"
+ * affordance (which hosts the in-table name filter that replaced the
+ * former standalone Search subtab). The legacy single-metric views
  * (`view-big/hot/wide/untested/sccs`) were deleted in Plan D once their
  * signal moved into the engine gate rules (`graph:large-function`,
  * `graph:wide-function`, `graph:high-blast-untested`, `graph:cycle`); the
@@ -83,8 +84,8 @@ const RESTRUCTURED_EXPLORE_TABS = true;
  *                        Must come before any view emitter.
  * 10. help-drawer      — declares `openHelpDrawer`. No external deps
  *                        beyond `el`.
- * 11-14. view-*        — push View descriptors into `views` (graph /
- *                        coupling / search / distribution). Each renderer
+ * 11-13. view-*        — push View descriptors into `views` (graph /
+ *                        coupling / distribution). Each renderer
  *                        closes over `el`, `passesFilter`, `displayName`,
  *                        `packageOfPath`, `renderFunctionRows`, plus its own
  *                        utilities.
@@ -98,7 +99,7 @@ const RESTRUCTURED_EXPLORE_TABS = true;
  */
 export function dashboardCodePathsJs(_restructured: boolean = RESTRUCTURED_EXPLORE_TABS): string {
   // The explore-tab restructure has shipped: there is one view set (graph /
-  // coupling / search / distribution). The `_restructured` parameter is kept
+  // coupling / distribution). The `_restructured` parameter is kept
   // for the test seam's call-shape compatibility but no longer selects a
   // legacy branch (the single-metric view emitters were deleted in Plan D).
   // Shared prelude — utilities + the views registry + help drawer. Every view
@@ -127,7 +128,6 @@ export function dashboardCodePathsJs(_restructured: boolean = RESTRUCTURED_EXPLO
   const views = [
     dashboardViewGraphJs(),
     dashboardViewCouplingJs(),
-    dashboardViewSearchJs(),
     dashboardViewDistributionJs(),
   ];
 

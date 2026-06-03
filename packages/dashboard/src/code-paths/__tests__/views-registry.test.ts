@@ -2,8 +2,10 @@
  * @fileoverview Restructured Code Paths explore-tab set (Plan D — shipped).
  *
  * The explore-tab restructure has shipped: `dashboardCodePathsJs` emits exactly
- * the kept views (graph / coupling / search) plus the ranked-distribution
+ * the kept views (graph / coupling) plus the ranked-distribution "Functions"
  * affordance, and the single-metric / standalone-SCC view sources were deleted.
+ * The former standalone Search subtab was folded into the Functions view as an
+ * in-table name filter, so it no longer registers a `search` view.
  * The emitter no longer has a legacy branch — the `restructured` parameter is a
  * vestigial test-seam arg that always yields the restructured set.
  */
@@ -26,14 +28,14 @@ function registeredViewIds(js: string): string[] {
 }
 
 describe('Code Paths explore-tab set', () => {
-  it('emitter registers exactly {graph, coupling, search, distribution}', () => {
+  it('emitter registers exactly {graph, coupling, distribution}', () => {
     const ids = registeredViewIds(dashboardCodePathsJs());
-    expect(new Set(ids)).toEqual(new Set(['graph', 'coupling', 'search', 'distribution']));
+    expect(new Set(ids)).toEqual(new Set(['graph', 'coupling', 'distribution']));
   });
 
-  it('drops the single-metric + standalone-SCC views', () => {
+  it('drops the single-metric + standalone-SCC + standalone-search views', () => {
     const ids = registeredViewIds(dashboardCodePathsJs());
-    for (const removed of ['big', 'hot', 'wide', 'untested', 'sccs']) {
+    for (const removed of ['big', 'hot', 'wide', 'untested', 'sccs', 'search']) {
       expect(ids).not.toContain(removed);
     }
   });

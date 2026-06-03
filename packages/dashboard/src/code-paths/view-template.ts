@@ -124,6 +124,14 @@ export interface RankedViewConfig {
   headingText: string;
   /** Empty-state message when the filter strips everything. */
   emptyMessage: string;
+  /**
+   * When true, render a search input above the table that filters the
+   * ranked rows by function simple-name (case-insensitive substring).
+   * Typing re-filters the table in place; the search box auto-focuses
+   * when the view activates. Used by the Functions view to absorb the
+   * former standalone Search subtab.
+   */
+  searchByName?: boolean;
 }
 
 /**
@@ -162,8 +170,50 @@ export function defineRankedView(config: RankedViewConfig): string {
   const predicate = config.predicate ?? 'passesFilter(occ, filterState)';
   const rowExtras = config.rowExtras ?? '{}';
   const preamble = config.preamble ?? '';
+  // When searchByName is on, the view keeps a module-scoped query string,
+  // renders a search input above the table, and re-filters the ranked
+  // rows by simple-name (case-insensitive substring) in place. The state
+  // var is namespaced by view id so multiple search-enabled views can
+  // coexist without clobbering each other.
+  const searchByName = config.searchByName === true;
+  const queryVar = `__rankedSearchQuery_${config.id.replaceAll(/\W/g, '_')}`;
+  const searchStateDecl = searchByName ? `let ${queryVar} = '';\n` : '';
+  const searchInputBlock = searchByName
+    ? String.raw`
+    const searchInput = el('input', {
+      type: 'search',
+      class: 'search-input code-paths-search',
+      id: 'code-paths-search-${config.id}',
+      placeholder: 'Filter functions by name…',
+    });
+    searchInput.value = ${queryVar};
+    searchInput.addEventListener('input', e => {
+      ${queryVar} = (e.target && e.target.value) || '';
+      renderRows();
+    });
+    container.appendChild(searchInput);`
+    : '';
+  const resultsHostDecl = searchByName
+    ? `    const rowsHost = el('div'); container.appendChild(rowsHost);`
+    : `    const rowsHost = container;`;
+  // Substring filter on simpleName; empty query keeps everything.
+  const searchFilterExpr = searchByName
+    ? String.raw`(function(occ){
+        const q = (${queryVar} || '').trim().toLowerCase();
+        if (q.length === 0) return true;
+        const nm = (occ.simpleName || '').toLowerCase();
+        return nm.indexOf(q) !== -1;
+      })`
+    : '(function(){ return true; })';
+  const onActivateBlock = searchByName
+    ? String.raw`,
+  onActivate() {
+    const input = document.getElementById('code-paths-search-${config.id}');
+    if (input && typeof input.focus === 'function') input.focus();
+  }`
+    : '';
   return String.raw`
-views.push({
+${searchStateDecl}views.push({
   id: ${jsString(config.id)},
   label: ${jsString(config.label)},
   help: ${helpJson},
@@ -186,16 +236,28 @@ views.push({
       container.appendChild(el('div', { class: 'empty', text: ${jsString(config.emptyMessage)} }));
       return;
     }
-    renderFunctionRows(
-      container,
-      ranked.map(r => Object.assign({}, r.occ, { __metric: r.metric }, (function(occ, metric){ return ${rowExtras}; })(r.occ, r.metric))),
-      [
+${searchInputBlock}
+${resultsHostDecl}
+    const __searchFilter = ${searchFilterExpr};
+    function renderRows() {
+      const filtered = ranked.filter(r => __searchFilter(r.occ));
+      if (filtered.length === 0) {
+        while (rowsHost.firstChild) rowsHost.removeChild(rowsHost.firstChild);
+        rowsHost.appendChild(el('div', { class: 'empty', text: ${jsString(config.emptyMessage)} }));
+        return;
+      }
+      renderFunctionRows(
+        rowsHost,
+        filtered.map(r => Object.assign({}, r.occ, { __metric: r.metric }, (function(occ, metric){ return ${rowExtras}; })(r.occ, r.metric))),
+        [
 ${columnsLiteral}
-      ],
-      ${jsString(config.headingText)},
-      ${jsString(config.id)},
-    );
-  },
+        ],
+        ${jsString(config.headingText)},
+        ${jsString(config.id)},
+      );
+    }
+    renderRows();
+  }${onActivateBlock}
 });
 `;
 }
