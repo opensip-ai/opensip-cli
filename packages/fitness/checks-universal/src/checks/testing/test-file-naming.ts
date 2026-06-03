@@ -38,7 +38,7 @@ const IGNORED_PATTERNS = [
   /-mocks\.[jt]sx?$/, // Mock files with plural suffix
   /[-_]helpers?\.[jt]sx?$/, // Helper files
   /\.test\.helpers?\.[jt]sx?$/, // Test-only helper files (e.g. service.test.helpers.ts)
-  /[-_]fixtures?\.[jt]sx?$/, // Fixture files
+  /[-_.]fixtures?\.[jt]sx?$/, // Fixture files (foo-fixtures.ts, catalog.fixture.ts, …)
   /[-_]utils?\.[jt]sx?$/, // Utility files
   /^services\.[jt]sx?$/, // Service mocks
   /^index\.[jt]sx?$/, // Index files (re-exports)
@@ -47,9 +47,10 @@ const IGNORED_PATTERNS = [
 /**
  * Directories to skip (build artifacts, etc.)
  *
- * `fixtures` and `test-utils` are subdirectories used to host test inputs
- * and per-package scope helpers — their files don't follow `.test.ts`
- * naming because they're not test files in the Vitest-discovery sense.
+ * `fixtures` / `__fixtures__` and `test-utils` are subdirectories used to
+ * host test inputs and per-package scope helpers — their files don't follow
+ * `.test.ts` naming because they're not test files in the Vitest-discovery
+ * sense.
  */
 const SKIP_DIRECTORIES = new Set([
   'node_modules',
@@ -58,6 +59,7 @@ const SKIP_DIRECTORIES = new Set([
   'coverage',
   '.turbo',
   'fixtures',
+  '__fixtures__',
   'test-utils',
 ])
 
