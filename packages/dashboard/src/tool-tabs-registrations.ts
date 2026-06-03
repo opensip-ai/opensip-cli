@@ -45,7 +45,7 @@ defineToolTab({
 defineToolTab({
   id: 'code-paths',
   tool: 'graph',
-  label: 'Code Paths',
+  label: 'Code Graph',
   icon: CODE_PATHS_ICON,
   badgeStyle: 'background:rgba(196,154,108,0.15);color:var(--accent)',
   renderFunctionName: 'renderCodePathsTab',
