@@ -349,11 +349,14 @@ in your PR. Updating the gate (e.g., via `disabledChecks` in
 and reviewer sign-off — it is not a default contributor option.
 
 **Why `pnpm fit` works at all in this monorepo:** workspace dep
-injection is enabled via `pnpm.injectWorkspacePackages: true` in the
-root `package.json`, plus `@opensip-tools/checks-typescript` and
-`@opensip-tools/checks-universal` are declared as root devDependencies.
-Without that, the discovery walker would find 0 check packages at the
-workspace root and the run would silently report 0 checks.
+injection is enabled via `injectWorkspacePackages: true` in
+`pnpm-workspace.yaml` (pnpm 11's settings home — it no longer reads the
+package.json `pnpm` field; the build-script allowlist and `overrides`
+moved there too, as `allowBuilds`/`overrides`), plus
+`@opensip-tools/checks-typescript` and `@opensip-tools/checks-universal`
+are declared as root devDependencies. Without that, the discovery walker
+would find 0 check packages at the workspace root and the run would
+silently report 0 checks.
 
 ## Documentation
 
