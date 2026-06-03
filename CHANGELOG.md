@@ -19,6 +19,13 @@ silenced warning below; the rest closes the class of bug that produced it.
   not an adapter). Discovery now requires the `opensipTools.kind: "graph-adapter"`
   marker — mirroring tool discovery — so non-adapter packages under the prefix
   are skipped silently.
+- **Dashboard: long table cells no longer bleed past the card edge.** The
+  `.data-table` containment contract now wraps body cells and breaks long
+  unbreakable tokens (file paths, regex, code snippets) by default, so a
+  free-text column can't overrun the card and push content past the page
+  boundary. Short metric columns (timestamps, durations, counts) opt out via
+  `.cell-nowrap` to stay on one line; the coupling matrix keeps its own
+  `.coupling-scroll` containment.
 
 ### Changed
 
