@@ -63,6 +63,11 @@ distinct from:
   `opensipTools.kind` marker is the canonical plugin-discovery contract; the
   `checks-*`/`graph-*` name-prefix scans are demoted to deprecated fallbacks
   (removal next major), enforced by a workspace-invariant test
+- [ADR-0008](./ADR-0008-opensip-cloud-signal-sync.md) — OpenSIP Cloud signal
+  sync: an optional, entitlement-gated, best-effort sink emits the `Signal`s a
+  run already produces to the cloud (store-only onboarding tier); local SQLite
+  stays the source of truth, the datastore contract is unchanged (operational
+  Postgres swap rejected), and `--report-to` is kept as the distinct SARIF path
 
 ### Superseded
 
