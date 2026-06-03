@@ -43,6 +43,8 @@ export type {
 export {
   discoverPackagesByMarker,
   isMarkerKind,
+  readMarkerKind,
+  MARKER_KINDS,
 } from './marker-discovery.js'
 export {
   discoverScopedPackages,

@@ -17,6 +17,8 @@ export {
   readToolPackageMetadata,
   discoverPackagesByMarker,
   isMarkerKind,
+  readMarkerKind,
+  MARKER_KINDS,
   discoverScopedPackages,
   hasPackageJson,
   resolvePackageDir,

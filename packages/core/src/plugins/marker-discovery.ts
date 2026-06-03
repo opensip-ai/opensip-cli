@@ -7,9 +7,12 @@
  * occurrence walking outward wins, matching Node's nearest-ancestor
  * module resolution).
  *
- * Three marker kinds are recognised today: `'tool'`, `'fit-pack'`,
- * `'sim-pack'`. New kinds get added to `MarkerKind` explicitly — keeping
- * the union closed lets the type system catch typos at call sites.
+ * Four marker kinds are recognised today: `'tool'`, `'fit-pack'`,
+ * `'sim-pack'`, and `'graph-adapter'`. New kinds get added to `MarkerKind`
+ * explicitly — keeping the union closed lets the type system catch typos at
+ * call sites, and makes `MARKER_KINDS` the single source of truth for the
+ * plugin-kind vocabulary (the workspace-invariant test asserts every
+ * package.json marker against it).
  *
  * Why a marker rather than a name pattern: a name-prefix rule (e.g.
  * anything matching `@opensip-tools/*`) breaks down once organisations
@@ -30,7 +33,12 @@ import { logger } from '../lib/logger.js';
 
 import { safeReaddir } from './node-modules-walk.js';
 
-const MARKER_KINDS = ['tool', 'fit-pack', 'sim-pack'] as const;
+/**
+ * The closed vocabulary of `opensipTools.kind` markers. Exported as the
+ * single source of truth: discovery wrappers narrow to it, and the
+ * workspace-invariant test validates every package.json marker against it.
+ */
+export const MARKER_KINDS = ['tool', 'fit-pack', 'sim-pack', 'graph-adapter'] as const;
 
 export type MarkerKind = (typeof MARKER_KINDS)[number];
 
@@ -125,8 +133,12 @@ function collectFromNodeModules(
  * MarkerKind union; otherwise undefined. Parse failures are logged at
  * debug — a malformed package.json under node_modules is not a discovery
  * concern, just an entry to skip.
+ *
+ * Exported as the canonical marker reader: every discovery path (tool,
+ * fit-pack, sim-pack, graph-adapter) reads the marker through this one
+ * function, so there is no second implementation to drift.
  */
-function readMarkerKind(packageDir: string): MarkerKind | undefined {
+export function readMarkerKind(packageDir: string): MarkerKind | undefined {
   const pkgJsonPath = join(packageDir, 'package.json');
   if (!existsSync(pkgJsonPath)) return undefined;
   try {
