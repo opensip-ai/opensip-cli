@@ -77,6 +77,11 @@ export function dashboardCssCodePaths(): string {
 .gv-downstream { color: var(--accent-fitness); }
 .gv-dimmed { opacity: 0.1; }
 
+/* Coupling toolbar (Export CSV) — sits between the heading and the matrix. */
+.coupling-toolbar { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+.coupling-export-btn { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 4px 12px; color: var(--text-muted); font-size: 12px; cursor: pointer; font-family: var(--font); }
+.coupling-export-btn:hover { background: var(--bg-hover); color: var(--text); }
+
 /* Coupling heat map cell shading — set --coupling-density per cell */
 .coupling-cell { background: color-mix(in srgb, var(--bg-surface), var(--accent) calc(var(--coupling-density, 0) * 60%)); cursor: pointer; }
 .coupling-cell.empty { color: var(--text-dim); cursor: default; }

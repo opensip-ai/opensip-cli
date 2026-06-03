@@ -66,6 +66,14 @@ views.push({
     }
     const section = el('div', { class: 'section' });
     section.appendChild(makeSectionHeading('Package coupling (' + pkgs.length + '×' + pkgs.length + ')', 'coupling'));
+    // Export the FULL (untruncated) coupling counts as long-format CSV.
+    const toolbar = el('div', { class: 'coupling-toolbar' });
+    toolbar.appendChild(el('button', {
+      class: 'coupling-export-btn',
+      text: 'Export CSV',
+      onclick: () => downloadCouplingCsv(counts),
+    }));
+    section.appendChild(toolbar);
     const card = el('div', { class: 'card' });
     const table = el('table', { class: 'coupling-table' });
     const thead = el('thead');
@@ -109,6 +117,50 @@ views.push({
     container.appendChild(section);
   },
 });
+
+// Build long-format coupling CSV from the per-caller count map
+// (Map<callerPkg, Map<calleePkg, count>>). One row per non-zero directed
+// pair; header 'caller_package,callee_package,call_count'. Rows are sorted by
+// caller then callee for a stable, diff-friendly export. Full and untruncated
+// — independent of any view truncation. Returned as a string so it is unit
+// testable without touching the DOM / Blob APIs.
+function buildCouplingCsv(counts) {
+  const rows = [];
+  for (const caller of Array.from(counts.keys()).sort()) {
+    const row = counts.get(caller);
+    if (!row) continue;
+    for (const callee of Array.from(row.keys()).sort()) {
+      const c = row.get(callee) || 0;
+      if (c === 0) continue;
+      rows.push(csvField(caller) + ',' + csvField(callee) + ',' + String(c));
+    }
+  }
+  return ['caller_package,callee_package,call_count'].concat(rows).join('\n');
+}
+
+// RFC-4180-ish field quoting: wrap in double quotes and double any embedded
+// quote when the value contains a comma, quote, CR, or LF. Package names are
+// normally bare, but '<unknown>' and odd repo layouts make this cheap insurance.
+function csvField(value) {
+  const s = String(value == null ? '' : value);
+  if (/[",\r\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+
+// Trigger a client-side download of the coupling CSV via a Blob + a transient
+// anchor. No-ops gracefully in environments without URL.createObjectURL.
+function downloadCouplingCsv(counts) {
+  const csv = buildCouplingCsv(counts);
+  try {
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = el('a', { href: url, download: 'coupling.csv', style: 'display:none' });
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => { try { URL.revokeObjectURL(url); } catch (e) { /* ignore */ } }, 0);
+  } catch (e) { /* download unsupported in this environment */ }
+}
 
 function openCouplingDrilldown(callerPkg, calleePkg, indexes, filterState) {
   // Render an inline Function Card overlay listing the call sites for

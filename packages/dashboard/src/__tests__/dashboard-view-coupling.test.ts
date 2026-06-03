@@ -5,7 +5,7 @@
  * View 4 (Package coupling) — N×N matrix + drilldown.
  */
 
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach, vi } from 'vitest';
 
 import { dashboardEditorLinkJs } from '../code-paths/editor-link.js';
 import { dashboardFiltersJs } from '../code-paths/filters.js';
@@ -168,6 +168,68 @@ describe('View 4 — Coupling matrix', () => {
     const cells = c.querySelectorAll('td.coupling-cell');
     expect(cells.length).toBe(1);
     expect(cells[0].textContent).toBe('1');
+  });
+
+  it('renders an Export CSV button in the coupling toolbar', () => {
+    const catalog: GraphCatalog = {
+      version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now',
+      functions: {
+        a: [makeOcc({ bodyHash: 'a', simpleName: 'a', filePath: 'packages/cli/src/a.ts',
+          calls: [{ to: ['x'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'x()' }] })],
+        x: [makeOcc({ bodyHash: 'x', simpleName: 'x', filePath: 'packages/contracts/src/x.ts' })],
+      },
+      features: { edge: [{ callerPackage: 'cli', calleePackage: 'contracts', count: 3 }] },
+    };
+    const env = loadEnv(catalog);
+    const c = document.createElement('div');
+    env.views.find(v => v.id === 'coupling')!.render(c, env.graphCatalog, env.graphIndexes, env.filterState);
+    const btn = c.querySelector('.coupling-export-btn');
+    expect(btn).not.toBeNull();
+    expect(btn!.textContent).toBe('Export CSV');
+  });
+
+  it('downloads a full, long-format, properly-escaped CSV of the coupling counts', () => {
+    const catalog: GraphCatalog = {
+      version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now',
+      functions: {
+        a: [makeOcc({ bodyHash: 'a', simpleName: 'a', filePath: 'packages/cli/src/a.ts' })],
+        x: [makeOcc({ bodyHash: 'x', simpleName: 'x', filePath: 'packages/contracts/src/x.ts' })],
+      },
+      features: {
+        edge: [
+          { callerPackage: 'cli', calleePackage: 'contracts', count: 3 },
+          { callerPackage: 'cli', calleePackage: 'cli', count: 2 },
+          // A package name with a comma forces RFC-4180 quoting.
+          { callerPackage: 'odd,pkg', calleePackage: 'cli', count: 1 },
+        ],
+      },
+    };
+    const env = loadEnv(catalog);
+    const c = document.createElement('div');
+    env.views.find(v => v.id === 'coupling')!.render(c, env.graphCatalog, env.graphIndexes, env.filterState);
+
+    // Capture the Blob the download path hands to URL.createObjectURL.
+    const createSpy = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock');
+    const revokeSpy = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+
+    const btn = c.querySelector<HTMLButtonElement>('.coupling-export-btn')!;
+    btn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(createSpy).toHaveBeenCalledTimes(1);
+    const blob = createSpy.mock.calls[0][0] as Blob;
+    createSpy.mockRestore();
+    revokeSpy.mockRestore();
+
+    return blob.text().then(text => {
+      const lines = text.split('\n');
+      expect(lines[0]).toBe('caller_package,callee_package,call_count');
+      // Sorted by caller then callee; the comma-bearing package is quoted.
+      expect(lines).toContain('cli,cli,2');
+      expect(lines).toContain('cli,contracts,3');
+      expect(lines).toContain('"odd,pkg",cli,1');
+      // 1 header + 3 data rows, no truncation.
+      expect(lines.length).toBe(4);
+    });
   });
 
   it('shows the no-data empty state when the catalog carries no edge feature', () => {
