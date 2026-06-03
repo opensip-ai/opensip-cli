@@ -2,9 +2,9 @@
  * Aggregate cross-package code path for the duplicated-function-body rule.
  *
  * Validates the second, package-spread code path: a body hash present in
- * ≥ minCrossPackageDuplicatePackages DISTINCT packages (via pkgOf) emits
- * ONE aggregate signal with NO per-copy size/line floor, and suppresses
- * the per-instance signals for that same hash.
+ * ≥ minCrossPackageDuplicatePackages DISTINCT packages (via pkgOf) — that
+ * also clears the same size floor as the per-instance path — emits ONE
+ * aggregate signal and suppresses the per-instance signals for that hash.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -27,18 +27,18 @@ function perInstance(signals: readonly Signal[]): readonly Signal[] {
 const evaluate = duplicatedFunctionBodyRule.evaluate.bind(duplicatedFunctionBodyRule);
 
 describe('duplicated-function-body aggregate cross-package path', () => {
-  it('fires exactly one aggregate signal for a small body in 3 packages', () => {
-    // Small bodySize (50) is below the default minDuplicateBodySize (200),
-    // so the per-instance path would be silent — the aggregate path catches it.
-    const small = { bodySize: 50, line: 1, endLine: 2 };
-    const a = occ({ bodyHash: 'h', simpleName: 'stripStrings', package: 'pkg-c', ...small });
+  /** A body that clears the default size floor (≥ 5 lines, ≥ 200 chars). */
+  const substantial = { bodySize: 500, line: 1, endLine: 10 };
+
+  it('fires exactly one aggregate signal for a substantial body in 3 packages', () => {
+    const a = occ({ bodyHash: 'h', simpleName: 'stripStrings', package: 'pkg-c', ...substantial });
     const b = occ({
       bodyHash: 'h',
       simpleName: 'stripStrings',
       package: 'pkg-a',
       filePath: 'src/b.ts',
       qualifiedName: 'src/b.stripStrings',
-      ...small,
+      ...substantial,
     });
     const c = occ({
       bodyHash: 'h',
@@ -46,7 +46,7 @@ describe('duplicated-function-body aggregate cross-package path', () => {
       package: 'pkg-b',
       filePath: 'src/c.ts',
       qualifiedName: 'src/c.stripStrings',
-      ...small,
+      ...substantial,
     });
     const catalog = makeCatalog([a, b, c]);
     const signals = evaluate(catalog, buildIndexes(catalog), {});
@@ -63,9 +63,21 @@ describe('duplicated-function-body aggregate cross-package path', () => {
     expect(s?.severity).toBe('low');
     expect(s?.category).toBe('quality');
     expect(s?.ruleId).toBe('graph:duplicated-function-body');
-    // Anchored at lexicographically-lowest qualifiedName (src/b < src/c < src/a's `src/a.*`?).
+    // Anchored at lexicographically-lowest qualifiedName.
     // qualifiedNames are: src/a.stripStrings, src/b.stripStrings, src/c.stripStrings.
     expect(s?.code?.file).toBe('src/a.ts');
+  });
+
+  it('does NOT fire for a TRIVIAL body across packages (size floor)', () => {
+    // A tiny body (50 chars / 2 lines) — an empty DI shim, one-line getter,
+    // thin delegator — is below the size floor, so the aggregate path skips it
+    // even though it spans 3 packages (and the per-instance path is floored too).
+    const trivial = { bodySize: 50, line: 1, endLine: 2 };
+    const a = occ({ bodyHash: 'h', simpleName: 'get', package: 'pkg-a', ...trivial });
+    const b = occ({ bodyHash: 'h', simpleName: 'get', package: 'pkg-b', filePath: 'src/b.ts', qualifiedName: 'src/b.get', ...trivial });
+    const c = occ({ bodyHash: 'h', simpleName: 'get', package: 'pkg-c', filePath: 'src/c.ts', qualifiedName: 'src/c.get', ...trivial });
+    const catalog = makeCatalog([a, b, c]);
+    expect(evaluate(catalog, buildIndexes(catalog), {})).toHaveLength(0);
   });
 
   it('does NOT fire for a within-package small dup (1 package)', () => {
@@ -79,22 +91,24 @@ describe('duplicated-function-body aggregate cross-package path', () => {
   });
 
   it('honors the minCrossPackageDuplicatePackages threshold', () => {
-    const small = { bodySize: 50, line: 1, endLine: 2 };
-    const a = occ({ bodyHash: 'h', simpleName: 'a', package: 'pkg-a', ...small });
+    const a = occ({ bodyHash: 'h', simpleName: 'a', package: 'pkg-a', ...substantial });
     const b = occ({
       bodyHash: 'h',
       simpleName: 'b',
       package: 'pkg-b',
       filePath: 'src/b.ts',
       qualifiedName: 'src/b.b',
-      ...small,
+      ...substantial,
     });
     const catalog = makeCatalog([a, b]);
 
-    // Default threshold (3): 2 packages → no aggregate, no per-instance (size floor).
-    expect(evaluate(catalog, buildIndexes(catalog), {})).toHaveLength(0);
+    // Default threshold (3): 2 packages → no aggregate. The body clears the
+    // size floor, so the per-instance path reports it instead (1 signal).
+    const def = evaluate(catalog, buildIndexes(catalog), {});
+    expect(aggregates(def)).toHaveLength(0);
+    expect(perInstance(def)).toHaveLength(1);
 
-    // Lowered to 2: exactly one aggregate signal.
+    // Lowered to 2: exactly one aggregate signal (and no per-instance double).
     const lowered = evaluate(catalog, buildIndexes(catalog), {
       minCrossPackageDuplicatePackages: 2,
     });
@@ -179,27 +193,27 @@ describe('duplicated-function-body aggregate cross-package path', () => {
   it('buckets legacy catalogs (no package) via pkgOf path fallback', () => {
     // No `package` stamp → pkgOf falls back to packageOf(filePath), the
     // packages/<segment>/ heuristic. Three distinct segments → 3 packages.
-    const small = { bodySize: 50, line: 1, endLine: 2, package: undefined };
+    const legacy = { bodySize: 500, line: 1, endLine: 10, package: undefined };
     const a = occ({
       bodyHash: 'h',
       simpleName: 'a',
       filePath: 'packages/lang-typescript/src/a.ts',
       qualifiedName: 'packages/lang-typescript/src/a.a',
-      ...small,
+      ...legacy,
     });
     const b = occ({
       bodyHash: 'h',
       simpleName: 'b',
       filePath: 'packages/lang-python/src/b.ts',
       qualifiedName: 'packages/lang-python/src/b.b',
-      ...small,
+      ...legacy,
     });
     const c = occ({
       bodyHash: 'h',
       simpleName: 'c',
       filePath: 'packages/lang-go/src/c.ts',
       qualifiedName: 'packages/lang-go/src/c.c',
-      ...small,
+      ...legacy,
     });
     const catalog = makeCatalog([a, b, c]);
     const signals = evaluate(catalog, buildIndexes(catalog), {});

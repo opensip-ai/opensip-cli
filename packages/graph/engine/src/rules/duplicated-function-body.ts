@@ -21,15 +21,19 @@
  *
  *      Emits N-1 signals per group (one per non-primary occurrence).
  *
- *   2. **Aggregate (cross-package, no size floor).** A *small* body
- *      copied across *many* packages is the most expensive class of
- *      duplication, and the size floor above is exactly what hides it.
- *      For each body hash present in ≥ minCrossPackageDuplicatePackages
- *      (default 3) DISTINCT packages (via `pkgOf`) — with the same
- *      kind/test-file exclusions but NO size/line floor — the rule emits
- *      ONE aggregate signal naming the packages, and SUPPRESSES the
- *      per-instance signals for that same hash (no double-reporting).
- *      Bodies that don't reach N packages flow through path (1) unchanged.
+ *   2. **Aggregate (cross-package).** For each body hash present in
+ *      ≥ minCrossPackageDuplicatePackages (default 3) DISTINCT packages
+ *      (via `pkgOf`), the rule emits ONE aggregate signal naming the
+ *      packages and SUPPRESSES the per-instance signals for that same hash
+ *      (no double-reporting). Bodies that don't reach N packages flow
+ *      through path (1) unchanged.
+ *
+ *      This path applies the SAME size floor as path (1) — a trivial body
+ *      (an empty DI-constructor shim, a one-line getter, a thin
+ *      delegator) copied across packages is not an actionable hoist target,
+ *      and flagging it just produces noise. The genuinely-shared helpers
+ *      this path was built to surface have already been hoisted; the floor
+ *      keeps it a watchdog for *substantial* new cross-package duplication.
  */
 
 import { createSignal } from '@opensip-tools/core';
@@ -39,7 +43,7 @@ import { pkgOf } from '../resolve-callee.js';
 import { applySeverityOverride } from './_severity-override.js';
 import { defineRule } from './define-rule.js';
 
-import type { Catalog, FeatureTable, FunctionOccurrence } from '../types.js';
+import type { Catalog, FeatureTable, FunctionOccurrence, GraphConfig } from '../types.js';
 import type { Signal } from '@opensip-tools/core';
 
 const DEFAULT_MIN_LINES = 5;
@@ -68,10 +72,16 @@ export const duplicatedFunctionBodyRule = defineRule({
     for (const [bodyHash, occs] of aggregateBuckets) {
       const packages = [...new Set(occs.map((o) => pkgOf(o)))].sort();
       if (packages.length < minPackages) continue;
+      const anchor = lowestByQualifiedName(occs);
+      // Size floor (the same gate the per-instance path applies): a trivial
+      // body — an empty DI constructor, a one-line getter, a thin delegator —
+      // copied across packages is not an actionable hoist target. Skip it; it
+      // won't be picked up by the per-instance path either (also floored), so
+      // there is nothing to suppress.
+      if (!isInterestingForDup(anchor, minLines, minBodySize, features)) continue;
       // This hash is owned by the aggregate path; suppress its per-instance
       // signals so a single duplicate group never double-reports.
       suppressedHashes.add(bodyHash);
-      const anchor = lowestByQualifiedName(occs);
       signals.push(
         createSignal({
           source: 'graph',
@@ -95,38 +105,53 @@ export const duplicatedFunctionBodyRule = defineRule({
     // Per-instance path: size-gated groups, skipping any hash already
     // claimed by an aggregate signal so a group never double-reports.
     const groups = groupByHash(catalog, minLines, minBodySize, features);
-    for (const group of groups) {
-      if (group.length < 2) continue;
-      const primary = group[0];
-      /* v8 ignore next */
-      if (!primary) continue;
-      if (suppressedHashes.has(primary.bodyHash)) continue;
-      for (let i = 1; i < group.length; i++) {
-        const occ = group[i];
-        /* v8 ignore next */
-        if (!occ) continue;
-        signals.push(
-          createSignal({
-            source: 'graph',
-            severity: applySeverityOverride('low', SLUG, config),
-            category: 'quality',
-            ruleId: SLUG,
-            message: `${occ.simpleName} has the same body as ${primary.qualifiedName} (${primary.filePath}:${String(primary.line)}).`,
-            code: { file: occ.filePath, line: occ.line, column: occ.column },
-            suggestion:
-              'Extract the shared body to a single function and have both call sites import it.',
-            metadata: {
-              primary: primary.qualifiedName,
-              duplicate: occ.qualifiedName,
-              groupSize: group.length,
-            },
-          }),
-        );
-      }
-    }
+    signals.push(...emitPerInstanceSignals(groups, suppressedHashes, config));
     return signals;
   },
 });
+
+/**
+ * Per-instance duplicate signals: N-1 per size-gated group, skipping any hash
+ * already claimed by an aggregate signal (no double-reporting). Extracted from
+ * evaluate() to keep its cognitive complexity within budget.
+ */
+function emitPerInstanceSignals(
+  groups: readonly (readonly FunctionOccurrence[])[],
+  suppressedHashes: ReadonlySet<string>,
+  config: GraphConfig,
+): Signal[] {
+  const signals: Signal[] = [];
+  for (const group of groups) {
+    if (group.length < 2) continue;
+    const primary = group[0];
+    /* v8 ignore next */
+    if (!primary) continue;
+    if (suppressedHashes.has(primary.bodyHash)) continue;
+    for (let i = 1; i < group.length; i++) {
+      const occ = group[i];
+      /* v8 ignore next */
+      if (!occ) continue;
+      signals.push(
+        createSignal({
+          source: 'graph',
+          severity: applySeverityOverride('low', SLUG, config),
+          category: 'quality',
+          ruleId: SLUG,
+          message: `${occ.simpleName} has the same body as ${primary.qualifiedName} (${primary.filePath}:${String(primary.line)}).`,
+          code: { file: occ.filePath, line: occ.line, column: occ.column },
+          suggestion:
+            'Extract the shared body to a single function and have both call sites import it.',
+          metadata: {
+            primary: primary.qualifiedName,
+            duplicate: occ.qualifiedName,
+            groupSize: group.length,
+          },
+        }),
+      );
+    }
+  }
+  return signals;
+}
 
 function groupByHash(
   catalog: Catalog,

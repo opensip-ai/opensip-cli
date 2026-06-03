@@ -148,22 +148,22 @@ checkOverrides:
 
 graph:
   # graph:duplicated-function-body — aggregate cross-package code path.
-  # A body hash appearing in >= this many DISTINCT packages emits a single
-  # aggregate "hoist to a shared package" signal (with no per-copy size
-  # floor) and suppresses the per-instance signals for that hash.
+  # A body hash appearing in >= this many DISTINCT packages — that ALSO
+  # clears the same size floor as the per-instance path (minDuplicateBodyLines
+  # / minDuplicateBodySize) — emits a single aggregate "hoist to a shared
+  # package" signal and suppresses the per-instance signals for that hash.
   #
   # The default is 3 (safe for arbitrary repos — unambiguous shared infra).
-  # We keep it at 2 HERE as a deliberately-aggressive lens: it surfaces
-  # EVERY body shared across two packages so a genuinely-shared helper is
-  # caught the moment it appears. The real shared helpers it found have been
+  # We keep it at 2 HERE as a deliberately-aggressive lens: it surfaces every
+  # SUBSTANTIAL body shared across two packages so a genuinely-shared helper
+  # is caught the moment it appears. The real shared helpers it found were
   # hoisted (nameOf / skipBlockComment / isReturnValueDiscarded ->
-  # graph-adapter-common; isIdentChar -> core). The remainder it reports are
-  # known-intentional and accepted as informational (graph is not a CI gate
-  # here): thin Registry<T>/getter delegators, DataStore DI-constructor
-  # shims, and per-tool plugin-loader state accessors that are deliberately
-  # NOT shared (fitness's load-error state != sim's; see check-loader.ts
-  # header, audit F6). I.e. threshold 2 is a watchdog for NEW duplication,
-  # not an assertion that every current hit is consolidatable.
+  # graph-adapter-common; isIdentChar -> core). The trivial remainder it used
+  # to report — thin Registry<T>/getter delegators, DataStore DI-constructor
+  # shims, per-tool plugin-loader state accessors deliberately NOT shared
+  # (fitness's load-error state != sim's; see check-loader.ts header, audit
+  # F6) — now falls below the size floor and no longer surfaces. So threshold
+  # 2 is a clean watchdog for NEW substantial duplication.
   minCrossPackageDuplicatePackages: 2
 
 # =============================================================================
