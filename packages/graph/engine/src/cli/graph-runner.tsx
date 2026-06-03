@@ -187,7 +187,7 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
         // enforces. Without this call, default `opensip-tools graph`
         // (no args, no flags) runs the live view but writes no row,
         // so the dashboard's Code Paths > Sessions never sees the run.
-        persistSession({ cwd: args.cwd }, result.signals, datastore);
+        persistSession({ cwd: args.cwd }, result.signals, datastore, durationMs);
         // Compute the fit-style summary the cli-ui `RunSummary` renders.
         // buildCliOutput already applies the fit-aligned per-rule pass
         // rule (`errors === 0` per render/json.ts), so the passed/failed

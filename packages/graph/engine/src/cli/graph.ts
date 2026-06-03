@@ -319,7 +319,8 @@ async function dispatchGraphResult(
   // write a row — the parent persists exactly one aggregate session
   // for the whole `--workspace` invocation.
   if (opts.json !== true) {
-    persistSession(opts, result.signals, cli.scope.datastore() as DataStore | undefined);
+    const durationMs = Math.max(0, Date.now() - Date.parse(startedAt));
+    persistSession(opts, result.signals, cli.scope.datastore() as DataStore | undefined, durationMs);
   }
   cli.setExitCode(EXIT_CODES.SUCCESS);
   logger.info({
@@ -515,9 +516,10 @@ export function persistSession(
   opts: GraphCommandOptions,
   signals: readonly Signal[],
   datastore: DataStore | undefined,
+  durationMs: number,
 ): void {
   if (!datastore) return;
-  saveGraphSession(opts, buildCliOutput(signals, 'graph'), datastore);
+  saveGraphSession(opts, buildCliOutput(signals, 'graph', undefined, durationMs), datastore);
 }
 
 function persistWorkspaceSession(

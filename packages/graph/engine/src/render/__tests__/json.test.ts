@@ -61,6 +61,34 @@ describe('buildCliOutput', () => {
     const fast = buildCliOutput([], 'graph', 'fast') as CliOutput & { resolutionMode?: string };
     expect(fast.resolutionMode).toBe('fast');
   });
+
+  it('carries the durationMs argument onto the CliOutput', () => {
+    const out = buildCliOutput([signal()], 'graph', undefined, 1234);
+    expect(out.durationMs).toBe(1234);
+  });
+
+  it('defaults durationMs to 0 when not supplied', () => {
+    const out = buildCliOutput([signal()], 'graph');
+    expect(out.durationMs).toBe(0);
+  });
+
+  it('threads scalar signal metadata onto findings, filtering non-scalars', () => {
+    const out = buildCliOutput(
+      [signal({ ruleId: 'graph:large-function', metadata: { bodyLines: 321, label: 'big', flag: true, nested: { a: 1 }, arr: [1, 2] } })],
+      'graph',
+    );
+    const finding = out.checks[0]?.findings[0];
+    expect(finding?.metadata).toEqual({ bodyLines: 321, label: 'big', flag: true });
+    // Non-scalar values (objects, arrays) are dropped.
+    expect(finding?.metadata && 'nested' in finding.metadata).toBe(false);
+    expect(finding?.metadata && 'arr' in finding.metadata).toBe(false);
+  });
+
+  it('omits the metadata field entirely when no scalar metadata survives', () => {
+    const out = buildCliOutput([signal({ metadata: { nested: { a: 1 } } })], 'graph');
+    const finding = out.checks[0]?.findings[0];
+    expect(finding && 'metadata' in finding).toBe(false);
+  });
 });
 
 describe('renderJson', () => {

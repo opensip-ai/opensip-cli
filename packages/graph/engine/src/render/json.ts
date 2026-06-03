@@ -16,14 +16,37 @@ export const renderJson: Renderer = (signals, context): string => {
   return JSON.stringify(cliOutput, null, 2);
 };
 
+/**
+ * Narrow a signal's open `metadata` bag to the JSON-safe scalar subset
+ * the FindingOutput contract permits (string | number | boolean).
+ * Returns undefined when nothing survives the filter, so findings
+ * without metric metadata stay clean.
+ */
+function projectMetadata(
+  metadata: Record<string, unknown> | undefined,
+): Readonly<Record<string, string | number | boolean>> | undefined {
+  if (!metadata) return undefined;
+  const out: Record<string, string | number | boolean> = {};
+  let any = false;
+  for (const [k, v] of Object.entries(metadata)) {
+    if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') {
+      out[k] = v;
+      any = true;
+    }
+  }
+  return any ? out : undefined;
+}
+
 export function buildCliOutput(
-  signals: readonly { ruleId: string; message: string; severity: string; filePath: string; line?: number; column?: number; suggestion?: string }[],
+  signals: readonly { ruleId: string; message: string; severity: string; filePath: string; line?: number; column?: number; suggestion?: string; metadata?: Record<string, unknown> }[],
   command: string,
   resolutionMode?: 'exact' | 'fast',
+  durationMs = 0,
 ): CliOutput {
   // Group findings by ruleId so each rule maps to a CheckOutput.
   const byRule = new Map<string, FindingOutput[]>();
   for (const s of signals) {
+    const metadata = projectMetadata(s.metadata);
     const finding: FindingOutput = {
       ruleId: s.ruleId,
       message: s.message,
@@ -32,6 +55,7 @@ export function buildCliOutput(
       line: s.line,
       column: s.column,
       suggestion: s.suggestion,
+      ...(metadata ? { metadata } : {}),
     };
     let arr = byRule.get(s.ruleId);
     if (!arr) {
@@ -77,7 +101,7 @@ export function buildCliOutput(
     passed: errors === 0,
     summary,
     checks,
-    durationMs: 0,
+    durationMs,
     // Honest-approximation marker: present only when the run was fast,
     // so machine consumers see that edges are syntactic/approximate.
     ...(resolutionMode === 'fast' ? { resolutionMode } : {}),

@@ -113,6 +113,13 @@ export interface FindingOutput {
   readonly line?: number;
   readonly column?: number;
   readonly suggestion?: string;
+  /**
+   * Optional structured metadata carried from the producing rule's
+   * signal. Used by the dashboard to render per-rule metric columns
+   * (e.g. graph's `bodyLines`, `blast`, `paramCount`, `sccSize`).
+   * Additive and backward-compatible: fitness findings omit it.
+   */
+  readonly metadata?: Readonly<Record<string, string | number | boolean>>;
 }
 
 export interface TableRow {
