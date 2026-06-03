@@ -195,9 +195,67 @@ describe('View 8 — Visualization', () => {
     expect(js).toContain("e.key === 'Escape'");
   });
 
-  it('does not cull by the function-level filter state (whole-graph package insight)', () => {
+  it('does not consult the shared Explore filterState (the view owns its controls)', () => {
     const js = dashboardViewGraphJs();
+    // The view never calls the shared passesFilter; package level is whole-graph
+    // and function level applies its OWN Scope/Kind filter inside the projector.
     expect(js).not.toContain('passesFilter');
     expect(js).not.toContain('No nodes match the active filters');
+  });
+
+  it('renders the Level/Scope/Package/Kind controls, with Package & Kind disabled at package level', () => {
+    const env = loadEnv(true);
+    embedViewModel(SAMPLE_VM);
+    const c = document.createElement('div');
+    document.body.append(c);
+    env.views.find(v => v.id === 'graph')!.render(c, null, null, null);
+    const level = c.querySelector<HTMLSelectElement>('[data-control="level"]');
+    const scope = c.querySelector<HTMLSelectElement>('[data-control="scope"]');
+    const pkg = c.querySelector<HTMLSelectElement>('[data-control="package"]');
+    const kind = c.querySelector<HTMLSelectElement>('[data-control="kind"]');
+    expect(level).not.toBeNull();
+    expect(scope).not.toBeNull();
+    expect(level!.value).toBe('package'); // default
+    // Package + Kind only apply at function level → disabled at package level.
+    expect(pkg!.disabled).toBe(true);
+    expect(kind!.disabled).toBe(true);
+    expect(kind!.multiple).toBe(true);
+  });
+
+  it('projects a single package\'s function graph at function level (intra-package)', () => {
+    // Two functions in pkg-a, a → b. Switching to function level + selecting
+    // pkg-a should project them into a Cytoscape canvas (intra-package default).
+    const occA = { bodyHash: 'A', simpleName: 'a', filePath: 'packages/pkg-a/src/a.ts', kind: 'function-declaration', inTestFile: false, qualifiedName: 'a' };
+    const occB = { bodyHash: 'B', simpleName: 'b', filePath: 'packages/pkg-a/src/b.ts', kind: 'function-declaration', inTestFile: false, qualifiedName: 'b' };
+    const indexes = {
+      byBodyHash: new Map<string, unknown>([['A', occA], ['B', occB]]),
+      occurrencesByHash: new Map<string, unknown[]>([['A', [occA]], ['B', [occB]]]),
+      bySimpleName: new Map(),
+      callees: new Map<string, string[]>([['A', ['B']]]),
+      callers: new Map<string, string[]>([['B', ['A']]]),
+    };
+    const catalog = { version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now', functions: { a: [occA], b: [occB] } };
+
+    const env = loadEnv(true);
+    const c = document.createElement('div');
+    document.body.append(c);
+    env.views.find(v => v.id === 'graph')!.render(c, catalog, indexes, null);
+
+    // Switch Level → function (re-renders in place via the change handler).
+    const level = c.querySelector<HTMLSelectElement>('[data-control="level"]')!;
+    level.value = 'function';
+    level.dispatchEvent(new Event('change'));
+    // Before a package is chosen, the view prompts for one (no canvas yet).
+    expect(c.querySelector('#code-paths-graph-canvas')).toBeNull();
+    expect(c.querySelector('.empty')!.textContent).toContain('Select a package');
+
+    // Choose pkg-a → the function graph projects and the canvas mounts.
+    const pkg = c.querySelector<HTMLSelectElement>('[data-control="package"]')!;
+    expect([...pkg.options].map(o => o.value)).toContain('pkg-a');
+    pkg.value = 'pkg-a';
+    pkg.dispatchEvent(new Event('change'));
+    expect(c.querySelector('#code-paths-graph-canvas')).not.toBeNull();
+    // The Edges (intra vs cross-package) toggle appears only at function level.
+    expect(c.querySelector('[data-control="granularity"]')).not.toBeNull();
   });
 });

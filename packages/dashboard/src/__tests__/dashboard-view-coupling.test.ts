@@ -188,7 +188,7 @@ describe('View 4 — Coupling matrix', () => {
     expect(btn!.textContent).toBe('Export CSV');
   });
 
-  it('downloads a full, long-format, properly-escaped CSV of the coupling counts', () => {
+  it('downloads the coupling matrix as a wide, properly-escaped CSV mirroring the table', () => {
     const catalog: GraphCatalog = {
       version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now',
       functions: {
@@ -225,15 +225,17 @@ describe('View 4 — Coupling matrix', () => {
 
     return blob.text().then(text => {
       const lines = text.split('\n');
-      expect(lines[0]).toBe('caller_package,callee_package,call_count');
-      // Sorted by caller then callee; the comma-bearing package is quoted.
-      expect(lines).toContain('cli,cli,2');
-      expect(lines).toContain('cli,contracts,3');
-      expect(lines).toContain('"odd,pkg",cli,1');
-      // The scoped '@'-package is neutralized with a leading apostrophe so a
-      // spreadsheet can't read it as a formula (CSV/formula-injection guard).
-      expect(lines).toContain("'@scope/pkg,cli,4");
-      // 1 header + 4 data rows, no truncation.
+      // Wide matrix: a corner cell + one column per callee package, sorted.
+      // Package set + sort match the table: ['@scope/pkg','cli','contracts','odd,pkg'].
+      expect(lines[0].startsWith('caller')).toBe(true);
+      // The '@'-scoped header is apostrophe-guarded; the comma-bearing one quoted.
+      expect(lines[0]).toContain('\'@scope/pkg,cli,contracts,"odd,pkg"');
+      // One row per caller (every package), cells are the directed counts (0 = none).
+      expect(lines).toContain("'@scope/pkg,0,4,0,0");
+      expect(lines).toContain('cli,0,2,3,0');
+      expect(lines).toContain('contracts,0,0,0,0');
+      expect(lines).toContain('"odd,pkg",0,1,0,0');
+      // 1 header + 4 caller rows (full N×N, no truncation).
       expect(lines.length).toBe(5);
     });
   });

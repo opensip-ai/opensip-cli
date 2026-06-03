@@ -15,6 +15,14 @@
  * it from there (falling back to the raw inbound-caller count when the
  * catalog carries no features). This builder now only assembles the
  * adjacency the views need for navigation and member resolution.
+ *
+ * Also emits `resolveCalleeOcc(target, callerOcc, indexes)` — the shared
+ * call-target → callee-occurrence resolver. It lives here (not in any single
+ * view) because more than one view needs it: the Coupling drilldown AND the
+ * function-level Visualization both resolve a call target's bodyHash to the
+ * occurrence the caller can actually reach, disambiguating body-hash
+ * collisions across packages. Emitting it in the prelude (ahead of every
+ * view) removes the load-bearing cross-view emission order it used to imply.
  */
 
 export function dashboardIndexesJs(): string {
@@ -62,6 +70,28 @@ function buildIndexes(catalog) {
     if (out.length > 0) callees.set(occ.bodyHash, out);
   }
   return { byBodyHash, occurrencesByHash, bySimpleName, callees, callers };
+}
+
+// Resolve a call target (a bodyHash) to the callee occurrence the caller can
+// reach, disambiguating body-hash collisions across packages. byBodyHash
+// keeps only one occurrence per hash (the collision winner), which
+// mis-attributes the callee's package; occurrencesByHash preserves all, so we
+// prefer the caller's own package, else fall back deterministically (lowest
+// qualifiedName). The dashboard catalog carries no import set, so this mirrors
+// the engine's fast-mode (same-package-only) attribution. Used by the Coupling
+// drilldown and the function-level Visualization projection.
+function resolveCalleeOcc(target, callerOcc, indexes) {
+  const candidates = (indexes.occurrencesByHash && indexes.occurrencesByHash.get(target)) || null;
+  if (!candidates || candidates.length === 0) return indexes.byBodyHash.get(target);
+  if (candidates.length === 1) return candidates[0];
+  const callerPkg = pkgOf(callerOcc);
+  let samePkg = null;
+  let lowest = candidates[0];
+  for (const c of candidates) {
+    if (!samePkg && pkgOf(c) === callerPkg) samePkg = c;
+    if (c.qualifiedName < lowest.qualifiedName) lowest = c;
+  }
+  return samePkg || lowest;
 }
 `;
 }

@@ -60,6 +60,14 @@ export function dashboardViewGraphStylesheetJs(): string {
       selector: 'edge[?isCycleEdge]',
       style: { 'line-color': '#d46a6a', 'target-arrow-color': '#d46a6a' },
     },
+    // Function-level "+ cross-package" mode only: a callee that lives OUTSIDE
+    // the selected package is drawn as a faded ellipse so the boundary reads
+    // at a glance. Package-level view-models never set 'external', so this
+    // selector is inert there.
+    {
+      selector: 'node[?external]',
+      style: { 'background-color': '#3a3a3a', 'border-color': '#666', 'color': '#9a9a9a', 'shape': 'ellipse', 'opacity': 0.55 },
+    },
     {
       selector: 'node.gv-search-hit',
       style: { 'background-color': '#e0a96d', 'border-color': '#fff', 'border-width': 3, 'opacity': 1 },

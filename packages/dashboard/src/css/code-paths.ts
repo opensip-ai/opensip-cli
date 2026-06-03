@@ -62,6 +62,14 @@ export function dashboardCssCodePaths(): string {
 .code-paths-graph-scc-btn { font-size: 12px; padding: 4px 10px; border-radius: var(--radius-sm); cursor: pointer; background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-muted); font-family: var(--font); user-select: none; margin-left: 12px; }
 .code-paths-graph-scc-btn:hover { background: var(--bg-hover); color: var(--text); }
 .code-paths-graph-scc-btn.active { background: #d46a6a; color: var(--bg); border-color: #d46a6a; }
+/* Visualization control toolbar (Level / Scope / Package / Kind / Edges).
+   Self-contained to the view (not the shared Explore filter bar): the
+   Package/Kind selects are disabled at package level and enabled at function
+   level, so they fade rather than vanish. */
+.code-paths-graph-controls { gap: 6px; }
+.code-paths-graph-select { font-size: 12px; padding: 3px 8px; border-radius: var(--radius-sm); background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-muted); font-family: var(--font); }
+.code-paths-graph-select:disabled { opacity: 0.4; cursor: not-allowed; }
+.code-paths-graph-multi { min-width: 150px; height: 64px; vertical-align: middle; }
 .code-paths-graph-banner { font-size: 12px; color: var(--text-muted); background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 10px; margin-bottom: 10px; }
 .code-paths-graph-search { width: 320px; margin-bottom: 10px; display: block; }
 .code-paths-graph-canvas { width: 100%; height: 640px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); }
@@ -78,7 +86,7 @@ export function dashboardCssCodePaths(): string {
 .gv-dimmed { opacity: 0.1; }
 
 /* Coupling toolbar (Export CSV) — sits between the heading and the matrix. */
-.coupling-toolbar { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+.coupling-toolbar { display: flex; justify-content: flex-start; margin-bottom: 8px; }
 .coupling-export-btn { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 4px 12px; color: var(--text-muted); font-size: 12px; cursor: pointer; font-family: var(--font); }
 .coupling-export-btn:hover { background: var(--bg-hover); color: var(--text); }
 

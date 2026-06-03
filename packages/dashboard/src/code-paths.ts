@@ -66,7 +66,8 @@ const RESTRUCTURED_EXPLORE_TABS = true;
  *
  *  1. path-utils       — declares `displayName`, `packageOfPath`, `pkgOf`,
  *                        `shortPkg`.
- *  2. indexes          — declares `buildIndexes`. No external deps.
+ *  2. indexes          — declares `buildIndexes`, `resolveCalleeOcc`. Uses
+ *                        `pkgOf` (path-utils, above).
  *  3. filters          — declares `filterState`, `passesFilter`,
  *                        `renderFilterChips`. No external deps.
  *  4. editor-link      — declares `editorLink`. Reads `EDITOR_PROTOCOL`
@@ -84,11 +85,14 @@ const RESTRUCTURED_EXPLORE_TABS = true;
  *                        Must come before any view emitter.
  * 10. help-drawer      — declares `openHelpDrawer`. No external deps
  *                        beyond `el`.
- * 11-13. view-*        — push View descriptors into `views` (graph /
- *                        coupling / distribution). Each renderer
- *                        closes over `el`, `passesFilter`, `displayName`,
- *                        `packageOfPath`, `renderFunctionRows`, plus its own
- *                        utilities.
+ * 11-13. view-*        — push View descriptors into `views` in TAB order:
+ *                        coupling / distribution / graph (alphabetical:
+ *                        Coupling, Functions, Visualization — the first is the
+ *                        default view). Each renderer closes over `el`,
+ *                        `passesFilter`, `displayName`, `packageOfPath`,
+ *                        `renderFunctionRows`, plus its own utilities; the
+ *                        Visualization renderer also uses `resolveCalleeOcc`
+ *                        (prelude) for its function-level projection.
  * 15. panelOrchestrator — top-level `renderCodePathsTab`,
  *                        `renderCodePathsExplore`, `openCodePathsSession`.
  *                        Uses every name above plus `renderSubtabBar`
@@ -98,8 +102,8 @@ const RESTRUCTURED_EXPLORE_TABS = true;
  * a `{ id, deps, emit }` topological sort.
  */
 export function dashboardCodePathsJs(_restructured: boolean = RESTRUCTURED_EXPLORE_TABS): string {
-  // The explore-tab restructure has shipped: there is one view set (graph /
-  // coupling / distribution). The `_restructured` parameter is kept
+  // The explore-tab restructure has shipped: there is one view set (coupling /
+  // distribution / graph). The `_restructured` parameter is kept
   // for the test seam's call-shape compatibility but no longer selects a
   // legacy branch (the single-metric view emitters were deleted in Plan D).
   // Shared prelude — utilities + the views registry + help drawer. Every view
@@ -121,14 +125,18 @@ export function dashboardCodePathsJs(_restructured: boolean = RESTRUCTURED_EXPLO
     dashboardHelpDrawerJs(),
   ];
 
-  // The kept visualizations + the ranked-distribution affordance. SCCs fold
-  // into the graph view's cycle highlight; the single-metric tabs were dropped
-  // (their signal moved into the engine gate rules). `renderCodePathsExplore`
-  // iterates `views` to build the chip bar.
+  // The kept visualizations + the ranked-distribution affordance, in TAB
+  // order (alphabetical): Coupling, Functions, Visualization. `views[0]` is
+  // the default view, so Coupling opens first. SCCs fold into the graph view's
+  // cycle highlight; the single-metric tabs were dropped (their signal moved
+  // into the engine gate rules). `renderCodePathsExplore` iterates `views` to
+  // build the tab bar. Emission order here is also the runtime registry order;
+  // the three view emitters have no cross-dependencies (each only references
+  // prelude names), so this order is free to match the desired tab order.
   const views = [
-    dashboardViewGraphJs(),
     dashboardViewCouplingJs(),
     dashboardViewDistributionJs(),
+    dashboardViewGraphJs(),
   ];
 
   return [...prelude, ...views, panelOrchestratorJs()].join('\n');

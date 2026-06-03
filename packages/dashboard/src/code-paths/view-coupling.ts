@@ -118,24 +118,28 @@ views.push({
   },
 });
 
-// Build long-format coupling CSV from the per-caller count map
-// (Map<callerPkg, Map<calleePkg, count>>). One row per non-zero directed
-// pair; header 'caller_package,callee_package,call_count'. Rows are sorted by
-// caller then callee for a stable, diff-friendly export. Full and untruncated
-// — independent of any view truncation. Returned as a string so it is unit
-// testable without touching the DOM / Blob APIs.
+// Build the coupling CSV as the SAME wide matrix the on-screen table shows
+// (Map<callerPkg, Map<calleePkg, count>>): a 'caller \\ callee' corner cell,
+// one column per callee package, one row per caller package, cells = the
+// directed call count (0 where there is no edge). The package set and its sort
+// are computed exactly as the table builds them, so the CSV is the grid —
+// easier to navigate in a spreadsheet than our scrollable matrix on very large
+// repos. Full and untruncated. Returned as a string so it is unit testable
+// without touching the DOM / Blob APIs.
 function buildCouplingCsv(counts) {
-  const rows = [];
-  for (const caller of Array.from(counts.keys()).sort()) {
+  const callees = [].concat(...Array.from(counts.values(), m => Array.from(m.keys())));
+  const pkgs = Array.from(new Set([...counts.keys(), ...callees])).sort();
+  const header = [csvField('caller \\\\ callee')].concat(pkgs.map(csvField)).join(',');
+  const rows = [header];
+  for (const caller of pkgs) {
     const row = counts.get(caller);
-    if (!row) continue;
-    for (const callee of Array.from(row.keys()).sort()) {
-      const c = row.get(callee) || 0;
-      if (c === 0) continue;
-      rows.push(csvField(caller) + ',' + csvField(callee) + ',' + String(c));
+    const cells = [csvField(caller)];
+    for (const callee of pkgs) {
+      cells.push(String((row && row.get(callee)) || 0));
     }
+    rows.push(cells.join(','));
   }
-  return ['caller_package,callee_package,call_count'].concat(rows).join('\n');
+  return rows.join('\n');
 }
 
 // RFC-4180-ish field quoting: wrap in double quotes and double any embedded
@@ -209,27 +213,6 @@ function openCouplingDrilldown(callerPkg, calleePkg, indexes, filterState) {
   }
   if (count === 0) list.appendChild(el('li', { class: 'external', text: 'No call sites found.' }));
   card.appendChild(list);
-}
-
-// Resolve a call target (a bodyHash) to the callee occurrence the caller can
-// reach, disambiguating body-hash collisions across packages. byBodyHash
-// keeps only one occurrence per hash (the collision winner), which
-// mis-attributes the callee's package; occurrencesByHash preserves all, so we
-// prefer the caller's own package, else fall back deterministically (lowest
-// qualifiedName). The dashboard catalog carries no import set, so this mirrors
-// the engine's fast-mode (same-package-only) attribution.
-function resolveCalleeOcc(target, callerOcc, indexes) {
-  const candidates = (indexes.occurrencesByHash && indexes.occurrencesByHash.get(target)) || null;
-  if (!candidates || candidates.length === 0) return indexes.byBodyHash.get(target);
-  if (candidates.length === 1) return candidates[0];
-  const callerPkg = pkgOf(callerOcc);
-  let samePkg = null;
-  let lowest = candidates[0];
-  for (const c of candidates) {
-    if (!samePkg && pkgOf(c) === callerPkg) samePkg = c;
-    if (c.qualifiedName < lowest.qualifiedName) lowest = c;
-  }
-  return samePkg || lowest;
 }
 `;
 }

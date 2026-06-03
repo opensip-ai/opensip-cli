@@ -1,30 +1,38 @@
 /**
- * View 8 — "Visualization" (package node-link topology, Cytoscape.js + dagre).
+ * View 8 — "Visualization" (node-link topology, Cytoscape.js + dagre).
  *
- * The non-tabular Code Graph view: it renders the *shape* of the call graph
- * at PACKAGE granularity (item 10) rather than function granularity — one
- * node per package, one edge per directed package→package coupling. Function
- * granularity produced thousands of nodes, unusable on real repos; the
- * package rollup is the same data the Coupling matrix shows, drawn as a
- * node-link graph. Renderer is the vendored `cytoscape` global + the
- * `cytoscapeDagre` layout extension, both inlined by
+ * The non-tabular Code Graph view. A self-contained **Level** control switches
+ * what the graph shows:
+ *
+ *  - PACKAGE level (default) — one node per package, one edge per directed
+ *    package→package coupling. Function granularity across the whole repo
+ *    produced thousands of nodes, unusable in a node-link layout; the package
+ *    rollup is the same data the Coupling matrix shows, drawn as a graph.
+ *    Source: the pre-projected `graph-view-model` JSON blob embedded by
+ *    `generator.ts` (projector in `graph-view-model.ts`, run at
+ *    report-generation time) — NOT the raw catalog. Absent blob → empty state.
+ *  - FUNCTION level — the functions of ONE selected package and the calls
+ *    among them, projected client-side from the embedded catalog indexes by
+ *    `gvBuildFunctionElements`. Scoping to a single package keeps the node
+ *    count bounded. The "Edges" toggle chooses intra-package only (default) or
+ *    "+ cross-package" (also draw calls leaving the package, to faded external
+ *    nodes). Honors the Scope (test inclusion) and Kind (multi-select) filters.
+ *
+ * The view owns its controls (Level / Scope / Package / Kind / Edges) in
+ * `gvRenderControls`; the shared Explore filter chips govern the Functions
+ * table, NOT this view. Package + Kind only apply at function level, so they
+ * are disabled at package level. Renderer is the vendored `cytoscape` global +
+ * the `cytoscapeDagre` layout extension, both inlined by
  * `dashboardCytoscapeVendorJs()` ahead of this emitter in `code-paths.ts`.
  *
- * Data source: the pre-projected `graph-view-model` JSON blob embedded by
- * `generator.ts` (projector in `graph-view-model.ts`, run at
- * report-generation time) — NOT the raw catalog. Absent blob → empty state.
- *
- * Features: pan/zoom, layout selector (dagre/cose/breadthfirst), package-name
- * search, node-click impact highlight (direct caller/callee packages), and
- * cross-package cycle highlighting. Visual encoding (totalCoupling→size,
- * weight→edge thickness, sccId→accent) is applied in
- * `gvStylesheet` / `gvBuildElements`.
- *
- * NOTE: the filter chips (kind / test / package include-exclude) operate on
- * function-level facets and are intentionally NOT applied here — like the
- * Coupling matrix, this is a whole-graph package insight.
+ * Features: pan/zoom, layout selector (dagre/cose/breadthfirst), name search,
+ * node-click impact highlight (direct caller/callee neighbors), and
+ * cross-package cycle highlighting (package level). Visual encoding
+ * (totalCoupling→size, weight→edge thickness, sccId→accent, external→faded) is
+ * applied in `gvStylesheet` / `gvBuildElements` / `gvBuildFunctionElements`.
  */
 
+import { dashboardGraphControlsJs } from './graph-controls.js';
 import { dashboardViewGraphStylesheetJs } from './graph-stylesheet.js';
 
 export function dashboardViewGraphJs(): string {
@@ -51,6 +59,26 @@ var GV_LAYOUTS = [
 ];
 var gvCurrentLayout = 'dagre';
 var gvCy = null;
+
+// ---- Visualization control state (self-contained; NOT the shared Explore
+// filter bar). These live in module vars so they survive the in-place
+// re-render each control change triggers (gvRenderGraph). ----
+//   gvLevel            'package' (default) → package→package rollup blob.
+//                      'function'          → the selected package's functions.
+//   gvIncludeTests     Scope dropdown: false = production only (default).
+//   gvSelectedPackage  single package chosen at function level (null = none).
+//   gvKinds            multi-selected function kinds ([] = all).
+//   gvCrossPackage     function-level "Edges" toggle: false = intra-package
+//                      (default), true = also draw edges leaving the package
+//                      to faded external function nodes.
+var gvLevel = 'package';
+var gvIncludeTests = false;
+var gvSelectedPackage = null;
+var gvKinds = [];
+var gvCrossPackage = false;
+// The active Escape handler, tracked so each re-render replaces (not stacks)
+// its document-level keydown listener.
+var gvEscHandler = null;
 
 function gvLoadViewModel() {
   var blob = document.getElementById('graph-view-model');
@@ -235,7 +263,9 @@ function gvRenderSearchBox(host) {
     type: 'search',
     class: 'search-input code-paths-graph-search',
     id: 'code-paths-graph-search-input',
-    placeholder: 'Find a package by name…',
+    // Labels are package names at package level, function names at function
+    // level; the search matches whatever the live node labels are.
+    placeholder: gvLevel === 'function' ? 'Find a function by name…' : 'Find a package by name…',
   });
   input.addEventListener('input', function(e) {
     gvApplySearch((e.target && e.target.value) || '');
@@ -264,21 +294,39 @@ function gvApplySearch(query) {
   }
 }
 
-views.push({
-  id: 'graph',
-  label: 'Visualization',
-  help: {
-    title: 'Visualization',
-    sections: [
-      { heading: 'What this is', body: 'A node-link visualization of the call graph aggregated to packages, rendered with Cytoscape.js. Each node is a package; each edge is the directed coupling from one package into another. Node size reflects total coupling (calls in + calls out); edge thickness reflects the number of call edges between the two packages.' },
-      { heading: 'Why you care', body: 'The table views project the graph into rankings and lists, and the Coupling matrix shows the same package data as a grid. This view shows that topology directly — hub packages, tightly-coupled clusters, and circular package dependencies — which is work to reconstruct from a table or matrix.' },
-      { heading: 'How to read it', body: 'Bigger nodes are more coupled packages; thicker edges carry more calls. Use the layout selector to switch between layered (dagre), force (cose), and hierarchical (breadthfirst). The matrix on the Coupling tab is the same data in tabular form.' },
-      { heading: 'What to do', body: 'Pan and zoom to explore. Type in the search box to center and highlight a package by name; non-matches fade. Click a package to trace its direct callers (upstream) and callees (downstream).' },
-      { heading: 'Cross-package cycles', body: 'Strongly-connected components are groups of packages that can all reach each other through call edges (found via Tarjan’s algorithm). Click "Highlight cycles" in the toolbar to emphasize cycle members and cycle edges while dimming the acyclic remainder. A cycle between packages is usually a layering smell. Break it by extracting the shared protocol into a third package both sides depend on, or by inverting one call into a callback/event.' },
-    ],
-  },
-  render(container, catalog, indexes, filterState) {
-    while (container.firstChild) container.removeChild(container.firstChild);
+${dashboardGraphControlsJs()}
+
+// The actual render driver — called by the view's render() AND by every
+// control-change handler (so a control change re-renders in place). Mirrors
+// the old render() but branches on gvLevel for the element source. Package
+// level keeps the historical empty-state ORDER (view-model check before the
+// cytoscape check) so the structural view tests stay valid.
+function gvRenderGraph(container, catalog, indexes) {
+  while (container.firstChild) container.removeChild(container.firstChild);
+  // Defer the expensive mount while this panel is hidden (see gvPanelHidden).
+  // activateView() re-renders the panel once it becomes visible.
+  if (gvPanelHidden(container)) return;
+
+  gvRenderControls(container, catalog, indexes);
+  gvRenderLayoutSelector(container);
+  gvRenderSearchBox(container);
+
+  var elements;
+  if (gvLevel === 'function') {
+    if (typeof cytoscape !== 'function') {
+      container.appendChild(el('div', { class: 'empty', text: 'Graph renderer unavailable.' }));
+      return;
+    }
+    if (!gvSelectedPackage) {
+      container.appendChild(el('div', { class: 'empty', text: 'Select a package to view its functions.' }));
+      return;
+    }
+    elements = gvBuildFunctionElements(indexes, gvSelectedPackage, gvIncludeTests, gvKinds, gvCrossPackage);
+    if (!elements || elements.length === 0) {
+      container.appendChild(el('div', { class: 'empty', text: 'No functions in this package.' }));
+      return;
+    }
+  } else {
     var vm = gvLoadViewModel();
     if (!vm || !vm.nodes || vm.nodes.length === 0) {
       container.appendChild(el('div', { class: 'empty', text: 'No graph to display.' }));
@@ -288,54 +336,65 @@ views.push({
       container.appendChild(el('div', { class: 'empty', text: 'Graph renderer unavailable.' }));
       return;
     }
-
-    // Defer the expensive mount while this panel is hidden (see gvPanelHidden).
-    // activateView() re-renders the panel once it becomes visible.
-    if (gvPanelHidden(container)) return;
-
-    gvRenderLayoutSelector(container);
-    gvRenderSearchBox(container);
-
-    var canvas = el('div', { class: 'code-paths-graph-canvas', id: 'code-paths-graph-canvas' });
-    container.appendChild(canvas);
-
-    var elements = gvBuildElements(vm);
+    elements = gvBuildElements(vm);
     if (elements.length === 0) {
-      canvas.appendChild(el('div', { class: 'empty', text: 'No packages to display.' }));
+      container.appendChild(el('div', { class: 'empty', text: 'No packages to display.' }));
       return;
     }
+  }
 
-    // Mounting can throw in environments without a real 2D canvas (e.g.
-    // headless test runners). Fail soft — the rest of the page stays usable.
-    try {
-      gvCy = cytoscape({
-        container: canvas,
-        elements: elements,
-        style: gvStylesheet(),
-        layout: gvLayoutOptions(gvCurrentLayout),
-        wheelSensitivity: 0.2,
-        minZoom: 0.05,
-        maxZoom: 4,
-      });
-    } catch (e) {
-      gvCy = null;
-      canvas.appendChild(el('div', { class: 'empty', text: 'Graph renderer could not initialize in this environment.' }));
-      return;
-    }
+  var canvas = el('div', { class: 'code-paths-graph-canvas', id: 'code-paths-graph-canvas' });
+  container.appendChild(canvas);
 
-    // Click a package → highlight its direct caller/callee packages.
-    // Background click or Esc clears.
-    gvCy.on('tap', 'node', function(evt) {
-      gvApplyImpact(evt.target.id());
+  // Mounting can throw in environments without a real 2D canvas (e.g. headless
+  // test runners). Fail soft — the rest of the page stays usable.
+  try {
+    gvCy = cytoscape({
+      container: canvas,
+      elements: elements,
+      style: gvStylesheet(),
+      layout: gvLayoutOptions(gvCurrentLayout),
+      wheelSensitivity: 0.2,
+      minZoom: 0.05,
+      maxZoom: 4,
     });
-    gvCy.on('tap', function(evt) {
-      if (evt.target === gvCy) gvClearImpact();
-    });
-    gvCy.__gvEscHandler = function(e) { if (e.key === 'Escape') gvClearImpact(); };
-    document.addEventListener('keydown', gvCy.__gvEscHandler);
+  } catch (e) {
+    gvCy = null;
+    canvas.appendChild(el('div', { class: 'empty', text: 'Graph renderer could not initialize in this environment.' }));
+    return;
+  }
 
-    // Re-apply the cycle emphasis if the toggle was left on across a re-render.
-    gvApplySccHighlight();
+  // Click a node → highlight its direct caller/callee neighbors. Background
+  // click or Esc clears. Replace (don't stack) the document keydown listener.
+  gvCy.on('tap', 'node', function(evt) { gvApplyImpact(evt.target.id()); });
+  gvCy.on('tap', function(evt) { if (evt.target === gvCy) gvClearImpact(); });
+  if (gvEscHandler) { try { document.removeEventListener('keydown', gvEscHandler); } catch (e) { /* ignore */ } }
+  gvEscHandler = function(e) { if (e.key === 'Escape') gvClearImpact(); };
+  document.addEventListener('keydown', gvEscHandler);
+
+  // Re-apply the cycle emphasis if the toggle was left on across a re-render.
+  gvApplySccHighlight();
+}
+
+views.push({
+  id: 'graph',
+  label: 'Visualization',
+  help: {
+    title: 'Visualization',
+    sections: [
+      { heading: 'What this is', body: 'A node-link visualization of the call graph, rendered with Cytoscape.js. At Package level each node is a package and each edge is the directed coupling from one package into another; node size reflects total coupling (calls in + calls out) and edge thickness reflects the number of call edges. At Function level it shows the functions of one selected package and the calls among them.' },
+      { heading: 'Levels', body: 'Use the Level control to switch between Package (the whole-repo package rollup, the same data as the Coupling matrix) and Function (one package at a time). Function level enables the Package picker (which package to show) and the Kind multi-select, plus an Edges toggle: "Intra-package" shows only calls inside the package; "+ cross-package" also draws calls leaving the package to faded external nodes. The Scope control (production only vs include tests) applies at both levels.' },
+      { heading: 'Why you care', body: 'The table views project the graph into rankings and lists, and the Coupling matrix shows the same package data as a grid. This view shows that topology directly — hub packages, tightly-coupled clusters, and circular package dependencies at package level; the internal call structure of a single package at function level.' },
+      { heading: 'How to read it', body: 'Bigger nodes are more coupled; thicker edges carry more calls. Use the layout selector to switch between layered (dagre), force (cose), and hierarchical (breadthfirst). The matrix on the Coupling tab is the package-level data in tabular form.' },
+      { heading: 'What to do', body: 'Pan and zoom to explore. Type in the search box to center and highlight a node by name; non-matches fade. Click a node to trace its direct callers (upstream) and callees (downstream).' },
+      { heading: 'Cross-package cycles', body: 'Strongly-connected components are groups of packages that can all reach each other through call edges (found via Tarjan’s algorithm). Click "Highlight cycles" in the toolbar to emphasize cycle members and cycle edges while dimming the acyclic remainder. A cycle between packages is usually a layering smell. Break it by extracting the shared protocol into a third package both sides depend on, or by inverting one call into a callback/event.' },
+    ],
+  },
+  render(container, catalog, indexes, filterState) {
+    // The shared Explore filterState is intentionally NOT consulted here — this
+    // view owns its own controls (gvRenderControls). All rendering lives in
+    // gvRenderGraph so control-change handlers can re-render in place.
+    gvRenderGraph(container, catalog, indexes);
   },
   onActivate() {
     // The canvas needs a measured size before fit() — defer one frame so
