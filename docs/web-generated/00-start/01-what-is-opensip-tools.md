@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-27
-release: v2.0.x
+last_verified: 2026-06-03
+release: v2.6.x
 title: "What is opensip-tools?"
 audience: [getting-started, contributors]
 purpose: "The front door — what problem opensip-tools solves, what it does, what it isn't, and how to try it."
@@ -84,7 +84,7 @@ The second loop, opt-in. *"Does it behave correctly under stress?"* A scenario s
 
 ### `graph` — static call-graph analysis
 
-The third loop. *"What is reachable from where?"* Builds the project's static call graph in five stages and runs five built-in rules over it: `orphan-subtree`, `duplicated-function-body`, `no-side-effect-path`, `test-only-reachable`, and `always-throws-branch`. (Blast radius is a dashboard insight, not a gate rule — the dashboard's Hot Functions view ranks functions by it.) Five language adapters ship in v2.0 (TypeScript, Python, Rust, Go, Java). Has its own baseline-gate flow.
+The third loop. *"What is reachable from where?"* Builds the project's static call graph in a staged pipeline and runs built-in rules over it. As of v2.6.0 the graph tool is a *peer* of `fit`: rules are authored with `defineRule` (mirroring `defineCheck`), selected through the same shared recipe substrate, and their findings land in sessions and the dashboard just like fitness checks. Ten rules ship today — the original five reachability/duplication rules (`orphan-subtree`, `duplicated-function-body`, `no-side-effect-path`, `test-only-reachable`, `always-throws-branch`) plus five structural rules (`large-function`, `wide-function`, `high-blast-untested`, `cycle`, `unexpected-coupling`). Per-function metrics — size, fan-out, blast radius, test coverage — are computed by an engine feature layer and surfaced both as rule findings and in the dashboard's graph view. Five language adapters ship (TypeScript, Python, Rust, Go, Java). Has its own baseline-gate flow.
 
 The CLI doesn't know what any of these three do internally — they're tools registered against a shared dispatcher. Same model lets a future `audit` or `lint` tool slot in without CLI changes. For the architecture behind that decoupling, see [`../10-concepts/02-tool-plugin-model.md`](/docs/opensip-tools/10-concepts/02-tool-plugin-model/).
 

@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-26
-release: v2.0.x
+last_verified: 2026-06-03
+release: v2.6.0
 title: "JSON output schema"
 audience: [ci-integrators, plugin-authors]
 purpose: "The CliOutput shape (and the SimDoneResult shape). Every field, every type, every presence rule."
@@ -189,7 +189,7 @@ The line and column are **1-based** to match SARIF and most editor conventions. 
 }
 ```
 
-Each rule appears as a `CheckOutput` whose `checkSlug` is the graph rule slug (`graph:orphan-subtree`, `graph:duplicated-function-body`, `graph:no-side-effect-path`, `graph:test-only-reachable`, `graph:always-throws-branch`). Findings carry the same `FindingOutput` shape, and graph's SARIF renderer is a thin wrapper over fitness's `buildSarifLog` (DEC-3 cross-tool import) — no graph-specific extensions today. See the renderer at [`packages/graph/engine/src/render/json.ts`](../../../packages/graph/engine/src/render/json.ts) and the SARIF wrapper at [`packages/graph/engine/src/render/sarif.ts`](../../../packages/graph/engine/src/render/sarif.ts).
+Each rule appears as a `CheckOutput` whose `checkSlug` is the graph rule slug (`graph:orphan-subtree`, `graph:duplicated-function-body`, `graph:no-side-effect-path`, `graph:test-only-reachable`, `graph:always-throws-branch`, `graph:large-function`, `graph:wide-function`, `graph:high-blast-untested`, `graph:cycle`). Findings carry the same `FindingOutput` shape, and graph's SARIF renderer is a thin wrapper over fitness's `buildSarifLog` (DEC-3 cross-tool import) — no graph-specific extensions today. See the renderer at [`packages/graph/engine/src/render/json.ts`](../../../packages/graph/engine/src/render/json.ts) and the SARIF wrapper at [`packages/graph/engine/src/render/sarif.ts`](../../../packages/graph/engine/src/render/sarif.ts).
 
 ---
 

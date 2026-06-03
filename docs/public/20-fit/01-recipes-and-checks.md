@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-26
-release: v2.0.x
+last_verified: 2026-06-03
+release: v2.6.x
 title: "Recipes and checks"
 audience: [contributors, plugin-authors]
 purpose: "What a recipe is, what a check is, and how they compose. The two primary author-facing primitives in fit."
@@ -201,7 +201,7 @@ export default defineRecipe({
 });
 ```
 
-The full input shape is in [`packages/fitness/engine/src/recipes/types.ts:184`](../../../packages/fitness/engine/src/recipes/types.ts):
+The full input shape is in [`packages/fitness/engine/src/recipes/types.ts`](../../../packages/fitness/engine/src/recipes/types.ts):
 
 ```ts
 interface FitnessRecipeDefinition {
@@ -272,7 +272,7 @@ defineCheck({
 });
 ```
 
-The recipe service projects the `config:` map into module-level state before execution, so checks read it synchronously. Without an override, `getCheckConfig()` returns an empty object — checks should default-handle that.
+The recipe service projects the `config:` map onto the current `RunScope` (the per-invocation execution scope) before execution and clears it when the run finishes, so checks read it synchronously via `getCheckConfig()`. The lookup is scope-bound rather than module-bound — `getCheckConfig` resolves through `currentScope()` in `@opensip-tools/core`, which keeps the config slot identity stable even when two copies of `@opensip-tools/fitness` are loaded (the CLI's bundled copy and a plugin pack's resolved copy). Without an override, or when called outside a run scope, `getCheckConfig()` returns an empty object — checks should default-handle that.
 
 ### Execution options
 

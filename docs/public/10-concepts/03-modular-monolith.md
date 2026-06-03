@@ -1,10 +1,10 @@
 ---
 status: current
-last_verified: 2026-05-26
-release: v2.0.x
+last_verified: 2026-06-03
+release: v2.6.x
 title: "Layered package graph"
 audience: [contributors]
-purpose: "The 29-package monorepo, the five-layer dependency rule, why dependency-cruiser exists, and the trade-offs."
+purpose: "The 30-package monorepo, the five-layer dependency rule, why dependency-cruiser exists, and the trade-offs."
 source-files:
   - .dependency-cruiser.cjs
   - pnpm-workspace.yaml
@@ -25,7 +25,7 @@ Twenty-nine packages. Five layers. One enforced rule: dependencies flow up only.
 This document is the conceptual map. For the lookup-shaped catalog of every package's role and exports, jump to [`70-reference/02-package-catalog.md`](../70-reference/02-package-catalog.md). For the literal dep-cruiser rules, see [`80-implementation/05-layer-policy.md`](../80-implementation/05-layer-policy.md).
 
 > **What you'll understand after this:**
-> - Why opensip-tools ships as 29 packages instead of one.
+> - Why opensip-tools ships as 30 packages instead of one.
 > - The five layers, in order, and what each one is for.
 > - How the layer rule is enforced (and what happens if you break it).
 > - The documented exceptions and why they exist.
@@ -77,7 +77,7 @@ This document is the conceptual map. For the lookup-shaped catalog of every pack
 
 - **Tools** — `@opensip-tools/fitness`, `@opensip-tools/simulation`, `@opensip-tools/graph`. Each implements the `Tool` contract and contributes its own CLI subcommand surface.
 - **Shared libraries** — `@opensip-tools/dashboard` (self-contained HTML report renderer; consumed by fitness's `dashboard` command and the auto-open hook) and `@opensip-tools/cli-ui` (Ink/React presentational primitives — `Banner`, `Spinner`, `RunHeader`, `theme` — extracted from `cli/` so tools that ship a live view depend on the UI kit without pulling in the dispatcher). Neither implements the `Tool` contract; they are libraries Tools consume.
-- **Language adapters** — `lang-typescript`, `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp` implement the `LanguageAdapter` contract used by fitness checks. The graph engine has its own `GraphLanguageAdapter` contract, implemented by five publishable adapter packages: `graph-typescript`, `graph-python`, `graph-rust`, `graph-go`, `graph-java`. The fitness `lang-*` packages and the graph `graph-*` packages are unrelated siblings at this layer — different contracts, different parser stacks; see [`50-extend/05-language-adapters.md`](../50-extend/05-language-adapters.md) for the distinction.
+- **Language adapters** — `lang-typescript`, `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp` implement the `LanguageAdapter` contract used by fitness checks. The graph engine has its own `GraphLanguageAdapter` contract, implemented by five publishable adapter packages: `graph-typescript`, `graph-python`, `graph-rust`, `graph-go`, `graph-java` (the latter four share `graph-adapter-common`, a scaffolding package hosting the tree-sitter discover/parse/walk/cache-key factories). The fitness `lang-*` packages and the graph `graph-*` packages are unrelated siblings at this layer — different contracts, different parser stacks; see [`50-extend/05-language-adapters.md`](../50-extend/05-language-adapters.md) for the distinction.
 
 **Layer 4 — `@opensip-tools/checks-*`.** Seven check packs: `checks-universal`, `checks-typescript`, `checks-python`, `checks-go`, `checks-java`, `checks-cpp`, `checks-rust`. Each pack depends on `fitness` (for `defineCheck`) and `core` (for `Signal`, errors, the language adapter type). Check packs do **not** depend on `cli` or `contracts` — they're the marketplace shape, designed to be installable from npm without dragging the CLI in.
 
@@ -158,7 +158,7 @@ The trade-off: a *true* type-only cycle (which is a structural smell — usually
 
 ---
 
-## Why 29 packages and not 1
+## Why 30 packages and not 1
 
 A single mega-package was considered. It would compile faster, ship faster, and have a simpler `package.json`. We chose against it for three load-bearing reasons:
 
@@ -170,7 +170,7 @@ A check pack like `@opensip-tools/checks-python` has to be installable on its ow
 opensip-tools plugin add @opensip-tools/checks-python
 ```
 
-…and not pull in the JavaScript universe. With a single mega-package, every install pulls every check. With 29 packages, an install pulls only what's needed. (Today the bundled distribution still installs everything; tomorrow's tree-shaken or selectively-installed distribution doesn't have to.)
+…and not pull in the JavaScript universe. With a single mega-package, every install pulls every check. With 30 packages, an install pulls only what's needed. (Today the bundled distribution still installs everything; tomorrow's tree-shaken or selectively-installed distribution doesn't have to.)
 
 ### 2. The Tool contract's promise
 
@@ -178,15 +178,15 @@ The Tool contract says "any npm package can be a Tool." That promise only holds 
 
 ### 3. The layer rule needs to be visible
 
-A flat package can have any internal structure. With 29 packages, the layer is the directory structure: looking at `packages/` tells you the architecture in five seconds. If a contributor accidentally adds an upward edge, the build fails before the PR is even reviewed. The layer rule isn't aspiration — it's a wall.
+A flat package can have any internal structure. With 30 packages, the layer is the directory structure: looking at `packages/` tells you the architecture in five seconds. If a contributor accidentally adds an upward edge, the build fails before the PR is even reviewed. The layer rule isn't aspiration — it's a wall.
 
 ---
 
 ## What this shape costs
 
-Trade-offs are real. The 29-package layout is more expensive in three places:
+Trade-offs are real. The 30-package layout is more expensive in three places:
 
-- **More `package.json` files to maintain.** Version bumps span 29 publishable files (plus the private workspace-root `package.json` for tooling versions). We use `pnpm` workspace protocol (`workspace:*`) so internal deps are auto-linked, and a release script bumps all 29 in lockstep.
+- **More `package.json` files to maintain.** Version bumps span 30 publishable files (plus the private workspace-root `package.json` for tooling versions). We use `pnpm` workspace protocol (`workspace:*`) so internal deps are auto-linked, and a release script bumps all 30 in lockstep.
 - **More `tsconfig.json` files.** Each package has its own. Project references handle the build graph. The cost is configuration footprint, not build speed.
 - **A discovery cost when reading the codebase.** "Where does `Signal` live?" is one search now: `packages/core/src/types/signal.ts`. But "where does `defineCheck` live?" requires knowing the layer (`fitness`) and the framework subdir (`fitness/engine/src/framework/`). The package catalog ([`70-reference/02-package-catalog.md`](../70-reference/02-package-catalog.md)) is the antidote.
 

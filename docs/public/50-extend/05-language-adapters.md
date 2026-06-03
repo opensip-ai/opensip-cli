@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-26
-release: v2.0.x
+last_verified: 2026-06-03
+release: v2.6.x
 title: "Language adapters (fitness)"
 audience: [contributors, plugin-authors]
 purpose: "What the fitness LanguageAdapter is, the six bundled adapters, and how to author a new one."
@@ -11,8 +11,10 @@ source-files:
   - packages/core/src/languages/content-filter-dispatch.ts
   - packages/core/src/languages/generic-types.ts
   - packages/languages/lang-typescript/src/adapter.ts
+  - packages/languages/lang-typescript/src/filter.ts
   - packages/languages/lang-rust/src/adapter.ts
   - packages/languages/lang-python/src/adapter.ts
+  - packages/graph/graph-adapter-common/src/parse.ts
 related-docs:
   - ../00-start/05-vocabulary.md
   - ../10-concepts/03-modular-monolith.md
@@ -24,7 +26,7 @@ related-docs:
 > **Two adapter contracts, one ambiguous word.** opensip-tools has two distinct language-adapter interfaces, used by different subsystems:
 >
 > - **`LanguageAdapter`** (this doc) lives in [`@opensip-tools/core`](../../../packages/core/src/languages/adapter.ts). Used by the **fitness** engine. Three required methods (`parse`, `stripStrings`, `stripComments`) plus an optional query API. Lets fitness checks operate on filtered (comment- and string-stripped) source. Implemented by the six `@opensip-tools/lang-*` packages.
-> - **`GraphLanguageAdapter`** (separate, [`@opensip-tools/graph`](../../../packages/graph/engine/src/lang-adapter/types.ts)) is used by the **graph** engine. Six methods (`discoverFiles`, `parseProject`, `walkProject`, `resolveCallSites`, `cacheKey`, optional `ruleHints`). Lets graph build call catalogs across languages. Implemented by the **five publishable `@opensip-tools/graph-*` packages** under `packages/graph/graph-{typescript,python,rust,go,java}/`, each marked with `opensipTools.kind: "graph-adapter"`.
+> - **`GraphLanguageAdapter`** (separate, [`@opensip-tools/graph`](../../../packages/graph/engine/src/lang-adapter/types.ts)) is used by the **graph** engine. Six methods (`discoverFiles`, `parseProject`, `walkProject`, `resolveCallSites`, `cacheKey`, optional `ruleHints`). Lets graph build call catalogs across languages. Implemented by the **five publishable `@opensip-tools/graph-*` packages** under `packages/graph/graph-{typescript,python,rust,go,java}/`, each marked with `opensipTools.kind: "graph-adapter"`. The four tree-sitter adapters (python, rust, go, java) load **vendored `web-tree-sitter` WASM grammars** (a `.wasm` file in each adapter's `wasm/` dir) and share scaffolding from [`@opensip-tools/graph-adapter-common`](../../../packages/graph/graph-adapter-common/src/parse.ts); `graph-typescript` is TypeScript-compiler-backed (not tree-sitter). There is no native build step — no node-gyp, no prebuilt `.node`.
 >
 > They are siblings, not the same thing. A given language has one of each (e.g. TypeScript has both a fitness `typescriptAdapter` shipped by `@opensip-tools/lang-typescript` and a graph `typescriptGraphAdapter` shipped by `@opensip-tools/graph-typescript`). For graph adapters, see [`40-graph/03-adding-a-language.md`](../40-graph/03-adding-a-language.md). The rest of this doc covers the fitness `LanguageAdapter` only.
 
@@ -154,11 +156,9 @@ The trade-off: a check that *would* benefit from AST-aware analysis on Rust (say
 
 ---
 
-## The exception: `lang-typescript` → `fitness`
+## Lang packs depend only on core
 
-`@opensip-tools/lang-typescript` re-exports `filterContent`, `clearFilterCache`, and `FilteredContent` from `@opensip-tools/fitness`. This is the documented exception to the "lang packs depend only on core" layer rule — see [`80-implementation/05-layer-policy.md`](../80-implementation/05-layer-policy.md) and the named `lang-no-fitness-except-typescript` carve-out in [`.dependency-cruiser.cjs`](../../../.dependency-cruiser.cjs).
-
-The history: those symbols moved out of `core` during an earlier refactor but the typescript adapter still re-exports them for downstream consumers that grew used to importing them from `lang-typescript`. The exception is named (`lang-no-fitness-except-typescript`) so any *other* lang pack reaching into fitness trips the rule.
+`@opensip-tools/lang-typescript` *owns* `filterContent`, `clearFilterCache`, and `FilteredContent` ([`packages/languages/lang-typescript/src/filter.ts`](../../../packages/languages/lang-typescript/src/filter.ts)) — the TS-aware string/comment stripping lives alongside the rest of the adapter. There is no longer any lang-pack → `fitness` edge; the historical `lang-typescript → fitness` exception was paid down by moving those symbols into the adapter package itself. The flat `lang-no-fitness` rule in [`.dependency-cruiser.cjs`](../../../.dependency-cruiser.cjs) now applies uniformly: *no* lang pack reaches up into fitness. See [`80-implementation/05-layer-policy.md`](../80-implementation/05-layer-policy.md).
 
 ---
 

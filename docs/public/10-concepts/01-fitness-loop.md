@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-26
-release: v2.0.x
+last_verified: 2026-06-03
+release: v2.6.x
 title: "The fitness loop"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "One check, end to end. Definition → loading → recipe selection → scope resolution → execution → signal → render → exit. The spine of the doc set."

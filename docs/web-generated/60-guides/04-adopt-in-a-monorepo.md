@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-27
-release: v2.0.x
+last_verified: 2026-06-03
+release: v2.6.x
 title: "Adopt in a monorepo"
 audience: [plugin-authors, ci-integrators]
 purpose: "Task-led: introduce opensip-tools to a large polyglot monorepo. Workspace-package graduation, per-package targets, scoped baselines."
@@ -69,11 +69,10 @@ Once the recipe is stable:
 
 ```bash
 opensip-tools fit --recipe quality --gate-save
-git add -f opensip-tools/.runtime/baseline.sarif
-git commit -m "chore(fit): seed quality baseline"
+# Writes the baseline into opensip-tools/.runtime/datastore.sqlite
 ```
 
-Then add the [CI step](/docs/opensip-tools/60-guides/03-wire-into-ci/). PRs see *"is this getting worse?"*. The team fixes baseline cases as they touch the surrounding code.
+The baseline lives in the project's SQLite store (`opensip-tools/.runtime/datastore.sqlite`), which is gitignored. Publish it as a CI artifact from main-branch builds and restore it on PR builds before `--gate-compare` — the artifact pattern is in the [CI step](/docs/opensip-tools/60-guides/03-wire-into-ci/). PRs then see *"is this getting worse?"*. The team fixes baseline cases as they touch the surrounding code.
 
 ## When `.mjs` files outgrow themselves
 
@@ -188,22 +187,22 @@ targets:
 
 Each check's `scope: { languages, concerns }` filters which targets it runs against. A check with `scope: { concerns: ['backend'] }` runs against `api-server` only. The full target-matching model is in [targets and scope](/docs/opensip-tools/20-fit/02-targets-and-scope/).
 
-## Scoped baselines
+## Scoping a run
 
-For a really large monorepo, you may want per-package baselines so one team's drift doesn't drag others. Today, opensip-tools stores one project-level baseline in SQLite — but you can scope runs by target via the `--target` flag:
+For a really large monorepo, you may want to narrow what a given CI job runs. opensip-tools stores one project-level baseline in SQLite, and there is no `--target` flag that restricts a run to a single named target. The scoping levers you do have:
 
-```bash
-opensip-tools fit --target api-server --gate-compare
-opensip-tools fit --target dashboard --gate-compare
-```
+- **Per-job recipes.** Author a recipe per team/area whose selector pulls only the relevant checks (e.g. `{ type: 'tags', include: ['backend'] }` for the API job, a `{ type: 'pattern', include: ['dashboard-*'] }` recipe for the dashboard job). Run each as a separate CI job with `--recipe <name>` to parallelize.
+- **`--check <slug>`** runs a single check by slug.
+- **`--tags <comma,separated>`** filters checks by tag ad-hoc, without a recipe.
+- **Target globs** (the `targets:` block above) still bound *which files* each check sees, so a `backend`-scoped check never touches dashboard files regardless of which job runs it.
 
-Each runs only the checks that match that target's scope. Run them as separate CI jobs to parallelize. (True multi-baseline support — one baseline per target — is on the roadmap; today, the single baseline holds findings across all targets, but the per-target invocation still gates correctly because new findings have to be new in some target.)
+The single SQLite baseline holds findings across all targets; a per-recipe job still gates correctly because a new finding has to be new in whatever the job's recipe selected. (True per-target multi-baseline support is on the roadmap.)
 
 ## When to use sim or graph
 
 This guide focused on `fit` because that's where adoption usually starts. Once `fit` is running:
 
-- **`graph`** — adds static call-graph rules (orphan code, duplicated bodies, dead paths). Six rules, no authoring required, runs in ~15s cold / ~2.5s incremental on a large repo. See [graph stages and catalog](/docs/opensip-tools/40-graph/01-stages-and-catalog/).
+- **`graph`** — adds static call-graph rules (orphan code, duplicated bodies, dead paths, oversized functions, unexpected coupling, cycles). Ten built-in rules, no authoring required, runs in ~15s cold / ~2.5s incremental on a large repo. See [graph stages and catalog](/docs/opensip-tools/40-graph/01-stages-and-catalog/).
 - **`sim`** — load / chaos / invariant simulation. Opt-in, experimental. Useful if you have a service to simulate against. See [scenarios and recipes](/docs/opensip-tools/30-sim/01-scenarios-and-recipes/).
 
 Both share the same baseline-gate model and the same CLI shape. Add them when the team has bandwidth.

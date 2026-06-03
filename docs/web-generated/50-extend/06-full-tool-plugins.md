@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-27
-release: v2.0.x
+last_verified: 2026-06-03
+release: v2.6.x
 title: "Full Tool plugins"
 audience: [plugin-authors]
 purpose: "Build a Tool plugin — your own opensip-tools subcommand. Use when fit/sim/graph aren't the right shape and you want something fundamentally different."

@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-26
-release: v2.0.x
+last_verified: 2026-06-03
+release: v2.6.0
 title: "Dashboard"
 audience: [users, contributors]
 purpose: "The HTML report — what it shows, when it opens, how it's generated, and where it lives."
@@ -26,7 +26,7 @@ The dashboard is a self-contained HTML report of every fit and sim run on the lo
 
 > **What you'll understand after this:**
 > - When the dashboard opens automatically vs. manually.
-> - What the HTML report contains (the four panels).
+> - What the HTML report contains (the four top-level tabs and their subtabs).
 > - How the static HTML is generated and how data flows in.
 > - Where the dashboard's source lives.
 
@@ -53,7 +53,7 @@ The HTML file is always written. If any guard skips the browser launch, the user
 
 ## What it shows
 
-Four top-level tabs (`Overview`, `Fitness`, `Simulation`, `Code Paths`). The Fitness and Simulation tabs each carry three subtabs (`Overview`, `Catalog`, `Recipes`) — the per-tool `Overview` subtab shows that tool's session list. Every panel module lives under [`packages/dashboard/src/`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.0/packages/dashboard/src/); the top-of-page tool-tab switcher is wired by [`tool-tabs.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.0/packages/dashboard/src/tool-tabs.ts).
+Four top-level tabs (`Overview`, `Fitness`, `Simulation`, `Code Paths`). The Fitness and Simulation tabs each carry three subtabs (`Overview`, `Catalog`, `Recipes`) — the per-tool `Overview` subtab shows that tool's session list. The Code Paths (graph) tab carries four subtabs (`Sessions`, `Catalog`, `Recipes`, `Explore`). Every panel module lives under [`packages/dashboard/src/`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.0/packages/dashboard/src/); the top-of-page tool-tab switcher is wired by [`tool-tabs.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.0/packages/dashboard/src/tool-tabs.ts).
 
 ### Overview
 
@@ -94,25 +94,30 @@ Source: [`packages/dashboard/src/recipes.ts`](https://github.com/opensip-ai/open
 
 ### Code Paths panel
 
-The Code Paths panel is the dashboard's interactive call-graph explorer. It's powered by the catalog produced by `opensip-tools graph` and surfaces seven curated views, each answering a real developer question with a clear next step. The pipeline that builds the underlying catalog is documented in [`40-graph/01-stages-and-catalog.md`](/docs/opensip-tools/40-graph/01-stages-and-catalog/).
+The Code Paths panel is the dashboard's graph-tool surface. It's powered by the catalog produced by `opensip-tools graph`. The pipeline that builds the underlying catalog is documented in [`40-graph/01-stages-and-catalog.md`](/docs/opensip-tools/40-graph/01-stages-and-catalog/).
 
-The panel is language-agnostic — it consumes the generic v3 `Catalog` shape and works against TypeScript, Python, Rust, Go, and Java catalogs alike. Per-edge `confidence` is carried on `GraphCallEdge` and is available to views; today it's read but not surfaced as a UI badge, so reachability views on tree-sitter catalogs will look the same as TypeScript ones even though the underlying edges are lower-fidelity. See the per-rule fidelity table in [`02-rules-and-gating.md`](/docs/opensip-tools/40-graph/02-rules-and-gating/) for what this means in practice.
+Like the Fitness and Simulation tabs, the Code Paths tab carries subtabs:
 
-The seven views (each with the same row-click → universal Function Card flow). The non-Search views are paginated at 10 rows per page rather than capped — every function in the catalog (after filter chips apply) is reachable by paging through the table:
+- **Sessions** — recent graph runs and their per-rule findings (shared session table).
+- **Catalog** — the registered graph rules, with default severity and source.
+- **Recipes** — the configured graph recipes (named rule subsets).
+- **Explore** — the interactive catalog browser (the views below).
 
-- **Hot functions** — sorted by inbound caller count. "Who depends on `logger`?"
-- **Big functions** — sorted by `endLine - line`. "What should I split during this refactor?"
-- **Wide functions** — sorted by `params.length`, with a parameter thumbnail. "Where would a config-object refactor pay off?"
-- **Coupling heat map** — N×N package-by-package call density matrix; click a cell for the actual call sites. "Is `core` really the bottom layer?"
-- **Untested production code** — production functions with no static caller from any test file, sorted by inbound count. "What's the highest-risk gap?"
-- **Cycles / SCCs** — Tarjan's SCC over the call graph, every component of size ≥ 2. "Where's the tightest knot?"
-- **Search** — fuzzy match over `simpleName`, bound to the persistent search input at the top of the panel.
+The **Explore** subtab is language-agnostic — it consumes the generic v3 `Catalog` shape and works against TypeScript, Python, Rust, Go, and Java catalogs alike. Per-edge `confidence` is carried on `GraphCallEdge` and is available to views; today it's read but not surfaced as a UI badge, so reachability views on tree-sitter catalogs look the same as TypeScript ones even though the underlying edges are lower-fidelity. See the per-rule fidelity table in [`02-rules-and-gating.md`](/docs/opensip-tools/40-graph/02-rules-and-gating/) for what this means in practice.
+
+The Explore subtab has three views (each with the same row-click → universal Function Card flow):
+
+- **Graph** — a node-link topology rendering of the call graph (Cytoscape.js + dagre/cose/breadthfirst layouts), with **SCC cycle highlighting** folded in (the highlight the standalone "SCCs" view used to own).
+- **Coupling** — the N×N package-by-package call-density matrix; click a cell for the actual call sites. "Is `core` really the bottom layer?"
+- **Functions** — one sortable, paginated, filter-aware function table. Its columns are the union of the metrics the former single-metric tabs ranked individually: body length (lines, the default sort), inbound callers, parameter count (width), and kind/package/file. It carries an in-table **name filter** (which absorbed the former standalone Search subtab) plus a **Test-only** toggle that narrows to production functions reached only from tests. Paginated at 10 rows per page — every function in the catalog (after filters) is reachable by paging.
+
+> **History.** Earlier releases shipped five single-metric explore tabs (Big / Hot / Wide / Untested / SCCs) plus a standalone Search. These were removed in the Code Paths restructure once their signal moved into engine gate rules (`graph:large-function`, `graph:wide-function`, `graph:high-blast-untested`, `graph:cycle`): Big/Hot/Wide/Untested collapsed into the single sortable **Functions** table, the SCCs signal lives on as the Graph view's cycle highlight, and Search became the Functions name filter.
 
 The **Universal Function Card** is the cross-cutting drill-down: every clickable function name in any view opens the same overlay with name + location, body length, kind, params, return type, callers grouped by package, callees (resolved + external), an "Open in editor" deep link (`vscode://` or `cursor://` — opt in via `dashboard.editor` in [`opensip-tools.config.yml`](/docs/opensip-tools/70-reference/03-configuration/); falls back to "Copy path" when unset), and a "Trace from entry" BFS.
 
-Filter chips above the view tabs apply to every view: package multi-select, kind multi-select, and a production/test toggle (default: production-only).
+Filter chips apply across the Explore views: package multi-select, kind multi-select, and a production/test toggle (default: production-only).
 
-Source: [`packages/dashboard/src/code-paths.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.0/packages/dashboard/src/code-paths.ts) and the per-view files under [`packages/dashboard/src/code-paths/`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.0/packages/dashboard/src/code-paths/).
+Source: [`packages/dashboard/src/code-paths.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.0/packages/dashboard/src/code-paths.ts) and the per-view files under [`packages/dashboard/src/code-paths/`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.0/packages/dashboard/src/code-paths/) (`view-graph.ts`, `view-coupling.ts`, `view-distribution.ts`).
 
 ### Tool tabs
 
@@ -165,20 +170,21 @@ top-of-page `<script>` block via the existing
 
 ### `defineRankedView` — the rank-and-render skeleton
 
-The four ranked views in Code Paths (`hot`, `big`, `wide`,
-`untested`) share one rank-and-render skeleton: walk
-`indexes.byBodyHash.values()`, apply chip filters and an optional
-view-specific predicate, compute a numeric metric, sort
-descending, and hand the result to `renderFunctionRows`. That
-skeleton lives in
+The ranked **Functions** view in Code Paths is built on a
+rank-and-render skeleton: walk `indexes.byBodyHash.values()`, apply
+chip filters and an optional view-specific predicate, compute a
+numeric metric, sort descending, and hand the result to
+`renderFunctionRows`. That skeleton lives in
 [`code-paths/view-template.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.0/packages/dashboard/src/code-paths/view-template.ts);
-each view file is ~30 lines of declarative config (`id`, `label`,
-`help`, `metric`, optional `predicate` / `preamble` / `rowExtras`,
-`columns`, `headingText`, `emptyMessage`).
+the view file is declarative config (`id`, `label`, `help`, `metric`,
+optional `predicate` / `preamble` / `searchByName` / `filterToggle`,
+`columns`, `headingText`, `emptyMessage`). It is the same skeleton the
+removed single-metric tabs (`big` / `hot` / `wide` / `untested`) used —
+the Functions view now subsumes all four via re-sortable columns.
 
 A new ranked view that fits this shape is one config and one
 registration in [`code-paths.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.0/packages/dashboard/src/code-paths.ts).
-Bespoke views (Coupling, SCCs, Search) have different shapes and
+Bespoke views (Graph, Coupling) have different shapes and
 keep their own emitters.
 
 ### `registerTabActivator` — session-aware tab navigation

@@ -1,10 +1,10 @@
 ---
 status: current
-last_verified: 2026-05-26
-release: v2.0.x
+last_verified: 2026-06-03
+release: v2.6.0
 title: "Stages and catalog (graph)"
 audience: [contributors, plugin-authors, ci-integrators]
-purpose: "How `graph` builds its picture of the codebase — the six-stage pipeline, the catalog format, and the content-keyed cache."
+purpose: "How `graph` builds its picture of the codebase — the seven-stage pipeline, the catalog format, and the content-keyed cache."
 source-files:
   - packages/graph/engine/src/tool.ts
   - packages/cli/src/bootstrap/register-graph-adapters.ts
@@ -22,6 +22,8 @@ source-files:
   - packages/graph/graph-go/src/index.ts
   - packages/graph/graph-java/src/index.ts
   - packages/graph/engine/src/pipeline/indexes.ts
+  - packages/graph/engine/src/pipeline/features.ts
+  - packages/graph/graph-adapter-common/src/parse.ts
   - packages/graph/engine/src/persistence/catalog-repo.ts
   - packages/graph/engine/src/persistence/schema.ts
   - packages/graph/engine/src/cache/invalidate.ts
@@ -42,14 +44,14 @@ The `graph` command is the static call-graph tool. Where `fit` answers "is the c
 > **Naming.** CLI-facing docs and code use `graph`; the dashboard labels the same data **Code Paths**. The catalog lives in the project-local SQLite store at `<project>/opensip-tools/.runtime/datastore.sqlite` — see [Catalog in SQLite](#the-catalog-in-sqlite) below.
 
 > **What you'll understand after this:**
-> - The six-stage pipeline graph uses to build its picture of the codebase.
+> - The seven-stage pipeline graph uses to build its picture of the codebase.
 > - Why inventory finishes before edges start, and why edges reference catalog entries by hash.
 > - The catalog file format on disk and how cache invalidation works.
 > - How entry points are inferred and why they're a separate concern from the rules that consume them.
 
 ---
 
-## The six-stage pipeline
+## The seven-stage pipeline
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
@@ -77,19 +79,29 @@ The `graph` command is the static call-graph tool. Where `fit` answers "is the c
 └──────────────────────────────┬───────────────────────────────────────┘
                                ▼
 ┌──────────────────────────────────────────────────────────────────────┐
-│  Stage 4  —  RULES                                                   │
-│  Each rule: (Catalog, Indexes, Config) → Signal[]                    │
+│  Stage 4  —  FEATURE BUILD                                          │
+│  Derive feature columns from Catalog + Indexes — blast radius, SCC,  │
+│  package coupling, reachability, bodyLines — lazily (only the        │
+│  columns an enabled rule or the dashboard needs). Recomputed views   │
+│  in-engine; materialized into the catalog only for the decoupled     │
+│  dashboard (ADR-0006).                                               │
+│  Output: FeatureTable (passed to rules; optionally persisted)        │
+└──────────────────────────────┬───────────────────────────────────────┘
+                               ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│  Stage 5  —  RULES                                                   │
+│  Each rule: (Catalog, Indexes, Config, features?) → Signal[]         │
 │  Output: Signal[]                                                    │
 └──────────────────────────────┬───────────────────────────────────────┘
                                ▼
 ┌──────────────────────────────────────────────────────────────────────┐
-│  Stage 5  —  RENDER                                                  │
+│  Stage 6  —  RENDER                                                  │
 │  Signal[] → terminal report | JSON | SARIF | dashboard               │
 │  Output: stdout, files, exit code                                    │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-Stages 0–2 are language-agnostic over the [`GraphLanguageAdapter`](../../../packages/graph/engine/src/lang-adapter/types.ts) contract. The orchestrator looks up an adapter via [`lang-adapter/registry.ts`](../../../packages/graph/engine/src/lang-adapter/registry.ts), then dispatches `discoverFiles`, `parseProject`, `walkProject`, and `resolveCallSites` through it. Stage 3 (`buildIndexes`) lives in [`packages/graph/engine/src/pipeline/indexes.ts`](../../../packages/graph/engine/src/pipeline/indexes.ts); stages 4–5 live in [`packages/graph/engine/src/rules/`](../../../packages/graph/engine/src/rules/) and [`packages/graph/engine/src/render/`](../../../packages/graph/engine/src/render/).
+Stages 0–2 are language-agnostic over the [`GraphLanguageAdapter`](../../../packages/graph/engine/src/lang-adapter/types.ts) contract. The orchestrator looks up an adapter via [`lang-adapter/registry.ts`](../../../packages/graph/engine/src/lang-adapter/registry.ts), then dispatches `discoverFiles`, `parseProject`, `walkProject`, and `resolveCallSites` through it. Stage 3 (`buildIndexes`) lives in [`packages/graph/engine/src/pipeline/indexes.ts`](../../../packages/graph/engine/src/pipeline/indexes.ts) and Stage 4 (`buildFeatures`) in [`packages/graph/engine/src/pipeline/features.ts`](../../../packages/graph/engine/src/pipeline/features.ts); stages 5–6 live in [`packages/graph/engine/src/rules/`](../../../packages/graph/engine/src/rules/) and [`packages/graph/engine/src/render/`](../../../packages/graph/engine/src/render/). The orchestrator instruments `discover`/`parse`/`walk`/`resolve`/`index`/`features`/`rules` as the `GRAPH_STAGES` spans.
 
 The stage boundaries are deliberately narrow: each stage communicates through typed outputs instead of reaching into a neighbor's intermediate state. That isolation is the main design guarantee.
 
@@ -103,7 +115,7 @@ Output: `{ projectDirAbs, files, configPathAbs?, compilerOptions? }`. The option
 
 ### Stage 1+2 — Parse, walk, resolve
 
-`adapter.parseProject` builds adapter-internal parse state (TypeScript: a `ts.Program` with `getTypeChecker()` forced eagerly so parent pointers are populated; Python and Rust: a `Map<filePath, tree-sitter Tree>`). `adapter.walkProject` then walks every file from stage 0 exactly once and emits both:
+`adapter.parseProject` builds adapter-internal parse state (TypeScript: a `ts.Program` with `getTypeChecker()` forced eagerly so parent pointers are populated; Python, Rust, Go, Java: a `Map<filePath, tree-sitter Tree>` produced by a vendored `web-tree-sitter` WASM grammar — no native build at install). `adapter.walkProject` then walks every file from stage 0 exactly once and emits both:
 - A **Catalog** — a flat, indexed list of every callable thing in the project. "Callable thing" is broader than function: function/method declarations, arrow functions / lambdas / closures, constructors, getter/setter pairs, function expressions, and one synthetic `<module-init>` entry per file that owns its top-level statements.
 - A list of **CallSiteRecord**s — pre-located nodes that the resolver pass will dispatch over (call/new/jsx/identifier-in-value-position/shorthand assignment for TypeScript; `call`/`attribute`/`macro_invocation`/etc. for tree-sitter adapters). Each record carries the `bodyHash` of the enclosing function-shape, computed by the same walker pass, so the resolver dispatcher doesn't need to re-walk the AST or re-hash to find ownership.
 
@@ -155,7 +167,7 @@ interface CallEdge {
 
 For the TypeScript adapter, resolver logic is split into one file per call shape in [`graph-typescript/edge-resolvers/`](../../../packages/graph/graph-typescript/src/edge-resolvers/): direct calls, property-access calls, JSX elements, `new` expressions, polymorphic dispatch, and a catalog-fallback resolver that handles the long tail. The tree-sitter adapters take the simpler approach — a single `resolve.ts` per adapter that does name-based lookup against the frozen catalog ([`graph-python/resolve.ts`](../../../packages/graph/graph-python/src/resolve.ts), [`graph-rust/resolve.ts`](../../../packages/graph/graph-rust/src/resolve.ts), and equivalents for graph-go and graph-java).
 
-For the TypeScript adapter, a single `ts.Program` is created in `parseProject` and shared across the walk and the resolver pass; `getTypeChecker()` is forced eagerly so parent pointers are populated before visitors walk parent chains. Cold full-rebuild runtime on the opensip-tools self-graph today is ~15 s; subsequent runs hit the incremental path described under "Cache invalidation" below. Tree-sitter adapters parse files lazily into a per-file `Tree` and never build a project-wide symbol table.
+For the TypeScript adapter, a single `ts.Program` is created in `parseProject` and shared across the walk and the resolver pass; `getTypeChecker()` is forced eagerly so parent pointers are populated before visitors walk parent chains. Cold full-rebuild runtime on the opensip-tools self-graph today is ~15 s; subsequent runs hit the incremental path described under "Cache invalidation" below. Tree-sitter adapters (Python, Rust, Go, Java) parse each file into a per-file `Tree` via a vendored `web-tree-sitter` WASM grammar — `Parser.init()` and `Language.load(<wasm>)` run once at module load — and never build a project-wide symbol table.
 
 ### Stage 3 — Index build
 
@@ -267,6 +279,7 @@ Notable shape choices:
 - **Each value is an array.** Two functions named `analyze` in different files don't collide; the array holds both occurrences.
 - **`calls[i].to` is always an array.** Static (one element), polymorphic (many), unresolved (zero). Consumers don't switch on shape.
 - **Anonymous functions get angle-bracketed names** (`<arrow:...>`, `<module-init:...>`) so they can't collide with real identifiers.
+- **Optional `features` surface.** The catalog payload carries an optional `features` block (per-function `bodyLines` / `blast` / reachability, plus package-level `scc` and `packageCoupling` rows) computed by the engine's feature-derivation stage ([`pipeline/features.ts`](../../../packages/graph/engine/src/pipeline/features.ts)). Per [ADR-0006](../../decisions/ADR-0006-derived-data-persistence-policy.md), features are a recomputed in-engine view for the rules and are **materialized into the catalog only when the producing run requests them** (for the decoupled dashboard); a default run persists no features.
 
 ## Cache invalidation
 
@@ -314,6 +327,6 @@ These shapes trade cross-subtree edge fidelity for speed and memory. Use `--no-c
 
 ## What's next
 
-- **[`02-rules-and-gating.md`](./02-rules-and-gating.md)** — the five rules that consume the catalog, the gate workflow, and the SARIF integration.
+- **[`02-rules-and-gating.md`](./02-rules-and-gating.md)** — the ten rules that consume the catalog, the gate workflow, and the SARIF integration.
 - **[`70-reference/01-cli-commands.md#graph`](../70-reference/01-cli-commands.md)** — the CLI flag reference.
 - **`git -P log -- packages/graph`** — the perf-plan history landed in waves: heap-sizing hint, freed Program, streamed write, sliced hashing, per-package scope, fused walk, parallel runner, transitive incremental rebuild. The original perf plan documents were removed once each wave shipped; the commit history is the source of truth.

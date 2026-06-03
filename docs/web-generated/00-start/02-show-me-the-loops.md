@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-27
-release: v2.0.x
+last_verified: 2026-06-03
+release: v2.6.x
 title: "Show me each loop"
 audience: [getting-started]
 purpose: "One sample per tool — fit check, sim scenario, graph rule — so you can see the shape of the work before reading the architecture docs."
@@ -25,7 +25,7 @@ opensip-tools ships three first-party tools. Each answers a different question s
 |---|---|---|
 | `fit` | "Is the codebase clean?" | A **check** — runs once per file, returns violations. |
 | `sim` | "Does it behave correctly under stress?" | A **scenario** — drives traffic against your service and asserts on the result. |
-| `graph` | "What is reachable from where?" | A **rule** over the static call graph — five ship in the box; not user-extensible the same way. |
+| `graph` | "What is reachable from where?" | A **rule** over the static call graph — authored with `defineRule` (parallel to `defineCheck`); ten ship in the box. |
 
 One concrete sample of each, below. After you've seen them, [quick start](/docs/opensip-tools/00-start/00-quick-start/) shows you how to run them.
 
@@ -111,13 +111,13 @@ export default defineLoadScenario({
 
 The four scenario kinds — `defineLoadScenario`, `defineChaosScenario`, `defineInvariantScenario`, `defineFixEvaluationScenario` — each emit the same `RunnableScenario` shape with a different `kind:` discriminator. Recipes compose scenarios the same way fit recipes compose checks. Deeper detail: [scenarios and recipes](/docs/opensip-tools/30-sim/01-scenarios-and-recipes/).
 
-> Simulation is opt-in and experimental in v2.0.x. The shapes are stable; the runtime mechanics are still being hardened.
+> Simulation is opt-in and experimental. The shapes are stable; the runtime mechanics are still being hardened.
 
 ---
 
 ## `graph` — a rule on the call graph
 
-`graph` is different from `fit` and `sim` in one important way: **you don't author rules; you run the bundled ones.** The engine builds your project's static call graph in five stages (discover → walk → resolve → index → render); five rules consume that graph and emit findings.
+As of v2.6.0, `graph` is an architectural *peer* of `fit`: rules are authored with `defineRule` — the call-graph analogue of `defineCheck` — selected through the same shared recipe substrate, and their findings land in sessions and the dashboard exactly like fitness checks. The difference is the *input*: where a check sees `(content, filePath)`, a rule sees the engine **dataset** (the catalog, the indexes, and a derived feature layer). The engine builds your project's static call graph in a staged pipeline (discover → walk → resolve → index → derive features → render); ten built-in rules consume that dataset and emit findings.
 
 ```text
 > opensip-tools graph
@@ -130,11 +130,13 @@ The four scenario kinds — `defineLoadScenario`, `defineChaosScenario`, `define
   ✓ no-side-effect-path         0 violations
   ✗ test-only-reachable         1 violation
   ✓ always-throws-branch        0 violations
+  ✗ large-function              2 violations
+  ...
 
-  3 Passed, 2 Failed | Duration 2.5s   (incremental rebuild)
+  ... | Duration 2.5s   (incremental rebuild)
 ```
 
-The five rules:
+The ten rules, in two groups. Reachability and duplication:
 
 - **`orphan-subtree`** — functions reachable from nothing (no entry point, no test).
 - **`duplicated-function-body`** — distinct functions whose bodies hash the same (refactor candidates).
@@ -142,9 +144,17 @@ The five rules:
 - **`test-only-reachable`** — code only reached from test files (likely dead in production).
 - **`always-throws-branch`** — branches that always throw, suggesting an unreachable code path.
 
-Blast radius (the functions with the widest change-impact) is not a gate rule — it's surfaced in the dashboard's Hot Functions view, which ranks functions by their composite blast score.
+Structural (added in v2.6.0, fed by the engine feature layer):
 
-Like `fit`, `graph` ships with a gate flow: `--gate-save` captures today's catalog as a baseline, `--gate-compare` fails the run when new violations appear. Five language adapters ship in v2.0: TypeScript, Python, Rust, Go, Java. Deeper detail: [stages and catalog](/docs/opensip-tools/40-graph/01-stages-and-catalog/) and [rules and gating](/docs/opensip-tools/40-graph/02-rules-and-gating/).
+- **`large-function`** — functions whose body exceeds a configured line count.
+- **`wide-function`** — functions taking too many parameters.
+- **`high-blast-untested`** — functions with a high blast radius that no test reaches (fixable by adding a test).
+- **`cycle`** — functions participating in a call cycle (a strongly-connected component); cross-package cycles are flagged at higher severity.
+- **`unexpected-coupling`** — package dependency cycles (two packages that import each other, A→B→A). Bounded and breakable; statistical "coupling outlier" rankings stay a dashboard insight, not a gate.
+
+Per-function metrics (size, fan-out, blast radius, test coverage) are computed once by the engine feature layer; rules query them, and the dashboard's graph view surfaces them as the same findings — one source of truth, no client-side recomputation.
+
+Like `fit`, `graph` ships with a gate flow: `--gate-save` captures today's catalog as a baseline, `--gate-compare` fails the run when new violations appear. Five language adapters ship: TypeScript, Python, Rust, Go, Java. Deeper detail: [stages and catalog](/docs/opensip-tools/40-graph/01-stages-and-catalog/) and [rules and gating](/docs/opensip-tools/40-graph/02-rules-and-gating/).
 
 ---
 

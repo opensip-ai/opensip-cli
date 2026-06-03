@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-26
-release: v2.0.x
+last_verified: 2026-06-03
+release: v2.6.x
 title: "CLI dispatch"
 audience: [contributors]
 purpose: "How argv becomes a Tool action handler. The CLI bootstrap, registration order, the global flag set, error suggestions."
@@ -73,7 +73,7 @@ A few of the constraints that pinned the order:
 
 - **Language adapters before any check ever runs.** The fitness tool's content filter dispatches per-file based on the language registry. A check that runs before any adapter is registered would treat every file as raw text and silently miss violations. The adapters are registered first inside `bootstrapCli()`, so they're in place before any tool's `register()` is called.
 - **First-party tools before discovery.** `ToolRegistry.register()` is last-writer-wins. `bootstrapCli()` registers the bundled tools first so a discovered third-party tool with the same id (e.g. a custom `fitness` replacement) can override them. The discovery walk via `discoverToolPackages()` explicitly skips packages whose `metadata.id` matches one of the bundled tools so a non-customized third-party install can't accidentally clobber the built-ins.
-- **Tools mount before CLI-owned commands.** Tool subcommands (`fit`, `sim`, `graph`, `dashboard`, …) get mounted in `registerAllTools()` first. CLI-owned commands (`init`, `sessions`, `plugin`, `configure`, `completion`, `uninstall`) are mounted afterwards in `registerCliCommands()`. The order avoids duplicate-name collisions (a tool can't squat a CLI-owned name) and keeps tool subcommands at the top of `--help`.
+- **Tools mount before CLI-owned commands.** Tool subcommands (`fit`, `sim`, `graph`, `dashboard`, …) get mounted in `mountAllToolCommands()` first. CLI-owned commands (`init`, `sessions`, `plugin`, `configure`, `completion`, `uninstall`) are mounted afterwards in `registerCliCommands()`. The order avoids duplicate-name collisions (a tool can't squat a CLI-owned name) and keeps tool subcommands at the top of `--help`.
 - **`parseAsync` last.** Commander parses argv synchronously but action handlers are async. `parseAsync` returns when the action handler resolves, which is what blocks Node's event loop until the run completes.
 
 ---
@@ -91,7 +91,7 @@ Some commands belong to the CLI itself, not to any Tool. They live under [`packa
 | `completion` | CLI | Prints shell completion. Sources its catalog from the per-invocation `ToolRegistry`. |
 | `sessions list/purge` | CLI | Reads the runtime session store. Cross-tool. |
 
-Tool-owned commands are mounted by their Tool's `register()` call. The current first-party set: fitness contributes `fit`, `dashboard`, `fit-list`, `fit-recipes`, and `fit-baseline-export`; simulation contributes `sim`; graph contributes `graph`, `graph-lookup`, `graph-symbol-index`, and `graph-baseline-export`. Third-party tools add their own. The CLI's job is to provide the program; the Tool decides what handlers it gets.
+Tool-owned commands are mounted by their Tool's `register()` call. The current first-party set: fitness contributes `fit`, `dashboard`, `fit-list`, `fit-recipes`, and `fit-baseline-export`; simulation contributes `sim`; graph contributes `graph`, `graph-lookup`, `graph-symbol-index`, `graph-baseline-export`, `graph-recipes` (graph now has its own `defineRule` + recipes, mirroring fitness — ADR-0005), plus the internal `graph-shard-worker` and the `graph-catalog-export` / `graph-sarif-export` export commands. Third-party tools add their own. The CLI's job is to provide the program; the Tool decides what handlers it gets.
 
 The split is functional, not arbitrary. CLI-owned commands deal with concerns that span every Tool — initialization, plugins, sessions, user config. Tool-owned commands deal with concerns specific to that Tool's domain. A new Tool doesn't need to provide its own `init`; it inherits the CLI's.
 
@@ -151,7 +151,7 @@ Things that can go wrong, and what the CLI does:
 | Failure | When | What the CLI does |
 |---|---|---|
 | Invalid argv | Commander parse | Commander prints help; exit 1. |
-| Tool registration throws | Step 2.b — `registerAllTools()` | Logged at error level; the failing tool is skipped; CLI continues with remaining tools. |
+| Tool registration throws | `mountAllToolCommands()` | Logged at error level; the failing tool is skipped; CLI continues with remaining tools. |
 | Action handler throws | Inside Tool execution | Caught at the program level; rendered as `ErrorResult`; exit code from `error.exitCode` or 2. |
 | Missing config | Tool action calls `loadProjectConfig()` | Tool throws `ConfigurationError`; CLI surfaces the error and the suggestion. Exit 2. |
 | Plugin failed to load | Inside the Tool's lazy plugin loader (e.g. `ensureChecksLoaded` in fitness) | Logged; the failing plugin is skipped; CLI continues. |
@@ -170,7 +170,7 @@ For `acme-api` running `opensip-tools fit --gate-compare` from CI on 2026-05-17:
    - Registers six bundled language adapters (`typescript`, `rust`, `python`, `java`, `go`, `cpp`) into `langRegistry`.
    - Registers `fitnessTool`, `simulationTool`, `graphTool` into `toolRegistry`.
    - `discoverToolPackages()` walks `node_modules`. No third-party Tools installed. Returns empty.
-3. `mountAllToolCommands(toolRegistry, ctx)`: `fitnessTool.register(ctx)` mounts `fit`, `dashboard`, `fit-list`, `fit-recipes`, `fit-baseline-export`; `simulationTool.register(ctx)` mounts `sim`; `graphTool.register(ctx)` mounts `graph`, `graph-lookup`, `graph-symbol-index`, `graph-baseline-export`.
+3. `mountAllToolCommands(toolRegistry, ctx)`: `fitnessTool.register(ctx)` mounts `fit`, `dashboard`, `fit-list`, `fit-recipes`, `fit-baseline-export`; `simulationTool.register(ctx)` mounts `sim`; `graphTool.register(ctx)` mounts `graph`, `graph-lookup`, `graph-symbol-index`, `graph-baseline-export`, `graph-recipes` (and its internal/export commands).
 4. `registerCliCommands()`: `init`, `configure`, `uninstall`, `plugin`, `completion`, `sessions` mounted.
 5. `argv = ['node', 'opensip-tools', 'fit', '--gate-compare']` — there's a subcommand, so the welcome banner is skipped.
 6. `parseAsync()` runs. The `preAction` hook enters a fresh `RunScope`, reads the `fit` command's `opts.debug` (false), and leaves the log level at `info`. It also runs the once-per-day update check and records the result on the scope for the banner / stderr nag (no-op when up-to-date or offline; never blocks). A runId like `RUN_01HXYZG9V8K1J7P3M2N0RQS5T6W` is generated (uppercase prefix + ULID); the day-level log file `<project>/opensip-tools/.runtime/logs/2026-05-17.jsonl` is opened on first write. Commander dispatches to `fitnessTool`'s `fit` action handler with `--gate-compare = true`. The Tool runs `executeFit` and the gate diff. Exit code 1 (regression detected).

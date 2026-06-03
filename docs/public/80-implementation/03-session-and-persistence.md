@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-21
-release: v2.0.x
+last_verified: 2026-06-03
+release: v2.6.x
 title: "Session and persistence"
 audience: [contributors]
 purpose: "What gets written to disk during and after a run. The runtime dir layout, the SQLite store, logs, reports."
@@ -11,9 +11,11 @@ source-files:
   - packages/datastore/src/data-store.ts
   - packages/datastore/src/factory.ts
   - packages/contracts/src/session-types.ts
+  - packages/contracts/src/graph-catalog.ts
   - packages/session-store/src/session-repo.ts
   - packages/session-store/src/store.ts
   - packages/session-store/src/schema/sessions.ts
+  - packages/cli/src/dashboard-compose.ts
   - packages/graph/engine/src/persistence/baseline-repo.ts
   - packages/graph/engine/src/persistence/catalog-repo.ts
   - packages/graph/engine/src/persistence/schema.ts
@@ -65,8 +67,8 @@ Schemas are owned by the package that produces the data — datastore is paradig
 
 | Owner | Schema file | Tables |
 |---|---|---|
-| `@opensip-tools/session-store` | `src/schema/sessions.ts` | `sessions`, `session_checks`, `session_findings` |
-| `@opensip-tools/graph` | `src/persistence/schema.ts` | `graph_baseline_signals`, `graph_baseline_meta`, `graph_catalog` |
+| `@opensip-tools/session-store` | `src/schema/sessions.ts` | `sessions`, `session_tool_payload` |
+| `@opensip-tools/graph` | `src/persistence/schema.ts` | `graph_baseline_signals`, `graph_baseline_meta`, `graph_catalog`, `graph_shard_fragment` |
 | `@opensip-tools/fitness` | `src/persistence/schema.ts` | `fit_baseline` |
 
 `__drizzle_migrations` is a fourth, internal table — Drizzle uses it to record which migrations have been applied.
@@ -77,26 +79,25 @@ SQLite + Drizzle were chosen because the runtime store is local, project-scoped,
 
 ## Sessions
 
-A session is one record per `fit`, `sim`, or `graph` run. Stored as a row in the `sessions` table, with a `session_checks` row per check and `session_findings` rows for each violation. The wire-shape is unchanged from v1 — the `StoredSession` interface in [`packages/contracts/src/session-types.ts`](../../../packages/contracts/src/session-types.ts) is what `SessionRepo` round-trips:
+A session is one record per `fit`, `sim`, or `graph` run. The persistence layer holds **zero tool-specific vocabulary** (audit 2026-05-29, session split): the `sessions` table carries only the columns every tool shares, and per-session detail lives in a separate `session_tool_payload` row as an **opaque JSON blob** whose shape is owned and validated by the writing tool. The `StoredSession` interface in [`packages/contracts/src/session-types.ts`](../../../packages/contracts/src/session-types.ts) is what `SessionRepo` round-trips:
 
 ```ts
 interface StoredSession {
   readonly id: string;
-  readonly tool: 'fit' | 'sim' | 'graph';
+  readonly tool: 'fit' | 'sim' | 'graph';   // ToolShortId
   readonly timestamp: string;
   readonly cwd: string;
   readonly recipe?: string;
   readonly score: number;
   readonly passed: boolean;
-  readonly summary: { total, passed, failed, errors, warnings };
-  readonly checks: readonly {
-    checkSlug, passed, violationCount?, findings[], durationMs
-  }[];
   readonly durationMs: number;
+  readonly payload?: unknown;                // tool-owned opaque detail; contracts never inspects it
 }
 ```
 
-The session is written via [`SessionRepo.save()`](../../../packages/session-store/src/session-repo.ts) inside a single transaction (sessions row + per-check rows + per-finding rows), so even a run that crashes mid-render leaves a complete or no record — never a partial one.
+The old per-check / per-finding columns (`session_checks`, `session_findings`) are gone — that detail now rides inside `payload` (checks, findings, summaries, etc. for `fit`; whatever shape each tool defines). `contracts` treats `payload` as `unknown`; the dashboard, as presentation owner, reads and renders it — the same producer/consumer split used for `GraphCatalog`.
+
+The session is written via [`SessionRepo.save()`](../../../packages/session-store/src/session-repo.ts) inside a single transaction (the `sessions` row plus, when `payload` is present, one `session_tool_payload` row), so even a run that crashes mid-render leaves a complete or no record — never a partial one.
 
 ### The `sessions` command
 
@@ -107,7 +108,7 @@ opensip-tools sessions purge --older-than 7       # DELETE FROM sessions WHERE t
 opensip-tools sessions purge -y                   # skip the confirmation prompt
 ```
 
-`purge` is **row-level data deletion**, not file removal. The FK cascade from `sessions` → `session_checks` → `session_findings` ensures that purging a session cleans up its dependents in one shot.
+`purge` is **row-level data deletion**, not file removal. The FK cascade from `sessions` → `session_tool_payload` (`onDelete: 'cascade'`) ensures that purging a session drops its opaque payload row in one shot.
 
 The dashboard reads the same store to populate its run-history view.
 
@@ -115,7 +116,13 @@ The dashboard reads the same store to populate its run-history view.
 
 ## The graph catalog
 
-`@opensip-tools/graph` builds a call-graph catalog (functions, occurrences, calls) and persists it via [`CatalogRepo`](../../../packages/graph/engine/src/persistence/catalog-repo.ts). v2 stores the whole catalog as a single SQLite row; metadata fields (language, cache key, files fingerprint) are lifted into typed columns so the orchestrator can fingerprint-mismatch without parsing the payload. The reconstructed `Catalog` shape is byte-identical to v1's, so dashboard view derivations and rules are unchanged.
+`@opensip-tools/graph` builds a call-graph catalog (functions, occurrences, calls) and persists it via [`CatalogRepo`](../../../packages/graph/engine/src/persistence/catalog-repo.ts). v2 stores the whole catalog as a single SQLite row; metadata fields (language, cache key, files fingerprint) are lifted into typed columns so the orchestrator can fingerprint-mismatch without parsing the payload.
+
+### The derived `features` surface (ADR-0006)
+
+The persisted catalog document carries an optional **`features`** layer — derived columns the engine computes from the raw catalog: per-function `bodyLines` / `blast` (direct + transitive blast radius) / reachability flags, per-package coupling degrees, SCC membership, and directed package-coupling edges. The contract shape is [`GraphFeatures`](../../../packages/contracts/src/graph-catalog.ts) (structurally mirrored from the engine's `PersistedFeatures` so the decoupled dashboard reads features without importing `@opensip-tools/graph`).
+
+The persistence policy is **materialize only when forced** (ADR-0006): features are a *plain view* recomputed on demand for in-engine rules, and **materialized into the catalog JSON only for the columns the decoupled dashboard renders** (blast, SCC, package coupling). The `features` field is therefore present only on catalogs produced by a dashboard-bound run; the dashboard falls back to a no-data state when it's absent. Everything else (callers/callees indexes) is recomputed cheaply on every load and never stored.
 
 The `--workspace` runner spawns one child process per workspace unit (per adapter `discoverWorkspaceUnits`). Each child opens its own `DataStore` against the shared `datastore.sqlite` file. WAL mode permits concurrent readers + one writer, so the parallelism is safe but serialized at the catalog write boundary — per-unit incremental writes are deferred to a follow-up `graph-catalog-perf` plan.
 
@@ -158,9 +165,9 @@ The log file persists until manually deleted. There's no rotation; that's the us
 
 ## Reports
 
-The HTML dashboard writes a single self-contained file at `<project>/opensip-tools/.runtime/reports/latest.html` ([`packages/fitness/engine/src/cli/dashboard.ts`](../../../packages/fitness/engine/src/cli/dashboard.ts)). Each generation overwrites the previous file — the dashboard is "always show the most recent state", not a per-run archive.
+The HTML dashboard writes a single self-contained file at `<project>/opensip-tools/.runtime/reports/latest.html`. Each generation overwrites the previous file — the dashboard is "always show the most recent state", not a per-run archive.
 
-The generator pulls sessions via `SessionRepo.list({ limit: 20 })` and the graph catalog via `CatalogRepo.loadFullCatalog()`, then assembles the inlined HTML (JS via `<script type="module">`, CSS via `<style>`, session/catalog data via `<script type="application/json">`). The output is one self-contained file you can email — no CDN, no asset bundle, no server.
+Composition is owned by the **CLI** ([`packages/cli/src/dashboard-compose.ts`](../../../packages/cli/src/dashboard-compose.ts)), the cross-tool composition root. It reads sessions via `SessionRepo.list({ limit: 20 })`, then walks every registered tool's optional `collectDashboardData(scope)` seam and merges the keyed contributions into one `DashboardInput` — graph returns its `graphCatalog` (via `CatalogRepo.loadCatalogContract()`), fitness returns its catalogs, neither reaching into the other (this is what the `fitness-no-graph` / `graph-no-fitness` layer rules enforce). The merged input is handed to `generateDashboardHtml` ([`@opensip-tools/dashboard`](../../../packages/dashboard/src/generator.ts)), which assembles the inlined HTML (JS via `<script type="module">`, CSS via `<style>`, session/catalog data via `<script type="application/json">`). The output is one self-contained file you can email — no CDN, no asset bundle, no server.
 
 The dashboard auto-open hook fires after a run if (a) `--open` was requested or auto-open is configured, (b) output isn't `--json`, and (c) stdout is a TTY.
 
@@ -181,7 +188,7 @@ A reference for "I want to free disk / I'm debugging."
 | Command | Touches |
 |---|---|
 | `opensip-tools sessions list` | `SELECT FROM sessions` |
-| `opensip-tools sessions purge --older-than N` | `DELETE FROM sessions WHERE timestamp < cutoff` (FK cascades to checks + findings) |
+| `opensip-tools sessions purge --older-than N` | `DELETE FROM sessions WHERE timestamp < cutoff` (FK cascades to the tool-payload row) |
 | `opensip-tools fit --no-cache` / `graph --no-cache` | Forces cache miss; rebuilds full catalog/results, ignores any cached row |
 | `opensip-tools uninstall --project [path]` | Removes `<path>/opensip-tools/` recursively. **`datastore.sqlite` and its `-wal` / `-shm` sidecars are caught transitively.** On Windows, ensure no opensip-tools CLI process is active when running this — open file handles can block WAL/SHM removal. |
 | `opensip-tools uninstall` (no flag) | Removes `~/.opensip-tools/`. No DB there; user-global state is a single config file. |

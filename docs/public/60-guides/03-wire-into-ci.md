@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-27
-release: v2.0.x
+last_verified: 2026-06-03
+release: v2.6.x
 title: "Wire into CI"
 audience: [ci-integrators, getting-started]
 purpose: "Task-led: add opensip-tools to your CI pipeline with PR annotations and baseline gating. GitHub Actions and GitLab examples."
@@ -41,20 +41,22 @@ That's the floor. The rest of this page is the polish: how to surface findings a
 
 ## PR annotations via SARIF
 
-`--report-format sarif` emits the [SARIF](https://docs.oasis-open.org/sarif/sarif/v2.1.0/os/sarif-v2.1.0-os.html) format that GitHub understands natively. Uploaded findings appear inline in the PR's "Files changed" view.
+opensip-tools exports the [SARIF](https://docs.oasis-open.org/sarif/sarif/v2.1.0/os/sarif-v2.1.0-os.html) format that GitHub understands natively via the `fit-baseline-export` subcommand. The flow is two steps: run `fit --gate-save` (which records findings into the project SQLite store and exits 0 regardless of findings), then `fit-baseline-export --out fit.sarif` to write the SARIF document. Uploaded findings appear inline in the PR's "Files changed" view.
 
 ```yaml
-- run: opensip-tools fit --report-format sarif --report-out fit.sarif
+- run: opensip-tools fit --gate-save        # record findings in the SQLite store (exit 0)
+- run: opensip-tools fit-baseline-export --out fit.sarif
+  if: always()      # export even if a prior step failed
 - uses: github/codeql-action/upload-sarif@v3
-  if: always()      # upload even when the previous step failed
+  if: always()      # upload even when a previous step failed
   with:
     sarif_file: fit.sarif
     category: opensip-fit
 ```
 
-The `if: always()` is important — when the gate fails (exit code 1), GitHub skips subsequent steps by default. You want the SARIF upload to run anyway so the developer sees the annotations on their PR.
+The `if: always()` is important — when an earlier step fails (exit code 1), GitHub skips subsequent steps by default. You want the SARIF export + upload to run anyway so the developer sees the annotations on their PR.
 
-For GitLab, SARIF uploads to the *Code Quality* widget if you rename it to `gl-code-quality-report.json` and use [GitLab's converter](https://docs.gitlab.com/ee/user/application_security/sast/#sarif-format). Alternative: `--report-format gitlab-code-quality` (native, no conversion needed).
+For GitLab, convert the exported SARIF to the *Code Quality* widget format with [GitLab's converter](https://docs.gitlab.com/ee/user/application_security/sast/#sarif-format), renaming the output to `gl-code-quality-report.json`. (There is no native GitLab code-quality emitter today — go through SARIF.)
 
 ## Baseline-gate flow
 
@@ -72,14 +74,9 @@ Then in CI:
 - run: opensip-tools fit --gate-compare
 ```
 
-`--gate-compare` exits 0 if no *new* violations appeared since the baseline. Existing ones are tolerated. The baseline lives in SQLite (`opensip-tools/.runtime/datastore.sqlite`); since `.runtime/` is gitignored, you'll want to publish + restore the baseline as a CI artifact, or commit it explicitly.
+`--gate-compare` exits 0 if no *new* violations appeared since the baseline. Existing ones are tolerated. The baseline lives in SQLite (`opensip-tools/.runtime/datastore.sqlite`); since `.runtime/` is gitignored, you'll want to publish + restore the baseline store as a CI artifact.
 
-**Two patterns for shipping the baseline:**
-
-1. **Commit it.** Add `opensip-tools/.runtime/baseline.sarif` (export with `opensip-tools fit --gate-save --export-baseline opensip-tools/.runtime/baseline.sarif`) and `git add -f` it. Pro: works on a fresh CI runner. Con: noisy diffs when the baseline updates.
-2. **Restore from artifacts.** Cache the baseline file between runs via `actions/cache@v4` keyed on the main branch SHA. Pro: no commits in the repo. Con: a one-time bootstrap is needed.
-
-For most teams, option 1 wins on simplicity. The baseline file is small (one entry per existing violation, deduplicated) and updates land in PRs that fix violations — which is the right moment to see them.
+**The artifact pattern:** the gate baseline is a SQLite store, not a committed file. The standard flow is to run `fit --gate-save` on main-branch builds and upload `opensip-tools/.runtime/datastore.sqlite` as a workflow artifact; PR builds download that artifact into `opensip-tools/.runtime/` before running `fit --gate-compare`. (For a human-readable export — e.g. to inspect the baseline or feed GitHub Code Scanning — use `fit-baseline-export --out baseline.sarif`, which reads the same store.) See [output, gate, SARIF](../20-fit/04-output-gate-sarif.md) and [the architecture-gate CI patterns](../10-concepts/05-architecture-gate.md#ci-integration-patterns) for the full workflow.
 
 ## Recommended full setup
 
@@ -99,17 +96,28 @@ jobs:
         with: { node-version: 22 }
       - run: npm install -g opensip-tools
 
+      # Restore the baseline store produced by the last main-branch build.
+      - uses: actions/download-artifact@v4
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        with:
+          name: fit-baseline
+          path: opensip-tools/.runtime/
+
       # On PRs: gate against new violations only.
       # On main: refresh the baseline (so the next PR sees current state).
       - name: Run fit
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            opensip-tools fit --gate-compare \
-              --report-format sarif --report-out fit.sarif
+            opensip-tools fit --gate-compare
           else
-            opensip-tools fit --gate-save \
-              --report-format sarif --report-out fit.sarif
+            opensip-tools fit --gate-save
           fi
+
+      # Export the SARIF for PR annotations (reads the SQLite store).
+      - name: Export SARIF
+        if: always()
+        run: opensip-tools fit-baseline-export --out fit.sarif
 
       - name: Upload SARIF
         if: always()
@@ -117,6 +125,13 @@ jobs:
         with:
           sarif_file: fit.sarif
           category: opensip-fit
+
+      # On main: publish the refreshed baseline store for the next PR.
+      - uses: actions/upload-artifact@v4
+        if: github.event_name != 'pull_request'
+        with:
+          name: fit-baseline
+          path: opensip-tools/.runtime/datastore.sqlite
 ```
 
 This is the shape we recommend: PRs see "is this getting worse?", main updates the bar. Developers fix legacy violations at their own pace; CI is fast (no full-codebase pass on every PR).

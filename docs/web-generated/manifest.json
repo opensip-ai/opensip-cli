@@ -123,7 +123,7 @@
       "audience": [
         "contributors"
       ],
-      "purpose": "The 29-package monorepo, the five-layer dependency rule, why dependency-cruiser exists, and the trade-offs."
+      "purpose": "The 30-package monorepo, the five-layer dependency rule, why dependency-cruiser exists, and the trade-offs."
     },
     {
       "file": "docs/web-generated/10-concepts/04-contract-surfaces.md",
@@ -234,7 +234,7 @@
         "plugin-authors",
         "ci-integrators"
       ],
-      "purpose": "How `graph` builds its picture of the codebase — the six-stage pipeline, the catalog format, and the content-keyed cache."
+      "purpose": "How `graph` builds its picture of the codebase — the seven-stage pipeline, the catalog format, and the content-keyed cache."
     },
     {
       "file": "docs/web-generated/40-graph/02-rules-and-gating.md",

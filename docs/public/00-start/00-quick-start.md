@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-26
-release: v2.0.x
+last_verified: 2026-06-03
+release: v2.6.x
 title: "Quick start"
 audience: [getting-started, contributors, plugin-authors, ci-integrators]
 purpose: "Four commands from zero to a passing fitness run. Hands-on before the conceptual material."

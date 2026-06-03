@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-26
-release: v2.0.x
+last_verified: 2026-06-03
+release: v2.6.x
 title: "Sim execution model"
 audience: [contributors]
 purpose: "How the sim engine runs scenarios. Dispatcher, executor lifecycle, result aggregation, exit semantics."
@@ -141,7 +141,7 @@ The `--kind` CLI filter (`opensip-tools sim --kind invariant`) is a post-selecto
 
 ## The aggregated result
 
-After every scenario runs, the recipe service produces a `SimDoneResult` ([`packages/contracts/src/types.ts:271`](../../../packages/contracts/src/types.ts)):
+After every scenario runs, the recipe service produces a `SimDoneResult` ([`packages/contracts/src/command-results.ts`](../../../packages/contracts/src/command-results.ts)):
 
 ```ts
 interface SimDoneResult {

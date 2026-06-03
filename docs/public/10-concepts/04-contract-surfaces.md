@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-26
-release: v2.0.x
+last_verified: 2026-06-03
+release: v2.6.x
 title: "Contract surfaces"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "The system's public edges. Every contract opensip-tools makes with the outside world, and what changing each one would cost."

@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-26
-release: v2.0.x
+last_verified: 2026-06-03
+release: v2.6.x
 title: "The tool-plugin model"
 audience: [contributors, plugin-authors]
 purpose: "How the CLI doesn't know what `fit` does. The Tool contract, the registry, the dispatcher, and what it takes to add a third tool."
@@ -62,7 +62,8 @@ The context object is the inversion-of-control seam. A tool needs to render resu
 interface ToolCliContext {
   program: unknown;                              // Commander program (cast inside the tool)
   render: (result: unknown) => Promise<void>;
-  renderLive: (viewKey: string, args: unknown) => Promise<void>;
+  registerLiveView: (key: string, renderer: LiveViewRenderer) => void;
+  renderLive: (key: string, args: unknown) => Promise<void>;
   maybeOpenDashboard: (opts: { openRequested: boolean; jsonOutput: boolean; cwd: string }) => Promise<void>;
   logger: typeof coreLogger;
   setExitCode: (code: number) => void;
@@ -71,7 +72,7 @@ interface ToolCliContext {
 
 `program` is typed as `unknown` so the contract doesn't pin tools to a specific Commander major version. Each tool casts it on the way in: `const program = cli.program as Command`. If a Commander upgrade changes the type, only the tools that touch that exact API need to update — the contract itself stays stable.
 
-`renderLive(viewKey, args)` is the only stateful UI seam. The CLI maintains a small registry of "live views" (currently `'fit'`); a tool that wants a streaming spinner-to-results experience asks for one by name. Adding a new live view is a CLI-side change, not a contract change.
+`registerLiveView(key, renderer)` / `renderLive(key, args)` are the stateful UI seam. A tool that wants a streaming spinner-to-results experience registers its own renderer under a key inside its `register(cli)` hook, then invokes it by key. The live-view registry is owned by the tool, not the CLI — both `fit` and `graph` ship one. Adding a new live view is a tool-side change, not a contract change.
 
 ---
 
@@ -198,8 +199,8 @@ export const tool = auditSecTool; // discovery export
   "main": "dist/index.js",
   "opensipTools": { "kind": "tool" },
   "peerDependencies": {
-    "opensip-tools": "^1.0.0",
-    "@opensip-tools/core": "^1.0.0"
+    "opensip-tools": "^2.6.0",
+    "@opensip-tools/core": "^2.6.0"
   }
 }
 ```
@@ -223,7 +224,7 @@ If your tool also wants to ship checks (the way `@opensip-tools/checks-typescrip
 Three things, in order of importance:
 
 1. **A stable kernel.** `@opensip-tools/core` does not import any tool. The layer policy ([dependency-cruiser config](https://github.com/opensip-ai/opensip-tools/blob/v2.6.0/.dependency-cruiser.cjs)) enforces this — `core-imports-nothing-workspace` would fail the build if `core` ever reached up. This means kernel changes are safe: a kernel bump can't break a tool, because the kernel can't see the tool.
-2. **Independent tool versioning.** Each Tool package has its own version. The CLI is pinned to a major-version range of each first-party tool, but third-party tools can release on their own cadence. A user can pin `@opensip-tools/checks-python@2.x` while staying on `opensip-tools@1.x`.
+2. **Independent tool versioning.** Each Tool package has its own version. The CLI is pinned to a major-version range of each first-party tool, but third-party tools can release on their own cadence. A user can pin a third-party `@yourorg/audit-sec@0.x` while staying on the current `opensip-tools@2.x`.
 3. **A future where `fit` is just one of many tools.** The platform was designed for `audit-*`, `lint-*`, `report-*`, `bench-*`, and similar Tools to slot in. Today there are three (`fit`, `sim`, `graph`); tomorrow there might be ten. The CLI grows by zero lines.
 
 ---

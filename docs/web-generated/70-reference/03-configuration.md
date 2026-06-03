@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-27
-release: v2.0.x
+last_verified: 2026-06-03
+release: v2.6.0
 title: "Configuration"
 audience: [getting-started, ci-integrators, plugin-authors]
 purpose: "The opensip-tools.config.yml schema, every field, defaults, and where each is read."
@@ -9,6 +9,8 @@ source-files:
   - packages/fitness/engine/src/signalers/schema.ts
   - packages/core/src/config-resolution.ts
   - packages/cli/src/commands/init.ts
+  - packages/graph/engine/src/cli/graph-config.ts
+  - packages/graph/engine/src/types.ts
 related-docs:
   - ../00-start/06-system-context.md
   - ../20-fit/02-targets-and-scope.md
@@ -36,11 +38,12 @@ simulation: {}            # SimulationConfig
 cli: {}                   # CliDefaults
 plugins: {}               # per-domain pin lists (read out-of-band — see below)
 dashboard: {}             # dashboard.editor (read out-of-band — see below)
+graph: {}                 # graph rule knobs (read out-of-band — see below)
 ```
 
 Every section is optional; a missing section becomes `{}`.
 
-The validated schema (`SignalersConfigSchema`) covers `globalExcludes`, `targets`, `checkOverrides`, `fitness`, `simulation`, and `cli`. **`plugins:` and `dashboard:` are read out-of-band** by separate parsers ([`readProjectPluginsList`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.0/packages/core/src/plugins/discover.ts) and `extractDashboardEditor` in [`dashboard.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.0/packages/fitness/engine/src/cli/dashboard.ts)) so they can evolve independently of the fitness schema.
+The validated schema (`SignalersConfigSchema`) covers `globalExcludes`, `targets`, `checkOverrides`, `fitness`, `simulation`, and `cli`. **`plugins:`, `dashboard:`, and `graph:` are read out-of-band** by separate parsers ([`readProjectPluginsList`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.0/packages/core/src/plugins/discover.ts), `extractDashboardEditor` in [`dashboard.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.0/packages/fitness/engine/src/cli/dashboard.ts), and `loadGraphConfig` in [`graph-config.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.0/packages/graph/engine/src/cli/graph-config.ts)) so each can evolve independently of the fitness schema. The `graph:` loader is deliberately permissive — a missing config, malformed YAML, or absent `graph:` key all collapse to `{}`, and every rule then falls back to its in-rule default.
 
 ---
 
@@ -177,6 +180,60 @@ dashboard:
 ```
 
 Read out-of-band like `plugins:`.
+
+## `graph`
+
+Per-rule knobs for the `graph` tool. Read out-of-band by `loadGraphConfig` ([`graph-config.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.0/packages/graph/engine/src/cli/graph-config.ts)), not by the fitness Zod schema. Every field is optional; an omitted field uses the rule's in-rule default. The loader projects only the field types — it does not strictly validate, so a malformed value is dropped (the rule then uses its default).
+
+### Duplicated-function-body (`graph:duplicated-function-body`)
+
+| Field | Type | Default | Effect |
+|---|---|---|---|
+| `minDuplicateBodyLines` | number | `5` | Minimum lines for a duplicated-function-body match. |
+| `minDuplicateBodySize` | number | `200` | Minimum normalized body size (chars) for a per-instance match. Filters trivial pass-through wrappers. |
+| `minCrossPackageDuplicatePackages` | number | `3` | Minimum DISTINCT packages a body hash must appear in to trigger the aggregate cross-package duplication signal (suppressing the per-instance signals for that hash). |
+| `minCrossPackageDuplicateBodySize` | number | `80` | Normalized-body-size floor (chars) for the aggregate cross-package path. Deliberately lighter than `minDuplicateBodySize`; no line floor. |
+
+### Orphan detection (`graph:orphan-subtree`)
+
+| Field | Type | Default | Effect |
+|---|---|---|---|
+| `flagExportedOrphans` | bool | `false` | Allow flagging exported, zero-caller functions as orphans. Enable only for repos with trustworthy cross-package call resolution. |
+| `flagTestOrphans` | bool | `false` | Allow flagging functions declared in test files as orphans (otherwise left to `graph:test-only-reachable`). |
+
+### Structural-rule thresholds
+
+Two-band (warn / error) thresholds for the structural rules. A value between the warn and error band emits a `medium` signal; above the error band emits `high`.
+
+| Field | Rule | Type | Default | Effect |
+|---|---|---|---|---|
+| `largeFunctionWarnLines` | `graph:large-function` | number | `300` | Body-line count above which a function emits a `medium` signal. (`bodyLines` is the physical span — incl. comments/blanks — so the gate default is calibrated higher than the dashboard's "~80 worth questioning" heuristic.) |
+| `largeFunctionErrorLines` | `graph:large-function` | number | `500` | Body-line count above which a function emits a `high` signal. |
+| `wideFunctionWarnParams` | `graph:wide-function` | number | `5` | Parameter count above which a function emits a `medium` signal. |
+| `wideFunctionErrorParams` | `graph:wide-function` | number | `7` | Parameter count above which a function emits a `high` signal. |
+| `highBlastWarnThreshold` | `graph:high-blast-untested` | number | `75` | Minimum `blast.score` (an absolute count, never a percentile) for an untested function to emit a `medium` signal. |
+| `highBlastErrorThreshold` | `graph:high-blast-untested` | number | `150` | Minimum `blast.score` for an untested function to emit a `high` signal. |
+| `cycleMinSize` | `graph:cycle` | number | `3` | Minimum SCC size that emits a `medium` signal. A package-crossing cycle always wins `high`. |
+| `cycleSize2Severity` | `graph:cycle` | `'off' \| 'low'` | `'off'` | Posture for the size-2 band (a 2-member cycle, often legitimate mutual recursion). `'off'` → no signal; `'low'` → a `low` signal. |
+
+### Other knobs
+
+| Field | Type | Default | Effect |
+|---|---|---|---|
+| `entryPointHashes` | string[] | — | Override the inferred entry-point list with explicit body hashes. |
+| `severityOverrides` | map (rule-slug → `'error' \| 'warning'`) | `{}` | Per-rule severity clamp. An applied opt-in: a listed rule's emitted signals are clamped to the named severity. Only `'error'` / `'warning'` values are accepted; other values are dropped. |
+
+```yaml
+graph:
+  minDuplicateBodyLines: 8
+  largeFunctionWarnLines: 100
+  largeFunctionErrorLines: 200
+  wideFunctionErrorParams: 8
+  highBlastErrorThreshold: 30
+  cycleSize2Severity: low
+  severityOverrides:
+    graph:orphan-subtree: warning
+```
 
 ---
 

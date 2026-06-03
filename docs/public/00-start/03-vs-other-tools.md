@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-27
-release: v2.0.x
+last_verified: 2026-06-03
+release: v2.6.x
 title: "vs. other tools"
 audience: [getting-started]
 purpose: "Honest comparison: what opensip-tools does that ESLint, Semgrep, Sonarqube, and Snyk don't — and what it deliberately doesn't try to do."
@@ -21,7 +21,7 @@ opensip-tools is not a replacement for ESLint, Semgrep, or Sonarqube — it comp
 |---|---|---|---|---|---|
 | **Polyglot in one run** | ✓ TS, Python, Rust, Go, Java, C/C++ | ✗ (one per language) | ✓ | ✓ | ✓ (security focus) |
 | **User-authored architectural rules** | ✓ (`defineCheck` in 15 lines) | partial (custom rules per linter) | ✓ (Semgrep YAML) | partial (XPath-ish) | ✗ |
-| **Static call-graph rules** (orphan code, dead paths) | ✓ (5 built-in) | ✗ | partial | ✓ | ✗ |
+| **Static call-graph rules** (orphan code, dead paths, structural) | ✓ (10 built-in, `defineRule`) | ✗ | partial | ✓ | ✗ |
 | **Load / chaos / invariant simulation** | ✓ (`sim`, experimental) | ✗ | ✗ | ✗ | ✗ |
 | **CI gate with baselines** | ✓ (`--gate-save` / `--gate-compare`) | partial (snapshot files) | ✓ | ✓ | ✓ |
 | **SARIF output for PR annotations** | ✓ | partial | ✓ | ✓ | ✓ |
@@ -52,7 +52,7 @@ Linters and opensip-tools coexist. They answer different questions; you run both
 This is the closest comparison — both are polyglot rule runners aimed above traditional linters. The differences:
 
 - **Rule format.** Semgrep rules are YAML pattern-matching expressions. opensip-tools checks are TypeScript/JS functions. Semgrep's YAML is more compact for syntactic patterns; opensip-tools's code is more flexible for arbitrary logic (multi-file analysis, custom data structures, fetching the package graph). If your rules are mostly "match this pattern with these variables", Semgrep is sharper. If your rules need to walk the call graph or check that a specific file exists, opensip-tools is sharper.
-- **Sim and graph loops.** opensip-tools also ships `sim` (load / chaos / invariant simulation) and `graph` (static call-graph rules). These don't have Semgrep equivalents. If you want one tool for "is the code clean" + "does it behave under load" + "what's reachable", opensip-tools covers all three.
+- **Sim and graph loops.** opensip-tools also ships `sim` (load / chaos / invariant simulation) and `graph` (static call-graph rules, authored the same way `fit` checks are via `defineRule`). These don't have Semgrep equivalents. If you want one tool for "is the code clean" + "does it behave under load" + "what's reachable", opensip-tools covers all three.
 - **Hosting.** Semgrep's OSS engine is free; their cloud product (App / Pro) is paid and where most of the rule library lives. opensip-tools is fully open-source — no separate cloud product is required. The optional `--report-to` endpoint posts to OpenSIP Cloud for dashboards, but the CLI works fully offline.
 
 Many teams use both: Semgrep for the security-rule library, opensip-tools for project-shape and architecture rules.

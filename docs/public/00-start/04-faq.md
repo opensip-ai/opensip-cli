@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-27
-release: v2.0.x
+last_verified: 2026-06-03
+release: v2.6.x
 title: "FAQ"
 audience: [getting-started]
 purpose: "Common questions about adoption, edge cases, and what opensip-tools does or doesn't do."
@@ -70,7 +70,7 @@ Use the **baseline gate flow.** Run `opensip-tools fit --gate-save` once to capt
 
 `fit` runs against TypeScript / JavaScript, Python, Rust, Go, Java, and C/C++. Language detection is automatic (looks for `tsconfig.json`, `Cargo.toml`, `pyproject.toml`, `go.mod`, `pom.xml`, `CMakeLists.txt`). 90 of the 145+ built-in checks are language-agnostic; the rest target a specific language pack.
 
-`graph` ships five language adapters in v2.0: TypeScript, Python, Rust, Go, Java.
+`graph` ships five language adapters: TypeScript, Python, Rust, Go, Java. The TypeScript adapter uses the TypeScript compiler API; the Python, Go, Rust, and Java adapters parse with vendored web-tree-sitter WASM grammars, so there's no native toolchain or compiler to install for them.
 
 `sim` is language-independent — scenarios are JavaScript and drive your service over HTTP.
 
@@ -95,7 +95,7 @@ The runtime cost scales with `checks × matched-files`, not with project size. A
 - **Check** — a single `fit` rule. One file, one `defineCheck()` call. Runs once per matched file.
 - **Recipe** — a named lineup of checks (or scenarios) plus execution options. Used for "what should we run in this CI step?"
 - **Scenario** — a single `sim` workload (load, chaos, invariant, fix-evaluation).
-- **Rule** — what `graph` calls its built-in analyses (orphan-subtree, duplicated-function-body, etc.). Not user-extensible the same way as checks.
+- **Rule** — what `graph` calls its analyses (orphan-subtree, duplicated-function-body, large-function, etc.). As of v2.6.0 a rule is authored with `defineRule`, the call-graph parallel to `defineCheck`; ten ship in the box. The difference from a check is the input: a rule queries the engine **dataset** (call graph + derived feature columns), not a single file's `(content, filePath)`.
 
 See [vocabulary](./05-vocabulary.md) for the full glossary.
 

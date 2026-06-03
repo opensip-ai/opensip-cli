@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-26
-release: v2.0.x
+last_verified: 2026-06-03
+release: v2.6.x
 title: "Scenarios and recipes (sim)"
 audience: [contributors, plugin-authors]
 purpose: "What a sim scenario is, the four kinds, and how recipes compose them. The author-facing primitives in the simulation tool."

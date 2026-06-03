@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-26
-release: v2.0.x
+last_verified: 2026-06-03
+release: v2.6.x
 title: "Check pack architecture"
 audience: [contributors, plugin-authors]
 purpose: "How check packs are structured, the bundled seven, scope filters, parameterization, and the marketplace shape."
@@ -17,7 +17,7 @@ source-files:
   - packages/core/src/plugins/marker-discovery.ts
   - packages/core/src/plugins/types.ts
 related-docs:
-  - ./01-language-adapters.md
+  - ./05-language-adapters.md
   - ../20-fit/01-recipes-and-checks.md
   - ../50-extend/01-plugin-authoring.md
   - ../70-reference/02-package-catalog.md

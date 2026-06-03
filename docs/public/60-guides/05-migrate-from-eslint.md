@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-27
-release: v2.0.x
+last_verified: 2026-06-03
+release: v2.6.x
 title: "Migrate from ESLint"
 audience: [getting-started, ci-integrators]
 purpose: "Task-led: when an ESLint rule belongs in opensip-tools, when it doesn't, and how the two tools coexist in one CI pipeline."
@@ -80,8 +80,9 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       - run: npm install -g opensip-tools
-      - run: opensip-tools fit --gate-compare \
-               --report-format sarif --report-out fit.sarif
+      - run: opensip-tools fit --gate-compare
+      - run: opensip-tools fit-baseline-export --out fit.sarif
+        if: always()
       - uses: github/codeql-action/upload-sarif@v3
         if: always()
         with: { sarif_file: fit.sarif, category: opensip-fit }

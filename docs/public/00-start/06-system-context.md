@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-26
-release: v2.0.x
+last_verified: 2026-06-03
+release: v2.6.x
 title: "System context"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "Where opensip-tools sits between you, your codebase, CI, and OpenSIP Cloud — and what it touches on disk."

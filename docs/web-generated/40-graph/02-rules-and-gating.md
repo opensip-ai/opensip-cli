@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-26
-release: v2.0.x
+last_verified: 2026-06-03
+release: v2.6.0
 title: "Rules and gating (graph)"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "The ten graph rules, what each one detects, and how the save/compare gate flow integrates with CI."
@@ -85,7 +85,7 @@ The rule does a forward BFS from the entry-point seeds (computed by [`_entry-poi
 
 1. **Per-instance (size-gated).** Report any group with more than one occurrence whose source span clears `minDuplicateBodyLines` (default 5) **and** whose normalized body clears `minDuplicateBodySize` (default 200 characters). This is the "two big functions someone should extract" case. It emits N-1 signals per group (one per non-primary copy).
 
-2. **Aggregate (cross-package, no size floor).** A *small* body copied across *many* packages is the most expensive class of duplication, and the per-instance size floor is exactly what hides it (e.g. `stripStrings`/`stripComments` copied across five language adapters, each copy below the 200-character floor). For each body hash present in **≥ `minCrossPackageDuplicatePackages`** (default 3) *distinct* packages — identified via the same package-boundary the coupling grid uses — the rule emits **one** aggregate signal naming the sorted package list and the occurrence count, with **no** per-copy size or line floor. When a hash qualifies here, the per-instance signals for that same hash are **suppressed**, so a single duplicate group never double-reports. Bodies that don't reach N packages flow through path (1) unchanged.
+2. **Aggregate (cross-package, light size floor).** A *small* body copied across *many* packages is the most expensive class of duplication, and the per-instance size floor is exactly what hides it (e.g. `stripStrings`/`stripComments` copied across five language adapters, each copy below the 200-character floor). For each body hash present in **≥ `minCrossPackageDuplicatePackages`** (default 3) *distinct* packages — identified via the same package-boundary the coupling grid uses — the rule emits **one** aggregate signal naming the sorted package list and the occurrence count. This path applies **no line floor** and a *lighter*, body-size-only floor (`minCrossPackageDuplicateBodySize`, default **80** characters) than the per-instance path's 200-character floor — tuned only to drop trivial bodies (empty DI-constructor shims, one-line getters, thin delegators) while keeping genuinely-small shared utilities visible. When a hash qualifies here, the per-instance signals for that same hash are **suppressed**, so a single duplicate group never double-reports. Bodies that don't reach N packages flow through path (1) unchanged.
 
 Both paths apply the same exclusions: `arrow` / `function-expression` / `module-init` kinds and test-file occurrences are skipped. The aggregate signal carries `metadata: { packages, packageCount, occurrenceCount, bodyHash }` and is anchored at the lexicographically-lowest qualified name for a stable fingerprint.
 
@@ -96,6 +96,7 @@ Both paths apply the same exclusions: `arrow` / `function-expression` / `module-
 | `minDuplicateBodyLines` | 5 | Per-instance: minimum source-span lines. |
 | `minDuplicateBodySize` | 200 | Per-instance: minimum normalized body characters. |
 | `minCrossPackageDuplicatePackages` | 3 | Aggregate: minimum distinct packages a body hash must span to fire one aggregate signal (and suppress its per-instance copies). Lower to **2** for a repo where every two-package duplicate is a real hoist target; raise it to quiet a noisy repo. |
+| `minCrossPackageDuplicateBodySize` | 80 | Aggregate: minimum normalized body characters (no line floor). Lighter than the per-instance floor — drops only trivial bodies while keeping small shared utilities visible. |
 
 **False-positive shape**: the rule matches function bodies *textually* and does not currently resolve called identifiers through lexical scope. On the per-instance path, thin wrapper functions are suppressed by `minDuplicateBodySize`, but two larger functions with identical text and different lexical bindings can still look like duplicates. The aggregate cross-package path is the high-signal subset: ≥3 distinct packages is unambiguously shared infra that should be hoisted into a common package.
 
@@ -139,18 +140,18 @@ recipe. Thresholds are opinionated in-rule defaults, overridable via the
 
 ### `graph:large-function`
 
-[`rules/large-function.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.0/packages/graph/engine/src/rules/large-function.ts) — flag functions whose body is large enough to be worth splitting. Two bands over the `bodyLines` feature column (`endLine − line + 1`):
+[`rules/large-function.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.0/packages/graph/engine/src/rules/large-function.ts) — flag functions whose body is large enough to be worth splitting. Two bands over the `bodyLines` feature column (`endLine − line + 1`, so it counts comments + blank lines). The gate defaults are calibrated higher than the dashboard's "~80 worth questioning / ~150 too much" heuristic so the gate flags genuinely oversized functions rather than flooding the baseline:
 
-- `> largeFunctionWarnLines` (default **80**) → `medium`.
-- `> largeFunctionErrorLines` (default **150**) → `high`.
+- `> largeFunctionWarnLines` (default **300**) → `medium`.
+- `> largeFunctionErrorLines` (default **500**) → `high`.
 
-Actionable ("split it"), precise (a 200-line function is rarely intended), bounded (count reaches zero once every function is under the limit).
+The synthetic `<module-init>` occurrence and test-file occurrences are skipped (this flags actual long functions in production code, not whole-file length). Actionable ("split it"), precise (a 500-line function is rarely intended), bounded (count reaches zero once every function is under the limit).
 
 ### `graph:wide-function`
 
-[`rules/wide-function.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.0/packages/graph/engine/src/rules/wide-function.ts) — flag functions with too many parameters, read directly from `params.length` (raw catalog data, no feature column):
+[`rules/wide-function.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.0/packages/graph/engine/src/rules/wide-function.ts) — flag functions with too many parameters, read directly from `params.length` (raw catalog data, no feature column). Test-file occurrences are skipped:
 
-- `> wideFunctionWarnParams` (default **4**) → `medium`.
+- `> wideFunctionWarnParams` (default **5**) → `medium`.
 - `> wideFunctionErrorParams` (default **7**) → `high`.
 
 Suggestion: group related parameters into an options object, or split the function.
@@ -159,10 +160,10 @@ Suggestion: group related parameters into an options object, or split the functi
 
 [`rules/high-blast-untested.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.0/packages/graph/engine/src/rules/high-blast-untested.ts) — the flagship combination gate: a high-reach function that **no test exercises**. The predicate is `blast.score >= threshold && !testReachable` — an **absolute** blast threshold (never a percentile), so the count reaches zero once every high-blast function is test-covered. This is exactly the bounded-gating shape [ADR-0001](https://github.com/opensip-ai/opensip-tools/blob/v2.6.0/docs/decisions/ADR-0001-graph-rules-actionable-precise-bounded.md) sanctions for a metric: it gates as an absolute-threshold input to an actionable, bounded predicate.
 
-- `blast.score >= highBlastWarnThreshold` (default **8**) and untested → `medium`.
-- `blast.score >= highBlastErrorThreshold` (default **20**) and untested → `high`.
+- `blast.score >= highBlastWarnThreshold` (default **75**) and untested → `medium`.
+- `blast.score >= highBlastErrorThreshold` (default **150**) and untested → `high`.
 
-A high-blast **tested** function and a **low-blast** untested function both emit nothing. The fix is one verb: add a test. Precision tracks edge-resolution fidelity (blast is computed over resolved call edges).
+A high-blast **tested** function and a **low-blast** untested function both emit nothing. Functions defined in a test file are skipped (asking whether test code "is reached by a test" is meaningless). The fix is one verb: add a test. Precision tracks edge-resolution fidelity (blast is computed over resolved call edges).
 
 ### `graph:cycle`
 
@@ -172,6 +173,8 @@ A high-blast **tested** function and a **low-blast** untested function both emit
 - `crossesPackages` → `high` (wins regardless of size — cross-package cycles are the most expensive to unwind).
 - `sccSize === 2` → `cycleSize2Severity` (default **`off`** — legitimate mutual recursion is common; set `low` to surface them as notes).
 - `sccSize >= cycleMinSize` (default **3**) → `medium`.
+
+A cycle whose members are **all** in test files is skipped (recursive test helpers / mutually-recursive fixtures are test code, not a production-architecture concern); a cycle that includes any production member is kept.
 
 ### `graph:unexpected-coupling`
 
@@ -199,11 +202,11 @@ The rules above don't know how the entry point list was built — the ones that 
 
 ## Per-language fidelity
 
-Rules don't know which adapter built the catalog — they consume `Catalog` + `Indexes` only — but each `CallEdge` carries a `confidence` field (`'high' | 'medium' | 'low'`) that reflects how the adapter resolved it. The TypeScript adapter uses the symbol table for direct calls and emits `'high'` confidence; the tree-sitter Python and Rust adapters resolve by name and emit `'medium'` (or `'low'` when multiple catalog entries share a simple name). The same rule on a Python catalog therefore produces a noisier output than on a TypeScript catalog — same logic, different input quality.
+Rules don't know which adapter built the catalog — they consume `Catalog` + `Indexes` only — but each `CallEdge` carries a `confidence` field (`'high' | 'medium' | 'low'`) that reflects how the adapter resolved it. The TypeScript adapter uses the symbol table for direct calls and emits `'high'` confidence; the tree-sitter adapters (Python, Rust, Go, Java — all WASM-backed via `web-tree-sitter`) resolve by name and emit `'medium'` (or `'low'` when multiple catalog entries share a simple name). The same rule on a Python catalog therefore produces a noisier output than on a TypeScript catalog — same logic, different input quality.
 
 The fidelity matrix:
 
-| Rule | TypeScript adapter | Tree-sitter adapter (Python, Rust) |
+| Rule | TypeScript adapter | Tree-sitter adapter (Python, Rust, Go, Java) |
 |---|---|---|
 | `orphan-subtree` | High — symbol resolution gives accurate transitive callee sets | Medium — name-based resolution; multiple `process` functions may pick the wrong target |
 | `duplicated-function-body` | Medium — body hash is textual; lexical-scope FPs documented | Medium — same fidelity (body hashing is language-agnostic) |
@@ -277,7 +280,7 @@ The SARIF mapping is a graph-native emitter, [`renderSarifOpenSip` in `render/sa
 | Function occurrence | `result.locations[0].physicalLocation.{artifactLocation,region}` |
 | Severity | `result.level` (`error` \| `warning`) |
 
-The graph SARIF reuses fitness's `buildSarifLog` (DEC-3) and emits the standard SARIF 2.1.0 fields. Today the SARIF carries `ruleId` + location only; fingerprinting remains part of the graph gate's SQLite baseline.
+The graph SARIF is a graph-native emitter (it no longer wraps fitness's `buildSarifLog`, per DEC-498) and emits the standard SARIF 2.1.0 fields. Today the SARIF carries `ruleId` + location only; fingerprinting remains part of the graph gate's SQLite baseline.
 
 Exit code 4 is reserved for `--report-to` upload failure (network error or non-2xx response). This separates "the gate said no" (exit 1) from "we couldn't tell the gate anything" (exit 4) — both fail the build but mean different things.
 

@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-22
-release: v2.0.x
+last_verified: 2026-06-03
+release: v2.6.0
 title: "CLI command tree"
 audience: [users, ci-integrators, contributors]
 purpose: "Lookup-shaped reference for every CLI command, its flags, and when to use each."
@@ -145,6 +145,9 @@ opensip-tools graph --no-cache
 opensip-tools graph --gate-save
 opensip-tools graph --gate-compare
 opensip-tools graph --report-to <url>
+
+# Scope to a named recipe (a subset of graph rules; default = all rules)
+opensip-tools graph --recipe <name>
 ```
 
 `graph` is the single entry point for static call-graph analysis. The default (non-JSON) output is a one-line summary; pass `-v`/`--verbose` to expand the structured terminal report into its detailed sections: catalog summary, findings grouped by rule (top 10 per rule, with overflow indicator), and top 10 inferred entry points. The full data is always available via `--json`.
@@ -159,6 +162,7 @@ opensip-tools graph --report-to <url>
 | `--json` | bool | `false` | Output a `CliOutput`-shaped JSON document instead of the unified terminal report. |
 | `--no-cache` | bool | `false` | Skip the catalog cache and force a full rebuild. |
 | `--resolution <mode>` | string | `exact` | Edge resolution tier: `exact` (semantic, uses the type checker) or `fast` (syntactic, no type checker — ~2× faster cold builds at lower edge fidelity). Invalid values fail loudly at the boundary. |
+| `--recipe <name>` | string | — | Run a named graph recipe — a subset of the graph rule set. Default (no flag): all rules. An unknown name fails with a configuration error. List recipes with `graph-recipes`. |
 | `--gate-save` | bool | `false` | Save the current Signal fingerprint set to the project's SQLite store (`graph_baseline_signals` table). Mutually exclusive with `--gate-compare`. |
 | `--gate-compare` | bool | `false` | Compare current Signals to the saved baseline; exit non-zero on regression. |
 | `--baseline <path>` | path | — | Override the default baseline location (used with `--gate-save` / `--gate-compare`) — e.g. pin to a CI artifact location instead of the project's SQLite store. |
@@ -246,6 +250,35 @@ opensip-tools graph-baseline-export --out graph-baseline.json
 | `--json` | bool | `false` | Emit a JSON result envelope on stdout instead of the human-readable summary. |
 
 Exit codes: 0 on success, non-zero with a `result.exitCode` if the baseline is missing or the write fails. Useful for promoting a local baseline into CI or sharing one across machines without copying the SQLite file.
+
+---
+
+## `graph-recipes` (alias: `list-graph-recipes`) — catalog graph recipes
+
+Tool-owned (graph Tool). Mirrors `fit-recipes` for the graph tool: prints the loaded graph-recipe inventory (a graph recipe is a named subset of the graph rule set). Reuses the shared `ListRecipesResult` contract and renderer.
+
+```
+opensip-tools graph-recipes
+opensip-tools graph-recipes --json
+opensip-tools list-graph-recipes        # alias
+```
+
+| Flag | Type | Default | Effect |
+|---|---|---|---|
+| `--json` | bool | `false` | Output structured JSON instead of the human-readable list. |
+
+JSON shape (same `list-recipes` envelope as `fit-recipes`):
+
+```json
+{
+  "type": "list-recipes",
+  "recipes": [
+    { "name": "default", "description": "...", "checkCount": "all rules" }
+  ]
+}
+```
+
+`checkCount` is a free-form label reused as a rule count — `"all rules"` for an `all` selector, `"<n> rules"` for an explicit selector, `"pattern-based"` otherwise.
 
 ---
 

@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-22
-release: v2.0.x
+last_verified: 2026-06-03
+release: v2.6.x
 title: "Output, gate, SARIF"
 audience: [contributors, ci-integrators]
 purpose: "What happens to the violations a check produces — render layer, JSON output, SARIF, the gate, cloud reporting."
@@ -53,7 +53,7 @@ The paths are mutually exclusive in their effect on stdout, but composable in th
 
 ## The `CliOutput` envelope
 
-Every output path starts from the same shape — a `CliOutput` produced after the recipe runs. Defined at [`packages/contracts/src/types.ts:100`](../../../packages/contracts/src/types.ts):
+Every output path starts from the same shape — a `CliOutput` produced after the recipe runs. Defined at [`packages/contracts/src/types.ts`](../../../packages/contracts/src/types.ts):
 
 ```ts
 interface CliOutput {
@@ -254,7 +254,7 @@ The full SARIF spec has many more optional fields (`taxonomies`, `invocations`, 
 
 ### Reading SARIF as a baseline
 
-The baseline reader is forgiving — it tolerates partial SARIF (a run with no `results` array, a result with no `locations`, etc.) so a hand-edited baseline doesn't crash the gate. See [`packages/fitness/engine/src/gate.ts:287`](../../../packages/fitness/engine/src/gate.ts) (`extractViolationsFromSarif`).
+The baseline reader is forgiving — it tolerates partial SARIF (a run with no `results` array, a result with no `locations`, etc.) so a hand-edited baseline doesn't crash the gate. See [`packages/fitness/engine/src/gate.ts`](../../../packages/fitness/engine/src/gate.ts) (`extractViolationsFromSarif`).
 
 This permissiveness exists for a real reason: teams sometimes hand-edit baselines to remove a finding they've intentionally fixed, or to add an entry that they want grandfathered. The gate parser shouldn't refuse those edits as long as the document is structurally a SARIF log.
 

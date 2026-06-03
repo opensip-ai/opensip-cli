@@ -77,8 +77,8 @@ These docs are written for engineers fluent in TypeScript and Node tooling. Voic
 ### 40 — Graph
 *Static call-graph analysis: what `opensip-tools graph` produces and how the dashboard consumes it.*
 
-18. [**Stages and catalog**](/docs/opensip-tools/40-graph/01-stages-and-catalog/) — The six-stage pipeline (discover → inventory → edges → indexes → rules → render) and the catalog's on-disk shape.
-19. [**Rules and gating**](/docs/opensip-tools/40-graph/02-rules-and-gating/) — The six rules, entry-point inference, `--gate-save`/`--gate-compare`, SARIF output.
+18. [**Stages and catalog**](/docs/opensip-tools/40-graph/01-stages-and-catalog/) — The seven-stage pipeline (discover → inventory → edges → indexes → features → rules → render) and the catalog's on-disk shape.
+19. [**Rules and gating**](/docs/opensip-tools/40-graph/02-rules-and-gating/) — The ten rules, entry-point inference, `--gate-save`/`--gate-compare`, SARIF output.
 20. [**Adding a language**](/docs/opensip-tools/40-graph/03-adding-a-language/) — Step-by-step guide for writing a new `GraphLanguageAdapter`.
 
 ### 50 — Extend

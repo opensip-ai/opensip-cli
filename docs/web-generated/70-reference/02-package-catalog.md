@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-26
-release: v2.0.0
+last_verified: 2026-06-03
+release: v2.6.0
 title: "Package catalog"
 audience: [contributors, plugin-authors]
 purpose: "Flat reference of every package in the monorepo: name, path, layer, one-line role, key exports. Lookup-only; the conceptual layer narrative lives in 10-concepts/03-modular-monolith.md."
@@ -54,7 +54,7 @@ Peer packages at the same layer. Tools implement the `Tool` contract; shared lib
 |---|---|---|---|
 | `@opensip-tools/fitness` | `packages/fitness/engine/` | Fitness check engine, `defineCheck`, `defineRecipe`, gate, SARIF builder | `defineCheck`, `defineRecipe`, `FitnessRecipeService`, `defaultRecipeRegistry`, `getCheckConfig`, `executeFit`, `loadSignalersConfig`, `fitnessTool`, `saveBaseline`, `compareToBaseline`, `buildSarifLog`, `reportToCloud`, `openDashboard` |
 | `@opensip-tools/simulation` | `packages/simulation/engine/` | Simulation engine, four scenario kinds | `defineLoadScenario`, `defineChaosScenario`, `defineInvariantScenario`, `defineFixEvaluationScenario`, `defineSimulationRecipe`, `simulationTool`, `currentSimulationRecipeRegistry`, `SCENARIO_KINDS` |
-| `@opensip-tools/graph` | `packages/graph/engine/` | Static call-graph + dead-end analysis kernel. Six-stage staged pipeline (discover → inventory → edges → indexes → rules → render). Language-agnostic — adapters live in their own publishable packages (see "Graph language adapters" below) and register through `registerAdapter`. Imports SARIF helpers from `@opensip-tools/fitness` (peer-layer dep, DEC-3) | `graphTool`, `Catalog`, `FunctionOccurrence`, `CallEdge`, `Indexes`, `Rule`, `Renderer`, `GraphLanguageAdapter`, `registerAdapter`, `pickAdapter` |
+| `@opensip-tools/graph` | `packages/graph/engine/` | Static call-graph + dead-end analysis kernel. Seven-stage staged pipeline (discover → inventory → edges → indexes → features → rules → render). Language-agnostic — adapters live in their own publishable packages (see "Graph language adapters" below) and register through `registerAdapter`. Owns its own SARIF emitter (`render/sarif-opensip.ts`, DEC-498 — no longer the fitness shim); depends on `@opensip-tools/contracts` + `@opensip-tools/reporting`, not fitness | `graphTool`, `Catalog`, `FunctionOccurrence`, `CallEdge`, `Indexes`, `Rule`, `Renderer`, `GraphLanguageAdapter`, `registerAdapter`, `pickAdapter` |
 
 ### Shared libraries
 
@@ -78,17 +78,20 @@ Implement `LanguageAdapter`. Used by fitness checks and any future tool that nee
 | `@opensip-tools/lang-go` | `packages/languages/lang-go/` | Go adapter — strip routines | `goAdapter` |
 | `@opensip-tools/lang-cpp` | `packages/languages/lang-cpp/` | C/C++ adapter — strip routines | `cppAdapter` |
 
-### Graph language adapters (five languages)
+### Graph language adapters (five languages + shared scaffolding)
 
 Distinct from the fitness language adapters above — these implement the graph engine's `GraphLanguageAdapter` contract (catalog inventory, edge extraction). Each is a publishable npm package marked with `opensipTools.kind: "graph-adapter"` and registered via `registerAdapter` when imported.
 
+The four tree-sitter adapters (Python, Rust, Go, Java) are backed by **`web-tree-sitter`** (the WASM build — no native tree-sitter binding) and share `@opensip-tools/graph-adapter-common`, the tree-sitter scaffolding package (discover/parse/walk/cache-key factories). It sits downstream of the engine and upstream of the four tree-sitter adapters. The TypeScript adapter is the exception — it resolves its call graph through the TS compiler API, not tree-sitter.
+
 | Package | Path | Role | Key exports |
 |---|---|---|---|
+| `@opensip-tools/graph-adapter-common` | `packages/graph/graph-adapter-common/` | Shared tree-sitter scaffolding (discover/parse/walk/cache-key factories) for the tree-sitter graph adapters. Depends on `core`, `graph`, `web-tree-sitter`. Downstream of the engine, upstream of go/java/python/rust | discover/parse/walk/cache-key factory helpers |
 | `@opensip-tools/graph-typescript` | `packages/graph/graph-typescript/` | TypeScript graph adapter — symbol-resolved call graph via TS compiler API | `typescriptGraphAdapter` |
-| `@opensip-tools/graph-python` | `packages/graph/graph-python/` | Python graph adapter — tree-sitter backed | `pythonGraphAdapter` |
-| `@opensip-tools/graph-rust` | `packages/graph/graph-rust/` | Rust graph adapter — tree-sitter backed | `rustGraphAdapter` |
-| `@opensip-tools/graph-go` | `packages/graph/graph-go/` | Go graph adapter — tree-sitter backed | `goGraphAdapter` |
-| `@opensip-tools/graph-java` | `packages/graph/graph-java/` | Java graph adapter — tree-sitter backed | `javaGraphAdapter` |
+| `@opensip-tools/graph-python` | `packages/graph/graph-python/` | Python graph adapter — `web-tree-sitter` backed | `pythonGraphAdapter` |
+| `@opensip-tools/graph-rust` | `packages/graph/graph-rust/` | Rust graph adapter — `web-tree-sitter` backed | `rustGraphAdapter` |
+| `@opensip-tools/graph-go` | `packages/graph/graph-go/` | Go graph adapter — `web-tree-sitter` backed | `goGraphAdapter` |
+| `@opensip-tools/graph-java` | `packages/graph/graph-java/` | Java graph adapter — `web-tree-sitter` backed | `javaGraphAdapter` |
 
 ## Layer 4 — fitness check packs
 
@@ -134,17 +137,17 @@ Imports every layer below. The published binary.
 
 ## Verification trail
 
-Last verified at v2.0.0 against:
+Last verified at v2.6.0 against:
 
-- `packages/` directory listing — **29 publishable packages** total:
+- `packages/` directory listing — **30 publishable packages** total (all at `2.6.0`):
   - Layer 1 (kernel): 1 — `core`
   - Layer 2 (datastore + contracts + session-store + reporting): 4 — `datastore`, `contracts`, `session-store`, `reporting`
   - Layer 3 Tools: 3 — `fitness`, `simulation`, `graph`
   - Layer 3 Shared libraries: 2 — `dashboard`, `cli-ui`
   - Layer 3 Fitness language adapters: 6 — `lang-typescript`, `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp`
-  - Layer 3 Graph language adapters: 5 — `graph-typescript`, `graph-python`, `graph-rust`, `graph-go`, `graph-java`
+  - Layer 3 Graph language adapters + scaffolding: 6 — `graph-adapter-common`, `graph-typescript`, `graph-python`, `graph-rust`, `graph-go`, `graph-java`
   - Layer 4 (check packs): 7 — `checks-universal`, `checks-typescript`, `checks-python`, `checks-java`, `checks-go`, `checks-cpp`, `checks-rust`
   - Layer 5 (composition root): 1 — `cli`
-- v2.0.0 promoted graph language adapters from internal subdirs to publishable npm packages (`@opensip-tools/graph-*`), added `checks-rust` to the bundled check packs, and split `dashboard` and `cli-ui` into peer-layer libraries to keep Tool engines free of UI-kit and rendering dependencies. The fitness language adapters (`@opensip-tools/lang-*`) and the graph language adapters (`@opensip-tools/graph-*`) are unrelated siblings implementing different contracts (`LanguageAdapter` vs. `GraphLanguageAdapter`) — see [`50-extend/05-language-adapters.md`](/docs/opensip-tools/50-extend/05-language-adapters/) for the distinction.
+- v2.0.0 promoted graph language adapters from internal subdirs to publishable npm packages (`@opensip-tools/graph-*`), added `checks-rust` to the bundled check packs, and split `dashboard` and `cli-ui` into peer-layer libraries to keep Tool engines free of UI-kit and rendering dependencies. Since then the tree-sitter graph adapters moved to the WASM `web-tree-sitter` build and grew a shared `@opensip-tools/graph-adapter-common` scaffolding package (29 → 30 packages). The fitness language adapters (`@opensip-tools/lang-*`) and the graph language adapters (`@opensip-tools/graph-*`) are unrelated siblings implementing different contracts (`LanguageAdapter` vs. `GraphLanguageAdapter`) — see [`50-extend/05-language-adapters.md`](/docs/opensip-tools/50-extend/05-language-adapters/) for the distinction.
 - Each package's `package.json` `description` and `name` field, read directly.
 - The dep-cruiser config for layer rules.

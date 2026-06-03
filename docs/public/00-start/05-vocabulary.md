@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-26
-release: v2.0.x
+last_verified: 2026-06-03
+release: v2.6.x
 title: "Vocabulary"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "The terms used everywhere in opensip-tools. Read this once before going deeper."
@@ -10,10 +10,13 @@ source-files:
   - packages/core/src/tools/types.ts
   - packages/core/src/plugins/types.ts
   - packages/core/src/languages/adapter.ts
+  - packages/core/src/recipes/registry.ts
   - packages/fitness/engine/src/framework/check-types.ts
   - packages/fitness/engine/src/recipes/types.ts
   - packages/fitness/engine/src/signalers/types.ts
   - packages/fitness/engine/src/targets/types.ts
+  - packages/graph/engine/src/rules/define-rule.ts
+  - packages/graph/engine/src/rules/registry.ts
 related-docs:
   - ./01-what-is-opensip-tools.md
   - ./06-system-context.md
@@ -21,7 +24,7 @@ related-docs:
 ---
 # Vocabulary
 
-The codebase has twelve load-bearing terms. If you know what each of these is, you can read any source file in the repo without guessing. They're listed in a deliberate order — earlier terms support later ones.
+The codebase has thirteen load-bearing terms. If you know what each of these is, you can read any source file in the repo without guessing. They're listed in a deliberate order — earlier terms support later ones.
 
 If you're skimming for one definition, [Ctrl-F]. If you're reading top-to-bottom, expect each entry to be ~3-6 sentences with a source pointer.
 
@@ -55,7 +58,7 @@ Recipes are created with `defineRecipe()` from [`packages/fitness/engine/src/rec
 
 The default recipe — what `opensip-tools fit` runs without `--recipe` — is built by [`packages/fitness/engine/src/recipes/built-in-recipes.ts`](../../../packages/fitness/engine/src/recipes/built-in-recipes.ts) and selects every enabled check. A project ships its own recipes under `opensip-tools/fit/recipes/*.mjs`.
 
-`sim` has its own parallel recipe shape ([`packages/simulation/engine/src/`](../../../packages/simulation/engine/src/)). Same idea, different selector.
+As of v2.6.0 the generic recipe substrate — the named selection of units (by id/tag) plus per-unit config overrides — lives in `@opensip-tools/core` (`RecipeRegistry<T>`, generic over the unit type), with the selector-resolution and per-unit-override logic shared. Each tool keeps its own *execution* strategy (fitness runs checks parallel/sequential over file content; sim runs scenarios; graph evaluates rules once over the dataset). `sim` and `graph` reuse the same substrate with their own selectors — same idea, different unit type.
 
 ## Scenario
 
@@ -67,6 +70,12 @@ A **scenario** is the sim-side equivalent of a check — a single, named, determ
 - **`fix-evaluation`** — replay a corpus of fixes and score them.
 
 Scenarios are defined by tool packs analogous to check packs ([`packages/simulation/engine/src/kinds/`](../../../packages/simulation/engine/src/kinds/)). The shape is younger and less stable than checks — expect minor-version churn.
+
+## Rule
+
+A **rule** is the `graph`-side equivalent of a check — a single, named analysis over the static call graph. As of v2.6.0 (ADR-0005) the graph tool is an architectural peer of fitness: rules are authored with `defineRule` ([`packages/graph/engine/src/rules/define-rule.ts`](../../../packages/graph/engine/src/rules/define-rule.ts)), the parallel to `defineCheck`. The difference is the input — a check sees `(content, filePath)`; a rule's `evaluate(dataset)` sees the engine **dataset**: the catalog, the indexes, and a derived **feature layer** (per-function size, fan-out, blast radius, test reachability; package-coupling and SCC membership). "The data is the data, the engine is the engine" — rules are declarative queries over that dataset, and the dashboard's graph view is a pure view over the same data.
+
+Ten rules ship today, in a fixed registration order ([`packages/graph/engine/src/rules/registry.ts`](../../../packages/graph/engine/src/rules/registry.ts)): the five original reachability/duplication rules (`orphan-subtree`, `duplicated-function-body`, `no-side-effect-path`, `test-only-reachable`, `always-throws-branch`) plus five structural rules (`large-function`, `wide-function`, `high-blast-untested`, `cycle`, `unexpected-coupling`). Runtime loading of project-local rules is deferred — the bundled set is what runs today. Rule slugs are byte-stable (they key the baseline fingerprint), so a rule's `ruleId` survives refactors.
 
 ## Signal
 

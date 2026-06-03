@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-31
-release: v2.0.x
+last_verified: 2026-06-03
+release: v2.6.x
 title: "Checks reference"
 audience: [getting-started, ci-integrators, plugin-authors]
 purpose: "Browsable index of every built-in fit check, grouped by pack and primary tag. Auto-generated from source by scripts/build-checks-index.mjs."

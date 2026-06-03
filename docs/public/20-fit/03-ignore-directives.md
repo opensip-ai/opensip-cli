@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-05-22
-release: v2.0.x
+last_verified: 2026-06-03
+release: v2.6.x
 title: "Ignore directives"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "Inline source-level suppression — how `@fitness-ignore-next-line` and `@fitness-ignore-file` work, when to use them, and where they fit in the run."
@@ -59,7 +59,7 @@ Suppresses violations of the named check on the line immediately following the d
 console.log(`[startup] PID ${process.pid}`);
 ```
 
-…and the fitness directive lands on the `console.log` call, even though two unrelated linter directives sit between it and the line. The recognized neighbors are listed in `KNOWN_DIRECTIVE_KEYWORDS` ([`packages/fitness/engine/src/framework/directive-parsing.ts:16`](../../../packages/fitness/engine/src/framework/directive-parsing.ts)): `eslint-disable-next-line`, `eslint-disable-line`, `@ts-expect-error`, `@ts-ignore`, `@ts-nocheck`, `prettier-ignore`, `biome-ignore`, plus the fitness directives themselves.
+…and the fitness directive lands on the `console.log` call, even though two unrelated linter directives sit between it and the line. The recognized neighbors are listed in `KNOWN_DIRECTIVE_KEYWORDS` ([`packages/fitness/engine/src/framework/directive-parsing.ts`](../../../packages/fitness/engine/src/framework/directive-parsing.ts)): `eslint-disable-next-line`, `eslint-disable-line`, `@ts-expect-error`, `@ts-ignore`, `@ts-nocheck`, `prettier-ignore`, `biome-ignore`, plus the fitness directives themselves.
 
 ### `@fitness-ignore-file`
 
