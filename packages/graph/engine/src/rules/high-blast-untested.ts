@@ -30,8 +30,8 @@ import { defineRule } from './define-rule.js';
 
 import type { Signal } from '@opensip-tools/core';
 
-const DEFAULT_WARN_BLAST = 8;
-const DEFAULT_ERROR_BLAST = 20;
+const DEFAULT_WARN_BLAST = 75;
+const DEFAULT_ERROR_BLAST = 150;
 
 export const highBlastUntestedRule = defineRule({
   slug: 'graph:high-blast-untested',

@@ -3,8 +3,12 @@
  * worth splitting. A two-band predicate over the `bodyLines` feature column
  * (Phase C: `endLine − line + 1`).
  *
- * Bands (defaults from the dashboard's former Big Functions view, `view-big.ts`:
- * "above ~80 worth questioning; ~150 almost always too much"):
+ * Bands (`bodyLines` is the PHYSICAL span `endLine − line + 1`, so it counts
+ * comments + blank lines). The gate defaults are calibrated higher than the
+ * dashboard's "~80 worth questioning / ~150 too much" heuristic so the gate
+ * flags genuinely oversized functions rather than every long-but-fine one
+ * (on a real codebase ~80/~150 floods the baseline). Override per-project via
+ * config:
  *   - `bodyLines <= warn`  → no signal.
  *   - `(warn, error]`      → base `medium`.
  *   - `> error`            → base `high`.
@@ -23,8 +27,8 @@ import { defineRule } from './define-rule.js';
 import type { FeatureTable, FunctionOccurrence } from '../types.js';
 import type { Signal } from '@opensip-tools/core';
 
-const DEFAULT_WARN_LINES = 80;
-const DEFAULT_ERROR_LINES = 150;
+const DEFAULT_WARN_LINES = 300;
+const DEFAULT_ERROR_LINES = 500;
 
 export const largeFunctionRule = defineRule({
   slug: 'graph:large-function',

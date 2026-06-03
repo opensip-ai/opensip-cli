@@ -59,16 +59,20 @@ describe('clamp integration — baseline-neutral when unset, clamps when set', (
     for (const s of clamped) expect(s.severity).toBe('high');
   });
 
-  it('large-function (base high) is unchanged with {} and clamps when overridden', () => {
+  it('large-function (base high) is unchanged without an override and clamps when set', () => {
     const big = occ({ bodyHash: 'h', simpleName: 'huge', line: 1, endLine: 200 });
     const catalog = makeCatalog([big]);
     const indexes = buildIndexes(catalog);
+    // Explicit thresholds (error 150) so the 200-line span is base `high`
+    // regardless of the shipped defaults — this case tests the clamp, not the bands.
+    const bands: GraphConfig = { largeFunctionWarnLines: 80, largeFunctionErrorLines: 150 };
 
-    const baseSignals = largeFunctionRule.evaluate(catalog, indexes, {});
+    const baseSignals = largeFunctionRule.evaluate(catalog, indexes, bands);
     expect(baseSignals).toHaveLength(1);
     expect(baseSignals[0]?.severity).toBe('high');
 
     const clamped = largeFunctionRule.evaluate(catalog, indexes, {
+      ...bands,
       severityOverrides: { 'graph:large-function': 'warning' },
     });
     expect(clamped[0]?.severity).toBe('medium');
