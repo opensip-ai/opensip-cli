@@ -42,10 +42,11 @@ const NON_ADAPTER_GRAPH_PACKAGES = new Set<string>([
   `${SCOPE}/graph-adapter-common`, // shared adapter scaffolding (no `adapter` export)
 ]);
 
-/** `checks-*` packages that intentionally are NOT fit packs. */
-const NON_PACK_CHECKS_PACKAGES = new Set<string>([
-  // none today — a future `checks-common` shared lib would be listed here.
-]);
+/**
+ * `checks-*` packages that intentionally are NOT fit packs.
+ * None today — a future `checks-common` shared lib would be added here.
+ */
+const NON_PACK_CHECKS_PACKAGES = new Set<string>();
 
 /** First-party tool engines that must carry the `tool` marker. */
 const TOOL_PACKAGES = new Set<string>([
@@ -149,6 +150,7 @@ describe('plugin-kind contract (workspace invariant)', () => {
   it('every @opensip-tools/checks-* package is a declared fit-pack or explicitly allowlisted', () => {
     const checksPrefixed = PACKAGES.filter((p) => p.name.startsWith(`${SCOPE}/checks-`));
     const offenders = checksPrefixed.filter(
+      // eslint-disable-next-line sonarjs/no-empty-collection -- NON_PACK_CHECKS_PACKAGES is a deliberate, currently-empty extension seam (ADR-0007), symmetric with the graph allowlist; a future checks-* shared lib gets added here.
       (p) => p.kind !== 'fit-pack' && !NON_PACK_CHECKS_PACKAGES.has(p.name),
     );
     expect(
@@ -166,6 +168,7 @@ describe('plugin-kind contract (workspace invariant)', () => {
     const masked = PACKAGES.filter(
       (p) =>
         (NON_ADAPTER_GRAPH_PACKAGES.has(p.name) && p.kind === 'graph-adapter') ||
+        // eslint-disable-next-line sonarjs/no-empty-collection -- see note above: empty-today extension seam, not dead code.
         (NON_PACK_CHECKS_PACKAGES.has(p.name) && p.kind === 'fit-pack'),
     );
     expect(
