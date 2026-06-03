@@ -14,6 +14,7 @@ import { dashboardEditorLinkJs } from '../code-paths/editor-link.js';
 import { dashboardFiltersJs } from '../code-paths/filters.js';
 import { dashboardFunctionCardJs } from '../code-paths/function-card.js';
 import { dashboardFunctionRowJs } from '../code-paths/function-row.js';
+import { dashboardHelpDrawerJs } from '../code-paths/help-drawer.js';
 import { dashboardIndexesJs } from '../code-paths/indexes.js';
 import { dashboardPathUtilsJs } from '../code-paths/path-utils.js';
 import { dashboardTraceJs } from '../code-paths/trace.js';
@@ -57,6 +58,7 @@ return { views, graphCatalog, graphIndexes, filterState };
       + dashboardViewsRegistryJs()
       + dashboardFiltersJs()
       + dashboardFunctionRowJs()
+      + dashboardHelpDrawerJs()
       + dashboardEditorLinkJs()
       + dashboardTraceJs()
       + dashboardFunctionCardJs()
@@ -140,6 +142,27 @@ describe('Functions (distribution) view', () => {
     input.value = '';
     input.dispatchEvent(new Event('input', { bubbles: true }));
     expect(view.querySelectorAll('[data-body-hash]').length).toBe(3);
+  });
+
+  it('renders the "Functions (N)" heading with ⓘ ABOVE the controls (like Coupling/Visualization)', () => {
+    const { view } = renderDistribution();
+    const heading = view.querySelector('h3');
+    const info = view.querySelector('.section-info');
+    const controls = view.querySelector('.code-paths-ranked-controls');
+    expect(heading).not.toBeNull();
+    expect(heading!.textContent).toContain('Functions (3)'); // 3 functions in the sample
+    expect(info).not.toBeNull();
+    expect(controls).not.toBeNull();
+    // The heading must precede the controls row in document order.
+    expect(heading!.compareDocumentPosition(controls!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('updates the heading count as the filter narrows the rows', () => {
+    const { view } = renderDistribution();
+    const input = view.querySelector<HTMLInputElement>('#code-paths-search-distribution')!;
+    input.value = 'parse';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(view.querySelector('h3')!.textContent).toContain('Functions (1)');
   });
 
   it('renders Kind and Package single-select dropdowns before the search box', () => {

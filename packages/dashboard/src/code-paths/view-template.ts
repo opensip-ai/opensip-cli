@@ -241,9 +241,11 @@ export function defineRankedView(config: RankedViewConfig): string {
     const controlsRow = el('div', { class: 'code-paths-ranked-controls' });${kindPackageBlock}${searchInputBlock}
     container.appendChild(controlsRow);`
     : '';
-  const resultsHostDecl = hasControls
-    ? `    const rowsHost = el('div'); container.appendChild(rowsHost);`
-    : `    const rowsHost = container;`;
+  // The section heading renders into its OWN host ABOVE the controls (so the
+  // "Functions (N) ⓘ" heading sits above the dropdowns, consistent with the
+  // Coupling and Visualization views). The rows always render into a separate
+  // host below — renderFunctionRows clears its host, so it must NOT be the
+  // shared container (that would wipe the heading + controls).
   // Combined row predicate: Kind, Package, then name substring. Each clause is
   // skipped when its control is absent or set to "all"/empty.
   const kindClause = filterByKP ? `if (${kindVar} && occ.kind !== ${kindVar}) return false;` : '';
@@ -285,11 +287,16 @@ ${stateDecl}views.push({
       container.appendChild(el('div', { class: 'empty', text: ${jsString(config.emptyMessage)} }));
       return;
     }
+    const headingHost = el('div'); container.appendChild(headingHost);
 ${controlsBlock}
-${resultsHostDecl}
+    const rowsHost = el('div'); container.appendChild(rowsHost);
     const __rowFilter = ${rowFilterExpr};
     function renderRows() {
       const filtered = ranked.filter(r => __rowFilter(r.occ));
+      // Heading (with the ⓘ help button) above the controls; its count tracks
+      // the currently-shown rows as the filters narrow them.
+      while (headingHost.firstChild) headingHost.removeChild(headingHost.firstChild);
+      headingHost.appendChild(makeSectionHeading(${jsString(config.headingText)} + ' (' + filtered.length + ')', ${jsString(config.id)}));
       if (filtered.length === 0) {
         while (rowsHost.firstChild) rowsHost.removeChild(rowsHost.firstChild);
         rowsHost.appendChild(el('div', { class: 'empty', text: ${jsString(config.emptyMessage)} }));
@@ -303,6 +310,7 @@ ${columnsLiteral}
         ],
         ${jsString(config.headingText)},
         ${jsString(config.id)},
+        true,
       );
     }
     renderRows();

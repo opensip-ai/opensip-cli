@@ -33,18 +33,25 @@ export function dashboardCssCodePaths(): string {
 .code-paths-graph-toolbar-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
 /* Visualization controls — ONE CSS grid (not two flex rows) so the label and
    control columns line up like a table across both rows:
-     Row 1: Layout · Scope · Highlight-cycles checkbox (spans the rest)
+     Row 1: Layout · Scope
      Row 2: Level · Package · Kind (· Edges, function level only)
    Label columns auto-size to the widest label across both rows; control columns
-   are a fixed 190px. The Package/Kind controls are disabled at package level
+   are a fixed 190px. The small column-gap keeps each label tight against its
+   dropdown; group-start labels (labelG) add a left margin so the groups still
+   read as separate. The Package/Kind controls are disabled at package level
    (they only apply at function level), so they fade rather than vanish. */
-.code-paths-graph-grid { display: grid; grid-template-columns: auto 190px auto 190px auto 190px auto 190px; gap: 10px 12px; align-items: center; margin-bottom: 12px; }
+.code-paths-graph-grid { display: grid; grid-template-columns: auto 190px auto 190px auto 190px auto 190px; gap: 8px 6px; align-items: center; margin-bottom: 10px; }
 .code-paths-graph-grid .code-paths-graph-toolbar-label { justify-self: start; }
-/* The cycles checkbox sits in row 1, col 5, and spans to the row end so row 2
-   starts on a fresh grid row. */
-.code-paths-graph-grid-rest { grid-column: 5 / -1; }
+/* Group-start labels (Scope/Package/Kind/Edges) get a left margin so a group
+   reads as separate from the previous control while its own dropdown stays
+   tight beside it. */
+.code-paths-graph-grid-group { margin-left: 16px; }
+/* The Level label forces a fresh grid row (row 1 leaves cols 5-8 empty). */
+.code-paths-graph-grid-break { grid-column: 1; }
 .code-paths-graph-checkbox { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; user-select: none; height: 30px; }
 .code-paths-graph-checkbox input { cursor: pointer; }
+/* The Highlight-cycles checkbox sits on its own line below the search box. */
+.code-paths-graph-cycles-row { margin-bottom: 12px; }
 /* Functions view controls row (Kind · Package · search). */
 .code-paths-ranked-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; margin-bottom: 12px; }
 .code-paths-ranked-controls .code-paths-search { margin-bottom: 0; }

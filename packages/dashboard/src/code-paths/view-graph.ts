@@ -279,6 +279,7 @@ function gvRenderGraph(container, catalog, indexes) {
   container.appendChild(makeSectionHeading('Visualization', 'graph'));
   gvRenderControls(container, catalog, indexes);
   gvRenderSearchBox(container);
+  gvRenderCyclesToggle(container);
 
   var elements;
   if (gvLevel === 'function') {

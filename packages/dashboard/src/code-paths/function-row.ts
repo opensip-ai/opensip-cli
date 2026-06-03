@@ -37,7 +37,7 @@ function makeSectionHeading(text, viewId) {
   return h3;
 }
 
-function renderFunctionRows(container, occurrences, columns, heading, viewId) {
+function renderFunctionRows(container, occurrences, columns, heading, viewId, skipHeading) {
   while (container.firstChild) container.removeChild(container.firstChild);
   if (!occurrences || occurrences.length === 0) {
     container.appendChild(el('div', { class: 'empty', text: 'No functions to show.' }));
@@ -45,7 +45,9 @@ function renderFunctionRows(container, occurrences, columns, heading, viewId) {
   }
   const headingText = (heading || 'Results') + ' (' + occurrences.length + ')';
   const section = el('div', { class: 'section' });
-  section.appendChild(makeSectionHeading(headingText, viewId));
+  // skipHeading lets a caller render the section heading itself (e.g. ABOVE its
+  // own controls row) rather than at the top of the rows host.
+  if (!skipHeading) section.appendChild(makeSectionHeading(headingText, viewId));
   const card = el('div', { class: 'card' });
   const table = el('table', { class: 'data-table sortable' });
   const thead = el('thead');
