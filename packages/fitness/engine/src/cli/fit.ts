@@ -23,7 +23,8 @@
  * same names.
  */
 
-import { logger } from '@opensip-tools/core';
+import { currentScope, logger, noopSignalSink } from '@opensip-tools/core';
+import { emitRunSignals } from '@opensip-tools/reporting';
 
 import { defaultRegistry } from '../framework/registry.js';
 import { buildScopeBasedFileMap } from '../framework/scope-resolver.js';
@@ -159,6 +160,17 @@ export async function executeFit(
   if (opts.datastore) {
     persistFitSession(opts.datastore, args, output);
   }
+
+  // ADR-0008: best-effort cloud signal emit, AFTER local persistence. No-op
+  // for the keyless/not-entitled majority (zero IO); never throws and never
+  // affects the exit code. The run's selected sink rides on the RunScope.
+  await emitRunSignals({
+    output,
+    tool: 'fit',
+    recipe: recipeName,
+    cwd: process.cwd(),
+    signalSink: currentScope()?.signalSink ?? noopSignalSink,
+  });
 
   // Collect warnings from check loading (ensureChecksLoaded → loadWarnings)
   // and from config validation (validateLanguagesAgainstAdapters). Both flow

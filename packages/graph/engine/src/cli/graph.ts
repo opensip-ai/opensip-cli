@@ -34,6 +34,7 @@ import {
   ToolError,
   ValidationError,
 } from '@opensip-tools/core';
+import { emitRunSignals } from '@opensip-tools/reporting';
 import { SessionRepo } from '@opensip-tools/session-store';
 
 import { pickAdapter } from '../lang-adapter/registry.js';
@@ -321,6 +322,16 @@ async function dispatchGraphResult(
   if (opts.json !== true) {
     const durationMs = Math.max(0, Date.now() - Date.parse(startedAt));
     persistSession(opts, result.signals, cli.scope.datastore() as DataStore | undefined, durationMs);
+    // ADR-0008: best-effort cloud signal emit, mirroring local-session
+    // persistence (skipped for --json/--catalog-output machine artifacts).
+    // No-op for the keyless/not-entitled majority; never throws.
+    await emitRunSignals({
+      output: buildCliOutput(result.signals, 'graph', result.catalog?.resolutionMode),
+      tool: 'graph',
+      recipe: opts.recipe,
+      cwd: opts.cwd,
+      signalSink: cli.scope.signalSink,
+    });
   }
   cli.setExitCode(EXIT_CODES.SUCCESS);
   logger.info({
