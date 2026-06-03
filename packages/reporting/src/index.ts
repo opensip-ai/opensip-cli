@@ -17,3 +17,5 @@ export {
   type EntitlementSource,
   type CheckEntitlementInput,
 } from './entitlement.js';
+export { createCloudSignalSink, type CloudSignalSinkOptions } from './cloud-signal-sink.js';
+export { postChunked, type EgressResult, type RetryPolicy, type PostChunkedArgs } from './http-egress.js';
