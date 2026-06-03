@@ -2,13 +2,13 @@
 /**
  * @vitest-environment jsdom
  *
- * View 8 (Graph) — Cytoscape node-link view.
+ * View 8 (Visualization) — Cytoscape PACKAGE node-link view (item 10/11).
  *
- * The emitter is snapshotted (matches the other view-*.test.ts pattern)
- * and exercised structurally: the view registers with id 'graph', renders
- * the layout selector + canvas from an embedded view-model blob, falls
- * back to an empty state when the blob is missing, and bans any
- * @opensip-tools/graph import.
+ * The emitter is snapshotted (matches the other view-*.test.ts pattern) and
+ * exercised structurally: the view registers with id 'graph' and label
+ * 'Visualization', renders the layout selector + canvas from an embedded
+ * package-level view-model blob, falls back to an empty state when the blob is
+ * missing, and bans any @opensip-tools/graph import.
  */
 
 import { describe, expect, it, beforeEach } from 'vitest';
@@ -28,16 +28,8 @@ interface GraphView {
   onActivate?: () => void;
 }
 
-interface FilterState {
-  packages: Set<string>;
-  kinds: Set<string>;
-  includeTests: boolean;
-}
-
 interface Env {
   views: GraphView[];
-  filterState: FilterState;
-  gvBfsReach: (seedId: string, adjacency: Map<string, string[]>) => Record<string, true>;
 }
 
 function loadEnv(withVendor: boolean): Env {
@@ -57,7 +49,7 @@ var graphCatalog = null;
 var graphIndexes = { byBodyHash: new Map(), bySimpleName: new Map(), callees: new Map(), callers: new Map() };
 `;
   const tail = `
-return { views, filterState, gvBfsReach };
+return { views };
 `;
   const parts = [elSrc];
   if (withVendor) parts.push(dashboardCytoscapeVendorJs());
@@ -83,35 +75,14 @@ function embedViewModel(vm: unknown): void {
   document.body.append(blob);
 }
 
+// Package-level sample: two packages, one directed edge pkg-a → pkg-b.
 const SAMPLE_VM = {
   language: 'typescript',
   nodes: [
-    {
-      id: 'a',
-      label: 'pkg/mod.alpha',
-      filePath: 'packages/x/src/a.ts',
-      kind: 'function-declaration',
-      visibility: 'exported',
-      inTestFile: false,
-      callDegreeIn: 0,
-      callDegreeOut: 1,
-      sccId: null,
-    },
-    {
-      id: 'b',
-      label: 'pkg/mod.beta',
-      filePath: 'packages/x/src/b.ts',
-      kind: 'method',
-      visibility: 'private',
-      inTestFile: true,
-      callDegreeIn: 1,
-      callDegreeOut: 0,
-      sccId: null,
-    },
+    { id: 'pkg-a', label: 'pkg-a', totalCoupling: 3, sccId: null },
+    { id: 'pkg-b', label: 'pkg-b', totalCoupling: 3, sccId: null },
   ],
-  edges: [
-    { source: 'a', target: 'b', resolution: 'static', confidence: 'high', isCycleEdge: false },
-  ],
+  edges: [{ source: 'pkg-a', target: 'pkg-b', weight: 3, isCycleEdge: false }],
 };
 
 beforeEach(() => {
@@ -128,14 +99,20 @@ describe('dashboardViewGraphJs (emitter)', () => {
   });
 });
 
-describe('View 8 — Graph', () => {
-  it('registers a graph view with id and label', () => {
+describe('View 8 — Visualization', () => {
+  it('registers a view with id "graph" and label "Visualization"', () => {
     const env = loadEnv(false);
     const view = env.views.find(v => v.id === 'graph');
     expect(view).toBeDefined();
-    expect(view!.label).toBe('Graph');
+    expect(view!.label).toBe('Visualization');
     expect(typeof view!.render).toBe('function');
     expect(typeof view!.onActivate).toBe('function');
+  });
+
+  it('keeps the view id stable as "graph" for deep-link hashes', () => {
+    // The label changed (item 11) but the id must NOT churn.
+    expect(dashboardViewGraphJs()).toContain("id: 'graph'");
+    expect(dashboardViewGraphJs()).toContain("label: 'Visualization'");
   });
 
   it('renders the empty state when no view-model blob is present', () => {
@@ -152,8 +129,6 @@ describe('View 8 — Graph', () => {
     const c = document.createElement('div');
     document.body.append(c);
     env.views.find(v => v.id === 'graph')!.render(c, null, null, null);
-    // With no cytoscape global the view short-circuits to the unavailable
-    // empty state before mounting the toolbar/canvas.
     expect(c.querySelector('.empty')!.textContent).toContain('Graph renderer unavailable');
     expect(c.querySelector('#code-paths-graph-canvas')).toBeNull();
   });
@@ -164,16 +139,12 @@ describe('View 8 — Graph', () => {
     const c = document.createElement('div');
     document.body.append(c);
     env.views.find(v => v.id === 'graph')!.render(c, null, null, null);
-    const btns = [...c.querySelectorAll<HTMLElement>('.code-paths-graph-layout-btn')].map(
-      b => b.dataset.layout,
-    );
+    const btns = [...c.querySelectorAll<HTMLElement>('.code-paths-graph-layout-btn')].map(b => b.dataset.layout);
     expect(btns).toEqual(['dagre', 'cose', 'breadthfirst']);
-    expect(
-      c.querySelector<HTMLElement>('.code-paths-graph-layout-btn.active')!.dataset.layout,
-    ).toBe('dagre');
+    expect(c.querySelector<HTMLElement>('.code-paths-graph-layout-btn.active')!.dataset.layout).toBe('dagre');
   });
 
-  it('renders the folded SCC "Highlight cycles" toggle in the graph toolbar', () => {
+  it('renders the "Highlight cycles" toggle in the toolbar', () => {
     const env = loadEnv(true);
     embedViewModel(SAMPLE_VM);
     const c = document.createElement('div');
@@ -182,7 +153,6 @@ describe('View 8 — Graph', () => {
     const sccBtn = c.querySelector<HTMLElement>('.code-paths-graph-scc-btn');
     expect(sccBtn).not.toBeNull();
     expect(sccBtn!.textContent).toContain('Highlight cycles');
-    // The toggle is NOT a layout button — keeps the layout-selector set clean.
     expect(sccBtn!.classList.contains('code-paths-graph-layout-btn')).toBe(false);
   });
 
@@ -195,111 +165,39 @@ describe('View 8 — Graph', () => {
     expect(c.querySelector('#code-paths-graph-canvas')).not.toBeNull();
   });
 
-  it('shows the truncation banner when truncatedFromTotal is set', () => {
-    const env = loadEnv(true);
-    embedViewModel({ ...SAMPLE_VM, truncatedFromTotal: 9999 });
-    const c = document.createElement('div');
-    document.body.append(c);
-    env.views.find(v => v.id === 'graph')!.render(c, null, null, env.filterState);
-    const banner = c.querySelector('.code-paths-graph-banner');
-    expect(banner).not.toBeNull();
-    expect(banner!.textContent).toContain('Showing top 2 of 9999');
-  });
-
-  it('renders the search box above the canvas', () => {
+  it('renders the package-name search box above the canvas', () => {
     const env = loadEnv(true);
     embedViewModel(SAMPLE_VM);
     const c = document.createElement('div');
     document.body.append(c);
-    env.views.find(v => v.id === 'graph')!.render(c, null, null, env.filterState);
-    expect(c.querySelector('#code-paths-graph-search-input')).not.toBeNull();
-  });
-
-  it('culls nodes the active filter rejects (production-only hides test nodes)', () => {
-    // SAMPLE_VM node "a" is non-test, "b" is inTestFile. Default filter is
-    // production-only (includeTests false) → only "a" survives, but "a"'s
-    // sole edge targets "b", so the edge is dropped too. The graph still
-    // mounts (one node), so we assert the no-match state does NOT appear.
-    const env = loadEnv(true);
-    embedViewModel(SAMPLE_VM);
-    const c = document.createElement('div');
-    document.body.append(c);
-    env.views.find(v => v.id === 'graph')!.render(c, null, null, env.filterState);
-    const empties = [...c.querySelectorAll('.empty')].map(e => e.textContent);
-    expect(empties.some(t => t?.includes('No nodes match'))).toBe(false);
-  });
-
-  it('shows the no-match empty state when the filter rejects every node', () => {
-    const env = loadEnv(true);
-    embedViewModel(SAMPLE_VM);
-    // Restrict to a kind no node has → everything is culled.
-    env.filterState.kinds.add('constructor');
-    const c = document.createElement('div');
-    document.body.append(c);
-    env.views.find(v => v.id === 'graph')!.render(c, null, null, env.filterState);
-    const empties = [...c.querySelectorAll('.empty')].map(e => e.textContent);
-    expect(empties.some(t => t?.includes('No nodes match the active filters'))).toBe(true);
+    env.views.find(v => v.id === 'graph')!.render(c, null, null, null);
+    const input = c.querySelector<HTMLInputElement>('#code-paths-graph-search-input');
+    expect(input).not.toBeNull();
+    expect(input!.getAttribute('placeholder')).toContain('package');
   });
 
   it('reuses the shared fuzzyMatch index for search (no separate index)', () => {
-    // The emitter references fuzzyMatch (from search.js) rather than building
-    // its own — a regression guard for the "reuse, not reinvent" rule.
     expect(dashboardViewGraphJs()).toContain('fuzzyMatch');
   });
 
-  it('keys impact highlight off graphIndexes callers/callees and clears on Esc', () => {
+  it('sizes nodes by totalCoupling and edges by weight (package encoding)', () => {
     const js = dashboardViewGraphJs();
-    expect(js).toContain('indexes.callers');
-    expect(js).toContain('indexes.callees');
+    expect(js).toContain("ele.data('totalCoupling')");
+    expect(js).toContain("ele.data('weight')");
+  });
+
+  it('drives impact highlight off live package adjacency and clears on Esc', () => {
+    const js = dashboardViewGraphJs();
+    // Package-level impact uses the live cytoscape neighborhood, not the
+    // function-level graphIndexes adjacency.
+    expect(js).toContain("incomers('node')");
+    expect(js).toContain("outgoers('node')");
     expect(js).toContain("e.key === 'Escape'");
   });
-});
 
-describe('gvBfsReach — impact traversal', () => {
-  it('returns the downstream reach set, excluding the seed', () => {
-    const env = loadEnv(false);
-    // a -> b -> c -> d (linear chain).
-    const adj = new Map<string, string[]>([
-      ['a', ['b']],
-      ['b', ['c']],
-      ['c', ['d']],
-    ]);
-    const reached = env.gvBfsReach('a', adj);
-    expect(Object.keys(reached).sort()).toEqual(['b', 'c', 'd']);
-    expect(reached.a).toBeUndefined();
-  });
-
-  it('is cycle-safe (does not hang on a cycle)', () => {
-    const env = loadEnv(false);
-    // a -> b -> c -> a (3-cycle) plus c -> d.
-    const adj = new Map<string, string[]>([
-      ['a', ['b']],
-      ['b', ['c']],
-      ['c', ['a', 'd']],
-    ]);
-    const reached = env.gvBfsReach('a', adj);
-    // a is the seed → excluded even though c points back to it.
-    expect(Object.keys(reached).sort()).toEqual(['b', 'c', 'd']);
-    expect(reached.a).toBeUndefined();
-  });
-
-  it('skips self-edges (a node is not its own caller/callee)', () => {
-    const env = loadEnv(false);
-    const adj = new Map<string, string[]>([['a', ['a', 'b']]]);
-    const reached = env.gvBfsReach('a', adj);
-    expect(reached.a).toBeUndefined();
-    expect(reached.b).toBe(true);
-  });
-
-  it('returns an empty set for a disconnected node', () => {
-    const env = loadEnv(false);
-    const adj = new Map<string, string[]>([['x', ['y']]]);
-    const reached = env.gvBfsReach('lonely', adj);
-    expect(Object.keys(reached)).toHaveLength(0);
-  });
-
-  it('tolerates a missing/invalid adjacency map', () => {
-    const env = loadEnv(false);
-    expect(env.gvBfsReach('a', undefined as unknown as Map<string, string[]>)).toEqual({});
+  it('does not cull by the function-level filter state (whole-graph package insight)', () => {
+    const js = dashboardViewGraphJs();
+    expect(js).not.toContain('passesFilter');
+    expect(js).not.toContain('No nodes match the active filters');
   });
 });

@@ -1,20 +1,28 @@
 /**
- * View 8 — "Graph" (node-link topology, Cytoscape.js + dagre).
+ * View 8 — "Visualization" (package node-link topology, Cytoscape.js + dagre).
  *
- * The non-tabular Code Paths view: it renders the *shape* of the call graph
- * rather than a projection of it. Renderer is the vendored `cytoscape`
- * global + the `cytoscapeDagre` layout extension, both inlined by
+ * The non-tabular Code Graph view: it renders the *shape* of the call graph
+ * at PACKAGE granularity (item 10) rather than function granularity — one
+ * node per package, one edge per directed package→package coupling. Function
+ * granularity produced thousands of nodes, unusable on real repos; the
+ * package rollup is the same data the Coupling matrix shows, drawn as a
+ * node-link graph. Renderer is the vendored `cytoscape` global + the
+ * `cytoscapeDagre` layout extension, both inlined by
  * `dashboardCytoscapeVendorJs()` ahead of this emitter in `code-paths.ts`.
  *
  * Data source: the pre-projected `graph-view-model` JSON blob embedded by
  * `generator.ts` (projector in `graph-view-model.ts`, run at
  * report-generation time) — NOT the raw catalog. Absent blob → empty state.
  *
- * Features: pan/zoom, layout selector (dagre/cose/breadthfirst), filter-chip
- * culling, fuzzy search, node-click impact highlight, and SCC cycle
- * highlighting. Visual encoding (kind→shape, visibility→stroke, degree→size,
- * sccId→group accent, resolution→edge style, confidence→edge opacity) is
- * applied in `gvStylesheet` / `gvBuildElements`.
+ * Features: pan/zoom, layout selector (dagre/cose/breadthfirst), package-name
+ * search, node-click impact highlight (direct caller/callee packages), and
+ * cross-package cycle highlighting. Visual encoding (totalCoupling→size,
+ * weight→edge thickness, sccId→accent) is applied in
+ * `gvStylesheet` / `gvBuildElements`.
+ *
+ * NOTE: the filter chips (kind / test / package include-exclude) operate on
+ * function-level facets and are intentionally NOT applied here — like the
+ * Coupling matrix, this is a whole-graph package insight.
  */
 
 import { dashboardViewGraphStylesheetJs } from './graph-stylesheet.js';
@@ -32,7 +40,7 @@ export function dashboardViewGraphJs(): string {
   } catch (e) { /* extension already registered or unavailable */ }
 })();
 
-// Available layouts. dagre is the default for mostly-DAG code graphs; cose
+// Available layouts. dagre is the default for mostly-DAG package graphs; cose
 // (built-in force-directed) reads better when cycles dominate;
 // breadthfirst is a cheap hierarchical fallback. No fcose — it needs a
 // fourth vendored extension and the bundle budget is tight.
@@ -50,50 +58,21 @@ function gvLoadViewModel() {
   try { return JSON.parse(blob.textContent); } catch (e) { return null; }
 }
 
-// notifyViews() (and the init loop) fan render() out to EVERY Code Paths
+// notifyViews() (and the init loop) fan render() out to EVERY Code Graph
 // panel, not just the active one — the row-table views re-render in O(rows),
-// but a full Cytoscape mount + dagre layout over thousands of nodes is far
-// from free. Defer that work until this panel is actually visible: the panel
-// orchestrator toggles an 'active' class on the live '.code-paths-view'
-// panel. A container that is a panel but not active is hidden → skip the
-// mount (it runs on activation). A container that is NOT a panel (e.g. a
-// unit-test harness div) is treated as visible so direct render() calls mount.
+// but a full Cytoscape mount + dagre layout is far from free. Defer that work
+// until this panel is actually visible: the panel orchestrator toggles an
+// 'active' class on the live '.code-paths-view' panel. A container that is a
+// panel but not active is hidden → skip the mount (it runs on activation). A
+// container that is NOT a panel (e.g. a unit-test harness div) is treated as
+// visible so direct render() calls mount.
 function gvPanelHidden(container) {
   return !!(container && container.classList &&
     container.classList.contains('code-paths-view') &&
     !container.classList.contains('active'));
 }
 
-function gvNodeShape(kind) {
-  switch (kind) {
-    case 'constructor': return 'diamond';
-    case 'method': return 'round-rectangle';
-    case 'getter': case 'setter': return 'round-rectangle';
-    case 'arrow': return 'round-tag';
-    case 'module-init': return 'hexagon';
-    default: return 'ellipse';
-  }
-}
-
-function gvNodeBorderStyle(visibility) {
-  if (visibility === 'private') return 'dashed';
-  if (visibility === 'module-local') return 'dotted';
-  return 'solid';
-}
-
-function gvEdgeStyle(resolution) {
-  if (resolution === 'static' || resolution === 'constructor') return 'solid';
-  if (resolution === 'dynamic-string') return 'dotted';
-  return 'dashed';
-}
-
-function gvEdgeOpacity(confidence) {
-  if (confidence === 'low') return 0.3;
-  if (confidence === 'medium') return 0.6;
-  return 0.9;
-}
-
-// Map a sccId to a stable hue so cyclic clusters are visually grouped.
+// Map a sccId to a stable hue so cross-package cyclic clusters are grouped.
 function gvSccColor(sccId) {
   if (!sccId) return null;
   var h = 0;
@@ -101,52 +80,30 @@ function gvSccColor(sccId) {
   return 'hsl(' + h + ', 70%, 55%)';
 }
 
-// A view-model node carries the same facets passesFilter() reads off a
-// catalog occurrence (filePath, kind, inTestFile). Reuse the shared
-// predicate so the Graph view culls exactly like the table views do — a
-// filter chip toggled in one view hides the same functions here.
-function gvNodePasses(node, filterState) {
-  if (typeof passesFilter !== 'function' || !filterState) return true;
-  return passesFilter(node, filterState);
-}
-
-function gvBuildElements(vm, filterState) {
+function gvBuildElements(vm) {
   var elements = [];
-  var visible = {};
   for (var i = 0; i < vm.nodes.length; i++) {
     var n = vm.nodes[i];
-    if (!gvNodePasses(n, filterState)) continue;
-    visible[n.id] = true;
-    var degree = (n.callDegreeIn || 0) + (n.callDegreeOut || 0);
     elements.push({
       group: 'nodes',
       data: {
         id: n.id,
         label: n.label,
-        filePath: n.filePath,
-        kind: n.kind,
-        visibility: n.visibility,
-        inTestFile: !!n.inTestFile,
-        degree: degree,
+        totalCoupling: n.totalCoupling || 0,
         sccId: n.sccId || null,
         sccColor: gvSccColor(n.sccId),
-        shape: gvNodeShape(n.kind),
-        borderStyle: gvNodeBorderStyle(n.visibility),
       },
     });
   }
   for (var j = 0; j < vm.edges.length; j++) {
     var e = vm.edges[j];
-    // An edge survives only when BOTH endpoints survive the filter.
-    if (!visible[e.source] || !visible[e.target]) continue;
     elements.push({
       group: 'edges',
       data: {
         id: 'e' + j,
         source: e.source,
         target: e.target,
-        lineStyle: gvEdgeStyle(e.resolution),
-        edgeOpacity: gvEdgeOpacity(e.confidence),
+        weight: e.weight || 1,
         isCycleEdge: !!e.isCycleEdge,
       },
     });
@@ -158,12 +115,12 @@ ${dashboardViewGraphStylesheetJs()}
 
 function gvLayoutOptions(layoutId) {
   if (layoutId === 'dagre') {
-    return { name: 'dagre', rankDir: 'LR', nodeSep: 14, rankSep: 48, fit: true, padding: 24 };
+    return { name: 'dagre', rankDir: 'LR', nodeSep: 24, rankSep: 64, fit: true, padding: 24 };
   }
   if (layoutId === 'breadthfirst') {
-    return { name: 'breadthfirst', directed: true, spacingFactor: 1.1, fit: true, padding: 24 };
+    return { name: 'breadthfirst', directed: true, spacingFactor: 1.2, fit: true, padding: 24 };
   }
-  return { name: 'cose', animate: false, fit: true, padding: 24, nodeRepulsion: 4500 };
+  return { name: 'cose', animate: false, fit: true, padding: 24, nodeRepulsion: 6000 };
 }
 
 function gvRunLayout(layoutId) {
@@ -193,10 +150,11 @@ function gvRenderLayoutSelector(host) {
       bar.appendChild(btn);
     })(GV_LAYOUTS[i]);
   }
-  // SCC-highlight toggle (folds the former standalone "Cycles / SCCs" view
-  // into the topology view — cycles are best *seen* on the node-link graph).
-  // When on, cycle members + cycle edges are emphasized and the acyclic
-  // remainder is dimmed, so mutually-recursive clusters pop out.
+  // Cross-package-cycle highlight toggle. When on, packages in a multi-package
+  // cycle + the edges between them are emphasized and the acyclic remainder is
+  // dimmed, so circular package dependencies pop out. Reads the same SCC facets
+  // the projector already attached to the view-model (graph-view-model.ts) — no
+  // second Tarjan pass in the browser.
   var sccBtn = el('button', {
     class: 'code-paths-graph-scc-btn' + (gvSccHighlight ? ' active' : ''),
     'data-scc-toggle': '1',
@@ -211,11 +169,9 @@ function gvRenderLayoutSelector(host) {
   host.appendChild(bar);
 }
 
-// Emphasize strongly-connected (cyclic) clusters on the live graph. A node
-// is "in a cycle" when it carries an sccId; an edge when isCycleEdge is set.
-// Toggling off clears the emphasis. Reads the same SCC facets the projector
-// already attached to the view-model (graph-view-model.ts) — no second
-// Tarjan pass in the browser.
+// Emphasize cross-package cyclic clusters on the live graph. A node is "in a
+// cycle" when it carries an sccId; an edge when isCycleEdge is set. Toggling
+// off clears the emphasis.
 var gvSccHighlight = false;
 
 function gvApplySccHighlight() {
@@ -234,41 +190,23 @@ function gvApplySccHighlight() {
   });
 }
 
-// Breadth-first reach set over one of the graphIndexes adjacency maps
-// (callers for upstream, callees for downstream). Cycle-safe via a visited
-// set. The seed itself is NOT included in the returned set, and self-edges
-// are skipped (a node is not treated as its own caller/callee) — both
-// choices keep the seed styled 'selected' rather than upstream/downstream.
-function gvBfsReach(seedId, adjacency) {
-  var reached = {};
-  if (!adjacency || typeof adjacency.get !== 'function') return reached;
-  var queue = [seedId];
-  var visited = {};
-  visited[seedId] = true;
-  while (queue.length > 0) {
-    var cur = queue.shift();
-    var neighbors = adjacency.get(cur) || [];
-    for (var i = 0; i < neighbors.length; i++) {
-      var nxt = neighbors[i];
-      if (nxt === seedId) continue; // skip self-edge back to the seed
-      if (visited[nxt]) continue;
-      visited[nxt] = true;
-      reached[nxt] = true;
-      queue.push(nxt);
-    }
-  }
-  return reached;
-}
-
 function gvClearImpact() {
   if (!gvCy) return;
   gvCy.elements().removeClass('gv-selected gv-upstream gv-downstream gv-dimmed');
 }
 
-function gvApplyImpact(seedId, indexes) {
-  if (!gvCy || !indexes) return;
-  var upstream = gvBfsReach(seedId, indexes.callers);   // who reaches the seed
-  var downstream = gvBfsReach(seedId, indexes.callees); // what the seed reaches
+// Impact highlight at package granularity: light the clicked package, its
+// direct caller packages (incomers) and direct callee packages (outgoers).
+// Built straight off the live Cytoscape adjacency rather than a function-level
+// index, since the nodes ARE packages here.
+function gvApplyImpact(seedId) {
+  if (!gvCy) return;
+  var seed = gvCy.getElementById(seedId);
+  if (!seed || seed.length === 0) return;
+  var upstream = {};   // packages that call the seed
+  var downstream = {}; // packages the seed calls
+  seed.incomers('node').forEach(function(n) { if (n.id() !== seedId) upstream[n.id()] = true; });
+  seed.outgoers('node').forEach(function(n) { if (n.id() !== seedId) downstream[n.id()] = true; });
   gvCy.batch(function() {
     gvCy.elements().removeClass('gv-selected gv-upstream gv-downstream');
     gvCy.elements().addClass('gv-dimmed');
@@ -278,26 +216,26 @@ function gvApplyImpact(seedId, indexes) {
       else if (upstream[id]) { n.removeClass('gv-dimmed').addClass('gv-upstream'); }
       else if (downstream[id]) { n.removeClass('gv-dimmed').addClass('gv-downstream'); }
     });
-    // Un-dim edges whose endpoints are both in the lit set so the highlighted
-    // subgraph reads as connected paths, not just isolated nodes.
+    // Un-dim edges incident to the seed so the lit neighborhood reads as
+    // connected coupling, not isolated nodes.
     gvCy.edges().forEach(function(ed) {
       var s = ed.source().id();
       var t = ed.target().id();
-      var lit = function(id) { return id === seedId || upstream[id] || downstream[id]; };
-      if (lit(s) && lit(t)) ed.removeClass('gv-dimmed');
+      if (s === seedId || t === seedId) ed.removeClass('gv-dimmed');
     });
   });
 }
 
-// Search box (DOM, above the canvas). Reuses the same fuzzy index the
-// Search view uses (fuzzyMatch over simple names). A hit centers + fits the
-// matched node and flags it; non-matches fade. Clearing restores opacity.
+// Search box (DOM, above the canvas). Filters by PACKAGE NAME. Reuses the same
+// fuzzy index the table views use (fuzzyMatch over the node labels = package
+// names). A hit centers + fits the matched node and flags it; non-matches
+// fade. Clearing restores opacity.
 function gvRenderSearchBox(host) {
   var input = el('input', {
     type: 'search',
     class: 'search-input code-paths-graph-search',
     id: 'code-paths-graph-search-input',
-    placeholder: 'Find a node by name…',
+    placeholder: 'Find a package by name…',
   });
   input.addEventListener('input', function(e) {
     gvApplySearch((e.target && e.target.value) || '');
@@ -310,7 +248,7 @@ function gvApplySearch(query) {
   var q = (query || '').trim();
   gvCy.nodes().removeClass('gv-search-hit gv-search-fade');
   if (q.length === 0) return;
-  // The view-model label is the qualified name; match against it directly
+  // The view-model label is the package name; match against it directly
   // (the fuzzy scorer lives in search.js, emitted earlier in the bundle).
   var labels = gvCy.nodes().map(function(n) { return n.data('label') || ''; });
   var matches = (typeof fuzzyMatch === 'function') ? fuzzyMatch(q, labels) : [];
@@ -328,15 +266,15 @@ function gvApplySearch(query) {
 
 views.push({
   id: 'graph',
-  label: 'Graph',
+  label: 'Visualization',
   help: {
-    title: 'Graph',
+    title: 'Visualization',
     sections: [
-      { heading: 'What this is', body: 'A node-link visualization of the call graph rendered with Cytoscape.js. Each node is a function; each edge is a static call. Node size reflects total call degree (callers + callees); cyclic clusters share an accent border.' },
-      { heading: 'Why you care', body: 'The seven table views project the graph into rankings and lists. This view shows topology directly — hub functions, tightly cyclic clusters, disconnected islands, and the upstream/downstream radius around a node — which is work to reconstruct from a table.' },
-      { heading: 'How to read it', body: 'Node shape encodes kind (diamond=constructor, hexagon=module-init, rounded=method). Border style encodes visibility (solid=exported, dotted=module-local, dashed=private). Edge style encodes call resolution; faded edges are low-confidence. Use the layout selector to switch between layered (dagre), force (cose), and hierarchical (breadthfirst).' },
-      { heading: 'What to do', body: 'Pan and zoom to explore. The filter chips above the view tab bar cull nodes here exactly as they cull rows in the table views. Type in the search box to center and highlight a node; non-matches fade. Click a node to trace its upstream/downstream impact.' },
-      { heading: 'Cycles / SCCs', body: 'Strongly-connected components are groups of functions that can all reach each other through call edges (found via Tarjan’s algorithm). Click "Highlight cycles" in the toolbar to emphasize cycle members and cycle edges while dimming the acyclic remainder. Size-2 cycles (direct mutual recursion) are usually fine; larger cycles — especially spanning multiple packages — are a layering smell. Break a cycle by extracting the shared protocol into a third place both sides depend on, or by inverting one call into a callback/event.' },
+      { heading: 'What this is', body: 'A node-link visualization of the call graph aggregated to packages, rendered with Cytoscape.js. Each node is a package; each edge is the directed coupling from one package into another. Node size reflects total coupling (calls in + calls out); edge thickness reflects the number of call edges between the two packages.' },
+      { heading: 'Why you care', body: 'The table views project the graph into rankings and lists, and the Coupling matrix shows the same package data as a grid. This view shows that topology directly — hub packages, tightly-coupled clusters, and circular package dependencies — which is work to reconstruct from a table or matrix.' },
+      { heading: 'How to read it', body: 'Bigger nodes are more coupled packages; thicker edges carry more calls. Use the layout selector to switch between layered (dagre), force (cose), and hierarchical (breadthfirst). The matrix on the Coupling tab is the same data in tabular form.' },
+      { heading: 'What to do', body: 'Pan and zoom to explore. Type in the search box to center and highlight a package by name; non-matches fade. Click a package to trace its direct callers (upstream) and callees (downstream).' },
+      { heading: 'Cross-package cycles', body: 'Strongly-connected components are groups of packages that can all reach each other through call edges (found via Tarjan’s algorithm). Click "Highlight cycles" in the toolbar to emphasize cycle members and cycle edges while dimming the acyclic remainder. A cycle between packages is usually a layering smell. Break it by extracting the shared protocol into a third package both sides depend on, or by inverting one call into a callback/event.' },
     ],
   },
   render(container, catalog, indexes, filterState) {
@@ -358,22 +296,12 @@ views.push({
     gvRenderLayoutSelector(container);
     gvRenderSearchBox(container);
 
-    if (typeof vm.truncatedFromTotal === 'number' && vm.truncatedFromTotal > vm.nodes.length) {
-      container.appendChild(el('div', {
-        class: 'code-paths-graph-banner',
-        text: 'Showing top ' + vm.nodes.length + ' of ' + vm.truncatedFromTotal + ' by call degree. Use filters to broaden.',
-      }));
-    }
-
     var canvas = el('div', { class: 'code-paths-graph-canvas', id: 'code-paths-graph-canvas' });
     container.appendChild(canvas);
 
-    // Re-render fires on every filterState change (notifyViews fans out to
-    // every view's render). Cull nodes/edges the active filter rejects — an
-    // edge survives only when both endpoints do.
-    var elements = gvBuildElements(vm, filterState);
+    var elements = gvBuildElements(vm);
     if (elements.length === 0) {
-      canvas.appendChild(el('div', { class: 'empty', text: 'No nodes match the active filters.' }));
+      canvas.appendChild(el('div', { class: 'empty', text: 'No packages to display.' }));
       return;
     }
 
@@ -395,11 +323,10 @@ views.push({
       return;
     }
 
-    // Click a node → highlight upstream (callers, transitive) and downstream
-    // (callees, transitive) reach sets via the shared graphIndexes adjacency
-    // lists. Background click or Esc clears.
+    // Click a package → highlight its direct caller/callee packages.
+    // Background click or Esc clears.
     gvCy.on('tap', 'node', function(evt) {
-      gvApplyImpact(evt.target.id(), indexes);
+      gvApplyImpact(evt.target.id());
     });
     gvCy.on('tap', function(evt) {
       if (evt.target === gvCy) gvClearImpact();

@@ -1,10 +1,12 @@
 /**
  * View-model projection — `projectCatalogToGraphViewModel`.
  *
- * The projector is the bundle-size budget enforcement point; these tests
- * lock the schema (field presence), the degree-accounting invariants, the
- * SCC pass, the external-target drop, the byte budget, and the
- * performance pre-filter (top-N truncation).
+ * The projector aggregates the function call graph up to PACKAGE granularity
+ * (item 10): one node per package, one edge per directed package→package
+ * coupling with a call-count weight. These tests lock the schema, the
+ * package-attribution (mirroring `pkgOf`), the weight accounting, the
+ * totalCoupling sizing input, the external-target drop, the cross-package SCC
+ * pass, and the byte budget.
  */
 
 import { readFileSync } from 'node:fs';
@@ -14,8 +16,8 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import {
-  DEFAULT_MAX_INLINE_NODES,
   GraphViewModelError,
+  packageOf,
   projectCatalogToGraphViewModel,
 } from '../code-paths/graph-view-model.js';
 
@@ -24,8 +26,6 @@ import type { GraphCatalog, GraphFunctionOccurrence } from '@opensip-tools/contr
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 function loadFixture(): GraphCatalog {
-  // The fixture lives next to the compiled test; resolve relative to source
-  // (dist mirrors the layout, so `__tests__/fixtures/` resolves in both).
   const candidates = [
     join(HERE, 'fixtures', 'catalog-small.json'),
     join(HERE, '..', '..', 'src', '__tests__', 'fixtures', 'catalog-small.json'),
@@ -62,14 +62,87 @@ function makeOcc(
   };
 }
 
-describe('projectCatalogToGraphViewModel', () => {
-  it('throws GraphViewModelError on a missing functions map', () => {
-    expect(() => projectCatalogToGraphViewModel({} as unknown as GraphCatalog)).toThrow(
-      GraphViewModelError,
+/** A two-package catalog: package "a" (a1→a2 internal, a1→b1 cross) and
+ *  package "b" (b1→a1 cross — forms an a↔b cycle). */
+function twoPackageCatalog(): GraphCatalog {
+  return {
+    version: '3.0',
+    tool: 'graph',
+    language: 'typescript',
+    builtAt: 'now',
+    functions: {
+      a1: [
+        makeOcc({
+          bodyHash: 'a1',
+          simpleName: 'a1',
+          package: '@scope/pkg-a',
+          filePath: 'packages/pkg-a/src/a1.ts',
+          calls: [{ to: ['a2', 'b1'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'c' }],
+        }),
+      ],
+      a2: [
+        makeOcc({
+          bodyHash: 'a2',
+          simpleName: 'a2',
+          package: '@scope/pkg-a',
+          filePath: 'packages/pkg-a/src/a2.ts',
+          calls: [{ to: ['ext'], line: 2, column: 0, resolution: 'static', confidence: 'high', text: 'c' }],
+        }),
+      ],
+      b1: [
+        makeOcc({
+          bodyHash: 'b1',
+          simpleName: 'b1',
+          package: '@scope/pkg-b',
+          filePath: 'packages/pkg-b/src/b1.ts',
+          calls: [{ to: ['a1'], line: 3, column: 0, resolution: 'static', confidence: 'high', text: 'c' }],
+        }),
+      ],
+    },
+  };
+}
+
+describe('packageOf', () => {
+  it('prefers the build-stamped package, scope-stripped', () => {
+    expect(packageOf(makeOcc({ bodyHash: 'h', simpleName: 'f', package: '@opensip-tools/lang-typescript' }))).toBe(
+      'lang-typescript',
     );
   });
 
-  it('projects the fixture into a stable view-model (snapshot)', () => {
+  it('falls back to the path heuristic when package is absent', () => {
+    expect(packageOf(makeOcc({ bodyHash: 'h', simpleName: 'f', filePath: 'packages/widget/src/x.ts' }))).toBe(
+      'widget',
+    );
+  });
+
+  it('returns <unknown> for an unattributable path', () => {
+    expect(packageOf(makeOcc({ bodyHash: 'h', simpleName: 'f', filePath: 'random/x.ts' }))).toBe('<unknown>');
+  });
+
+  it('returns <unknown> when the occurrence is null/undefined or has no usable path', () => {
+    expect(packageOf(null as unknown as GraphFunctionOccurrence)).toBe('<unknown>');
+    expect(packageOf(undefined as unknown as GraphFunctionOccurrence)).toBe('<unknown>');
+    expect(packageOf(makeOcc({ bodyHash: 'h', simpleName: 'f', filePath: '' }))).toBe('<unknown>');
+  });
+
+  it('ignores a non-string package value and a non-string path', () => {
+    // package is the wrong type → fall back to the path heuristic.
+    expect(
+      packageOf(makeOcc({ bodyHash: 'h', simpleName: 'f', package: 42 as unknown as string, filePath: 'packages/widget/src/x.ts' })),
+    ).toBe('widget');
+    // path is the wrong type → <unknown>.
+    expect(
+      packageOf(makeOcc({ bodyHash: 'h', simpleName: 'f', filePath: 123 as unknown as string })),
+    ).toBe('<unknown>');
+  });
+});
+
+describe('projectCatalogToGraphViewModel (package-level)', () => {
+  it('throws GraphViewModelError on a missing functions map', () => {
+    expect(() => projectCatalogToGraphViewModel({} as unknown as GraphCatalog)).toThrow(GraphViewModelError);
+  });
+
+  it('projects the real fixture into a stable view-model (snapshot)', () => {
     const vm = projectCatalogToGraphViewModel(loadFixture());
     expect(vm).toMatchSnapshot();
   });
@@ -79,134 +152,144 @@ describe('projectCatalogToGraphViewModel', () => {
     expect(vm.language).toBe('typescript');
   });
 
-  it('emits one node per occurrence and every schema field', () => {
-    const vm = projectCatalogToGraphViewModel(loadFixture());
-    expect(vm.nodes.length).toBe(20);
+  it('emits PACKAGE nodes (id = label = package name) — not function nodes', () => {
+    const vm = projectCatalogToGraphViewModel(twoPackageCatalog());
+    const ids = vm.nodes.map(n => n.id).sort();
+    expect(ids).toEqual(['pkg-a', 'pkg-b']);
     for (const node of vm.nodes) {
-      expect(typeof node.id).toBe('string');
-      expect(typeof node.label).toBe('string');
-      expect(typeof node.filePath).toBe('string');
-      expect(typeof node.kind).toBe('string');
-      expect(typeof node.visibility).toBe('string');
-      expect(typeof node.inTestFile).toBe('boolean');
-      expect(typeof node.callDegreeIn).toBe('number');
-      expect(typeof node.callDegreeOut).toBe('number');
-      expect(node.sccId === null || typeof node.sccId === 'string').toBe(true);
-    }
-    for (const edge of vm.edges) {
-      expect(typeof edge.source).toBe('string');
-      expect(typeof edge.target).toBe('string');
-      expect(typeof edge.resolution).toBe('string');
-      expect(typeof edge.confidence).toBe('string');
-      expect(typeof edge.isCycleEdge).toBe('boolean');
+      expect(node.id).toBe(node.label);
+      // No function-level fields leak into the package node.
+      expect(node).not.toHaveProperty('kind');
+      expect(node).not.toHaveProperty('filePath');
+      expect(node).not.toHaveProperty('bodyHash');
+      expect(typeof node.totalCoupling).toBe('number');
     }
   });
 
-  it('drops edges whose target is not an in-project node', () => {
-    const vm = projectCatalogToGraphViewModel(loadFixture());
-    const ids = new Set(vm.nodes.map(n => n.id));
-    for (const edge of vm.edges) {
-      expect(ids.has(edge.source)).toBe(true);
-      expect(ids.has(edge.target)).toBe(true);
-    }
-    // The external target `hZZ_external` must never appear.
-    expect(vm.edges.some(e => e.target === 'hZZ_external')).toBe(false);
+  it('emits package→package edges with a call-count weight', () => {
+    const vm = projectCatalogToGraphViewModel(twoPackageCatalog());
+    const byKey = new Map(vm.edges.map(e => [e.source + '->' + e.target, e]));
+    // a1→a2 is an internal package-a call → self-loop weight 1.
+    expect(byKey.get('pkg-a->pkg-a')?.weight).toBe(1);
+    // a1→b1 cross edge, weight 1.
+    expect(byKey.get('pkg-a->pkg-b')?.weight).toBe(1);
+    // b1→a1 cross edge, weight 1.
+    expect(byKey.get('pkg-b->pkg-a')?.weight).toBe(1);
   });
 
-  it('callDegreeIn/Out equal the incident edge counts', () => {
-    const vm = projectCatalogToGraphViewModel(loadFixture());
-    for (const node of vm.nodes) {
-      const inCount = vm.edges.filter(e => e.target === node.id).length;
-      const outCount = vm.edges.filter(e => e.source === node.id).length;
-      expect(node.callDegreeIn).toBe(inCount);
-      expect(node.callDegreeOut).toBe(outCount);
-    }
-  });
-
-  it('stamps a shared non-null sccId on the known 3-cycle', () => {
-    const vm = projectCatalogToGraphViewModel(loadFixture());
-    const cyclic = vm.nodes.filter(n => ['h05', 'h06', 'h07'].includes(n.id));
-    expect(cyclic).toHaveLength(3);
-    const sccIds = new Set(cyclic.map(n => n.sccId));
-    expect(sccIds.size).toBe(1);
-    expect([...sccIds][0]).not.toBeNull();
-    // Edges entirely within the cycle are flagged.
-    const cycleEdges = vm.edges.filter(
-      e => ['h05', 'h06', 'h07'].includes(e.source) && ['h05', 'h06', 'h07'].includes(e.target),
-    );
-    expect(cycleEdges.length).toBeGreaterThanOrEqual(3);
-    for (const e of cycleEdges) expect(e.isCycleEdge).toBe(true);
-  });
-
-  it('leaves acyclic nodes with sccId null and isCycleEdge false', () => {
-    const vm = projectCatalogToGraphViewModel(loadFixture());
-    const h00 = vm.nodes.find(n => n.id === 'h00');
-    expect(h00?.sccId).toBeNull();
-    // The hub edges into h00 are not cycle edges.
-    const intoHub = vm.edges.filter(e => e.target === 'h00');
-    for (const e of intoHub) expect(e.isCycleEdge).toBe(false);
-  });
-
-  it('omits truncatedFromTotal when below the cap', () => {
-    const vm = projectCatalogToGraphViewModel(loadFixture());
-    expect(vm.truncatedFromTotal).toBeUndefined();
-  });
-
-  it('keeps the JSON within the per-node/edge byte budget', () => {
-    const vm = projectCatalogToGraphViewModel(loadFixture());
-    const bytes = JSON.stringify(vm).length;
-    // Phase 0 §4.5: ~246 B/node + ~104 B/edge. Generous 1.5x margin for a
-    // tiny fixture (fixed JSON overhead dominates at this scale).
-    const budget = Math.round((vm.nodes.length * 246 + vm.edges.length * 104) * 1.5) + 512;
-    expect(bytes).toBeLessThan(budget);
-  });
-
-  it('exposes the documented default cap', () => {
-    expect(DEFAULT_MAX_INLINE_NODES).toBe(5000);
-  });
-
-  it('truncates to the top-N by call degree and records the pre-truncation total', () => {
-    // Build a 6-node catalog where degrees are strictly ordered, cap at 3.
-    const functions: Record<string, GraphFunctionOccurrence[]> = {};
-    for (let i = 0; i < 6; i++) {
-      const id = `n${i}`;
-      // n0 calls everyone (high out-degree); everyone calls n5 (high in-degree).
-      const targets = i === 0 ? ['n1', 'n2', 'n3', 'n4', 'n5'] : ['n5'];
-      functions[`fn${i}`] = [
-        makeOcc({
-          bodyHash: id,
-          simpleName: `fn${i}`,
-          calls: [
-            {
-              to: targets.filter(t => t !== id),
-              line: 1,
-              column: 0,
-              resolution: 'static',
-              confidence: 'high',
-              text: 'c',
-            },
-          ],
-        }),
-      ];
-    }
+  it('aggregates multiple function calls between the same package pair into one weighted edge', () => {
     const catalog: GraphCatalog = {
       version: '3.0',
       tool: 'graph',
       language: 'typescript',
       builtAt: 'now',
-      functions,
+      functions: {
+        a: [
+          makeOcc({
+            bodyHash: 'a',
+            simpleName: 'a',
+            package: '@s/pa',
+            filePath: 'packages/pa/src/a.ts',
+            calls: [{ to: ['x', 'y'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'c' }],
+          }),
+        ],
+        x: [makeOcc({ bodyHash: 'x', simpleName: 'x', package: '@s/pb', filePath: 'packages/pb/src/x.ts' })],
+        y: [makeOcc({ bodyHash: 'y', simpleName: 'y', package: '@s/pb', filePath: 'packages/pb/src/y.ts' })],
+      },
     };
-    const vm = projectCatalogToGraphViewModel(catalog, { maxInlineNodes: 3 });
-    expect(vm.nodes.length).toBe(3);
-    expect(vm.truncatedFromTotal).toBe(6);
-    // Every retained edge has both endpoints in the kept set.
-    const kept = new Set(vm.nodes.map(n => n.id));
-    for (const e of vm.edges) {
-      expect(kept.has(e.source)).toBe(true);
-      expect(kept.has(e.target)).toBe(true);
+    const vm = projectCatalogToGraphViewModel(catalog);
+    const edge = vm.edges.find(e => e.source === 'pa' && e.target === 'pb');
+    expect(edge?.weight).toBe(2);
+  });
+
+  it('drops calls whose target is not an in-project function (external)', () => {
+    const vm = projectCatalogToGraphViewModel(twoPackageCatalog());
+    // a2 calls only an external 'ext' — it must NOT create any edge.
+    expect(vm.edges.some(e => e.target === '<unknown>' || e.target === 'ext')).toBe(false);
+  });
+
+  it('sets totalCoupling = sum of incident edge weights (fan-in + fan-out)', () => {
+    const vm = projectCatalogToGraphViewModel(twoPackageCatalog());
+    for (const node of vm.nodes) {
+      const incident = vm.edges
+        .filter(e => e.source === node.id || e.target === node.id)
+        // a self-loop contributes its weight to both fan-in and fan-out.
+        .reduce((sum, e) => sum + (e.source === node.id ? e.weight : 0) + (e.target === node.id ? e.weight : 0), 0);
+      expect(node.totalCoupling).toBe(incident);
     }
-    // n0 (out-degree 5) and n5 (in-degree 5) are the most central — kept.
-    expect(kept.has('n0')).toBe(true);
-    expect(kept.has('n5')).toBe(true);
+  });
+
+  it('stamps a shared non-null sccId on a cross-package cycle (a↔b)', () => {
+    const vm = projectCatalogToGraphViewModel(twoPackageCatalog());
+    const sccIds = new Set(vm.nodes.map(n => n.sccId));
+    expect(sccIds.size).toBe(1);
+    expect([...sccIds][0]).not.toBeNull();
+    const crossCycleEdges = vm.edges.filter(
+      e => e.source !== e.target && ['pkg-a', 'pkg-b'].includes(e.source) && ['pkg-a', 'pkg-b'].includes(e.target),
+    );
+    for (const e of crossCycleEdges) expect(e.isCycleEdge).toBe(true);
+  });
+
+  it('does NOT flag a package as cyclic just because it has internal (self-loop) calls', () => {
+    const catalog: GraphCatalog = {
+      version: '3.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
+      functions: {
+        a: [
+          makeOcc({
+            bodyHash: 'a',
+            simpleName: 'a',
+            package: '@s/solo',
+            filePath: 'packages/solo/src/a.ts',
+            calls: [{ to: ['b'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'c' }],
+          }),
+        ],
+        b: [makeOcc({ bodyHash: 'b', simpleName: 'b', package: '@s/solo', filePath: 'packages/solo/src/b.ts' })],
+      },
+    };
+    const vm = projectCatalogToGraphViewModel(catalog);
+    expect(vm.nodes).toHaveLength(1);
+    expect(vm.nodes[0].sccId).toBeNull();
+    expect(vm.edges[0].isCycleEdge).toBe(false);
+  });
+
+  it('tolerates occurrences with no calls and edges with no targets (empty-array branches)', () => {
+    const catalog: GraphCatalog = {
+      version: '3.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
+      functions: {
+        // No `calls` at all.
+        a: [makeOcc({ bodyHash: 'a', simpleName: 'a', package: '@s/pa', filePath: 'packages/pa/src/a.ts' })],
+        // A call edge with an empty `to` array.
+        b: [
+          makeOcc({
+            bodyHash: 'b',
+            simpleName: 'b',
+            package: '@s/pa',
+            filePath: 'packages/pa/src/b.ts',
+            calls: [{ to: [], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'c' }],
+          }),
+        ],
+        // An empty occurrences list for a function name.
+        c: [],
+      },
+    };
+    const vm = projectCatalogToGraphViewModel(catalog);
+    expect(vm.nodes.map(n => n.id)).toEqual(['pa']);
+    expect(vm.edges).toHaveLength(0);
+    expect(vm.nodes[0].totalCoupling).toBe(0);
+    expect(vm.nodes[0].sccId).toBeNull();
+  });
+
+  it('keeps the JSON within a generous per-node/edge byte budget', () => {
+    const vm = projectCatalogToGraphViewModel(loadFixture());
+    const bytes = JSON.stringify(vm).length;
+    // Package nodes are far slimmer than function nodes were.
+    const budget = (vm.nodes.length * 120 + vm.edges.length * 80) * 1.5 + 512;
+    expect(bytes).toBeLessThan(budget);
   });
 });

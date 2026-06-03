@@ -132,11 +132,12 @@ export function generateDashboardHtml(input: DashboardInput): string {
   const safeGraphRuleCatalogJson = escapeForScriptContext(JSON.stringify(graphRuleCatalog))
   const safeGraphRecipeCatalogJson = escapeForScriptContext(JSON.stringify(graphRecipeCatalog))
   const graphCatalogBlock = serializeOptionalBlob('graph-catalog', graphCatalog, 'json')
-  // The Graph view (view-graph.ts) consumes a slim, pre-projected view-model
-  // rather than the raw catalog: projection (degrees, SCCs, centrality
-  // truncation) runs here at generation time and is embedded as its own JSON
-  // blob, sized for the renderer rather than for storage. See
-  // code-paths/graph-view-model.ts.
+  // The Visualization view (view-graph.ts) consumes a slim, pre-projected
+  // view-model rather than the raw catalog: projection aggregates the
+  // function call graph up to PACKAGE nodes + package→package edges (with
+  // coupling weights + cross-package SCCs) here at generation time and embeds
+  // it as its own JSON blob, sized for the renderer rather than for storage.
+  // See code-paths/graph-view-model.ts.
   const graphViewModel = graphCatalog ? projectCatalogToGraphViewModel(graphCatalog) : null
   const graphViewModelBlock = serializeOptionalBlob('graph-view-model', graphViewModel, 'json')
   const editorProtocolJs = serializeOptionalBlob('EDITOR_PROTOCOL', editorProtocol, 'literal')

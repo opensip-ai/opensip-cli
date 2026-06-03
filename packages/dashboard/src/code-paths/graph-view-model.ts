@@ -1,54 +1,52 @@
 /**
- * View-model projection for the Code Paths "Graph" view.
+ * View-model projection for the Code Graph "Visualization" view.
  *
  * Projects the raw graph `GraphCatalog` (consumed by JSON shape from
  * `@opensip-tools/contracts` — never from `@opensip-tools/graph`) into
  * the slim, embed-ready `GraphViewModel` the Cytoscape renderer consumes.
  *
+ * PACKAGE-LEVEL projection (item 10): the visualization renders a
+ * node-link graph at *package* granularity, NOT function granularity.
+ * Function-level catalogs on real repos contain thousands of function
+ * nodes — unusable in a node-link layout. This projector aggregates the
+ * function call graph up to packages:
+ *
+ *  - Node  = one package (id = label = package name via the same
+ *    attribution the Coupling view uses — see `packageOf` below, which
+ *    mirrors `pkgOf` in `path-utils.ts`).
+ *  - Edge  = caller-package → callee-package, with `weight` = the number
+ *    of underlying function→function call edges between those packages.
+ *
+ * This is intentionally the same package→package data the Coupling grid
+ * shows — a node-link rendering of it rather than a matrix. Every OTHER
+ * consumer (Coupling drilldown, Functions table, rules, …) still reads
+ * the function-level catalog directly; only THIS view aggregates up.
+ *
  * This module is the bundle-size budget enforcement point: the report
  * ships what this projector emits, not the catalog's storage shape.
- * Fields the renderer never reads (function bodies, params, decorators,
- * source ranges, hashes beyond the node id) are dropped here.
  *
- * Architecture decisions (Phase 0 of docs/plans/ready/graph-visualizer-view):
+ * Architecture decisions:
  *  - Projection runs at report-generation time (server-side, in
  *    `generator.ts`) and the result is embedded as a JSON blob, mirroring
- *    the existing `graph-catalog` blob. This keeps the centrality-based
- *    truncation off the client and makes the embedded JSON size — not the
- *    raw catalog size — the measured budget.
- *  - Tarjan's SCC algorithm is replicated locally (in the sibling
- *    `graph-scc.ts` module) because the graph engine's implementation is
- *    off-limits to this package (the catalog-decoupling rule §2.4); the
- *    dashboard depends only on `@opensip-tools/contracts` for types, not on
- *    the engine runtime.
- *  - For catalogs above `DEFAULT_MAX_INLINE_NODES` (5,000), the projector
- *    emits only the top-N nodes by `callDegreeIn + callDegreeOut` and
- *    records the pre-truncation total in `truncatedFromTotal` so the view
- *    can banner "Showing top N of M". (Phase 0 §4.5 performance pre-filter.)
+ *    the existing `graph-catalog` blob.
+ *  - Cross-package cycles are detected with Tarjan's SCC over the package
+ *    graph (cheap at package granularity — tens of nodes, not thousands).
+ *    The engine's SCC implementation is off-limits to this package (the
+ *    catalog-decoupling rule §2.4); the local replica lives in the sibling
+ *    `graph-scc.ts` module.
  */
 
 import { buildAdjacency, tarjanSccIds } from './graph-scc.js';
 
-import type {
-  GraphCallConfidence,
-  GraphCallResolution,
-  GraphCatalog,
-  GraphFunctionKind,
-  GraphFunctionOccurrence,
-  GraphVisibility,
-} from '@opensip-tools/contracts';
-
-/** Default soft cap on inlined nodes. Above this the projector truncates
- *  by call degree. Parameterizable via {@link ProjectOptions.maxInlineNodes}. */
-export const DEFAULT_MAX_INLINE_NODES = 5000;
+import type { GraphCatalog, GraphFunctionOccurrence } from '@opensip-tools/contracts';
 
 /**
  * Slim, embed-ready projection of a graph catalog for the dashboard's
- * Graph view. Produced by {@link projectCatalogToGraphViewModel} and
- * consumed by `view-graph.ts`.
+ * Visualization view. Produced by {@link projectCatalogToGraphViewModel}
+ * and consumed by `view-graph.ts`.
  *
- * Every field has a concrete UI consumer in the skeleton / filter+search /
- * impact phases — see the plan's §4.3 field-to-consumer map.
+ * Aggregated to PACKAGE granularity — one node per package, one edge per
+ * directed package→package coupling.
  */
 export interface GraphViewModel {
   /**
@@ -60,91 +58,49 @@ export interface GraphViewModel {
 
   readonly nodes: readonly GraphViewModelNode[];
   readonly edges: readonly GraphViewModelEdge[];
-
-  /**
-   * Set when the projector truncated the catalog (performance pre-filter).
-   * Holds the pre-truncation node count so the view can render a
-   * "Showing top N of M" banner. `undefined` (omitted) when no truncation
-   * occurred — the renderer must treat absence and `nodes.length`
-   * equality with the catalog as equivalent.
-   */
-  readonly truncatedFromTotal?: number;
 }
 
 export interface GraphViewModelNode {
-  /**
-   * Stable handle — the function's `bodyHash` from the catalog. Matches
-   * the key in `graphIndexes.byBodyHash`, `.callees`, and `.callers`. The
-   * impact-highlight BFS keys on this.
-   */
+  /** Stable handle AND display label — the package name. */
   readonly id: string;
 
-  /**
-   * Display label — the function's `qualifiedName`. The renderer truncates
-   * for the canvas; the full name is available on hover. Chosen over
-   * `simpleName` because graphs without qualification collapse method
-   * overloads and name-collisions into unreadable multi-node hubs.
-   */
+  /** Display label — the package name (same as {@link id}). */
   readonly label: string;
 
   /**
-   * File the function is defined in. Required for the "open in editor"
-   * affordance (matches the `editor-link.ts` pattern used by the other
-   * Code Paths views).
+   * Total coupling degree = fan-in + fan-out call count (sum of incident
+   * edge weights). Drives node *size* — hub packages render larger.
+   * Pre-computed here so the renderer can size without re-iterating edges.
    */
-  readonly filePath: string;
-
-  /** Drives node *shape* (e.g. diamond=constructor, square=method, circle=function-declaration). */
-  readonly kind: GraphFunctionKind;
-
-  /** Drives node *stroke style* (e.g. dashed=private, solid=exported). */
-  readonly visibility: GraphVisibility;
-
-  /** Test-file flag. Lets the view dim test nodes on demand. */
-  readonly inTestFile: boolean;
+  readonly totalCoupling: number;
 
   /**
-   * Pre-computed in-degree (caller count). Drives node *size* — hub
-   * functions render larger. Pre-computing in the projector (not on the
-   * client) means the renderer can size without iterating edges first.
-   */
-  readonly callDegreeIn: number;
-
-  /** Pre-computed out-degree (callee count). Same sizing rationale. */
-  readonly callDegreeOut: number;
-
-  /**
-   * SCC membership. `null` = not in a non-trivial cycle. Non-null = string
-   * id shared by every node in the same SCC. Drives cycle-cluster *color
-   * grouping*. Pairs with {@link GraphViewModelEdge.isCycleEdge}.
+   * SCC membership over the PACKAGE graph. `null` = not in a non-trivial
+   * package-level cycle. Non-null = string id shared by every package in
+   * the same cyclic cluster. Drives cross-package-cycle highlighting.
    */
   readonly sccId: string | null;
 }
 
 export interface GraphViewModelEdge {
-  /** Source node id (caller's bodyHash). */
+  /** Source package name (caller). */
   readonly source: string;
 
-  /** Target node id (callee's bodyHash). */
+  /** Target package name (callee). */
   readonly target: string;
 
-  /** Drives edge *style* (solid=static, dashed=method-dispatch, dotted=dynamic-string). */
-  readonly resolution: GraphCallResolution;
-
-  /** Drives edge *opacity* (low=faded). Surfaces parser uncertainty visually. */
-  readonly confidence: GraphCallConfidence;
+  /**
+   * Number of underlying function→function call edges from the source
+   * package into the target package. Drives edge *thickness*.
+   */
+  readonly weight: number;
 
   /**
-   * `true` iff this edge participates in a cycle (both endpoints in the
-   * same non-null `sccId`). Highlights cycle backbones in concert with
-   * the node `sccId` grouping.
+   * `true` iff this edge participates in a package-level cycle (both
+   * endpoints in the same non-null `sccId`). Highlights cross-package
+   * cycle backbones in concert with the node `sccId` grouping.
    */
   readonly isCycleEdge: boolean;
-}
-
-export interface ProjectOptions {
-  /** Soft cap on inlined nodes. Defaults to {@link DEFAULT_MAX_INLINE_NODES}. */
-  readonly maxInlineNodes?: number;
 }
 
 /** Thrown when the catalog is structurally unusable for projection. */
@@ -157,55 +113,48 @@ export class GraphViewModelError extends Error {
 
 interface MutableNode {
   readonly id: string;
-  readonly label: string;
-  readonly filePath: string;
-  readonly kind: GraphFunctionKind;
-  readonly visibility: GraphVisibility;
-  readonly inTestFile: boolean;
-  callDegreeIn: number;
-  callDegreeOut: number;
+  totalCoupling: number;
   sccId: string | null;
 }
 
-interface RawEdge {
+interface MutableEdge {
   readonly source: string;
   readonly target: string;
-  readonly resolution: GraphCallResolution;
-  readonly confidence: GraphCallConfidence;
+  weight: number;
 }
 
 /**
- * Project a graph catalog into the slim {@link GraphViewModel}.
+ * Project a graph catalog into the slim, PACKAGE-LEVEL {@link GraphViewModel}.
  *
- * Pure function — no I/O, no side effects. Three passes:
- *  - Pass A: emit one node per function occurrence.
- *  - Pass B: emit edges (dropping targets not present as nodes, matching
- *    `buildIndexes`' behavior for unresolved/external calls) and
- *    accumulate `callDegreeIn`/`callDegreeOut` on the endpoints.
- *  - Pass C: Tarjan SCC pass — stamp `sccId` on cyclic nodes and
- *    `isCycleEdge` on edges whose endpoints share a non-null `sccId`.
+ * Pure function — no I/O, no side effects. Four passes:
+ *  - Pass A: map every function `bodyHash` to its package (so call targets,
+ *    which are bodyHashes, can be resolved to a package).
+ *  - Pass B: walk function call edges, aggregate to package→package edges
+ *    keyed by `caller→callee`, accumulating a call-count `weight`.
+ *  - Pass C: derive package nodes (one per package seen) and accumulate
+ *    `totalCoupling` (fan-in + fan-out weight) on each.
+ *  - Pass D: Tarjan SCC over the package graph — stamp `sccId` on cyclic
+ *    packages and `isCycleEdge` on edges whose endpoints share an `sccId`.
  *
  * @throws {GraphViewModelError} when `catalog` or `catalog.functions` is missing.
  */
-export function projectCatalogToGraphViewModel(
-  catalog: GraphCatalog,
-  options: ProjectOptions = {},
-): GraphViewModel {
+export function projectCatalogToGraphViewModel(catalog: GraphCatalog): GraphViewModel {
   if (!catalog || typeof catalog !== 'object' || !catalog.functions) {
     throw new GraphViewModelError('catalog is missing or has no functions map');
   }
-  const maxInlineNodes = options.maxInlineNodes ?? DEFAULT_MAX_INLINE_NODES;
 
-  const nodeById = collectNodes(catalog); // Pass A
-  const rawEdges = collectEdges(catalog, nodeById); // Pass B (mutates degrees)
-  const { nodes, edges, truncatedFromTotal } = applyPerformancePreFilter(
-    nodeById,
-    rawEdges,
-    maxInlineNodes,
+  const packageByHash = mapHashesToPackages(catalog); // Pass A
+  const edgeByKey = aggregatePackageEdges(catalog, packageByHash); // Pass B
+  const { nodes, edges } = deriveNodesAndEdges(packageByHash, edgeByKey); // Pass C
+
+  // Pass D: Tarjan SCC over the package graph. Self-loops (intra-package
+  // calls — the matrix diagonal) are excluded so a single package with
+  // internal calls is NOT flagged as a cycle; only genuine multi-package
+  // cycles (A→B→A) earn an sccId.
+  const adjacency = buildAdjacency(
+    nodes,
+    edges.filter(e => e.source !== e.target),
   );
-
-  // Pass C: Tarjan SCC over the (possibly truncated) node/edge set.
-  const adjacency = buildAdjacency(nodes, edges);
   const sccByNode = tarjanSccIds(
     nodes.map(n => n.id),
     adjacency,
@@ -216,133 +165,134 @@ export function projectCatalogToGraphViewModel(
     language: catalog.language,
     nodes: nodes.map(toViewModelNode),
     edges: edges.map(e => toViewModelEdge(e, sccByNode)),
-    ...(truncatedFromTotal === undefined ? {} : { truncatedFromTotal }),
   };
 }
 
-/** Pass A — one mutable node per function occurrence, keyed by `bodyHash`. */
-function collectNodes(catalog: GraphCatalog): Map<string, MutableNode> {
-  const nodeById = new Map<string, MutableNode>();
+/**
+ * The package a function occurrence belongs to. Mirrors `pkgOf` in
+ * `path-utils.ts` (the browser-side helper the Coupling view uses) so the
+ * server-side projection and the client-side coupling matrix attribute
+ * functions to packages identically: prefer the build-time-stamped
+ * `occurrence.package` (scope-stripped), else the path heuristic.
+ */
+export function packageOf(occ: GraphFunctionOccurrence): string {
+  if (occ && typeof occ.package === 'string' && occ.package.length > 0) {
+    return shortPackage(occ.package);
+  }
+  return packageOfPath(occ ? occ.filePath : '');
+}
+
+/** Strip an npm scope for display: "@opensip-tools/lang-typescript" → "lang-typescript". */
+function shortPackage(name: string): string {
+  if (typeof name !== 'string') return '<unknown>';
+  return name.codePointAt(0) === 64 /* @ */ ? name.slice(name.indexOf('/') + 1) : name;
+}
+
+/** Path-only fallback (first segment under `packages/`). */
+function packageOfPath(filePath: string): string {
+  if (typeof filePath !== 'string' || filePath.length === 0) return '<unknown>';
+  const m = /^packages\/([^/]+)\//.exec(filePath);
+  return m ? m[1] : '<unknown>';
+}
+
+/** Pass A — bodyHash → package name (last write wins, mirroring buildIndexes). */
+function mapHashesToPackages(catalog: GraphCatalog): Map<string, string> {
+  const packageByHash = new Map<string, string>();
   for (const name of Object.keys(catalog.functions)) {
     const occs: readonly GraphFunctionOccurrence[] = catalog.functions[name] ?? [];
-    for (const occ of occs) {
-      // bodyHash is the stable id; a collision would mean two occurrences
-      // claim the same node — last write wins (mirrors buildIndexes).
-      nodeById.set(occ.bodyHash, {
-        id: occ.bodyHash,
-        label: occ.qualifiedName,
-        filePath: occ.filePath,
-        kind: occ.kind,
-        visibility: occ.visibility,
-        inTestFile: occ.inTestFile,
-        callDegreeIn: 0,
-        callDegreeOut: 0,
-        sccId: null,
-      });
-    }
+    for (const occ of occs) packageByHash.set(occ.bodyHash, packageOf(occ));
   }
-  return nodeById;
+  return packageByHash;
 }
 
 /**
- * Pass B — emit edges (dropping targets absent from `nodeById`, matching
- * `buildIndexes`' handling of unresolved/external calls) and accumulate
- * `callDegreeIn`/`callDegreeOut` on the endpoints (mutates `nodeById`).
+ * Pass B — aggregate function call edges to directed package→package edges
+ * keyed by `callercallee`, accumulating a call-count `weight`. Call
+ * targets whose bodyHash is not an in-project function are dropped (matching
+ * the function-level projector's handling of unresolved/external calls).
+ * Self-package edges (intra-package calls) are kept — they show up as
+ * self-loops, consistent with the Coupling matrix diagonal.
  */
-function collectEdges(
+function aggregatePackageEdges(
   catalog: GraphCatalog,
-  nodeById: Map<string, MutableNode>,
-): RawEdge[] {
-  const rawEdges: RawEdge[] = [];
+  packageByHash: ReadonlyMap<string, string>,
+): Map<string, MutableEdge> {
+  const edgeByKey = new Map<string, MutableEdge>();
   for (const name of Object.keys(catalog.functions)) {
-    const occs: readonly GraphFunctionOccurrence[] = catalog.functions[name] ?? [];
-    for (const occ of occs) {
-      collectEdgesForOccurrence(occ, nodeById, rawEdges);
+    for (const occ of catalog.functions[name] ?? []) {
+      accumulateOccurrenceEdges(occ, packageByHash, edgeByKey);
     }
   }
-  return rawEdges;
+  return edgeByKey;
 }
 
-/** Emit one {@link RawEdge} per resolved in-project call target of `occ`,
- *  accumulating degree on both endpoints. */
-function collectEdgesForOccurrence(
+/** Add one weighted package edge per resolved call target of `occ`. */
+function accumulateOccurrenceEdges(
   occ: GraphFunctionOccurrence,
-  nodeById: Map<string, MutableNode>,
-  out: RawEdge[],
+  packageByHash: ReadonlyMap<string, string>,
+  edgeByKey: Map<string, MutableEdge>,
 ): void {
-  const sourceNode = nodeById.get(occ.bodyHash);
-  if (!sourceNode) return;
+  const callerPkg = packageByHash.get(occ.bodyHash);
+  if (callerPkg === undefined) return;
   for (const edge of occ.calls ?? []) {
     for (const target of edge.to ?? []) {
-      const targetNode = nodeById.get(target);
-      if (!targetNode) continue;
-      sourceNode.callDegreeOut += 1;
-      targetNode.callDegreeIn += 1;
-      out.push({
-        source: occ.bodyHash,
-        target,
-        resolution: edge.resolution,
-        confidence: edge.confidence,
-      });
+      const calleePkg = packageByHash.get(target);
+      if (calleePkg === undefined) continue; // external / unresolved
+      bumpEdge(edgeByKey, callerPkg, calleePkg);
     }
   }
 }
 
-interface PreFilterResult {
-  readonly nodes: MutableNode[];
-  readonly edges: RawEdge[];
-  readonly truncatedFromTotal: number | undefined;
+/** Increment (or create) the weighted edge for a caller-to-callee package pair. */
+function bumpEdge(edgeByKey: Map<string, MutableEdge>, source: string, target: string): void {
+  // Newline delimiter: package names never contain one, so caller+callee keys
+  // can't collide (unlike empty-string concat).
+  const key = source + '\n' + target;
+  const existing = edgeByKey.get(key);
+  if (existing) existing.weight += 1;
+  else edgeByKey.set(key, { source, target, weight: 1 });
 }
 
 /**
- * For catalogs above `maxInlineNodes`, keep the top-N nodes by total call
- * degree (centrality proxy) and drop edges with a pruned endpoint. Below
- * the cap, pass everything through untruncated.
+ * Pass C — derive one node per package (every package that appears as a
+ * function's package OR as an edge endpoint) and accumulate `totalCoupling`
+ * (sum of incident edge weights) on each.
  */
-function applyPerformancePreFilter(
-  nodeById: ReadonlyMap<string, MutableNode>,
-  rawEdges: readonly RawEdge[],
-  maxInlineNodes: number,
-): PreFilterResult {
-  const allNodes = [...nodeById.values()];
-  if (allNodes.length <= maxInlineNodes) {
-    return { nodes: allNodes, edges: [...rawEdges], truncatedFromTotal: undefined };
-  }
-  const kept = [...allNodes]
-    .sort((a, b) => b.callDegreeIn + b.callDegreeOut - (a.callDegreeIn + a.callDegreeOut))
-    .slice(0, maxInlineNodes);
-  const keptIds = new Set(kept.map(n => n.id));
-  return {
-    nodes: kept,
-    edges: rawEdges.filter(e => keptIds.has(e.source) && keptIds.has(e.target)),
-    truncatedFromTotal: allNodes.length,
+function deriveNodesAndEdges(
+  packageByHash: ReadonlyMap<string, string>,
+  edgeByKey: ReadonlyMap<string, MutableEdge>,
+): { nodes: MutableNode[]; edges: MutableEdge[] } {
+  const nodeById = new Map<string, MutableNode>();
+  const ensure = (id: string): MutableNode => {
+    let n = nodeById.get(id);
+    if (!n) {
+      n = { id, totalCoupling: 0, sccId: null };
+      nodeById.set(id, n);
+    }
+    return n;
   };
+  // Every package that hosts a function is a node, even if it has no edges.
+  for (const pkg of packageByHash.values()) ensure(pkg);
+
+  const edges = [...edgeByKey.values()];
+  for (const e of edges) {
+    ensure(e.source).totalCoupling += e.weight;
+    ensure(e.target).totalCoupling += e.weight;
+  }
+  return { nodes: [...nodeById.values()], edges };
 }
 
 function toViewModelNode(n: MutableNode): GraphViewModelNode {
-  return {
-    id: n.id,
-    label: n.label,
-    filePath: n.filePath,
-    kind: n.kind,
-    visibility: n.visibility,
-    inTestFile: n.inTestFile,
-    callDegreeIn: n.callDegreeIn,
-    callDegreeOut: n.callDegreeOut,
-    sccId: n.sccId,
-  };
+  return { id: n.id, label: n.id, totalCoupling: n.totalCoupling, sccId: n.sccId };
 }
 
-function toViewModelEdge(e: RawEdge, sccByNode: ReadonlyMap<string, string>): GraphViewModelEdge {
+function toViewModelEdge(e: MutableEdge, sccByNode: ReadonlyMap<string, string>): GraphViewModelEdge {
   const sourceScc = sccByNode.get(e.source);
   const targetScc = sccByNode.get(e.target);
   return {
     source: e.source,
     target: e.target,
-    resolution: e.resolution,
-    confidence: e.confidence,
+    weight: e.weight,
     isCycleEdge: sourceScc != null && sourceScc === targetScc,
   };
 }
-
-/** Build a forward-adjacency map (source id → unique target ids). */

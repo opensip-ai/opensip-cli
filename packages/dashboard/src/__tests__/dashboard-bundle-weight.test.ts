@@ -75,12 +75,13 @@ describe('bundle weight gate', () => {
     expect(viewKb).toBeLessThan(50);
   });
 
-  it('projected view-model JSON stays within the per-node/edge byte budget', () => {
+  it('projected (package-level) view-model JSON stays within the per-node/edge byte budget', () => {
     const vm = projectCatalogToGraphViewModel(loadFixture());
     const bytes = size(JSON.stringify(vm));
-    // Phase 0 §4.5: ~246 B/node + ~104 B/edge. Allow a 1.5x margin (fixed
-    // JSON overhead dominates at fixture scale) plus a small constant.
-    const budget = Math.round((vm.nodes.length * 246 + vm.edges.length * 104) * 1.5) + 512;
+    // Package nodes are slim ({id,label,totalCoupling,sccId}) and there are
+    // few of them — fixed JSON overhead dominates at this scale, so the
+    // per-element estimate carries a generous constant floor.
+    const budget = Math.round((vm.nodes.length * 160 + vm.edges.length * 100) * 1.5) + 1024;
     const perNode = vm.nodes.length > 0 ? bytes / vm.nodes.length : 0;
     expect(
       bytes,

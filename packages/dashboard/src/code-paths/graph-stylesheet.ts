@@ -1,19 +1,23 @@
 /**
- * @fileoverview Cytoscape stylesheet for the Code Paths "Graph" view.
+ * @fileoverview Cytoscape stylesheet for the Code Graph "Visualization" view.
  *
  * A render helper (registers no view), extracted from `view-graph.ts` to keep
  * that emitter under the file-length budget and deliberately named out of the
  * `view-*` namespace so it stays clear of the views-disjoint architecture
  * rule. Emits the `gvStylesheet()` browser function as a JS string; the main
- * emitter interpolates it into its `<script>` body. The selectors/colors are
- * the visual encoding (node shape/stroke/size, edge style/opacity, SCC accent,
- * selection/search/impact highlight classes) documented in `view-graph.ts`.
+ * emitter interpolates it into its `<script>` body.
+ *
+ * PACKAGE granularity (item 10): nodes are packages, not functions. The
+ * visual encoding is therefore simpler than the function-level original —
+ * uniform round-rectangle nodes sized by total coupling degree, edges
+ * thickened by call-count weight, plus the cross-package SCC accent and the
+ * shared selection/search/impact highlight classes.
  */
 
 /**
  * Emit the `gvStylesheet()` browser function as a JS string. No leading or
  * trailing newline, so the main emitter can interpolate it where the inline
- * function used to sit and produce byte-identical output.
+ * function used to sit.
  */
 export function dashboardViewGraphStylesheetJs(): string {
   return String.raw`function gvStylesheet() {
@@ -24,42 +28,37 @@ export function dashboardViewGraphStylesheetJs(): string {
         'background-color': '#c4956a',
         'border-color': function(ele) { return ele.data('sccColor') || '#8a8a8a'; },
         'border-width': function(ele) { return ele.data('sccId') ? 3 : 1; },
-        'border-style': function(ele) { return ele.data('borderStyle'); },
-        'shape': function(ele) { return ele.data('shape'); },
-        'width': function(ele) { return 18 + Math.min(42, ele.data('degree') * 3); },
-        'height': function(ele) { return 18 + Math.min(42, ele.data('degree') * 3); },
-        'label': function(ele) {
-          var l = ele.data('label') || '';
-          return l.length > 28 ? l.slice(0, 27) + '…' : l;
-        },
-        'font-size': 7,
+        'shape': 'round-rectangle',
+        // Size by total coupling degree (fan-in + fan-out call count). The
+        // log-ish clamp keeps a megabus package from dwarfing the canvas.
+        'width': function(ele) { return 22 + Math.min(56, Math.sqrt(ele.data('totalCoupling') || 0) * 6); },
+        'height': function(ele) { return 22 + Math.min(56, Math.sqrt(ele.data('totalCoupling') || 0) * 6); },
+        'label': function(ele) { return ele.data('label') || ''; },
+        'font-size': 9,
         'color': '#ddd',
         'text-valign': 'bottom',
         'text-halign': 'center',
         'text-margin-y': 2,
-        'opacity': function(ele) { return ele.data('inTestFile') ? 0.55 : 1; },
+        'text-wrap': 'none',
       },
     },
     {
       selector: 'edge',
       style: {
-        'width': 1,
+        // Thickness by call-count weight (clamped). A solid uniform style —
+        // resolution/confidence encoding is function-level and not meaningful
+        // once edges are aggregated to packages.
+        'width': function(ele) { return 1 + Math.min(7, Math.sqrt(ele.data('weight') || 1) * 1.2); },
         'line-color': '#5a5a5a',
-        'line-style': function(ele) { return ele.data('lineStyle'); },
-        'opacity': function(ele) { return ele.data('edgeOpacity'); },
         'target-arrow-color': '#5a5a5a',
         'target-arrow-shape': 'triangle',
-        'arrow-scale': 0.6,
+        'arrow-scale': 0.8,
         'curve-style': 'bezier',
       },
     },
     {
       selector: 'edge[?isCycleEdge]',
-      style: { 'line-color': '#d46a6a', 'target-arrow-color': '#d46a6a', 'width': 1.5 },
-    },
-    {
-      selector: 'node.gv-node-selected',
-      style: { 'background-color': '#e0a96d', 'border-color': '#fff', 'border-width': 3 },
+      style: { 'line-color': '#d46a6a', 'target-arrow-color': '#d46a6a' },
     },
     {
       selector: 'node.gv-search-hit',
@@ -73,10 +72,11 @@ export function dashboardViewGraphStylesheetJs(): string {
       selector: 'edge.gv-search-fade',
       style: { 'opacity': 0.05 },
     },
-    // Impact highlight (Phase 5). Accent palette mirrors the dashboard
-    // theme: --accent (selected), --accent-fitness (downstream),
-    // --accent-sim (upstream). Hard-coded here because the Cytoscape canvas
-    // can't read CSS custom properties.
+    // Impact highlight (adapted to packages): clicking a package lights its
+    // direct caller packages (upstream) and callee packages (downstream).
+    // Accent palette mirrors the dashboard theme: --accent (selected),
+    // --accent-fitness (downstream), --accent-sim (upstream). Hard-coded
+    // because the Cytoscape canvas can't read CSS custom properties.
     {
       selector: 'node.gv-selected',
       style: { 'background-color': '#e0a96d', 'border-color': '#fff', 'border-width': 4, 'opacity': 1 },
@@ -93,16 +93,16 @@ export function dashboardViewGraphStylesheetJs(): string {
       selector: '.gv-dimmed',
       style: { 'opacity': 0.1 },
     },
-    // SCC-highlight toggle (folded-in "Cycles / SCCs" affordance). Cycle
-    // members get a bright accent fill; cycle edges turn red and thicken;
-    // the acyclic remainder fades so mutually-recursive clusters stand out.
+    // Cross-package cycle highlight (folded-in "Cycles / SCCs" affordance).
+    // Cycle members get a bright accent fill; cycle edges turn red and
+    // thicken; the acyclic remainder fades so multi-package cycles stand out.
     {
       selector: 'node.gv-scc-member',
       style: { 'background-color': '#d46a6a', 'border-color': '#fff', 'border-width': 3, 'opacity': 1 },
     },
     {
       selector: 'edge.gv-scc-edge',
-      style: { 'line-color': '#d46a6a', 'target-arrow-color': '#d46a6a', 'width': 2, 'opacity': 1 },
+      style: { 'line-color': '#d46a6a', 'target-arrow-color': '#d46a6a', 'width': 3, 'opacity': 1 },
     },
     {
       selector: '.gv-scc-dimmed',
