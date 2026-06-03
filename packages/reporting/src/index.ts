@@ -19,3 +19,13 @@ export {
 } from './entitlement.js';
 export { createCloudSignalSink, type CloudSignalSinkOptions } from './cloud-signal-sink.js';
 export { postChunked, type EgressResult, type RetryPolicy, type PostChunkedArgs } from './http-egress.js';
+export {
+  resolveSignalSink,
+  DEFAULT_CLOUD_ENDPOINT,
+  type ResolveSignalSinkInput,
+} from './resolve-signal-sink.js';
+export {
+  emitRunSignals,
+  resolveRepoIdentity,
+  type EmitRunSignalsInput,
+} from './emit-run-signals.js';
