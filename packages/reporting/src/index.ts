@@ -9,3 +9,4 @@
 
 export { buildSarifLog, chunkSarifRuns, reportToCloud, type ReportResult } from './sarif.js';
 export type { SarifResult, SarifLocation } from './sarif-types.js';
+export { collectSignalBatch, type CollectSignalBatchInput } from './collect-batch.js';
