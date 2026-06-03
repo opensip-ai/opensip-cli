@@ -273,6 +273,10 @@ function gvRenderGraph(container, catalog, indexes) {
   // activateView() re-renders the panel once it becomes visible.
   if (gvPanelHidden(container)) return;
 
+  // Section heading + ⓘ help button, consistent with the Coupling and
+  // Functions views (makeSectionHeading wires the button to openHelpDrawer for
+  // this view's id, which surfaces the 'graph' view's help sections).
+  container.appendChild(makeSectionHeading('Visualization', 'graph'));
   gvRenderControls(container, catalog, indexes);
   gvRenderSearchBox(container);
 

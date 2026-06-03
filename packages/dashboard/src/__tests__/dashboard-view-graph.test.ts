@@ -15,6 +15,8 @@ import { describe, expect, it, beforeEach } from 'vitest';
 
 import { dashboardCytoscapeVendorJs } from '../code-paths/cytoscape-vendor.js';
 import { dashboardFiltersJs } from '../code-paths/filters.js';
+import { dashboardFunctionRowJs } from '../code-paths/function-row.js';
+import { dashboardHelpDrawerJs } from '../code-paths/help-drawer.js';
 import { dashboardIndexesJs } from '../code-paths/indexes.js';
 import { dashboardPathUtilsJs } from '../code-paths/path-utils.js';
 import { dashboardSearchJs } from '../code-paths/search.js';
@@ -59,6 +61,8 @@ return { views };
     dashboardViewsRegistryJs(),
     dashboardFiltersJs(),
     dashboardSearchJs(),
+    dashboardFunctionRowJs(), // declares makeSectionHeading (the ⓘ heading helper)
+    dashboardHelpDrawerJs(),  // declares openHelpDrawer (so the ⓘ button renders)
     dashboardViewGraphJs(),
     tail,
   );
@@ -143,6 +147,19 @@ describe('View 8 — Visualization', () => {
     expect(layout).not.toBeNull();
     expect([...layout!.options].map(o => o.value)).toEqual(['dagre', 'cose', 'breadthfirst']);
     expect(layout!.value).toBe('dagre'); // default
+  });
+
+  it('renders a section heading with an ⓘ help button (consistent with Coupling/Functions)', () => {
+    const env = loadEnv(true);
+    embedViewModel(SAMPLE_VM);
+    const c = document.createElement('div');
+    document.body.append(c);
+    env.views.find(v => v.id === 'graph')!.render(c, null, null, null);
+    const heading = c.querySelector('h3');
+    expect(heading).not.toBeNull();
+    expect(heading!.textContent).toContain('Visualization');
+    const info = c.querySelector('.section-info');
+    expect(info).not.toBeNull();
   });
 
   it('renders the "Highlight cycles" toggle as a checkbox in the control toolbar', () => {

@@ -31,14 +31,18 @@ export function dashboardCssCodePaths(): string {
 /* ====== Code Paths Graph view (Cytoscape) ====== */
 .code-paths-graph-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
 .code-paths-graph-toolbar-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
-/* Visualization controls — two rows above the search box:
-     Row 1: Layout · Scope · Highlight-cycles checkbox
+/* Visualization controls — ONE CSS grid (not two flex rows) so the label and
+   control columns line up like a table across both rows:
+     Row 1: Layout · Scope · Highlight-cycles checkbox (spans the rest)
      Row 2: Level · Package · Kind (· Edges, function level only)
-   The Package/Kind controls are disabled at package level (they only apply at
-   function level), so they fade rather than vanish. Uniform select min-width
-   keeps the rows aligned. */
-.code-paths-graph-controls { gap: 8px 10px; row-gap: 8px; }
-.code-paths-graph-controls + .code-paths-graph-controls { margin-top: -2px; }
+   Label columns auto-size to the widest label across both rows; control columns
+   are a fixed 190px. The Package/Kind controls are disabled at package level
+   (they only apply at function level), so they fade rather than vanish. */
+.code-paths-graph-grid { display: grid; grid-template-columns: auto 190px auto 190px auto 190px auto 190px; gap: 10px 12px; align-items: center; margin-bottom: 12px; }
+.code-paths-graph-grid .code-paths-graph-toolbar-label { justify-self: start; }
+/* The cycles checkbox sits in row 1, col 5, and spans to the row end so row 2
+   starts on a fresh grid row. */
+.code-paths-graph-grid-rest { grid-column: 5 / -1; }
 .code-paths-graph-checkbox { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; user-select: none; height: 30px; }
 .code-paths-graph-checkbox input { cursor: pointer; }
 /* Functions view controls row (Kind · Package · search). */
@@ -46,6 +50,10 @@ export function dashboardCssCodePaths(): string {
 .code-paths-ranked-controls .code-paths-search { margin-bottom: 0; }
 .code-paths-graph-select { font-size: 12px; padding: 4px 8px; border-radius: var(--radius-sm); background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-muted); font-family: var(--font); min-width: 150px; height: 30px; box-sizing: border-box; }
 .code-paths-graph-select:disabled { opacity: 0.4; cursor: not-allowed; }
+/* Inside the grid, controls fill their fixed 190px column so right edges align. */
+.code-paths-graph-grid .code-paths-graph-select { min-width: 0; width: 100%; }
+.code-paths-graph-grid .code-paths-graph-ms { width: 100%; }
+.code-paths-graph-grid .code-paths-graph-ms-trigger { width: 100%; }
 /* Kind multi-select: a trigger button + a checkbox popover (native
    <select multiple> renders an always-open listbox, which looked wrong). */
 .code-paths-graph-ms { position: relative; display: inline-block; }
