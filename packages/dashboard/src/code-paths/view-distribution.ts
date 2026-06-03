@@ -51,7 +51,7 @@ export function dashboardViewDistributionJs(): string {
       { label: 'Lines', value: 'o => o.__metric' },
       { label: 'Callers', value: 'o => distCallerCount(o)' },
       { label: 'Params', value: 'o => distParamCount(o)' },
-      { label: 'Test-only', value: "o => distTestOnly(o) ? 'yes' : ''" },
+      // The former 'Test-only' column moved to a "Test-only" filter toggle (below).
       { label: 'Kind', value: 'o => o.kind' },
       { label: 'Package', value: 'o => pkgOf(o)' },
       { label: 'File', value: "o => o.filePath + ':' + o.line" },
@@ -64,5 +64,8 @@ export function dashboardViewDistributionJs(): string {
     // Kind (single-select) + Package (single-select) dropdowns in the same
     // controls row, before the search box: Kind · Package · search.
     filterByKindPackage: true,
+    // A "Test-only" checkbox after the search box — when checked, narrows the
+    // table to production functions reached only from tests (distTestOnly).
+    filterToggle: { label: 'Test-only', predicate: 'distTestOnly(occ)' },
   });
 }

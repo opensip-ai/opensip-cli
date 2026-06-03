@@ -140,6 +140,15 @@ export interface RankedViewConfig {
    * Package, then the search box, in that order). Used by the Functions view.
    */
   filterByKindPackage?: boolean;
+  /**
+   * When set, render a checkbox toggle AFTER the search box that narrows the
+   * table to rows matching `predicate` when checked (off by default).
+   *
+   * `predicate` is JS source spliced VERBATIM into the row filter — a boolean
+   * expression closing over `occ` (and any `preamble`-declared helper). Used by
+   * the Functions view for a "Test-only" toggle (`distTestOnly(occ)`).
+   */
+  filterToggle?: { label: string; predicate: string };
 }
 
 /**
@@ -185,14 +194,17 @@ export function defineRankedView(config: RankedViewConfig): string {
   // coexist without clobbering each other.
   const searchByName = config.searchByName === true;
   const filterByKP = config.filterByKindPackage === true;
-  const hasControls = searchByName || filterByKP;
+  const toggle = config.filterToggle ?? null;
+  const hasControls = searchByName || filterByKP || toggle !== null;
   const idSuffix = config.id.replaceAll(/\W/g, '_');
   const queryVar = `__rankedSearchQuery_${idSuffix}`;
   const kindVar = `__rankedKind_${idSuffix}`;
   const pkgVar = `__rankedPkg_${idSuffix}`;
+  const toggleVar = `__rankedToggle_${idSuffix}`;
   const stateDecl =
     (searchByName ? `let ${queryVar} = '';\n` : '') +
-    (filterByKP ? `let ${kindVar} = '';\nlet ${pkgVar} = '';\n` : '');
+    (filterByKP ? `let ${kindVar} = '';\nlet ${pkgVar} = '';\n` : '') +
+    (toggle ? `let ${toggleVar} = false;\n` : '');
   // Kind + Package single-selects (filterByKindPackage). Built into the shared
   // controls row; each re-filters the table in place. Options come from the
   // shared KIND_LIST / packagesInCatalog (declared by the filters emitter).
@@ -234,11 +246,23 @@ export function defineRankedView(config: RankedViewConfig): string {
     });
     controlsRow.appendChild(searchInput);`
     : '';
-  // The controls row (Kind · Package · search) sits above the table. When no
-  // controls are configured, rows render straight into the container.
+  // Checkbox toggle (filterToggle) — rendered AFTER the search box; narrows the
+  // table to rows matching the predicate when checked.
+  const toggleBlock = toggle
+    ? String.raw`
+    const toggleLabel = el('label', { class: 'code-paths-graph-checkbox' });
+    const toggleCb = el('input', { type: 'checkbox', 'data-control': 'fn-toggle' });
+    toggleCb.checked = ${toggleVar};
+    toggleCb.addEventListener('change', () => { ${toggleVar} = toggleCb.checked; renderRows(); });
+    toggleLabel.appendChild(toggleCb);
+    toggleLabel.appendChild(document.createTextNode(' ' + ${jsString(toggle.label)}));
+    controlsRow.appendChild(toggleLabel);`
+    : '';
+  // The controls row (Kind · Package · search · toggle) sits above the table.
+  // When no controls are configured, rows render straight into the container.
   const controlsBlock = hasControls
     ? String.raw`
-    const controlsRow = el('div', { class: 'code-paths-ranked-controls' });${kindPackageBlock}${searchInputBlock}
+    const controlsRow = el('div', { class: 'code-paths-ranked-controls' });${kindPackageBlock}${searchInputBlock}${toggleBlock}
     container.appendChild(controlsRow);`
     : '';
   // The section heading renders into its OWN host ABOVE the controls (so the
@@ -253,8 +277,9 @@ export function defineRankedView(config: RankedViewConfig): string {
   const nameClause = searchByName
     ? `const q = (${queryVar} || '').trim().toLowerCase(); if (q.length && (occ.simpleName || '').toLowerCase().indexOf(q) === -1) return false;`
     : '';
+  const toggleClause = toggle ? `if (${toggleVar} && !(${toggle.predicate})) return false;` : '';
   const rowFilterExpr = hasControls
-    ? `(function(occ){ ${kindClause} ${pkgClause} ${nameClause} return true; })`
+    ? `(function(occ){ ${kindClause} ${pkgClause} ${nameClause} ${toggleClause} return true; })`
     : '(function(){ return true; })';
   const onActivateBlock = searchByName
     ? String.raw`,

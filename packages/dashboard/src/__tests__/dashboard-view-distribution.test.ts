@@ -201,4 +201,41 @@ describe('Functions (distribution) view', () => {
     expect(view.textContent).toContain('ztarget');
     expect(view.textContent).not.toContain('validateInput');
   });
+
+  it('no longer renders a "Test-only" column', () => {
+    const { view } = renderDistribution();
+    const headers = [...view.querySelectorAll('th')].map(th => th.textContent);
+    expect(headers).not.toContain('Test-only');
+  });
+
+  it('the "Test-only" toggle narrows the table to test-only functions', () => {
+    const edge = { line: 1, column: 0, resolution: 'static' as const, confidence: 'high' as const, text: 'x()' };
+    const env = loadEnv({
+      version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now',
+      functions: {
+        // Production fn reached ONLY from a test file → test-only.
+        prod: [makeOcc({ bodyHash: 'prod', simpleName: 'prodFn', filePath: 'packages/cli/src/prod.ts' })],
+        // Production fn reached from production code → not test-only.
+        normal: [makeOcc({ bodyHash: 'normal', simpleName: 'normalFn', filePath: 'packages/cli/src/normal.ts' })],
+        normalCaller: [makeOcc({ bodyHash: 'normalCaller', simpleName: 'callerFn', filePath: 'packages/cli/src/nc.ts', calls: [{ to: ['normal'], ...edge }] })],
+        // A test-file fn that calls prod (excluded from the table by production-only default).
+        testFn: [makeOcc({ bodyHash: 'testFn', simpleName: 'testFn', filePath: 'packages/cli/src/__tests__/t.test.ts', inTestFile: true, calls: [{ to: ['prod'], ...edge }] })],
+      },
+    });
+    const view = document.createElement('div');
+    env.views.find(v => v.id === 'distribution')!.render(view, env.graphCatalog, env.graphIndexes, env.filterState);
+    // Production-only by default (testFn lives in a test file) → 3 rows.
+    expect(view.querySelectorAll('[data-body-hash]').length).toBe(3);
+    const toggle = view.querySelector<HTMLInputElement>('input[data-control="fn-toggle"]')!;
+    expect(toggle).not.toBeNull();
+    // The toggle renders after the search box.
+    const search = view.querySelector<HTMLInputElement>('#code-paths-search-distribution')!;
+    expect(search.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    toggle.checked = true;
+    toggle.dispatchEvent(new Event('change', { bubbles: true }));
+    // Only the test-only production function remains.
+    expect(view.querySelectorAll('[data-body-hash]').length).toBe(1);
+    expect(view.textContent).toContain('prodFn');
+    expect(view.textContent).not.toContain('normalFn');
+  });
 });
