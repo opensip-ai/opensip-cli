@@ -17,7 +17,10 @@ export function dashboardCssDataTable(): string {
 .data-table th:hover { color: var(--text-muted); }
 .data-table th[data-sort="asc"]::after { content: ' ▲'; font-size: 10px; }
 .data-table th[data-sort="desc"]::after { content: ' ▼'; font-size: 10px; }
-.data-table td { padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 13px; }
+/* Shared cell baseline: every .data-table body cell renders in the standard
+   site font at a consistent size, so views don't drift or force monospace.
+   Set at the root here rather than per-view (item 13). */
+.data-table td { padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 13px; font-family: var(--font); }
 .data-table tr:hover { background: var(--bg-hover); }
 .data-table tr.clickable { cursor: pointer; }
 .data-table tr.selected { background: var(--bg-hover); border-left: 2px solid var(--accent); }

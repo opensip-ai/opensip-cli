@@ -49,6 +49,27 @@ describe('dashboard graph-tab — rule/recipe catalog wiring', () => {
     expect(html).toContain('const graphRecipeCatalog =');
   });
 
+  it('renders the Catalog rule cell without a monospace/font-mono override (item 13)', () => {
+    // The Rule slug cell used to force font-family: var(--font-mono,monospace).
+    // It must now inherit the shared .data-table td styling instead. Guard the
+    // emitted renderGraphRuleCatalog source against the regression.
+    const ruleCellMarker = "el('td', { text: rule.slug,";
+    const idx = html.indexOf(ruleCellMarker);
+    expect(idx).toBeGreaterThan(-1);
+    const cellDecl = html.slice(idx, idx + 120);
+    expect(cellDecl).not.toContain('font-mono');
+    expect(cellDecl).not.toContain('monospace');
+  });
+
+  it('gives .data-table td a shared font baseline (standard site font, 13px)', () => {
+    expect(html).toContain('.data-table td {');
+    // The shared cell rule carries both the size and the site font family.
+    const tdRule = html.slice(html.indexOf('.data-table td {'));
+    const firstRule = tdRule.slice(0, tdRule.indexOf('}'));
+    expect(firstRule).toContain('font-size: 13px');
+    expect(firstRule).toContain('font-family: var(--font)');
+  });
+
   it('@opensip-tools/dashboard declares no @opensip-tools/graph dependency (decoupled)', () => {
     const pkg = JSON.parse(readFileSync(join(HERE, '..', '..', 'package.json'), 'utf8')) as {
       dependencies?: Record<string, string>;

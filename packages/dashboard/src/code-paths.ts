@@ -256,7 +256,7 @@ function renderGraphRuleCatalog(container, rulesData) {
   const tbody = el('tbody');
   rulesData.forEach(rule => {
     const row = el('tr');
-    row.appendChild(el('td', { text: rule.slug, style: 'font-weight:500;font-family:var(--font-mono,monospace)' }));
+    row.appendChild(el('td', { text: rule.slug, style: 'font-weight:500' }));
     const sevCell = el('td');
     const sevColor = rule.defaultSeverity === 'error' ? 'color:var(--danger)' : 'color:var(--warning)';
     sevCell.appendChild(el('span', { text: rule.defaultSeverity, style: sevColor + ';font-size:12px' }));
