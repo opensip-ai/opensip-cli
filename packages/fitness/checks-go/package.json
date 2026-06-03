@@ -13,6 +13,7 @@
     "url": "https://github.com/opensip-ai/opensip-tools/issues"
   },
   "type": "module",
+  "opensipTools": { "kind": "fit-pack" },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {

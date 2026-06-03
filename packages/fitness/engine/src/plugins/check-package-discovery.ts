@@ -1,9 +1,17 @@
 /**
- * @fileoverview Auto-discovery of `<scope>/checks-*` packages installed
- * in node_modules. The default scope is `@opensip-tools`; customers
+ * @fileoverview Name-pattern auto-discovery of `<scope>/checks-*` packages
+ * installed in node_modules. The default scope is `@opensip-tools`; customers
  * can opt in additional scopes via `plugins.packageScopes` so internal
  * check packs published to their own scope (e.g. `@acme/checks-*`)
  * are discovered without per-package explicit listing.
+ *
+ * DEPRECATED PATH — kept for backward compatibility. The canonical way to
+ * declare a check pack is the `opensipTools.kind: "fit-pack"` marker (read by
+ * core's marker discovery and unioned in by `check-loader.ts`). First-party
+ * `@opensip-tools/checks-*` packs all carry the marker, so this name-pattern
+ * scan is redundant for them; it survives only so third-party packs that
+ * relied on prefix-only discovery don't break. New packs should declare the
+ * marker; the prefix scan is slated for removal in the next major (ADR-0007).
  *
  * Resolution rules (apply in order):
  *

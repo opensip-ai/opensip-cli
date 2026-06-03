@@ -352,11 +352,12 @@ export async function loadDiscoveredCheckPackages(projectDir: string): Promise<L
     autoDiscover: prefs.autoDiscoverChecks,
     packageScopes: prefs.packageScopes,
   });
-  // Marker-based discovery runs in parallel with the name-pattern walk.
-  // Customers who declare opensipTools.kind: "fit-pack" in package.json get
-  // discovered regardless of npm scope. Dedupe by package name; first
-  // occurrence (name-pattern walk) wins so existing customers' telemetry
-  // doesn't shift over to a different code path silently.
+  // Marker-based discovery is the canonical path: any package declaring
+  // opensipTools.kind: "fit-pack" is discovered regardless of npm scope. It
+  // runs in parallel with the (deprecated) name-pattern walk, which survives
+  // only for third-party packs that haven't adopted the marker yet. Dedupe by
+  // package name; first occurrence (name-pattern walk) wins so existing
+  // customers' telemetry doesn't shift over to a different code path silently.
   const markerDiscovered = discoverPackagesByMarker({ projectDir, kind: 'fit-pack' });
   const seenNames = new Set(discovered.map((p) => p.name));
   const allPacks: readonly { name: string; packageDir: string }[] = [
