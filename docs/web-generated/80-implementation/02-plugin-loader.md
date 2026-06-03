@@ -24,7 +24,7 @@ related-docs:
 opensip-tools loads four kinds of plugins. Each has its own discovery shape, but they share a small, explicit policy: nothing loads silently, nothing loads transitively without opt-in, and the project owns its plugin set.
 
 > **What you'll understand after this:**
-> - The five discovery shapes (Tool marker, fit-pack marker + scope-prefix scan, sim-pack marker + project-pinned, graph-adapter name-pattern + explicit pin, direct import).
+> - The five discovery shapes (Tool marker, fit-pack marker + scope-prefix scan, sim-pack marker + project-pinned, graph-adapter name-pattern + kind marker + explicit pin, direct import).
 > - Why source-file plugins auto-load but project-pinned npm packages require explicit listing.
 > - The on-disk layout the `plugin add/remove/list/sync` commands operate on.
 > - What `plugin sync` does and when CI should run it.
@@ -38,7 +38,7 @@ opensip-tools loads four kinds of plugins. Each has its own discovery shape, but
 | **Tools** | `node_modules` walk for `opensipTools.kind === 'tool'` marker | At CLI startup, by `discoverToolPackages()` |
 | **Check packs** | (a) `node_modules` walk for `<scope>/checks-*` under default + configured `plugins.packageScopes`, (b) `node_modules` walk for `opensipTools.kind === 'fit-pack'` marker, (c) explicit `plugins.checkPackages:` list. All run in parallel; results merged and deduped by package name. | Inside fitness's `loadDiscoveredCheckPackages()` |
 | **Sim scenario packs** | (a) Project-local source files under `opensip-tools/sim/`, (b) `node_modules` walk for `opensipTools.kind === 'sim-pack'` marker, (c) project-pinned via `plugins.sim:` list under `.runtime/plugins/sim/` | Inside simulation's `ensureScenariosLoaded()` |
-| **Graph adapters** | (a) Explicit `plugins.graphAdapters:` list in `opensip-tools.config.yml` (when present, replaces the auto-scan entirely), (b) `plugins.autoDiscoverGraphAdapters: false` opt-out, (c) default: `node_modules` walk for any package whose name matches `@opensip-tools/graph-*`. | At CLI startup, by `discoverGraphAdapterPackages()` |
+| **Graph adapters** | (a) Explicit `plugins.graphAdapters:` list in `opensip-tools.config.yml` (when present, replaces the auto-scan entirely), (b) `plugins.autoDiscoverGraphAdapters: false` opt-out, (c) default: `node_modules` walk for any package whose name matches `@opensip-tools/graph-*` **and** declares the `opensipTools.kind: "graph-adapter"` marker (so shared scaffolding under the same prefix — e.g. `@opensip-tools/graph-adapter-common` — is not mistaken for an adapter). | At CLI startup, by `discoverGraphAdapterPackages()` |
 | **Language adapters** | Direct CLI imports (no discovery walk) | At CLI bootstrap, before any Tool's `register()` runs |
 
 Different kinds, different lifetimes. Tools are global to the binary — once registered, they're available regardless of cwd. Check packs and scenario packs are project-scoped — they load when the relevant Tool actually runs. Language adapters are bundled — they're a CLI dep, not a discoverable plugin, because the framework can't usefully run without them.

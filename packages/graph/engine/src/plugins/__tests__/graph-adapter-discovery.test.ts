@@ -26,7 +26,15 @@ function makeNodeModulesPackage(
   mkdirSync(dir, { recursive: true });
   writeFileSync(
     join(dir, 'package.json'),
-    JSON.stringify({ name: scopedName, version: '0.0.0', main: './index.js', ...fields }),
+    JSON.stringify({
+      name: scopedName,
+      version: '0.0.0',
+      main: './index.js',
+      // Real adapters declare this marker; auto-discovery requires it. Tests
+      // that want a marker-less library pass `{ opensipTools: undefined }`.
+      opensipTools: { kind: 'graph-adapter' },
+      ...fields,
+    }),
   );
   writeFileSync(join(dir, 'index.js'), 'export const adapter = {}; export const metadata = {}');
   return dir;
@@ -78,6 +86,16 @@ describe('discoverGraphAdapterPackages — auto-discovery (default)', () => {
     makeNodeModulesPackage(testDir, '@opensip-tools/core');
     const result = discoverGraphAdapterPackages({ projectDir: testDir });
     expect(result).toHaveLength(0);
+  });
+
+  it('does NOT auto-discover a graph-* scaffolding library with no kind marker', () => {
+    // @opensip-tools/graph-adapter-common shares the `graph-` prefix but is a
+    // shared library, not an adapter — it carries no `opensipTools.kind`, so
+    // auto-discovery must skip it silently (no "missing adapter export" warning).
+    makeNodeModulesPackage(testDir, '@opensip-tools/graph-adapter-common', { opensipTools: undefined });
+    makeNodeModulesPackage(testDir, '@opensip-tools/graph-python');
+    const result = discoverGraphAdapterPackages({ projectDir: testDir });
+    expect(result.map((p) => p.name)).toEqual(['@opensip-tools/graph-python']);
   });
 
   it('walks ancestor node_modules to handle pnpm hoisted layouts', () => {

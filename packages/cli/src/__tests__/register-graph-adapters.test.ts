@@ -37,7 +37,12 @@ describe('discoverAndRegisterGraphAdapterPackages', () => {
     mkdirSync(dir, { recursive: true });
     writeFileSync(
       join(dir, 'package.json'),
-      JSON.stringify({ name: '@opensip-tools/graph-broken', version: '0.0.0', main: './index.js' }),
+      JSON.stringify({
+        name: '@opensip-tools/graph-broken',
+        version: '0.0.0',
+        main: './index.js',
+        opensipTools: { kind: 'graph-adapter' },
+      }),
     );
     writeFileSync(join(dir, 'index.js'), 'throw new Error("boot fail");');
 
@@ -53,7 +58,13 @@ describe('discoverAndRegisterGraphAdapterPackages', () => {
     mkdirSync(dir, { recursive: true });
     writeFileSync(
       join(dir, 'package.json'),
-      JSON.stringify({ name: '@opensip-tools/graph-fixture', version: '0.0.0', type: 'module', main: './index.js' }),
+      JSON.stringify({
+        name: '@opensip-tools/graph-fixture',
+        version: '0.0.0',
+        type: 'module',
+        main: './index.js',
+        opensipTools: { kind: 'graph-adapter' },
+      }),
     );
     writeFileSync(
       join(dir, 'index.js'),
@@ -64,11 +75,12 @@ describe('discoverAndRegisterGraphAdapterPackages', () => {
     expect(registered).toBe(1);
   });
 
-  it('skips a discovered pack whose package.json is unreadable (no metadata)', async () => {
-    // Discovery only checks that package.json EXISTS (existsSync), so a
-    // malformed package.json is still discovered, but
-    // readGraphAdapterPackageMetadata returns undefined ⇒ the pack is
-    // skipped before any import.
+  it('silently skips a graph-* dir whose package.json is unreadable', async () => {
+    // Discovery now reads `opensipTools.kind` from package.json to decide
+    // whether a `graph-*` dir is an adapter. A malformed package.json can't
+    // declare the marker, so the dir is treated as "not an adapter" and
+    // skipped at discovery — no import, no warning (a corrupt third-party
+    // package is not ours to complain about).
     const dir = join(testDir, 'node_modules', '@opensip-tools', 'graph-malformed');
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, 'package.json'), '{ this is not valid json');
@@ -76,16 +88,24 @@ describe('discoverAndRegisterGraphAdapterPackages', () => {
     const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     const registered = await discoverAndRegisterGraphAdapterPackages({ projectDir: testDir });
     expect(registered).toBe(0);
-    expect(stderr).toHaveBeenCalled();
+    expect(stderr).not.toHaveBeenCalled();
     stderr.mockRestore();
   });
 
-  it('skips packs that lack a valid adapter export', async () => {
+  it('warns and skips a pack that declares the marker but exports no adapter', async () => {
+    // This pack declares itself a graph-adapter (carries the kind marker) but
+    // its entry exports no `adapter` — a genuine authoring error. Discovery
+    // picks it up (marker present), import succeeds, validation fails ⇒ warn.
     const dir = join(testDir, 'node_modules', '@opensip-tools', 'graph-empty');
     mkdirSync(dir, { recursive: true });
     writeFileSync(
       join(dir, 'package.json'),
-      JSON.stringify({ name: '@opensip-tools/graph-empty', version: '0.0.0', main: './index.js' }),
+      JSON.stringify({
+        name: '@opensip-tools/graph-empty',
+        version: '0.0.0',
+        main: './index.js',
+        opensipTools: { kind: 'graph-adapter' },
+      }),
     );
     writeFileSync(join(dir, 'index.js'), 'export const notAdapter = {};');
 
