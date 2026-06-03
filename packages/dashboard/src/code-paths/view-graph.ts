@@ -277,12 +277,9 @@ function gvRenderGraph(container, catalog, indexes) {
   // Functions views (makeSectionHeading wires the button to openHelpDrawer for
   // this view's id, which surfaces the 'graph' view's help sections).
   container.appendChild(makeSectionHeading('Visualization', 'graph'));
+  // The control grid includes the search box and the Highlight-cycles toggle
+  // (row 1, cols 3-4), so there's nothing else to render here.
   gvRenderControls(container, catalog, indexes);
-  // Row 3: the name search box and the Highlight-cycles checkbox share one row.
-  var searchRow = el('div', { class: 'code-paths-graph-searchrow' });
-  gvRenderSearchBox(searchRow);
-  gvRenderCyclesToggle(searchRow);
-  container.appendChild(searchRow);
 
   var elements;
   if (gvLevel === 'function') {

@@ -34,70 +34,73 @@ function gvAddOptions(sel, pairs, current) {
   }
 }
 
-// The view's dropdown controls, laid out as a single CSS GRID (label/control
-// columns shared across both rows so everything lines up like a table). The
-// search box (gvRenderSearchBox) and the Highlight-cycles checkbox
-// (gvRenderCyclesToggle) render below this grid:
-//   Row 1: Layout · Scope
-//   Row 2: Level · Package · Kind (· Edges, function level only)
-// One grid (not two flex rows) is what makes the columns align: the label
-// columns auto-size to the widest label across BOTH rows, and the control
-// columns are a fixed width, so LAYOUT/LEVEL, SCOPE/PACKAGE, etc. line up.
+// The view's controls, laid out as a 2-row × 4-column CSS grid where each cell
+// is a labeled control (label + control flex pair). Auto-flow fills 4 cells per
+// row:
+//   Row 1: Layout · Scope · Search · Highlight cycles
+//   Row 2: Level · Package · Kind · Edges
 // Self-contained (the shared Explore filter bar was removed). The Level
-// dropdown decides what the graph shows; Package + Kind only apply at function
-// level, so they are DISABLED at package level (faded, not hidden). Most
-// changes re-render the graph in place via gvRenderGraph; Layout re-runs the
-// layout on the live graph (no remount).
+// dropdown decides what the graph shows; Package, Kind, AND Edges only apply at
+// function level, so all three are DISABLED at package level (faded, not
+// hidden) — consistent greying. Most changes re-render the graph in place via
+// gvRenderGraph; Layout re-runs the layout on the live graph (no remount).
 function gvRenderControls(host, catalog, indexes) {
   function rerender() { gvRenderGraph(host, catalog, indexes); }
   var fnLevel = (gvLevel === 'function');
   var grid = el('div', { class: 'code-paths-graph-grid' });
-  // label() — a column-1 (row-start) label, hugs the left. labelG() — a
-  // group-start label in a later column; carries a small left margin so the
-  // group reads as separate while its own dropdown stays tight beside it.
-  function label(t) { grid.appendChild(el('span', { class: 'code-paths-graph-toolbar-label', text: t })); }
-  function labelG(t) { grid.appendChild(el('span', { class: 'code-paths-graph-toolbar-label code-paths-graph-grid-group', text: t })); }
+  // cell(labelText, control) — one labeled grid cell (label + control). A null
+  // labelText yields an unlabeled cell (used for the search box).
+  function cell(labelText, control) {
+    var c = el('div', { class: 'code-paths-graph-cell' });
+    if (labelText) c.appendChild(el('span', { class: 'code-paths-graph-toolbar-label', text: labelText }));
+    if (control) c.appendChild(control);
+    grid.appendChild(c);
+    return c;
+  }
 
-  // ---- Row 1: Layout · Scope · Highlight cycles ----
+  // ---- Row 1: Layout · Scope · Search · Highlight cycles ----
   // Layout — dropdown; re-runs the layout on the live graph (no full remount).
-  label('Layout');
   var layoutSel = el('select', { class: 'code-paths-graph-select', 'data-control': 'layout' });
   gvAddOptions(layoutSel, GV_LAYOUTS.map(function(l) { return [l.id, l.label]; }), gvCurrentLayout);
   layoutSel.addEventListener('change', function(e) { gvRunLayout(e.target.value); });
-  grid.appendChild(layoutSel);
+  cell('Layout', layoutSel);
 
   // Scope — always enabled. Production-only vs include-tests.
-  labelG('Scope');
   var scopeSel = el('select', { class: 'code-paths-graph-select', 'data-control': 'scope' });
   gvAddOptions(scopeSel, [['prod', 'Production only'], ['tests', 'Include tests']], gvIncludeTests ? 'tests' : 'prod');
   scopeSel.addEventListener('change', function(e) { gvIncludeTests = (e.target.value === 'tests'); rerender(); });
-  grid.appendChild(scopeSel);
+  cell('Scope', scopeSel);
 
-  // ---- Row 2: Level · Package · Kind (· Edges) ----
-  // The Level label carries 'code-paths-graph-grid-break' (grid-column: 1) so it
-  // starts a fresh grid row even though row 1 left cols 5-8 empty (the cycles
-  // checkbox that used to fill them now lives below the search box).
-  grid.appendChild(el('span', { class: 'code-paths-graph-toolbar-label code-paths-graph-grid-break', text: 'Level' }));
+  // Search (unlabeled cell) — the name search box.
+  var searchCell = el('div', { class: 'code-paths-graph-cell code-paths-graph-cell-search' });
+  gvRenderSearchBox(searchCell);
+  grid.appendChild(searchCell);
+
+  // Highlight cycles (unlabeled cell) — the checkbox toggle.
+  var cyclesCell = el('div', { class: 'code-paths-graph-cell' });
+  gvRenderCyclesToggle(cyclesCell);
+  grid.appendChild(cyclesCell);
+
+  // ---- Row 2: Level · Package · Kind · Edges ----
+  // Level — always enabled. Drives package vs function granularity.
   var levelSel = el('select', { class: 'code-paths-graph-select', 'data-control': 'level' });
   gvAddOptions(levelSel, [['package', 'Package'], ['function', 'Function']], gvLevel);
   levelSel.addEventListener('change', function(e) { gvLevel = e.target.value; rerender(); });
-  grid.appendChild(levelSel);
+  cell('Level', levelSel);
 
   // Package — single-select; function level only (disabled at package level).
-  labelG('Package');
   var pkgs = (typeof packagesInCatalog === 'function') ? packagesInCatalog(catalog) : [];
   var pkgSel = el('select', { class: 'code-paths-graph-select', 'data-control': 'package' });
   pkgSel.appendChild(el('option', { value: '', text: pkgs.length ? '— select —' : '— none —' }));
   gvAddOptions(pkgSel, pkgs.map(function(p) { return [p, p]; }), gvSelectedPackage);
   pkgSel.disabled = !fnLevel;
   pkgSel.addEventListener('change', function(e) { gvSelectedPackage = e.target.value || null; rerender(); });
-  grid.appendChild(pkgSel);
+  cell('Package', pkgSel);
 
   // Kind — multi-select dropdown; function level only (disabled at package
   // level). A custom checkbox popover (gvMultiSelect) rather than a native
   // <select multiple> listbox, which renders as an always-open box.
-  labelG('Kind');
-  grid.appendChild(gvMultiSelect({
+  cell('Kind', gvMultiSelect({
     id: 'kind',
     items: (typeof KIND_LIST !== 'undefined') ? KIND_LIST : [],
     selected: gvKinds,
@@ -107,13 +110,12 @@ function gvRenderControls(host, catalog, indexes) {
   }));
 
   // Edges — function level only: intra-package (default) vs + cross-package.
-  if (fnLevel) {
-    labelG('Edges');
-    var edgeSel = el('select', { class: 'code-paths-graph-select', 'data-control': 'granularity' });
-    gvAddOptions(edgeSel, [['intra', 'Intra-package'], ['cross', '+ cross-package']], gvCrossPackage ? 'cross' : 'intra');
-    edgeSel.addEventListener('change', function(e) { gvCrossPackage = (e.target.value === 'cross'); rerender(); });
-    grid.appendChild(edgeSel);
-  }
+  // Always present; disabled at package level (consistent with Package/Kind).
+  var edgeSel = el('select', { class: 'code-paths-graph-select', 'data-control': 'granularity' });
+  gvAddOptions(edgeSel, [['intra', 'Intra-package'], ['cross', '+ cross-package']], gvCrossPackage ? 'cross' : 'intra');
+  edgeSel.disabled = !fnLevel;
+  edgeSel.addEventListener('change', function(e) { gvCrossPackage = (e.target.value === 'cross'); rerender(); });
+  cell('Edges', edgeSel);
 
   host.appendChild(grid);
 }

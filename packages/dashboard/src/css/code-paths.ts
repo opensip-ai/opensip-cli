@@ -31,39 +31,28 @@ export function dashboardCssCodePaths(): string {
 /* ====== Code Paths Graph view (Cytoscape) ====== */
 .code-paths-graph-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
 .code-paths-graph-toolbar-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
-/* Visualization controls — ONE CSS grid (not two flex rows) so the label and
-   control columns line up like a table across both rows:
-     Row 1: Layout · Scope
-     Row 2: Level · Package · Kind (· Edges, function level only)
-   Label columns auto-size to the widest label across both rows; control columns
-   are a fixed 190px. The small column-gap keeps each label tight against its
-   dropdown; group-start labels (labelG) add a left margin so the groups still
-   read as separate. The Package/Kind controls are disabled at package level
-   (they only apply at function level), so they fade rather than vanish. */
-.code-paths-graph-grid { display: grid; grid-template-columns: auto 190px auto 190px auto 190px auto 190px; gap: 8px 6px; align-items: center; margin-bottom: 10px; }
-/* Labels are RIGHT-aligned within their (fixed-width) column so each label
-   hugs its own dropdown (a short label like LEVEL no longer floats far from
-   its control); the dropdown columns still line up. */
-.code-paths-graph-grid .code-paths-graph-toolbar-label { justify-self: end; }
-/* Group-start labels (Scope/Package/Kind/Edges) get a left margin so a group
-   reads as separate from the previous control. */
-.code-paths-graph-grid-group { margin-left: 16px; }
-/* The Level label forces a fresh grid row (row 1 leaves cols 5-8 empty). */
-.code-paths-graph-grid-break { grid-column: 1; }
+/* Visualization controls — a 2-row × 4-column grid; each cell is a labeled
+   control (label + control flex pair). Auto-flow fills 4 cells per row:
+     Row 1: Layout · Scope · Search · Highlight cycles
+     Row 2: Level · Package · Kind · Edges
+   Each label has a fixed width so the controls line up within a column, and
+   the columns are content-sized so the rows read like a table. Package, Kind,
+   and Edges are disabled at package level (they only apply at function level),
+   so they fade rather than vanish. */
+.code-paths-graph-grid { display: grid; grid-template-columns: repeat(4, max-content); gap: 12px 24px; align-items: center; margin-bottom: 12px; }
+.code-paths-graph-cell { display: flex; align-items: center; gap: 8px; }
+.code-paths-graph-cell .code-paths-graph-toolbar-label { min-width: 56px; text-align: right; }
+.code-paths-graph-cell .code-paths-graph-select { width: 190px; min-width: 0; }
+.code-paths-graph-cell .code-paths-graph-ms { width: 190px; }
+.code-paths-graph-cell .code-paths-graph-ms-trigger { width: 100%; }
+.code-paths-graph-cell-search .code-paths-graph-search { width: 220px; margin-bottom: 0; }
 .code-paths-graph-checkbox { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; user-select: none; height: 30px; }
 .code-paths-graph-checkbox input { cursor: pointer; }
-/* Row 3: the name search box and the Highlight-cycles checkbox share one row. */
-.code-paths-graph-searchrow { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; }
-.code-paths-graph-searchrow .code-paths-graph-search { margin-bottom: 0; }
 /* Functions view controls row (Kind · Package · search). */
 .code-paths-ranked-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; margin-bottom: 12px; }
 .code-paths-ranked-controls .code-paths-search { margin-bottom: 0; }
 .code-paths-graph-select { font-size: 12px; padding: 4px 8px; border-radius: var(--radius-sm); background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-muted); font-family: var(--font); min-width: 150px; height: 30px; box-sizing: border-box; }
 .code-paths-graph-select:disabled { opacity: 0.4; cursor: not-allowed; }
-/* Inside the grid, controls fill their fixed 190px column so right edges align. */
-.code-paths-graph-grid .code-paths-graph-select { min-width: 0; width: 100%; }
-.code-paths-graph-grid .code-paths-graph-ms { width: 100%; }
-.code-paths-graph-grid .code-paths-graph-ms-trigger { width: 100%; }
 /* Kind multi-select: a trigger button + a checkbox popover (native
    <select multiple> renders an always-open listbox, which looked wrong). */
 .code-paths-graph-ms { position: relative; display: inline-block; }

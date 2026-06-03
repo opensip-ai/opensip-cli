@@ -222,7 +222,7 @@ describe('View 8 — Visualization', () => {
     expect(js).not.toContain('No nodes match the active filters');
   });
 
-  it('renders the Level/Scope/Package/Kind controls, with Package & Kind disabled at package level', () => {
+  it('renders Level/Scope/Package/Kind/Edges, with Package, Kind & Edges disabled (not hidden) at package level', () => {
     const env = loadEnv(true);
     embedViewModel(SAMPLE_VM);
     const c = document.createElement('div');
@@ -234,14 +234,19 @@ describe('View 8 — Visualization', () => {
     // Kind is a custom multi-select dropdown (trigger button + checkbox panel),
     // not a native <select multiple>.
     const kind = c.querySelector<HTMLButtonElement>('button[data-control="kind"]');
+    const edges = c.querySelector<HTMLSelectElement>('select[data-control="granularity"]');
     expect(level).not.toBeNull();
     expect(scope).not.toBeNull();
     expect(level!.value).toBe('package'); // default
     expect(kind).not.toBeNull();
     expect(kind!.classList.contains('code-paths-graph-ms-trigger')).toBe(true);
-    // Package + Kind only apply at function level → disabled at package level.
+    // Edges is now ALWAYS rendered (was hidden until function level).
+    expect(edges).not.toBeNull();
+    // Package, Kind & Edges only apply at function level → disabled (greyed),
+    // not hidden, at package level — consistent across the three.
     expect(pkg!.disabled).toBe(true);
     expect(kind!.disabled).toBe(true);
+    expect(edges!.disabled).toBe(true);
   });
 
   it('Kind multi-select enables at function level and updates the graph on close', () => {
