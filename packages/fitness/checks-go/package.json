@@ -1,6 +1,6 @@
 {
   "name": "@opensip-tools/checks-go",
-  "version": "2.5.2",
+  "version": "2.6.0",
   "license": "MIT",
   "description": "Go fitness checks for opensip-tools",
   "repository": {

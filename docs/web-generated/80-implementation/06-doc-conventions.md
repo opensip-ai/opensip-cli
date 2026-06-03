@@ -125,7 +125,7 @@ No binary images unless unavoidable. They diff poorly, can't be searched, and br
 
 ## Cross-linking
 
-Use Markdown links for prominent cross-links and inline code links for source-file references. Prefer real relative targets such as `[**Layer policy**](/docs/opensip-tools/80-implementation/05-layer-policy/)` or ``[`packages/core/src/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.5.2/packages/core/src/index.ts)``.
+Use Markdown links for prominent cross-links and inline code links for source-file references. Prefer real relative targets such as `[**Layer policy**](/docs/opensip-tools/80-implementation/05-layer-policy/)` or ``[`packages/core/src/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.0/packages/core/src/index.ts)``.
 
 Always link forward and back. A doc that depends on another doc's concept links to that doc; the linked-from doc, when relevant, links back to the dependent.
 

@@ -4,6 +4,79 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.6.0] — 2026-06-02
+
+The **symmetric tool architecture** release: the `graph` tool reaches parity
+with `fitness` — rules are authored like checks (`defineRule` ↔ `defineCheck`),
+selected via a shared recipe substrate, and surfaced uniformly in the dashboard.
+Five new structural graph rules ship on a new engine feature layer. See
+`docs/decisions/ADR-0005` (symmetric tool architecture), `ADR-0006`
+(derived-data persistence), and `ADR-0001` (rule-gating bar).
+
+### Added
+
+- **Five structural graph rules**, each a declarative predicate over the new
+  feature layer with opinionated, config-overridable thresholds:
+  - `graph:large-function` — body length (warn 300 / error 500 physical lines).
+  - `graph:wide-function` — parameter count (warn > 4 / error > 7).
+  - `graph:high-blast-untested` — a high call-graph blast radius **and** no test
+    coverage (warn ≥ 75 / error ≥ 150 blast score) — the flagship combination gate.
+  - `graph:cycle` — strongly-connected-component size (cross-package → error).
+  - `graph:unexpected-coupling` — package-level dependency cycles.
+- **Graph recipes.** `graph --recipe <name>` selects a rule subset (default:
+  all rules); `graph-recipes` (alias `list-graph-recipes`) lists them. Rules are
+  authored with the new `defineRule()` factory (the `defineCheck` analogue).
+- **Graph engine feature layer** — blast radius, strongly-connected components,
+  package coupling, test/entry reachability, and body length are computed in the
+  engine and materialized into the catalog for the dashboard to consume.
+- **Dashboard:** the graph tool tab gains **Catalog** and **Recipes** subtabs;
+  the topology view gains **SCC cycle highlighting**; a ranked-distribution
+  function table replaces the removed single-metric tabs (see Changed).
+- **Opt-in severity clamp** — `severityOverrides` in the `graph:` config clamps a
+  rule's emitted severity (baseline-neutral when unset).
+
+### Changed
+
+- **Recipe selection is now shared (ADR-0005).** The generic recipe substrate
+  (unit selection + per-unit config override) is hoisted into
+  `@opensip-tools/core`; `fitness`, `simulation`, and `graph` consume it instead
+  of three separate copies. No behavior change for `fit` / `sim` recipes.
+- **Derived-data persistence policy (ADR-0006).** Engine-derived analyses are
+  recomputed views by default, materialized into the catalog document only for
+  the decoupled dashboard.
+- **Dashboard graph tab restructure.** The graph tool tab is renamed **Code
+  Graph** (was "Code Paths"). The single-metric explore tabs (Big, Hot, Wide,
+  Untested, SCCs) are removed — those signals are now graph rules whose findings
+  surface in the graph tab. The remaining explore views are consolidated: the
+  **Search** subtab is folded into a searchable **Functions** view, the node-link
+  **Graph** view is reworked into a package-level **Visualization**, and the
+  **Coupling** matrix gains an **Export CSV** action for large repos. Per-rule
+  session findings gain metric columns (lines / parameters / blast score / SCC
+  size), error-before-warning sorting, and bounded overflow; a shared
+  `.data-table` style now applies uniformly across every dashboard table.
+- **Tree-sitter adapters → WebAssembly grammars.** The Python/Go/Rust/Java graph
+  adapters and the shared adapter scaffolding migrated to vendored
+  `web-tree-sitter` grammars — no native compilation at install time.
+- **Tooling:** adopted **pnpm 11**; workspace settings moved to
+  `pnpm-workspace.yaml`.
+- The graph catalog cache payload version bumped; existing caches rebuild
+  transparently on the next run (the catalog is derived state, not user data).
+
+### Fixed
+
+- **Dashboard Coupling CSV — formula-injection guard.** The Coupling "Export CSV"
+  neutralizes any cell beginning with `=`, `+`, `-`, `@`, tab, or CR (e.g. scoped
+  `@`-package names) with a leading apostrophe, so a spreadsheet cannot interpret
+  untrusted package names — drawn from arbitrary analyzed repos — as formulas.
+- **Graph session duration** is now the real wall-clock time (was reported as
+  `0.0s`), and finding metadata is persisted so the dashboard can surface per-rule
+  metric columns.
+- `test-file-naming` now recognizes the `__fixtures__/` directory convention and
+  dot-separated `*.fixture.ts` filenames (no longer mis-flagged as test files).
+- Resolved the dogfood `fit` warnings on the new graph/dashboard code (a
+  null-safety false positive, a dead export, a file-length soft-limit, and
+  composition-root / bounded-collection heuristic false positives).
+
 ## [2.5.2] — 2026-06-02
 
 ### Added
