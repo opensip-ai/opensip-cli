@@ -50,6 +50,26 @@ The PATH resolution works because `opensip-tools` declares `"bin": { "opensip-to
 
 **Blast radius of a break:** opensip's catalog ingestion fails. Per-tenant pipelines stall. User-visible. **Treat changes to any of the four contracts above as breaking changes requiring a major-version bump and coordination with opensip.**
 
+### Mode 3 — cloud signal ingestion (planned, ADR-0008)
+
+The OpenSIP Cloud "store-only" tier lets a customer running opensip-tools on their own machine POST the signals a run produced to OpenSIP Cloud over HTTP — the network version of the Mode 2 catalog ingestion. opensip-tools owns the **client and the wire contract**; the ingestion endpoint, entitlement API, and Postgres storage live in this (opensip) repo and **do not exist yet**.
+
+The wire payload is the `SignalBatch` envelope (`@opensip-tools/core` `types/signal-batch.ts`):
+
+```ts
+{ schemaVersion: 1, tool, recipe?, repo: { id?, remoteUrl?, commit? },
+  runId, createdAt, counts: { total, bySeverity }, truncated?, signals: Signal[] }
+```
+
+**Hidden contracts the ingestion endpoint MUST honor (ADR-0008):**
+
+1. The `SignalBatch` shape + `schemaVersion` (bump on any breaking change).
+2. **Idempotency.** Each chunk carries `Idempotency-Key: ${runId}:${ordinal}` (stable across retries). The endpoint MUST de-duplicate on it — the client retries `429`/`5xx`, so without server-side dedup the store accumulates duplicates.
+3. **`Retry-After`.** Emit it under load (the client honors it) rather than hard-failing.
+4. **Auth.** Reuses the existing `X-API-Key`; a `401`/`403` busts the client's entitlement cache. https-only (the key is credential-bearing).
+
+**Blast radius of a break:** customers on the storage tier silently stop syncing (best-effort: no local-run impact, but cloud data goes stale). Lower urgency than Mode 1/2 but still a coordinated contract.
+
 ---
 
 ## Operational notes
@@ -84,5 +104,6 @@ If a PR touches any of the following, coordinate with opensip:
 - Exit codes (`packages/contracts/src/exit-codes.ts`)
 - Structured-log shape on stderr (Pino field names, log levels)
 - Check definition shape or `opensip-tools.config.yml` schema
+- `SignalBatch` wire shape / `schemaVersion` + the Mode 3 idempotency & `Retry-After` obligations
 
 The coordination cost is one conversation — usually small. Skipping the conversation has cost zero up front and high cost in the hours after the next opensip release pulls the breaking change.
