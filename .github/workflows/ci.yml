@@ -102,3 +102,10 @@ jobs:
       # and commit the result. The `last_verified` date stamp is ignored.
       - name: Check generated checks index in sync
         run: pnpm docs:checks-index:check
+
+      # npm renders each package's page from the README inside *that* package's
+      # tarball, so a stale or missing per-package README ships straight to
+      # npmjs.com. The READMEs are generated from package.json metadata via
+      # `pnpm docs:readmes`; regenerate and commit if this fails.
+      - name: Check generated package READMEs in sync
+        run: pnpm docs:readmes:check
