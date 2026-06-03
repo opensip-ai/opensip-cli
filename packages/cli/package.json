@@ -48,6 +48,7 @@
     "@opensip-tools/lang-python": "workspace:*",
     "@opensip-tools/lang-rust": "workspace:*",
     "@opensip-tools/lang-typescript": "workspace:*",
+    "@opensip-tools/reporting": "workspace:*",
     "@opensip-tools/session-store": "workspace:*",
     "@opensip-tools/simulation": "workspace:*",
     "@opentelemetry/api": "^1.9.1",

@@ -28,6 +28,7 @@ import type { Logger } from './logger.js';
 import type { ProjectContext } from './project-context.js';
 import type { LanguageParseCache } from '../languages/parse-cache-class.js';
 import type { LanguageRegistry } from '../languages/registry.js';
+import type { SignalSink } from '../signals/signal-sink.js';
 
 /** Opaque slot for per-run recipe configuration (replaces globalThis Symbol). */
 export interface RecipeCheckConfigSlot {
@@ -72,4 +73,6 @@ export interface ToolScope extends ScopeContribution {
   readonly datastore: DataStoreThunk;
   readonly languages: LanguageRegistry;
   readonly runId: string;
+  /** Cloud signal sink for this run (ADR-0008); `noopSignalSink` unless cloud sync is on. */
+  readonly signalSink: SignalSink;
 }

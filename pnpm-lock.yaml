@@ -133,6 +133,9 @@ importers:
       '@opensip-tools/lang-typescript':
         specifier: workspace:*
         version: link:../languages/lang-typescript
+      '@opensip-tools/reporting':
+        specifier: workspace:*
+        version: link:../reporting
       '@opensip-tools/session-store':
         specifier: workspace:*
         version: link:../session-store

@@ -23,6 +23,7 @@
  */
 
 import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 
 import {
   RunScope,
@@ -35,8 +36,10 @@ import {
   readConfigSchemaVersion,
   resolveProjectContext,
   resolveProjectPaths,
+  resolveUserPaths,
   type ProjectContext,
 } from '@opensip-tools/core';
+import { resolveSignalSink } from '@opensip-tools/reporting';
 
 import {
   buildDatastoreThunk,
@@ -295,12 +298,24 @@ export function installPreActionHook(program: Command, version: string): void {
       process.stderr.write(formatUpdateNag(version, update));
     }
 
+    // ADR-0008: select the cloud signal sink for this run. Sync + cheap —
+    // keyless / `cloud.sync:false` / `--no-cloud` / non-https → no-op with no
+    // IO; the entitlement check is deferred to first emit so non-signal
+    // commands pay nothing. `opts.cloud === false` comes from `--no-cloud`.
+    const signalSink = resolveSignalSink({
+      apiKey: opts.apiKey as string | undefined,
+      cloud: cliDefaults.cloud,
+      noCloud: opts.cloud === false,
+      cacheDir: join(resolveUserPaths().userHomeDir, 'cache'),
+    });
+
     const { languages, tools } = getCurrentRegistriesForScope();
     const scope = new RunScope({
       logger,
       projectContext: project,
       languages,
       tools,
+      signalSink,
       // Item 2 — runId moves off the logger singleton onto RunScope as
       // a flat kernel field (per D7). The logger's runId provider,
       // bound at module init in run-scope.ts, reads it back via
