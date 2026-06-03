@@ -1,13 +1,12 @@
-import { withRetry, logger } from '@opensip-tools/core';
+import { generatePrefixedId } from '@opensip-tools/core';
+
+import { postChunked } from './http-egress.js';
 
 import type { SarifResult, SarifLocation } from './sarif-types.js';
 import type { CliOutput } from '@opensip-tools/contracts';
 
 const SARIF_SCHEMA = 'https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json';
 const MAX_FINDINGS_PER_CHUNK = 500;
-
-/** Logger module tag used by every event emitted from SARIF upload. */
-const MODULE_TAG = 'cli:report';
 
 /** Result of a cloud report upload */
 export interface ReportResult {
@@ -202,17 +201,8 @@ export function chunkSarifRuns(runs: SarifRun[], maxFindings = MAX_FINDINGS_PER_
   return chunks;
 }
 
-/** True for errors where retrying later or with a different chunk may succeed */
-function isTransientError(status: number): boolean {
-  return status >= 500 || status === 429;
-}
-
-/** Uploads SARIF runs to OpenSIP Cloud in chunks with per-chunk retries; returns aggregate result. */
-// eslint-disable-next-line sonarjs/cognitive-complexity -- network reporter: chunked uploads with per-chunk retries and aggregated error summary; phases read better inline
+/** Uploads SARIF runs to OpenSIP Cloud in chunks via the shared egress transport; returns aggregate result. */
 export async function reportToCloud(output: CliOutput, url: string, apiKey?: string): Promise<ReportResult> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (apiKey) headers['X-API-Key'] = apiKey;
-
   const allRuns = buildSarifRuns(output);
   if (allRuns.length === 0) {
     return { url, findingCount: 0, runCount: 0, success: true };
@@ -224,76 +214,29 @@ export async function reportToCloud(output: CliOutput, url: string, apiKey?: str
   const target = cwd ? `${sarifUrl}?cwd=${encodeURIComponent(cwd)}` : sarifUrl;
   const totalFindings = allRuns.reduce((n, r) => n + r.results.length, 0);
 
-  const chunks = chunkSarifRuns(allRuns);
-  const errors: string[] = [];
-  let succeeded = 0;
+  const rawChunks = chunkSarifRuns(allRuns);
+  const findingsPer = rawChunks.map((c) => c.reduce((n, r) => n + r.results.length, 0));
+  const bodies = rawChunks.map((c) => wrapSarifLog(c));
+  const reportRunId = generatePrefixedId('rpt');
 
-  for (let ci = 0; ci < chunks.length; ci++) {
-    const chunk = chunks[ci];
-    const chunkFindings = chunk.reduce((n, r) => n + r.results.length, 0);
-    // 60s base + 100ms per finding — receiver does per-finding work (dedup, persistence, traces)
-    const timeoutMs = Math.min(300_000, 60_000 + chunkFindings * 100);
-    const sarifLog = wrapSarifLog(chunk);
-
-    logger.info({ evt: 'cli.report.chunk.start', module: MODULE_TAG, chunk: `${ci + 1}/${chunks.length}`, findings: chunkFindings, timeoutMs });
-
-    try {
-      const res = await withRetry(
-        () => fetch(target, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(sarifLog),
-          signal: AbortSignal.timeout(timeoutMs),
-        }),
-        {
-          maxAttempts: 3,
-          initialDelayMs: 500,
-          maxDelayMs: 5000,
-          onRetry: (attempt, error, delayMs) => {
-            logger.info({
-              evt: 'cli.report.retry',
-              module: MODULE_TAG,
-              attempt,
-              error: error.message,
-              delayMs,
-              url: sarifUrl,
-              chunk: `${ci + 1}/${chunks.length}`,
-            });
-          },
-        },
-      );
-
-      if (!res.ok) {
-        const body = await res.text().catch(() => '');
-        const msg = `${res.status} ${res.statusText} ${body}`.trim();
-        errors.push(msg);
-
-        if (!isTransientError(res.status)) {
-          // Non-transient (4xx) — no point sending remaining chunks
-          logger.info({ evt: 'cli.report.abort', module: MODULE_TAG, reason: msg, remaining: chunks.length - ci - 1 });
-          break;
-        }
-        continue;
-      }
-
-      succeeded++;
-      logger.info({ evt: 'cli.report.chunk.done', module: MODULE_TAG, chunk: `${ci + 1}/${chunks.length}`, findings: chunkFindings });
-    } catch (error) {
-      // Network errors and timeouts are transient — continue with next chunk
-      /* v8 ignore next -- fetch errors are always Error subclasses; the String(error) fallback is defensive */
-      const errMsg = error instanceof Error ? error.message : String(error);
-      errors.push(errMsg);
-      logger.info({ evt: 'cli.report.chunk.error', module: MODULE_TAG, chunk: `${ci + 1}/${chunks.length}`, error: errMsg });
-    }
-  }
+  const result = await postChunked({
+    url: target,
+    apiKey,
+    chunks: bodies,
+    idempotencyKeyFor: (i) => `${reportRunId}:${i}`,
+    // 60s base + 100ms per finding — the receiver does per-finding work (dedup, persistence, traces).
+    timeoutFor: (_chunk, i) => Math.min(300_000, 60_000 + findingsPer[i] * 100),
+    policy: { maxAttempts: 3, overallDeadlineMs: 300_000, honorRetryAfter: true },
+    evtPrefix: 'cli.report',
+  });
 
   return {
     url: sarifUrl,
     findingCount: totalFindings,
     runCount: allRuns.length,
-    success: errors.length === 0,
-    error: errors.length > 0 ? errors.join('; ') : undefined,
-    chunksTotal: chunks.length,
-    chunksSucceeded: succeeded,
+    success: result.outcome === 'ok',
+    error: result.errors.length > 0 ? result.errors.join('; ') : undefined,
+    chunksTotal: rawChunks.length,
+    chunksSucceeded: result.acceptedChunks,
   };
 }

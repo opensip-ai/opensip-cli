@@ -386,21 +386,19 @@ describe('reportToCloud', () => {
     expect(calls).toBe(1);
   });
 
-  it('treats 5xx as transient and continues to remaining chunks', async () => {
-    // withRetry only retries when the awaited fn THROWS. A resolved
-    // 500 response is not an exception, so each chunk gets one fetch
-    // call. The 5xx classifier prevents the early break used for 4xx,
-    // so all chunks are still attempted.
+  it('retries 5xx at the chunk level (shared transport), then fails the chunk', async () => {
+    // The shared postChunked transport now RETRIES a 500 response per chunk
+    // (up to maxAttempts=3), instead of dropping the chunk on first 5xx.
+    // Two chunks (700 findings, cap = 500) x 3 attempts each = 6 fetch calls.
     let calls = 0;
     globalThis.fetch = vi.fn(() => {
       calls++;
       return Promise.resolve(new Response('server down', { status: 500 }));
     });
 
-    // Two chunks (700 findings, cap = 500) -> two fetch attempts.
     const result = await reportToCloud(makeOutputWithFindings(700), 'https://example.test');
     expect(result.success).toBe(false);
-    expect(calls).toBe(2);
+    expect(calls).toBe(6);
     expect(result.chunksSucceeded).toBe(0);
   }, 30_000);
 
