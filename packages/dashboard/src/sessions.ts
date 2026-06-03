@@ -9,6 +9,17 @@ export function dashboardSessionsJs(): string {
 // SESSION TABLE (used by fitness/sim tabs)
 // =======================================================
 
+// Per-rule metric column map for the expanded findings table. For these
+// graph rules the finding message just repeats the file + the metric, so
+// we DROP the Message column and render a dedicated metric column read
+// from finding.metadata (persisted via the FindingOutput.metadata field).
+const RULE_METRIC_COLUMNS = {
+  'graph:large-function': { label: 'Lines', key: 'bodyLines' },
+  'graph:high-blast-untested': { label: 'Score', key: 'blast' },
+  'graph:wide-function': { label: 'Parameters', key: 'paramCount' },
+  'graph:cycle': { label: 'Call Cycle', key: 'sccSize' },
+};
+
 /** Derive 3-state session status: 'fail' | 'warn' | 'pass'
  *  Counts live in the tool-owned opaque payload (summary). */
 function sessionStatus(s) {
@@ -128,17 +139,28 @@ function renderSessionTable(panel, toolSessions, accentColor) {
     // column so the header reads in the tool's own vocabulary. The
     // structural payload shape is identical; only the label differs.
     const itemColumn = tool === 'graph' ? 'Rule' : 'Check';
-    ['', itemColumn, 'Status', 'Errors', 'Warnings', 'Findings', 'Duration'].forEach(h => {
+    // Graph rules are dataset queries, not timed units — their per-rule
+    // duration is always 0ms, so drop the Duration column for graph
+    // sessions. Fitness/sim checks ARE timed; keep it for them.
+    const showDuration = tool !== 'graph';
+    const itemHeaders = ['', itemColumn, 'Status', 'Errors', 'Warnings', 'Findings'];
+    if (showDuration) itemHeaders.push('Duration');
+    itemHeaders.forEach(h => {
       thRow.appendChild(el('th', {text: h}));
     });
     thead.appendChild(thRow);
     table.appendChild(thead);
 
     const tbody = el('tbody');
+    // Sort rules/checks by severity weight: most errors first, then by
+    // warning count as a tiebreak (error-then-warning, stable).
     const sortedChecks = [...checks].sort((a, b) => {
       const aErrors = a.findings ? a.findings.filter(f => f.severity === 'error').length : 0;
       const bErrors = b.findings ? b.findings.filter(f => f.severity === 'error').length : 0;
-      return bErrors - aErrors;
+      if (bErrors !== aErrors) return bErrors - aErrors;
+      const aWarn = a.findings ? a.findings.filter(f => f.severity === 'warning').length : 0;
+      const bWarn = b.findings ? b.findings.filter(f => f.severity === 'warning').length : 0;
+      return bWarn - aWarn;
     });
     sortedChecks.forEach((check, i) => {
       const checkErrors = check.findings ? check.findings.filter(f => f.severity === 'error').length : 0;
@@ -169,36 +191,59 @@ function renderSessionTable(panel, toolSessions, accentColor) {
       row.appendChild(el('td', {text: ''+checkErrors, style: checkErrors > 0 ? 'color:var(--error)' : 'color:var(--text-dim)'}));
       row.appendChild(el('td', {text: ''+checkWarnings, style: checkWarnings > 0 ? 'color:var(--warning)' : 'color:var(--text-dim)'}));
       row.appendChild(el('td', {text: ''+findingsTotal, style: findingsTotal > 0 ? 'color:var(--text)' : 'color:var(--text-dim)'}));
-      row.appendChild(el('td', {text: check.durationMs > 0 ? check.durationMs + 'ms' : '0ms', style:'color:var(--text-dim)'}));
+      if (showDuration) row.appendChild(el('td', {text: check.durationMs > 0 ? check.durationMs + 'ms' : '0ms', style:'color:var(--text-dim)'}));
       tbody.appendChild(row);
 
       if (hasFindings) {
         const expRow = el('tr', {id: expanderId, class:'expander-row', 'data-check-status': checkStatusVal});
-        const expCell = el('td', {colspan:'7', style:'padding:0'});
+        const expCell = el('td', {colspan: '' + itemHeaders.length, style:'padding:0'});
         const expContent = el('div', {class:'expander-content'});
 
         const fTable = el('table', {class:'data-table', style:'margin:0;border:none'});
         const fHead = el('thead');
         const fHeaderRow = el('tr');
-        ['Severity', 'Message', 'File', 'Suggestion'].forEach(h => {
+        // Per-rule column shape. Most rules render the default
+        // [Severity, Message, File, Suggestion]. The graph metric rules
+        // below repeat the file + metric in their message, so they DROP
+        // Message and ADD a metric column read from finding.metadata.
+        const metricColumn = RULE_METRIC_COLUMNS[check.checkSlug];
+        const fHeaders = metricColumn
+          ? ['Severity', 'File', metricColumn.label, 'Suggestion']
+          : ['Severity', 'Message', 'File', 'Suggestion'];
+        fHeaders.forEach(h => {
           fHeaderRow.appendChild(el('th', {text: h, style:'font-size:11px;padding:6px 12px'}));
         });
         fHead.appendChild(fHeaderRow);
         fTable.appendChild(fHead);
 
         const fBody = el('tbody');
-        check.findings.forEach(f => {
+        // Sort findings within the rule: errors first, then warnings (stable).
+        const sevWeight = { error: 0, warning: 1 };
+        const sortedFindings = [...check.findings].sort((a, b) =>
+          (sevWeight[a.severity] ?? 2) - (sevWeight[b.severity] ?? 2));
+        sortedFindings.forEach(f => {
           const fRow = el('tr');
           const sevCell = el('td', {style:'padding:6px 12px'});
           sevCell.appendChild(el('span', {class:'finding-sev ' + f.severity, text: f.severity}));
           fRow.appendChild(sevCell);
-          fRow.appendChild(el('td', {text: f.message, style:'padding:6px 12px;font-size:13px'}));
-          fRow.appendChild(el('td', {text: f.filePath ? f.filePath + (f.line ? ':' + f.line : '') : '\u2014', style:'padding:6px 12px;color:var(--text-dim);font-size:12px'}));
+          const fileText = f.filePath ? f.filePath + (f.line ? ':' + f.line : '') : '\u2014';
+          if (metricColumn) {
+            fRow.appendChild(el('td', {text: fileText, style:'padding:6px 12px;color:var(--text-dim);font-size:12px'}));
+            const mv = f.metadata ? f.metadata[metricColumn.key] : undefined;
+            fRow.appendChild(el('td', {text: (mv === undefined || mv === null) ? '\u2014' : '' + mv, style:'padding:6px 12px;font-size:13px'}));
+          } else {
+            fRow.appendChild(el('td', {text: f.message, style:'padding:6px 12px;font-size:13px'}));
+            fRow.appendChild(el('td', {text: fileText, style:'padding:6px 12px;color:var(--text-dim);font-size:12px'}));
+          }
           fRow.appendChild(el('td', {text: f.suggestion || '\u2014', style:'padding:6px 12px;color:var(--accent);font-size:12px'}));
           fBody.appendChild(fRow);
         });
         fTable.appendChild(fBody);
-        expContent.appendChild(fTable);
+        // Wrap the wide findings table in a horizontal-scroll container so
+        // long file paths / messages scroll inside the card instead of
+        // overrunning the section (mirrors the .coupling-scroll fix).
+        const fScroll = el('div', {style:'overflow-x:auto;max-width:100%'}, [fTable]);
+        expContent.appendChild(fScroll);
         expCell.appendChild(expContent);
         expRow.appendChild(expCell);
         tbody.appendChild(expRow);
