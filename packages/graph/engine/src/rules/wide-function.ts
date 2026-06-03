@@ -36,6 +36,9 @@ export const wideFunctionRule = defineRule({
     for (const occ of indexes.byBodyHash.values()) {
       /* v8 ignore next */
       if (!occ.filePath) continue;
+      // Test files are not production code subject to this quality gate (same
+      // exclusion as large-function / high-blast-untested).
+      if (occ.inTestFile) continue;
       const n = occ.params.length;
       if (n <= warn) continue;
       const base = n > error ? 'high' : 'medium';

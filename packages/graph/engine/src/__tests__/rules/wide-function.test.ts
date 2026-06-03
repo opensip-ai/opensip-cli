@@ -54,4 +54,9 @@ describe('graph:wide-function bands', () => {
   it('returns [] for an empty catalog', () => {
     expect(wideFunctionRule.evaluate(makeCatalog([]), buildIndexes(makeCatalog([])), EMPTY)).toEqual([]);
   });
+
+  it('does not flag a wide function defined in a test file', () => {
+    const o = occ({ bodyHash: 'h', simpleName: 'wideHelper', params: params(9), inTestFile: true });
+    expect(wideFunctionRule.evaluate(makeCatalog([]), buildIndexes(makeCatalog([o])), EMPTY)).toEqual([]);
+  });
 });
