@@ -1,6 +1,9 @@
 // Types — internal signal (shared across tools)
 export type { Signal, SignalSeverity, SignalCategory, CreateSignalInput, FixHint } from './types/signal.js';
 export { createSignal } from './types/signal.js';
+// Cloud signal egress envelope (ADR-0008)
+export type { SignalBatch, RepoIdentity, BuildSignalBatchInput } from './types/signal-batch.js';
+export { buildSignalBatch, MAX_SIGNALS_PER_BATCH } from './types/signal-batch.js';
 
 // Languages — cross-language adapter API
 export * from './languages/index.js';
