@@ -30,5 +30,5 @@ export interface SignalSink {
 
 /** The default sink: does nothing, accepts nothing. Used whenever cloud sync is off. */
 export const noopSignalSink: SignalSink = {
-  emit: async () => ({ accepted: 0, authRejected: false }),
+  emit: () => Promise.resolve({ accepted: 0, authRejected: false }),
 };

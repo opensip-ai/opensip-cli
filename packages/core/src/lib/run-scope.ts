@@ -22,6 +22,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 
 import { LanguageParseCache } from '../languages/parse-cache-class.js';
 import { LanguageRegistry } from '../languages/registry.js';
+import { noopSignalSink } from '../signals/signal-sink.js';
 import { ToolRegistry } from '../tools/registry.js';
 
 import { logger as defaultLogger } from './logger.js';
@@ -30,6 +31,7 @@ import type { Logger, LoggerImpl } from './logger.js';
 import type { ProjectContext } from './project-context.js';
 import type { DataStoreThunk, RecipeCheckConfigSlot, ToolScope } from './scope-types.js';
 import type { UiContext } from './ui-context.js';
+import type { SignalSink } from '../signals/signal-sink.js';
 
 // RecipeCheckConfigSlot, DataStoreThunk, ToolScope, and ScopeContribution
 // live in the leaf `scope-types.ts` (audit 2026-05-29, M4) so the `Tool`
@@ -85,6 +87,13 @@ export interface RunScopeOptions {
    * a non-empty id via the pre-action-hook.
    */
   readonly runId?: string;
+  /**
+   * Cloud signal sink for this invocation (ADR-0008). Defaults to
+   * `noopSignalSink` — the CLI bootstrap sets the OpenSIP Cloud sink only
+   * when an API key resolves and entitlement is positive. No module-level
+   * state: selection is always explicit at the composition root.
+   */
+  readonly signalSink?: SignalSink;
 }
 
 /**
@@ -122,6 +131,8 @@ export class RunScope {
    * the logger's `formatEntry` only emits a `runId` field when truthy).
    */
   readonly runId: string;
+  /** Cloud signal sink for this invocation; `noopSignalSink` unless cloud sync is on. */
+  readonly signalSink: SignalSink;
 
   constructor(opts: RunScopeOptions = {}) {
     this.logger = opts.logger ?? defaultLogger;
@@ -134,6 +145,7 @@ export class RunScope {
     this.languages = opts.languages ?? new LanguageRegistry();
     this.ui = opts.ui;
     this.runId = opts.runId ?? '';
+    this.signalSink = opts.signalSink ?? noopSignalSink;
   }
 
   /** Release per-run resources (caches, recipe-config slot). */
