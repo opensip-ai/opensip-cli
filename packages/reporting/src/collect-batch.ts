@@ -9,8 +9,8 @@
  */
 import { buildSignalBatch, createSignal } from '@opensip-tools/core';
 
-import type { SignalBatch, RepoIdentity, Signal, SignalSeverity } from '@opensip-tools/core';
 import type { CliOutput, FindingOutput } from '@opensip-tools/contracts';
+import type { SignalBatch, RepoIdentity, Signal, SignalSeverity } from '@opensip-tools/core';
 
 // A fitness/graph finding is error|warning; signals carry the richer OpenSIP
 // severity scale. Map to the nearest rung (the platform can refine later).
