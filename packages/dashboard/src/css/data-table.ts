@@ -12,7 +12,18 @@ export function dashboardCssDataTable(): string {
   return String.raw`
 /* Table */
 .data-table { width: 100%; border-collapse: collapse; }
-.data-table td, .data-table th { white-space: nowrap; }
+/* Containment contract (defensive default).
+   - Headers are short labels: keep them on one line.
+   - Body cells WRAP and break long unbreakable tokens (file paths, regex,
+     code snippets in suggestions) so a free-text column can never overrun
+     the card edge and bleed past the page boundary.
+   - Short metric columns (timestamps, durations, counts) opt OUT with
+     the .cell-nowrap class to stay on a single line.
+   This makes "no horizontal bleed" the behaviour a view gets for free;
+   bleeding now requires a deliberate .cell-nowrap opt-out on long text. */
+.data-table th { white-space: nowrap; }
+.data-table td { white-space: normal; overflow-wrap: anywhere; }
+.data-table td.cell-nowrap { white-space: nowrap; }
 .data-table th { text-align: left; padding: 8px 12px; font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--border); font-weight: 600; cursor: pointer; }
 .data-table th:hover { color: var(--text-muted); }
 .data-table th[data-sort="asc"]::after { content: ' ▲'; font-size: 10px; }
@@ -45,7 +56,6 @@ export function dashboardCssDataTable(): string {
 /* Expander rows */
 .expander-row { display: none; }
 .expander-row.open { display: table-row; }
-.expander-row td { white-space: normal; }
 .expander-content { padding: 8px 12px 16px 36px; background: var(--bg); border-left: 2px solid var(--accent); margin-left: 12px; }
 .data-table tr.expanded td:first-child { color: var(--accent); }
 .data-table tr.clickable:hover td:first-child { color: var(--accent); }

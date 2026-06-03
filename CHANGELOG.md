@@ -4,6 +4,40 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.6.1] — 2026-06-03
+
+A discovery-hardening patch. No behavior change for normal runs beyond the
+silenced warning below; the rest closes the class of bug that produced it.
+
+### Fixed
+
+- **Graph-adapter discovery no longer warns on shared scaffolding.**
+  `opensip-tools` printed
+  `graph adapter @opensip-tools/graph-adapter-common does not export a valid "adapter" — skipping`
+  on every run: adapter auto-discovery matched the `@opensip-tools/graph-*`
+  name prefix and swept in the shared `graph-adapter-common` library (which is
+  not an adapter). Discovery now requires the `opensipTools.kind: "graph-adapter"`
+  marker — mirroring tool discovery — so non-adapter packages under the prefix
+  are skipped silently.
+
+### Changed
+
+- **Plugin discovery converges on the `opensipTools.kind` marker (ADR-0007).**
+  The marker is now the canonical contract for all four plugin kinds.
+  `'graph-adapter'` becomes a first-class marker kind in `core`, read through a
+  single canonical reader (graph's duplicate reader is gone). First-party
+  `@opensip-tools/checks-*` packs now declare `kind: "fit-pack"`, and the
+  `checks-*` / `graph-*` name-prefix scans are demoted to deprecated fallbacks
+  (kept for third-party backward compatibility; removal slated for the next
+  major).
+
+### Internal
+
+- A **workspace-invariant test** asserts the plugin-kind contract at the source
+  of truth — every `graph-*` / `checks-*` package declares its marker or is on
+  an explicit non-plugin allowlist — so this class of discovery drift fails in
+  CI rather than warning (or silently misbehaving) at runtime.
+
 ## [2.6.0] — 2026-06-03
 
 The **symmetric tool architecture** release: the `graph` tool reaches parity

@@ -61,7 +61,7 @@ function renderSessionTable(panel, toolSessions, accentColor) {
       row.classList.add('selected');
       renderDetail(s, idx);
     }});
-    row.appendChild(el('td', {text: new Date(s.timestamp).toLocaleString()}));
+    row.appendChild(el('td', {class:'cell-nowrap', text: new Date(s.timestamp).toLocaleString()}));
     row.appendChild(el('td', {text: s.recipe || 'default', style:'color:var(--text-muted)'}));
     const scoreCell = el('td', {style: 'font-weight:600;' + sc});
     scoreCell.textContent = s.score + '%';
