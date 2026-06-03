@@ -3,6 +3,7 @@
   "version": "2.6.1",
   "license": "MIT",
   "description": "Fitness checks engine for OpenSIP Tools",
+  "keywords": ["opensip-tools", "static-analysis", "code-quality", "fitness-functions", "linting", "architecture", "code-review"],
   "repository": {
     "type": "git",
     "url": "https://github.com/opensip-ai/opensip-tools.git",

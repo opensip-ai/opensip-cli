@@ -3,6 +3,7 @@
   "version": "2.6.1",
   "license": "MIT",
   "description": "Session persistence for OpenSIP Tools — the session SQLite schema and SessionRepo, extracted from contracts",
+  "keywords": ["opensip-tools", "static-analysis", "code-quality", "sqlite", "persistence"],
   "repository": {
     "type": "git",
     "url": "https://github.com/opensip-ai/opensip-tools.git",

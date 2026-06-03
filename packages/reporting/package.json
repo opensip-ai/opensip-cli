@@ -3,6 +3,7 @@
   "version": "2.6.1",
   "license": "MIT",
   "description": "Reporting for OpenSIP Tools — SARIF build and cloud report, extracted from contracts",
+  "keywords": ["opensip-tools", "static-analysis", "code-quality", "sarif", "reporting"],
   "repository": {
     "type": "git",
     "url": "https://github.com/opensip-ai/opensip-tools.git",

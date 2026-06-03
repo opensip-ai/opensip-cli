@@ -3,6 +3,7 @@
   "version": "2.6.1",
   "license": "MIT",
   "description": "TypeScript language adapter for the opensip-tools graph engine",
+  "keywords": ["opensip-tools", "static-analysis", "code-quality", "call-graph", "dependency-graph", "typescript", "javascript"],
   "repository": {
     "type": "git",
     "url": "https://github.com/opensip-ai/opensip-tools.git",

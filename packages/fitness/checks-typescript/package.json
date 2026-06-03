@@ -3,6 +3,7 @@
   "version": "2.6.1",
   "license": "MIT",
   "description": "TypeScript/Node.js fitness checks for opensip-tools",
+  "keywords": ["opensip-tools", "static-analysis", "code-quality", "fitness-checks", "linting", "typescript", "javascript"],
   "repository": {
     "type": "git",
     "url": "https://github.com/opensip-ai/opensip-tools.git",

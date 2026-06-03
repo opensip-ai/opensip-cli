@@ -3,6 +3,7 @@
   "version": "2.6.1",
   "license": "MIT",
   "description": "Static call-graph + dead-end analysis (seven-stage pipeline)",
+  "keywords": ["opensip-tools", "static-analysis", "code-quality", "call-graph", "dependency-graph", "code-analysis", "architecture"],
   "repository": {
     "type": "git",
     "url": "https://github.com/opensip-ai/opensip-tools.git",

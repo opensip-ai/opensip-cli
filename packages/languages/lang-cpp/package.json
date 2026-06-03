@@ -3,6 +3,7 @@
   "version": "2.6.1",
   "license": "MIT",
   "description": "C/C++ language adapter for opensip-tools (clang-tidy backed)",
+  "keywords": ["opensip-tools", "static-analysis", "code-quality", "parser", "ast", "tree-sitter", "cpp", "c++"],
   "repository": {
     "type": "git",
     "url": "https://github.com/opensip-ai/opensip-tools.git",

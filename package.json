@@ -37,6 +37,8 @@
     "docs:checks-index:check": "node scripts/extract-checks-metadata.mjs | node scripts/build-checks-index.mjs - --check",
     "docs:readmes": "node scripts/build-package-readmes.mjs",
     "docs:readmes:check": "node scripts/build-package-readmes.mjs --check",
+    "docs:keywords": "node scripts/build-package-keywords.mjs",
+    "docs:keywords:check": "node scripts/build-package-keywords.mjs --check",
     "verify-release": "node scripts/verify-release.mjs",
     "smoke-pack": "node scripts/smoke-pack.mjs",
     "prepare": "git config core.hooksPath .githooks 2>/dev/null || true"

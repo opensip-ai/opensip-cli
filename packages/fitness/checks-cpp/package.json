@@ -3,6 +3,7 @@
   "version": "2.6.1",
   "license": "MIT",
   "description": "C/C++ fitness checks (clang-tidy backed)",
+  "keywords": ["opensip-tools", "static-analysis", "code-quality", "fitness-checks", "linting", "cpp", "c++"],
   "repository": {
     "type": "git",
     "url": "https://github.com/opensip-ai/opensip-tools.git",

@@ -3,6 +3,7 @@
   "version": "2.6.1",
   "license": "MIT",
   "description": "Go language adapter for the opensip-tools graph engine",
+  "keywords": ["opensip-tools", "static-analysis", "code-quality", "call-graph", "dependency-graph", "go", "golang"],
   "repository": {
     "type": "git",
     "url": "https://github.com/opensip-ai/opensip-tools.git",

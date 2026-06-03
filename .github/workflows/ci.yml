@@ -109,3 +109,9 @@ jobs:
       # `pnpm docs:readmes`; regenerate and commit if this fails.
       - name: Check generated package READMEs in sync
         run: pnpm docs:readmes:check
+
+      # npm weights the keywords field in package search. They're derived from
+      # each package's identity by `pnpm docs:keywords`; a new package that
+      # ships with stale/missing keywords fails here.
+      - name: Check package keywords in sync
+        run: pnpm docs:keywords:check
