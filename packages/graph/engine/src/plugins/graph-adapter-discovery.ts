@@ -29,10 +29,10 @@
  * up to ancestor node_modules (matching Node's resolution algorithm).
  */
 
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-import { logger, readYamlFile, resolvePackageEntryPoint } from '@opensip-tools/core';
+import { logger, readMarkerKind, readYamlFile, resolvePackageEntryPoint } from '@opensip-tools/core';
 
 const CONFIG_FILENAME = 'opensip-tools.config.yml';
 
@@ -127,12 +127,13 @@ function autoDiscoverAdapters(projectDir: string): DiscoveredGraphAdapterPackage
         const packageDir = join(scopeDir, entry);
         if (!hasPackageJson(packageDir)) continue;
         // Auto-discovery only picks up packages that declare themselves graph
-        // adapters (`opensipTools.kind: "graph-adapter"`). Scaffolding libraries
-        // that share the `graph-` prefix but carry no marker — e.g.
+        // adapters (`opensipTools.kind: "graph-adapter"`), read through core's
+        // canonical marker reader. Scaffolding libraries that share the
+        // `graph-` prefix but carry no marker — e.g.
         // `@opensip-tools/graph-adapter-common` — are NOT adapters and are
         // skipped silently (mirrors tool discovery's `kind === 'tool'` gate;
         // otherwise the CLI warns about their missing `adapter` export).
-        if (readPackageKind(packageDir) !== 'graph-adapter') continue;
+        if (readMarkerKind(packageDir) !== 'graph-adapter') continue;
         seen.add(name);
         out.push({ name, packageDir });
       }
@@ -158,25 +159,6 @@ function resolvePackageDir(projectDir: string, name: string): string | undefined
 function hasPackageJson(packageDir: string): boolean {
   if (!existsSync(packageDir)) return false;
   return existsSync(join(packageDir, 'package.json'));
-}
-
-/**
- * Read `opensipTools.kind` from a package's package.json. Returns
- * `undefined` when the file is unreadable, malformed, or carries no kind
- * marker — the signal that a package is NOT a discoverable adapter (only
- * `'graph-adapter'` qualifies for auto-discovery).
- */
-function readPackageKind(packageDir: string): string | undefined {
-  try {
-    const json = JSON.parse(readFileSync(join(packageDir, 'package.json'), 'utf8')) as {
-      opensipTools?: { kind?: unknown };
-    };
-    const kind = json.opensipTools?.kind;
-    return typeof kind === 'string' ? kind : undefined;
-  } catch {
-    // @fitness-ignore-next-line error-handling-quality -- unreadable/malformed package.json → treat as "no marker" (not an adapter), same as a genuinely marker-less library.
-    return undefined;
-  }
 }
 
 function safeReaddir(dir: string): string[] {
