@@ -174,6 +174,20 @@ function collectDependencySites(
   }
 }
 
+/**
+ * Invariant context threaded through the `use`-declaration walker family
+ * (`emitFrom*` / `emitUseListItems` / `pushDepSite`). Built once per use
+ * declaration; only the current sub-`node` and the accumulated path `prefix`
+ * vary per call, so they stay positional while these five ride in the context.
+ */
+interface UseSiteContext {
+  readonly file: RustParsedFile;
+  readonly ownerHash: string;
+  readonly line: number;
+  readonly column: number;
+  readonly out: DependencySiteRecord[];
+}
+
 function collectFromUseDeclaration(
   decl: Node,
   file: RustParsedFile,
@@ -184,9 +198,14 @@ function collectFromUseDeclaration(
   // visibility_modifier on `pub use ...`).
   const body = pickUsePathNode(decl);
   if (!body) return;
-  const line = decl.startPosition.row + 1;
-  const column = decl.startPosition.column;
-  emitFromUseSegment(body, [], file, ownerHash, line, column, out);
+  const ctx: UseSiteContext = {
+    file,
+    ownerHash,
+    line: decl.startPosition.row + 1,
+    column: decl.startPosition.column,
+    out,
+  };
+  emitFromUseSegment(body, [], ctx);
 }
 
 function pickUsePathNode(decl: Node): Node | null {
@@ -210,11 +229,7 @@ function pickUsePathNode(decl: Node): Node | null {
 function emitFromUseSegment(
   node: Node,
   prefix: readonly string[],
-  file: RustParsedFile,
-  ownerHash: string,
-  line: number,
-  column: number,
-  out: DependencySiteRecord[],
+  ctx: UseSiteContext,
 ): void {
   switch (node.type) {
     case 'scoped_identifier':
@@ -222,96 +237,64 @@ function emitFromUseSegment(
     case 'crate':
     case 'super':
     case 'self': {
-      emitFromPathLeaf(node, prefix, file, ownerHash, line, column, out);
+      emitFromPathLeaf(node, prefix, ctx);
       return;
     }
     case 'use_as_clause': {
-      emitFromUseAsClause(node, prefix, file, ownerHash, line, column, out);
+      emitFromUseAsClause(node, prefix, ctx);
       return;
     }
     case 'use_wildcard': {
-      emitFromUseWildcard(node, prefix, file, ownerHash, line, column, out);
+      emitFromUseWildcard(node, prefix, ctx);
       return;
     }
     case 'scoped_use_list': {
-      emitFromScopedUseList(node, prefix, file, ownerHash, line, column, out);
+      emitFromScopedUseList(node, prefix, ctx);
       return;
     }
     case 'use_list': {
-      emitFromUseList(node, prefix, file, ownerHash, line, column, out);
+      emitFromUseList(node, prefix, ctx);
       return;
     }
     /* v8 ignore start */
     default: {
-      emitFromUnknownUseShape(node, prefix, file, ownerHash, line, column, out);
+      emitFromUnknownUseShape(node, prefix, ctx);
       return;
     }
     /* v8 ignore stop */
   }
 }
 
-function emitFromPathLeaf(
-  node: Node,
-  prefix: readonly string[],
-  file: RustParsedFile,
-  ownerHash: string,
-  line: number,
-  column: number,
-  out: DependencySiteRecord[],
-): void {
+function emitFromPathLeaf(node: Node, prefix: readonly string[], ctx: UseSiteContext): void {
   const segments = decodePathSegments(node);
-  pushDepSite([...prefix, ...segments], node, file, ownerHash, line, column, out);
+  pushDepSite([...prefix, ...segments], node, ctx);
 }
 
-function emitFromUseAsClause(
-  node: Node,
-  prefix: readonly string[],
-  file: RustParsedFile,
-  ownerHash: string,
-  line: number,
-  column: number,
-  out: DependencySiteRecord[],
-): void {
+function emitFromUseAsClause(node: Node, prefix: readonly string[], ctx: UseSiteContext): void {
   // `<path> as <alias>` — emit the underlying path only.
   const inner = node.namedChild(0);
   if (inner) {
-    emitFromUseSegment(inner, prefix, file, ownerHash, line, column, out);
+    emitFromUseSegment(inner, prefix, ctx);
   }
 }
 
-function emitFromUseWildcard(
-  node: Node,
-  prefix: readonly string[],
-  file: RustParsedFile,
-  ownerHash: string,
-  line: number,
-  column: number,
-  out: DependencySiteRecord[],
-): void {
+function emitFromUseWildcard(node: Node, prefix: readonly string[], ctx: UseSiteContext): void {
   // `<path>::*` — single emission with `*` as the trailing segment.
   // The grammar nests the path under the wildcard (single named
   // child); we append `'*'` to the segments.
   const inner = node.namedChild(0);
   const segments = inner ? decodePathSegments(inner) : [];
-  pushDepSite([...prefix, ...segments, '*'], node, file, ownerHash, line, column, out);
+  pushDepSite([...prefix, ...segments, '*'], node, ctx);
 }
 
-function emitFromScopedUseList(
-  node: Node,
-  prefix: readonly string[],
-  file: RustParsedFile,
-  ownerHash: string,
-  line: number,
-  column: number,
-  out: DependencySiteRecord[],
-): void {
+function emitFromScopedUseList(node: Node, prefix: readonly string[], ctx: UseSiteContext): void {
   // `<path>::{<list>}` — combine path + each list child.
   // Children order: a path-like (identifier / scoped_identifier /
   // crate / super / self) then a `use_list`.
   const split = splitScopedUseListChildren(node);
   if (split.list === null) return;
   const newPrefix = [...prefix, ...split.pathSegs];
-  emitUseListItems(split.list, newPrefix, file, ownerHash, line, column, out);
+  emitUseListItems(split.list, newPrefix, ctx);
 }
 
 function splitScopedUseListChildren(
@@ -329,54 +312,30 @@ function splitScopedUseListChildren(
   return { pathSegs, list };
 }
 
-function emitFromUseList(
-  node: Node,
-  prefix: readonly string[],
-  file: RustParsedFile,
-  ownerHash: string,
-  line: number,
-  column: number,
-  out: DependencySiteRecord[],
-): void {
+function emitFromUseList(node: Node, prefix: readonly string[], ctx: UseSiteContext): void {
   // Bare `{a, b}` — uncommon at top level; descend with current prefix.
-  emitUseListItems(node, prefix, file, ownerHash, line, column, out);
+  emitUseListItems(node, prefix, ctx);
 }
 
-function emitUseListItems(
-  list: Node,
-  prefix: readonly string[],
-  file: RustParsedFile,
-  ownerHash: string,
-  line: number,
-  column: number,
-  out: DependencySiteRecord[],
-): void {
+function emitUseListItems(list: Node, prefix: readonly string[], ctx: UseSiteContext): void {
   for (const item of namedChildrenOf(list)) {
     if (item.type === 'self') {
       // `use a::b::{self, X}` — `self` refers to the parent path,
       // i.e. emit the prefix itself.
-      pushDepSite([...prefix], item, file, ownerHash, line, column, out);
+      pushDepSite([...prefix], item, ctx);
       continue;
     }
-    emitFromUseSegment(item, prefix, file, ownerHash, line, column, out);
+    emitFromUseSegment(item, prefix, ctx);
   }
 }
 
 /* v8 ignore start */
-function emitFromUnknownUseShape(
-  node: Node,
-  prefix: readonly string[],
-  file: RustParsedFile,
-  ownerHash: string,
-  line: number,
-  column: number,
-  out: DependencySiteRecord[],
-): void {
+function emitFromUnknownUseShape(node: Node, prefix: readonly string[], ctx: UseSiteContext): void {
   // Unknown shape — defensive fallback: emit raw text as a single
   // segment so downstream attribution still has something to show.
   const text = node.text;
   if (text.length > 0) {
-    pushDepSite([...prefix, text], node, file, ownerHash, line, column, out);
+    pushDepSite([...prefix, text], node, ctx);
   }
 }
 /* v8 ignore stop */
@@ -401,26 +360,18 @@ function decodePathSegments(node: Node): readonly string[] {
   return [];
 }
 
-function pushDepSite(
-  segments: readonly string[],
-  node: Node,
-  file: RustParsedFile,
-  ownerHash: string,
-  line: number,
-  column: number,
-  out: DependencySiteRecord[],
-): void {
+function pushDepSite(segments: readonly string[], node: Node, ctx: UseSiteContext): void {
   if (segments.length === 0) {
     /* v8 ignore next */
     return;
   }
-  out.push({
+  ctx.out.push({
     nodeRef: node,
-    sourceFileRef: file,
-    ownerHash,
+    sourceFileRef: ctx.file,
+    ownerHash: ctx.ownerHash,
     specifier: segments.join('::'),
-    line,
-    column,
+    line: ctx.line,
+    column: ctx.column,
   });
 }
 
