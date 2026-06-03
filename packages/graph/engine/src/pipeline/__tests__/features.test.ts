@@ -172,6 +172,29 @@ describe('buildFeatures — reachability', () => {
     expect(f.function.get('hub')?.reachableOnlyFromTests).toBe(false);
     expect(f.function.get('orphan')?.reachableOnlyFromTests).toBe(false); // no callers at all
   });
+
+  it('testReachable means "exercised by a test" — true even for a production-reachable fn a test calls', () => {
+    // `p` is production-reachable (main → p) AND called by a test (t → p). The
+    // old definition (`!prodReachable`) wrongly reported testReachable=false
+    // here; it must be true (a test reaches it).
+    const entry = occ({ bodyHash: 'e', simpleName: 'main', package: 'cli', visibility: 'exported', calls: [call('p')] });
+    const p = occ({ bodyHash: 'p', simpleName: 'p', package: 'core' });
+    const t = occ({
+      bodyHash: 't', simpleName: 't', package: 'core',
+      filePath: 'packages/core/src/__tests__/p.test.ts', inTestFile: true, calls: [call('p')],
+    });
+    const catalog = catalogOf({ main: [entry], p: [p], t: [t] });
+    const f = buildFeatures(catalog, buildIndexes(catalog), CONFIG, ['reachableOnlyFromTests']);
+    expect(f.function.get('p')?.testReachable).toBe(true);
+  });
+
+  it('testReachable is false for a production-reachable fn no test exercises', () => {
+    const entry = occ({ bodyHash: 'e', simpleName: 'main', package: 'cli', visibility: 'exported', calls: [call('p')] });
+    const p = occ({ bodyHash: 'p', simpleName: 'p', package: 'core' });
+    const catalog = catalogOf({ main: [entry], p: [p] });
+    const f = buildFeatures(catalog, buildIndexes(catalog), CONFIG, ['reachableOnlyFromTests']);
+    expect(f.function.get('p')?.testReachable).toBe(false);
+  });
 });
 
 describe('buildFeatures — lazy union', () => {

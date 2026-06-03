@@ -101,6 +101,21 @@ describe('graph:high-blast-untested predicate (explicit thresholds 8/20)', () =>
     const empty: FeatureTable = { function: new Map(), package: new Map(), scc: [], edge: [] };
     expect(highBlastUntestedRule.evaluate(makeCatalog([]), buildIndexes(makeCatalog([])), EMPTY, undefined, empty)).toEqual([]);
   });
+
+  it('emits nothing for a function DEFINED in a test file (test code, not a production defect)', () => {
+    // A high-blast, "untested" row that would normally fire — but the occurrence
+    // lives in a test file, so it must be skipped (a function in a test file
+    // can't meaningfully be "not reached by a test").
+    const o = occ({ bodyHash: 'h', simpleName: 'reach', inTestFile: true });
+    const catalog = makeCatalog([o]);
+    const features: FeatureTable = {
+      function: new Map([['h', { bodyLines: 5, blast: blast(25), testReachable: false }]]),
+      package: new Map(),
+      scc: [],
+      edge: [],
+    };
+    expect(highBlastUntestedRule.evaluate(catalog, buildIndexes(catalog), BANDS, undefined, features)).toEqual([]);
+  });
 });
 
 describe('graph:high-blast-untested shipped defaults (warn 75 / error 150)', () => {

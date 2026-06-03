@@ -63,28 +63,31 @@ export interface ProcessResultOutput {
 // CHECK SUMMARY BUILDERS
 // =============================================================================
 
+/** Inputs for {@link createCheckSummary}. */
+interface CheckSummaryInput {
+  checkId: string
+  checkSlug: string
+  passed: boolean
+  errorCount: number
+  warningCount: number
+  durationMs: number
+  memoryProfile: CheckMemoryProfile
+  ignoredCount?: number
+  filesScanned?: number
+}
+
 /** Build a CheckSummary from a successful check execution */
-function createCheckSummary(
-  checkId: string,
-  checkSlug: string,
-  passed: boolean,
-  errorCount: number,
-  warningCount: number,
-  durationMs: number,
-  memoryProfile: CheckMemoryProfile,
-  ignoredCount = 0,
-  filesScanned = 0,
-): CheckSummary {
+function createCheckSummary(input: CheckSummaryInput): CheckSummary {
   return {
-    checkId,
-    checkSlug,
-    passed,
-    errors: errorCount,
-    warnings: warningCount,
-    durationMs,
-    filesScanned,
-    ignoredCount,
-    memoryProfile,
+    checkId: input.checkId,
+    checkSlug: input.checkSlug,
+    passed: input.passed,
+    errors: input.errorCount,
+    warnings: input.warningCount,
+    durationMs: input.durationMs,
+    filesScanned: input.filesScanned ?? 0,
+    ignoredCount: input.ignoredCount ?? 0,
+    memoryProfile: input.memoryProfile,
   }
 }
 
@@ -213,7 +216,7 @@ export function processSuccessResult(
 
   updateSessionForSuccess(session, checkResult, tags)
 
-  const summary = createCheckSummary(checkId, checkSlug, passed, errorCount, warningCount, durationMs, memoryProfile, ignoredCount, result.metadata.filesScanned ?? 0)
+  const summary = createCheckSummary({ checkId, checkSlug, passed, errorCount, warningCount, durationMs, memoryProfile, ignoredCount, filesScanned: result.metadata.filesScanned ?? 0 })
   callbacks.onCheckComplete?.(checkSlug, summary, checkIndex, totalChecks)
 
   const shouldStop = recipe.execution.stopOnFirstFailure && !passed

@@ -125,14 +125,14 @@ describe('buildAndResolveCatalogIncremental', () => {
       edges: new Map([[ownerEdgeKey('A2', 'a.ts'), [freshEdge]]]),
     });
 
-    const { catalog, resolutionStats } = buildAndResolveCatalogIncremental(
+    const { catalog, resolutionStats } = buildAndResolveCatalogIncremental({
       runStage,
       adapter,
-      { projectDirAbs: root, files: [join(root, 'a.ts'), join(root, 'b.ts')] },
-      cached,
-      [join(root, 'a.ts')],
-      'exact',
-    );
+      discovery: { projectDirAbs: root, files: [join(root, 'a.ts'), join(root, 'b.ts')] },
+      cachedCatalog: cached,
+      changedFilesAbs: [join(root, 'a.ts')],
+      resolutionMode: 'exact',
+    });
 
     // a re-walked to A2 with the fresh edge; b unchanged keeps its cached edge.
     expect(catalog.functions.a?.[0]?.bodyHash).toBe('A2');
@@ -150,14 +150,14 @@ describe('buildAndResolveCatalogIncremental', () => {
       deps: new Map([[ownerEdgeKey('M1', 'a.ts'), [dep]]]),
     });
 
-    const { catalog } = buildAndResolveCatalogIncremental(
+    const { catalog } = buildAndResolveCatalogIncremental({
       runStage,
       adapter,
-      { projectDirAbs: root, files: [join(root, 'a.ts')] },
-      cached,
-      [join(root, 'a.ts')],
-      'exact',
-    );
+      discovery: { projectDirAbs: root, files: [join(root, 'a.ts')] },
+      cachedCatalog: cached,
+      changedFilesAbs: [join(root, 'a.ts')],
+      resolutionMode: 'exact',
+    });
     expect(catalog.functions.mod?.[0]?.dependencies).toEqual([dep]);
   });
 });

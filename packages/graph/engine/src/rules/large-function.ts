@@ -43,6 +43,12 @@ export const largeFunctionRule = defineRule({
       // Skip occurrences with empty filePath (defensive, as orphan-subtree does).
       /* v8 ignore next */
       if (!occ.filePath) continue;
+      // The synthetic `<module-init>` occurrence is the file's whole top-level
+      // body, not a function — flagging it turns this into a "file too long"
+      // check (a signal that already lives in the fitness file-length check),
+      // and test files are not production functions to split. Skip both so this
+      // rule flags actual long FUNCTIONS in production code.
+      if (occ.kind === 'module-init' || occ.inTestFile) continue;
       const bodyLines = resolveBodyLines(occ, features);
       if (bodyLines <= warn) continue;
       const base = bodyLines > error ? 'high' : 'medium';

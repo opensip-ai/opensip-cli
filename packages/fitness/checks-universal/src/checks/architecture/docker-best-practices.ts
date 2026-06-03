@@ -470,16 +470,19 @@ function processRunLine(
   }
 }
 
-function processCopyLine(
-  trimmedLine: string,
-  lineNum: number,
-  index: number,
-  lines: string[],
-  file: string,
-  filePath: string,
-  state: AnalysisState,
-  violations: DockerfileViolation[],
-): void {
+interface ProcessCopyLineOptions {
+  trimmedLine: string
+  lineNum: number
+  index: number
+  lines: string[]
+  file: string
+  filePath: string
+  state: AnalysisState
+  violations: DockerfileViolation[]
+}
+
+function processCopyLine(options: ProcessCopyLineOptions): void {
+  const { trimmedLine, lineNum, index, lines, file, filePath, state, violations } = options
   const copyViolation = checkCopyOrder({
     line: trimmedLine,
     lineNum,
@@ -530,7 +533,7 @@ function processDockerfileLine(options: ProcessDockerfileLineOptions): void {
   }
 
   if (upperLine.startsWith('COPY ')) {
-    processCopyLine(trimmedLine, lineNum, index, lines, file, filePath, state, violations)
+    processCopyLine({ trimmedLine, lineNum, index, lines, file, filePath, state, violations })
   }
 }
 

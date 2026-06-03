@@ -92,3 +92,19 @@ describe('graph:large-function shipped defaults (warn 300 / error 500)', () => {
     expect(run(501, EMPTY)[0]?.severity).toBe('high');
   });
 });
+
+describe('graph:large-function skips non-functions and test files', () => {
+  it('does not flag a long <module-init> (whole-file body, not a function)', () => {
+    const idx = buildIndexes(makeCatalog([
+      occ({ bodyHash: 'm', simpleName: '<module-init:src/a.ts>', line: 1, endLine: 400, kind: 'module-init' }),
+    ]));
+    expect(largeFunctionRule.evaluate(makeCatalog([]), idx, BANDS)).toEqual([]);
+  });
+
+  it('does not flag a long function defined in a test file', () => {
+    const idx = buildIndexes(makeCatalog([
+      occ({ bodyHash: 't', simpleName: 'bigTestHelper', line: 1, endLine: 400, inTestFile: true }),
+    ]));
+    expect(largeFunctionRule.evaluate(makeCatalog([]), idx, BANDS)).toEqual([]);
+  });
+});

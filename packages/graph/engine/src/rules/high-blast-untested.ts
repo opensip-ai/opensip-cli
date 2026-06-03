@@ -48,6 +48,10 @@ export const highBlastUntestedRule = defineRule({
     for (const occ of indexes.byBodyHash.values()) {
       /* v8 ignore next */
       if (!occ.filePath) continue;
+      // A function DEFINED in a test file is itself test code — asking whether
+      // it "is reached by a test" is meaningless, so it must never be flagged
+      // as a high-blast untested production function. Skip test-file occurrences.
+      if (occ.inTestFile) continue;
       const row = features.function.get(occ.bodyHash);
       const blast = row?.blast;
       // Blast column absent for this row → can't gate → skip.

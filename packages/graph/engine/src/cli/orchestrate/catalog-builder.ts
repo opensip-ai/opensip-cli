@@ -154,16 +154,21 @@ export function buildAndResolveCatalog(
  * cached edge dangles. Verified by `incremental rebuild produces a
  * catalog identical to a full rebuild` test.
  */
+export interface IncrementalCatalogBuildOptions {
+  readonly runStage: RunStage;
+  readonly adapter: GraphLanguageAdapter;
+  readonly discovery: DiscoverOutput;
+  readonly cachedCatalog: Catalog;
+  readonly changedFilesAbs: readonly string[];
+  readonly resolutionMode: ResolutionMode;
+  readonly onProgress?: GraphProgressCallback;
+  readonly monitor?: PressureMonitor;
+}
+
 export function buildAndResolveCatalogIncremental(
-  runStage: RunStage,
-  adapter: GraphLanguageAdapter,
-  discovery: DiscoverOutput,
-  cachedCatalog: Catalog,
-  changedFilesAbs: readonly string[],
-  resolutionMode: ResolutionMode,
-  onProgress?: GraphProgressCallback,
-  monitor?: PressureMonitor,
+  options: IncrementalCatalogBuildOptions,
 ): { readonly catalog: Catalog; readonly resolutionStats: ResolutionStats } {
+  const { runStage, adapter, discovery, cachedCatalog, changedFilesAbs, resolutionMode, onProgress, monitor } = options;
   const parsed = runStage(
     'parse',
     onProgress,

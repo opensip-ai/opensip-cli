@@ -120,9 +120,10 @@ function buildFunctionFeatures(
   const reachableFromEntry = set.has('reachableFromEntry')
     ? computeReachableFromEntry(catalog, indexes, config)
     : undefined;
-  const prodReachable = set.has('reachableOnlyFromTests')
-    ? computeProdReachable(catalog, indexes)
-    : undefined;
+  // Both `testReachable` and `reachableOnlyFromTests` ride on this request.
+  const needsTestReach = set.has('reachableOnlyFromTests');
+  const prodReachable = needsTestReach ? computeProdReachable(catalog, indexes) : undefined;
+  const testReachable = needsTestReach ? computeTestReachable(indexes) : undefined;
 
   const out = new Map<string, FunctionFeatures>();
   for (const [hash, occ] of indexes.byBodyHash) {
@@ -131,9 +132,12 @@ function buildFunctionFeatures(
     };
     if (blast) row.blast = blast.get(hash);
     if (reachableFromEntry) row.reachableFromEntry = reachableFromEntry.has(hash);
-    if (prodReachable) {
-      const testReachable = !prodReachable.has(hash);
-      row.testReachable = testReachable;
+    if (prodReachable && testReachable) {
+      // `testReachable` = "exercised by a test" — reachable from a test-file
+      // function (NOT merely the negation of production-reachability, which is
+      // what this used to compute and which mislabeled production-reachable
+      // utilities as 'not reached by any test').
+      row.testReachable = testReachable.has(hash);
       row.reachableOnlyFromTests = isReachableOnlyFromTests(hash, indexes, prodReachable);
     }
     out.set(hash, row as FunctionFeatures);
@@ -229,6 +233,23 @@ function computeProdReachable(catalog: Catalog, indexes: Indexes): Set<string> {
     if (!occ) continue;
     if (occ.inTestFile) continue;
     seeds.add(ep.bodyHash);
+  }
+  return bfsForward(seeds, indexes);
+}
+
+/**
+ * Reachable from a TEST — i.e. exercised by a test. Seeds = EVERY function
+ * defined in a test file (each is a potential test entry); forward BFS over
+ * `callees`. A production function in the result set is transitively called by
+ * some test, so `testReachable` is true. This is the correct companion to the
+ * high-blast-untested rule ("not reached by any test" ⇔ not in this set) — it
+ * replaces the old `!prodReachable` definition, which conflated "unreachable
+ * from production" with "tested".
+ */
+function computeTestReachable(indexes: Indexes): Set<string> {
+  const seeds = new Set<string>();
+  for (const [hash, occ] of indexes.byBodyHash) {
+    if (occ.inTestFile) seeds.add(hash);
   }
   return bfsForward(seeds, indexes);
 }

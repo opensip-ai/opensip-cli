@@ -84,16 +84,16 @@ export function obtainCatalog(input: ObtainCatalogInput): ObtainCatalogOutput {
     return { catalog: cachedCatalog, cacheHit: true, resolutionStats: null };
   }
   const built = verdict.kind === 'incremental' && cachedCatalog
-    ? buildAndResolveCatalogIncremental(
-        input.runStage,
-        input.adapter,
-        input.discovery,
+    ? buildAndResolveCatalogIncremental({
+        runStage: input.runStage,
+        adapter: input.adapter,
+        discovery: input.discovery,
         cachedCatalog,
-        verdict.changedFiles,
-        input.resolutionMode,
-        input.onProgress,
-        input.monitor,
-      )
+        changedFilesAbs: verdict.changedFiles,
+        resolutionMode: input.resolutionMode,
+        onProgress: input.onProgress,
+        monitor: input.monitor,
+      })
     : buildAndResolveCatalog(
         input.runStage,
         input.adapter,
