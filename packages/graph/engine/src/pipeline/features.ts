@@ -452,24 +452,6 @@ export function toPersistedFeatures(
   return out;
 }
 
-/**
- * Inverse of {@link toPersistedFeatures}: records → `Map`, defaulting missing
- * entities to empty. Used by Phase 7 round-trip tests and any in-engine
- * fallback that needs a `FeatureTable` from a reloaded catalog.
- */
-export function fromPersistedFeatures(persisted: PersistedFeatures): FeatureTable {
-  const fn = new Map<string, FunctionFeatures>();
-  for (const [hash, row] of Object.entries(persisted.function ?? {})) fn.set(hash, row);
-  const pkg = new Map<string, PackageFeatures>();
-  for (const [name, row] of Object.entries(persisted.package ?? {})) pkg.set(name, row);
-  return {
-    function: fn,
-    package: pkg,
-    scc: persisted.scc ?? [],
-    edge: persisted.edge ?? [],
-  };
-}
-
 /** True when no entity is present (or every present entity is empty). */
 export function isPersistedFeaturesEmpty(persisted: PersistedFeatures): boolean {
   const hasFn = persisted.function !== undefined && Object.keys(persisted.function).length > 0;

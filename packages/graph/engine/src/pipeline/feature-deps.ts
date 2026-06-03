@@ -1,3 +1,4 @@
+// @fitness-ignore-file batch-operation-limits -- bounded synchronous union over the active rule set + caller columns (no async, no unbounded data load); the heuristic mis-reads the nested synchronous for...of as an async/unbounded batch.
 /**
  * Per-run feature dependency union.
  *

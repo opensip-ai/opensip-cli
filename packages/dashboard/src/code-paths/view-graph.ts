@@ -1,31 +1,20 @@
 /**
  * View 8 — "Graph" (node-link topology, Cytoscape.js + dagre).
  *
- * The first non-tabular Code Paths view: it renders the *shape* of the
- * call graph rather than another projection of it. The renderer is the
- * vendored Cytoscape global (`cytoscape`) plus the `cytoscapeDagre` layout
- * extension, both inlined by `dashboardCytoscapeVendorJs()` ahead of this
- * emitter in `code-paths.ts`.
+ * The non-tabular Code Paths view: it renders the *shape* of the call graph
+ * rather than a projection of it. Renderer is the vendored `cytoscape`
+ * global + the `cytoscapeDagre` layout extension, both inlined by
+ * `dashboardCytoscapeVendorJs()` ahead of this emitter in `code-paths.ts`.
  *
  * Data source: the pre-projected `graph-view-model` JSON blob embedded by
- * `generator.ts` (NOT the raw catalog). The projector lives in
- * `graph-view-model.ts` and runs at report-generation time; the view reads
- * the slim result. If the blob is absent (older report, no catalog), the
- * view shows an empty state.
+ * `generator.ts` (projector in `graph-view-model.ts`, run at
+ * report-generation time) — NOT the raw catalog. Absent blob → empty state.
  *
- * Phase 3 scope: pan / zoom / node-click selection + a layout selector
- * (dagre default, with cose and breadthfirst alternates — all available
- * without an extra extension; cose handles cyclic clusters dagre renders
- * awkwardly). Filter, search, and impact highlight are layered on by later
- * phases.
- *
- * Visual encoding (Phase 0 §4 field-to-consumer map):
- *   - node shape    ← kind        (constructor=diamond, method/getter/setter=round-rectangle, …)
- *   - node stroke   ← visibility  (private=dashed, module-local=dotted, exported=solid)
- *   - node size     ← callDegreeIn + callDegreeOut
- *   - node group    ← sccId       (cyclic clusters get a shared accent border)
- *   - edge style    ← resolution  (static=solid, method-dispatch=dashed, dynamic-string=dotted)
- *   - edge opacity  ← confidence  (low=faded)
+ * Features: pan/zoom, layout selector (dagre/cose/breadthfirst), filter-chip
+ * culling, fuzzy search, node-click impact highlight, and SCC cycle
+ * highlighting. Visual encoding (kind→shape, visibility→stroke, degree→size,
+ * sccId→group accent, resolution→edge style, confidence→edge opacity) is
+ * applied in `gvStylesheet` / `gvBuildElements`.
  */
 
 import { dashboardViewGraphStylesheetJs } from './graph-stylesheet.js';
