@@ -145,15 +145,17 @@ describe('View 8 — Visualization', () => {
     expect(layout!.value).toBe('dagre'); // default
   });
 
-  it('renders the "Highlight cycles" toggle in the control toolbar', () => {
+  it('renders the "Highlight cycles" toggle as a checkbox in the control toolbar', () => {
     const env = loadEnv(true);
     embedViewModel(SAMPLE_VM);
     const c = document.createElement('div');
     document.body.append(c);
     env.views.find(v => v.id === 'graph')!.render(c, null, null, null);
-    const sccBtn = c.querySelector<HTMLElement>('.code-paths-graph-scc-btn');
-    expect(sccBtn).not.toBeNull();
-    expect(sccBtn!.textContent).toContain('Highlight cycles');
+    const sccCb = c.querySelector<HTMLInputElement>('input[type="checkbox"][data-scc-toggle]');
+    expect(sccCb).not.toBeNull();
+    const lbl = c.querySelector<HTMLElement>('.code-paths-graph-checkbox');
+    expect(lbl).not.toBeNull();
+    expect(lbl!.textContent).toContain('Highlight cycles');
   });
 
   it('mounts a cytoscape canvas when the renderer is present', () => {

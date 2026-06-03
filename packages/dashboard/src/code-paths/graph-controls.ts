@@ -34,48 +34,75 @@ function gvAddOptions(sel, pairs, current) {
   }
 }
 
-// The view's own single-row control toolbar: Level / Scope / Package / Kind /
-// Edges / Layout dropdowns + a "Highlight cycles" toggle. Self-contained (the
-// shared Explore filter bar was removed). The Level dropdown decides what the
-// graph shows; Package + Kind only apply at function level, so they are
-// DISABLED at package level (faded, not hidden) to make that scoping legible.
-// Most changes re-render the graph in place via gvRenderGraph; the Layout
-// change re-runs the layout on the live graph without a remount.
+// The view's own controls, laid out in two rows above the search box (row 3,
+// rendered separately by gvRenderSearchBox):
+//   Row 1: Layout · Scope · Highlight-cycles checkbox
+//   Row 2: Level · Package · Kind (· Edges, function level only)
+// Self-contained (the shared Explore filter bar was removed). The Level
+// dropdown decides what the graph shows; Package + Kind only apply at function
+// level, so they are DISABLED at package level (faded, not hidden) to make that
+// scoping legible. Most changes re-render the graph in place via gvRenderGraph;
+// Layout re-runs the layout on the live graph (no remount) and the cycles
+// checkbox toggles the SCC emphasis in place.
 function gvRenderControls(host, catalog, indexes) {
-  var bar = el('div', { class: 'code-paths-graph-toolbar code-paths-graph-controls' });
-  function label(t) { bar.appendChild(el('span', { class: 'code-paths-graph-toolbar-label', text: t })); }
   function rerender() { gvRenderGraph(host, catalog, indexes); }
   var fnLevel = (gvLevel === 'function');
+  function label(bar, t) { bar.appendChild(el('span', { class: 'code-paths-graph-toolbar-label', text: t })); }
 
-  // Level — always enabled. Drives package vs function granularity.
-  label('Level');
-  var levelSel = el('select', { class: 'code-paths-graph-select', 'data-control': 'level' });
-  gvAddOptions(levelSel, [['package', 'Package'], ['function', 'Function']], gvLevel);
-  levelSel.addEventListener('change', function(e) { gvLevel = e.target.value; rerender(); });
-  bar.appendChild(levelSel);
+  // ---- Row 1: Layout · Scope · Highlight cycles ----
+  var row1 = el('div', { class: 'code-paths-graph-toolbar code-paths-graph-controls' });
+
+  // Layout — dropdown; re-runs the layout on the live graph (no full remount).
+  label(row1, 'Layout');
+  var layoutSel = el('select', { class: 'code-paths-graph-select', 'data-control': 'layout' });
+  gvAddOptions(layoutSel, GV_LAYOUTS.map(function(l) { return [l.id, l.label]; }), gvCurrentLayout);
+  layoutSel.addEventListener('change', function(e) { gvRunLayout(e.target.value); });
+  row1.appendChild(layoutSel);
 
   // Scope — always enabled. Production-only vs include-tests.
-  label('Scope');
+  label(row1, 'Scope');
   var scopeSel = el('select', { class: 'code-paths-graph-select', 'data-control': 'scope' });
   gvAddOptions(scopeSel, [['prod', 'Production only'], ['tests', 'Include tests']], gvIncludeTests ? 'tests' : 'prod');
   scopeSel.addEventListener('change', function(e) { gvIncludeTests = (e.target.value === 'tests'); rerender(); });
-  bar.appendChild(scopeSel);
+  row1.appendChild(scopeSel);
+
+  // Highlight cycles — a checkbox toggle (package-level SCC emphasis). Toggles
+  // the emphasis on the live graph in place; no re-render.
+  var sccToggle = el('label', { class: 'code-paths-graph-checkbox' });
+  var sccCb = el('input', { type: 'checkbox', 'data-scc-toggle': '1' });
+  sccCb.checked = gvSccHighlight;
+  sccCb.addEventListener('change', function() { gvSccHighlight = sccCb.checked; gvApplySccHighlight(); });
+  sccToggle.appendChild(sccCb);
+  sccToggle.appendChild(document.createTextNode(' Highlight cycles'));
+  row1.appendChild(sccToggle);
+
+  host.appendChild(row1);
+
+  // ---- Row 2: Level · Package · Kind (· Edges) ----
+  var row2 = el('div', { class: 'code-paths-graph-toolbar code-paths-graph-controls' });
+
+  // Level — always enabled. Drives package vs function granularity.
+  label(row2, 'Level');
+  var levelSel = el('select', { class: 'code-paths-graph-select', 'data-control': 'level' });
+  gvAddOptions(levelSel, [['package', 'Package'], ['function', 'Function']], gvLevel);
+  levelSel.addEventListener('change', function(e) { gvLevel = e.target.value; rerender(); });
+  row2.appendChild(levelSel);
 
   // Package — single-select; function level only (disabled at package level).
-  label('Package');
+  label(row2, 'Package');
   var pkgs = (typeof packagesInCatalog === 'function') ? packagesInCatalog(catalog) : [];
   var pkgSel = el('select', { class: 'code-paths-graph-select', 'data-control': 'package' });
   pkgSel.appendChild(el('option', { value: '', text: pkgs.length ? '— select —' : '— none —' }));
   gvAddOptions(pkgSel, pkgs.map(function(p) { return [p, p]; }), gvSelectedPackage);
   pkgSel.disabled = !fnLevel;
   pkgSel.addEventListener('change', function(e) { gvSelectedPackage = e.target.value || null; rerender(); });
-  bar.appendChild(pkgSel);
+  row2.appendChild(pkgSel);
 
   // Kind — multi-select dropdown; function level only (disabled at package
   // level). A custom checkbox popover (gvMultiSelect) rather than a native
   // <select multiple> listbox, which renders as an always-open box.
-  label('Kind');
-  bar.appendChild(gvMultiSelect({
+  label(row2, 'Kind');
+  row2.appendChild(gvMultiSelect({
     id: 'kind',
     items: (typeof KIND_LIST !== 'undefined') ? KIND_LIST : [],
     selected: gvKinds,
@@ -86,35 +113,14 @@ function gvRenderControls(host, catalog, indexes) {
 
   // Edges — function level only: intra-package (default) vs + cross-package.
   if (fnLevel) {
-    label('Edges');
+    label(row2, 'Edges');
     var edgeSel = el('select', { class: 'code-paths-graph-select', 'data-control': 'granularity' });
     gvAddOptions(edgeSel, [['intra', 'Intra-package'], ['cross', '+ cross-package']], gvCrossPackage ? 'cross' : 'intra');
     edgeSel.addEventListener('change', function(e) { gvCrossPackage = (e.target.value === 'cross'); rerender(); });
-    bar.appendChild(edgeSel);
+    row2.appendChild(edgeSel);
   }
 
-  // Layout — a dropdown (matches the other controls; was a button group).
-  // Changing layout re-runs the layout on the live graph (no full remount).
-  label('Layout');
-  var layoutSel = el('select', { class: 'code-paths-graph-select', 'data-control': 'layout' });
-  gvAddOptions(layoutSel, GV_LAYOUTS.map(function(l) { return [l.id, l.label]; }), gvCurrentLayout);
-  layoutSel.addEventListener('change', function(e) { gvRunLayout(e.target.value); });
-  bar.appendChild(layoutSel);
-
-  // Cross-package-cycle highlight toggle (package-level SCC emphasis).
-  var sccBtn = el('button', {
-    class: 'code-paths-graph-scc-btn' + (gvSccHighlight ? ' active' : ''),
-    'data-scc-toggle': '1',
-    text: 'Highlight cycles',
-    onclick: function() {
-      gvSccHighlight = !gvSccHighlight;
-      sccBtn.classList.toggle('active', gvSccHighlight);
-      gvApplySccHighlight();
-    },
-  });
-  bar.appendChild(sccBtn);
-
-  host.appendChild(bar);
+  host.appendChild(row2);
 }
 
 // A compact multi-select dropdown: a trigger button + a checkbox popover.

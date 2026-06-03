@@ -141,4 +141,41 @@ describe('Functions (distribution) view', () => {
     input.dispatchEvent(new Event('input', { bubbles: true }));
     expect(view.querySelectorAll('[data-body-hash]').length).toBe(3);
   });
+
+  it('renders Kind and Package single-select dropdowns before the search box', () => {
+    const { view } = renderDistribution();
+    const kind = view.querySelector<HTMLSelectElement>('select[data-control="fn-kind"]');
+    const pkg = view.querySelector<HTMLSelectElement>('select[data-control="fn-package"]');
+    const search = view.querySelector<HTMLInputElement>('#code-paths-search-distribution');
+    expect(kind).not.toBeNull();
+    expect(pkg).not.toBeNull();
+    // Defaults select "all".
+    expect(kind!.value).toBe('');
+    expect(pkg!.value).toBe('');
+    expect(kind!.options[0].textContent).toBe('All kinds');
+    expect(pkg!.options[0].textContent).toBe('All packages');
+    // Order in the controls row: Kind, Package, then the search box.
+    expect(kind!.compareDocumentPosition(pkg!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(pkg!.compareDocumentPosition(search!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('filters the table by the selected Package', () => {
+    const env = loadEnv({
+      version: '2.0', tool: 'graph', language: 'typescript', builtAt: 'now',
+      functions: {
+        a: [makeOcc({ bodyHash: 'a', simpleName: 'validateInput', filePath: 'packages/cli/src/a.ts' })],
+        z: [makeOcc({ bodyHash: 'z', simpleName: 'ztarget', filePath: 'packages/contracts/src/z.ts' })],
+      },
+    });
+    const view = document.createElement('div');
+    env.views.find(v => v.id === 'distribution')!.render(view, env.graphCatalog, env.graphIndexes, env.filterState);
+    expect(view.querySelectorAll('[data-body-hash]').length).toBe(2);
+    const pkg = view.querySelector<HTMLSelectElement>('select[data-control="fn-package"]')!;
+    pkg.value = 'contracts';
+    pkg.dispatchEvent(new Event('change', { bubbles: true }));
+    const rows = view.querySelectorAll('[data-body-hash]');
+    expect(rows.length).toBe(1);
+    expect(view.textContent).toContain('ztarget');
+    expect(view.textContent).not.toContain('validateInput');
+  });
 });

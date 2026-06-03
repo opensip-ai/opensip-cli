@@ -1,7 +1,7 @@
 /**
  * Subtab-bar Strategy — JS-string emitter for the shared subtab pattern.
  *
- * Both the fit/sim Tool Tab (Overview / Catalog / Recipes — three
+ * Both the fit/sim Tool Tab (Sessions / Catalog / Recipes — three
  * subtabs) and the Code Paths Tab (Sessions / Explore — two subtabs)
  * need the same DOM/click-delegation behaviour: a `.subtab-bar` of
  * clickable headers, a stack of `.subtab-panel` containers, and a

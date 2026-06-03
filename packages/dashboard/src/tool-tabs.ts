@@ -1,5 +1,5 @@
 /**
- * Tool tab rendering — creates subtabs (Overview / Catalog / Recipes) under each tool tab.
+ * Tool tab rendering — creates subtabs (Sessions / Catalog / Recipes) under each tool tab.
  * Returns JS code as a string.
  *
  * Delegates the subtab DOM/click pattern to the shared `renderSubtabBar`
@@ -16,7 +16,8 @@ export function dashboardToolTabsJs(): string {
 // =======================================================
 
 /**
- * Render a tool tab with subtabs: Overview | Catalog | Recipes
+ * Render a tool tab with subtabs: Sessions | Catalog | Recipes
+ * (the first subtab keeps the stable id 'overview' for routing).
  * @param panelId - e.g., 'panel-fitness'
  * @param toolSessions - filtered sessions for this tool
  * @param accentColor - CSS var for accent
@@ -31,7 +32,7 @@ export function dashboardToolTabsJs(): string {
 function renderToolTab(panelId, toolSessions, accentColor, catalogLabel, catalogData, renderCatalogFn, recipesData) {
   const panel = document.getElementById(panelId);
   renderSubtabBar(panel, [
-    { id: 'overview', label: 'Overview', render: function(p) {
+    { id: 'overview', label: 'Sessions', render: function(p) {
       renderSessionTable(p, toolSessions, accentColor);
     }},
     { id: 'catalog', label: catalogLabel, render: function(p) {

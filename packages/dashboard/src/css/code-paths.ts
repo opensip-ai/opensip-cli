@@ -31,15 +31,19 @@ export function dashboardCssCodePaths(): string {
 /* ====== Code Paths Graph view (Cytoscape) ====== */
 .code-paths-graph-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
 .code-paths-graph-toolbar-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
-.code-paths-graph-scc-btn { font-size: 12px; padding: 4px 10px; border-radius: var(--radius-sm); cursor: pointer; background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-muted); font-family: var(--font); user-select: none; height: 30px; box-sizing: border-box; }
-.code-paths-graph-scc-btn:hover { background: var(--bg-hover); color: var(--text); }
-.code-paths-graph-scc-btn.active { background: #d46a6a; color: var(--bg); border-color: #d46a6a; }
-/* Visualization control toolbar — one symmetric row of dropdowns (Level /
-   Scope / Package / Kind / Edges / Layout) + a Highlight-cycles toggle. The
-   Package/Kind controls are disabled at package level (they only apply at
+/* Visualization controls — two rows above the search box:
+     Row 1: Layout · Scope · Highlight-cycles checkbox
+     Row 2: Level · Package · Kind (· Edges, function level only)
+   The Package/Kind controls are disabled at package level (they only apply at
    function level), so they fade rather than vanish. Uniform select min-width
-   keeps the row aligned. */
+   keeps the rows aligned. */
 .code-paths-graph-controls { gap: 8px 10px; row-gap: 8px; }
+.code-paths-graph-controls + .code-paths-graph-controls { margin-top: -2px; }
+.code-paths-graph-checkbox { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; user-select: none; height: 30px; }
+.code-paths-graph-checkbox input { cursor: pointer; }
+/* Functions view controls row (Kind · Package · search). */
+.code-paths-ranked-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; margin-bottom: 12px; }
+.code-paths-ranked-controls .code-paths-search { margin-bottom: 0; }
 .code-paths-graph-select { font-size: 12px; padding: 4px 8px; border-radius: var(--radius-sm); background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-muted); font-family: var(--font); min-width: 150px; height: 30px; box-sizing: border-box; }
 .code-paths-graph-select:disabled { opacity: 0.4; cursor: not-allowed; }
 /* Kind multi-select: a trigger button + a checkbox popover (native

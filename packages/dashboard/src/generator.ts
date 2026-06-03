@@ -2,7 +2,7 @@
  * Dashboard HTML generator — orchestrates all modules into a single self-contained HTML file.
  *
  * Composes CSS, shared JS, and tab-specific JS into one HTML string with all data inlined.
- * Each tool tab (Fitness, Simulation) has subtabs: Overview, Catalog, Recipes.
+ * Each tool tab (Fitness, Simulation) has subtabs: Sessions, Catalog, Recipes.
  */
 
 

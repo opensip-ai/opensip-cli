@@ -132,6 +132,14 @@ export interface RankedViewConfig {
    * former standalone Search subtab.
    */
   searchByName?: boolean;
+  /**
+   * When true, render a Kind single-select and a Package single-select
+   * dropdown alongside the search box (in one controls row above the table)
+   * that further narrow the ranked rows. Both default to "all"; selecting a
+   * value re-filters the table in place. Combines with `searchByName` (Kind,
+   * Package, then the search box, in that order). Used by the Functions view.
+   */
+  filterByKindPackage?: boolean;
 }
 
 /**
@@ -176,8 +184,41 @@ export function defineRankedView(config: RankedViewConfig): string {
   // var is namespaced by view id so multiple search-enabled views can
   // coexist without clobbering each other.
   const searchByName = config.searchByName === true;
-  const queryVar = `__rankedSearchQuery_${config.id.replaceAll(/\W/g, '_')}`;
-  const searchStateDecl = searchByName ? `let ${queryVar} = '';\n` : '';
+  const filterByKP = config.filterByKindPackage === true;
+  const hasControls = searchByName || filterByKP;
+  const idSuffix = config.id.replaceAll(/\W/g, '_');
+  const queryVar = `__rankedSearchQuery_${idSuffix}`;
+  const kindVar = `__rankedKind_${idSuffix}`;
+  const pkgVar = `__rankedPkg_${idSuffix}`;
+  const stateDecl =
+    (searchByName ? `let ${queryVar} = '';\n` : '') +
+    (filterByKP ? `let ${kindVar} = '';\nlet ${pkgVar} = '';\n` : '');
+  // Kind + Package single-selects (filterByKindPackage). Built into the shared
+  // controls row; each re-filters the table in place. Options come from the
+  // shared KIND_LIST / packagesInCatalog (declared by the filters emitter).
+  const kindPackageBlock = filterByKP
+    ? String.raw`
+    controlsRow.appendChild(el('span', { class: 'code-paths-graph-toolbar-label', text: 'Kind' }));
+    const fnKindSel = el('select', { class: 'code-paths-graph-select', 'data-control': 'fn-kind' });
+    fnKindSel.appendChild(el('option', { value: '', text: 'All kinds' }));
+    (typeof KIND_LIST !== 'undefined' ? KIND_LIST : []).forEach(function(k) {
+      const o = el('option', { value: k, text: k });
+      if (k === ${kindVar}) o.selected = true;
+      fnKindSel.appendChild(o);
+    });
+    fnKindSel.addEventListener('change', e => { ${kindVar} = (e.target && e.target.value) || ''; renderRows(); });
+    controlsRow.appendChild(fnKindSel);
+    controlsRow.appendChild(el('span', { class: 'code-paths-graph-toolbar-label', text: 'Package' }));
+    const fnPkgSel = el('select', { class: 'code-paths-graph-select', 'data-control': 'fn-package' });
+    fnPkgSel.appendChild(el('option', { value: '', text: 'All packages' }));
+    ((typeof packagesInCatalog === 'function') ? packagesInCatalog(catalog) : []).forEach(function(p) {
+      const o = el('option', { value: p, text: p });
+      if (p === ${pkgVar}) o.selected = true;
+      fnPkgSel.appendChild(o);
+    });
+    fnPkgSel.addEventListener('change', e => { ${pkgVar} = (e.target && e.target.value) || ''; renderRows(); });
+    controlsRow.appendChild(fnPkgSel);`
+    : '';
   const searchInputBlock = searchByName
     ? String.raw`
     const searchInput = el('input', {
@@ -191,19 +232,27 @@ export function defineRankedView(config: RankedViewConfig): string {
       ${queryVar} = (e.target && e.target.value) || '';
       renderRows();
     });
-    container.appendChild(searchInput);`
+    controlsRow.appendChild(searchInput);`
     : '';
-  const resultsHostDecl = searchByName
+  // The controls row (Kind · Package · search) sits above the table. When no
+  // controls are configured, rows render straight into the container.
+  const controlsBlock = hasControls
+    ? String.raw`
+    const controlsRow = el('div', { class: 'code-paths-ranked-controls' });${kindPackageBlock}${searchInputBlock}
+    container.appendChild(controlsRow);`
+    : '';
+  const resultsHostDecl = hasControls
     ? `    const rowsHost = el('div'); container.appendChild(rowsHost);`
     : `    const rowsHost = container;`;
-  // Substring filter on simpleName; empty query keeps everything.
-  const searchFilterExpr = searchByName
-    ? String.raw`(function(occ){
-        const q = (${queryVar} || '').trim().toLowerCase();
-        if (q.length === 0) return true;
-        const nm = (occ.simpleName || '').toLowerCase();
-        return nm.indexOf(q) !== -1;
-      })`
+  // Combined row predicate: Kind, Package, then name substring. Each clause is
+  // skipped when its control is absent or set to "all"/empty.
+  const kindClause = filterByKP ? `if (${kindVar} && occ.kind !== ${kindVar}) return false;` : '';
+  const pkgClause = filterByKP ? `if (${pkgVar} && pkgOf(occ) !== ${pkgVar}) return false;` : '';
+  const nameClause = searchByName
+    ? `const q = (${queryVar} || '').trim().toLowerCase(); if (q.length && (occ.simpleName || '').toLowerCase().indexOf(q) === -1) return false;`
+    : '';
+  const rowFilterExpr = hasControls
+    ? `(function(occ){ ${kindClause} ${pkgClause} ${nameClause} return true; })`
     : '(function(){ return true; })';
   const onActivateBlock = searchByName
     ? String.raw`,
@@ -213,7 +262,7 @@ export function defineRankedView(config: RankedViewConfig): string {
   }`
     : '';
   return String.raw`
-${searchStateDecl}views.push({
+${stateDecl}views.push({
   id: ${jsString(config.id)},
   label: ${jsString(config.label)},
   help: ${helpJson},
@@ -236,11 +285,11 @@ ${searchStateDecl}views.push({
       container.appendChild(el('div', { class: 'empty', text: ${jsString(config.emptyMessage)} }));
       return;
     }
-${searchInputBlock}
+${controlsBlock}
 ${resultsHostDecl}
-    const __searchFilter = ${searchFilterExpr};
+    const __rowFilter = ${rowFilterExpr};
     function renderRows() {
-      const filtered = ranked.filter(r => __searchFilter(r.occ));
+      const filtered = ranked.filter(r => __rowFilter(r.occ));
       if (filtered.length === 0) {
         while (rowsHost.firstChild) rowsHost.removeChild(rowsHost.firstChild);
         rowsHost.appendChild(el('div', { class: 'empty', text: ${jsString(config.emptyMessage)} }));
