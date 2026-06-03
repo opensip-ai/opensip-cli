@@ -142,7 +142,13 @@ function buildCouplingCsv(counts) {
 // quote when the value contains a comma, quote, CR, or LF. Package names are
 // normally bare, but '<unknown>' and odd repo layouts make this cheap insurance.
 function csvField(value) {
-  const s = String(value == null ? '' : value);
+  let s = String(value == null ? '' : value);
+  // CSV/formula-injection guard: a cell a spreadsheet could read as a formula
+  // (leading =, +, -, @, tab, or CR) is neutralized with a leading apostrophe
+  // so Excel/Sheets treat it as text. Package names are untrusted — they come
+  // from arbitrary analyzed repos and can legitimately start with '@' (scoped
+  // packages) — so guard before the RFC-4180 quoting below.
+  if (s.length > 0 && /^[=+\-@\t\r]/.test(s)) s = "'" + s;
   if (/[",\r\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
   return s;
 }

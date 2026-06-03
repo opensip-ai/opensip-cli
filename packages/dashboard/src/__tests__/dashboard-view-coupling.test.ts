@@ -201,6 +201,9 @@ describe('View 4 — Coupling matrix', () => {
           { callerPackage: 'cli', calleePackage: 'cli', count: 2 },
           // A package name with a comma forces RFC-4180 quoting.
           { callerPackage: 'odd,pkg', calleePackage: 'cli', count: 1 },
+          // A scoped package starts with '@' — a CSV/formula-injection trigger
+          // that must be neutralized with a leading apostrophe.
+          { callerPackage: '@scope/pkg', calleePackage: 'cli', count: 4 },
         ],
       },
     };
@@ -227,8 +230,11 @@ describe('View 4 — Coupling matrix', () => {
       expect(lines).toContain('cli,cli,2');
       expect(lines).toContain('cli,contracts,3');
       expect(lines).toContain('"odd,pkg",cli,1');
-      // 1 header + 3 data rows, no truncation.
-      expect(lines.length).toBe(4);
+      // The scoped '@'-package is neutralized with a leading apostrophe so a
+      // spreadsheet can't read it as a formula (CSV/formula-injection guard).
+      expect(lines).toContain("'@scope/pkg,cli,4");
+      // 1 header + 4 data rows, no truncation.
+      expect(lines.length).toBe(5);
     });
   });
 
