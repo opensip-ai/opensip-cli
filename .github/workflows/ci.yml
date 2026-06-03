@@ -67,6 +67,25 @@ jobs:
           sarif_file: fit.sarif
           category: opensip-tools-fit
 
+      # Dogfood the graph tool the same way as fit: --gate-save records the
+      # current Signals into the (CI-ephemeral) datastore, then the SARIF export
+      # is uploaded to Code Scanning. GH compares against the latest main-branch
+      # graph SARIF and surfaces only NET-NEW graph findings on PR diffs.
+      - name: Graph (dogfood)
+        id: graph
+        run: pnpm graph:ci
+
+      - name: Export graph baseline to SARIF
+        if: always() && steps.graph.outcome != 'skipped'
+        run: node packages/cli/dist/index.js graph-baseline-export --out graph.sarif
+
+      - name: Upload graph SARIF
+        if: always() && hashFiles('graph.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: graph.sarif
+          category: opensip-tools-graph
+
       # Verify docs/web-generated/ (the website-facing transformed copy
       # of docs/public/) is in sync with its source. Editors who change
       # docs/public/*.md must regenerate docs/web-generated/ by running

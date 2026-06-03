@@ -22,7 +22,9 @@ import { defineRule } from './define-rule.js';
 
 import type { Signal } from '@opensip-tools/core';
 
-const DEFAULT_WARN_PARAMS = 4;
+// warn=5: `> 4 params` is a common, clean signature (e.g. a small options-ish
+// positional set), so warning at 5 was noisy; warn at 6+, error at 8+ instead.
+const DEFAULT_WARN_PARAMS = 5;
 const DEFAULT_ERROR_PARAMS = 7;
 
 export const wideFunctionRule = defineRule({

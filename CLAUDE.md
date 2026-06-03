@@ -348,6 +348,16 @@ in your PR. Updating the gate (e.g., via `disabledChecks` in
 `opensip-tools.config.yml`) requires PR-description justification
 and reviewer sign-off — it is not a default contributor option.
 
+The **graph** tool is dogfooded the same way: CI runs `pnpm graph:ci`
+(`graph --gate-save`) → `graph-baseline-export --out graph.sarif` →
+upload to Code Scanning under category `opensip-tools-graph`. Same
+ratchet: only net-new graph findings surface on PRs. The graph rules
+(large-function, wide-function, high-blast-untested, cycle,
+duplicated-function-body) skip test-file occurrences — they gate
+production code only — and `large-function` skips the synthetic
+`<module-init>` (whole-file) occurrence. Run `pnpm graph` locally to
+reproduce a graph alert.
+
 **Why `pnpm fit` works at all in this monorepo:** workspace dep
 injection is enabled via `injectWorkspacePackages: true` in
 `pnpm-workspace.yaml` (pnpm 11's settings home — it no longer reads the
