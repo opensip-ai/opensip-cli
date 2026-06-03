@@ -4,7 +4,13 @@ import { join } from 'node:path';
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-import { maybeNotify, isNewerVersion, checkForUpdate, formatUpdateNag } from '../update-notifier.js';
+import {
+  maybeNotify,
+  isNewerVersion,
+  checkForUpdate,
+  formatUpdateNag,
+  UPDATE_CHECK_INTERVAL_MS,
+} from '../update-notifier.js';
 
 const originalEnv = { ...process.env };
 const originalIsTTY = process.stdout.isTTY;
@@ -66,6 +72,18 @@ describe('maybeNotify', () => {
     // a unit test, but we can assert the call didn't throw and the
     // notifier instance was returned.
     expect(out).toBeDefined();
+  });
+});
+
+describe('UPDATE_CHECK_INTERVAL_MS', () => {
+  it('caps update detection latency at one hour, not a day', () => {
+    // This is the worst-case "I published but the CLI still says up-to-date"
+    // window. Locked deliberately: detection must stay sub-hourly so a freshly
+    // published release is noticed within the hour. Raising this back toward a
+    // day (the previous 24h value) should be a conscious change, not a drift.
+    expect(UPDATE_CHECK_INTERVAL_MS).toBe(60 * 60 * 1000);
+    expect(UPDATE_CHECK_INTERVAL_MS).toBeGreaterThan(0);
+    expect(UPDATE_CHECK_INTERVAL_MS).toBeLessThanOrEqual(60 * 60 * 1000);
   });
 });
 

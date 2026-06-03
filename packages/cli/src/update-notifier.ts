@@ -1,11 +1,11 @@
 /**
  * @fileoverview Thin wrapper around `update-notifier` that checks npm
- * once a day for a newer version of opensip-tools.
+ * hourly for a newer version of opensip-tools (see UPDATE_CHECK_INTERVAL_MS).
  *
  * `update-notifier` is used purely as the *fetcher* — it runs the throttled
- * (once-a-day), detached, non-blocking network check. It is NOT used as the
+ * (hourly), detached, non-blocking network check. It is NOT used as the
  * display source, because its `check()` deletes the cached result the instant
- * it's read, which would make the notice show at most once per 24-hour cycle.
+ * it's read, which would make the notice show at most once per fetch cycle.
  * Instead the newest known version is mirrored into a sticky store
  * (`update-state.ts`) that {@link checkForUpdate} consults on EVERY run, so
  * the notice persists until the running version catches up. See
@@ -37,6 +37,23 @@
 import updateNotifier, { type UpdateNotifier } from 'update-notifier'
 
 import { clearKnownLatest, readKnownLatest, writeKnownLatest } from './update-state.js'
+
+/**
+ * How often the detached background fetch may hit npm to learn the latest
+ * published version. `update-notifier` throttles its network check to this
+ * interval; the sticky store (`update-state.ts`) then drives *display* on
+ * every run. This is therefore the worst-case DETECTION latency: a freshly
+ * published release becomes visible within one interval of going live (on the
+ * run after the next fetch completes — the fetch is detached, so never the
+ * same run).
+ *
+ * Set to 1 hour rather than the conventional 24h: the fetch is non-blocking,
+ * so a shorter interval costs the user nothing at the command line and only a
+ * modest amount of extra npm traffic (≤1 request/hour/user), while shrinking
+ * the "I published but the CLI still says up-to-date" window from a day to an
+ * hour. One named constant so the two call sites can't drift.
+ */
+export const UPDATE_CHECK_INTERVAL_MS = 1000 * 60 * 60
 
 export interface NotifyOptions {
   readonly name: string
@@ -97,12 +114,12 @@ function shouldSkip(): boolean {
 
 /**
  * Resolve whether a newer published version is available, scheduling the
- * once-a-day background fetch as a side effect. Returns the newer version
+ * hourly background fetch as a side effect. Returns the newer version
  * string (e.g. `2.3.0`) when one is known, or `undefined` when up-to-date,
  * opted-out, or non-TTY.
  *
  * Unlike `update-notifier`'s own delete-on-read result, this is **sticky**:
- * the newest version the daily check observes is mirrored into a small store
+ * the newest version the hourly check observes is mirrored into a small store
  * (`update-state.ts`) that is read on EVERY run, so the notice persists until
  * the running version catches up — at which point the store is cleared and
  * the notice stops on its own.
@@ -114,12 +131,12 @@ function shouldSkip(): boolean {
 export function checkForUpdate(opts: CheckForUpdateOptions): string | undefined {
   if (shouldSkip()) return undefined
   try {
-    // Fetcher: schedules the throttled, detached daily network check. On the
+    // Fetcher: schedules the throttled, detached hourly network check. On the
     // run right after that check completes, `notifier.update` is populated
     // (then update-notifier deletes it from its own cache — hence the mirror).
     const notifier = updateNotifier({
       pkg: { name: opts.name, version: opts.version },
-      updateCheckInterval: 1000 * 60 * 60 * 24,
+      updateCheckInterval: UPDATE_CHECK_INTERVAL_MS,
       shouldNotifyInNpmScript: false,
     })
     const fresh = notifier.update
@@ -168,8 +185,9 @@ export function maybeNotify(opts: NotifyOptions): UpdateNotifier | null {
 
   const notifier = updateNotifier({
     pkg: { name: opts.name, version: opts.version },
-    // Once a day is standard and matches npm's own update nag.
-    updateCheckInterval: 1000 * 60 * 60 * 24,
+    // Hourly (UPDATE_CHECK_INTERVAL_MS) — the detached fetch never blocks the
+    // command, so we trade a little npm traffic for sub-hourly detection.
+    updateCheckInterval: UPDATE_CHECK_INTERVAL_MS,
     shouldNotifyInNpmScript: false,
   })
 

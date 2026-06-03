@@ -3,11 +3,11 @@
 /**
  * update-state — sticky persistence for the "update available" notice.
  *
- * `update-notifier` is a good *fetcher* (throttled, daily, detached
+ * `update-notifier` is a good *fetcher* (throttled — hourly here — detached
  * background network check) but a poor *display* source: its `check()`
  * deletes the cached result the instant it's read, so the notice would show
- * at most once per 24-hour cycle. A user who blinks past one `fit` run would
- * never see it again until the next daily check repopulated the cache.
+ * at most once per fetch cycle. A user who blinks past one `fit` run would
+ * never see it again until the next hourly check repopulated the cache.
  *
  * This module owns the display state instead. The update notifier mirrors the
  * newest known published version here; {@link readKnownLatest} is consulted on
@@ -28,7 +28,7 @@ import { resolveUserPaths } from '@opensip-tools/core';
 
 /** On-disk shape of `~/.opensip-tools/update-state.json`. */
 interface UpdateState {
-  /** The newest published version the daily check has observed. */
+  /** The newest published version the hourly check has observed. */
   readonly latest: string;
 }
 
