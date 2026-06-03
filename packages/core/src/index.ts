@@ -4,6 +4,9 @@ export { createSignal } from './types/signal.js';
 // Cloud signal egress envelope (ADR-0008)
 export type { SignalBatch, RepoIdentity, BuildSignalBatchInput } from './types/signal-batch.js';
 export { buildSignalBatch, MAX_SIGNALS_PER_BATCH } from './types/signal-batch.js';
+// Cloud signal sink seam (ADR-0008)
+export type { SignalSink, EmitResult } from './signals/signal-sink.js';
+export { noopSignalSink } from './signals/signal-sink.js';
 
 // Languages — cross-language adapter API
 export * from './languages/index.js';
