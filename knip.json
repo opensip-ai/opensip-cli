@@ -1,6 +1,9 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "ignoreExportsUsedInFile": true,
+  "rules": {
+    "duplicates": "off"
+  },
   "workspaces": {
     ".": {
       "ignoreDependencies": [
@@ -23,6 +26,9 @@
       ]
     },
     "packages/dashboard": {
+      "ignore": [
+        "src/vendor/cytoscape-bundle.js"
+      ],
       "ignoreDependencies": [
         "cytoscape",
         "cytoscape-dagre"
