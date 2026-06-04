@@ -54,6 +54,8 @@ function makeCli(program: Command): ToolCliContext {
     },
     setExitCode: vi.fn(),
     emitJson: vi.fn(),
+    emitEnvelope: vi.fn(),
+    deliverSignals: vi.fn(() => Promise.resolve()),
   };
 }
 
@@ -170,6 +172,8 @@ describe('graphTool action handler — end-to-end via Commander', () => {
         },
         setExitCode,
         emitJson: vi.fn(),
+        emitEnvelope: vi.fn(),
+        deliverSignals: vi.fn(() => Promise.resolve()),
         registerLiveView: vi.fn(),
       };
       graphTool.register(cli);
@@ -229,6 +233,8 @@ describe('graphTool action handler — end-to-end via Commander', () => {
         },
         setExitCode: vi.fn(),
         emitJson: vi.fn(),
+        emitEnvelope: vi.fn(),
+        deliverSignals: vi.fn(() => Promise.resolve()),
         registerLiveView: vi.fn(),
       };
       graphTool.register(cli);

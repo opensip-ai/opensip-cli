@@ -84,6 +84,10 @@ function makeFakeContext(program: Command): {
     emitJson: (value: unknown) => {
       emitted.push(value);
     },
+    emitEnvelope: (value: unknown) => {
+      emitted.push(value);
+    },
+    deliverSignals: () => Promise.resolve(),
   };
   return { ctx, rendered, exitCodes, emitted };
 }

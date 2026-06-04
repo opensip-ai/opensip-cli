@@ -48,6 +48,8 @@ function makeStubContext(): ToolCliContext {
     },
     setExitCode: vi.fn(),
     emitJson: vi.fn(),
+    emitEnvelope: vi.fn(),
+    deliverSignals: vi.fn(() => Promise.resolve()),
     datastore: undefined,
   };
 }

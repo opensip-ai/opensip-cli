@@ -50,8 +50,11 @@ import {
   type ToolRegistry,
 } from '@opensip-tools/core';
 import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
+import { formatSignalJson } from '@opensip-tools/output';
 
-import type { CommandResult } from '@opensip-tools/contracts';
+import { deliverEnvelope } from './bootstrap/deliver-envelope.js';
+
+import type { CommandResult, SignalEnvelope } from '@opensip-tools/contracts';
 import type { Command } from 'commander';
 
 // ---------------------------------------------------------------------------
@@ -261,6 +264,11 @@ export function buildToolCliContext(
   const log = opts.logger ?? defaultLogger;
   let exitCode: number | undefined;
 
+  const setExitCode = (code: number): void => {
+    exitCode = code;
+    process.exitCode = code;
+  };
+
   const ctx: ToolCliContext = {
     program: opts.program,
     get scope(): RunScope {
@@ -277,12 +285,31 @@ export function buildToolCliContext(
     renderLive: opts.liveViews.render,
     maybeOpenDashboard: opts.maybeOpenDashboard,
     logger: log,
-    setExitCode: (code) => {
-      exitCode = code;
-      process.exitCode = code;
-    },
+    setExitCode,
     emitJson: (value) => {
       process.stdout.write(JSON.stringify(value, null, 2) + '\n');
+    },
+    // The single `--json` contract for the signal era (ADR-0011): the
+    // envelope IS the wire shape, formatted through the one shared
+    // `formatSignalJson` formatter (no per-tool re-stringification). The
+    // composition root narrows the contract-typed payload here, the one
+    // place that legitimately imports `@opensip-tools/output`.
+    emitEnvelope: (envelope) => {
+      process.stdout.write(formatSignalJson(envelope as SignalEnvelope) + '\n');
+    },
+    // The root owns all effectful egress (ADR-0011 / ADR-0008): cloud sync via
+    // the run's signal sink + `--report-to` SARIF upload. Tools call this once
+    // per run; `setExitCode` is threaded so a `--report-to` failure on an
+    // otherwise-passing run can claim exit 4.
+    deliverSignals: async (envelope, deliverOpts) => {
+      await deliverEnvelope(envelope as SignalEnvelope, {
+        cwd: deliverOpts.cwd,
+        reportTo: deliverOpts.reportTo,
+        apiKey: deliverOpts.apiKey,
+        runFailed: deliverOpts.runFailed,
+        setExitCode,
+        logger: log,
+      });
     },
   };
 

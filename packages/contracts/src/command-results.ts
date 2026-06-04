@@ -12,6 +12,7 @@
  */
 
 import type { StoredSession } from './session-types.js';
+import type { SignalEnvelope } from './signal-envelope.js';
 import type { CheckOutput, SummaryOptions, TableRow } from './types.js';
 
 /** Union type for all command results — App.tsx dispatches on result.type */
@@ -73,6 +74,14 @@ export interface FitDoneResult {
   summary: SummaryOptions;
   label: string;
   cwd: string;
+  /**
+   * The run's signal envelope (ADR-0011). ADDITIVE during the migration:
+   * when present, the composition root derives the terminal table and the
+   * `--json`/cloud/`--report-to` paths FROM this envelope and the legacy
+   * `rows`/`summary`/`findings` fields are ignored. When absent (tools not
+   * yet migrated — Phase 6), the root falls through to the legacy fields.
+   */
+  envelope?: SignalEnvelope;
   findings?: {
     checks: readonly CheckOutput[];
   };
@@ -118,6 +127,13 @@ export interface GraphDoneResult {
   readonly durationMs: number;
   /** Next-step hint strip (hints may bold substrings); empty to suppress (verbose mode). */
   readonly footerHints: readonly { readonly text: string; readonly bold?: readonly string[] }[];
+  /**
+   * The run's signal envelope (ADR-0011). ADDITIVE during the migration:
+   * when present, the composition root derives the terminal table and the
+   * machine-output paths FROM this envelope. When absent (graph not yet
+   * migrated — Phase 5), the root uses the legacy `reportLines`/`summary`.
+   */
+  readonly envelope?: SignalEnvelope;
 }
 
 /**
@@ -262,6 +278,13 @@ export interface SimDoneResult {
   durationMs: number;
   /** Whether the run should cause a non-zero exit code (any scenario failed). */
   shouldFail?: boolean;
+  /**
+   * The run's signal envelope (ADR-0011). ADDITIVE during the migration:
+   * when present, the composition root derives the terminal table and the
+   * machine-output paths FROM this envelope. When absent (sim not yet
+   * migrated — Phase 4), the root uses the legacy scenario summaries.
+   */
+  envelope?: SignalEnvelope;
 }
 
 /**

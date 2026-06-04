@@ -95,6 +95,8 @@ function makeCli(): CapturedCli {
     },
     setExitCode: (c: number) => { exitCodes.push(c); },
     emitJson: vi.fn(),
+    emitEnvelope: vi.fn(),
+    deliverSignals: vi.fn(() => Promise.resolve()),
   };
   return { cli, exitCodes, datastore, render };
 }
@@ -426,6 +428,8 @@ describe('executeGraph', () => {
       },
       setExitCode: (c: number) => { exitCodes.push(c); },
       emitJson: vi.fn(),
+      emitEnvelope: vi.fn(),
+      deliverSignals: vi.fn(() => Promise.resolve()),
       registerLiveView: vi.fn(),
     };
     await executeGraph({ cwd: dir, gateSave: true }, cli);

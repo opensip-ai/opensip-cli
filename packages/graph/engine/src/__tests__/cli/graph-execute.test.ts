@@ -87,6 +87,8 @@ function mockCli(datastore?: DataStore): MockCliBag {
     cli: {
       setExitCode,
       emitJson: vi.fn(),
+      emitEnvelope: vi.fn(),
+      deliverSignals: vi.fn(() => Promise.resolve()),
       render,
       scope: { datastore: () => datastore, languages: new LanguageRegistry() },
     } as unknown as ToolCliContext,
