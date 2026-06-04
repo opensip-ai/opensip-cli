@@ -22,8 +22,8 @@
 
 import { pathToFileURL } from 'node:url';
 
-import { EXIT_CODES } from '@opensip-tools/contracts';
-import { discoverPackagesByMarker, logger, registerRecipesFromMod } from '@opensip-tools/core';
+import { buildSignalEnvelope, EXIT_CODES } from '@opensip-tools/contracts';
+import { currentScope, discoverPackagesByMarker, logger, registerRecipesFromMod } from '@opensip-tools/core';
 
 import { currentScenarioRegistry } from '../framework/registry.js';
 import { loadAllSimPlugins } from '../plugins/loader.js';
@@ -38,8 +38,10 @@ import { SCENARIO_KINDS } from '../types/kind-types.js';
 
 import type { RunnableScenario } from '../framework/runnable-scenario.js';
 import type { SimPluginExports } from '../plugins/types.js';
+import type { SimulationScenarioResult } from '../recipes/service.js';
 import type { ScenarioKind } from '../types/kind-types.js';
-import type { ErrorResult, SimDoneResult, ToolOptions } from '@opensip-tools/contracts';
+import type { ErrorResult, SimDoneResult, ToolOptions, UnitResult } from '@opensip-tools/contracts';
+import type { Signal } from '@opensip-tools/core';
 
 const VALID_KINDS = new Set<ScenarioKind>(SCENARIO_KINDS);
 
@@ -277,6 +279,59 @@ export async function loadDiscoveredScenarioPackages(projectDir: string): Promis
 }
 
 /**
+ * A scenario passes the verdict when it emitted no `critical`/`high` signals
+ * AND its own pass/fail verdict held (assertions passed, no thrown error).
+ * Mirrors {@link buildSignalEnvelope}'s "no critical/high ⇒ passed" rule and
+ * folds in the scenario's assertion verdict (a scenario can fail assertions
+ * without emitting a critical/high signal).
+ */
+function scenarioPassed(scenario: SimulationScenarioResult, signals: readonly Signal[]): boolean {
+  const hasErrorSignal = signals.some(
+    (s) => s.severity === 'critical' || s.severity === 'high',
+  );
+  return scenario.passed && !hasErrorSignal;
+}
+
+/**
+ * Collapse the recipe's per-scenario results into the envelope's two
+ * orthogonal carriers (ADR-0011):
+ *
+ *   - `signals`: the flat run-wide `Signal[]`. Each scenario's signals are
+ *     remapped to `source: <scenarioId>` so the shared table formatter
+ *     (which groups by `signal.source`) attributes them to the right unit
+ *     row even if a scenario authored a divergent `source`.
+ *   - `units`: one {@link UnitResult} per scenario (`slug: scenarioId`,
+ *     `passed`, `durationMs`, `error?`) — the per-unit ran/errored/timing
+ *     facts a flat signal list cannot express.
+ *
+ * `SimulationMetrics` (load p50/p95/p99) stays a tool-specific artifact on the
+ * per-kind `result` and is NOT lifted into the envelope's core shape.
+ */
+function assembleEnvelopeInputs(
+  scenarios: readonly SimulationScenarioResult[],
+): { units: UnitResult[]; signals: Signal[] } {
+  const units: UnitResult[] = [];
+  const signals: Signal[] = [];
+
+  for (const scenario of scenarios) {
+    const scenarioSignals = scenario.result?.signals ?? [];
+    // Remap source → scenarioId so per-scenario grouping is exact (the
+    // unit slug IS the scenarioId, per the migrated-tool contract).
+    for (const signal of scenarioSignals) {
+      signals.push(signal.source === scenario.scenarioId ? signal : { ...signal, source: scenario.scenarioId });
+    }
+    units.push({
+      slug: scenario.scenarioId,
+      passed: scenarioPassed(scenario, scenarioSignals),
+      durationMs: scenario.durationMs,
+      ...(scenario.error === undefined ? {} : { error: scenario.error }),
+    });
+  }
+
+  return { units, signals };
+}
+
+/**
  * Run sim and return a SimDoneResult (or an ErrorResult when the
  * recipe is missing). The caller decides what to print or render.
  */
@@ -337,24 +392,28 @@ export async function executeSim(
     durationMs: recipeResult.durationMs,
   });
 
+  // ADR-0011: surface every scenario's Signal[] into the one run envelope.
+  // `runId`/`createdAt` come off the live scope so cloud egress correlates
+  // with the same run id the logger stamps; `currentScope()` is bound for the
+  // whole dynamic extent of the action body (enterScope in the pre-action hook).
+  const { units, signals } = assembleEnvelopeInputs(scenarios);
+  const envelope = buildSignalEnvelope({
+    tool: 'sim',
+    recipe: recipeName,
+    runId: currentScope()?.runId ?? '',
+    createdAt: new Date().toISOString(),
+    units,
+    signals,
+  });
+
   return {
     result: {
       type: 'sim-done',
       recipeName,
       cwd: args.cwd,
-      totalScenarios: scenarios.length,
-      passedScenarios: passed,
-      failedScenarios: failed,
-      scenarios: scenarios.map((s) => ({
-        scenarioId: s.scenarioId,
-        scenarioName: s.scenarioName,
-        kind: s.kind,
-        passed: s.passed,
-        durationMs: s.durationMs,
-        ...(s.error ? { error: s.error } : {}),
-      })),
       durationMs: recipeResult.durationMs,
       shouldFail: failed > 0,
+      envelope,
     },
   };
 }
