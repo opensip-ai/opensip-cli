@@ -52,7 +52,7 @@ import {
 import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
 import { formatSignalJson } from '@opensip-tools/output';
 
-import { deliverEnvelope } from './bootstrap/deliver-envelope.js';
+import { deliverEnvelope, writeEnvelopeSarif } from './bootstrap/deliver-envelope.js';
 
 import type { CommandResult, SignalEnvelope } from '@opensip-tools/contracts';
 import type { Command } from 'commander';
@@ -311,6 +311,10 @@ export function buildToolCliContext(
         logger: log,
       });
     },
+    // Root-owned SARIF-file sink (ADR-0011): the one place that formats an
+    // envelope to SARIF and writes it to disk, so tools that export SARIF to a
+    // file (e.g. `graph sarif-export`) never import `@opensip-tools/output`.
+    writeSarif: (envelope, path) => writeEnvelopeSarif(envelope as SignalEnvelope, path),
   };
 
   return {

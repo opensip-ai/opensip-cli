@@ -75,6 +75,7 @@ function makeMockCli(datastore?: DataStore): MockCliBag {
     emitJson: vi.fn(),
     emitEnvelope: vi.fn(),
     deliverSignals: vi.fn(() => Promise.resolve()),
+    writeSarif: vi.fn(() => Promise.resolve()),
     datastore,
     scope: { datastore: () => datastore, languages: new LanguageRegistry() },
   } as unknown as ToolCliContext;

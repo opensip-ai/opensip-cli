@@ -56,6 +56,7 @@ function makeCli(program: Command): ToolCliContext {
     emitJson: vi.fn(),
     emitEnvelope: vi.fn(),
     deliverSignals: vi.fn(() => Promise.resolve()),
+    writeSarif: vi.fn(() => Promise.resolve()),
   };
 }
 
@@ -172,8 +173,12 @@ describe('graphTool action handler — end-to-end via Commander', () => {
         },
         setExitCode,
         emitJson: vi.fn(),
-        emitEnvelope: vi.fn(),
+        // Mirror the composition root's `emitEnvelope` seam (JSON to stdout).
+        emitEnvelope: vi.fn((envelope: unknown) => {
+          process.stdout.write(`${JSON.stringify(envelope)}\n`);
+        }),
         deliverSignals: vi.fn(() => Promise.resolve()),
+        writeSarif: vi.fn(() => Promise.resolve()),
         registerLiveView: vi.fn(),
       };
       graphTool.register(cli);
@@ -184,8 +189,9 @@ describe('graphTool action handler — end-to-end via Commander', () => {
       } finally {
         stdoutSpy.mockRestore();
       }
-      const parsed = JSON.parse(stdout) as { tool: string };
+      const parsed = JSON.parse(stdout) as { tool: string; schemaVersion: number };
       expect(parsed.tool).toBe('graph');
+      expect(parsed.schemaVersion).toBe(2);
       expect(setExitCode).toHaveBeenCalledWith(0);
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -235,6 +241,7 @@ describe('graphTool action handler — end-to-end via Commander', () => {
         emitJson: vi.fn(),
         emitEnvelope: vi.fn(),
         deliverSignals: vi.fn(() => Promise.resolve()),
+        writeSarif: vi.fn(() => Promise.resolve()),
         registerLiveView: vi.fn(),
       };
       graphTool.register(cli);

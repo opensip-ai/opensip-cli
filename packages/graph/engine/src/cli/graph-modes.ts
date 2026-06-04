@@ -8,8 +8,11 @@
  * on flag validation, run-scope resolution, and result dispatch. Owns:
  *
  *  - `runGateMode` (--gate-save / --gate-compare)
- *  - `runReportMode` (--report-to)
  *  - `runCatalogJsonMode` (--catalog-output)
+ *
+ * `--report-to` (the old `runReportMode`) moved to the composition root in
+ * ADR-0011 Phase 5: graph returns its `SignalEnvelope` and the root's
+ * `deliverSignals` owns cloud egress + the `--report-to` SARIF upload.
  */
 
 import { randomUUID } from 'node:crypto';
@@ -22,13 +25,10 @@ import {
   logger,
   ToolError,
 } from '@opensip-tools/core';
-import { reportToCloud } from '@opensip-tools/output';
 
 import { compareToBaseline, fingerprintSignal, saveBaseline } from '../gate.js';
 import { GraphBaselineRepo } from '../persistence/baseline-repo.js';
 import { renderCatalogJson } from '../render/catalog-json.js';
-import { buildCliOutput } from '../render/json.js';
-import { renderSarif } from '../render/sarif.js';
 
 import type { GraphCommandOptions } from './graph-options.js';
 import type { Catalog, Indexes } from '../types.js';
@@ -89,36 +89,6 @@ export async function runGateMode(
       ],
     });
   }
-}
-
-export async function runReportMode(
-  opts: GraphCommandOptions,
-  signals: readonly Signal[],
-  cli: ToolCliContext,
-): Promise<void> {
-  const cliOutput = buildCliOutput(signals, 'graph');
-  const url = opts.reportTo!;
-  // toolVersion tracks @opensip-tools/graph package.json's version. Manually
-  // synced — bump alongside any package.json version change. A future
-  // build-time constant via tsc plugin or import-assertion would remove this
-  // drift risk; not warranted for a single call site.
-  const sarif = renderSarif(signals, {
-    tool: 'opensip-tools-graph',
-    toolVersion: '2.0.0',
-  });
-  const result = await reportToCloud(cliOutput, url, opts.apiKey);
-  if (!result.success) {
-    cli.setExitCode(EXIT_CODES.REPORT_FAILED);
-    process.stderr.write(`Graph report failed: ${result.error ?? 'unknown error'}\n`);
-    return;
-  }
-  cli.setExitCode(EXIT_CODES.SUCCESS);
-  await cli.render({
-    type: 'graph-status',
-    lines: [
-      `Graph report sent to ${url} (${String(signals.length)} signals, ${sarif.length} bytes).`,
-    ],
-  });
 }
 
 /**

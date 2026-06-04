@@ -58,7 +58,8 @@ const EXPECTED: Record<string, string[]> = {
     '--quiet', '--recipe', '--recipes', '--report-to', '--tags', '--verbose',
   ],
   graph: [
-    '--changed-file', '--concurrency', '--cwd', '--debug',
+    // ADR-0011 (Phase 5): graph gained --api-key for --report-to cloud egress.
+    '--api-key', '--changed-file', '--concurrency', '--cwd', '--debug',
     '--gate-compare', '--gate-save', '--json', '--language', '--mode',
     '--no-cache', '--out', '--recipe', '--report-to', '--resolution', '--run-id',
     '--verbose', '--workspace',

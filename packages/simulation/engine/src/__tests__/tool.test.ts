@@ -88,6 +88,7 @@ function makeFakeContext(program: Command): {
       emitted.push(value);
     },
     deliverSignals: () => Promise.resolve(),
+    writeSarif: () => Promise.resolve(),
   };
   return { ctx, rendered, exitCodes, emitted };
 }

@@ -222,6 +222,22 @@ export interface ToolCliContext {
       readonly runFailed?: boolean;
     },
   ) => Promise<void>;
+  /**
+   * Write a tool-run **signal envelope** to a SARIF v2.1.0 file (ADR-0011).
+   * The composition root formats the envelope through the single shared
+   * `formatSignalSarif` formatter and writes the bytes to `path` (creating
+   * parent directories as needed). This is the root-owned SARIF-**file** sink
+   * — distinct from `--report-to` (a network sink) and the cloud sync — so a
+   * tool that exports SARIF to a file (e.g. `graph sarif-export`, the
+   * cross-repo `EngineSubprocessPort.runSarifExport` contract) does it through
+   * the root instead of importing `@opensip-tools/output` itself. Awaitable so
+   * the write completes before the short-lived CLI process exits.
+   *
+   * `envelope` is the `SignalEnvelope` from `@opensip-tools/contracts`, typed
+   * `unknown` here for the same layer reason as `render`/`emitEnvelope`/
+   * `deliverSignals`.
+   */
+  readonly writeSarif: (envelope: unknown, path: string) => Promise<void>;
 }
 
 /**

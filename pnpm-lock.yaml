@@ -519,9 +519,6 @@ importers:
       '@opensip-tools/datastore':
         specifier: workspace:*
         version: link:../../datastore
-      '@opensip-tools/output':
-        specifier: workspace:*
-        version: link:../../output
       '@opensip-tools/session-store':
         specifier: workspace:*
         version: link:../../session-store
@@ -544,6 +541,9 @@ importers:
         specifier: ^19.2.6
         version: 19.2.6
     devDependencies:
+      '@opensip-tools/output':
+        specifier: workspace:*
+        version: link:../../output
       '@types/node':
         specifier: ^22.19.19
         version: 22.19.19

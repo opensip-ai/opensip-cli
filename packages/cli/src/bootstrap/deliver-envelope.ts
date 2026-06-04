@@ -27,6 +27,9 @@
  * Phase 3 it is additive and dormant for un-migrated tools.
  */
 
+import { mkdir, writeFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
+
 import { EXIT_CODES } from '@opensip-tools/contracts';
 import { buildSignalBatch, currentScope, logger as defaultLogger } from '@opensip-tools/core';
 import {
@@ -173,4 +176,19 @@ export async function deliverEnvelope(
   }
 
   return { cloudAccepted, reportSuccess, reportUrl: opts.reportTo };
+}
+
+/**
+ * Root-owned SARIF-**file** sink (ADR-0011): format the envelope to SARIF via
+ * the single shared `formatSignalSarif` formatter and write the bytes to
+ * `path`, creating parent directories as needed. This is the seam behind
+ * `ToolCliContext.writeSarif` — a tool that exports SARIF to a file (e.g.
+ * `graph sarif-export`) routes through it instead of importing
+ * `@opensip-tools/output` itself. The formatter is pure; this function owns
+ * the effect (fs write).
+ */
+export async function writeEnvelopeSarif(envelope: SignalEnvelope, path: string): Promise<void> {
+  const sarif = formatSignalSarif(envelope);
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, sarif);
 }

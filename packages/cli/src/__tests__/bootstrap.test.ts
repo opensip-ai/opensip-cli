@@ -50,6 +50,7 @@ function makeStubContext(): ToolCliContext {
     emitJson: vi.fn(),
     emitEnvelope: vi.fn(),
     deliverSignals: vi.fn(() => Promise.resolve()),
+    writeSarif: vi.fn(() => Promise.resolve()),
     datastore: undefined,
   };
 }

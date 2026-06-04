@@ -5,15 +5,17 @@
  * `tool.test.ts` / `tool-register.test.ts`.
  */
 
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { ConfigurationError } from '@opensip-tools/core';
+import { formatSignalSarif } from '@opensip-tools/output';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { runSarifExportMode } from '../../cli/sarif-export.js';
 
+import type { SignalEnvelope } from '@opensip-tools/contracts';
 import type { Signal, ToolCliContext } from '@opensip-tools/core';
 
 function makeSignal(over: Partial<Signal> = {}): Signal {
@@ -35,9 +37,18 @@ function makeSignal(over: Partial<Signal> = {}): Signal {
   };
 }
 
+// The root-owned SARIF-file sink (`cli.writeSarif`): formats the envelope
+// through the single shared `formatSignalSarif` and writes it — exactly what
+// the CLI composition root does. Driving the real formatter here keeps the
+// subcommand's byte-output coverage end-to-end through the migrated seam.
 function makeCli(): { cli: ToolCliContext; setExitCode: ReturnType<typeof vi.fn> } {
   const setExitCode = vi.fn();
-  const cli = { setExitCode } as unknown as ToolCliContext;
+  // eslint-disable-next-line @typescript-eslint/require-await -- async to match the seam signature
+  const writeSarif = vi.fn(async (envelope: unknown, path: string) => {
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, formatSignalSarif(envelope as SignalEnvelope));
+  });
+  const cli = { setExitCode, writeSarif } as unknown as ToolCliContext;
   return { cli, setExitCode };
 }
 
@@ -52,11 +63,11 @@ afterEach(() => {
 });
 
 describe('runSarifExportMode', () => {
-  it('writes OpenSIP-convention SARIF v2.1.0 to the output path and sets exit 0', () => {
+  it('writes OpenSIP-convention SARIF v2.1.0 to the output path and sets exit 0', async () => {
     const outPath = join(workDir, 'out.sarif');
     const { cli, setExitCode } = makeCli();
 
-    runSarifExportMode(
+    await runSarifExportMode(
       { outputSarif: outPath, tenantId: 't1', repoId: 'r1', runId: 'run-1' },
       [makeSignal()],
       cli,
@@ -73,11 +84,11 @@ describe('runSarifExportMode', () => {
     expect(setExitCode).toHaveBeenCalledWith(0);
   });
 
-  it('creates the parent directory when the output path is nested', () => {
+  it('creates the parent directory when the output path is nested', async () => {
     const outPath = join(workDir, 'nested', 'deep', 'out.sarif');
     const { cli } = makeCli();
 
-    runSarifExportMode(
+    await runSarifExportMode(
       { outputSarif: outPath, tenantId: 't1', repoId: 'r1' },
       [makeSignal()],
       cli,
@@ -86,11 +97,11 @@ describe('runSarifExportMode', () => {
     expect(existsSync(outPath)).toBe(true);
   });
 
-  it('writes a valid SARIF document with zero results for an empty signal set', () => {
+  it('writes a valid SARIF document with zero results for an empty signal set', async () => {
     const outPath = join(workDir, 'empty.sarif');
     const { cli, setExitCode } = makeCli();
 
-    runSarifExportMode(
+    await runSarifExportMode(
       { outputSarif: outPath, tenantId: 't1', repoId: 'r1' },
       [],
       cli,
@@ -105,24 +116,24 @@ describe('runSarifExportMode', () => {
     expect(setExitCode).toHaveBeenCalledWith(0);
   });
 
-  it('throws ConfigurationError (and writes nothing) when --tenant-id is missing', () => {
+  it('rejects with ConfigurationError (and writes nothing) when --tenant-id is missing', async () => {
     const outPath = join(workDir, 'no-tenant.sarif');
     const { cli, setExitCode } = makeCli();
 
-    expect(() =>
+    await expect(
       runSarifExportMode({ outputSarif: outPath, repoId: 'r1' }, [makeSignal()], cli),
-    ).toThrow(ConfigurationError);
+    ).rejects.toThrow(ConfigurationError);
     expect(existsSync(outPath)).toBe(false);
     expect(setExitCode).not.toHaveBeenCalled();
   });
 
-  it('throws ConfigurationError when --repo-id is missing', () => {
+  it('rejects with ConfigurationError when --repo-id is missing', async () => {
     const outPath = join(workDir, 'no-repo.sarif');
     const { cli } = makeCli();
 
-    expect(() =>
+    await expect(
       runSarifExportMode({ outputSarif: outPath, tenantId: 't1' }, [makeSignal()], cli),
-    ).toThrow(ConfigurationError);
+    ).rejects.toThrow(ConfigurationError);
     expect(existsSync(outPath)).toBe(false);
   });
 });
