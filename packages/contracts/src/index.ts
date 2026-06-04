@@ -37,6 +37,16 @@ export type {
   SummaryOptions,
 } from './types.js';
 
+// Signal envelope — the universal tool-run output currency (ADR-0011).
+// The future `CommandResult` payload every tool returns; replaces the
+// fitness-shaped `CliOutput`/`CheckOutput`/`FindingOutput` husk. Additive
+// for now (Phase 0); consumed by formatters (Phase 2) and tools (Phases 4–6).
+export type {
+  SignalEnvelope,
+  RunVerdict,
+  UnitResult,
+} from './signal-envelope.js';
+
 // Command result types (the CommandResult union + per-command variants)
 export type {
   CommandResult,
