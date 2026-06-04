@@ -1,0 +1,24 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`formatSignalTableRows > derives one row per unit (snapshot) 1`] = `
+[
+  {
+    "duration": "12ms",
+    "durationMs": 12,
+    "error": undefined,
+    "errors": 1,
+    "status": "FAIL",
+    "unit": "graph:orphan-subtree",
+    "warnings": 0,
+  },
+  {
+    "duration": "7ms",
+    "durationMs": 7,
+    "error": undefined,
+    "errors": 0,
+    "status": "PASS",
+    "unit": "graph:large-function",
+    "warnings": 1,
+  },
+]
+`;
