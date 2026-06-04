@@ -41,7 +41,6 @@ export type {
   PluginLoadResult,
   LangPluginExports,
   PluginExports,
-  CheckDisplayEntry,
   PackageEntryResolution,
   ToolPackageDiscoveryOptions,
   DiscoveredToolPackage,

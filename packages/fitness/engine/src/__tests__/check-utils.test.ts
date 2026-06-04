@@ -14,7 +14,7 @@ import { createPathMatcher } from '../check-utils/path-matching.js'
 import { isCommentLine } from '../check-utils/source-analysis.js'
 import { isTestFile } from '../check-utils/test-helpers.js'
 
-import type { CheckDisplayEntry } from '@opensip-tools/core'
+import type { CheckDisplayEntry } from '../plugins/types.js'
 
 describe('getCheckIcon', () => {
   const map: Record<string, CheckDisplayEntry> = {

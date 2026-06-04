@@ -15,8 +15,7 @@ import { collectCheckObjects } from '@opensip-tools/fitness'
 import * as allChecks from './checks/index.js'
 import { CHECK_DISPLAY } from './display/index.js'
 
-import type { CheckDisplayEntry } from '@opensip-tools/core'
-import type { Check } from '@opensip-tools/fitness'
+import type { CheckDisplayEntry, Check  } from '@opensip-tools/fitness'
 
 /** All cross-language checks, exported as a flat array per plugin contract */
 export const checks: readonly Check[] = collectCheckObjects(allChecks)

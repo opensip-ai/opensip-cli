@@ -70,7 +70,7 @@ export type { SignalersConfig } from './signalers/types.js';
 // Plugin loader (fitness owns the dispatcher; lang plugins also flow through
 // it because lang adapter loading currently shares the same orchestration).
 export { loadPlugin, loadAllPlugins } from './plugins/loader.js';
-export type { FitPluginExports } from './plugins/types.js';
+export type { FitPluginExports, CheckDisplayEntry } from './plugins/types.js';
 
 // Check-package discovery (fitness-specific — scans @opensip-tools/checks-* packages).
 export {

@@ -15,16 +15,6 @@ import type { LanguageAdapter } from '../languages/adapter.js'
 // PLUGIN EXPORTS CONTRACT
 // =============================================================================
 
-/**
- * Display entry for a fitness check: [icon, displayName].
- *
- * Check packages can contribute display metadata for their own checks by
- * exporting a `checkDisplay` map. The CLI merges these from every loaded
- * package; later registrations win on key collision (last package loaded
- * has final say). Slugs without an entry fall back to kebab-to-title-case.
- */
-export type CheckDisplayEntry = readonly [icon: string, displayName: string]
-
 /** What a language plugin package/file exports */
 export interface LangPluginExports {
   readonly adapters?: readonly LanguageAdapter[]

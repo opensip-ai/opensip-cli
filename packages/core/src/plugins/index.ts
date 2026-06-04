@@ -74,5 +74,4 @@ export type {
   PluginLoadResult,
   LangPluginExports,
   PluginExports,
-  CheckDisplayEntry,
 } from './types.js'

@@ -16,7 +16,7 @@
 
 import { logger } from '@opensip-tools/core';
 
-import type { CheckDisplayEntry } from '@opensip-tools/core';
+import type { CheckDisplayEntry } from '../../plugins/types.js';
 
 /**
  * Merged display map contributed by every loaded check package via the

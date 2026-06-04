@@ -7,7 +7,7 @@
  * the graph tool's duplicated-function-body rule.
  */
 
-import type { CheckDisplayEntry } from '@opensip-tools/core'
+import type { CheckDisplayEntry } from '../plugins/types.js'
 
 /** Default fallback icon when a slug isn't in the display map. */
 const DEFAULT_ICON = '🔍'
