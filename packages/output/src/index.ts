@@ -9,6 +9,7 @@
 // --- format/ — pure (envelope) => string formatters (no IO) ---
 export type { Formatter } from './format/types.js';
 export { formatSignalJson } from './format/signal-json.js';
+export { formatSignalSarif, buildOpenSipSarif, type SarifDriver } from './format/signal-sarif.js';
 
 // --- legacy CliOutput-based SARIF (transitional; retired in Phase 7) ---
 export { buildSarifLog, chunkSarifRuns, reportToCloud, type ReportResult } from './sarif.js';

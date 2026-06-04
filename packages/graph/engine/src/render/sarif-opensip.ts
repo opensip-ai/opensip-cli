@@ -1,92 +1,24 @@
 /**
- * @fileoverview Graph-native SARIF v2.1.0 emitter with OpenSIP rule-ID convention.
+ * @fileoverview Graph SARIF adapter — TEMPORARY (removed in Phase 5).
  *
- * Replaces the prior fitness-shim wrapper (`@opensip-tools/fitness`'s
- * `buildSarifLog`) that funneled findings through the `CliOutput` shape.
- * This emitter walks `Signal[]` directly and produces SARIF results
- * whose `ruleId` follows the `graph.<rule-family>.<rule-id>` convention
- * required by OpenSIP's `SarifProvider` for downstream signal ingestion.
+ * The canonical signal → SARIF v2.1.0 emitter was promoted (moved) into
+ * `@opensip-tools/output` as `buildOpenSipSarif` / `formatSignalSarif`
+ * (ADR-0011, Phase 2 Task 2.4). This file keeps the graph-side
+ * `renderSarifOpenSip(signals, context)` signature so existing call sites
+ * (`cli/sarif-export.ts`, tests) keep working unchanged; Phase 5 rewires
+ * graph to emit the envelope and route through `formatSignalSarif`, after
+ * which this adapter (and `render/sarif.ts`) are deleted.
  *
- * Per Phase 0 audit Q1 (no consumer demand for multi-location data on
- * the OpenSIP side), every finding emits a SINGLE canonical physical
- * location. `relatedLocations` is deliberately not populated even for
- * blast-radius rules whose `Signal.metadata` may carry transitive-
- * context data — that data lives on the engine side for future
- * analysis but is intentionally dropped at the SARIF boundary.
- *
- * Phase 2 Task 2.2 per DEC-498.
+ * Graph-vocabulary stays in graph: this adapter applies the
+ * `engine-slug → OpenSIP-rule-ID` mapping (`mapEngineSlugToOpenSipRuleId`)
+ * before delegating. The shared output layer is tool-agnostic and emits
+ * each signal's `ruleId` verbatim.
  */
+import { buildOpenSipSarif } from '@opensip-tools/output';
 
 import { mapEngineSlugToOpenSipRuleId } from './rule-id-mapping.js';
 
-import type { Signal, SignalSeverity } from '@opensip-tools/core';
-
-/** SARIF v2.1.0 level — `'none' | 'note' | 'warning' | 'error'`. */
-type SarifLevel = 'none' | 'note' | 'warning' | 'error';
-
-/**
- * Map `Signal.severity` → SARIF `level`. Exhaustive over
- * `SignalSeverity` (`'critical' | 'high' | 'medium' | 'low'`).
- * `critical` and `high` both surface as `error` to match GitHub Code
- * Scanning's PR-blocking threshold.
- */
-function mapSeverityToSarifLevel(severity: SignalSeverity): SarifLevel {
-  switch (severity) {
-    case 'critical': {
-      return 'error';
-    }
-    case 'high': {
-      return 'error';
-    }
-    case 'medium': {
-      return 'warning';
-    }
-    case 'low': {
-      return 'note';
-    }
-  }
-}
-
-/** Minimal SARIF v2.1.0 shape — only the fields this emitter populates. */
-interface SarifLog {
-  readonly $schema: string;
-  readonly version: '2.1.0';
-  readonly runs: readonly SarifRun[];
-}
-
-interface SarifRun {
-  readonly tool: {
-    readonly driver: {
-      readonly name: string;
-      readonly version: string;
-      readonly informationUri?: string;
-      readonly rules: readonly SarifReportingDescriptor[];
-    };
-  };
-  readonly results: readonly SarifResult[];
-}
-
-interface SarifReportingDescriptor {
-  readonly id: string;
-}
-
-interface SarifResult {
-  readonly ruleId: string;
-  readonly level: SarifLevel;
-  readonly message: { readonly text: string };
-  readonly locations: readonly SarifLocation[];
-}
-
-interface SarifLocation {
-  readonly physicalLocation: {
-    readonly artifactLocation: { readonly uri: string };
-    readonly region?: {
-      readonly startLine?: number;
-      readonly startColumn?: number;
-      readonly endLine?: number;
-    };
-  };
-}
+import type { Signal } from '@opensip-tools/core';
 
 /** Required context — caller (`cli/graph.ts`) provides tool identity. */
 interface RenderSarifContext {
@@ -97,69 +29,23 @@ interface RenderSarifContext {
 }
 
 /**
- * Build a SARIF v2.1.0 log from engine `Signal[]` output.
+ * Build a SARIF v2.1.0 log from engine `Signal[]`, applying the OpenSIP
+ * rule-ID convention, then delegating to the canonical shared emitter.
  *
- * Every result's `ruleId` is the OpenSIP-convention slug from
- * `mapEngineSlugToOpenSipRuleId`. Every result has exactly one
- * `physicalLocation` (the primary site); transitive context that the
- * engine may carry in `Signal.metadata` is intentionally dropped per
- * Phase 0 audit Q1.
- *
- * @throws {ValidationError} when any signal's `ruleId` is not a known
- *   engine slug — propagates from `mapEngineSlugToOpenSipRuleId`.
+ * @throws {ValidationError} when any signal's `ruleId` is not a known engine
+ *   slug — propagates from `mapEngineSlugToOpenSipRuleId`.
  */
 export function renderSarifOpenSip(
   signals: readonly Signal[],
   context: RenderSarifContext,
 ): string {
-  const results: SarifResult[] = [];
-  const ruleIds = new Set<string>();
+  const mapped = signals.map((signal) => ({
+    ...signal,
+    ruleId: mapEngineSlugToOpenSipRuleId(signal.ruleId),
+  }));
 
-  for (const signal of signals) {
-    const mappedRuleId = mapEngineSlugToOpenSipRuleId(signal.ruleId);
-    ruleIds.add(mappedRuleId);
-
-    const filePath = signal.code?.file ?? signal.filePath;
-    const startLine = signal.code?.line ?? signal.line;
-    const startColumn = signal.code?.column ?? signal.column;
-
-    const physicalLocation: SarifLocation['physicalLocation'] = {
-      artifactLocation: { uri: filePath },
-      ...(startLine !== undefined || startColumn !== undefined
-        ? {
-            region: {
-              ...(startLine !== undefined && { startLine }),
-              ...(startColumn !== undefined && { startColumn }),
-            },
-          }
-        : {}),
-    };
-
-    results.push({
-      ruleId: mappedRuleId,
-      level: mapSeverityToSarifLevel(signal.severity),
-      message: { text: signal.message },
-      locations: [{ physicalLocation }],
-    });
-  }
-
-  const sarif: SarifLog = {
-    $schema: 'https://json.schemastore.org/sarif-2.1.0.json',
-    version: '2.1.0',
-    runs: [
-      {
-        tool: {
-          driver: {
-            name: context.tool,
-            version: context.toolVersion,
-            informationUri: 'https://github.com/opensip-ai/opensip-tools',
-            rules: [...ruleIds].sort().map((id) => ({ id })),
-          },
-        },
-        results,
-      },
-    ],
-  };
-
-  return JSON.stringify(sarif, null, 2);
+  return buildOpenSipSarif(mapped, {
+    name: context.tool,
+    version: context.toolVersion,
+  });
 }
