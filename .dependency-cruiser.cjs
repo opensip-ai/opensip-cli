@@ -229,6 +229,79 @@ module.exports = {
     },
 
     // -------------------------------------------------------------------
+    // ADR-0011 — tool engines emit, never render/deliver.
+    //
+    // A tool run produces a SignalEnvelope and RETURNS it; the CLI
+    // composition root maps flags → (formatter × sink) and owns rendering +
+    // cloud/file egress. So a tool ENGINE must never reach into the output
+    // package's pure formatters (json/sarif/table) or its effectful sinks
+    // (file/http/cloud). These rules prevent the tool→output edge from
+    // ever reappearing after Phases 5–6 removed it.
+    //
+    // THREE rules, because there are two import shapes:
+    //   * a DEEP subpath import (`.../output/src/format/signal-sarif.js`)
+    //     resolves straight into format/ or sink/ — caught by the two granular
+    //     rules below;
+    //   * a BARREL import (`@opensip-tools/output`) resolves to
+    //     `packages/output/src/index.ts` (NOT format/ or sink/), so the
+    //     granular rules can't see it — `tool-engines-no-output-barrel`
+    //     closes that (realistic) regression vector. After Phases 5–6 a tool
+    //     engine has ZERO production `@opensip-tools/output` imports, so a
+    //     blanket barrel ban is exactly right.
+    //
+    // Production source only. Test files are excluded globally (options.exclude
+    // drops `/__tests__/` + `*.test.*` before rules run), so graph's relocated
+    // golden test that imports `formatSignalSarif` from @opensip-tools/output
+    // does NOT trip these rules. The `pathNot` on `from` is belt-and-braces.
+    // -------------------------------------------------------------------
+    {
+      name: 'tool-engines-no-output-formatters',
+      severity: 'error',
+      comment:
+        'Tool engines (fitness/graph/simulation) must not import an ' +
+        '@opensip-tools/output formatter. Tools emit a SignalEnvelope and ' +
+        'return it; the CLI composition root chooses the formatter and ' +
+        'renders. (ADR-0011.)',
+      from: {
+        path: '^packages/(fitness/engine|graph/engine|simulation/engine)/src/',
+        pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`],
+      },
+      to: { path: '^packages/output/src/format/' },
+    },
+    {
+      name: 'tool-engines-no-output-sinks',
+      severity: 'error',
+      comment:
+        'Tool engines (fitness/graph/simulation) must not import an ' +
+        '@opensip-tools/output sink. Cloud/file egress is resolved ONLY at ' +
+        'the composition root (pre-action-hook for the sink; the render seam ' +
+        'for --report-to). Tools never deliver. (ADR-0011.)',
+      from: {
+        path: '^packages/(fitness/engine|graph/engine|simulation/engine)/src/',
+        pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`],
+      },
+      to: { path: '^packages/output/src/sink/' },
+    },
+    {
+      name: 'tool-engines-no-output-barrel',
+      severity: 'error',
+      comment:
+        'Tool engines (fitness/graph/simulation) must not import ' +
+        '@opensip-tools/output at all for emission. The barrel resolves to ' +
+        'output/src/index.ts (re-exporting both formatters and sinks), so the ' +
+        'granular format/sink rules cannot see it; this catches that path. ' +
+        'After Phases 5–6 a tool engine has zero production output imports — ' +
+        'tools return a SignalEnvelope; the composition root renders/delivers. ' +
+        '(ADR-0011.) Test files are excluded globally, so graph’s golden ' +
+        'SARIF test may import formatSignalSarif from the barrel.',
+      from: {
+        path: '^packages/(fitness/engine|graph/engine|simulation/engine)/src/',
+        pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`],
+      },
+      to: { path: String.raw`^packages/output/src/index\.ts$` },
+    },
+
+    // -------------------------------------------------------------------
     // Layer enforcement — contracts depends only on core
     // -------------------------------------------------------------------
     {
