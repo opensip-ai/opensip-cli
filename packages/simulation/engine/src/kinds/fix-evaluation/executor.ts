@@ -7,11 +7,12 @@
  * scoring predicates) lands in Phase 7.5 when the autoresearch corpus
  * loader migrates from YAML to `defineFixEvaluationScenario` calls.
  *
- * The runner returns a typed-but-empty result envelope until then; calling
- * `run()` produces a `passed: false` outcome with `predicateMatched: false`
- * and an explicit "harness not wired" reason on every leaf. This keeps the
- * type contract round-trippable while making it explicit that the Phase 7.5
- * implementation is required to get real verdicts.
+ * Fix-evaluation is a DEFERRED feature. The runner returns a typed result
+ * envelope flagged `outcome.harnessAvailable: false` — `passed: false`,
+ * `predicateMatched: false`, and a "harness not wired" reason on every leaf —
+ * so a run is never mistaken for a genuine evaluation verdict. The shape stays
+ * round-trippable for the Phase 7.5 harness; until then, callers (and the
+ * renderer) surface it as explicitly unavailable rather than as a real fail.
  */
 
 import { ScenarioAbortedError } from '../../framework/execution/execution-engine.js'
@@ -94,6 +95,7 @@ export function createFixEvaluationScenarioRunner(
           durationMs: Date.now() - startTime,
           signals: Object.freeze([]),
           outcome: Object.freeze({
+            harnessAvailable: false,
             predicateMatched: false,
             verdict,
             agentRun: Object.freeze({

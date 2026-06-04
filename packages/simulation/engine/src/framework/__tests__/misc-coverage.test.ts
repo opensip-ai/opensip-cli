@@ -183,6 +183,8 @@ describe('renderScenarioResultView — exhaustiveness guard', () => {
       durationMs: 12,
       signals: [],
       outcome: {
+        // The real-harness path: a genuine matched verdict (harness available).
+        harnessAvailable: true,
         predicateMatched: true,
         verdict: undefined,
         agentRun: { filesModified: [], testsModified: [], agentReportedSuccess: true },
@@ -193,6 +195,27 @@ describe('renderScenarioResultView — exhaustiveness guard', () => {
     expect(view.outcomeLabel).toBe('predicate matched');
     expect(view.assertionsPassed).toBe(1);
     expect(view.assertionsFailed).toBe(0);
+  });
+
+  it('renders the "predicate did not match" branch for an available fix-evaluation result', () => {
+    const result: ScenarioExecutorResult = {
+      kind: 'fix-evaluation',
+      scenarioId: 'fe-2',
+      passed: false,
+      durationMs: 9,
+      signals: [],
+      outcome: {
+        // Real-harness path with a non-matching verdict (harness available).
+        harnessAvailable: true,
+        predicateMatched: false,
+        verdict: undefined,
+        agentRun: { filesModified: [], testsModified: [], agentReportedSuccess: false },
+        matchedExpectedOutcome: false,
+      },
+    };
+    const view = renderScenarioResultView(result);
+    expect(view.outcomeLabel).toContain('predicate did not match');
+    expect(view.assertionsFailed).toBe(1);
   });
 });
 

@@ -434,9 +434,11 @@ describe('fix-evaluation executor — abort and leaf verdicts', () => {
     expect(result.kind).toBe('fix-evaluation');
     if (result.kind === 'fix-evaluation') {
       expect(result.outcome.verdict).toBeUndefined();
-      // also exercises renderScenarioResultView's "predicate did not match" branch:
+      // Deferred feature: the placeholder is flagged unavailable and renders as
+      // explicitly unavailable, never as a real (negative) verdict.
+      expect(result.outcome.harnessAvailable).toBe(false);
       const view = renderScenarioResultView(result);
-      expect(view.outcomeLabel).toContain('predicate did not match');
+      expect(view.outcomeLabel).toContain('unavailable');
     }
   });
 

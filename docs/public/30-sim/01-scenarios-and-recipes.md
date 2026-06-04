@@ -42,7 +42,7 @@ opensip-tools sim recognizes four kinds today, each with its own author-facing e
 | **load** | `defineLoadScenario` | Personas + ramp + sustain phase. Asserts SLOs (latency, throughput, error rate). |
 | **chaos** | `defineChaosScenario` | Base load + injected failures (kill, latency, partition). Asserts recovery. |
 | **invariant** | `defineInvariantScenario` | Seed state → act → assert a property holds. Property-based testing shape. |
-| **fix-evaluation** | `defineFixEvaluationScenario` | Replay a corpus of signals against a fix-generating agent → score with predicates. |
+| **fix-evaluation** _(deferred — not yet available)_ | `defineFixEvaluationScenario` | Replay a corpus of signals against a fix-generating agent → score with predicates. |
 
 Each kind has its own `define.ts`, `executor.ts`, and `result.ts` under [`packages/simulation/engine/src/kinds/<kind>/`](../../../packages/simulation/engine/src/kinds/). They share a common runtime contract (`RunnableScenario`, `ScenarioExecutorResult`) so the engine can execute any kind through the same dispatcher.
 
@@ -161,7 +161,9 @@ export default defineFixEvaluationScenario({
 });
 ```
 
-The fix-evaluation kind replays a corpus of past signals against a fix-generating agent and scores the agent's output with predicates. This is the shape that integrates with OpenSIP's autoresearch / continuous-learning loop, and it's the most experimental — its API surface and the corpus-fetch contract are still evolving.
+The fix-evaluation kind replays a corpus of past signals against a fix-generating agent and scores the agent's output with predicates. This is the shape that integrates with OpenSIP's autoresearch / continuous-learning loop.
+
+> **Deferred — not yet available.** The type surface, `defineFixEvaluationScenario`, and the predicate model ship so the shape is stable for the future harness, but the evaluation harness itself (corpus replay, agent invocation, predicate scoring) is **not wired**. Defining and running a fix-evaluation scenario today produces an explicit *"unavailable — fix-evaluation harness deferred"* result — a placeholder, never a real verdict (`outcome.harnessAvailable: false`). Don't rely on it for real fix scoring yet.
 
 ---
 

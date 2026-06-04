@@ -81,6 +81,10 @@ describe('defineFixEvaluationScenario', () => {
     const result = await scenario.run(new AbortController().signal)
     expect(result.kind).toBe('fix-evaluation')
     if (result.kind === 'fix-evaluation') {
+      // Deferred-feature guard: the placeholder flags itself unavailable and
+      // never reports a pass, so a run is never mistaken for a real verdict.
+      expect(result.outcome.harnessAvailable).toBe(false)
+      expect(result.passed).toBe(false)
       expect(result.outcome.predicateMatched).toBe(false)
       // verdict tree mirrors input structure
       expect(result.outcome.verdict?.type).toBe('composite')

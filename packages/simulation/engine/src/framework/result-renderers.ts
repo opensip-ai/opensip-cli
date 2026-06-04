@@ -91,6 +91,21 @@ export function renderScenarioResultView(
     }
 
     case 'fix-evaluation': {
+      // Deferred feature: when the harness isn't wired, label the run as
+      // explicitly unavailable rather than as a failed evaluation, so it reads
+      // honestly instead of looking like a real (negative) verdict.
+      if (!result.outcome.harnessAvailable) {
+        return {
+          kind: 'fix-evaluation',
+          scenarioId: result.scenarioId,
+          passed: result.passed,
+          durationMs: result.durationMs,
+          metrics: createEmptyMetrics(),
+          assertionsPassed: 0,
+          assertionsFailed: 0,
+          outcomeLabel: 'unavailable — fix-evaluation harness deferred',
+        }
+      }
       return {
         kind: 'fix-evaluation',
         scenarioId: result.scenarioId,

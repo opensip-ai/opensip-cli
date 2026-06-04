@@ -42,6 +42,14 @@ export interface AgentRunSummary {
 
 /** Outcome payload for a fix-evaluation-kind scenario. */
 export interface FixEvaluationOutcome {
+  /**
+   * Whether the evaluation harness (corpus replay, agent invocation, predicate
+   * scoring) actually ran. `false` means this is the deferred-feature
+   * placeholder: no agent ran, no real verdict was produced, and `passed` /
+   * `predicateMatched` are not real evaluation results. Surfaced so a run is
+   * never mistaken for a genuine fix-evaluation verdict.
+   */
+  readonly harnessAvailable: boolean
   /** Whether the predicate composition evaluated to true. */
   readonly predicateMatched: boolean
   /** Verdict tree for the composition (mirrors the input predicate structure). */

@@ -113,6 +113,8 @@ The result type is `InvariantScenarioExecutorResult` ([`packages/simulation/engi
 
 [`packages/simulation/engine/src/kinds/fix-evaluation/executor.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.1/packages/simulation/engine/src/kinds/fix-evaluation/executor.ts)
 
+> **Deferred — not yet available.** The harness below is the intended design; it is **not wired** today. Running a fix-evaluation scenario returns an explicit *"unavailable — fix-evaluation harness deferred"* placeholder (`outcome.harnessAvailable: false`), never a real verdict. The steps below describe the planned behavior.
+
 The most complex and the most experimental:
 
 1. Fetch the corpus — a sample of past signals matching `corpus.signalRuleId`, drawn from cloud storage or a local fixture.
