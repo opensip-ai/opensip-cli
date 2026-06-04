@@ -458,9 +458,6 @@ importers:
       '@opensip-tools/datastore':
         specifier: workspace:*
         version: link:../../datastore
-      '@opensip-tools/output':
-        specifier: workspace:*
-        version: link:../../output
       '@opensip-tools/session-store':
         specifier: workspace:*
         version: link:../../session-store

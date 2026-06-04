@@ -25,6 +25,7 @@
  */
 
 import { buildSignalEnvelope } from '@opensip-tools/contracts';
+import { isErrorSignal } from '@opensip-tools/core';
 
 import { mapEngineSlugToOpenSipRuleId } from '../render/rule-id-mapping.js';
 
@@ -40,11 +41,6 @@ export interface BuildGraphEnvelopeInput {
   /** Whole-run wall-clock; attributed to each unit row when known (else 0). */
   readonly durationMs?: number;
   readonly resolutionMode?: 'exact' | 'fast';
-}
-
-/** A signal that emitted at `critical`/`high` severity is an "error" rung. */
-function isErrorSignal(signal: Signal): boolean {
-  return signal.severity === 'critical' || signal.severity === 'high';
 }
 
 /**

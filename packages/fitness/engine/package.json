@@ -34,7 +34,6 @@
     "@opensip-tools/contracts": "workspace:*",
     "@opensip-tools/core": "workspace:*",
     "@opensip-tools/datastore": "workspace:*",
-    "@opensip-tools/output": "workspace:*",
     "@opensip-tools/session-store": "workspace:*",
     "@opentelemetry/api": "^1.9.1",
     "commander": "^14.0.3",
