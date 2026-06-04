@@ -25,8 +25,8 @@ npm install -g opensip-tools
 ## Documentation
 
 - 📚 Project docs: https://opensip.ai/docs/opensip-tools/
-- 🧭 Package catalog (what every package does): https://github.com/opensip-ai/opensip-tools/blob/v2.6.1/docs/public/70-reference/02-package-catalog.md
-- 📦 Source: https://github.com/opensip-ai/opensip-tools/tree/v2.6.1/packages/graph/graph-java
+- 🧭 Package catalog (what every package does): https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/docs/public/70-reference/02-package-catalog.md
+- 📦 Source: https://github.com/opensip-ai/opensip-tools/tree/v2.6.2/packages/graph/graph-java
 
 ## License
 
