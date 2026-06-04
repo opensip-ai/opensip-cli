@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { describe, it, expect, vi } from 'vitest';
 
-import { checkEntitlement } from '../entitlement.js';
+import { checkEntitlement } from '../sink/entitlement.js';
 
 const dir = (): Promise<string> => mkdtemp(join(tmpdir(), 'ent-'));
 const ok = (entitled: boolean): Response => Response.json({ entitled }, { status: 200 });

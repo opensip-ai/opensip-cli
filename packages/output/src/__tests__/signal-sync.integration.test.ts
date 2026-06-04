@@ -12,8 +12,8 @@ import { join } from 'node:path';
 
 import { describe, it, expect, vi } from 'vitest';
 
-import { emitRunSignals } from '../emit-run-signals.js';
-import { resolveSignalSink } from '../resolve-signal-sink.js';
+import { emitRunSignals } from '../sink/emit-run-signals.js';
+import { resolveSignalSink } from '../sink/resolve-signal-sink.js';
 
 import type { CliOutput } from '@opensip-tools/contracts';
 

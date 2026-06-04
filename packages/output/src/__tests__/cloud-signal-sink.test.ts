@@ -1,7 +1,7 @@
 import { buildSignalBatch, createSignal } from '@opensip-tools/core';
 import { describe, it, expect, vi } from 'vitest';
 
-import { createCloudSignalSink } from '../cloud-signal-sink.js';
+import { createCloudSignalSink } from '../sink/cloud-signal-sink.js';
 
 import type { Signal } from '@opensip-tools/core';
 

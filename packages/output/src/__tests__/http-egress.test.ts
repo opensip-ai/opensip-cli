@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 
-import { postChunked, type PostChunkedArgs } from '../http-egress.js';
+import { postChunked, type PostChunkedArgs } from '../sink/http-egress.js';
 
 /** A deterministic clock: `sleep` records delays and advances `now`. */
 function clock(start = 0) {

@@ -1,6 +1,6 @@
 import { generatePrefixedId } from '@opensip-tools/core';
 
-import { postChunked } from './http-egress.js';
+import { postChunked } from './sink/http-egress.js';
 
 import type { SarifResult, SarifLocation } from './sarif-types.js';
 import type { CliOutput } from '@opensip-tools/contracts';

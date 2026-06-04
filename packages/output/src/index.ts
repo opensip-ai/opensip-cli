@@ -6,25 +6,31 @@
  * It depends on core + contracts only.
  */
 
+// --- format/ — pure (envelope) => string formatters (no IO) ---
+export type { Formatter } from './format/types.js';
+
+// --- legacy CliOutput-based SARIF (transitional; retired in Phase 7) ---
 export { buildSarifLog, chunkSarifRuns, reportToCloud, type ReportResult } from './sarif.js';
 export type { SarifResult, SarifLocation } from './sarif-types.js';
-export { collectSignalBatch, type CollectSignalBatchInput } from './collect-batch.js';
+
+// --- sink/ — effectful delivery (file/cloud egress) ---
+export { collectSignalBatch, type CollectSignalBatchInput } from './sink/collect-batch.js';
 export {
   checkEntitlement,
   invalidateEntitlement,
   type EntitlementResult,
   type EntitlementSource,
   type CheckEntitlementInput,
-} from './entitlement.js';
-export { createCloudSignalSink, type CloudSignalSinkOptions } from './cloud-signal-sink.js';
-export { postChunked, type EgressResult, type RetryPolicy, type PostChunkedArgs } from './http-egress.js';
+} from './sink/entitlement.js';
+export { createCloudSignalSink, type CloudSignalSinkOptions } from './sink/cloud-signal-sink.js';
+export { postChunked, type EgressResult, type RetryPolicy, type PostChunkedArgs } from './sink/http-egress.js';
 export {
   resolveSignalSink,
   DEFAULT_CLOUD_ENDPOINT,
   type ResolveSignalSinkInput,
-} from './resolve-signal-sink.js';
+} from './sink/resolve-signal-sink.js';
 export {
   emitRunSignals,
   resolveRepoIdentity,
   type EmitRunSignalsInput,
-} from './emit-run-signals.js';
+} from './sink/emit-run-signals.js';

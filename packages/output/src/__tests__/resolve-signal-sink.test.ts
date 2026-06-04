@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { buildSignalBatch, createSignal, noopSignalSink } from '@opensip-tools/core';
 import { describe, it, expect, vi } from 'vitest';
 
-import { resolveSignalSink } from '../resolve-signal-sink.js';
+import { resolveSignalSink } from '../sink/resolve-signal-sink.js';
 
 import type { Signal } from '@opensip-tools/core';
 

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { emitRunSignals } from '../emit-run-signals.js';
+import { emitRunSignals } from '../sink/emit-run-signals.js';
 
 import type { CliOutput } from '@opensip-tools/contracts';
 import type { EmitResult, SignalBatch, SignalSink } from '@opensip-tools/core';
