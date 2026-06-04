@@ -12,7 +12,11 @@
  * prompt+UX wrapper around those primitives. Audit 2026-05-23 M3.
  */
 
+import { join } from 'node:path';
 import { createInterface } from 'node:readline';
+
+import { resolveUserPaths } from '@opensip-tools/core';
+import { checkEntitlement, DEFAULT_CLOUD_ENDPOINT } from '@opensip-tools/reporting';
 
 import {
   GLOBAL_CONFIG_PATH,
@@ -46,6 +50,31 @@ function maskKey(key: string): string {
   return `${key.slice(0, 4)}...${key.slice(-4)}`;
 }
 
+/**
+ * Test a freshly-entered key against the cloud entitlement endpoint — the
+ * configure flow's documented "test the key" step (audit P2-2). Prints the
+ * outcome; best-effort, never throws (checkEntitlement returns `entitled:
+ * false` on an invalid key, an unreachable endpoint, or a non-entitled plan).
+ * The key is saved regardless, so offline setup still works. Returns whether
+ * the key verified as entitled.
+ */
+export async function verifyConfiguredKey(key: string): Promise<boolean> {
+  process.stdout.write('Verifying key with OpenSIP Cloud...\n');
+  const { entitled } = await checkEntitlement({
+    apiKey: key,
+    endpoint: DEFAULT_CLOUD_ENDPOINT,
+    now: Date.now(),
+    cacheDir: join(resolveUserPaths().userHomeDir, 'cache'),
+  });
+  process.stdout.write(
+    entitled
+      ? '✓ API key verified — entitled to OpenSIP Cloud storage.\n'
+      : '⚠ Could not verify the key (invalid, not entitled, or cloud unreachable).\n' +
+          '  Saved anyway; cloud sync will retry on your next run.\n',
+  );
+  return entitled;
+}
+
 // ---------------------------------------------------------------------------
 // executeConfigure
 // ---------------------------------------------------------------------------
@@ -72,6 +101,9 @@ export async function executeConfigure(): Promise<ConfigureDoneResult> {
 
   existing.apiKey = key;
   writeGlobalConfig(existing);
+
+  // Test the key against the cloud entitlement endpoint (documented step 4).
+  await verifyConfiguredKey(key);
 
   return {
     type: 'configure-done',

@@ -2,9 +2,19 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { checkEntitlement } from '@opensip-tools/reporting';
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
+
 
 import type * as NodeOs from 'node:os';
+
+// Mock the cloud entitlement check so the configure flow's key-verification
+// step (audit P2-2) never hits the network in tests.
+vi.mock('@opensip-tools/reporting', () => ({
+  checkEntitlement: vi.fn(),
+  DEFAULT_CLOUD_ENDPOINT: 'https://cloud.example',
+}));
+const checkEntitlementMock = checkEntitlement as unknown as MockInstance;
 
 let HOME: string;
 let nextAnswer: string;
@@ -30,6 +40,8 @@ async function loadModule() {
 }
 
 beforeEach(() => {
+  checkEntitlementMock.mockReset();
+  checkEntitlementMock.mockResolvedValue({ entitled: false });
   HOME = mkdtempSync(join(tmpdir(), 'opensip-configure-test-'));
   writes = [];
   const origWrite = process.stdout.write.bind(process.stdout);
@@ -87,5 +99,34 @@ describe('executeConfigure', () => {
     expect(result.action).toBe('saved');
     // Keys <= 8 chars round-trip verbatim.
     expect(result.maskedKey).toBe('short');
+  });
+
+  it('tests the key against the cloud entitlement endpoint after saving (P2-2)', async () => {
+    nextAnswer = 'sk-saved-and-tested-1234';
+    const { executeConfigure } = await loadModule();
+    await executeConfigure();
+    expect(checkEntitlementMock).toHaveBeenCalledTimes(1);
+    expect(checkEntitlementMock).toHaveBeenCalledWith(
+      expect.objectContaining({ apiKey: 'sk-saved-and-tested-1234' }),
+    );
+  });
+});
+
+describe('verifyConfiguredKey (audit P2-2)', () => {
+  it('reports an entitled key as verified, without leaking the raw key', async () => {
+    checkEntitlementMock.mockResolvedValue({ entitled: true });
+    const { verifyConfiguredKey } = await loadModule();
+    const ok = await verifyConfiguredKey('sk-secret-9999');
+    expect(ok).toBe(true);
+    expect(writes.some((s) => s.includes('verified'))).toBe(true);
+    expect(writes.join('')).not.toContain('sk-secret-9999');
+  });
+
+  it('warns (and returns false) when the key is invalid / not entitled / unreachable', async () => {
+    checkEntitlementMock.mockResolvedValue({ entitled: false });
+    const { verifyConfiguredKey } = await loadModule();
+    const ok = await verifyConfiguredKey('sk-bad');
+    expect(ok).toBe(false);
+    expect(writes.some((s) => s.includes('Could not verify'))).toBe(true);
   });
 });
