@@ -5,10 +5,10 @@
  * needs to store them (tool, repo, run id, timestamp, counts). This is the
  * wire contract opensip-tools owns; the parent `opensip` repo ingests it.
  * `runId` is the idempotency root — the transport derives a per-chunk
- * `Idempotency-Key` of `${runId}:${ordinal}` (see @opensip-tools/reporting).
+ * `Idempotency-Key` of `${runId}:${ordinal}` (see @opensip-tools/output).
  *
  * `buildSignalBatch` is a pure factory (no IO beyond a truncation log). The
- * findings→Signal mapping that feeds it lives in @opensip-tools/reporting,
+ * findings→Signal mapping that feeds it lives in @opensip-tools/output,
  * because it consumes the `FindingOutput`/`CliOutput` contract types that sit
  * above core in the layer graph.
  */

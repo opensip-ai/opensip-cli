@@ -6,7 +6,7 @@
  * `--catalog-output` run. These tests spy the emit seam per mode.
  */
 
-import { emitRunSignals } from '@opensip-tools/reporting';
+import { emitRunSignals } from '@opensip-tools/output';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
 
@@ -22,7 +22,7 @@ vi.mock('../graph-modes.js', () => ({
   runReportMode: vi.fn().mockResolvedValue(undefined),
   runCatalogJsonMode: vi.fn(),
 }));
-vi.mock('@opensip-tools/reporting', () => ({ emitRunSignals: vi.fn().mockResolvedValue(undefined) }));
+vi.mock('@opensip-tools/output', () => ({ emitRunSignals: vi.fn().mockResolvedValue(undefined) }));
 
 const emitMock = emitRunSignals as unknown as MockInstance;
 

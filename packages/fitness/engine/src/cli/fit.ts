@@ -24,7 +24,7 @@
  */
 
 import { currentScope, logger, noopSignalSink } from '@opensip-tools/core';
-import { emitRunSignals } from '@opensip-tools/reporting';
+import { emitRunSignals } from '@opensip-tools/output';
 
 import { defaultRegistry } from '../framework/registry.js';
 import { buildScopeBasedFileMap } from '../framework/scope-resolver.js';

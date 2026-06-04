@@ -1,10 +1,9 @@
 /**
- * @opensip-tools/reporting — SARIF report generation + cloud upload.
+ * @opensip-tools/output — the tool-run output layer.
  *
- * Pure data-in/JSON-out plus one network call (`reportToCloud`). Consumes
- * the `CliOutput` type from @opensip-tools/contracts. Extracted from
- * contracts so that package carries types only (audit 2026-05-29,
- * contracts split).
+ * Renamed from `@opensip-tools/reporting` (Phase 2, ADR-0011): the package no
+ * longer just reports to cloud — it owns all machine formatting + delivery.
+ * It depends on core + contracts only.
  */
 
 export { buildSarifLog, chunkSarifRuns, reportToCloud, type ReportResult } from './sarif.js';

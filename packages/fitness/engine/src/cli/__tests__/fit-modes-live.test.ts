@@ -7,7 +7,7 @@
  */
 
 import { EXIT_CODES } from '@opensip-tools/contracts';
-import { reportToCloud } from '@opensip-tools/reporting';
+import { reportToCloud } from '@opensip-tools/output';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
 
@@ -17,7 +17,7 @@ import { executeFit } from '../fit.js';
 import type { ToolCliContext } from '@opensip-tools/core';
 
 vi.mock('../fit.js', () => ({ executeFit: vi.fn() }));
-vi.mock('@opensip-tools/reporting', () => ({ reportToCloud: vi.fn() }));
+vi.mock('@opensip-tools/output', () => ({ reportToCloud: vi.fn() }));
 
 const executeFitMock = executeFit as unknown as MockInstance;
 const reportToCloudMock = reportToCloud as unknown as MockInstance;

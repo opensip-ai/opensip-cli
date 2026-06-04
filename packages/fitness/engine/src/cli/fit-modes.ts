@@ -19,7 +19,7 @@ import {
   type CliOutput,
   type FitOptions,
 } from '@opensip-tools/contracts';
-import { reportToCloud, type ReportResult } from '@opensip-tools/reporting';
+import { reportToCloud, type ReportResult } from '@opensip-tools/output';
 
 import {
   saveBaseline,

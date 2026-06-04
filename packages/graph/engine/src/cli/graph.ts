@@ -34,7 +34,7 @@ import {
   ToolError,
   ValidationError,
 } from '@opensip-tools/core';
-import { emitRunSignals } from '@opensip-tools/reporting';
+import { emitRunSignals } from '@opensip-tools/output';
 import { SessionRepo } from '@opensip-tools/session-store';
 
 import { pickAdapter } from '../lang-adapter/registry.js';

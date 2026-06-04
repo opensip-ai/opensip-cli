@@ -20,11 +20,11 @@
 import { createHash } from 'node:crypto';
 
 import { ConfigurationError, SystemError, logger } from '@opensip-tools/core';
-import { buildSarifLog } from '@opensip-tools/reporting';
+import { buildSarifLog } from '@opensip-tools/output';
 
 import type { FitBaselineRepo } from './persistence/baseline-repo.js';
 import type { CliOutput } from '@opensip-tools/contracts';
-import type { SarifResult } from '@opensip-tools/reporting';
+import type { SarifResult } from '@opensip-tools/output';
 
 // ---------------------------------------------------------------------------
 // Types

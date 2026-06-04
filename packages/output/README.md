@@ -2,9 +2,9 @@
      Change the package's "description" (or the generator template) and run
      `pnpm docs:readmes`. CI enforces sync via `pnpm docs:readmes:check`. -->
 
-# @opensip-tools/reporting
+# @opensip-tools/output
 
-> Reporting for OpenSIP Tools — SARIF build and cloud report, extracted from contracts
+> Output layer for OpenSIP Tools — pure signal-envelope formatters (json/sarif/table) and effectful sinks (file/cloud)
 
 This is an **internal library** of the opensip-tools toolkit. It is published so the CLI and tools can depend on it; most users will not install it directly.
 
@@ -13,7 +13,7 @@ Part of [**opensip-tools**](https://github.com/opensip-ai/opensip-tools) — an 
 ## Install
 
 ```bash
-npm install @opensip-tools/reporting
+npm install @opensip-tools/output
 ```
 
 Most users just install the CLI, which bundles the first-party tools:
@@ -26,7 +26,7 @@ npm install -g opensip-tools
 
 - 📚 Project docs: https://opensip.ai/docs/opensip-tools/
 - 🧭 Package catalog (what every package does): https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/docs/public/70-reference/02-package-catalog.md
-- 📦 Source: https://github.com/opensip-ai/opensip-tools/tree/v2.6.2/packages/reporting
+- 📦 Source: https://github.com/opensip-ai/opensip-tools/tree/v2.6.2/packages/output
 
 ## License
 

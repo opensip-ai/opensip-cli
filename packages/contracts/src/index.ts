@@ -117,9 +117,10 @@ export type {
   GraphBlastScore,
 } from './graph-catalog.js';
 
-// SARIF + cloud reporting moved to @opensip-tools/reporting (audit
-// 2026-05-29, contracts split). The build/cloud-report runtime + its
-// types live there; contracts no longer re-exports them.
+// SARIF + cloud reporting moved to @opensip-tools/output (audit
+// 2026-05-29, contracts split; package renamed reporting→output in Phase 2,
+// ADR-0011). The formatter/sink runtime + its types live there; contracts
+// no longer re-exports them.
 
 // `commander` is referenced here purely as a type — `import type` keeps
 // the runtime bundle (`dist/index.js`) free of any commander require.

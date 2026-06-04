@@ -8,7 +8,7 @@
       "@opensip-tools/datastore": ["packages/datastore/src/index.ts"],
       "@opensip-tools/contracts": ["packages/contracts/src/index.ts"],
       "@opensip-tools/session-store": ["packages/session-store/src/index.ts"],
-      "@opensip-tools/reporting": ["packages/reporting/src/index.ts"],
+      "@opensip-tools/output": ["packages/output/src/index.ts"],
       "@opensip-tools/cli-ui": ["packages/cli-ui/src/index.ts"],
       "opensip-tools": ["packages/cli/src/index.ts"],
       "@opensip-tools/dashboard": ["packages/dashboard/src/index.ts"],

@@ -39,7 +39,7 @@ import {
   resolveUserPaths,
   type ProjectContext,
 } from '@opensip-tools/core';
-import { resolveSignalSink } from '@opensip-tools/reporting';
+import { resolveSignalSink } from '@opensip-tools/output';
 
 import {
   buildDatastoreThunk,

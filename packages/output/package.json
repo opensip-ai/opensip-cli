@@ -1,13 +1,13 @@
 {
-  "name": "@opensip-tools/reporting",
+  "name": "@opensip-tools/output",
   "version": "2.6.2",
   "license": "MIT",
-  "description": "Reporting for OpenSIP Tools — SARIF build and cloud report, extracted from contracts",
-  "keywords": ["opensip-tools", "static-analysis", "code-quality", "sarif", "reporting"],
+  "description": "Output layer for OpenSIP Tools — pure signal-envelope formatters (json/sarif/table) and effectful sinks (file/cloud)",
+  "keywords": ["opensip-tools", "static-analysis", "code-quality", "sarif", "output"],
   "repository": {
     "type": "git",
     "url": "https://github.com/opensip-ai/opensip-tools.git",
-    "directory": "packages/reporting"
+    "directory": "packages/output"
   },
   "homepage": "https://github.com/opensip-ai/opensip-tools",
   "bugs": {

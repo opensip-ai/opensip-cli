@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { checkEntitlement } from '@opensip-tools/reporting';
+import { checkEntitlement } from '@opensip-tools/output';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
 
@@ -10,7 +10,7 @@ import type * as NodeOs from 'node:os';
 
 // Mock the cloud entitlement check so the configure flow's key-verification
 // step (audit P2-2) never hits the network in tests.
-vi.mock('@opensip-tools/reporting', () => ({
+vi.mock('@opensip-tools/output', () => ({
   checkEntitlement: vi.fn(),
   DEFAULT_CLOUD_ENDPOINT: 'https://cloud.example',
 }));
