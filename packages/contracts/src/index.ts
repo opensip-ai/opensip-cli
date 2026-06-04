@@ -28,19 +28,9 @@ export type {
   ToolOptions,
 } from './types.js';
 
-// Output types (the structured JSON shape and its parts)
-export type {
-  CliOutput,
-  CheckOutput,
-  FindingOutput,
-  TableRow,
-  SummaryOptions,
-} from './types.js';
-
-// Signal envelope — the universal tool-run output currency (ADR-0011).
-// The future `CommandResult` payload every tool returns; replaces the
-// fitness-shaped `CliOutput`/`CheckOutput`/`FindingOutput` husk. Additive
-// for now (Phase 0); consumed by formatters (Phase 2) and tools (Phases 4–6).
+// Signal envelope — the universal tool-run output currency (ADR-0011). The
+// `CommandResult` payload every tool returns; it replaced the fitness-shaped
+// `CliOutput`/`CheckOutput`/`FindingOutput` husk, which was retired in Phase 7.
 export type {
   SignalEnvelope,
   RunVerdict,
@@ -75,8 +65,8 @@ export type {
 } from './command-results.js';
 
 // Canonical pass-rate (`score`) computation — shared by every tool that
-// builds a CliOutput so the dashboard "PASS RATE" stays consistent across
-// fit/graph and cannot drift back into per-tool formulas.
+// builds a signal envelope so the dashboard "PASS RATE" stays consistent
+// across fit/graph and cannot drift back into per-tool formulas.
 export { passRate } from './score.js';
 
 // Exit codes + error suggestion helper + typed-error → exit-code mapping

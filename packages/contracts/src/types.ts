@@ -1,5 +1,3 @@
-import type { ToolShortId } from '@opensip-tools/core';
-
 // =============================================================================
 // CLI OPTIONS TYPES
 // =============================================================================
@@ -73,80 +71,4 @@ export interface ToolOptions {
   reportTo?: string;
   /** `--api-key <key>` — auth for `--report-to`. */
   apiKey?: string;
-}
-
-// =============================================================================
-// OUTPUT TYPES — the structured JSON shape and its parts. Shared by the
-// CommandResult variants in `command-results.ts`.
-// =============================================================================
-
-/** Structured JSON output format */
-export interface CliOutput {
-  readonly version: '1.0';
-  readonly tool: ToolShortId;
-  readonly timestamp: string;
-  readonly recipe?: string;
-  readonly score: number;
-  readonly passed: boolean;
-  readonly summary: { total: number; passed: number; failed: number; errors: number; warnings: number };
-  readonly checks: readonly CheckOutput[];
-  readonly durationMs: number;
-  /**
-   * Graph-only: the call-graph resolution tier this run used. `'fast'`
-   * means edges are approximate (syntactic, no type checker); absent or
-   * `'exact'` means semantic. Surfaced so machine consumers of `graph
-   * --json` can branch on edge fidelity. Other tools never set it.
-   */
-  readonly resolutionMode?: 'exact' | 'fast';
-}
-
-export interface CheckOutput {
-  readonly checkSlug: string;
-  readonly passed: boolean;
-  readonly violationCount?: number;
-  readonly findings: readonly FindingOutput[];
-  readonly durationMs: number;
-  /**
-   * Optional check-level error string. Populated when the check itself
-   * threw (load error, runtime exception, timeout). Distinct from
-   * findings, which describe code-level violations the check detected.
-   */
-  readonly error?: string;
-}
-
-export interface FindingOutput {
-  readonly ruleId: string;
-  readonly message: string;
-  readonly severity: 'error' | 'warning';
-  readonly filePath?: string;
-  readonly line?: number;
-  readonly column?: number;
-  readonly suggestion?: string;
-  /**
-   * Optional structured metadata carried from the producing rule's
-   * signal. Used by the dashboard to render per-rule metric columns
-   * (e.g. graph's `bodyLines`, `blast`, `paramCount`, `sccSize`).
-   * Additive and backward-compatible: fitness findings omit it.
-   */
-  readonly metadata?: Readonly<Record<string, string | number | boolean>>;
-}
-
-export interface TableRow {
-  check: string;
-  status: 'PASS' | 'FAIL' | 'TIMEOUT';
-  errors: number;
-  warnings: number;
-  validated: string;
-  ignored: number;
-  duration: string;
-  durationMs: number;
-}
-
-export interface SummaryOptions {
-  passed: number;
-  failed: number;
-  totalErrors: number;
-  totalWarnings: number;
-  totalIgnored: number;
-  durationMs: number;
 }

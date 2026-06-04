@@ -1,54 +1,54 @@
-// Test that --json output matches the documented schema
+// Test that the machine-output contract — the signal envelope (ADR-0011) —
+// keeps its documented shape. CliOutput (version '1.0') was retired in Phase 7;
+// the envelope (schemaVersion 2) is the single output currency every tool emits.
 import { describe, it, expect } from 'vitest';
 
-// Import the CliOutput type
-import type { CliOutput } from '@opensip-tools/contracts';
+import type { SignalEnvelope } from '@opensip-tools/contracts';
 
 describe('JSON output contract', () => {
-  it('CliOutput has required fields', () => {
+  it('SignalEnvelope has required fields', () => {
     // Type-level test — if this compiles, the contract is valid
-    const output: CliOutput = {
-      version: '1.0',
+    const envelope: SignalEnvelope = {
+      schemaVersion: 2,
       tool: 'fit',
-      timestamp: '2026-01-01T00:00:00.000Z',
-      score: 100,
-      passed: true,
-      summary: { total: 1, passed: 1, failed: 0, errors: 0, warnings: 0 },
-      checks: [{
-        checkSlug: 'test',
+      runId: 'run-1',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      verdict: {
+        score: 100,
         passed: true,
-        findings: [],
-        durationMs: 100,
-      }],
-      durationMs: 100,
+        summary: { total: 1, passed: 1, failed: 0, errors: 0, warnings: 0 },
+      },
+      units: [{ slug: 'test', passed: true, durationMs: 100 }],
+      signals: [],
     };
-    expect(output.version).toBe('1.0');
-    expect(output.tool).toBe('fit');
+    expect(envelope.schemaVersion).toBe(2);
+    expect(envelope.tool).toBe('fit');
   });
 
-  it('version is 1.0', () => {
-    // This is the contract — if we change this, it's a breaking change
-    // Type-level assertion: CliOutput.version must be the literal '1.0'
-    const output: CliOutput = {
-      version: '1.0', tool: 'fit', timestamp: '', score: 0, passed: true,
-      summary: { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 },
-      checks: [], durationMs: 0,
+  it('schemaVersion is 2', () => {
+    // This is the contract — bumping it is a breaking change.
+    // Type-level assertion: SignalEnvelope.schemaVersion must be the literal 2.
+    const envelope: SignalEnvelope = {
+      schemaVersion: 2,
+      tool: 'fit',
+      runId: '',
+      createdAt: '',
+      verdict: { score: 0, passed: true, summary: { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 } },
+      units: [],
+      signals: [],
     };
-    expect(output.version).toBe('1.0');
+    expect(envelope.schemaVersion).toBe(2);
   });
 
   it('tool is fit or sim', () => {
-    const fitOutput: CliOutput = {
-      version: '1.0', tool: 'fit', timestamp: '', score: 0, passed: true,
-      summary: { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 },
-      checks: [], durationMs: 0,
+    const verdict = { score: 0, passed: true, summary: { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 } };
+    const fitEnvelope: SignalEnvelope = {
+      schemaVersion: 2, tool: 'fit', runId: '', createdAt: '', verdict, units: [], signals: [],
     };
-    const simOutput: CliOutput = {
-      version: '1.0', tool: 'sim', timestamp: '', score: 0, passed: true,
-      summary: { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 },
-      checks: [], durationMs: 0,
+    const simEnvelope: SignalEnvelope = {
+      schemaVersion: 2, tool: 'sim', runId: '', createdAt: '', verdict, units: [], signals: [],
     };
-    expect(fitOutput.tool).toBe('fit');
-    expect(simOutput.tool).toBe('sim');
+    expect(fitEnvelope.tool).toBe('fit');
+    expect(simEnvelope.tool).toBe('sim');
   });
 });

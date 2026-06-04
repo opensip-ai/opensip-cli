@@ -14,11 +14,9 @@ export { executeUninstall } from './commands/uninstall.js';
 export { decideOpen, launchBrowser } from './open-dashboard.js';
 export { maybeNotify } from './update-notifier.js';
 export type {
-  CliOutput,
-  CheckOutput,
-  FindingOutput,
-  TableRow,
-  SummaryOptions,
+  SignalEnvelope,
+  RunVerdict,
+  UnitResult,
   CommandResult,
   FitOptions,
   InitOptions,
