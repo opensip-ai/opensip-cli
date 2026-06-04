@@ -176,6 +176,7 @@ function register(cli: ToolCliContext): void {
     .option('--gate-save', 'Save current Signal set as the gate baseline', false)
     .option('--gate-compare', 'Compare current Signals to the gate baseline', false)
     .option('--report-to <url>', 'POST findings to OpenSIP Cloud or compatible')
+    .option('--api-key <key>', 'API key for --report-to authentication')
     .option(
       '--workspace',
       'Fan out across detected workspace units (memory-isolated; polyglot)',
@@ -204,6 +205,7 @@ function register(cli: ToolCliContext): void {
       gateSave?: boolean;
       gateCompare?: boolean;
       reportTo?: string;
+      apiKey?: string;
       workspace?: boolean;
       concurrency?: number;
       language?: string;
@@ -272,7 +274,7 @@ function register(cli: ToolCliContext): void {
         return;
       }
 
-      await executeGraph(
+      const envelope = await executeGraph(
         {
           cwd: opts.cwd,
           json: opts.json,
@@ -282,6 +284,7 @@ function register(cli: ToolCliContext): void {
           gateSave: opts.gateSave,
           gateCompare: opts.gateCompare,
           reportTo: opts.reportTo,
+          apiKey: opts.apiKey,
           paths,
           workspace: opts.workspace,
           concurrency: opts.concurrency,
@@ -291,6 +294,24 @@ function register(cli: ToolCliContext): void {
         },
         cli,
       );
+
+      // Effectful egress lives at the composition root (ADR-0011 / ADR-0008):
+      // cloud sync + `--report-to` (which owns exit 4). `executeGraph` returns
+      // the envelope for every mode that should deliver (gate / catalog /
+      // default render / `--report-to`) and `undefined` for the modes that
+      // must not (plain `--json` workspace-child carrier, `--workspace`
+      // parent, error paths). Called once per run, after rendering.
+      if (envelope !== undefined) {
+        await cli.deliverSignals(envelope, {
+          cwd: opts.cwd,
+          reportTo: opts.reportTo,
+          apiKey: opts.apiKey,
+          // A content failure (critical/high signals) dominates a `--report-to`
+          // upload failure (ADR-0008): a real failure must not be masked by
+          // exit 4. The gate path sets its own exit code upstream.
+          runFailed: !envelope.verdict.passed,
+        });
+      }
     });
 
   program
@@ -467,7 +488,7 @@ function register(cli: ToolCliContext): void {
           language: opts.language,
           datastore: cli.scope.datastore() as DataStore | undefined,
         });
-        runSarifExportMode(
+        await runSarifExportMode(
           {
             outputSarif: opts.outputSarif,
             tenantId: opts.tenantId,
