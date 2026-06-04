@@ -42,10 +42,10 @@ import {
   type FitDoneResult,
 } from '@opensip-tools/contracts';
 import { currentScope } from '@opensip-tools/core';
-import { reportToCloud } from '@opensip-tools/reporting';
 import { Box, Static, Text, useApp, render } from 'ink';
 import React, { useCallback, useEffect, useState } from 'react';
 
+import { reportFitFindings } from './fit-modes.js';
 import {
   CloudReportStatusLine,
   FindingsBlock,
@@ -124,11 +124,11 @@ function FitRunner({ args, datastore, setExitCode }: FitRunnerProps): React.Reac
 
       const { result, output } = fitResult as { result: FitDoneResult; output: CliOutput };
 
-      // Cloud reporting
+      // Cloud reporting — shared with the json/gate/non-TTY paths (audit P1-1).
       let finalResult: FitDoneResult = result;
-      if (args.reportTo && output) {
-        const reportStatus = await reportToCloud(output, args.reportTo, args.apiKey);
-        finalResult = reportStatus ? { ...result, reportStatus } : result;
+      const reportStatus = await reportFitFindings(output, args);
+      if (reportStatus) {
+        finalResult = { ...result, reportStatus };
       }
 
       if (finalResult.shouldFail) {

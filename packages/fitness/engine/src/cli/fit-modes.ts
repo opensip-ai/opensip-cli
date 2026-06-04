@@ -16,8 +16,10 @@
 import {
   EXIT_CODES,
   mapToolErrorToExitCode,
+  type CliOutput,
   type FitOptions,
 } from '@opensip-tools/contracts';
+import { reportToCloud, type ReportResult } from '@opensip-tools/reporting';
 
 import {
   saveBaseline,
@@ -45,6 +47,35 @@ function emitWarningsToStderr(result: { warnings?: readonly string[] }): void {
   if (!result.warnings || result.warnings.length === 0) return;
   for (const msg of result.warnings) {
     process.stderr.write(`opensip-tools: ${msg}\n`);
+  }
+}
+
+/**
+ * Send fit findings to `--report-to`, if requested. Shared by every fit mode so
+ * SARIF upload composes with json / gate / non-TTY runs, not only the TTY live
+ * view (audit P1-1). Returns the report status, or undefined when not
+ * requested / no output. Callers attach it to a rendered result (live) or
+ * surface it via {@link emitReportStatusToStderr} (non-Ink paths).
+ */
+export async function reportFitFindings(
+  output: CliOutput | undefined,
+  args: FitOptions,
+): Promise<ReportResult | undefined> {
+  if (!args.reportTo || !output) return undefined;
+  return reportToCloud(output, args.reportTo, args.apiKey);
+}
+
+/** Surface a `--report-to` outcome on stderr (non-Ink modes). No-op when absent. */
+function emitReportStatusToStderr(status: ReportResult | undefined): void {
+  if (!status) return;
+  if (status.success) {
+    process.stderr.write(
+      `opensip-tools: --report-to sent ${status.findingCount} finding(s) to ${status.url}\n`,
+    );
+  } else {
+    process.stderr.write(
+      `opensip-tools: --report-to failed (${status.url}): ${status.error ?? 'unknown error'}\n`,
+    );
   }
 }
 
@@ -82,6 +113,9 @@ export async function runJsonMode(args: FitOptions, cli: ToolCliContext): Promis
   // Warnings collected during the run go to stderr so JSON consumers still
   // see them without contaminating the structured stdout payload.
   emitWarningsToStderr(fitResult.result);
+  // --report-to composes with --json (audit P1-1): upload after the JSON is on
+  // stdout; the status goes to stderr so it doesn't corrupt the payload.
+  emitReportStatusToStderr(await reportFitFindings(fitResult.output, args));
 }
 
 /**
@@ -116,6 +150,9 @@ export async function runLiveMode(
       cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
     }
     await cli.render(fitResult.result);
+    // --report-to composes with non-TTY runs (CI), not just the TTY live view
+    // (audit P1-1). Send after the static result is rendered.
+    emitReportStatusToStderr(await reportFitFindings(fitResult.output, args));
   }
   await cli.maybeOpenDashboard({
     openRequested,
@@ -157,6 +194,9 @@ export async function runGateMode(args: FitOptions, cli: ToolCliContext): Promis
   // Surface non-fatal warnings before the gate output so the user sees them
   // alongside the run summary. Safe here because gate mode is non-Ink.
   emitWarningsToStderr(fitResult.result);
+  // --report-to composes with gate runs (audit P1-1): upload the findings
+  // regardless of save/compare, before the gate verdict is rendered.
+  emitReportStatusToStderr(await reportFitFindings(output, args));
   try {
     if (args.gateSave === true) {
       saveBaseline(output, repo);

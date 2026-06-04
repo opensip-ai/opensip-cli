@@ -7,16 +7,20 @@
  */
 
 import { EXIT_CODES } from '@opensip-tools/contracts';
+import { reportToCloud } from '@opensip-tools/reporting';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
-import { runLiveMode } from '../fit-modes.js';
+
+import { runJsonMode, runLiveMode } from '../fit-modes.js';
 import { executeFit } from '../fit.js';
 
 import type { ToolCliContext } from '@opensip-tools/core';
 
 vi.mock('../fit.js', () => ({ executeFit: vi.fn() }));
+vi.mock('@opensip-tools/reporting', () => ({ reportToCloud: vi.fn() }));
 
 const executeFitMock = executeFit as unknown as MockInstance;
+const reportToCloudMock = reportToCloud as unknown as MockInstance;
 
 interface MockCliBag {
   readonly cli: ToolCliContext;
@@ -31,11 +35,13 @@ function mockCli(): MockCliBag {
   const render = vi.fn().mockResolvedValue(undefined);
   const setExitCode = vi.fn();
   const maybeOpenDashboard = vi.fn().mockResolvedValue(undefined);
+  const emitJson = vi.fn();
   const cli = {
     renderLive,
     render,
     setExitCode,
     maybeOpenDashboard,
+    emitJson,
     logger: console,
     scope: { datastore: () => undefined },
   } as unknown as ToolCliContext;
@@ -51,6 +57,8 @@ function setTTY(value: boolean): void {
 
 beforeEach(() => {
   executeFitMock.mockReset();
+  reportToCloudMock.mockReset();
+  reportToCloudMock.mockResolvedValue({ url: 'https://x', findingCount: 3, runCount: 1, success: true });
 });
 
 afterEach(() => {
@@ -99,5 +107,38 @@ describe('runLiveMode', () => {
     await runLiveMode(args, cli, 'fit', false);
     expect(setExitCode).toHaveBeenCalledWith(2);
     expect(render).toHaveBeenCalledWith(result);
+  });
+});
+
+describe('--report-to composes across modes (audit P1-1)', () => {
+  const reportArgs = {
+    cwd: '/x',
+    reportTo: 'https://sink.example',
+    apiKey: 'k',
+  } as unknown as Parameters<typeof runJsonMode>[0];
+  const fitDone = { result: { type: 'fit-done', shouldFail: false }, output: { checks: [] } };
+
+  it('uploads via --report-to in --json mode (not just the TTY live view)', async () => {
+    executeFitMock.mockResolvedValue(fitDone);
+    const { cli } = mockCli();
+    await runJsonMode(reportArgs, cli);
+    expect(reportToCloudMock).toHaveBeenCalledTimes(1);
+    expect(reportToCloudMock).toHaveBeenCalledWith(fitDone.output, 'https://sink.example', 'k');
+  });
+
+  it('uploads via --report-to in non-TTY (CI) live mode', async () => {
+    setTTY(false);
+    executeFitMock.mockResolvedValue(fitDone);
+    const { cli } = mockCli();
+    await runLiveMode(reportArgs, cli, 'fit', false);
+    expect(reportToCloudMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not upload when --report-to is absent', async () => {
+    setTTY(false);
+    executeFitMock.mockResolvedValue(fitDone);
+    const { cli } = mockCli();
+    await runLiveMode(args, cli, 'fit', false);
+    expect(reportToCloudMock).not.toHaveBeenCalled();
   });
 });
