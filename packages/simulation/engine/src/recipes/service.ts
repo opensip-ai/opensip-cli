@@ -232,11 +232,27 @@ async function runSequential(
 
 async function runParallel(
   scenarios: readonly RunnableScenario[],
-  _recipe: SimulationRecipe,
+  recipe: SimulationRecipe,
   abortSignal?: AbortSignal,
 ): Promise<readonly SimulationScenarioResult[]> {
-  // Sim's parallel mode is unbounded today — scenarios are cheap and
-  // there's no global resource (file cache, parse cache) to throttle
-  // around. If maxParallel becomes important, slot a p-limit here.
-  return Promise.all(scenarios.map((s) => runSingle(s, abortSignal)));
+  const limit = recipe.execution.maxParallel;
+  // No bound configured (or a bound at/above the set size) → run them all at
+  // once, the historical behavior. A positive `maxParallel` caps the number of
+  // scenarios in flight via a fixed worker pool, honoring the recipe's
+  // declared concurrency ceiling (previously this option was ignored).
+  if (limit === undefined || limit <= 0 || limit >= scenarios.length) {
+    return Promise.all(scenarios.map((s) => runSingle(s, abortSignal)));
+  }
+
+  const results: SimulationScenarioResult[] = [];
+  let next = 0;
+  // `next++` is atomic in single-threaded JS, so each worker claims a distinct
+  // index; results are written by index to preserve scenario order.
+  const worker = async (): Promise<void> => {
+    for (let i = next++; i < scenarios.length; i = next++) {
+      results[i] = await runSingle(scenarios[i], abortSignal);
+    }
+  };
+  await Promise.all(Array.from({ length: limit }, () => worker()));
+  return results;
 }

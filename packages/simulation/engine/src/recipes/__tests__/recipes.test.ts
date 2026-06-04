@@ -60,6 +60,57 @@ afterEach(() => {
 });
 
 // =============================================================================
+// SimulationRecipeService — parallel concurrency (maxParallel)
+// =============================================================================
+
+const trackingScenario = (id: string, peak: { active: number; max: number }) =>
+  makeStubScenario(id, async () => {
+    peak.active++;
+    peak.max = Math.max(peak.max, peak.active);
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    peak.active--;
+    return stubLoadResult(id);
+  });
+
+describe('SimulationRecipeService — parallel concurrency', () => {
+  it('caps in-flight scenarios at recipe.execution.maxParallel', async () => {
+    const peak = { active: 0, max: 0 };
+    for (let i = 0; i < 6; i++) currentScenarioRegistry().register(trackingScenario(`p-${i}`, peak));
+    const recipe = defineSimulationRecipe({
+      id: 'URCP_par_bound',
+      name: 'par-bound',
+      displayName: 'Par bound',
+      description: 'bounded parallel',
+      scenarios: { type: 'all' },
+      execution: { mode: 'parallel', maxParallel: 2 },
+    });
+
+    const result = await new SimulationRecipeService().runRecipe(recipe);
+
+    expect(result.totalScenarios).toBe(6);
+    expect(peak.max).toBeGreaterThan(0);
+    expect(peak.max).toBeLessThanOrEqual(2);
+  });
+
+  it('runs unbounded when maxParallel is unset', async () => {
+    const peak = { active: 0, max: 0 };
+    for (let i = 0; i < 4; i++) currentScenarioRegistry().register(trackingScenario(`u-${i}`, peak));
+    const recipe = defineSimulationRecipe({
+      id: 'URCP_par_unbounded',
+      name: 'par-unbounded',
+      displayName: 'Par unbounded',
+      description: 'unbounded parallel',
+      scenarios: { type: 'all' },
+      execution: { mode: 'parallel' },
+    });
+
+    await new SimulationRecipeService().runRecipe(recipe);
+
+    expect(peak.max).toBe(4);
+  });
+});
+
+// =============================================================================
 // defineSimulationRecipe — shape validation
 // =============================================================================
 
