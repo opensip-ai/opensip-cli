@@ -66,6 +66,16 @@ module.exports = {
       to: { path: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`] },
     },
     {
+      name: 'no-cross-package-internal',
+      severity: 'error',
+      comment:
+        "Production code must not import a package's `src/internal.ts` barrel — those are " +
+        'test-only surfaces exposed via the `<pkg>/internal` subpath for cross-package test ' +
+        'suites (ADR-0009). Use the package public barrel, or promote the symbol into it.',
+      from: { pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`] },
+      to: { path: String.raw`/src/internal\.ts$` },
+    },
+    {
       name: 'not-to-dev-dep',
       severity: 'error',
       comment:

@@ -15,6 +15,7 @@
       "@opensip-tools/fitness": ["packages/fitness/engine/src/index.ts"],
       "@opensip-tools/simulation": ["packages/simulation/engine/src/index.ts"],
       "@opensip-tools/graph": ["packages/graph/engine/src/index.ts"],
+      "@opensip-tools/graph/internal": ["packages/graph/engine/src/internal.ts"],
       "@opensip-tools/graph-adapter-common": ["packages/graph/graph-adapter-common/src/index.ts"],
       "@opensip-tools/graph-typescript": ["packages/graph/graph-typescript/src/index.ts"],
       "@opensip-tools/graph-python": ["packages/graph/graph-python/src/index.ts"],

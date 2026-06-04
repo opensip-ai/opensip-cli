@@ -18,12 +18,10 @@
  */
 
 import {
-  alwaysThrowsBranchRule,
-  buildIndexes,
-  noSideEffectPathRule,
   type CallEdge,
   type FunctionOccurrence,
 } from '@opensip-tools/graph';
+import { alwaysThrowsBranchRule, buildIndexes, noSideEffectPathRule } from '@opensip-tools/graph/internal';
 import { pythonRuleHints } from '@opensip-tools/graph-python';
 import { rustRuleHints } from '@opensip-tools/graph-rust';
 import { describe, expect, it } from 'vitest';

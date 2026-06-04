@@ -6,7 +6,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { buildIndexes, orphanSubtreeRule } from '@opensip-tools/graph';
+import { buildIndexes, orphanSubtreeRule } from '@opensip-tools/graph/internal';
 import { afterAll, describe, expect, it } from 'vitest';
 
 

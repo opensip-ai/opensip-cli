@@ -165,16 +165,12 @@ export type {
 // constant. Cross-package tests import directly from each adapter
 // pack.
 
-// Pipeline + rule helpers required by cross-package integration tests.
-// These belong to the engine; the public-barrel exposure is to support
-// the graph-typescript test suite without forcing it to deep-import
-// engine internals.
-export { buildIndexes } from './pipeline/indexes.js';
+// `ownerEdgeKey` is public API: the tree-sitter adapter packs consume it to
+// emit owner edges consistently with the engine (part of the adapter contract).
 export { ownerEdgeKey } from './owner-key.js';
-export { alwaysThrowsBranchRule } from './rules/always-throws-branch.js';
-export { noSideEffectPathRule } from './rules/no-side-effect-path.js';
-export { duplicatedFunctionBodyRule } from './rules/duplicated-function-body.js';
-export { orphanSubtreeRule } from './rules/orphan-subtree.js';
+// `buildIndexes` and the individual built-in rule instances are NOT public —
+// they're consumed only by the cross-package rule tests and moved to
+// `@opensip-tools/graph/internal` (rules run via recipes by id). See ADR-0009.
 export { defineRule } from './rules/define-rule.js';
 export type { RuleDataset, GraphFeatures, DefineRuleConfig } from './rules/define-rule.js';
 // ── Graph recipes (Plan B — symmetric with fitness recipes) ────────
