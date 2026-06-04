@@ -97,20 +97,53 @@ describe('executeSim', () => {
     }
   });
 
-  it('ignores unknown --kind values (passes everything through)', async () => {
-    currentScenarioRegistry().register(defineLoadScenario({
-      id: 'pass-through',
-      name: 'pass-through',
-      description: 'load',
+  it('fails fast on an unknown --kind, running nothing', async () => {
+    // Previously an unknown --kind was silently ignored and every scenario
+    // ran. Now it is a configuration error raised BEFORE any scenario runs.
+    let executed = false;
+    currentScenarioRegistry().register({
+      id: 'should-not-run',
+      name: 'should-not-run',
+      description: 'x',
+      kind: 'load',
       tags: [],
-      personas: [persona('user', 1)],
-      duration: 1,
-      assertions: [ASSERTIONS.lowErrorRate(1)],
-    }));
+      run: () => {
+        executed = true;
+        return Promise.reject(new Error('must not run on an invalid --kind'));
+      },
+    });
     const { result } = await executeSim(args({ kind: 'fake-kind' }));
+    expect(result.type).toBe('error');
+    if (result.type === 'error') {
+      expect(result.exitCode).toBe(2);
+      expect(result.message).toContain('fake-kind');
+    }
+    expect(executed).toBe(false);
+  });
+
+  it('does NOT execute scenarios filtered out by --kind (no side effects)', async () => {
+    // Regression for the execute-then-filter bug: a scenario of a different
+    // kind must never run when --kind narrows it out. The tripwire rejects if
+    // executed, so reaching it at all would surface here.
+    let executed = false;
+    currentScenarioRegistry().register({
+      id: 'tripwire',
+      name: 'tripwire',
+      description: 'must not run when filtered out',
+      kind: 'load',
+      tags: [],
+      run: () => {
+        executed = true;
+        return Promise.reject(new Error('filtered-out scenario executed'));
+      },
+    });
+    // The default recipe selects all registered scenarios; --kind invariant
+    // narrows the 'load' tripwire out before execution.
+    const { result } = await executeSim(args({ kind: 'invariant' }));
     expect(result.type).toBe('sim-done');
+    expect(executed).toBe(false);
     if (result.type === 'sim-done') {
-      expect(result.totalScenarios).toBe(1);
+      expect(result.totalScenarios).toBe(0);
     }
   });
 

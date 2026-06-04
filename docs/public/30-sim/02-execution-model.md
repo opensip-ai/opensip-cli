@@ -135,7 +135,7 @@ The recipe's `execution.mode` decides ordering:
 
 The recipe service ([`packages/simulation/engine/src/recipes/service.ts`](../../../packages/simulation/engine/src/recipes/service.ts)) dispatches based on mode. Sequential dispatch awaits each scenario's result before starting the next; parallel uses a `Promise.all`-with-concurrency wrapper similar to fit's parallel dispatcher.
 
-The `--kind` CLI filter (`opensip-tools sim --kind invariant`) is a post-selector intersection. If your recipe selects `{ type: 'all' }` and you pass `--kind invariant`, you run the invariant subset and nothing else.
+The `--kind` CLI filter (`opensip-tools sim --kind invariant`) narrows the recipe-selected scenarios to a single kind **before they run** — filtered-out scenarios (including `load` and `chaos`, which have real side effects) are never executed, only to be hidden afterward. It applies on top of the recipe's own selector: if your recipe selects `{ type: 'all' }` and you pass `--kind invariant`, you run the invariant subset and nothing else. An unknown `--kind` is a configuration error, raised before any scenario runs.
 
 ---
 

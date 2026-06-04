@@ -21,6 +21,18 @@ import { currentScenarioRegistry } from '../framework/registry.js';
 import type { SimulationRecipe, ScenarioSelector } from './types.js';
 import type { RunnableScenario } from '../framework/runnable-scenario.js';
 import type { ScenarioExecutorResult } from '../framework/scenario-executor-result.js';
+import type { ScenarioKind } from '../types/kind-types.js';
+
+/** Optional narrowing applied to the recipe-selected scenarios before they run. */
+export interface RunRecipeOptions {
+  /**
+   * Restrict execution to a single scenario kind (the `--kind` CLI flag).
+   * Applied to the recipe-selected set BEFORE execution, so scenarios of
+   * other kinds — which may have real side effects (load, chaos) — are never
+   * run, only to be hidden from the output afterward.
+   */
+  readonly kindFilter?: ScenarioKind;
+}
 
 /** Per-scenario outcome inside a recipe run. */
 export interface SimulationScenarioResult {
@@ -60,20 +72,30 @@ export class SimulationRecipeService {
    * Run a recipe by resolving its scenario selector against the live
    * scenario registry and executing the matched set.
    */
-  async runRecipe(recipe: SimulationRecipe): Promise<SimulationRecipeResult> {
+  async runRecipe(
+    recipe: SimulationRecipe,
+    options: RunRecipeOptions = {},
+  ): Promise<SimulationRecipeResult> {
     const startedAt = Date.now();
     const matched = resolveSelector(recipe.scenarios);
+    // `--kind` narrows the recipe-selected set BEFORE execution. Previously the
+    // CLI ran every recipe-selected scenario and post-filtered the results,
+    // which meant a `--kind invariant` run still executed load/chaos scenarios
+    // (with their side effects) and merely hid them. Filter first, run second.
+    const selected = options.kindFilter
+      ? matched.filter((s) => s.kind === options.kindFilter)
+      : matched;
 
     logger.info({
       evt: 'simulation.recipe.start',
       module: 'simulation:recipes',
       recipeName: recipe.name,
-      scenarioCount: matched.length,
+      scenarioCount: selected.length,
     });
 
     const results = recipe.execution.mode === 'parallel'
-      ? await runParallel(matched, recipe, this.config.abortSignal)
-      : await runSequential(matched, recipe, this.config.abortSignal);
+      ? await runParallel(selected, recipe, this.config.abortSignal)
+      : await runSequential(selected, recipe, this.config.abortSignal);
 
     const passedCount = results.filter((r) => r.passed).length;
     const out: SimulationRecipeResult = {

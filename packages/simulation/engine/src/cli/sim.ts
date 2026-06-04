@@ -300,19 +300,31 @@ export async function executeSim(
     };
   }
 
-  // The `kind` filter, when present, narrows scenarios in addition to
-  // the recipe's own selector. Implemented by post-filtering the
-  // recipe service's result so the recipe author's intent stays
-  // primary and `--kind` is a CLI ergonomics layer on top.
-  const service = new SimulationRecipeService({ cwd: args.cwd });
-  const recipeResult = await service.runRecipe(recipe);
-
-  let scenarios = recipeResult.scenarios;
-  if (args.kind && isValidKind(args.kind)) {
-    const kindFilter = args.kind;
-    scenarios = scenarios.filter((s) => s.kind === kindFilter);
+  // `--kind`, when present, narrows the recipe-selected scenarios in addition
+  // to the recipe's own selector. It must be a known kind — fail fast on a
+  // typo BEFORE anything runs, rather than (as before) silently ignoring an
+  // invalid value and executing every scenario the recipe selected.
+  let kindFilter: ScenarioKind | undefined;
+  if (args.kind !== undefined) {
+    if (!isValidKind(args.kind)) {
+      return {
+        result: {
+          type: 'error',
+          message: `Unknown scenario kind '${args.kind}'.`,
+          suggestion: `Valid kinds: ${[...VALID_KINDS].join(', ')}.`,
+          exitCode: EXIT_CODES.CONFIGURATION_ERROR,
+        },
+      };
+    }
+    kindFilter = args.kind;
   }
 
+  // The kind filter is applied inside runRecipe, BEFORE execution, so
+  // filtered-out scenarios (with their side effects) never run.
+  const service = new SimulationRecipeService({ cwd: args.cwd });
+  const recipeResult = await service.runRecipe(recipe, { kindFilter });
+
+  const scenarios = recipeResult.scenarios;
   const passed = scenarios.filter((s) => s.passed).length;
   const failed = scenarios.length - passed;
 
