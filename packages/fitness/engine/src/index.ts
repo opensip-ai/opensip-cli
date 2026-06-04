@@ -102,14 +102,13 @@ export { fitnessTool, fitnessTool as tool } from './tool.js';
 // `collectDashboardData`. The CLI is the composition root.
 export {
   ensureChecksLoaded,
-  getDisplayName,
-  getEnabledCheckCount,
-  getIcon,
-  getPluginLoadErrors,
   setPreLoadHook,
   formatDuration,
-  formatValidatedColumn,
 } from './cli/fit.js';
+// getDisplayName / getEnabledCheckCount / getIcon / getPluginLoadErrors /
+// formatValidatedColumn are NOT re-exported: they're internal render/accessor
+// helpers with no external consumer (ADR-0009 curated surface). They remain
+// exported from their own module for the fitness CLI's relative imports.
 export type { PreLoadHook } from './cli/fit.js';
 // Fitness's dashboard-data collector — exported for unit coverage and
 // so the Tool descriptor can reference it. The CLI walks every tool's
