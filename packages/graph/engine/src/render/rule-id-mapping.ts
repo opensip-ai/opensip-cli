@@ -69,3 +69,23 @@ export function mapEngineSlugToOpenSipRuleId(slug: string): string {
   }
   return mapped;
 }
+
+/**
+ * Inverse of {@link RULE_ID_MAPPING}: OpenSIP rule ID → engine slug. The
+ * mapping is 1:1, so the inverse is unambiguous. Used by the `--workspace`
+ * parent to recover engine slugs from child envelopes (whose signals carry
+ * the Option-A-mapped OpenSIP rule ID) before building the dashboard session
+ * payload, whose per-rule metric columns are keyed on engine slugs.
+ */
+export const OPENSIP_RULE_ID_TO_ENGINE_SLUG: Readonly<Record<string, string>> = Object.freeze(
+  Object.fromEntries(Object.entries(RULE_ID_MAPPING).map(([slug, ruleId]) => [ruleId, slug])),
+);
+
+/**
+ * Translate an OpenSIP-convention rule ID back to its engine slug. Returns
+ * the input unchanged when it is already an engine slug (or otherwise
+ * unmapped) so callers can pass through signals that were never remapped.
+ */
+export function mapOpenSipRuleIdToEngineSlug(ruleId: string): string {
+  return OPENSIP_RULE_ID_TO_ENGINE_SLUG[ruleId] ?? ruleId;
+}

@@ -78,22 +78,26 @@ interface MockCliBag {
   readonly cli: ToolCliContext;
   readonly setExitCode: MockInstance;
   readonly render: MockInstance;
+  readonly emitEnvelope: MockInstance;
 }
 
 function mockCli(datastore?: DataStore): MockCliBag {
   const setExitCode = vi.fn();
   const render = vi.fn(() => Promise.resolve());
+  const emitEnvelope = vi.fn();
   return {
     cli: {
       setExitCode,
       emitJson: vi.fn(),
-      emitEnvelope: vi.fn(),
+      emitEnvelope,
       deliverSignals: vi.fn(() => Promise.resolve()),
+      writeSarif: vi.fn(() => Promise.resolve()),
       render,
       scope: { datastore: () => datastore, languages: new LanguageRegistry() },
     } as unknown as ToolCliContext,
     setExitCode,
     render,
+    emitEnvelope,
   };
 }
 
@@ -107,18 +111,15 @@ function renderedLines(render: MockInstance): string {
 let stdoutSpy: MockInstance<typeof process.stdout.write>;
 let stderrSpy: MockInstance<typeof process.stderr.write>;
 let projectDir: string;
-let stdout = '';
 
 beforeEach(() => {
   enterScope(makeGraphTestScope());
   projectDir = mkdtempSync(join(tmpdir(), 'graph-exec-'));
   mkdirSync(join(projectDir, 'src'), { recursive: true });
   writeFileSync(join(projectDir, 'src', 'a.ts'), 'export const x = 1;\n', 'utf8');
-  stdout = '';
-  stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation((c: string | Uint8Array) => {
-    stdout += typeof c === 'string' ? c : c.toString();
-    return true;
-  });
+  // Suppress (don't capture) stdout noise — the `--json` mode now routes
+  // through the `cli.emitEnvelope` mock, asserted directly.
+  stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
   stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
 });
 
@@ -154,15 +155,16 @@ describe('executeGraph — mutually-exclusive flags', () => {
 });
 
 describe('executeGraph — render dispatch', () => {
-  it('renders JSON to stdout under --json (exit 0)', async () => {
+  it('emits the signal envelope under --json (exit 0)', async () => {
     currentAdapterRegistry().register(populatedAdapter());
     const datastore = DataStoreFactory.open({ backend: 'memory' });
     try {
-      const { cli, setExitCode } = mockCli(datastore);
+      const { cli, setExitCode, emitEnvelope } = mockCli(datastore);
       await executeGraph({ cwd: projectDir, noCache: true, json: true }, cli);
       expect(setExitCode).toHaveBeenCalledWith(0);
-      const parsed = JSON.parse(stdout) as { tool: string };
-      expect(parsed.tool).toBe('graph');
+      const envelope = emitEnvelope.mock.calls[0]?.[0] as { tool: string; schemaVersion: number };
+      expect(envelope.tool).toBe('graph');
+      expect(envelope.schemaVersion).toBe(2);
     } finally {
       datastore.close();
     }
@@ -209,14 +211,14 @@ describe('executeGraph — multiple positional paths', () => {
     writeFileSync(join(other, 'src', 'a.ts'), 'export const y = 2;\n', 'utf8');
     const datastore = DataStoreFactory.open({ backend: 'memory' });
     try {
-      const { cli, setExitCode } = mockCli(datastore);
+      const { cli, setExitCode, emitEnvelope } = mockCli(datastore);
       await executeGraph(
         { cwd: projectDir, noCache: true, json: true, paths: [projectDir, other] },
         cli,
       );
       expect(setExitCode).toHaveBeenCalledWith(0);
-      const parsed = JSON.parse(stdout) as { tool: string };
-      expect(parsed.tool).toBe('graph');
+      const envelope = emitEnvelope.mock.calls[0]?.[0] as { tool: string };
+      expect(envelope.tool).toBe('graph');
     } finally {
       datastore.close();
       rmSync(other, { recursive: true, force: true });
