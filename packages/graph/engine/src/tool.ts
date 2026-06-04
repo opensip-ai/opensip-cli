@@ -1,3 +1,4 @@
+// @fitness-ignore-file no-direct-stdout-in-tool-engine -- auxiliary subcommand status line: `graph-baseline-export` writes the JSON baseline to a file and prints a one-line "Exported graph baseline to <path>" confirmation (the --json path uses cli.emitJson). This is not the signal-envelope run output (ADR-0011), which routes through the composition root.
 // @fitness-ignore-file detached-promises -- async command actions invoke synchronous helpers (runCatalogJsonMode/runSarifExportMode/handleGraphError all return void); the heuristic flags them inside the async handlers. Matches the sibling graph CLI files (graph.ts, graph-modes.ts, orchestrate.ts).
 // @fitness-ignore-file module-coupling-fan-out -- composition root: the graph Tool descriptor wires every subcommand, the scope contribution, and the adapter/rule/recipe registries; high intra-project fan-out is inherent to a tool-wiring file (cf. the index.ts / code-paths.ts barrels that suppress the same check).
 /**

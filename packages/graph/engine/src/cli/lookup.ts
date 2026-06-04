@@ -1,3 +1,4 @@
+// @fitness-ignore-file no-direct-stdout-in-tool-engine -- read-only auxiliary subcommand: the `--json` machine path deliberately bypasses the human render seam to emit a structured catalog-query result straight to stdout (documented inline at the call site). The human path uses cli.render. Not the signal-envelope run output.
 /**
  * `opensip-tools graph lookup <name>` — read-only catalog query.
  *

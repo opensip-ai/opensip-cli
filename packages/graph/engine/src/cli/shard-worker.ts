@@ -1,3 +1,4 @@
+// @fitness-ignore-file no-direct-stdout-in-tool-engine -- subprocess IPC protocol: the worker serializes its ShardBuildResult to stdout and the parent (shard runner) reads stdout to EOF. This is not run output through the render seam; it is the wire format between two CLI processes.
 /**
  * `graph-shard-worker <specPath>` — the per-shard build subprocess.
  *

@@ -98,6 +98,8 @@ interface MockCli {
   readonly render: MockInstance;
   /** Captures the envelope executeGraph hands to cli.emitEnvelope() under --json. */
   readonly emitEnvelope: MockInstance;
+  /** Captures the JSON document executeGraph hands to cli.emitJson() (--workspace --json). */
+  readonly emitJson: MockInstance;
 }
 
 function mockCli(
@@ -107,6 +109,7 @@ function mockCli(
   const setExitCode = vi.fn();
   const render = vi.fn(() => Promise.resolve());
   const emitEnvelope = vi.fn();
+  const emitJson = vi.fn();
   const resolvedLanguages = languages ?? new LanguageRegistry();
   return {
     cli: {
@@ -114,11 +117,13 @@ function mockCli(
       setExitCode,
       render,
       emitEnvelope,
+      emitJson,
       scope: { datastore: () => datastore, languages: resolvedLanguages },
     } as unknown as ToolCliContext,
     setExitCode,
     render,
     emitEnvelope,
+    emitJson,
   };
 }
 
@@ -583,7 +588,7 @@ process.exit(1);
     const units: WorkspaceUnit[] = [
       { id: 'a', rootDir: pkg, configPath: join(pkg, 'tsconfig.json') },
     ];
-    const { cli, setExitCode } = mockCli(datastore, makeWorkspaceLangRegistry(units));
+    const { cli, setExitCode, emitJson } = mockCli(datastore, makeWorkspaceLangRegistry(units));
     await executeGraph(
       {
         cwd: workDir,
@@ -596,8 +601,10 @@ process.exit(1);
       cli,
     );
     expect(setExitCode).toHaveBeenCalledWith(1);
-    const out = stdoutSpy.mock.calls.map((c) => String(c[0])).join('');
-    const parsed = JSON.parse(out) as { mode: string; totalFindings: number };
+    // ADR-0011: --workspace --json now emits the JSON document object through
+    // the CLI seam (cli.emitJson), not process.stdout directly.
+    expect(emitJson).toHaveBeenCalledTimes(1);
+    const parsed = emitJson.mock.calls[0]?.[0] as { mode: string; totalFindings: number };
     expect(parsed.mode).toBe('workspace');
     expect(parsed.totalFindings).toBe(0);
   });
