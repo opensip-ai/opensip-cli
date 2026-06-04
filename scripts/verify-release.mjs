@@ -7,7 +7,7 @@
 // disagree with package.json, missing CHANGELOG entries, stale
 // generated docs, cross-package deps pointing at the wrong version.
 //
-// Six checks (all run; any failure exits 1):
+// Nine checks (all run; any failure exits 1):
 //
 //   1. All @opensip-tools/* packages share the same `version`.
 //   2. Tag matches the package version (CI: --expected-version $TAG).
@@ -17,6 +17,10 @@
 //   5. Cross-package dependencies use `workspace:*` or pin the
 //      consensus version — no stale version ranges.
 //   6. CHANGELOG.md top entry has a valid ISO date (YYYY-MM-DD).
+//   7. Per-package READMEs are in sync (version-pinned links — a bump
+//      staled these and 4 did not cover them). build-package-readmes --check.
+//   8. Package keywords are in sync. build-package-keywords --check.
+//   9. The checks index is in sync. extract-checks-metadata | build-checks-index --check.
 //
 // Usage:
 //   node scripts/verify-release.mjs                     # local pre-flight
@@ -200,6 +204,45 @@ if (crossPkgIssues.length === 0) {
   pass(5, `cross-package deps consistent (all using workspace:* or pinned to ${consensusVersion}).`);
 } else {
   fail(5, `${crossPkgIssues.length} stale cross-package dep range(s):\n    ${crossPkgIssues.join('\n    ')}`);
+}
+
+// 7/8/9 — the other generated artifacts must be in sync too. A version bump
+// re-pins README source links, so these are exactly the staleness check #4
+// (web docs) does not cover.
+function delegateGenerator(id, scriptArgs, okMsg, fixMsg, input) {
+  try {
+    execFileSync('node', scriptArgs, { cwd: REPO_ROOT, stdio: 'pipe', ...(input ? { input } : {}) });
+    pass(id, okMsg);
+  } catch (error) {
+    const out = (error.stdout?.toString() || error.stderr?.toString() || error.message || '').trim();
+    fail(id, `${fixMsg}\n${out}`);
+  }
+}
+
+delegateGenerator(
+  7,
+  ['scripts/build-package-readmes.mjs', '--check'],
+  'per-package READMEs are in sync.',
+  'Per-package READMEs are stale (likely version-pinned links). Run `pnpm docs:readmes`.',
+);
+delegateGenerator(
+  8,
+  ['scripts/build-package-keywords.mjs', '--check'],
+  'package keywords are in sync.',
+  'Package keywords are stale. Run `pnpm docs:keywords`.',
+);
+// Checks index is a pipe (extract → build --check); feed the metadata via stdin.
+try {
+  const meta = execFileSync('node', ['scripts/extract-checks-metadata.mjs'], { cwd: REPO_ROOT });
+  delegateGenerator(
+    9,
+    ['scripts/build-checks-index.mjs', '-', '--check'],
+    'checks index is in sync.',
+    'Checks index is stale. Run `pnpm docs:checks-index`.',
+    meta,
+  );
+} catch (error) {
+  fail(9, `could not run the checks-index check: ${error.message}`);
 }
 
 // ---------------------------------------------------------------------
