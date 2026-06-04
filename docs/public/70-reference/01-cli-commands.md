@@ -55,6 +55,12 @@ and best-effort**: results are always written to the local SQLite store first,
 and a cloud failure never blocks, slows, or fails a run. On a successful sync
 you'll see `✓ Sent N signals to OpenSIP Cloud`.
 
+For `graph`, every human-facing mode emits — the default render, `--gate-save`/
+`--gate-compare`, `--report-to`, and `--catalog-output`. Two modes do not emit:
+plain `--json` (a machine-artifact stream, also the carrier each `--workspace`
+child runs under) and `--workspace` itself (the parent aggregates per-unit
+findings for the dashboard, not signals). Run a whole-project `graph` to sync.
+
 What is sent: each signal's file path, message, suggestion, code-location
 hints, and rule metadata. Nothing is sent for users without an API key or
 without the entitlement.

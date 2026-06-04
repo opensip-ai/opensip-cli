@@ -290,7 +290,9 @@ async function executeMultiPathGraph(
   await dispatchGraphResult(opts, combined, cli, startedAt);
 }
 
-async function dispatchGraphResult(
+// Exported for the per-mode signal-emit test (audit P1-2). Not re-exported by
+// the package barrel (only `executeGraph` is), so it stays package-internal.
+export async function dispatchGraphResult(
   opts: GraphCommandOptions,
   result: Awaited<ReturnType<typeof runGraph>>,
   cli: ToolCliContext,
@@ -298,46 +300,65 @@ async function dispatchGraphResult(
 ): Promise<void> {
   if (opts.gateSave === true || opts.gateCompare === true) {
     await runGateMode(opts, result.signals, cli, result.catalog?.resolutionMode);
+    await emitGraphSignals(opts, result, cli);
     logger.info({ evt: EVT_GRAPH_COMPLETE, module: MODULE_GRAPH_CLI });
     return;
   }
   if (typeof opts.reportTo === 'string' && opts.reportTo.length > 0) {
     await runReportMode(opts, result.signals, cli);
+    await emitGraphSignals(opts, result, cli);
     logger.info({ evt: EVT_GRAPH_COMPLETE, module: MODULE_GRAPH_CLI });
     return;
   }
   if (typeof opts.catalogOutput === 'string' && opts.catalogOutput.length > 0) {
     runCatalogJsonMode(opts, result, cli, startedAt);
+    await emitGraphSignals(opts, result, cli);
     logger.info({ evt: EVT_GRAPH_COMPLETE, module: MODULE_GRAPH_CLI });
     return;
   }
   await renderGraphResult(opts, result, startedAt, cli);
-  // `--json` is a peer of --gate-save / --gate-compare / --report-to /
-  // --catalog-output: the run's purpose is producing a machine-readable
-  // artifact, not populating dashboard session history. Skipping the
-  // session write here also means children spawned by
-  // `executeWorkspaceGraph` (which always run with --json) don't each
-  // write a row — the parent persists exactly one aggregate session
-  // for the whole `--workspace` invocation.
+  // Session persistence is dashboard history — populated on human-facing runs
+  // only. `--json` is the machine-artifact mode AND the carrier each
+  // `executeWorkspaceGraph` child runs under; skipping the session write here
+  // keeps "one human invocation = one session" (the --workspace parent persists
+  // the single aggregate row).
   if (opts.json !== true) {
     const durationMs = Math.max(0, Date.now() - Date.parse(startedAt));
     persistSession(opts, result.signals, cli.scope.datastore() as DataStore | undefined, durationMs);
-    // ADR-0008: best-effort cloud signal emit, mirroring local-session
-    // persistence (skipped for --json/--catalog-output machine artifacts).
-    // No-op for the keyless/not-entitled majority; never throws.
-    await emitRunSignals({
-      output: buildCliOutput(result.signals, 'graph', result.catalog?.resolutionMode),
-      tool: 'graph',
-      recipe: opts.recipe,
-      cwd: opts.cwd,
-      signalSink: cli.scope.signalSink,
-    });
+    // Cloud signal emit is now decoupled from session persistence (audit P1-2)
+    // and also runs in the gate/report/catalog branches above. Plain `--json`
+    // stays excluded so workspace child processes don't each emit; the parent
+    // aggregates findings for the dashboard but does not emit cloud signals.
+    await emitGraphSignals(opts, result, cli);
   }
   cli.setExitCode(EXIT_CODES.SUCCESS);
   logger.info({
     evt: EVT_GRAPH_COMPLETE,
     module: MODULE_GRAPH_CLI,
     signals: result.signals.length,
+  });
+}
+
+/**
+ * Best-effort cloud signal emit for a graph run (ADR-0008), decoupled from
+ * session persistence so it fires in every documented single-run mode — gate,
+ * report, catalog, and the default render — not only the dashboard-populating
+ * path (audit P1-2). No-op for the keyless / not-entitled majority; never
+ * throws. Plain `--json` and `--workspace` deliberately do not emit (see the
+ * call sites): `--json` is the workspace-child carrier, and the workspace
+ * parent aggregates findings for the dashboard, not signals for the cloud.
+ */
+async function emitGraphSignals(
+  opts: GraphCommandOptions,
+  result: Awaited<ReturnType<typeof runGraph>>,
+  cli: ToolCliContext,
+): Promise<void> {
+  await emitRunSignals({
+    output: buildCliOutput(result.signals, 'graph', result.catalog?.resolutionMode),
+    tool: 'graph',
+    recipe: opts.recipe,
+    cwd: opts.cwd,
+    signalSink: cli.scope.signalSink,
   });
 }
 
@@ -459,6 +480,11 @@ async function executeWorkspaceGraph(
     // = one session" that fitness/sim already follow; the per-unit
     // child processes don't persist because they always run with --json
     // (see dispatchGraphResult).
+    //
+    // Cloud signal sync (ADR-0008) is intentionally NOT emitted for
+    // --workspace (audit P1-2): the parent aggregates per-unit findings for
+    // the dashboard, not signals, and the --json children skip emit to avoid
+    // fragmented per-unit batches. A whole-project `graph` run emits normally.
     persistWorkspaceSession(opts, allFindings, durationMs, cli);
   }
 
