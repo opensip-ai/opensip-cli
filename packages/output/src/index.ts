@@ -17,12 +17,7 @@ export {
   type SignalTableSummary,
 } from './format/signal-table.js';
 
-// --- legacy CliOutput-based SARIF (transitional; retired in Phase 7) ---
-export { buildSarifLog, chunkSarifRuns, reportToCloud, type ReportResult } from './sarif.js';
-export type { SarifResult, SarifLocation } from './sarif-types.js';
-
 // --- sink/ — effectful delivery (file/cloud egress) ---
-export { collectSignalBatch, type CollectSignalBatchInput } from './sink/collect-batch.js';
 export {
   checkEntitlement,
   invalidateEntitlement,
@@ -37,8 +32,4 @@ export {
   DEFAULT_CLOUD_ENDPOINT,
   type ResolveSignalSinkInput,
 } from './sink/resolve-signal-sink.js';
-export {
-  emitRunSignals,
-  resolveRepoIdentity,
-  type EmitRunSignalsInput,
-} from './sink/emit-run-signals.js';
+export { resolveRepoIdentity } from './sink/repo-identity.js';

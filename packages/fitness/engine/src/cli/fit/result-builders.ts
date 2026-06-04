@@ -1,13 +1,13 @@
 /**
- * Pure builders that transform fitness recipe results into the public
- * CLI output shapes (`CliOutput`, `FitDoneResult`) — plus the
- * formatting helpers they rely on and the best-effort session
- * persistence side effect invoked at the `executeFit` boundary.
+ * Pure builders that transform fitness recipe results into the run's
+ * `SignalEnvelope` (the universal output currency, ADR-0011) and the
+ * `FitDoneResult` that carries it — plus the formatting helpers they rely on
+ * and the best-effort session persistence side effect invoked at the
+ * `executeFit` boundary.
  *
  * Keeping these together (rather than per-output-shape) makes the
- * finding-shape mapping visible in one place: both `buildCliOutput` and
- * `buildFitDoneResult` flatten check violations into the same `Finding`
- * shape, and any change to that shape must be paired across both.
+ * signal-shape mapping visible in one place: `buildFitEnvelope` maps check
+ * violations to `Signal`s and `buildFitDoneResult` wraps the envelope.
  */
 
 import {

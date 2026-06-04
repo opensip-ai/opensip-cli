@@ -1,46 +1,40 @@
 /**
  * End-to-end validation of the cloud signal-sync pipeline
- * (resolveSignalSink → deferred entitlement → emitRunSignals → cloud sink),
+ * (resolveSignalSink → deferred entitlement → sink.emit → cloud egress),
  * against a routed mock fetch. The real OpenSIP Cloud ingestion + entitlement
  * endpoints live in the parent `opensip` repo and do not exist yet, so this
  * stands in for them and pins the load-bearing invariants: cloud-additive,
  * fail-closed, opt-out, and never-blocks-the-run.
+ *
+ * Drives the sink the same way the composition root's `deliverEnvelope` does —
+ * build a `SignalBatch` and call `sink.emit(batch)` (the `CliOutput`-based
+ * `emitRunSignals` driver was retired in ADR-0011 Phase 7).
  */
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { buildSignalBatch, createSignal } from '@opensip-tools/core';
 import { describe, it, expect, vi } from 'vitest';
 
-import { emitRunSignals } from '../sink/emit-run-signals.js';
 import { resolveSignalSink } from '../sink/resolve-signal-sink.js';
 
-import type { CliOutput } from '@opensip-tools/contracts';
+import type { SignalBatch } from '@opensip-tools/core';
 
-function output(findings: number): CliOutput {
-  return {
-    version: '1.0',
+function batch(findings: number): SignalBatch {
+  return buildSignalBatch({
     tool: 'fit',
-    timestamp: '2026-06-03T00:00:00.000Z',
-    score: 0,
-    passed: false,
-    summary: { total: 1, passed: 0, failed: 1, errors: findings, warnings: 0 },
-    durationMs: 1,
-    checks: [
-      {
-        checkSlug: 'demo',
-        passed: false,
-        durationMs: 1,
-        findings: Array.from({ length: findings }, (_, i) => ({
-          ruleId: `r${i}`,
-          message: `m${i}`,
-          severity: 'error' as const,
-          filePath: `src/f${i}.ts`,
-          line: i + 1,
-        })),
-      },
-    ],
-  };
+    repo: {},
+    signals: Array.from({ length: findings }, (_, i) =>
+      createSignal({
+        source: 'demo',
+        severity: 'high',
+        ruleId: `r${i}`,
+        message: `m${i}`,
+        code: { file: `src/f${i}.ts`, line: i + 1 },
+      }),
+    ),
+  });
 }
 
 function routedFetch(entitled: boolean, signals: number | 'reject' = 200) {
@@ -66,7 +60,7 @@ async function run(opts: { apiKey?: string; noCloud?: boolean; fetchImpl: typeof
     cacheDir,
     fetchImpl: opts.fetchImpl,
   });
-  return emitRunSignals({ output: output(3), tool: 'fit', cwd: '.', signalSink: sink, repo: {} });
+  return sink.emit(batch(3));
 }
 
 describe('cloud signal sync — end to end', () => {

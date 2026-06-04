@@ -8,9 +8,9 @@
  * `Idempotency-Key` of `${runId}:${ordinal}` (see @opensip-tools/output).
  *
  * `buildSignalBatch` is a pure factory (no IO beyond a truncation log). The
- * findings→Signal mapping that feeds it lives in @opensip-tools/output,
- * because it consumes the `FindingOutput`/`CliOutput` contract types that sit
- * above core in the layer graph.
+ * run already produces `Signal[]` natively (ADR-0011), so the CLI composition
+ * root maps a tool's `SignalEnvelope` to a batch (`deliver-envelope.ts`,
+ * @opensip-tools/cli) — no findings→Signal downgrade step exists anymore.
  */
 import { generatePrefixedId } from '../lib/ids.js';
 import { logger } from '../lib/logger.js';
@@ -57,7 +57,7 @@ export interface BuildSignalBatchInput {
    * Preserve an existing run identity instead of generating a fresh one.
    * The composition root passes the {@link SignalEnvelope}'s `runId` here
    * (ADR-0011) so the cloud-egress idempotency root matches the run the
-   * user observed. Omitted on the legacy `CliOutput` path → a fresh id.
+   * user observed. Omitted → a fresh id is generated.
    */
   readonly runId?: string;
   /** Preserve the envelope's `createdAt` instead of stamping `now`. */

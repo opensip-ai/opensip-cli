@@ -165,9 +165,10 @@ function envelopeTableNode(rows: readonly SignalTableRow[]): ViewNode | null {
 }
 
 /**
- * The shared envelope → terminal-table view. Used by the fit/sim/graph cases
- * once their result carries an envelope; falls back to the legacy
- * `rows`/`reportLines` derivations until each tool migrates (Phases 4–6).
+ * The shared envelope → terminal-table view. Used by every migrated tool's
+ * result (fit/sim always; graph when it carries an envelope). The per-tool
+ * `rows`/`reportLines` legacy derivations it once fell back to were retired in
+ * Phase 7 (ADR-0011).
  */
 export function envelopeToTableView(envelope: SignalEnvelope): ViewNode {
   const rows = formatSignalTableRows(envelope);
