@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { buildOpenSipSarif, formatSignalSarif } from '../signal-sarif.js';
-import { EMPTY_ENVELOPE, FIXTURE_ENVELOPE } from './fixtures.js';
+
+import { EMPTY_ENVELOPE, FIXTURE_ENVELOPE } from './envelope.fixtures.js';
 
 describe('formatSignalSarif', () => {
   it('renders the envelope as SARIF v2.1.0 (snapshot)', () => {

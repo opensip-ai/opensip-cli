@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { formatSignalJson } from '../signal-json.js';
-import { EMPTY_ENVELOPE, FIXTURE_ENVELOPE } from './fixtures.js';
+
+import { EMPTY_ENVELOPE, FIXTURE_ENVELOPE } from './envelope.fixtures.js';
 
 import type { SignalEnvelope } from '@opensip-tools/contracts';
 
