@@ -28,14 +28,16 @@ export type {
   ToolOptions,
 } from './types.js';
 
-// Output types (the structured JSON shape and its parts)
+// Signal envelope — the universal tool-run output currency (ADR-0011). The
+// `CommandResult` payload every tool returns; it replaced the fitness-shaped
+// `CliOutput`/`CheckOutput`/`FindingOutput` husk, which was retired in Phase 7.
 export type {
-  CliOutput,
-  CheckOutput,
-  FindingOutput,
-  TableRow,
-  SummaryOptions,
-} from './types.js';
+  SignalEnvelope,
+  RunVerdict,
+  UnitResult,
+  BuildEnvelopeInput,
+} from './signal-envelope.js';
+export { buildSignalEnvelope } from './signal-envelope.js';
 
 // Command result types (the CommandResult union + per-command variants)
 export type {
@@ -63,8 +65,8 @@ export type {
 } from './command-results.js';
 
 // Canonical pass-rate (`score`) computation — shared by every tool that
-// builds a CliOutput so the dashboard "PASS RATE" stays consistent across
-// fit/graph and cannot drift back into per-tool formulas.
+// builds a signal envelope so the dashboard "PASS RATE" stays consistent
+// across fit/graph and cannot drift back into per-tool formulas.
 export { passRate } from './score.js';
 
 // Exit codes + error suggestion helper + typed-error → exit-code mapping
@@ -105,9 +107,10 @@ export type {
   GraphBlastScore,
 } from './graph-catalog.js';
 
-// SARIF + cloud reporting moved to @opensip-tools/reporting (audit
-// 2026-05-29, contracts split). The build/cloud-report runtime + its
-// types live there; contracts no longer re-exports them.
+// SARIF + cloud reporting moved to @opensip-tools/output (audit
+// 2026-05-29, contracts split; package renamed reporting→output in Phase 2,
+// ADR-0011). The formatter/sink runtime + its types live there; contracts
+// no longer re-exports them.
 
 // `commander` is referenced here purely as a type — `import type` keeps
 // the runtime bundle (`dist/index.js`) free of any commander require.

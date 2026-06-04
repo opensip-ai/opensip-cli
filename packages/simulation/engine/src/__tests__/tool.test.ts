@@ -84,6 +84,11 @@ function makeFakeContext(program: Command): {
     emitJson: (value: unknown) => {
       emitted.push(value);
     },
+    emitEnvelope: (value: unknown) => {
+      emitted.push(value);
+    },
+    deliverSignals: () => Promise.resolve(),
+    writeSarif: () => Promise.resolve(),
   };
   return { ctx, rendered, exitCodes, emitted };
 }
@@ -127,6 +132,8 @@ describe('simulationTool.register', () => {
       expect.arrayContaining(['--recipe', '--cwd', '--json', '--kind', '--debug', '--open']),
     );
     expect(optionNames).toEqual(expect.arrayContaining(['--quiet']));
+    // ADR-0011 (Phase 4): sim gains cloud egress via the root's deliverSignals.
+    expect(optionNames).toEqual(expect.arrayContaining(['--report-to', '--api-key']));
   });
 
   it('runs the action against the default recipe and renders the result', async () => {
@@ -144,7 +151,7 @@ describe('simulationTool.register', () => {
     expect(result.recipeName).toBe('default');
   });
 
-  it('emits a JSON envelope through cli.emitJson when --json is passed', async () => {
+  it('emits the signal envelope through cli.emitEnvelope when --json is passed', async () => {
     const program = new Command();
     program.exitOverride();
     const { ctx, emitted } = makeFakeContext(program);
@@ -153,9 +160,12 @@ describe('simulationTool.register', () => {
 
     await program.parseAsync(['node', 'cli', 'sim', '--json'], { from: 'node' });
 
+    // ADR-0011 (Phase 4): --json routes the SignalEnvelope (not the bespoke
+    // SimDoneResult) through the root's emitEnvelope → formatSignalJson.
     expect(emitted).toHaveLength(1);
-    const payload = emitted[0] as { type?: string };
-    expect(payload.type).toBe('sim-done');
+    const payload = emitted[0] as { schemaVersion?: number; tool?: string };
+    expect(payload.schemaVersion).toBe(2);
+    expect(payload.tool).toBe('sim');
   });
 
   it('returns exit code 2 in JSON mode when the recipe is unknown', async () => {

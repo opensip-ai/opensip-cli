@@ -141,14 +141,14 @@ describe('SaaS-mode concurrent scopes', () => {
     expect(observedScopeInB).toBe(scopeB);
     expect(observedScopeInA).not.toBe(observedScopeInB);
 
-    // 2. Both executions produced an output (no error result).
+    // 2. Both executions produced an envelope (no error result).
     expect(a.result.type).not.toBe('error');
     expect(b.result.type).not.toBe('error');
-    expect(a.output).toBeDefined();
-    expect(b.output).toBeDefined();
+    expect(a.envelope).toBeDefined();
+    expect(b.envelope).toBeDefined();
 
-    // 3. Outputs are distinct objects (no shared output cache).
-    expect(a.output).not.toBe(b.output);
+    // 3. Envelopes are distinct objects (no shared output cache).
+    expect(a.envelope).not.toBe(b.envelope);
 
     // 4. Each scope's parseCache is independent. Touching one must not
     //    surface in the other.
@@ -177,14 +177,14 @@ describe('SaaS-mode concurrent scopes', () => {
     const scopeB = makeScope();
 
     // Seed the slot in A; B's slot must remain empty.
-    scopeA.recipeCheckConfig.set('check-x', { from: 'A' });
+    scopeA.recipeUnitConfig.set('check-x', { from: 'A' });
 
     const [aSeesOwn, bSeesNothing] = await Promise.all([
       runWithScope(scopeA, () => {
-        return Promise.resolve(currentScope()?.recipeCheckConfig.get('check-x'));
+        return Promise.resolve(currentScope()?.recipeUnitConfig.get('check-x'));
       }),
       runWithScope(scopeB, () => {
-        return Promise.resolve(currentScope()?.recipeCheckConfig.get('check-x'));
+        return Promise.resolve(currentScope()?.recipeUnitConfig.get('check-x'));
       }),
     ]);
 

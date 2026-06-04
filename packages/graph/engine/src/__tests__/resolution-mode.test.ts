@@ -3,15 +3,15 @@
  *   - a Catalog without resolutionMode is treated as exact (absence ⇒ exact);
  *   - the mode round-trips through catalog persistence (the warm-run honesty
  *     guarantee — consumers read it on cache hits, not just fresh builds);
- *   - buildCliOutput surfaces resolutionMode only for fast;
+ *   - buildGraphEnvelope surfaces resolutionMode only for fast;
  *   - the approximation caveat helper reflects the tier.
  */
 
 import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { buildGraphEnvelope } from '../cli/build-envelope.js';
 import { CatalogRepo } from '../persistence/catalog-repo.js';
-import { buildCliOutput } from '../render/json.js';
 import { approximateSuffix, isApproximateCatalog } from '../rules/_approximation.js';
 
 import type { Catalog, FunctionOccurrence, ResolutionMode } from '../types.js';
@@ -88,14 +88,16 @@ describe('resolution-mode contract', () => {
     });
   });
 
-  describe('buildCliOutput', () => {
+  describe('buildGraphEnvelope', () => {
+    const RUN = { signals: [], runId: 'run-1', createdAt: '2026-06-04T00:00:00.000Z' };
+
     it('omits resolutionMode for exact / undefined', () => {
-      expect(buildCliOutput([], 'graph').resolutionMode).toBeUndefined();
-      expect(buildCliOutput([], 'graph', 'exact').resolutionMode).toBeUndefined();
+      expect(buildGraphEnvelope(RUN).resolutionMode).toBeUndefined();
+      expect(buildGraphEnvelope({ ...RUN, resolutionMode: 'exact' }).resolutionMode).toBeUndefined();
     });
 
     it('includes resolutionMode for fast', () => {
-      expect(buildCliOutput([], 'graph', 'fast').resolutionMode).toBe('fast');
+      expect(buildGraphEnvelope({ ...RUN, resolutionMode: 'fast' }).resolutionMode).toBe('fast');
     });
   });
 

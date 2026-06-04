@@ -2,7 +2,7 @@
  * SaaS-mode tool-subscope concurrent-scope smoke test (Item 1).
  *
  * Companion to `saas-mode-smoke.test.ts`. That file proves the
- * kernel-level RunScope fields (logger, parseCache, recipeCheckConfig,
+ * kernel-level RunScope fields (logger, parseCache, recipeUnitConfig,
  * tools, languages) are per-scope. This file proves the tool-level
  * subscopes added in Item 1 — `scope.simulation.{scenarios,recipes}`
  * and `scope.graph.{adapters,rules}` — are per-scope too.

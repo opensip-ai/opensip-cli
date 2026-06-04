@@ -16,10 +16,9 @@
  * only forbids the reverse — cli-ui must never import contracts.
  */
 
-import { line, group, viewRunSummary, viewFooterHints, type Span, type ViewNode } from '@opensip-tools/cli-ui';
-import { formatDuration } from '@opensip-tools/core';
+import { line, group, viewRunSummary, viewFooterHints, formatValidatedColumn, parseValidatedCount, sortFitRowPriority, type Span, type Tone, type ViewNode } from '@opensip-tools/cli-ui';
+import { formatSignalTableRows, formatSignalTableSummary, type SignalTableRow } from '@opensip-tools/output';
 
-import { viewFitDone } from './views/fit-done-view.js';
 import { viewInit } from './views/init-view.js';
 import {
   viewListChecks,
@@ -34,9 +33,8 @@ import {
 } from './views/misc-views.js';
 import { viewPlugin } from './views/plugin-view.js';
 
-import type { CommandResult, SimDoneResult, ErrorResult, GraphDoneResult } from '@opensip-tools/contracts';
+import type { CommandResult, ErrorResult, GraphDoneResult, SignalEnvelope } from '@opensip-tools/contracts';
 
-const SEPARATOR: ViewNode = { kind: 'separator' };
 const SPACER: ViewNode = { kind: 'spacer' };
 
 /** `✗ <message>` plus an optional dim suggestion — mirrors ErrorMessage. */
@@ -48,48 +46,6 @@ function errorView(result: ErrorResult): ViewNode {
     children.push(line([{ text: `    ${result.suggestion}` }], true));
   }
   return group(children, 2);
-}
-
-/** One scenario row: `✓/✗ name (kind, Nms)`, with an indented error line. */
-function scenarioView(s: SimDoneResult['scenarios'][number]): ViewNode {
-  const row = line([
-    { text: s.passed ? '✓' : '✗', tone: s.passed ? 'success' : 'error' },
-    { text: ` ${s.scenarioName} `, bold: true },
-    { text: `(${s.kind}, ${s.durationMs}ms)`, dim: true },
-  ]);
-  if (s.error === undefined) return row;
-  return group([row, group([line([{ text: s.error, tone: 'error' }])], 2)]);
-}
-
-function simDoneView(result: SimDoneResult): ViewNode {
-  const summary: Span[] = [
-    { text: String(result.passedScenarios), bold: true },
-    { text: ' passed, ' },
-    { text: String(result.failedScenarios), bold: true, ...(result.failedScenarios > 0 ? { tone: 'error' as const } : {}) },
-    { text: ' failed ' },
-    { text: `| Duration ${formatDuration(result.durationMs)}`, dim: true },
-  ];
-
-  const body: ViewNode =
-    result.scenarios.length === 0
-      ? line(
-          [{ text: `No scenarios matched recipe '${result.recipeName}'. Add one to opensip-tools/sim/scenarios/.` }],
-          true,
-        )
-      : group(result.scenarios.map(scenarioView));
-
-  return group(
-    [
-      line([{ text: 'Simulation', tone: 'brand', bold: true }]),
-      line([{ text: `Recipe: ${result.recipeName}` }], true),
-      SEPARATOR,
-      SPACER,
-      body,
-      SPACER,
-      line(summary),
-    ],
-    2,
-  );
 }
 
 /**
@@ -120,20 +76,137 @@ function linesView(lines: readonly string[]): ViewNode {
   return group(lines.map((l) => line([{ text: l }])));
 }
 
+// --- Envelope-derived terminal table (ADR-0011) -----------------------------
+//
+// The single, tool-agnostic table derivation: every migrated tool's result
+// carries a `SignalEnvelope`, and the terminal table is derived FROM its
+// `units` + `signals` via the shared `formatSignalTableRows` / `Summary`
+// formatters (`@opensip-tools/output`). One row per unit (check / rule /
+// scenario). Replaces the three per-tool, pre-computed `rows`/`reportLines`
+// shapes (the fit/sim/graph `*DoneResult` legacy branches, retired in Phase 7).
+
+const ENV_COL = { status: 7, errors: 6, warnings: 8, validated: 12, ignored: 7, duration: 10 } as const;
+
+function envStatusTone(status: SignalTableRow['status']): Tone {
+  if (status === 'FAIL') return 'error';
+  if (status === 'ERROR') return 'warning';
+  return 'success';
+}
+
+function envDurationTone(ms: number): Tone {
+  if (ms >= 60_000) return 'error';
+  if (ms >= 30_000) return 'warning';
+  return 'success';
+}
+
+/** Ignored-ratio tone: red >10%, yellow >5%, else muted (parity with the live view). */
+function envIgnoredTone(ignored: number, validatedCell: string): Tone {
+  const total = parseValidatedCount(validatedCell);
+  if (total === 0 || ignored === 0) return 'muted';
+  const pct = (ignored / total) * 100;
+  if (pct > 10) return 'error';
+  if (pct > 5) return 'warning';
+  return 'muted';
+}
+
+const ENV_SEP: Span = { text: ' | ' };
+
+/**
+ * Fixed-width per-unit table from the envelope's signal-table rows, or null
+ * when empty. Renders fitness's `Validated`/`Ignores` columns when ANY row
+ * carries `validated` (a per-unit fact on {@link UnitResult}); graph/sim rows
+ * omit them, so those tools' tables stay the lean 5-column form.
+ */
+function envelopeTableNode(rows: readonly SignalTableRow[]): ViewNode | null {
+  if (rows.length === 0) return null;
+  const sorted = [...rows].sort((a, b) => sortFitRowPriority(a) - sortFitRowPriority(b));
+  const unitW = Math.max(40, ...sorted.map((r) => r.unit.length));
+  const showValidated = sorted.some((r) => r.validated !== undefined);
+
+  const headerCells = [
+    'Unit'.padEnd(unitW), 'Status'.padEnd(ENV_COL.status),
+    'Errors'.padEnd(ENV_COL.errors), 'Warnings'.padEnd(ENV_COL.warnings),
+    ...(showValidated ? ['Validated'.padEnd(ENV_COL.validated), 'Ignores'.padEnd(ENV_COL.ignored)] : []),
+    'Duration'.padEnd(ENV_COL.duration),
+  ];
+  const sepCells = [
+    '-'.repeat(unitW), '-'.repeat(ENV_COL.status),
+    '-'.repeat(ENV_COL.errors), '-'.repeat(ENV_COL.warnings),
+    ...(showValidated ? ['-'.repeat(ENV_COL.validated), '-'.repeat(ENV_COL.ignored)] : []),
+    '-'.repeat(ENV_COL.duration),
+  ];
+  const header = line([{ text: headerCells.join(' | ') }]);
+  const separator = line([{ text: sepCells.join('-|-') }]);
+
+  const rowNodes = sorted.map((r) => {
+    const validatedCell = formatValidatedColumn(r.validated, r.itemType);
+    const spans: Span[] = [
+      { text: r.unit.padEnd(unitW) },
+      ENV_SEP,
+      { text: r.status.padEnd(ENV_COL.status), tone: envStatusTone(r.status) },
+      ENV_SEP,
+      { text: String(r.errors).padEnd(ENV_COL.errors), tone: r.errors > 0 ? 'error' : 'success' },
+      ENV_SEP,
+      { text: String(r.warnings).padEnd(ENV_COL.warnings), tone: r.warnings > 0 ? 'warning' : 'muted' },
+    ];
+    if (showValidated) {
+      spans.push(
+        ENV_SEP,
+        { text: validatedCell.padEnd(ENV_COL.validated) },
+        ENV_SEP,
+        { text: String(r.ignored ?? 0).padEnd(ENV_COL.ignored), tone: envIgnoredTone(r.ignored ?? 0, validatedCell) },
+      );
+    }
+    spans.push(ENV_SEP, { text: r.duration.padEnd(ENV_COL.duration), tone: envDurationTone(r.durationMs) });
+    return line(spans);
+  });
+
+  return group([header, separator, ...rowNodes]);
+}
+
+/**
+ * The shared envelope → terminal-table view. Used by every migrated tool's
+ * result (fit/sim always; graph when it carries an envelope). The per-tool
+ * `rows`/`reportLines` legacy derivations it once fell back to were retired in
+ * Phase 7 (ADR-0011).
+ */
+export function envelopeToTableView(envelope: SignalEnvelope): ViewNode {
+  const rows = formatSignalTableRows(envelope);
+  const summary = formatSignalTableSummary(envelope);
+  const children: ViewNode[] = [];
+  const table = envelopeTableNode(rows);
+  if (table !== null) children.push(table);
+  children.push(
+    viewRunSummary({
+      passed: summary.passed,
+      failed: summary.failed,
+      errors: summary.totalErrors,
+      warnings: summary.totalWarnings,
+      durationMs: summary.durationMs,
+    }),
+  );
+  return group(children);
+}
+
 /** Map any CommandResult to its view-model node (total — every variant covered). */
 export function resultToView(result: CommandResult): ViewNode {
   switch (result.type) {
     case 'fit-done': {
-      return viewFitDone(result);
+      // ADR-0011 (fitness migrated, Phase 6): the result always carries an
+      // envelope; the terminal table is derived from it (one row per check
+      // unit, with the fitness-only Validated/Ignores columns).
+      return envelopeToTableView(result.envelope);
     }
     case 'error': {
       return errorView(result);
     }
     case 'sim-done': {
-      return simDoneView(result);
+      // sim is migrated (Phase 4): the result always carries an envelope and
+      // the per-scenario table is derived from it (one unit row per scenario).
+      return envelopeToTableView(result.envelope);
     }
     case 'graph-done': {
-      return graphDoneView(result);
+      return result.envelope ? envelopeToTableView(result.envelope) : graphDoneView(result);
     }
     case 'gate-done': {
       return linesView(result.lines);

@@ -5,12 +5,12 @@
  * needs to store them (tool, repo, run id, timestamp, counts). This is the
  * wire contract opensip-tools owns; the parent `opensip` repo ingests it.
  * `runId` is the idempotency root — the transport derives a per-chunk
- * `Idempotency-Key` of `${runId}:${ordinal}` (see @opensip-tools/reporting).
+ * `Idempotency-Key` of `${runId}:${ordinal}` (see @opensip-tools/output).
  *
  * `buildSignalBatch` is a pure factory (no IO beyond a truncation log). The
- * findings→Signal mapping that feeds it lives in @opensip-tools/reporting,
- * because it consumes the `FindingOutput`/`CliOutput` contract types that sit
- * above core in the layer graph.
+ * run already produces `Signal[]` natively (ADR-0011), so the CLI composition
+ * root maps a tool's `SignalEnvelope` to a batch (`deliver-envelope.ts`,
+ * @opensip-tools/cli) — no findings→Signal downgrade step exists anymore.
  */
 import { generatePrefixedId } from '../lib/ids.js';
 import { logger } from '../lib/logger.js';
@@ -53,6 +53,15 @@ export interface BuildSignalBatchInput {
   readonly signals: readonly Signal[];
   /** Override the per-batch cap (tests). Defaults to {@link MAX_SIGNALS_PER_BATCH}. */
   readonly maxSignals?: number;
+  /**
+   * Preserve an existing run identity instead of generating a fresh one.
+   * The composition root passes the {@link SignalEnvelope}'s `runId` here
+   * (ADR-0011) so the cloud-egress idempotency root matches the run the
+   * user observed. Omitted → a fresh id is generated.
+   */
+  readonly runId?: string;
+  /** Preserve the envelope's `createdAt` instead of stamping `now`. */
+  readonly createdAt?: string;
 }
 
 // Highest severity first when we must drop signals to fit the cap.
@@ -85,8 +94,8 @@ export function buildSignalBatch(input: BuildSignalBatchInput): SignalBatch {
     tool: input.tool,
     recipe: input.recipe,
     repo: input.repo,
-    runId: generatePrefixedId('run'),
-    createdAt: new Date().toISOString(),
+    runId: input.runId ?? generatePrefixedId('run'),
+    createdAt: input.createdAt ?? new Date().toISOString(),
     counts: { total: signals.length, bySeverity },
     truncated,
     signals,

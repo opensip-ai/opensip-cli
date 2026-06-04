@@ -4,7 +4,7 @@
  *
  * A recipe can carry a `config` map keyed by unit slug (checks today,
  * rules in a later phase). The recipe service projects this map into the
- * current `RunScope`'s `recipeCheckConfig` slot before any unit runs and
+ * current `RunScope`'s `recipeUnitConfig` slot before any unit runs and
  * clears it once the run completes. Each unit reads its slice via
  * `getUnitConfig<T>(slug)` and merges it with its built-in defaults.
  *
@@ -25,8 +25,8 @@
  * tests that don't set up a scope) returns an empty object — the unit's
  * own defaults handle the empty case.
  *
- * The slot name (`recipeCheckConfig`) and its `RecipeCheckConfigSlot`
- * type are unchanged; only the accessors and map type are generalized.
+ * The slot name (`recipeUnitConfig`) and its `RecipeUnitConfigSlot`
+ * type are now unit-neutral, matching the generalized accessors and map type.
  */
 
 import { currentScope } from '../lib/run-scope.js';
@@ -52,7 +52,7 @@ export type RecipeUnitConfigMap = Readonly<Record<string, Readonly<Record<string
  */
 export function getUnitConfig<T extends Record<string, unknown>>(slug: string): T {
   const scope = currentScope();
-  const entry = scope?.recipeCheckConfig.get<T>(slug);
+  const entry = scope?.recipeUnitConfig.get<T>(slug);
   if (!entry) return {} as T;
   return entry;
 }
@@ -69,7 +69,7 @@ export function setCurrentRecipeUnitConfig(
   scope: RunScope,
   config: RecipeUnitConfigMap | undefined,
 ): void {
-  scope.recipeCheckConfig.setAll(config ?? {});
+  scope.recipeUnitConfig.setAll(config ?? {});
 }
 
 /**
@@ -77,5 +77,5 @@ export function setCurrentRecipeUnitConfig(
  * the end of a recipe run (success or failure).
  */
 export function clearCurrentRecipeUnitConfig(scope: RunScope): void {
-  scope.recipeCheckConfig.clear();
+  scope.recipeUnitConfig.clear();
 }

@@ -18,7 +18,7 @@ export function workspaceReportLines(
   perUnit: readonly WorkspaceUnitRunResult[],
   durationMs: number,
 ): readonly string[] {
-  const totalFindings = perUnit.reduce((n, r) => n + r.findings.length, 0)
+  const totalFindings = perUnit.reduce((n, r) => n + r.signals.length, 0)
   return [
     'opensip-tools graph --workspace',
     '',
@@ -64,9 +64,9 @@ export function renderWorkspaceJson(
         rootDir: r.rootDir,
         displayPath: r.displayPath,
         exitCode: r.exitCode,
-        findings: r.findings,
+        signals: r.signals,
       })),
-      totalFindings: perUnit.reduce((n, r) => n + r.findings.length, 0),
+      totalFindings: perUnit.reduce((n, r) => n + r.signals.length, 0),
     },
     null,
     2,
@@ -80,7 +80,7 @@ function renderWorkspaceStatusLines(
   for (const r of perUnit) {
     const status = r.exitCode === 0 ? 'ok' : `FAILED (exit ${String(r.exitCode)})`
     const display = unitDisplay(r)
-    out.push(`  ${display}: ${String(r.findings.length)} finding(s) — ${status}`)
+    out.push(`  ${display}: ${String(r.signals.length)} finding(s) — ${status}`)
     if (r.exitCode !== 0 && r.stderr.length > 0) {
       const stderrPreview = r.stderr.split('\n').slice(0, 3).join('\n    ')
       out.push(`    stderr: ${stderrPreview}`)
@@ -94,21 +94,21 @@ function renderWorkspaceFindingsLines(
 ): readonly string[] {
   const out: string[] = []
   for (const r of perUnit) {
-    if (r.findings.length === 0) continue
+    if (r.signals.length === 0) continue
     out.push(`[${unitDisplay(r)}]`, ...renderUnitFindingPreview(r), '')
   }
   return out
 }
 
 function renderUnitFindingPreview(r: WorkspaceUnitRunResult): readonly string[] {
-  const preview = r.findings.slice(0, FINDINGS_PREVIEW)
-  const lines = preview.map((f) => {
-    const loc = typeof f.line === 'number' ? `:${String(f.line)}` : ''
-    return `  ${f.filePath}${loc} — ${f.message}`
+  const preview = r.signals.slice(0, FINDINGS_PREVIEW)
+  const lines = preview.map((s) => {
+    const loc = typeof s.line === 'number' ? `:${String(s.line)}` : ''
+    return `  ${s.filePath}${loc} — ${s.message}`
   })
-  if (r.findings.length > preview.length) {
+  if (r.signals.length > preview.length) {
     lines.push(
-      `  ... ${String(r.findings.length - preview.length)} more (use --json for full list)`,
+      `  ... ${String(r.signals.length - preview.length)} more (use --json for full list)`,
     )
   }
   return lines

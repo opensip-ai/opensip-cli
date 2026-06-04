@@ -68,7 +68,6 @@ export type {
   PersistedFeatures,
   PersistedFunctionFeatures,
 } from './types.js';
-export type { Renderer, RenderContext } from './render/types.js';
 export type { Shard, ShardBuildResult } from './cli/orchestrate/shard-model.js';
 
 // EdgeResolver, ResolverContext, InventoryVisitor, VisitorContext used

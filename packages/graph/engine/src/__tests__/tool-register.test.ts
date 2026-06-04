@@ -5,12 +5,13 @@
  * instance so the option-parsing layer is exercised end-to-end.
  */
 
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { enterScope, LanguageRegistry } from '@opensip-tools/core';
 import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
+import { formatSignalSarif } from '@opensip-tools/output';
 import { Command } from 'commander';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
@@ -132,6 +133,15 @@ function makeMockCli(datastore?: DataStore): MockCliBag {
     logger: console,
     setExitCode,
     emitJson,
+    emitEnvelope: vi.fn(),
+    deliverSignals: vi.fn().mockResolvedValue(undefined),
+    // Root-owned SARIF-file sink (ADR-0011): mirror the composition root —
+    // format the envelope through the shared formatter and write it.
+    // eslint-disable-next-line @typescript-eslint/require-await -- async to match the seam signature
+    writeSarif: vi.fn(async (envelope: unknown, path: string) => {
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(path, formatSignalSarif(envelope as Parameters<typeof formatSignalSarif>[0]));
+    }),
     datastore,
     scope: { datastore: () => datastore, languages: new LanguageRegistry() },
   } as unknown as ToolCliContext;

@@ -204,16 +204,17 @@ module.exports = {
     },
 
     // -------------------------------------------------------------------
-    // Layer enforcement — reporting depends on core + contracts only.
+    // Layer enforcement — output depends on core + contracts only.
     // -------------------------------------------------------------------
     {
-      name: 'reporting-imports-core-contracts-only',
+      name: 'output-imports-core-contracts-only',
       severity: 'error',
       comment:
-        'reporting builds SARIF and reports to cloud. It depends on core ' +
-        '(withRetry, logger) and contracts (CliOutput type) only — never ' +
+        'output hosts the pure signal-envelope formatters (json/sarif/table) ' +
+        'and the effectful sinks (file/cloud). It depends on core ' +
+        '(withRetry, logger) and contracts (SignalEnvelope type) only — never ' +
         'datastore, a tool, cli, lang, check pack, graph, or simulation.',
-      from: { path: '^packages/reporting/src/' },
+      from: { path: '^packages/output/src/' },
       to: {
         path: [
           '^packages/datastore/',
@@ -237,7 +238,7 @@ module.exports = {
         'contracts holds the CliOutput / exit codes / persistence TYPES used ' +
         'by every tool. It must not import from any tool, the cli entry ' +
         'point, language packs, dashboard, or the runtime packages it was ' +
-        'split into (datastore / session-store / reporting). It depends on ' +
+        'split into (datastore / session-store / output). It depends on ' +
         'core only (audit 2026-05-29, contracts split).',
       from: { path: '^packages/contracts/src/' },
       to: {
@@ -248,7 +249,7 @@ module.exports = {
           '^packages/dashboard/',
           '^packages/datastore/',
           '^packages/session-store/',
-          '^packages/reporting/',
+          '^packages/output/',
           '^packages/languages/lang-',
           '^packages/fitness/checks-',
         ],

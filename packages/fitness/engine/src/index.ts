@@ -118,9 +118,9 @@ export type { CheckCatalogEntry, RecipeCatalogEntry } from './cli/dashboard.js';
 export { listChecks } from './cli/list-checks.js';
 export { listRecipes } from './cli/list-recipes.js';
 
-// Architecture-gate primitives (baseline save / compare) and SARIF
-// upload — both operate on fitness's CliOutput. Wired into the `fit`
-// subcommand by the tool's register() handler.
+// Architecture-gate primitives (baseline save / compare). Operate on the
+// run's signals. Wired into the `fit` subcommand by the tool's register()
+// handler.
 export {
   saveBaseline,
   compareToBaseline,
@@ -130,10 +130,10 @@ export {
 } from './gate.js';
 export type { GateCompareResult } from './gate.js';
 export { FitBaselineRepo } from './persistence/baseline-repo.js';
-// SARIF + cloud reporting moved to @opensip-tools/contracts (audit
-// 2026-05-29, M1) so graph can report without a graph→fitness cycle.
-// Import buildSarifLog / chunkSarifRuns / reportToCloud / ReportResult
-// from @opensip-tools/contracts.
+// SARIF + cloud egress live in @opensip-tools/output and are driven by the
+// CLI composition root (ADR-0011): the shared `formatSignalSarif` formatter
+// plus the file/cloud sinks. The tool engines no longer build or report their
+// own output — they return a `SignalEnvelope` and the root renders it.
 
 // Shared utilities for check authors (extracted from per-pack copies).
 export {

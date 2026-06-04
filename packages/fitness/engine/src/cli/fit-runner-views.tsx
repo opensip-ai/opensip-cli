@@ -1,43 +1,31 @@
 /**
  * @fileoverview Tool-specific Ink render pieces for the live fit view.
  *
- * Extracted from `fit-runner.tsx` so the state-machine entry there
- * stays compact. Each component here consumes FitDoneResult-shaped
- * data and pulls colours from the shared cli-ui theme. The Banner,
- * RunHeader, Spinner, and ErrorMessage primitives remain owned by
- * `@opensip-tools/cli-ui` — only the fitness-specific renderers live
- * here.
+ * Extracted from `fit-runner.tsx` so the state-machine entry there stays
+ * compact. Each component here consumes the run's {@link SignalEnvelope}-
+ * derived view-models (`FitTableRow` / `FitFindingsGroup`, built by
+ * `fit/envelope-view.ts`) and pulls colours from the shared cli-ui theme. The
+ * Banner, RunHeader, Spinner, and ErrorMessage primitives remain owned by
+ * `@opensip-tools/cli-ui` — only the fitness-specific renderers live here.
+ *
+ * ADR-0011 Phase 6: fitness no longer imports `@opensip-tools/output`; the
+ * live table/findings derive straight from the envelope (the static/non-TTY
+ * path uses the shared `formatSignalTableRows` at the composition root).
  */
 
 import { useTheme, sortFitRowPriority, parseValidatedCount } from '@opensip-tools/cli-ui';
-import {
-  type CheckOutput,
-  type FitDoneResult,
-  type TableRow,
-} from '@opensip-tools/contracts';
 import { Box, Text } from 'ink';
 import React from 'react';
 
+import { fitValidatedCell, type FitTableRow, type FitFindingsGroup } from './fit/envelope-view.js';
+
+import type { Signal } from '@opensip-tools/core';
+
 const DEFAULT_VIOLATIONS_PER_CHECK = 25;
 
-interface CheckCounts {
-  errorCount: number;
-  warningCount: number;
-}
-
-function countBySeverity(check: CheckOutput): CheckCounts {
-  let errorCount = 0;
-  let warningCount = 0;
-  for (const f of check.findings) {
-    if (f.severity === 'error') errorCount++;
-    else warningCount++;
-  }
-  return { errorCount, warningCount };
-}
-
-function statusColor(theme: ReturnType<typeof useTheme>, status: TableRow['status']): string {
+function statusColor(theme: ReturnType<typeof useTheme>, status: FitTableRow['status']): string {
   if (status === 'FAIL') return theme.statusFail;
-  if (status === 'TIMEOUT') return theme.statusTimeout;
+  if (status === 'ERROR') return theme.statusTimeout;
   return theme.statusPass;
 }
 
@@ -56,7 +44,7 @@ function durationColor(theme: ReturnType<typeof useTheme>, ms: number): string {
   return theme.success;
 }
 
-export function ResultsTable({ rows }: { readonly rows: readonly TableRow[] }): React.ReactElement | null {
+export function ResultsTable({ rows }: { readonly rows: readonly FitTableRow[] }): React.ReactElement | null {
   const theme = useTheme();
   if (rows.length === 0) return null;
   const sorted = [...rows].sort((a, b) => sortFitRowPriority(a) - sortFitRowPriority(b));
@@ -84,23 +72,26 @@ export function ResultsTable({ rows }: { readonly rows: readonly TableRow[] }): 
     <Box flexDirection="column">
       <Text>{headerCells.join(' | ')}</Text>
       <Text>{separatorCells.join('-|-')}</Text>
-      {sorted.map((row, i) => (
-        <Text key={i}>
-          {row.check.padEnd(maxCheckWidth)}
-          {' | '}
-          <Text color={statusColor(theme, row.status)}>{row.status.padEnd(widths.status)}</Text>
-          {' | '}
-          <Text color={row.errors > 0 ? theme.error : theme.success}>{String(row.errors).padEnd(widths.errors)}</Text>
-          {' | '}
-          <Text color={row.warnings > 0 ? theme.warning : theme.muted}>{String(row.warnings).padEnd(widths.warnings)}</Text>
-          {' | '}
-          {row.validated.padEnd(widths.validated)}
-          {' | '}
-          <Text color={ignoredColor(theme, row.ignored, row.validated)}>{String(row.ignored).padEnd(widths.ignored)}</Text>
-          {' | '}
-          <Text color={durationColor(theme, row.durationMs)}>{row.duration.padEnd(widths.duration)}</Text>
-        </Text>
-      ))}
+      {sorted.map((row, i) => {
+        const validatedCell = fitValidatedCell(row);
+        return (
+          <Text key={i}>
+            {row.check.padEnd(maxCheckWidth)}
+            {' | '}
+            <Text color={statusColor(theme, row.status)}>{row.status.padEnd(widths.status)}</Text>
+            {' | '}
+            <Text color={row.errors > 0 ? theme.error : theme.success}>{String(row.errors).padEnd(widths.errors)}</Text>
+            {' | '}
+            <Text color={row.warnings > 0 ? theme.warning : theme.muted}>{String(row.warnings).padEnd(widths.warnings)}</Text>
+            {' | '}
+            {validatedCell.padEnd(widths.validated)}
+            {' | '}
+            <Text color={ignoredColor(theme, row.ignored, validatedCell)}>{String(row.ignored).padEnd(widths.ignored)}</Text>
+            {' | '}
+            <Text color={durationColor(theme, row.durationMs)}>{row.duration.padEnd(widths.duration)}</Text>
+          </Text>
+        );
+      })}
     </Box>
   );
 }
@@ -133,20 +124,21 @@ export function WarningsBlock({ warnings }: { readonly warnings: readonly string
   );
 }
 
-export function FindingsBlock({ checks }: { readonly checks: readonly CheckOutput[] }): React.ReactElement {
+/** A single finding's location string (`file:line`), or '' when no location. */
+function locationOf(signal: Signal): string {
+  if (!signal.filePath) return '';
+  return signal.line ? `${signal.filePath}:${signal.line}` : signal.filePath;
+}
+
+export function FindingsBlock({ groups }: { readonly groups: readonly FitFindingsGroup[] }): React.ReactElement {
   const theme = useTheme();
-  const total = checks.reduce((sum, c) => {
-    const { errorCount, warningCount } = countBySeverity(c);
-    return sum + errorCount + warningCount + (c.error ? 1 : 0);
-  }, 0);
+  const total = groups.reduce(
+    (sum, g) => sum + g.errorCount + g.warningCount + (g.error ? 1 : 0),
+    0,
+  );
 
-  const relevant = checks.filter((c) => {
-    const { errorCount, warningCount } = countBySeverity(c);
-    return errorCount > 0 || warningCount > 0 || c.error;
-  });
-
-  const anyTruncated = relevant.some(
-    (c) => c.findings.length > DEFAULT_VIOLATIONS_PER_CHECK,
+  const anyTruncated = groups.some(
+    (g) => g.findings.length > DEFAULT_VIOLATIONS_PER_CHECK,
   );
 
   return (
@@ -158,35 +150,34 @@ export function FindingsBlock({ checks }: { readonly checks: readonly CheckOutpu
         :
       </Text>
       <Text> </Text>
-      {relevant.map((check) => {
-        const { errorCount, warningCount } = countBySeverity(check);
-        const count = errorCount + warningCount + (check.error ? 1 : 0);
-        const visible = check.findings.slice(0, DEFAULT_VIOLATIONS_PER_CHECK);
-        const hidden = Math.max(0, check.findings.length - visible.length);
+      {groups.map((group) => {
+        const count = group.errorCount + group.warningCount + (group.error ? 1 : 0);
+        const visible = group.findings.slice(0, DEFAULT_VIOLATIONS_PER_CHECK);
+        const hidden = Math.max(0, group.findings.length - visible.length);
         return (
-          <Box key={check.checkSlug} flexDirection="column" marginLeft={2}>
+          <Box key={group.checkSlug} flexDirection="column" marginLeft={2}>
             <Text>
-              <Text color={theme.brand}>{check.checkSlug}</Text>
+              <Text color={theme.brand}>{group.checkSlug}</Text>
               {' '}
               <Text dimColor>({count})</Text>
             </Text>
-            {check.error && (
+            {group.error && (
               <Text>
                 {'      '}
                 <Text color={theme.error}>error</Text>
                 {'  '}
-                {check.error}
+                {group.error}
               </Text>
             )}
             {visible.map((v, i) => {
-              const lineSuffix = v.line ? `:${v.line}` : '';
-              const loc = v.filePath ? `${v.filePath}${lineSuffix}` : '';
+              const loc = locationOf(v);
+              const isError = v.severity === 'critical' || v.severity === 'high';
               return (
                 <Box key={i} flexDirection="column">
                   <Text>
                     {'      '}
-                    <Text color={v.severity === 'error' ? theme.error : theme.warning}>
-                      {v.severity === 'error' ? 'error' : 'warn'}
+                    <Text color={isError ? theme.error : theme.warning}>
+                      {isError ? 'error' : 'warn'}
                     </Text>
                     {'  '}
                     {v.message}
@@ -214,44 +205,6 @@ export function FindingsBlock({ checks }: { readonly checks: readonly CheckOutpu
           {' '}<Text bold>opensip-tools dashboard</Text>.
         </Text>
       )}
-    </Box>
-  );
-}
-
-type ReportStatusShape = NonNullable<FitDoneResult['reportStatus']>;
-
-export function CloudReportStatusLine({ status }: { readonly status: ReportStatusShape }): React.ReactElement {
-  const theme = useTheme();
-  const { url, findingCount, runCount, success, error, chunksTotal, chunksSucceeded } = status;
-  const chunkDetail = chunksTotal != null && chunksTotal > 1
-    ? ` (${chunksSucceeded ?? 0}/${chunksTotal} chunks)`
-    : '';
-
-  if (!success) {
-    const partial = chunksSucceeded != null && chunksSucceeded > 0;
-    return (
-      <Box flexDirection="column" paddingLeft={2}>
-        <Text>
-          <Text color={partial ? theme.warning : theme.error}>{partial ? '⚠' : '✗'}</Text>
-          {' '}
-          {partial ? 'Partially reported' : 'Failed to report'} to <Text dimColor>{url}</Text>{chunkDetail}
-        </Text>
-        {error && <Text dimColor>{'    '}{error}</Text>}
-      </Box>
-    );
-  }
-
-  return (
-    <Box flexDirection="column" paddingLeft={2}>
-      <Text>
-        <Text color={theme.success}>{'✔'}</Text>
-        {' '}
-        Reported to <Text dimColor>{url}</Text>{chunkDetail}
-      </Text>
-      <Text dimColor>
-        {'    '}
-        {findingCount} findings from {runCount} checks
-      </Text>
     </Box>
   );
 }

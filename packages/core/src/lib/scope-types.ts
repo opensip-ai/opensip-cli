@@ -31,7 +31,7 @@ import type { LanguageRegistry } from '../languages/registry.js';
 import type { SignalSink } from '../signals/signal-sink.js';
 
 /** Opaque slot for per-run recipe configuration (replaces globalThis Symbol). */
-export interface RecipeCheckConfigSlot {
+export interface RecipeUnitConfigSlot {
   get<T extends Record<string, unknown>>(slug: string): T | undefined;
   set(slug: string, config: Record<string, unknown>): void;
   setAll(config: Record<string, Record<string, unknown>>): void;
@@ -68,7 +68,7 @@ export interface ScopeContribution {}
 export interface ToolScope extends ScopeContribution {
   readonly logger: Logger;
   readonly parseCache: LanguageParseCache;
-  readonly recipeCheckConfig: RecipeCheckConfigSlot;
+  readonly recipeUnitConfig: RecipeUnitConfigSlot;
   readonly projectContext: ProjectContext | undefined;
   readonly datastore: DataStoreThunk;
   readonly languages: LanguageRegistry;

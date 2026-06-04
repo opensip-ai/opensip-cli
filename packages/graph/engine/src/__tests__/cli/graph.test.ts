@@ -96,6 +96,8 @@ interface MockCli {
   readonly setExitCode: MockInstance;
   /** Captures the CommandResult(s) executeGraph hands to cli.render(). */
   readonly render: MockInstance;
+  /** Captures the envelope executeGraph hands to cli.emitEnvelope() under --json. */
+  readonly emitEnvelope: MockInstance;
 }
 
 function mockCli(
@@ -104,16 +106,19 @@ function mockCli(
 ): MockCli {
   const setExitCode = vi.fn();
   const render = vi.fn(() => Promise.resolve());
+  const emitEnvelope = vi.fn();
   const resolvedLanguages = languages ?? new LanguageRegistry();
   return {
     cli: {
       datastore,
       setExitCode,
       render,
+      emitEnvelope,
       scope: { datastore: () => datastore, languages: resolvedLanguages },
     } as unknown as ToolCliContext,
     setExitCode,
     render,
+    emitEnvelope,
   };
 }
 
@@ -260,14 +265,13 @@ describe('executeGraph — human / JSON modes', () => {
     expect(done.footerHints).toEqual([]);
   });
 
-  it('renders JSON when --json is set', async () => {
-    const { cli, setExitCode } = mockCli(datastore);
+  it('emits the signal envelope when --json is set', async () => {
+    const { cli, setExitCode, emitEnvelope } = mockCli(datastore);
     await executeGraph({ cwd: projectDir, noCache: true, json: true }, cli);
     expect(setExitCode).toHaveBeenCalledWith(0);
-    const out = stdoutSpy.mock.calls.map((c) => String(c[0])).join('');
-    const parsed = JSON.parse(out) as { tool: string; version: string };
-    expect(parsed.tool).toBe('graph');
-    expect(parsed.version).toBe('1.0');
+    const envelope = emitEnvelope.mock.calls[0]?.[0] as { tool: string; schemaVersion: number };
+    expect(envelope.tool).toBe('graph');
+    expect(envelope.schemaVersion).toBe(2);
   });
 
   it('emits a configuration error when --gate-save and --gate-compare are both set', async () => {

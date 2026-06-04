@@ -26,26 +26,26 @@
  * above; see docs/plans/graph-cli-language-neutral-scoping/.
  */
 
-import { EXIT_CODES } from '@opensip-tools/contracts';
+import { EXIT_CODES, passRate } from '@opensip-tools/contracts';
 import {
   ConfigurationError,
+  currentScope,
   generatePrefixedId,
   logger,
   ToolError,
   ValidationError,
 } from '@opensip-tools/core';
-import { emitRunSignals } from '@opensip-tools/reporting';
 import { SessionRepo } from '@opensip-tools/session-store';
 
 import { pickAdapter } from '../lang-adapter/registry.js';
 import { CatalogRepo } from '../persistence/catalog-repo.js';
 import { buildGraphSessionPayload } from '../persistence/session-payload.js';
 import { resolveRecipeToRules } from '../recipes/resolve.js';
-import { buildCliOutput, buildCliOutputFromFindings, renderJson } from '../render/json.js';
+import { mapOpenSipRuleIdToEngineSlug } from '../render/rule-id-mapping.js';
 
-
+import { buildGraphEnvelope } from './build-envelope.js';
 import { detectLanguages } from './detect.js';
-import { runCatalogJsonMode, runGateMode, runReportMode } from './graph-modes.js';
+import { runCatalogJsonMode, runGateMode } from './graph-modes.js';
 import { buildUnifiedReportLines, countFiles, resolutionBannerText } from './graph-report.js';
 import { loadGraphConfig, runGraph, runShardedGraph } from './orchestrate.js';
 import { positionalPathLabel, resolvePositionalPaths } from './positional-paths.js';
@@ -57,7 +57,7 @@ import type { GraphCommandOptions } from './graph-options.js';
 import type { Shard } from './orchestrate/shard-model.js';
 import type { RunGraphResult } from './orchestrate.js';
 import type { Catalog, FeatureColumn, GraphConfig, Rule } from '../types.js';
-import type { FindingOutput, GraphDoneResult } from '@opensip-tools/contracts';
+import type { GraphDoneResult, SignalEnvelope } from '@opensip-tools/contracts';
 import type { LanguageAdapter, Signal, ToolCliContext } from '@opensip-tools/core';
 import type { DataStore } from '@opensip-tools/datastore';
 
@@ -79,10 +79,19 @@ const MODULE_GRAPH_RENDER = 'graph:render';
  */
 const DASHBOARD_FEATURE_COLUMNS: readonly FeatureColumn[] = ['blast', 'scc', 'packageCoupling'];
 
+/**
+ * Run graph and return the run's {@link SignalEnvelope} so the composition
+ * root can deliver it (cloud + `--report-to`, ADR-0011). Returns `undefined`
+ * for the paths that do NOT produce a deliverable envelope: plain `--json`
+ * (the `--workspace` child carrier — children must not each emit cloud
+ * signals) and `--workspace` itself (the parent aggregates per-unit findings
+ * for the dashboard, not signals for the cloud — audit P1-2), and any error
+ * path. tool.ts calls `cli.deliverSignals` only when an envelope comes back.
+ */
 export async function executeGraph(
   opts: GraphCommandOptions,
   cli: ToolCliContext,
-): Promise<void> {
+): Promise<SignalEnvelope | undefined> {
   logger.info({ evt: 'graph.cli.graph.start', module: MODULE_GRAPH_CLI, cwd: opts.cwd });
   const startedAt = new Date().toISOString();
   try {
@@ -96,12 +105,11 @@ export async function executeGraph(
     const rules = resolveRecipeToRules(opts.recipe);
     if (opts.workspace === true) {
       await executeWorkspaceGraph(opts, cli);
-      return;
+      return undefined;
     }
     const positionalPaths = resolvePositionalScope(opts);
     if (positionalPaths.length > 1) {
-      await executeMultiPathGraph(opts, positionalPaths, cli, startedAt, rules);
-      return;
+      return await executeMultiPathGraph(opts, positionalPaths, cli, startedAt, rules);
     }
     const runCwd = positionalPaths[0] ?? opts.cwd;
     // Honor the project's `graph:` config block (rule knobs like
@@ -126,9 +134,10 @@ export async function executeGraph(
           emitFeatures: DASHBOARD_FEATURE_COLUMNS,
         });
     enforceLanguageMismatchPolicy(opts, result.catalog, [runCwd]);
-    await dispatchGraphResult(opts, result, cli, startedAt);
+    return await dispatchGraphResult(opts, result, cli, startedAt);
   } catch (error) {
     handleGraphError('graph', error, cli);
+    return undefined;
   }
 }
 
@@ -246,7 +255,7 @@ async function executeMultiPathGraph(
   cli: ToolCliContext,
   startedAt: string,
   rules: readonly Rule[],
-): Promise<void> {
+): Promise<SignalEnvelope | undefined> {
   const allSignals: Signal[] = [];
   let combinedFiles = 0;
   let lastResult: Awaited<ReturnType<typeof runGraph>> | null = null;
@@ -278,7 +287,7 @@ async function executeMultiPathGraph(
     );
   }
   /* v8 ignore next */
-  if (lastResult === null) return;
+  if (lastResult === null) return undefined;
   const combined = {
     catalog: lastResult.catalog,
     indexes: lastResult.indexes,
@@ -287,55 +296,66 @@ async function executeMultiPathGraph(
     cacheHit: lastResult.cacheHit,
     features: lastResult.features,
   };
-  await dispatchGraphResult(opts, combined, cli, startedAt);
+  return await dispatchGraphResult(opts, combined, cli, startedAt);
 }
 
-// Exported for the per-mode signal-emit test (audit P1-2). Not re-exported by
+/**
+ * Assemble the run's {@link SignalEnvelope} from its raw engine signals
+ * (ADR-0011). Centralises `runId`/`createdAt` resolution off the live scope so
+ * cloud egress correlates with the run id the logger stamps; the envelope is
+ * pure (the clock read happens here, once).
+ */
+function envelopeFor(
+  opts: GraphCommandOptions,
+  result: Awaited<ReturnType<typeof runGraph>>,
+  durationMs: number,
+): SignalEnvelope {
+  return buildGraphEnvelope({
+    signals: result.signals,
+    recipe: opts.recipe,
+    runId: currentScope()?.runId ?? '',
+    createdAt: new Date().toISOString(),
+    durationMs,
+    resolutionMode: result.catalog?.resolutionMode,
+  });
+}
+
+// Exported for the per-mode dispatch test (audit P1-2). Not re-exported by
 // the package barrel (only `executeGraph` is), so it stays package-internal.
+//
+// Returns the run's envelope for every mode that should deliver signals
+// (gate, catalog, `--report-to`, default render) so the composition root can
+// cloud-emit + report-to it ONCE (ADR-0011 / ADR-0008). Returns `undefined`
+// for plain `--json` (the `--workspace` child carrier — children must not each
+// emit cloud signals).
 export async function dispatchGraphResult(
   opts: GraphCommandOptions,
   result: Awaited<ReturnType<typeof runGraph>>,
   cli: ToolCliContext,
   startedAt: string,
-): Promise<void> {
+): Promise<SignalEnvelope | undefined> {
+  const durationMs = Math.max(0, Date.now() - Date.parse(startedAt));
   if (opts.gateSave === true || opts.gateCompare === true) {
-    // Gate output and the best-effort cloud emit are independent (the emit is a
-    // no-op for the keyless majority) — run them concurrently.
-    await Promise.all([
-      runGateMode(opts, result.signals, cli, result.catalog?.resolutionMode),
-      emitGraphSignals(opts, result, cli),
-    ]);
+    await runGateMode(opts, result.signals, cli, result.catalog?.resolutionMode);
     logger.info({ evt: EVT_GRAPH_COMPLETE, module: MODULE_GRAPH_CLI });
-    return;
-  }
-  if (typeof opts.reportTo === 'string' && opts.reportTo.length > 0) {
-    await Promise.all([
-      runReportMode(opts, result.signals, cli),
-      emitGraphSignals(opts, result, cli),
-    ]);
-    logger.info({ evt: EVT_GRAPH_COMPLETE, module: MODULE_GRAPH_CLI });
-    return;
+    return envelopeFor(opts, result, durationMs);
   }
   if (typeof opts.catalogOutput === 'string' && opts.catalogOutput.length > 0) {
     runCatalogJsonMode(opts, result, cli, startedAt);
-    await emitGraphSignals(opts, result, cli);
     logger.info({ evt: EVT_GRAPH_COMPLETE, module: MODULE_GRAPH_CLI });
-    return;
+    return envelopeFor(opts, result, durationMs);
   }
-  await renderGraphResult(opts, result, startedAt, cli);
+  const envelope = await renderGraphResult(opts, result, startedAt, cli);
   // Session persistence is dashboard history — populated on human-facing runs
-  // only. `--json` is the machine-artifact mode AND the carrier each
-  // `executeWorkspaceGraph` child runs under; skipping the session write here
-  // keeps "one human invocation = one session" (the --workspace parent persists
-  // the single aggregate row).
-  if (opts.json !== true) {
-    const durationMs = Math.max(0, Date.now() - Date.parse(startedAt));
+  // only. Skipped for:
+  //   - `--json` (the machine-artifact mode AND the carrier each
+  //     `executeWorkspaceGraph` child runs under — keeps "one human invocation
+  //     = one session"; the --workspace parent persists the single aggregate);
+  //   - `--report-to` (an export mode; like gate/catalog it opts out of session
+  //     history — the root delivers the envelope to the receiver instead).
+  const isReportTo = typeof opts.reportTo === 'string' && opts.reportTo.length > 0;
+  if (opts.json !== true && !isReportTo) {
     persistSession(opts, result.signals, cli.scope.datastore() as DataStore | undefined, durationMs);
-    // Cloud signal emit is now decoupled from session persistence (audit P1-2)
-    // and also runs in the gate/report/catalog branches above. Plain `--json`
-    // stays excluded so workspace child processes don't each emit; the parent
-    // aggregates findings for the dashboard but does not emit cloud signals.
-    await emitGraphSignals(opts, result, cli);
   }
   cli.setExitCode(EXIT_CODES.SUCCESS);
   logger.info({
@@ -343,29 +363,11 @@ export async function dispatchGraphResult(
     module: MODULE_GRAPH_CLI,
     signals: result.signals.length,
   });
-}
-
-/**
- * Best-effort cloud signal emit for a graph run (ADR-0008), decoupled from
- * session persistence so it fires in every documented single-run mode — gate,
- * report, catalog, and the default render — not only the dashboard-populating
- * path (audit P1-2). No-op for the keyless / not-entitled majority; never
- * throws. Plain `--json` and `--workspace` deliberately do not emit (see the
- * call sites): `--json` is the workspace-child carrier, and the workspace
- * parent aggregates findings for the dashboard, not signals for the cloud.
- */
-async function emitGraphSignals(
-  opts: GraphCommandOptions,
-  result: Awaited<ReturnType<typeof runGraph>>,
-  cli: ToolCliContext,
-): Promise<void> {
-  await emitRunSignals({
-    output: buildCliOutput(result.signals, 'graph', result.catalog?.resolutionMode),
-    tool: 'graph',
-    recipe: opts.recipe,
-    cwd: opts.cwd,
-    signalSink: cli.scope.signalSink,
-  });
+  // Plain `--json` is the workspace-child carrier: it returns `undefined` so
+  // the root does not cloud-emit per child (the parent owns the dashboard
+  // aggregate, not per-unit signal batches — audit P1-2). Every other mode
+  // (default render, `--report-to`) returns the envelope for root delivery.
+  return opts.json === true ? undefined : envelope;
 }
 
 /**
@@ -380,33 +382,36 @@ const GRAPH_FOOTER_HINTS: readonly { readonly text: string; readonly bold?: read
   { text: '--report-to <url> to send to OpenSIP', bold: ['--report-to <url>'] },
 ];
 
+/**
+ * Render the run and return its {@link SignalEnvelope} (ADR-0011).
+ *
+ * `--json` emits the envelope through the shared `formatSignalJson`
+ * (`cli.emitEnvelope`). The default/`--verbose` path hands a `graph-done`
+ * result to the render seam (Ink on TTY, plain text in pipes/CI): graph's
+ * report is richer than the neutral per-unit table — it carries the verbose
+ * catalog/findings/entry-point body (`reportLines`), a fast-tier caveat
+ * (`resolutionBanner`), the one-line PASS/FAIL `summary`, and next-step
+ * `footerHints`. The summary counts are derived from the envelope's verdict so
+ * `--json` and the human report agree; the envelope itself is NOT carried on
+ * the result (it would route to the neutral unit table and drop graph's body),
+ * but IS returned for the composition root's cloud + `--report-to` delivery.
+ */
 async function renderGraphResult(
   opts: GraphCommandOptions,
   result: Awaited<ReturnType<typeof runGraph>>,
   startedAt: string,
   cli: ToolCliContext,
-): Promise<void> {
+): Promise<SignalEnvelope> {
+  const durationMs = Math.max(0, Date.now() - Date.parse(startedAt));
+  const envelope = envelopeFor(opts, result, durationMs);
   if (opts.json === true) {
     logger.info({ evt: 'graph.render.json.start', module: MODULE_GRAPH_RENDER });
-    const out = renderJson(result.signals, {
-      cwd: opts.cwd,
-      tool: 'graph',
-      command: 'graph',
-      resolutionMode: result.catalog?.resolutionMode,
-    });
-    process.stdout.write(`${out}\n`);
+    cli.emitEnvelope(envelope);
     logger.info({ evt: 'graph.render.json.complete', module: MODULE_GRAPH_RENDER });
-    return;
+    return envelope;
   }
   logger.info({ evt: 'graph.render.table.start', module: MODULE_GRAPH_RENDER });
-  // Mirror the Ink live-view surface: default shows summary + footer hint
-  // only; `--verbose` opens up the catalog / findings-by-rule / entry-points
-  // body. The result is handed to the central render seam, which renders it
-  // as Ink (TTY) or plain text (pipe/CI) from one definition — no
-  // hand-maintained plain-text copies of the summary/footer/banner.
   const verbose = opts.verbose === true;
-  const cliOutput = buildCliOutput(result.signals, 'graph', result.catalog?.resolutionMode);
-  const durationMs = Math.max(0, Date.now() - Date.parse(startedAt));
   const reportLines = verbose
     ? buildUnifiedReportLines(
         {
@@ -419,21 +424,23 @@ async function renderGraphResult(
       )
     : [];
   const resolutionBanner = resolutionBannerText(result.catalog?.resolutionMode);
+  const { summary } = envelope.verdict;
   const done: GraphDoneResult = {
     type: 'graph-done',
     reportLines,
     ...(resolutionBanner === undefined ? {} : { resolutionBanner }),
     summary: {
-      passed: cliOutput.summary.passed,
-      failed: cliOutput.summary.failed,
-      errors: cliOutput.summary.errors,
-      warnings: cliOutput.summary.warnings,
+      passed: summary.passed,
+      failed: summary.failed,
+      errors: summary.errors,
+      warnings: summary.warnings,
     },
     durationMs,
     footerHints: verbose ? [] : GRAPH_FOOTER_HINTS,
   };
   await cli.render(done);
   logger.info({ evt: 'graph.render.table.complete', module: MODULE_GRAPH_RENDER });
+  return envelope;
 }
 
 /**
@@ -474,8 +481,8 @@ async function executeWorkspaceGraph(
   });
   const durationMs = Date.now() - startedAt;
 
-  const allFindings: FindingOutput[] = [];
-  for (const r of result.perUnit) allFindings.push(...r.findings);
+  const allSignals: Signal[] = [];
+  for (const r of result.perUnit) allSignals.push(...r.signals);
 
   if (opts.json === true) {
     process.stdout.write(`${renderWorkspaceJson(result.perUnit, durationMs)}\n`);
@@ -488,10 +495,11 @@ async function executeWorkspaceGraph(
     // (see dispatchGraphResult).
     //
     // Cloud signal sync (ADR-0008) is intentionally NOT emitted for
-    // --workspace (audit P1-2): the parent aggregates per-unit findings for
-    // the dashboard, not signals, and the --json children skip emit to avoid
-    // fragmented per-unit batches. A whole-project `graph` run emits normally.
-    persistWorkspaceSession(opts, allFindings, durationMs, cli);
+    // --workspace (audit P1-2): the parent aggregates per-unit signals for
+    // the dashboard, not for the cloud, and the --json children skip emit to
+    // avoid fragmented per-unit batches. A whole-project `graph` run emits
+    // normally (the root's deliverSignals on the returned envelope).
+    persistWorkspaceSession(opts, allSignals, durationMs, cli);
   }
 
   // If any child failed to spawn or exited with an error, surface it
@@ -509,7 +517,7 @@ async function executeWorkspaceGraph(
     evt: EVT_GRAPH_COMPLETE,
     module: MODULE_GRAPH_CLI,
     units: result.perUnit.length,
-    findings: allFindings.length,
+    findings: allSignals.length,
     failed: result.anyChildFailed,
     durationMs,
   });
@@ -562,40 +570,54 @@ export function persistSession(
   durationMs: number,
 ): void {
   if (!datastore) return;
-  saveGraphSession(opts, buildCliOutput(signals, 'graph', undefined, durationMs), datastore);
+  // The single-process path holds the raw engine signals (engine slugs), so
+  // the session payload's per-rule keys are engine slugs directly.
+  saveGraphSession(opts, signals, durationMs, datastore);
 }
 
 function persistWorkspaceSession(
   opts: GraphCommandOptions,
-  findings: readonly FindingOutput[],
+  signals: readonly Signal[],
   durationMs: number,
   cli: ToolCliContext,
 ): void {
   const datastore = cli.scope.datastore() as DataStore | undefined;
   if (!datastore) return;
-  saveGraphSession(opts, buildCliOutputFromFindings(findings, 'graph', durationMs), datastore);
+  // Child envelopes carry Option-A-mapped OpenSIP rule IDs; reverse-map back
+  // to engine slugs so the aggregate session payload's per-rule metric columns
+  // (keyed on engine slugs in the dashboard) keep working.
+  const engineSignals = signals.map((s) => {
+    const ruleId = mapOpenSipRuleIdToEngineSlug(s.ruleId);
+    return { ...s, ruleId, source: ruleId };
+  });
+  saveGraphSession(opts, engineSignals, durationMs, datastore);
 }
 
 function saveGraphSession(
   opts: GraphCommandOptions,
-  cliOutput: ReturnType<typeof buildCliOutput>,
+  signals: readonly Signal[],
+  durationMs: number,
   datastore: DataStore,
 ): void {
   try {
+    // Graph-owned opaque detail: summary + rule-grouped per-signal findings
+    // (engine slugs), built straight from the run's `Signal[]` (ADR-0011 — no
+    // `CliOutput`). The generic session row holds zero graph vocabulary; the
+    // dashboard reads this blob structurally.
+    const payload = buildGraphSessionPayload(signals);
     const repo = new SessionRepo(datastore);
     repo.save({
       id: generatePrefixedId('graph'),
       tool: 'graph',
-      timestamp: cliOutput.timestamp,
+      timestamp: new Date().toISOString(),
       cwd: opts.cwd,
-      score: cliOutput.score,
-      passed: cliOutput.passed,
-      durationMs: cliOutput.durationMs,
-      // Graph-owned opaque detail: summary + rule-grouped per-signal
-      // findings (the same rule grouping graph already computes for its
-      // JSON/SARIF surfaces). The generic session row holds zero graph
-      // vocabulary; the dashboard reads this blob structurally.
-      payload: buildGraphSessionPayload(cliOutput),
+      // Pass rate over passed/total rules — same definition fit uses (a
+      // warnings-only run is all-rules-passed → 100). `passed` ⇔ no
+      // error-severity (critical|high) signals.
+      score: passRate(payload.summary),
+      passed: payload.summary.errors === 0,
+      durationMs,
+      payload,
     });
   } catch {
     /* v8 ignore next */

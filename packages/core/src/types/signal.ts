@@ -52,6 +52,23 @@ export interface FixHint {
   readonly description?: string
 }
 
+/**
+ * True when a severity is on the "error" rung (`critical` or `high`), as
+ * opposed to the "warning" rung (`medium`/`low`). This is the single canonical
+ * predicate behind the run verdict (`passed ⇔ no error-rung signals`), the
+ * terminal table's error/warning split, the gate's severity, the SARIF
+ * `error` level, and the dashboard's 2-level bucketing — shared so all
+ * consumers agree (it lives in core alongside {@link Signal}).
+ */
+export function isErrorSeverity(severity: SignalSeverity): boolean {
+  return severity === 'critical' || severity === 'high'
+}
+
+/** True when a {@link Signal} is on the error rung. See {@link isErrorSeverity}. */
+export function isErrorSignal(signal: Signal): boolean {
+  return isErrorSeverity(signal.severity)
+}
+
 import { randomUUID } from 'node:crypto'
 
 /** Builds a {@link Signal} with default provider, generated id, and ISO timestamp. */

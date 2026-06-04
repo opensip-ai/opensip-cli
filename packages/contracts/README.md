@@ -4,7 +4,7 @@
 
 # @opensip-tools/contracts
 
-> Shared contract types for OpenSIP Tools — CliOutput / CommandResult shapes, exit codes, session persistence
+> Shared contract types for OpenSIP Tools — SignalEnvelope / CommandResult shapes, exit codes, session persistence
 
 This is an **internal library** of the opensip-tools toolkit. It is published so the CLI and tools can depend on it; most users will not install it directly.
 

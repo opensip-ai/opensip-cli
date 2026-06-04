@@ -37,8 +37,7 @@ import { currentScope, formatDuration } from '@opensip-tools/core';
 import { Box, Text, useApp, render } from 'ink';
 import React, { useCallback, useEffect, useState } from 'react';
 
-import { buildCliOutput } from '../render/json.js';
-
+import { buildGraphEnvelope } from './build-envelope.js';
 import { buildUnifiedReportLines, persistSession } from './graph.js';
 import { GRAPH_STAGES, runGraph } from './orchestrate.js';
 
@@ -189,15 +188,20 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
         // so the dashboard's Code Paths > Sessions never sees the run.
         persistSession({ cwd: args.cwd }, result.signals, datastore, durationMs);
         // Compute the fit-style summary the cli-ui `RunSummary` renders.
-        // buildCliOutput already applies the fit-aligned per-rule pass
-        // rule (`errors === 0` per render/json.ts), so the passed/failed
-        // counts here match what fit shows for an equivalent run.
-        const cliOutput = buildCliOutput(result.signals, 'graph');
+        // The envelope's verdict applies the fit-aligned per-rule pass rule
+        // (`passed` ⇔ no critical/high), so the passed/failed counts here
+        // match what fit shows for an equivalent run. runId/createdAt are
+        // summary-irrelevant here (the live view neither emits nor delivers).
+        const verdictSummary = buildGraphEnvelope({
+          signals: result.signals,
+          runId: currentScope()?.runId ?? '',
+          createdAt: new Date().toISOString(),
+        }).verdict.summary;
         const summary: RunSummaryShape = {
-          passed: cliOutput.summary.passed,
-          failed: cliOutput.summary.failed,
-          errors: cliOutput.summary.errors,
-          warnings: cliOutput.summary.warnings,
+          passed: verdictSummary.passed,
+          failed: verdictSummary.failed,
+          errors: verdictSummary.errors,
+          warnings: verdictSummary.warnings,
           durationMs,
         };
         // includeSummary: false — RunSummary takes the place of the

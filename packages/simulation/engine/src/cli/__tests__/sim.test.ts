@@ -57,8 +57,10 @@ describe('executeSim', () => {
     const { result } = await executeSim(args());
     expect(result.type).toBe('sim-done');
     if (result.type === 'sim-done') {
-      expect(result.totalScenarios).toBe(1);
-      expect(result.scenarios[0]?.scenarioId).toBe('load-a');
+      // ADR-0011: per-scenario facts live on the envelope's `units` sidecar
+      // (one unit per scenario, slug === scenarioId).
+      expect(result.envelope.units).toHaveLength(1);
+      expect(result.envelope.units[0]?.slug).toBe('load-a');
     }
   });
 
@@ -75,7 +77,7 @@ describe('executeSim', () => {
     const { result } = await executeSim(args({ kind: 'load' }));
     expect(result.type).toBe('sim-done');
     if (result.type === 'sim-done') {
-      expect(result.totalScenarios).toBe(1);
+      expect(result.envelope.units).toHaveLength(1);
     }
   });
 
@@ -92,7 +94,7 @@ describe('executeSim', () => {
     const { result } = await executeSim(args({ kind: 'chaos' }));
     expect(result.type).toBe('sim-done');
     if (result.type === 'sim-done') {
-      expect(result.totalScenarios).toBe(0);
+      expect(result.envelope.units).toHaveLength(0);
       expect(result.shouldFail).toBe(false);
     }
   });
@@ -143,7 +145,7 @@ describe('executeSim', () => {
     expect(result.type).toBe('sim-done');
     expect(executed).toBe(false);
     if (result.type === 'sim-done') {
-      expect(result.totalScenarios).toBe(0);
+      expect(result.envelope.units).toHaveLength(0);
     }
   });
 
@@ -160,7 +162,7 @@ describe('executeSim', () => {
     const { result } = await executeSim(args());
     expect(result.type).toBe('sim-done');
     if (result.type === 'sim-done') {
-      expect(result.failedScenarios).toBe(1);
+      expect(result.envelope.verdict.summary.failed).toBe(1);
       expect(result.shouldFail).toBe(true);
     }
   });
@@ -169,7 +171,7 @@ describe('executeSim', () => {
     const { result } = await executeSim(args());
     expect(result.type).toBe('sim-done');
     if (result.type === 'sim-done') {
-      expect(result.totalScenarios).toBe(0);
+      expect(result.envelope.units).toHaveLength(0);
       expect(result.shouldFail).toBe(false);
     }
   });
@@ -185,7 +187,8 @@ describe('executeSim', () => {
     });
     const { result } = await executeSim(args());
     if (result.type === 'sim-done') {
-      expect(result.scenarios[0]?.error).toContain('a-specific-message');
+      // The scenario's thrown error is carried on its unit (slug === scenarioId).
+      expect(result.envelope.units[0]?.error).toContain('a-specific-message');
     }
   });
 });

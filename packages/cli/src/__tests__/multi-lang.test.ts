@@ -50,7 +50,7 @@ describe('CLI multi-language', () => {
     expect([0, 1]).toContain(result.exitCode) // 0 if all pass, 1 if some fail (acceptable in fixture)
     const output: unknown = JSON.parse(result.stdout)
     expect(typeof output).toBe('object')
-    expect((output as { version: string }).version).toBe('1.0')
+    expect((output as { schemaVersion: number }).schemaVersion).toBe(2)
   })
 
   it('produces no plugin-load errors for the fixture', () => {
@@ -92,7 +92,7 @@ describe('CLI multi-language', () => {
     expect(result.stderr).toContain('klingon')
     // CLI should still complete (exit 0 since no errors fired) and
     // produce valid JSON on stdout.
-    const output = JSON.parse(result.stdout) as { version: string }
-    expect(output.version).toBe('1.0')
+    const output = JSON.parse(result.stdout) as { schemaVersion: number }
+    expect(output.schemaVersion).toBe(2)
   })
 })

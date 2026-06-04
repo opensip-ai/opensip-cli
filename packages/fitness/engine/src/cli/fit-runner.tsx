@@ -38,17 +38,16 @@ import {
 import {
   EXIT_CODES,
   type FitOptions,
-  type CliOutput,
   type ErrorResult,
   type FitDoneResult,
+  type SignalEnvelope,
 } from '@opensip-tools/contracts';
 import { currentScope } from '@opensip-tools/core';
 import { Box, Static, Text, useApp, render } from 'ink';
 import React, { useCallback, useEffect, useState } from 'react';
 
-import { reportFitFindings } from './fit-modes.js';
+import { envelopeToFindingsGroups, envelopeToFitRows } from './fit/envelope-view.js';
 import {
-  CloudReportStatusLine,
   FindingsBlock,
   ResultsTable,
   WarningsBlock,
@@ -79,9 +78,11 @@ interface FitRunnerProps {
   readonly args: FitOptions;
   readonly datastore?: DataStore;
   readonly setExitCode?: (code: number) => void;
+  /** Called with the run's envelope once it completes, for root-owned egress. */
+  readonly onEnvelope?: (envelope: SignalEnvelope) => void;
 }
 
-function FitRunner({ args, datastore, setExitCode }: FitRunnerProps): React.ReactElement {
+function FitRunner({ args, datastore, setExitCode, onEnvelope }: FitRunnerProps): React.ReactElement {
   const { exit } = useApp();
   const [state, setState] = useState<FitState>({ phase: 'loading' });
 
@@ -123,26 +124,18 @@ function FitRunner({ args, datastore, setExitCode }: FitRunnerProps): React.Reac
         return;
       }
 
-      const { result, output } = fitResult as { result: FitDoneResult; output: CliOutput };
+      const { result } = fitResult as { result: FitDoneResult };
 
-      // Cloud reporting — shared with the json/gate/non-TTY paths (audit P1-1).
-      let finalResult: FitDoneResult = result;
-      const reportStatus = await reportFitFindings(output, args);
-      if (reportStatus) {
-        finalResult = { ...result, reportStatus };
+      if (result.shouldFail) {
+        setExitCode?.(EXIT_CODES.RUNTIME_ERROR);
       }
 
-      if (finalResult.shouldFail) {
-        setExitCode?.(1);
-      } else if (reportStatus && !reportStatus.success) {
-        // A `--report-to` upload failure fails the run (EXIT_CODES.REPORT_FAILED,
-        // the documented contract), but only when the run otherwise passed — a
-        // real check/gate failure (shouldFail above) takes precedence and is
-        // never masked by a reporting failure.
-        setExitCode?.(EXIT_CODES.REPORT_FAILED);
-      }
+      // Effectful egress (cloud + `--report-to`) lives at the composition root
+      // now (ADR-0011): `renderFitLive` returns this envelope and the tool's
+      // `registerLiveView` callback delivers it once the Ink app exits.
+      onEnvelope?.(result.envelope);
 
-      setState({ phase: 'done', result: finalResult, checkCount });
+      setState({ phase: 'done', result, checkCount });
       setTimeout(() => exit(), 100);
     })();
 
@@ -231,30 +224,33 @@ function FitRunner({ args, datastore, setExitCode }: FitRunnerProps): React.Reac
     }
 
     case 'done': {
+      const { envelope } = state.result;
+      const { summary } = envelope.verdict;
+      const durationMs = envelope.units.reduce((total, u) => total + u.durationMs, 0);
+      const showFindings =
+        (args.verbose === true || args.findings === true) &&
+        summary.errors + summary.warnings > 0;
       return (
         <>
           {staticHeader}
           <Box flexDirection="column">
           {!args.quiet && (args.verbose === true || args.findings === true) && (
             <Box paddingTop={1} flexDirection="column">
-              <ResultsTable rows={state.result.rows} />
+              <ResultsTable rows={envelopeToFitRows(envelope)} />
             </Box>
           )}
           <RunSummary
-            passed={state.result.summary.passed}
-            failed={state.result.summary.failed}
-            errors={state.result.summary.totalErrors}
-            warnings={state.result.summary.totalWarnings}
-            durationMs={state.result.summary.durationMs}
+            passed={summary.passed}
+            failed={summary.failed}
+            errors={summary.errors}
+            warnings={summary.warnings}
+            durationMs={durationMs}
           />
           {!args.quiet && state.result.warnings && state.result.warnings.length > 0 && (
             <WarningsBlock warnings={state.result.warnings} />
           )}
-          {!args.quiet && state.result.findings && (
-            <FindingsBlock checks={state.result.findings.checks} />
-          )}
-          {!args.quiet && state.result.reportStatus && (
-            <CloudReportStatusLine status={state.result.reportStatus} />
+          {!args.quiet && showFindings && (
+            <FindingsBlock groups={envelopeToFindingsGroups(envelope)} />
           )}
           {!args.quiet && args.verbose !== true && args.findings !== true && (
             <RunFooterHints
@@ -304,27 +300,37 @@ export interface RenderFitLiveOptions {
 }
 
 /**
- * Render the live `fit` view. Returns once the underlying Ink app exits.
+ * Render the live `fit` view. Returns the run's {@link SignalEnvelope} once
+ * the underlying Ink app exits (or `undefined` on an error / no-result run).
  *
  * The CLI's `tool.register(cli)` wires this through
  * `cli.registerLiveView('fit', (args) => renderFitLive(args, { ... }))`.
  * `setExitCode` is the single mutator path on `process.exitCode`; the
  * runner calls it for error and `shouldFail` outcomes so the CLI's
- * exit-code seam stays the only writer.
+ * exit-code seam stays the only writer. The returned envelope lets the tool's
+ * registration deliver signals (cloud + `--report-to`) at the composition
+ * root after the interactive view exits (ADR-0011 — egress is not in-view).
  */
 export async function renderFitLive(
   args: FitOptions,
   datastore?: DataStore,
   options?: RenderFitLiveOptions,
-): Promise<void> {
+): Promise<SignalEnvelope | undefined> {
+  let envelope: SignalEnvelope | undefined;
   const app = render(
     <ThemeProvider>
       <ClockProvider>
-        <FitRunner args={args} datastore={datastore} setExitCode={options?.setExitCode} />
+        <FitRunner
+          args={args}
+          datastore={datastore}
+          setExitCode={options?.setExitCode}
+          onEnvelope={(e) => { envelope = e; }}
+        />
       </ClockProvider>
     </ThemeProvider>,
   );
   await app.waitUntilExit();
   // Trailing newline so shell prompt starts on a new line.
   process.stdout.write('\n');
+  return envelope;
 }

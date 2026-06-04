@@ -90,14 +90,15 @@ describe('CLI e2e', () => {
   describe('fit', () => {
     it('runs successfully with --json', () => {
       const { stdout, exitCode } = run('fit', '--json');
-      // Parse as JSON — should not throw
+      // Parse as JSON — should not throw. ADR-0011: --json is the signal envelope.
       const output = JSON.parse(stdout);
-      expect(output.version).toBe('1.0');
+      expect(output.schemaVersion).toBe(2);
       expect(output.tool).toBe('fit');
-      expect(output.summary).toBeDefined();
-      expect(typeof output.summary.total).toBe('number');
-      expect(typeof output.summary.passed).toBe('number');
-      expect(typeof output.summary.failed).toBe('number');
+      expect(output.verdict).toBeDefined();
+      expect(typeof output.verdict.summary.total).toBe('number');
+      expect(typeof output.verdict.summary.passed).toBe('number');
+      expect(typeof output.verdict.summary.failed).toBe('number');
+      expect(Array.isArray(output.signals)).toBe(true);
       // Exit code depends on whether shouldFail is set; just verify it parsed
       expect([0, 1]).toContain(exitCode);
     });
@@ -135,29 +136,29 @@ describe('CLI e2e', () => {
       const { stdout } = run('fit', '--json', '--check', 'no-console-log');
       const output = JSON.parse(stdout);
       expect(output.tool).toBe('fit');
-      expect(output.summary).toBeDefined();
-      // --check must narrow to exactly one check, not the full default recipe.
-      expect(output.summary.total).toBe(1);
-      expect(output.checks).toHaveLength(1);
-      expect(output.checks[0].checkSlug).toBe('no-console-log');
+      expect(output.verdict).toBeDefined();
+      // --check must narrow to exactly one check (unit), not the full default recipe.
+      expect(output.verdict.summary.total).toBe(1);
+      expect(output.units).toHaveLength(1);
+      expect(output.units[0].slug).toBe('no-console-log');
     });
 
     it('--recipe quick-smoke runs without error', () => {
       const { stdout } = run('fit', '--json', '--recipe', 'quick-smoke');
       const output = JSON.parse(stdout);
       expect(output.tool).toBe('fit');
-      expect(output.summary).toBeDefined();
-      expect(output.summary.total).toBeGreaterThan(0);
+      expect(output.verdict).toBeDefined();
+      expect(output.verdict.summary.total).toBeGreaterThan(0);
     });
 
     it('--json summary fields have expected types', () => {
       const { stdout } = run('fit', '--json', '--recipe', 'quick-smoke');
       const output = JSON.parse(stdout);
-      expect(typeof output.timestamp).toBe('string');
-      expect(typeof output.score).toBe('number');
-      expect(typeof output.passed).toBe('boolean');
-      expect(typeof output.durationMs).toBe('number');
-      expect(Array.isArray(output.checks)).toBe(true);
+      expect(typeof output.createdAt).toBe('string');
+      expect(typeof output.verdict.score).toBe('number');
+      expect(typeof output.verdict.passed).toBe('boolean');
+      expect(Array.isArray(output.signals)).toBe(true);
+      expect(Array.isArray(output.units)).toBe(true);
     });
 
     it('unknown recipe produces error JSON', () => {
@@ -232,12 +233,13 @@ describe('CLI e2e', () => {
 
   describe('sim', () => {
     it('runs the built-in default recipe with no scenarios registered', () => {
-      // No user-authored scenarios in the e2e env, so the default
-      // recipe matches zero scenarios and exits cleanly. The output
-      // surface (Ink summary) mentions the recipe name.
+      // No user-authored scenarios in the e2e env, so the default recipe
+      // matches zero scenarios and exits cleanly. Since Phase 4 (ADR-0011)
+      // the sim view is the shared envelope-derived table; with zero units
+      // it renders the shared run-summary line ("0 Passed, 0 Failed ...").
       const { stdout, exitCode } = run('sim');
       expect(exitCode).toBe(0);
-      expect(stdout.toLowerCase()).toContain('recipe');
+      expect(stdout).toContain('0 Passed, 0 Failed');
     });
 
     it('exits 2 when given an unknown recipe name', () => {

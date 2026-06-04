@@ -95,6 +95,13 @@ function makeCli(): CapturedCli {
     },
     setExitCode: (c: number) => { exitCodes.push(c); },
     emitJson: vi.fn(),
+    // Mirror the composition root's `emitEnvelope` seam: write the envelope as
+    // JSON to stdout so the `--json` integration test can parse it.
+    emitEnvelope: vi.fn((envelope: unknown) => {
+      process.stdout.write(`${JSON.stringify(envelope, null, 2)}\n`);
+    }),
+    deliverSignals: vi.fn(() => Promise.resolve()),
+    writeSarif: vi.fn(() => Promise.resolve()),
   };
   return { cli, exitCodes, datastore, render };
 }
@@ -179,14 +186,20 @@ describe('executeGraph', () => {
     expect(exitCodes).toContain(0);
   });
 
-  it('JSON mode prints a CliOutput-shaped document', async () => {
+  it('JSON mode emits the signal envelope', async () => {
     setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });
     const { cli, exitCodes } = makeCli();
     await executeGraph({ cwd: dir, json: true }, cli);
-    const parsed = JSON.parse(stdout) as { tool: string; recipe: string; checks: unknown[] };
+    const parsed = JSON.parse(stdout) as {
+      tool: string;
+      schemaVersion: number;
+      signals: unknown[];
+      verdict: { passed: boolean };
+    };
     expect(parsed.tool).toBe('graph');
-    expect(parsed.recipe).toBe('graph');
-    expect(Array.isArray(parsed.checks)).toBe(true);
+    expect(parsed.schemaVersion).toBe(2);
+    expect(Array.isArray(parsed.signals)).toBe(true);
+    expect(typeof parsed.verdict.passed).toBe('boolean');
     expect(exitCodes).toContain(0);
   });
 
@@ -243,17 +256,21 @@ describe('executeGraph', () => {
     expect(exitCodes).toContain(2);
   });
 
-  it('--report-to with an unreachable URL returns a report-failed exit code', async () => {
-    // Need at least one finding so reportToCloud actually fires the
-    // request — otherwise it short-circuits to success.
+  it('--report-to returns the envelope for the root to deliver (ADR-0011)', async () => {
+    // Egress moved off executeGraph to the composition root (ADR-0011 Phase 5):
+    // executeGraph renders the report and RETURNS the envelope; the root's
+    // `cli.deliverSignals` owns cloud egress + the `--report-to` upload (and
+    // exit code 4). That exit-4 behaviour is covered in the CLI's
+    // envelope-routing tests — here we just assert the envelope is returned so
+    // the root has something to deliver.
     setupFixture(dir, {
       'index.ts': `function unused(): number { return 1; }\nexport function main(): void {}\n`,
     });
     const { cli, exitCodes } = makeCli();
-    // Use an obviously dead, reserved port to force fetch failure quickly.
-    await executeGraph({ cwd: dir, reportTo: 'http://127.0.0.1:1' }, cli);
-    expect(exitCodes).toContain(4);
-    expect(stderr).toContain('Graph report failed');
+    const envelope = await executeGraph({ cwd: dir, reportTo: 'http://127.0.0.1:1' }, cli);
+    expect(envelope?.tool).toBe('graph');
+    expect(envelope?.schemaVersion).toBe(2);
+    expect(exitCodes).toContain(0);
   });
 
   it('errors when --workspace and positional paths are passed together', async () => {
@@ -309,14 +326,17 @@ describe('executeGraph', () => {
     expect(exitCodes).toContain(0);
   });
 
-  it('--report-to with no findings short-circuits to success', async () => {
-    // No findings — reportToCloud short-circuits and returns success.
+  it('--report-to with no findings renders the report and returns the envelope', async () => {
+    // A clean run still returns an envelope (the root may still cloud-emit it);
+    // executeGraph renders the normal graph report rather than a bespoke
+    // "report sent" status line now that delivery lives at the root.
     setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });
     const { cli, exitCodes, render } = makeCli();
-    await executeGraph({ cwd: dir, reportTo: 'http://127.0.0.1:1' }, cli);
-    // Should succeed because the "no findings" short-circuit doesn't
-    // attempt the network request.
-    expect(renderedLines(render)).toContain('Graph report sent');
+    const envelope = await executeGraph({ cwd: dir, reportTo: 'http://127.0.0.1:1' }, cli);
+    const done = render.mock.calls[0]?.[0] as GraphDoneLike;
+    expect(done.type).toBe('graph-done');
+    expect(envelope?.tool).toBe('graph');
+    expect(envelope?.verdict.passed).toBe(true);
     expect(exitCodes).toContain(0);
   });
 
@@ -335,14 +355,15 @@ describe('executeGraph', () => {
     writeFileSync(join(dir, 'packages', 'b', 'main.ts'), `export function b(): number { return 1; }\n`, 'utf8');
     // Helper script that pretends to be the CLI for child invocations:
     // takes the graph subcommand args, ignores them, and emits an empty
-    // CliOutput JSON document.
+    // SignalEnvelope JSON document (ADR-0011 — the parent parses .signals).
     const helper = join(dir, 'fake-cli.cjs');
     writeFileSync(
       helper,
       `process.stdout.write(JSON.stringify({\n` +
-        `  version: '1.0', tool: 'graph', recipe: 'graph',\n` +
-        `  timestamp: new Date().toISOString(), durationMs: 0,\n` +
-        `  score: 100, passed: true, summary: 'ok', checks: []\n` +
+        `  schemaVersion: 2, tool: 'graph', recipe: 'graph',\n` +
+        `  runId: 'r', createdAt: new Date().toISOString(),\n` +
+        `  verdict: { score: 100, passed: true, summary: { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 } },\n` +
+        `  units: [], signals: []\n` +
         `}));\n` +
         `process.exit(0);\n`,
       'utf8',
@@ -370,19 +391,17 @@ describe('executeGraph', () => {
     mkdirSync(join(dir, 'packages', 'a'), { recursive: true });
     writeFileSync(join(dir, 'packages', 'a', 'tsconfig.json'), FIXTURE_TSCONFIG, 'utf8');
     writeFileSync(join(dir, 'packages', 'a', 'main.ts'), `export function a(): number { return 1; }\n`, 'utf8');
-    // Helper that emits one finding so the findings section renders.
+    // Helper that emits one signal so the findings section renders (ADR-0011 —
+    // the parent parses .signals off the child's SignalEnvelope stdout).
     const helper = join(dir, 'fake-cli.cjs');
     writeFileSync(
       helper,
       `process.stdout.write(JSON.stringify({\n` +
-        `  version: '1.0', tool: 'graph', recipe: 'graph',\n` +
-        `  timestamp: new Date().toISOString(), durationMs: 0,\n` +
-        `  score: 50, passed: false, summary: 'one',\n` +
-        `  checks: [{\n` +
-        `    checkSlug: 'graph:orphan-subtree', passed: false, violationCount: 1,\n` +
-        `    findings: [{ ruleId: 'graph:orphan-subtree', message: 'orphan x', severity: 'low', filePath: 'main.ts', line: 1, column: 1 }],\n` +
-        `    durationMs: 0\n` +
-        `  }]\n` +
+        `  schemaVersion: 2, tool: 'graph', recipe: 'graph',\n` +
+        `  runId: 'r', createdAt: new Date().toISOString(),\n` +
+        `  verdict: { score: 50, passed: false, summary: { total: 1, passed: 0, failed: 1, errors: 0, warnings: 1 } },\n` +
+        `  units: [{ slug: 'graph.dead-code.orphan-subtree', passed: true, durationMs: 0 }],\n` +
+        `  signals: [{ id: 's1', source: 'graph.dead-code.orphan-subtree', provider: 'opensip-tools', severity: 'low', category: 'quality', ruleId: 'graph.dead-code.orphan-subtree', message: 'orphan x', filePath: 'main.ts', line: 1, column: 1, metadata: {}, createdAt: new Date().toISOString() }]\n` +
         `}));\n` +
         `process.exit(0);\n`,
       'utf8',
@@ -426,6 +445,9 @@ describe('executeGraph', () => {
       },
       setExitCode: (c: number) => { exitCodes.push(c); },
       emitJson: vi.fn(),
+      emitEnvelope: vi.fn(),
+      deliverSignals: vi.fn(() => Promise.resolve()),
+      writeSarif: vi.fn(() => Promise.resolve()),
       registerLiveView: vi.fn(),
     };
     await executeGraph({ cwd: dir, gateSave: true }, cli);

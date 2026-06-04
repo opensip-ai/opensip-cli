@@ -12,6 +12,7 @@
  */
 
 import { renderToText, renderToInk, ThemeProvider } from '@opensip-tools/cli-ui';
+import { buildSignalEnvelope } from '@opensip-tools/contracts';
 import { render } from 'ink-testing-library';
 import React from 'react';
 import { describe, it, expect } from 'vitest';
@@ -41,18 +42,25 @@ function plainText(result: CommandResult): string {
 
 const FIXTURES: Readonly<Record<string, CommandResult>> = {
   error: { type: 'error', message: 'boom', suggestion: 'try --help', exitCode: 1 },
+  // ADR-0011 (Phase 4): sim-done is now envelope-derived (one unit row per
+  // scenario), rendered through the shared envelopeToTableView like fit/graph.
   'sim-done': {
     type: 'sim-done',
     recipeName: 'example',
     cwd: '/x',
-    totalScenarios: 2,
-    passedScenarios: 1,
-    failedScenarios: 1,
     durationMs: 1500,
-    scenarios: [
-      { scenarioId: 'a', scenarioName: 'loads', kind: 'load', passed: true, durationMs: 10 },
-      { scenarioId: 'b', scenarioName: 'inv', kind: 'invariant', passed: false, durationMs: 20, error: 'broke' },
-    ],
+    shouldFail: true,
+    envelope: buildSignalEnvelope({
+      tool: 'sim',
+      recipe: 'example',
+      runId: 'run-1',
+      createdAt: '2026-06-04T00:00:00.000Z',
+      units: [
+        { slug: 'a', passed: true, durationMs: 10 },
+        { slug: 'b', passed: false, durationMs: 20, error: 'broke' },
+      ],
+      signals: [],
+    }),
   },
   'graph-done': {
     type: 'graph-done',
@@ -67,18 +75,26 @@ const FIXTURES: Readonly<Record<string, CommandResult>> = {
     type: 'graph-status',
     lines: ['saveBaseline — 1 occurrence(s)', '  saveBaseline (function)', '    src/gate.ts:12:0'],
   },
+  // ADR-0011 Phase 6: fit-done is envelope-derived (one row per check unit,
+  // with the fitness Validated/Ignores columns from UnitResult).
   'fit-done': {
     type: 'fit-done',
     label: 'fit',
     cwd: '/x',
-    rows: [
-      { check: 'no-console', status: 'FAIL', errors: 2, warnings: 0, validated: '10 files', ignored: 0, duration: '5ms', durationMs: 5 },
-      { check: 'naming', status: 'PASS', errors: 0, warnings: 1, validated: '10 files', ignored: 0, duration: '3ms', durationMs: 3 },
-    ],
-    summary: { passed: 1, failed: 1, totalErrors: 2, totalWarnings: 1, totalIgnored: 0, durationMs: 8 },
-    findings: {
-      checks: [{ checkSlug: 'no-console', passed: false, findings: [{ ruleId: 'no-console', message: 'console.log', severity: 'error', filePath: 'a.ts', line: 3 }], durationMs: 5 }],
-    },
+    envelope: buildSignalEnvelope({
+      tool: 'fit',
+      runId: 'r',
+      createdAt: '2026-06-04T00:00:00.000Z',
+      units: [
+        { slug: 'no-console', passed: false, durationMs: 5, filesValidated: 10, itemType: 'files', ignoredCount: 0 },
+        { slug: 'naming', passed: true, durationMs: 3, filesValidated: 10, itemType: 'files', ignoredCount: 0 },
+      ],
+      signals: [
+        { id: 's1', source: 'no-console', provider: 'opensip-tools', severity: 'high', category: 'quality', ruleId: 'no-console', message: 'console.log', filePath: 'a.ts', line: 3, metadata: {}, createdAt: '2026-06-04T00:00:00.000Z' },
+        { id: 's2', source: 'no-console', provider: 'opensip-tools', severity: 'high', category: 'quality', ruleId: 'no-console', message: 'console.log', filePath: 'b.ts', line: 4, metadata: {}, createdAt: '2026-06-04T00:00:00.000Z' },
+        { id: 's3', source: 'naming', provider: 'opensip-tools', severity: 'medium', category: 'quality', ruleId: 'naming', message: 'bad name', filePath: 'c.ts', metadata: {}, createdAt: '2026-06-04T00:00:00.000Z' },
+      ],
+    }),
   },
 };
 

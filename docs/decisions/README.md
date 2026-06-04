@@ -72,6 +72,18 @@ distinct from:
   surfaces: test-only/internal exports move behind a `<pkg>/internal` subpath,
   the kernel carries no tool vocabulary, and persistence schema/raw-handle stay
   owner-private (repositories only), enforced by dependency-cruiser
+- [ADR-0010](./ADR-0010-lang-canonical-parse-substrate.md) — `lang-*` is the
+  single canonical parse + AST substrate for the whole platform: fitness checks
+  *and* graph adapters consume `lang-*`, tree-sitter parsing moves from
+  `graph-adapter-common` into `lang-*` (generalizing the existing
+  `graph-typescript → lang-typescript` edge), `MinimalTextTree` is retired
+  per-language — unblocking AST-level polyglot fit checks (parent DEC-521)
+- [ADR-0011](./ADR-0011-signal-output-currency-formatter-sink.md) — `Signal` is
+  the universal output currency: every tool (units = check/rule/scenario) emits
+  one signal envelope (`Signal[]` + verdict), `CliOutput`/`CheckOutput` are
+  retired, formatters become pure shared `envelope→string` transforms and sinks
+  stay heterogeneous (not unified), and tools never render — the CLI composition
+  root routes the envelope to a (formatter × sink). Resolves audit Findings 1 & 5
 
 ### Superseded
 

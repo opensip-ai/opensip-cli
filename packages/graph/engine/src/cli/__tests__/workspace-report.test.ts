@@ -8,15 +8,21 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderWorkspaceJson, workspaceReportLines } from '../workspace-report.js';
 
 import type { WorkspaceUnitRunResult } from '../workspace-runner.js';
-import type { FindingOutput } from '@opensip-tools/contracts';
+import type { Signal } from '@opensip-tools/core';
 
-function finding(over: Partial<FindingOutput> = {}): FindingOutput {
+function signal(over: Partial<Signal> = {}): Signal {
   return {
-    ruleId: 'graph.cycle',
+    id: 'sig_cycle',
+    source: 'graph.architecture.cycle',
+    provider: 'opensip-tools',
+    severity: 'medium',
+    category: 'quality',
+    ruleId: 'graph.architecture.cycle',
     message: 'cyclic dependency',
-    severity: 'warning',
     filePath: 'src/a.ts',
     line: 12,
+    metadata: {},
+    createdAt: '2026-06-04T00:00:00.000Z',
     ...over,
   };
 }
@@ -26,7 +32,7 @@ function unit(over: Partial<WorkspaceUnitRunResult> = {}): WorkspaceUnitRunResul
     unitId: 'core',
     rootDir: '/abs/packages/core',
     displayPath: 'packages/core',
-    findings: [],
+    signals: [],
     exitCode: 0,
     stderr: '',
     ...over,
@@ -46,7 +52,7 @@ const text = (perUnit: readonly WorkspaceUnitRunResult[], durationMs: number): s
 
 describe('workspaceReportLines', () => {
   it('renders an ok unit with its finding count and project-relative display path', () => {
-    const out = text([unit({ findings: [finding()] })], 1234);
+    const out = text([unit({ signals: [signal()] })], 1234);
     expect(out).toContain('opensip-tools graph --workspace');
     expect(out).toContain('== Units (1) ==');
     expect(out).toContain('packages/core: 1 finding(s) — ok');
@@ -68,21 +74,21 @@ describe('workspaceReportLines', () => {
   });
 
   it('falls back to rootDir when displayPath is empty', () => {
-    const out = text([unit({ displayPath: '', findings: [finding()] })], 1);
+    const out = text([unit({ displayPath: '', signals: [signal()] })], 1);
     expect(out).toContain('/abs/packages/core: 1 finding(s)');
   });
 
   it('omits the line suffix when a finding has no line number', () => {
-    const out = text([unit({ findings: [finding({ line: undefined })] })], 1);
+    const out = text([unit({ signals: [signal({ line: undefined })] })], 1);
     expect(out).toContain('src/a.ts — cyclic dependency');
     expect(out).not.toContain('src/a.ts: ');
   });
 
   it('truncates a finding preview past the cap and reports the remainder', () => {
     const many = Array.from({ length: 13 }, (_v, i) =>
-      finding({ message: `m${String(i)}`, line: i + 1 }),
+      signal({ message: `m${String(i)}`, line: i + 1 }),
     );
-    const out = text([unit({ findings: many })], 1);
+    const out = text([unit({ signals: many })], 1);
     expect(out).toContain('... 3 more (use --json for full list)');
     expect(out).toContain('13 total finding(s)');
   });
@@ -91,7 +97,7 @@ describe('workspaceReportLines', () => {
 describe('renderWorkspaceJson', () => {
   it('produces a stable JSON document mirroring every unit', () => {
     const json = renderWorkspaceJson(
-      [unit({ findings: [finding()] }), unit({ unitId: 'cli', findings: [] })],
+      [unit({ signals: [signal()] }), unit({ unitId: 'cli', signals: [] })],
       99,
     );
     const parsed = JSON.parse(json) as {
@@ -100,7 +106,7 @@ describe('renderWorkspaceJson', () => {
       mode: string;
       durationMs: number;
       totalFindings: number;
-      units: { unitId: string; findings: unknown[] }[];
+      units: { unitId: string; signals: unknown[] }[];
     };
     expect(parsed.version).toBe('1.0');
     expect(parsed.tool).toBe('graph');
@@ -108,6 +114,6 @@ describe('renderWorkspaceJson', () => {
     expect(parsed.durationMs).toBe(99);
     expect(parsed.totalFindings).toBe(1);
     expect(parsed.units.map((u) => u.unitId)).toEqual(['core', 'cli']);
-    expect(parsed.units[0]?.findings).toHaveLength(1);
+    expect(parsed.units[0]?.signals).toHaveLength(1);
   });
 });

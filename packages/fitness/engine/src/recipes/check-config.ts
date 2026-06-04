@@ -10,7 +10,7 @@
  *
  * Recipes can carry a `checks.config` map keyed by check slug. The recipe
  * service projects this map into the current `RunScope`'s
- * `recipeCheckConfig` slot before any check runs and clears it once the
+ * `recipeUnitConfig` slot before any check runs and clears it once the
  * run completes. Individual checks read their slice via
  * `getCheckConfig<T>(slug)` and merge it with their built-in defaults.
  *

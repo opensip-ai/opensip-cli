@@ -6,7 +6,7 @@
  * `pluginLoadErrors`, `loadWarnings`, `preLoadHook`) — they are a
  * single unit of state, written exactly once per process by
  * `ensureChecksLoaded()` (or by the CLI bootstrap, in `preLoadHook`'s
- * case) and read by the phase helpers downstream (`buildCliOutput`,
+ * case) and read by the phase helpers downstream (`buildFitEnvelope`,
  * `buildFitDoneResult`) plus the public `getPluginLoadErrors()` /
  * `getDisplayName()` / `getIcon()` accessors that `FitView` and
  * `dashboard.ts` consume.
@@ -59,7 +59,7 @@ import { mergeCheckDisplay, rebuildDisplayLookups } from './display-registry.js'
 let checksLoadedFor: string | null = null;
 
 /** Plugin load failures from the most recent `ensureChecksLoaded` call —
- * read by `buildCliOutput` and `buildFitDoneResult` to fail the run. */
+ * read by `buildFitEnvelope` and `buildFitDoneResult` to fail the run. */
 let pluginLoadErrors: readonly string[] = [];
 
 /**

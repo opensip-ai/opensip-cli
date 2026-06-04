@@ -8,13 +8,13 @@
  *     self-identifies with this form.
  *
  *   - **Short form** (`'fit' | 'sim' | 'graph'`) — used as the storage
- *     discriminator in `StoredSession.tool`, `CliOutput.tool`,
+ *     discriminator in `StoredSession.tool`, `SignalEnvelope.tool`,
  *     path-domain names (`<project>/opensip-tools/fit/`,
  *     `<project>/opensip-tools/sim/`), and CLI subcommand names. SQL
  *     rows, generated dashboards, and on-disk layout all use it.
  *
  * Prior to audit-round-3 Finding H, the same literal union appeared
- * inline in 5+ places (`StoredSession.tool`, `CliOutput.tool`,
+ * inline in 5+ places (`StoredSession.tool`, the JSON output `tool`,
  * `PathDomain`, `VALID_TOOLS` set, etc.) with no shared source of
  * truth. Adding a 4th first-party tool risked editing N − 1 sites and
  * silently passing tests until a SQL row carried an unknown

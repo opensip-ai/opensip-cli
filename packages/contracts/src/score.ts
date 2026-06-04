@@ -1,12 +1,12 @@
 /**
  * Canonical pass rate for a run.
  *
- * `score` is a shared field on {@link CliOutput} and `StoredSession` that
- * the dashboard renders as the "PASS RATE" column. It has ONE meaning
- * across every tool: the percentage of checks that passed.
+ * `score` is a shared field on the run verdict (`SignalEnvelope.verdict`)
+ * and `StoredSession` that the dashboard renders as the "PASS RATE" column.
+ * It has ONE meaning across every tool: the percentage of units that passed.
  *
- * A check passes when it has no error-severity findings — warnings alone
- * do not fail a check (see `CheckOutput.passed`). So a warnings-only run
+ * A unit passes when it has no error-severity signals — warnings alone
+ * do not fail a unit. So a warnings-only run
  * scores 100, consistent with the WARN-but-passing status the dashboard
  * shows for it. An empty run (no checks) also scores 100, matching the
  * fitness gate-baseline convention so `--gate-compare` does not report a

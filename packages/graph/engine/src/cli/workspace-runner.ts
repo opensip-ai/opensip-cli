@@ -24,13 +24,14 @@ import {
   ConfigurationError,
   logger,
   type LanguageAdapter,
+  type Signal,
   type WorkspaceUnit,
 } from '@opensip-tools/core'
 
 import { runWorkerPool } from './orchestrate/worker-pool.js'
 
 import type { ResolutionMode } from '../types.js'
-import type { CliOutput, FindingOutput } from '@opensip-tools/contracts'
+import type { SignalEnvelope } from '@opensip-tools/contracts'
 
 /**
  * Per-unit result from a `graph --workspace` fan-out — one entry per
@@ -46,7 +47,13 @@ export interface WorkspaceUnitRunResult {
    * under `cwd`.
    */
   readonly displayPath: string
-  readonly findings: readonly FindingOutput[]
+  /**
+   * The child run's signals, parsed from its `--json` {@link SignalEnvelope}
+   * stdout (ADR-0011). These carry OpenSIP-mapped `ruleId`/`source` (the
+   * child applies Option A); the parent reverse-maps to engine slugs only
+   * where the dashboard session payload needs them.
+   */
+  readonly signals: readonly Signal[]
   readonly exitCode: number
   readonly stderr: string
 }
@@ -207,19 +214,19 @@ function spawnGraphChild(input: SpawnInput): Promise<WorkspaceUnitRunResult> {
         unitId: input.unit.id,
         rootDir: input.unit.rootDir,
         displayPath: relative(input.cwd, input.unit.rootDir),
-        findings: [],
+        signals: [],
         exitCode: -1,
         stderr: `failed to spawn child: ${err.message}`,
       })
       /* v8 ignore stop */
     })
     child.on('close', (code) => {
-      const findings = parseChildFindings(stdout, input.unit.rootDir, stderr)
+      const signals = parseChildSignals(stdout, input.unit.rootDir, stderr)
       resolvePromise({
         unitId: input.unit.id,
         rootDir: input.unit.rootDir,
         displayPath: relative(input.cwd, input.unit.rootDir),
-        findings,
+        signals,
         /* v8 ignore next */
         exitCode: code ?? -1,
         stderr,
@@ -229,20 +236,21 @@ function spawnGraphChild(input: SpawnInput): Promise<WorkspaceUnitRunResult> {
 }
 
 /**
- * Parse a child's `--json` stdout into a flat FindingOutput[]. Returns
- * an empty array on parse failure; the caller surfaces the child's
- * stderr separately.
+ * Parse a child's `--json` {@link SignalEnvelope} stdout into a flat
+ * `Signal[]` (ADR-0011 — `graph --json` now emits the envelope, not the
+ * legacy `CliOutput`). Returns an empty array on parse failure; the caller
+ * surfaces the child's stderr separately.
  */
-function parseChildFindings(
+function parseChildSignals(
   stdout: string,
   rootDir: string,
   stderr: string,
-): readonly FindingOutput[] {
+): readonly Signal[] {
   const trimmed = stdout.trim()
   if (trimmed.length === 0) return []
-  let parsed: CliOutput
+  let parsed: SignalEnvelope
   try {
-    parsed = JSON.parse(trimmed) as CliOutput
+    parsed = JSON.parse(trimmed) as SignalEnvelope
   } catch (error) {
     /* v8 ignore start */
     logger.warn({
@@ -255,10 +263,5 @@ function parseChildFindings(
     return []
     /* v8 ignore stop */
   }
-  const out: FindingOutput[] = []
-  /* v8 ignore next 3 */
-  for (const check of parsed.checks ?? []) {
-    for (const finding of check.findings ?? []) out.push(finding)
-  }
-  return out
+  return parsed.signals ?? []
 }

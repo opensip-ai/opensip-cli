@@ -23,7 +23,7 @@ describe('RunScope — construction', () => {
     expect(scope.tools.list()).toHaveLength(0);
     expect(scope.languages.list()).toHaveLength(0);
     expect(scope.projectContext).toBeUndefined();
-    expect(scope.recipeCheckConfig).toBeDefined();
+    expect(scope.recipeUnitConfig).toBeDefined();
     scope.dispose();
   });
 
@@ -59,12 +59,12 @@ describe('RunScope — construction', () => {
 });
 
 describe('RunScope — dispose', () => {
-  it('clears parseCache and recipeCheckConfig', () => {
+  it('clears parseCache and recipeUnitConfig', () => {
     const scope = new RunScope();
-    scope.recipeCheckConfig.set('slug-a', { foo: 1 });
-    expect(scope.recipeCheckConfig.get('slug-a')).toEqual({ foo: 1 });
+    scope.recipeUnitConfig.set('slug-a', { foo: 1 });
+    expect(scope.recipeUnitConfig.get('slug-a')).toEqual({ foo: 1 });
     scope.dispose();
-    expect(scope.recipeCheckConfig.get('slug-a')).toBeUndefined();
+    expect(scope.recipeUnitConfig.get('slug-a')).toBeUndefined();
   });
 
   it('does not throw on a never-used scope', () => {
@@ -135,18 +135,18 @@ describe('runWithScope / currentScope', () => {
   it('two concurrent scopes in Promise.all do not leak (ALS isolation)', async () => {
     const scopeA = new RunScope();
     const scopeB = new RunScope();
-    scopeA.recipeCheckConfig.set('shared', { who: 'a' });
-    scopeB.recipeCheckConfig.set('shared', { who: 'b' });
+    scopeA.recipeUnitConfig.set('shared', { who: 'a' });
+    scopeB.recipeUnitConfig.set('shared', { who: 'b' });
 
     // Each callback yields a tick before reading its scope so the two
     // chains interleave through the microtask queue. ALS must hold.
     const a = runWithScope(scopeA, async () => {
       await Promise.resolve();
-      return currentScope()?.recipeCheckConfig.get('shared');
+      return currentScope()?.recipeUnitConfig.get('shared');
     });
     const b = runWithScope(scopeB, async () => {
       await Promise.resolve();
-      return currentScope()?.recipeCheckConfig.get('shared');
+      return currentScope()?.recipeUnitConfig.get('shared');
     });
 
     const [aResult, bResult] = await Promise.all([a, b]);
@@ -211,10 +211,10 @@ describe('runId — scope-bound propagation to logger event-stamping', () => {
   });
 });
 
-describe('RecipeCheckConfigSlot', () => {
+describe('RecipeUnitConfigSlot', () => {
   it('get/set/setAll/clear round-trip', () => {
     const scope = new RunScope();
-    const slot = scope.recipeCheckConfig;
+    const slot = scope.recipeUnitConfig;
 
     expect(slot.get('missing')).toBeUndefined();
 
@@ -236,7 +236,7 @@ describe('RecipeCheckConfigSlot', () => {
 
   it('get returns undefined for missing slug', () => {
     const scope = new RunScope();
-    expect(scope.recipeCheckConfig.get('nope')).toBeUndefined();
+    expect(scope.recipeUnitConfig.get('nope')).toBeUndefined();
     scope.dispose();
   });
 });

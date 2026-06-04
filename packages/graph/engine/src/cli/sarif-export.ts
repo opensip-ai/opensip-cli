@@ -2,26 +2,30 @@
  * @fileoverview `sarif-export` subcommand mode helper (DEC-498, opensip
  * Phase 2/Phase 6).
  *
- * Runs the graph pipeline's findings through the OpenSIP-convention SARIF
- * renderer (`renderSarifOpenSip`, aliased `renderSarif`) and writes the
- * SARIF v2.1.0 document to the `--output-sarif <path>` file. The opensip
+ * Builds the run's signal envelope (applying the OpenSIP rule-ID convention —
+ * Option A — at assembly) and writes the SARIF v2.1.0 document to the
+ * `--output-sarif <path>` file via the root-owned SARIF-file sink
+ * (`cli.writeSarif`, ADR-0011 Phase 5). The opensip
  * `EngineSubprocessPort.runSarifExport` invokes this per commit-sync /
- * dead-code run, then lands the file on opensip's `SarifProvider`.
+ * dead-code run, then lands the file on opensip's `SarifProvider`. Its
+ * external behavior (the `--output-sarif` flag, byte-identical OpenSIP SARIF)
+ * is unchanged: the canonical signal → SARIF formatter (`formatSignalSarif` in
+ * `@opensip-tools/output`) emits the same bytes graph's former adapter did
+ * once the envelope carries the OpenSIP-mapped rule IDs.
  *
- * Sibling of `runCatalogJsonMode` (`graph-modes.ts`): same throw-and-catch
- * style (rethrows typed errors for the top-level `handleGraphError`), same
- * synchronous file write (bounded payload; want disk backpressure rather
- * than a deferred-write surprise).
+ * Per ADR-0011 (file is a sink; the root renders/delivers), SARIF-to-file is a
+ * root seam — graph no longer imports `@opensip-tools/output`. Validates the
+ * provenance flags the consumer contract requires (`--tenant-id`/`--repo-id`)
+ * so a misinvocation fails loudly (exit 2) rather than emitting an unscoped
+ * file.
  */
 
 import { randomUUID } from 'node:crypto';
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname } from 'node:path';
 
 import { EXIT_CODES } from '@opensip-tools/contracts';
-import { ConfigurationError, logger, readPackageVersion } from '@opensip-tools/core';
+import { ConfigurationError, logger } from '@opensip-tools/core';
 
-import { renderSarif } from '../render/sarif.js';
+import { buildGraphEnvelope } from './build-envelope.js';
 
 import type { Signal, ToolCliContext } from '@opensip-tools/core';
 
@@ -36,22 +40,19 @@ export interface SarifExportOptions {
 }
 
 /**
- * Render the engine's findings as OpenSIP-convention SARIF and write them
- * to `opts.outputSarif`. Validates the provenance flags the consumer
- * contract requires (`--tenant-id`, `--repo-id`) so a misinvocation fails
- * loudly (exit 2) rather than emitting an unscoped file.
+ * Build the OpenSIP-convention SARIF envelope from the engine's findings and
+ * write it to `opts.outputSarif` through the root-owned `cli.writeSarif` seam.
  *
- * `tenantId` / `repoId` are not embedded in the SARIF body today — the
- * `renderSarifOpenSip` shape carries no `properties` bag — but they are
- * required at the boundary (the opensip side always supplies them and
- * scopes the ingest by them) and `runId` is threaded into the log line
- * for trace correlation.
+ * `tenantId` / `repoId` are not embedded in the SARIF body today — the SARIF
+ * shape carries no `properties` bag — but they are required at the boundary
+ * (the opensip side always supplies them and scopes the ingest by them) and
+ * `runId` is threaded into the log line for trace correlation.
  */
-export function runSarifExportMode(
+export async function runSarifExportMode(
   opts: SarifExportOptions,
   signals: readonly Signal[],
   cli: ToolCliContext,
-): void {
+): Promise<void> {
   if (typeof opts.tenantId !== 'string' || opts.tenantId.length === 0) {
     throw new ConfigurationError('--output-sarif requires --tenant-id <id>.');
   }
@@ -67,20 +68,22 @@ export function runSarifExportMode(
     output: opts.outputSarif,
   });
 
-  const sarif = renderSarif(signals, {
-    tool: 'opensip-tools-graph',
-    toolVersion: readPackageVersion(import.meta.url),
+  // Option A: the envelope's signals carry the OpenSIP-mapped rule IDs, so the
+  // shared `formatSignalSarif` (behind `cli.writeSarif`) emits the same SARIF
+  // bytes graph's former adapter produced. `runId`/`createdAt` are SARIF-body-
+  // irrelevant for this formatter, so deterministic placeholders are fine.
+  const envelope = buildGraphEnvelope({
+    signals,
+    runId,
+    createdAt: new Date().toISOString(),
   });
-
-  mkdirSync(dirname(opts.outputSarif), { recursive: true });
-  writeFileSync(opts.outputSarif, sarif);
+  await cli.writeSarif(envelope, opts.outputSarif);
 
   logger.info({
     evt: 'graph.render.sarif_export.complete',
     module: MODULE_GRAPH_RENDER,
     runId,
     output: opts.outputSarif,
-    bytes: sarif.length,
     signalCount: signals.length,
   });
   cli.setExitCode(EXIT_CODES.SUCCESS);

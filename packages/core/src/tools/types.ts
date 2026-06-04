@@ -114,7 +114,7 @@ export interface ToolCliContext {
   readonly program: unknown;
   /**
    * Per-run resources (logger, parseCache, registries, datastore,
-   * recipeCheckConfig, projectContext). Constructed once per CLI
+   * recipeUnitConfig, projectContext). Constructed once per CLI
    * invocation by the bootstrap. Tools read every per-run resource
    * via `cli.scope.foo` — the previously-exported `defaultToolRegistry`
    * / `defaultLanguageRegistry` singletons are gone, and the Phase 5
@@ -180,6 +180,64 @@ export interface ToolCliContext {
    * future: optional `--out <file>`, envelope wrappers, etc.).
    */
   readonly emitJson: (value: unknown) => void;
+  /**
+   * Emit a tool-run **signal envelope** as machine-output (ADR-0011). The
+   * CLI composition root formats the envelope through the single shared
+   * `formatSignalJson` formatter and writes it to stdout — so the `--json`
+   * wire contract lives in `@opensip-tools/output`, not re-stringified per
+   * tool. Tools switch from `emitJson(toolShapedOutput)` to
+   * `emitEnvelope(envelope)` as they migrate (Phases 4–6, ADR-0011).
+   *
+   * The value is the `SignalEnvelope` from `@opensip-tools/contracts`; it is
+   * typed `unknown` here for the same reason `render`/`emitJson` are — the
+   * `Tool` contract in core must not name the contracts-layer payload type
+   * (that edge would invert the layer graph). The composition root narrows
+   * it.
+   */
+  readonly emitEnvelope: (envelope: unknown) => void;
+  /**
+   * Deliver a tool-run **signal envelope** to the effectful sinks the
+   * composition root owns (ADR-0011 / ADR-0008): best-effort cloud sync via
+   * the run's `scope.signalSink`, and — when `--report-to` is set — a SARIF
+   * upload (which owns exit code 4). The tool builds the envelope and calls
+   * this **once per run** after rendering / emitting; the root maps it to
+   * `SignalBatch` (cloud) and `formatSignalSarif` (report-to). Awaitable so
+   * egress completes before the short-lived CLI process exits.
+   *
+   * This replaces the per-tool `emitRunSignals` / `reportToCloud` calls the
+   * engines make today — moving all egress to the root lets the engines drop
+   * their `@opensip-tools/output` dependency (Phases 4–6). Best-effort: cloud
+   * failures never throw and never affect the exit code; only a `--report-to`
+   * failure on an otherwise-passing run sets exit 4.
+   *
+   * `envelope` is the `SignalEnvelope` from `@opensip-tools/contracts`, typed
+   * `unknown` here for the same layer reason as `render`/`emitEnvelope`.
+   */
+  readonly deliverSignals: (
+    envelope: unknown,
+    opts: {
+      readonly cwd: string;
+      readonly reportTo?: string;
+      readonly apiKey?: string;
+      readonly runFailed?: boolean;
+    },
+  ) => Promise<void>;
+  /**
+   * Write a tool-run **signal envelope** to a SARIF v2.1.0 file (ADR-0011).
+   * The composition root formats the envelope through the single shared
+   * `formatSignalSarif` formatter and writes the bytes to `path` (creating
+   * parent directories as needed). This is the root-owned SARIF-**file** sink
+   * — distinct from `--report-to` (a network sink) and the cloud sync — so a
+   * tool that exports SARIF to a file (e.g. `graph sarif-export`, the
+   * cross-repo `EngineSubprocessPort.runSarifExport` contract) does it through
+   * the root instead of importing `@opensip-tools/output` itself. Awaitable so
+   * the write completes before the short-lived CLI process exits.
+   *
+   * `envelope` is the `SignalEnvelope` from `@opensip-tools/contracts`, typed
+   * `unknown` here for the same layer reason as `render`/`emitEnvelope`/
+   * `deliverSignals`.
+   */
+  readonly writeSarif: (envelope: unknown, path: string) => Promise<void>;
 }
 
 /**

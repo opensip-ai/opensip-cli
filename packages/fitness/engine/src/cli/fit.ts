@@ -14,7 +14,7 @@
  *   - `fit/display-registry.ts` — merged check display map
  *   - `fit/config-loader.ts`    — config parse + language validation
  *   - `fit/recipe-selector.ts`  — recipe-pick + run
- *   - `fit/result-builders.ts`  — CliOutput / FitDoneResult / session persist
+ *   - `fit/result-builders.ts`  — SignalEnvelope / FitDoneResult / session persist
  *
  * This file re-exports the public surface (`executeFit`,
  * `ensureChecksLoaded`, the display accessors, `setPreLoadHook`, the
@@ -23,8 +23,7 @@
  * same names.
  */
 
-import { currentScope, logger, noopSignalSink } from '@opensip-tools/core';
-import { emitRunSignals } from '@opensip-tools/reporting';
+import { logger } from '@opensip-tools/core';
 
 import { defaultRegistry } from '../framework/registry.js';
 import { buildScopeBasedFileMap } from '../framework/scope-resolver.js';
@@ -33,11 +32,11 @@ import { FitnessRecipeService } from '../recipes/service.js';
 import { ensureChecksLoaded, getLoadWarnings } from './fit/check-loader.js';
 import { loadFitConfig, validateLanguagesAgainstAdapters } from './fit/config-loader.js';
 import { runRecipeOrAdHoc, selectRecipe } from './fit/recipe-selector.js';
-import { buildCliOutput, buildFitCallbacks, buildFitDoneResult, persistFitSession } from './fit/result-builders.js';
+import { buildFitEnvelope, buildFitCallbacks, buildFitDoneResult, persistFitSession } from './fit/result-builders.js';
 
 import type {
   FitOptions,
-  CliOutput,
+  SignalEnvelope,
   FitDoneResult,
   ErrorResult,
 } from '@opensip-tools/contracts';
@@ -60,7 +59,10 @@ export {
 } from './fit/check-loader.js';
 export type { LoadDiscoveredResult, PreLoadHook } from './fit/check-loader.js';
 export { getDisplayName, getIcon } from './fit/display-registry.js';
-export { formatValidatedColumn } from './fit/result-builders.js';
+// `formatValidatedColumn` moved to `@opensip-tools/cli-ui` (shared by the
+// fit static + live table views) in ADR-0011 Phase 6; re-export it here so
+// fitness's public surface is unchanged.
+export { formatValidatedColumn } from '@opensip-tools/cli-ui';
 // `formatDuration` is shared across tools and lives in core; re-export it
 // here so fitness's public surface is unchanged.
 export { formatDuration } from '@opensip-tools/core';
@@ -77,7 +79,7 @@ export { formatDuration } from '@opensip-tools/core';
  *   - `onProgress` — wired to `FitnessRecipeService` callbacks; FitView
  *     drives the live progress bar from this callback.
  *   - `datastore` — when supplied, the run is persisted via
- *     `SessionRepo.save(...)` after `buildCliOutput`. Errors during the
+ *     `SessionRepo.save(...)` after `buildFitEnvelope`. Errors during the
  *     save are best-effort: a failed write logs `cli.fit.session.save_failed`
  *     and is swallowed so a SQLite hiccup never fails an otherwise
  *     successful fitness run — the same best-effort policy the graph
@@ -113,7 +115,7 @@ export interface ExecuteFitOptions {
 export async function executeFit(
   args: FitOptions,
   opts: ExecuteFitOptions = {},
-): Promise<{ result: FitDoneResult; output: CliOutput } | { result: ErrorResult; output?: undefined }> {
+): Promise<{ result: FitDoneResult; envelope: SignalEnvelope } | { result: ErrorResult; envelope?: undefined }> {
   logger.info({ evt: 'cli.checks.loading', module: 'cli:fit' });
   await ensureChecksLoaded(args.cwd);
   logger.info({ evt: 'cli.checks.loaded', module: 'cli:fit', checkCount: defaultRegistry.listEnabled().length });
@@ -148,7 +150,12 @@ export async function executeFit(
   if ('error' in fitResultOrError) return { result: fitResultOrError.error };
   const fitnessResult = fitResultOrError;
 
-  const output = buildCliOutput(fitnessResult, recipeName);
+  // ADR-0011: the run's signal envelope is the canonical post-run transform —
+  // the universal output currency the composition root renders, emits
+  // (`--json`), and delivers (cloud + `--report-to`). Cloud egress no longer
+  // happens here: the root's `deliverSignals` owns it (engines dropped their
+  // `@opensip-tools/output` dependency in Phase 6).
+  const envelope = buildFitEnvelope(fitnessResult, recipeName);
 
   // Persistence: when bootstrap supplied a datastore, write the
   // session via SessionRepo. Best-effort — a SQLite write failure never
@@ -158,19 +165,8 @@ export async function executeFit(
   // (FitView, runJsonMode, runGateMode) gets the write for free as long
   // as they pass `datastore` through.
   if (opts.datastore) {
-    persistFitSession(opts.datastore, args, output);
+    persistFitSession(opts.datastore, args, envelope, fitnessResult.durationMs);
   }
-
-  // ADR-0008: best-effort cloud signal emit, AFTER local persistence. No-op
-  // for the keyless/not-entitled majority (zero IO); never throws and never
-  // affects the exit code. The run's selected sink rides on the RunScope.
-  await emitRunSignals({
-    output,
-    tool: 'fit',
-    recipe: recipeName,
-    cwd: process.cwd(),
-    signalSink: currentScope()?.signalSink ?? noopSignalSink,
-  });
 
   // Collect warnings from check loading (ensureChecksLoaded → loadWarnings)
   // and from config validation (validateLanguagesAgainstAdapters). Both flow
@@ -178,9 +174,9 @@ export async function executeFit(
   // can surface them without breaking Ink's frame tracking.
   const warnings = [...getLoadWarnings(), ...validationWarnings];
 
-  const result = buildFitDoneResult({ args, fitnessResult, signalersConfig, recipeName, warnings });
+  const result = buildFitDoneResult({ args, fitnessResult, envelope, signalersConfig, recipeName, warnings });
 
-  logger.info({ evt: 'cli.fit.complete', module: 'cli:fit', score: output.score, passed: fitnessResult.success, totalChecks: fitnessResult.summary.totalChecks, durationMs: fitnessResult.durationMs });
+  logger.info({ evt: 'cli.fit.complete', module: 'cli:fit', score: envelope.verdict.score, passed: fitnessResult.success, totalChecks: fitnessResult.summary.totalChecks, durationMs: fitnessResult.durationMs });
 
-  return { result, output };
+  return { result, envelope };
 }

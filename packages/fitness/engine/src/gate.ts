@@ -2,8 +2,8 @@
  * Architecture-gate primitive — pre/post-fix regression detection.
  *
  * Operations:
- *   - saveBaseline(output, repo)         — persist current SARIF as the baseline
- *   - compareToBaseline(output, repo)    — diff current SARIF against baseline
+ *   - saveBaseline(envelope, repo)       — persist the run's signal envelope as the baseline
+ *   - compareToBaseline(envelope, repo)  — diff the current envelope against the baseline
  *   - renderGateCompareOutput(result)    — pretty-print the diff for stdout
  *
  * Wired into the `fit` command via `--gate-save` and `--gate-compare` flags
@@ -15,16 +15,23 @@
  * Diffs match by (filePath, ruleId, message) — line numbers are
  * intentionally NOT in the matching key so unrelated line shifts
  * don't register as added/resolved violations.
+ *
+ * ADR-0011 Phase 6: the baseline stores the run's {@link SignalEnvelope}
+ * (signals) directly — NOT a SARIF document — mirroring graph's signal-keyed
+ * baseline. This removes fitness's `@opensip-tools/output` production
+ * dependency (the root owns all SARIF egress). `fit-baseline-export` reads the
+ * stored envelope back and writes SARIF to disk via the root `cli.writeSarif`
+ * seam, so the on-disk CI artifact stays a SARIF document. The datastore is a
+ * rebuildable local cache (ADR-0006); no migration of pre-existing rows.
  */
 
 import { createHash } from 'node:crypto';
 
-import { ConfigurationError, SystemError, logger } from '@opensip-tools/core';
-import { buildSarifLog } from '@opensip-tools/reporting';
+import { ConfigurationError, SystemError, isErrorSignal, logger } from '@opensip-tools/core';
 
 import type { FitBaselineRepo } from './persistence/baseline-repo.js';
-import type { CliOutput } from '@opensip-tools/contracts';
-import type { SarifResult } from '@opensip-tools/reporting';
+import type { SignalEnvelope } from '@opensip-tools/contracts';
+import type { Signal } from '@opensip-tools/core';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -113,18 +120,19 @@ export class GateBaselineInvalidError extends SystemError {
 // ---------------------------------------------------------------------------
 
 /**
- * Persist the current run's findings as a baseline SARIF document.
- * Overwrites any existing baseline.
+ * Persist the current run's {@link SignalEnvelope} as the gate baseline.
+ * Overwrites any existing baseline. The signals ARE the baseline (no SARIF
+ * detour); `fit-baseline-export` converts the stored envelope to a SARIF file
+ * via the root `cli.writeSarif` seam when CI needs the on-disk artifact.
  */
-export function saveBaseline(output: CliOutput, repo: FitBaselineRepo): void {
-  const sarif = buildSarifLog(output);
-  const findingCount = output.checks.reduce((n, c) => n + c.findings.length, 0);
-  repo.save(sarif, findingCount);
+export function saveBaseline(envelope: SignalEnvelope, repo: FitBaselineRepo): void {
+  const findingCount = envelope.signals.length;
+  repo.save(envelope, findingCount);
   logger.info({
     evt: 'cli.gate.save.complete',
     module: 'cli:gate',
     findingCount,
-    checkCount: output.checks.length,
+    checkCount: envelope.units.length,
   });
 }
 
@@ -142,10 +150,11 @@ export function saveBaseline(output: CliOutput, repo: FitBaselineRepo): void {
  *   forking compareToBaseline.
  *
  * @throws {GateBaselineMissingError} when the baseline doesn't exist
- * @throws {GateBaselineInvalidError} when the baseline isn't valid SARIF
+ * @throws {GateBaselineInvalidError} when the stored baseline isn't a
+ *   parseable signal envelope
  */
 export function compareToBaseline(
-  output: CliOutput,
+  envelope: SignalEnvelope,
   repo: FitBaselineRepo,
   identity: ViolationIdentity = DEFAULT_VIOLATION_IDENTITY,
 ): GateCompareResult {
@@ -154,8 +163,8 @@ export function compareToBaseline(
     throw new GateBaselineMissingError();
   }
 
-  const baselineViolations = extractViolationsFromSarif(baselineDoc, identity);
-  const currentViolations = extractViolationsFromCliOutput(output, identity);
+  const baselineViolations = extractViolationsFromStoredBaseline(baselineDoc, identity);
+  const currentViolations = extractViolationsFromEnvelope(envelope, identity);
 
   const baselineByHash = new Map(baselineViolations.map((v) => [v.hash, v]));
   const currentByHash = new Map(currentViolations.map((v) => [v.hash, v]));
@@ -254,77 +263,62 @@ export function renderGateCompareOutput(result: GateCompareResult): string {
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-function extractViolationsFromCliOutput(output: CliOutput, identity: ViolationIdentity): GateViolation[] {
+/** The gate's 2-level severity for a signal (`critical|high → error`). */
+function signalGateSeverity(signal: Signal): 'error' | 'warning' {
+  return isErrorSignal(signal) ? 'error' : 'warning';
+}
+
+/**
+ * Extract the gate's `GateViolation[]` from the run's {@link SignalEnvelope}.
+ * Iterates the flat `signals` list; the diff identity is UNCHANGED —
+ * `(filePath, ruleId, message)` — so existing baselines keep matching across
+ * the CliOutput→envelope migration. `ruleId` is `signal.ruleId` (the check
+ * slug, the same value the old `FindingOutput.ruleId` carried).
+ */
+function extractViolationsFromEnvelope(envelope: SignalEnvelope, identity: ViolationIdentity): GateViolation[] {
   const violations: GateViolation[] = [];
-  for (const check of output.checks) {
-    for (const f of check.findings) {
-      const filePath = f.filePath ?? '';
-      violations.push({
-        hash: identity({ filePath, ruleId: f.ruleId, message: f.message }),
-        ruleId: f.ruleId,
-        message: f.message,
-        filePath,
-        line: f.line,
-        severity: f.severity,
-      });
-    }
+  for (const signal of envelope.signals) {
+    const filePath = signal.filePath;
+    violations.push({
+      hash: identity({ filePath, ruleId: signal.ruleId, message: signal.message }),
+      ruleId: signal.ruleId,
+      message: signal.message,
+      filePath,
+      line: signal.line,
+      severity: signalGateSeverity(signal),
+    });
   }
   return violations;
 }
 
-interface SarifRun {
-  tool?: { driver?: { name?: string } };
-  results?: readonly SarifResult[];
-}
-
-interface SarifDoc {
-  version?: string;
-  runs?: readonly SarifRun[];
+/** The structural subset of a stored baseline this gate reads back: its signals. */
+interface StoredBaselineEnvelope {
+  signals?: readonly Signal[];
 }
 
 /**
- * Convert a parsed SARIF document into the gate's internal `GateViolation`
- * shape.
+ * Extract the gate's `GateViolation[]` from a stored baseline — the
+ * {@link SignalEnvelope} that `saveBaseline` persisted. Reads the same flat
+ * `signals` list `extractViolationsFromEnvelope` uses on the current run, so
+ * baseline and current are diffed on identical `(filePath, ruleId, message)`
+ * identity.
  *
  * @throws {GateBaselineInvalidError} When `doc` is not an object or its
- *   `runs` property is missing or not an array — the SARIF document is
+ *   `signals` property is missing or not an array — the stored baseline is
  *   structurally invalid for our gate consumer.
  */
-function extractViolationsFromSarif(
+function extractViolationsFromStoredBaseline(
   doc: unknown,
   identity: ViolationIdentity,
 ): GateViolation[] {
   if (typeof doc !== 'object' || doc === null) {
     throw new GateBaselineInvalidError('top-level value is not an object');
   }
-  const sarif = doc as SarifDoc;
-  if (sarif.runs === undefined || !Array.isArray(sarif.runs)) {
-    throw new GateBaselineInvalidError('missing or non-array `runs`');
+  const baseline = doc as StoredBaselineEnvelope;
+  if (baseline.signals === undefined || !Array.isArray(baseline.signals)) {
+    throw new GateBaselineInvalidError('missing or non-array `signals`');
   }
-
-  const runs: readonly SarifRun[] = sarif.runs;
-  const violations: GateViolation[] = [];
-  for (const run of runs) {
-    const results: readonly SarifResult[] | undefined = run.results;
-    if (results === undefined) continue;
-    for (const result of results) {
-      const ruleId = result.ruleId ?? '';
-      const message = result.message?.text ?? '';
-      const loc = result.locations?.[0]?.physicalLocation;
-      const filePath = loc?.artifactLocation?.uri ?? '';
-      const line = loc?.region?.startLine;
-      const severity = result.level === 'error' ? 'error' : 'warning';
-      violations.push({
-        hash: identity({ filePath, ruleId, message }),
-        ruleId,
-        message,
-        filePath,
-        line,
-        severity,
-      });
-    }
-  }
-  return violations;
+  return extractViolationsFromEnvelope({ signals: baseline.signals } as unknown as SignalEnvelope, identity);
 }
 
 function formatLocation(v: GateViolation): string {

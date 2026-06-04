@@ -52,7 +52,9 @@ describe('sim tool — flag-surface contract', () => {
     // Adding or removing a `sim` flag must be a deliberate change to this list,
     // so a new flag can't ship undocumented or an old one vanish silently.
     expect(recordRegisteredFlags()).toEqual(
-      ['--cwd', '--debug', '--json', '--kind', '--open', '--quiet', '--recipe'].sort(),
+      // ADR-0011 (Phase 4): sim gained cloud egress (--report-to / --api-key)
+      // when it began emitting the signal envelope.
+      ['--cwd', '--debug', '--json', '--kind', '--open', '--quiet', '--recipe', '--report-to', '--api-key'].sort(),
     );
   });
 });

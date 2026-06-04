@@ -40,6 +40,8 @@ function register(cli: ToolCliContext): void {
     .option('-q, --quiet', 'Suppress banner / boxes; print only the pass-fail summary', false)
     .option('--open', 'Launch the HTML dashboard in your browser after the run completes', false)
     .option('--kind <kind>', 'Filter scenarios by kind (load | chaos | invariant | fix-evaluation)')
+    .option('--report-to <url>', 'POST signals to OpenSIP Cloud or compatible')
+    .option('--api-key <key>', 'API key for --report-to authentication')
     .option('--debug', 'Enable debug mode for structured log output', false)
     .action(
       async (
@@ -47,25 +49,37 @@ function register(cli: ToolCliContext): void {
       ) => {
         const { result } = await executeSim(opts);
 
-        if (opts.json) {
-          if (result.type === 'error') {
-            cli.setExitCode(result.exitCode);
+        if (result.type === 'error') {
+          cli.setExitCode(result.exitCode);
+          if (opts.json) {
             cli.emitJson({ error: result.message });
           } else {
-            if (result.shouldFail === true) cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
-            cli.emitJson(result);
+            await cli.render(result);
           }
           return;
         }
 
-        if (result.type === 'error') {
-          cli.setExitCode(result.exitCode);
+        if (result.shouldFail === true) cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
+
+        // ADR-0011: one render path per mode. `--json` emits the envelope
+        // through the shared formatSignalJson; default renders the envelope-
+        // derived per-scenario table. The bespoke `emitJson(result)` shape is
+        // retired — sim routes through the composition root.
+        if (opts.json) {
+          cli.emitEnvelope(result.envelope);
+        } else {
           await cli.render(result);
-          return;
         }
 
-        if (result.shouldFail === true) cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
-        await cli.render(result);
+        // Effectful egress lives at the root (cloud sink + `--report-to`,
+        // which owns exit 4). Called once per run, after rendering. sim gains
+        // SARIF + cloud "for free" now that it emits the envelope (ADR-0011).
+        await cli.deliverSignals(result.envelope, {
+          cwd: process.cwd(),
+          reportTo: opts.reportTo,
+          apiKey: opts.apiKey,
+          runFailed: result.shouldFail,
+        });
 
         await cli.maybeOpenDashboard({
           openRequested: Boolean(opts.open),

@@ -16,7 +16,7 @@ import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 
 import { resolveUserPaths } from '@opensip-tools/core';
-import { checkEntitlement, DEFAULT_CLOUD_ENDPOINT } from '@opensip-tools/reporting';
+import { checkEntitlement, DEFAULT_CLOUD_ENDPOINT } from '@opensip-tools/output';
 
 import {
   GLOBAL_CONFIG_PATH,
