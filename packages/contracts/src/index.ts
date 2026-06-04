@@ -45,7 +45,9 @@ export type {
   SignalEnvelope,
   RunVerdict,
   UnitResult,
+  BuildEnvelopeInput,
 } from './signal-envelope.js';
+export { buildSignalEnvelope } from './signal-envelope.js';
 
 // Command result types (the CommandResult union + per-command variants)
 export type {

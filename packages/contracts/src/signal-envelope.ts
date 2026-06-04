@@ -18,11 +18,13 @@
  * version. It is `2`, succeeding the implicit `CliOutput` "1.0" husk this
  * envelope replaces.
  */
+import { passRate } from './score.js';
+
 import type { Signal, ToolShortId } from '@opensip-tools/core';
 
 /**
  * Run-level verdict header. `passed` ⇔ "no `critical`/`high` signals";
- * `score` is the canonical pass rate over `summary`.
+ * `score` is the canonical {@link passRate} over `summary`.
  */
 export interface RunVerdict {
   readonly score: number;
@@ -62,4 +64,65 @@ export interface SignalEnvelope {
   readonly signals: readonly Signal[];
   /** Graph-only edge-fidelity marker, carried over from CliOutput.resolutionMode. */
   readonly resolutionMode?: 'exact' | 'fast';
+}
+
+/**
+ * Input to {@link buildSignalEnvelope}. `signals` are already the wire
+ * currency; `units` carry the per-unit ran/errored/timing facts. `runId` and
+ * `createdAt` are supplied by the caller (formatter-purity contract: no
+ * `Date.now()`/`randomUUID` in this layer, so tests stay deterministic).
+ */
+export interface BuildEnvelopeInput {
+  readonly tool: ToolShortId;
+  readonly recipe?: string;
+  readonly runId: string;
+  readonly createdAt: string;
+  readonly units: readonly UnitResult[];
+  readonly signals: readonly Signal[];
+  readonly resolutionMode?: 'exact' | 'fast';
+}
+
+/**
+ * Assemble a {@link SignalEnvelope} from a run's units + signals.
+ *
+ * Centralises the verdict/summary computation so all three tools agree on
+ * "`passed` ⇔ no critical/high" and the score definition. Pure: no IO, no
+ * clock, no id generation — `runId`/`createdAt` arrive on the input.
+ *
+ * - `summary.total/passed/failed` come from `units` (units are what "ran").
+ * - `summary.errors/warnings` come from `signals` (critical|high → error,
+ *   else warning).
+ * - `score = passRate(summary)`; `passed = errors === 0`.
+ */
+export function buildSignalEnvelope(input: BuildEnvelopeInput): SignalEnvelope {
+  const total = input.units.length;
+  const passed = input.units.filter((u) => u.passed).length;
+  const failed = total - passed;
+
+  let errors = 0;
+  let warnings = 0;
+  for (const signal of input.signals) {
+    if (signal.severity === 'critical' || signal.severity === 'high') errors += 1;
+    else warnings += 1;
+  }
+
+  const summary = { total, passed, failed, errors, warnings };
+
+  const verdict: RunVerdict = {
+    score: passRate(summary),
+    passed: errors === 0,
+    summary,
+  };
+
+  return {
+    schemaVersion: 2,
+    tool: input.tool,
+    recipe: input.recipe,
+    runId: input.runId,
+    createdAt: input.createdAt,
+    verdict,
+    units: input.units,
+    signals: input.signals,
+    resolutionMode: input.resolutionMode,
+  };
 }
