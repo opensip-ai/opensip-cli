@@ -129,7 +129,7 @@ Imports every layer below. The published binary.
 ## Adding a new package
 
 1. **Decide the layer.** Apply the rules in [`../10-concepts/03-modular-monolith.md`](/docs/opensip-tools/10-concepts/03-modular-monolith/): kernel = zero tool knowledge; contracts = used by every tool; tools = own a Tool contract; language adapters = implement `LanguageAdapter`; check packs = ship `Check[]`; cli = composition root only.
-2. **Add the dep-cruiser carve-out** if needed. The default layer rules forbid most cross-layer edges; if your package needs an exception, add it to [`.dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.1/.dependency-cruiser.cjs) and document it in [`../80-implementation/05-layer-policy.md`](/docs/opensip-tools/80-implementation/05-layer-policy/).
+2. **Add the dep-cruiser carve-out** if needed. The default layer rules forbid most cross-layer edges; if your package needs an exception, add it to [`.dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/.dependency-cruiser.cjs) and document it in [`../80-implementation/05-layer-policy.md`](/docs/opensip-tools/80-implementation/05-layer-policy/).
 3. **Add a row** in the right table above with the canonical npm name, path, one-line role (concrete, not "fitness concerns"), and 1–3 key exports a reader would grep for.
 4. **Update the layer narrative** in `10-concepts/03-modular-monolith.md` if the new package changes what the layer *means*. Pure additions to an existing pattern don't need a narrative edit — just the row here.
 

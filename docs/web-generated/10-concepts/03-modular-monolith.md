@@ -89,7 +89,7 @@ That's it. Five layers, twenty-nine packages.
 
 ## How the layer rule is enforced
 
-The layer rule — "dependencies flow up only" — is enforced by [dependency-cruiser](https://github.com/opensip-ai/opensip-tools/blob/v2.6.1/.dependency-cruiser.cjs) at lint time. The relevant rules:
+The layer rule — "dependencies flow up only" — is enforced by [dependency-cruiser](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/.dependency-cruiser.cjs) at lint time. The relevant rules:
 
 ```js
 // core imports nothing else from the workspace.
@@ -121,7 +121,7 @@ The build runs `pnpm depcruise` as part of the standard `pnpm lint` flow. A forb
 
 ## The documented exception
 
-Real codebases have edge cases. Today the layer rules carry exactly one — type-only edges (below). Two earlier cross-layer exceptions have since been **paid down** and deleted from [`.dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.1/.dependency-cruiser.cjs):
+Real codebases have edge cases. Today the layer rules carry exactly one — type-only edges (below). Two earlier cross-layer exceptions have since been **paid down** and deleted from [`.dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/.dependency-cruiser.cjs):
 
 - **`lang-typescript` → `fitness`** (the `filterContent` back-edge): `filterContent` / `clearFilterCache` / `FilteredContent` now live in `@opensip-tools/lang-typescript` itself, so no lang pack reaches up into a tool. The `lang-no-fitness-except-typescript` rule is gone.
 - **`graph` → `fitness`** (SARIF reuse): SARIF building and cloud reporting moved to `@opensip-tools/contracts` / `@opensip-tools/reporting`, so `graph` reports without a `graph → fitness` edge. The `graph-may-import-fitness-sarif` info-exception is gone.

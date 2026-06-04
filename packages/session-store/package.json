@@ -1,6 +1,6 @@
 {
   "name": "@opensip-tools/session-store",
-  "version": "2.6.1",
+  "version": "2.6.2",
   "license": "MIT",
   "description": "Session persistence for OpenSIP Tools — the session SQLite schema and SessionRepo, extracted from contracts",
   "keywords": ["opensip-tools", "static-analysis", "code-quality", "sqlite", "persistence"],

@@ -1,6 +1,6 @@
 {
   "name": "@opensip-tools/graph-rust",
-  "version": "2.6.1",
+  "version": "2.6.2",
   "license": "MIT",
   "description": "Rust language adapter for the opensip-tools graph engine",
   "keywords": ["opensip-tools", "static-analysis", "code-quality", "call-graph", "dependency-graph", "rust"],

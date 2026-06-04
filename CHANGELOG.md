@@ -4,6 +4,61 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.6.2] — 2026-06-03
+
+OpenSIP Cloud signal sync, a two-audit remediation pass, and packaging polish.
+
+> **Heads-up for plugin authors:** this release moves and tightens some package
+> surfaces (see _Changed_). If you author a check pack, note the
+> `CheckDisplayEntry` import path change below.
+
+### Added
+
+- **OpenSIP Cloud signal sync (ADR-0008).** With an API key and the cloud
+  entitlement, each entitled `fit`/`graph` run additionally emits its signals
+  to OpenSIP Cloud — additive, best-effort, never blocking or failing a run.
+  Local SQLite stays the source of truth. Opt out per-run with `--no-cloud`,
+  per-project with `cli.cloud.sync: false`, or machine-wide via
+  `~/.opensip-tools/config.yml`. A first-run notice explains what is sent.
+- **Per-package READMEs and npm `keywords`** generated for all 30 published
+  packages (so npmjs.com pages render and are searchable), with `docs:readmes`
+  / `docs:keywords` generators + CI sync gates.
+- **ADR-0009 (public-API-surface policy)** and a `no-cross-package-internal`
+  dependency-cruiser rule; capability guards that lock every tool's flag
+  surface and sim's scheduler order.
+
+### Changed
+
+- **Public API surface tightened (ADR-0009).** Test-only engine internals moved
+  behind `@opensip-tools/graph/internal` and `@opensip-tools/fitness/internal`;
+  the raw session schema is package-private; leaked internal helpers were
+  dropped from the fitness barrel. **Migration:** import `CheckDisplayEntry`
+  from `@opensip-tools/fitness` (it moved out of `@opensip-tools/core`).
+- **Update check runs hourly** instead of daily, so a newly published release
+  is noticed within the hour (the detached fetch still never blocks a command).
+- Docs: the modular-monolith and contract-surface concepts refreshed to match
+  ADR-0007 (marker-canonical plugin discovery).
+
+### Fixed
+
+- **sim `--kind` no longer runs filtered-out scenarios.** It narrowed *after*
+  execution, so `--kind invariant` still ran load/chaos scenarios (with their
+  side effects) and merely hid them; an invalid `--kind` ran everything. Now it
+  filters before execution and fails fast on an unknown kind.
+- **sim `maxParallel` is honored** — the parallel scheduler was unbounded.
+- **fix-evaluation surfaces as explicitly unavailable** (deferred) instead of a
+  placeholder `passed: false` that looked like a real verdict.
+- **Privacy: the user-level cloud opt-out is now wired.** `cloud.sync: false`
+  in `~/.opensip-tools/config.yml` was read for the API key but ignored for the
+  sync setting; it now disables sync (a `false` in either user or project
+  config wins).
+- **`fit --report-to` composes with `--json`, gate, and non-TTY (CI) runs** —
+  it previously only fired in the TTY live view.
+- **graph emits cloud signals in gate/report/catalog modes**, not just the
+  default render (decoupled from dashboard-session persistence).
+- **`configure` tests the API key** against the cloud entitlement endpoint, as
+  documented, instead of only storing it.
+
 ## [2.6.1] — 2026-06-03
 
 A discovery-hardening patch. No behavior change for normal runs beyond the

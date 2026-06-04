@@ -1,6 +1,6 @@
 {
   "name": "@opensip-tools/lang-java",
-  "version": "2.6.1",
+  "version": "2.6.2",
   "license": "MIT",
   "description": "Java language adapter for opensip-tools",
   "keywords": ["opensip-tools", "static-analysis", "code-quality", "parser", "ast", "tree-sitter", "java"],

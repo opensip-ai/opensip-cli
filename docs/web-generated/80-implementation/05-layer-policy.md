@@ -20,7 +20,7 @@ The five-layer package graph (core → datastore/contracts → tools/libraries/a
 
 For the conceptual layer narrative, see [`../10-concepts/03-modular-monolith.md`](/docs/opensip-tools/10-concepts/03-modular-monolith/).
 
-The literal rules are at [`.dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.1/.dependency-cruiser.cjs).
+The literal rules are at [`.dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/.dependency-cruiser.cjs).
 
 ---
 
@@ -194,7 +194,7 @@ The lang layer is below check packs in the implicit ordering, even though both s
 }
 ```
 
-A flat rule: *no* lang pack reaches up into fitness. The historical `lang-typescript → fitness` exception (`@opensip-tools/lang-typescript` re-exporting `filterContent`, `clearFilterCache`, `FilteredContent`) was paid down by moving those symbols into the adapter package itself — they now live in [`packages/languages/lang-typescript/src/filter.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.1/packages/languages/lang-typescript/src/filter.ts) alongside the rest of the TS-aware string/comment stripping. With that, the rule simplified from the named carve-out (`lang-no-fitness-except-typescript`) to the unconditional form above.
+A flat rule: *no* lang pack reaches up into fitness. The historical `lang-typescript → fitness` exception (`@opensip-tools/lang-typescript` re-exporting `filterContent`, `clearFilterCache`, `FilteredContent`) was paid down by moving those symbols into the adapter package itself — they now live in [`packages/languages/lang-typescript/src/filter.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/packages/languages/lang-typescript/src/filter.ts) alongside the rest of the TS-aware string/comment stripping. With that, the rule simplified from the named carve-out (`lang-no-fitness-except-typescript`) to the unconditional form above.
 
 ---
 

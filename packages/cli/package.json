@@ -1,6 +1,6 @@
 {
   "name": "opensip-tools",
-  "version": "2.6.1",
+  "version": "2.6.2",
   "license": "MIT",
   "description": "OpenSIP Tools — codebase analysis from the command line (the CLI; `npm i -g opensip-tools`)",
   "keywords": ["opensip-tools", "static-analysis", "code-quality", "cli", "fitness-functions", "call-graph", "architecture", "linting", "code-review", "devtools"],
