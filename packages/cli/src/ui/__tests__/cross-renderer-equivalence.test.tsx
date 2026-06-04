@@ -75,18 +75,26 @@ const FIXTURES: Readonly<Record<string, CommandResult>> = {
     type: 'graph-status',
     lines: ['saveBaseline — 1 occurrence(s)', '  saveBaseline (function)', '    src/gate.ts:12:0'],
   },
+  // ADR-0011 Phase 6: fit-done is envelope-derived (one row per check unit,
+  // with the fitness Validated/Ignores columns from UnitResult).
   'fit-done': {
     type: 'fit-done',
     label: 'fit',
     cwd: '/x',
-    rows: [
-      { check: 'no-console', status: 'FAIL', errors: 2, warnings: 0, validated: '10 files', ignored: 0, duration: '5ms', durationMs: 5 },
-      { check: 'naming', status: 'PASS', errors: 0, warnings: 1, validated: '10 files', ignored: 0, duration: '3ms', durationMs: 3 },
-    ],
-    summary: { passed: 1, failed: 1, totalErrors: 2, totalWarnings: 1, totalIgnored: 0, durationMs: 8 },
-    findings: {
-      checks: [{ checkSlug: 'no-console', passed: false, findings: [{ ruleId: 'no-console', message: 'console.log', severity: 'error', filePath: 'a.ts', line: 3 }], durationMs: 5 }],
-    },
+    envelope: buildSignalEnvelope({
+      tool: 'fit',
+      runId: 'r',
+      createdAt: '2026-06-04T00:00:00.000Z',
+      units: [
+        { slug: 'no-console', passed: false, durationMs: 5, filesValidated: 10, itemType: 'files', ignoredCount: 0 },
+        { slug: 'naming', passed: true, durationMs: 3, filesValidated: 10, itemType: 'files', ignoredCount: 0 },
+      ],
+      signals: [
+        { id: 's1', source: 'no-console', provider: 'opensip-tools', severity: 'high', category: 'quality', ruleId: 'no-console', message: 'console.log', filePath: 'a.ts', line: 3, metadata: {}, createdAt: '2026-06-04T00:00:00.000Z' },
+        { id: 's2', source: 'no-console', provider: 'opensip-tools', severity: 'high', category: 'quality', ruleId: 'no-console', message: 'console.log', filePath: 'b.ts', line: 4, metadata: {}, createdAt: '2026-06-04T00:00:00.000Z' },
+        { id: 's3', source: 'naming', provider: 'opensip-tools', severity: 'medium', category: 'quality', ruleId: 'naming', message: 'bad name', filePath: 'c.ts', metadata: {}, createdAt: '2026-06-04T00:00:00.000Z' },
+      ],
+    }),
   },
 };
 

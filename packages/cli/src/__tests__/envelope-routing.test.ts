@@ -138,11 +138,9 @@ describe('root --json path (emitEnvelope)', () => {
 });
 
 describe('root table path (renderResult derives the table from the envelope)', () => {
-  it('derives the per-unit table from the envelope when the result carries one', async () => {
+  it('derives the per-unit table from the envelope the result carries', async () => {
     const result: FitDoneResult = {
       type: 'fit-done',
-      rows: [],
-      summary: { passed: 0, failed: 0, totalErrors: 0, totalWarnings: 0, durationMs: 0 },
       label: 'fit',
       cwd: '/tmp',
       envelope: ENVELOPE,
@@ -159,21 +157,6 @@ describe('root table path (renderResult derives the table from the envelope)', (
     // The shared run-summary line is derived from verdict.summary.
     expect(out).toMatch(/1 Passed/);
     expect(out).toMatch(/1 Failed/);
-  });
-
-  it('falls through to the legacy view when the result carries NO envelope', () => {
-    // A legacy fit-done (no envelope) must derive its view from `rows`, not
-    // the envelope path — verified directly through resultToView's twin.
-    const legacy: FitDoneResult = {
-      type: 'fit-done',
-      rows: [],
-      summary: { passed: 0, failed: 0, totalErrors: 0, totalWarnings: 0, durationMs: 0 },
-      label: 'fit',
-      cwd: '/tmp',
-    };
-    // envelopeToTableView is only reachable when an envelope is present;
-    // a missing envelope keeps the legacy branch (no throw, no envelope read).
-    expect(legacy.envelope).toBeUndefined();
   });
 });
 

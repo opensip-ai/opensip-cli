@@ -1,26 +1,27 @@
 /**
- * runLiveMode dispatch — the animated Ink live view is a TTY-only affordance.
- * On a TTY it renders live; in a pipe / CI / redirect (non-TTY) it falls back
- * to running the engine and emitting the static `fit-done` result through the
- * render seam (dual-rendered as plain text), mirroring the live runner's
- * single-exit-code policy. These tests pin both branches.
+ * runLiveMode / runJsonMode dispatch (ADR-0011 Phase 6).
+ *
+ * The animated Ink live view is a TTY-only affordance. On a TTY `runLiveMode`
+ * renders live (and the tool's `registerLiveView` callback delivers signals);
+ * in a pipe / CI / redirect (non-TTY) it falls back to running the engine,
+ * rendering the static `fit-done` result through the seam, then delivering the
+ * envelope once at the composition root. `runJsonMode` emits the envelope via
+ * `cli.emitEnvelope` and delivers once. These tests pin the dispatch + the
+ * single `deliverSignals` egress call (the root owns exit 4, tested there).
  */
 
-import { EXIT_CODES } from '@opensip-tools/contracts';
-import { reportToCloud } from '@opensip-tools/output';
+import { EXIT_CODES, buildSignalEnvelope } from '@opensip-tools/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
-
 
 import { runJsonMode, runLiveMode } from '../fit-modes.js';
 import { executeFit } from '../fit.js';
 
+import type { SignalEnvelope } from '@opensip-tools/contracts';
 import type { ToolCliContext } from '@opensip-tools/core';
 
 vi.mock('../fit.js', () => ({ executeFit: vi.fn() }));
-vi.mock('@opensip-tools/output', () => ({ reportToCloud: vi.fn() }));
 
 const executeFitMock = executeFit as unknown as MockInstance;
-const reportToCloudMock = reportToCloud as unknown as MockInstance;
 
 interface MockCliBag {
   readonly cli: ToolCliContext;
@@ -28,6 +29,8 @@ interface MockCliBag {
   readonly render: MockInstance;
   readonly setExitCode: MockInstance;
   readonly maybeOpenDashboard: MockInstance;
+  readonly emitEnvelope: MockInstance;
+  readonly deliverSignals: MockInstance;
 }
 
 function mockCli(): MockCliBag {
@@ -36,19 +39,33 @@ function mockCli(): MockCliBag {
   const setExitCode = vi.fn();
   const maybeOpenDashboard = vi.fn().mockResolvedValue(undefined);
   const emitJson = vi.fn();
+  const emitEnvelope = vi.fn();
+  const deliverSignals = vi.fn().mockResolvedValue(undefined);
   const cli = {
     renderLive,
     render,
     setExitCode,
     maybeOpenDashboard,
     emitJson,
+    emitEnvelope,
+    deliverSignals,
     logger: console,
     scope: { datastore: () => undefined },
   } as unknown as ToolCliContext;
-  return { cli, renderLive, render, setExitCode, maybeOpenDashboard };
+  return { cli, renderLive, render, setExitCode, maybeOpenDashboard, emitEnvelope, deliverSignals };
 }
 
 const args = { cwd: '/x' } as unknown as Parameters<typeof runLiveMode>[0];
+
+function envelope(): SignalEnvelope {
+  return buildSignalEnvelope({
+    tool: 'fit',
+    runId: 'r',
+    createdAt: '2026-06-04T00:00:00.000Z',
+    units: [],
+    signals: [],
+  });
+}
 
 const savedTTY = process.stdout.isTTY;
 function setTTY(value: boolean): void {
@@ -57,8 +74,6 @@ function setTTY(value: boolean): void {
 
 beforeEach(() => {
   executeFitMock.mockReset();
-  reportToCloudMock.mockReset();
-  reportToCloudMock.mockResolvedValue({ url: 'https://x', findingCount: 3, runCount: 1, success: true });
 });
 
 afterEach(() => {
@@ -69,121 +84,89 @@ afterEach(() => {
 describe('runLiveMode', () => {
   it('renders the animated live view on a TTY (and never the static seam)', async () => {
     setTTY(true);
-    const { cli, renderLive, render, maybeOpenDashboard } = mockCli();
+    const { cli, renderLive, render, maybeOpenDashboard, deliverSignals } = mockCli();
     await runLiveMode(args, cli, 'fit', false);
     expect(renderLive).toHaveBeenCalledWith('fit', args);
     expect(render).not.toHaveBeenCalled();
     expect(executeFitMock).not.toHaveBeenCalled();
+    // The TTY live view delivers via the tool's registerLiveView callback,
+    // not runLiveMode — so runLiveMode itself does not call deliverSignals here.
+    expect(deliverSignals).not.toHaveBeenCalled();
     expect(maybeOpenDashboard).toHaveBeenCalledTimes(1);
   });
 
-  it('falls back to the static fit-done result through the seam when stdout is not a TTY', async () => {
+  it('falls back to the static fit-done result + delivers once on non-TTY', async () => {
     setTTY(false);
     const result = { type: 'fit-done', shouldFail: false };
-    executeFitMock.mockResolvedValue({ result, output: {} });
-    const { cli, renderLive, render, setExitCode } = mockCli();
+    executeFitMock.mockResolvedValue({ result, envelope: envelope() });
+    const { cli, renderLive, render, setExitCode, deliverSignals } = mockCli();
     await runLiveMode(args, cli, 'fit', false);
     expect(renderLive).not.toHaveBeenCalled();
     expect(executeFitMock).toHaveBeenCalledTimes(1);
     expect(render).toHaveBeenCalledWith(result);
+    expect(deliverSignals).toHaveBeenCalledTimes(1);
     // A passing run that didn't breach the fail threshold leaves the exit code alone.
     expect(setExitCode).not.toHaveBeenCalled();
   });
 
   it('exits RUNTIME_ERROR on a non-TTY run that breached the fail threshold', async () => {
     setTTY(false);
-    executeFitMock.mockResolvedValue({ result: { type: 'fit-done', shouldFail: true }, output: {} });
+    executeFitMock.mockResolvedValue({ result: { type: 'fit-done', shouldFail: true }, envelope: envelope() });
     const { cli, setExitCode, render } = mockCli();
     await runLiveMode(args, cli, 'fit', false);
     expect(setExitCode).toHaveBeenCalledWith(EXIT_CODES.RUNTIME_ERROR);
     expect(render).toHaveBeenCalled();
   });
 
-  it('propagates an error result\'s exit code on a non-TTY run', async () => {
+  it('propagates an error result\'s exit code on a non-TTY run (no delivery)', async () => {
     setTTY(false);
     const result = { type: 'error', exitCode: 2, message: 'no config' };
     executeFitMock.mockResolvedValue({ result });
-    const { cli, setExitCode, render } = mockCli();
+    const { cli, setExitCode, render, deliverSignals } = mockCli();
     await runLiveMode(args, cli, 'fit', false);
     expect(setExitCode).toHaveBeenCalledWith(2);
     expect(render).toHaveBeenCalledWith(result);
+    expect(deliverSignals).not.toHaveBeenCalled();
   });
 });
 
-describe('--report-to composes across modes (audit P1-1)', () => {
+describe('runJsonMode', () => {
   const reportArgs = {
     cwd: '/x',
     reportTo: 'https://sink.example',
     apiKey: 'k',
   } as unknown as Parameters<typeof runJsonMode>[0];
-  const fitDone = { result: { type: 'fit-done', shouldFail: false }, output: { checks: [] } };
 
-  it('uploads via --report-to in --json mode (not just the TTY live view)', async () => {
-    executeFitMock.mockResolvedValue(fitDone);
-    const { cli } = mockCli();
+  it('emits the envelope and delivers signals once', async () => {
+    const env = envelope();
+    executeFitMock.mockResolvedValue({ result: { type: 'fit-done', shouldFail: false }, envelope: env });
+    const { cli, emitEnvelope, deliverSignals } = mockCli();
     await runJsonMode(reportArgs, cli);
-    expect(reportToCloudMock).toHaveBeenCalledTimes(1);
-    expect(reportToCloudMock).toHaveBeenCalledWith(fitDone.output, 'https://sink.example', 'k');
+    expect(emitEnvelope).toHaveBeenCalledWith(env);
+    expect(deliverSignals).toHaveBeenCalledTimes(1);
+    expect(deliverSignals).toHaveBeenCalledWith(env, {
+      cwd: '/x',
+      reportTo: 'https://sink.example',
+      apiKey: 'k',
+      runFailed: false,
+    });
   });
 
-  it('uploads via --report-to in non-TTY (CI) live mode', async () => {
-    setTTY(false);
-    executeFitMock.mockResolvedValue(fitDone);
-    const { cli } = mockCli();
-    await runLiveMode(reportArgs, cli, 'fit', false);
-    expect(reportToCloudMock).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not upload when --report-to is absent', async () => {
-    setTTY(false);
-    executeFitMock.mockResolvedValue(fitDone);
-    const { cli } = mockCli();
-    await runLiveMode(args, cli, 'fit', false);
-    expect(reportToCloudMock).not.toHaveBeenCalled();
-  });
-});
-
-describe('--report-to exit-code contract (audit P2.2)', () => {
-  const reportArgs = {
-    cwd: '/x',
-    reportTo: 'https://sink.example',
-    apiKey: 'k',
-  } as unknown as Parameters<typeof runJsonMode>[0];
-  const passing = { result: { type: 'fit-done', shouldFail: false }, output: { checks: [] } };
-  const failed = { url: 'https://sink.example', findingCount: 0, runCount: 1, success: false, error: 'unreachable' };
-
-  it('exits REPORT_FAILED when a --report-to upload fails on an otherwise-passing --json run', async () => {
-    executeFitMock.mockResolvedValue(passing);
-    reportToCloudMock.mockResolvedValue(failed);
-    const { cli, setExitCode } = mockCli();
-    await runJsonMode(reportArgs, cli);
-    expect(setExitCode).toHaveBeenCalledWith(EXIT_CODES.REPORT_FAILED);
-  });
-
-  it('exits REPORT_FAILED on report failure in non-TTY (CI) live mode', async () => {
-    setTTY(false);
-    executeFitMock.mockResolvedValue(passing);
-    reportToCloudMock.mockResolvedValue(failed);
-    const { cli, setExitCode } = mockCli();
-    await runLiveMode(reportArgs, cli, 'fit', false);
-    expect(setExitCode).toHaveBeenCalledWith(EXIT_CODES.REPORT_FAILED);
-  });
-
-  it('leaves the exit code untouched when the upload succeeds on a passing run', async () => {
-    setTTY(false);
-    executeFitMock.mockResolvedValue(passing);
-    // default beforeEach mock: success: true
-    const { cli, setExitCode } = mockCli();
-    await runLiveMode(reportArgs, cli, 'fit', false);
-    expect(setExitCode).not.toHaveBeenCalledWith(EXIT_CODES.REPORT_FAILED);
-  });
-
-  it('does NOT mask a check/gate failure: a failing run keeps RUNTIME_ERROR even if reporting also fails', async () => {
-    executeFitMock.mockResolvedValue({ result: { type: 'fit-done', shouldFail: true }, output: { checks: [] } });
-    reportToCloudMock.mockResolvedValue(failed);
-    const { cli, setExitCode } = mockCli();
+  it('passes runFailed=true to deliverSignals on a failing run (root owns exit 4)', async () => {
+    const env = envelope();
+    executeFitMock.mockResolvedValue({ result: { type: 'fit-done', shouldFail: true }, envelope: env });
+    const { cli, setExitCode, deliverSignals } = mockCli();
     await runJsonMode(reportArgs, cli);
     expect(setExitCode).toHaveBeenCalledWith(EXIT_CODES.RUNTIME_ERROR);
-    expect(setExitCode).not.toHaveBeenCalledWith(EXIT_CODES.REPORT_FAILED);
+    expect(deliverSignals).toHaveBeenCalledWith(env, expect.objectContaining({ runFailed: true }));
+  });
+
+  it('emits an error payload and does not deliver on an error result', async () => {
+    executeFitMock.mockResolvedValue({ result: { type: 'error', exitCode: 2, message: 'no config' } });
+    const { cli, emitEnvelope, deliverSignals, setExitCode } = mockCli();
+    await runJsonMode(args, cli);
+    expect(setExitCode).toHaveBeenCalledWith(2);
+    expect(emitEnvelope).not.toHaveBeenCalled();
+    expect(deliverSignals).not.toHaveBeenCalled();
   });
 });

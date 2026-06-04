@@ -16,10 +16,9 @@
 import {
   EXIT_CODES,
   mapToolErrorToExitCode,
-  type CliOutput,
   type FitOptions,
+  type SignalEnvelope,
 } from '@opensip-tools/contracts';
-import { reportToCloud, type ReportResult } from '@opensip-tools/output';
 
 import {
   saveBaseline,
@@ -51,49 +50,25 @@ function emitWarningsToStderr(result: { warnings?: readonly string[] }): void {
 }
 
 /**
- * Send fit findings to `--report-to`, if requested. Shared by every fit mode so
- * SARIF upload composes with json / gate / non-TTY runs, not only the TTY live
- * view (audit P1-1). Returns the report status, or undefined when not
- * requested / no output. Callers attach it to a rendered result (live) or
- * surface it via {@link emitReportStatusToStderr} (non-Ink paths).
+ * Deliver the run's signal envelope to the composition-root-owned effectful
+ * sinks (ADR-0011 / ADR-0008): best-effort cloud sync + the `--report-to`
+ * SARIF upload (which owns exit code 4). Called once per mode, after the
+ * render/emit. `runFailed` is the real exit decision (`shouldFail` /
+ * gate-degraded), so a `--report-to` upload failure never masks a genuine
+ * check/gate failure. No-op when neither cloud nor `--report-to` is active.
  */
-export async function reportFitFindings(
-  output: CliOutput | undefined,
-  args: FitOptions,
-): Promise<ReportResult | undefined> {
-  if (!args.reportTo || !output) return undefined;
-  return reportToCloud(output, args.reportTo, args.apiKey);
-}
-
-/** Surface a `--report-to` outcome on stderr (non-Ink modes). No-op when absent. */
-function emitReportStatusToStderr(status: ReportResult | undefined): void {
-  if (!status) return;
-  if (status.success) {
-    process.stderr.write(
-      `opensip-tools: --report-to sent ${status.findingCount} finding(s) to ${status.url}\n`,
-    );
-  } else {
-    process.stderr.write(
-      `opensip-tools: --report-to failed (${status.url}): ${status.error ?? 'unknown error'}\n`,
-    );
-  }
-}
-
-/**
- * Apply the `--report-to` exit-code contract (ADR-0008 / system-context):
- * an upload failure exits `EXIT_CODES.REPORT_FAILED` — but only when the run
- * otherwise passed. A real check/gate failure (`runFailed`) takes precedence
- * and is never masked by a reporting failure. Matches graph's `runReportMode`,
- * which fails CI on report upload failure.
- */
-function applyReportExitCode(
+async function deliverFitSignals(
   cli: ToolCliContext,
-  status: ReportResult | undefined,
+  envelope: SignalEnvelope,
+  args: FitOptions,
   runFailed: boolean,
-): void {
-  if (status && !status.success && !runFailed) {
-    cli.setExitCode(EXIT_CODES.REPORT_FAILED);
-  }
+): Promise<void> {
+  await cli.deliverSignals(envelope, {
+    cwd: args.cwd,
+    reportTo: args.reportTo,
+    apiKey: args.apiKey,
+    runFailed,
+  });
 }
 
 export async function runListMode(args: FitOptions, cli: ToolCliContext): Promise<void> {
@@ -118,24 +93,24 @@ export async function runRecipesMode(args: FitOptions, cli: ToolCliContext): Pro
  */
 export async function runJsonMode(args: FitOptions, cli: ToolCliContext): Promise<void> {
   const fitResult = await executeFit(args, { datastore: cli.scope.datastore() as DataStore | undefined });
-  if (fitResult.result.type === 'error') {
+  if (fitResult.envelope === undefined) {
     cli.setExitCode(fitResult.result.exitCode);
     cli.emitJson({ error: fitResult.result.message });
     return;
   }
-  const runFailed = fitResult.result.type === 'fit-done' && fitResult.result.shouldFail === true;
+  const runFailed = fitResult.result.shouldFail === true;
   if (runFailed) {
     cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
   }
-  cli.emitJson(fitResult.output);
+  // ADR-0011: emit the signal envelope through the shared `formatSignalJson`
+  // formatter (the root owns stdout). No per-tool re-stringification.
+  cli.emitEnvelope(fitResult.envelope);
   // Warnings collected during the run go to stderr so JSON consumers still
   // see them without contaminating the structured stdout payload.
   emitWarningsToStderr(fitResult.result);
-  // --report-to composes with --json (audit P1-1): upload after the JSON is on
-  // stdout; the status goes to stderr so it doesn't corrupt the payload.
-  const reportStatus = await reportFitFindings(fitResult.output, args);
-  emitReportStatusToStderr(reportStatus);
-  applyReportExitCode(cli, reportStatus, runFailed);
+  // Effectful egress lives at the composition root: cloud sync + `--report-to`
+  // (which owns exit 4). Called once, after the JSON is on stdout.
+  await deliverFitSignals(cli, fitResult.envelope, args, runFailed);
 }
 
 /**
@@ -164,20 +139,19 @@ export async function runLiveMode(
     const fitResult = await executeFit(args, {
       datastore: cli.scope.datastore() as DataStore | undefined,
     });
-    const runFailed =
-      fitResult.result.type === 'error' ||
-      (fitResult.result.type === 'fit-done' && fitResult.result.shouldFail === true);
-    if (fitResult.result.type === 'error') {
+    if (fitResult.envelope === undefined) {
       cli.setExitCode(fitResult.result.exitCode);
-    } else if (fitResult.result.shouldFail === true) {
-      cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
+      await cli.render(fitResult.result);
+    } else {
+      const runFailed = fitResult.result.shouldFail === true;
+      if (runFailed) {
+        cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
+      }
+      await cli.render(fitResult.result);
+      // Effectful egress at the composition root (cloud + `--report-to`),
+      // composing with non-TTY runs (CI), not just the TTY live view.
+      await deliverFitSignals(cli, fitResult.envelope, args, runFailed);
     }
-    await cli.render(fitResult.result);
-    // --report-to composes with non-TTY runs (CI), not just the TTY live view
-    // (audit P1-1). Send after the static result is rendered.
-    const reportStatus = await reportFitFindings(fitResult.output, args);
-    emitReportStatusToStderr(reportStatus);
-    applyReportExitCode(cli, reportStatus, runFailed);
   }
   await cli.maybeOpenDashboard({
     openRequested,
@@ -204,7 +178,7 @@ export async function runGateMode(args: FitOptions, cli: ToolCliContext): Promis
   // is written against — gate-save / gate-compare runs land in the
   // session history alongside live-mode runs.
   const fitResult = await executeFit(args, { datastore });
-  if (fitResult.result.type !== 'fit-done') {
+  if (fitResult.envelope === undefined) {
     cli.logger.warn({
       evt: 'cli.gate.fit_failed',
       module: 'cli:gate',
@@ -215,36 +189,32 @@ export async function runGateMode(args: FitOptions, cli: ToolCliContext): Promis
     process.stderr.write(`Error: ${fitResult.result.message}\n`);
     return;
   }
-  const output = fitResult.output!;
+  const { envelope } = fitResult;
   // Surface non-fatal warnings before the gate output so the user sees them
   // alongside the run summary. Safe here because gate mode is non-Ink.
   emitWarningsToStderr(fitResult.result);
-  // --report-to composes with gate runs (audit P1-1): upload the findings
-  // regardless of save/compare, before the gate verdict is rendered. The
-  // report-failure exit code is applied AFTER the verdict below so a gate
-  // regression dominates, but an upload failure still fails an otherwise-
-  // passing gate (REPORT_FAILED contract).
-  const reportStatus = await reportFitFindings(output, args);
-  emitReportStatusToStderr(reportStatus);
   try {
     if (args.gateSave === true) {
-      saveBaseline(output, repo);
-      const findingCount = output.checks.reduce((n, c) => n + c.findings.length, 0);
+      saveBaseline(envelope, repo);
       await cli.render({
         type: 'gate-done',
         lines: [
           'Baseline saved (project SQLite store)',
-          `  ${output.checks.length} check(s), ${findingCount} finding(s)`,
+          `  ${envelope.units.length} check(s), ${envelope.signals.length} finding(s)`,
         ],
       });
-      // gate-save itself never fails the run; only a report upload failure can.
-      applyReportExitCode(cli, reportStatus, false);
+      // Effectful egress at the root (cloud + `--report-to`). gate-save itself
+      // never fails the run; only a `--report-to` upload failure can (exit 4),
+      // which `deliverSignals` owns. runFailed=false here.
+      await deliverFitSignals(cli, envelope, args, false);
       return;
     }
-    const result = compareToBaseline(output, repo);
+    const result = compareToBaseline(envelope, repo);
     await cli.render({ type: 'gate-done', lines: renderGateCompareOutput(result).split('\n') });
     cli.setExitCode(result.degraded ? EXIT_CODES.RUNTIME_ERROR : EXIT_CODES.SUCCESS);
-    applyReportExitCode(cli, reportStatus, result.degraded);
+    // A gate regression dominates a `--report-to` upload failure: pass
+    // `degraded` as runFailed so exit 4 never masks the gate verdict.
+    await deliverFitSignals(cli, envelope, args, result.degraded);
     return;
   } catch (error) {
     // Gate mode is plain-text (not Ink), so we render the error

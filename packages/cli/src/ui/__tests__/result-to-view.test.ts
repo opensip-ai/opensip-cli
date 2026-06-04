@@ -11,63 +11,77 @@ function textOf(result: CommandResult): string {
   return renderToText(resultToView(result));
 }
 
+/** Build a fit signal for the table-derivation tests (`source === ruleId === checkSlug`). */
+function fitSignal(over: { source: string; severity: Signal['severity']; message?: string; filePath?: string; line?: number }): Signal {
+  return {
+    id: `sig_${over.source}_${String(over.line ?? 0)}`,
+    source: over.source,
+    provider: 'opensip-tools',
+    severity: over.severity,
+    category: 'quality',
+    ruleId: over.source,
+    message: over.message ?? 'm',
+    filePath: over.filePath ?? 'a.ts',
+    line: over.line,
+    metadata: {},
+    createdAt: '2026-06-04T00:00:00.000Z',
+  };
+}
+
 describe('resultToView', () => {
-  it('renders fit-done: table, summary, findings, and cloud-report status', () => {
+  it('renders fit-done from the envelope: table (with Validated/Ignores), summary', () => {
+    // ADR-0011 Phase 6: fitness is migrated — the fit-done table is derived
+    // from the envelope's units + signals (one row per check unit), including
+    // the fitness-only Validated/Ignores columns carried on UnitResult.
     const out = textOf({
       type: 'fit-done',
       label: 'fit',
       cwd: '/x',
-      rows: [
-        { check: 'no-console', status: 'FAIL', errors: 2, warnings: 0, validated: '10 files', ignored: 0, duration: '5ms', durationMs: 5 },
-        { check: 'naming', status: 'PASS', errors: 0, warnings: 1, validated: '10 files', ignored: 0, duration: '3ms', durationMs: 3 },
-      ],
-      summary: { passed: 1, failed: 1, totalErrors: 2, totalWarnings: 1, totalIgnored: 0, durationMs: 8 },
-      findings: {
-        checks: [
-          { checkSlug: 'no-console', passed: false, findings: [{ ruleId: 'no-console', message: 'console.log', severity: 'error', filePath: 'a.ts', line: 3 }], durationMs: 5 },
+      envelope: buildSignalEnvelope({
+        tool: 'fit',
+        runId: 'r',
+        createdAt: '2026-06-04T00:00:00.000Z',
+        units: [
+          { slug: 'no-console', passed: false, durationMs: 5, filesValidated: 10, itemType: 'files', ignoredCount: 0 },
+          { slug: 'naming', passed: true, durationMs: 3, filesValidated: 10, itemType: 'files', ignoredCount: 0 },
         ],
-      },
-      reportStatus: { url: 'https://x', findingCount: 3, runCount: 2, success: true },
+        signals: [
+          fitSignal({ source: 'no-console', severity: 'high', message: 'console.log', filePath: 'a.ts', line: 3 }),
+          fitSignal({ source: 'no-console', severity: 'high', message: 'console.log', filePath: 'b.ts', line: 4 }),
+          fitSignal({ source: 'naming', severity: 'medium', message: 'bad name' }),
+        ],
+      }),
     });
-    // Table: FAIL sorts above PASS, header + separator present.
-    expect(out).toContain('Check');
+    // Table: FAIL sorts above PASS, header + the fitness columns present.
+    expect(out).toContain('Unit');
     expect(out).toContain('Status');
+    expect(out).toContain('Validated');
+    expect(out).toContain('Ignores');
+    expect(out).toContain('10 files');
     expect(out.indexOf('no-console')).toBeLessThan(out.indexOf('naming')); // FAIL before PASS
-    // Shared summary line.
+    // Shared summary line (1 passed, 1 failed; 2 errors, 1 warning).
     expect(out).toContain('1 Passed, 1 Failed (2 Errors, 1 Warnings) | Duration 8ms');
-    // Findings detail + cloud status.
-    expect(out).toContain('Findings (1):');
-    expect(out).toContain('error  console.log a.ts:3');
-    expect(out).toContain('Reported to https://x');
   });
 
-  it('renders fit-done failure branches: check error, warn finding, truncation, failed cloud report', () => {
-    const manyFindings = Array.from({ length: 30 }, (_, i) => ({
-      ruleId: 'r',
-      message: `w${i}`,
-      severity: 'warning' as const,
-      filePath: 'b.ts',
-    }));
+  it('renders fit-done errored/clean units: ERROR status, blank validated cell', () => {
     const out = textOf({
       type: 'fit-done',
       label: 'fit',
       cwd: '/x',
-      rows: [{ check: 'broken', status: 'TIMEOUT', errors: 0, warnings: 0, validated: '—', ignored: 3, duration: '60s', durationMs: 61_000 }],
-      summary: { passed: 0, failed: 1, totalErrors: 0, totalWarnings: 30, totalIgnored: 3, durationMs: 100 },
-      findings: {
-        checks: [
-          { checkSlug: 'loader', passed: false, findings: [], durationMs: 1, error: 'failed to load' },
-          { checkSlug: 'naming', passed: false, findings: manyFindings, durationMs: 2 },
+      envelope: buildSignalEnvelope({
+        tool: 'fit',
+        runId: 'r',
+        createdAt: '2026-06-04T00:00:00.000Z',
+        units: [
+          { slug: 'loader', passed: false, durationMs: 1, error: 'failed to load' },
+          { slug: 'naming', passed: false, durationMs: 2, filesValidated: 5, itemType: 'files', ignoredCount: 3 },
         ],
-      },
-      reportStatus: { url: 'https://x', findingCount: 0, runCount: 1, success: false, error: 'network down', chunksTotal: 3, chunksSucceeded: 1 },
+        signals: [fitSignal({ source: 'naming', severity: 'medium', message: 'w0', filePath: 'b.ts' })],
+      }),
     });
-    expect(out).toContain('error  failed to load'); // check-level error
-    expect(out).toContain('warn  w0'); // warning finding
-    expect(out).toContain('… 5 more hidden'); // 30 - 25 cap
-    expect(out).toContain('Showing first 25 violations per check');
-    expect(out).toContain('Partially reported to https://x (1/3 chunks)'); // partial cloud failure
-    expect(out).toContain('network down');
+    expect(out).toContain('ERROR'); // errored unit status
+    expect(out).toContain('loader');
+    expect(out).toContain('—'); // loader has no validated count → blank cell
   });
 
   it('renders help and list views (every result type is now total)', () => {

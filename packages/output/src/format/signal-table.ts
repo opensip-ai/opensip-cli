@@ -13,10 +13,14 @@
  * (`(envelope) => string`). The Ink renderer (cli-ui) is the string side.
  *
  * The envelope carries only what a flat `Signal[]` cannot express (ran,
- * errored, timing); fitness-only columns (`validated`/`ignored`) are NOT
- * envelope-expressible and are intentionally absent from this neutral row.
+ * errored, timing). Two further per-unit facts a flat list cannot express —
+ * fitness's `filesValidated`/`ignoredCount` — ride on {@link UnitResult} as
+ * optional fields; this formatter surfaces them as the optional
+ * `validated`/`ignored` row columns when present (graph/sim omit them → the
+ * renderer leaves the column blank). This keeps ONE shared table formatter
+ * (ADR-0011, Phase 6, decision B) rather than a fitness-specific rich view.
  */
-import { formatDuration } from '@opensip-tools/core';
+import { formatDuration, isErrorSignal } from '@opensip-tools/core';
 
 import type { SignalEnvelope, UnitResult } from '@opensip-tools/contracts';
 import type { Signal } from '@opensip-tools/core';
@@ -37,6 +41,16 @@ export interface SignalTableRow {
   readonly durationMs: number;
   /** The unit's error message, when it errored (status `ERROR`). */
   readonly error?: string;
+  /**
+   * Count of files/items the unit validated this run, or undefined when the
+   * unit does not scan files (graph/sim). The renderer formats it with
+   * {@link itemType} as the noun (`"450 files"`); a `0`/undefined renders `—`.
+   */
+  readonly validated?: number;
+  /** The scanned-item noun for {@link validated} (`files` / `packages` / …). */
+  readonly itemType?: string;
+  /** Findings suppressed by an inline ignore directive, or undefined when N/A. */
+  readonly ignored?: number;
 }
 
 /** Aggregate summary line for the terminal table, derived from the verdict. */
@@ -46,11 +60,6 @@ export interface SignalTableSummary {
   readonly totalErrors: number;
   readonly totalWarnings: number;
   readonly durationMs: number;
-}
-
-/** A signal is an "error" rung when it is `critical` or `high`; else a "warning". */
-function isErrorSignal(signal: Signal): boolean {
-  return signal.severity === 'critical' || signal.severity === 'high';
 }
 
 /** Group a run's signals by their `source` (the emitting unit's slug). */
@@ -93,6 +102,9 @@ export function formatSignalTableRows(envelope: SignalEnvelope): SignalTableRow[
       duration: formatDuration(unit.durationMs),
       durationMs: unit.durationMs,
       error: unit.error,
+      validated: unit.filesValidated,
+      itemType: unit.itemType,
+      ignored: unit.ignoredCount,
     };
   });
 }

@@ -19,7 +19,7 @@ export { ProjectHeader, formatProjectHeader, viewProjectHeader, type ProjectHead
 export { RunHeader, type RunHeaderProps, type RunHeaderMeta } from './run-header.js';
 export { RunSummary, viewRunSummary, type RunSummaryProps } from './run-summary.js';
 export { RunFooterHints, viewFooterHints, type RunFooterHint, type RunFooterHintsProps } from './run-footer-hints.js';
-export { sortFitRowPriority, parseValidatedCount, type FitRowSortKey } from './fit-table-format.js';
+export { sortFitRowPriority, parseValidatedCount, formatValidatedColumn, type FitRowSortKey } from './fit-table-format.js';
 export { Spinner, type SpinnerProps, useSpinner, useStandaloneSpinner } from './spinner.js';
 export { ClockProvider, type ClockProviderProps, useClock, useTick } from './clock.js';
 export {

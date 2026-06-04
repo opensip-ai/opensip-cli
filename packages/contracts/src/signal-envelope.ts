@@ -50,6 +50,23 @@ export interface UnitResult {
   readonly violationCount?: number;
   readonly durationMs: number;
   readonly error?: string;
+  /**
+   * Files the unit validated/scanned this run (fitness's "Validated" column).
+   * A per-unit fact a flat `Signal[]` cannot express — a check that scanned
+   * 450 files and emitted 0 signals still has `filesValidated: 450`. Optional:
+   * graph rules / sim scenarios do not scan files and omit it (the terminal
+   * table renders the column blank for those tools). `itemType` names the
+   * scanned noun (`files` / `packages` / …) for the column label.
+   */
+  readonly filesValidated?: number;
+  readonly itemType?: string;
+  /**
+   * Findings suppressed by an inline `@fitness-ignore` directive this run
+   * (fitness's "Ignores" column). Like {@link filesValidated}, a per-unit fact
+   * not recoverable from the (post-suppression) signal list; optional and
+   * omitted by tools without a suppression mechanism.
+   */
+  readonly ignoredCount?: number;
 }
 
 /** The one tool-run output envelope. The `CommandResult` payload every tool returns. */

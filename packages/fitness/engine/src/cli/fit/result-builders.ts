@@ -11,143 +11,115 @@
  */
 
 import {
-  passRate,
+  buildSignalEnvelope,
   type FitOptions,
-  type CliOutput,
-  type TableRow,
-  type SummaryOptions,
+  type SignalEnvelope,
+  type UnitResult,
   type FitDoneResult,
 } from '@opensip-tools/contracts';
-import { formatDuration, generatePrefixedId, logger } from '@opensip-tools/core';
+import { currentScope, generatePrefixedId, logger } from '@opensip-tools/core';
 import { SessionRepo } from '@opensip-tools/session-store';
 
 import { buildFitnessSessionPayload } from '../../persistence/session-payload.js';
+import { violationToSignal } from '../../signalers/violation-to-signal.js';
 
 import { getPluginLoadErrors } from './check-loader.js';
-import { getDisplayName } from './display-registry.js';
 
 import type { FitnessRecipeServiceCallbacks, CheckSummary } from '../../recipes/service-types.js';
-import type { FitnessRecipeResult } from '../../recipes/types.js';
+import type { FitnessRecipeResult, RecipeCheckResult } from '../../recipes/types.js';
 import type { SignalersConfig } from '../../signalers/types.js';
+import type { Signal } from '@opensip-tools/core';
 import type { DataStore } from '@opensip-tools/datastore';
 
 // ---------------------------------------------------------------------------
-// Formatting helpers (used to build TableRow data)
+// Envelope builder (ADR-0011, Phase 6) — the canonical post-run transform
 // ---------------------------------------------------------------------------
 
-// `formatDuration` now lives in `@opensip-tools/core` (shared across tools);
-// imported above for the table builders below. Fitness's public re-export of
-// it is sourced straight from core in `cli/fit.ts`.
-
-/** Renders a "validated" table column showing item count with singular/plural noun. */
-export function formatValidatedColumn(totalItems: number | undefined, itemType = 'items'): string {
-  // No meaningful count: external tool checks, errored checks, or checks with no file scanning
-  if (!totalItems) return '—';
-  // Use singular for count of 1, plural otherwise (e.g., "1 file", "450 files", "13 packages")
-  const singular = itemType.endsWith('s') ? itemType.slice(0, -1) : itemType;
-  return totalItems === 1 ? `${totalItems} ${singular}` : `${totalItems} ${itemType}`;
+/** Per-check error string for the unit sidecar: the check's own error, or a timeout marker. */
+function unitError(cr: RecipeCheckResult): string | undefined {
+  if (cr.error !== undefined) return cr.error;
+  if (cr.timedOut === true) return 'timed out';
+  return undefined;
 }
-
-function rowStatus(cr: { timedOut?: boolean; passed: boolean }): 'TIMEOUT' | 'PASS' | 'FAIL' {
-  if (cr.timedOut) return 'TIMEOUT';
-  return cr.passed ? 'PASS' : 'FAIL';
-}
-
-// ---------------------------------------------------------------------------
-// Output builders
-// ---------------------------------------------------------------------------
 
 /**
- * Map a {@link FitnessRecipeResult} onto the shared {@link CliOutput}
- * shape that the dashboard, JSON exporter, and SARIF builder all
- * consume. The same finding shape is produced here and in
- * {@link buildFitDoneResult} below so any change is paired.
+ * Assemble the fit run's {@link SignalEnvelope} — the universal output
+ * currency the composition root renders (table), emits (`--json`), and
+ * delivers (cloud + `--report-to`).
+ *
+ * Each check violation becomes one {@link Signal} (`source === ruleId ===
+ * checkSlug`) via {@link violationToSignal}; every check that ran produces one
+ * {@link UnitResult} row (so a clean check still appears in the table). The
+ * fitness-only `Validated`/`Ignores` columns ride on the unit as
+ * `filesValidated`/`itemType`/`ignoredCount` (per-unit facts a flat signal
+ * list cannot express). The verdict/summary are computed centrally by
+ * {@link buildSignalEnvelope} so all three tools agree on "passed ⇔ no
+ * critical/high".
+ *
+ * Pure: the only clock read (`createdAt`) and the run id come from the caller's
+ * scope, matching graph/sim's envelope builders.
  */
-export function buildCliOutput(
+export function buildFitEnvelope(
   fitnessResult: FitnessRecipeResult,
   recipeName: string | undefined,
-): CliOutput {
-  const { summary, checkResults, durationMs } = fitnessResult;
-  // Shared pass-rate helper — the live renderer, service.buildResult, and
-  // graph all route through passRate() so gate baselines and the dashboard
-  // can never disagree (a divergence here used to risk a phantom
-  // --gate-compare regression).
-  const score = passRate({ total: summary.totalChecks, passed: summary.passedChecks });
-  return {
-    version: '1.0',
-    tool: 'fit',
-    timestamp: new Date().toISOString(),
-    recipe: recipeName,
-    score,
-    passed: summary.failedChecks === 0 && getPluginLoadErrors().length === 0,
-    summary: {
-      total: summary.totalChecks,
-      passed: summary.passedChecks,
-      failed: summary.failedChecks,
-      errors: summary.totalErrors,
-      warnings: summary.totalWarnings,
-    },
-    checks: checkResults.map(cr => ({
-      checkSlug: cr.checkSlug,
+): SignalEnvelope {
+  const { checkResults } = fitnessResult;
+
+  const signals: Signal[] = [];
+  const units: UnitResult[] = [];
+  for (const cr of checkResults) {
+    for (const violation of cr.violations ?? []) {
+      signals.push(violationToSignal(cr.checkSlug, violation));
+    }
+    units.push({
+      slug: cr.checkSlug,
       passed: cr.passed,
       violationCount: cr.violationCount,
-      findings: (cr.violations ?? []).map(v => ({
-        ruleId: cr.checkSlug,
-        message: v.message,
-        severity: v.severity,
-        filePath: v.file,
-        line: v.line,
-        column: v.column,
-        suggestion: v.suggestion,
-      })),
       durationMs: cr.durationMs,
-    })),
-    durationMs,
-  };
+      error: unitError(cr),
+      filesValidated: cr.totalItems,
+      itemType: cr.itemType,
+      ignoredCount: cr.ignoredCount,
+    });
+  }
+
+  return buildSignalEnvelope({
+    tool: 'fit',
+    recipe: recipeName,
+    runId: currentScope()?.runId ?? '',
+    createdAt: new Date().toISOString(),
+    units,
+    signals,
+  });
 }
 
-/** Input bundle for {@link buildFitDoneResult}: CLI args, recipe result, and signaler config. */
+/** Input bundle for {@link buildFitDoneResult}: CLI args, recipe result, the run envelope, and signaler config. */
 export interface BuildFitDoneArgs {
   args: FitOptions;
   fitnessResult: FitnessRecipeResult;
+  envelope: SignalEnvelope;
   signalersConfig: SignalersConfig;
   recipeName: string | undefined;
   warnings?: readonly string[];
 }
 
 /**
- * Build the {@link FitDoneResult} the live renderer / JSON output / gate
- * mode all consume. Computes the configured fail thresholds, the table
- * rows, the optional grouped findings block, and the run label.
+ * Build the {@link FitDoneResult} the live renderer / non-TTY render path
+ * consume. Carries the run's {@link SignalEnvelope} (the composition root
+ * derives the terminal table + summary FROM it — one row per check unit) plus
+ * the run label, the fail-threshold verdict, and non-fatal warnings.
+ *
+ * `shouldFail` (the exit-code driver) is NOT envelope.verdict.passed: it folds
+ * in the configured `failOnErrors`/`failOnWarnings` thresholds and the
+ * plugin-load-error gate, which the pure signal verdict cannot express.
  *
  * Pure builder: session persistence (SessionRepo.save) lives at the
- * `executeFit` call site (post-call), not here. Threading `datastore`
- * into `executeFit`'s opts in v2 made it unnecessary to push it into
- * this builder, and keeping the function side-effect-free preserves the
- * D1-phase decomposition. See `executeFit` for the persistence write.
+ * `executeFit` call site (post-call), not here. The envelope is assembled once
+ * in `executeFit` and threaded in so the gate, render, and session-payload
+ * paths all consume the same envelope.
  */
-export function buildFitDoneResult({ args, fitnessResult, signalersConfig, recipeName, warnings }: BuildFitDoneArgs): FitDoneResult {
-  const { summary, checkResults, durationMs } = fitnessResult;
-
-  const tableRows: TableRow[] = checkResults.map(cr => ({
-    check: getDisplayName(cr.checkSlug),
-    status: rowStatus(cr),
-    errors: cr.errorCount,
-    warnings: cr.warningCount,
-    validated: formatValidatedColumn(cr.totalItems, cr.itemType),
-    ignored: cr.ignoredCount,
-    duration: formatDuration(cr.durationMs),
-    durationMs: cr.durationMs,
-  }));
-
-  const summaryOpts: SummaryOptions = {
-    passed: summary.passedChecks,
-    failed: summary.failedChecks,
-    totalErrors: summary.totalErrors,
-    totalWarnings: summary.totalWarnings,
-    totalIgnored: summary.totalIgnored,
-    durationMs,
-  };
+export function buildFitDoneResult({ args, fitnessResult, envelope, signalersConfig, recipeName, warnings }: BuildFitDoneArgs): FitDoneResult {
+  const { summary } = fitnessResult;
 
   // Determine exit code from config thresholds.
   // failOnErrors: fail if total errors >= this value (default: 1, 0 = never fail on errors)
@@ -159,39 +131,13 @@ export function buildFitDoneResult({ args, fitnessResult, signalersConfig, recip
     (failOnErrors > 0 && summary.totalErrors >= failOnErrors) ||
     (failOnWarnings > 0 && summary.totalWarnings >= failOnWarnings);
 
-  let findings: FitDoneResult['findings'];
-  if ((args.findings || args.verbose) && (summary.totalErrors + summary.totalWarnings) > 0) {
-    findings = {
-      checks: checkResults
-        .filter(cr => cr.errorCount > 0 || cr.warningCount > 0 || cr.error)
-        .map(cr => ({
-          checkSlug: cr.checkSlug,
-          passed: cr.passed,
-          violationCount: cr.violationCount,
-          findings: (cr.violations ?? []).map(v => ({
-            ruleId: cr.checkSlug,
-            message: v.message,
-            severity: v.severity,
-            filePath: v.file,
-            line: v.line,
-            column: v.column,
-            suggestion: v.suggestion,
-          })),
-          durationMs: cr.durationMs,
-          error: cr.error,
-        })),
-    };
-  }
-
   const label = args.tags ? `tags: ${args.tags}` : `recipe ${recipeName ?? 'default'}`;
 
   return {
     type: 'fit-done',
-    rows: tableRows,
-    summary: summaryOpts,
     label,
     cwd: args.cwd,
-    findings,
+    envelope,
     shouldFail,
     configFound: true,
     warnings: warnings && warnings.length > 0 ? warnings : undefined,
@@ -242,30 +188,34 @@ export function buildFitCallbacks(
 
 /**
  * Best-effort session persistence — invoked when `executeFit` is called
- * with a `datastore` opt. Maps `CliOutput` directly onto the
- * `StoredSession` shape that `SessionRepo` consumes. Errors are caught
- * and logged so a write failure never fails the run.
+ * with a `datastore` opt. Maps the run's {@link SignalEnvelope} onto the
+ * generic `StoredSession` row (`score`/`passed`/`timestamp` from the
+ * envelope's verdict + identity) and the dashboard-shaped opaque payload
+ * (derived from the envelope's signals/units, 4→2 severity). Errors are
+ * caught and logged so a write failure never fails the run.
  */
 export function persistFitSession(
   datastore: DataStore,
   args: FitOptions,
-  output: CliOutput,
+  envelope: SignalEnvelope,
+  durationMs: number,
 ): void {
   try {
     const repo = new SessionRepo(datastore);
     repo.save({
       id: generatePrefixedId('fit'),
       tool: 'fit',
-      timestamp: output.timestamp,
+      timestamp: envelope.createdAt,
       cwd: args.cwd,
-      recipe: output.recipe,
-      score: output.score,
-      passed: output.passed,
-      durationMs: output.durationMs,
-      // Fitness-owned opaque detail (summary + per-check findings). The
-      // generic session row above holds zero fitness vocabulary; the
-      // dashboard reads this payload to render the Fitness tab.
-      payload: buildFitnessSessionPayload(output),
+      recipe: envelope.recipe,
+      score: envelope.verdict.score,
+      passed: envelope.verdict.passed,
+      durationMs,
+      // Fitness-owned opaque detail (summary + per-check findings), derived
+      // from the envelope's signals/units. The generic session row above
+      // holds zero fitness vocabulary; the dashboard reads this payload to
+      // render the Fitness tab.
+      payload: buildFitnessSessionPayload(envelope),
     });
   } catch (error) {
     logger.warn({

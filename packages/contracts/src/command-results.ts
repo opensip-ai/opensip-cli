@@ -4,16 +4,14 @@
  *
  * Extracted from `types.ts` so that file stays focused on CLI option / output
  * shapes and neither grows past the file-length limit. This module depends on
- * `types.ts` for the shared output shapes (`TableRow`, `SummaryOptions`,
- * `CheckOutput`) and on `session-types.ts` for `StoredSession`; `types.ts`
- * does NOT import back, so there is no cycle. Re-exported from the package
- * barrel (`index.ts`), so consumers still import these from
- * `@opensip-tools/contracts`.
+ * `session-types.ts` for `StoredSession` and `signal-envelope.ts` for the
+ * `SignalEnvelope` every migrated tool returns; `types.ts` does NOT import
+ * back, so there is no cycle. Re-exported from the package barrel
+ * (`index.ts`), so consumers still import these from `@opensip-tools/contracts`.
  */
 
 import type { StoredSession } from './session-types.js';
 import type { SignalEnvelope } from './signal-envelope.js';
-import type { CheckOutput, SummaryOptions, TableRow } from './types.js';
 
 /** Union type for all command results — App.tsx dispatches on result.type */
 export type CommandResult =
@@ -70,21 +68,17 @@ export interface ConfigureDoneResult {
 
 export interface FitDoneResult {
   type: 'fit-done';
-  rows: TableRow[];
-  summary: SummaryOptions;
   label: string;
   cwd: string;
   /**
-   * The run's signal envelope (ADR-0011). ADDITIVE during the migration:
-   * when present, the composition root derives the terminal table and the
-   * `--json`/cloud/`--report-to` paths FROM this envelope and the legacy
-   * `rows`/`summary`/`findings` fields are ignored. When absent (tools not
-   * yet migrated — Phase 6), the root falls through to the legacy fields.
+   * The run's signal envelope (ADR-0011). REQUIRED since Phase 6 (fitness is
+   * migrated): the composition root derives the terminal table (one row per
+   * check `unit`, grouped by `signal.source === checkSlug`) and the
+   * `--json`/cloud/`--report-to` paths FROM this envelope. The fitness-only
+   * `Validated`/`Ignores` columns ride on `envelope.units` as
+   * `filesValidated`/`itemType`/`ignoredCount`.
    */
-  envelope?: SignalEnvelope;
-  findings?: {
-    checks: readonly CheckOutput[];
-  };
+  envelope: SignalEnvelope;
   reportStatus?: {
     url: string;
     findingCount: number;

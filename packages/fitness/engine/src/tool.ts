@@ -128,9 +128,23 @@ function register(cli: ToolCliContext): void {
   // lookup handshake is gone — adding a fourth tool with a live view
   // requires zero CLI edits.
   cli.registerLiveView(FIT_LIVE_VIEW_KEY, async (args) => {
-    await renderFitLive(args as FitOptions, cli.scope.datastore() as DataStore | undefined, {
+    const fitArgs = args as FitOptions;
+    const envelope = await renderFitLive(fitArgs, cli.scope.datastore() as DataStore | undefined, {
       setExitCode: cli.setExitCode,
     });
+    // Effectful egress lives at the composition root (ADR-0011 / ADR-0008):
+    // best-effort cloud sync + `--report-to` (which owns exit 4). Delivered
+    // ONCE, after the interactive Ink view exits. A content failure
+    // (critical/high signals) dominates a `--report-to` upload failure so a
+    // real failure is never masked by exit 4.
+    if (envelope !== undefined) {
+      await cli.deliverSignals(envelope, {
+        cwd: fitArgs.cwd,
+        reportTo: fitArgs.reportTo,
+        apiKey: fitArgs.apiKey,
+        runFailed: !envelope.verdict.passed,
+      });
+    }
   });
 
   registerFitCommand(program, cli);
@@ -225,9 +239,9 @@ function registerBaselineExportCommand(program: CliProgram, cli: ToolCliContext)
     .requiredOption('--out <path>', 'Output file path for the SARIF baseline')
     .option(CWD_FLAG, CWD_DESC, process.cwd())
     .option(JSON_FLAG, JSON_DESC, false)
-    .action((opts: ToolOptions & { out: string }) => {
+    .action(async (opts: ToolOptions & { out: string }) => {
       const datastore = cli.scope.datastore() as DataStore;
-      const result = exportFitBaseline(datastore, opts.out);
+      const result = await exportFitBaseline(datastore, opts.out, cli);
       if (result.type === 'error') {
         cli.setExitCode(result.exitCode);
         if (opts.json) {
@@ -241,9 +255,7 @@ function registerBaselineExportCommand(program: CliProgram, cli: ToolCliContext)
         cli.emitJson(result);
         return;
       }
-      process.stdout.write(
-        `Exported fit baseline to ${result.outPath} (${String(result.bytesWritten)} bytes)\n`,
-      );
+      process.stdout.write(`Exported fit baseline to ${result.outPath}\n`);
     });
 }
 

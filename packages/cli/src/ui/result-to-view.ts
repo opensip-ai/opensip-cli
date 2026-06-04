@@ -16,10 +16,9 @@
  * only forbids the reverse — cli-ui must never import contracts.
  */
 
-import { line, group, viewRunSummary, viewFooterHints, type Span, type Tone, type ViewNode } from '@opensip-tools/cli-ui';
+import { line, group, viewRunSummary, viewFooterHints, formatValidatedColumn, parseValidatedCount, sortFitRowPriority, type Span, type Tone, type ViewNode } from '@opensip-tools/cli-ui';
 import { formatSignalTableRows, formatSignalTableSummary, type SignalTableRow } from '@opensip-tools/output';
 
-import { viewFitDone } from './views/fit-done-view.js';
 import { viewInit } from './views/init-view.js';
 import {
   viewListChecks,
@@ -86,7 +85,7 @@ function linesView(lines: readonly string[]): ViewNode {
 // scenario). Replaces the three per-tool, pre-computed `rows`/`reportLines`
 // shapes (the fit/sim/graph `*DoneResult` legacy branches, retired in Phase 7).
 
-const ENV_COL = { status: 7, errors: 6, warnings: 8, duration: 10 } as const;
+const ENV_COL = { status: 7, errors: 6, warnings: 8, validated: 12, ignored: 7, duration: 10 } as const;
 
 function envStatusTone(status: SignalTableRow['status']): Tone {
   if (status === 'FAIL') return 'error';
@@ -100,31 +99,48 @@ function envDurationTone(ms: number): Tone {
   return 'success';
 }
 
+/** Ignored-ratio tone: red >10%, yellow >5%, else muted (parity with the live view). */
+function envIgnoredTone(ignored: number, validatedCell: string): Tone {
+  const total = parseValidatedCount(validatedCell);
+  if (total === 0 || ignored === 0) return 'muted';
+  const pct = (ignored / total) * 100;
+  if (pct > 10) return 'error';
+  if (pct > 5) return 'warning';
+  return 'muted';
+}
+
 const ENV_SEP: Span = { text: ' | ' };
 
-/** Fixed-width per-unit table from the envelope's signal-table rows, or null when empty. */
+/**
+ * Fixed-width per-unit table from the envelope's signal-table rows, or null
+ * when empty. Renders fitness's `Validated`/`Ignores` columns when ANY row
+ * carries `validated` (a per-unit fact on {@link UnitResult}); graph/sim rows
+ * omit them, so those tools' tables stay the lean 5-column form.
+ */
 function envelopeTableNode(rows: readonly SignalTableRow[]): ViewNode | null {
   if (rows.length === 0) return null;
-  const unitW = Math.max(40, ...rows.map((r) => r.unit.length));
+  const sorted = [...rows].sort((a, b) => sortFitRowPriority(a) - sortFitRowPriority(b));
+  const unitW = Math.max(40, ...sorted.map((r) => r.unit.length));
+  const showValidated = sorted.some((r) => r.validated !== undefined);
 
-  const header = line([
-    {
-      text:
-        `${'Unit'.padEnd(unitW)} | ${'Status'.padEnd(ENV_COL.status)} | ` +
-        `${'Errors'.padEnd(ENV_COL.errors)} | ${'Warnings'.padEnd(ENV_COL.warnings)} | ${'Duration'.padEnd(ENV_COL.duration)}`,
-    },
-  ]);
-  const separator = line([
-    {
-      text: [
-        '-'.repeat(unitW), '-'.repeat(ENV_COL.status), '-'.repeat(ENV_COL.errors),
-        '-'.repeat(ENV_COL.warnings), '-'.repeat(ENV_COL.duration),
-      ].join('-|-'),
-    },
-  ]);
+  const headerCells = [
+    'Unit'.padEnd(unitW), 'Status'.padEnd(ENV_COL.status),
+    'Errors'.padEnd(ENV_COL.errors), 'Warnings'.padEnd(ENV_COL.warnings),
+    ...(showValidated ? ['Validated'.padEnd(ENV_COL.validated), 'Ignores'.padEnd(ENV_COL.ignored)] : []),
+    'Duration'.padEnd(ENV_COL.duration),
+  ];
+  const sepCells = [
+    '-'.repeat(unitW), '-'.repeat(ENV_COL.status),
+    '-'.repeat(ENV_COL.errors), '-'.repeat(ENV_COL.warnings),
+    ...(showValidated ? ['-'.repeat(ENV_COL.validated), '-'.repeat(ENV_COL.ignored)] : []),
+    '-'.repeat(ENV_COL.duration),
+  ];
+  const header = line([{ text: headerCells.join(' | ') }]);
+  const separator = line([{ text: sepCells.join('-|-') }]);
 
-  const rowNodes = rows.map((r) =>
-    line([
+  const rowNodes = sorted.map((r) => {
+    const validatedCell = formatValidatedColumn(r.validated, r.itemType);
+    const spans: Span[] = [
       { text: r.unit.padEnd(unitW) },
       ENV_SEP,
       { text: r.status.padEnd(ENV_COL.status), tone: envStatusTone(r.status) },
@@ -132,10 +148,18 @@ function envelopeTableNode(rows: readonly SignalTableRow[]): ViewNode | null {
       { text: String(r.errors).padEnd(ENV_COL.errors), tone: r.errors > 0 ? 'error' : 'success' },
       ENV_SEP,
       { text: String(r.warnings).padEnd(ENV_COL.warnings), tone: r.warnings > 0 ? 'warning' : 'muted' },
-      ENV_SEP,
-      { text: r.duration.padEnd(ENV_COL.duration), tone: envDurationTone(r.durationMs) },
-    ]),
-  );
+    ];
+    if (showValidated) {
+      spans.push(
+        ENV_SEP,
+        { text: validatedCell.padEnd(ENV_COL.validated) },
+        ENV_SEP,
+        { text: String(r.ignored ?? 0).padEnd(ENV_COL.ignored), tone: envIgnoredTone(r.ignored ?? 0, validatedCell) },
+      );
+    }
+    spans.push(ENV_SEP, { text: r.duration.padEnd(ENV_COL.duration), tone: envDurationTone(r.durationMs) });
+    return line(spans);
+  });
 
   return group([header, separator, ...rowNodes]);
 }
@@ -167,10 +191,10 @@ export function envelopeToTableView(envelope: SignalEnvelope): ViewNode {
 export function resultToView(result: CommandResult): ViewNode {
   switch (result.type) {
     case 'fit-done': {
-      // ADR-0011: a migrated result carries the envelope; derive the table
-      // from it. Un-migrated results (Phase 6 pending) fall through to the
-      // legacy `rows`/`findings` view.
-      return result.envelope ? envelopeToTableView(result.envelope) : viewFitDone(result);
+      // ADR-0011 (fitness migrated, Phase 6): the result always carries an
+      // envelope; the terminal table is derived from it (one row per check
+      // unit, with the fitness-only Validated/Ignores columns).
+      return envelopeToTableView(result.envelope);
     }
     case 'error': {
       return errorView(result);
