@@ -168,3 +168,49 @@ describe('resolveApiKey', () => {
     expect(resolveApiKey()).toBeUndefined();
   });
 });
+
+describe('resolveEffectiveCloudConfig (audit P0-2 — user opt-out layered over project)', () => {
+  it('honors the user cloud.sync:false opt-out even when the project enables sync', async () => {
+    // The exact privacy gap: a user writes `cloud.sync: false` in
+    // ~/.opensip-tools/config.yml and expects sync off everywhere.
+    const { resolveEffectiveCloudConfig, writeGlobalConfig } = await loadModule();
+    writeGlobalConfig({ cloud: { sync: false } });
+    expect(resolveEffectiveCloudConfig({ sync: true })?.sync).toBe(false);
+  });
+
+  it('honors a project cloud.sync:false opt-out when the user has no cloud block', async () => {
+    const { resolveEffectiveCloudConfig } = await loadModule();
+    expect(resolveEffectiveCloudConfig({ sync: false })?.sync).toBe(false);
+  });
+
+  it('disables when EITHER source is false (the more restrictive wins)', async () => {
+    const { resolveEffectiveCloudConfig, writeGlobalConfig } = await loadModule();
+    writeGlobalConfig({ cloud: { sync: true } });
+    expect(resolveEffectiveCloudConfig({ sync: false })?.sync).toBe(false);
+  });
+
+  it('falls through to the project value when the user sets no cloud block', async () => {
+    const { resolveEffectiveCloudConfig, writeGlobalConfig } = await loadModule();
+    writeGlobalConfig({ apiKey: 'sk-x' });
+    expect(resolveEffectiveCloudConfig({ sync: true })?.sync).toBe(true);
+  });
+
+  it('lets the user endpoint override the project endpoint', async () => {
+    const { resolveEffectiveCloudConfig, writeGlobalConfig } = await loadModule();
+    writeGlobalConfig({ cloud: { endpoint: 'https://user.example' } });
+    expect(resolveEffectiveCloudConfig({ endpoint: 'https://project.example' })?.endpoint).toBe(
+      'https://user.example',
+    );
+  });
+
+  it('returns undefined when neither user nor project configures cloud', async () => {
+    const { resolveEffectiveCloudConfig } = await loadModule();
+    expect(resolveEffectiveCloudConfig()).toBeUndefined();
+  });
+
+  it('ignores a malformed user cloud block (falls through to project)', async () => {
+    const { resolveEffectiveCloudConfig, writeGlobalConfig } = await loadModule();
+    writeGlobalConfig({ cloud: { sync: 'yes' } as never });
+    expect(resolveEffectiveCloudConfig({ sync: true })?.sync).toBe(true);
+  });
+});

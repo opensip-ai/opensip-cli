@@ -45,6 +45,13 @@ export const GLOBAL_CONFIG_PATH = join(OPENSIP_DIR, 'config.yml');
  */
 export interface GlobalConfig {
   apiKey?: string;
+  /**
+   * User-level OpenSIP Cloud signal-sync control (ADR-0008). This is the
+   * machine-wide privacy opt-out: `cloud.sync: false` here disables signal
+   * sync for every project run from this account, regardless of any project's
+   * own `cli.cloud:` setting. `endpoint` overrides the cloud URL per user.
+   */
+  cloud?: { sync?: boolean; endpoint?: string };
   [key: string]: unknown;
 }
 
@@ -117,4 +124,46 @@ export function resolveApiKey(cliFlag?: string): string | undefined {
   if (process.env.OPENSIP_API_KEY) return process.env.OPENSIP_API_KEY;
   const config = readGlobalConfig();
   return config.apiKey ?? undefined;
+}
+
+/** Read + validate the user-level `cloud:` block, defensively. */
+function readUserCloudConfig(): { sync?: boolean; endpoint?: string } | undefined {
+  const raw = readGlobalConfig().cloud;
+  if (!raw || typeof raw !== 'object') return undefined;
+  const r = raw as Record<string, unknown>;
+  const out: { sync?: boolean; endpoint?: string } = {};
+  if (typeof r.sync === 'boolean') out.sync = r.sync;
+  if (typeof r.endpoint === 'string') out.endpoint = r.endpoint;
+  return out.sync === undefined && out.endpoint === undefined ? undefined : out;
+}
+
+/**
+ * Resolve the effective cloud config for a run by layering the user-level
+ * cloud block (`~/.opensip-tools/config.yml#cloud`) over the project-level
+ * `cli.cloud:` block — the missing piece behind audit P0-2, where the
+ * documented user opt-out was read for the API key but never for `cloud`.
+ *
+ * Semantics (a data-egress control, so opt-out is sticky):
+ *   - `sync` is `false` if EITHER the user (privacy opt-out) or the project
+ *     (policy opt-out) sets it `false` — the more restrictive wins, neither
+ *     silently overrides the other. Otherwise the user's explicit value, then
+ *     the project's.
+ *   - `endpoint` takes the user override, then the project's.
+ *   - the per-invocation `--no-cloud` flag overrides everything (applied
+ *     separately, in resolveSignalSink's `noCloud`).
+ */
+export function resolveEffectiveCloudConfig(
+  projectCloud?: { readonly sync?: boolean; readonly endpoint?: string },
+): { sync?: boolean; endpoint?: string } | undefined {
+  const userCloud = readUserCloudConfig();
+  if (!userCloud && !projectCloud) return undefined;
+  const out: { sync?: boolean; endpoint?: string } = {};
+  const sync =
+    userCloud?.sync === false || projectCloud?.sync === false
+      ? false
+      : userCloud?.sync ?? projectCloud?.sync;
+  const endpoint = userCloud?.endpoint ?? projectCloud?.endpoint;
+  if (sync !== undefined) out.sync = sync;
+  if (endpoint !== undefined) out.endpoint = endpoint;
+  return out.sync === undefined && out.endpoint === undefined ? undefined : out;
 }

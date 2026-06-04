@@ -242,9 +242,17 @@ graph:
 ```yaml
 # ~/.opensip-tools/config.yml
 apiKey: '<your-opensip-cloud-key>'
+cloud:
+  sync: false               # optional: machine-wide opt-out of cloud signal sync
+  endpoint: https://...     # optional: https override of the built-in cloud URL
 ```
 
-One field — the OpenSIP Cloud API key for `--report-to`. Cross-project. Use `opensip-tools configure` to write it; `opensip-tools uninstall --user` removes the entire `~/.opensip-tools/` directory.
+Cross-project, flat keys. `apiKey` is the OpenSIP Cloud key (for `--report-to`
+and cloud signal sync). The optional `cloud` block is the machine-wide
+privacy control: `sync: false` disables cloud signal sync for every project run
+from this account (it layers over each project's `cli.cloud:`; a `false` in
+either place wins). Use `opensip-tools configure` to write the key;
+`opensip-tools uninstall --user` removes the entire `~/.opensip-tools/` directory.
 
 ---
 

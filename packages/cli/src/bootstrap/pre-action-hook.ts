@@ -49,6 +49,7 @@ import {
 import { checkForUpdate, formatUpdateNag } from '../update-notifier.js';
 
 import { loadCliDefaults, mergeConfigDefaults } from './cli-defaults.js';
+import { resolveEffectiveCloudConfig } from './global-config.js';
 
 import type { Command } from 'commander';
 
@@ -302,9 +303,13 @@ export function installPreActionHook(program: Command, version: string): void {
     // keyless / `cloud.sync:false` / `--no-cloud` / non-https → no-op with no
     // IO; the entitlement check is deferred to first emit so non-signal
     // commands pay nothing. `opts.cloud === false` comes from `--no-cloud`.
+    //
+    // `cloud` layers the user-level opt-out (~/.opensip-tools/config.yml#cloud)
+    // over the project's `cli.cloud:` block (audit P0-2): a user `sync: false`
+    // disables sync for every project on this machine.
     const signalSink = resolveSignalSink({
       apiKey: opts.apiKey as string | undefined,
-      cloud: cliDefaults.cloud,
+      cloud: resolveEffectiveCloudConfig(cliDefaults.cloud),
       // `--no-cloud` is a global flag, so read it through optsWithGlobals().
       noCloud: actionCommand.optsWithGlobals().cloud === false,
       cacheDir: join(resolveUserPaths().userHomeDir, 'cache'),

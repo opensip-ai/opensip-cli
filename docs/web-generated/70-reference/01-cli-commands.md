@@ -59,16 +59,18 @@ What is sent: each signal's file path, message, suggestion, code-location
 hints, and rule metadata. Nothing is sent for users without an API key or
 without the entitlement.
 
-Configure or opt out via `~/.opensip-tools/config.yml`:
+Opt out machine-wide in your user config `~/.opensip-tools/config.yml` (flat,
+alongside `apiKey`):
 
 ```yaml
-cli:
-  cloud:
-    sync: true              # default true when entitled; false to opt out
-    endpoint: https://...   # optional https override of the built-in URL
+cloud:
+  sync: false               # disables signal sync for every project on this account
+  endpoint: https://...     # optional https override of the built-in URL
 ```
 
-Or opt out per-run with `--no-cloud`.
+Or per project in `opensip-tools.config.yml` under `cli.cloud:` (same fields).
+A `sync: false` in **either** place disables sync — the more restrictive
+setting wins. Or opt out per-run with `--no-cloud`.
 
 This is distinct from `--report-to`: that path explicitly POSTs **SARIF** to
 **any** receiver (and can fail a CI build via exit 4), whereas cloud sync emits
