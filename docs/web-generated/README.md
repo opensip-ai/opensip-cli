@@ -33,6 +33,7 @@ These docs are written for engineers fluent in TypeScript and Node tooling. Voic
 | **Wiring opensip-tools into CI** | 60 (`03-wire-into-ci`) — full walkthrough with GitHub Actions example. Or 20 (`04-output-gate-sarif`) for the gate model alone. |
 | **Adopting in a large monorepo** | 60 (`04-adopt-in-a-monorepo`) — workspace package graduation + baseline-gate flow. |
 | **Migrating from ESLint (or coexisting with it)** | 60 (`05-migrate-from-eslint`) — which rules belong where. |
+| **Wondering what gets sent to the cloud (and how to turn it off)** | 10 (`06-cloud-signal-sync`) — the pipeline, the exact payload, and the three opt-outs. |
 | **Reviewing a PR that touches the kernel** | 80 (`05-layer-policy`) + 70 (`02-package-catalog`) for lookup. |
 | **Looking for a specific package, command, or config field** | 70 — that's what it's for. |
 
@@ -52,74 +53,75 @@ These docs are written for engineers fluent in TypeScript and Node tooling. Voic
 6. [**System context**](/docs/opensip-tools/00-start/06-system-context/) — Where opensip-tools sits between you, your codebase, CI, and OpenSIP Cloud. The runtime layout.
 
 ### 10 — Concepts
-*The conceptual core. If you understand these five docs, you understand opensip-tools.*
+*The conceptual core. If you understand these six docs, you understand opensip-tools.*
 
 7. [**The fitness loop**](/docs/opensip-tools/10-concepts/01-fitness-loop/) — **The spine.** One check from definition to violation to gate decision. Threads through every later doc.
 8. [**The tool-plugin model**](/docs/opensip-tools/10-concepts/02-tool-plugin-model/) — Kernel + Tool contract + first-party tools + dispatcher. Why the CLI doesn't know what `fit` does.
-9. [**Layered package graph**](/docs/opensip-tools/10-concepts/03-modular-monolith/) — The 29-package monorepo, the layer rules, why dependency-cruiser exists.
+9. [**Layered package graph**](/docs/opensip-tools/10-concepts/03-modular-monolith/) — The 30-package monorepo, the layer rules, why dependency-cruiser exists.
 10. [**Contract surfaces**](/docs/opensip-tools/10-concepts/04-contract-surfaces/) — The system's public edges: CLI argv, Tool interface, plugin manifests, JSON output.
 11. [**Architecture gate**](/docs/opensip-tools/10-concepts/05-architecture-gate/) — Baseline workflow, drift detection, line-shift invariance, CI integration.
+12. [**Cloud signal sync**](/docs/opensip-tools/10-concepts/06-cloud-signal-sync/) — How an entitled run's findings reach OpenSIP Cloud: the pipeline, the `SignalBatch` payload, fail-closed entitlement, and the three opt-outs.
 
 ### 20 — Fit
 *The fitness command's main flow. This is what 90% of users invoke.*
 
-12. [**Recipes and checks**](/docs/opensip-tools/20-fit/01-recipes-and-checks/) — What a recipe is, what a check is, how they compose. `defineCheck` and `defineRecipe`.
-13. [**Targets and scope**](/docs/opensip-tools/20-fit/02-targets-and-scope/) — Language detection, target registry, glob expansion, ignore handling.
-14. [**Ignore directives**](/docs/opensip-tools/20-fit/03-ignore-directives/) — Inline source-level suppression: `@fitness-ignore-next-line` and `@fitness-ignore-file`.
-15. [**Output, gate, SARIF**](/docs/opensip-tools/20-fit/04-output-gate-sarif/) — Render layer, baseline/compare flow, JSON shape, CI integration.
+13. [**Recipes and checks**](/docs/opensip-tools/20-fit/01-recipes-and-checks/) — What a recipe is, what a check is, how they compose. `defineCheck` and `defineRecipe`.
+14. [**Targets and scope**](/docs/opensip-tools/20-fit/02-targets-and-scope/) — Language detection, target registry, glob expansion, ignore handling.
+15. [**Ignore directives**](/docs/opensip-tools/20-fit/03-ignore-directives/) — Inline source-level suppression: `@fitness-ignore-next-line` and `@fitness-ignore-file`.
+16. [**Output, gate, SARIF**](/docs/opensip-tools/20-fit/04-output-gate-sarif/) — Render layer, baseline/compare flow, JSON shape, CI integration.
 
 ### 30 — Sim
 *Simulation is opt-in and experimental — read after the fit loop is solid.*
 
-16. [**Scenarios and recipes**](/docs/opensip-tools/30-sim/01-scenarios-and-recipes/) — What a sim scenario is, the four kinds, recipe composition.
-17. [**Execution model**](/docs/opensip-tools/30-sim/02-execution-model/) — How the sim engine runs scenarios, reports findings, exits.
+17. [**Scenarios and recipes**](/docs/opensip-tools/30-sim/01-scenarios-and-recipes/) — What a sim scenario is, the four kinds, recipe composition.
+18. [**Execution model**](/docs/opensip-tools/30-sim/02-execution-model/) — How the sim engine runs scenarios, reports findings, exits.
 
 ### 40 — Graph
 *Static call-graph analysis: what `opensip-tools graph` produces and how the dashboard consumes it.*
 
-18. [**Stages and catalog**](/docs/opensip-tools/40-graph/01-stages-and-catalog/) — The seven-stage pipeline (discover → inventory → edges → indexes → features → rules → render) and the catalog's on-disk shape.
-19. [**Rules and gating**](/docs/opensip-tools/40-graph/02-rules-and-gating/) — The ten rules, entry-point inference, `--gate-save`/`--gate-compare`, SARIF output.
-20. [**Adding a language**](/docs/opensip-tools/40-graph/03-adding-a-language/) — Step-by-step guide for writing a new `GraphLanguageAdapter`.
+19. [**Stages and catalog**](/docs/opensip-tools/40-graph/01-stages-and-catalog/) — The seven-stage pipeline (discover → inventory → edges → indexes → features → rules → render) and the catalog's on-disk shape.
+20. [**Rules and gating**](/docs/opensip-tools/40-graph/02-rules-and-gating/) — The ten rules, entry-point inference, `--gate-save`/`--gate-compare`, SARIF output.
+21. [**Adding a language**](/docs/opensip-tools/40-graph/03-adding-a-language/) — Step-by-step guide for writing a new `GraphLanguageAdapter`.
 
 ### 50 — Extend
 *Author plugins. Project-local `.mjs` files, publishable check packs, language adapters, full Tool plugins.*
 
-21. [**Plugin authoring**](/docs/opensip-tools/50-extend/01-plugin-authoring/) — Overview of the five extension shapes. Routes you to the right deep-dive.
-22. [**Project-local plugins**](/docs/opensip-tools/50-extend/02-project-local-plugins/) — Loose `.mjs` files for check, recipe, sim scenario. The fastest path.
-23. [**Publishable packs**](/docs/opensip-tools/50-extend/03-publishable-packs/) — Workspace + npm-pack authoring walkthrough; migration recipe from loose `.mjs`.
-24. [**Check pack architecture**](/docs/opensip-tools/50-extend/04-check-pack-architecture/) — Platform internals: pack contract, scope filters, parameterization, discovery.
-25. [**Language adapters**](/docs/opensip-tools/50-extend/05-language-adapters/) — What an adapter is, the six bundled, authoring a new one.
-26. [**Full Tool plugins**](/docs/opensip-tools/50-extend/06-full-tool-plugins/) — Your own subcommand. The Tool contract.
+22. [**Plugin authoring**](/docs/opensip-tools/50-extend/01-plugin-authoring/) — Overview of the five extension shapes. Routes you to the right deep-dive.
+23. [**Project-local plugins**](/docs/opensip-tools/50-extend/02-project-local-plugins/) — Loose `.mjs` files for check, recipe, sim scenario. The fastest path.
+24. [**Publishable packs**](/docs/opensip-tools/50-extend/03-publishable-packs/) — Workspace + npm-pack authoring walkthrough; migration recipe from loose `.mjs`.
+25. [**Check pack architecture**](/docs/opensip-tools/50-extend/04-check-pack-architecture/) — Platform internals: pack contract, scope filters, parameterization, discovery.
+26. [**Language adapters**](/docs/opensip-tools/50-extend/05-language-adapters/) — What an adapter is, the six bundled, authoring a new one.
+27. [**Full Tool plugins**](/docs/opensip-tools/50-extend/06-full-tool-plugins/) — Your own subcommand. The Tool contract.
 
 ### 60 — Guides
 *Task-led walkthroughs. Pick the one that matches "I want to …".*
 
-27. [**Write your first check**](/docs/opensip-tools/60-guides/01-write-your-first-check/) — From `init` to `--gate-save` in 15 minutes. The starting walkthrough.
-28. [**Ban an API pattern**](/docs/opensip-tools/60-guides/02-ban-an-api-pattern/) — Concrete recipe: "block all uses of `crypto.createCipher`". Covers regex vs. AST.
-29. [**Wire into CI**](/docs/opensip-tools/60-guides/03-wire-into-ci/) — GitHub Actions example with SARIF upload + baseline gate.
-30. [**Adopt in a monorepo**](/docs/opensip-tools/60-guides/04-adopt-in-a-monorepo/) — Workspace-package graduation + baseline-gate flow for large repos.
-31. [**Migrate from ESLint**](/docs/opensip-tools/60-guides/05-migrate-from-eslint/) — Which rules belong in ESLint, which belong in opensip-tools, how they coexist.
+28. [**Write your first check**](/docs/opensip-tools/60-guides/01-write-your-first-check/) — From `init` to `--gate-save` in 15 minutes. The starting walkthrough.
+29. [**Ban an API pattern**](/docs/opensip-tools/60-guides/02-ban-an-api-pattern/) — Concrete recipe: "block all uses of `crypto.createCipher`". Covers regex vs. AST.
+30. [**Wire into CI**](/docs/opensip-tools/60-guides/03-wire-into-ci/) — GitHub Actions example with SARIF upload + baseline gate.
+31. [**Adopt in a monorepo**](/docs/opensip-tools/60-guides/04-adopt-in-a-monorepo/) — Workspace-package graduation + baseline-gate flow for large repos.
+32. [**Migrate from ESLint**](/docs/opensip-tools/60-guides/05-migrate-from-eslint/) — Which rules belong in ESLint, which belong in opensip-tools, how they coexist.
 
 ### 70 — Reference
 *Lookup-shaped. Not for sequential reading.*
 
-32. [**CLI commands**](/docs/opensip-tools/70-reference/01-cli-commands/) — Every command, its flags, when to use each.
-33. [**Package catalog**](/docs/opensip-tools/70-reference/02-package-catalog/) — All 29 packages with one-line role and key exports. Grouped by layer.
-34. [**Configuration**](/docs/opensip-tools/70-reference/03-configuration/) — `opensip-tools.config.yml` schema, every field, defaults.
-35. [**JSON output schema**](/docs/opensip-tools/70-reference/04-json-output-schema/) — The `CliOutput` shape consumed by CI and dashboards.
-36. [**Checks reference**](/docs/opensip-tools/70-reference/05-checks-index/) — Browsable index of every built-in fit check, grouped by pack and primary tag. Auto-generated from source.
-37. [**Dashboard**](/docs/opensip-tools/70-reference/06-dashboard/) — The HTML report: what it shows, when it opens, where it lives.
+33. [**CLI commands**](/docs/opensip-tools/70-reference/01-cli-commands/) — Every command, its flags, when to use each.
+34. [**Package catalog**](/docs/opensip-tools/70-reference/02-package-catalog/) — All 29 packages with one-line role and key exports. Grouped by layer.
+35. [**Configuration**](/docs/opensip-tools/70-reference/03-configuration/) — `opensip-tools.config.yml` schema, every field, defaults.
+36. [**JSON output schema**](/docs/opensip-tools/70-reference/04-json-output-schema/) — The `CliOutput` shape consumed by CI and dashboards.
+37. [**Checks reference**](/docs/opensip-tools/70-reference/05-checks-index/) — Browsable index of every built-in fit check, grouped by pack and primary tag. Auto-generated from source.
+38. [**Dashboard**](/docs/opensip-tools/70-reference/06-dashboard/) — The HTML report: what it shows, when it opens, where it lives.
 
 ### 80 — Internals
 *For contributors and PR reviewers. Runtime mechanics, layer policy, doc conventions, website integration.*
 
-38. [**CLI dispatch**](/docs/opensip-tools/80-implementation/01-cli-dispatch/) — argv parsing, tool registration, command tree assembly.
-39. [**Plugin loader**](/docs/opensip-tools/80-implementation/02-plugin-loader/) — Source-file auto-discovery, npm-package pinning, `plugin sync`.
-40. [**Session and persistence**](/docs/opensip-tools/80-implementation/03-session-and-persistence/) — Runtime dir layout, sessions, reports, logs, cache, baseline.
-41. [**Coding standards**](/docs/opensip-tools/80-implementation/04-coding-standards/) — TS strictness, error handling, exit codes, ESLint posture.
-42. [**Layer policy**](/docs/opensip-tools/80-implementation/05-layer-policy/) — Dependency-cruiser rules, allowed imports, why the kernel can't import a tool.
-43. [**Doc conventions**](/docs/opensip-tools/80-implementation/06-doc-conventions/) — Voice, frontmatter, diagrams, verification trails.
-44. [**Website integration**](/docs/opensip-tools/80-implementation/07-website-integration/) — How opensip.ai consumes `docs/web-generated/`: proxy, route, manifest contract.
+39. [**CLI dispatch**](/docs/opensip-tools/80-implementation/01-cli-dispatch/) — argv parsing, tool registration, command tree assembly.
+40. [**Plugin loader**](/docs/opensip-tools/80-implementation/02-plugin-loader/) — Source-file auto-discovery, npm-package pinning, `plugin sync`.
+41. [**Session and persistence**](/docs/opensip-tools/80-implementation/03-session-and-persistence/) — Runtime dir layout, sessions, reports, logs, cache, baseline.
+42. [**Coding standards**](/docs/opensip-tools/80-implementation/04-coding-standards/) — TS strictness, error handling, exit codes, ESLint posture.
+43. [**Layer policy**](/docs/opensip-tools/80-implementation/05-layer-policy/) — Dependency-cruiser rules, allowed imports, why the kernel can't import a tool.
+44. [**Doc conventions**](/docs/opensip-tools/80-implementation/06-doc-conventions/) — Voice, frontmatter, diagrams, verification trails.
+45. [**Website integration**](/docs/opensip-tools/80-implementation/07-website-integration/) — How opensip.ai consumes `docs/web-generated/`: proxy, route, manifest contract.
 
 ---
 

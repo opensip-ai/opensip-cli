@@ -159,6 +159,18 @@
       "purpose": "How every command's human-readable output is defined once and rendered two ways — Ink for a TTY, plain text for pipes/CI — so the two cannot drift."
     },
     {
+      "file": "docs/web-generated/10-concepts/06-cloud-signal-sync.md",
+      "path": "/docs/opensip-tools/10-concepts/06-cloud-signal-sync/",
+      "section": "10-concepts",
+      "title": "Cloud signal sync",
+      "audience": [
+        "getting-started",
+        "ci-integrators",
+        "contributors"
+      ],
+      "purpose": "How OpenSIP Cloud signal sync works end to end — the pipeline, exactly what is sent, the entitlement and best-effort guarantees, and the three ways to turn it off."
+    },
+    {
       "file": "docs/web-generated/20-fit/01-recipes-and-checks.md",
       "path": "/docs/opensip-tools/20-fit/01-recipes-and-checks/",
       "section": "20-fit",
@@ -541,7 +553,8 @@
         "/docs/opensip-tools/10-concepts/03-modular-monolith/",
         "/docs/opensip-tools/10-concepts/04-contract-surfaces/",
         "/docs/opensip-tools/10-concepts/05-architecture-gate/",
-        "/docs/opensip-tools/10-concepts/06-cli-output-rendering/"
+        "/docs/opensip-tools/10-concepts/06-cli-output-rendering/",
+        "/docs/opensip-tools/10-concepts/06-cloud-signal-sync/"
       ]
     },
     {
@@ -630,6 +643,7 @@
         "/docs/opensip-tools/00-start/02-show-me-the-loops/",
         "/docs/opensip-tools/00-start/03-vs-other-tools/",
         "/docs/opensip-tools/00-start/04-faq/",
+        "/docs/opensip-tools/10-concepts/06-cloud-signal-sync/",
         "/docs/opensip-tools/50-extend/02-project-local-plugins/",
         "/docs/opensip-tools/60-guides/01-write-your-first-check/",
         "/docs/opensip-tools/60-guides/02-ban-an-api-pattern/",
@@ -684,6 +698,7 @@
         "/docs/opensip-tools/10-concepts/01-fitness-loop/",
         "/docs/opensip-tools/10-concepts/04-contract-surfaces/",
         "/docs/opensip-tools/10-concepts/05-architecture-gate/",
+        "/docs/opensip-tools/10-concepts/06-cloud-signal-sync/",
         "/docs/opensip-tools/20-fit/03-ignore-directives/",
         "/docs/opensip-tools/20-fit/04-output-gate-sarif/",
         "/docs/opensip-tools/40-graph/01-stages-and-catalog/",
@@ -712,6 +727,7 @@
         "/docs/opensip-tools/10-concepts/04-contract-surfaces/",
         "/docs/opensip-tools/10-concepts/05-architecture-gate/",
         "/docs/opensip-tools/10-concepts/06-cli-output-rendering/",
+        "/docs/opensip-tools/10-concepts/06-cloud-signal-sync/",
         "/docs/opensip-tools/20-fit/01-recipes-and-checks/",
         "/docs/opensip-tools/20-fit/02-targets-and-scope/",
         "/docs/opensip-tools/20-fit/03-ignore-directives/",
