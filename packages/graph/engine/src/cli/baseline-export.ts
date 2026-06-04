@@ -17,10 +17,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
-import { sql } from 'drizzle-orm';
-
 import { GraphBaselineRepo } from '../persistence/baseline-repo.js';
-import { graphBaselineMeta } from '../persistence/schema.js';
 
 import type { DataStore } from '@opensip-tools/datastore';
 
@@ -64,18 +61,12 @@ export function exportGraphBaseline(
       exitCode: 2,
     };
   }
-  // Read capturedAt from the existence-marker row directly. The repo
-  // doesn't expose this today; a small raw query keeps the
-  // repo's public surface stable.
-  const metaRow = datastore.db
-    .select({ capturedAt: graphBaselineMeta.capturedAt })
-    .from(graphBaselineMeta)
-    .where(sql`id = 1`)
-    .get();
-  // Defensive: exists() returned true above, so this should always be
-  // a row, but a torn read in a concurrent session could theoretically
-  // surprise us. Surface a structured error rather than crashing.
-  if (!metaRow) {
+  // Read capturedAt through the repo — cross-module data access goes through
+  // repositories, not the raw datastore handle (M3 / ADR-0009).
+  const capturedAt = repo.capturedAt();
+  // Defensive: exists() returned true above, so this should always be present,
+  // but a torn read in a concurrent session could theoretically surprise us.
+  if (capturedAt === undefined) {
     return {
       type: 'error',
       message: 'Graph baseline meta row missing after exists() reported present.',
@@ -86,7 +77,7 @@ export function exportGraphBaseline(
   const file: GraphBaselineFile = {
     version: '1',
     tool: 'graph',
-    capturedAt: new Date(metaRow.capturedAt).toISOString(),
+    capturedAt: new Date(capturedAt).toISOString(),
     fingerprints,
   };
   const serialized = JSON.stringify(file, null, 2);

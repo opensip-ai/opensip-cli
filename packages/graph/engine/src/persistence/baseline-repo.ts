@@ -96,4 +96,14 @@ export class GraphBaselineRepo {
     }
     return row !== undefined;
   }
+
+  /** When the baseline was captured (ms epoch), or `undefined` when none exists. */
+  capturedAt(): number | undefined {
+    const row = this.datastore.db
+      .select({ capturedAt: graphBaselineMeta.capturedAt })
+      .from(graphBaselineMeta)
+      .limit(1)
+      .get();
+    return row?.capturedAt;
+  }
 }
