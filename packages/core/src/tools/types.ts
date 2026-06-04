@@ -114,7 +114,7 @@ export interface ToolCliContext {
   readonly program: unknown;
   /**
    * Per-run resources (logger, parseCache, registries, datastore,
-   * recipeCheckConfig, projectContext). Constructed once per CLI
+   * recipeUnitConfig, projectContext). Constructed once per CLI
    * invocation by the bootstrap. Tools read every per-run resource
    * via `cli.scope.foo` — the previously-exported `defaultToolRegistry`
    * / `defaultLanguageRegistry` singletons are gone, and the Phase 5

@@ -29,17 +29,17 @@ import { logger as defaultLogger } from './logger.js';
 
 import type { Logger, LoggerImpl } from './logger.js';
 import type { ProjectContext } from './project-context.js';
-import type { DataStoreThunk, RecipeCheckConfigSlot, ToolScope } from './scope-types.js';
+import type { DataStoreThunk, RecipeUnitConfigSlot, ToolScope } from './scope-types.js';
 import type { UiContext } from './ui-context.js';
 import type { SignalSink } from '../signals/signal-sink.js';
 
-// RecipeCheckConfigSlot, DataStoreThunk, ToolScope, and ScopeContribution
+// RecipeUnitConfigSlot, DataStoreThunk, ToolScope, and ScopeContribution
 // live in the leaf `scope-types.ts` (audit 2026-05-29, M4) so the `Tool`
 // contract can depend on them without naming the concrete `RunScope` —
 // breaking the RunScope⟷Tool type cycle. The core barrel sources them
 // directly from `scope-types.ts`; `run-scope.ts` imports what it needs below.
 
-class DefaultRecipeCheckConfigSlot implements RecipeCheckConfigSlot {
+class DefaultRecipeUnitConfigSlot implements RecipeUnitConfigSlot {
   private store: Record<string, Record<string, unknown>> = {};
 
   get<T extends Record<string, unknown>>(slug: string): T | undefined {
@@ -117,7 +117,7 @@ export interface RunScopeOptions {
 export class RunScope {
   readonly logger: Logger;
   readonly parseCache: LanguageParseCache;
-  readonly recipeCheckConfig: RecipeCheckConfigSlot;
+  readonly recipeUnitConfig: RecipeUnitConfigSlot;
   readonly projectContext: ProjectContext | undefined;
   readonly datastore: DataStoreThunk;
   readonly tools: ToolRegistry;
@@ -137,7 +137,7 @@ export class RunScope {
   constructor(opts: RunScopeOptions = {}) {
     this.logger = opts.logger ?? defaultLogger;
     this.parseCache = opts.parseCache ?? new LanguageParseCache();
-    this.recipeCheckConfig = new DefaultRecipeCheckConfigSlot();
+    this.recipeUnitConfig = new DefaultRecipeUnitConfigSlot();
     this.projectContext = opts.projectContext;
     // eslint-disable-next-line unicorn/no-useless-undefined -- explicit no-store sentinel matches the prior `cli.datastore` contract (tools cast to `DataStore | undefined`).
     this.datastore = opts.datastore ?? (() => undefined);
@@ -151,7 +151,7 @@ export class RunScope {
   /** Release per-run resources (caches, recipe-config slot). */
   dispose(): void {
     this.parseCache.dispose();
-    this.recipeCheckConfig.clear();
+    this.recipeUnitConfig.clear();
     // FileCache lifecycle is owned by fitness; not on RunScope.
     // datastore close is the consumer's responsibility — RunScope
     // doesn't open it eagerly.

@@ -137,7 +137,7 @@ export type { RunScopeOptions } from './lib/run-scope.js';
 // (breaks the RunScope⟷Tool type cycle; audit 2026-05-29 M4). Source them
 // here directly from the leaf.
 export type {
-  RecipeCheckConfigSlot,
+  RecipeUnitConfigSlot,
   DataStoreThunk,
   ToolScope,
   ScopeContribution,
