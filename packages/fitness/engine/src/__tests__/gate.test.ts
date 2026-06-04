@@ -3,15 +3,18 @@
  * Unit tests for the architecture-gate primitive (v2 — SQLite-backed).
  *
  * Covers:
- *   - saveBaseline: writes SARIF to fit_baseline; idempotent overwrite
+ *   - saveBaseline: persists the run signal envelope to fit_baseline; idempotent overwrite
  *   - compareToBaseline: classifies added/resolved/unchanged correctly
  *   - Hash matching ignores line-number changes (D3 in plan.md)
  *   - Missing/invalid baseline → typed errors
  *   - renderGateCompareOutput: formats sections correctly per state
  */
 
+import { buildSignalEnvelope, type SignalEnvelope } from '@opensip-tools/contracts';
+import { createSignal, type Signal } from '@opensip-tools/core';
 import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
 
 import {
   saveBaseline,
@@ -25,41 +28,44 @@ import {
 } from '../gate.js';
 import { FitBaselineRepo } from '../persistence/baseline-repo.js';
 
-import type { CliOutput, FindingOutput } from '@opensip-tools/contracts';
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeFinding(overrides: Partial<FindingOutput> = {}): FindingOutput {
-  return {
-    ruleId: 'no-console-log',
-    message: 'console.log found',
-    severity: 'error',
-    filePath: 'src/index.ts',
-    line: 42,
-    ...overrides,
-  };
+/** A check violation, as the fitness check framework hands it to the signaler. */
+interface FindingInput {
+  ruleId?: string;
+  message?: string;
+  severity?: 'error' | 'warning';
+  filePath?: string;
+  line?: number;
 }
 
-function makeOutput(findings: FindingOutput[] = [makeFinding()]): CliOutput {
-  return {
-    version: '1.0',
+/**
+ * Build a core {@link Signal} mirroring fitness's violation→signal mapping
+ * (`error → high`, `warning → medium`; `source === ruleId === checkSlug`). The
+ * gate diffs on `(filePath, ruleId, message)`, which round-trip unchanged.
+ */
+function makeFinding(overrides: FindingInput = {}): Signal {
+  const ruleId = overrides.ruleId ?? 'no-console-log';
+  return createSignal({
+    source: ruleId,
+    ruleId,
+    message: overrides.message ?? 'console.log found',
+    severity: (overrides.severity ?? 'error') === 'error' ? 'high' : 'medium',
+    code: { file: overrides.filePath ?? 'src/index.ts', line: overrides.line ?? 42 },
+  });
+}
+
+/** Build a fit {@link SignalEnvelope} carrying the given signals (one unit). */
+function makeOutput(findings: Signal[] = [makeFinding()]): SignalEnvelope {
+  return buildSignalEnvelope({
     tool: 'fit',
-    timestamp: '2026-05-03T00:00:00.000Z',
-    score: 90,
-    passed: false,
-    summary: { total: 1, passed: 0, failed: 1, errors: findings.filter(f => f.severity === 'error').length, warnings: findings.filter(f => f.severity === 'warning').length },
-    durationMs: 100,
-    checks: [
-      {
-        checkSlug: 'no-console-log',
-        passed: false,
-        durationMs: 50,
-        findings,
-      },
-    ],
-  };
+    runId: 'run_test',
+    createdAt: '2026-05-03T00:00:00.000Z',
+    units: [{ slug: 'no-console-log', passed: false, durationMs: 50 }],
+    signals: findings,
+  });
 }
 
 let datastore: DataStore;
@@ -78,27 +84,37 @@ afterEach(() => {
 // saveBaseline
 // ---------------------------------------------------------------------------
 
+/** An empty fit envelope (no checks ran, no signals). */
+function emptyOutput(): SignalEnvelope {
+  return buildSignalEnvelope({
+    tool: 'fit',
+    runId: 'run_test',
+    createdAt: '2026-05-03T00:00:00.000Z',
+    units: [],
+    signals: [],
+  });
+}
+
 describe('saveBaseline', () => {
-  it('writes a SARIF document to the SQLite baseline table', () => {
+  it('writes the run signal envelope to the SQLite baseline table', () => {
     saveBaseline(makeOutput(), repo);
-    const doc = repo.load() as { version: string; runs: { results: unknown[] }[] };
-    expect(doc.version).toBe('2.1.0');
-    expect(Array.isArray(doc.runs)).toBe(true);
-    expect(doc.runs[0]?.results.length).toBe(1);
+    const doc = repo.load() as { schemaVersion: number; signals: unknown[] };
+    expect(doc.schemaVersion).toBe(2);
+    expect(Array.isArray(doc.signals)).toBe(true);
+    expect(doc.signals.length).toBe(1);
   });
 
   it('overwrites an existing baseline row', () => {
     saveBaseline(makeOutput([makeFinding({ message: 'first' })]), repo);
     saveBaseline(makeOutput([makeFinding({ message: 'second' })]), repo);
-    const doc = repo.load() as { runs: { results: { message: { text: string } }[] }[] };
-    expect(doc.runs[0]?.results[0]?.message.text).toBe('second');
+    const doc = repo.load() as { signals: { message: string }[] };
+    expect(doc.signals[0]?.message).toBe('second');
   });
 
-  it('writes empty runs array when there are no findings', () => {
-    const empty: CliOutput = { ...makeOutput(), checks: [] };
-    saveBaseline(empty, repo);
-    const doc = repo.load() as { runs: unknown[] };
-    expect(doc.runs).toEqual([]);
+  it('writes an empty signals array when there are no findings', () => {
+    saveBaseline(emptyOutput(), repo);
+    const doc = repo.load() as { signals: unknown[] };
+    expect(doc.signals).toEqual([]);
   });
 });
 
@@ -108,7 +124,7 @@ describe('saveBaseline', () => {
 
 describe('compareToBaseline — classification', () => {
   // eslint-disable-next-line unicorn/consistent-function-scoping -- closes over `repo` from beforeEach
-  const setupBaseline = (findings: FindingOutput[]): void => {
+  const setupBaseline = (findings: Signal[]): void => {
     saveBaseline(makeOutput(findings), repo);
   };
 
@@ -180,8 +196,8 @@ describe('compareToBaseline — classification', () => {
   });
 
   it('handles fully empty baseline and current', () => {
-    saveBaseline({ ...makeOutput(), checks: [] }, repo);
-    const result = compareToBaseline({ ...makeOutput(), checks: [] }, repo);
+    saveBaseline(emptyOutput(), repo);
+    const result = compareToBaseline(emptyOutput(), repo);
 
     expect(result.added).toEqual([]);
     expect(result.resolved).toEqual([]);
@@ -242,46 +258,27 @@ describe('compareToBaseline — errors', () => {
     expect(() => compareToBaseline(makeOutput(), repo)).toThrow(GateBaselineInvalidError);
   });
 
-  it('throws GateBaselineInvalidError when runs is missing', () => {
-    repo.save({ version: '2.1.0' }, 0);
+  it('throws GateBaselineInvalidError when signals is missing', () => {
+    repo.save({ schemaVersion: 2 }, 0);
     expect(() => compareToBaseline(makeOutput(), repo)).toThrow(GateBaselineInvalidError);
   });
 
-  it('throws GateBaselineInvalidError when runs is not an array', () => {
-    repo.save({ version: '2.1.0', runs: 'oops' }, 0);
+  it('throws GateBaselineInvalidError when signals is not an array', () => {
+    repo.save({ schemaVersion: 2, signals: 'oops' }, 0);
     expect(() => compareToBaseline(makeOutput(), repo)).toThrow(GateBaselineInvalidError);
   });
 });
 
 // ---------------------------------------------------------------------------
-// compareToBaseline — robustness against partial SARIF
+// compareToBaseline — round-trips the stored envelope baseline
 // ---------------------------------------------------------------------------
 
-describe('compareToBaseline — partial SARIF tolerance', () => {
-  it('skips runs with non-array results', () => {
-    repo.save(
-      {
-        version: '2.1.0',
-        runs: [
-          { tool: { driver: { name: 'bad-run' } } }, // no results array
-          {
-            tool: { driver: { name: 'good-run' } },
-            results: [
-              {
-                ruleId: 'kept',
-                message: { text: 'kept message' },
-                level: 'error',
-                locations: [
-                  { physicalLocation: { artifactLocation: { uri: 'a.ts' }, region: { startLine: 1 } } },
-                ],
-              },
-            ],
-          },
-        ],
-      },
-      1,
+describe('compareToBaseline — stored-envelope round-trip', () => {
+  it('matches a baseline persisted by saveBaseline on (filePath, ruleId, message)', () => {
+    saveBaseline(
+      makeOutput([makeFinding({ filePath: 'a.ts', ruleId: 'kept', message: 'kept message' })]),
+      repo,
     );
-
     const result = compareToBaseline(
       makeOutput([makeFinding({ filePath: 'a.ts', ruleId: 'kept', message: 'kept message' })]),
       repo,
@@ -291,24 +288,12 @@ describe('compareToBaseline — partial SARIF tolerance', () => {
     expect(result.resolved).toEqual([]);
   });
 
-  it('handles SARIF results with missing locations (no filePath)', () => {
-    repo.save(
-      {
-        version: '2.1.0',
-        runs: [
-          {
-            tool: { driver: { name: 'tool' } },
-            results: [{ ruleId: 'global-rule', message: { text: 'global issue' }, level: 'warning' }],
-          },
-        ],
-      },
-      1,
-    );
-
-    const current = makeOutput([
-      { ruleId: 'global-rule', message: 'global issue', severity: 'warning' },
-    ]);
-    const result = compareToBaseline(current, repo);
+  it('handles findings with no location (empty filePath)', () => {
+    const globalSig = makeFinding({ ruleId: 'global-rule', message: 'global issue', severity: 'warning' });
+    // A check-wide finding with no file site: strip the location off the signal.
+    const noLoc: Signal = { ...globalSig, filePath: '', line: undefined, code: undefined };
+    saveBaseline(makeOutput([noLoc]), repo);
+    const result = compareToBaseline(makeOutput([noLoc]), repo);
     expect(result.unchanged.length).toBe(1);
     expect(result.added).toEqual([]);
   });

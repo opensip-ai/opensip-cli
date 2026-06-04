@@ -1,21 +1,33 @@
 /**
- * Fitness-owned session payload (audit 2026-05-29, session split).
+ * Fitness-owned session payload (audit 2026-05-29, session split;
+ * rebuilt from the run's {@link SignalEnvelope} in ADR-0011 Phase 6 — no
+ * `CliOutput`).
  *
  * `contracts` stores per-session detail as an opaque JSON blob in
  * `session_tool_payload.payload` and holds zero check/finding/summary
- * vocabulary. Fitness owns the shape of its own payload here and ships
- * the dashboard renderer that reads it back. Mirrors the detail that the
- * Fitness dashboard tab renders: a top-line summary plus per-check
- * results and findings.
+ * vocabulary. Fitness owns the shape of its own payload here and ships the
+ * dashboard renderer that reads it back. The dashboard's shared session-detail
+ * renderer reads `{ summary, checks[] }` where each check has `checkSlug`,
+ * `passed`, `violationCount`, `durationMs`, and `findings[].severity ∈
+ * error|warning` (2-LEVEL) — so this payload derives FROM the envelope's
+ * 4-level signals, collapsing `critical|high → error`, else `warning`. The
+ * 4-level severity stays in `--json`; the 2-level lives only here (two
+ * consumers, two shapes).
  */
 
-import type { CliOutput } from '@opensip-tools/contracts';
+import { isErrorSignal } from '@opensip-tools/core';
+
+import type { SignalEnvelope, UnitResult } from '@opensip-tools/contracts';
+import type { Signal } from '@opensip-tools/core';
+
+/** Two-level severity the dashboard buckets on (`critical|high → error`). */
+export type FitnessFindingSeverity = 'error' | 'warning';
 
 /** Per-check finding inside a {@link FitnessSessionPayload}. */
 interface FitnessSessionFinding {
   readonly ruleId: string;
   readonly message: string;
-  readonly severity: string;
+  readonly severity: FitnessFindingSeverity;
   readonly filePath?: string;
   readonly line?: number;
   readonly column?: number;
@@ -43,24 +55,60 @@ export interface FitnessSessionPayload {
   readonly checks: readonly FitnessSessionCheck[];
 }
 
-/** Build the fitness session payload from a {@link CliOutput}. */
-export function buildFitnessSessionPayload(output: CliOutput): FitnessSessionPayload {
+/** Map a signal to the dashboard's 2-level bucket (`critical|high → error`). */
+function toDashboardSeverity(signal: Signal): FitnessFindingSeverity {
+  return isErrorSignal(signal) ? 'error' : 'warning';
+}
+
+/** Map a check's signals into the dashboard-shaped finding rows. */
+function findingsFor(signals: readonly Signal[]): FitnessSessionFinding[] {
+  return signals.map((s) => ({
+    ruleId: s.ruleId,
+    message: s.message,
+    severity: toDashboardSeverity(s),
+    filePath: s.filePath,
+    line: s.line,
+    column: s.column,
+    suggestion: s.suggestion,
+  }));
+}
+
+/**
+ * Build the fitness session payload directly from the run's
+ * {@link SignalEnvelope}.
+ *
+ * One `checks[]` entry per `units[]` row (every check that ran — a clean check
+ * still appears, matching the dashboard's per-check catalog stats), with its
+ * findings recovered by grouping `signals` on `signal.source === unit.slug`.
+ * The 4-level signal severity is collapsed to the dashboard's `error|warning`.
+ * `summary` is taken from the envelope's verdict, which already counts
+ * `critical|high → errors`, else `warnings`.
+ */
+export function buildFitnessSessionPayload(envelope: SignalEnvelope): FitnessSessionPayload {
+  const bySource = new Map<string, Signal[]>();
+  for (const s of envelope.signals) {
+    const bucket = bySource.get(s.source);
+    if (bucket) bucket.push(s);
+    else bySource.set(s.source, [s]);
+  }
+
+  const checks: FitnessSessionCheck[] = envelope.units.map((unit: UnitResult) => ({
+    checkSlug: unit.slug,
+    passed: unit.passed,
+    violationCount: unit.violationCount,
+    findings: findingsFor(bySource.get(unit.slug) ?? []),
+    durationMs: unit.durationMs,
+  }));
+
+  const { summary } = envelope.verdict;
   return {
-    summary: output.summary,
-    checks: output.checks.map((c) => ({
-      checkSlug: c.checkSlug,
-      passed: c.passed,
-      violationCount: c.violationCount,
-      findings: c.findings.map((f) => ({
-        ruleId: f.ruleId,
-        message: f.message,
-        severity: f.severity,
-        filePath: f.filePath,
-        line: f.line,
-        column: f.column,
-        suggestion: f.suggestion,
-      })),
-      durationMs: c.durationMs,
-    })),
+    summary: {
+      total: summary.total,
+      passed: summary.passed,
+      failed: summary.failed,
+      errors: summary.errors,
+      warnings: summary.warnings,
+    },
+    checks,
   };
 }
