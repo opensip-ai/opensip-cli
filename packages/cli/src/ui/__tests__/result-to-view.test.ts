@@ -1,9 +1,11 @@
 import { renderToText } from '@opensip-tools/cli-ui';
+import { buildSignalEnvelope } from '@opensip-tools/contracts';
 import { describe, it, expect } from 'vitest';
 
 import { resultToView } from '../result-to-view.js';
 
 import type { CommandResult, SimDoneResult } from '@opensip-tools/contracts';
+import type { Signal } from '@opensip-tools/core';
 
 function textOf(result: CommandResult): string {
   return renderToText(resultToView(result));
@@ -83,33 +85,67 @@ describe('resultToView', () => {
     expect(out).toBe('  ✗ boom');
   });
 
+  // ADR-0011 (Phase 4): sim is migrated — the sim-done view is derived from
+  // the envelope's per-unit table (one row per scenario), not the retired
+  // per-scenario `simDoneView`. Scenario `a` passed; scenario `b` failed an
+  // assertion (emitting a `high` signal sourced at its scenarioId).
+  const bSignal: Signal = {
+    id: 'sig_b1',
+    source: 'b',
+    provider: 'opensip-tools',
+    severity: 'high',
+    category: 'resilience',
+    ruleId: 'invariant.violated',
+    message: 'invariant broke',
+    filePath: '',
+    metadata: {},
+    createdAt: '2026-06-04T00:00:00.000Z',
+  };
   const simBase: SimDoneResult = {
     type: 'sim-done',
     recipeName: 'example',
     cwd: '/x',
-    totalScenarios: 2,
-    passedScenarios: 1,
-    failedScenarios: 1,
     durationMs: 1500,
-    scenarios: [
-      { scenarioId: 'a', scenarioName: 'loads ok', kind: 'load', passed: true, durationMs: 10 },
-      { scenarioId: 'b', scenarioName: 'invariant', kind: 'invariant', passed: false, durationMs: 20, error: 'broke' },
-    ],
+    shouldFail: true,
+    envelope: buildSignalEnvelope({
+      tool: 'sim',
+      recipe: 'example',
+      runId: 'run-1',
+      createdAt: '2026-06-04T00:00:00.000Z',
+      units: [
+        { slug: 'a', passed: true, durationMs: 10 },
+        { slug: 'b', passed: false, durationMs: 20 },
+      ],
+      signals: [bSignal],
+    }),
   };
 
-  it('renders the sim-done header, scenarios, and summary as plain text', () => {
+  it('renders the sim-done table and summary from the envelope', () => {
     const out = textOf(simBase);
-    expect(out).toContain('  Simulation');
-    expect(out).toContain('  Recipe: example');
-    expect(out).toContain('✓ loads ok (load, 10ms)');
-    expect(out).toContain('✗ invariant (invariant, 20ms)');
-    expect(out).toContain('broke');
-    expect(out).toContain('1 passed, 1 failed | Duration 1.5s');
+    // One row per scenario-unit, keyed by scenarioId; b's high signal counts
+    // as an error on its row and drives the FAIL status.
+    expect(out).toContain('Unit');
+    expect(out).toContain('Status');
+    expect(out).toContain('a');
+    expect(out).toContain('b');
+    // Shared run summary: 1 passed, 1 failed, 1 error.
+    expect(out).toContain('1 Passed, 1 Failed (1 Errors, 0 Warnings)');
   });
 
-  it('renders the empty-scenarios sim-done shape', () => {
-    const out = textOf({ ...simBase, scenarios: [], totalScenarios: 0, passedScenarios: 0, failedScenarios: 0 });
-    expect(out).toContain("No scenarios matched recipe 'example'");
+  it('renders the empty-scenarios sim-done shape (no table, zeroed summary)', () => {
+    const out = textOf({
+      ...simBase,
+      shouldFail: false,
+      envelope: buildSignalEnvelope({
+        tool: 'sim',
+        recipe: 'example',
+        runId: 'run-1',
+        createdAt: '2026-06-04T00:00:00.000Z',
+        units: [],
+        signals: [],
+      }),
+    });
+    expect(out).toContain('0 Passed, 0 Failed (0 Errors, 0 Warnings)');
   });
 
   it('renders graph-done summary + footer via the shared producers (no banner text)', () => {

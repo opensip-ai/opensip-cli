@@ -264,27 +264,18 @@ export interface SimDoneResult {
   type: 'sim-done';
   recipeName: string;
   cwd: string;
-  totalScenarios: number;
-  passedScenarios: number;
-  failedScenarios: number;
-  scenarios: {
-    scenarioId: string;
-    scenarioName: string;
-    kind: 'load' | 'chaos' | 'invariant' | 'fix-evaluation';
-    passed: boolean;
-    durationMs: number;
-    error?: string;
-  }[];
   durationMs: number;
   /** Whether the run should cause a non-zero exit code (any scenario failed). */
   shouldFail?: boolean;
   /**
-   * The run's signal envelope (ADR-0011). ADDITIVE during the migration:
-   * when present, the composition root derives the terminal table and the
-   * machine-output paths FROM this envelope. When absent (sim not yet
-   * migrated — Phase 4), the root uses the legacy scenario summaries.
+   * The run's signal envelope (ADR-0011). REQUIRED since Phase 4 (sim is
+   * migrated): the composition root derives the terminal table (one row per
+   * scenario `unit`, grouped by `signal.source === scenarioId`) and the
+   * `--json`/cloud/`--report-to` paths FROM this envelope. The per-scenario
+   * pass/fail summary is recovered from `envelope.units`, so no scenario
+   * summary fields are duplicated on the result.
    */
-  envelope?: SignalEnvelope;
+  envelope: SignalEnvelope;
 }
 
 /**

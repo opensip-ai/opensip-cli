@@ -232,12 +232,13 @@ describe('CLI e2e', () => {
 
   describe('sim', () => {
     it('runs the built-in default recipe with no scenarios registered', () => {
-      // No user-authored scenarios in the e2e env, so the default
-      // recipe matches zero scenarios and exits cleanly. The output
-      // surface (Ink summary) mentions the recipe name.
+      // No user-authored scenarios in the e2e env, so the default recipe
+      // matches zero scenarios and exits cleanly. Since Phase 4 (ADR-0011)
+      // the sim view is the shared envelope-derived table; with zero units
+      // it renders the shared run-summary line ("0 Passed, 0 Failed ...").
       const { stdout, exitCode } = run('sim');
       expect(exitCode).toBe(0);
-      expect(stdout.toLowerCase()).toContain('recipe');
+      expect(stdout).toContain('0 Passed, 0 Failed');
     });
 
     it('exits 2 when given an unknown recipe name', () => {

@@ -64,6 +64,15 @@ export interface ToolOptions {
   recipe?: string;
   /** Filter by scenario kind (load / chaos / invariant / fix-evaluation). */
   kind?: string;
+  /**
+   * `--report-to <url>` — POST the run's signals to OpenSIP Cloud or a
+   * compatible receiver. sim gained cloud egress when it began emitting the
+   * signal envelope (ADR-0011, Phase 4); the composition root's
+   * `deliverSignals` owns the actual egress (and exit code 4).
+   */
+  reportTo?: string;
+  /** `--api-key <key>` — auth for `--report-to`. */
+  apiKey?: string;
 }
 
 // =============================================================================

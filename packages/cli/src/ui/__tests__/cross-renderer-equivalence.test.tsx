@@ -12,6 +12,7 @@
  */
 
 import { renderToText, renderToInk, ThemeProvider } from '@opensip-tools/cli-ui';
+import { buildSignalEnvelope } from '@opensip-tools/contracts';
 import { render } from 'ink-testing-library';
 import React from 'react';
 import { describe, it, expect } from 'vitest';
@@ -41,18 +42,25 @@ function plainText(result: CommandResult): string {
 
 const FIXTURES: Readonly<Record<string, CommandResult>> = {
   error: { type: 'error', message: 'boom', suggestion: 'try --help', exitCode: 1 },
+  // ADR-0011 (Phase 4): sim-done is now envelope-derived (one unit row per
+  // scenario), rendered through the shared envelopeToTableView like fit/graph.
   'sim-done': {
     type: 'sim-done',
     recipeName: 'example',
     cwd: '/x',
-    totalScenarios: 2,
-    passedScenarios: 1,
-    failedScenarios: 1,
     durationMs: 1500,
-    scenarios: [
-      { scenarioId: 'a', scenarioName: 'loads', kind: 'load', passed: true, durationMs: 10 },
-      { scenarioId: 'b', scenarioName: 'inv', kind: 'invariant', passed: false, durationMs: 20, error: 'broke' },
-    ],
+    shouldFail: true,
+    envelope: buildSignalEnvelope({
+      tool: 'sim',
+      recipe: 'example',
+      runId: 'run-1',
+      createdAt: '2026-06-04T00:00:00.000Z',
+      units: [
+        { slug: 'a', passed: true, durationMs: 10 },
+        { slug: 'b', passed: false, durationMs: 20, error: 'broke' },
+      ],
+      signals: [],
+    }),
   },
   'graph-done': {
     type: 'graph-done',
