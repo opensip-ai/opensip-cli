@@ -177,14 +177,14 @@ describe('SaaS-mode concurrent scopes', () => {
     const scopeB = makeScope();
 
     // Seed the slot in A; B's slot must remain empty.
-    scopeA.recipeCheckConfig.set('check-x', { from: 'A' });
+    scopeA.recipeUnitConfig.set('check-x', { from: 'A' });
 
     const [aSeesOwn, bSeesNothing] = await Promise.all([
       runWithScope(scopeA, () => {
-        return Promise.resolve(currentScope()?.recipeCheckConfig.get('check-x'));
+        return Promise.resolve(currentScope()?.recipeUnitConfig.get('check-x'));
       }),
       runWithScope(scopeB, () => {
-        return Promise.resolve(currentScope()?.recipeCheckConfig.get('check-x'));
+        return Promise.resolve(currentScope()?.recipeUnitConfig.get('check-x'));
       }),
     ]);
 
