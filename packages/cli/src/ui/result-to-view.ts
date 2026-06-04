@@ -16,8 +16,9 @@
  * only forbids the reverse — cli-ui must never import contracts.
  */
 
-import { line, group, viewRunSummary, viewFooterHints, type Span, type ViewNode } from '@opensip-tools/cli-ui';
+import { line, group, viewRunSummary, viewFooterHints, type Span, type Tone, type ViewNode } from '@opensip-tools/cli-ui';
 import { formatDuration } from '@opensip-tools/core';
+import { formatSignalTableRows, formatSignalTableSummary, type SignalTableRow } from '@opensip-tools/output';
 
 import { viewFitDone } from './views/fit-done-view.js';
 import { viewInit } from './views/init-view.js';
@@ -34,7 +35,7 @@ import {
 } from './views/misc-views.js';
 import { viewPlugin } from './views/plugin-view.js';
 
-import type { CommandResult, SimDoneResult, ErrorResult, GraphDoneResult } from '@opensip-tools/contracts';
+import type { CommandResult, SimDoneResult, ErrorResult, GraphDoneResult, SignalEnvelope } from '@opensip-tools/contracts';
 
 const SEPARATOR: ViewNode = { kind: 'separator' };
 const SPACER: ViewNode = { kind: 'spacer' };
@@ -120,20 +121,109 @@ function linesView(lines: readonly string[]): ViewNode {
   return group(lines.map((l) => line([{ text: l }])));
 }
 
+// --- Envelope-derived terminal table (ADR-0011) -----------------------------
+//
+// The single, tool-agnostic table derivation: every migrated tool's result
+// carries a `SignalEnvelope`, and the terminal table is derived FROM its
+// `units` + `signals` via the shared `formatSignalTableRows` / `Summary`
+// formatters (`@opensip-tools/output`). One row per unit (check / rule /
+// scenario). Replaces the three per-tool, pre-computed `rows`/`reportLines`
+// shapes (the fit/sim/graph `*DoneResult` legacy branches, retired in Phase 7).
+
+const ENV_COL = { status: 7, errors: 6, warnings: 8, duration: 10 } as const;
+
+function envStatusTone(status: SignalTableRow['status']): Tone {
+  if (status === 'FAIL') return 'error';
+  if (status === 'ERROR') return 'warning';
+  return 'success';
+}
+
+function envDurationTone(ms: number): Tone {
+  if (ms >= 60_000) return 'error';
+  if (ms >= 30_000) return 'warning';
+  return 'success';
+}
+
+const ENV_SEP: Span = { text: ' | ' };
+
+/** Fixed-width per-unit table from the envelope's signal-table rows, or null when empty. */
+function envelopeTableNode(rows: readonly SignalTableRow[]): ViewNode | null {
+  if (rows.length === 0) return null;
+  const unitW = Math.max(40, ...rows.map((r) => r.unit.length));
+
+  const header = line([
+    {
+      text:
+        `${'Unit'.padEnd(unitW)} | ${'Status'.padEnd(ENV_COL.status)} | ` +
+        `${'Errors'.padEnd(ENV_COL.errors)} | ${'Warnings'.padEnd(ENV_COL.warnings)} | ${'Duration'.padEnd(ENV_COL.duration)}`,
+    },
+  ]);
+  const separator = line([
+    {
+      text: [
+        '-'.repeat(unitW), '-'.repeat(ENV_COL.status), '-'.repeat(ENV_COL.errors),
+        '-'.repeat(ENV_COL.warnings), '-'.repeat(ENV_COL.duration),
+      ].join('-|-'),
+    },
+  ]);
+
+  const rowNodes = rows.map((r) =>
+    line([
+      { text: r.unit.padEnd(unitW) },
+      ENV_SEP,
+      { text: r.status.padEnd(ENV_COL.status), tone: envStatusTone(r.status) },
+      ENV_SEP,
+      { text: String(r.errors).padEnd(ENV_COL.errors), tone: r.errors > 0 ? 'error' : 'success' },
+      ENV_SEP,
+      { text: String(r.warnings).padEnd(ENV_COL.warnings), tone: r.warnings > 0 ? 'warning' : 'muted' },
+      ENV_SEP,
+      { text: r.duration.padEnd(ENV_COL.duration), tone: envDurationTone(r.durationMs) },
+    ]),
+  );
+
+  return group([header, separator, ...rowNodes]);
+}
+
+/**
+ * The shared envelope → terminal-table view. Used by the fit/sim/graph cases
+ * once their result carries an envelope; falls back to the legacy
+ * `rows`/`reportLines` derivations until each tool migrates (Phases 4–6).
+ */
+export function envelopeToTableView(envelope: SignalEnvelope): ViewNode {
+  const rows = formatSignalTableRows(envelope);
+  const summary = formatSignalTableSummary(envelope);
+  const children: ViewNode[] = [];
+  const table = envelopeTableNode(rows);
+  if (table !== null) children.push(table);
+  children.push(
+    viewRunSummary({
+      passed: summary.passed,
+      failed: summary.failed,
+      errors: summary.totalErrors,
+      warnings: summary.totalWarnings,
+      durationMs: summary.durationMs,
+    }),
+  );
+  return group(children);
+}
+
 /** Map any CommandResult to its view-model node (total — every variant covered). */
 export function resultToView(result: CommandResult): ViewNode {
   switch (result.type) {
     case 'fit-done': {
-      return viewFitDone(result);
+      // ADR-0011: a migrated result carries the envelope; derive the table
+      // from it. Un-migrated results (Phase 6 pending) fall through to the
+      // legacy `rows`/`findings` view.
+      return result.envelope ? envelopeToTableView(result.envelope) : viewFitDone(result);
     }
     case 'error': {
       return errorView(result);
     }
     case 'sim-done': {
-      return simDoneView(result);
+      return result.envelope ? envelopeToTableView(result.envelope) : simDoneView(result);
     }
     case 'graph-done': {
-      return graphDoneView(result);
+      return result.envelope ? envelopeToTableView(result.envelope) : graphDoneView(result);
     }
     case 'gate-done': {
       return linesView(result.lines);
