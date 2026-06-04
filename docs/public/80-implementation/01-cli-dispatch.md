@@ -88,10 +88,11 @@ Some commands belong to the CLI itself, not to any Tool. They live under [`packa
 | `configure` | CLI | Manages user-level (`~/.opensip-tools/config.yml`) state. Cross-tool. |
 | `uninstall` | CLI | Removes the user-level dotdir. Cross-tool. |
 | `plugin add/remove/list/sync` | CLI | Manages project-pinned plugins. Cross-tool. |
-| `completion` | CLI | Prints shell completion. Sources its catalog from the per-invocation `ToolRegistry`. |
+| `completion` | CLI | Prints shell completion from a **static first-party** `SUBCOMMANDS` list (kept in sync with the live program by a drift-catch test). Third-party tool subcommands are not included. |
+| `dashboard` | CLI | Generates + opens the HTML report, aggregating each tool's contributed dashboard data (composition root). Cross-tool. |
 | `sessions list/purge` | CLI | Reads the runtime session store. Cross-tool. |
 
-Tool-owned commands are mounted by their Tool's `register()` call. The current first-party set: fitness contributes `fit`, `dashboard`, `fit-list`, `fit-recipes`, and `fit-baseline-export`; simulation contributes `sim`; graph contributes `graph`, `graph-lookup`, `graph-symbol-index`, `graph-baseline-export`, `graph-recipes` (graph now has its own `defineRule` + recipes, mirroring fitness — ADR-0005), plus the internal `graph-shard-worker` and the `graph-catalog-export` / `graph-sarif-export` export commands. Third-party tools add their own. The CLI's job is to provide the program; the Tool decides what handlers it gets.
+Tool-owned commands are mounted by their Tool's `register()` call. The current first-party set: fitness contributes `fit`, `fit-list`, `fit-recipes`, and `fit-baseline-export`; simulation contributes `sim`; graph contributes `graph`, `graph-lookup`, `graph-symbol-index`, `graph-baseline-export`, `graph-recipes` (graph now has its own `defineRule` + recipes, mirroring fitness — ADR-0005), plus the internal `graph-shard-worker` and the `graph-catalog-export` / `graph-sarif-export` export commands. The `dashboard` command is **CLI-owned** (composition root), not a fitness command — it walks every tool's `collectDashboardData`. Third-party tools add their own. The CLI's job is to provide the program; the Tool decides what handlers it gets.
 
 The split is functional, not arbitrary. CLI-owned commands deal with concerns that span every Tool — initialization, plugins, sessions, user config. Tool-owned commands deal with concerns specific to that Tool's domain. A new Tool doesn't need to provide its own `init`; it inherits the CLI's.
 
@@ -170,8 +171,8 @@ For `acme-api` running `opensip-tools fit --gate-compare` from CI on 2026-05-17:
    - Registers six bundled language adapters (`typescript`, `rust`, `python`, `java`, `go`, `cpp`) into `langRegistry`.
    - Registers `fitnessTool`, `simulationTool`, `graphTool` into `toolRegistry`.
    - `discoverToolPackages()` walks `node_modules`. No third-party Tools installed. Returns empty.
-3. `mountAllToolCommands(toolRegistry, ctx)`: `fitnessTool.register(ctx)` mounts `fit`, `dashboard`, `fit-list`, `fit-recipes`, `fit-baseline-export`; `simulationTool.register(ctx)` mounts `sim`; `graphTool.register(ctx)` mounts `graph`, `graph-lookup`, `graph-symbol-index`, `graph-baseline-export`, `graph-recipes` (and its internal/export commands).
-4. `registerCliCommands()`: `init`, `configure`, `uninstall`, `plugin`, `completion`, `sessions` mounted.
+3. `mountAllToolCommands(toolRegistry, ctx)`: `fitnessTool.register(ctx)` mounts `fit`, `fit-list`, `fit-recipes`, `fit-baseline-export`; `simulationTool.register(ctx)` mounts `sim`; `graphTool.register(ctx)` mounts `graph`, `graph-lookup`, `graph-symbol-index`, `graph-baseline-export`, `graph-recipes` (and its internal/export commands).
+4. `registerCliCommands()`: `init`, `dashboard`, `configure`, `uninstall`, `plugin`, `completion`, `sessions` mounted.
 5. `argv = ['node', 'opensip-tools', 'fit', '--gate-compare']` — there's a subcommand, so the welcome banner is skipped.
 6. `parseAsync()` runs. The `preAction` hook enters a fresh `RunScope`, reads the `fit` command's `opts.debug` (false), and leaves the log level at `info`. It also runs the once-per-day update check and records the result on the scope for the banner / stderr nag (no-op when up-to-date or offline; never blocks). A runId like `RUN_01HXYZG9V8K1J7P3M2N0RQS5T6W` is generated (uppercase prefix + ULID); the day-level log file `<project>/opensip-tools/.runtime/logs/2026-05-17.jsonl` is opened on first write. Commander dispatches to `fitnessTool`'s `fit` action handler with `--gate-compare = true`. The Tool runs `executeFit` and the gate diff. Exit code 1 (regression detected).
 

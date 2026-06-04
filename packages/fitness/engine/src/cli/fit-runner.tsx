@@ -36,6 +36,7 @@ import {
   UpdateHint,
 } from '@opensip-tools/cli-ui';
 import {
+  EXIT_CODES,
   type FitOptions,
   type CliOutput,
   type ErrorResult,
@@ -133,6 +134,12 @@ function FitRunner({ args, datastore, setExitCode }: FitRunnerProps): React.Reac
 
       if (finalResult.shouldFail) {
         setExitCode?.(1);
+      } else if (reportStatus && !reportStatus.success) {
+        // A `--report-to` upload failure fails the run (EXIT_CODES.REPORT_FAILED,
+        // the documented contract), but only when the run otherwise passed — a
+        // real check/gate failure (shouldFail above) takes precedence and is
+        // never masked by a reporting failure.
+        setExitCode?.(EXIT_CODES.REPORT_FAILED);
       }
 
       setState({ phase: 'done', result: finalResult, checkCount });

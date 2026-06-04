@@ -105,7 +105,7 @@ Value is a single target name (string) or a non-empty list.
 | `failOnErrors` | int ≥ 0 | `1` | Threshold for `shouldFail`. `0` = never fail; `1` = fail on first error. |
 | `failOnWarnings` | int ≥ 0 | `0` | Threshold for warnings. `0` = ignore warnings entirely. |
 | `disabledChecks` | string[] | `[]` | Slugs to skip (a recipe's `includeDisabled` can opt back in). |
-| `schedules` | object[] | `[]` | Reserved for cloud-side scheduled runs. |
+| `schedules` | object[] | `[]` | Reserved for cloud-side scheduled runs. **Ignored locally** — the CLI config schema does not parse, validate, or act on this field (unknown keys are silently dropped). No local scheduler exists. |
 
 ```yaml
 fitness:
@@ -119,7 +119,7 @@ Setting `failOnErrors: 5` lets a run pass with fewer than 5 errors — useful du
 
 ## `simulation`
 
-Currently only `schedules: []`, reserved for cloud-side scheduling. The simulation engine reads no other fields from this section; future versions may add `defaultRecipe`, `maxParallel`, etc.
+Currently only `schedules: []`, reserved for cloud-side scheduling — and **ignored by the local CLI** (not parsed, validated, or acted on; there is no local scheduler). The simulation engine reads no other fields from this section; future versions may add `defaultRecipe`, `maxParallel`, etc.
 
 ## `cli`
 

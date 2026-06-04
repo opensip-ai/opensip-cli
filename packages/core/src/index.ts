@@ -35,7 +35,7 @@ export {
   VALID_NPM_SCOPE_REGEX,
 } from './plugins/index.js';
 export type {
-  PluginDomain,
+  PluginLayout,
   DiscoveredPlugin,
   LoadedPlugin,
   PluginLoadResult,
@@ -53,7 +53,7 @@ export type {
   RegisterRecipesOptions,
   RegisterRecipesResult,
   RegisterCtx,
-  RegisterCounts,
+  RegisteredCounts,
   RegisterExportsFn,
 } from './plugins/index.js';
 
@@ -198,7 +198,7 @@ export { formatDuration } from './lib/format.js';
 // ~/.opensip-tools/config.yml). Every consumer constructs paths through
 // this module so a layout change is a single-file edit.
 export { resolveProjectPaths, resolveUserPaths } from './lib/paths.js';
-export type { ProjectPaths, UserPaths, PathDomain, PluginsPathDomain } from './lib/paths.js';
+export type { ProjectPaths, UserPaths, PathDomain } from './lib/paths.js';
 
 // Lib — project-context resolver. One-shot ancestor walk from cwd to
 // the nearest opensip-tools.config.yml. Returns a ProjectContext that

@@ -28,6 +28,7 @@ import { ToolError, type ToolErrorOptions } from '../lib/errors.js';
 
 import type { Logger } from '../lib/logger.js';
 import type { ScopeContribution, ToolScope } from '../lib/scope-types.js';
+import type { PluginLayout } from '../plugins/types.js';
 
 // `ToolScope` (the Tool-facing scope view) and `ScopeContribution` (the
 // augmentable subscope bag a tool returns from `contributeScope`) live in
@@ -234,6 +235,15 @@ export interface Tool {
    * register().
    */
   readonly commands: readonly ToolCommandDescriptor[];
+  /**
+   * Optional project-local plugin layout. Tools that support
+   * user-authored / npm plugins under `<project>/opensip-tools/<domain>/`
+   * declare `{ domain, userSubdirs }` here; the kernel's `discoverPlugins`
+   * / `loadAllPlugins` and the CLI's `plugin` command read it instead of
+   * hardcoding domain names (ADR-0009 corollary 1). Tools with no
+   * project-local plugins (e.g. graph) leave this undefined.
+   */
+  readonly pluginLayout?: PluginLayout;
   /**
    * Mount this tool's subcommands onto the CLI's Commander program.
    * Called once at CLI startup, before argv parsing. Use the supplied

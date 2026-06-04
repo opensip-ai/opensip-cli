@@ -103,6 +103,10 @@ function makeCtx(): MakeCtxResult {
       return Promise.resolve();
     }),
     datastore,
+    pluginLayouts: [
+      { domain: 'fit', userSubdirs: ['checks', 'recipes'] },
+      { domain: 'sim', userSubdirs: ['scenarios', 'recipes'] },
+    ],
   };
   return { ctx, rendered, setExitCode, datastore };
 }
@@ -131,7 +135,7 @@ describe('registerPlugins — action bodies', () => {
 
     await program.parseAsync(['plugin', 'list'], { from: 'user' });
 
-    expect(pluginList).toHaveBeenCalledWith('/discovered/root');
+    expect(pluginList).toHaveBeenCalledWith('/discovered/root', ctx.pluginLayouts);
     expect(rendered).toHaveLength(1);
   });
 
@@ -150,7 +154,7 @@ describe('registerPlugins — action bodies', () => {
     } finally {
       spy.mockRestore();
     }
-    expect(pluginList).toHaveBeenCalledWith('/explicit/cwd');
+    expect(pluginList).toHaveBeenCalledWith('/explicit/cwd', ctx.pluginLayouts);
     expect(rendered).toHaveLength(0);
     expect(writes.join('')).toContain('"action": "list"');
   });
@@ -161,7 +165,7 @@ describe('registerPlugins — action bodies', () => {
     registerPlugins(program, ctx);
 
     await program.parseAsync(['plugin', 'add', '@my-co/foo', '--cwd', '/p', '--domain', 'fit'], { from: 'user' });
-    expect(pluginAdd).toHaveBeenCalledWith('@my-co/foo', '/p', 'fit');
+    expect(pluginAdd).toHaveBeenCalledWith('@my-co/foo', '/p', 'fit', ctx.pluginLayouts);
   });
 
   it('plugin remove: forwards the positional arg, --domain, and effectiveCwd', async () => {
@@ -170,7 +174,7 @@ describe('registerPlugins — action bodies', () => {
     registerPlugins(program, ctx);
 
     await program.parseAsync(['plugin', 'remove', '@my-co/foo', '--cwd', '/p', '--domain', 'sim'], { from: 'user' });
-    expect(pluginRemove).toHaveBeenCalledWith('@my-co/foo', '/p', 'sim');
+    expect(pluginRemove).toHaveBeenCalledWith('@my-co/foo', '/p', 'sim', ctx.pluginLayouts);
   });
 
   it('plugin sync: forwards --domain and effectiveCwd', async () => {
@@ -179,7 +183,7 @@ describe('registerPlugins — action bodies', () => {
     registerPlugins(program, ctx);
 
     await program.parseAsync(['plugin', 'sync', '--cwd', '/p'], { from: 'user' });
-    expect(pluginSync).toHaveBeenCalledWith('/p', undefined);
+    expect(pluginSync).toHaveBeenCalledWith('/p', undefined, ctx.pluginLayouts);
   });
 });
 

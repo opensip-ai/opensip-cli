@@ -18,13 +18,13 @@ describe('resolveProjectPaths', () => {
     expect(p.configFile).toBe(join(PROJECT, 'opensip-tools.config.yml'));
   });
 
-  it('places user-source in opensip-tools/{fit,sim}/{checks,recipes,scenarios}', () => {
+  it('resolves user-source plugin dirs generically via userPluginDir(domain, kind)', () => {
     const p = resolveProjectPaths(PROJECT);
     expect(p.userSourceDir).toBe(join(PROJECT, 'opensip-tools'));
-    expect(p.fitChecksDir).toBe(join(PROJECT, 'opensip-tools', 'fit', 'checks'));
-    expect(p.fitRecipesDir).toBe(join(PROJECT, 'opensip-tools', 'fit', 'recipes'));
-    expect(p.simScenariosDir).toBe(join(PROJECT, 'opensip-tools', 'sim', 'scenarios'));
-    expect(p.simRecipesDir).toBe(join(PROJECT, 'opensip-tools', 'sim', 'recipes'));
+    expect(p.userPluginDir('fit', 'checks')).toBe(join(PROJECT, 'opensip-tools', 'fit', 'checks'));
+    expect(p.userPluginDir('fit', 'recipes')).toBe(join(PROJECT, 'opensip-tools', 'fit', 'recipes'));
+    expect(p.userPluginDir('sim', 'scenarios')).toBe(join(PROJECT, 'opensip-tools', 'sim', 'scenarios'));
+    expect(p.userPluginDir('sim', 'recipes')).toBe(join(PROJECT, 'opensip-tools', 'sim', 'recipes'));
   });
 
   it('places runtime state under opensip-tools/.runtime', () => {

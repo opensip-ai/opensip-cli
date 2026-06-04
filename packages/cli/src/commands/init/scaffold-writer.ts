@@ -84,10 +84,10 @@ function scaffoldFitChecks(
   options: ScaffoldOptions,
   createdFiles: string[],
 ): void {
-  mkdirSync(paths.fitChecksDir, { recursive: true });
+  mkdirSync(paths.userPluginDir('fit', 'checks'), { recursive: true });
   if (languages.length === 1) {
     writeScaffoldedFile(
-      join(paths.fitChecksDir, 'example-check.mjs'),
+      join(paths.userPluginDir('fit', 'checks'), 'example-check.mjs'),
       exampleCheckSource(languages[0] ?? 'typescript'),
       options.keepCustom,
       options.preExistingByPath,
@@ -98,7 +98,7 @@ function scaffoldFitChecks(
   // Polyglot: one example per language so each is independently editable / deletable.
   for (const lang of languages) {
     writeScaffoldedFile(
-      join(paths.fitChecksDir, `example-check-${lang}.mjs`),
+      join(paths.userPluginDir('fit', 'checks'), `example-check-${lang}.mjs`),
       exampleCheckSource(lang, lang),
       options.keepCustom,
       options.preExistingByPath,
@@ -115,30 +115,30 @@ function scaffoldExamples(
 ): void {
   scaffoldFitChecks(paths, languages, options, createdFiles);
 
-  mkdirSync(paths.fitRecipesDir, { recursive: true });
+  mkdirSync(paths.userPluginDir('fit', 'recipes'), { recursive: true });
   const slugs = languages.length === 1
     ? ['example-check']
     : languages.map((lang) => `example-check-${lang}`);
   writeScaffoldedFile(
-    join(paths.fitRecipesDir, 'example-recipe.mjs'),
+    join(paths.userPluginDir('fit', 'recipes'), 'example-recipe.mjs'),
     exampleRecipeSource(slugs),
     options.keepCustom,
     options.preExistingByPath,
     createdFiles,
   );
 
-  mkdirSync(paths.simScenariosDir, { recursive: true });
+  mkdirSync(paths.userPluginDir('sim', 'scenarios'), { recursive: true });
   writeScaffoldedFile(
-    join(paths.simScenariosDir, 'example-scenario.mjs'),
+    join(paths.userPluginDir('sim', 'scenarios'), 'example-scenario.mjs'),
     exampleScenarioSource(),
     options.keepCustom,
     options.preExistingByPath,
     createdFiles,
   );
 
-  mkdirSync(paths.simRecipesDir, { recursive: true });
+  mkdirSync(paths.userPluginDir('sim', 'recipes'), { recursive: true });
   writeScaffoldedFile(
-    join(paths.simRecipesDir, 'example-recipe.mjs'),
+    join(paths.userPluginDir('sim', 'recipes'), 'example-recipe.mjs'),
     exampleSimRecipeSource(),
     options.keepCustom,
     options.preExistingByPath,

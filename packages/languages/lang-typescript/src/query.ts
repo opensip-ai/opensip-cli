@@ -1,7 +1,11 @@
 import ts from 'typescript'
 
-import type { LanguageQueryAPI } from '@opensip-tools/core/languages/adapter.js'
-import type { GenericFunction, Import, Location } from '@opensip-tools/core/languages/generic-types.js'
+import type {
+  GenericFunction,
+  Import,
+  LanguageQueryAPI,
+  Location,
+} from '@opensip-tools/core/languages'
 
 function locationOf(sourceFile: ts.SourceFile, node: ts.Node): Location {
   const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile))

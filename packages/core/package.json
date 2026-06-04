@@ -23,9 +23,8 @@
     "./types": "./dist/types/index.js",
     "./signal": "./dist/types/signal.js",
     "./plugins": "./dist/plugins/index.js",
-    "./plugins/*": "./dist/plugins/*",
     "./languages": "./dist/languages/index.js",
-    "./languages/*": "./dist/languages/*",
+    "./languages/parse-cache.js": "./dist/languages/parse-cache.js",
     "./test-utils/with-scope.js": "./dist/test-utils/with-scope.js"
   },
   "scripts": {

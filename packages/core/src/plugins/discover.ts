@@ -2,12 +2,15 @@
 /**
  * @fileoverview Plugin discovery for the project-local layout.
  *
- * Two artifact sources are walked per fit/sim domain:
+ * Discovery is descriptor-driven: the caller passes a `PluginLayout`
+ * (`{ domain, userSubdirs }`) declared by the owning tool. The kernel
+ * never enumerates tool domains itself (ADR-0009 corollary 1). Two
+ * artifact sources are walked for the layout:
  *
- *   1. USER SOURCE — `<project>/opensip-tools/<tool>/<kind>/*.{js,mjs}`
- *      where `<kind>` is `checks`/`recipes` for fit, or
- *      `scenarios`/`recipes` for sim. Auto-loaded by directory presence;
- *      no config opt-in.
+ *   1. USER SOURCE — `<project>/opensip-tools/<domain>/<kind>/*.{js,mjs}`
+ *      for each `kind` in `layout.userSubdirs` (e.g. `checks`/`recipes`
+ *      for fitness, `scenarios`/`recipes` for simulation). Auto-loaded
+ *      by directory presence; no config opt-in.
  *
  *   2. NPM PLUGINS — packages installed under
  *      `<project>/opensip-tools/.runtime/plugins/<domain>/node_modules/`
@@ -16,9 +19,9 @@
  *      list is required so a `plugin install` step is intentional, not
  *      an accidental load of every transitive devDep.
  *
- * The `'lang'` domain (language adapters) doesn't have project-local
- * plugin dirs — it returns an empty array. Language adapters ship as
- * direct deps of the CLI.
+ * A layout with an empty `userSubdirs` and no declared npm plugins
+ * (e.g. the language-adapter domain, whose adapters ship as direct CLI
+ * deps) discovers nothing — an emergent property, not a special case.
  */
 
 import { existsSync, readdirSync, realpathSync, statSync } from 'node:fs'
@@ -31,59 +34,43 @@ import { readYamlFile } from '../lib/yaml.js'
 
 import { resolvePackageEntryPoint } from './package-entry.js'
 
-import type { DiscoveredPlugin, PluginDomain } from './types.js'
+import type { DiscoveredPlugin, PluginLayout } from './types.js'
 
 /** Logger module tag used by every event in this file. */
 const MODULE_TAG = 'core:plugins'
-
-/**
- * User-source subdirectories per fit/sim domain. Each entry walks
- * a different artifact type. Domains other than fit/sim have no
- * subdirs and discoverPlugins() returns empty for them.
- */
-const USER_SUBDIRS: Partial<Record<PluginDomain, readonly string[]>> = {
-  fit: ['checks', 'recipes'],
-  sim: ['scenarios', 'recipes'],
-}
 
 // =============================================================================
 // PUBLIC ENTRY POINT
 // =============================================================================
 
 /**
- * Discover all plugins for a domain in the project layout.
+ * Discover all plugins for a layout in the project layout.
  *
  * Returns a list of `DiscoveredPlugin` entries (loose .mjs files +
  * npm packages) for the loader to import. Discovery is silent on a
  * missing project directory or absent subdirs — callers that care
  * about "did we find anything?" should check the returned length.
  *
- * @param domain      'fit' / 'sim' / 'lang'.
+ * @param layout      The owning tool's `PluginLayout` (`{ domain,
+ *                    userSubdirs }`).
  * @param projectDir  Project root. Required — there is no user-global
  *                    fallback. Pass undefined to discover nothing
  *                    (used by callers that don't have a project
  *                    context yet).
  */
 export function discoverPlugins(
-  domain: PluginDomain,
+  layout: PluginLayout,
   projectDir?: string,
 ): DiscoveredPlugin[] {
   if (!projectDir) return []
 
-  const subdirs = USER_SUBDIRS[domain]
-  if (!subdirs) {
-    // 'lang' — no user-source layout. Return empty; caller
-    // (e.g. CLI bootstrap) registers language adapters via direct
-    // package imports, not the file-plugin path.
-    return []
-  }
-
+  const { domain, userSubdirs } = layout
   const projectPaths = resolveProjectPaths(projectDir)
   const plugins: DiscoveredPlugin[] = []
 
-  // 1. User-source loose files: opensip-tools/<tool>/<kind>/*.{js,mjs}
+  // 1. User-source loose files: opensip-tools/<domain>/<kind>/*.{js,mjs}
   const toolDir = join(projectPaths.userSourceDir, domain)
-  for (const kind of subdirs) {
+  for (const kind of userSubdirs) {
     const kindDir = join(toolDir, kind)
     if (!existsSync(kindDir)) continue
     plugins.push(...discoverLooseFiles(kindDir, `${domain}/${kind}`))
@@ -141,7 +128,7 @@ export function discoverPlugins(
  */
 export function readProjectPluginsList(
   projectDir: string,
-  domain: PluginDomain,
+  domain: string,
 ): readonly string[] | undefined {
   let configPath: string
   try {

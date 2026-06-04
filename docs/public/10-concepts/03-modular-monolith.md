@@ -20,7 +20,7 @@ related-docs:
 ---
 # Layered package graph
 
-Twenty-nine packages. Five layers. One enforced rule: dependencies flow up only.
+Thirty packages. Five layers. One enforced rule: dependencies flow up only.
 
 This document is the conceptual map. For the lookup-shaped catalog of every package's role and exports, jump to [`70-reference/02-package-catalog.md`](../70-reference/02-package-catalog.md). For the literal dep-cruiser rules, see [`80-implementation/05-layer-policy.md`](../80-implementation/05-layer-policy.md).
 
@@ -28,7 +28,7 @@ This document is the conceptual map. For the lookup-shaped catalog of every pack
 > - Why opensip-tools ships as 30 packages instead of one.
 > - The five layers, in order, and what each one is for.
 > - How the layer rule is enforced (and what happens if you break it).
-> - The one documented exception (type-only edges) and the two that were paid down.
+> - How type-only edges are caught by a second cruiser pass, and the two cross-layer exceptions that were paid down.
 > - Trade-offs: what this shape buys you, what it costs.
 
 ---
@@ -83,7 +83,7 @@ This document is the conceptual map. For the lookup-shaped catalog of every pack
 
 **Layer 5 — `opensip-tools`.** The composition root. Imports every first-party tool and language adapter, registers them, builds the Commander tree, runs the dispatcher. The only package that knows everything below it.
 
-That's it. Five layers, twenty-nine packages.
+That's it. Five layers, thirty packages.
 
 ---
 
@@ -119,18 +119,22 @@ The build runs `pnpm depcruise` as part of the standard `pnpm lint` flow. A forb
 
 ---
 
-## The documented exception
+## Two cruiser passes — no standing layer exception
 
-Real codebases have edge cases. Today the layer rules carry exactly one — type-only edges (below). Two earlier cross-layer exceptions have since been **paid down** and deleted from [`.dependency-cruiser.cjs`](../../../.dependency-cruiser.cjs):
+Real codebases have edge cases. Two earlier cross-layer exceptions once lived in [`.dependency-cruiser.cjs`](../../../.dependency-cruiser.cjs); both have since been **paid down** and deleted:
 
 - **`lang-typescript` → `fitness`** (the `filterContent` back-edge): `filterContent` / `clearFilterCache` / `FilteredContent` now live in `@opensip-tools/lang-typescript` itself, so no lang pack reaches up into a tool. The `lang-no-fitness-except-typescript` rule is gone.
 - **`graph` → `fitness`** (SARIF reuse): SARIF building and cloud reporting moved to `@opensip-tools/contracts` / `@opensip-tools/reporting`, so `graph` reports without a `graph → fitness` edge. The `graph-may-import-fitness-sarif` info-exception is gone.
 
-### Type-only edges
+What remains is not an exception but a *second lens*. The layer ruleset runs twice, and both passes gate `pnpm lint`.
 
-`tsPreCompilationDeps: false` in the dep-cruiser config means type-only imports (`import type { ... }`) don't count as edges. This avoids false positives where two files form a type-cycle (each one `import type`s a type from the other) that doesn't actually exist at runtime — TypeScript erases those imports. Real runtime cycles are still caught by the `no-circular` rule.
+### Type-only edges are caught by the type-aware pass
 
-The trade-off: a *true* type-only cycle (which is a structural smell — usually means a type belongs in a third file) won't be flagged here. Knip catches some of these as orphaned types; the rest are caught at type-check time.
+The **runtime pass** ([`.dependency-cruiser.cjs`](../../../.dependency-cruiser.cjs)) sets `tsPreCompilationDeps: false`, so type-only imports (`import type { ... }`) don't count as edges. It models what actually runs: two files that only `import type` from each other form no runtime cycle, and TypeScript erases those imports, so flagging them would be a false positive.
+
+That leaves a blind spot — a type-only *layer inversion* or *cycle* would be invisible to the runtime pass. The **type-aware pass** ([`.dependency-cruiser.types.cjs`](../../../.dependency-cruiser.types.cjs)) closes it: it flips `tsPreCompilationDeps: true` and re-runs the **same** `forbidden` ruleset over the type-inclusive graph. Every directional layer rule — and `no-circular` — therefore also fires on type-only edges.
+
+The upshot: there is **no** standing "you may `import type` upward" allowance. A type-only import from a lower layer into a higher one trips the type-aware pass exactly as a runtime import trips the runtime pass. (The historical type-only cycles that predated this pass were paid down before it was promoted from visibility-only to gating.)
 
 ---
 

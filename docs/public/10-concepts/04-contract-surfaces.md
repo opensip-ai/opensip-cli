@@ -232,7 +232,7 @@ Currently use the same project-pinned shape as fit (declare the package in `plug
 - **Changing what an existing shape requires is a major change.** A pack declaring `opensipTools.kind: "fit-pack"` that exports `checks: Check[]` should keep working across minors.
 - **The Tool marker (`opensipTools.kind: 'tool'`) is a stable surface.** A future fifth kind would be a deliberate addition, not an accident.
 
-The `PluginDomain` type ([`packages/core/src/plugins/types.ts`](../../../packages/core/src/plugins/types.ts)) lists `'fit' | 'sim' | 'lang'` — these are domain identifiers used for path resolution (`<project>/opensip-tools/.runtime/plugins/<domain>/`), not `package.json` `kind` values.
+A tool's project-local plugin layout is described by a `PluginLayout` descriptor (`{ domain, userSubdirs }` — [`packages/core/src/plugins/types.ts`](../../../packages/core/src/plugins/types.ts)) that the tool declares on its `Tool.pluginLayout` and the kernel consumes. The `domain` is a plain string segment used for path resolution (`<project>/opensip-tools/<domain>/<kind>/` and `.runtime/plugins/<domain>/`), not a `package.json` `kind` value. The kernel deliberately does **not** enumerate the first-party domains — there is no `'fit' | 'sim' | 'lang'` union in core (ADR-0009 corollary 1).
 
 ---
 

@@ -6,6 +6,13 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 
 import { discoverPlugins } from '../discover.js'
 
+import type { PluginLayout } from '../types.js'
+
+/** Layouts under test — fit (checks/recipes), sim (scenarios/recipes), lang (none). */
+const FIT_LAYOUT: PluginLayout = { domain: 'fit', userSubdirs: ['checks', 'recipes'] }
+const SIM_LAYOUT: PluginLayout = { domain: 'sim', userSubdirs: ['scenarios', 'recipes'] }
+const LANG_LAYOUT: PluginLayout = { domain: 'lang', userSubdirs: [] }
+
 let testDir: string
 
 beforeEach(() => {
@@ -50,16 +57,16 @@ function setupPluginsConfig(deps: string[]): void {
 
 describe('discoverPlugins', () => {
   it('returns empty array when projectDir is undefined', () => {
-    expect(discoverPlugins('fit')).toEqual([])
+    expect(discoverPlugins(FIT_LAYOUT)).toEqual([])
   })
 
   it('returns empty array when no opensip-tools/ directory exists', () => {
-    expect(discoverPlugins('fit', testDir)).toEqual([])
+    expect(discoverPlugins(FIT_LAYOUT, testDir)).toEqual([])
   })
 
   it('returns empty array for `lang` (no subdir model)', () => {
     mkdirSync(join(testDir, 'opensip-tools', 'lang'), { recursive: true })
-    expect(discoverPlugins('lang', testDir)).toEqual([])
+    expect(discoverPlugins(LANG_LAYOUT, testDir)).toEqual([])
   })
 
   describe('user-source files (no config opt-in needed)', () => {
@@ -67,7 +74,7 @@ describe('discoverPlugins', () => {
       mkdirSync(fitChecksDir(), { recursive: true })
       writeFileSync(join(fitChecksDir(), 'my-check.mjs'), 'export const checks = []')
 
-      const result = discoverPlugins('fit', testDir)
+      const result = discoverPlugins(FIT_LAYOUT, testDir)
       expect(result).toHaveLength(1)
       expect(result[0]).toMatchObject({
         type: 'file',
@@ -80,7 +87,7 @@ describe('discoverPlugins', () => {
       mkdirSync(fitChecksDir(), { recursive: true })
       writeFileSync(join(fitChecksDir(), 'plugin.js'), 'export const checks = []')
 
-      const result = discoverPlugins('fit', testDir)
+      const result = discoverPlugins(FIT_LAYOUT, testDir)
       expect(result).toHaveLength(1)
       expect(result[0]?.source).toBe('plugin.js')
     })
@@ -91,7 +98,7 @@ describe('discoverPlugins', () => {
       writeFileSync(join(fitChecksDir(), 'my-check.mjs'), 'export const checks = []')
       writeFileSync(join(fitRecipesDir(), 'my-recipe.mjs'), 'export const recipes = []')
 
-      const result = discoverPlugins('fit', testDir)
+      const result = discoverPlugins(FIT_LAYOUT, testDir)
       expect(result).toHaveLength(2)
       const sources = result.map(p => p.source).sort()
       expect(sources).toEqual(['my-check.mjs', 'my-recipe.mjs'])
@@ -101,7 +108,7 @@ describe('discoverPlugins', () => {
       mkdirSync(simScenariosDir(), { recursive: true })
       writeFileSync(join(simScenariosDir(), 'load.mjs'), 'export const scenarios = []')
 
-      const result = discoverPlugins('sim', testDir)
+      const result = discoverPlugins(SIM_LAYOUT, testDir)
       expect(result).toHaveLength(1)
       expect(result[0]?.namespace).toContain('sim/scenarios/load')
     })
@@ -111,12 +118,12 @@ describe('discoverPlugins', () => {
       writeFileSync(join(fitChecksDir(), 'readme.txt'), 'not a plugin')
       writeFileSync(join(fitChecksDir(), 'data.json'), '{}')
 
-      expect(discoverPlugins('fit', testDir)).toEqual([])
+      expect(discoverPlugins(FIT_LAYOUT, testDir)).toEqual([])
     })
 
     it('ignores subdirectories when scanning loose files', () => {
       mkdirSync(join(fitChecksDir(), 'subdir'), { recursive: true })
-      expect(discoverPlugins('fit', testDir)).toEqual([])
+      expect(discoverPlugins(FIT_LAYOUT, testDir)).toEqual([])
     })
   })
 
@@ -129,7 +136,7 @@ describe('discoverPlugins', () => {
       writeFileSync(join(pkgDir, 'index.js'), 'export const checks = []')
 
       // Config is absent → no opt-in → package not loaded
-      expect(discoverPlugins('fit', testDir)).toEqual([])
+      expect(discoverPlugins(FIT_LAYOUT, testDir)).toEqual([])
     })
 
     it('discovers packages listed in plugins.fit when installed', () => {
@@ -141,7 +148,7 @@ describe('discoverPlugins', () => {
 
       setupPluginsConfig(['my-plugin'])
 
-      const result = discoverPlugins('fit', testDir)
+      const result = discoverPlugins(FIT_LAYOUT, testDir)
       expect(result).toHaveLength(1)
       expect(result[0]).toMatchObject({
         type: 'package',
@@ -163,7 +170,7 @@ describe('discoverPlugins', () => {
 
       setupPluginsConfig(['@scope/checks'])
 
-      const result = discoverPlugins('fit', testDir)
+      const result = discoverPlugins(FIT_LAYOUT, testDir)
       expect(result).toHaveLength(1)
       expect(result[0]).toMatchObject({
         type: 'package',
@@ -174,7 +181,7 @@ describe('discoverPlugins', () => {
     it('skips packages that are listed but not installed', () => {
       setupPluginsConfig(['ghost-package'])
       // No node_modules/ghost-package/ exists
-      expect(discoverPlugins('fit', testDir)).toEqual([])
+      expect(discoverPlugins(FIT_LAYOUT, testDir)).toEqual([])
     })
 
     it('skips packages without an entry point', () => {
@@ -187,7 +194,7 @@ describe('discoverPlugins', () => {
       }))
       setupPluginsConfig(['broken'])
 
-      expect(discoverPlugins('fit', testDir)).toEqual([])
+      expect(discoverPlugins(FIT_LAYOUT, testDir)).toEqual([])
     })
 
     it('uses exports["."] when available', () => {
@@ -203,7 +210,7 @@ describe('discoverPlugins', () => {
 
       setupPluginsConfig(['exports-pkg'])
 
-      const result = discoverPlugins('fit', testDir)
+      const result = discoverPlugins(FIT_LAYOUT, testDir)
       expect(result).toHaveLength(1)
       expect(result[0]?.entryPoint).toContain('lib/main.js')
     })
@@ -224,13 +231,13 @@ describe('discoverPlugins', () => {
 
       setupPluginsConfig(['../escapee'])
 
-      expect(discoverPlugins('fit', testDir)).toEqual([])
+      expect(discoverPlugins(FIT_LAYOUT, testDir)).toEqual([])
     })
 
     it('rejects absolute-path plugin names', () => {
       mkdirSync(fitPluginsDir(), { recursive: true })
       setupPluginsConfig(['/etc/passwd'])
-      expect(discoverPlugins('fit', testDir)).toEqual([])
+      expect(discoverPlugins(FIT_LAYOUT, testDir)).toEqual([])
     })
 
     it('rejects loose-file plugins that are symlinks pointing outside the source dir', () => {
@@ -246,7 +253,7 @@ describe('discoverPlugins', () => {
       const symlinkPath = join(fitChecksDir(), 'looks-legit.mjs')
       symlinkSync(outsideTarget, symlinkPath)
 
-      expect(discoverPlugins('fit', testDir)).toEqual([])
+      expect(discoverPlugins(FIT_LAYOUT, testDir)).toEqual([])
     })
 
     it('accepts symlinks that resolve INSIDE the source dir (pnpm-style)', () => {
@@ -260,7 +267,7 @@ describe('discoverPlugins', () => {
       const symlinkPath = join(fitChecksDir(), 'aliased.mjs')
       symlinkSync(realFile, symlinkPath)
 
-      const result = discoverPlugins('fit', testDir)
+      const result = discoverPlugins(FIT_LAYOUT, testDir)
       expect(result.length).toBeGreaterThanOrEqual(1)
       expect(result.every(p => p.type === 'file')).toBe(true)
     })
@@ -308,7 +315,7 @@ describe('discoverPlugins', () => {
       // Sanity: the default path has NO config — only the pointer path does.
       expect(existsSync(join(testDir, 'opensip-tools.config.yml'))).toBe(false)
 
-      const result = discoverPlugins('fit', testDir)
+      const result = discoverPlugins(FIT_LAYOUT, testDir)
       expect(result).toHaveLength(1)
       expect(result[0]).toMatchObject({ type: 'package', namespace: 'pointed-pkg' })
     })
@@ -325,14 +332,14 @@ describe('discoverPlugins', () => {
       )
       writeFileSync(join(pkgDir, 'index.js'), 'export const checks = []')
 
-      const result = discoverPlugins('fit', testDir)
+      const result = discoverPlugins(FIT_LAYOUT, testDir)
       expect(result).toHaveLength(1)
       expect(result[0]).toMatchObject({ type: 'package', namespace: 'default-pkg' })
     })
 
     it('returns undefined-equivalent (no findings) when neither config exists', () => {
       // No config anywhere → discovery falls through gracefully.
-      expect(discoverPlugins('fit', testDir)).toEqual([])
+      expect(discoverPlugins(FIT_LAYOUT, testDir)).toEqual([])
     })
   })
 
@@ -350,7 +357,7 @@ describe('discoverPlugins', () => {
       writeFileSync(join(pkgDir, 'index.js'), 'export const checks = []')
       writeConfig('plugins:\n  fit:\n    - "pkg"\n')
 
-      const result = discoverPlugins('fit', testDir)
+      const result = discoverPlugins(FIT_LAYOUT, testDir)
       expect(result).toHaveLength(2)
       expect(result.find(p => p.type === 'package')).toBeDefined()
       expect(result.find(p => p.type === 'file')).toBeDefined()

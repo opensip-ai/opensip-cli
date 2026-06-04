@@ -89,6 +89,50 @@ module.exports = {
     },
 
     // -------------------------------------------------------------------
+    // Persistence ownership — keep the repository boundary a real seam, not
+    // a convention. `DataStore.db` (a raw Drizzle handle) is public, so the
+    // one thing standing between a stray module and another tool's tables is
+    // reachability of that tool's table symbols. This rule confines the
+    // schema/table modules to their owning persistence layer, so a module
+    // cannot pair the public `db` handle with a foreign table to bypass its
+    // repository. Persistence-owned code is the `datastore` + `session-store`
+    // packages and each tool's `src/persistence/` repository layer.
+    //
+    // NOTE on scope: a rule confining raw `drizzle-orm` query-builder imports
+    // (`sql`/`eq`/…) was considered but is unenforceable under this config —
+    // `options.includeOnly: '^packages/'` drops every node_modules edge before
+    // rules run, so any `to:` targeting an npm package is inert (verified: a
+    // probe import of `drizzle-orm` from a non-persistence file is NOT flagged,
+    // the same reason `not-to-dev-dep` cannot fire here). The residual it would
+    // have covered — `db.run(sql`raw SQL`)` with no table import — does not
+    // reach a table *symbol*, so it falls outside the boundary this seam
+    // protects. (Audit finding-3.)
+    // -------------------------------------------------------------------
+    {
+      name: 'tables-only-in-persistence',
+      severity: 'error',
+      comment:
+        'Schema/table modules (the `sqliteTable` definitions under a ' +
+        '`src/persistence/` layer, or under `session-store/src/schema/`) may ' +
+        'be imported ONLY by their owning persistence layer. A module that ' +
+        'reaches a table symbol plus the public `DataStore.db` handle could ' +
+        'bypass another module’s repository boundary; this forbids that. ' +
+        '(Audit finding-3.)',
+      from: {
+        path: '^packages/',
+        pathNot: [
+          '/src/persistence/',
+          '^packages/session-store/src/',
+          '/__tests__/',
+          String.raw`\.test\.(ts|tsx)$`,
+        ],
+      },
+      to: {
+        path: [String.raw`/src/persistence/schema\.ts$`, '^packages/session-store/src/schema/'],
+      },
+    },
+
+    // -------------------------------------------------------------------
     // Layer enforcement — core (the kernel) imports nothing from the workspace
     // -------------------------------------------------------------------
     {

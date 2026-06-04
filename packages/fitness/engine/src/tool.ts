@@ -62,6 +62,7 @@ import {
 import { renderFitLive } from './cli/fit-runner.js';
 import { listChecks } from './cli/list-checks.js';
 import { listRecipes } from './cli/list-recipes.js';
+import { FIT_PLUGIN_LAYOUT } from './plugins/loader.js';
 
 import type {
   Tool,
@@ -257,6 +258,7 @@ export const fitnessTool: Tool = {
     description: 'Run fitness checks against a codebase',
   },
   commands: [FIT, FIT_LIST, FIT_RECIPES, FIT_BASELINE_EXPORT],
+  pluginLayout: FIT_PLUGIN_LAYOUT,
   register,
   collectDashboardData: collectFitnessDashboardData,
   initialize: async (): Promise<void> => {

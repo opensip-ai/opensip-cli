@@ -32,7 +32,9 @@ opensip-tools/
 │   │                            #   migrations
 │   ├── dashboard/               # @opensip-tools/dashboard — self-contained
 │   │                            #   HTML report generator (generateDashboardHtml);
-│   │                            #   consumed by fitness's `dashboard` command
+│   │                            #   consumed by the CLI-owned `dashboard` command
+│   │                            #   (composition root), which aggregates each
+│   │                            #   tool's contributed data
 │   ├── cli/                     # opensip-tools — generic tool dispatcher
 │   ├── cli-ui/                  # @opensip-tools/cli-ui — shared Ink/React
 │   │                            #   primitives (Banner, Spinner, RunHeader,
@@ -127,7 +129,8 @@ tool dispatcher:
    the bundled language adapters (TypeScript, Rust, Python, Java, Go,
    C/C++) into it.
 2. Constructs a fresh per-invocation `ToolRegistry` and registers the
-   first-party tools — `fitnessTool` and `simulationTool` — into it.
+   first-party tools — `fitnessTool`, `simulationTool`, and `graphTool`
+   (`FIRST_PARTY_TOOLS` in `bootstrap/register-tools.ts`) — into it.
    Both registries are passed into `new RunScope({ tools, languages })`
    — there are no module-singleton registries (see the RunScope section
    below).

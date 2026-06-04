@@ -136,12 +136,12 @@ export {
 // packages uniformly; dedup at register-tools.ts handles the
 // duplicate-id case.
 export { simulationTool, simulationTool as tool } from './tool.js'
-export {
-  executeSim,
-  ensureScenariosLoaded,
-  getPluginLoadErrors,
-  setPreLoadHook,
-} from './cli/sim.js'
+// CLI lifecycle surface (mirrors fitness's curated barrel per ADR-0009).
+// `executeSim` is NOT here — it moved to `@opensip-tools/simulation/internal`
+// (test-only). `getPluginLoadErrors` is an internal render/accessor helper
+// with no external consumer, so it is exported only from its own module for
+// the simulation CLI's relative imports — not re-exported here.
+export { ensureScenariosLoaded, setPreLoadHook } from './cli/sim.js'
 export type { PreLoadHook } from './cli/sim.js'
 
 // =============================================================================

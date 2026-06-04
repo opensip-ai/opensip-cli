@@ -58,7 +58,7 @@ const EXPECTED: Record<string, string[]> = {
     '--quiet', '--recipe', '--recipes', '--report-to', '--tags', '--verbose',
   ],
   graph: [
-    '--baseline', '--changed-file', '--concurrency', '--cwd', '--debug',
+    '--changed-file', '--concurrency', '--cwd', '--debug',
     '--gate-compare', '--gate-save', '--json', '--language', '--mode',
     '--no-cache', '--out', '--recipe', '--report-to', '--resolution', '--run-id',
     '--verbose', '--workspace',

@@ -49,7 +49,7 @@ describe('lang plugin domain', () => {
 
     const result = await inScope(() => loadPlugin(plugin, 'lang'))
     expect(result.error).toBeUndefined()
-    expect(result.adaptersRegistered).toBe(1)
+    expect(result.registered.adapters).toBe(1)
     expect(langRegistry.get('fake-rust')).toBeDefined()
     expect(langRegistry.forFile('demo.fakers')?.id).toBe('fake-rust')
   })
@@ -69,8 +69,9 @@ describe('lang plugin domain', () => {
     }
 
     const result = await inScope(() => loadPlugin(plugin, 'lang'))
-    expect(result.checksRegistered).toBe(0)
-    expect(result.adaptersRegistered).toBe(0)
+    // The lang registrar reports only adapters; it never registers checks.
+    expect(result.registered.checks).toBeUndefined()
+    expect(result.registered.adapters).toBe(0)
   })
 
   it('warns when a lang plugin exports no adapters', async () => {
@@ -85,7 +86,7 @@ describe('lang plugin domain', () => {
     }
 
     const result = await inScope(() => loadPlugin(plugin, 'lang'))
-    expect(result.adaptersRegistered).toBe(0)
+    expect(result.registered.adapters).toBe(0)
     expect(result.error).toBeUndefined()
   })
 
@@ -104,7 +105,7 @@ describe('lang plugin domain', () => {
 
     const result = await inScope(() => loadPlugin(plugin, 'lang'))
     expect(result.error).toBeUndefined()
-    expect(result.adaptersRegistered).toBe(0)
+    expect(result.registered.adapters).toBe(0)
   })
 
   it('skips invalid adapter entries', async () => {
@@ -125,7 +126,7 @@ describe('lang plugin domain', () => {
     }
 
     const result = await inScope(() => loadPlugin(plugin, 'lang'))
-    expect(result.adaptersRegistered).toBe(1)
+    expect(result.registered.adapters).toBe(1)
     expect(langRegistry.get('good')).toBeDefined()
   })
 
@@ -150,7 +151,7 @@ describe('lang plugin domain', () => {
 
     const result = await inScope(() => loadPlugin(plugin, 'lang'))
     expect(result.error).toBeUndefined()
-    expect(result.adaptersRegistered).toBe(1)
+    expect(result.registered.adapters).toBe(1)
     expect(langRegistry.get('fake-lang-named')).toBeDefined()
   })
 
@@ -175,7 +176,7 @@ describe('lang plugin domain', () => {
 
     const result = await inScope(() => loadPlugin(plugin, 'lang'))
     expect(result.error).toBeUndefined()
-    expect(result.adaptersRegistered).toBe(1)
+    expect(result.registered.adapters).toBe(1)
     expect(langRegistry.get('fake-lang-default')).toBeDefined()
   })
 
@@ -201,7 +202,7 @@ describe('lang plugin domain', () => {
 
     const result = await inScope(() => loadPlugin(plugin, 'lang'))
     expect(result.error).toBeUndefined()
-    expect(result.adaptersRegistered).toBe(1)
+    expect(result.registered.adapters).toBe(1)
   })
 
   it('loadAllPlugins for the lang domain returns empty', async () => {
@@ -213,7 +214,7 @@ describe('lang plugin domain', () => {
     const baseDir = mkdtempSync(join(tmpdir(), 'opensip-lang-base-'))
     try {
       const result = await inScope(() => loadAllPlugins('lang', baseDir))
-      expect(result.totalAdapters).toBe(0)
+      expect(result.totals).toEqual({})
       expect(result.plugins).toHaveLength(0)
     } finally {
       rmSync(baseDir, { recursive: true, force: true })

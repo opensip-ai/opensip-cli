@@ -22,7 +22,6 @@ import {
   type YAMLSeq,
 } from 'yaml';
 
-import type { PathDomain } from '@opensip-tools/core';
 
 /**
  * Edit the project's `plugins.<domain>` list. Returns true when the
@@ -33,7 +32,7 @@ import type { PathDomain } from '@opensip-tools/core';
  */
 export function editPluginList(
   configPath: string,
-  domain: PathDomain,
+  domain: string,
   name: string,
   op: 'add' | 'remove',
 ): boolean {
@@ -89,7 +88,7 @@ export function editPluginList(
 function appendToPluginList(
   doc: YAMLDocument,
   root: YAMLMap,
-  domain: PathDomain,
+  domain: string,
   name: string,
   configPath: string,
 ): boolean {
@@ -120,7 +119,7 @@ function appendToPluginList(
 function removeFromPluginList(
   doc: YAMLDocument,
   root: YAMLMap,
-  domain: PathDomain,
+  domain: string,
   name: string,
   configPath: string,
 ): boolean {
@@ -139,10 +138,10 @@ function removeFromPluginList(
   return true;
 }
 
-export function addToConfigPluginList(configPath: string, domain: PathDomain, name: string): boolean {
+export function addToConfigPluginList(configPath: string, domain: string, name: string): boolean {
   return editPluginList(configPath, domain, name, 'add');
 }
 
-export function removeFromConfigPluginList(configPath: string, domain: PathDomain, name: string): boolean {
+export function removeFromConfigPluginList(configPath: string, domain: string, name: string): boolean {
   return editPluginList(configPath, domain, name, 'remove');
 }

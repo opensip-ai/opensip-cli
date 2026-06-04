@@ -45,7 +45,7 @@ describe('loadPlugin', () => {
     }
 
     const result = await loadPlugin(plugin)
-    expect(result.checksRegistered).toBe(0)
+    expect(result.registered.checks).toBe(0)
     expect(result.error).toBeUndefined()
     expect(result.namespace).toBe('empty-plugin')
   })
@@ -62,7 +62,8 @@ describe('loadPlugin', () => {
     }
 
     const result = await loadPlugin(plugin)
-    expect(result.checksRegistered).toBe(0)
+    // On a load failure the kernel reports an empty count map.
+    expect(result.registered).toEqual({})
     expect(result.error).toContain('plugin init failed')
   })
 
@@ -78,8 +79,8 @@ describe('loadPlugin', () => {
     }
 
     const result = await loadPlugin(plugin)
-    expect(result.checksRegistered).toBe(0)
-    expect(result.recipesRegistered).toBe(0)
+    expect(result.registered.checks).toBe(0)
+    expect(result.registered.recipes).toBe(0)
     expect(result.error).toBeUndefined()
   })
 
@@ -102,7 +103,7 @@ describe('loadPlugin', () => {
     }
 
     const result = await loadPlugin(plugin)
-    expect(result.checksRegistered).toBe(0)
+    expect(result.registered.checks).toBe(0)
     expect(result.error).toBeUndefined()
   })
 
@@ -143,7 +144,7 @@ describe('loadPlugin', () => {
 
     const result = await loadPlugin(plugin)
     expect(result.error).toBeUndefined()
-    expect(result.checksRegistered).toBe(2)
+    expect(result.registered.checks).toBe(2)
   })
 
   it('registers a Check from default export', async () => {
@@ -170,7 +171,7 @@ describe('loadPlugin', () => {
 
     const result = await loadPlugin(plugin)
     expect(result.error).toBeUndefined()
-    expect(result.checksRegistered).toBe(1)
+    expect(result.registered.checks).toBe(1)
   })
 
   it('warns and skips when checks export is not an array', async () => {
@@ -189,7 +190,7 @@ describe('loadPlugin', () => {
     const result = await loadPlugin(plugin)
     // Loader warns and continues — no error, zero registrations.
     expect(result.error).toBeUndefined()
-    expect(result.checksRegistered).toBe(0)
+    expect(result.registered.checks).toBe(0)
   })
 
   it('registers recipes alongside checks', async () => {
@@ -217,7 +218,7 @@ describe('loadPlugin', () => {
 
     const result = await loadPlugin(plugin)
     expect(result.error).toBeUndefined()
-    expect(result.recipesRegistered).toBeGreaterThanOrEqual(1)
+    expect(result.registered.recipes).toBeGreaterThanOrEqual(1)
   })
 
   it('warns on malformed recipe entries (missing id/name) without failing', async () => {
@@ -238,7 +239,7 @@ describe('loadPlugin', () => {
 
     const result = await loadPlugin(plugin)
     expect(result.error).toBeUndefined()
-    expect(result.recipesRegistered).toBe(0)
+    expect(result.registered.recipes).toBe(0)
   })
 
   it('deduplicates checks appearing in both array and named exports', async () => {
@@ -267,7 +268,7 @@ describe('loadPlugin', () => {
 
     const result = await loadPlugin(plugin)
     expect(result.error).toBeUndefined()
-    expect(result.checksRegistered).toBe(1)
+    expect(result.registered.checks).toBe(1)
   })
 })
 
@@ -275,8 +276,7 @@ describe('loadAllPlugins', () => {
   it('returns empty result when no plugins found', async () => {
     const result = await loadAllPlugins('fit', join(testDir, 'nonexistent'))
     expect(result.plugins).toEqual([])
-    expect(result.totalChecks).toBe(0)
-    expect(result.totalRecipes).toBe(0)
+    expect(result.totals).toEqual({})
     expect(result.errors).toEqual([])
   })
 

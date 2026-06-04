@@ -19,11 +19,13 @@ function makeContext(): {
   setExitCode: ReturnType<typeof vi.fn>;
   render: (result: CommandResult) => Promise<void>;
   datastore: () => unknown;
+  pluginLayouts: readonly never[];
 } {
   return {
     setExitCode: vi.fn(),
     render: vi.fn(() => Promise.resolve()),
     datastore: () => undefined,
+    pluginLayouts: [],
   };
 }
 

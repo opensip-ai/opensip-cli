@@ -16,6 +16,10 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./internal": "./dist/internal.js"
+  },
   "opensipTools": {
     "kind": "tool"
   },

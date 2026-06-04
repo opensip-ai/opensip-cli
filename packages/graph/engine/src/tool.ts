@@ -175,7 +175,6 @@ function register(cli: ToolCliContext): void {
     .option('--recipe <name>', 'Run a named recipe (a subset of graph rules). Default: all rules')
     .option('--gate-save', 'Save current Signal set as the gate baseline', false)
     .option('--gate-compare', 'Compare current Signals to the gate baseline', false)
-    .option('--baseline <path>', 'Override the default baseline path')
     .option('--report-to <url>', 'POST findings to OpenSIP Cloud or compatible')
     .option(
       '--workspace',
@@ -204,7 +203,6 @@ function register(cli: ToolCliContext): void {
       recipe?: string;
       gateSave?: boolean;
       gateCompare?: boolean;
-      baseline?: string;
       reportTo?: string;
       workspace?: boolean;
       concurrency?: number;
@@ -283,7 +281,6 @@ function register(cli: ToolCliContext): void {
           recipe: opts.recipe,
           gateSave: opts.gateSave,
           gateCompare: opts.gateCompare,
-          baseline: opts.baseline,
           reportTo: opts.reportTo,
           paths,
           workspace: opts.workspace,
@@ -350,9 +347,12 @@ function register(cli: ToolCliContext): void {
       );
     });
 
-  // catalog-export — dedicated subcommand over the same catalog-JSON
-  // renderer as `graph --catalog-output`, matching the CLI contract the
-  // opensip `EngineSubprocessPort.runCatalogExport` spawns (DEC-498).
+  // catalog-export — dedicated subcommand carrying the catalog-JSON
+  // renderer + machine flags (`--catalog-output`/`--tenant-id`/`--repo-id`/
+  // `--git-sha`). This is the CLI contract the opensip
+  // `EngineSubprocessPort.runCatalogExport` spawns (DEC-498). The flags live
+  // here, NOT on `graph` — the v1 `graph --catalog-output` shape was retired
+  // by the split, so docs/consumers must target `catalog-export`.
   program
     .command(GRAPH_CATALOG_EXPORT.name)
     .description(GRAPH_CATALOG_EXPORT.description)

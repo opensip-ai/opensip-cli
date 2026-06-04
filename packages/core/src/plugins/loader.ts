@@ -35,7 +35,7 @@ import { discoverPlugins } from './discover.js'
 import type {
   DiscoveredPlugin,
   LoadedPlugin,
-  PluginDomain,
+  PluginLayout,
   PluginLoadResult,
 } from './types.js'
 
@@ -55,23 +55,23 @@ export interface RegisterCtx {
   readonly debug: (evt: string, fields?: Record<string, unknown>) => void
 }
 
-/** Per-plugin registration counts returned from the callback. */
-export interface RegisterCounts {
-  readonly checksRegistered?: number
-  readonly recipesRegistered?: number
-  readonly adaptersRegistered?: number
-  readonly scenariosRegistered?: number
-}
+/**
+ * Per-plugin registration counts returned from the callback — a generic
+ * map keyed by whatever artifact kinds the domain registers (e.g.
+ * `{ checks: 3, recipes: 1 }`, `{ scenarios: 2 }`, `{ adapters: 1 }`).
+ * The kernel carries no tool-specific counter names (ADR-0009 M2).
+ */
+export type RegisteredCounts = Readonly<Record<string, number>>
 
 /**
  * Callback that registers a plugin's exports into the right registries
- * for its domain. Returns the per-counter totals for that plugin.
- * Counters not produced by a domain may be omitted (treated as zero).
+ * for its domain. Returns the per-kind counts for that plugin. Kinds a
+ * domain doesn't produce are simply absent from the map.
  */
 export type RegisterExportsFn = (
   mod: Record<string, unknown>,
   ctx: RegisterCtx,
-) => Promise<RegisterCounts> | RegisterCounts
+) => Promise<RegisteredCounts> | RegisteredCounts
 
 /**
  * Load a single discovered plugin: dynamic-import its entry, run the
@@ -109,18 +109,9 @@ export async function loadPlugin(
     const moduleUrl = pathToFileURL(plugin.entryPoint).href
     const mod = (await import(moduleUrl)) as Record<string, unknown>
 
-    const counts = await registerExports(mod, ctx)
+    const registered = await registerExports(mod, ctx)
 
-    const checksRegistered = counts.checksRegistered ?? 0
-    const recipesRegistered = counts.recipesRegistered ?? 0
-    const adaptersRegistered = counts.adaptersRegistered ?? 0
-    const scenariosRegistered = counts.scenariosRegistered ?? 0
-
-    const nothingRegistered =
-      checksRegistered === 0 &&
-      recipesRegistered === 0 &&
-      adaptersRegistered === 0 &&
-      scenariosRegistered === 0
+    const nothingRegistered = Object.values(registered).every((n) => n === 0)
 
     if (nothingRegistered) {
       logger.warn({
@@ -137,20 +128,14 @@ export async function loadPlugin(
       module: MODULE_TAG,
       namespace: plugin.namespace,
       source: plugin.source,
-      checksRegistered,
-      recipesRegistered,
-      adaptersRegistered,
-      scenariosRegistered,
+      registered,
     })
 
     return {
       namespace: plugin.namespace,
       source: plugin.source,
       type: plugin.type,
-      checksRegistered,
-      recipesRegistered,
-      ...(counts.adaptersRegistered !== undefined && { adaptersRegistered }),
-      ...(counts.scenariosRegistered !== undefined && { scenariosRegistered }),
+      registered,
     }
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error)
@@ -169,8 +154,7 @@ export async function loadPlugin(
       namespace: plugin.namespace,
       source: plugin.source,
       type: plugin.type,
-      checksRegistered: 0,
-      recipesRegistered: 0,
+      registered: {},
       error: errorMsg,
     }
   }
@@ -184,11 +168,11 @@ export async function loadPlugin(
  * user-global fallback, by design.
  */
 export async function loadAllPlugins(
-  domain: PluginDomain,
+  layout: PluginLayout,
   projectDir: string | undefined,
   registerExports: RegisterExportsFn,
 ): Promise<PluginLoadResult> {
-  const discovered = discoverPlugins(domain, projectDir)
+  const discovered = discoverPlugins(layout, projectDir)
 
   const plugins: LoadedPlugin[] = []
   const errors: string[] = []
@@ -201,12 +185,14 @@ export async function loadAllPlugins(
     }
   }
 
-  return {
-    plugins,
-    totalChecks: plugins.reduce((sum, p) => sum + p.checksRegistered, 0),
-    totalRecipes: plugins.reduce((sum, p) => sum + p.recipesRegistered, 0),
-    totalAdapters: plugins.reduce((sum, p) => sum + (p.adaptersRegistered ?? 0), 0),
-    totalScenarios: plugins.reduce((sum, p) => sum + (p.scenariosRegistered ?? 0), 0),
-    errors,
+  // Sum each plugin's per-kind counts into generic totals. No tool
+  // vocabulary here — whatever keys the domain reported roll up.
+  const totals: Record<string, number> = {}
+  for (const plugin of plugins) {
+    for (const [kind, count] of Object.entries(plugin.registered)) {
+      totals[kind] = (totals[kind] ?? 0) + count
+    }
   }
+
+  return { plugins, totals, errors }
 }

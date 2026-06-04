@@ -142,3 +142,48 @@ describe('--report-to composes across modes (audit P1-1)', () => {
     expect(reportToCloudMock).not.toHaveBeenCalled();
   });
 });
+
+describe('--report-to exit-code contract (audit P2.2)', () => {
+  const reportArgs = {
+    cwd: '/x',
+    reportTo: 'https://sink.example',
+    apiKey: 'k',
+  } as unknown as Parameters<typeof runJsonMode>[0];
+  const passing = { result: { type: 'fit-done', shouldFail: false }, output: { checks: [] } };
+  const failed = { url: 'https://sink.example', findingCount: 0, runCount: 1, success: false, error: 'unreachable' };
+
+  it('exits REPORT_FAILED when a --report-to upload fails on an otherwise-passing --json run', async () => {
+    executeFitMock.mockResolvedValue(passing);
+    reportToCloudMock.mockResolvedValue(failed);
+    const { cli, setExitCode } = mockCli();
+    await runJsonMode(reportArgs, cli);
+    expect(setExitCode).toHaveBeenCalledWith(EXIT_CODES.REPORT_FAILED);
+  });
+
+  it('exits REPORT_FAILED on report failure in non-TTY (CI) live mode', async () => {
+    setTTY(false);
+    executeFitMock.mockResolvedValue(passing);
+    reportToCloudMock.mockResolvedValue(failed);
+    const { cli, setExitCode } = mockCli();
+    await runLiveMode(reportArgs, cli, 'fit', false);
+    expect(setExitCode).toHaveBeenCalledWith(EXIT_CODES.REPORT_FAILED);
+  });
+
+  it('leaves the exit code untouched when the upload succeeds on a passing run', async () => {
+    setTTY(false);
+    executeFitMock.mockResolvedValue(passing);
+    // default beforeEach mock: success: true
+    const { cli, setExitCode } = mockCli();
+    await runLiveMode(reportArgs, cli, 'fit', false);
+    expect(setExitCode).not.toHaveBeenCalledWith(EXIT_CODES.REPORT_FAILED);
+  });
+
+  it('does NOT mask a check/gate failure: a failing run keeps RUNTIME_ERROR even if reporting also fails', async () => {
+    executeFitMock.mockResolvedValue({ result: { type: 'fit-done', shouldFail: true }, output: { checks: [] } });
+    reportToCloudMock.mockResolvedValue(failed);
+    const { cli, setExitCode } = mockCli();
+    await runJsonMode(reportArgs, cli);
+    expect(setExitCode).toHaveBeenCalledWith(EXIT_CODES.RUNTIME_ERROR);
+    expect(setExitCode).not.toHaveBeenCalledWith(EXIT_CODES.REPORT_FAILED);
+  });
+});

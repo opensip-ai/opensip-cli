@@ -34,7 +34,7 @@ export function registerPlugins(program: Command, ctx: CliCommandsContext): void
 
   mountResultCommand<{ cwd?: string; projectContext?: ProjectContext; json: boolean }>(
     listCmd,
-    (opts) => pluginList(effectiveCwd(opts)),
+    (opts) => pluginList(effectiveCwd(opts), ctx.pluginLayouts),
     { ctx, jsonFlag: (opts) => opts.json },
   );
 
@@ -47,7 +47,7 @@ export function registerPlugins(program: Command, ctx: CliCommandsContext): void
 
   mountResultCommandWithArg<string, { domain?: string; cwd?: string; projectContext?: ProjectContext; json: boolean }>(
     addCmd,
-    (packageName, opts) => pluginAdd(packageName, effectiveCwd(opts), opts.domain),
+    (packageName, opts) => pluginAdd(packageName, effectiveCwd(opts), opts.domain, ctx.pluginLayouts),
     { ctx, jsonFlag: (opts) => opts.json },
   );
 
@@ -60,7 +60,7 @@ export function registerPlugins(program: Command, ctx: CliCommandsContext): void
 
   mountResultCommandWithArg<string, { domain?: string; cwd?: string; projectContext?: ProjectContext; json: boolean }>(
     removeCmd,
-    (packageName, opts) => pluginRemove(packageName, effectiveCwd(opts), opts.domain),
+    (packageName, opts) => pluginRemove(packageName, effectiveCwd(opts), opts.domain, ctx.pluginLayouts),
     { ctx, jsonFlag: (opts) => opts.json },
   );
 
@@ -73,7 +73,7 @@ export function registerPlugins(program: Command, ctx: CliCommandsContext): void
 
   mountResultCommand<{ domain?: string; cwd?: string; projectContext?: ProjectContext; json: boolean }>(
     syncCmd,
-    (opts) => pluginSync(effectiveCwd(opts), opts.domain),
+    (opts) => pluginSync(effectiveCwd(opts), opts.domain, ctx.pluginLayouts),
     { ctx, jsonFlag: (opts) => opts.json },
   );
 }

@@ -18,7 +18,7 @@ export {
 } from './loader.js'
 export type {
   RegisterCtx,
-  RegisterCounts,
+  RegisteredCounts,
   RegisterExportsFn,
 } from './loader.js'
 export {
@@ -68,7 +68,7 @@ export type {
   RegisterRecipesResult,
 } from './recipe-loader.js'
 export type {
-  PluginDomain,
+  PluginLayout,
   DiscoveredPlugin,
   LoadedPlugin,
   PluginLoadResult,

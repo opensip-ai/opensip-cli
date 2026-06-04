@@ -28,11 +28,29 @@ import type {
   DiscoveredPlugin,
   LangPluginExports,
   LoadedPlugin,
-  PluginDomain,
+  PluginLayout,
   PluginLoadResult,
-  RegisterCounts,
+  RegisteredCounts,
   RegisterCtx,
 } from '@opensip-tools/core'
+
+/**
+ * Fitness's project-local plugin layout — user checks/recipes live under
+ * `<project>/opensip-tools/fit/{checks,recipes}/`. Exported so the
+ * `fitnessTool` descriptor (`Tool.pluginLayout`) and the CLI's `plugin`
+ * command share one source of truth (ADR-0009 corollary 1).
+ */
+export const FIT_PLUGIN_LAYOUT: PluginLayout = {
+  domain: 'fit',
+  userSubdirs: ['checks', 'recipes'],
+}
+
+/**
+ * Language-adapter domain layout — adapters ship as direct CLI deps, so
+ * there is no project-local loose-file layout. Discovery yields nothing
+ * unless `plugins.lang` is declared.
+ */
+const LANG_PLUGIN_LAYOUT: PluginLayout = { domain: 'lang', userSubdirs: [] }
 
 /**
  * Register a fitness-domain plugin's exports. Supports two authorship
@@ -49,7 +67,7 @@ import type {
 function registerFitExports(
   mod: Record<string, unknown>,
   ctx: RegisterCtx,
-): RegisterCounts {
+): RegisteredCounts {
   const fit = mod as FitPluginExports
   const registeredIds = new Set<string>()
   let checksRegistered = 0
@@ -118,7 +136,7 @@ function registerFitExports(
   )
   recipesRegistered += helperRecipesRegistered
 
-  return { checksRegistered, recipesRegistered }
+  return { checks: checksRegistered, recipes: recipesRegistered }
 }
 
 /**
@@ -129,7 +147,7 @@ function registerFitExports(
 function registerLangExports(
   mod: Record<string, unknown>,
   ctx: RegisterCtx,
-): RegisterCounts {
+): RegisteredCounts {
   const lang = mod as LangPluginExports
   const registeredAdapterIds = new Set<string>()
   let adaptersRegistered = 0
@@ -195,7 +213,7 @@ function registerLangExports(
   // Default export: a single LanguageAdapter
   tryRegisterAdapter(mod.default, 'default')
 
-  return { adaptersRegistered }
+  return { adapters: adaptersRegistered }
 }
 
 /**
@@ -204,7 +222,7 @@ function registerLangExports(
  */
 export async function loadPlugin(
   plugin: DiscoveredPlugin,
-  domain: PluginDomain = 'fit',
+  domain = 'fit',
 ): Promise<LoadedPlugin> {
   const register = domain === 'lang' ? registerLangExports : registerFitExports
   return coreLoadPlugin(plugin, register)
@@ -215,11 +233,12 @@ export async function loadPlugin(
  * `registerExports` callback (fit vs lang) and delegates to core's loader.
  */
 export async function loadAllPlugins(
-  domain: PluginDomain,
+  domain: string,
   projectDir?: string,
 ): Promise<PluginLoadResult> {
   const register = domain === 'lang' ? registerLangExports : registerFitExports
-  return coreLoadAllPlugins(domain, projectDir, register)
+  const layout = domain === 'lang' ? LANG_PLUGIN_LAYOUT : FIT_PLUGIN_LAYOUT
+  return coreLoadAllPlugins(layout, projectDir, register)
 }
 
 /**

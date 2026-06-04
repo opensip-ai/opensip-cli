@@ -17,7 +17,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { resolveProjectPaths, type PathDomain } from '@opensip-tools/core';
+import { resolveProjectPaths } from '@opensip-tools/core';
 
 /** Filename of the host package.json that pins plugin installs. */
 export const HOST_PACKAGE_JSON = 'package.json';
@@ -33,7 +33,7 @@ export function isSafeNpmSpec(spec: string): boolean {
   return true;
 }
 
-export function ensurePluginHostDir(domain: PathDomain, cwd: string): string {
+export function ensurePluginHostDir(domain: string, cwd: string): string {
   const paths = resolveProjectPaths(cwd);
   const dir = paths.pluginsDir(domain);
   mkdirSync(dir, { recursive: true });

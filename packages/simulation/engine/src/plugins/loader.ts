@@ -24,10 +24,22 @@ import type { SimPluginExports } from './types.js'
 import type { RunnableScenario } from '../framework/runnable-scenario.js'
 import type { SimulationRecipe } from '../recipes/types.js'
 import type {
+  PluginLayout,
   PluginLoadResult,
-  RegisterCounts,
+  RegisteredCounts,
   RegisterCtx,
 } from '@opensip-tools/core'
+
+/**
+ * Simulation's project-local plugin layout — user scenarios/recipes live
+ * under `<project>/opensip-tools/sim/{scenarios,recipes}/`. Exported so
+ * the `simulationTool` descriptor (`Tool.pluginLayout`) and the CLI's
+ * `plugin` command share one source of truth (ADR-0009 corollary 1).
+ */
+export const SIM_PLUGIN_LAYOUT: PluginLayout = {
+  domain: 'sim',
+  userSubdirs: ['scenarios', 'recipes'],
+}
 
 /** Register one recipe; returns true if newly registered. Duplicate
  *  recipes throw — caught here and reported as not-newly-registered,
@@ -118,11 +130,11 @@ function registerRecipesArray(
   return recipesRegistered
 }
 
-function registerSimExports(mod: Record<string, unknown>, ctx: RegisterCtx): RegisterCounts {
+function registerSimExports(mod: Record<string, unknown>, ctx: RegisterCtx): RegisteredCounts {
   const exports = mod as SimPluginExports
   const scenariosRegistered = registerScenariosArray(exports.scenarios, ctx)
   const recipesRegistered = registerRecipesArray(exports.recipes, ctx)
-  return { scenariosRegistered, recipesRegistered }
+  return { scenarios: scenariosRegistered, recipes: recipesRegistered }
 }
 
 /**
@@ -133,5 +145,5 @@ function registerSimExports(mod: Record<string, unknown>, ctx: RegisterCtx): Reg
  * user-global fallback, by design.
  */
 export async function loadAllSimPlugins(projectDir?: string): Promise<PluginLoadResult> {
-  return loadAllPlugins('sim', projectDir, registerSimExports)
+  return loadAllPlugins(SIM_PLUGIN_LAYOUT, projectDir, registerSimExports)
 }

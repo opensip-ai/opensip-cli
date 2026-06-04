@@ -20,9 +20,7 @@ describe('loadAllSimPlugins', () => {
   it('returns an empty result when no projectDir is provided', async () => {
     const result = await loadAllSimPlugins();
     expect(result.plugins).toEqual([]);
-    expect(result.totalChecks).toBe(0);
-    expect(result.totalRecipes).toBe(0);
-    expect(result.totalScenarios).toBe(0);
+    expect(result.totals).toEqual({});
     expect(result.errors).toEqual([]);
   });
 
@@ -43,8 +41,8 @@ describe('loadAllSimPlugins', () => {
 
     const result = await loadAllSimPlugins(testDir);
     expect(result.plugins.length).toBe(1);
-    expect(result.totalScenarios).toBe(0);
-    expect(result.totalRecipes).toBe(0);
+    expect(result.totals.scenarios).toBe(0);
+    expect(result.totals.recipes).toBe(0);
   });
 
   it('collects an error when a plugin file throws on import', async () => {
@@ -71,7 +69,7 @@ describe('loadAllSimPlugins', () => {
 
     const result = await loadAllSimPlugins(testDir);
     expect(result.plugins.length).toBe(1);
-    expect(result.totalRecipes).toBe(0);
+    expect(result.totals.recipes).toBe(0);
   });
 
   it('skips invalid recipe items', async () => {
@@ -87,6 +85,6 @@ describe('loadAllSimPlugins', () => {
     // One valid recipe should register (or be deduped if a previous test
     // already registered one with the same id — the loader silently
     // ignores duplicates, so we accept 0 or 1).
-    expect(result.totalRecipes === 0 || result.totalRecipes === 1).toBe(true);
+    expect(result.totals.recipes === 0 || result.totals.recipes === 1).toBe(true);
   });
 });

@@ -37,14 +37,16 @@ opensip's `package.json` additionally pins:
 "opensip-tools": "^2.0.0"
 ```
 
-opensip's catalog-ingestion path calls `spawn('opensip-tools', ['graph', '--catalog-output', ...])` to produce a JSON catalog file, which `CatalogIngestor` then upserts to Postgres. This is the first time opensip has had a **runtime production dependency** on opensip-tools (all prior deps were content packs loaded as data, not commands invoked at runtime).
+opensip's catalog-ingestion path calls `spawn('opensip-tools', ['catalog-export', '--catalog-output', ...])` (the dedicated subcommand `EngineSubprocessPort.runCatalogExport` spawns, per DEC-498) to produce a JSON catalog file, which `CatalogIngestor` then upserts to Postgres. This is the first time opensip has had a **runtime production dependency** on opensip-tools (all prior deps were content packs loaded as data, not commands invoked at runtime).
+
+> **Note (DEC-498):** the catalog flags live on a dedicated `catalog-export` command, **not** on `graph`. Earlier revisions of this doc described `graph --catalog-output`; the `graph` command never carried those flags after the split. `--catalog-output`, `--tenant-id`, `--repo-id`, and `--git-sha` are `requiredOption`s on `catalog-export`. If the parent's spawn still uses `graph --catalog-output`, it would fail at runtime — verify against the parent's `EngineSubprocessPort`.
 
 The PATH resolution works because `opensip-tools` declares `"bin": { "opensip-tools": "./dist/index.js" }`. pnpm symlinks `node_modules/.bin/opensip-tools` and prepends `node_modules/.bin/` to PATH at runtime, so `spawn('opensip-tools', ...)` resolves to our binary inside opensip's containers.
 
 **Hidden contracts:**
 
 1. The `opensip-tools` bin name. Renaming it (or moving the bin entry) breaks opensip silently — the spawn fails at runtime, not at build time.
-2. The `graph --catalog-output <path>` subcommand and flags. The catalog JSON schema written to that path is the API surface.
+2. The `catalog-export --catalog-output <path>` subcommand and flags. The catalog JSON schema written to that path is the API surface.
 3. Exit-code semantics (per `packages/contracts/src/exit-codes.ts`). opensip's subprocess port parses these.
 4. The structured-log shape on stderr (Pino JSON lines). opensip captures these into Loki for diagnostics.
 
@@ -99,7 +101,7 @@ opensip writes the catalog JSON to a path it controls, then reads it back. We do
 If a PR touches any of the following, coordinate with opensip:
 
 - The `opensip-tools` bin name or location
-- `graph` subcommand flags, including `--catalog-output`
+- `catalog-export` subcommand flags, including `--catalog-output`
 - Catalog JSON schema (entry types, edge types, hint shapes)
 - Exit codes (`packages/contracts/src/exit-codes.ts`)
 - Structured-log shape on stderr (Pino field names, log levels)

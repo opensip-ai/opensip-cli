@@ -5,7 +5,7 @@ import { typescriptQuery } from './query.js'
 import { stripComments, stripStrings } from './strip.js'
 import { discoverTypescriptWorkspaceUnits } from './workspace-units.js'
 
-import type { LanguageAdapter } from '@opensip-tools/core/languages/adapter.js'
+import type { LanguageAdapter } from '@opensip-tools/core/languages'
 import type ts from 'typescript'
 
 export const typescriptAdapter: LanguageAdapter<ts.SourceFile, ts.Node> = {

@@ -34,7 +34,7 @@ Three rules unrelated to the layer architecture but enforced workspace-wide.
 { name: 'no-circular', from: {}, to: { circular: true } }
 ```
 
-No circular dependencies between modules within a package. Type-only cycles are allowed (`tsPreCompilationDeps: false`); runtime cycles are forbidden. A circular runtime dep is a structural smell — usually means a type or constant belongs in a third file.
+No circular dependencies between modules within a package. The main pass ignores type-only edges (`tsPreCompilationDeps: false`) so it flags only runtime cycles; the type-aware pass (`.dependency-cruiser.types.cjs`) re-runs `no-circular` over the type-inclusive graph, so type-only cycles are caught too. A circular dep — runtime or type-only — is a structural smell, usually meaning a type or constant belongs in a third file.
 
 ### `no-deprecated-core`
 
@@ -265,13 +265,13 @@ Concrete examples of edges that fail the build:
 - **`packages/graph/engine/src/pipeline/inventory-visitors/foo.ts` imports from `pipeline/edge-resolvers/`** — `graph-visitors-resolvers-disjoint` fails (and the symmetric counterpart). They share helpers, not each other.
 - **A circular import inside any package** — `no-circular` fails. Refactor.
 
-All of these surface during `pnpm depcruise` (run as part of `pnpm lint`). Each violation prints the offending file, the import line, and the rule name.
+All of these surface during `pnpm depcruise` — and, re-run over the type-inclusive graph, during `pnpm depcruise:types`. Both run as part of `pnpm lint`. Each violation prints the offending file, the import line, and the rule name.
 
 ---
 
 ## How to add a new exception
 
-Only one standing exception remains: `tsPreCompilationDeps: false`, which exempts type-only edges so a module can `import type` from a higher layer without tripping a layer rule. The two earlier cross-package exceptions were both paid down — `lang-typescript → fitness` (by moving `filterContent` into the adapter) and `graph → fitness` via `render/sarif.ts` (by relocating the SARIF / cloud-reporting module to `@opensip-tools/contracts`). New exceptions are rare and require justification.
+There are **no standing layer exceptions**. `tsPreCompilationDeps: false` on the main pass is not one: it only defers type-only edges to the type-aware pass (`.dependency-cruiser.types.cjs`, `tsPreCompilationDeps: true`), which re-runs the full ruleset over the type-inclusive graph — so a type-only layer inversion or cycle is rejected just like a runtime one. The two earlier cross-package exceptions were both paid down — `lang-typescript → fitness` (by moving `filterContent` into the adapter) and `graph → fitness` via `render/sarif.ts` (by relocating the SARIF / cloud-reporting module to `@opensip-tools/contracts`). New exceptions are rare and require justification.
 
 Process:
 

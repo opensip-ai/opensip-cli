@@ -47,8 +47,7 @@ import { join } from 'node:path';
 import {
   readProjectPluginsList,
   resolveProjectPaths,
-  type PathDomain,
-  type PluginDomain,
+  type PluginLayout,
 } from '@opensip-tools/core';
 
 import {
@@ -70,12 +69,26 @@ import type { PluginInfo, PluginResult, SyncEntry } from '@opensip-tools/contrac
 // =============================================================================
 // VALIDATION HELPERS
 // =============================================================================
+//
+// The plugin-supporting domains are NOT hardcoded here — they are sourced
+// from the registered tools' `pluginLayout` descriptors (threaded in via
+// `CliCommandsContext.pluginLayouts`). The kernel stays tool-agnostic and
+// the tools remain the single source of truth (ADR-0009 corollary 1).
 
-const VALID_DOMAINS: ReadonlySet<PathDomain> = new Set(['fit', 'sim']);
+/** The set of plugin-supporting domain names from the contributed layouts. */
+function domainNames(layouts: readonly PluginLayout[]): string[] {
+  return layouts.map((l) => l.domain);
+}
 
-function inferDomain(packageName: string): PathDomain {
-  if (/\bsim\b/.test(packageName)) return 'sim';
-  return 'fit';
+/**
+ * Infer a target domain from a package name when --domain is omitted: the
+ * first declared domain whose name appears as a word in the package name,
+ * else the first declared domain. Domain names come from trusted
+ * first-party layouts, so building a RegExp from them is safe.
+ */
+function inferDomain(packageName: string, domains: readonly string[]): string | undefined {
+  const match = domains.find((d) => new RegExp(String.raw`\b${d}\b`).test(packageName));
+  return match ?? domains[0];
 }
 
 /**
@@ -83,10 +96,13 @@ function inferDomain(packageName: string): PathDomain {
  * A bare cast would let a caller pass '../../etc' and drive path
  * construction outside opensip-tools/.runtime/.
  */
-function resolveDomain(override: string | undefined, packageName: string): PathDomain | undefined {
-  if (override === undefined) return inferDomain(packageName);
-  if (VALID_DOMAINS.has(override as PathDomain)) return override as PathDomain;
-  return undefined;
+function resolveDomain(
+  override: string | undefined,
+  packageName: string,
+  domains: readonly string[],
+): string | undefined {
+  if (override === undefined) return inferDomain(packageName, domains);
+  return domains.includes(override) ? override : undefined;
 }
 
 /**
@@ -100,17 +116,19 @@ export const __test = { editPluginList };
 // COMMAND: plugin list
 // =============================================================================
 
-export async function pluginList(cwd: string = process.cwd()): Promise<PluginResult> {
+export async function pluginList(
+  cwd: string = process.cwd(),
+  layouts: readonly PluginLayout[] = [],
+): Promise<PluginResult> {
   const { discoverPlugins } = await import('@opensip-tools/core');
-  const domains: PluginDomain[] = ['fit', 'sim'];
 
   const plugins: PluginInfo[] = [];
 
-  for (const domain of domains) {
-    const found = discoverPlugins(domain, cwd);
+  for (const layout of layouts) {
+    const found = discoverPlugins(layout, cwd);
     for (const plugin of found) {
       plugins.push({
-        domain,
+        domain: layout.domain,
         namespace: plugin.namespace,
         pluginType: plugin.type,
       });
@@ -144,6 +162,7 @@ export async function pluginAdd(
   packageName: string | undefined,
   cwd: string = process.cwd(),
   domainOverride?: string,
+  layouts: readonly PluginLayout[] = [],
 ): Promise<PluginResult> {
   if (!packageName) {
     return {
@@ -161,13 +180,14 @@ export async function pluginAdd(
       error: `Invalid package spec '${packageName}' — must not start with '-' (would be interpreted as an npm flag)`,
     };
   }
-  const domain = resolveDomain(domainOverride, packageName);
+  const domains = domainNames(layouts);
+  const domain = resolveDomain(domainOverride, packageName, domains);
   if (!domain) {
     return {
       type: 'plugin-add',
       packageName,
       success: false,
-      error: `Invalid --domain '${String(domainOverride)}' — expected one of: ${[...VALID_DOMAINS].join(', ')}`,
+      error: `Invalid --domain '${String(domainOverride)}' — expected one of: ${domains.join(', ')}`,
     };
   }
 
@@ -245,6 +265,7 @@ export async function pluginRemove(
   packageName: string | undefined,
   cwd: string = process.cwd(),
   domainOverride?: string,
+  layouts: readonly PluginLayout[] = [],
 ): Promise<PluginResult> {
   if (!packageName) {
     return {
@@ -263,13 +284,14 @@ export async function pluginRemove(
     };
   }
 
-  const domain = resolveDomain(domainOverride, packageName);
+  const domains = domainNames(layouts);
+  const domain = resolveDomain(domainOverride, packageName, domains);
   if (!domain) {
     return {
       type: 'plugin-remove',
       packageName,
       success: false,
-      error: `Invalid --domain '${String(domainOverride)}' — expected one of: ${[...VALID_DOMAINS].join(', ')}`,
+      error: `Invalid --domain '${String(domainOverride)}' — expected one of: ${domains.join(', ')}`,
     };
   }
 
@@ -329,18 +351,15 @@ export async function pluginRemove(
 export async function pluginSync(
   cwd: string = process.cwd(),
   domainOverride?: string,
+  layouts: readonly PluginLayout[] = [],
 ): Promise<PluginResult> {
-  // pluginSync only iterates plugin-supporting domains. PluginDomain is
-  // fit|sim|lang; lang plugins route through the language registry rather
-  // than this installer, so the plugin command handles only fit|sim. Graph
-  // does not route through plugin install.
-  type SyncDomain = 'fit' | 'sim';
-  const syncDomains: SyncDomain[] = ['fit', 'sim'];
-  const domains: SyncDomain[] = (
-    domainOverride && VALID_DOMAINS.has(domainOverride as PathDomain)
-      ? [domainOverride as SyncDomain]
-      : syncDomains
-  );
+  // pluginSync iterates the plugin-supporting domains contributed by the
+  // registered tools (their `pluginLayout.domain`). A --domain override
+  // narrows to one, but only if it is one of those domains — an arbitrary
+  // string must not drive path construction outside .runtime/plugins/.
+  const allDomains = domainNames(layouts);
+  const domains: string[] =
+    domainOverride && allDomains.includes(domainOverride) ? [domainOverride] : allDomains;
 
   const synced: SyncEntry[] = [];
   const errors: string[] = [];

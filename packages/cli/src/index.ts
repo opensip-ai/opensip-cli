@@ -72,10 +72,17 @@ async function main(): Promise<void> {
   });
 
   mountAllToolCommands(toolRegistry, ctx);
+  // Source the plugin-supporting domains from the registered tools'
+  // declared layouts — the kernel never enumerates them (ADR-0009).
+  const pluginLayouts = toolRegistry
+    .list()
+    .map((t) => t.pluginLayout)
+    .filter((l): l is NonNullable<typeof l> => l !== undefined);
   registerCliCommands(program, {
     setExitCode: ctx.setExitCode,
     render: renderResult,
     datastore: () => getOrOpenDatastore(logger),
+    pluginLayouts,
   });
 
   // Bare `opensip-tools` → welcome screen. The update check is owned by the

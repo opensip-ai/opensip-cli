@@ -78,9 +78,12 @@ describe('graphTool.register', () => {
     expect(flags).toContain('--no-cache');
     expect(flags).toContain('--gate-save');
     expect(flags).toContain('--gate-compare');
-    expect(flags).toContain('--baseline');
     expect(flags).toContain('--report-to');
     expect(flags).toContain('--debug');
+    // --baseline was removed (audit P1.2): it was mounted + documented but had
+    // zero readers (runGateMode is datastore-backed). Guard against re-adding
+    // a vestigial no-op flag.
+    expect(flags).not.toContain('--baseline');
   });
 
   it('action calls the registered handler with the parsed options (smoke)', async () => {

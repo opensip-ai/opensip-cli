@@ -43,14 +43,13 @@ export interface ProjectPaths {
   readonly configFile: string;
   /** <project>/opensip-tools — user-authored content root. */
   readonly userSourceDir: string;
-  /** <project>/opensip-tools/fit/checks — custom check definitions. */
-  readonly fitChecksDir: string;
-  /** <project>/opensip-tools/fit/recipes — custom fitness recipes. */
-  readonly fitRecipesDir: string;
-  /** <project>/opensip-tools/sim/scenarios — custom scenario definitions. */
-  readonly simScenariosDir: string;
-  /** <project>/opensip-tools/sim/recipes — custom sim recipes. */
-  readonly simRecipesDir: string;
+  /**
+   * `<project>/opensip-tools/<domain>/<kind>` — a tool's user-authored
+   * plugin source dir (e.g. `userPluginDir('fit', 'checks')`). Generic
+   * over (domain, kind) so the kernel carries no fit/sim vocabulary
+   * (ADR-0009 corollary 1); the layout's `userSubdirs` supply the kinds.
+   */
+  readonly userPluginDir: (domain: string, kind: string) => string;
   /** <project>/opensip-tools/.runtime — gitignored runtime state. */
   readonly runtimeDir: string;
   /** <project>/opensip-tools/.runtime/sessions */
@@ -64,36 +63,21 @@ export interface ProjectPaths {
   /** <project>/opensip-tools/.runtime/cache/graph — graph-tool catalog cache root. */
   readonly graphCacheDir: string;
   /** <project>/opensip-tools/.runtime/plugins/<domain> — npm-installed plugins. */
-  readonly pluginsDir: (domain: PluginsPathDomain) => string;
+  readonly pluginsDir: (domain: string) => string;
 }
 
 /**
- * Path-resolver domain set — tools whose plugins land in project
- * paths. Intentionally narrower than `core/plugins`'s `PluginDomain`
- * (`'fit' | 'sim' | 'lang'`); 'lang' adapters install via package deps
- * not project-local plugin dirs.
+ * Path-resolver domain set for FIRST-PARTY tools — the storage/path
+ * discriminator (`'fit' | 'sim' | 'graph'`). Aliased to `ToolShortId`
+ * from the central registry (audit-round-3 Finding H) so first-party
+ * path/storage sites stay in sync.
  *
- * `'graph'` is included so graph-tool can persist per-project cache +
- * baseline state under `.runtime/cache/graph/` and (later) load
- * project-local rule plugins from `.runtime/plugins/graph/`.
- *
- * Aliased to `ToolShortId` from the central registry (audit-round-3
- * Finding H) so the four prior inline copies of this union stay in
- * sync. Kept as a named alias for self-documentation at use sites
- * that talk about path/domain semantics rather than tool ids.
+ * Note this is tool *identity*, a separate concern from plugin
+ * *discovery*: `pluginsDir` / `userPluginDir` take a plain `string` so
+ * third-party tools can host project-local plugins without being listed
+ * here (ADR-0009 corollary 1).
  */
 export type PathDomain = ToolShortId;
-
-/**
- * Domain set accepted by `pluginsDir`. Wider than `PathDomain` because
- * `core/plugins/discover` calls it with a value typed `PluginDomain`
- * (`'fit' | 'sim' | 'lang'`); `'lang'` will not actually reach
- * `pluginsDir` today (the discover function returns empty for it before
- * constructing a path), but typing the union here removes a
- * `as 'fit' | 'sim'` cast at the call site and keeps the type system
- * honest if a third tool lands.
- */
-export type PluginsPathDomain = PathDomain | 'lang';
 
 /** Resolve the project path layout for a given project directory. */
 export function resolveProjectPaths(projectDir: string): ProjectPaths {
@@ -105,10 +89,7 @@ export function resolveProjectPaths(projectDir: string): ProjectPaths {
     projectDir,
     configFile: join(projectDir, 'opensip-tools.config.yml'),
     userSourceDir,
-    fitChecksDir: join(userSourceDir, 'fit', 'checks'),
-    fitRecipesDir: join(userSourceDir, 'fit', 'recipes'),
-    simScenariosDir: join(userSourceDir, 'sim', 'scenarios'),
-    simRecipesDir: join(userSourceDir, 'sim', 'recipes'),
+    userPluginDir: (domain, kind) => join(userSourceDir, domain, kind),
     runtimeDir,
     sessionsDir: join(runtimeDir, 'sessions'),
     reportsDir: join(runtimeDir, 'reports'),

@@ -11,6 +11,7 @@ import { readPackageVersion } from '@opensip-tools/core';
 
 import { executeSim } from './cli/sim.js';
 import { createScenarioRegistry } from './framework/registry.js';
+import { SIM_PLUGIN_LAYOUT } from './plugins/loader.js';
 import { createSimulationRecipeRegistry } from './recipes/registry.js';
 // Side-effect import: ensures the RunScope.simulation augmentation is
 // loaded so `scope.simulation` is the correctly-typed slot here.
@@ -96,6 +97,7 @@ export const simulationTool: Tool = {
     description: 'Run simulation scenarios against a codebase',
   },
   commands: [SIM],
+  pluginLayout: SIM_PLUGIN_LAYOUT,
   register,
   contributeScope,
 };

@@ -47,19 +47,29 @@ Per-command flags that appear on most subcommands (registered individually by ea
 
 ### OpenSIP Cloud signal sync
 
-If you have configured an OpenSIP API key (`opensip-tools configure` or
-`OPENSIP_API_KEY`) **and** are entitled to the cloud storage tier, each `fit`
+> **Preview — not yet generally available.** The cloud ingestion, entitlement,
+> and storage endpoints live in the parent OpenSIP service and **do not exist
+> yet** ([ADR-0008](/docs/opensip-tools/10-concepts/06-cloud-signal-sync/)). This repo ships the
+> client and the wire contract (`SignalBatch`) only. Until the server side ships,
+> an entitled run has no live endpoint to sync against; the description below is
+> the *intended* behavior, gated behind a key + entitlement the OSS majority
+> never sets.
+
+When configured (an OpenSIP API key via `opensip-tools configure` or
+`OPENSIP_API_KEY`) **and** entitled to the cloud storage tier, each `fit`
 and `graph` run additionally emits its **signals** (the findings it already
-produces) to OpenSIP Cloud, where they are stored for you. This is **additive
-and best-effort**: results are always written to the local SQLite store first,
-and a cloud failure never blocks, slows, or fails a run. On a successful sync
-you'll see `✓ Sent N signals to OpenSIP Cloud`.
+produces) to OpenSIP Cloud for storage. This is **additive and best-effort**:
+results are always written to the local SQLite store first, and a cloud failure
+never blocks, slows, or fails a run. On a successful sync you'll see
+`✓ Sent N signals to OpenSIP Cloud`.
 
 For `graph`, every human-facing mode emits — the default render, `--gate-save`/
-`--gate-compare`, `--report-to`, and `--catalog-output`. Two modes do not emit:
-plain `--json` (a machine-artifact stream, also the carrier each `--workspace`
-child runs under) and `--workspace` itself (the parent aggregates per-unit
-findings for the dashboard, not signals). Run a whole-project `graph` to sync.
+`--gate-compare`, and `--report-to`. Two modes do not emit: plain `--json`
+(a machine-artifact stream, also the carrier each `--workspace` child runs under)
+and `--workspace` itself (the parent aggregates per-unit findings for the
+dashboard, not signals). The separate `catalog-export` command is a catalog dump
+for the parent ingestor, not a signal-emitting run. Run a whole-project `graph`
+to sync.
 
 What is sent: each signal's file path, message, suggestion, code-location
 hints, and rule metadata. Nothing is sent for users without an API key or
@@ -120,7 +130,7 @@ opensip-tools fit --gate-compare
 
 **Mutual exclusion:** `--gate-save` and `--gate-compare` cannot be combined.
 
-**Exit codes:** 0 (passed), 1 (violations or regression), 2 (configuration error), 3 (`--check` slug not found via the error-suggestion mapping). Note: a `--report-to` upload failure on `fit` is reported in the run footer but does **not** change the exit code (only the `graph` tool exits 4 for upload failure).
+**Exit codes:** 0 (passed), 1 (violations or regression), 2 (configuration error), 3 (`--check` slug not found via the error-suggestion mapping), 4 (`--report-to` upload failure). A `--report-to` upload failure exits 4 — but only when the run otherwise passed; a check/gate failure (1) or configuration error (2) takes precedence and is never masked by a reporting failure. This matches `graph` and the canonical exit-code contract.
 
 **See also:** [`20-fit/04-output-gate-sarif.md`](/docs/opensip-tools/20-fit/04-output-gate-sarif/), [`10-concepts/05-architecture-gate.md`](/docs/opensip-tools/10-concepts/05-architecture-gate/).
 
@@ -203,7 +213,6 @@ opensip-tools graph --recipe <name>
 | `--recipe <name>` | string | — | Run a named graph recipe — a subset of the graph rule set. Default (no flag): all rules. An unknown name fails with a configuration error. List recipes with `graph-recipes`. |
 | `--gate-save` | bool | `false` | Save the current Signal fingerprint set to the project's SQLite store (`graph_baseline_signals` table). Mutually exclusive with `--gate-compare`. |
 | `--gate-compare` | bool | `false` | Compare current Signals to the saved baseline; exit non-zero on regression. |
-| `--baseline <path>` | path | — | Override the default baseline location (used with `--gate-save` / `--gate-compare`) — e.g. pin to a CI artifact location instead of the project's SQLite store. |
 | `--report-to <url>` | string | — | POST findings to OpenSIP Cloud or a compatible SARIF endpoint. |
 | `-v, --verbose` | bool | `false` | Expand the done view to show the detailed catalog, findings-by-rule, and entry-point sections (default: one-line summary only). |
 | `--debug` | bool | `false` | Enable debug-mode structured log output. |
@@ -569,7 +578,7 @@ opensip-tools completion zsh > ~/.opensip-tools-completion.zsh
 echo "source ~/.opensip-tools-completion.zsh" >> ~/.zshrc
 ```
 
-The completion catalog is sourced from the per-invocation `ToolRegistry.list()`, so installed third-party tools' commands complete automatically once the script is regenerated.
+The completion catalog is a **static first-party list** (`SUBCOMMANDS` in `packages/cli/src/commands/completion.ts`), kept in sync with the live Commander program by a drift-catch test. It covers the built-in `fit`/`sim`/`graph` command families; **third-party tool subcommands are not included** in generated completion today, even though those tools are discovered and runnable at runtime.
 
 ---
 

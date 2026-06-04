@@ -43,7 +43,6 @@ export interface GraphCommandOptions {
   readonly recipe?: string;
   readonly gateSave?: boolean;
   readonly gateCompare?: boolean;
-  readonly baseline?: string;
   readonly reportTo?: string;
   readonly apiKey?: string;
   /**

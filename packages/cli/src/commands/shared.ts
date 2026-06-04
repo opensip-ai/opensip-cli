@@ -9,6 +9,7 @@
  */
 
 import type { CommandResult } from '@opensip-tools/contracts';
+import type { PluginLayout } from '@opensip-tools/core';
 
 /** Commander spec for the shared `--cwd <path>` option. */
 export const CWD_OPTION_SPEC = '--cwd <path>';
@@ -25,6 +26,14 @@ export const JSON_DESC = 'Output structured JSON';
 export interface CliCommandsContext {
   readonly setExitCode: (code: number) => void;
   readonly render: (result: CommandResult) => Promise<void>;
+  /**
+   * Project-local plugin layouts contributed by the registered tools
+   * (each tool's `Tool.pluginLayout`). The `plugin` command reads these
+   * to know which domains support project-local plugins instead of
+   * hardcoding `['fit', 'sim']` — the kernel stays tool-agnostic and the
+   * tools remain the single source of truth (ADR-0009 corollary 1).
+   */
+  readonly pluginLayouts: readonly PluginLayout[];
   /**
    * v2 persistence accessor (thunk). Calling this returns the project-local
    * DataStore, opening it lazily on first access. Commands that don't read

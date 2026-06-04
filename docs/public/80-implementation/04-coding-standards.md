@@ -217,7 +217,7 @@ import { sarifBuilder } from './sarif.js';
 import type { Check } from './types.js';
 ```
 
-Type-only imports use `import type` so they're erased at compile time. The dep-cruiser config explicitly ignores type-only imports (`tsPreCompilationDeps: false`), so a module can `import type` from a higher layer without violating the layer rule.
+Type-only imports use `import type` so they're erased at compile time. The main dep-cruiser pass ignores type-only imports (`tsPreCompilationDeps: false`) because they carry no runtime edge — but this does **not** mean you may `import type` from a higher layer. A second, type-aware pass (`.dependency-cruiser.types.cjs`, `tsPreCompilationDeps: true`) re-runs the full layer ruleset over the type-inclusive graph, so a type-only layer inversion or cycle is still rejected. Both passes run under `pnpm lint`. See [`05-layer-policy.md`](./05-layer-policy.md#how-to-add-a-new-exception) and [`../10-concepts/03-modular-monolith.md`](../10-concepts/03-modular-monolith.md#type-only-edges-are-caught-by-the-type-aware-pass).
 
 ---
 
