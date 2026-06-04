@@ -13,6 +13,7 @@
       "opensip-tools": ["packages/cli/src/index.ts"],
       "@opensip-tools/dashboard": ["packages/dashboard/src/index.ts"],
       "@opensip-tools/fitness": ["packages/fitness/engine/src/index.ts"],
+      "@opensip-tools/fitness/internal": ["packages/fitness/engine/src/internal.ts"],
       "@opensip-tools/simulation": ["packages/simulation/engine/src/index.ts"],
       "@opensip-tools/graph": ["packages/graph/engine/src/index.ts"],
       "@opensip-tools/graph/internal": ["packages/graph/engine/src/internal.ts"],

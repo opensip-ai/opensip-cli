@@ -90,21 +90,17 @@ export type {
 // register-tools.ts handles the duplicate-id case.
 export { fitnessTool, fitnessTool as tool } from './tool.js';
 
-// CLI command implementations — re-exported for the Phase 2 CLI which
-// still drives commands directly. Phase 4 will collapse these behind
-// the Tool contract.
-//
-// Audit 2026-05-29 (L2): `executeFit` retains a live consumer — the
-// SaaS-mode concurrency test (cli/__tests__/saas-mode-smoke.test.ts). It
-// is active API, not dead code; removing it needs that consumer migrated
-// to the Tool contract first (Phase 4), which is out of scope for L2.
+// CLI command implementations — vestigial re-exports from the Phase 2 CLI era.
+// The CLI now drives fitness through the Tool contract (`fitnessTool`), so
+// these have no external production consumers. `executeFit` moved to
+// `@opensip-tools/fitness/internal` (ADR-0009): its only consumer is the
+// SaaS-mode concurrency smoke test, which is not public API.
 //
 // The old `openDashboard` export is GONE (L2): fitness no longer owns
 // dashboard composition. It now contributes only its own dashboard
 // inputs via `collectFitnessDashboardData`, wired into `fitnessTool`'s
 // `collectDashboardData`. The CLI is the composition root.
 export {
-  executeFit,
   ensureChecksLoaded,
   getDisplayName,
   getEnabledCheckCount,

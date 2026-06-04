@@ -41,7 +41,7 @@ import {
   currentScope,
   runWithScope,
 } from '@opensip-tools/core';
-import { executeFit } from '@opensip-tools/fitness';
+import { executeFit } from '@opensip-tools/fitness/internal';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { FitOptions } from '@opensip-tools/contracts';
