@@ -68,6 +68,10 @@ distinct from:
   run already produces to the cloud (store-only onboarding tier); local SQLite
   stays the source of truth, the datastore contract is unchanged (operational
   Postgres swap rejected), and `--report-to` is kept as the distinct SARIF path
+- [ADR-0009](./ADR-0009-public-api-surface-policy.md) — Explicit public-API
+  surfaces: test-only/internal exports move behind a `<pkg>/internal` subpath,
+  the kernel carries no tool vocabulary, and persistence schema/raw-handle stay
+  owner-private (repositories only), enforced by dependency-cruiser
 
 ### Superseded
 
