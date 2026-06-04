@@ -20,6 +20,7 @@ const MAX_SIGNALS_PER_CHUNK = 500;
 // whole sync so a throttling server can never hang the CLI.
 const POLICY = { maxAttempts: 4, overallDeadlineMs: 120_000, honorRetryAfter: true } as const;
 
+/** Construction options for the OpenSIP Cloud signal sink: target endpoint, API key, and an injectable `fetch` for tests. */
 export interface CloudSignalSinkOptions {
   readonly endpoint: string;
   readonly apiKey: string;
@@ -75,6 +76,7 @@ export function createCloudSignalSink(opts: CloudSignalSinkOptions): SignalSink 
               apiKey: opts.apiKey,
               chunks,
               idempotencyKeyFor: (i) => `${batch.runId}:${i}`,
+              // @fitness-ignore-next-line null-safety -- `i` is the in-range index of the chunks array being posted; chunks[i] is always defined
               timeoutFor: (_chunk, i) => Math.min(120_000, 30_000 + chunks[i].signals.length * 50),
               policy: POLICY,
               evtPrefix: 'cli.signal-sync',

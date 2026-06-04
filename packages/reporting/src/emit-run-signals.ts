@@ -1,3 +1,4 @@
+// @fitness-ignore-file error-handling-quality -- best-effort cloud egress (ADR-0008): repo-identity detection and detached signal egress must degrade silently (no git, spawn failure, network error). A cloud failure never blocks, slows, or fails the user's run.
 /**
  * emitRunSignals — the per-run cloud-egress entry point tools call after they
  * build their `CliOutput` (ADR-0008), mirroring how each engine already calls

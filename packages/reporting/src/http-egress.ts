@@ -41,6 +41,7 @@ export interface EgressResult {
   readonly errors: readonly string[];
 }
 
+/** Arguments for posting pre-chunked SARIF/signal bodies to a cloud receiver, one POST per body, under the retry policy. */
 export interface PostChunkedArgs {
   readonly url: string;
   readonly apiKey?: string;

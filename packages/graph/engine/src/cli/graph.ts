@@ -299,14 +299,20 @@ export async function dispatchGraphResult(
   startedAt: string,
 ): Promise<void> {
   if (opts.gateSave === true || opts.gateCompare === true) {
-    await runGateMode(opts, result.signals, cli, result.catalog?.resolutionMode);
-    await emitGraphSignals(opts, result, cli);
+    // Gate output and the best-effort cloud emit are independent (the emit is a
+    // no-op for the keyless majority) — run them concurrently.
+    await Promise.all([
+      runGateMode(opts, result.signals, cli, result.catalog?.resolutionMode),
+      emitGraphSignals(opts, result, cli),
+    ]);
     logger.info({ evt: EVT_GRAPH_COMPLETE, module: MODULE_GRAPH_CLI });
     return;
   }
   if (typeof opts.reportTo === 'string' && opts.reportTo.length > 0) {
-    await runReportMode(opts, result.signals, cli);
-    await emitGraphSignals(opts, result, cli);
+    await Promise.all([
+      runReportMode(opts, result.signals, cli),
+      emitGraphSignals(opts, result, cli),
+    ]);
     logger.info({ evt: EVT_GRAPH_COMPLETE, module: MODULE_GRAPH_CLI });
     return;
   }

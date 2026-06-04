@@ -311,6 +311,7 @@ export function installPreActionHook(program: Command, version: string): void {
       apiKey: opts.apiKey as string | undefined,
       cloud: resolveEffectiveCloudConfig(cliDefaults.cloud),
       // `--no-cloud` is a global flag, so read it through optsWithGlobals().
+      // @fitness-ignore-next-line null-safety -- optsWithGlobals() returns a commander OptionValues record (never null); `.cloud` is a safe optional read
       noCloud: actionCommand.optsWithGlobals().cloud === false,
       cacheDir: join(resolveUserPaths().userHomeDir, 'cache'),
     });

@@ -1,3 +1,5 @@
+// @fitness-ignore-file error-handling-quality -- best-effort entitlement cache + check (ADR-0008): a missing/corrupt/unwritable cache and an unreachable endpoint all degrade to "not entitled" / a re-check next run, never throwing on the cloud hot path.
+// @fitness-ignore-file unbounded-memory -- reads a tiny tool-generated entitlement cache file (a single boolean + timestamp).
 /**
  * Entitlement check for OpenSIP Cloud signal sync (ADR-0008).
  *

@@ -1,3 +1,4 @@
+// @fitness-ignore-file error-handling-quality -- best-effort sink selection + first-run notice (ADR-0008): a failed marker read/write just re-shows the notice, and the entitlement/egress paths degrade silently. Cloud sync never blocks the user's run.
 /**
  * resolveSignalSink — choose the SignalSink for a run (ADR-0008).
  *
@@ -87,6 +88,7 @@ export function resolveSignalSink(input: ResolveSignalSinkInput): SignalSink {
         });
         if (!ent.entitled) return { accepted: 0, authRejected: false };
 
+        // @fitness-ignore-next-line async-waterfall-detection -- the first-run notice must print BEFORE the emit; deliberately sequential, not parallelized
         await maybeShowFirstRunNotice(input.cacheDir);
         const result = await cloudSink.emit(batch);
         if (result.authRejected) {

@@ -241,6 +241,7 @@ async function runParallel(
   // scenarios in flight via a fixed worker pool, honoring the recipe's
   // declared concurrency ceiling (previously this option was ignored).
   if (limit === undefined || limit <= 0 || limit >= scenarios.length) {
+    // @fitness-ignore-next-line no-unbounded-concurrency -- intentional run-all-at-once when no maxParallel is configured (the documented historical behavior); the bounded worker pool below is the capped path
     return Promise.all(scenarios.map((s) => runSingle(s, abortSignal)));
   }
 
