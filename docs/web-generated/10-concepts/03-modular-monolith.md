@@ -28,7 +28,7 @@ This document is the conceptual map. For the lookup-shaped catalog of every pack
 > - Why opensip-tools ships as 30 packages instead of one.
 > - The five layers, in order, and what each one is for.
 > - How the layer rule is enforced (and what happens if you break it).
-> - The documented exceptions and why they exist.
+> - The one documented exception (type-only edges) and the two that were paid down.
 > - Trade-offs: what this shape buys you, what it costs.
 
 ---
@@ -119,36 +119,12 @@ The build runs `pnpm depcruise` as part of the standard `pnpm lint` flow. A forb
 
 ---
 
-## The three documented exceptions
+## The documented exception
 
-Real codebases have edge cases. This one has three, all written into [`.dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.1/.dependency-cruiser.cjs).
+Real codebases have edge cases. Today the layer rules carry exactly one — type-only edges (below). Two earlier cross-layer exceptions have since been **paid down** and deleted from [`.dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.1/.dependency-cruiser.cjs):
 
-### `lang-typescript` → `fitness`
-
-`@opensip-tools/lang-typescript` re-exports `filterContent`, `clearFilterCache`, and `FilteredContent` from `@opensip-tools/fitness`. Those symbols moved out of `core` during an earlier refactor but the typescript adapter still needs the legacy export path for downstream consumers. The dep-cruiser rule explicitly carves out a hole:
-
-```js
-{ name: 'lang-no-fitness-except-typescript',
-  from: { path: '^packages/languages/lang-', pathNot: '^packages/languages/lang-typescript/' },
-  to:   { path: '^@opensip-tools/fitness' },
-}
-```
-
-This is a mild architectural smell, not a bug — it means `lang-typescript` lives at Layer 3 like its peers but takes a sideways dep on `fitness`. The exception is named so you trip a different alarm if any *other* lang pack starts taking the same shortcut.
-
-### `graph` → `fitness` (peer-layer SARIF reuse)
-
-`@opensip-tools/graph` imports `buildSarifLog`, `chunkSarifRuns`, and `reportToCloud` from `@opensip-tools/fitness`. Both packages sit at Layer 3 (the tools/lang peer layer); cross-tool imports at the same layer are allowed when the alternative is a duplicate implementation that would drift over time. The dep-cruiser rule restricts the edge to the single permitted file and tags it `info`-severity so the build records but does not reject:
-
-```js
-{ name: 'graph-may-import-fitness-sarif',
-  severity: 'info',
-  from: { path: '^packages/graph/engine/src/render/sarif\\.ts$' },
-  to:   { path: '^@opensip-tools/fitness$' },
-}
-```
-
-The eventual extraction to a shared `@opensip-tools/sarif` package becomes a mechanical refactor when both `fit` and `graph` already import from one source.
+- **`lang-typescript` → `fitness`** (the `filterContent` back-edge): `filterContent` / `clearFilterCache` / `FilteredContent` now live in `@opensip-tools/lang-typescript` itself, so no lang pack reaches up into a tool. The `lang-no-fitness-except-typescript` rule is gone.
+- **`graph` → `fitness`** (SARIF reuse): SARIF building and cloud reporting moved to `@opensip-tools/contracts` / `@opensip-tools/reporting`, so `graph` reports without a `graph → fitness` edge. The `graph-may-import-fitness-sarif` info-exception is gone.
 
 ### Type-only edges
 
@@ -214,7 +190,7 @@ opensip-tools           ─── imports ───►  @opensip-tools/fitness
    the CLI's loaded check registry, populated at startup
 ```
 
-The `cli` imports `fitness` to get the `fitnessTool` (Layer 5 → Layer 3). It also imports the bundled language adapters to register them (Layer 5 → Layer 3). It does **not** import `checks-universal` directly — instead, the plugin loader walks `node_modules` at runtime and discovers any package whose name matches `@opensip-tools/checks-*`. The check pack imports `fitness` (for `defineCheck`) and `core` (for `Signal`), both lower layers. Every arrow points up.
+The `cli` imports `fitness` to get the `fitnessTool` (Layer 5 → Layer 3). It also imports the bundled language adapters to register them (Layer 5 → Layer 3). It does **not** import `checks-universal` directly — instead, the plugin loader walks `node_modules` at runtime and discovers any package declaring `opensipTools.kind: "fit-pack"` (the `@opensip-tools/checks-*` name prefix is a deprecated fallback; see ADR-0007). The check pack imports `fitness` (for `defineCheck`) and `core` (for `Signal`), both lower layers. Every arrow points up.
 
 ---
 

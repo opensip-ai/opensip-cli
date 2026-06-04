@@ -38,7 +38,7 @@ A contract is a promise to a consumer outside your control. Break it, and the co
 | 3 | JSON output (`CliOutput`) | CI, dashboards, the gate, OpenSIP Cloud | **stable** (semver-major) | `packages/contracts/src/types.ts` |
 | 4 | SARIF output | GitHub Code Scanning, IDEs | **stable** (versioned by SARIF spec) | `packages/reporting/src/sarif.ts` |
 | 5 | Tool plugin contract (`Tool`) | third-party tools | **stable** (semver-major) | `packages/core/src/tools/types.ts` |
-| 6 | Plugin discovery (Tool marker + check-pack name prefix) | third-party tools, check packs | **stable** (semver-major) | `packages/core/src/plugins/tool-package-discovery.ts`, `packages/fitness/engine/src/plugins/check-package-discovery.ts` |
+| 6 | Plugin discovery (`opensipTools.kind` markers; check-pack name prefix is a deprecated fallback) | third-party tools, check packs | **stable** (semver-major) | `packages/core/src/plugins/tool-package-discovery.ts`, `packages/fitness/engine/src/plugins/check-package-discovery.ts` |
 
 Anything else — internal types, framework helpers, the recipe registry shape, the language-adapter content-filter API — is **internal**. It can move between minors. Don't depend on it from outside the workspace; if you do, you're on your own when it shifts.
 
@@ -200,18 +200,19 @@ opensip-tools discovers third-party packages two different ways depending on wha
 
 The kernel's [`discoverToolPackages`](../../../packages/core/src/plugins/tool-package-discovery.ts) walks `node_modules` looking for the `opensipTools.kind === 'tool'` marker. The package's main entry must export a `tool: Tool` symbol.
 
-### Check packs — name-prefix discovery
+### Check packs — `opensipTools.kind` marker (name prefix is a deprecated fallback)
 
 ```json
 {
   "name": "@opensip-tools/checks-mything",
+  "opensipTools": { "kind": "fit-pack" },
   "main": "dist/index.js"
 }
 ```
 
-The fitness engine's [`discoverCheckPackages`](../../../packages/fitness/engine/src/plugins/check-package-discovery.ts) walks `node_modules` looking for any package whose name matches `@opensip-tools/checks-*`. **No `opensipTools.kind` marker is required** — the name prefix is the contract. The package's main entry must export `checks: Check[]`, optionally `recipes: FitnessRecipe[]`, and optionally `checkDisplay: Record<string, [icon, name]>`.
+The canonical contract is the `opensipTools.kind: "fit-pack"` marker ([ADR-0007](../decisions/ADR-0007-marker-canonical-plugin-discovery.md)). The fitness engine merges marker-discovered packs with a legacy `@opensip-tools/checks-*` name-prefix scan ([`discoverCheckPackages`](../../../packages/fitness/engine/src/plugins/check-package-discovery.ts)), retained only as a **deprecated fallback** for third-party packs that predate the marker (removal in the next major). All first-party `@opensip-tools/checks-*` packs carry the marker. A pack's main entry must export `checks: Check[]`, optionally `recipes: FitnessRecipe[]`, and optionally `checkDisplay: Record<string, [icon, name]>`.
 
-For names outside the `@opensip-tools/checks-*` prefix (e.g. an internal scope), declare the package explicitly in the project config:
+For packs published under your own scope, declare the marker and either add your scope to `plugins.packageScopes:` or pin the package explicitly in the project config:
 
 ```yaml
 plugins:
@@ -228,10 +229,10 @@ Currently use the same project-pinned shape as fit (declare the package in `plug
 ### Stability rules
 
 - **Adding a new auto-discovery shape is a minor change.** Existing packs don't break.
-- **Changing what an existing shape requires is a major change.** A pack at `@opensip-tools/checks-*` that exports `checks: Check[]` should keep working across minors.
+- **Changing what an existing shape requires is a major change.** A pack declaring `opensipTools.kind: "fit-pack"` that exports `checks: Check[]` should keep working across minors.
 - **The Tool marker (`opensipTools.kind: 'tool'`) is a stable surface.** A future fifth kind would be a deliberate addition, not an accident.
 
-The `PluginDomain` type ([`packages/core/src/plugins/types.ts:91`](../../../packages/core/src/plugins/types.ts)) lists `'fit' | 'sim' | 'asm' | 'lang'` — these are domain identifiers used for path resolution (`<project>/opensip-tools/.runtime/plugins/<domain>/`), not `package.json` `kind` values. `asm` is reserved for a future tool.
+The `PluginDomain` type ([`packages/core/src/plugins/types.ts`](../../../packages/core/src/plugins/types.ts)) lists `'fit' | 'sim' | 'lang'` — these are domain identifiers used for path resolution (`<project>/opensip-tools/.runtime/plugins/<domain>/`), not `package.json` `kind` values.
 
 ---
 
@@ -264,7 +265,7 @@ You've now seen the four mental-model docs:
 
 1. [`01-fitness-loop.md`](./01-fitness-loop.md) — the spine, eight stages.
 2. [`02-tool-plugin-model.md`](./02-tool-plugin-model.md) — how the CLI doesn't know what `fit` does.
-3. [`03-modular-monolith.md`](./03-modular-monolith.md) — five layers, 29 packages.
+3. [`03-modular-monolith.md`](./03-modular-monolith.md) — five layers, 30 packages.
 4. This doc — the public edges.
 
 Time to go deeper. Section [`20-fit/`](../20-fit/) expands stages 4–8 of the loop with full code paths. Section [`30-sim/`](../30-sim/) does the same for `sim`. Sections 40+ cover runtime mechanics, subsystems, surfaces, reference, and conventions.
