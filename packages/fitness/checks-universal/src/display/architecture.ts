@@ -20,6 +20,7 @@ export const ARCHITECTURE_DISPLAY = Object.freeze<Record<string, CheckDisplayEnt
   'node-version-consistency': ['📦', 'Node Version Consistency'],
   'phantom-dependency-detection': ['📦', 'Phantom Dependency Detection'],
   'project-readme-existence': ['📝', 'Project README Existence'],
+  'restrict-raw-db-access': ['🗄️', 'Restrict Raw DB Access'],
   'stale-build-artifacts': ['🏚️', 'Stale Build Artifacts'],
 })
 

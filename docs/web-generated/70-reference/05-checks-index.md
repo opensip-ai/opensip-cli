@@ -20,17 +20,17 @@ related-docs:
 ---
 # Checks reference
 
-opensip-tools ships **146+ built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
+opensip-tools ships **148+ built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
 
 > This page is **auto-generated** from the source by [`scripts/build-checks-index.mjs`](https://github.com/opensip-ai/opensip-tools/blob/main/scripts/build-checks-index.mjs). Do not edit it by hand — edit the check's source file (the link in each row), then re-run the generator.
 
 ---
 
-## Universal  *(91 checks)*
+## Universal  *(92 checks)*
 
 Language-agnostic; runs against every project.
 
-### Architecture  *(13)*
+### Architecture  *(14)*
 
 | Slug | Description |
 |---|---|
@@ -46,6 +46,7 @@ Language-agnostic; runs against every project.
 | [`node-version-consistency`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/node-version-consistency.ts) | Validate Node.js version consistency across configs |
 | [`phantom-dependency-detection`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/dependencies/phantom-dependency-detection.ts) | Detect phantom dependencies (used but not declared in package.json) |
 | [`project-readme-existence`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/project-readme-existence.ts) | Ensures every package has a README.md file |
+| [`restrict-raw-db-access`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/restrict-raw-db-access.ts) | Confine the raw Drizzle handle (DataStore.db) to the persistence ownership boundary (ADR-0009) |
 | [`stale-build-artifacts`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/stale-build-artifacts.ts) | Detects compiled .js/.d.ts/.js.map files in source directories that should only exist in dist/ |
 
 ### Security  *(18)*
@@ -234,14 +235,15 @@ TypeScript/JavaScript projects; uses TS-AST analysis.
 
 ---
 
-## Python  *(1 check)*
+## Python  *(2 checks)*
 
 Python projects.
 
-### Quality  *(1)*
+### Quality  *(2)*
 
 | Slug | Description |
 |---|---|
+| [`python-function-too-long`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-python/src/checks/function-too-long.ts) | Python functions should stay under a line budget for readability and testability |
 | [`python-no-bare-except`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-python/src/checks/no-bare-except.ts) | Bare except clauses catch system-exiting exceptions like KeyboardInterrupt |
 
 ---
