@@ -7,6 +7,16 @@ export { buildSignalBatch, MAX_SIGNALS_PER_BATCH } from './types/signal-batch.js
 // Cloud signal sink seam (ADR-0008)
 export type { SignalSink, EmitResult } from './signals/signal-sink.js';
 export { noopSignalSink } from './signals/signal-sink.js';
+// Inline suppression primitive (ADR-0014) — shared `@x-ignore-*` machinery
+export { filterSignalsBySuppressions } from './signals/suppress.js';
+export type {
+  SuppressionKeywords,
+  SuppressionLocation,
+  SuppressionRequest,
+  SuppressionMatch,
+  SuppressionResult,
+} from './signals/suppress.js';
+export { COMMENT_OPENERS, stripCommentOpener } from './signals/comment-openers.js';
 
 // Languages — cross-language adapter API
 export * from './languages/index.js';
