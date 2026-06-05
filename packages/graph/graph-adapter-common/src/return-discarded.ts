@@ -13,7 +13,7 @@
  * Java/Rust form lives here.
  */
 
-import type { Node } from 'web-tree-sitter';
+import type { Node } from '@opensip-tools/tree-sitter';
 
 /**
  * The call's return value is discarded when the call expression is the

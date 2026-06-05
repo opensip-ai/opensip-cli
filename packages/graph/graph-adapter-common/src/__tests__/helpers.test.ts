@@ -19,7 +19,7 @@ import {
 } from '../walk.js';
 
 import type { FunctionOccurrence } from '@opensip-tools/graph';
-import type { Node } from 'web-tree-sitter';
+import type { Node } from '@opensip-tools/tree-sitter';
 
 // Minimal fake of the web-tree-sitter `Node` shape `isReturnValueDiscarded`
 // reads: it only ever inspects `.parent` and `.type`.

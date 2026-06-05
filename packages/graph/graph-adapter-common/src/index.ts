@@ -23,8 +23,6 @@ export {
 } from './discover.js';
 
 export {
-  createTreeSitterParseProject,
-  type TreeSitterParseConfig,
   type TreeSitterParsedFile,
   type TreeSitterParsedProject,
 } from './parse.js';
