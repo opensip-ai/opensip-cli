@@ -1,9 +1,17 @@
 {
   "name": "@opensip-tools/cli-ui",
-  "version": "2.6.2",
+  "version": "3.0.0",
   "license": "MIT",
   "description": "Shared Ink/React presentational primitives for OpenSIP Tools CLI tools — banner, spinner, run header, theme. Used by every tool that ships an Ink live view.",
-  "keywords": ["opensip-tools", "static-analysis", "code-quality", "cli", "terminal", "ink", "react"],
+  "keywords": [
+    "opensip-tools",
+    "static-analysis",
+    "code-quality",
+    "cli",
+    "terminal",
+    "ink",
+    "react"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/opensip-ai/opensip-tools.git",

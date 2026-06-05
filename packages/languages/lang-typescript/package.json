@@ -1,9 +1,18 @@
 {
   "name": "@opensip-tools/lang-typescript",
-  "version": "2.6.2",
+  "version": "3.0.0",
   "license": "MIT",
   "description": "TypeScript/JavaScript language adapter for opensip-tools",
-  "keywords": ["opensip-tools", "static-analysis", "code-quality", "parser", "ast", "tree-sitter", "typescript", "javascript"],
+  "keywords": [
+    "opensip-tools",
+    "static-analysis",
+    "code-quality",
+    "parser",
+    "ast",
+    "tree-sitter",
+    "typescript",
+    "javascript"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/opensip-ai/opensip-tools.git",

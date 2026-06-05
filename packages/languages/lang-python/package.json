@@ -1,9 +1,17 @@
 {
   "name": "@opensip-tools/lang-python",
-  "version": "2.6.2",
+  "version": "3.0.0",
   "license": "MIT",
   "description": "Python language adapter for opensip-tools",
-  "keywords": ["opensip-tools", "static-analysis", "code-quality", "parser", "ast", "tree-sitter", "python"],
+  "keywords": [
+    "opensip-tools",
+    "static-analysis",
+    "code-quality",
+    "parser",
+    "ast",
+    "tree-sitter",
+    "python"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/opensip-ai/opensip-tools.git",

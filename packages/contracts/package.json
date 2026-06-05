@@ -1,9 +1,15 @@
 {
   "name": "@opensip-tools/contracts",
-  "version": "2.6.2",
+  "version": "3.0.0",
   "license": "MIT",
   "description": "Shared contract types for OpenSIP Tools — SignalEnvelope / CommandResult shapes, exit codes, session persistence",
-  "keywords": ["opensip-tools", "static-analysis", "code-quality", "types", "contracts"],
+  "keywords": [
+    "opensip-tools",
+    "static-analysis",
+    "code-quality",
+    "types",
+    "contracts"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/opensip-ai/opensip-tools.git",

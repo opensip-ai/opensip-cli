@@ -1,9 +1,16 @@
 {
   "name": "@opensip-tools/datastore",
-  "version": "2.6.2",
+  "version": "3.0.0",
   "license": "MIT",
   "description": "SQLite + Drizzle persistence layer for OpenSIP Tools — DataStore interface, backends, factory, schema migrations",
-  "keywords": ["opensip-tools", "static-analysis", "code-quality", "sqlite", "drizzle", "persistence"],
+  "keywords": [
+    "opensip-tools",
+    "static-analysis",
+    "code-quality",
+    "sqlite",
+    "drizzle",
+    "persistence"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/opensip-ai/opensip-tools.git",
