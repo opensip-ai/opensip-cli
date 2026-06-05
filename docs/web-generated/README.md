@@ -108,7 +108,7 @@ These docs are written for engineers fluent in TypeScript and Node tooling. Voic
 33. [**CLI commands**](/docs/opensip-tools/70-reference/01-cli-commands/) — Every command, its flags, when to use each.
 34. [**Package catalog**](/docs/opensip-tools/70-reference/02-package-catalog/) — All 30 packages with one-line role and key exports. Grouped by layer.
 35. [**Configuration**](/docs/opensip-tools/70-reference/03-configuration/) — `opensip-tools.config.yml` schema, every field, defaults.
-36. [**JSON output schema**](/docs/opensip-tools/70-reference/04-json-output-schema/) — The `CliOutput` shape consumed by CI and dashboards.
+36. [**JSON output schema**](/docs/opensip-tools/70-reference/04-json-output-schema/) — The `SignalEnvelope` shape consumed by CI and dashboards.
 37. [**Checks reference**](/docs/opensip-tools/70-reference/05-checks-index/) — Browsable index of every built-in fit check, grouped by pack and primary tag. Auto-generated from source.
 38. [**Dashboard**](/docs/opensip-tools/70-reference/06-dashboard/) — The HTML report: what it shows, when it opens, where it lives.
 

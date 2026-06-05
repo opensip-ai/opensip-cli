@@ -146,7 +146,7 @@
         "contributors",
         "ci-integrators"
       ],
-      "purpose": "The baseline-and-compare workflow. Identity hash, line-shift invariance, partial-SARIF tolerance, CI integration patterns."
+      "purpose": "The baseline-and-compare workflow. Identity hash, line-shift invariance, CI integration patterns."
     },
     {
       "file": "docs/web-generated/10-concepts/06-cli-output-rendering.md",
@@ -213,7 +213,7 @@
         "contributors",
         "ci-integrators"
       ],
-      "purpose": "What happens to the violations a check produces — render layer, JSON output, SARIF, the gate, cloud reporting."
+      "purpose": "What happens to the signals a check produces — formatter/sink routing, JSON output, SARIF, the gate, cloud reporting."
     },
     {
       "file": "docs/web-generated/30-sim/01-scenarios-and-recipes.md",
@@ -433,7 +433,7 @@
         "ci-integrators",
         "plugin-authors"
       ],
-      "purpose": "The CliOutput shape (and the SimDoneResult shape). Every field, every type, every presence rule."
+      "purpose": "The SignalEnvelope shape every tool emits on --json. Every field, every type, every presence rule, plus the v1→v2 mapping."
     },
     {
       "file": "docs/web-generated/70-reference/05-checks-index.md",

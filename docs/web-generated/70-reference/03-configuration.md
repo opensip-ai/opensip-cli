@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-03
+last_verified: 2026-06-04
 release: v2.6.0
 title: "Configuration"
 audience: [getting-started, ci-integrators, plugin-authors]
@@ -301,6 +301,6 @@ Every section is optional; add or remove as needed.
 
 ## What's next
 
-- [**JSON output schema**](/docs/opensip-tools/70-reference/04-json-output-schema/) — the `CliOutput` shape that runs emit.
+- [**JSON output schema**](/docs/opensip-tools/70-reference/04-json-output-schema/) — the `SignalEnvelope` shape that runs emit.
 - [**Targets and scope**](/docs/opensip-tools/20-fit/02-targets-and-scope/) — how targets interact with check scopes.
 - [**Plugin loader**](/docs/opensip-tools/80-implementation/02-plugin-loader/) — how `plugins.<domain>:` is consumed.

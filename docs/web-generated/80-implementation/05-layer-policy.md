@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-03
+last_verified: 2026-06-04
 release: v2.6.x
 title: "Layer policy"
 audience: [contributors]
@@ -143,7 +143,7 @@ For the deeper rationale (why a separate package, why not core, why not contract
 
 `contracts` depends only on `core`. It can't reach up to a tool, the CLI, or check packs.
 
-The reasoning: contracts exists to define the contract surface (`CliOutput`, `CommandResult`, `EXIT_CODES`) that *every* Tool consumes. If it took a dep on one Tool, it'd be coupled to that Tool's lifecycle.
+The reasoning: contracts exists to define the contract surface (`SignalEnvelope`, `CommandResult`, `EXIT_CODES`) that *every* Tool consumes. If it took a dep on one Tool, it'd be coupled to that Tool's lifecycle.
 
 ### `fitness-no-cli` and `simulation-no-cli`
 
@@ -196,6 +196,20 @@ The lang layer is below check packs in the implicit ordering, even though both s
 
 A flat rule: *no* lang pack reaches up into fitness. The historical `lang-typescript → fitness` exception (`@opensip-tools/lang-typescript` re-exporting `filterContent`, `clearFilterCache`, `FilteredContent`) was paid down by moving those symbols into the adapter package itself — they now live in [`packages/languages/lang-typescript/src/filter.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/packages/languages/lang-typescript/src/filter.ts) alongside the rest of the TS-aware string/comment stripping. With that, the rule simplified from the named carve-out (`lang-no-fitness-except-typescript`) to the unconditional form above.
 
+### Output-boundary rules (ADR-0011)
+
+[ADR-0011](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/docs/decisions/ADR-0011-signal-output-currency-formatter-sink.md) makes the `SignalEnvelope` the single output currency: a tool engine *returns* an envelope and **never renders or delivers its own output**. The CLI composition root maps flags → (formatter × sink). Four guards keep that honest — three dependency-cruiser rules plus one fitness check, because the contract has both an *import* shape and a *call* shape:
+
+- **`tool-engines-no-output-formatters`** — a tool engine (`packages/{fitness,graph,simulation}/engine/src/`) must not import an `@opensip-tools/output` formatter (`output/src/format/`). Rendering belongs to the composition root.
+- **`tool-engines-no-output-sinks`** — a tool engine must not import an `@opensip-tools/output` sink (`output/src/sink/`). Cloud/file egress is resolved only at the root.
+- **`tool-engines-no-output-barrel`** — a tool engine must not import the `@opensip-tools/output` barrel at all. The barrel (`output/src/index.ts`) re-exports both formatters and sinks, so the two granular rules above can't see a barrel import; this third rule closes that vector. After the migration a tool engine has zero production `@opensip-tools/output` imports.
+
+  All three are production-source-only — test files are globally excluded, so graph's relocated golden SARIF test may import `formatSignalSarif` from the barrel.
+
+- **`no-direct-stdout-in-tool-engine`** (a fitness check, slug `no-direct-stdout-in-tool-engine`, [`packages/fitness/checks-universal/src/checks/architecture/`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/packages/fitness/checks-universal/src/checks/architecture/no-direct-stdout-in-tool-engine.ts)) — catches the call shape no import can catch: a tool engine writing run output straight to **stdout** (`process.stdout.write`, `console.log`/`.info`/`.debug`). Scope is **stdout only** — `console.error`/`.warn` are deliberately absent because stderr is the legitimate diagnostics channel (error messages, warnings, failure notices are not run output). The check fires only inside the three tool engines. Legitimate direct stdout (subprocess IPC, machine `--json` paths that deliberately bypass the render seam, auxiliary-subcommand status lines) is exempted per-file via `@fitness-ignore-file no-direct-stdout-in-tool-engine` with a justification.
+
+  The complementary positive contract is the `CommandResult` return type: a tool returns its envelope and routes any output through the `ToolCliContext` seam (`cli.render` / `cli.emitEnvelope` / `cli.deliverSignals` / `cli.writeSarif`).
+
 ---
 
 ## Tool-internal partitioning rules
@@ -225,7 +239,7 @@ A cluster of rules in `.dependency-cruiser.cjs` keep the graph tool's stages cle
 
 **Cross-tool decoupling** (graph and fitness are now fully independent):
 
-- **`graph-no-fitness`** — graph production source must not import `@opensip-tools/fitness`. The former sole edge was the SARIF / `reportToCloud` helper; that module moved to `@opensip-tools/contracts` (the cross-cutting output-format contract), so graph and fitness both consume it from *below* with no peer cycle. There is no longer any sanctioned exception. (Test files may use devDeps.)
+- **`graph-no-fitness`** — graph production source must not import `@opensip-tools/fitness`. The former sole edge was the SARIF / cloud-report helper; per ADR-0011 SARIF is now the single shared `formatSignalSarif` formatter in `@opensip-tools/output`, applied at the composition root — graph returns a `SignalEnvelope` and imports neither fitness nor `@opensip-tools/output`. There is no longer any sanctioned exception. (Test files may use devDeps.)
 - **`fitness-no-graph`** — fitness production source must not import `@opensip-tools/graph`. The former dashboard-reads-graph edge is gone: the CLI is now the dashboard composition root and each tool contributes its own dashboard data via the `Tool.collectDashboardData` seam. (Test files may use devDeps.)
 
 **Dropped in v2.0.0** (recorded here so future spelunkers don't wonder where they went):

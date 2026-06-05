@@ -1,12 +1,13 @@
 ---
 status: current
-last_verified: 2026-06-03
+last_verified: 2026-06-04
 release: v2.6.0
 title: "JSON output schema"
 audience: [ci-integrators, plugin-authors]
-purpose: "The CliOutput shape (and the SimDoneResult shape). Every field, every type, every presence rule."
+purpose: "The SignalEnvelope shape every tool emits on --json. Every field, every type, every presence rule, plus the v1→v2 mapping."
 source-files:
-  - packages/contracts/src/types.ts
+  - packages/contracts/src/signal-envelope.ts
+  - packages/core/src/types/signal.ts
 related-docs:
   - ../10-concepts/04-contract-surfaces.md
   - ../20-fit/04-output-gate-sarif.md
@@ -14,22 +15,59 @@ related-docs:
 ---
 # JSON output schema
 
-`opensip-tools fit --json` and `opensip-tools sim --json` emit structured JSON on stdout. This is the contract surface for CI integrations.
+`opensip-tools fit --json`, `opensip-tools sim --json`, and `opensip-tools graph --json` all emit **the same structured JSON on stdout** — the `SignalEnvelope`. This is the contract surface for CI integrations.
 
-The shapes live in [`packages/contracts/src/types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/packages/contracts/src/types.ts).
+The shape lives in [`packages/contracts/src/signal-envelope.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/packages/contracts/src/signal-envelope.ts) (the envelope) and [`packages/core/src/types/signal.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/packages/core/src/types/signal.ts) (the `Signal`). Per [ADR-0011](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/docs/decisions/ADR-0011-signal-output-currency-formatter-sink.md), **`Signal` is the single output currency of every tool**: a `fit` check, a `graph` rule, and a `sim` scenario are all **units** that *produce signals*, and every run yields one envelope. The pretty-printed JSON is produced by the single shared `formatSignalJson` formatter ([`packages/output/src/format/signal-json.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/packages/output/src/format/signal-json.ts)) — the envelope *is* the wire shape, with no transform.
 
-> **Stability:** the `version: '1.0'` discriminator on `CliOutput` is part of the contract. Adding optional fields is a minor change; removing or changing types is a major change.
+> **Stability:** the `schemaVersion: 2` field on the envelope is the output-contract version (independent of any package version). Adding optional fields is a minor change; removing or changing types is a major change.
+
+> **Migrating from the old shape?** This is a breaking change from the v1 `CliOutput` JSON (`version: "1.0"`, `checks[]`, `findings[]`, `error|warning` severity). Jump to the [v1 → v2 mapping](#v1--v2-mapping) below.
 
 ---
 
-## fit (fitness checks) — `CliOutput`
+## The `SignalEnvelope`
 
-```ts
+```jsonc
 {
-  "version": "1.0",
+  "schemaVersion": 2,
   "tool": "fit",
-  "timestamp": "2026-05-15T10:30:00.000Z",
   "recipe": "default",
+  "runId": "run_9bb6ef4d07c0",
+  "createdAt": "2026-05-15T10:30:00.000Z",
+  "verdict": {
+    "score": 87,
+    "passed": false,
+    "summary": {
+      "total": 80,
+      "passed": 78,
+      "failed": 2,
+      "errors": 5,
+      "warnings": 12
+    }
+  },
+  "units": [ /* UnitResult[] */ ],
+  "signals": [ /* Signal[] */ ]
+}
+```
+
+### Top-level fields
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `schemaVersion` | `2` | yes | Output-contract version. Bumped on breaking changes; independent of package version. |
+| `tool` | `"fit"` \| `"sim"` \| `"graph"` | yes | The tool that produced this envelope. |
+| `recipe` | string | no | Recipe name if `--recipe` was used (or the default recipe's name). |
+| `runId` | string | yes | Stable identifier for this run (also used as the cloud-egress / `--report-to` idempotency root). |
+| `createdAt` | string (ISO 8601) | yes | When the run was assembled. |
+| `verdict` | `RunVerdict` | yes | Run-level pass/fail header. See below. |
+| `units` | `UnitResult[]` | yes | Per-unit ran/errored/timing facts. May be `[]`. |
+| `signals` | `Signal[]` | yes | The flat list of findings the run produced. May be `[]`. |
+| `resolutionMode` | `"exact"` \| `"fast"` | no | **graph-only** edge-fidelity marker. Absent for `fit` / `sim`. |
+
+### `RunVerdict`
+
+```jsonc
+{
   "score": 87,
   "passed": false,
   "summary": {
@@ -38,166 +76,114 @@ The shapes live in [`packages/contracts/src/types.ts`](https://github.com/opensi
     "failed": 2,
     "errors": 5,
     "warnings": 12
-  },
-  "checks": [ /* CheckOutput[] */ ],
-  "durationMs": 4321
+  }
 }
 ```
 
-### Top-level fields
-
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `version` | `"1.0"` | yes | Schema discriminator. Bumped on breaking changes. |
-| `tool` | `"fit"` \| `"sim"` \| `"graph"` | yes | The tool that produced this output. `"fit"` for `opensip-tools fit`. |
-| `timestamp` | string (ISO 8601) | yes | When the run started. |
-| `recipe` | string | no | Recipe name if `--recipe` was used (or the default recipe's name). |
-| `score` | number (0..100) | yes | Pass percentage. Deterministic given the same set of checks/findings. |
-| `passed` | boolean | yes | True iff every check passed (exit code 0 unless thresholds say otherwise). |
-| `summary.total` | number | yes | Total checks run. |
-| `summary.passed` | number | yes | Checks that passed. |
-| `summary.failed` | number | yes | Checks that failed (any error/warning count > 0). |
-| `summary.errors` | number | yes | Total error-level findings across all checks. |
-| `summary.warnings` | number | yes | Total warning-level findings. |
-| `checks` | CheckOutput[] | yes | Per-check results. |
-| `durationMs` | number | yes | Total run time in ms. |
+| `score` | number (0..100) | yes | Pass percentage. Deterministic given the same set of units/signals. |
+| `passed` | boolean | yes | `true` ⇔ **no `critical`/`high` signals** (the "error rung"). This is the CI gate: `--json \| jq -e '.verdict.passed'`. |
+| `summary.total` | number | yes | Total units that ran. |
+| `summary.passed` | number | yes | Units that passed (emitted no `critical`/`high` signals). |
+| `summary.failed` | number | yes | Units that failed. |
+| `summary.errors` | number | yes | Total `critical` + `high` signals across the run. |
+| `summary.warnings` | number | yes | Total `medium` + `low` signals across the run. |
 
-### `CheckOutput`
+### `UnitResult`
 
-```ts
+A **unit** is the neutral umbrella over a fit check, a graph rule, and a sim scenario. `units[]` carries only what a flat `Signal[]` cannot express — that a unit ran, whether it errored, and timing.
+
+```jsonc
 {
-  "checkSlug": "no-console-log",
+  "slug": "no-console-log",
   "passed": false,
   "violationCount": 2,
-  "findings": [ /* FindingOutput[] */ ],
-  "durationMs": 87
+  "durationMs": 87,
+  "filesValidated": 450,
+  "itemType": "files",
+  "ignoredCount": 1
 }
 ```
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `checkSlug` | string | yes | Check's kebab-case slug. |
-| `passed` | boolean | yes | True iff the check produced zero violations. |
-| `violationCount` | number | no | Number of violations. Equal to `findings.length` for most checks. |
-| `findings` | FindingOutput[] | yes | Violation details. May be `[]`. |
-| `durationMs` | number | yes | Time the check took to execute. |
+| `slug` | string | yes | The unit's identifier (check slug / graph rule slug / scenario id). |
+| `passed` | boolean | yes | `true` ⇔ the unit emitted no `critical`/`high` signals. |
+| `violationCount` | number | no | Number of signals the unit produced. |
+| `durationMs` | number | yes | Time the unit took to execute. |
+| `error` | string | no | Error message if the unit errored (e.g. an agent provider unreachable for a sim scenario). A unit can have run-and-errored with zero signals. |
+| `filesValidated` | number | no | **fitness-only.** Files the check scanned this run (the "Validated" column). A check that scanned 450 files and emitted 0 signals still reports `filesValidated: 450`. Graph rules / sim scenarios don't scan files and omit it. |
+| `itemType` | string | no | **fitness-only.** Names the scanned noun (`"files"` / `"packages"` / …) for the column label that pairs with `filesValidated`. |
+| `ignoredCount` | number | no | **fitness-only.** Findings suppressed by an inline `@fitness-ignore` directive this run (the "Ignores" column). Omitted by tools without a suppression mechanism. |
 
-### `FindingOutput`
+### `Signal`
 
-```ts
+Each entry in `signals[]` is a `Signal` ([`packages/core/src/types/signal.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/packages/core/src/types/signal.ts)). This is the richer shape that replaced the lossy `FindingOutput`: it carries 4-level severity, a `category`, a `provider`, a `fingerprint`, and a fix hint with confidence.
+
+```jsonc
 {
+  "id": "sig_a3f9c204e1b2",
+  "source": "no-console-log",
+  "provider": "opensip-tools",
+  "severity": "high",
+  "category": "quality",
   "ruleId": "fit:no-console-log",
   "message": "console.log is forbidden in production",
-  "severity": "error",
+  "suggestion": "Replace with structured logger.info()",
   "filePath": "services/api/src/routes/health.ts",
   "line": 42,
   "column": 17,
-  "suggestion": "Replace with structured logger.info()"
+  "code": { "file": "services/api/src/routes/health.ts", "line": 42, "column": 17 },
+  "fixAction": "replace-with-logger",
+  "fixConfidence": 0.8,
+  "metadata": {},
+  "createdAt": "2026-05-15T10:30:00.000Z"
 }
 ```
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `ruleId` | string | yes | Rule identifier. Format: `fit:<slug>` for fit checks, `<provider>:<rule>` for command-mode wrappers. |
+| `id` | string | yes | Per-signal identifier (`sig_<12 hex>`). |
+| `source` | string | yes | The producing unit's slug — the join key back to `units[].slug`. For graph this is the OpenSIP-convention rule id (`graph.<family>.<rule>`). |
+| `provider` | string | yes | The producer's namespace. `"opensip-tools"` for built-in checks/rules; command-mode wrappers carry the wrapped tool's name. |
+| `severity` | `"critical"` \| `"high"` \| `"medium"` \| `"low"` | yes | 4-level severity. `critical`/`high` are the "error rung" (drive `verdict.passed`); `medium`/`low` are the "warning rung". |
+| `category` | string | yes | Canonical labels: `security` \| `quality` \| `architecture` \| `testing` \| `resilience` \| `documentation` \| `warning` \| `performance` \| `error`. Open at the plugin layer (a plugin may declare its own). |
+| `ruleId` | string | yes | Rule identifier. `fit:<slug>` for fit checks, `graph.<family>.<rule>` for graph rules, `<provider>:<rule>` for command-mode wrappers. |
 | `message` | string | yes | Human-readable description. |
-| `severity` | `"error" \| "warning"` | yes | Finding severity. |
-| `filePath` | string | no | Project-relative file path. Absent for cross-cutting findings. |
-| `line` | number | no | 1-based line number. Absent for findings without a location. |
-| `column` | number | no | 1-based column number. |
 | `suggestion` | string | no | Optional fix suggestion. |
+| `filePath` | string | yes | Project-relative file path. Empty string (`""`) for cross-cutting signals with no location. |
+| `line` | number | no | 1-based line number. Absent for signals without a location. |
+| `column` | number | no | 1-based column number. |
+| `code` | `{ file?, line?, column? }` | no | Structured location echo (mirrors `filePath`/`line`/`column`). |
+| `fixAction` | string | no | Machine label for the suggested fix. |
+| `fixConfidence` | number (0..1) | no | Confidence in the suggested fix. |
+| `metadata` | object | yes | Open key/value bag for rule-specific detail. May be `{}`. |
+| `strength` | number | no | Optional signal-strength weight. |
+| `fingerprint` | string | no | Stable de-dup fingerprint when the producer computes one. |
+| `createdAt` | string (ISO 8601) | yes | When the signal was created. |
 
-The line and column are **1-based** to match SARIF and most editor conventions. A finding without a location simply omits `filePath` / `line` / `column`.
-
----
-
-## sim (simulation scenarios) — `SimDoneResult`
-
-```ts
-{
-  "type": "sim-done",
-  "recipeName": "pre-deploy",
-  "cwd": "/workspace/acme-api",
-  "totalScenarios": 3,
-  "passedScenarios": 1,
-  "failedScenarios": 2,
-  "scenarios": [ /* per-scenario summaries */ ],
-  "durationMs": 165432,
-  "shouldFail": true
-}
-```
-
-### Top-level fields
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `type` | `"sim-done"` | yes | Result kind discriminator. |
-| `recipeName` | string | yes | Recipe that ran. |
-| `cwd` | string | yes | Project root used for the run. |
-| `totalScenarios` | number | yes | Scenarios the recipe matched. |
-| `passedScenarios` | number | yes | Scenarios that passed. |
-| `failedScenarios` | number | yes | Scenarios that failed. |
-| `scenarios` | object[] | yes | Per-scenario summaries. |
-| `durationMs` | number | yes | Total run time in ms. |
-| `shouldFail` | boolean | no | True iff at least one scenario failed. Exit code 1 when true. |
-
-### Per-scenario summary
-
-```ts
-{
-  "scenarioId": "11111111-1111-4111-8111-111111111111",
-  "scenarioName": "checkout-burst",
-  "kind": "load",
-  "passed": true,
-  "durationMs": 32_415,
-  "error": undefined
-}
-```
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `scenarioId` | string | yes | Scenario's UUID. |
-| `scenarioName` | string | yes | Human-readable name. |
-| `kind` | `"load" \| "chaos" \| "invariant" \| "fix-evaluation"` | yes | Scenario kind. |
-| `passed` | boolean | yes | True iff the scenario passed all assertions. |
-| `durationMs` | number | yes | Scenario execution time. |
-| `error` | string | no | Error message if the scenario errored (e.g. agent provider unreachable). |
-
-> **Note:** per-kind details (load p99, invariant counterexample, chaos recovery time) are **not** in this top-level shape. They're in the session record on disk under `<project>/opensip-tools/.runtime/sessions/{timestamp}-sim-{recipe?}.json`. The dashboard reads the session record for the deeper view.
+The line and column are **1-based** to match SARIF and most editor conventions. A signal without a location omits `line` / `column` and carries an empty `filePath`.
 
 ---
 
-## graph (call-graph rules) — `CliOutput`
+## Per-tool notes
 
-`opensip-tools graph --json` produces the **same `CliOutput` envelope** as `fit --json`. The only difference is `tool: "graph"` and the `ruleId` format on each finding (`graph:<rule-slug>` instead of `fit:<check-slug>`):
+All three tools emit the **same envelope**; the differences are confined to a few fields:
 
-```json
-{
-  "version": "1.0",
-  "tool": "graph",
-  "timestamp": "2026-05-17T10:30:00.000Z",
-  "score": 92,
-  "passed": false,
-  "summary": {
-    "total": 5,
-    "passed": 4,
-    "failed": 1,
-    "errors": 0,
-    "warnings": 23
-  },
-  "checks": [ /* one CheckOutput per graph rule */ ],
-  "durationMs": 7891
-}
-```
+- **`fit`** — `tool: "fit"`; each unit is a check (`slug` = check slug); signal `ruleId` is `fit:<slug>`. Units carry the fitness-only `filesValidated` / `itemType` / `ignoredCount`.
+- **`graph`** — `tool: "graph"`; each unit is a graph rule; signal `ruleId` / `source` are the OpenSIP-convention id (`graph.<family>.<rule>`). The graph rules: `orphan-subtree`, `duplicated-function-body`, `no-side-effect-path`, `test-only-reachable`, `always-throws-branch`, `large-function`, `wide-function`, `high-blast-untested`, `cycle`. The graph envelope also carries the optional `resolutionMode` marker. Graph builds the envelope in [`packages/graph/engine/src/cli/build-envelope.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/packages/graph/engine/src/cli/build-envelope.ts).
+- **`sim`** — `tool: "sim"`; each unit is a scenario (`slug` = scenario id, `error` set when a scenario errored). `sim --json` now emits this envelope too — the old bespoke `sim-done` JSON shape is retired.
 
-Each rule appears as a `CheckOutput` whose `checkSlug` is the graph rule slug (`graph:orphan-subtree`, `graph:duplicated-function-body`, `graph:no-side-effect-path`, `graph:test-only-reachable`, `graph:always-throws-branch`, `graph:large-function`, `graph:wide-function`, `graph:high-blast-untested`, `graph:cycle`). Findings carry the same `FindingOutput` shape, and graph's SARIF renderer is a thin wrapper over fitness's `buildSarifLog` (DEC-3 cross-tool import) — no graph-specific extensions today. See the renderer at [`packages/graph/engine/src/render/json.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/packages/graph/engine/src/render/json.ts) and the SARIF wrapper at [`packages/graph/engine/src/render/sarif.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/packages/graph/engine/src/render/sarif.ts).
+> **Per-kind sim detail** (load p99, invariant counterexample, chaos recovery time) is **not** in the envelope. It lives in the session record on disk under `<project>/opensip-tools/.runtime/sessions/{timestamp}-sim-{recipe?}.json`. The dashboard reads the session record for the deeper view.
 
 ---
 
 ## Error result — `ErrorResult`
 
-When a run fails before producing a result (config invalid, plugin failed to load, baseline missing), the JSON output is the error envelope rather than `CliOutput` / `SimDoneResult`:
+When a run fails before producing an envelope (config invalid, plugin failed to load, baseline missing), the JSON output is the error envelope rather than a `SignalEnvelope`:
 
-```ts
+```jsonc
 {
   "error": "Gate baseline not found in the project SQLite store. Run `opensip-tools fit --gate-save` first to create one."
 }
@@ -207,12 +193,32 @@ Exit code is 2 (configuration/runtime error) or whatever the throwing code speci
 
 ---
 
+## v1 → v2 mapping
+
+The v1 `--json` output was the fitness-shaped `CliOutput` husk (`version: "1.0"`). v2 is the signal-native `SignalEnvelope` (`schemaVersion: 2`). The mapping for a CI consumer migrating off v1:
+
+| v1 (`CliOutput`) | v2 (`SignalEnvelope`) | Notes |
+|---|---|---|
+| `version: "1.0"` | `schemaVersion: 2` | Discriminator field renamed and re-typed (string → number). |
+| top-level `score` | `verdict.score` | Same 0..100 meaning. |
+| top-level `passed` | `verdict.passed` | Same boolean; now defined as "no `critical`/`high` signals". |
+| `summary.*` | `verdict.summary.*` | Same field names, nested under `verdict`. |
+| `timestamp` | `createdAt` | Renamed. |
+| `durationMs` (top-level) | per-unit `units[].durationMs` | No single top-level total; sum `units[].durationMs` if needed. |
+| `checks[]` | `units[]` | Per-unit ran/errored/timing facts (no nested findings). |
+| `checks[].checkSlug` | `units[].slug` **and** `signals[].source` | The signal's `source` is the join key back to its unit's `slug`. |
+| `checks[].findings[]` | `signals[]` | Flattened into one top-level list; join to a unit via `signals[].source === units[].slug`. |
+| `findings[].severity: "error" \| "warning"` | `signals[].severity: "critical" \| "high" \| "medium" \| "low"` | 4-level. `error` ≈ `critical`/`high`; `warning` ≈ `medium`/`low`. |
+| `findings[].ruleId` / `message` / `suggestion` / `filePath` / `line` / `column` | `signals[].ruleId` / `message` / `suggestion` / `filePath` / `line` / `column` | Same fields; signals add `category`, `provider`, `fingerprint`, `fixConfidence`. |
+
+---
+
 ## Compatibility commitments
 
 - **Adding optional fields is a minor change.** A consumer that doesn't know about a new field continues to work.
 - **Adding required fields is a major change.** This would break consumers that don't account for it.
-- **Reordering keys is *not* a contract.** Consumers must parse, not pattern-match. In practice the renderer emits keys in declared order.
-- **The `version: '1.0'` discriminator changes only on a major.** A `version: '2.0'` payload is allowed to break consumers expecting 1.0; they should switch on the version.
+- **Reordering keys is *not* a contract.** Consumers must parse, not pattern-match. In practice the formatter emits keys in declared order.
+- **`schemaVersion` changes only on a major.** A `schemaVersion: 3` payload is allowed to break consumers expecting 2; switch on the version.
 
 ---
 
@@ -221,17 +227,20 @@ Exit code is 2 (configuration/runtime error) or whatever the throwing code speci
 A few CI patterns:
 
 ```bash
-# Fail on any violation:
-opensip-tools fit --json | jq -e '.passed'
+# Fail on any error-rung (critical/high) signal:
+opensip-tools fit --json | jq -e '.verdict.passed'
 
-# Print only failed checks:
-opensip-tools fit --json | jq '.checks | map(select(.passed == false))'
+# Print only failed units:
+opensip-tools fit --json | jq '.units | map(select(.passed == false))'
 
-# Count errors by file:
-opensip-tools fit --json | jq '.checks[].findings[] | select(.severity == "error") | .filePath' | sort | uniq -c
+# Count error-rung signals by file:
+opensip-tools fit --json | jq '.signals[] | select(.severity == "critical" or .severity == "high") | .filePath' | sort | uniq -c
+
+# All signals for one unit (join on source → slug):
+opensip-tools fit --json | jq '.signals[] | select(.source == "no-console-log")'
 
 # Score gate:
-opensip-tools fit --json | jq -e '.score >= 90'
+opensip-tools fit --json | jq -e '.verdict.score >= 90'
 ```
 
 For SARIF (the gate's native shape), use `--gate-save` / `--gate-compare`. The SARIF shape is the SARIF 2.1.0 spec's, not opensip-tools' — see [`10-concepts/05-architecture-gate.md`](/docs/opensip-tools/10-concepts/05-architecture-gate/).

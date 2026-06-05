@@ -1,13 +1,13 @@
 ---
 status: current
-last_verified: 2026-06-03
+last_verified: 2026-06-04
 release: v2.6.x
 title: "Architecture gate"
 audience: [contributors, ci-integrators]
-purpose: "The baseline-and-compare workflow. Identity hash, line-shift invariance, partial-SARIF tolerance, CI integration patterns."
+purpose: "The baseline-and-compare workflow. Identity hash, line-shift invariance, CI integration patterns."
 source-files:
   - packages/fitness/engine/src/gate.ts
-  - packages/reporting/src/sarif.ts
+  - packages/output/src/format/signal-sarif.ts
   - packages/fitness/engine/src/persistence/baseline-repo.ts
   - packages/fitness/engine/src/__tests__/gate.test.ts
   - packages/fitness/engine/src/tool.ts
@@ -23,7 +23,7 @@ The gate is opensip-tools' answer to "we have legacy violations and we need to s
 > **What you'll understand after this:**
 > - The two-mode flow: `--gate-save` and `--gate-compare`.
 > - The identity hash and why line numbers are excluded.
-> - How partial-SARIF tolerance lets users hand-edit baselines.
+> - Why the v2 baseline is a stored `SignalEnvelope`, not a SARIF document.
 > - The CI patterns that make the gate useful in practice.
 
 ---
@@ -35,7 +35,9 @@ opensip-tools fit --gate-save                 # capture today's reality
 opensip-tools fit --gate-compare              # CI gate from now on
 ```
 
-`--gate-save` runs the configured recipe and writes the resulting findings as a SARIF document into the project's SQLite store (`fit_baseline` table at `<project>/opensip-tools/.runtime/datastore.sqlite`, via [`FitBaselineRepo`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/packages/fitness/engine/src/persistence/baseline-repo.ts)). There is **exactly one baseline per project**.
+`--gate-save` runs the configured recipe and stores the resulting `SignalEnvelope` into the project's SQLite store (`fit_baseline` table at `<project>/opensip-tools/.runtime/datastore.sqlite`, via [`FitBaselineRepo`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/packages/fitness/engine/src/persistence/baseline-repo.ts)). There is **exactly one baseline per project**.
+
+> **Baseline shape (ADR-0011).** The v2 baseline stores the run's `SignalEnvelope` (its `signals`) directly — **not** a SARIF document — mirroring graph's signal-keyed baseline. This keeps fitness off any `@opensip-tools/output` production dependency: the composition root owns all SARIF egress. `fit-baseline-export` reads the stored envelope back and writes a SARIF file via the root `cli.writeSarif` seam, so the on-disk CI artifact stays SARIF.
 
 > **v1 → v2 break.** v1 wrote baselines as SARIF *files* (`baseline.sarif`) and let users override the path with `--baseline <path>`. **The `--baseline` flag is gone in v2.** Teams that committed `baseline.sarif` to git for cross-CI gate comparisons should re-run `--gate-save` once on v2, then adopt one of the artifact-based CI patterns below. See [`80-implementation/03-session-and-persistence.md`](/docs/opensip-tools/80-implementation/03-session-and-persistence/) for the schema layout.
 
@@ -96,12 +98,12 @@ The line-shift invariance is exercised by [`packages/fitness/engine/src/__tests_
 [`packages/fitness/engine/src/gate.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/packages/fitness/engine/src/gate.ts):
 
 ```ts
-export function compareToBaseline(output: CliOutput, repo: FitBaselineRepo): GateCompareResult {
+export function compareToBaseline(envelope: SignalEnvelope, repo: FitBaselineRepo): GateCompareResult {
   // 1. Throw GateBaselineMissingError if repo.load() returns null.
-  // 2. Parse the SARIF document held in the fit_baseline row.
+  // 2. Read the stored baseline envelope from the fit_baseline row.
   //    Throw GateBaselineInvalidError on bad input.
-  // 3. Extract baseline violations from SARIF runs[].results[].
-  // 4. Extract current violations from output.checks[].findings[].
+  // 3. Extract baseline violations from baseline.signals (extractViolationsFromStoredBaseline).
+  // 4. Extract current violations from envelope.signals (extractViolationsFromEnvelope).
   // 5. Hash both lists into Maps keyed by hash.
   // 6. Diff:
   //      added       = current.keys() - baseline.keys()
@@ -117,24 +119,15 @@ The `degraded` flag is `added.length > 0`. A run can resolve violations *and* ad
 
 ---
 
-## Partial-SARIF tolerance
+## Tolerant baseline reading
 
-The reader is forgiving. From [`packages/fitness/engine/src/gate.ts:287`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/packages/fitness/engine/src/gate.ts) (`extractViolationsFromSarif`):
+Both the stored baseline envelope and the current run reduce to the same hashed violation list before the diff. `extractViolationsFromStoredBaseline` and `extractViolationsFromEnvelope` ([`packages/fitness/engine/src/gate.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/packages/fitness/engine/src/gate.ts)) read only the fields the identity hash needs (`filePath`, `ruleId`, `message`) off each `signal` and ignore the rest:
 
-- A run with no `results` array → skipped silently. (Maybe the user removed all findings from a run; that's not a parse error.)
-- A run with `results` but missing `tool.driver` → still parsed, the result entries become violations.
-- A result with no `locations` (a "global" finding without a file) → parsed with `filePath = ''`. The hash still works.
-- A result with `region.startLine = 0` or missing → no line in the violation; the hash is unaffected because line numbers aren't in the hash anyway.
+- A signal with no location → `filePath = ''`. The hash still works (line/column aren't in the hash anyway).
+- Extra signal fields (`category`, `provider`, `fixConfidence`, `metadata`, …) are ignored — they don't affect identity.
+- A baseline envelope with an empty `signals` list → zero baseline violations; every current signal reads as added.
 
-The `extractViolationsFromSarif` code path also tolerates extra fields the SARIF parser might inject (extensions, properties bags, etc.). It reads the four fields it needs and ignores the rest.
-
-This permissiveness exists because **users sometimes hand-edit baselines.** A team might:
-
-- Delete an entry from `runs[].results[]` because the violation has been intentionally fixed and they want the next compare to be clean.
-- Add an entry by copy-pasting a result block to grandfather a violation they know about but can't fix yet.
-- Bulk-replace a file path because they renamed a directory.
-
-These edits are first-class operations. The gate parser refuses corrupt JSON or missing top-level fields (`runs` is required), but it doesn't enforce SARIF-spec strictness on individual results. The gate is for the team's workflow, not for SARIF-spec compliance.
+The baseline is a rebuildable local cache (ADR-0006): the datastore is regenerated by re-running `--gate-save`, so there is no migration of pre-existing rows. If you need a text-shaped, hand-editable artifact (to grandfather a finding, or to commit to git), use `fit-baseline-export` to emit a SARIF file and one of the artifact-based CI patterns below.
 
 ---
 
@@ -152,9 +145,9 @@ opensip-tools fit --gate-compare
                             cli.setExitCode(result.degraded ? 1 : 0)
 ```
 
-The gate is a post-processing layer on top of the standard `executeFit()` run. It doesn't change which checks ran, which targets were resolved, or how filtering applied. It just takes the same `CliOutput` the renderer would have shown and runs the diff.
+The gate is a post-processing layer on top of the standard `executeFit()` run. It doesn't change which checks ran, which targets were resolved, or how filtering applied. It just takes the same `SignalEnvelope` the renderer would have shown and runs the diff.
 
-This is why ignore directives are compatible with the gate: a directive suppresses a violation *before* the violation enters `CliOutput`, so the baseline doesn't see it and the compare doesn't see it. A new directive added today removes a finding from the current run; the gate reports it as resolved (since it was in the baseline). A directive removed today re-introduces a finding; the gate reports it as added.
+This is why ignore directives are compatible with the gate: a directive suppresses a violation *before* the signal enters the envelope, so the baseline doesn't see it and the compare doesn't see it. A new directive added today removes a finding from the current run; the gate reports it as resolved (since it was in the baseline). A directive removed today re-introduces a finding; the gate reports it as added.
 
 ---
 
@@ -204,7 +197,7 @@ The baseline lives in `.runtime/datastore.sqlite` (gitignored). Each developer's
 
 This is the loosest shape. Useful for early adoption, where the team isn't yet ready to enforce the gate in CI but wants the regression-detection workflow as a personal tool.
 
-> **Why no "committed baseline" pattern in v2?** Because the v2 baseline is a row in a SQLite database with WAL sidecars, committing it to git would mean committing a binary blob that diffs poorly and races on WAL writes. The artifact pattern above is the supported substitute. Teams that strongly need a text-shaped baseline in git can hand-export the SARIF payload from the `fit_baseline` row, but the CLI does not offer a built-in export today.
+> **Why no "committed baseline" pattern in v2?** Because the v2 baseline is a row in a SQLite database with WAL sidecars, committing it to git would mean committing a binary blob that diffs poorly and races on WAL writes. The artifact pattern above is the supported substitute. Teams that strongly need a text-shaped baseline in git can run `fit-baseline-export` to write the stored envelope as a SARIF file and commit that.
 
 ---
 
