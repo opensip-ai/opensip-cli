@@ -40,7 +40,6 @@ const PluginsSchema = z.object({
   sim: z.array(z.string()).optional(),
   lang: z.array(z.string()).optional(),
   checkPackages: z.array(z.string()).optional(),
-  autoDiscoverChecks: z.boolean().optional(),
   packageScopes: z.array(z.string()).optional(),
 }).optional()
 
@@ -70,7 +69,6 @@ function buildFromParsed(
     sim?: readonly string[]
     lang?: readonly string[]
     checkPackages?: readonly string[]
-    autoDiscoverChecks?: boolean
     packageScopes?: readonly string[]
   },
 ): { registry: TargetRegistry; config: TargetsConfig } {
@@ -113,7 +111,6 @@ function buildFromParsed(
         ...(rawPlugins.sim && { sim: Object.freeze([...rawPlugins.sim]) }),
         ...(rawPlugins.lang && { lang: Object.freeze([...rawPlugins.lang]) }),
         ...(rawPlugins.checkPackages && { checkPackages: Object.freeze([...rawPlugins.checkPackages]) }),
-        ...(rawPlugins.autoDiscoverChecks !== undefined && { autoDiscoverChecks: rawPlugins.autoDiscoverChecks }),
         ...(rawPlugins.packageScopes && { packageScopes: Object.freeze([...rawPlugins.packageScopes]) }),
       })
     : undefined

@@ -220,7 +220,7 @@ describe('readScenarioPackagePreferences', () => {
     expect(prefs.autoDiscoverScenarios).toBe(false)
   })
 
-  it('reads packageScopes from project config (shared with fitness)', () => {
+  it('reads packageScopes from project config', () => {
     writeFileSync(
       join(testDir, 'opensip-tools.config.yml'),
       `plugins:

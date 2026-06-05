@@ -103,8 +103,7 @@ export async function ensureScenariosLoaded(projectDir?: string): Promise<void> 
   //    installed in node_modules. No package is privileged. Project
   //    config can override (plugins.scenarioPackages: [...]) or opt
   //    out (plugins.autoDiscoverScenarios: false). Customer-owned
-  //    scopes are picked up via plugins.packageScopes (shared with
-  //    fitness's check-package discovery).
+  //    scopes are picked up via plugins.packageScopes.
   //
   //    Like fitness's path, projectDir is the discovery anchor; an
   //    ad-hoc invocation without one falls through to no discovery.

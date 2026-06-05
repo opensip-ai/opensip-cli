@@ -113,7 +113,7 @@ checkOverrides:
     expect(() => loadTargetsConfig(testDir)).toThrow(/unknown target/);
   });
 
-  it('parses plugins block with all keys', () => {
+  it('parses plugins block with current keys', () => {
     writeFileSync(
       join(testDir, 'opensip-tools.config.yml'),
       `targets:
@@ -124,14 +124,14 @@ plugins:
   fit: ["@a/b"]
   sim: ["@c/d"]
   checkPackages: ["@e/f"]
-  autoDiscoverChecks: false
+  packageScopes: ["@acme"]
 `,
     );
     const { config } = loadTargetsConfig(testDir);
     expect(config.plugins?.fit).toEqual(['@a/b']);
     expect(config.plugins?.sim).toEqual(['@c/d']);
     expect(config.plugins?.checkPackages).toEqual(['@e/f']);
-    expect(config.plugins?.autoDiscoverChecks).toBe(false);
+    expect(config.plugins?.packageScopes).toEqual(['@acme']);
   });
 
   it('throws ValidationError when target name is not kebab-case', () => {

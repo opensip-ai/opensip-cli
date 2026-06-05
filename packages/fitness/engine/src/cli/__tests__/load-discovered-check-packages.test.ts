@@ -2,9 +2,8 @@
  * Integration tests for `loadDiscoveredCheckPackages`.
  *
  * Builds fixture node_modules layouts in tmpdir and asserts the loader
- * registers checks + recipes from packages discovered via either the
- * name-pattern walk (legacy @opensip-tools/checks-* / packageScopes) or
- * the marker walk (`opensipTools.kind: "fit-pack"`).
+ * registers checks + recipes from packages discovered via the marker walk
+ * (`opensipTools.kind: "fit-pack"`) or exact `plugins.checkPackages` entries.
  *
  * Phase 7.4 of the marker-based-discovery plan.
  */
@@ -128,12 +127,30 @@ describe('loadDiscoveredCheckPackages', () => {
     expect(defaultRecipeRegistry.has(recipeId)).toBe(true);
   });
 
-  it('discovers and loads a name-pattern-only package (@opensip-tools/checks-*)', async () => {
+  it('does not load a prefix-only package without the fit-pack marker', async () => {
+    const { checkSlug } = writeFixturePack({
+      packageDir: join(testDir, 'node_modules', '@opensip-tools', 'checks-fixture'),
+      packageName: '@opensip-tools/checks-fixture',
+    });
+
+    const { totalRegistered: registered } = await loadDiscoveredCheckPackages(testDir);
+
+    expect(registered).toBe(0);
+    expect(defaultRegistry.getBySlug(checkSlug)).toBeUndefined();
+  });
+
+  it('loads a non-marker package when explicitly listed in plugins.checkPackages', async () => {
     const { checkSlug, recipeId } = writeFixturePack({
       packageDir: join(testDir, 'node_modules', '@opensip-tools', 'checks-fixture'),
       packageName: '@opensip-tools/checks-fixture',
-      // No marker — discovery is via the legacy scope+name walk.
     });
+    writeFileSync(
+      join(testDir, 'opensip-tools.config.yml'),
+      `plugins:
+  checkPackages:
+    - "@opensip-tools/checks-fixture"
+`,
+    );
 
     const { totalRegistered: registered } = await loadDiscoveredCheckPackages(testDir);
 
@@ -142,10 +159,7 @@ describe('loadDiscoveredCheckPackages', () => {
     expect(defaultRecipeRegistry.has(recipeId)).toBe(true);
   });
 
-  it('loads a pack matching BOTH name-pattern and marker only once (dedupe by name)', async () => {
-    // A pack named @opensip-tools/checks-foo that ALSO declares the marker.
-    // The name-pattern walk finds it first; the marker walk also finds it;
-    // dedupe-by-name keeps a single load.
+  it('loads a checks-prefixed pack when it declares the fit-pack marker', async () => {
     const { checkSlug, recipeId } = writeFixturePack({
       packageDir: join(testDir, 'node_modules', '@opensip-tools', 'checks-dual'),
       packageName: '@opensip-tools/checks-dual',
@@ -241,11 +255,13 @@ describe('loadDiscoveredCheckPackages', () => {
     const a = writeFixturePack({
       packageDir: join(testDir, 'node_modules', '@opensip-tools', 'checks-foreigncore-a'),
       packageName: '@opensip-tools/checks-foreigncore-a',
+      marker: 'fit-pack',
       withForeignCore: true,
     });
     const b = writeFixturePack({
       packageDir: join(testDir, 'node_modules', '@opensip-tools', 'checks-foreigncore-b'),
       packageName: '@opensip-tools/checks-foreigncore-b',
+      marker: 'fit-pack',
       withForeignCore: true,
     });
 
@@ -274,6 +290,7 @@ describe('loadDiscoveredCheckPackages', () => {
     const { checkSlug } = writeFixturePack({
       packageDir: join(testDir, 'node_modules', '@opensip-tools', 'checks-samecore'),
       packageName: '@opensip-tools/checks-samecore',
+      marker: 'fit-pack',
     });
 
     const { totalRegistered, coreMismatchSkips } = await loadDiscoveredCheckPackages(testDir);

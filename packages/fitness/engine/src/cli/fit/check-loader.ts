@@ -135,19 +135,14 @@ export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
     }
   }
 
-  // 3. Discover and load every @opensip-tools/checks-* package installed
-  //    in node_modules. No package is privileged — what used to be a
-  //    hardcoded `import('@opensip-tools/checks-builtin')` is now an
-  //    ordinary npm dependency declared by opensip-tools and
-  //    discovered via discoverCheckPackages() like every other pack.
-  //    Project config can override (plugins.checkPackages: [...]) or
-  //    opt out (plugins.autoDiscoverChecks: false).
+  // 3. Discover and load fit-pack packages installed in node_modules.
+  //    Marker discovery (`opensipTools.kind: "fit-pack"`) is the automatic
+  //    path. `plugins.checkPackages` can add exact package names for packs
+  //    that do not declare the marker yet.
   //
-  //    `projectDir` is the discovery anchor — discoverCheckPackages
-  //    walks up to ancestor node_modules from there. When called
-  //    without one (e.g. ad-hoc `opensip-tools fit` in an unconfigured
-  //    dir) we fall back to the CLI's own install dir so the bundled
-  //    deps still resolve.
+  //    `projectDir` is the discovery anchor. When called without one (e.g.
+  //    ad-hoc `opensip-tools fit` in an unconfigured dir) we fall back to the
+  //    CLI's own install dir so the bundled deps still resolve.
   const discoveryAnchor = projectDir ?? cliInstallDir();
   const { totalRegistered: checksRegistered, warnings: packWarnings, coreMismatchSkips } =
     await loadDiscoveredCheckPackages(discoveryAnchor);
@@ -160,12 +155,12 @@ export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
     // When the run is empty BECAUSE every candidate pack was refused for a
     // core mismatch, loadDiscoveredCheckPackages already pushed a consolidated
     // warning explaining it and pointing at `pnpm fit`. The generic "install a
-    // checks-* package" guidance would be actively misleading there (the packs
+    // fit-pack package" guidance would be actively misleading there (the packs
     // ARE installed), so only emit it when nothing was skipped for a mismatch.
     if (coreMismatchSkips.length === 0) {
       loadWarnings.push(
         'no check packages were loaded. ' +
-          'Install at least one @opensip-tools/checks-* package, ' +
+          'Install at least one package declaring opensipTools.kind: "fit-pack", ' +
           'or declare plugins.checkPackages in opensip-tools.config.yml.',
       );
     }
@@ -298,14 +293,14 @@ export interface LoadDiscoveredResult {
   /**
    * Names of check packs refused by the single-core guard (B). Lets the
    * caller tailor the no-checks-loaded message: when the run is empty BECAUSE
-   * packs were skipped for a core mismatch, the generic "install a checks-*
+   * packs were skipped for a core mismatch, the generic "install a fit-pack
    * package" guidance is misleading (the packs ARE installed).
    */
   readonly coreMismatchSkips: readonly string[];
 }
 
 /**
- * Load every check package returned by discoverCheckPackages(). Each
+ * Load every marker-discovered or explicitly listed check package. Each
  * package's main entry should follow the FitPluginExports contract:
  *
  *   - `checks`: readonly Check[]                (required)
@@ -324,15 +319,11 @@ export async function loadDiscoveredCheckPackages(projectDir: string): Promise<L
   const discovered = discoverCheckPackages({
     projectDir,
     explicitPackages: prefs.checkPackages,
-    autoDiscover: prefs.autoDiscoverChecks,
-    packageScopes: prefs.packageScopes,
   });
-  // Marker-based discovery is the canonical path: any package declaring
-  // opensipTools.kind: "fit-pack" is discovered regardless of npm scope. It
-  // runs in parallel with the (deprecated) name-pattern walk, which survives
-  // only for third-party packs that haven't adopted the marker yet. Dedupe by
-  // package name; first occurrence (name-pattern walk) wins so existing
-  // customers' telemetry doesn't shift over to a different code path silently.
+  // Marker-based discovery is the automatic path: any package declaring
+  // opensipTools.kind: "fit-pack" is discovered regardless of npm scope. Exact
+  // `plugins.checkPackages` entries load alongside it for packages that do not
+  // declare the marker yet. Dedupe by package name; explicit config wins.
   const markerDiscovered = discoverPackagesByMarker({ projectDir, kind: 'fit-pack' });
   const seenNames = new Set(discovered.map((p) => p.name));
   const allPacks: readonly { name: string; packageDir: string }[] = [

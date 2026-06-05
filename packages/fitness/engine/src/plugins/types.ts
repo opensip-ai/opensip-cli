@@ -1,7 +1,7 @@
 /**
  * @fileoverview Fitness plugin export contract
  *
- * What an @opensip-tools/checks-* (or any fit-domain plugin) exports.
+ * What a fit-domain plugin exports.
  * Held in fitness because it references Check / FitnessRecipe — types
  * the kernel doesn't know about.
  */

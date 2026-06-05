@@ -1,12 +1,12 @@
 // @ts-check
 /**
- * dependency-cruiser config — enforces the v1.0 layered architecture.
+ * dependency-cruiser config — enforces the layered architecture.
  *
  * Layer order (lower depends on higher only):
  *
  *   1. @opensip-tools/core           — kernel
  *   2. @opensip-tools/datastore      — SQLite + Drizzle persistence layer
- *   3. @opensip-tools/contracts      — shared contract types (CliOutput, exit codes, persistence)
+ *   3. @opensip-tools/contracts      — shared contract types (SignalEnvelope, CommandResult, exit codes)
  *   4. @opensip-tools/lang-*         — language adapters (depend on core)
  *   4. @opensip-tools/fitness        — fitness engine + cli/* commands
  *   4. @opensip-tools/simulation     — simulation engine + cli/* commands
@@ -335,7 +335,7 @@ module.exports = {
       name: 'contracts-imports-core-only',
       severity: 'error',
       comment:
-        'contracts holds the CliOutput / exit codes / persistence TYPES used ' +
+        'contracts holds the SignalEnvelope / CommandResult / exit code TYPES used ' +
         'by every tool. It must not import from any tool, the cli entry ' +
         'point, language packs, dashboard, or the runtime packages it was ' +
         'split into (datastore / session-store / output). It depends on ' +
@@ -701,10 +701,9 @@ module.exports = {
     {
       // Audit 2026-05-29 (M1): the prior `graph-may-import-fitness-sarif`
       // info-exception is gone. The only real graph→fitness edge was
-      // `reportToCloud`; the SARIF + cloud-reporting module moved to
-      // @opensip-tools/contracts (the cross-cutting output-format
-      // contract), so graph and fitness both consume it from below with
-      // no peer cycle. Graph must now NOT import fitness at all — there
+      // `reportToCloud`; SARIF formatting and cloud delivery moved to
+      // @opensip-tools/output and are applied at the CLI composition root,
+      // so graph and fitness have no peer cycle. Graph must now NOT import fitness at all — there
       // is no sanctioned exception. (Breaking this cycle is what lets
       // fitness read graph's catalog via CatalogRepo instead of raw SQL;
       // see H1.) Production source only; test files may use devDeps.
@@ -712,8 +711,8 @@ module.exports = {
       severity: 'error',
       comment:
         'Graph must not import @opensip-tools/fitness. The former SARIF / ' +
-        'reportToCloud edge was removed by relocating that module to ' +
-        '@opensip-tools/contracts (audit 2026-05-29, M1).',
+        'reportToCloud edge was removed by relocating output formatting ' +
+        'and delivery to @opensip-tools/output (audit 2026-05-29, M1).',
       from: {
         path: '^packages/graph/',
         pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`],

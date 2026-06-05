@@ -1,6 +1,6 @@
 /**
- * @fileoverview Shared npm-scope validation + resolution for plugin
- * auto-discovery (check packs, scenario packs, future tool packs).
+ * @fileoverview Shared npm-scope validation + resolution for scoped plugin
+ * auto-discovery (scenario packs, future package families).
  *
  * Discovery code maps a scope string to `node_modules/<scope>/` and
  * scans for packages. Untrusted scope strings reach `path.join`, so we
@@ -8,10 +8,9 @@
  * segments. A stray `..` or `/` would otherwise scan the wrong
  * directory.
  *
- * Hoisted into core so every tool's discovery surface enforces the
- * same invariant. The `@opensip-tools/checks-*` discovery in fitness
- * and `@opensip-tools/scenarios-*` discovery in sim both flow through
- * this helper.
+ * Hoisted into core so every scoped discovery surface enforces the
+ * same invariant. The `@opensip-tools/scenarios-*` discovery in sim
+ * flows through this helper.
  */
 
 import { logger } from '../lib/logger.js'
@@ -34,8 +33,7 @@ export const VALID_NPM_SCOPE_REGEX = /^@[a-z0-9][a-z0-9._-]*$/
  * @param extraScopes   Customer-configured additions
  * @param evt           Log event name to use when warning about invalid
  *                       entries — lets each caller emit a domain-specific
- *                       event name (`plugin.check_package.invalid_scope`,
- *                       `plugin.scenario_package.invalid_scope`).
+   *                       event name (`plugin.scenario_package.invalid_scope`).
  */
 export function resolveScopes(
   defaultScope: string,
