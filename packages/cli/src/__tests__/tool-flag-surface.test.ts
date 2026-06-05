@@ -61,8 +61,8 @@ const EXPECTED: Record<string, string[]> = {
     // ADR-0011 (Phase 5): graph gained --api-key for --report-to cloud egress.
     '--api-key', '--changed-file', '--concurrency', '--cwd', '--debug',
     '--gate-compare', '--gate-save', '--json', '--language', '--mode',
-    '--no-cache', '--out', '--recipe', '--report-to', '--resolution', '--run-id',
-    '--verbose', '--workspace',
+    '--no-cache', '--out', '--profile', '--recipe', '--report-to', '--resolution',
+    '--run-id', '--verbose', '--workspace',
   ],
   // ADR-0011 (Phase 4): sim gained --report-to / --api-key cloud egress.
   simulation: ['--api-key', '--cwd', '--debug', '--json', '--kind', '--open', '--quiet', '--recipe', '--report-to'],

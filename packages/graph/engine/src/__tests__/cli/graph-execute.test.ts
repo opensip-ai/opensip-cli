@@ -6,7 +6,7 @@
  * narrower language-mismatch + tool-register suites don't reach.
  */
 
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -197,6 +197,77 @@ describe('executeGraph — render dispatch', () => {
       expect(done.type).toBe('graph-done');
       expect(done.footerHints.some((h) => h.text.includes('Use --verbose for detailed results'))).toBe(true);
       expect(done.reportLines).toEqual([]);
+    } finally {
+      datastore.close();
+    }
+  });
+
+  it('profiles a synthetic sharded build for a large flat TypeScript project', async () => {
+    const files = Array.from({ length: 2501 }, (_unused, i) =>
+      join(projectDir, 'src', `file-${String(i)}.ts`),
+    );
+    const largeFlatAdapter: GraphLanguageAdapter = {
+      ...populatedAdapter(),
+      discoverFiles: ({ cwd }: { cwd: string }): DiscoverOutput => ({
+        projectDirAbs: cwd,
+        files,
+        configPathAbs: join(cwd, 'tsconfig.json'),
+        compilerOptions: undefined,
+      }),
+    };
+    currentAdapterRegistry().register(largeFlatAdapter);
+    const fakeCliPath = join(projectDir, 'fake-shard-cli.cjs');
+    writeFileSync(
+      fakeCliPath,
+      String.raw`
+const { readFileSync } = require('node:fs');
+const spec = JSON.parse(readFileSync(process.argv[3], 'utf8'));
+const id = spec.shard.id;
+const name = id.replace(/[^a-zA-Z0-9]/g, '_');
+const occ = {
+  bodyHash: 'h-' + id, simpleName: name, qualifiedName: id + '.' + name,
+  filePath: 'src/' + name + '.ts', line: 1, column: 0, endLine: 1,
+  kind: 'function-declaration', params: [], returnType: null,
+  enclosingClass: null, decorators: [], visibility: 'exported',
+  inTestFile: false, definedInGenerated: false, calls: [],
+};
+const result = {
+  shardId: id,
+  fragment: {
+    version: '3.0', tool: 'graph', language: 'typescript', builtAt: 'x',
+    cacheKey: 'k-' + id, resolutionMode: spec.resolutionMode,
+    functions: { [name]: [occ] },
+  },
+  fingerprint: 'fp-' + id,
+  boundaryCalls: [],
+  parseErrors: [],
+};
+process.stdout.write(JSON.stringify(result));
+process.exit(0);
+`,
+      'utf8',
+    );
+    const profilePath = join(projectDir, 'profile.json');
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    try {
+      const { cli, setExitCode } = mockCli(datastore);
+      await executeGraph({
+        cwd: projectDir,
+        noCache: true,
+        cliScript: fakeCliPath,
+        concurrency: 1,
+        profileOutput: profilePath,
+      }, cli);
+      expect(setExitCode).toHaveBeenCalledWith(0);
+      const profile = JSON.parse(readFileSync(profilePath, 'utf8')) as {
+        runs: { mode: string; stages: { name: string; detail?: string }[] }[];
+      };
+      expect(profile.runs[0]?.mode).toBe('sharded');
+      expect(profile.runs[0]?.stages).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ name: 'sharded-build', detail: '2 shard(s)' }),
+        ]),
+      );
     } finally {
       datastore.close();
     }

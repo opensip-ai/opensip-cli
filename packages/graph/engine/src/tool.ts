@@ -178,6 +178,7 @@ function register(cli: ToolCliContext): void {
     .option('--gate-compare', 'Compare current Signals to the gate baseline', false)
     .option('--report-to <url>', 'POST findings to OpenSIP Cloud or compatible')
     .option('--api-key <key>', 'API key for --report-to authentication')
+    .option('--profile <path>', 'Write graph performance profile JSON to path')
     .option(
       '--workspace',
       'Fan out across detected workspace units (memory-isolated; polyglot)',
@@ -207,6 +208,7 @@ function register(cli: ToolCliContext): void {
       gateCompare?: boolean;
       reportTo?: string;
       apiKey?: string;
+      profile?: string;
       workspace?: boolean;
       concurrency?: number;
       language?: string;
@@ -244,6 +246,7 @@ function register(cli: ToolCliContext): void {
         && opts.gateCompare !== true
         /* v8 ignore next */
         && (typeof opts.reportTo !== 'string' || opts.reportTo.length === 0)
+        && (typeof opts.profile !== 'string' || opts.profile.length === 0)
         && opts.workspace !== true
         && paths.length === 0
         /* v8 ignore next */
@@ -286,6 +289,7 @@ function register(cli: ToolCliContext): void {
           gateCompare: opts.gateCompare,
           reportTo: opts.reportTo,
           apiKey: opts.apiKey,
+          profileOutput: opts.profile,
           paths,
           workspace: opts.workspace,
           concurrency: opts.concurrency,

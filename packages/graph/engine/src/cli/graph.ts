@@ -48,13 +48,20 @@ import { detectLanguages } from './detect.js';
 import { runCatalogJsonMode, runGateMode } from './graph-modes.js';
 import { buildUnifiedReportLines, countFiles, resolutionBannerText } from './graph-report.js';
 import { loadGraphConfig, runGraph, runShardedGraph } from './orchestrate.js';
+import {
+  detectMonorepoLayout,
+  partitionFlatRepo,
+  selectStrategyForLayout,
+} from './orchestrate/flat-monorepo-strategy.js';
 import { positionalPathLabel, resolvePositionalPaths } from './positional-paths.js';
 import { MemoryPressureError } from './pressure-monitor.js';
+import { GraphProfileBuilder, writeGraphProfile } from './profile.js';
 import { buildWorkspaceJsonDocument, writeWorkspaceReport } from './workspace-report.js';
 import { discoverPolyglotUnits, runWorkspaceUnitsInParallel } from './workspace-runner.js';
 
 import type { GraphCommandOptions } from './graph-options.js';
 import type { Shard } from './orchestrate/shard-model.js';
+import type { GraphProfileRunRecorder } from './profile.js';
 import type { RunGraphResult } from './orchestrate.js';
 import type { Catalog, FeatureColumn, GraphConfig, Rule } from '../types.js';
 import type { GraphDoneResult, SignalEnvelope } from '@opensip-tools/contracts';
@@ -94,6 +101,7 @@ export async function executeGraph(
 ): Promise<SignalEnvelope | undefined> {
   logger.info({ evt: 'graph.cli.graph.start', module: MODULE_GRAPH_CLI, cwd: opts.cwd });
   const startedAt = new Date().toISOString();
+  const profile = createProfileBuilder(opts, startedAt);
   try {
     validateMutuallyExclusiveFlags(opts);
     // Resolve `--recipe` once at the top of the run (CLI layer owns
@@ -104,12 +112,15 @@ export async function executeGraph(
     // (fail-fast); children re-resolve `--recipe` in their own scope.
     const rules = resolveRecipeToRules(opts.recipe);
     if (opts.workspace === true) {
-      await executeWorkspaceGraph(opts, cli);
+      await executeWorkspaceGraph(opts, cli, profile);
+      writeProfileIfRequested(opts, profile);
       return undefined;
     }
     const positionalPaths = resolvePositionalScope(opts);
     if (positionalPaths.length > 1) {
-      return await executeMultiPathGraph(opts, positionalPaths, cli, startedAt, rules);
+      const envelope = await executeMultiPathGraph(opts, positionalPaths, cli, startedAt, rules, profile);
+      writeProfileIfRequested(opts, profile);
+      return envelope;
     }
     const runCwd = positionalPaths[0] ?? opts.cwd;
     // Honor the project's `graph:` config block (rule knobs like
@@ -121,8 +132,13 @@ export async function executeGraph(
     // to the single-process build for one-package repos or when sharding
     // can't engage (no worker script, discovery failure).
     const shards = positionalPaths.length === 0 ? await resolveShards(opts, cli) : [];
+    const profileRun = profile?.startRun({
+      label: positionalPaths.length === 0 ? 'root' : positionalPathLabel(runCwd, opts.cwd),
+      cwd: runCwd,
+      mode: shards.length > 1 ? 'sharded' : 'single-process',
+    });
     const result = shards.length > 1
-      ? await runShardedBuild(opts, shards, runCwd, cli, config, rules)
+      ? await runProfiledShardedBuild(profileRun, opts, shards, runCwd, cli, config, rules)
       : await runGraph({
           cwd: runCwd,
           noCache: opts.noCache,
@@ -132,9 +148,13 @@ export async function executeGraph(
           rules,
           datastore: cli.scope.datastore() as DataStore | undefined,
           emitFeatures: DASHBOARD_FEATURE_COLUMNS,
+          onProgress: profileRun?.onProgress,
         });
+    profileRun?.finish(result);
     enforceLanguageMismatchPolicy(opts, result.catalog, [runCwd]);
-    return await dispatchGraphResult(opts, result, cli, startedAt);
+    const envelope = await dispatchGraphResult(opts, result, cli, startedAt);
+    writeProfileIfRequested(opts, profile);
+    return envelope;
   } catch (error) {
     handleGraphError('graph', error, cli);
     return undefined;
@@ -157,9 +177,9 @@ async function resolveShards(opts: GraphCommandOptions, cli: ToolCliContext): Pr
     units = await discoverPolyglotUnits(opts.cwd, resolveAdaptersForRun(opts, cli));
   } catch {
     /* v8 ignore next */
-    return [];
+    return resolveSyntheticFlatShards(opts);
   }
-  if (units.length <= 1) return [];
+  if (units.length <= 1) return resolveSyntheticFlatShards(opts);
 
   const adapter = pickAdapter(opts.cwd);
   const shards: Shard[] = [];
@@ -176,6 +196,48 @@ async function resolveShards(opts: GraphCommandOptions, cli: ToolCliContext): Pr
     if (files.length > 0) shards.push({ id: unit.id, rootDir: unit.rootDir, files, configPathAbs });
   }
   // Need at least two non-empty shards to justify the parallel/merge overhead.
+  if (shards.length > 1) return shards;
+  return resolveSyntheticFlatShards(opts);
+}
+
+/**
+ * Flat-large fallback for single-tsconfig TypeScript repos. Workspace
+ * sharding is preferred because package boundaries are semantically real. When
+ * no workspace split exists and the TypeScript file count crosses the same
+ * threshold as heap preflight's 12 GB tier, synthesize directory-coherent
+ * shards and feed them into the existing sharded build.
+ */
+function resolveSyntheticFlatShards(opts: GraphCommandOptions): Shard[] {
+  if (typeof opts.language === 'string' && opts.language.length > 0) return [];
+  const adapter = pickAdapter(opts.cwd);
+  if (adapter.id !== 'typescript') return [];
+  let discovery: ReturnType<typeof adapter.discoverFiles>;
+  try {
+    discovery = adapter.discoverFiles({ cwd: opts.cwd });
+  } catch {
+    return [];
+  }
+  const layout = detectMonorepoLayout({
+    repoRoot: discovery.projectDirAbs,
+    files: discovery.files,
+  });
+  const selection = selectStrategyForLayout(layout);
+  if (layout.kind !== 'flat-large' || selection.mode !== 'synthetic-partition') {
+    return [];
+  }
+  const partitions = partitionFlatRepo({
+    files: layout.files,
+    repoRoot: discovery.projectDirAbs,
+    strategy: selection.partitionStrategy ?? 'hybrid',
+  });
+  const shards = partitions
+    .filter((p) => p.files.length > 0)
+    .map((p): Shard => ({
+      id: `partition:${p.id}`,
+      rootDir: discovery.projectDirAbs,
+      files: p.files,
+      configPathAbs: discovery.configPathAbs,
+    }));
   return shards.length > 1 ? shards : [];
 }
 
@@ -210,6 +272,54 @@ async function runShardedBuild(
     cacheHit: sharded.cacheHit,
     features: sharded.features,
   };
+}
+
+async function runProfiledShardedBuild(
+  profileRun: GraphProfileRunRecorder | undefined,
+  opts: GraphCommandOptions,
+  shards: readonly Shard[],
+  projectRoot: string,
+  cli: ToolCliContext,
+  config: GraphConfig,
+  rules: readonly Rule[],
+): Promise<RunGraphResult> {
+  const started = Date.now();
+  const result = await runShardedBuild(opts, shards, projectRoot, cli, config, rules);
+  profileRun?.recordStage(
+    'sharded-build',
+    Date.now() - started,
+    `${String(shards.length)} shard(s)`,
+  );
+  return result;
+}
+
+function createProfileBuilder(
+  opts: GraphCommandOptions,
+  startedAt: string,
+): GraphProfileBuilder | undefined {
+  if (typeof opts.profileOutput !== 'string' || opts.profileOutput.length === 0) {
+    return undefined;
+  }
+  return new GraphProfileBuilder({
+    cwd: opts.cwd,
+    mode: opts.workspace === true ? 'workspace' : ((opts.paths?.length ?? 0) > 1 ? 'multi-path' : 'graph'),
+    resolutionMode: opts.resolution,
+    startedAt,
+  });
+}
+
+function writeProfileIfRequested(
+  opts: GraphCommandOptions,
+  profile: GraphProfileBuilder | undefined,
+): void {
+  if (profile === undefined) return;
+  if (typeof opts.profileOutput !== 'string' || opts.profileOutput.length === 0) return;
+  const outPath = writeGraphProfile(opts.profileOutput, opts.cwd, profile.complete());
+  logger.info({
+    evt: 'graph.profile.write.complete',
+    module: MODULE_GRAPH_CLI,
+    output: outPath,
+  });
 }
 
 function validateMutuallyExclusiveFlags(opts: GraphCommandOptions): void {
@@ -255,12 +365,18 @@ async function executeMultiPathGraph(
   cli: ToolCliContext,
   startedAt: string,
   rules: readonly Rule[],
+  profile?: GraphProfileBuilder,
 ): Promise<SignalEnvelope | undefined> {
   const allSignals: Signal[] = [];
   let combinedFiles = 0;
   let lastResult: Awaited<ReturnType<typeof runGraph>> | null = null;
   const config = loadGraphConfig(opts.cwd);
   for (const p of paths) {
+    const profileRun = profile?.startRun({
+      label: positionalPathLabel(p, opts.cwd),
+      cwd: p,
+      mode: 'single-process',
+    });
     const r = await runGraph({
       cwd: p,
       noCache: opts.noCache,
@@ -270,7 +386,9 @@ async function executeMultiPathGraph(
       rules,
       datastore: cli.scope.datastore() as DataStore | undefined,
       emitFeatures: DASHBOARD_FEATURE_COLUMNS,
+      onProgress: profileRun?.onProgress,
     });
+    profileRun?.finish(r);
     lastResult = r;
     allSignals.push(...r.signals);
     if (r.catalog !== null) combinedFiles += countFiles(r.catalog);
@@ -452,6 +570,7 @@ async function renderGraphResult(
 async function executeWorkspaceGraph(
   opts: GraphCommandOptions,
   cli: ToolCliContext,
+  profile?: GraphProfileBuilder,
 ): Promise<void> {
   const cliScript = opts.cliScript ?? process.argv[1];
   if (typeof cliScript !== 'string' || cliScript.length === 0) {
@@ -469,6 +588,7 @@ async function executeWorkspaceGraph(
     );
   }
 
+  const profileRun = profile?.startRun({ label: 'workspace', cwd: opts.cwd, mode: 'workspace' });
   const startedAt = Date.now();
   const result = await runWorkspaceUnitsInParallel({
     cwd: opts.cwd,
@@ -480,9 +600,14 @@ async function executeWorkspaceGraph(
     recipe: opts.recipe,
   });
   const durationMs = Date.now() - startedAt;
+  profileRun?.recordStage('workspace-fanout', durationMs, `${String(units.length)} unit(s)`);
 
   const allSignals: Signal[] = [];
   for (const r of result.perUnit) allSignals.push(...r.signals);
+  profileRun?.finishSummary({
+    cacheHit: false,
+    signals: allSignals.length,
+  });
 
   if (opts.json === true) {
     // ADR-0011: emit through the CLI seam, not process.stdout directly.
@@ -650,4 +775,3 @@ export function handleGraphError(label: string, error: unknown, cli: ToolCliCont
   }
   process.stderr.write(`${label}: ${error instanceof Error ? error.message : String(error)}\n`);
 }
-

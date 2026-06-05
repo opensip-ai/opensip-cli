@@ -31,7 +31,8 @@ export interface TypescriptParsedProject {
 /**
  * The adapter-internal parsed-project shape, discriminated by tier so the
  * walk and resolve stages can branch:
- *   - exact: `{ kind: 'exact', program }` — the live `ts.Program` (checker forced).
+ *   - exact: `{ kind: 'exact', program }` — the live `ts.Program`; the checker
+ *     is constructed lazily by the resolve stage.
  *   - fast:  `{ kind: 'fast', sourceFiles }` — standalone source files, no checker.
  * The engine treats this as opaque `unknown`; only the TS adapter introspects it.
  */
@@ -42,7 +43,8 @@ export type TsParsed =
 /**
  * Parse the project for the requested resolution tier. `fast` skips the
  * Program + checker entirely (see {@link parseProjectFast}); `exact`
- * builds the Program and forces the checker exactly as before.
+ * builds the Program and lets the resolve stage construct the checker only
+ * when semantic edge resolution actually needs it.
  */
 export function parseProject(input: ParseInput): ParseOutput<TsParsed> {
   if (input.resolutionMode === 'fast') {
@@ -65,10 +67,9 @@ function parseProjectExact(input: ParseInput): ParseOutput<TsParsed> {
     rootNames: [...input.files],
     options: compilerOptions,
   });
-  // Force the binder so parent pointers + symbol table are populated
-  // before either inventory visitors (which walk parent chains) or
-  // resolvers (which call getSymbolAtLocation) need them.
-  program.getTypeChecker();
+  // Do not force the checker here. The structural walk only needs source
+  // files with parent pointers; semantic symbol tables are constructed lazily
+  // in resolveEdgesFromRecords when exact resolution asks for them.
 
   const parseErrors: ParseError[] = [];
   /* v8 ignore start */
