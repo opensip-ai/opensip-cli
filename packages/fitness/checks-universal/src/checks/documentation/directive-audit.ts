@@ -7,6 +7,7 @@
  * - TypeScript: `@ts-expect-error`
  * - ESLint: `eslint-disable`, `eslint-disable-next-line`, `eslint-disable-line`
  * - Fitness: `@fitness-ignore-file`, `@fitness-ignore-next-line`
+ * - Graph: `@graph-ignore-file`, `@graph-ignore-next-line`
  * - Semgrep: `nosemgrep`
  *
  * The four grammar parsers live in `./_directives/`. This file is
@@ -18,6 +19,7 @@ import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-to
 
 import { parseESLintDirectives } from './_directives/eslint.js'
 import { parseFitnessDirectives } from './_directives/fitness.js'
+import { parseGraphDirectives } from './_directives/graph.js'
 import { parseSemgrepDirectives } from './_directives/semgrep.js'
 import { parseTypeScriptDirectives } from './_directives/typescript.js'
 
@@ -32,6 +34,7 @@ const DIRECTIVE_MARKERS = [
   '@ts-expect-error',
   'eslint-disable',
   '@fitness-ignore',
+  '@graph-ignore',
   'nosemgrep',
 ]
 
@@ -48,6 +51,7 @@ function collectFileDirectives(content: string, filePath: string, file: string):
     ...parseTypeScriptDirectives(content, filePath, file),
     ...parseESLintDirectives(content, filePath, file),
     ...parseFitnessDirectives(content, filePath, file),
+    ...parseGraphDirectives(content, filePath, file),
     ...parseSemgrepDirectives(content, filePath, file),
   ]
 
@@ -148,6 +152,7 @@ export const directiveAudit = defineCheck({
 - TypeScript directives: \`@ts-expect-error\` in \`//\` comments
 - ESLint directives: \`eslint-disable\`, \`eslint-disable-next-line\`, \`eslint-disable-line\` in both line (\`//\`) and block (\`/* */\`) comments
 - Fitness directives: \`@fitness-ignore-file\` and \`@fitness-ignore-next-line\` with check ID and \`--\` reason separator
+- Graph directives: \`@graph-ignore-file\` and \`@graph-ignore-next-line\` with \`graph:<rule>\` ID and \`--\` reason separator
 - Semgrep directives: \`nosemgrep\` with optional \`:\` rule ID and \`--\` reason separator
 - Classifies each directive by source, scope (file/next-line/same-line), rule, and reason
 - Only processes TypeScript files (\`.ts\`, \`.tsx\`), skips files without directive markers for performance
