@@ -20,6 +20,7 @@ import { join } from 'node:path';
 
 import { currentTraceparent, logger } from '@opensip-tools/core';
 
+import { stampEngineVersion } from '../../cache/engine-version.js';
 import { computeFilesFingerprint } from '../../cache/invalidate.js';
 
 import { runWorkerPool } from './worker-pool.js';
@@ -118,11 +119,13 @@ export function planShardWork(
   const cached: ShardBuildResult[] = [];
   const toBuild: Shard[] = [];
   for (const shard of shards) {
-    const cacheKey = adapter.cacheKey({
-      projectDirAbs: shard.rootDir,
-      configPathAbs: shard.configPathAbs,
-      resolutionMode,
-    });
+    const cacheKey = stampEngineVersion(
+      adapter.cacheKey({
+        projectDirAbs: shard.rootDir,
+        configPathAbs: shard.configPathAbs,
+        resolutionMode,
+      }),
+    );
     const fingerprint = computeFilesFingerprint(shard.files);
     const fragment = repo.loadValidShardFragment(shard.id, cacheKey, fingerprint);
     if (fragment) cached.push(fragment);

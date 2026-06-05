@@ -10,6 +10,7 @@
  * the progress/pressure-monitor wrapper here.
  */
 
+import { stampEngineVersion } from '../../cache/engine-version.js';
 import { ownerEdgeKey } from '../../owner-key.js';
 
 import {
@@ -306,12 +307,14 @@ function assembleCatalog(
     tool: 'graph',
     language: adapter.id,
     builtAt: new Date().toISOString(),
-    cacheKey: adapter.cacheKey({
-      projectDirAbs: discovery.projectDirAbs,
-      configPathAbs: discovery.configPathAbs,
-      compilerOptions: discovery.compilerOptions,
-      resolutionMode,
-    }),
+    cacheKey: stampEngineVersion(
+      adapter.cacheKey({
+        projectDirAbs: discovery.projectDirAbs,
+        configPathAbs: discovery.configPathAbs,
+        compilerOptions: discovery.compilerOptions,
+        resolutionMode,
+      }),
+    ),
     // Self-describe the tier so loaded catalogs are honest about
     // approximation without re-deriving it from the cacheKey.
     resolutionMode,

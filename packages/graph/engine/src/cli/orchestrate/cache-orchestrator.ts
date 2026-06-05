@@ -9,6 +9,7 @@
  *   - 'invalid'      → full rebuild
  */
 
+import { stampEngineVersion } from '../../cache/engine-version.js';
 import {
   classifyCatalog,
   computeFilesFingerprint,
@@ -61,12 +62,14 @@ export interface ObtainCatalogOutput {
 export function obtainCatalog(input: ObtainCatalogInput): ObtainCatalogOutput {
   const cachedCatalog: Catalog | null =
     input.useCache && input.catalogRepo ? input.catalogRepo.loadFullCatalog() : null;
-  const currentCacheKey = input.adapter.cacheKey({
-    projectDirAbs: input.discovery.projectDirAbs,
-    configPathAbs: input.discovery.configPathAbs,
-    compilerOptions: input.discovery.compilerOptions,
-    resolutionMode: input.resolutionMode,
-  });
+  const currentCacheKey = stampEngineVersion(
+    input.adapter.cacheKey({
+      projectDirAbs: input.discovery.projectDirAbs,
+      configPathAbs: input.discovery.configPathAbs,
+      compilerOptions: input.discovery.compilerOptions,
+      resolutionMode: input.resolutionMode,
+    }),
+  );
   const verdict = cachedCatalog
     ? classifyCatalog(cachedCatalog, {
         currentLanguage: input.adapter.id,

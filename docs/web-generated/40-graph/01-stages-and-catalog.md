@@ -27,6 +27,7 @@ source-files:
   - packages/graph/engine/src/persistence/catalog-repo.ts
   - packages/graph/engine/src/persistence/schema.ts
   - packages/graph/engine/src/cache/invalidate.ts
+  - packages/graph/engine/src/cache/engine-version.ts
   - packages/graph/engine/src/cli/orchestrate.ts
   - packages/graph/engine/src/cli/scope.ts
   - packages/graph/engine/src/cli/packages-runner.ts
@@ -232,7 +233,7 @@ The two rules that consume entry-points only see the resulting `EntryPoint[]` �
 
 The output of stages 1+2 is persisted to the project-local SQLite store at `<project>/opensip-tools/.runtime/datastore.sqlite` via [`CatalogRepo.replaceAll(catalog)`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/graph/engine/src/persistence/catalog-repo.ts). The catalog rides a single row in the `graph_catalog` table: cache-validity fields (language, cacheKey, filesFingerprint) live in typed columns; the function/occurrence/edge data is stored as a JSON payload preserving v1's wire-shape exactly.
 
-The reconstructed `Catalog` value returned by `CatalogRepo.loadFullCatalog()` is identical to v1's `readCatalog` output — dashboard view derivations, rules, and indexes consume the same shape. Format v3 (v1.3.0) carries a `language` field (the adapter id) and an opaque `cacheKey` (an adapter-supplied invalidation string).
+The reconstructed `Catalog` value returned by `CatalogRepo.loadFullCatalog()` is identical to v1's `readCatalog` output — dashboard view derivations, rules, and indexes consume the same shape. Format v3 (v1.3.0) carries a `language` field (the adapter id) and an opaque `cacheKey` — the adapter's invalidation string prefixed with the running engine version (`eng=<version>|…`, see [Cache invalidation](#cache-invalidation) below).
 
 ```jsonc
 {
@@ -240,7 +241,7 @@ The reconstructed `Catalog` value returned by `CatalogRepo.loadFullCatalog()` is
   "tool": "graph",
   "language": "typescript",       // adapter id; Python catalog → "python", Rust → "rust", …
   "builtAt": "2026-05-18T12:00:00.000Z",
-  "cacheKey": "ts-5.7.3-9bb6ef4d07c08140", // adapter-supplied invalidation key
+  "cacheKey": "eng=3.0.0|ts-5.7.3-9bb6ef4d07c08140", // engine version + adapter-supplied invalidation key
   "filesFingerprint": "694\n/abs/path/foo.ts|1715000000000|1234\n...",
   "functions": {
     "saveBaseline": [
@@ -289,7 +290,9 @@ Notable shape choices:
 |---|---|---|
 | `valid` | `language` (adapter id), `cacheKey` (adapter-supplied invalidation key), and per-file fingerprint all match exactly. | Reuse the cached catalog as-is. |
 | `incremental` | `language` + `cacheKey` agree, but at least one file's mtime/size differs from the cache. | Re-walk the dependency closure of changed files and merge with cached entries from unchanged files. See "Incremental rebuild" below. |
-| `invalid` | Different adapter (`language` mismatch), adapter cacheKey changed (e.g. tsconfig content edited or TS upgraded), no fingerprint, or pre-v3 catalog format on disk. | Discard the cache; do a full rebuild. |
+| `invalid` | Different adapter (`language` mismatch), `cacheKey` changed — including the **engine version** (opensip-tools was upgraded), the adapter's own key (tsconfig content edited or TS upgraded), the resolution tier — no fingerprint, or pre-v3 catalog format on disk. | Discard the cache; do a full rebuild. |
+
+**Engine-version stamping.** The `cacheKey` is the adapter's invalidation string prefixed with the running graph engine's package version: `eng=<version>|<adapter-key>` ([`cache/engine-version.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/graph/engine/src/cache/engine-version.ts), [ADR-0015](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/docs/decisions/ADR-0015-engine-version-cache-invalidation.md)). This guarantees that **upgrading opensip-tools invalidates the cache** even when your source is unchanged — so a new engine (with, say, improved edge resolution or body hashing) never replays a catalog built by the old one. The stamp is applied in the language-agnostic engine, so it covers every adapter (TypeScript and the tree-sitter languages) and both the full-catalog cache and the per-shard fragment cache. The visible consequence: the **first `graph` run after an upgrade is a full cold rebuild**; subsequent runs cache-hit as normal. This is deliberate over-invalidation — a one-time rebuild is always safe, whereas a stale cache is not.
 
 The fingerprint is per-file `path|mtimeMs|size`, computed by `computeFilesFingerprint`. Mtime is cheap to read and stable enough — the ones that lie (formatter passes, `touch`, git clean rebuilds) cause an unnecessary incremental rebuild that produces a byte-identical result, not a correctness bug.
 

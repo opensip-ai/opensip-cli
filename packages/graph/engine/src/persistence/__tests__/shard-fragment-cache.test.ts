@@ -13,6 +13,7 @@ import { join } from 'node:path';
 import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { stampEngineVersion } from '../../cache/engine-version.js';
 import { computeFilesFingerprint } from '../../cache/invalidate.js';
 import { planShardWork } from '../../cli/orchestrate/shard-runner.js';
 import { CatalogRepo } from '../catalog-repo.js';
@@ -123,11 +124,16 @@ describe('planShardWork', () => {
     const b = shard('b');
     // Seed both with a fragment whose key+fingerprint match the current files.
     for (const s of [a, b]) {
-      const key = adapter.cacheKey({
-        projectDirAbs: s.rootDir,
-        configPathAbs: s.configPathAbs,
-        resolutionMode: 'exact',
-      });
+      // planShardWork stamps the engine version onto the comparison key, so
+      // the seeded fragment must carry the same stamp (in production the worker
+      // stamps via assembleCatalog). ADR-0015.
+      const key = stampEngineVersion(
+        adapter.cacheKey({
+          projectDirAbs: s.rootDir,
+          configPathAbs: s.configPathAbs,
+          resolutionMode: 'exact',
+        }),
+      );
       const fp = computeFilesFingerprint(s.files);
       repo.upsertShardFragment(result(s.id, key, fp));
     }

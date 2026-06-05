@@ -102,6 +102,11 @@ distinct from:
   accidental-home implementation onto it and graph adopts it (3.0 GA
   prerequisite). Whole-rule disable + the baseline ratchet stay per-tool.
   Extends ADR-0005's hoist-shared-substrate-to-core symmetry to suppression
+- [ADR-0015](./ADR-0015-engine-version-cache-invalidation.md) — Fold the engine
+  package version into the graph `cacheKey` (`stampEngineVersion`) at every
+  engine-side cacheKey site, so a tool upgrade invalidates the catalog +
+  per-shard fragment caches for every language. One stamp, both caches, no
+  datastore migration; safe over-invalidation (one cold rebuild per upgrade)
 
 ### Superseded
 

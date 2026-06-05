@@ -17,6 +17,7 @@ import { join } from 'node:path';
 import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { stampEngineVersion } from '../../../cache/engine-version.js';
 import { CatalogRepo } from '../../../persistence/catalog-repo.js';
 import { runShardedGraph } from '../sharded-graph.js';
 
@@ -27,6 +28,10 @@ import type { Shard } from '../shard-model.js';
 // Fixture worker: emits one exported function occurrence per shard, named
 // after the shard id, so the merged catalog has a predictable shape. A
 // shard id starting with 'fail:' exits non-zero.
+// The real worker stamps the engine version onto the fragment cacheKey via
+// assembleCatalog (ADR-0015); the fixture must emit the same stamped key so a
+// no-change rerun is a clean cache hit.
+const STAMPED_KEY = stampEngineVersion('key-none');
 const WORKER_SCRIPT = String.raw`
 const { readFileSync } = require('node:fs');
 const spec = JSON.parse(readFileSync(process.argv[3], 'utf8'));
@@ -55,7 +60,7 @@ const result = {
   shardId: id,
   fragment: {
     version: '3.0', tool: 'graph', language: 'typescript', builtAt: 'x',
-    cacheKey: 'key-none', resolutionMode: 'exact', functions: { [name]: [occ] },
+    cacheKey: ${JSON.stringify(STAMPED_KEY)}, resolutionMode: 'exact', functions: { [name]: [occ] },
   },
   fingerprint: parts.join('\n'), boundaryCalls: [], parseErrors: [],
 };
