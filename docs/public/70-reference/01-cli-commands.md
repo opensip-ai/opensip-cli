@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-03
+last_verified: 2026-06-04
 release: v2.6.0
 title: "CLI command tree"
 audience: [users, ci-integrators, contributors]
@@ -115,7 +115,7 @@ opensip-tools fit --gate-compare
 | `--exclude <slug>` | repeatable | `[]` | Exclude check by slug. Can be passed multiple times. |
 | `--list` | bool | `false` | List available checks instead of running. |
 | `--recipes` | bool | `false` | List available recipes instead of running. |
-| `--json` | bool | `false` | Emit `CliOutput` JSON on stdout instead of the table renderer. |
+| `--json` | bool | `false` | Emit the `SignalEnvelope` JSON on stdout instead of the table renderer. |
 | `--findings` | bool | `false` | Append a per-check finding listing after the table. |
 | `-v, --verbose` | bool | `false` | Inline finding details + findings summary. |
 | `--report-to <url>` | URL | — | POST findings to a URL (OpenSIP Cloud or compatible). |
@@ -151,7 +151,7 @@ opensip-tools sim --kind <kind>
 | `--recipe <name>` | string | built-in `default` | Run a named sim recipe. |
 | `--kind <kind>` | string | — | Filter scenarios by kind. One of `load`, `chaos`, `invariant`, `fix-evaluation`. |
 | `--cwd <path>` | path | `process.cwd()` | Target directory. |
-| `--json` | bool | `false` | Emit `SimDoneResult` JSON on stdout instead of the table renderer. |
+| `--json` | bool | `false` | Emit the `SignalEnvelope` JSON on stdout instead of the table renderer. |
 | `-q, --quiet` | bool | `false` | Suppress banner. |
 | `--open` | bool | `false` | Launch dashboard after run. |
 | `--debug` | bool | `false` | Enable debug-level logging. |
@@ -207,7 +207,7 @@ opensip-tools graph --recipe <name>
 | `--workspace` | bool | `false` | Fan the run across every workspace unit returned by each detected adapter's `discoverWorkspaceUnits` hook. Polyglot per D8b: a repo with both a TS pnpm workspace and a Cargo workspace fans out across both adapters' units in one combined run. Memory-isolated (one child process per unit). Mutually exclusive with positional paths. |
 | `--concurrency <n>` | int | `cpus()-1` | Concurrency cap for `--workspace` child processes. |
 | `--language <name>` | string | — | Force a specific language adapter, suppressing marker-based auto-detection. If the discovered file count is zero, exits with code 2 and the message `--language <name> matched 0 files under <paths>; check the flag or paths.` (D14). |
-| `--json` | bool | `false` | Output a `CliOutput`-shaped JSON document instead of the unified terminal report. |
+| `--json` | bool | `false` | Output the `SignalEnvelope` JSON document instead of the unified terminal report. |
 | `--no-cache` | bool | `false` | Skip the catalog cache and force a full rebuild. |
 | `--resolution <mode>` | string | `exact` | Edge resolution tier: `exact` (semantic, uses the type checker) or `fast` (syntactic, no type checker — ~2× faster cold builds at lower edge fidelity). Invalid values fail loudly at the boundary. |
 | `--recipe <name>` | string | — | Run a named graph recipe — a subset of the graph rule set. Default (no flag): all rules. An unknown name fails with a configuration error. List recipes with `graph-recipes`. |
