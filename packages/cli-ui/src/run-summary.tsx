@@ -52,7 +52,9 @@ export function viewRunSummary({ passed, failed, errors, warnings, durationMs }:
   return line(spans);
 }
 
-/** Ink view of {@link viewRunSummary}, with the live-view's top padding. */
+/** Ink view of {@link viewRunSummary}. Indented to `paddingLeft={2}` so the
+ *  live summary line aligns with the run header + footer hints (both also at 2)
+ *  instead of sitting flush-left against the indented rest of the output. */
 export function RunSummary(props: RunSummaryProps): React.ReactElement {
-  return <Box paddingTop={1}>{renderToInk(viewRunSummary(props))}</Box>;
+  return <Box paddingTop={1} paddingLeft={2}>{renderToInk(viewRunSummary(props))}</Box>;
 }

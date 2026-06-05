@@ -281,7 +281,6 @@ function FitRunner({ args, datastore, setExitCode, onEnvelope }: FitRunnerProps)
               hints={[
                 { text: 'Use --verbose for detailed results', bold: ['--verbose'] },
                 { text: 'opensip-tools dashboard for HTML report', bold: ['opensip-tools dashboard'] },
-                { text: '--report-to <url> to send to OpenSIP', bold: ['--report-to <url>'] },
               ]}
             />
           )}

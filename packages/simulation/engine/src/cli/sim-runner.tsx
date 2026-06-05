@@ -184,7 +184,6 @@ function SimRunner({ args, setExitCode, onEnvelope }: SimRunnerProps): React.Rea
           <RunFooterHints
             hints={[
               { text: 'opensip-tools dashboard for HTML report', bold: ['opensip-tools dashboard'] },
-              { text: '--report-to <url> to send to OpenSIP', bold: ['--report-to <url>'] },
             ]}
           />
         )}

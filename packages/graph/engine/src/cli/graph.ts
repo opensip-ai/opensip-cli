@@ -528,7 +528,6 @@ export async function dispatchGraphResult(
 const GRAPH_FOOTER_HINTS: readonly { readonly text: string; readonly bold?: readonly string[] }[] = [
   { text: 'Use --verbose for detailed results', bold: ['--verbose'] },
   { text: 'opensip-tools dashboard for HTML report', bold: ['opensip-tools dashboard'] },
-  { text: '--report-to <url> to send to OpenSIP', bold: ['--report-to <url>'] },
 ];
 
 /**
