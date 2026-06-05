@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-03
-release: v2.6.x
+release: v3.0.0
 title: "Scenarios and recipes (sim)"
 audience: [contributors, plugin-authors]
 purpose: "What a sim scenario is, the four kinds, and how recipes compose them. The author-facing primitives in the simulation tool."
@@ -216,7 +216,7 @@ Same three sources as checks:
 
 1. **Built-in.** Currently empty — the engine ships kind support but no built-in scenarios. (Compare to `fit`, where `@opensip-tools/checks-universal` ships universal checks.) Because of this, running `sim` in a project with no project-local or npm-package scenarios fails closed with exit 2 (an empty run is not a pass — see the exit-code contract in the [CLI reference](../70-reference/01-cli-commands.md#sim--run-simulation-scenarios)). Run `opensip-tools init` to scaffold example scenarios first.
 2. **Project-local.** `<project>/opensip-tools/sim/scenarios/*.mjs`. Loaded by the plugin discoverer at startup.
-3. **npm-package.** Any package listed in `plugins.sim:` in the project config. The package's main entry exports `scenarios: RunnableScenario[]` and optionally `recipes: SimulationRecipe[]`. Sim packs use explicit pinning only — there is no `@opensip-tools/sim-*` name-prefix auto-discovery today.
+3. **npm-package.** Sim packs are discovered from project `node_modules` when they declare `opensipTools.kind: "sim-pack"`, or when their package name matches `<scope>/scenarios-*` under the default `@opensip-tools` scope plus any configured `plugins.packageScopes`. For deterministic install/sync, `opensip-tools plugin add --domain sim <pkg>` installs into `.runtime/plugins/sim/` and records the package under `plugins.sim:`. The package's main entry exports `scenarios: RunnableScenario[]` and optionally `recipes: SimulationRecipe[]`.
 
 The registry ([`packages/simulation/engine/src/framework/registry.ts`](../../../packages/simulation/engine/src/framework/registry.ts)) is last-writer-wins on id collision. Discovery surfaces conflicts in the CLI's startup logs.
 

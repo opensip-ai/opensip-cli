@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-04
-release: v2.6.0
+release: v3.0.0
 title: "CLI command tree"
 audience: [users, ci-integrators, contributors]
 purpose: "Lookup-shaped reference for every CLI command, its flags, and when to use each."
@@ -210,6 +210,7 @@ opensip-tools graph --recipe <name>
 | `--json` | bool | `false` | Output the `SignalEnvelope` JSON document instead of the unified terminal report. |
 | `--no-cache` | bool | `false` | Skip the catalog cache and force a full rebuild. |
 | `--resolution <mode>` | string | `exact` | Edge resolution tier: `exact` (semantic, uses the type checker) or `fast` (syntactic, no type checker — ~2× faster cold builds at lower edge fidelity). Invalid values fail loudly at the boundary. |
+| `--profile <path>` | path | — | Write a graph performance profile JSON artifact with stage timings, run mode, cache verdict, file/function counts, and resolution stats. Relative paths resolve against `--cwd`. |
 | `--recipe <name>` | string | — | Run a named graph recipe — a subset of the graph rule set. Default (no flag): all rules. An unknown name fails with a configuration error. List recipes with `graph-recipes`. |
 | `--gate-save` | bool | `false` | Save the current Signal fingerprint set to the project's SQLite store (`graph_baseline_signals` table). Mutually exclusive with `--gate-compare`. |
 | `--gate-compare` | bool | `false` | Compare current Signals to the saved baseline; exit non-zero on regression. |
@@ -228,7 +229,7 @@ opensip-tools graph --workspace
 
 **Session contract.** A single CLI invocation produces a single dashboard session, regardless of how many positional paths or workspace units the run analyzed. Modes that produce machine-readable artifacts instead of dashboard sessions (`--json`, `--gate-save`, `--gate-compare`, `--report-to`) opt out. (Machine-artifact catalog/SARIF exports live on the dedicated `catalog-export` / `sarif-export` subcommands — the v1 `graph --catalog-output` flag was retired by the graph-adapter split.)
 
-**Adapter selection.** v2.0.0 ships first-party graph adapters for TypeScript, Python, Rust, Go, and Java — each is its own publishable npm package under the `@opensip-tools/graph-*` namespace. Discovery is by name pattern: `node_modules` is walked for any package whose name matches `@opensip-tools/graph-*`, or you can pin an explicit list under `plugins.graphAdapters:` in `opensip-tools.config.yml`. Marker-file detection (`tsconfig.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `pom.xml`/`build.gradle*`) then chooses which discovered adapter(s) apply to the run; positional paths inherit that decision unless `--language` overrides it.
+**Adapter selection.** opensip-tools ships first-party graph adapters for TypeScript, Python, Rust, Go, and Java — each is its own publishable npm package under the `@opensip-tools/graph-*` namespace. Auto-discovery is name pattern + marker: `node_modules` is walked for packages whose names match `@opensip-tools/graph-*` and whose `package.json` declares `opensipTools.kind: "graph-adapter"`, or you can pin an explicit list under `plugins.graphAdapters:` in `opensip-tools.config.yml`. Marker-file detection (`tsconfig.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `pom.xml`/`build.gradle*`) then chooses which discovered adapter(s) apply to the run; positional paths inherit that decision unless `--language` overrides it.
 
 **Exit codes:** 0 (success / gate clean), 1 (runtime error / gate regression / any `--workspace` child failed), 2 (configuration error / D14 zero-file mismatch), 4 (`--report-to` upload failed).
 

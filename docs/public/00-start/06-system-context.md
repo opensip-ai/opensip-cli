@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-03
-release: v2.6.x
+release: v3.0.0
 title: "System context"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "Where opensip-tools sits between you, your codebase, CI, and OpenSIP Cloud — and what it touches on disk."
@@ -14,6 +14,7 @@ source-files:
 related-docs:
   - ./01-what-is-opensip-tools.md
   - ./05-vocabulary.md
+  - ./07-architecture-overview.md
   - ../80-implementation/03-session-and-persistence.md
   - ../70-reference/03-configuration.md
 ---
@@ -200,4 +201,4 @@ We'll see how each layer of the system handles this project — from the CLI dis
 
 ## What's next
 
-Orientation done. The mental-model section ([`../10-concepts/`](../10-concepts/)) is where the architecture starts to land. Open with [`01-fitness-loop.md`](../10-concepts/01-fitness-loop.md) — it's the spine of the doc set.
+Orientation done. Next, open [`07-architecture-overview.md`](./07-architecture-overview.md) for the visual map of package layers, runtime flow, and tool pipelines. After that, the mental-model section ([`../10-concepts/`](../10-concepts/)) is where the architecture starts to land in detail.

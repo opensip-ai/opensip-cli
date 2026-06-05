@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-05-27
-release: v2.0.x
+release: v3.0.0
 title: "Publishable packs"
 audience: [plugin-authors]
 purpose: "Author and publish a fit-pack or sim-pack: workspace package skeleton, the marker contract, four discovery paths, and the migration recipe from loose .mjs files."
@@ -44,14 +44,14 @@ Tag your pack's `package.json` with `opensipTools.kind`:
 
 Discovery is name-pattern-independent — your pack can use any npm scope you own (`@acme/fit`, `@my-internal-org/checks-platform`, anything). The marker is what makes the platform find it. Same pattern for sim packs with `"kind": "sim-pack"`.
 
-### Four discovery paths
+### Discovery paths
 
 Listed in recommendation order:
 
 - **Marker (recommended)** — declare `opensipTools.kind: "fit-pack"` (or `"sim-pack"`) in your pack's `package.json`. Free choice of scope and name. No config entry. Sim packs use `"sim-pack"`.
-- **`@opensip-tools/checks-*` name pattern** — auto-discovered by the platform's default scope scan. **Reserved for first-party packs** published by the opensip-tools project. Don't publish customer packs under this scope — it's owned by the platform and a future first-party pack may collide.
-- **`plugins.packageScopes` (compat)** — soft-deprecated. Useful for legacy third-party packs that follow `@scope/checks-*` naming without declaring the marker. New packs should use the marker pattern; `packageScopes` exists to keep older packs working without rewriting them. Same key is shared with `@scope/scenarios-*` for sim.
-- **`plugins.checkPackages` explicit listing** — pin individual packages by name. `opensip-tools plugin add @scope/pack` does this in one step. Best fit when you want a deterministic, version-pinned set rather than scope-wide auto-discovery. Parallel key for sim is `plugins.scenarioPackages`.
+- **`plugins.checkPackages` explicit listing** — name individual fit packages from project `node_modules`. Use only for packages that do not declare the marker yet. Parallel key for sim is `plugins.scenarioPackages`.
+- **Project-pinned install** — `opensip-tools plugin add --domain fit @scope/pack` or `--domain sim @scope/pack` installs into `.runtime/plugins/<domain>/` and records `plugins.fit:` / `plugins.sim:` so teammates can reproduce it with `plugin sync`.
+- **Sim `scenarios-*` scope scan** — sim packs can also follow `<scope>/scenarios-*`; `plugins.packageScopes` extends the scope list for this sim-only naming convention.
 
 ## When to graduate from loose `.mjs`
 

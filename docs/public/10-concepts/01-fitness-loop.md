@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-04
-release: v2.6.x
+release: v3.0.0
 title: "The fitness loop"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "One check, end to end. Definition → loading → recipe selection → scope resolution → execution → signal → render → exit. The spine of the doc set."
@@ -135,10 +135,10 @@ Source: [`packages/core/src/plugins/discover.ts`](../../../packages/core/src/plu
 Three sources of checks get loaded, in order:
 
 1. **Language adapters.** Registered inside `bootstrapCli()` before any tool's `register()` runs — `lang-typescript`, `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp` each contribute one `LanguageAdapter` to the per-invocation `LanguageRegistry`. Without this, the framework would treat every file as raw text and a regex check looking for `console.log` would also match the literal string in a comment.
-2. **npm-package check packs.** The plugin loader walks `node_modules` for any package whose name matches `@opensip-tools/checks-*` (the auto-discovery prefix), or any package listed in `plugins.checkPackages:` (the explicit-pin form). Each one exports a list of `defineCheck()` results. Bundled packs include `@opensip-tools/checks-universal`, `@opensip-tools/checks-typescript`, `@opensip-tools/checks-python`, etc.
+2. **npm-package check packs.** The plugin loader walks `node_modules` for packages declaring `opensipTools.kind: "fit-pack"` (the canonical marker form), plus any exact packages listed in `plugins.checkPackages:`. Each one exports a list of `defineCheck()` results. Bundled packs include `@opensip-tools/checks-universal`, `@opensip-tools/checks-typescript`, `@opensip-tools/checks-python`, etc.
 3. **Project-local checks.** `.mjs` files under `<project>/opensip-tools/fit/checks/` are loaded via dynamic `import()`. Each module either exports a single `Check` (the value returned by `defineCheck()`) or an array of them.
 
-If `plugins.checkPackages:` is set in the config, **only** those packages are loaded — auto-discovery is disabled for the run. This lets a project pin its check pack list and refuse anything pulled in transitively.
+`plugins.checkPackages:` is an exact-name supplement for non-marker packages; marker-based fit-pack discovery still runs.
 
 After this stage, the in-memory check registry has every available check addressable by id and slug.
 

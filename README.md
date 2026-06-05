@@ -186,7 +186,7 @@ opensip-tools sim                   # run simulations
 ### `graph` — static call-graph analysis
 ```bash
 opensip-tools graph                 # run all rules, terminal report
-opensip-tools graph --json          # CliOutput-shaped JSON (for CI)
+opensip-tools graph --json          # SignalEnvelope-shaped JSON (for CI)
 opensip-tools graph --no-cache      # skip the catalog cache; re-run stages 1+2
 opensip-tools graph --gate-save     # save current signals as baseline
 opensip-tools graph --gate-compare  # compare against baseline; exit 1 on new signals
@@ -439,10 +439,10 @@ won't need to.
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "peerDependencies": {
-    "@opensip-tools/fitness": "^2.0.0"
+    "@opensip-tools/fitness": "^3.0.0"
   },
   "devDependencies": {
-    "@opensip-tools/fitness": "^2.0.0",
+    "@opensip-tools/fitness": "^3.0.0",
     "typescript": "^5.7.0"
   }
 }
@@ -486,16 +486,15 @@ export const recipes = [{
 }];
 ```
 
-#### Auto-discovery
+#### Discovery
 
-Any installed npm package whose name matches `@opensip-tools/checks-*` is
+Any installed npm package declaring `opensipTools.kind: "fit-pack"` is
 auto-discovered by the CLI — no `plugin install` step needed. Run
-`pnpm add @my-org/fitness-checks` (or `npm install`) in your project, name
-the package's bin or use the explicit list option, and the CLI loads it on
-the next `fit` run.
+`pnpm add @my-org/fitness-checks` (or `npm install`) in your project and the
+CLI loads it on the next `fit` run.
 
-For non-`@opensip-tools/checks-*` names, declare them in your project's
-`opensip-tools.config.yml`:
+For packages that do not declare the marker yet, list them by exact name in
+your project's `opensip-tools.config.yml`:
 
 ```yaml
 plugins:
@@ -503,8 +502,7 @@ plugins:
     - "@my-org/fitness-checks"
 ```
 
-This explicit list disables auto-discovery for the run, so you get a
-deterministic set of check packs.
+This exact list supplements marker-based discovery.
 
 **Why peer dependency?** Check packs return Check objects that the host
 registers and executes; they don't mutate host singletons. Declaring
@@ -736,11 +734,11 @@ packages/
                            #   language adapters, plugin loader, Registry/RunScope,
                            #   Tool contract
   contracts/               # @opensip-tools/contracts — contract types between
-                           #   Tools and the runner: CliOutput/CommandResult
+                           #   Tools and the runner: SignalEnvelope/CommandResult
                            #   shapes, exit codes, GraphCatalog surface
   datastore/               # @opensip-tools/datastore — SQLite + Drizzle persistence
   session-store/           # @opensip-tools/session-store — session persistence
-  reporting/               # @opensip-tools/reporting — SARIF / cloud report output
+  output/                  # @opensip-tools/output — SARIF / cloud report output
   dashboard/               # @opensip-tools/dashboard — self-contained HTML report
   cli-ui/                  # @opensip-tools/cli-ui — shared Ink/React primitives
   cli/                     # opensip-tools — generic tool dispatcher

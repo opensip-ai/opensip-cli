@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-04
-release: v2.6.x
+release: v3.0.0
 title: "Layer policy"
 audience: [contributors]
 purpose: "The dependency-cruiser rules that enforce the five-layer package graph and the tool-internal partitioning rules (graph stages, dashboard panels), rule by rule, with rationale."
@@ -70,7 +70,7 @@ Production code can't import test files; source code can't import devDependencie
 
 ## Layer enforcement rules
 
-The rules that pin the cross-package layer cake. The set below covers the load-bearing ones (core, datastore, contracts, fitness/simulation/lang/check-pack isolation). Three more runtime packages split out of `contracts` carry their own "depends-on-core-only-ish" rules in the same shape: `session-store-imports-core-datastore-contracts-only`, `reporting-imports-core-contracts-only`, and `dashboard-imports-only-core-contracts` (plus `cli-ui-no-workspace-deps` / `cli-ui-no-tools` for the leaf UI kit). They read exactly like the ones below — a `from` package, a forbidden `to` path-list.
+The rules that pin the cross-package layer cake. The set below covers the load-bearing ones (core, datastore, contracts, fitness/simulation/lang/check-pack isolation). Three more runtime packages split out of `contracts` carry their own "depends-on-core-only-ish" rules in the same shape: `session-store-imports-core-datastore-contracts-only`, `output-imports-core-contracts-only`, and `dashboard-imports-only-core-contracts` (plus `cli-ui-no-workspace-deps` / `cli-ui-no-tools` for the leaf UI kit). They read exactly like the ones below — a `from` package, a forbidden `to` path-list.
 
 ### `core-imports-nothing-workspace`
 
@@ -285,7 +285,7 @@ All of these surface during `pnpm depcruise` — and, re-run over the type-inclu
 
 ## How to add a new exception
 
-There are **no standing layer exceptions**. `tsPreCompilationDeps: false` on the main pass is not one: it only defers type-only edges to the type-aware pass (`.config/dependency-cruiser.types.cjs`, `tsPreCompilationDeps: true`), which re-runs the full ruleset over the type-inclusive graph — so a type-only layer inversion or cycle is rejected just like a runtime one. The two earlier cross-package exceptions were both paid down — `lang-typescript → fitness` (by moving `filterContent` into the adapter) and `graph → fitness` via `render/sarif.ts` (by relocating the SARIF / cloud-reporting module to `@opensip-tools/contracts`). New exceptions are rare and require justification.
+There are **no standing layer exceptions**. `tsPreCompilationDeps: false` on the main pass is not one: it only defers type-only edges to the type-aware pass (`.config/dependency-cruiser.types.cjs`, `tsPreCompilationDeps: true`), which re-runs the full ruleset over the type-inclusive graph — so a type-only layer inversion or cycle is rejected just like a runtime one. The two earlier cross-package exceptions were both paid down — `lang-typescript → fitness` (by moving `filterContent` into the adapter) and `graph → fitness` via `render/sarif.ts` (by moving SARIF formatting and cloud delivery into `@opensip-tools/output` and applying them at the CLI composition root). New exceptions are rare and require justification.
 
 Process:
 

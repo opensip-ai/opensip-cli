@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-03
-release: v2.6.x
+release: v3.0.0
 title: "vs. other tools"
 audience: [getting-started]
 purpose: "Honest comparison: what opensip-tools does that ESLint, Semgrep, Sonarqube, and Snyk don't — and what it deliberately doesn't try to do."

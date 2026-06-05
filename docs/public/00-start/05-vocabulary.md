@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-03
-release: v2.6.x
+release: v3.0.0
 title: "Vocabulary"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "The terms used everywhere in opensip-tools. Read this once before going deeper."
@@ -48,7 +48,7 @@ Checks are created with `defineCheck()` from [`packages/fitness/engine/src/frame
 - **`analyzeAll`** — multi-file: `(fileAccessor) => CheckViolation[]`. The check controls its own iteration; useful for cross-file rules like circular-import detection.
 - **`command`** — external tool: `command: { argv: [...], parseOutput: ... }`. The framework runs the binary, captures stdout/stderr, and the check parses violations from the output.
 
-Checks live in three places: project-local `.mjs` files under `opensip-tools/fit/checks/`, npm packages whose name matches `@opensip-tools/checks-*` (auto-discovered), and any package listed in `plugins.checkPackages:` in the project config (explicit pinning).
+Checks live in three places: project-local `.mjs` files under `opensip-tools/fit/checks/`, npm packages declaring `opensipTools.kind: "fit-pack"` (auto-discovered), and any package listed in `plugins.checkPackages:` in the project config (exact-name supplement).
 
 ## Recipe
 
@@ -121,7 +121,7 @@ A check declares its preferred filter mode via `contentFilter: 'raw' | 'strip-st
 A **plugin** is anything opensip-tools loads at runtime that wasn't compiled into it. Three flavors:
 
 1. **Source-file plugins.** `.mjs` files under `opensip-tools/{fit,sim}/{checks,recipes,scenarios}/`. The plugin loader auto-discovers them at startup. Adding a check is "drop a file in checks/" — no config change.
-2. **npm-package plugins.** Two discovery shapes coexist. **Tools** are any package whose `package.json` declares `opensipTools.kind === 'tool'` — the kernel walks `node_modules` for the marker. **Check packs** are any package whose name matches `@opensip-tools/checks-*` — the fitness engine walks `node_modules` by name prefix. See [`packages/core/src/plugins/tool-package-discovery.ts`](../../../packages/core/src/plugins/tool-package-discovery.ts) and [`packages/fitness/engine/src/plugins/check-package-discovery.ts`](../../../packages/fitness/engine/src/plugins/check-package-discovery.ts).
+2. **npm-package plugins.** Marker discovery is canonical. **Tools** are any package whose `package.json` declares `opensipTools.kind === 'tool'`; **check packs** declare `opensipTools.kind === 'fit-pack'`; **sim packs** declare `opensipTools.kind === 'sim-pack'`. Sim packs can also use the `<scope>/scenarios-*` scoped discovery path. See [`packages/core/src/plugins/tool-package-discovery.ts`](../../../packages/core/src/plugins/tool-package-discovery.ts), [`packages/fitness/engine/src/plugins/check-package-discovery.ts`](../../../packages/fitness/engine/src/plugins/check-package-discovery.ts), and [`packages/simulation/engine/src/plugins/scenario-package-discovery.ts`](../../../packages/simulation/engine/src/plugins/scenario-package-discovery.ts).
 3. **Project-pinned plugins.** Listed under `plugins.{fit,sim,asm,lang}:` in `opensip-tools.config.yml`. When this list is present, *only* those packages are loaded — auto-discovery is disabled, so no surprise plugin gets pulled in via a transitive dep.
 
 The `opensip-tools plugin` command surface (`add`/`remove`/`list`/`sync`) manages the project-pinned form. See [`packages/cli/src/commands/plugin.ts`](../../../packages/cli/src/commands/plugin.ts).

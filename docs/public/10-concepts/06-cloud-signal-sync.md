@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-04
-release: v2.6.x
+release: v3.0.0
 title: "Cloud signal sync"
 audience: [getting-started, ci-integrators, contributors]
 purpose: "How OpenSIP Cloud signal sync works end to end — the pipeline, exactly what is sent, the entitlement and best-effort guarantees, and the three ways to turn it off."
@@ -9,19 +9,19 @@ source-files:
   - packages/core/src/types/signal.ts
   - packages/core/src/types/signal-batch.ts
   - packages/core/src/signals/signal-sink.ts
-  - packages/reporting/src/resolve-signal-sink.ts
-  - packages/reporting/src/emit-run-signals.ts
-  - packages/reporting/src/entitlement.ts
-  - packages/reporting/src/cloud-signal-sink.ts
-  - packages/reporting/src/http-egress.ts
+  - packages/cli/src/bootstrap/deliver-envelope.ts
+  - packages/output/src/sink/resolve-signal-sink.ts
+  - packages/output/src/sink/entitlement.ts
+  - packages/output/src/sink/cloud-signal-sink.ts
+  - packages/output/src/sink/http-egress.ts
 related-docs:
   - ../70-reference/01-cli-commands.md
   - ../70-reference/03-configuration.md
-  - ../decisions/ADR-0008-opensip-cloud-signal-sync.md
+  - ../../decisions/ADR-0008-opensip-cloud-signal-sync.md
 ---
 # Cloud signal sync
 
-Cloud signal sync is an **optional, entitlement-gated, best-effort** sidecar to a normal run. When you have an OpenSIP Cloud API key and the cloud-storage entitlement, each `fit`/`graph` run *also* sends the findings it already computes to OpenSIP Cloud for storage. It is **additive**: your results are always written to the local SQLite store first, and a cloud failure never blocks, slows, or fails a run. Decided in [ADR-0008](../decisions/ADR-0008-opensip-cloud-signal-sync.md).
+Cloud signal sync is an **optional, entitlement-gated, best-effort** sidecar to a normal run. When you have an OpenSIP Cloud API key and the cloud-storage entitlement, each `fit`/`graph` run *also* sends the findings it already computes to OpenSIP Cloud for storage. It is **additive**: your results are always written to the local SQLite store first, and a cloud failure never blocks, slows, or fails a run. Decided in [ADR-0008](../../decisions/ADR-0008-opensip-cloud-signal-sync.md).
 
 > **Preview — server side not yet available.** This repo owns the **client and the wire contract** (a `SignalBatch` envelope) only. The signal-ingestion endpoint, the entitlement API, and the Postgres storage live in the parent `opensip` service and **do not exist yet** (per ADR-0008). Until they ship, an entitled run has no live endpoint to reach — this page describes the *intended* behavior and the client pipeline that is already wired, not a feature you can rely on today.
 

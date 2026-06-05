@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-04
-release: v2.6.0
+release: v3.0.0
 title: "Configuration"
 audience: [getting-started, ci-integrators, plugin-authors]
 purpose: "The opensip-tools.config.yml schema, every field, defaults, and where each is read."
@@ -150,15 +150,16 @@ CLI flags always override config — `--no-json` overrides a `cli.json: true` se
 
 ## `plugins`
 
-Plugin lists and discovery preferences. **Read out-of-band** (not in the Zod schema). Three complementary discovery paths layer:
+Plugin lists and discovery preferences. **Read out-of-band** (not in the Zod schema). Marker discovery, scoped sim discovery, and explicit/project-pinned package lists layer:
 
 | Field | Effect |
 |---|---|
 | `plugins.fit` | Arbitrary-scope fitness packs pinned into `.runtime/plugins/fit/`. Managed by `plugin add/remove/sync`. |
 | `plugins.sim` | Arbitrary-scope simulation packs pinned into `.runtime/plugins/sim/`. |
-| `plugins.packageScopes` | Additional npm scopes to scan for `<scope>/checks-*` and `<scope>/scenarios-*` packages. `@opensip-tools` is always scanned. |
-| `plugins.checkPackages` | When set, **strict** — only these packages load via the name-pattern path. Marker-based discovery still runs alongside. |
-| `plugins.autoDiscoverChecks` | `false` disables the scope scan for fit checks. Default `true`. Ignored when `checkPackages` is set. |
+| `plugins.packageScopes` | Additional npm scopes to scan for `<scope>/scenarios-*` simulation packages. `@opensip-tools` is always scanned. |
+| `plugins.checkPackages` | Exact fitness package names to load from project `node_modules` in addition to marker-based `fit-pack` discovery. |
+| `plugins.scenarioPackages` | Exact simulation package names to load from project `node_modules`; when set, replaces the `<scope>/scenarios-*` scan. Marker-based `sim-pack` discovery still runs alongside. |
+| `plugins.autoDiscoverScenarios` | `false` disables the `<scope>/scenarios-*` scan for sim. Default `true`. Ignored when `scenarioPackages` is set. |
 
 ```yaml
 plugins:
@@ -166,7 +167,7 @@ plugins:
   packageScopes: ['@acme']
 ```
 
-**Marker-based discovery** — packages declaring `opensipTools.kind: "fit-pack"` or `"sim-pack"` in `package.json` — is always on and **not configurable from this file**. The marker is the publication-scope-independent path; this config governs only the name-pattern and explicit-pin paths. See [plugin loader](../80-implementation/02-plugin-loader.md).
+**Marker-based discovery** — packages declaring `opensipTools.kind: "fit-pack"` or `"sim-pack"` in `package.json` — is always on and **not configurable from this file**. The marker is the publication-scope-independent path; this config governs only explicit package lists and the sim `scenarios-*` scope scan. See [plugin loader](../80-implementation/02-plugin-loader.md).
 
 ## `dashboard`
 

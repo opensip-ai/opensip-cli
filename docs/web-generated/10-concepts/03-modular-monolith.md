@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-04
-release: v2.6.x
+release: v3.0.0
 title: "Layered package graph"
 audience: [contributors]
 purpose: "The 30-package monorepo, the five-layer dependency rule, why dependency-cruiser exists, and the trade-offs."
@@ -53,7 +53,7 @@ This document is the conceptual map. For the lookup-shaped catalog of every pack
 │           └──────────────────────────────────────────────────┘    │
 │                                  ▲                                 │
 │  Layer 2  ┌──────────────────────┴───────────────────────────┐    │
-│           │  datastore   contracts   session-store   reporting │   │
+│           │  datastore   contracts   session-store   output    │   │
 │           └──────────────────────────────────────────────────┘    │
 │                                  ▲                                 │
 │  Layer 1  ┌──────────────────────┴───────────────────────────┐    │
@@ -69,7 +69,7 @@ This document is the conceptual map. For the lookup-shaped catalog of every pack
 **Layer 2 — `@opensip-tools/datastore`, `@opensip-tools/contracts`, `@opensip-tools/session-store`, and `@opensip-tools/output`.** Four packages above the kernel, each depending only on `core` and (where noted) on lower siblings within this layer — never on a tool.
 
 - **`@opensip-tools/datastore`** is the persistence kernel — the `DataStore` interface, the SQLite + Drizzle implementation, the in-memory backend for tests, the workspace migration store under `migrations/`. Paradigm-agnostic infrastructure: tools and session-store own their domain schemas (sessions in session-store; baseline/catalog in graph; baseline in fitness) and register them with the datastore at open time. Depends on `core` only.
-- **`@opensip-tools/contracts`** is the shared contract layer between Tools and the runner: the `SignalEnvelope` shape every tool returns (with its `verdict`/`units[]`/`signals[]`), the `CommandResult` discriminated union the renderer dispatches on, the exit-code constants, the cross-tool `StoredSession` type, and the `GraphCatalog` type surface that the graph tool produces and the dashboard consumes. A types-and-constants surface — the `SessionRepo` runtime and sessions schema live in `session-store`, not here. Imports `core` and `datastore`. Does not import any tool.
+- **`@opensip-tools/contracts`** is the shared contract layer between Tools and the runner: the `SignalEnvelope` shape every tool returns (with its `verdict`/`units[]`/`signals[]`), the `CommandResult` discriminated union the renderer dispatches on, the exit-code constants, the cross-tool `StoredSession` type, and the `GraphCatalog` type surface that the graph tool produces and the dashboard consumes. A types-and-constants surface — the `SessionRepo` runtime and sessions schema live in `session-store`, not here. Imports `core` only. Does not import any tool.
 - **`@opensip-tools/session-store`** owns session persistence: the `SessionRepo` runtime, the `sessions`/`session_checks`/`session_findings` schema, and the `generateSessionId`/`sanitizeForFilename` helpers. Depends on `core`, `datastore`, and `contracts` (for the `StoredSession` shape it round-trips).
 - **`@opensip-tools/output`** (renamed from `@opensip-tools/reporting`, ADR-0011) owns all machine output: pure `(envelope) => string` formatters under `format/` (json, sarif, table) and effectful `sink/` delivery (cloud egress, entitlement). The CLI composition root composes a formatter with a sink per the run's flags; tool engines no longer import it. Depends on `core` and `contracts` only.
 
@@ -194,7 +194,7 @@ opensip-tools           ─── imports ───►  @opensip-tools/fitness
    the CLI's loaded check registry, populated at startup
 ```
 
-The `cli` imports `fitness` to get the `fitnessTool` (Layer 5 → Layer 3). It also imports the bundled language adapters to register them (Layer 5 → Layer 3). It does **not** import `checks-universal` directly — instead, the plugin loader walks `node_modules` at runtime and discovers any package declaring `opensipTools.kind: "fit-pack"` (the `@opensip-tools/checks-*` name prefix is a deprecated fallback; see ADR-0007). The check pack imports `fitness` (for `defineCheck`) and `core` (for `Signal`), both lower layers. Every arrow points up.
+The `cli` imports `fitness` to get the `fitnessTool` (Layer 5 → Layer 3). It also imports the bundled language adapters to register them (Layer 5 → Layer 3). It does **not** import `checks-universal` directly — instead, the plugin loader walks `node_modules` at runtime and discovers any package declaring `opensipTools.kind: "fit-pack"` (or listed exactly in `plugins.checkPackages`). The check pack imports `fitness` (for `defineCheck`) and `core` (for `Signal`), both lower layers. Every arrow points up.
 
 ---
 

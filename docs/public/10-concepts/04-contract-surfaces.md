@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-04
-release: v2.6.x
+release: v3.0.0
 title: "Contract surfaces"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "The system's public edges. Every contract opensip-tools makes with the outside world, and what changing each one would cost."
@@ -11,7 +11,7 @@ source-files:
   - packages/core/src/tools/types.ts
   - packages/core/src/plugins/types.ts
   - packages/core/src/languages/adapter.ts
-  - packages/reporting/src/sarif.ts
+  - packages/output/src/format/signal-sarif.ts
 related-docs:
   - ./01-fitness-loop.md
   - ./02-tool-plugin-model.md
@@ -38,7 +38,7 @@ A contract is a promise to a consumer outside your control. Break it, and the co
 | 3 | JSON output (`SignalEnvelope`) | CI, dashboards, the gate, OpenSIP Cloud | **stable** (semver-major) | `packages/contracts/src/signal-envelope.ts` |
 | 4 | SARIF output | GitHub Code Scanning, IDEs | **stable** (versioned by SARIF spec) | `packages/output/src/format/signal-sarif.ts` |
 | 5 | Tool plugin contract (`Tool`) | third-party tools | **stable** (semver-major) | `packages/core/src/tools/types.ts` |
-| 6 | Plugin discovery (`opensipTools.kind` markers; check-pack name prefix is a deprecated fallback) | third-party tools, check packs | **stable** (semver-major) | `packages/core/src/plugins/tool-package-discovery.ts`, `packages/fitness/engine/src/plugins/check-package-discovery.ts` |
+| 6 | Plugin discovery (`opensipTools.kind` markers; exact check-package pins; sim `scenarios-*` scope scan) | third-party tools, check packs, sim packs | **stable** (semver-major) | `packages/core/src/plugins/tool-package-discovery.ts`, `packages/fitness/engine/src/plugins/check-package-discovery.ts`, `packages/simulation/engine/src/plugins/scenario-package-discovery.ts` |
 
 Anything else — internal types, framework helpers, the recipe registry shape, the language-adapter content-filter API — is **internal**. It can move between minors. Don't depend on it from outside the workspace; if you do, you're on your own when it shifts.
 
@@ -186,7 +186,7 @@ opensip-tools discovers third-party packages two different ways depending on wha
 
 The kernel's [`discoverToolPackages`](../../../packages/core/src/plugins/tool-package-discovery.ts) walks `node_modules` looking for the `opensipTools.kind === 'tool'` marker. The package's main entry must export a `tool: Tool` symbol.
 
-### Check packs — `opensipTools.kind` marker (name prefix is a deprecated fallback)
+### Check packs — `opensipTools.kind` marker
 
 ```json
 {
@@ -196,21 +196,21 @@ The kernel's [`discoverToolPackages`](../../../packages/core/src/plugins/tool-pa
 }
 ```
 
-The canonical contract is the `opensipTools.kind: "fit-pack"` marker ([ADR-0007](../decisions/ADR-0007-marker-canonical-plugin-discovery.md)). The fitness engine merges marker-discovered packs with a legacy `@opensip-tools/checks-*` name-prefix scan ([`discoverCheckPackages`](../../../packages/fitness/engine/src/plugins/check-package-discovery.ts)), retained only as a **deprecated fallback** for third-party packs that predate the marker (removal in the next major). All first-party `@opensip-tools/checks-*` packs carry the marker. A pack's main entry must export `checks: Check[]`, optionally `recipes: FitnessRecipe[]`, and optionally `checkDisplay: Record<string, [icon, name]>`.
+The canonical contract is the `opensipTools.kind: "fit-pack"` marker ([ADR-0007](../../decisions/ADR-0007-marker-canonical-plugin-discovery.md)). The fitness engine discovers marker-declared packs from project `node_modules`; `plugins.checkPackages:` can additionally name exact packages that do not declare the marker yet. The old `@opensip-tools/checks-*` name-prefix scan has been removed. All first-party `@opensip-tools/checks-*` packs carry the marker. A pack's main entry must export `checks: Check[]`, optionally `recipes: FitnessRecipe[]`, and optionally `checkDisplay: Record<string, [icon, name]>`.
 
-For packs published under your own scope, declare the marker and either add your scope to `plugins.packageScopes:` or pin the package explicitly in the project config:
+For packs published under your own scope, declare the marker or pin the package explicitly in the project config:
 
 ```yaml
 plugins:
   checkPackages:
-    - '@my-org/fitness-checks'      # explicit pin disables auto-discovery
+    - '@my-org/fitness-checks'      # exact-name supplement for non-marker packages
 ```
 
-When `plugins.checkPackages:` is set, **only** those packages load — the `@opensip-tools/checks-*` auto-discovery is disabled for the run.
+Marker-based discovery always runs; `plugins.checkPackages:` is an exact-name supplement for non-marker packages.
 
 ### Sim scenario packs
 
-Currently use the same project-pinned shape as fit (declare the package in `plugins.sim:` in the project config and `plugin add` it). There is no name-prefix auto-discovery for sim today.
+Use the same marker shape with `opensipTools.kind: "sim-pack"`. Sim also supports `<scope>/scenarios-*` discovery under `@opensip-tools` plus configured `plugins.packageScopes`, and the reproducible project-pinned shape (`plugins.sim:`) managed by `plugin add/remove/sync`.
 
 ### Stability rules
 

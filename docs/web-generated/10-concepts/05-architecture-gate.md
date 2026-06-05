@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-04
-release: v2.6.x
+release: v3.0.0
 title: "Architecture gate"
 audience: [contributors, ci-integrators]
 purpose: "The baseline-and-compare workflow. Identity hash, line-shift invariance, CI integration patterns."
