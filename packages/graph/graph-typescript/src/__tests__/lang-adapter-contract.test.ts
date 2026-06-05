@@ -203,10 +203,10 @@ describe('GraphLanguageAdapter contract — TypeScript', () => {
 
   // ── I-4: resolveCallSites doesn't mutate catalog ─────────────
 
-  it('I-4 — resolveCallSites does not mutate the input catalog', () => {
+  it('I-4 — resolveCallSites does not mutate the input catalog', async () => {
     const { walk, catalog, project } = buildPipeline(typescriptGraphAdapter, dir);
     const before = JSON.stringify(catalog);
-    typescriptGraphAdapter.resolveCallSites({
+    await typescriptGraphAdapter.resolveCallSites({
       project,
       catalog,
       callSites: walk.callSites,
@@ -219,13 +219,13 @@ describe('GraphLanguageAdapter contract — TypeScript', () => {
 
   // ── I-5: every CallEdge.to references a catalog bodyHash or is empty ──
 
-  it('I-5 — every CallEdge.to references a catalog bodyHash or is empty', () => {
+  it('I-5 — every CallEdge.to references a catalog bodyHash or is empty', async () => {
     const { walk, catalog, project } = buildPipeline(typescriptGraphAdapter, dir);
     const knownHashes = new Set<string>();
     for (const arr of Object.values(catalog.functions)) {
       for (const o of arr) knownHashes.add(o.bodyHash);
     }
-    const resolved = typescriptGraphAdapter.resolveCallSites({
+    const resolved = await typescriptGraphAdapter.resolveCallSites({
       project,
       catalog,
       callSites: walk.callSites,
@@ -355,13 +355,13 @@ describe('GraphLanguageAdapter contract — TypeScript', () => {
     expect(kinds.has('arrow')).toBe(true);
   });
 
-  it('CallSiteRecord opaque handles round-trip through resolveCallSites', () => {
+  it('CallSiteRecord opaque handles round-trip through resolveCallSites', async () => {
     const { walk, catalog, project } = buildPipeline(typescriptGraphAdapter, dir);
     const records: CallSiteRecord[] = [...walk.callSites];
     expect(records.length).toBeGreaterThan(0);
     // The opaque shape uses nodeRef/sourceFileRef; the adapter can
-    // cast back successfully (validated by no thrown errors).
-    expect(() =>
+    // cast back successfully (validated by the promise resolving, not rejecting).
+    await expect(
       typescriptGraphAdapter.resolveCallSites({
         project,
         catalog,
@@ -369,7 +369,7 @@ describe('GraphLanguageAdapter contract — TypeScript', () => {
         projectDirAbs: dir,
         resolutionMode: 'exact',
       }),
-    ).not.toThrow();
+    ).resolves.toBeDefined();
   });
 });
 

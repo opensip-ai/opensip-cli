@@ -65,7 +65,7 @@ function findModuleInit(catalog: Catalog, filePath: string): FunctionOccurrence 
   return undefined;
 }
 
-function runAdapter(): { catalog: Catalog; dependenciesByOwner: ReadonlyMap<string, readonly { readonly to: readonly string[]; readonly specifier: string; readonly line: number; readonly column: number }[]> | undefined } {
+async function runAdapter(): Promise<{ catalog: Catalog; dependenciesByOwner: ReadonlyMap<string, readonly { readonly to: readonly string[]; readonly specifier: string; readonly line: number; readonly column: number }[]> | undefined }> {
   const discovery = typescriptGraphAdapter.discoverFiles({
     cwd: fixtureRoot,
   });
@@ -91,7 +91,7 @@ function runAdapter(): { catalog: Catalog; dependenciesByOwner: ReadonlyMap<stri
     cacheKey: 'test',
     functions: walked.occurrences,
   };
-  const resolved = typescriptGraphAdapter.resolveCallSites({
+  const resolved = await typescriptGraphAdapter.resolveCallSites({
     project: parsed.project,
     catalog: initialCatalog,
     callSites: walked.callSites,
@@ -103,7 +103,7 @@ function runAdapter(): { catalog: Catalog; dependenciesByOwner: ReadonlyMap<stri
 }
 
 describe('TypeScript adapter — depends_on emission (Phase 4)', () => {
-  it('walks an ImportDeclaration as a dependency site on the importing file', () => {
+  it('walks an ImportDeclaration as a dependency site on the importing file', async () => {
     writeFile(
       'src/greet.ts',
       `import { formatName } from './format.js';\nexport function greet(name: string): string { return formatName(name); }\n`,
@@ -113,7 +113,7 @@ describe('TypeScript adapter — depends_on emission (Phase 4)', () => {
       `export function formatName(raw: string): string { return raw.trim(); }\n`,
     );
 
-    const { catalog, dependenciesByOwner } = runAdapter();
+    const { catalog, dependenciesByOwner } = await runAdapter();
     const greetModuleInit = findModuleInit(catalog, 'src/greet.ts');
     const formatModuleInit = findModuleInit(catalog, 'src/format.ts');
 
@@ -128,13 +128,13 @@ describe('TypeScript adapter — depends_on emission (Phase 4)', () => {
     expect(greetDeps![0].line).toBe(1);
   });
 
-  it('emits an unresolved edge for external package imports', () => {
+  it('emits an unresolved edge for external package imports', async () => {
     writeFile(
       'src/greet.ts',
       `import { something } from '@opensip-tools/nonexistent-pkg';\nexport function greet(): string { return String(something); }\n`,
     );
 
-    const { catalog, dependenciesByOwner } = runAdapter();
+    const { catalog, dependenciesByOwner } = await runAdapter();
     const greetModuleInit = findModuleInit(catalog, 'src/greet.ts');
     expect(greetModuleInit).toBeDefined();
 
@@ -144,7 +144,7 @@ describe('TypeScript adapter — depends_on emission (Phase 4)', () => {
     expect(greetDeps![0].to).toEqual([]);
   });
 
-  it('preserves multiple imports as separate dependency edges', () => {
+  it('preserves multiple imports as separate dependency edges', async () => {
     writeFile(
       'src/main.ts',
       [
@@ -158,7 +158,7 @@ describe('TypeScript adapter — depends_on emission (Phase 4)', () => {
     writeFile('src/a.ts', `export function a(): string { return 'a'; }\n`);
     writeFile('src/b.ts', `export function b(): string { return 'b'; }\n`);
 
-    const { catalog, dependenciesByOwner } = runAdapter();
+    const { catalog, dependenciesByOwner } = await runAdapter();
     const mainModuleInit = findModuleInit(catalog, 'src/main.ts');
     expect(mainModuleInit).toBeDefined();
 
@@ -175,13 +175,13 @@ describe('TypeScript adapter — depends_on emission (Phase 4)', () => {
     expect(aEdge!.to).toHaveLength(1);
   });
 
-  it('produces no dependency edges for a file with no imports', () => {
+  it('produces no dependency edges for a file with no imports', async () => {
     writeFile(
       'src/standalone.ts',
       `export function standalone(): number { return 42; }\n`,
     );
 
-    const { catalog, dependenciesByOwner } = runAdapter();
+    const { catalog, dependenciesByOwner } = await runAdapter();
     const standaloneModuleInit = findModuleInit(catalog, 'src/standalone.ts');
     expect(standaloneModuleInit).toBeDefined();
 
@@ -190,7 +190,7 @@ describe('TypeScript adapter — depends_on emission (Phase 4)', () => {
     expect(deps).toBeUndefined();
   });
 
-  it('captures import line numbers (1-based) for source attribution', () => {
+  it('captures import line numbers (1-based) for source attribution', async () => {
     writeFile(
       'src/multiline.ts',
       [
@@ -203,7 +203,7 @@ describe('TypeScript adapter — depends_on emission (Phase 4)', () => {
     );
     writeFile('src/other.ts', `export const x = 1;\n`);
 
-    const { catalog, dependenciesByOwner } = runAdapter();
+    const { catalog, dependenciesByOwner } = await runAdapter();
     const moduleInit = findModuleInit(catalog, 'src/multiline.ts');
     const deps = dependenciesByOwner!.get(ownerEdgeKey(moduleInit!.bodyHash, moduleInit!.filePath));
     expect(deps).toHaveLength(1);

@@ -36,12 +36,12 @@ import type { ToolCliContext } from '@opensip-tools/core';
  * Exits non-zero (via setExitCode) on failure so the parent can attribute
  * the error to this shard.
  */
-export function executeShardWorker(specPath: string, cli: ToolCliContext): void {
+export async function executeShardWorker(specPath: string, cli: ToolCliContext): Promise<void> {
   let shardId = '<unknown>';
   try {
     const spec = JSON.parse(readFileSync(specPath, 'utf8')) as ShardWorkerSpec;
     shardId = spec.shard.id;
-    const result = buildShard(spec);
+    const result = await buildShard(spec);
     // Single write of the whole JSON document — the parent reads stdout to EOF.
     process.stdout.write(JSON.stringify(result));
     cli.setExitCode(0);
@@ -59,7 +59,7 @@ export function executeShardWorker(specPath: string, cli: ToolCliContext): void 
   }
 }
 
-function buildShard(spec: ShardWorkerSpec): ShardBuildResult {
+async function buildShard(spec: ShardWorkerSpec): Promise<ShardBuildResult> {
   const { shard, projectRoot, resolutionMode } = spec;
   const adapter = pickAdapter(shard.rootDir);
 
@@ -81,7 +81,7 @@ function buildShard(spec: ShardWorkerSpec): ShardBuildResult {
   // parent build's sharded span via the TRACEPARENT the runner propagates into
   // this worker's env (extracted at the CLI boundary by initTelemetry). No live
   // view here — the worker is headless — so no progress/monitor plumbing.
-  const built = buildAndResolveCatalog({
+  const built = await buildAndResolveCatalog({
     runStage: spanRunStage({ 'opensip_tools.graph.shard_id': shard.id }),
     adapter,
     discovery,

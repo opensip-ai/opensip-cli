@@ -1,5 +1,5 @@
 /**
- * In-process ProgressTransport (ADR-0015) — runs the job in the current process
+ * In-process ProgressTransport (ADR-0016) — runs the job in the current process
  * and fans its events out to subscribers. The common case: tools whose execution
  * already yields to the event loop (fit's async file I/O, sim's awaited
  * scenarios), so the render thread stays free to animate.

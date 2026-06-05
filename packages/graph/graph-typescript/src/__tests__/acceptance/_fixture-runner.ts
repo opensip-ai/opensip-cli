@@ -42,7 +42,7 @@ export function writeFixture(rootDir: string, files: FixtureFiles): void {
   }
 }
 
-export function runFixture(rootDir: string): Catalog {
+export async function runFixture(rootDir: string): Promise<Catalog> {
   const discovery = discoverFiles({ projectDir: rootDir });
   const inventory = buildCatalog({
     projectDirAbs: discovery.projectDirAbs,
@@ -50,7 +50,7 @@ export function runFixture(rootDir: string): Catalog {
     compilerOptions: discovery.compilerOptions,
     tsConfigPathAbs: discovery.tsConfigPathAbs,
   });
-  return resolveCatalogEdges(inventory, discovery.projectDirAbs);
+  return await resolveCatalogEdges(inventory, discovery.projectDirAbs);
 }
 
 export function findOccurrence(

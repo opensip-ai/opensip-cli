@@ -54,6 +54,19 @@ import type {
   ResolverVerdict,
 } from '@opensip-tools/graph';
 
+/** How many call sites to process between cooperative event-loop yields. Tuned
+ *  so the live view's 80ms clock ticks several times per second during a long
+ *  resolve, while keeping the macrotask-hop count (and its overhead) tiny. */
+const YIELD_EVERY_CALL_SITES = 250;
+
+/** Yield to the event loop once (a macrotask hop), so the in-process live view
+ *  can paint a frame mid-stage (ADR-0016). */
+function yieldToEventLoop(): Promise<void> {
+  return new Promise<void>((resolve) => {
+    setImmediate(resolve);
+  });
+}
+
 function tsPosition(node: ts.Node, sourceFile: ts.SourceFile): {
   readonly line: number;
   readonly column: number;
@@ -88,16 +101,24 @@ export interface EdgeResolutionFromRecordsInput {
  * `resolveCallSitesAdapter` drives this directly with the records the walk
  * already emitted.
  */
-export function resolveEdgesFromRecords(
+export async function resolveEdgesFromRecords(
   input: EdgeResolutionFromRecordsInput,
-): EdgeResolutionOutput {
+): Promise<EdgeResolutionOutput> {
   logger.info({ evt: 'graph.edges.start', module: 'graph:edges' });
   const checker = input.program.getTypeChecker();
   const callsByHash = new Map<string, CallEdge[]>();
   const stats = createMutableStats();
   const sink: EdgeSink = { edgesByOwner: callsByHash, stats };
 
+  let processed = 0;
   for (const r of input.callSites) {
+    // Cooperative yield (ADR-0016): resolve is the heaviest stage (tens of
+    // thousands of sites). Yielding to the event loop every N sites lets the
+    // in-process live view's 80ms clock tick, so the spinner animates instead
+    // of freezing for the whole stage. The macrotask hops (~1 per N sites) are
+    // negligible against the per-site type-checker work.
+    if (processed > 0 && processed % YIELD_EVERY_CALL_SITES === 0) await yieldToEventLoop();
+    processed += 1;
     // Bucket edges per OWNER OCCURRENCE (bodyHash + file), not bodyHash alone:
     // body-twin functions in different files share a hash, and a hash-only
     // bucket would union their edges into phantom cross-package calls.
@@ -153,9 +174,9 @@ export interface EdgeResolutionSyntacticInput {
  * Stats stay honest: fast edges land in `resolvedMedium`/`resolvedLow`/
  * `unresolved`, never `resolvedHigh`.
  */
-export function resolveEdgesSyntactic(
+export async function resolveEdgesSyntactic(
   input: EdgeResolutionSyntacticInput,
-): EdgeResolutionOutput {
+): Promise<EdgeResolutionOutput> {
   logger.info({ evt: 'graph.edges.syntactic.start', module: 'graph:edges' });
   const callsByHash = new Map<string, CallEdge[]>();
   const stats = createMutableStats();
@@ -164,7 +185,11 @@ export function resolveEdgesSyntactic(
   // One import index per source file — cached across that file's sites.
   const importIndexByFile = new Map<ts.SourceFile, ImportIndex>();
 
+  let processed = 0;
   for (const r of input.callSites) {
+    // Cooperative yield — see resolveEdgesFromRecords (ADR-0016).
+    if (processed > 0 && processed % YIELD_EVERY_CALL_SITES === 0) await yieldToEventLoop();
+    processed += 1;
     // Per-owner-occurrence bucket key (see resolveEdgesFromRecords).
     const ownerKey = ownerEdgeKey(r.ownerHash, relative(input.projectDirAbs, r.sourceFile.fileName));
     if (r.kind === 'creation') {

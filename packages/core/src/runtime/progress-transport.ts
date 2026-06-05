@@ -1,6 +1,6 @@
 /**
  * ProgressTransport — the seam that decouples *where a tool's work runs* from
- * *how its progress reaches the renderer* (ADR-0015).
+ * *how its progress reaches the renderer* (ADR-0016).
  *
  * Two implementations:
  *   - in-process (this directory) — a plain in-memory fan-out, for tools whose

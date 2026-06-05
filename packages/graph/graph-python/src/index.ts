@@ -32,7 +32,7 @@ import { walkProject as pythonWalkProject } from './walk.js';
 import type { PythonParsedProject } from './parse.js';
 import type { GraphLanguageAdapter } from '@opensip-tools/graph';
 
-export const pythonGraphAdapter: GraphLanguageAdapter<PythonParsedProject> = {
+export const pythonGraphAdapter = {
   id: 'python',
   fileExtensions: ['.py'],
   displayName: 'Python',
@@ -42,7 +42,7 @@ export const pythonGraphAdapter: GraphLanguageAdapter<PythonParsedProject> = {
   resolveCallSites: pythonResolveCallSites,
   cacheKey: pythonCacheKey,
   ruleHints: pythonRuleHints,
-};
+} satisfies GraphLanguageAdapter<PythonParsedProject>;
 
 /**
  * Discovery contract: external adapter packs export `adapter` (the

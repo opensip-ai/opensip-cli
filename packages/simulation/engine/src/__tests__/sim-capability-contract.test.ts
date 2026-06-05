@@ -48,7 +48,7 @@ function recordRegisteredFlags(): string[] {
     action: () => sub,
   };
   const program = { command: () => sub };
-  // register() now also contributes a live view (ADR-0015); the recorder only
+  // register() now also contributes a live view (ADR-0016); the recorder only
   // cares about flags, so registerLiveView is a no-op here.
   simulationTool.register({ program, registerLiveView: noop } as unknown as ToolCliContext);
   return flags.sort();

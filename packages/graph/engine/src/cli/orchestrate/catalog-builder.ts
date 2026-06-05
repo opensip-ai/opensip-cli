@@ -46,7 +46,9 @@ export interface RunStageArgs<T> {
   readonly stage: GraphStage;
   readonly onProgress: GraphProgressCallback | undefined;
   readonly monitor: PressureMonitor | undefined;
-  readonly fn: () => T;
+  /** The stage work. May be sync or async — async stages (e.g. the cooperative
+   *  resolve) let the live view's spinner animate (ADR-0016). */
+  readonly fn: () => T | Promise<T>;
   readonly detailFn?: (result: T) => string | undefined;
   readonly attrsFn?: (result: T) => Attributes;
 }
@@ -56,8 +58,11 @@ export interface RunStageArgs<T> {
  * Kept here as a type alias so catalog-builder doesn't import the
  * concrete function (which lives in orchestrate.ts at the parent
  * level) and we avoid a circular dependency.
+ *
+ * Async: `runStage` awaits its `fn` and yields to the event loop so the live
+ * view animates during long stages (ADR-0016).
  */
-export type RunStage = <T>(args: RunStageArgs<T>) => T;
+export type RunStage = <T>(args: RunStageArgs<T>) => Promise<T>;
 
 /** Inputs to the full-rebuild {@link buildAndResolveCatalog}. */
 export interface CatalogBuildOptions {
@@ -82,19 +87,19 @@ export interface CatalogBuildOptions {
  * any caller, so V8 can reclaim the bound AST before Stage 3
  * (`buildIndexes`) and the cache write run.
  */
-export function buildAndResolveCatalog(options: CatalogBuildOptions): {
+export async function buildAndResolveCatalog(options: CatalogBuildOptions): Promise<{
   readonly catalog: Catalog;
   readonly resolutionStats: ResolutionStats;
   readonly boundaryCalls?: readonly CrossBoundaryCall[];
   readonly parseErrors: readonly ParseError[];
-} {
+}> {
   const { runStage, adapter, discovery, resolutionMode, onProgress, monitor, emitBoundaryCalls } =
     options;
   // Phase 4 unified walk: Stage 1's catalog construction and Stage 2's
   // call-site location share a single AST descent per file. The walk
   // emits the catalog plus a flat list of pre-located call-site
   // records; resolveCallSites dispatches resolvers without re-walking.
-  const parsed = runStage({
+  const parsed = await runStage({
     stage: 'parse',
     onProgress,
     monitor,
@@ -106,7 +111,7 @@ export function buildAndResolveCatalog(options: CatalogBuildOptions): {
     }),
     detailFn: () => adapter.displayName,
   });
-  const walked = runStage({
+  const walked = await runStage({
     stage: 'walk',
     onProgress,
     monitor,
@@ -120,7 +125,7 @@ export function buildAndResolveCatalog(options: CatalogBuildOptions): {
 
   const initialCatalog = assembleCatalog(adapter, discovery, walked.occurrences, resolutionMode);
 
-  const resolved = runStage({
+  const resolved = await runStage({
     stage: 'resolve',
     onProgress,
     monitor,
@@ -178,11 +183,11 @@ export interface IncrementalCatalogBuildOptions {
   readonly monitor?: PressureMonitor;
 }
 
-export function buildAndResolveCatalogIncremental(
+export async function buildAndResolveCatalogIncremental(
   options: IncrementalCatalogBuildOptions,
-): { readonly catalog: Catalog; readonly resolutionStats: ResolutionStats } {
+): Promise<{ readonly catalog: Catalog; readonly resolutionStats: ResolutionStats }> {
   const { runStage, adapter, discovery, cachedCatalog, changedFilesAbs, resolutionMode, onProgress, monitor } = options;
-  const parsed = runStage({
+  const parsed = await runStage({
     stage: 'parse',
     onProgress,
     monitor,
@@ -195,7 +200,7 @@ export function buildAndResolveCatalogIncremental(
     detailFn: () => `${adapter.displayName} (incremental)`,
   });
 
-  const { walked, closureRel } = runStage({
+  const { walked, closureRel } = await runStage({
     stage: 'walk',
     onProgress,
     monitor,
@@ -222,7 +227,7 @@ export function buildAndResolveCatalogIncremental(
     functions: mergedFunctions,
   } as Catalog;
 
-  const resolved = runStage({
+  const resolved = await runStage({
     stage: 'resolve',
     onProgress,
     monitor,

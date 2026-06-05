@@ -32,8 +32,8 @@ const APP = [
   'export function run(): number { return localOnly(); }',
 ].join('\n');
 
-function buildBothTiers(dir: string): Record<ResolutionMode, { resolved: ReturnType<typeof adapter.resolveCallSites>; cacheKey: string }> {
-  const run = (resolutionMode: ResolutionMode): { resolved: ReturnType<typeof adapter.resolveCallSites>; cacheKey: string } => {
+async function buildBothTiers(dir: string): Promise<Record<ResolutionMode, { resolved: Awaited<ReturnType<typeof adapter.resolveCallSites>>; cacheKey: string }>> {
+  const run = async (resolutionMode: ResolutionMode): Promise<{ resolved: Awaited<ReturnType<typeof adapter.resolveCallSites>>; cacheKey: string }> => {
     const disc = adapter.discoverFiles({ cwd: dir });
     const parsed = adapter.parseProject({
       projectDirAbs: disc.projectDirAbs,
@@ -61,7 +61,7 @@ function buildBothTiers(dir: string): Record<ResolutionMode, { resolved: ReturnT
       resolutionMode,
       functions: walk.occurrences,
     };
-    const resolved = adapter.resolveCallSites({
+    const resolved = await adapter.resolveCallSites({
       project: parsed.project,
       catalog,
       callSites: walk.callSites,
@@ -71,7 +71,7 @@ function buildBothTiers(dir: string): Record<ResolutionMode, { resolved: ReturnT
     });
     return { resolved, cacheKey };
   };
-  return { exact: run('exact'), fast: run('fast') };
+  return { exact: await run('exact'), fast: await run('fast') };
 }
 
 function allEdges(byOwner: ReadonlyMap<string, readonly CallEdge[]>): CallEdge[] {
@@ -92,8 +92,8 @@ describe('fast vs exact (TypeScript adapter, end-to-end)', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it('both tiers produce edges; fast edges are all syntactic and never high', () => {
-    const { exact, fast } = buildBothTiers(dir);
+  it('both tiers produce edges; fast edges are all syntactic and never high', async () => {
+    const { exact, fast } = await buildBothTiers(dir);
 
     const exactEdges = allEdges(exact.resolved.edgesByOwner);
     const fastEdges = allEdges(fast.resolved.edgesByOwner);
@@ -106,8 +106,8 @@ describe('fast vs exact (TypeScript adapter, end-to-end)', () => {
     }
   });
 
-  it('fast resolution stats never populate resolvedHigh', () => {
-    const { fast } = buildBothTiers(dir);
+  it('fast resolution stats never populate resolvedHigh', async () => {
+    const { fast } = await buildBothTiers(dir);
     expect(fast.resolved.stats.resolvedHigh).toBe(0);
     // Every located call site is accounted for.
     const total =
@@ -117,15 +117,15 @@ describe('fast vs exact (TypeScript adapter, end-to-end)', () => {
     expect(fast.resolved.stats.totalCallSites).toBe(total);
   });
 
-  it('separates the cache: fast and exact cacheKeys differ for the same tsconfig', () => {
-    const { exact, fast } = buildBothTiers(dir);
+  it('separates the cache: fast and exact cacheKeys differ for the same tsconfig', async () => {
+    const { exact, fast } = await buildBothTiers(dir);
     expect(fast.cacheKey).not.toBe(exact.cacheKey);
     expect(fast.cacheKey).toContain('-fast-');
     expect(exact.cacheKey).toContain('-exact-');
   });
 
-  it('fast recovers the cross-file (imported) and same-file call edges', () => {
-    const { fast } = buildBothTiers(dir);
+  it('fast recovers the cross-file (imported) and same-file call edges', async () => {
+    const { fast } = await buildBothTiers(dir);
     const targets = new Set(allEdges(fast.resolved.edgesByOwner).flatMap((e) => e.to));
     // main → helper (imported, cross-file) and the same-file chain all resolve.
     expect(targets.size).toBeGreaterThanOrEqual(3);

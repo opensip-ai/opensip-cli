@@ -27,7 +27,7 @@ const SIM: ToolCommandDescriptor = {
 };
 
 // Live-view key — matches the `sim` subcommand name so the dispatcher's
-// renderLive(key) lookup resolves it (ADR-0015). sim's Ink/React renderer
+// renderLive(key) lookup resolves it (ADR-0016). sim's Ink/React renderer
 // (renderSimLive) is registered directly; the prior static-only path remains
 // for json / non-TTY runs.
 const SIM_LIVE_VIEW_KEY = 'sim';
@@ -38,7 +38,7 @@ function register(cli: ToolCliContext): void {
   // Audit 2026-05-23 G6.
   const program = cli.program as CliProgram;
 
-  // Contribute sim's live view (ADR-0015). Effectful egress (cloud +
+  // Contribute sim's live view (ADR-0016). Effectful egress (cloud +
   // `--report-to`) lives at the composition root: renderSimLive returns the
   // run's envelope and this callback delivers it once the Ink app exits — the
   // same contract fit uses.

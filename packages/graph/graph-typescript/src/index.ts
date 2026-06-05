@@ -170,15 +170,15 @@ function toTsCallSites(callSites: readonly ContractCallSiteRecord[]): TsCallSite
   }));
 }
 
-function resolveCallSitesAdapter(
+async function resolveCallSitesAdapter(
   input: ResolveInput<TsParsed>,
-): ResolveOutput {
+): Promise<ResolveOutput> {
   // Branch on the parsed-project tier BEFORE touching the checker. The
   // fast tier has no `ts.Program`, so the exact (checker-backed) resolver
   // cannot run on it.
   const base = input.project.kind === 'fast'
-    ? resolveCallSitesFast(input, input.project)
-    : resolveCallSitesExact(input, input.project);
+    ? await resolveCallSitesFast(input, input.project)
+    : await resolveCallSitesExact(input, input.project);
   // Sharded build: also emit cross-boundary descriptors for calls that
   // didn't land within this shard's own occurrences. Syntactic and
   // mode-independent, so it runs identically for both tiers.
@@ -187,12 +187,12 @@ function resolveCallSitesAdapter(
   return { ...base, boundaryCalls };
 }
 
-function resolveCallSitesExact(
+async function resolveCallSitesExact(
   input: ResolveInput<TsParsed>,
   project: TypescriptParsedProject,
-): ResolveOutput {
+): Promise<ResolveOutput> {
   const tsCallSites = toTsCallSites(input.callSites);
-  const result = resolveEdgesFromRecords({
+  const result = await resolveEdgesFromRecords({
     catalog: input.catalog,
     program: project.program,
     projectDirAbs: input.projectDirAbs,
@@ -236,12 +236,12 @@ function resolveCallSitesExact(
  * they remain an exact-tier feature, so `dependenciesByOwner` is omitted
  * (the contract treats absence as "not emitted by this tier").
  */
-function resolveCallSitesFast(
+async function resolveCallSitesFast(
   input: ResolveInput<TsParsed>,
   _project: TypescriptFastParsedProject,
-): ResolveOutput {
+): Promise<ResolveOutput> {
   const tsCallSites = toTsCallSites(input.callSites);
-  const result = resolveEdgesSyntactic({
+  const result = await resolveEdgesSyntactic({
     catalog: input.catalog,
     projectDirAbs: input.projectDirAbs,
     callSites: tsCallSites,

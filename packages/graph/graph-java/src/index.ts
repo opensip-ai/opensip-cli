@@ -29,7 +29,7 @@ import { walkProject as javaWalkProject } from './walk.js';
 import type { JavaParsedProject } from './parse.js';
 import type { GraphLanguageAdapter } from '@opensip-tools/graph';
 
-export const javaGraphAdapter: GraphLanguageAdapter<JavaParsedProject> = {
+export const javaGraphAdapter = {
   id: 'java',
   fileExtensions: ['.java'],
   displayName: 'Java',
@@ -39,7 +39,7 @@ export const javaGraphAdapter: GraphLanguageAdapter<JavaParsedProject> = {
   resolveCallSites: javaResolveCallSites,
   cacheKey: javaCacheKey,
   ruleHints: javaRuleHints,
-};
+} satisfies GraphLanguageAdapter<JavaParsedProject>;
 
 /** Plugin discovery contract: exported as `adapter` for runtime registration. */
 export { javaGraphAdapter as adapter };

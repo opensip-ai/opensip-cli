@@ -13,7 +13,7 @@
  * coverage, so multi-package (sharded) builds emitted no per-stage spans at all.
  */
 
-import { withSpan, type Attributes } from '@opensip-tools/core';
+import { withSpanAsync, type Attributes } from '@opensip-tools/core';
 
 import type { RunStage } from './orchestrate/catalog-builder.js';
 
@@ -29,11 +29,11 @@ export const GRAPH_TRACER = 'opensip-tools-graph';
  */
 export function spanRunStage(baseAttrs: Attributes = {}): RunStage {
   return ({ stage, fn, attrsFn }) =>
-    withSpan(
+    withSpanAsync(
       GRAPH_TRACER,
       `opensip_tools.graph.${stage}`,
-      (span) => {
-        const out = fn();
+      async (span) => {
+        const out = await fn();
         if (attrsFn) span.setAttributes(attrsFn(out));
         return out;
       },

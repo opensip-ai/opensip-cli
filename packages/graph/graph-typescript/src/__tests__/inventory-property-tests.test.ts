@@ -67,7 +67,7 @@ function buildCatalog(rootDir: string, files: Readonly<Record<string, string>>):
   }).catalog;
 }
 
-function buildCatalogWithEdges(rootDir: string, files: Readonly<Record<string, string>>): Catalog {
+async function buildCatalogWithEdges(rootDir: string, files: Readonly<Record<string, string>>): Promise<Catalog> {
   rmSync(rootDir, { recursive: true, force: true });
   mkdirSync(rootDir, { recursive: true });
   writeFileSync(join(rootDir, 'tsconfig.json'), FIXTURE_TSCONFIG, 'utf8');
@@ -83,7 +83,7 @@ function buildCatalogWithEdges(rootDir: string, files: Readonly<Record<string, s
     compilerOptions: discovery.compilerOptions,
     tsConfigPathAbs: discovery.tsConfigPathAbs,
   });
-  return resolveCatalogEdges(inv, discovery.projectDirAbs);
+  return await resolveCatalogEdges(inv, discovery.projectDirAbs);
 }
 
 function allOccurrences(catalog: Catalog): FunctionOccurrence[] {
@@ -368,9 +368,9 @@ describe('Property 5 — synthesized arrow simpleName is deterministic', () => {
 describe('Property 6 — catalog closure: every CallEdge.to hash exists in catalog', () => {
   let dir: string;
   let catalog: Catalog;
-  beforeAll(() => {
+  beforeAll(async () => {
     dir = mkdtempSync(join(tmpdir(), 'graph-prop6-'));
-    catalog = buildCatalogWithEdges(dir, {
+    catalog = await buildCatalogWithEdges(dir, {
       'lib.ts':
         `export function helper(x: number): number { return x + 1; }\n` +
         `export function indirect(): number { return helper(2); }\n`,

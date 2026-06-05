@@ -7,10 +7,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { buildIndexes, orphanSubtreeRule } from '@opensip-tools/graph/internal';
-import { afterAll, describe, expect, it } from 'vitest';
-
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { runFixture, writeFixture } from '../acceptance/_fixture-runner.js';
+
+
+
 
 describe('orphan-subtree rule', () => {
   const fixtureDir = mkdtempSync(join(tmpdir(), 'graph-orphan-rule-'));
@@ -19,9 +21,11 @@ describe('orphan-subtree rule', () => {
   writeFixture(fixtureDir, {
     'index.ts': `function unusedHelper() { return 1; }\nexport function entry(): number {\n  return helper();\n}\nfunction helper(): number { return 42; }\n`,
   });
-  const catalog = runFixture(fixtureDir);
-  const indexes = buildIndexes(catalog);
-  const signals = orphanSubtreeRule.evaluate(catalog, indexes, {});
+  let signals: ReturnType<typeof orphanSubtreeRule.evaluate>;
+  beforeAll(async () => {
+    const catalog = await runFixture(fixtureDir);
+    signals = orphanSubtreeRule.evaluate(catalog, buildIndexes(catalog), {});
+  });
 
   it('flags unusedHelper as orphan', () => {
     const orphans = signals.map((s) => s.metadata.simpleName);
@@ -64,9 +68,12 @@ describe('orphan-subtree rule — exported recursive renderer (D2 + D3)', () => 
       '',
     ].join('\n'),
   });
-  const catalog = runFixture(fixtureDir);
-  const signals = orphanSubtreeRule.evaluate(catalog, buildIndexes(catalog), {});
-  const orphans = signals.map((s) => s.metadata.simpleName);
+  let orphans: unknown[];
+  beforeAll(async () => {
+    const catalog = await runFixture(fixtureDir);
+    const signals = orphanSubtreeRule.evaluate(catalog, buildIndexes(catalog), {});
+    orphans = signals.map((s) => s.metadata.simpleName);
+  });
 
   it('does not flag the exported recursive renderer', () => {
     expect(orphans).not.toContain('renderToText');

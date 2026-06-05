@@ -120,7 +120,7 @@ afterEach(() => {
 });
 
 describe('executeShardWorker', () => {
-  it('builds the shard and emits a ShardBuildResult JSON on stdout, exit 0', () => {
+  it('builds the shard and emits a ShardBuildResult JSON on stdout, exit 0', async () => {
     currentAdapterRegistry().register(fakeAdapter());
     const specPath = join(dir, 'spec.json');
     const spec: ShardWorkerSpec = {
@@ -131,7 +131,7 @@ describe('executeShardWorker', () => {
     writeFileSync(specPath, JSON.stringify(spec), 'utf8');
 
     const { cli, setExitCode } = mockCli();
-    executeShardWorker(specPath, cli);
+    await executeShardWorker(specPath, cli);
 
     expect(setExitCode).toHaveBeenCalledWith(0);
     const result = JSON.parse(stdout) as ShardBuildResult;
@@ -142,11 +142,11 @@ describe('executeShardWorker', () => {
     expect(result.parseErrors).toEqual([]);
   });
 
-  it('attributes a read/parse failure to the shard: stderr names it, exit 1', () => {
+  it('attributes a read/parse failure to the shard: stderr names it, exit 1', async () => {
     currentAdapterRegistry().register(fakeAdapter());
     // Spec file does not exist → readFileSync throws inside the worker.
     const { cli, setExitCode } = mockCli();
-    executeShardWorker(join(dir, 'missing.json'), cli);
+    await executeShardWorker(join(dir, 'missing.json'), cli);
 
     expect(setExitCode).toHaveBeenCalledWith(1);
     expect(stderr).toContain('graph-shard-worker');

@@ -35,7 +35,7 @@ import { walkProject as rustWalkProject } from './walk.js';
 import type { RustParsedProject } from './parse.js';
 import type { GraphLanguageAdapter } from '@opensip-tools/graph';
 
-export const rustGraphAdapter: GraphLanguageAdapter<RustParsedProject> = {
+export const rustGraphAdapter = {
   id: 'rust',
   fileExtensions: ['.rs'],
   displayName: 'Rust',
@@ -45,7 +45,7 @@ export const rustGraphAdapter: GraphLanguageAdapter<RustParsedProject> = {
   resolveCallSites: rustResolveCallSites,
   cacheKey: rustCacheKey,
   ruleHints: rustRuleHints,
-};
+} satisfies GraphLanguageAdapter<RustParsedProject>;
 
 /**
  * Discovery contract: external adapter packs export `adapter` (the

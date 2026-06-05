@@ -1,6 +1,6 @@
 /**
  * sim-runner — owns the live-view state machine for `opensip-tools sim`
- * (ADR-0015). Before this, sim had NO live view: it ran to completion silently
+ * (ADR-0016). Before this, sim had NO live view: it ran to completion silently
  * and printed a static envelope-to-table. It now renders the shared
  * <LiveProgress> (pool mode) during the run, so the user sees an animated
  * spinner + scenario `completed/total` — including for parallel recipes, where

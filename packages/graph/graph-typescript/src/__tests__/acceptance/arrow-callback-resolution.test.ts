@@ -9,9 +9,12 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { findOccurrence, runFixture, writeFixture } from './_fixture-runner.js';
+
+import type { Catalog } from '@opensip-tools/graph';
+
 
 describe('arrow-callback-resolution acceptance fixture', () => {
   const fixtureDir = mkdtempSync(join(tmpdir(), 'graph-arrow-'));
@@ -21,7 +24,8 @@ describe('arrow-callback-resolution acceptance fixture', () => {
     'lib.ts': `export function helper(): number { return 1; }\n`,
     'caller.ts': `import { helper } from './lib.js';\nexport function caller(): readonly number[] {\n  const xs = [1, 2, 3];\n  return xs.map((n) => n * helper());\n}\n`,
   });
-  const catalog = runFixture(fixtureDir);
+  let catalog!: Catalog;
+  beforeAll(async () => { catalog = await runFixture(fixtureDir); });
 
   it('synthesizes an <arrow:...> occurrence with calls', () => {
     const arrowOcc = findOccurrence(

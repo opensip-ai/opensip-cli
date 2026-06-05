@@ -1,6 +1,6 @@
 /**
  * LiveProgress — the single live-run renderer shared by fit, graph, and sim
- * (ADR-0015). Replaces graph's bespoke StageChecklist/StageLine/RunningStageLine
+ * (ADR-0016). Replaces graph's bespoke StageChecklist/StageLine/RunningStageLine
  * and fit's inline Spinner wiring with one component driven by the
  * {@link ProgressEvent} stream.
  *

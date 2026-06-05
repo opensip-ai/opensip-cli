@@ -13,24 +13,24 @@ import { describe, it, expect, vi } from 'vitest';
 import { spanRunStage } from '../graph-tracer.js';
 
 describe('spanRunStage (sharded-worker stage spans)', () => {
-  it('runs fn and returns its value with no SDK registered (no-op span)', () => {
+  it('runs fn and returns its value with no SDK registered (no-op span)', async () => {
     const run = spanRunStage({ 'opensip_tools.graph.shard_id': 's1' });
-    const result = run({ stage: 'parse', onProgress: undefined, monitor: undefined, fn: () => 'OUT' });
+    const result = await run({ stage: 'parse', onProgress: undefined, monitor: undefined, fn: () => 'OUT' });
     expect(result).toBe('OUT');
   });
 
-  it('passes the stage result to attrsFn so per-stage attributes are derived', () => {
+  it('passes the stage result to attrsFn so per-stage attributes are derived', async () => {
     const run = spanRunStage();
     const attrsFn = vi.fn(() => ({ 'opensip_tools.graph.file_count': 3 }));
     const out = { files: [1, 2, 3] };
-    run({ stage: 'discover', onProgress: undefined, monitor: undefined, fn: () => out, attrsFn });
+    await run({ stage: 'discover', onProgress: undefined, monitor: undefined, fn: () => out, attrsFn });
     expect(attrsFn).toHaveBeenCalledWith(out);
   });
 
-  it('tolerates base attrs + a no-op span without throwing', () => {
+  it('tolerates base attrs + a no-op span without throwing', async () => {
     const run = spanRunStage({ 'opensip_tools.graph.shard_id': 's2' });
-    expect(() =>
+    await expect(
       run({ stage: 'resolve', onProgress: undefined, monitor: undefined, fn: () => undefined }),
-    ).not.toThrow();
+    ).resolves.toBeUndefined();
   });
 });

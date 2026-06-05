@@ -43,7 +43,7 @@ function findOcc(catalog: Catalog, name: string, filePath: string): FunctionOccu
 }
 
 describe('body-twin edge keying', () => {
-  it('keeps each twin occurrence’s edges to its own file, not the union', () => {
+  it('keeps each twin occurrence’s edges to its own file, not the union', async () => {
     const discovery = typescriptGraphAdapter.discoverFiles({ cwd: root });
     const parsed = typescriptGraphAdapter.parseProject({
       projectDirAbs: discovery.projectDirAbs,
@@ -60,7 +60,7 @@ describe('body-twin edge keying', () => {
       version: '3.0', tool: 'graph', language: 'typescript', builtAt: 'x', cacheKey: 't',
       functions: walked.occurrences,
     };
-    const { edgesByOwner } = typescriptGraphAdapter.resolveCallSites({
+    const { edgesByOwner } = await typescriptGraphAdapter.resolveCallSites({
       project: parsed.project,
       catalog,
       callSites: walked.callSites,

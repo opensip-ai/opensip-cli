@@ -59,7 +59,7 @@ export interface ObtainCatalogOutput {
  * dispatching to the right rebuild path (full vs Wave 4 incremental
  * vs cache hit) per `classifyCatalog`'s verdict.
  */
-export function obtainCatalog(input: ObtainCatalogInput): ObtainCatalogOutput {
+export async function obtainCatalog(input: ObtainCatalogInput): Promise<ObtainCatalogOutput> {
   const cachedCatalog: Catalog | null =
     input.useCache && input.catalogRepo ? input.catalogRepo.loadFullCatalog() : null;
   const currentCacheKey = stampEngineVersion(
@@ -87,7 +87,7 @@ export function obtainCatalog(input: ObtainCatalogInput): ObtainCatalogOutput {
     return { catalog: cachedCatalog, cacheHit: true, resolutionStats: null };
   }
   const built = verdict.kind === 'incremental' && cachedCatalog
-    ? buildAndResolveCatalogIncremental({
+    ? await buildAndResolveCatalogIncremental({
         runStage: input.runStage,
         adapter: input.adapter,
         discovery: input.discovery,
@@ -97,7 +97,7 @@ export function obtainCatalog(input: ObtainCatalogInput): ObtainCatalogOutput {
         onProgress: input.onProgress,
         monitor: input.monitor,
       })
-    : buildAndResolveCatalog({
+    : await buildAndResolveCatalog({
         runStage: input.runStage,
         adapter: input.adapter,
         discovery: input.discovery,

@@ -243,7 +243,15 @@ export interface GraphLanguageAdapter<P = ParsedProject> {
   discoverFiles(input: DiscoverInput): DiscoverOutput;
   parseProject(input: ParseInput): ParseOutput<P>;
   walkProject(input: WalkInput<P>): WalkOutput;
-  resolveCallSites(input: ResolveInput<P>): ResolveOutput;
+  /**
+   * Resolve call sites to edges. May return synchronously OR a Promise: the
+   * resolve stage is a tool's heaviest loop (tens of thousands of call sites),
+   * so an adapter MAY run it cooperatively — yielding to the event loop every N
+   * sites — so the live view's spinner animates instead of freezing for the
+   * stage's whole duration (ADR-0016). The orchestrator always `await`s the
+   * result, so sync adapters are unaffected.
+   */
+  resolveCallSites(input: ResolveInput<P>): ResolveOutput | Promise<ResolveOutput>;
   cacheKey(input: CacheKeyInput): string;
 
   readonly ruleHints?: RuleHints;

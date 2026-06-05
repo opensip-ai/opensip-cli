@@ -23,7 +23,7 @@
  * public type surface.
  */
 
-import { withSpan, type Signal } from '@opensip-tools/core';
+import { withSpanAsync, type Signal } from '@opensip-tools/core';
 
 import { currentAdapterRegistry, pickAdapter } from '../lang-adapter/registry.js';
 import { CatalogRepo } from '../persistence/catalog-repo.js';
@@ -138,7 +138,19 @@ export interface RunGraphResult {
   readonly features: FeatureTable | null;
 }
 
-function runStage<T>(args: RunStageArgs<T>): T {
+/**
+ * Yield to the event loop once (a macrotask hop). Lets the in-process live view
+ * paint between/within stages so its spinner animates instead of freezing while
+ * a synchronous stage runs (ADR-0016, cooperative-yield). A no-op for cost in
+ * non-interactive runs (one `setImmediate` per stage is negligible).
+ */
+function yieldToEventLoop(): Promise<void> {
+  return new Promise<void>((resolve) => {
+    setImmediate(resolve);
+  });
+}
+
+async function runStage<T>(args: RunStageArgs<T>): Promise<T> {
   const { stage, onProgress, monitor, fn, detailFn, attrsFn } = args;
   monitor?.setStage(stage);
   // Sample BEFORE the stage starts. The previous stage may have left
@@ -146,14 +158,15 @@ function runStage<T>(args: RunStageArgs<T>): T {
   // would push us over and forfeit the ability to report cleanly.
   monitor?.check();
   onProgress?.({ type: 'stage-start', stage });
+  // Yield so the live view paints the stage-start (the spinner moves to this
+  // row) before a synchronous stage blocks the loop. The cooperative resolve
+  // stage yields again internally, so its spinner keeps ticking throughout.
+  await yieldToEventLoop();
   const startedAt = Date.now();
-  // Emit one span per stage. withSpan is a no-op when no SDK is registered
-  // (standalone runs), so the span captures wall-clock + low-cardinality
-  // stage attributes for embedding consumers without changing standalone
-  // behavior. The existing durationMs/onProgress logic is untouched and keeps
-  // feeding the live view alongside the span.
-  const result = withSpan(GRAPH_TRACER, `opensip_tools.graph.${stage}`, (span) => {
-    const out = fn();
+  // Emit one span per stage. withSpanAsync keeps the span open across the
+  // (possibly async) stage work and is a no-op when no SDK is registered.
+  const result = await withSpanAsync(GRAPH_TRACER, `opensip_tools.graph.${stage}`, async (span) => {
+    const out = await fn();
     if (attrsFn) span.setAttributes(attrsFn(out));
     return out;
   }, { 'opensip_tools.graph.stage': stage });
@@ -172,7 +185,7 @@ function runStage<T>(args: RunStageArgs<T>): T {
  * orchestrator wires their outputs together and consults the cache
  * before redoing stages 1+2.
  */
-// eslint-disable-next-line @typescript-eslint/require-await -- async surface for future cache I/O
+ 
 export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
   const config: GraphConfig = input.config ?? {};
   const ruleSet: readonly Rule[] = input.rules ?? currentRules();
@@ -184,7 +197,7 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
   const monitor = createPressureMonitor();
   try {
     const adapter = pickAdapterFor(input);
-    const discovery = runStage({
+    const discovery = await runStage({
       stage: 'discover',
       onProgress: input.onProgress,
       monitor,
@@ -196,7 +209,7 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
       attrsFn: (d) => ({ 'opensip_tools.graph.file_count': d.files.length }),
     });
 
-    const { catalog, cacheHit, resolutionStats } = obtainCatalog({
+    const { catalog, cacheHit, resolutionStats } = await obtainCatalog({
       runStage,
       adapter,
       discovery,
@@ -208,7 +221,7 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
       monitor,
     });
 
-    const indexes: Indexes = runStage({
+    const indexes: Indexes = await runStage({
       stage: 'index',
       onProgress: input.onProgress,
       monitor,
@@ -222,7 +235,7 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
     // Stage 3.5 — feature derivation. Runs after index / before rules so rules
     // consume the columns as a plain view (ADR-0006). Computes only the union
     // of the rule set's featureDeps + the caller's emitFeatures.
-    const features: FeatureTable = runStage({
+    const features: FeatureTable = await runStage({
       stage: 'features',
       onProgress: input.onProgress,
       monitor,
@@ -233,7 +246,7 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
       }),
     });
 
-    const signals: Signal[] = runStage({
+    const signals: Signal[] = await runStage({
       stage: 'rules',
       onProgress: input.onProgress,
       monitor,

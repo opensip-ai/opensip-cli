@@ -10,13 +10,13 @@
  * `cli.registerLiveView(key, renderer)`.
  *
  * Progress rendering is the shared `<LiveProgress>` from
- * `@opensip-tools/cli-ui` (ADR-0015), driven in `phases` mode: graph's
+ * `@opensip-tools/cli-ui` (ADR-0016), driven in `phases` mode: graph's
  * 7 fixed pipeline stages map onto the universal `ProgressEvent` stream.
  * The former graph-local StageChecklist/StageLine/RunningStageLine are
- * gone. The transport is the in-process one here — graph's pipeline is a
- * synchronous CPU blast, so the spinner does not yet animate (the
- * subprocess transport that frees the render thread lands in a later
- * phase); this phase unifies the visual without changing that behavior.
+ * gone. The transport is the in-process one — graph stays host-agnostic
+ * (no subprocess), and the heavy `resolve` stage yields to the event loop
+ * cooperatively (ADR-0016, `resolveEdgesFromRecords`), so the live spinner
+ * animates and stages reveal progressively instead of freezing for the run.
  *
  * Single exit-code write path: error outcomes route through the
  * supplied `setExitCode` callback (`ToolCliContext.setExitCode`) so the

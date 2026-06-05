@@ -8,9 +8,12 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { findOccurrence, runFixture, writeFixture } from './_fixture-runner.js';
+
+import type { Catalog } from '@opensip-tools/graph';
+
 
 describe('jsx-resolution acceptance fixture', () => {
   const fixtureDir = mkdtempSync(join(tmpdir(), 'graph-jsx-'));
@@ -20,7 +23,8 @@ describe('jsx-resolution acceptance fixture', () => {
     'foo.tsx': `export function Foo(): JSX.Element { return <span>foo</span>; }\n`,
     'caller.tsx': `import { Foo } from './foo.js';\nexport function Caller(): JSX.Element {\n  return <div><Foo /></div>;\n}\n`,
   });
-  const catalog = runFixture(fixtureDir);
+  let catalog!: Catalog;
+  beforeAll(async () => { catalog = await runFixture(fixtureDir); });
 
   it('resolves <Foo /> to the Foo function declaration', () => {
     const callerOcc = findOccurrence(catalog, (o) => o.simpleName === 'Caller');

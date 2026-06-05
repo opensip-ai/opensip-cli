@@ -355,8 +355,8 @@ function registerGraphShardWorkerCommand(program: CliProgram, cli: ToolCliContex
     .command(GRAPH_SHARD_WORKER.name)
     .description(GRAPH_SHARD_WORKER.description)
     .argument('<specPath>', 'Path to a JSON ShardWorkerSpec file')
-    .action((specPath: string) => {
-      executeShardWorker(specPath, cli);
+    .action(async (specPath: string) => {
+      await executeShardWorker(specPath, cli);
     });
 }
 

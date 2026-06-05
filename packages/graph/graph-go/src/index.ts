@@ -29,7 +29,7 @@ import { walkProject as goWalkProject } from './walk.js';
 import type { GoParsedProject } from './parse.js';
 import type { GraphLanguageAdapter } from '@opensip-tools/graph';
 
-export const goGraphAdapter: GraphLanguageAdapter<GoParsedProject> = {
+export const goGraphAdapter = {
   id: 'go',
   fileExtensions: ['.go'],
   displayName: 'Go',
@@ -39,7 +39,7 @@ export const goGraphAdapter: GraphLanguageAdapter<GoParsedProject> = {
   resolveCallSites: goResolveCallSites,
   cacheKey: goCacheKey,
   ruleHints: goRuleHints,
-};
+} satisfies GraphLanguageAdapter<GoParsedProject>;
 
 /** Plugin discovery contract: exported as `adapter` for runtime registration. */
 export { goGraphAdapter as adapter };

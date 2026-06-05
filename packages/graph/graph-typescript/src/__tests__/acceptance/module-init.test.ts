@@ -11,9 +11,12 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { findOccurrence, runFixture, writeFixture } from './_fixture-runner.js';
+
+import type { Catalog } from '@opensip-tools/graph';
+
 
 describe('module-init acceptance fixture', () => {
   const fixtureDir = mkdtempSync(join(tmpdir(), 'graph-modinit-'));
@@ -23,7 +26,8 @@ describe('module-init acceptance fixture', () => {
     'lib.ts': `export function helper(): number { return 1; }\n`,
     'init.ts': `import { helper } from './lib.js';\nexport const result = helper();\nhelper();\n`,
   });
-  const catalog = runFixture(fixtureDir);
+  let catalog!: Catalog;
+  beforeAll(async () => { catalog = await runFixture(fixtureDir); });
 
   it('synthesizes a <module-init> occurrence for init.ts', () => {
     const modInit = findOccurrence(

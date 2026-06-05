@@ -16,9 +16,12 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { findOccurrence, runFixture, writeFixture } from './acceptance/_fixture-runner.js';
+
+import type { Catalog } from '@opensip-tools/graph';
+
 
 describe('value-reference + shorthand edge resolution', () => {
   const fixtureDir = mkdtempSync(join(tmpdir(), 'graph-value-ref-'));
@@ -78,7 +81,8 @@ describe('value-reference + shorthand edge resolution', () => {
       }
     `,
   });
-  const catalog = runFixture(fixtureDir);
+  let catalog!: Catalog;
+  beforeAll(async () => { catalog = await runFixture(fixtureDir); });
 
   it('builds a catalog (sanity)', () => {
     expect(Object.keys(catalog.functions).length).toBeGreaterThan(0);

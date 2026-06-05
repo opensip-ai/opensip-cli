@@ -12,7 +12,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { resolveByCatalogFallback } from '../../edge-resolvers/catalog-fallback.js';
 import { findOccurrence, runFixture, writeFixture } from '../acceptance/_fixture-runner.js';
@@ -137,7 +137,8 @@ describe('edge-resolvers — defensive / unresolved branches', () => {
       void _refs;
     `,
   });
-  const catalog = runFixture(fixtureDir);
+  let catalog!: Catalog;
+  beforeAll(async () => { catalog = await runFixture(fixtureDir); });
 
   it('produces a catalog (sanity)', () => {
     expect(Object.keys(catalog.functions).length).toBeGreaterThan(0);

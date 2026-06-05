@@ -1,6 +1,6 @@
 /**
  * Progress currency — the universal live-run event vocabulary consumed by the
- * shared `<LiveProgress>` renderer (ADR-0015). The run-time analogue of
+ * shared `<LiveProgress>` renderer (ADR-0016). The run-time analogue of
  * `@opensip-tools/contracts`' `SignalEnvelope` *output* currency.
  *
  * Why this lives in cli-ui (not contracts): progress is renderer-bound and

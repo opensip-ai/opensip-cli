@@ -28,8 +28,9 @@ import type {
 import type { RunStage } from '../catalog-builder.js';
 
 // A pass-through runStage: just invoke the work fn. The orchestrator's
-// real one adds progress/pressure plumbing we don't need here.
-const runStage: RunStage = ({ fn }) => fn();
+// real one adds progress/pressure plumbing we don't need here. Async to match
+// the RunStage contract (ADR-0016 cooperative-yield); awaits a sync-or-async fn.
+const runStage: RunStage = async ({ fn }) => fn();
 
 function occ(
   simpleName: string,
@@ -110,7 +111,7 @@ function incrementalAdapter(opts: {
 describe('buildAndResolveCatalogIncremental', () => {
   const root = ROOT;
 
-  it('re-resolves closure files and keeps cached edges for unchanged files', () => {
+  it('re-resolves closure files and keeps cached edges for unchanged files', async () => {
     const cachedEdge: CallEdge = {
       to: ['B1'], line: 5, column: 1, resolution: 'static', confidence: 'high', text: 'b()',
     };
@@ -125,7 +126,7 @@ describe('buildAndResolveCatalogIncremental', () => {
       edges: new Map([[ownerEdgeKey('A2', 'a.ts'), [freshEdge]]]),
     });
 
-    const { catalog, resolutionStats } = buildAndResolveCatalogIncremental({
+    const { catalog, resolutionStats } = await buildAndResolveCatalogIncremental({
       runStage,
       adapter,
       discovery: { projectDirAbs: root, files: [join(root, 'a.ts'), join(root, 'b.ts')] },
@@ -141,7 +142,7 @@ describe('buildAndResolveCatalogIncremental', () => {
     expect(resolutionStats.totalCallSites).toBe(1);
   });
 
-  it('attaches module-level dependency edges via the incremental post-pass', () => {
+  it('attaches module-level dependency edges via the incremental post-pass', async () => {
     const cached = catalogOf(occ('mod', 'a.ts', 'M1'));
     const dep: DependencyEdge = { to: ['lodash'], specifier: 'lodash', line: 1, column: 0 };
     const adapter = incrementalAdapter({
@@ -150,7 +151,7 @@ describe('buildAndResolveCatalogIncremental', () => {
       deps: new Map([[ownerEdgeKey('M1', 'a.ts'), [dep]]]),
     });
 
-    const { catalog } = buildAndResolveCatalogIncremental({
+    const { catalog } = await buildAndResolveCatalogIncremental({
       runStage,
       adapter,
       discovery: { projectDirAbs: root, files: [join(root, 'a.ts')] },

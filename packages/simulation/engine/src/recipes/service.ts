@@ -60,7 +60,7 @@ export interface SimulationRecipeServiceConfig {
   readonly cwd?: string;
   readonly abortSignal?: AbortSignal;
   /**
-   * Optional live-progress callback (ADR-0015). Fired once with `(0, total)`
+   * Optional live-progress callback (ADR-0016). Fired once with `(0, total)`
    * before execution and then with a monotonic `(completed, total)` after each
    * scenario finishes — across BOTH sequential and parallel modes. `total` is
    * the post-kind-filter selected-set size. Count-shaped (not a renderer event)
@@ -101,7 +101,7 @@ export class SimulationRecipeService {
       scenarioCount: selected.length,
     });
 
-    // Live-progress (ADR-0015): emit a monotonic completed count across both
+    // Live-progress (ADR-0016): emit a monotonic completed count across both
     // execution modes. `++completed` is atomic in single-threaded JS, so the
     // parallel pool's concurrent completions still produce a correct count.
     const total = selected.length;

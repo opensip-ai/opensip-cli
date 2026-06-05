@@ -9,9 +9,12 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { findOccurrence, runFixture, writeFixture } from './_fixture-runner.js';
+
+import type { Catalog } from '@opensip-tools/graph';
+
 
 describe('alias-resolution acceptance fixture', () => {
   const fixtureDir = mkdtempSync(join(tmpdir(), 'graph-alias-'));
@@ -21,7 +24,8 @@ describe('alias-resolution acceptance fixture', () => {
     'x.ts': `export function foo(): number { return 42; }\n`,
     'caller.ts': `import { foo } from './x.js';\nexport function caller(): number { return foo(); }\n`,
   });
-  const catalog = runFixture(fixtureDir);
+  let catalog!: Catalog;
+  beforeAll(async () => { catalog = await runFixture(fixtureDir); });
 
   it('resolves the imported call to the foreign declaration', () => {
     const callerOcc = findOccurrence(catalog, (o) => o.simpleName === 'caller');

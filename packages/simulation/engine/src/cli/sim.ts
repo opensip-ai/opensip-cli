@@ -311,7 +311,7 @@ function assembleEnvelopeInputs(
 /** Options for {@link executeSim}. */
 export interface ExecuteSimOptions {
   /**
-   * Live-progress callback (ADR-0015). Forwarded to the recipe service, which
+   * Live-progress callback (ADR-0016). Forwarded to the recipe service, which
    * fires `(0, total)` at start and a monotonic `(completed, total)` per
    * scenario. The interactive sim runner maps these to pool ProgressEvents;
    * non-interactive callers (json / non-TTY) omit it.
