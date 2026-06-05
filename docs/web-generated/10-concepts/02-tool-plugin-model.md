@@ -223,7 +223,7 @@ If your tool also wants to ship checks (the way `@opensip-tools/checks-typescrip
 
 Three things, in order of importance:
 
-1. **A stable kernel.** `@opensip-tools/core` does not import any tool. The layer policy ([dependency-cruiser config](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/.dependency-cruiser.cjs)) enforces this — `core-imports-nothing-workspace` would fail the build if `core` ever reached up. This means kernel changes are safe: a kernel bump can't break a tool, because the kernel can't see the tool.
+1. **A stable kernel.** `@opensip-tools/core` does not import any tool. The layer policy ([dependency-cruiser config](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/.config/dependency-cruiser.cjs)) enforces this — `core-imports-nothing-workspace` would fail the build if `core` ever reached up. This means kernel changes are safe: a kernel bump can't break a tool, because the kernel can't see the tool.
 2. **Independent tool versioning.** Each Tool package has its own version. The CLI is pinned to a major-version range of each first-party tool, but third-party tools can release on their own cadence. A user can pin a third-party `@yourorg/audit-sec@0.x` while staying on the current `opensip-tools@2.x`.
 3. **A future where `fit` is just one of many tools.** The platform was designed for `audit-*`, `lint-*`, `report-*`, `bench-*`, and similar Tools to slot in. Today there are three (`fit`, `sim`, `graph`); tomorrow there might be ten. The CLI grows by zero lines.
 

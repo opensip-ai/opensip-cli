@@ -110,7 +110,7 @@ const DOMAIN_SPECIFIC_FUNCTIONS = new Set([
   'hasPackageJson',
   // Language-adapter parsers and dir normalizers — one per graph-* pack
   // (graph-go, graph-java, graph-python, graph-rust, graph-typescript) by
-  // design; cross-pack imports are forbidden by .dependency-cruiser.cjs.
+  // design; cross-pack imports are forbidden by .config/dependency-cruiser.cjs.
   'normalizeProjectDir',
   'parseProject',
   // Tokenizer helper present in several language-adapter strip-comment passes

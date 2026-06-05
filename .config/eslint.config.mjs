@@ -333,7 +333,8 @@ export default tseslint.config(
   },
 
   // ---------------------------------------------------------------------------
-  // Build/release scripts (scripts/*.mjs) + root config files (*.cjs, *.mjs).
+  // Build/release scripts (scripts/*.mjs) + tooling configs (.config/*.cjs,
+  // .config/*.mjs) + any remaining root config files (*.cjs, *.mjs).
   //
   // These are Node programs, not product code. The big tuning block above is
   // scoped to `**/*.{ts,tsx}`, so these files used to fall through to the raw
@@ -346,7 +347,7 @@ export default tseslint.config(
   // are fixed in the scripts themselves.
   // ---------------------------------------------------------------------------
   {
-    files: ['scripts/**/*.{mjs,js}', '*.{mjs,cjs,js}'],
+    files: ['scripts/**/*.{mjs,js}', '.config/*.{mjs,cjs,js}', '*.{mjs,cjs,js}'],
     languageOptions: {
       globals: { ...globals.node },
     },

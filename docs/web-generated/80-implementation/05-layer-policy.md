@@ -6,7 +6,7 @@ title: "Layer policy"
 audience: [contributors]
 purpose: "The dependency-cruiser rules that enforce the five-layer package graph and the tool-internal partitioning rules (graph stages, dashboard panels), rule by rule, with rationale."
 source-files:
-  - .dependency-cruiser.cjs
+  - .config/dependency-cruiser.cjs
   - pnpm-workspace.yaml
 related-docs:
   - ../10-concepts/03-modular-monolith.md
@@ -20,7 +20,7 @@ The five-layer package graph (core → datastore/contracts → tools/libraries/a
 
 For the conceptual layer narrative, see [`../10-concepts/03-modular-monolith.md`](/docs/opensip-tools/10-concepts/03-modular-monolith/).
 
-The literal rules are at [`.dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/.dependency-cruiser.cjs).
+The literal rules are at [`.config/dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/.config/dependency-cruiser.cjs).
 
 ---
 
@@ -34,7 +34,7 @@ Three rules unrelated to the layer architecture but enforced workspace-wide.
 { name: 'no-circular', from: {}, to: { circular: true } }
 ```
 
-No circular dependencies between modules within a package. The main pass ignores type-only edges (`tsPreCompilationDeps: false`) so it flags only runtime cycles; the type-aware pass (`.dependency-cruiser.types.cjs`) re-runs `no-circular` over the type-inclusive graph, so type-only cycles are caught too. A circular dep — runtime or type-only — is a structural smell, usually meaning a type or constant belongs in a third file.
+No circular dependencies between modules within a package. The main pass ignores type-only edges (`tsPreCompilationDeps: false`) so it flags only runtime cycles; the type-aware pass (`.config/dependency-cruiser.types.cjs`) re-runs `no-circular` over the type-inclusive graph, so type-only cycles are caught too. A circular dep — runtime or type-only — is a structural smell, usually meaning a type or constant belongs in a third file.
 
 ### `no-deprecated-core`
 
@@ -218,7 +218,7 @@ Beyond the cross-package layer cake, two tools define their own internal-shape r
 
 ### Graph tool — the seven-stage pipeline and adapter-package isolation
 
-A cluster of rules in `.dependency-cruiser.cjs` keep the graph tool's stages clean and the adapter packs isolated. Some pin the original cross-stage discipline (rules-no-parser, renderers-no-pipeline, visitors-resolvers-disjoint); the rest landed when the graph language adapters were extracted into their own publishable npm packages under `packages/graph/graph-*/` (and again when the four tree-sitter adapters were consolidated onto a shared `graph-adapter-common` scaffolding package). The former `info`-severity SARIF allow-rule is gone — graph no longer imports fitness at all (see below).
+A cluster of rules in `.config/dependency-cruiser.cjs` keep the graph tool's stages clean and the adapter packs isolated. Some pin the original cross-stage discipline (rules-no-parser, renderers-no-pipeline, visitors-resolvers-disjoint); the rest landed when the graph language adapters were extracted into their own publishable npm packages under `packages/graph/graph-*/` (and again when the four tree-sitter adapters were consolidated onto a shared `graph-adapter-common` scaffolding package). The former `info`-severity SARIF allow-rule is gone — graph no longer imports fitness at all (see below).
 
 **Engine ↔ adapter-pack boundaries** (the adapter-package split):
 
@@ -285,13 +285,13 @@ All of these surface during `pnpm depcruise` — and, re-run over the type-inclu
 
 ## How to add a new exception
 
-There are **no standing layer exceptions**. `tsPreCompilationDeps: false` on the main pass is not one: it only defers type-only edges to the type-aware pass (`.dependency-cruiser.types.cjs`, `tsPreCompilationDeps: true`), which re-runs the full ruleset over the type-inclusive graph — so a type-only layer inversion or cycle is rejected just like a runtime one. The two earlier cross-package exceptions were both paid down — `lang-typescript → fitness` (by moving `filterContent` into the adapter) and `graph → fitness` via `render/sarif.ts` (by relocating the SARIF / cloud-reporting module to `@opensip-tools/contracts`). New exceptions are rare and require justification.
+There are **no standing layer exceptions**. `tsPreCompilationDeps: false` on the main pass is not one: it only defers type-only edges to the type-aware pass (`.config/dependency-cruiser.types.cjs`, `tsPreCompilationDeps: true`), which re-runs the full ruleset over the type-inclusive graph — so a type-only layer inversion or cycle is rejected just like a runtime one. The two earlier cross-package exceptions were both paid down — `lang-typescript → fitness` (by moving `filterContent` into the adapter) and `graph → fitness` via `render/sarif.ts` (by relocating the SARIF / cloud-reporting module to `@opensip-tools/contracts`). New exceptions are rare and require justification.
 
 Process:
 
 1. Confirm the edge is genuinely necessary — most "I need this" cases turn out to be a different module belonging at a different layer.
 2. Open a PR that:
-   - Adds the rule exception in `.dependency-cruiser.cjs` with a `comment:` field describing the rationale.
+   - Adds the rule exception in `.config/dependency-cruiser.cjs` with a `comment:` field describing the rationale.
    - Updates this doc with the new exception.
    - Updates [`../10-concepts/03-modular-monolith.md`](/docs/opensip-tools/10-concepts/03-modular-monolith/) if the layer rule's *meaning* changes.
 3. Get review explicitly on the layer impact — not just the code-level change.

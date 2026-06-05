@@ -3,7 +3,7 @@
  * persistence ownership boundary.
  *
  * ADR-0009 ("public-API surface policy") + the `tables-only-in-persistence`
- * rule in `.dependency-cruiser.cjs`: `DataStore.db` (a raw Drizzle handle,
+ * rule in `.config/dependency-cruiser.cjs`: `DataStore.db` (a raw Drizzle handle,
  * `packages/datastore/src/data-store.ts`) is intentionally PUBLIC. The
  * architecture gate confines *table symbols* to their owning persistence
  * layer, so a stray module cannot pair the public `db` handle with a foreign

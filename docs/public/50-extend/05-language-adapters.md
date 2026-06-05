@@ -158,7 +158,7 @@ The trade-off: a check that *would* benefit from AST-aware analysis on Rust (say
 
 ## Lang packs depend only on core
 
-`@opensip-tools/lang-typescript` *owns* `filterContent`, `clearFilterCache`, and `FilteredContent` ([`packages/languages/lang-typescript/src/filter.ts`](../../../packages/languages/lang-typescript/src/filter.ts)) — the TS-aware string/comment stripping lives alongside the rest of the adapter. There is no longer any lang-pack → `fitness` edge; the historical `lang-typescript → fitness` exception was paid down by moving those symbols into the adapter package itself. The flat `lang-no-fitness` rule in [`.dependency-cruiser.cjs`](../../../.dependency-cruiser.cjs) now applies uniformly: *no* lang pack reaches up into fitness. See [`80-implementation/05-layer-policy.md`](../80-implementation/05-layer-policy.md).
+`@opensip-tools/lang-typescript` *owns* `filterContent`, `clearFilterCache`, and `FilteredContent` ([`packages/languages/lang-typescript/src/filter.ts`](../../../packages/languages/lang-typescript/src/filter.ts)) — the TS-aware string/comment stripping lives alongside the rest of the adapter. There is no longer any lang-pack → `fitness` edge; the historical `lang-typescript → fitness` exception was paid down by moving those symbols into the adapter package itself. The flat `lang-no-fitness` rule in [`.config/dependency-cruiser.cjs`](../../../.config/dependency-cruiser.cjs) now applies uniformly: *no* lang pack reaches up into fitness. See [`80-implementation/05-layer-policy.md`](../80-implementation/05-layer-policy.md).
 
 ---
 

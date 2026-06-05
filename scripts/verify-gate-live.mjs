@@ -3,11 +3,11 @@
 // verify-gate-live — guard against the dependency-cruiser architecture gate
 // silently going INERT.
 //
-// Background: every cross-package layer rule in .dependency-cruiser.cjs
+// Background: every cross-package layer rule in .config/dependency-cruiser.cjs
 // matches RESOLVED file paths (e.g. ^packages/fitness/engine/). Those rules
 // can only fire if @opensip-tools imports actually resolve into a package's
 // src tree and appear as edges in the cruise graph. That resolution depends
-// on tsconfig.depcruise.json (the `paths` map) being wired into
+// on .config/tsconfig.depcruise.json (the `paths` map) being wired into
 // options.tsConfig.fileName. If that wiring breaks — a tsconfig rename, a
 // resolver-option change, a dropped paths entry — cross-package edges vanish
 // from the graph, every cross-package rule matches nothing, and
@@ -75,7 +75,7 @@ function depcruiseReport(target) {
   try {
     return execFileSync(
       'npx',
-      ['depcruise', '--config', '.dependency-cruiser.cjs', '--no-progress', '--output-type', 'err', target],
+      ['depcruise', '--config', '.config/dependency-cruiser.cjs', '--no-progress', '--output-type', 'err', target],
       { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },
     );
   } catch (error) {
@@ -123,7 +123,7 @@ function main() {
   try {
     const out = execFileSync(
       'npx',
-      ['depcruise', '--config', '.dependency-cruiser.cjs', '--no-progress', '--output-type', 'json', 'packages'],
+      ['depcruise', '--config', '.config/dependency-cruiser.cjs', '--no-progress', '--output-type', 'json', 'packages'],
       { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 },
     );
     json = JSON.parse(out);
@@ -160,7 +160,7 @@ function main() {
   }
 
   if (!sawWorkspaceImportResolved) {
-    console.error('verify-gate-live: FAIL — no @opensip-tools import resolved to a package src tree. The dependency-cruiser resolver is broken; every cross-package layer rule is INERT. Check options.tsConfig.fileName -> tsconfig.depcruise.json and its paths map.');
+    console.error('verify-gate-live: FAIL — no @opensip-tools import resolved to a package src tree. The dependency-cruiser resolver is broken; every cross-package layer rule is INERT. Check options.tsConfig.fileName -> .config/tsconfig.depcruise.json and its paths map.');
     process.exit(1);
   }
   if (crossPackageEdges < MIN_CROSS_PACKAGE_EDGES) {

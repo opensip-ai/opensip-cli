@@ -846,7 +846,13 @@ module.exports = {
       // via each package's `exports` to dist/, which exclude + includeOnly
       // below then drop — making every cross-package layer rule inert
       // (the whole point of this gate). NOT used for tsc builds.
-      fileName: 'tsconfig.depcruise.json',
+      //
+      // Absolute path (via __dirname) is deliberate: dependency-cruiser passes
+      // TypeScript both a basePath of this file's dir AND the relative
+      // configFileName, which double-counts the `.config/` segment and breaks
+      // the relative `extends: ../tsconfig.json` resolution. An absolute
+      // fileName wins TS's path-combine and sidesteps the double-count.
+      fileName: require('node:path').resolve(__dirname, 'tsconfig.depcruise.json'),
     },
 
     // Type-only imports are stripped at compile time, so a file A that

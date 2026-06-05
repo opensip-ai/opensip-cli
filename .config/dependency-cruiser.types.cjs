@@ -36,7 +36,7 @@
  * spread below rather than relaxing the whole gate.
  */
 
-const base = require('./.dependency-cruiser.cjs');
+const base = require('./dependency-cruiser.cjs');
 
 /** @type {import('dependency-cruiser').IConfiguration} */
 module.exports = {

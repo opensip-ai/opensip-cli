@@ -77,9 +77,13 @@ opensip-tools/
 │       ├── lang-java/
 │       └── lang-cpp/
 │
-├── eslint.config.mjs            # workspace ESLint config
-├── knip.json                    # knip orphan-detection config
-├── .dependency-cruiser.cjs      # architecture-layer enforcement
+├── .config/                     # tooling configs (not auto-discovered —
+│   │                            #   invoked via --config from package.json)
+│   ├── eslint.config.mjs        #   workspace ESLint config
+│   ├── knip.json                #   knip orphan-detection config
+│   ├── dependency-cruiser.cjs   #   architecture-layer enforcement
+│   ├── dependency-cruiser.types.cjs  # type-aware companion gate
+│   └── tsconfig.depcruise.json  #   depcruise-only paths→src map
 ├── turbo.json                   # Turborepo task config
 ├── pnpm-workspace.yaml          # packages/*  +  packages/<tool>/*
 └── tsconfig.json                # Root TS config (ES2022, Node16)

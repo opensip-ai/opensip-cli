@@ -1,8 +1,10 @@
 {
   "//": "depcruise-only. Maps @opensip-tools/* to package SOURCE so dependency-cruiser resolves cross-package imports into packages/*/src (where the layer rules match). Without this, workspace imports resolve via each package's exports to dist/, which the cruiser's exclude + includeOnly drop — making every cross-package rule inert. NOT used for tsc builds; the real builds use each package's own tsconfig.",
-  "extends": "./tsconfig.json",
+  "extends": "../tsconfig.json",
+  "//include": "Explicit include so TypeScript finds inputs from this file's .config/ home; the default '**/*' would glob .config/ (empty) and error TS18003. Paths are relative to this file's directory.",
+  "include": ["../packages/**/*.ts"],
   "compilerOptions": {
-    "baseUrl": ".",
+    "baseUrl": "..",
     "paths": {
       "@opensip-tools/core": ["packages/core/src/index.ts"],
       "@opensip-tools/tree-sitter": ["packages/tree-sitter/src/index.ts"],
