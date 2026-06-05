@@ -31,6 +31,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Clean every package's dist/ before build so the dogfood gates
+      # (fit:ci / graph:ci, which run the compiled engine from dist) can
+      # never execute a stale or Turbo-cache-restored binary that lags the
+      # source. Matches release.yml's pre-build clean; cheap on a fresh
+      # checkout and guarantees the analyzed source and running engine agree.
+      - name: Clean dist
+        run: pnpm -r run clean
+
       - name: Build
         run: pnpm build
 
