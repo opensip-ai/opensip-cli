@@ -25,12 +25,11 @@ enforcement-reason: >
 
 **Decision:** Plugin discovery treats the `opensipTools.kind` marker as the
 single canonical contract for all four plugin kinds (`tool`, `fit-pack`,
-`sim-pack`, `graph-adapter`). The historical name-prefix scans (`checks-*`,
-`graph-*`) are demoted to **deprecated fallbacks** retained only for backward
-compatibility, and are slated for removal in the next major. A
-workspace-invariant test enforces that every first-party plugin declares its
-marker and that any prefix-matching package which is deliberately *not* a
-plugin is explicitly allowlisted.
+`sim-pack`, `graph-adapter`). The historical `checks-*` prefix scan has been
+removed; graph adapter discovery remains name-pattern + marker gated
+(`graph-*` and `kind: "graph-adapter"`). A workspace-invariant test enforces
+that every first-party plugin declares its marker and that any prefix-matching
+package which is deliberately *not* a plugin is explicitly allowlisted.
 
 **Alternatives:**
 
@@ -39,11 +38,11 @@ plugin is explicitly allowlisted.
   under a magic prefix changes discovery. That is precisely how
   `@opensip-tools/graph-adapter-common` (shared scaffolding) was loaded as an
   adapter and warned on every run.
-- *Delete the prefix arms now.* Rejected for this release: the `checks-*` scan
-  is a public extension contract (third parties publish `@acme/checks-*` and
-  rely on prefix-only discovery via `plugins.packageScopes`). Removing it is a
-  breaking change that belongs in a major with a deprecation window, not a
-  patch.
+- *Delete the prefix arms in the original migration.* Rejected for that release:
+  the `checks-*` scan was a public extension contract (third parties could
+  publish `@acme/checks-*` and rely on prefix-only discovery via
+  `plugins.packageScopes`). It was later removed as an explicit breaking cleanup
+  once marker discovery became the only check-pack auto-discovery path.
 - *Add only a detector (the invariant test), leave triggers untouched.*
   Rejected as insufficient: a detector catches drift but the dangerous implicit
   trigger survives. Demoting the trigger and detecting marker correctness are
@@ -66,9 +65,9 @@ would otherwise silently fail to load.
 - First-party `@opensip-tools/checks-*` packs and `@opensip-tools/graph-*`
   adapters now declare their marker; the prefix scan is redundant for them.
 - The `checks-*` prefix scan (`check-package-discovery.ts`) and its
-  `plugins.packageScopes` extension survive as a documented, deprecated
-  third-party fallback. New packs — first- or third-party — should declare the
-  marker. Removal is tracked for the next major.
+  `plugins.packageScopes` extension have been removed. Check packs now
+  auto-discover only through `opensipTools.kind: "fit-pack"`; exact
+  `plugins.checkPackages` entries remain for non-marker packages.
 - Graph-adapter auto-discovery is marker-gated (`graph-*` **and**
   `kind: "graph-adapter"`); graph adapter discovery is first-party-scope-only,
   so this is non-breaking.

@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-05-26
-release: v2.0.x
+release: v3.0.0
 title: "Plugin loader"
 audience: [contributors, plugin-authors]
 purpose: "How plugins are discovered, loaded, and registered. Source files, npm packages, project pinning, the sync command."
@@ -24,7 +24,7 @@ related-docs:
 opensip-tools loads four kinds of plugins. Each has its own discovery shape, but they share a small, explicit policy: nothing loads silently, nothing loads transitively without opt-in, and the project owns its plugin set.
 
 > **What you'll understand after this:**
-> - The five discovery shapes (Tool marker, fit-pack marker + scope-prefix scan, sim-pack marker + project-pinned, graph-adapter name-pattern + kind marker + explicit pin, direct import).
+> - The five discovery shapes (Tool marker, fit-pack marker + exact pin, sim-pack marker + scoped scenarios + project-pinned, graph-adapter name-pattern + kind marker + explicit pin, direct import).
 > - Why source-file plugins auto-load but project-pinned npm packages require explicit listing.
 > - The on-disk layout the `plugin add/remove/list/sync` commands operate on.
 > - What `plugin sync` does and when CI should run it.
@@ -36,8 +36,8 @@ opensip-tools loads four kinds of plugins. Each has its own discovery shape, but
 | Plugin kind | Discovery shape | Where loaded |
 |---|---|---|
 | **Tools** | `node_modules` walk for `opensipTools.kind === 'tool'` marker | At CLI startup, by `discoverToolPackages()` |
-| **Check packs** | (a) `node_modules` walk for `<scope>/checks-*` under default + configured `plugins.packageScopes`, (b) `node_modules` walk for `opensipTools.kind === 'fit-pack'` marker, (c) explicit `plugins.checkPackages:` list. All run in parallel; results merged and deduped by package name. | Inside fitness's `loadDiscoveredCheckPackages()` |
-| **Sim scenario packs** | (a) Project-local source files under `opensip-tools/sim/`, (b) `node_modules` walk for `opensipTools.kind === 'sim-pack'` marker, (c) project-pinned via `plugins.sim:` list under `.runtime/plugins/sim/` | Inside simulation's `ensureScenariosLoaded()` |
+| **Check packs** | (a) `node_modules` walk for `opensipTools.kind === 'fit-pack'` marker, (b) exact `plugins.checkPackages:` list for non-marker packages. Results merge and dedupe by package name, with explicit config winning. | Inside fitness's `loadDiscoveredCheckPackages()` |
+| **Sim scenario packs** | (a) Project-local source files under `opensip-tools/sim/`, (b) `node_modules` walk for `opensipTools.kind === 'sim-pack'` marker, (c) `node_modules` walk for `<scope>/scenarios-*` under default + configured `plugins.packageScopes`, (d) project-pinned via `plugins.sim:` list under `.runtime/plugins/sim/`. | Inside simulation's `ensureScenariosLoaded()` |
 | **Graph adapters** | (a) Explicit `plugins.graphAdapters:` list in `opensip-tools.config.yml` (when present, replaces the auto-scan entirely), (b) `plugins.autoDiscoverGraphAdapters: false` opt-out, (c) default: `node_modules` walk for any package whose name matches `@opensip-tools/graph-*` **and** declares the `opensipTools.kind: "graph-adapter"` marker (so shared scaffolding under the same prefix — e.g. `@opensip-tools/graph-adapter-common` — is not mistaken for an adapter). | At CLI startup, by `discoverGraphAdapterPackages()` |
 | **Language adapters** | Direct CLI imports (no discovery walk) | At CLI bootstrap, before any Tool's `register()` runs |
 
@@ -112,38 +112,23 @@ The discoverer walks `.runtime/plugins/<domain>/node_modules/` but **only loads 
 
 The explicit list is the contract for arbitrary-scope packs. A transitive devDep can't silently inject checks — the user (or the `plugin add` command) has to add its name to `plugins.<domain>:` for it to load.
 
-### 3. Scope-based + marker-based check-pack discovery (fit only)
+### 3. Marker-based check-pack discovery (fit)
 
-Beyond the project-pinned form, fitness runs **two complementary discovery passes** on every fit invocation and merges the results, deduplicating by package name (name-pattern wins on collision so telemetry doesn't shift over to a different code path silently):
+Beyond the project-pinned form, fitness runs marker discovery on every fit invocation and merges in any exact `plugins.checkPackages:` entries, deduplicating by package name (explicit config wins on collision):
 
-**Pass A — scope-prefix scan** ([`packages/fitness/engine/src/plugins/check-package-discovery.ts`](../../../packages/fitness/engine/src/plugins/check-package-discovery.ts)). The fitness engine walks `node_modules` (from `cwd` upward through ancestor `node_modules` directories, matching Node's resolution algorithm) and registers every package whose name matches `<scope>/checks-*`. The default scope is `@opensip-tools`; customers extend the scan to their own scopes via `plugins.packageScopes:`.
+**Pass A — marker scan, canonical path** ([`packages/core/src/plugins/marker-discovery.ts`](../../../packages/core/src/plugins/marker-discovery.ts)). The `node_modules` walker scans every installed package for `package.json` declaring `opensipTools.kind === 'fit-pack'`. Discovery is publication-scope-independent — a pack can use any npm name (`@acme/fit`, `@my-internal-org/checks-platform`, anything) and still be discovered.
 
-Resolution rules apply in order:
+**Pass B — exact package list** ([`packages/fitness/engine/src/plugins/check-package-discovery.ts`](../../../packages/fitness/engine/src/plugins/check-package-discovery.ts)). `plugins.checkPackages:` names additional packages to resolve from project `node_modules`. This is the compatibility path for packages that do not declare the marker yet:
 
-1. **`plugins.checkPackages:` is set** — that explicit list wins. The scope scan is skipped entirely. Lets users pin their check set deterministically:
+```yaml
+plugins:
+  checkPackages:
+    - '@my-org/fitness-checks'
+```
 
-   ```yaml
-   plugins:
-     checkPackages:
-       - '@opensip-tools/checks-universal'
-       - '@my-org/fitness-checks'              # outside the configured scopes → must be pinned
-   ```
+No package is privileged — the bundled packs (`@opensip-tools/checks-universal`, `@opensip-tools/checks-typescript`, etc.) carry the marker and are discovered through the same contract as third-party packs. Add a marker-tagged pack to your project's `dependencies`, and it's loaded on the next run with no further wiring.
 
-2. **`plugins.autoDiscoverChecks: false`** — no additional check packages are loaded. Lets users opt out of dependency-based discovery (e.g. when running in an environment with unrelated `@opensip-tools` packages installed).
-
-3. **Default + `plugins.packageScopes`** — scan `node_modules` under the default scope (`@opensip-tools`) plus any customer-configured scopes for any `<scope>/checks-*` package, and register them all. Cross-tool: `packageScopes` is shared across check and sim discovery; one entry picks up both `@acme/checks-*` and `@acme/scenarios-*` packs.
-
-   ```yaml
-   plugins:
-     packageScopes:
-       - '@acme'                              # also scans @acme/checks-* and @acme/scenarios-*
-   ```
-
-**Pass B — marker scan** ([`packages/core/src/plugins/marker-discovery.ts`](../../../packages/core/src/plugins/marker-discovery.ts)). The same `node_modules` walker scans every installed package for `package.json` declaring `opensipTools.kind === 'fit-pack'`. Discovery is publication-scope-independent — a pack can use any npm name (`@acme/fit`, `@my-internal-org/checks-platform`, anything) and still be discovered. Best fit for organisations that'd rather not pin a scope or adopt the `checks-*` naming convention; the marker carries the same intent the prefix scan would have caught.
-
-No package is privileged — the bundled packs (`@opensip-tools/checks-universal`, `@opensip-tools/checks-typescript`, etc.) are discovered the same way as third-party packs. Add a `@opensip-tools/checks-mything` (or a marker-tagged pack under any name) to your project's `dependencies`, and it's loaded on the next run with no further wiring.
-
-The scope-prefix shape is what makes "install and use" frictionless for the bundled packs and any packs published into a configured scope. The marker shape is the equivalent affordance for organisations whose npm taxonomy doesn't match the `checks-*` convention. The explicit-pinning shape (`plugins.checkPackages:` or `plugins.fit:`) is what handles locked-down deployments where the inventory must be reproducible. Sim packs follow the same model with `opensipTools.kind: 'sim-pack'`.
+The marker shape is what makes "install and use" frictionless without constraining npm names. The exact-list shape (`plugins.checkPackages:`) handles non-marker packages. Project-pinned fit packs (`plugins.fit:`) are managed by `plugin add/remove/sync`.
 
 ---
 

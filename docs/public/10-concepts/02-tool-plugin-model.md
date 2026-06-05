@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-03
-release: v2.6.x
+release: v3.0.0
 title: "The tool-plugin model"
 audience: [contributors, plugin-authors]
 purpose: "How the CLI doesn't know what `fit` does. The Tool contract, the registry, the dispatcher, and what it takes to add a third tool."
@@ -219,7 +219,7 @@ What you *don't* need:
 - A code change in `@opensip-tools/core`.
 - A schema migration for the project config (unless your tool has its own config — which goes in a tool-namespaced section under `opensip-tools.config.yml`).
 
-If your tool also wants to ship checks (the way `@opensip-tools/checks-typescript` does for `fit`), you have a separate option: a check pack — any npm package whose name matches `@opensip-tools/checks-*` (or is listed in `plugins.checkPackages:`). That's a different contract — see [`50-extend/01-plugin-authoring.md`](../50-extend/01-plugin-authoring.md).
+If your tool also wants to ship checks (the way `@opensip-tools/checks-typescript` does for `fit`), you have a separate option: a check pack — any npm package declaring `opensipTools.kind: "fit-pack"` (or listed in `plugins.checkPackages:`). That's a different contract — see [`50-extend/01-plugin-authoring.md`](../50-extend/01-plugin-authoring.md).
 
 ---
 

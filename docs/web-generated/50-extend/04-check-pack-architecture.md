@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-03
-release: v2.6.x
+release: v3.0.0
 title: "Check pack architecture"
 audience: [contributors, plugin-authors]
 purpose: "How check packs are structured, the bundled seven, scope filters, parameterization, and the marketplace shape."
@@ -24,7 +24,7 @@ related-docs:
 ---
 # Check pack architecture
 
-A check pack is an npm package that contributes one or more `Check` objects. Seven pack packages ship today; an arbitrary number of third-party packs can be added by `plugin add`, by name-prefix auto-discovery within a configured npm scope, or by declaring `opensipTools.kind: "fit-pack"` in `package.json`. The pack contract is simple, the marketplace shape is intentional, and the discovery layer (covered in [`80-implementation/02-plugin-loader.md`](/docs/opensip-tools/80-implementation/02-plugin-loader/)) takes care of the rest.
+A check pack is an npm package that contributes one or more `Check` objects. Seven pack packages ship today; an arbitrary number of third-party packs can be added by `plugin add`, by declaring `opensipTools.kind: "fit-pack"` in `package.json`, or by exact name in `plugins.checkPackages`. The pack contract is simple, the marketplace shape is intentional, and the discovery layer (covered in [`80-implementation/02-plugin-loader.md`](/docs/opensip-tools/80-implementation/02-plugin-loader/)) takes care of the rest.
 
 > **What you'll understand after this:**
 > - The `FitPluginExports` shape every pack implements.
@@ -62,17 +62,17 @@ Plus a discoverable package.json shape:
 ```json
 {
   "name": "@opensip-tools/checks-universal",
+  "opensipTools": { "kind": "fit-pack" },
   "main": "dist/index.js"
 }
 ```
 
-Discovery uses **two complementary paths**, both run on every fit invocation; results are merged and deduplicated by package name (first-seen wins, name-pattern path takes precedence over marker):
+Discovery uses **two paths**, both run on every fit invocation; results are merged and deduplicated by package name:
 
-- **Name-pattern + scope** — `<scope>/checks-*` packages installed in `node_modules`. The default scope is `@opensip-tools`; customers extend the scan to their own scope via `plugins.packageScopes:` (e.g. `['@acme']` picks up `@acme/checks-*`). This is how the seven bundled packs and any packs published in a configured scope load.
-- **Marker** — any package whose `package.json` declares `opensipTools.kind: "fit-pack"` is discovered regardless of npm scope or name pattern. Best fit for organisations who'd rather not pin a scope or use the `checks-*` naming convention.
-- **Explicit list** — `plugins.checkPackages:` in `opensip-tools.config.yml` pins a deterministic set by exact name; when set, it wins over the name-pattern path entirely. Use for locked-down deployments where the check inventory must be reproducible. Marker discovery still runs alongside it.
+- **Marker** — any package whose `package.json` declares `opensipTools.kind: "fit-pack"` is discovered regardless of npm scope or name pattern. This is the canonical path for first-party and third-party packs.
+- **Explicit list** — `plugins.checkPackages:` in `opensip-tools.config.yml` names packages by exact name. Use for packages that do not declare the marker yet. Marker discovery still runs alongside it.
 
-See [`80-implementation/02-plugin-loader.md`](/docs/opensip-tools/80-implementation/02-plugin-loader/) for the resolution rules and how `plugins.autoDiscoverChecks: false` lets you opt out of the name-pattern path entirely.
+See [`80-implementation/02-plugin-loader.md`](/docs/opensip-tools/80-implementation/02-plugin-loader/) for the resolution rules.
 
 The [`collectCheckObjects`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/fitness/engine/src/framework/check-types.ts) helper (re-exported from `@opensip-tools/fitness`) walks a barrel's exports recursively, narrowing each value to a `Check` via `isCheck` and deduplicating by reference. Each pack's `src/index.ts` calls it on `allChecks` (the re-export of `src/checks/index.ts`) so new checks are picked up by simply re-exporting them from the category barrel — no central registration list to update.
 
@@ -218,7 +218,7 @@ Minimum viable pack:
 
 ```
 @my-co/checks-internal/
-├── package.json                # name: '@opensip-tools/checks-*' or pinned in config
+├── package.json                # opensipTools.kind: 'fit-pack' (or pinned in config)
 ├── dist/index.js               # exports: checks, checkDisplay, metadata
 └── README.md                   # author affordance
 ```

@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-05-27
-release: v2.0.x
+release: v3.0.0
 title: "Project-local plugins"
 audience: [plugin-authors, getting-started]
 purpose: "The fastest path to extend opensip-tools: drop .mjs files under opensip-tools/{fit,sim}/ — checks, recipes, scenarios."

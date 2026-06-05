@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-03
-release: v2.6.x
+release: v3.0.0
 title: "Wire into CI"
 audience: [ci-integrators, getting-started]
 purpose: "Task-led: add opensip-tools to your CI pipeline with PR annotations and baseline gating. GitHub Actions and GitLab examples."

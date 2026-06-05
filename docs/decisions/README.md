@@ -61,8 +61,8 @@ distinct from:
   is expensive or a decoupled consumer can't run the query (no SQL/DB views)
 - [ADR-0007](./ADR-0007-marker-canonical-plugin-discovery.md) — The
   `opensipTools.kind` marker is the canonical plugin-discovery contract; the
-  `checks-*`/`graph-*` name-prefix scans are demoted to deprecated fallbacks
-  (removal next major), enforced by a workspace-invariant test
+  `checks-*` prefix scan has been removed and graph adapter discovery is
+  marker-gated, enforced by a workspace-invariant test
 - [ADR-0008](./ADR-0008-opensip-cloud-signal-sync.md) — OpenSIP Cloud signal
   sync: an optional, entitlement-gated, best-effort sink emits the `Signal`s a
   run already produces to the cloud (store-only onboarding tier); local SQLite

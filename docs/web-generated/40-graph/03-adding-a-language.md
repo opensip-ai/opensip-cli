@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-03
-release: v2.6.0
+release: v3.0.0
 title: "Adding a language to graph"
 audience: [contributors, plugin-authors]
 purpose: "Step-by-step guide for writing a new GraphLanguageAdapter — C/C++, or anything else — without touching the engine."
@@ -24,7 +24,7 @@ related-docs:
 
 # Adding a language to graph
 
-The `graph` tool started as a TypeScript-only call-graph engine. The language-pluggability work introduced a six-method `GraphLanguageAdapter` contract so the engine itself doesn't know any specific language. There are **five first-party adapters** — each as its own publishable npm package under `packages/graph/graph-<lang>/`: TypeScript (symbol-resolved via the TS compiler API), Python (tree-sitter), Rust (tree-sitter), Go (tree-sitter), and Java (tree-sitter). The four tree-sitter adapters are backed by **vendored `web-tree-sitter` WASM grammars** (no native build / node-gyp at install) and share the parse/discover/walk/cache-key scaffolding in [`@opensip-tools/graph-adapter-common`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/graph/graph-adapter-common/src/parse.ts). Discovery is by **name pattern**: any package whose name matches `@opensip-tools/graph-*` is auto-discovered, or you can pin an exact list in `plugins.graphAdapters` in `opensip-tools.config.yml`. Any first-party or third-party adapter slots in by implementing the contract and shipping under that name pattern (or via the explicit-pin form).
+The `graph` tool started as a TypeScript-only call-graph engine. The language-pluggability work introduced a six-method `GraphLanguageAdapter` contract so the engine itself doesn't know any specific language. There are **five first-party adapters** — each as its own publishable npm package under `packages/graph/graph-<lang>/`: TypeScript (symbol-resolved via the TS compiler API), Python (tree-sitter), Rust (tree-sitter), Go (tree-sitter), and Java (tree-sitter). The four tree-sitter adapters are backed by **vendored `web-tree-sitter` WASM grammars** (no native build / node-gyp at install) and share the parse/discover/walk/cache-key scaffolding in [`@opensip-tools/graph-adapter-common`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/graph/graph-adapter-common/src/parse.ts). Auto-discovery is by **name pattern + marker**: a package must match `@opensip-tools/graph-*` and declare `opensipTools.kind: "graph-adapter"`, or you can pin an exact list in `plugins.graphAdapters` in `opensip-tools.config.yml`. Any first-party or third-party adapter slots in by implementing the contract and shipping under that name/marker pair (or via the explicit-pin form).
 
 This doc walks a contributor through that workflow.
 
@@ -108,7 +108,7 @@ packages/graph/graph-<id>/
 
 This mirrors `graph-python/`, `graph-rust/`, `graph-go/`, and `graph-java/` — the recommended template for tree-sitter adapters. The four tree-sitter adapters keep most of their `discover` / `parse` / `walk` / `cache-key` scaffolding in [`@opensip-tools/graph-adapter-common`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/graph/graph-adapter-common/src/parse.ts) (e.g. `createTreeSitterParseProject`, `createDiscover`, `hashConfig`) and each `src/` file is a thin per-language binding plus the vendored `wasm/<grammar>.wasm` (shipped in the package's `files`). The TypeScript adapter has a deeper subdir layout (`inventory-visitors/`, `edge-resolvers/`, `inventory-helpers/`) because its symbol-resolved walk is genuinely more complex; for a tree-sitter adapter the flat layout is plenty. Adapters that prefer one big file or a different breakdown are fine — the contract doesn't care, only the public `index.ts` export matters.
 
-**Third-party graph adapters** are supported via the same name-pattern discovery path the first-party packages use: any package installed in `node_modules` whose name matches `@opensip-tools/graph-*` is loaded and its `adapter` export registered. For deployments that need pinned discovery, list the exact package names under `plugins.graphAdapters:` in `opensip-tools.config.yml` — that list replaces the auto-scan entirely. The adapter contract types (`GraphLanguageAdapter`, `registerAdapter`, `pickAdapter`) are exported from `@opensip-tools/graph`.
+**Third-party graph adapters** are supported via the same discovery path the first-party packages use: any package installed in `node_modules` whose name matches `@opensip-tools/graph-*` and declares `opensipTools.kind: "graph-adapter"` is loaded and its `adapter` export registered. For deployments that need pinned discovery, list the exact package names under `plugins.graphAdapters:` in `opensip-tools.config.yml` — that list replaces the auto-scan entirely. The adapter contract types (`GraphLanguageAdapter`, `registerAdapter`, `pickAdapter`) are exported from `@opensip-tools/graph`.
 
 ---
 
@@ -161,7 +161,7 @@ When you ship a new adapter, add a row to this table in your PR.
 
 ## 6. Registration
 
-First-party and third-party adapters use the same registration path: ship a package whose name matches `@opensip-tools/graph-*` (or whose name is listed under `plugins.graphAdapters:` in the project config) and whose main entry exports `adapter`.
+First-party and third-party adapters use the same registration path: ship a package whose name matches `@opensip-tools/graph-*`, declares `opensipTools.kind: "graph-adapter"`, and whose main entry exports `adapter` (or list the package name under `plugins.graphAdapters:` in the project config).
 
 ```json
 {

@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-03
-release: v2.6.x
+release: v3.0.0
 title: "Migrate from ESLint"
 audience: [getting-started, ci-integrators]
 purpose: "Task-led: when an ESLint rule belongs in opensip-tools, when it doesn't, and how the two tools coexist in one CI pipeline."

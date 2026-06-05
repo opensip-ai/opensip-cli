@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-03
-release: v2.6.x
+release: v3.0.0
 title: "What is opensip-tools?"
 audience: [getting-started, contributors]
 purpose: "The front door — what problem opensip-tools solves, what it does, what it isn't, and how to try it."
@@ -15,6 +15,7 @@ related-docs:
   - ./02-show-me-the-loops.md
   - ./05-vocabulary.md
   - ./06-system-context.md
+  - ./07-architecture-overview.md
   - ../10-concepts/01-fitness-loop.md
   - ../10-concepts/02-tool-plugin-model.md
 ---
@@ -111,4 +112,5 @@ opensip-tools fit --recipe example
 | Run the four-command smoke right now | [Quick start](./00-quick-start.md) |
 | Learn the vocabulary used across the docs | [Vocabulary](./05-vocabulary.md) |
 | Understand the runtime layout (what's on disk) | [System context](./06-system-context.md) |
+| See the high-level architecture map | [Architecture overview](./07-architecture-overview.md) |
 | Go deeper on the architecture (contributors) | [Mental model](../10-concepts/) → [Architecture index](../README.md) |
