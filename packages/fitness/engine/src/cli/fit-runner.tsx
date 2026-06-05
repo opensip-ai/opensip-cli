@@ -26,14 +26,17 @@ import {
   Banner,
   ClockProvider,
   ErrorMessage,
+  LiveProgress,
   normalizeBannerSize,
   ProjectHeader,
   RunFooterHints,
   RunHeader,
   RunSummary,
-  Spinner,
   ThemeProvider,
   UpdateHint,
+  type ProgressCallback,
+  type ProgressEvent,
+  type ProgressSurface,
 } from '@opensip-tools/cli-ui';
 import {
   EXIT_CODES,
@@ -42,9 +45,9 @@ import {
   type FitDoneResult,
   type SignalEnvelope,
 } from '@opensip-tools/contracts';
-import { currentScope } from '@opensip-tools/core';
+import { createInProcessTransport, currentScope } from '@opensip-tools/core';
 import { Box, Static, Text, useApp, render } from 'ink';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 import { envelopeToFindingsGroups, envelopeToFitRows } from './fit/envelope-view.js';
 import {
@@ -64,13 +67,41 @@ const FIT_TOOL_TITLE = 'Fitness Checks';
 const FIT_TOOL_DESCRIPTION =
   'Scanning your codebase for quality, security, and architecture issues.';
 
+// Pool-shape surfaces for the shared <LiveProgress> renderer. fit's checks are a
+// dynamic pool (many, counted), not a fixed pipeline — so it renders as one
+// spinner + completed/total counter. The synthetic stage id is 'checks'.
+const FIT_LOADING_SURFACE: ProgressSurface = { shape: 'pool', label: 'Loading checks...' };
+const FIT_RUNNING_SURFACE: ProgressSurface = { shape: 'pool', label: 'Running checks...' };
+const NO_PROGRESS: (cb: ProgressCallback) => void = () => {
+  // The loading phase has no live event stream yet — LiveProgress renders a bare
+  // animated spinner from a no-op subscription.
+};
+
+/**
+ * Run fit, translating the engine's monotonic (completed, total) callback into
+ * pool-shape ProgressEvents on the `'checks'` stage. Hoisted to module scope so
+ * the emit translation isn't a 5th-level nested function inside the runner's
+ * effect.
+ */
+function executeFitWithProgress(
+  args: FitOptions,
+  datastore: DataStore | undefined,
+  emit: (event: ProgressEvent) => void,
+): ReturnType<typeof executeFit> {
+  emit({ type: 'stage-start', stage: 'checks', label: 'Running checks...' });
+  return executeFit(args, {
+    onProgress: (completed, total) => emit({ type: 'stage-progress', stage: 'checks', completed, total }),
+    datastore,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // State machine
 // ---------------------------------------------------------------------------
 
 type FitState =
   | { phase: 'loading' }
-  | { phase: 'running'; completed: number; total: number; checkCount: number }
+  | { phase: 'running'; checkCount: number; subscribe: (cb: ProgressCallback) => void }
   | { phase: 'done'; result: FitDoneResult; checkCount: number }
   | { phase: 'error'; result: ErrorResult };
 
@@ -86,18 +117,6 @@ function FitRunner({ args, datastore, setExitCode, onEnvelope }: FitRunnerProps)
   const { exit } = useApp();
   const [state, setState] = useState<FitState>({ phase: 'loading' });
 
-  // Progress-state machine: `executeFit` calls back with a monotonic
-  // (completed, total) pair via `buildFitCallbacks` in fit.ts. The
-  // useCallback identity is stable across renders so the underlying
-  // `useEffect` does not re-fire on each tick.
-  const onProgress = useCallback((completed: number, total: number) => {
-    setState((prev) =>
-      prev.phase === 'running'
-        ? { ...prev, completed, total }
-        : prev,
-    );
-  }, []);
-
   useEffect(() => {
     let cancelled = false;
 
@@ -107,13 +126,20 @@ function FitRunner({ args, datastore, setExitCode, onEnvelope }: FitRunnerProps)
       const checkCount = getEnabledCheckCount();
 
       if (cancelled) return;
-      setState({ phase: 'running', completed: 0, total: 0, checkCount });
 
-      // Phase 2: Execute. Pass `onProgress` so the spinner ticks live,
-      // and `datastore` so the run lands in the SQLite session history
-      // (the JSON path goes through tool.ts's runJsonMode and threads
-      // its own copy).
-      const fitResult = await executeFit(args, { onProgress, datastore });
+      // Phase 2: Execute through the in-process transport. The engine reports a
+      // monotonic (completed, total) pair via `buildFitCallbacks`; the runner
+      // translates each into a pool `stage-progress` ProgressEvent that the
+      // shared <LiveProgress> renderer folds into the spinner + counter. fit's
+      // execution yields to the event loop, so the spinner animates in-process.
+      const transport = createInProcessTransport();
+      const run = transport.run<ProgressEvent, Awaited<ReturnType<typeof executeFit>>>(
+        (emit) => executeFitWithProgress(args, datastore, emit),
+      );
+
+      setState({ phase: 'running', checkCount, subscribe: run.onProgress });
+
+      const fitResult = await run.result;
 
       if (cancelled) return;
 
@@ -205,8 +231,8 @@ function FitRunner({ args, datastore, setExitCode, onEnvelope }: FitRunnerProps)
       return (
         <>
           {staticHeader}
-          <Box paddingLeft={2} paddingTop={1}>
-            <Spinner total={0} completed={0} label="Loading checks..." />
+          <Box paddingTop={1}>
+            <LiveProgress surface={FIT_LOADING_SURFACE} subscribe={NO_PROGRESS} />
           </Box>
         </>
       );
@@ -216,9 +242,7 @@ function FitRunner({ args, datastore, setExitCode, onEnvelope }: FitRunnerProps)
       return (
         <>
           {staticHeader}
-          <Box paddingLeft={2}>
-            <Spinner total={state.total} completed={state.completed} label="Running checks..." />
-          </Box>
+          <LiveProgress surface={FIT_RUNNING_SURFACE} subscribe={state.subscribe} />
         </>
       );
     }
