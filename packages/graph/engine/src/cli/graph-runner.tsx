@@ -9,20 +9,25 @@
  * edits — each tool ships its own renderer and registers it via
  * `cli.registerLiveView(key, renderer)`.
  *
- * Shared presentational primitives (Banner, RunHeader, theme tokens)
- * come from `@opensip-tools/cli-ui`. The stage-checklist component is
- * graph-specific and stays here.
+ * Progress rendering is the shared `<LiveProgress>` from
+ * `@opensip-tools/cli-ui` (ADR-0015), driven in `phases` mode: graph's
+ * 7 fixed pipeline stages map onto the universal `ProgressEvent` stream.
+ * The former graph-local StageChecklist/StageLine/RunningStageLine are
+ * gone. The transport is the in-process one here — graph's pipeline is a
+ * synchronous CPU blast, so the spinner does not yet animate (the
+ * subprocess transport that frees the render thread lands in a later
+ * phase); this phase unifies the visual without changing that behavior.
  *
  * Single exit-code write path: error outcomes route through the
  * supplied `setExitCode` callback (`ToolCliContext.setExitCode`) so the
- * CLI keeps its only `process.exitCode` mutator. The historical
- * `process.exitCode = 1` write that lived in GraphView is gone.
+ * CLI keeps its only `process.exitCode` mutator.
  */
 
 import {
   Banner,
   ClockProvider,
   ErrorMessage,
+  LiveProgress,
   normalizeBannerSize,
   ProjectHeader,
   RunFooterHints,
@@ -30,12 +35,13 @@ import {
   RunSummary,
   ThemeProvider,
   UpdateHint,
-  useSpinner,
-  useTheme,
+  type ProgressCallback,
+  type ProgressEvent,
+  type ProgressSurface,
 } from '@opensip-tools/cli-ui';
-import { currentScope, formatDuration } from '@opensip-tools/core';
+import { createInProcessTransport, currentScope } from '@opensip-tools/core';
 import { Box, Text, useApp, render } from 'ink';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 import { buildGraphEnvelope } from './build-envelope.js';
 import { buildUnifiedReportLines, persistSession } from './graph.js';
@@ -47,18 +53,6 @@ import type { DataStore } from '@opensip-tools/datastore';
 
 const GRAPH_TOOL_TITLE = 'Code Graph';
 const GRAPH_TOOL_DESCRIPTION = 'Building call-graph from source';
-
-// ---------------------------------------------------------------------------
-// State machine
-// ---------------------------------------------------------------------------
-
-type StageStatus =
-  | { kind: 'pending' }
-  | { kind: 'running'; startedAt: number }
-  | { kind: 'done'; durationMs: number; detail?: string }
-  | { kind: 'cached' };
-
-type StageMap = Readonly<Record<GraphStage, StageStatus>>;
 
 const STAGE_LABELS: Readonly<Record<GraphStage, string>> = {
   discover: 'Discover files',
@@ -80,6 +74,28 @@ const STAGE_RUNNING_DETAIL: Readonly<Record<GraphStage, string>> = {
   rules: 'Evaluating rule set...',
 };
 
+// The phases surface the shared renderer consumes: graph's fixed, ordered
+// stages, each carrying its checklist label + running sub-label.
+const GRAPH_SURFACE: ProgressSurface = {
+  shape: 'phases',
+  stages: GRAPH_STAGES.map((id) => ({
+    id,
+    label: STAGE_LABELS[id],
+    runningDetail: STAGE_RUNNING_DETAIL[id],
+  })),
+};
+
+/** Map graph's pipeline event onto the universal progress currency. */
+function toProgressEvent(event: GraphProgressEvent): ProgressEvent {
+  if (event.type === 'stage-start') {
+    return { type: 'stage-start', stage: event.stage, label: STAGE_LABELS[event.stage] };
+  }
+  if (event.type === 'stage-done') {
+    return { type: 'stage-done', stage: event.stage, durationMs: event.durationMs ?? 0, detail: event.detail };
+  }
+  return { type: 'stage-cached', stage: event.stage };
+}
+
 interface RunSummaryShape {
   readonly passed: number;
   readonly failed: number;
@@ -90,15 +106,9 @@ interface RunSummaryShape {
 
 type ViewState =
   | { phase: 'loading' }
-  | { phase: 'running'; stages: StageMap }
-  | { phase: 'done'; stages: StageMap; reportLines: readonly string[]; summary: RunSummaryShape }
+  | { phase: 'running'; subscribe: (cb: ProgressCallback) => void }
+  | { phase: 'done'; subscribe: (cb: ProgressCallback) => void; reportLines: readonly string[]; summary: RunSummaryShape }
   | { phase: 'error'; message: string };
-
-function initialStages(): Record<GraphStage, StageStatus> {
-  const out = {} as Record<GraphStage, StageStatus>;
-  for (const stage of GRAPH_STAGES) out[stage] = { kind: 'pending' };
-  return out;
-}
 
 interface GraphRunnerArgs {
   readonly cwd: string;
@@ -120,18 +130,35 @@ interface GraphRunnerArgs {
    * `minCrossPackageDuplicatePackages`, `minDuplicateBodyLines`,
    * `entryPointHashes`). Forwarded to `runGraph` so the interactive
    * default path honors the SAME config as the `executeGraph` dispatch
-   * path. Without it the live view silently fell back to rule defaults,
-   * so bare `graph` / `graph --verbose` disagreed with `graph --json`.
+   * path.
    */
   readonly config?: GraphConfig;
   /**
    * `--recipe`: the resolved rule subset for this run. Resolved on the
    * dispatch seam (`tool.ts`, inside the entered RunScope) and forwarded
    * to `runGraph` so the interactive path honors `--recipe` for parity
-   * with `executeGraph`. Absent ⇒ `runGraph` falls back to `currentRules()`
-   * (the default recipe = all rules).
+   * with `executeGraph`. Absent ⇒ `runGraph` falls back to `currentRules()`.
    */
   readonly rules?: readonly Rule[];
+}
+
+/** Run the pipeline through the transport, mapping graph events to the shared
+ *  progress currency. Hoisted to module scope so the emit translation isn't a
+ *  deeply-nested function inside the runner's effect. */
+function runGraphWithProgress(
+  args: GraphRunnerArgs,
+  datastore: DataStore | undefined,
+  emit: (event: ProgressEvent) => void,
+): Promise<RunGraphResult> {
+  return runGraph({
+    cwd: args.cwd,
+    noCache: args.noCache,
+    resolution: args.resolution,
+    config: args.config,
+    rules: args.rules,
+    datastore,
+    onProgress: (event) => emit(toProgressEvent(event)),
+  });
 }
 
 interface GraphRunnerProps {
@@ -144,54 +171,27 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
   const { exit } = useApp();
   const [state, setState] = useState<ViewState>({ phase: 'loading' });
 
-  const onProgress = useCallback((event: GraphProgressEvent) => {
-    setState((prev) => {
-      const base: Record<GraphStage, StageStatus> = prev.phase === 'running'
-        ? { ...prev.stages }
-        : initialStages();
-      if (event.type === 'stage-start') {
-        base[event.stage] = { kind: 'running', startedAt: Date.now() };
-      } else if (event.type === 'stage-done') {
-        base[event.stage] = {
-          kind: 'done',
-          durationMs: event.durationMs ?? 0,
-          detail: event.detail,
-        };
-      } else {
-        base[event.stage] = { kind: 'cached' };
-      }
-      return { phase: 'running', stages: base };
-    });
-  }, []);
-
   useEffect(() => {
     let cancelled = false;
     const startedAt = Date.now();
+
+    const transport = createInProcessTransport();
+    const run = transport.run<ProgressEvent, RunGraphResult>(
+      (emit) => runGraphWithProgress(args, datastore, emit),
+    );
+    setState({ phase: 'running', subscribe: run.onProgress });
+
     void (async () => {
-      setState({ phase: 'running', stages: initialStages() });
       try {
-        const result: RunGraphResult = await runGraph({
-          cwd: args.cwd,
-          noCache: args.noCache,
-          resolution: args.resolution,
-          config: args.config,
-          rules: args.rules,
-          onProgress,
-          datastore,
-        });
+        const result = await run.result;
         if (cancelled) return;
         const durationMs = Date.now() - startedAt;
-        // Persist exactly one session — matches the contract the
-        // dispatch-path orchestrator (`executeGraph` → `persistSession`)
-        // enforces. Without this call, default `opensip-tools graph`
-        // (no args, no flags) runs the live view but writes no row,
-        // so the dashboard's Code Paths > Sessions never sees the run.
+        // Persist exactly one session — matches the contract the dispatch-path
+        // orchestrator (`executeGraph` → `persistSession`) enforces, so the
+        // dashboard's Code Paths > Sessions sees the interactive run.
         persistSession({ cwd: args.cwd }, result.signals, datastore, durationMs);
-        // Compute the fit-style summary the cli-ui `RunSummary` renders.
-        // The envelope's verdict applies the fit-aligned per-rule pass rule
-        // (`passed` ⇔ no critical/high), so the passed/failed counts here
-        // match what fit shows for an equivalent run. runId/createdAt are
-        // summary-irrelevant here (the live view neither emits nor delivers).
+        // Compute the fit-style summary the cli-ui `RunSummary` renders. The
+        // envelope's verdict applies the fit-aligned per-rule pass rule.
         const verdictSummary = buildGraphEnvelope({
           signals: result.signals,
           runId: currentScope()?.runId ?? '',
@@ -204,9 +204,8 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
           warnings: verdictSummary.warnings,
           durationMs,
         };
-        // includeSummary: false — RunSummary takes the place of the
-        // text "== Summary ==" footer that buildUnifiedReportLines used
-        // to append.
+        // includeSummary: false — RunSummary takes the place of the text
+        // "== Summary ==" footer buildUnifiedReportLines used to append.
         const reportLines = buildUnifiedReportLines({
           catalog: result.catalog,
           indexes: result.indexes,
@@ -215,7 +214,7 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
         }, { includeSummary: false });
         setState((prev) => ({
           phase: 'done',
-          stages: prev.phase === 'running' ? prev.stages : initialStages(),
+          subscribe: prev.phase === 'running' ? prev.subscribe : run.onProgress,
           reportLines,
           summary,
         }));
@@ -231,10 +230,10 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
     return () => { cancelled = true; };
   }, []);
 
-  // Presentation settings resolved once in the pre-action hook; the live
-  // view runs inside that scope. `mini` carries the project path in its box,
-  // so the separate ProjectHeader line is dropped for it (matches App.tsx);
-  // walkedUp flows in so mini keeps the "(found N levels up)" hint.
+  // Presentation settings resolved once in the pre-action hook; the live view
+  // runs inside that scope. `mini` carries the project path in its box, so the
+  // separate ProjectHeader line is dropped for it (matches App.tsx); walkedUp
+  // flows in so mini keeps the "(found N levels up)" hint.
   const scope = currentScope();
   const ui = scope?.ui;
   const walkedUp = scope?.projectContext?.walkedUp;
@@ -268,10 +267,13 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
     );
   }
 
+  // running | done — the same <LiveProgress> stays mounted across both so its
+  // reduced stage state (the ✓ checklist) persists; the done phase adds the
+  // summary + footer below it.
   return (
     <Box flexDirection="column">
       {header}
-      <StageChecklist stages={state.stages} />
+      <LiveProgress surface={GRAPH_SURFACE} subscribe={state.subscribe} />
       {state.phase === 'done' && (
         <>
           {args.verbose === true && (
@@ -299,91 +301,6 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
           )}
         </>
       )}
-    </Box>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Stage-checklist — graph-specific visual. Banner/RunHeader/ErrorMessage
-// come from @opensip-tools/cli-ui (imported at the top).
-// ---------------------------------------------------------------------------
-
-function StageChecklist({ stages }: { readonly stages: StageMap }): React.ReactElement {
-  return (
-    <Box flexDirection="column" paddingLeft={2} paddingTop={1}>
-      {GRAPH_STAGES.map((stage) => (
-        <StageLine key={stage} stage={stage} status={stages[stage]} />
-      ))}
-    </Box>
-  );
-}
-
-interface StageLineProps {
-  readonly stage: GraphStage;
-  readonly status: StageStatus;
-}
-
-function StageLine({ stage, status }: StageLineProps): React.ReactElement {
-  const theme = useTheme();
-  const label = STAGE_LABELS[stage];
-
-  if (status.kind === 'pending') {
-    return (
-      <Text dimColor>
-        {'  '}<Text>○</Text> {label}
-      </Text>
-    );
-  }
-
-  if (status.kind === 'cached') {
-    return (
-      <Text>
-        <Text color={theme.success}>✓</Text>{' '}
-        <Text>{label}</Text>{'   '}
-        <Text dimColor>(cached)</Text>
-      </Text>
-    );
-  }
-
-  if (status.kind === 'done') {
-    const dur = formatDuration(status.durationMs);
-    const detail = status.detail ? `${status.detail} (${dur})` : dur;
-    return (
-      <Text>
-        <Text color={theme.success}>✓</Text>{' '}
-        <Text>{label}</Text>{'   '}
-        <Text dimColor>{detail}</Text>
-      </Text>
-    );
-  }
-
-  return <RunningStageLine stage={stage} startedAt={status.startedAt} label={label} />;
-}
-
-interface RunningStageLineProps {
-  readonly stage: GraphStage;
-  readonly startedAt: number;
-  readonly label: string;
-}
-
-function RunningStageLine({ stage, startedAt, label }: RunningStageLineProps): React.ReactElement {
-  const theme = useTheme();
-  const frame = useSpinner();
-  // Re-render on each tick; derive wall-clock elapsed from Date.now() so it
-  // stays accurate regardless of how many ticks have fired since startedAt.
-  const elapsed = formatDuration(Date.now() - startedAt);
-
-  return (
-    <Box flexDirection="column">
-      <Text>
-        <Text color={theme.brand}>{frame}</Text>{' '}
-        <Text bold>{label}</Text>
-      </Text>
-      <Text>
-        {'    └─ '}
-        <Text dimColor>{STAGE_RUNNING_DETAIL[stage]}</Text>{' '}
-        <Text dimColor>({elapsed})</Text>
-      </Text>
     </Box>
   );
 }
