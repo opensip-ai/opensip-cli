@@ -40,6 +40,33 @@ describe('formatSignalTableRows', () => {
   it('returns no rows for an empty envelope', () => {
     expect(formatSignalTableRows(EMPTY_ENVELOPE)).toEqual([]);
   });
+
+  it('surfaces fitness validated/itemType/ignored columns when present on the unit', () => {
+    // Fitness carries per-unit `filesValidated`/`itemType`/`ignoredCount` —
+    // facts a flat signal list cannot express. The shared table formatter
+    // must pass them through to the row so cli-ui can render the columns.
+    const env: SignalEnvelope = {
+      ...EMPTY_ENVELOPE,
+      units: [
+        { slug: 'no-todo-comments', passed: true, durationMs: 5, filesValidated: 450, itemType: 'files', ignoredCount: 3 },
+      ],
+    };
+    const [row] = formatSignalTableRows(env);
+    expect(row).toMatchObject({ validated: 450, itemType: 'files', ignored: 3 });
+  });
+
+  it('leaves validated/itemType/ignored undefined for tools that do not scan files (graph/sim)', () => {
+    // graph/sim units omit the fitness-only fields; the row must carry
+    // `undefined` (the renderer blanks the column) rather than a fabricated 0.
+    const env: SignalEnvelope = {
+      ...EMPTY_ENVELOPE,
+      units: [{ slug: 'graph.architecture.cycle', passed: true, durationMs: 8 }],
+    };
+    const [row] = formatSignalTableRows(env);
+    expect(row?.validated).toBeUndefined();
+    expect(row?.itemType).toBeUndefined();
+    expect(row?.ignored).toBeUndefined();
+  });
 });
 
 describe('formatSignalTableSummary', () => {
