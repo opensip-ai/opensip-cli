@@ -207,8 +207,13 @@ const KNOWN_SYNC_FUNCTIONS = new Set([
  * `additionalSyncReceivers`.
  */
 const KNOWN_SYNC_RECEIVERS = new Set([
-  // Logging/output (synchronous — write to buffer)
+  // Logging/output (synchronous — write to buffer). `log` is the common
+  // logger-variable shorthand; the receiver-pattern list below only matches
+  // names containing the literal `logger`, so `log.info(...)` (a void logger
+  // call) would otherwise be a false positive. Exact match avoids the
+  // substring breadth of adding `log` to the pattern list (catalog/dialog).
   'console',
+  'log',
   // Node.js built-ins (synchronous APIs)
   'path',
   'fs',

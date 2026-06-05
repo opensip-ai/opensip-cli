@@ -15,7 +15,7 @@
  * FileAccessor then resolves `files.read('packages/...')` against cwd.
  */
 
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 
@@ -359,6 +359,20 @@ describe('typescript-frontend — analyzeAll over a real app fixture', () => {
   let appsDir: string
 
   beforeEach(() => {
+    // Remove any cov-tsf-* fixtures a prior *interrupted* run left behind (the
+    // afterEach below cleans up on normal completion, but SIGINT bypasses it).
+    // This keeps the working tree — and a subsequent `pnpm fit` — free of stale
+    // detritus that would otherwise be analyzed as real source.
+    const appsRoot = join(repoRoot, 'apps')
+    try {
+      for (const entry of readdirSync(appsRoot)) {
+        if (entry.startsWith('cov-tsf-')) {
+          rmSync(join(appsRoot, entry), { recursive: true, force: true })
+        }
+      }
+    } catch {
+      // apps/ may not exist yet — nothing to clean.
+    }
     appsDir = join(repoRoot, 'apps', `cov-tsf-${process.pid}-${Date.now()}`)
     mkdirSync(join(appsDir, 'src'), { recursive: true })
     writeFileSync(
