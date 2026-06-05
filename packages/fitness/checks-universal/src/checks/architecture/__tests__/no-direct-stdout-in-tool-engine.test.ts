@@ -41,8 +41,8 @@ describe('analyzeDirectStdout', () => {
     // The framework's `strip-strings` contentFilter blanks string + comment
     // bodies; what reaches `analyze` no longer contains the literal call text.
     // Simulate the filtered line: the offending text is gone.
-    const filteredComment = '//' // "process.stdout" body removed by the filter
-    const filteredString = 'const msg = ""' // "console.log(...)" body removed
+    const filteredComment = '//' // the stdout-write text is blanked by the filter
+    const filteredString = 'const msg = ""' // the console-call text is blanked by the filter
     expect(analyzeDirectStdout(filteredComment)).toHaveLength(0)
     expect(analyzeDirectStdout(filteredString)).toHaveLength(0)
   })

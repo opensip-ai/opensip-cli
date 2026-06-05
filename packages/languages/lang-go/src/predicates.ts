@@ -1,3 +1,4 @@
+// @fitness-ignore-file duplicate-utility-functions -- ADR-0010: the per-language tree-sitter vocabulary intentionally shares helper names across lang-* with grammar-specific implementations; consolidating would defeat the substrate design.
 /**
  * v1 per-language node-kind predicates for Go (ADR-0010). The generic
  * traversal/position helpers live in `@opensip-tools/tree-sitter`; only the
