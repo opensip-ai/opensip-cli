@@ -46,6 +46,12 @@ export interface GraphCommandOptions {
   readonly reportTo?: string;
   readonly apiKey?: string;
   /**
+   * `--profile <path>`: write a stage-timing JSON artifact for this run.
+   * Intended for cold-start diagnostics; relative paths resolve against
+   * `cwd`.
+   */
+  readonly profileOutput?: string;
+  /**
    * Positional `[paths...]`. Empty/undefined means whole-project scope.
    * Each path must be an existing directory (absolute or relative to
    * `cwd`). Multiple paths run sequentially in-process and aggregate
