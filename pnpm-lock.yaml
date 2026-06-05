@@ -634,9 +634,12 @@ importers:
       '@opensip-tools/graph-adapter-common':
         specifier: workspace:*
         version: link:../graph-adapter-common
-      web-tree-sitter:
-        specifier: 0.25.10
-        version: 0.25.10
+      '@opensip-tools/lang-python':
+        specifier: workspace:*
+        version: link:../../languages/lang-python
+      '@opensip-tools/tree-sitter':
+        specifier: workspace:*
+        version: link:../../tree-sitter
     devDependencies:
       '@types/node':
         specifier: ^22.19.19

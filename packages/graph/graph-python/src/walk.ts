@@ -59,7 +59,7 @@ import type {
   WalkInput,
   WalkOutput,
 } from '@opensip-tools/graph';
-import type { Node } from 'web-tree-sitter';
+import type { Node } from '@opensip-tools/tree-sitter';
 
 const TEST_PATH_RE = /(?:^|\/)tests?\//;
 const TEST_FILE_NAME_RE = /(?:^|\/)test_[^/]+\.py$|_test\.py$/;

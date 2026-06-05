@@ -26,7 +26,7 @@ import { childrenOf, namedChildrenOf } from '@opensip-tools/graph-adapter-common
 
 import type { PythonParsedFile } from './parse.js';
 import type { DependencySiteRecord } from '@opensip-tools/graph';
-import type { Node } from 'web-tree-sitter';
+import type { Node } from '@opensip-tools/tree-sitter';
 
 export function collectDependencySites(
   file: PythonParsedFile,

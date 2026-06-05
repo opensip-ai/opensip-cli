@@ -29,6 +29,8 @@ export {
   type TreeSitterParsedProject,
 } from './parse.js';
 
+export { createParseProjectFromAdapter } from './parse-from-adapter.js';
+
 export {
   hashConfig,
   makeConfigCacheKey,
