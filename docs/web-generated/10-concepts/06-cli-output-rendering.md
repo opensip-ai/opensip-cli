@@ -86,7 +86,13 @@ presentation primitives.
   `schemaVersion: 2`) with its own `emitEnvelope` seam (the shared
   `formatSignalJson` formatter at the composition root, ADR-0011); it does
   not go through the view-model. See [Contract surfaces](/docs/opensip-tools/10-concepts/04-contract-surfaces/).
-- **Live progress views** (the animated `fit`/`graph` runners) are
-  inherently TTY-only and render directly with cli-ui primitives. A non-TTY
-  run falls back to the static, dual-rendered result. Expressing a live
-  view's final frame through the view-model is tracked future work.
+- **Live progress views** (the animated `fit`, `graph`, and `sim` runners) are
+  inherently TTY-only and render directly with cli-ui primitives. All three
+  share one renderer — `<LiveProgress>` (ADR-0016), driven by a universal
+  `ProgressEvent` stream in two modes: a *phases* checklist (graph's fixed
+  pipeline stages) and a *pool* spinner + `completed/total` counter (fit's
+  checks, sim's scenarios). `graph` keeps its spinner animating during its
+  heavy `resolve` stage by yielding to the event loop cooperatively, so it stays
+  in-process and host-agnostic. A non-TTY run falls back to the static,
+  dual-rendered result. Expressing a live view's final frame through the
+  view-model is tracked future work.
