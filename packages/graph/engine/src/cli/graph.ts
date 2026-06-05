@@ -43,6 +43,7 @@ import { buildGraphSessionPayload } from '../persistence/session-payload.js';
 import { resolveRecipeToRules } from '../recipes/resolve.js';
 import { mapOpenSipRuleIdToEngineSlug } from '../render/rule-id-mapping.js';
 
+import { applyGraphSuppressions } from './apply-suppressions.js';
 import { buildGraphEnvelope } from './build-envelope.js';
 import { detectLanguages } from './detect.js';
 import { runCatalogJsonMode, runGateMode } from './graph-modes.js';
@@ -455,19 +456,26 @@ function envelopeFor(
 // emit cloud signals).
 export async function dispatchGraphResult(
   opts: GraphCommandOptions,
-  result: Awaited<ReturnType<typeof runGraph>>,
+  rawResult: Awaited<ReturnType<typeof runGraph>>,
   cli: ToolCliContext,
   startedAt: string,
 ): Promise<SignalEnvelope | undefined> {
   const durationMs = Math.max(0, Date.now() - Date.parse(startedAt));
+  // ADR-0014: apply @graph-ignore inline waivers BEFORE any mode consumes the
+  // signals — the gate baseline, catalog, render, and session persistence all
+  // see the post-waiver set. `--workspace` is covered transitively: each child
+  // runs `graph --json` through this function, so the parent aggregates
+  // already-waived signals.
+  const { kept, suppressedCount } = await applyGraphSuppressions(rawResult.signals, opts.cwd);
+  const result = { ...rawResult, signals: kept };
   if (opts.gateSave === true || opts.gateCompare === true) {
     await runGateMode(opts, result.signals, cli, result.catalog?.resolutionMode);
-    logger.info({ evt: EVT_GRAPH_COMPLETE, module: MODULE_GRAPH_CLI });
+    logger.info({ evt: EVT_GRAPH_COMPLETE, module: MODULE_GRAPH_CLI, suppressed: suppressedCount });
     return envelopeFor(opts, result, durationMs);
   }
   if (typeof opts.catalogOutput === 'string' && opts.catalogOutput.length > 0) {
     runCatalogJsonMode(opts, result, cli, startedAt);
-    logger.info({ evt: EVT_GRAPH_COMPLETE, module: MODULE_GRAPH_CLI });
+    logger.info({ evt: EVT_GRAPH_COMPLETE, module: MODULE_GRAPH_CLI, suppressed: suppressedCount });
     return envelopeFor(opts, result, durationMs);
   }
   const envelope = await renderGraphResult(opts, result, startedAt, cli);
@@ -487,6 +495,7 @@ export async function dispatchGraphResult(
     evt: EVT_GRAPH_COMPLETE,
     module: MODULE_GRAPH_CLI,
     signals: result.signals.length,
+    suppressed: suppressedCount,
   });
   // Plain `--json` is the workspace-child carrier: it returns `undefined` so
   // the root does not cloud-emit per child (the parent owns the dashboard

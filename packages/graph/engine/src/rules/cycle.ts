@@ -83,6 +83,11 @@ export const cycleRule = defineRule({
             // signal: the distinct packages this cross-package SCC spans
             // (undefined for an intra-package cycle).
             relatedPackageCycle: spannedPackages,
+            // Every member's source location (ADR-0014): a `@graph-ignore`
+            // directive above ANY member waives this one-per-SCC finding, not
+            // only the computed anchor line. Metadata is not fingerprinted, so
+            // this is baseline-neutral.
+            memberLocations: memberLocations(scc, indexes),
           },
         }),
       );
@@ -152,4 +157,21 @@ function packagesOf(scc: SccFeatures, indexes: Indexes): readonly string[] {
     if (occ) packages.add(pkgOf(occ));
   }
   return [...packages].sort();
+}
+
+/**
+ * Every resolvable member's `{ file, line }` — the candidate locations a
+ * `@graph-ignore` directive may target to waive this SCC (ADR-0014). Consumed
+ * by graph's suppression `locate()` so a directive above any member matches.
+ */
+function memberLocations(
+  scc: SccFeatures,
+  indexes: Indexes,
+): readonly { readonly file: string; readonly line: number }[] {
+  const locations: { file: string; line: number }[] = [];
+  for (const hash of scc.members) {
+    const occ = indexes.byBodyHash.get(hash);
+    if (occ?.filePath) locations.push({ file: occ.filePath, line: occ.line });
+  }
+  return locations;
 }
