@@ -161,6 +161,23 @@ function register(cli: ToolCliContext): void {
     );
   });
 
+  // Mount each subcommand block. Order preserved exactly (graph,
+  // graph-lookup, graph-shard-worker, graph-symbol-index,
+  // graph-baseline-export, catalog-export, sarif-export, graph-recipes)
+  // — the blocks were extracted verbatim into focused helpers below to
+  // keep this orchestrator readable (graph:large-function).
+  registerGraphCommand(program, cli);
+  registerGraphLookupCommand(program, cli);
+  registerGraphShardWorkerCommand(program, cli);
+  registerGraphSymbolIndexCommand(program, cli);
+  registerGraphBaselineExportCommand(program, cli);
+  registerGraphCatalogExportCommand(program, cli);
+  registerGraphSarifExportCommand(program, cli);
+  registerGraphRecipesCommand(program, cli);
+}
+
+/** Mount the unified `graph` subcommand (rules, entry points, catalog summary). */
+function registerGraphCommand(program: CliProgram, cli: ToolCliContext): void {
   program
     .command(GRAPH.name)
     .description(GRAPH.description)
@@ -318,7 +335,10 @@ function register(cli: ToolCliContext): void {
         });
       }
     });
+}
 
+/** Mount `graph-lookup` — look up function occurrences by simple name. */
+function registerGraphLookupCommand(program: CliProgram, cli: ToolCliContext): void {
   program
     .command(GRAPH_LOOKUP.name)
     .description(GRAPH_LOOKUP.description)
@@ -327,7 +347,10 @@ function register(cli: ToolCliContext): void {
     .action(async (name: string, opts: { json?: boolean }) => {
       await executeLookup({ name, json: opts.json }, cli);
     });
+}
 
+/** Mount `graph-shard-worker` — [internal] build one shard from a spec file. */
+function registerGraphShardWorkerCommand(program: CliProgram, cli: ToolCliContext): void {
   program
     .command(GRAPH_SHARD_WORKER.name)
     .description(GRAPH_SHARD_WORKER.description)
@@ -335,7 +358,10 @@ function register(cli: ToolCliContext): void {
     .action((specPath: string) => {
       executeShardWorker(specPath, cli);
     });
+}
 
+/** Mount `graph-symbol-index` — emit a symbolindex.json artifact. */
+function registerGraphSymbolIndexCommand(program: CliProgram, cli: ToolCliContext): void {
   program
     .command(GRAPH_SYMBOL_INDEX.name)
     .description(GRAPH_SYMBOL_INDEX.description)
@@ -344,7 +370,10 @@ function register(cli: ToolCliContext): void {
     .action((opts: { cwd: string; out: string }) => {
       executeSymbolIndex({ cwd: opts.cwd, out: opts.out }, cli);
     });
+}
 
+/** Mount `graph-baseline-export` — export the graph gate baseline (JSON). */
+function registerGraphBaselineExportCommand(program: CliProgram, cli: ToolCliContext): void {
   program
     .command(GRAPH_BASELINE_EXPORT.name)
     .description(GRAPH_BASELINE_EXPORT.description)
@@ -372,13 +401,17 @@ function register(cli: ToolCliContext): void {
           `(${String(result.fingerprintCount)} fingerprint(s), ${String(result.bytesWritten)} bytes)\n`,
       );
     });
+}
 
-  // catalog-export — dedicated subcommand carrying the catalog-JSON
-  // renderer + machine flags (`--catalog-output`/`--tenant-id`/`--repo-id`/
-  // `--git-sha`). This is the CLI contract the opensip
-  // `EngineSubprocessPort.runCatalogExport` spawns (DEC-498). The flags live
-  // here, NOT on `graph` — the v1 `graph --catalog-output` shape was retired
-  // by the split, so docs/consumers must target `catalog-export`.
+/**
+ * Mount `catalog-export` — dedicated subcommand carrying the catalog-JSON
+ * renderer + machine flags (`--catalog-output`/`--tenant-id`/`--repo-id`/
+ * `--git-sha`). This is the CLI contract the opensip
+ * `EngineSubprocessPort.runCatalogExport` spawns (DEC-498). The flags live
+ * here, NOT on `graph` — the v1 `graph --catalog-output` shape was retired
+ * by the split, so docs/consumers must target `catalog-export`.
+ */
+function registerGraphCatalogExportCommand(program: CliProgram, cli: ToolCliContext): void {
   program
     .command(GRAPH_CATALOG_EXPORT.name)
     .description(GRAPH_CATALOG_EXPORT.description)
@@ -457,10 +490,14 @@ function register(cli: ToolCliContext): void {
         handleGraphError('catalog-export', error, cli);
       }
     });
+}
 
-  // sarif-export — runs the pipeline and writes OpenSIP-convention SARIF
-  // to a file, matching the opensip `EngineSubprocessPort.runSarifExport`
-  // contract (DEC-498). Always a full run (findings, not incremental).
+/**
+ * Mount `sarif-export` — runs the pipeline and writes OpenSIP-convention
+ * SARIF to a file, matching the opensip `EngineSubprocessPort.runSarifExport`
+ * contract (DEC-498). Always a full run (findings, not incremental).
+ */
+function registerGraphSarifExportCommand(program: CliProgram, cli: ToolCliContext): void {
   program
     .command(GRAPH_SARIF_EXPORT.name)
     .description(GRAPH_SARIF_EXPORT.description)
@@ -507,9 +544,13 @@ function register(cli: ToolCliContext): void {
         handleGraphError('sarif-export', error, cli);
       }
     });
+}
 
-  // graph-recipes — list available graph recipes (mirrors fit-recipes).
-  // Reuses the shared ListRecipesResult contract + viewListRecipes renderer.
+/**
+ * Mount `graph-recipes` — list available graph recipes (mirrors fit-recipes).
+ * Reuses the shared ListRecipesResult contract + viewListRecipes renderer.
+ */
+function registerGraphRecipesCommand(program: CliProgram, cli: ToolCliContext): void {
   const graphRecipesCmd = program
     .command(GRAPH_RECIPES.name)
     .description(GRAPH_RECIPES.description);
