@@ -22,6 +22,15 @@ export { RunFooterHints, viewFooterHints, type RunFooterHint, type RunFooterHint
 export { sortFitRowPriority, parseValidatedCount, formatValidatedColumn, type FitRowSortKey } from './fit-table-format.js';
 export { Spinner, type SpinnerProps, useSpinner, useStandaloneSpinner } from './spinner.js';
 export { ClockProvider, type ClockProviderProps, useClock, useTick } from './clock.js';
+export { formatDuration } from './format-duration.js';
+export { LiveProgress, useProgressState, type LiveProgressProps } from './live-progress.js';
+export type {
+  ProgressEvent,
+  ProgressCallback,
+  ProgressShape,
+  ProgressStageDescriptor,
+  ProgressSurface,
+} from './progress-event.js';
 export {
   type ViewNode,
   type Span,

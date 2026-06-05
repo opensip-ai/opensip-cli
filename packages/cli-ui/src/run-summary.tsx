@@ -18,6 +18,7 @@
 import { Box } from 'ink';
 import React from 'react';
 
+import { formatDuration } from './format-duration.js';
 import { renderToInk } from './render-to-ink.js';
 import { line, type Span, type ViewNode } from './view-model.js';
 
@@ -27,11 +28,6 @@ export interface RunSummaryProps {
   readonly errors: number;
   readonly warnings: number;
   readonly durationMs: number;
-}
-
-function formatDuration(ms: number): string {
-  if (ms < 1000) return `${ms}ms`;
-  return `${(ms / 1000).toFixed(1)}s`;
 }
 
 /**
