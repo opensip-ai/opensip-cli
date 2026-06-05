@@ -165,7 +165,7 @@ describe('registerPlugins — action bodies', () => {
     registerPlugins(program, ctx);
 
     await program.parseAsync(['plugin', 'add', '@my-co/foo', '--cwd', '/p', '--domain', 'fit'], { from: 'user' });
-    expect(pluginAdd).toHaveBeenCalledWith('@my-co/foo', '/p', 'fit', ctx.pluginLayouts);
+    expect(pluginAdd).toHaveBeenCalledWith('@my-co/foo', '/p', 'fit', ctx.pluginLayouts, { project: false });
   });
 
   it('plugin remove: forwards the positional arg, --domain, and effectiveCwd', async () => {
@@ -174,7 +174,7 @@ describe('registerPlugins — action bodies', () => {
     registerPlugins(program, ctx);
 
     await program.parseAsync(['plugin', 'remove', '@my-co/foo', '--cwd', '/p', '--domain', 'sim'], { from: 'user' });
-    expect(pluginRemove).toHaveBeenCalledWith('@my-co/foo', '/p', 'sim', ctx.pluginLayouts);
+    expect(pluginRemove).toHaveBeenCalledWith('@my-co/foo', '/p', 'sim', ctx.pluginLayouts, { project: false });
   });
 
   it('plugin sync: forwards --domain and effectiveCwd', async () => {

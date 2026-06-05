@@ -140,7 +140,7 @@ export const tool = {
 };
 ```
 
-Once the package is installed under `node_modules` (project-pinned via `plugin add` or transitively via a regular dependency), the CLI picks it up at next launch. No config edit, no code change in `cli` or `core`.
+Once the package is installed, the CLI picks it up at next launch — no config edit, no code change in `cli` or `core`. Discovery walks, in precedence order: the project's `.runtime/plugins/tool/` (from `plugin add --project`), the project tree's `node_modules` (a plain `npm install`), the user-global `~/.opensip-tools/plugins/tool/` (the default `plugin add`, available in every project), and the CLI's own install tree (`npm i -g`). A project-local pin shadows a user-global install of the same tool.
 
 ---
 

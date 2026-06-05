@@ -33,15 +33,18 @@ export type {
 } from './package-entry.js'
 export {
   discoverToolPackages,
+  discoverToolPackagesFromAnchors,
   readToolPackageMetadata,
 } from './tool-package-discovery.js'
 export type {
   ToolPackageDiscoveryOptions,
+  ToolDiscoverySource,
   DiscoveredToolPackage,
   ToolPackageMetadata,
 } from './tool-package-discovery.js'
 export {
   discoverPackagesByMarker,
+  discoverPackagesInNodeModules,
   isMarkerKind,
   readMarkerKind,
   MARKER_KINDS,

@@ -192,6 +192,78 @@ describe('schema-version skew', () => {
   });
 });
 
+describe('full Tool-plugin install path (audit P1b)', () => {
+  const FIXTURE_TOOL = join(__dirname, 'fixtures', 'tool-plugin');
+  const TOOL_PKG = join('@opensip-tools-fixture', 'tool-demo');
+
+  // A throwaway HOME so the user-global install (~/.opensip-tools/...) lands
+  // in a temp dir, never the real home. resolveUserPaths() reads homedir().
+  function withFreshHome(): { home: string; env: Record<string, string> } {
+    const home = realpathSync(mkdtempSync(join(tmpdir(), 'opensip-e2e-home-')));
+    return { home, env: { HOME: home, USERPROFILE: home } };
+  }
+
+  function writeProject(): void {
+    writeFileSync(join(testDir, 'opensip-tools.config.yml'), 'schemaVersion: 1\ntargets: {}\n', 'utf8');
+  }
+
+  it('`plugin add <tool>` installs user-global and the subcommand works in the project', () => {
+    writeProject();
+    const { home, env } = withFreshHome();
+    try {
+      const add = runCli(['plugin', 'add', FIXTURE_TOOL, '--json'], testDir, env);
+      expect(add.exitCode).toBe(0);
+      expect((JSON.parse(add.stdout) as { success?: boolean }).success).toBe(true);
+      // Landed in the user-global tool host dir, NOT a fit/sim domain dir,
+      // and NO config entry was written (tools auto-discover by marker).
+      expect(existsSync(join(home, '.opensip-tools', 'plugins', 'tool', 'node_modules', TOOL_PKG))).toBe(true);
+      expect(readFileSync(join(testDir, 'opensip-tools.config.yml'), 'utf8')).not.toContain('tool-demo');
+
+      // Discovered + mounted: top-level help lists the new subcommand …
+      expect(runCli(['--help'], testDir, env).stdout).toContain('audit-demo');
+      // … and it actually runs.
+      const ran = runCli(['audit-demo'], testDir, env);
+      expect(ran.exitCode).toBe(0);
+      expect(ran.stdout).toContain('audit-demo ran');
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it('`plugin add <tool> --project` installs project-local (.runtime/) only', () => {
+    writeProject();
+    const { home, env } = withFreshHome();
+    try {
+      const add = runCli(['plugin', 'add', FIXTURE_TOOL, '--project', '--json'], testDir, env);
+      expect(add.exitCode).toBe(0);
+      expect(
+        existsSync(join(testDir, 'opensip-tools', '.runtime', 'plugins', 'tool', 'node_modules', TOOL_PKG)),
+      ).toBe(true);
+      // Did NOT install user-global.
+      expect(existsSync(join(home, '.opensip-tools', 'plugins', 'tool'))).toBe(false);
+      const ran = runCli(['audit-demo'], testDir, env);
+      expect(ran.exitCode).toBe(0);
+      expect(ran.stdout).toContain('audit-demo ran');
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it('`plugin list` reports an installed tool plugin under the `tool` domain', () => {
+    writeProject();
+    const { home, env } = withFreshHome();
+    try {
+      runCli(['plugin', 'add', FIXTURE_TOOL, '--json'], testDir, env);
+      const list = runCli(['plugin', 'list', '--json'], testDir, env);
+      expect(list.exitCode).toBe(0);
+      const plugins = (JSON.parse(list.stdout) as { plugins: { domain: string; namespace: string }[] }).plugins;
+      expect(plugins.some((p) => p.domain === 'tool' && p.namespace.includes('tool-demo'))).toBe(true);
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('no-side-effects', () => {
   it('uninstall --project --dry-run does NOT open the SQLite datastore', () => {
     writeFileSync(join(testDir, 'opensip-tools.config.yml'), 'schemaVersion: 1\ntargets: {}\n', 'utf8');

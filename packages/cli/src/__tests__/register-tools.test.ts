@@ -153,7 +153,7 @@ describe('discoverAndRegisterToolPackages', () => {
     const empty = mkdtempSync(join(tmpdir(), 'opensip-discover-test-'));
     try {
       await expect(
-        discoverAndRegisterToolPackages(registry, { projectDir: empty }),
+        discoverAndRegisterToolPackages(registry, { sources: [{ dir: empty, mode: 'walkUp' }] }),
       ).resolves.toBeUndefined();
     } finally {
       rmSync(empty, { recursive: true, force: true });
@@ -217,7 +217,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
       }),
     );
     const registry = new ToolRegistryClass();
-    await discoverAndRegisterToolPackages(registry, { projectDir: CLI_PKG_ROOT });
+    await discoverAndRegisterToolPackages(registry, { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] });
     expect(registry.get('fixture-valid')).toBeDefined();
   });
 
@@ -237,7 +237,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
     const registry = new ToolRegistryClass();
     const restore = silenceStderr();
     try {
-      await discoverAndRegisterToolPackages(registry, { projectDir: CLI_PKG_ROOT });
+      await discoverAndRegisterToolPackages(registry, { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] });
     } finally {
       restore();
     }
@@ -259,7 +259,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
       }),
     );
     const registry = new ToolRegistryClass();
-    await discoverAndRegisterToolPackages(registry, { projectDir: CLI_PKG_ROOT });
+    await discoverAndRegisterToolPackages(registry, { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] });
     // The built-in id is skipped before registration ⇒ nothing added.
     expect(registry.list()).toHaveLength(0);
   });
@@ -281,7 +281,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
     const restore = silenceStderr();
     try {
       await expect(
-        discoverAndRegisterToolPackages(registry, { projectDir: CLI_PKG_ROOT }),
+        discoverAndRegisterToolPackages(registry, { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] }),
       ).resolves.toBeUndefined();
     } finally {
       restore();

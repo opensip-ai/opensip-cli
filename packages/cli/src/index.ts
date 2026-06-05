@@ -63,6 +63,7 @@ async function main(): Promise<void> {
     langRegistry,
     toolRegistry,
     projectDir: dirname(dirname(fileURLToPath(import.meta.url))),
+    cwd: process.cwd(),
     cliEntryUrl: import.meta.url,
   });
 

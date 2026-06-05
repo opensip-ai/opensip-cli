@@ -19,6 +19,9 @@
  *
  *   ~/.opensip-tools/                           ← USER-LEVEL (cross-project)
  *     config.yml                                ← cloud API key, defaults
+ *     plugins/tool/node_modules/                ← user-global Tool plugins
+ *                                                 (whole subcommands;
+ *                                                 available in every project)
  *
  * Every consumer (logger, persistence/store, gate, plugin loader,
  * configure command, uninstall command) constructs paths through this
@@ -111,6 +114,15 @@ export interface UserPaths {
   /** ~/.opensip-tools/config.yml — cloud API key + per-user defaults. */
   readonly configFile: string;
   /**
+   * `~/.opensip-tools/plugins/<domain>` — user-global (cross-project)
+   * npm-installed plugins. Used today by the `tool` domain: a Tool plugin
+   * is a whole subcommand, so a user-global install makes it available in
+   * every project (like `npm i -g`), unlike fit/sim packs which are
+   * project-committed. Generic over domain for symmetry with
+   * `ProjectPaths.pluginsDir`.
+   */
+  readonly pluginsDir: (domain: string) => string;
+  /**
    * ~/.opensip-tools/update-state.json — tool-generated cache of the
    * last-known newer published version, so the "update available" notice can
    * persist across runs instead of showing once. NOT user-authored: written
@@ -127,5 +139,6 @@ export function resolveUserPaths(): UserPaths {
     userHomeDir,
     configFile: join(userHomeDir, 'config.yml'),
     updateStateFile: join(userHomeDir, 'update-state.json'),
+    pluginsDir: (domain) => join(userHomeDir, 'plugins', domain),
   };
 }

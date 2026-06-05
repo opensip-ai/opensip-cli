@@ -4,7 +4,12 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { discoverToolPackages, readToolPackageMetadata } from '../tool-package-discovery.js';
+import { discoverPackagesInNodeModules } from '../marker-discovery.js';
+import {
+  discoverToolPackages,
+  discoverToolPackagesFromAnchors,
+  readToolPackageMetadata,
+} from '../tool-package-discovery.js';
 
 let testDir: string;
 
@@ -82,6 +87,69 @@ describe('discoverToolPackages', () => {
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, 'package.json'), '{not-json');
     expect(discoverToolPackages({ projectDir: testDir })).toEqual([]);
+  });
+});
+
+describe('discoverPackagesInNodeModules (single-dir scan, no walk-up)', () => {
+  it('finds a tool in the exact node_modules dir', () => {
+    writePkg(join(testDir, 'host', 'node_modules', '@my', 'audit'), {
+      name: '@my/audit',
+      opensipTools: { kind: 'tool' },
+    });
+    const out = discoverPackagesInNodeModules(join(testDir, 'host', 'node_modules'), 'tool');
+    expect(out.map((t) => t.name)).toEqual(['@my/audit']);
+  });
+
+  it('does NOT walk up into ancestor node_modules', () => {
+    // A tool in an ANCESTOR node_modules must be invisible to the single-dir
+    // scan (this is the property that keeps a host-dir scan from pulling in
+    // $HOME/node_modules).
+    writePkg(join(testDir, 'node_modules', 'ancestor-tool'), {
+      name: 'ancestor-tool',
+      opensipTools: { kind: 'tool' },
+    });
+    const emptyHost = join(testDir, 'host', 'node_modules');
+    mkdirSync(emptyHost, { recursive: true });
+    expect(discoverPackagesInNodeModules(emptyHost, 'tool')).toEqual([]);
+  });
+
+  it('returns [] when the dir does not exist', () => {
+    expect(discoverPackagesInNodeModules(join(testDir, 'nope'), 'tool')).toEqual([]);
+  });
+});
+
+describe('discoverToolPackagesFromAnchors', () => {
+  it('merges walkUp + scanDir sources, first-occurrence-wins on duplicate name', () => {
+    // Project-local host dir (scanDir) pins audit@local; the cwd walk also
+    // sees a different copy — the earlier source wins.
+    writePkg(join(testDir, 'proj', '.runtime', 'plugins', 'tool', 'node_modules', 'audit'), {
+      name: 'audit',
+      opensipTools: { kind: 'tool' },
+    });
+    writePkg(join(testDir, 'cwd', 'node_modules', 'audit'), {
+      name: 'audit',
+      opensipTools: { kind: 'tool' },
+    });
+    writePkg(join(testDir, 'cwd', 'node_modules', 'other'), {
+      name: 'other',
+      opensipTools: { kind: 'tool' },
+    });
+
+    const out = discoverToolPackagesFromAnchors([
+      { dir: join(testDir, 'proj', '.runtime', 'plugins', 'tool'), mode: 'scanDir' },
+      { dir: join(testDir, 'cwd'), mode: 'walkUp' },
+    ]);
+    expect(out.map((t) => t.name).sort()).toEqual(['audit', 'other']);
+    // First source (project-local scanDir) wins for the duplicate name.
+    expect(out.find((t) => t.name === 'audit')?.packageDir).toBe(
+      join(testDir, 'proj', '.runtime', 'plugins', 'tool', 'node_modules', 'audit'),
+    );
+  });
+
+  it('returns [] when no source yields a tool', () => {
+    expect(
+      discoverToolPackagesFromAnchors([{ dir: join(testDir, 'empty'), mode: 'walkUp' }]),
+    ).toEqual([]);
   });
 });
 

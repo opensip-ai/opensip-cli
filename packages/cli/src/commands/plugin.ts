@@ -42,11 +42,16 @@
 
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 
 import {
+  discoverPackagesInNodeModules,
+  isMarkerKind,
+  readMarkerKind,
   readProjectPluginsList,
   resolveProjectPaths,
+  resolveUserPaths,
+  type MarkerKind,
   type PluginLayout,
 } from '@opensip-tools/core';
 
@@ -57,6 +62,8 @@ import {
 } from './plugin/config-edit.js';
 import {
   ensurePluginHostDir,
+  ensureUserPluginHostDir,
+  extractNameFromSpec,
   findInstalledName,
   HOST_PACKAGE_JSON,
   installMissingPeers,
@@ -65,6 +72,31 @@ import {
 } from './plugin/host-dir.js';
 
 import type { PluginInfo, PluginResult, SyncEntry } from '@opensip-tools/contracts';
+
+/**
+ * Pseudo-domain for full Tool plugins (whole subcommands). Distinct from
+ * the fit/sim plugin DOMAINS (which are project-committed + listed in
+ * `plugins.<domain>` config): a Tool plugin auto-discovers by its
+ * `opensipTools.kind: "tool"` marker, needs NO config entry, and installs
+ * user-global by default (`~/.opensip-tools/plugins/tool`) so the
+ * subcommand is available in every project — or project-local
+ * (`.runtime/plugins/tool`) with `--project`.
+ */
+const TOOL_DOMAIN = 'tool';
+
+/**
+ * CommandResult discriminator literals. `as const` keeps the literal type
+ * (so the PluginResult union still narrows) while satisfying
+ * sonarjs/no-duplicate-string — no scattered eslint-disable needed.
+ */
+const PLUGIN_ADD = 'plugin-add' as const;
+const PLUGIN_REMOVE = 'plugin-remove' as const;
+
+/** Options shared by `plugin add`/`remove` for Tool-plugin scope selection. */
+export interface PluginScopeOpts {
+  /** Install/remove a Tool plugin in the project-local host dir instead of user-global. */
+  readonly project?: boolean;
+}
 
 // =============================================================================
 // VALIDATION HELPERS
@@ -106,6 +138,98 @@ function resolveDomain(
 }
 
 /**
+ * Detect a package's `opensipTools.kind` BEFORE installing, so `plugin add`
+ * can route a Tool plugin to its host dir rather than a fit/sim domain.
+ *
+ *  - Local-path specs (`.`/`/`/`file:`): read the target's package.json
+ *    directly — free and offline.
+ *  - Registry specs: `npm view <name> opensipTools.kind` (one network
+ *    call; `plugin add` is already online for the install).
+ *
+ * Returns undefined when undetectable (offline, private registry, no
+ * marker) — the caller then falls back to fit/sim domain inference.
+ */
+function detectPluginKind(spec: string, cwd: string): MarkerKind | undefined {
+  if (spec.startsWith('/') || spec.startsWith('.') || spec.startsWith('file:')) {
+    const raw = spec.startsWith('file:') ? spec.slice('file:'.length) : spec;
+    return readMarkerKind(isAbsolute(raw) ? raw : join(cwd, raw));
+  }
+  try {
+    const name = extractNameFromSpec(spec) ?? spec;
+    const out = execFileSync('npm', ['view', name, 'opensipTools.kind'], {
+      cwd,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+      .toString()
+      .trim();
+    return isMarkerKind(out) ? out : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Decide whether `plugin add/remove <spec>` targets a Tool plugin:
+ * explicit `--domain tool`, or (when no `--domain` is given) a detected
+ * `kind: "tool"` marker. An explicit fit/sim `--domain` is honoured as-is.
+ */
+function isToolTarget(domainOverride: string | undefined, spec: string, cwd: string): boolean {
+  if (domainOverride === TOOL_DOMAIN) return true;
+  if (domainOverride !== undefined) return false;
+  return detectPluginKind(spec, cwd) === 'tool';
+}
+
+type InstallOutcome = { readonly ok: true; readonly installedName: string } | { readonly ok: false; readonly error: string };
+
+/**
+ * `npm install --ignore-scripts <spec>` into a plugin host dir, then
+ * resolve the real installed name and auto-install peers. Shared by the
+ * fit/sim domain path and the Tool-plugin path.
+ *
+ * --ignore-scripts: plugins run via dynamic import() at tool time; they
+ * don't legitimately need install-time code execution. Blocks supply-chain
+ * attacks via postinstall hooks. npm's stdout is routed to stderr so JSON
+ * renderers (which own process stdout) are not contaminated.
+ */
+function npmInstallIntoHost(dir: string, packageName: string): InstallOutcome {
+  const depsBefore = readHostDependencies(dir);
+  try {
+    execFileSync('npm', ['install', '--ignore-scripts', packageName], {
+      cwd: dir,
+      stdio: ['ignore', process.stderr, process.stderr],
+    });
+    const resolvedName = findInstalledName(dir, packageName, depsBefore);
+    const isLocalPathSpec =
+      packageName.startsWith('/') || packageName.startsWith('.') || packageName.startsWith('file:');
+    if (!resolvedName && isLocalPathSpec) {
+      return {
+        ok: false,
+        error: `Installed '${packageName}' but could not resolve the installed package name from package.json. The install was not recorded; remove and retry.`,
+      };
+    }
+    installMissingPeers(dir, packageName, depsBefore);
+    return { ok: true, installedName: resolvedName ?? packageName };
+  } catch (error) {
+    return { ok: false, error: `Failed to add ${packageName}: ${error instanceof Error ? error.message : String(error)}` };
+  }
+}
+
+/**
+ * Install a Tool plugin into its host dir (user-global by default,
+ * project-local with `--project`). No `plugins.<domain>` config entry —
+ * Tool plugins auto-discover by their `kind: "tool"` marker.
+ */
+function addToolPlugin(packageName: string, cwd: string, project: boolean): PluginResult {
+  const dir = project ? ensurePluginHostDir(TOOL_DOMAIN, cwd) : ensureUserPluginHostDir(TOOL_DOMAIN);
+  const outcome = npmInstallIntoHost(dir, packageName);
+  if (!outcome.ok) {
+    return { type: PLUGIN_ADD, packageName, success: false, error: outcome.error };
+  }
+  return { type: PLUGIN_ADD, packageName: outcome.installedName, success: true };
+}
+
+/**
  * Test-only export for the YAML-driven config edit so unit tests can
  * exercise the round-trip behaviour without spawning npm. Intentionally
  * not part of the public CLI API surface.
@@ -135,6 +259,21 @@ export async function pluginList(
     }
   }
 
+  // Tool plugins are not a fit/sim layout — they auto-discover by marker
+  // from the user-global host dir and (with --project) the project-local
+  // one. Dedup by name; a project-local pin shadows a user-global install.
+  const seenTools = new Set<string>();
+  for (const dir of [
+    resolveProjectPaths(cwd).pluginsDir(TOOL_DOMAIN),
+    resolveUserPaths().pluginsDir(TOOL_DOMAIN),
+  ]) {
+    for (const pkg of discoverPackagesInNodeModules(join(dir, 'node_modules'), 'tool')) {
+      if (seenTools.has(pkg.name)) continue;
+      seenTools.add(pkg.name);
+      plugins.push({ domain: TOOL_DOMAIN, namespace: pkg.name, pluginType: 'package' });
+    }
+  }
+
   return {
     type: 'plugin-list',
     plugins,
@@ -153,20 +292,17 @@ export async function pluginList(
  * "install" alone always incomplete. Single-step is the only sensible
  * default.
  */
-/* eslint-disable sonarjs/no-duplicate-string -- 'plugin-add' is the
- * CommandResult discriminator literal; factoring it into a constant
- * would defeat the type narrowing on the union arm.
- */
 // eslint-disable-next-line @typescript-eslint/require-await -- async to keep the Promise<PluginResult> contract; npm install is synchronous via execFileSync
 export async function pluginAdd(
   packageName: string | undefined,
   cwd: string = process.cwd(),
   domainOverride?: string,
   layouts: readonly PluginLayout[] = [],
+  scope: PluginScopeOpts = {},
 ): Promise<PluginResult> {
   if (!packageName) {
     return {
-      type: 'plugin-add',
+      type: PLUGIN_ADD,
       packageName: '',
       success: false,
       error: 'No package name provided. Usage: opensip-tools plugin add <package-name>',
@@ -174,102 +310,83 @@ export async function pluginAdd(
   }
   if (!isSafeNpmSpec(packageName)) {
     return {
-      type: 'plugin-add',
+      type: PLUGIN_ADD,
       packageName,
       success: false,
       error: `Invalid package spec '${packageName}' — must not start with '-' (would be interpreted as an npm flag)`,
     };
   }
+
+  // Tool-plugin path: install into the user-global (or --project) tool host
+  // dir, no config entry (tools auto-discover by marker).
+  if (isToolTarget(domainOverride, packageName, cwd)) {
+    return addToolPlugin(packageName, cwd, scope.project === true);
+  }
+
+  // fit/sim domain path: install into the project-local domain host dir and
+  // record in plugins.<domain> so discovery loads it.
   const domains = domainNames(layouts);
   const domain = resolveDomain(domainOverride, packageName, domains);
   if (!domain) {
     return {
-      type: 'plugin-add',
+      type: PLUGIN_ADD,
       packageName,
       success: false,
-      error: `Invalid --domain '${String(domainOverride)}' — expected one of: ${domains.join(', ')}`,
+      error: `Invalid --domain '${String(domainOverride)}' — expected one of: ${[...domains, TOOL_DOMAIN].join(', ')}`,
     };
   }
 
   const dir = ensurePluginHostDir(domain, cwd);
-  const depsBefore = readHostDependencies(dir);
-
-  try {
-    // --ignore-scripts: refuse to execute plugin postinstall/preinstall
-    // hooks. Plugins run via dynamic import() at fit time; they don't
-    // legitimately need install-time code execution. This blocks
-    // supply-chain attacks where a malicious plugin runs arbitrary
-    // code during `npm install`.
-    // Route npm's stdout to stderr so JSON-mode renderers (which write
-    // structured output to the process stdout) are not contaminated by
-    // `npm warn ...` / `added N packages` lines. npm progress is still
-    // visible on the user's terminal because stderr is inherited.
-    execFileSync('npm', ['install', '--ignore-scripts', packageName], {
-      cwd: dir,
-      stdio: ['ignore', process.stderr, process.stderr],
-    });
-
-    // Identify the package name as recorded in package.json (handles
-    // local-path specs that don't carry a name in the spec itself).
-    // For local-path specs (`/`, `./`, `file:`), the spec itself is NOT
-    // a valid name — writing it into the config-file plugin list would
-    // cause both discovery (which expects a real npm name) and a later
-    // `plugin remove <spec>` to mis-handle the entry. If we can't
-    // resolve the installed name, fail explicitly rather than persist
-    // a broken entry.
-    const resolvedName = findInstalledName(dir, packageName, depsBefore);
-    const isLocalPathSpec =
-      packageName.startsWith('/') || packageName.startsWith('.') || packageName.startsWith('file:');
-    if (!resolvedName && isLocalPathSpec) {
-      return {
-        type: 'plugin-add',
-        packageName,
-        success: false,
-        error: `Installed '${packageName}' but could not resolve the installed package name from package.json. The config was not updated; remove and retry.`,
-      };
-    }
-    const installedName = resolvedName ?? packageName;
-
-    installMissingPeers(dir, packageName, depsBefore);
-
-    // Update the project config so discovery actually loads it.
-    const paths = resolveProjectPaths(cwd);
-    addToConfigPluginList(paths.configFile, domain, installedName);
-
-    return {
-      type: 'plugin-add',
-      packageName: installedName,
-      success: true,
-    };
-  } catch (error) {
-    return {
-      type: 'plugin-add',
-      packageName,
-      success: false,
-      error: `Failed to add ${packageName}: ${error instanceof Error ? error.message : String(error)}`,
-    };
+  const outcome = npmInstallIntoHost(dir, packageName);
+  if (!outcome.ok) {
+    return { type: PLUGIN_ADD, packageName, success: false, error: outcome.error };
   }
+  // Update the project config so discovery actually loads it.
+  addToConfigPluginList(resolveProjectPaths(cwd).configFile, domain, outcome.installedName);
+  return { type: PLUGIN_ADD, packageName: outcome.installedName, success: true };
 }
-/* eslint-enable sonarjs/no-duplicate-string */
 
 // =============================================================================
 // COMMAND: plugin remove <package>
 // =============================================================================
 
-/* eslint-disable sonarjs/no-duplicate-string -- 'plugin-remove' is the
- * CommandResult discriminator literal; factoring it into a constant
- * would defeat the type narrowing on the union arm.
- */
+/** npm-uninstall a package from a host dir. Pure of config concerns. */
+function npmUninstallFromHost(dir: string, packageName: string): boolean {
+  try {
+    execFileSync('npm', ['uninstall', packageName], {
+      cwd: dir,
+      stdio: ['ignore', process.stderr, process.stderr],
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Remove a Tool plugin from its host dir (user-global by default, --project otherwise). */
+function removeToolPlugin(packageName: string, cwd: string, project: boolean): PluginResult {
+  const dir = project ? resolveProjectPaths(cwd).pluginsDir(TOOL_DOMAIN) : resolveUserPaths().pluginsDir(TOOL_DOMAIN);
+  if (!existsSync(join(dir, HOST_PACKAGE_JSON))) {
+    return { type: PLUGIN_REMOVE, packageName, success: false, error: `No tool plugins installed in ${dir}` };
+  }
+  if (!npmUninstallFromHost(dir, packageName)) {
+    return { type: PLUGIN_REMOVE, packageName, success: false, error: `Failed to remove ${packageName}` };
+  }
+  // No config entry to clean up — tool plugins auto-discover by marker.
+  return { type: PLUGIN_REMOVE, packageName, success: true };
+}
+
 // eslint-disable-next-line @typescript-eslint/require-await -- async to keep the Promise<PluginResult> contract; npm uninstall is synchronous via execFileSync
 export async function pluginRemove(
   packageName: string | undefined,
   cwd: string = process.cwd(),
   domainOverride?: string,
   layouts: readonly PluginLayout[] = [],
+  scope: PluginScopeOpts = {},
 ): Promise<PluginResult> {
   if (!packageName) {
     return {
-      type: 'plugin-remove',
+      type: PLUGIN_REMOVE,
       packageName: '',
       success: false,
       error: 'No package name provided. Usage: opensip-tools plugin remove <package-name>',
@@ -277,21 +394,28 @@ export async function pluginRemove(
   }
   if (!isSafeNpmSpec(packageName)) {
     return {
-      type: 'plugin-remove',
+      type: PLUGIN_REMOVE,
       packageName,
       success: false,
       error: `Invalid package spec '${packageName}' — must not start with '-' (would be interpreted as an npm flag)`,
     };
   }
 
+  // Tool-plugin path: a tool removal targets the tool host dir directly.
+  // Detection by an installed package can't read a published marker, so the
+  // tool path is keyed on the explicit `--domain tool`.
+  if (domainOverride === TOOL_DOMAIN) {
+    return removeToolPlugin(packageName, cwd, scope.project === true);
+  }
+
   const domains = domainNames(layouts);
   const domain = resolveDomain(domainOverride, packageName, domains);
   if (!domain) {
     return {
-      type: 'plugin-remove',
+      type: PLUGIN_REMOVE,
       packageName,
       success: false,
-      error: `Invalid --domain '${String(domainOverride)}' — expected one of: ${domains.join(', ')}`,
+      error: `Invalid --domain '${String(domainOverride)}' — expected one of: ${[...domains, TOOL_DOMAIN].join(', ')}`,
     };
   }
 
@@ -300,34 +424,19 @@ export async function pluginRemove(
 
   if (!existsSync(join(dir, HOST_PACKAGE_JSON))) {
     return {
-      type: 'plugin-remove',
+      type: PLUGIN_REMOVE,
       packageName,
       success: false,
       error: `No plugins installed in ${domain}/`,
     };
   }
 
-  try {
-    execFileSync('npm', ['uninstall', packageName], {
-      cwd: dir,
-      stdio: ['ignore', process.stderr, process.stderr],
-    });
-    removeFromConfigPluginList(paths.configFile, domain, packageName);
-    return {
-      type: 'plugin-remove',
-      packageName,
-      success: true,
-    };
-  } catch {
-    return {
-      type: 'plugin-remove',
-      packageName,
-      success: false,
-      error: `Failed to remove ${packageName}`,
-    };
+  if (!npmUninstallFromHost(dir, packageName)) {
+    return { type: PLUGIN_REMOVE, packageName, success: false, error: `Failed to remove ${packageName}` };
   }
+  removeFromConfigPluginList(paths.configFile, domain, packageName);
+  return { type: PLUGIN_REMOVE, packageName, success: true };
 }
-/* eslint-enable sonarjs/no-duplicate-string */
 
 // =============================================================================
 // COMMAND: plugin sync (post-clone bootstrap)

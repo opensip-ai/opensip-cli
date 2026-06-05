@@ -41,6 +41,7 @@ import { registerLanguageAdapters } from './register-language-adapters.js';
 import {
   registerFirstPartyTools,
   discoverAndRegisterToolPackages,
+  buildToolDiscoverySources,
 } from './register-tools.js';
 
 import type { LanguageRegistry, ToolRegistry } from '@opensip-tools/core';
@@ -54,8 +55,17 @@ export { installPreActionHook } from './pre-action-hook.js';
 export interface BootstrapOptions {
   readonly langRegistry: LanguageRegistry;
   readonly toolRegistry: ToolRegistry;
-  /** Project directory used by `discoverToolPackages`; usually the CLI install dir. */
+  /**
+   * The CLI's own install directory. Anchors discovery of graph adapters
+   * and of tools installed as siblings of a global `opensip-tools`.
+   */
   readonly projectDir: string;
+  /**
+   * The user's working directory (process.cwd()). Anchors project-local
+   * and user-global tool discovery (a plain `npm install @tool`, the
+   * project's `.runtime/plugins/tool`, and `~/.opensip-tools/plugins/tool`).
+   */
+  readonly cwd: string;
   /**
    * `import.meta.url` of the CLI entry. Used to init telemetry as early as
    * possible (reads the CLI package version for the `service.version` resource
@@ -88,7 +98,7 @@ export async function bootstrapCli(opts: BootstrapOptions): Promise<void> {
   registerLanguageAdapters(opts.langRegistry);
   registerFirstPartyTools(opts.toolRegistry);
   await discoverAndRegisterToolPackages(opts.toolRegistry, {
-    projectDir: opts.projectDir,
+    sources: buildToolDiscoverySources(opts.cwd, opts.projectDir),
   });
   await discoverAndRegisterGraphAdapterPackages({ projectDir: opts.projectDir });
 }

@@ -95,6 +95,24 @@ export function discoverPackagesByMarker(
   return out;
 }
 
+/**
+ * Scan EXACTLY ONE `node_modules` directory for packages declaring
+ * `opensipTools.kind === kind` — no ancestor walk. Used for fixed plugin
+ * host dirs (`~/.opensip-tools/plugins/tool/node_modules`,
+ * `<project>/.runtime/plugins/tool/node_modules`) where walking up would
+ * wrongly pull in `$HOME/node_modules` or unrelated ancestor trees.
+ */
+export function discoverPackagesInNodeModules(
+  nodeModulesDir: string,
+  kind: MarkerKind,
+): DiscoveredMarkerPackage[] {
+  const out: DiscoveredMarkerPackage[] = [];
+  if (existsSync(nodeModulesDir)) {
+    collectFromNodeModules(nodeModulesDir, kind, new Set<string>(), out);
+  }
+  return out;
+}
+
 // eslint-disable-next-line sonarjs/cognitive-complexity -- node_modules walker: handles both flat and @scope/* layouts and skips invalid entries inline
 function collectFromNodeModules(
   nodeModulesDir: string,

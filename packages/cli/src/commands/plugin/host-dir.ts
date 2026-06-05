@@ -17,7 +17,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { resolveProjectPaths } from '@opensip-tools/core';
+import { resolveProjectPaths, resolveUserPaths } from '@opensip-tools/core';
 
 /** Filename of the host package.json that pins plugin installs. */
 export const HOST_PACKAGE_JSON = 'package.json';
@@ -33,11 +33,9 @@ export function isSafeNpmSpec(spec: string): boolean {
   return true;
 }
 
-export function ensurePluginHostDir(domain: string, cwd: string): string {
-  const paths = resolveProjectPaths(cwd);
-  const dir = paths.pluginsDir(domain);
+/** Create the host package.json (if absent) for a plugin host dir + return the dir. */
+function ensureHostDir(dir: string, domain: string): string {
   mkdirSync(dir, { recursive: true });
-
   const pkgJsonPath = join(dir, HOST_PACKAGE_JSON);
   if (!existsSync(pkgJsonPath)) {
     writeFileSync(
@@ -56,6 +54,20 @@ export function ensurePluginHostDir(domain: string, cwd: string): string {
     );
   }
   return dir;
+}
+
+/** Project-local plugin host dir: `<project>/opensip-tools/.runtime/plugins/<domain>`. */
+export function ensurePluginHostDir(domain: string, cwd: string): string {
+  return ensureHostDir(resolveProjectPaths(cwd).pluginsDir(domain), domain);
+}
+
+/**
+ * User-global plugin host dir: `~/.opensip-tools/plugins/<domain>`. Used by
+ * the `tool` domain so a `plugin add <tool>` makes the subcommand available
+ * across every project (the cross-project analogue of `npm i -g`).
+ */
+export function ensureUserPluginHostDir(domain: string): string {
+  return ensureHostDir(resolveUserPaths().pluginsDir(domain), domain);
 }
 
 /**
@@ -122,7 +134,7 @@ export function readHostDependencies(dir: string): Set<string> {
   return new Set(Object.keys(hostPkg?.dependencies ?? {}));
 }
 
-function extractNameFromSpec(spec: string): string | undefined {
+export function extractNameFromSpec(spec: string): string | undefined {
   if (spec.startsWith('/') || spec.startsWith('.') || spec.startsWith('file:')) return undefined;
   if (spec.startsWith('@')) {
     const withoutScope = spec.slice(1);

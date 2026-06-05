@@ -40,27 +40,31 @@ export function registerPlugins(program: Command, ctx: CliCommandsContext): void
 
   const addCmd = pluginCmd
     .command('add <package>')
-    .description('Install a plugin AND register it in opensip-tools.config.yml')
-    .option('--domain <fit|sim>', 'Target domain (default: inferred from package name)')
+    .description('Install a plugin (fit/sim pack → project config; tool → user-global by default)')
+    .option('--domain <fit|sim|tool>', 'Target domain (default: inferred; tool plugins auto-detected by marker)')
+    .option('--project', 'For a tool plugin, install project-local (.runtime/) instead of user-global', false)
     .option(CWD_OPTION_SPEC, 'Project root', process.cwd())
     .option('--json', JSON_DESC, false);
 
-  mountResultCommandWithArg<string, { domain?: string; cwd?: string; projectContext?: ProjectContext; json: boolean }>(
+  mountResultCommandWithArg<string, { domain?: string; project?: boolean; cwd?: string; projectContext?: ProjectContext; json: boolean }>(
     addCmd,
-    (packageName, opts) => pluginAdd(packageName, effectiveCwd(opts), opts.domain, ctx.pluginLayouts),
+    (packageName, opts) =>
+      pluginAdd(packageName, effectiveCwd(opts), opts.domain, ctx.pluginLayouts, { project: opts.project }),
     { ctx, jsonFlag: (opts) => opts.json },
   );
 
   const removeCmd = pluginCmd
     .command('remove <package>')
-    .description('Uninstall a plugin AND remove it from opensip-tools.config.yml')
-    .option('--domain <fit|sim>', 'Target domain (default: inferred from package name)')
+    .description('Uninstall a plugin (and remove from opensip-tools.config.yml for fit/sim packs)')
+    .option('--domain <fit|sim|tool>', 'Target domain (default: inferred from package name)')
+    .option('--project', 'For a tool plugin, target the project-local install instead of user-global', false)
     .option(CWD_OPTION_SPEC, 'Project root', process.cwd())
     .option('--json', JSON_DESC, false);
 
-  mountResultCommandWithArg<string, { domain?: string; cwd?: string; projectContext?: ProjectContext; json: boolean }>(
+  mountResultCommandWithArg<string, { domain?: string; project?: boolean; cwd?: string; projectContext?: ProjectContext; json: boolean }>(
     removeCmd,
-    (packageName, opts) => pluginRemove(packageName, effectiveCwd(opts), opts.domain, ctx.pluginLayouts),
+    (packageName, opts) =>
+      pluginRemove(packageName, effectiveCwd(opts), opts.domain, ctx.pluginLayouts, { project: opts.project }),
     { ctx, jsonFlag: (opts) => opts.json },
   );
 

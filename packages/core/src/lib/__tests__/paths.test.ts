@@ -49,5 +49,10 @@ describe('resolveUserPaths', () => {
     expect(u.userHomeDir).toBe(join(homedir(), '.opensip-tools'));
     expect(u.configFile).toBe(join(u.userHomeDir, 'config.yml'));
   });
+
+  it('places user-global plugins under ~/.opensip-tools/plugins/<domain>', () => {
+    const u = resolveUserPaths();
+    expect(u.pluginsDir('tool')).toBe(join(u.userHomeDir, 'plugins', 'tool'));
+  });
 });
 

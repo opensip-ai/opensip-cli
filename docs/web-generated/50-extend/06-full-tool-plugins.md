@@ -85,7 +85,10 @@ export const tool: Tool = {
 };
 ```
 
-That's the whole tool. `npm install @my-co/audit-sec` (or `opensip-tools plugin add @my-co/audit-sec`) and `opensip-tools audit-sec` works on the next invocation.
+That's the whole tool. Install it either way and `opensip-tools audit-sec` works on the next invocation:
+
+- **`opensip-tools plugin add @my-co/audit-sec`** — the CLI detects the `opensipTools.kind: "tool"` marker (reading a local path's `package.json`, or `npm view` for a registry spec) and installs it **user-global** into `~/.opensip-tools/plugins/tool/`, so the subcommand is available in **every** project — the cross-project analogue of `npm i -g`. Add `--project` to install it project-local under `<project>/opensip-tools/.runtime/plugins/tool/` instead (that copy is gitignored and not shared with teammates). Unlike fit/sim packs, a tool needs **no** `plugins.<domain>` config entry — it auto-discovers by its marker. (If detection can't reach the registry — offline / private — pass `--domain tool` to force the tool path.)
+- **`npm install @my-co/audit-sec`** in your project — discovery walks the project tree's `node_modules`, so a plain install is picked up too. A global `npm i -g @my-co/audit-sec` next to a global `opensip-tools` is found via the CLI's own install tree.
 
 ## What you don't need
 

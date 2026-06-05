@@ -543,17 +543,24 @@ CLI-owned: [`packages/cli/src/commands/plugin.ts`](../../../packages/cli/src/com
 ```
 opensip-tools plugin list
 opensip-tools plugin add <pkg>
-opensip-tools plugin add <pkg> --domain <fit|sim>
+opensip-tools plugin add <pkg> --domain <fit|sim|tool>
+opensip-tools plugin add <tool-pkg> --project
 opensip-tools plugin remove <pkg>
 opensip-tools plugin sync
 ```
 
 | Flag | Subcommands | Effect |
 |---|---|---|
-| `--domain <fit\|sim>` | `add`, `remove`, `sync` | Override the inferred domain (`add`/`remove`) or scope a sync to one domain (`sync`). |
+| `--domain <fit\|sim\|tool>` | `add`, `remove`, `sync` | Override the inferred domain (`add`/`remove`) or scope a sync to one domain (`sync`). `tool` selects the full-Tool-plugin path. |
+| `--project` | `add`, `remove` | For a **tool** plugin, target the project-local host dir (`.runtime/plugins/tool/`) instead of the user-global default. No effect on fit/sim packs (always project-local). |
 | `--cwd <path>` | all | Project root. Default: `process.cwd()`. |
 
-**`add`** writes to `.runtime/plugins/<domain>/node_modules/<pkg>/` and appends to `plugins.<domain>:` in `opensip-tools.config.yml`. **`remove`** is the inverse. **`list`** intersects installed and config-listed packages. **`sync`** installs everything declared in the config — the post-clone bootstrap.
+There are **two plugin shapes** with different install models:
+
+- **fit/sim packs** (`kind: "fit-pack"` / `"sim-pack"`) are **project-committed**: `add` writes to `.runtime/plugins/<domain>/node_modules/<pkg>/` **and** appends to `plugins.<domain>:` in `opensip-tools.config.yml` so teammates reproduce them via `sync`. `remove` is the inverse.
+- **full Tool plugins** (`kind: "tool"`, whole subcommands) **auto-discover by marker — no config entry**. `add` detects the kind before installing (local `package.json`, or `npm view` for a registry spec) and installs **user-global** to `~/.opensip-tools/plugins/tool/` by default (available in every project), or project-local with `--project`. Force the tool path with `--domain tool` when detection can't reach the registry. Because there's no config record, tool plugins are **not** part of `sync`.
+
+**`list`** shows fit/sim packs (installed ∩ config-listed) plus every discovered tool plugin (under the `tool` domain). **`sync`** installs everything declared in the config — the post-clone bootstrap (fit/sim only).
 
 **See also:** [`80-implementation/02-plugin-loader.md`](../80-implementation/02-plugin-loader.md).
 
