@@ -20,10 +20,9 @@
  *      scope (default scope plus any customer additions) for packages
  *      whose name matches `<scope>/scenarios-*` and return the list.
  *
- * No package is privileged. `plugins.packageScopes` is shared with
- * fitness's check-package discovery — a customer that lists `['@acme']`
- * once gets both `@acme/checks-*` and `@acme/scenarios-*` picked up,
- * which is the whole point of a single scope-level switch.
+ * No package is privileged. `plugins.packageScopes` extends the sim
+ * scenario-package scan — a customer that lists `['@acme']` gets
+ * `@acme/scenarios-*` picked up without exact per-package listing.
  *
  * The walker handles pnpm's nested node_modules layout: it looks at
  * the project's direct node_modules, then walks up to ancestor

@@ -3,7 +3,7 @@
  *
  * Plugin discovery keys off the `opensipTools.kind` marker in each
  * package's package.json. Historically some kinds were *also* discovered
- * by name prefix (`graph-*`, `checks-*`), which meant merely adding a
+ * by name prefix, which meant merely adding a
  * package under that prefix could silently change runtime discovery — that
  * is exactly how `@opensip-tools/graph-adapter-common` (shared scaffolding,
  * not an adapter) ended up being loaded as an adapter and warned on every
@@ -12,11 +12,10 @@
  * This test locks the contract at the source of truth — the real
  * package.json files in this repo — in BOTH directions:
  *
- *   - A package under a discovery prefix MUST either declare the matching
- *     marker, or be on an explicit allowlist of "intentionally not a
- *     plugin". A new `graph-*` / `checks-*` package that is neither fails
- *     here, at PR time, instead of warning (or silently misbehaving) at
- *     runtime.
+ *   - A package under a first-party plugin naming prefix MUST either declare
+ *     the matching marker, or be on an explicit allowlist of "intentionally not
+ *     a plugin". A new `graph-*` / `checks-*` package that is neither fails
+ *     here, at PR time, instead of drifting away from the marker contract.
  *   - A package on an allowlist MUST NOT declare the plugin marker — so the
  *     allowlist can never silently mask a real plugin.
  *   - Every declared `kind` must be in the closed `MARKER_KINDS` vocabulary
@@ -25,7 +24,7 @@
  *
  * The allowlists are the deliberate-intent mechanism: adding a `graph-*` or
  * `checks-*` package that is NOT a plugin forces a conscious one-line edit
- * here, with a reason, rather than an accidental discovery-behavior change.
+ * here, with a reason.
  */
 
 import { readdirSync, readFileSync } from 'node:fs';
@@ -150,7 +149,7 @@ describe('plugin-kind contract (workspace invariant)', () => {
   it('every @opensip-tools/checks-* package is a declared fit-pack or explicitly allowlisted', () => {
     const checksPrefixed = PACKAGES.filter((p) => p.name.startsWith(`${SCOPE}/checks-`));
     const offenders = checksPrefixed.filter(
-      // eslint-disable-next-line sonarjs/no-empty-collection -- NON_PACK_CHECKS_PACKAGES is a deliberate, currently-empty extension seam (ADR-0007), symmetric with the graph allowlist; a future checks-* shared lib gets added here.
+      // eslint-disable-next-line sonarjs/no-empty-collection -- NON_PACK_CHECKS_PACKAGES is a deliberate, currently-empty extension seam, symmetric with the graph allowlist; a future checks-* shared lib gets added here.
       (p) => p.kind !== 'fit-pack' && !NON_PACK_CHECKS_PACKAGES.has(p.name),
     );
     expect(

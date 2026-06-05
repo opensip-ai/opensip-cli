@@ -2,21 +2,17 @@
  * @fileoverview Shared node_modules ancestor-walk primitives for plugin
  * auto-discovery.
  *
- * Every tool's package discovery (`checks-*`, `scenarios-*`, future
- * packs) walks up the directory tree from a project root, scanning
+ * Scoped package discovery (`scenarios-*`, future packs) walks up the
+ * directory tree from a project root, scanning
  * `node_modules/<scope>/` directories — mirroring Node's nearest-ancestor
  * module resolution, which handles pnpm hoisting and monorepo layouts
  * where the scope may live in the workspace root.
  *
  * The leaf filesystem probes (`safeReaddir`, `hasPackageJson`) and the
- * explicit-name resolver (`resolvePackageDir`) were triplicated across
- * `marker-discovery.ts` (kernel), fitness's `check-package-discovery.ts`,
- * and simulation's `scenario-package-discovery.ts`. They live here now —
- * one home for the generic walk plumbing the kernel already owns. The
- * structurally-identical `autoDiscover{Checks,Scenarios}` walk bodies are
- * subsumed by `discoverScopedPackages`, parameterized by name `prefix`
- * exactly as `marker-discovery.ts` is parameterized by `kind` and
- * `scope-validation.ts` by `evt`.
+ * explicit-name resolver (`resolvePackageDir`) are shared by marker
+ * discovery, exact package resolution, and simulation's scoped scenario-pack
+ * discovery. They live here now — one home for the generic walk plumbing the
+ * kernel already owns.
  *
  * These are pure `node:fs` / `node:path` primitives — no fitness/sim
  * vocabulary leaks down into the kernel. The per-tool policy (explicit
