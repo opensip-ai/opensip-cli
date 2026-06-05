@@ -32,12 +32,11 @@ import { join } from 'node:path';
 import { runWithScope, type RunScope } from '@opensip-tools/core';
 import { makeTestScope } from '@opensip-tools/core/test-utils/with-scope.js';
 import {
-  runGraph,
-  GRAPH_STAGES,
   currentAdapterRegistry,
   graphTool,
   type GraphLanguageAdapter,
 } from '@opensip-tools/graph';
+import { runGraph, GRAPH_STAGES } from '@opensip-tools/graph/internal';
 import {
   ROOT_CONTEXT,
   context as otelContext,

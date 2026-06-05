@@ -18,3 +18,31 @@ export { alwaysThrowsBranchRule } from './rules/always-throws-branch.js';
 export { noSideEffectPathRule } from './rules/no-side-effect-path.js';
 export { duplicatedFunctionBodyRule } from './rules/duplicated-function-body.js';
 export { orphanSubtreeRule } from './rules/orphan-subtree.js';
+
+// ── Orchestration / CLI-handler surface (ADR-0009, Finding 3) ──────
+//
+// These drive the six-stage pipeline and the `graph` CLI command. The
+// production path reaches them via `graphTool.register` (and the parent
+// repo via the `catalog-export` subcommand), never by importing these
+// symbols — so they are private. Only the cross-package adapter and CLI
+// telemetry test suites import them, exercising the orchestrator end to
+// end without going through Commander.
+export { runGraph, GRAPH_STAGES } from './cli/orchestrate.js';
+export type {
+  GraphStage,
+  GraphProgressEvent,
+  GraphProgressCallback,
+  RunGraphInput,
+  RunGraphResult,
+} from './cli/orchestrate.js';
+export { executeGraph, buildUnifiedReportLines } from './cli/graph.js';
+export type { UnifiedReportInput } from './cli/graph.js';
+export { MemoryPressureError } from './cli/pressure-monitor.js';
+export {
+  HEAP_TARGETS,
+  decideHeapTargetMb,
+  systemHasMemoryFor,
+  runHeapPreflight,
+  totalSystemMemoryMb,
+} from './cli/heap-preflight.js';
+export type { Shard, ShardBuildResult } from './cli/orchestrate/shard-model.js';

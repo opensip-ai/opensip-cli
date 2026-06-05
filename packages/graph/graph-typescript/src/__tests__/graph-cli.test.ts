@@ -12,7 +12,8 @@ import { join } from 'node:path';
 
 import { enterScope, LanguageRegistry, RunScope } from '@opensip-tools/core';
 import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
-import { currentAdapterRegistry, executeGraph, graphTool } from '@opensip-tools/graph';
+import { currentAdapterRegistry, graphTool } from '@opensip-tools/graph';
+import { executeGraph } from '@opensip-tools/graph/internal';
 import { typescriptAdapter } from '@opensip-tools/lang-typescript';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 

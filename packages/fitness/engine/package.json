@@ -20,6 +20,11 @@
     ".": "./dist/index.js",
     "./internal": "./dist/internal.js"
   },
+  "publishConfig": {
+    "exports": {
+      ".": "./dist/index.js"
+    }
+  },
   "opensipTools": {
     "kind": "tool"
   },

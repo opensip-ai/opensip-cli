@@ -11,7 +11,8 @@ import { join } from 'node:path';
 
 import { enterScope, RunScope } from '@opensip-tools/core';
 import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
-import { currentAdapterRegistry, graphTool, runGraph } from '@opensip-tools/graph';
+import { currentAdapterRegistry, graphTool } from '@opensip-tools/graph';
+import { runGraph } from '@opensip-tools/graph/internal';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { typescriptGraphAdapter } from '../index.js';

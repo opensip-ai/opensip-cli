@@ -17,28 +17,21 @@ export type { GraphSubscope } from './scope-augmentation.js';
 // packages uniformly; dedup at register-tools.ts handles the
 // duplicate-id case.
 export { graphTool, graphTool as tool } from './tool.js';
-export { runGraph, GRAPH_STAGES } from './cli/orchestrate.js';
-export type {
-  GraphStage,
-  GraphProgressEvent,
-  GraphProgressCallback,
-  RunGraphInput,
-  RunGraphResult,
-} from './cli/orchestrate.js';
-export { buildUnifiedReportLines } from './cli/graph.js';
-export type { UnifiedReportInput } from './cli/graph.js';
+// Orchestration / CLI-handler / heap-preflight / shard-model / report
+// helpers (runGraph, executeGraph, GRAPH_STAGES, the heap-preflight
+// surface, MemoryPressureError, Shard*, buildUnifiedReportLines, and
+// their I/O types) are NOT public API — they are consumed only by the
+// engine itself and the cross-package adapter/telemetry test suites.
+// They moved to `@opensip-tools/graph/internal` per ADR-0009 (Finding 3):
+// the CLI drives graph via `graphTool.register`, not these symbols, and
+// the parent-repo contract spawns the `catalog-export` subcommand rather
+// than importing the orchestrator. See ./internal.ts.
 // Graph catalog persistence — exposed so consumers (e.g. fitness's
 // dashboard command) can read the catalog via a typed repo instead of
 // raw SQL against the graph_catalog table (audit 2026-05-29, H1).
+// Intentionally public per the Finding-3 audit even though the only
+// in-repo consumer today is graph's own tool.ts dashboard contribution.
 export { CatalogRepo } from './persistence/catalog-repo.js';
-export { MemoryPressureError } from './cli/pressure-monitor.js';
-export {
-  HEAP_TARGETS,
-  decideHeapTargetMb,
-  systemHasMemoryFor,
-  runHeapPreflight,
-  totalSystemMemoryMb,
-} from './cli/heap-preflight.js';
 export type {
   Catalog,
   FunctionOccurrence,
@@ -68,7 +61,8 @@ export type {
   PersistedFeatures,
   PersistedFunctionFeatures,
 } from './types.js';
-export type { Shard, ShardBuildResult } from './cli/orchestrate/shard-model.js';
+// `Shard` / `ShardBuildResult` are orchestration internals (sharded build
+// model) consumed only by tests — moved to ./internal (ADR-0009, Finding 3).
 
 // EdgeResolver, ResolverContext, InventoryVisitor, VisitorContext used
 // to live here as TS-specific re-exports. PR 1b moved them to
@@ -184,4 +178,3 @@ export {
 } from './recipes/built-in-recipes.js';
 export { GraphRecipeRegistry, createRecipeRegistry, currentGraphRecipes } from './recipes/registry.js';
 export { resolveRecipeToRules } from './recipes/resolve.js';
-export { executeGraph } from './cli/graph.js';
