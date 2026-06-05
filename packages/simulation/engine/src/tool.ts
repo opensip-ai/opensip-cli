@@ -9,6 +9,7 @@
 import { EXIT_CODES, type CliProgram, type ToolOptions } from '@opensip-tools/contracts';
 import { readPackageVersion } from '@opensip-tools/core';
 
+import { renderSimLive } from './cli/sim-runner.js';
 import { executeSim } from './cli/sim.js';
 import { createScenarioRegistry } from './framework/registry.js';
 import { SIM_PLUGIN_LAYOUT } from './plugins/loader.js';
@@ -25,11 +26,34 @@ const SIM: ToolCommandDescriptor = {
   description: 'Run simulation scenarios [experimental]',
 };
 
+// Live-view key — matches the `sim` subcommand name so the dispatcher's
+// renderLive(key) lookup resolves it (ADR-0015). sim's Ink/React renderer
+// (renderSimLive) is registered directly; the prior static-only path remains
+// for json / non-TTY runs.
+const SIM_LIVE_VIEW_KEY = 'sim';
+
 function register(cli: ToolCliContext): void {
   // `CliProgram` is contracts' alias for commander's `Command` —
   // contracts already declares commander as an optional peer dep.
   // Audit 2026-05-23 G6.
   const program = cli.program as CliProgram;
+
+  // Contribute sim's live view (ADR-0015). Effectful egress (cloud +
+  // `--report-to`) lives at the composition root: renderSimLive returns the
+  // run's envelope and this callback delivers it once the Ink app exits — the
+  // same contract fit uses.
+  cli.registerLiveView(SIM_LIVE_VIEW_KEY, async (args) => {
+    const simArgs = args as ToolOptions;
+    const envelope = await renderSimLive(simArgs, { setExitCode: cli.setExitCode });
+    if (envelope !== undefined) {
+      await cli.deliverSignals(envelope, {
+        cwd: simArgs.cwd,
+        reportTo: simArgs.reportTo,
+        apiKey: simArgs.apiKey,
+        runFailed: !envelope.verdict.passed,
+      });
+    }
+  });
 
   program
     .command(SIM.name)
@@ -47,6 +71,18 @@ function register(cli: ToolCliContext): void {
       async (
         opts: ToolOptions & { recipe?: string; quiet?: boolean; open?: boolean; kind?: string },
       ) => {
+        // Interactive TTY (non-json): the animated live view. Egress + exit code
+        // are handled inside the registerLiveView callback / renderSimLive after
+        // the Ink app exits.
+        if (opts.json !== true && process.stdout.isTTY === true) {
+          await cli.renderLive(SIM_LIVE_VIEW_KEY, opts);
+          await cli.maybeOpenDashboard({ openRequested: Boolean(opts.open), jsonOutput: false });
+          return;
+        }
+
+        // json / non-TTY (pipe / CI): run the engine and render statically — the
+        // animated Ink view is a TTY-only affordance. Output is byte-for-byte the
+        // pre-live-view behavior.
         const { result } = await executeSim(opts);
 
         if (result.type === 'error') {
@@ -63,8 +99,7 @@ function register(cli: ToolCliContext): void {
 
         // ADR-0011: one render path per mode. `--json` emits the envelope
         // through the shared formatSignalJson; default renders the envelope-
-        // derived per-scenario table. The bespoke `emitJson(result)` shape is
-        // retired — sim routes through the composition root.
+        // derived per-scenario table.
         if (opts.json) {
           cli.emitEnvelope(result.envelope);
         } else {
@@ -72,8 +107,7 @@ function register(cli: ToolCliContext): void {
         }
 
         // Effectful egress lives at the root (cloud sink + `--report-to`,
-        // which owns exit 4). Called once per run, after rendering. sim gains
-        // SARIF + cloud "for free" now that it emits the envelope (ADR-0011).
+        // which owns exit 4). Called once per run, after rendering.
         await cli.deliverSignals(result.envelope, {
           cwd: process.cwd(),
           reportTo: opts.reportTo,

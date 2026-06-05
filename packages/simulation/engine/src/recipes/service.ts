@@ -59,6 +59,14 @@ export interface SimulationRecipeResult {
 export interface SimulationRecipeServiceConfig {
   readonly cwd?: string;
   readonly abortSignal?: AbortSignal;
+  /**
+   * Optional live-progress callback (ADR-0015). Fired once with `(0, total)`
+   * before execution and then with a monotonic `(completed, total)` after each
+   * scenario finishes — across BOTH sequential and parallel modes. `total` is
+   * the post-kind-filter selected-set size. Count-shaped (not a renderer event)
+   * so the engine stays UI-agnostic; the sim runner maps it to ProgressEvents.
+   */
+  readonly onProgress?: (completed: number, total: number) => void;
 }
 
 export class SimulationRecipeService {
@@ -93,9 +101,23 @@ export class SimulationRecipeService {
       scenarioCount: selected.length,
     });
 
+    // Live-progress (ADR-0015): emit a monotonic completed count across both
+    // execution modes. `++completed` is atomic in single-threaded JS, so the
+    // parallel pool's concurrent completions still produce a correct count.
+    const total = selected.length;
+    let completed = 0;
+    const { onProgress } = this.config;
+    onProgress?.(0, total);
+    const onComplete = onProgress
+      ? (): void => {
+          completed += 1;
+          onProgress(completed, total);
+        }
+      : undefined;
+
     const results = recipe.execution.mode === 'parallel'
-      ? await runParallel(selected, recipe, this.config.abortSignal)
-      : await runSequential(selected, recipe, this.config.abortSignal);
+      ? await runParallel(selected, recipe, this.config.abortSignal, onComplete)
+      : await runSequential(selected, recipe, this.config.abortSignal, onComplete);
 
     const passedCount = results.filter((r) => r.passed).length;
     const out: SimulationRecipeResult = {
@@ -219,12 +241,14 @@ async function runSequential(
   scenarios: readonly RunnableScenario[],
   recipe: SimulationRecipe,
   abortSignal?: AbortSignal,
+  onComplete?: () => void,
 ): Promise<readonly SimulationScenarioResult[]> {
   const out: SimulationScenarioResult[] = [];
   for (const scenario of scenarios) {
     if (abortSignal?.aborted) break;
     const result = await runSingle(scenario, abortSignal);
     out.push(result);
+    onComplete?.();
     if (!result.passed && recipe.execution.stopOnFirstFailure === true) break;
   }
   return out;
@@ -234,15 +258,21 @@ async function runParallel(
   scenarios: readonly RunnableScenario[],
   recipe: SimulationRecipe,
   abortSignal?: AbortSignal,
+  onComplete?: () => void,
 ): Promise<readonly SimulationScenarioResult[]> {
   const limit = recipe.execution.maxParallel;
+  const runOne = async (s: RunnableScenario): Promise<SimulationScenarioResult> => {
+    const result = await runSingle(s, abortSignal);
+    onComplete?.();
+    return result;
+  };
   // No bound configured (or a bound at/above the set size) → run them all at
   // once, the historical behavior. A positive `maxParallel` caps the number of
   // scenarios in flight via a fixed worker pool, honoring the recipe's
   // declared concurrency ceiling (previously this option was ignored).
   if (limit === undefined || limit <= 0 || limit >= scenarios.length) {
     // @fitness-ignore-next-line no-unbounded-concurrency -- intentional run-all-at-once when no maxParallel is configured (the documented historical behavior); the bounded worker pool below is the capped path
-    return Promise.all(scenarios.map((s) => runSingle(s, abortSignal)));
+    return Promise.all(scenarios.map((s) => runOne(s)));
   }
 
   const results: SimulationScenarioResult[] = [];
@@ -251,7 +281,7 @@ async function runParallel(
   // index; results are written by index to preserve scenario order.
   const worker = async (): Promise<void> => {
     for (let i = next++; i < scenarios.length; i = next++) {
-      results[i] = await runSingle(scenarios[i], abortSignal);
+      results[i] = await runOne(scenarios[i]);
     }
   };
   await Promise.all(Array.from({ length: limit }, () => worker()));

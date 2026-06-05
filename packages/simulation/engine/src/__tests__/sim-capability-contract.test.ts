@@ -31,6 +31,11 @@ import type { ToolCliContext } from '@opensip-tools/core';
  * `program.command(...).description(...).option(...).action(...)`, so a chain
  * recorder is enough — no commander dependency, no action invocation.
  */
+/** No-op stand-in for ToolCliContext methods the flag recorder doesn't exercise. */
+function noop(): void {
+  /* intentional no-op for test mocks */
+}
+
 function recordRegisteredFlags(): string[] {
   const flags: string[] = [];
   const sub = {
@@ -43,7 +48,9 @@ function recordRegisteredFlags(): string[] {
     action: () => sub,
   };
   const program = { command: () => sub };
-  simulationTool.register({ program } as unknown as ToolCliContext);
+  // register() now also contributes a live view (ADR-0015); the recorder only
+  // cares about flags, so registerLiveView is a no-op here.
+  simulationTool.register({ program, registerLiveView: noop } as unknown as ToolCliContext);
   return flags.sort();
 }
 

@@ -308,12 +308,24 @@ function assembleEnvelopeInputs(
   return { units, signals };
 }
 
+/** Options for {@link executeSim}. */
+export interface ExecuteSimOptions {
+  /**
+   * Live-progress callback (ADR-0015). Forwarded to the recipe service, which
+   * fires `(0, total)` at start and a monotonic `(completed, total)` per
+   * scenario. The interactive sim runner maps these to pool ProgressEvents;
+   * non-interactive callers (json / non-TTY) omit it.
+   */
+  readonly onProgress?: (completed: number, total: number) => void;
+}
+
 /**
  * Run sim and return a SimDoneResult (or an ErrorResult when the
  * recipe is missing). The caller decides what to print or render.
  */
 export async function executeSim(
   args: ToolOptions,
+  opts: ExecuteSimOptions = {},
 ): Promise<{ result: SimDoneResult | ErrorResult }> {
   // Lifecycle: load .mjs plugins + scenario packages before the recipe
   // registry is read. Idempotent per project dir.
@@ -353,7 +365,7 @@ export async function executeSim(
 
   // The kind filter is applied inside runRecipe, BEFORE execution, so
   // filtered-out scenarios (with their side effects) never run.
-  const service = new SimulationRecipeService({ cwd: args.cwd });
+  const service = new SimulationRecipeService({ cwd: args.cwd, onProgress: opts.onProgress });
   const recipeResult = await service.runRecipe(recipe, { kindFilter });
 
   const scenarios = recipeResult.scenarios;

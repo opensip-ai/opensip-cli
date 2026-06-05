@@ -35,12 +35,16 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@opensip-tools/cli-ui": "workspace:*",
     "@opensip-tools/contracts": "workspace:*",
     "@opensip-tools/core": "workspace:*",
-    "commander": "^14.0.3"
+    "commander": "^14.0.3",
+    "ink": "^7.0.4",
+    "react": "^19.2.6"
   },
   "devDependencies": {
     "@types/node": "^22.19.19",
+    "@types/react": "^19.2.15",
     "typescript": "~6.0.3",
     "vitest": "^4.1.7"
   }
