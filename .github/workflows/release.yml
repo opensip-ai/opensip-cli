@@ -104,7 +104,7 @@ jobs:
 
       # Pack every workspace package into a tarball. `pnpm pack` resolves
       # workspace:* deps into concrete versions, which `npm publish` then
-      # uploads. We pack all 29 up front so the publish step can run
+      # uploads. We pack all 31 up front so the publish step can run
       # against a known-good set of tarballs in dependency order.
       - name: Pack all workspace packages (resolves workspace:*)
         run: |

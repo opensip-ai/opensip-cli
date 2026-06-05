@@ -189,28 +189,9 @@ fitness:
     # Hasura / GraphQL
     - hasura-production-config
     - graphql-offset-pagination
-    # React / Accessibility / Mobile
+    # React / Accessibility / Mobile — real checks that simply never apply
+    # to this Node CLI codebase (no React/Expo/mobile surface).
     - a11y-form-labels
     - a11y-semantic-html
-    - accessibility-icon-rendering
-    - modal-accessibility
-    - aria-landmarks
-    - accessible-touchables
     - expo-vector-icons
     - image-optimization
-    - flashlist-enforcement
-    - platform-checks
-    - memo-list-items
-    - frontend-client-boundary-placement
-    # CSS / Styling / Theme
-    - heading-style-consistency
-    - theme-token-usage
-    - lineheight-token-usage
-    - zindex-token-usage
-    # UI Components
-    - shared-component-usage
-    - raw-html-elements
-    - modal-consistency
-    - nextjs-conventions
-    - datatable-column-tooltips
-    - datatable-pagination

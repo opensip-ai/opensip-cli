@@ -84,11 +84,11 @@ The wire payload is the `SignalBatch` envelope (`@opensip-tools/core` `types/sig
 
 `@opensip-tools/checks-typescript` (content) and `opensip-tools` (binary) ship on separate version trains. opensip can bump one without the other. Bumping `cli` to a new major does not disturb the pinned `checks-typescript` version. This is intentional — content-pack changes and CLI changes have different review cadences and different breakage profiles.
 
-### Engine subprocess has no OpenTelemetry SDK
+### Engine subprocess spans — opt-in OpenTelemetry (shipped)
 
-When opensip spawns the engine, the parent side has full span coverage (opensip wraps the spawn in a `withSpanResult(...)`). The child side is opaque — the engine runs `discover → inventory → edges → indexes → rules → render` synchronously with no spans. opensip sees engine duration as a single ~30-second span with no children.
+When opensip spawns the engine, the parent side has full span coverage (opensip wraps the spawn in a `withSpanResult(...)`). Previously the child side was opaque — the engine ran `discover → inventory → edges → indexes → rules → render` with no spans, so opensip saw engine duration as a single ~30-second span with no children.
 
-This is acknowledged as a known gap. The intended shape — env-var-gated opt-in OTel with W3C TraceContext propagation, so standalone CLI users see no change while embedding consumers get per-stage spans — is roughly a 1–2 day implementation. **Trigger condition:** the first time we cannot answer a production support question with the parent span alone — likely 2–4 weeks after opensip ships against the consolidated substrate.
+That gap is now closed (ADR-0004, `status: active`). The engine emits one span per stage via `withSpan(...)` from `@opensip-tools/core` (`graph/engine/src/cli/orchestrate.ts`; the sharded build wraps the whole run in a parent span). It is **env-var-gated opt-in**: `withSpan` is a no-op when no OTel SDK is registered, so standalone CLI users see zero change and pay nothing. The SDK is wired only at the CLI boundary (`cli/src/telemetry/sdk-init.ts`), and W3C TraceContext propagation lets an embedding consumer like opensip stitch the engine's per-stage spans under its own parent span.
 
 ### Stable engine output paths
 
