@@ -67,9 +67,16 @@ function parseProjectExact(input: ParseInput): ParseOutput<TsParsed> {
     rootNames: [...input.files],
     options: compilerOptions,
   });
-  // Do not force the checker here. The structural walk only needs source
-  // files with parent pointers; semantic symbol tables are constructed lazily
-  // in resolveEdgesFromRecords when exact resolution asks for them.
+  // Force the binder. getTypeChecker() binds every source file, which
+  // populates BOTH the AST parent pointers the structural walk reads (a
+  // Program parses with setParentNodes:false, so node.parent is otherwise
+  // undefined) AND the symbol tables the exact resolver needs. Deferring it
+  // saves nothing in exact mode: resolveEdgesFromRecords (edges.ts) calls
+  // getTypeChecker() unconditionally, so the bind happens either way — and
+  // the cached second call is a no-op. Forcing it here is what makes the
+  // walk's parent chains valid. (Fast mode skips all of this and substitutes
+  // createSourceFile(setParentNodes:true); see parse-fast.ts.)
+  program.getTypeChecker();
 
   const parseErrors: ParseError[] = [];
   /* v8 ignore start */

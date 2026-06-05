@@ -10,8 +10,8 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
 
-import type { RunGraphResult } from './orchestrate.js';
 import type { GraphProgressEvent } from './orchestrate/types.js';
+import type { RunGraphResult } from './orchestrate.js';
 import type { Catalog, ResolutionMode } from '../types.js';
 
 export interface GraphProfileStage {

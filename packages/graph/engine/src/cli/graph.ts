@@ -47,12 +47,12 @@ import { buildGraphEnvelope } from './build-envelope.js';
 import { detectLanguages } from './detect.js';
 import { runCatalogJsonMode, runGateMode } from './graph-modes.js';
 import { buildUnifiedReportLines, countFiles, resolutionBannerText } from './graph-report.js';
-import { loadGraphConfig, runGraph, runShardedGraph } from './orchestrate.js';
 import {
   detectMonorepoLayout,
   partitionFlatRepo,
   selectStrategyForLayout,
 } from './orchestrate/flat-monorepo-strategy.js';
+import { loadGraphConfig, runGraph, runShardedGraph } from './orchestrate.js';
 import { positionalPathLabel, resolvePositionalPaths } from './positional-paths.js';
 import { MemoryPressureError } from './pressure-monitor.js';
 import { GraphProfileBuilder, writeGraphProfile } from './profile.js';
@@ -61,8 +61,8 @@ import { discoverPolyglotUnits, runWorkspaceUnitsInParallel } from './workspace-
 
 import type { GraphCommandOptions } from './graph-options.js';
 import type { Shard } from './orchestrate/shard-model.js';
-import type { GraphProfileRunRecorder } from './profile.js';
 import type { RunGraphResult } from './orchestrate.js';
+import type { GraphProfileRunRecorder } from './profile.js';
 import type { Catalog, FeatureColumn, GraphConfig, Rule } from '../types.js';
 import type { GraphDoneResult, SignalEnvelope } from '@opensip-tools/contracts';
 import type { LanguageAdapter, Signal, ToolCliContext } from '@opensip-tools/core';
@@ -293,6 +293,13 @@ async function runProfiledShardedBuild(
   return result;
 }
 
+/** Profile bucket for the run shape: workspace fan-out, multi-path, or single graph. */
+function profileMode(opts: GraphCommandOptions): string {
+  if (opts.workspace === true) return 'workspace';
+  if ((opts.paths?.length ?? 0) > 1) return 'multi-path';
+  return 'graph';
+}
+
 function createProfileBuilder(
   opts: GraphCommandOptions,
   startedAt: string,
@@ -302,7 +309,7 @@ function createProfileBuilder(
   }
   return new GraphProfileBuilder({
     cwd: opts.cwd,
-    mode: opts.workspace === true ? 'workspace' : ((opts.paths?.length ?? 0) > 1 ? 'multi-path' : 'graph'),
+    mode: profileMode(opts),
     resolutionMode: opts.resolution,
     startedAt,
   });

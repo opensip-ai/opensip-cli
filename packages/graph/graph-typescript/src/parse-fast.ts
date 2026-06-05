@@ -2,10 +2,10 @@
 /**
  * TypeScript fast (checker-free) parse implementation.
  *
- * The exact parse (`parse.ts`) calls `ts.createProgram`; exact resolution
- * later forces `program.getTypeChecker()` — the single most expensive
- * operation in a cold graph build. Fast mode avoids both the Program and the
- * checker.
+ * The exact parse (`parse.ts`) calls `ts.createProgram` and forces
+ * `program.getTypeChecker()` — the single most expensive operation in a cold
+ * graph build (it binds every file: parent pointers for the walk + symbol
+ * tables for the resolver). Fast mode avoids both the Program and the checker.
  *
  * Fast mode needs the parent pointers but NOT the symbol table: it
  * resolves edges syntactically (name + import graph) and never calls the
