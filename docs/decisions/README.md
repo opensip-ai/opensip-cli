@@ -84,6 +84,13 @@ distinct from:
   retired, formatters become pure shared `envelope→string` transforms and sinks
   stay heterogeneous (not unified), and tools never render — the CLI composition
   root routes the envelope to a (formatter × sink). Resolves audit Findings 1 & 5
+- [ADR-0012](./ADR-0012-versioning-and-release-policy.md) — Versioning & release
+  policy: semver-honest package versions; the machine-output/wire contract is
+  versioned independently via `SignalEnvelope.schemaVersion`/`SignalBatch.schemaVersion`;
+  breaking changes batch into deliberate major windows (long-lived pre-GA majors,
+  not a fast-climbing integer); **3.0.0 is the first GA/stable release** on the
+  existing names (same-name 1.0 reset is impossible — 1.0.0 is burned on npm;
+  rename rejected); old versions retired via `npm deprecate`, never `unpublish`
 
 ### Superseded
 
