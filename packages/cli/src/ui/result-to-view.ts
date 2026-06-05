@@ -206,7 +206,9 @@ export function resultToView(result: CommandResult): ViewNode {
       return envelopeToTableView(result.envelope);
     }
     case 'graph-done': {
-      return result.envelope ? envelopeToTableView(result.envelope) : graphDoneView(result);
+      // graph keeps its own rich report view (it delivers signals via an
+      // explicit `cli.deliverSignals(...)` call, not via a result envelope).
+      return graphDoneView(result);
     }
     case 'gate-done': {
       return linesView(result.lines);
