@@ -78,7 +78,9 @@ export function buildToolDiscoverySources(cwd: string, cliInstallDir: string): T
       sources.push({ dir: resolveProjectPaths(project.projectRoot).pluginsDir('tool'), mode: 'scanDir' });
     }
   } catch {
-    // No resolvable project context → no project-local tool source.
+    // @swallow-ok no resolvable project context (e.g. running outside any
+    // project) → contribute no project-local tool source. Best-effort by
+    // documented contract; see the JSDoc on buildToolDiscoverySources.
   }
   sources.push(
     { dir: cwd, mode: 'walkUp' },

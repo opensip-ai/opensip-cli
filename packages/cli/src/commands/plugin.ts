@@ -36,22 +36,21 @@
  * -------------
  * - This file owns the `plugin {list,add,remove,sync}` command bodies.
  * - `plugin/config-edit.ts` — YAML round-trip edits to plugins.<domain>.
+ * - `plugin/domain-resolution.ts` — TOOL_DOMAIN + the pure validation
+ *   logic that routes a spec to a domain / Tool host dir (no install).
  * - `plugin/host-dir.ts` — host package.json creation + installed-
  *   package introspection (incl. peer-dependency auto-install).
  */
 
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { isAbsolute, join } from 'node:path';
+import { join } from 'node:path';
 
 import {
   discoverPackagesInNodeModules,
-  isMarkerKind,
-  readMarkerKind,
   readProjectPluginsList,
   resolveProjectPaths,
   resolveUserPaths,
-  type MarkerKind,
   type PluginLayout,
 } from '@opensip-tools/core';
 
@@ -61,9 +60,14 @@ import {
   removeFromConfigPluginList,
 } from './plugin/config-edit.js';
 import {
+  domainNames,
+  isToolTarget,
+  resolveDomain,
+  TOOL_DOMAIN,
+} from './plugin/domain-resolution.js';
+import {
   ensurePluginHostDir,
   ensureUserPluginHostDir,
-  extractNameFromSpec,
   findInstalledName,
   HOST_PACKAGE_JSON,
   installMissingPeers,
@@ -72,17 +76,6 @@ import {
 } from './plugin/host-dir.js';
 
 import type { PluginInfo, PluginResult, SyncEntry } from '@opensip-tools/contracts';
-
-/**
- * Pseudo-domain for full Tool plugins (whole subcommands). Distinct from
- * the fit/sim plugin DOMAINS (which are project-committed + listed in
- * `plugins.<domain>` config): a Tool plugin auto-discovers by its
- * `opensipTools.kind: "tool"` marker, needs NO config entry, and installs
- * user-global by default (`~/.opensip-tools/plugins/tool`) so the
- * subcommand is available in every project — or project-local
- * (`.runtime/plugins/tool`) with `--project`.
- */
-const TOOL_DOMAIN = 'tool';
 
 /**
  * CommandResult discriminator literals. `as const` keeps the literal type
@@ -96,88 +89,6 @@ const PLUGIN_REMOVE = 'plugin-remove' as const;
 export interface PluginScopeOpts {
   /** Install/remove a Tool plugin in the project-local host dir instead of user-global. */
   readonly project?: boolean;
-}
-
-// =============================================================================
-// VALIDATION HELPERS
-// =============================================================================
-//
-// The plugin-supporting domains are NOT hardcoded here — they are sourced
-// from the registered tools' `pluginLayout` descriptors (threaded in via
-// `CliCommandsContext.pluginLayouts`). The kernel stays tool-agnostic and
-// the tools remain the single source of truth (ADR-0009 corollary 1).
-
-/** The set of plugin-supporting domain names from the contributed layouts. */
-function domainNames(layouts: readonly PluginLayout[]): string[] {
-  return layouts.map((l) => l.domain);
-}
-
-/**
- * Infer a target domain from a package name when --domain is omitted: the
- * first declared domain whose name appears as a word in the package name,
- * else the first declared domain. Domain names come from trusted
- * first-party layouts, so building a RegExp from them is safe.
- */
-function inferDomain(packageName: string, domains: readonly string[]): string | undefined {
-  const match = domains.find((d) => new RegExp(String.raw`\b${d}\b`).test(packageName));
-  return match ?? domains[0];
-}
-
-/**
- * Resolve the target domain, rejecting arbitrary strings from --domain.
- * A bare cast would let a caller pass '../../etc' and drive path
- * construction outside opensip-tools/.runtime/.
- */
-function resolveDomain(
-  override: string | undefined,
-  packageName: string,
-  domains: readonly string[],
-): string | undefined {
-  if (override === undefined) return inferDomain(packageName, domains);
-  return domains.includes(override) ? override : undefined;
-}
-
-/**
- * Detect a package's `opensipTools.kind` BEFORE installing, so `plugin add`
- * can route a Tool plugin to its host dir rather than a fit/sim domain.
- *
- *  - Local-path specs (`.`/`/`/`file:`): read the target's package.json
- *    directly — free and offline.
- *  - Registry specs: `npm view <name> opensipTools.kind` (one network
- *    call; `plugin add` is already online for the install).
- *
- * Returns undefined when undetectable (offline, private registry, no
- * marker) — the caller then falls back to fit/sim domain inference.
- */
-function detectPluginKind(spec: string, cwd: string): MarkerKind | undefined {
-  if (spec.startsWith('/') || spec.startsWith('.') || spec.startsWith('file:')) {
-    const raw = spec.startsWith('file:') ? spec.slice('file:'.length) : spec;
-    return readMarkerKind(isAbsolute(raw) ? raw : join(cwd, raw));
-  }
-  try {
-    const name = extractNameFromSpec(spec) ?? spec;
-    const out = execFileSync('npm', ['view', name, 'opensipTools.kind'], {
-      cwd,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    })
-      .toString()
-      .trim();
-    return isMarkerKind(out) ? out : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-/**
- * Decide whether `plugin add/remove <spec>` targets a Tool plugin:
- * explicit `--domain tool`, or (when no `--domain` is given) a detected
- * `kind: "tool"` marker. An explicit fit/sim `--domain` is honoured as-is.
- */
-function isToolTarget(domainOverride: string | undefined, spec: string, cwd: string): boolean {
-  if (domainOverride === TOOL_DOMAIN) return true;
-  if (domainOverride !== undefined) return false;
-  return detectPluginKind(spec, cwd) === 'tool';
 }
 
 type InstallOutcome = { readonly ok: true; readonly installedName: string } | { readonly ok: false; readonly error: string };

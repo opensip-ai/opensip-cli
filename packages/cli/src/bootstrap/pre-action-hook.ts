@@ -1,3 +1,4 @@
+// @fitness-ignore-file detached-promises -- the preAction hook is a composition root: its body invokes synchronous bootstrap helpers (mergeConfigDefaults, configureLogger, the checkSchemaVersion/checkNoProject/warnAboutPhantom bailout guards, enterScope) that the name-based heuristic mistakes for promise-returning calls. The one genuine async call (maybeInitializeOwningTool) is awaited. Matches the same suppression on index.ts and bootstrap/index.ts.
 /**
  * pre-action-hook — Commander `preAction` body.
  *
@@ -56,6 +57,7 @@ import { checkForUpdate, formatUpdateNag } from '../update-notifier.js';
 
 import { loadCliDefaults, mergeConfigDefaults } from './cli-defaults.js';
 import { resolveEffectiveCloudConfig } from './global-config.js';
+import { formatCliTooOldMessage, formatNoProjectFoundMessage } from './pre-action-messages.js';
 
 import type { Command } from 'commander';
 
@@ -80,51 +82,6 @@ const PROJECT_AGNOSTIC_COMMANDS: ReadonlySet<string> = new Set([
   'completion',
   'uninstall',
 ]);
-
-interface CliTooOldInput {
-  readonly root: string;
-  readonly configVersion: number;
-  readonly cliVersion: number;
-}
-
-/**
- * Render the "your CLI is too old" message. Direction-correct: when the
- * config schema is newer than the CLI knows about, the USER UPGRADES
- * THE CLI — not "run migrate" (migrate goes the OTHER direction, taking
- * an old config UP to the current CLI's version).
- */
-function formatCliTooOldMessage(input: CliTooOldInput): string {
-  return [
-    `✗ This project's opensip-tools.config.yml uses a newer schema than your CLI supports.`,
-    ``,
-    `  Project:        ${input.root}`,
-    `  Config schema:  v${input.configVersion}`,
-    `  CLI supports:   v${input.cliVersion}`,
-    ``,
-    `  Update your CLI to continue:`,
-    `    npm install -g opensip-tools@latest`,
-    ``,
-    `  (Or, if installed locally to the project: pnpm up opensip-tools@latest)`,
-  ].join('\n');
-}
-
-function formatNoProjectFoundMessage(cwd: string, jsonOutput: boolean): string {
-  if (jsonOutput) {
-    return JSON.stringify({
-      error: 'No opensip-tools.config.yml found. Searched from ' + cwd + ' upward. To get started: opensip-tools init',
-    });
-  }
-  return [
-    '✗ No opensip-tools project found.',
-    '',
-    '  Searched from: ' + cwd,
-    '  Walked up to: /',
-    '',
-    '  To get started:',
-    '    opensip-tools init',
-  ].join('\n');
-}
-
 
 const MODULE_TAG = 'cli:bootstrap';
 
