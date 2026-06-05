@@ -287,6 +287,7 @@ function emitFromUseWildcard(node: Node, prefix: readonly string[], ctx: UseSite
   pushDepSite([...prefix, ...segments, '*'], node, ctx);
 }
 
+// @graph-ignore-next-line graph:cycle -- intentional recursion over nested `use` scoped-list AST nodes (path::{a, b::{c}})
 function emitFromScopedUseList(node: Node, prefix: readonly string[], ctx: UseSiteContext): void {
   // `<path>::{<list>}` — combine path + each list child.
   // Children order: a path-like (identifier / scoped_identifier /
@@ -413,6 +414,7 @@ interface WalkCtx {
   readonly callSites: CallSiteRecord[];
 }
 
+// @graph-ignore-next-line graph:cycle -- intentional recursive-descent AST visitor; the cycle is the traversal (visit re-enters via the impl/item helpers)
 function visit(node: Node, frame: Frame, ctx: WalkCtx): void {
   if (node.type === 'impl_item') {
     visitImpl(node, frame, ctx);

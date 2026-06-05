@@ -35,6 +35,7 @@
 import { dashboardGraphControlsJs } from './graph-controls.js';
 import { dashboardViewGraphStylesheetJs } from './graph-stylesheet.js';
 
+// @graph-ignore-next-line graph:large-function -- emits one cohesive browser-JS bundle as a String.raw template; bodyLines counts the embedded JS-as-string, not splittable logic (ADR-0014)
 export function dashboardViewGraphJs(): string {
   return String.raw`
 // Register the dagre layout extension once (the vendored globals are

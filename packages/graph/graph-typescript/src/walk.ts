@@ -242,6 +242,7 @@ function walkFile(
       /* v8 ignore next */
       const className = node.name?.text ?? '<anon-class>';
       const childCtx: VisitorContext = { ...ctx, enclosingClass: className };
+      // @graph-ignore-next-line graph:cycle -- intentional recursive descent; forEachChild re-enters the visitor (descend)
       ts.forEachChild(node, (c) => { descend(c, childCtx, childOwnerHash); });
       return;
     }

@@ -281,6 +281,7 @@ export async function filterSignalsBySuppressions(
   await Promise.all(
     [...uniqueFiles].map(async (filePath) => {
       try {
+        // @fitness-ignore-next-line unbounded-memory -- `readFile` is the injected reader (the kernel does no real I/O); callers read project SOURCE files the analyzers already loaded — inherently bounded, not attacker-controlled blobs.
         const content = await readFile(filePath);
         scanByFile.set(filePath, scanSuppressionDirectives(content, keywords));
       } catch {

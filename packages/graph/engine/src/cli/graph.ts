@@ -461,10 +461,10 @@ export async function dispatchGraphResult(
   startedAt: string,
 ): Promise<SignalEnvelope | undefined> {
   const durationMs = Math.max(0, Date.now() - Date.parse(startedAt));
-  // ADR-0014: apply @graph-ignore inline waivers BEFORE any mode consumes the
-  // signals — the gate baseline, catalog, render, and session persistence all
-  // see the post-waiver set. `--workspace` is covered transitively: each child
-  // runs `graph --json` through this function, so the parent aggregates
+  // ADR-0014: apply the inline graph-ignore waivers BEFORE any mode consumes
+  // the signals — the gate baseline, catalog, render, and session persistence
+  // all see the post-waiver set. `--workspace` is covered transitively: each
+  // child runs `graph --json` through this function, so the parent aggregates
   // already-waived signals.
   const { kept, suppressedCount } = await applyGraphSuppressions(rawResult.signals, opts.cwd);
   const result = { ...rawResult, signals: kept };

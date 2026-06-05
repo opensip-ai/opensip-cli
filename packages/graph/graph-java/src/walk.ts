@@ -178,6 +178,7 @@ interface WalkCtx {
   readonly callSites: CallSiteRecord[];
 }
 
+// @graph-ignore-next-line graph:cycle -- intentional recursive-descent AST visitor; the cycle is the traversal (visit re-enters via the type/member helpers)
 function visit(node: Node, frame: Frame, ctx: WalkCtx): void {
   if (TYPE_DECL_NODES.has(node.type)) {
     visitTypeDeclaration(node, frame, ctx);
