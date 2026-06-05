@@ -53,6 +53,7 @@ import {
   record,
   runWalk,
   synthesizeModuleInit as buildModuleInit,
+  type WalkSinks,
 } from '@opensip-tools/graph-adapter-common';
 
 import { digestRustBody, digestSyntheticBody } from './body-digest.js';
@@ -88,10 +89,9 @@ function walkFile(
   absPath: string,
   file: RustParsedFile,
   projectDirAbs: string,
-  out: Record<string, FunctionOccurrence[]>,
-  callSites: CallSiteRecord[],
-  dependencySites: DependencySiteRecord[],
+  sinks: WalkSinks,
 ): void {
+  const { occurrences: out, callSites, dependencySites } = sinks;
   const filePathProjectRel = relative(projectDirAbs, absPath).split(sep).join('/');
   const inTestFile = isTestFile(filePathProjectRel);
   const definedInGenerated = isGeneratedFile(filePathProjectRel);

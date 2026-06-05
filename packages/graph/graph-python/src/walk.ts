@@ -46,6 +46,7 @@ import {
   record,
   runWalk,
   synthesizeModuleInit as buildModuleInit,
+  type WalkSinks,
 } from '@opensip-tools/graph-adapter-common';
 
 import { digestPythonBody, digestSyntheticBody } from './body-digest.js';
@@ -54,7 +55,6 @@ import { collectDependencySites } from './walk-dependencies.js';
 import type { PythonParsedFile, PythonParsedProject } from './parse.js';
 import type {
   CallSiteRecord,
-  DependencySiteRecord,
   FunctionOccurrence,
   WalkInput,
   WalkOutput,
@@ -81,10 +81,9 @@ function walkFile(
   absPath: string,
   file: PythonParsedFile,
   projectDirAbs: string,
-  out: Record<string, FunctionOccurrence[]>,
-  callSites: CallSiteRecord[],
-  dependencySites: DependencySiteRecord[],
+  sinks: WalkSinks,
 ): void {
+  const { occurrences: out, callSites, dependencySites } = sinks;
   const filePathProjectRel = relative(projectDirAbs, absPath).split(sep).join('/');
   const inTestFile = isTestFile(filePathProjectRel);
   const definedInGenerated = isGeneratedFile(filePathProjectRel);
@@ -171,14 +170,7 @@ function visitClass(node: Node, frame: Frame, ctx: WalkCtx): void {
 }
 
 function visitFunction(node: Node, frame: Frame, ctx: WalkCtx): void {
-  const occ = visitFunctionDefinition(
-    node,
-    ctx.file,
-    ctx.filePathProjectRel,
-    frame.enclosingClass,
-    ctx.inTestFile,
-    ctx.definedInGenerated,
-  );
+  const occ = visitFunctionDefinition(node, frame.enclosingClass, ctx);
   if (!occ) return;
   record(ctx.out, occ);
   const childFrame: Frame = { ownerHash: occ.bodyHash, enclosingClass: null };
@@ -189,7 +181,7 @@ function visitFunction(node: Node, frame: Frame, ctx: WalkCtx): void {
 }
 
 function visitLambdaNode(node: Node, frame: Frame, ctx: WalkCtx): boolean {
-  const occ = visitLambda(node, ctx.file, ctx.filePathProjectRel, ctx.inTestFile, ctx.definedInGenerated);
+  const occ = visitLambda(node, ctx);
   if (!occ) return false;
   record(ctx.out, occ);
   if (frame.ownerHash !== occ.bodyHash) {
@@ -210,12 +202,10 @@ function visitLambdaNode(node: Node, frame: Frame, ctx: WalkCtx): boolean {
 
 function visitFunctionDefinition(
   node: Node,
-  file: PythonParsedFile,
-  filePathProjectRel: string,
   enclosingClass: string | null,
-  inTestFile: boolean,
-  definedInGenerated: boolean,
+  ctx: WalkCtx,
 ): FunctionOccurrence | null {
+  const { file, filePathProjectRel, inTestFile, definedInGenerated } = ctx;
   const name = nameOf(node) ?? '<anon-fn>';
   const digest = digestPythonBody(file.source.slice(node.startIndex, node.endIndex));
   const kind = classifyFunctionKind(name, enclosingClass);
@@ -253,13 +243,8 @@ function classifyFunctionKind(
   return 'method';
 }
 
-function visitLambda(
-  node: Node,
-  file: PythonParsedFile,
-  filePathProjectRel: string,
-  inTestFile: boolean,
-  definedInGenerated: boolean,
-): FunctionOccurrence | null {
+function visitLambda(node: Node, ctx: WalkCtx): FunctionOccurrence | null {
+  const { file, filePathProjectRel, inTestFile, definedInGenerated } = ctx;
   const digest = digestPythonBody(file.source.slice(node.startIndex, node.endIndex));
   const startLine = node.startPosition.row + 1;
   const startCol = node.startPosition.column;

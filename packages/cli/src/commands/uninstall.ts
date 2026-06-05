@@ -172,15 +172,18 @@ function filterTargetsForAction(
   }
 }
 
+/** The resolved uninstall plan a preamble summarizes. */
+interface PreambleInput {
+  mode: UninstallMode
+  purge: boolean
+  toDelete: readonly Target[]
+  toKeep: readonly Target[]
+  rootPath: string
+}
+
 /** Print the pre-prompt summary appropriate to mode + purge state. */
-function printPreambleForRun(
-  write: (s: string) => void,
-  mode: UninstallMode,
-  purge: boolean,
-  toDelete: readonly Target[],
-  toKeep: readonly Target[],
-  rootPath: string,
-): void {
+function printPreambleForRun(write: (s: string) => void, input: PreambleInput): void {
+  const { mode, purge, toDelete, toKeep, rootPath } = input
   if (mode === 'user') {
     printUserModeTargets(write, toDelete)
   } else if (purge) {
@@ -217,7 +220,7 @@ export async function executeUninstall(opts: UninstallOptions = {}): Promise<Uni
     return buildResult({ action: 'empty', mode, targets: [], rootPath })
   }
 
-  printPreambleForRun(write, mode, purge, toDelete, toKeep, rootPath)
+  printPreambleForRun(write, { mode, purge, toDelete, toKeep, rootPath })
 
   if (opts.dryRun) {
     return buildResult({ action: 'dry-run', mode, targets: toDelete, rootPath })

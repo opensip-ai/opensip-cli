@@ -155,14 +155,19 @@ function getCallFunctionName(node: ts.CallExpression): string {
   return ''
 }
 
+interface UnsanitizedCallRule {
+  readonly functionNames: Set<string>
+  readonly message: string
+  readonly suggestion: string
+}
+
 function checkUnsanitizedCallArgs(
   node: ts.CallExpression,
   sourceFile: ts.SourceFile,
   filePath: string,
-  functionNames: Set<string>,
-  message: string,
-  suggestion: string,
+  rule: UnsanitizedCallRule,
 ): CheckViolation | null {
+  const { functionNames, message, suggestion } = rule
   const functionName = getCallFunctionName(node)
   if (!functionNames.has(functionName)) return null
   /* v8 ignore next -- defensive AST/type guard */
@@ -259,27 +264,23 @@ export const inputSanitization = defineCheck({
       }
 
       if (ts.isCallExpression(node)) {
-        const cmdInjection = checkUnsanitizedCallArgs(
-          node,
-          sourceFile,
-          filePath,
-          EXEC_FUNCTIONS,
-          'User input passed to shell command - potential command injection',
-          'Never pass user input directly to shell commands. Use execFile with separate arguments array, or validate input against a strict allowlist. Consider using child_process.spawn with shell: false.',
-        )
+        const cmdInjection = checkUnsanitizedCallArgs(node, sourceFile, filePath, {
+          functionNames: EXEC_FUNCTIONS,
+          message: 'User input passed to shell command - potential command injection',
+          suggestion:
+            'Never pass user input directly to shell commands. Use execFile with separate arguments array, or validate input against a strict allowlist. Consider using child_process.spawn with shell: false.',
+        })
         if (cmdInjection) {
           violations.push(cmdInjection)
           return
         }
 
-        const pathTraversal = checkUnsanitizedCallArgs(
-          node,
-          sourceFile,
-          filePath,
-          FS_FUNCTIONS,
-          'User input in file path - potential path traversal vulnerability',
-          'Validate file paths with path.resolve and ensure they stay within allowed directories: const safePath = path.resolve(baseDir, userInput); if (!safePath.startsWith(baseDir)) throw new Error("Invalid path");',
-        )
+        const pathTraversal = checkUnsanitizedCallArgs(node, sourceFile, filePath, {
+          functionNames: FS_FUNCTIONS,
+          message: 'User input in file path - potential path traversal vulnerability',
+          suggestion:
+            'Validate file paths with path.resolve and ensure they stay within allowed directories: const safePath = path.resolve(baseDir, userInput); if (!safePath.startsWith(baseDir)) throw new Error("Invalid path");',
+        })
         if (pathTraversal) {
           violations.push(pathTraversal)
           return

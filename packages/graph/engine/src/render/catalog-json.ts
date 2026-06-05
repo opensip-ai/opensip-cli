@@ -120,6 +120,16 @@ function occurrenceToSymbol(
 }
 
 /**
+ * The repo + commit identity stamped onto every exported symbol/edge id.
+ * Threaded as one value so the row mappers stay under the wide-function
+ * parameter budget.
+ */
+interface ExportIdentity {
+  readonly repoId: string;
+  readonly gitSha: string;
+}
+
+/**
  * Map engine's `CallEdge` to one or more `CatalogExportEdge` rows.
  *
  * - Polymorphic edges (`to.length > 1`) split into one row per target.
@@ -135,9 +145,9 @@ function callEdgeToRows(
   callerOcc: FunctionOccurrence,
   callEdge: CallEdge,
   indexes: Indexes,
-  repoId: string,
-  gitSha: string,
+  identity: ExportIdentity,
 ): readonly CatalogExportEdge[] {
+  const { repoId, gitSha } = identity;
   const fromFilePath = callerOcc.filePath;
   const edgeKind = 'calls';
 
@@ -218,9 +228,9 @@ function dependencyEdgeToRows(
   fromFilePath: string,
   depEdge: DependencyEdge,
   byBodyHash: ReadonlyMap<string, FunctionOccurrence>,
-  repoId: string,
-  gitSha: string,
+  identity: ExportIdentity,
 ): readonly CatalogExportEdge[] {
+  const { repoId, gitSha } = identity;
   const edgeKind = 'depends_on';
 
   if (depEdge.to.length === 0) {
@@ -300,6 +310,7 @@ export interface RenderCatalogJsonInput {
 export function renderCatalogJson(input: RenderCatalogJsonInput): string {
   const { catalog, indexes, provenance, repoId, gitSha } = input;
   const language = catalog.language;
+  const identity: ExportIdentity = { repoId, gitSha };
 
   const symbols: CatalogExportSymbol[] = [];
   const edges: CatalogExportEdge[] = [];
@@ -310,14 +321,7 @@ export function renderCatalogJson(input: RenderCatalogJsonInput): string {
       symbols.push(symbol);
 
       for (const callEdge of occurrence.calls) {
-        const rows = callEdgeToRows(
-          symbol.id,
-          occurrence,
-          callEdge,
-          indexes,
-          repoId,
-          gitSha,
-        );
+        const rows = callEdgeToRows(symbol.id, occurrence, callEdge, indexes, identity);
         edges.push(...rows);
       }
 
@@ -331,8 +335,7 @@ export function renderCatalogJson(input: RenderCatalogJsonInput): string {
             occurrence.filePath,
             depEdge,
             indexes.byBodyHash,
-            repoId,
-            gitSha,
+            identity,
           );
           edges.push(...rows);
         }

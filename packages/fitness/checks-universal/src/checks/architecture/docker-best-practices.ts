@@ -450,14 +450,17 @@ function processUserLine(trimmedLine: string, state: AnalysisState): void {
   }
 }
 
-function processRunLine(
-  trimmedLine: string,
-  lineNum: number,
-  file: string,
-  filePath: string,
-  state: AnalysisState,
-  violations: DockerfileViolation[],
-): void {
+interface ProcessRunLineOptions {
+  trimmedLine: string
+  lineNum: number
+  file: string
+  filePath: string
+  state: AnalysisState
+  violations: DockerfileViolation[]
+}
+
+function processRunLine(options: ProcessRunLineOptions): void {
+  const { trimmedLine, lineNum, file, filePath, state, violations } = options
   const runResult = checkRunCommand(trimmedLine, lineNum, file, filePath)
   violations.push(...runResult.violations)
   if (runResult.hasFrozenLockfileViolation) state.hasFrozenLockfile = false
@@ -529,7 +532,7 @@ function processDockerfileLine(options: ProcessDockerfileLineOptions): void {
   if (secretViolation) violations.push(secretViolation)
 
   if (upperLine.startsWith('RUN ')) {
-    processRunLine(trimmedLine, lineNum, file, filePath, state, violations)
+    processRunLine({ trimmedLine, lineNum, file, filePath, state, violations })
   }
 
   if (upperLine.startsWith('COPY ')) {

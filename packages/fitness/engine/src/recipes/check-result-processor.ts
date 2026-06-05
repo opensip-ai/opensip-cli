@@ -91,27 +91,29 @@ function createCheckSummary(input: CheckSummaryInput): CheckSummary {
   }
 }
 
+interface ErrorSummaryInput {
+  checkId: string
+  checkSlug: string
+  durationMs: number
+  memoryProfile: CheckMemoryProfile
+  timedOut: boolean
+  errorMessage: string
+}
+
 /** Build a CheckSummary from a failed or errored check execution */
-function createErrorSummary(
-  checkId: string,
-  checkSlug: string,
-  durationMs: number,
-  memoryProfile: CheckMemoryProfile,
-  timedOut: boolean,
-  errorMessage: string,
-): CheckSummary {
+function createErrorSummary(input: ErrorSummaryInput): CheckSummary {
   return {
-    checkId,
-    checkSlug,
+    checkId: input.checkId,
+    checkSlug: input.checkSlug,
     passed: false,
     errors: 1,
     warnings: 0,
-    durationMs,
+    durationMs: input.durationMs,
     filesScanned: 0,
     ignoredCount: 0,
-    memoryProfile,
-    timedOut,
-    errorMessage,
+    memoryProfile: input.memoryProfile,
+    timedOut: input.timedOut,
+    errorMessage: input.errorMessage,
   }
 }
 
@@ -255,7 +257,14 @@ export function processErrorResult(ctx: ProcessorContext, input: ProcessErrorInp
 
   updateSessionForError(session, checkResult)
 
-  const summary = createErrorSummary(checkId, checkSlug, durationMs, memoryProfile, timedOut, errMsg)
+  const summary = createErrorSummary({
+    checkId,
+    checkSlug,
+    durationMs,
+    memoryProfile,
+    timedOut,
+    errorMessage: errMsg,
+  })
   callbacks.onError?.(checkSlug, error instanceof Error ? error : new SystemError(errMsg, { code: 'SYSTEM.FITNESS.CHECK_ERROR' }))
   callbacks.onCheckComplete?.(checkSlug, summary, checkIndex, totalChecks)
 

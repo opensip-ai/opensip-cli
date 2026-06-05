@@ -48,10 +48,10 @@ import type { CallSiteRecord } from './walk.js';
 import type {
   CallEdge,
   Catalog,
+  EdgeSink,
   FunctionOccurrence,
   ResolutionStats,
   ResolverVerdict,
-  MutableStats,
 } from '@opensip-tools/graph';
 
 function tsPosition(node: ts.Node, sourceFile: ts.SourceFile): {
@@ -95,6 +95,7 @@ export function resolveEdgesFromRecords(
   const checker = input.program.getTypeChecker();
   const callsByHash = new Map<string, CallEdge[]>();
   const stats = createMutableStats();
+  const sink: EdgeSink = { edgesByOwner: callsByHash, stats };
 
   for (const r of input.callSites) {
     // Bucket edges per OWNER OCCURRENCE (bodyHash + file), not bodyHash alone:
@@ -103,15 +104,7 @@ export function resolveEdgesFromRecords(
     const ownerKey = ownerEdgeKey(r.ownerHash, relative(input.projectDirAbs, r.sourceFile.fileName));
     if (r.kind === 'creation') {
       if (r.childHash === undefined) continue;
-      pushSharedCreationEdge(
-        r.node,
-        r.sourceFile,
-        ownerKey,
-        r.childHash,
-        callsByHash,
-        stats,
-        tsPosition,
-      );
+      pushSharedCreationEdge(tsPosition(r.node, r.sourceFile), ownerKey, r.childHash, sink);
       continue;
     }
     const ctx: ResolverContext = {
@@ -123,7 +116,7 @@ export function resolveEdgesFromRecords(
     };
     const verdict = computeVerdict(r.node, ctx);
     if (verdict === null) continue;
-    pushCallEdge(r.node, r.sourceFile, verdict, ownerKey, callsByHash, stats);
+    pushCallEdge(r.node, r.sourceFile, verdict, ownerKey, sink);
   }
 
   const newCatalog = rebuildCatalog(input.catalog, callsByHash);
@@ -166,6 +159,7 @@ export function resolveEdgesSyntactic(
   logger.info({ evt: 'graph.edges.syntactic.start', module: 'graph:edges' });
   const callsByHash = new Map<string, CallEdge[]>();
   const stats = createMutableStats();
+  const sink: EdgeSink = { edgesByOwner: callsByHash, stats };
   const knownFiles = collectKnownFiles(input.catalog);
   // One import index per source file — cached across that file's sites.
   const importIndexByFile = new Map<ts.SourceFile, ImportIndex>();
@@ -175,15 +169,7 @@ export function resolveEdgesSyntactic(
     const ownerKey = ownerEdgeKey(r.ownerHash, relative(input.projectDirAbs, r.sourceFile.fileName));
     if (r.kind === 'creation') {
       if (r.childHash === undefined) continue;
-      pushSharedCreationEdge(
-        r.node,
-        r.sourceFile,
-        ownerKey,
-        r.childHash,
-        callsByHash,
-        stats,
-        tsPosition,
-      );
+      pushSharedCreationEdge(tsPosition(r.node, r.sourceFile), ownerKey, r.childHash, sink);
       continue;
     }
     let importIndex = importIndexByFile.get(r.sourceFile);
@@ -200,7 +186,7 @@ export function resolveEdgesSyntactic(
       importIndex,
     });
     if (verdict === null) continue;
-    pushCallEdge(r.node, r.sourceFile, verdict, ownerKey, callsByHash, stats);
+    pushCallEdge(r.node, r.sourceFile, verdict, ownerKey, sink);
   }
 
   const newCatalog = rebuildCatalog(input.catalog, callsByHash);
@@ -228,9 +214,9 @@ function pushCallEdge(
   sourceFile: ts.SourceFile,
   verdict: ResolverVerdict,
   ownerKey: string,
-  callsByHash: Map<string, CallEdge[]>,
-  stats: MutableStats,
+  sink: EdgeSink,
 ): void {
+  const { edgesByOwner: callsByHash, stats } = sink;
   stats.totalCallSites++;
   const pos = tsPosition(node, sourceFile);
   const edge: CallEdge = {

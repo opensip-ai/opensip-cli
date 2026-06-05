@@ -126,7 +126,7 @@ export {
 // types. Exporting the type alone preserves the plan's intent (no
 // alternate construction path) without forcing adapter packs to
 // inline the structural type at every helper boundary.
-export type { EdgePosition, MutableStats } from './lang-adapter/edge-helpers.js';
+export type { EdgePosition, EdgeSink, MutableStats } from './lang-adapter/edge-helpers.js';
 
 // ── Shared body-digest primitives ─────────────────────────────────
 //

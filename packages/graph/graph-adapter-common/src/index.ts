@@ -45,6 +45,7 @@ export {
   type FileClassifierConfig,
   runWalk,
   type RunWalkParams,
+  type WalkSinks,
   synthesizeModuleInit,
   type SynthesizeModuleInitParams,
   buildNameIndex,

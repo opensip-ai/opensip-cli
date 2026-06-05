@@ -28,7 +28,7 @@ export const GRAPH_TRACER = 'opensip-tools-graph';
  * distinguishable when they nest under the parent build trace.
  */
 export function spanRunStage(baseAttrs: Attributes = {}): RunStage {
-  return (stage, _onProgress, _monitor, fn, _detailFn, attrsFn) =>
+  return ({ stage, fn, attrsFn }) =>
     withSpan(
       GRAPH_TRACER,
       `opensip_tools.graph.${stage}`,

@@ -179,14 +179,25 @@ function applyGlobalExcludes(
  * When called without pre-resolved targets (single-check fallback), globalExcludes
  * are applied after direct globbing.
  */
+/**
+ * The project-level resolution environment shared across every check in a
+ * single {@link buildScopeBasedFileMap} pass: the target registry, the
+ * targets config, the project root, and (when pre-resolved) the cached
+ * target→files map. Grouped so per-check resolution stays a 3-arg call.
+ */
+interface CheckFileResolutionContext {
+  registry: TargetRegistry
+  config: TargetsConfig
+  rootDir: string
+  resolvedTargets?: Map<string, readonly string[]>
+}
+
 function resolveFilesForCheck(
   slug: string,
   scope: CheckScope | undefined,
-  registry: TargetRegistry,
-  config: TargetsConfig,
-  rootDir: string,
-  resolvedTargets?: Map<string, readonly string[]>,
+  ctx: CheckFileResolutionContext,
 ): readonly string[] | undefined {
+  const { registry, config, rootDir, resolvedTargets } = ctx
   const { globalExcludes, checkOverrides } = config
 
   // When resolvedTargets is provided, globalExcludes are pre-applied — skip re-filtering
@@ -245,11 +256,12 @@ export function buildScopeBasedFileMap(
   // Pre-resolve all targets once — deduplicated glob pass across all targets.
   // GlobalExcludes are applied during pre-resolution so per-check lookups are pure in-memory.
   const resolvedTargets = preResolveAllTargets(registry, config, rootDir)
+  const ctx: CheckFileResolutionContext = { registry, config, rootDir, resolvedTargets }
 
   const result = new Map<string, readonly string[]>()
 
   for (const check of checks) {
-    const files = resolveFilesForCheck(check.slug, check.scope, registry, config, rootDir, resolvedTargets)
+    const files = resolveFilesForCheck(check.slug, check.scope, ctx)
     if (files !== undefined) {
       result.set(check.slug, files)
     }

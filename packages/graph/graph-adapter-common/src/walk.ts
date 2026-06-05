@@ -83,6 +83,21 @@ export function makeFileClassifier(config: FileClassifierConfig): FileClassifier
 
 // ── walk driver ───────────────────────────────────────────────────
 
+/**
+ * The three output accumulators a per-file walk appends into. Grouping
+ * them keeps `walkFile` (and the adapter `visit` helpers that thread
+ * them) under the wide-function parameter budget, and names the cohesive
+ * "walk output" concept the driver allocates once per project.
+ */
+export interface WalkSinks {
+  /** By-simple-name occurrence sink (the engine's `out` map). */
+  readonly occurrences: Record<string, FunctionOccurrence[]>;
+  /** Flat list of call sites discovered across the file. */
+  readonly callSites: CallSiteRecord[];
+  /** Flat list of dependency (import) sites discovered across the file. */
+  readonly dependencySites: DependencySiteRecord[];
+}
+
 /** Inputs to the shared `walkProject` driver. */
 export interface RunWalkParams<P extends TreeSitterParsedProject> {
   readonly input: WalkInput<P>;
@@ -94,9 +109,7 @@ export interface RunWalkParams<P extends TreeSitterParsedProject> {
     absPath: string,
     file: P['files'] extends ReadonlyMap<string, infer F> ? F : never,
     projectDirAbs: string,
-    out: Record<string, FunctionOccurrence[]>,
-    callSites: CallSiteRecord[],
-    dependencySites: DependencySiteRecord[],
+    sinks: WalkSinks,
   ) => void;
 }
 
@@ -117,6 +130,7 @@ export function runWalk<P extends TreeSitterParsedProject>(
   const callSites: CallSiteRecord[] = [];
   const dependencySites: DependencySiteRecord[] = [];
   const parseErrors: ParseError[] = [];
+  const sinks: WalkSinks = { occurrences, callSites, dependencySites };
 
   const sortedPaths = [...input.files].filter((p) => input.project.files.has(p)).sort();
 
@@ -128,9 +142,7 @@ export function runWalk<P extends TreeSitterParsedProject>(
         path,
         file as P['files'] extends ReadonlyMap<string, infer F> ? F : never,
         input.projectDirAbs,
-        occurrences,
-        callSites,
-        dependencySites,
+        sinks,
       );
     } catch (error) {
       parseErrors.push({

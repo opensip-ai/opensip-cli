@@ -107,6 +107,20 @@ export interface MutableStats {
   apply(edge: CallEdge): void;
 }
 
+/**
+ * The two output accumulators a resolver threads through edge emission:
+ * the per-owner edge map and the running confidence stats. Grouping them
+ * names the "resolution output" a resolver allocates once per pass and
+ * keeps the edge-push helpers (and the adapter `pushCallEdge` functions)
+ * under the wide-function parameter budget.
+ */
+export interface EdgeSink {
+  /** Per-owner-hash edge list, appended via {@link appendEdge}. */
+  readonly edgesByOwner: Map<string, CallEdge[]>;
+  /** Running per-confidence counters, bumped as edges are appended. */
+  readonly stats: MutableStats;
+}
+
 /** Constructs a fresh {@link MutableStats} accumulator for edge resolver bookkeeping. */
 export function createMutableStats(): MutableStats {
   const stats = {
@@ -150,21 +164,17 @@ export interface EdgePosition {
  * to the child unconditionally. Static, high-confidence by
  * construction.
  *
- * Generic over the adapter's node and file shapes; the `position`
- * callback resolves the line/column/text without forcing the helper
- * to know how the adapter parses code. Bumps `totalCallSites` and
- * `resolvedHigh` on the supplied stats.
+ * Parser-agnostic: the caller resolves the call site's {@link EdgePosition}
+ * (the only thing the helper needs from the adapter's node/file pair) and
+ * passes it in, so this helper never touches a parser-specific node shape.
+ * Bumps `totalCallSites` and `resolvedHigh` on the sink's stats.
  */
-export function pushCreationEdge<NodeRef, FileRef>(
-  node: NodeRef,
-  file: FileRef,
+export function pushCreationEdge(
+  pos: EdgePosition,
   ownerHash: string,
   childHash: string,
-  edgesByOwner: Map<string, CallEdge[]>,
-  stats: MutableStats,
-  position: (node: NodeRef, file: FileRef) => EdgePosition,
+  sink: EdgeSink,
 ): void {
-  const pos = position(node, file);
   const truncated = truncateForCreationEdge(pos.text);
   const edge: CallEdge = {
     to: [childHash],
@@ -175,7 +185,7 @@ export function pushCreationEdge<NodeRef, FileRef>(
     text: `${CREATION_EDGE_PREFIX}${truncated}`,
     discarded: false,
   };
-  appendEdge(edgesByOwner, ownerHash, edge);
-  stats.totalCallSites++;
-  stats.resolvedHigh++;
+  appendEdge(sink.edgesByOwner, ownerHash, edge);
+  sink.stats.totalCallSites++;
+  sink.stats.resolvedHigh++;
 }

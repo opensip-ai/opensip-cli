@@ -47,7 +47,7 @@ import type {
   CallEdge,
   DependencyEdge,
   DependencySiteRecord,
-  MutableStats,
+  EdgeSink,
   ResolutionStats,
   ResolveInput,
   ResolveOutput,
@@ -71,16 +71,17 @@ export function resolveCallSites(input: ResolveInput<PythonParsedProject>): Reso
   const byName = buildNameIndex(input.catalog.functions);
   const edgesByOwner = new Map<string, CallEdge[]>();
   const stats = createMutableStats();
+  const sink: EdgeSink = { edgesByOwner, stats };
 
   for (const r of input.callSites) {
     const node = r.nodeRef as Node;
     const file = r.sourceFileRef as PythonParsedFile;
     if (r.kind === 'creation') {
       if (r.childHash === undefined) continue;
-      pushCreationEdge(node, file, r.ownerHash, r.childHash, edgesByOwner, stats, pythonPosition);
+      pushCreationEdge(pythonPosition(node, file), r.ownerHash, r.childHash, sink);
       continue;
     }
-    pushCallEdge(node, file, r.ownerHash, byName, edgesByOwner, stats);
+    pushCallEdge(node, file, r.ownerHash, byName, sink);
   }
 
   const finalStats: ResolutionStats = {
@@ -288,9 +289,9 @@ function pushCallEdge(
   file: PythonParsedFile,
   ownerHash: string,
   byName: ReadonlyMap<string, readonly string[]>,
-  edgesByOwner: Map<string, CallEdge[]>,
-  stats: MutableStats,
+  sink: EdgeSink,
 ): void {
+  const { edgesByOwner, stats } = sink;
   stats.totalCallSites++;
   const target = extractCallTargetName(node);
   const pos = pythonPosition(node, file);

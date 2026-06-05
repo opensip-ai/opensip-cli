@@ -119,7 +119,7 @@ export async function executeGraph(
     }
     const positionalPaths = resolvePositionalScope(opts);
     if (positionalPaths.length > 1) {
-      const envelope = await executeMultiPathGraph(opts, positionalPaths, cli, startedAt, rules, profile);
+      const envelope = await executeMultiPathGraph({ opts, cli, rules, startedAt, profile }, positionalPaths);
       writeProfileIfRequested(opts, profile);
       return envelope;
     }
@@ -139,7 +139,7 @@ export async function executeGraph(
       mode: shards.length > 1 ? 'sharded' : 'single-process',
     });
     const result = shards.length > 1
-      ? await runProfiledShardedBuild(profileRun, opts, shards, runCwd, cli, config, rules)
+      ? await runProfiledShardedBuild(profileRun, { opts, shards, projectRoot: runCwd, cli, config, rules })
       : await runGraph({
           cwd: runCwd,
           noCache: opts.noCache,
@@ -242,15 +242,24 @@ function resolveSyntheticFlatShards(opts: GraphCommandOptions): Shard[] {
   return shards.length > 1 ? shards : [];
 }
 
+/**
+ * The inputs the sharded build path threads from {@link executeGraph}: the
+ * parsed options, the resolved shard set + its root, the CLI context, and
+ * the run's config + recipe rules. Grouped so the build helpers stay under
+ * the wide-function parameter budget and share one named shape.
+ */
+interface ShardedBuildContext {
+  readonly opts: GraphCommandOptions;
+  readonly shards: readonly Shard[];
+  readonly projectRoot: string;
+  readonly cli: ToolCliContext;
+  readonly config: GraphConfig;
+  readonly rules: readonly Rule[];
+}
+
 /** Drive the sharded build and adapt it to the RunGraphResult dispatch shape. */
-async function runShardedBuild(
-  opts: GraphCommandOptions,
-  shards: readonly Shard[],
-  projectRoot: string,
-  cli: ToolCliContext,
-  config: GraphConfig,
-  rules: readonly Rule[],
-): Promise<RunGraphResult> {
+async function runShardedBuild(ctx: ShardedBuildContext): Promise<RunGraphResult> {
+  const { opts, shards, projectRoot, cli, config, rules } = ctx;
   const datastore = cli.scope.datastore() as DataStore | undefined;
   const sharded = await runShardedGraph({
     shards,
@@ -277,19 +286,14 @@ async function runShardedBuild(
 
 async function runProfiledShardedBuild(
   profileRun: GraphProfileRunRecorder | undefined,
-  opts: GraphCommandOptions,
-  shards: readonly Shard[],
-  projectRoot: string,
-  cli: ToolCliContext,
-  config: GraphConfig,
-  rules: readonly Rule[],
+  ctx: ShardedBuildContext,
 ): Promise<RunGraphResult> {
   const started = Date.now();
-  const result = await runShardedBuild(opts, shards, projectRoot, cli, config, rules);
+  const result = await runShardedBuild(ctx);
   profileRun?.recordStage(
     'sharded-build',
     Date.now() - started,
-    `${String(shards.length)} shard(s)`,
+    `${String(ctx.shards.length)} shard(s)`,
   );
   return result;
 }
@@ -367,14 +371,25 @@ function enforceLanguageMismatchPolicy(
   );
 }
 
+/**
+ * The ambient run context {@link executeGraph} threads into the multi-path
+ * fan-out: parsed options, CLI context, recipe rules, the run's start
+ * timestamp, and the optional profile builder. Grouped to keep the helper
+ * under the wide-function parameter budget.
+ */
+interface MultiPathContext {
+  readonly opts: GraphCommandOptions;
+  readonly cli: ToolCliContext;
+  readonly rules: readonly Rule[];
+  readonly startedAt: string;
+  readonly profile?: GraphProfileBuilder;
+}
+
 async function executeMultiPathGraph(
-  opts: GraphCommandOptions,
+  ctx: MultiPathContext,
   paths: readonly string[],
-  cli: ToolCliContext,
-  startedAt: string,
-  rules: readonly Rule[],
-  profile?: GraphProfileBuilder,
 ): Promise<SignalEnvelope | undefined> {
+  const { opts, cli, rules, startedAt, profile } = ctx;
   const allSignals: Signal[] = [];
   let combinedFiles = 0;
   let lastResult: Awaited<ReturnType<typeof runGraph>> | null = null;

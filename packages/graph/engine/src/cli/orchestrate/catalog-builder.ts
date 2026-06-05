@@ -37,19 +37,42 @@ import type { PressureMonitor } from '../pressure-monitor.js';
 import type { Attributes } from '@opensip-tools/core';
 
 /**
+ * Arguments to a {@link RunStage} invocation: the stage label, the
+ * live-view/pressure plumbing, the work to run, and optional result
+ * labelers for the progress detail line and span attributes.
+ */
+export interface RunStageArgs<T> {
+  readonly stage: GraphStage;
+  readonly onProgress: GraphProgressCallback | undefined;
+  readonly monitor: PressureMonitor | undefined;
+  readonly fn: () => T;
+  readonly detailFn?: (result: T) => string | undefined;
+  readonly attrsFn?: (result: T) => Attributes;
+}
+
+/**
  * Shape of the `runStage` helper passed in by the orchestrator.
  * Kept here as a type alias so catalog-builder doesn't import the
  * concrete function (which lives in orchestrate.ts at the parent
  * level) and we avoid a circular dependency.
  */
-export type RunStage = <T>(
-  stage: GraphStage,
-  onProgress: GraphProgressCallback | undefined,
-  monitor: PressureMonitor | undefined,
-  fn: () => T,
-  detailFn?: (result: T) => string | undefined,
-  attrsFn?: (result: T) => Attributes,
-) => T;
+export type RunStage = <T>(args: RunStageArgs<T>) => T;
+
+/** Inputs to the full-rebuild {@link buildAndResolveCatalog}. */
+export interface CatalogBuildOptions {
+  readonly runStage: RunStage;
+  readonly adapter: GraphLanguageAdapter;
+  readonly discovery: DiscoverOutput;
+  readonly resolutionMode: ResolutionMode;
+  readonly onProgress?: GraphProgressCallback;
+  readonly monitor?: PressureMonitor;
+  /**
+   * Sharded build (plan #2): when true, request cross-boundary call
+   * descriptors from the adapter and surface them in the return for the
+   * cross-shard pass. Off for ordinary single-process builds.
+   */
+  readonly emitBoundaryCalls?: boolean;
+}
 
 /**
  * Run Stage 1 + Stage 2 and return only the catalog and resolution
@@ -58,60 +81,49 @@ export type RunStage = <T>(
  * any caller, so V8 can reclaim the bound AST before Stage 3
  * (`buildIndexes`) and the cache write run.
  */
-export function buildAndResolveCatalog(
-  runStage: RunStage,
-  adapter: GraphLanguageAdapter,
-  discovery: DiscoverOutput,
-  resolutionMode: ResolutionMode,
-  onProgress?: GraphProgressCallback,
-  monitor?: PressureMonitor,
-  /**
-   * Sharded build (plan #2): when true, request cross-boundary call
-   * descriptors from the adapter and surface them in the return for the
-   * cross-shard pass. Off for ordinary single-process builds.
-   */
-  emitBoundaryCalls?: boolean,
-): {
+export function buildAndResolveCatalog(options: CatalogBuildOptions): {
   readonly catalog: Catalog;
   readonly resolutionStats: ResolutionStats;
   readonly boundaryCalls?: readonly CrossBoundaryCall[];
   readonly parseErrors: readonly ParseError[];
 } {
+  const { runStage, adapter, discovery, resolutionMode, onProgress, monitor, emitBoundaryCalls } =
+    options;
   // Phase 4 unified walk: Stage 1's catalog construction and Stage 2's
   // call-site location share a single AST descent per file. The walk
   // emits the catalog plus a flat list of pre-located call-site
   // records; resolveCallSites dispatches resolvers without re-walking.
-  const parsed = runStage(
-    'parse',
+  const parsed = runStage({
+    stage: 'parse',
     onProgress,
     monitor,
-    () => adapter.parseProject({
+    fn: () => adapter.parseProject({
       projectDirAbs: discovery.projectDirAbs,
       files: discovery.files,
       compilerOptions: discovery.compilerOptions,
       resolutionMode,
     }),
-    () => adapter.displayName,
-  );
-  const walked = runStage(
-    'walk',
+    detailFn: () => adapter.displayName,
+  });
+  const walked = runStage({
+    stage: 'walk',
     onProgress,
     monitor,
-    () => adapter.walkProject({
+    fn: () => adapter.walkProject({
       project: parsed.project,
       files: discovery.files,
       projectDirAbs: discovery.projectDirAbs,
     }),
-    (w) => `${String(Object.keys(w.occurrences).length)} functions`,
-  );
+    detailFn: (w) => `${String(Object.keys(w.occurrences).length)} functions`,
+  });
 
   const initialCatalog = assembleCatalog(adapter, discovery, walked.occurrences, resolutionMode);
 
-  const resolved = runStage(
-    'resolve',
+  const resolved = runStage({
+    stage: 'resolve',
     onProgress,
     monitor,
-    () => adapter.resolveCallSites({
+    fn: () => adapter.resolveCallSites({
       project: parsed.project,
       catalog: initialCatalog,
       callSites: walked.callSites,
@@ -120,8 +132,8 @@ export function buildAndResolveCatalog(
       resolutionMode,
       emitBoundaryCalls,
     }),
-    (r) => `${String(r.stats.totalCallSites)} call site(s)`,
-  );
+    detailFn: (r) => `${String(r.stats.totalCallSites)} call site(s)`,
+  });
 
   const catalog = stitchEdges(initialCatalog, resolved.edgesByOwner, resolved.dependenciesByOwner);
   return {
@@ -169,32 +181,32 @@ export function buildAndResolveCatalogIncremental(
   options: IncrementalCatalogBuildOptions,
 ): { readonly catalog: Catalog; readonly resolutionStats: ResolutionStats } {
   const { runStage, adapter, discovery, cachedCatalog, changedFilesAbs, resolutionMode, onProgress, monitor } = options;
-  const parsed = runStage(
-    'parse',
+  const parsed = runStage({
+    stage: 'parse',
     onProgress,
     monitor,
-    () => adapter.parseProject({
+    fn: () => adapter.parseProject({
       projectDirAbs: discovery.projectDirAbs,
       files: discovery.files,
       compilerOptions: discovery.compilerOptions,
       resolutionMode,
     }),
-    () => `${adapter.displayName} (incremental)`,
-  );
+    detailFn: () => `${adapter.displayName} (incremental)`,
+  });
 
-  const { walked, closureRel } = runStage(
-    'walk',
+  const { walked, closureRel } = runStage({
+    stage: 'walk',
     onProgress,
     monitor,
-    () => expandClosureToFixpoint({
+    fn: () => expandClosureToFixpoint({
       adapter,
       discovery,
       cachedCatalog,
       parsedProject: parsed.project,
       changedFilesAbs,
     }),
-    (out) => `${String(out.closureRel.size)} closure file(s)`,
-  );
+    detailFn: (out) => `${String(out.closureRel.size)} closure file(s)`,
+  });
 
   // Build the resolver-input catalog from the merged occurrence set
   // so name- and hash-based fallbacks see the full project.
@@ -209,11 +221,11 @@ export function buildAndResolveCatalogIncremental(
     functions: mergedFunctions,
   } as Catalog;
 
-  const resolved = runStage(
-    'resolve',
+  const resolved = runStage({
+    stage: 'resolve',
     onProgress,
     monitor,
-    () => adapter.resolveCallSites({
+    fn: () => adapter.resolveCallSites({
       project: parsed.project,
       catalog: initialCatalog,
       callSites: walked.callSites,
@@ -221,8 +233,8 @@ export function buildAndResolveCatalogIncremental(
       projectDirAbs: discovery.projectDirAbs,
       resolutionMode,
     }),
-    (r) => `${String(r.stats.totalCallSites)} call site(s)`,
-  );
+    detailFn: (r) => `${String(r.stats.totalCallSites)} call site(s)`,
+  });
 
   // Apply resolved edges only to closure files; unchanged files keep
   // their cached edges. Their bodyHashes are present in the merged

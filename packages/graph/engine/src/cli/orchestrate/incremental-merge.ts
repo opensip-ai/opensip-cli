@@ -55,6 +55,15 @@ export function expandClosureToFixpoint(input: ClosureInput): ClosureOutput {
   );
   const closureAbs = new Set(changedFilesAbs);
   const cachedHashesByFile = groupCachedHashesByFile(cachedCatalog);
+  // Loop-invariant context for the per-iteration closure expansion; only
+  // `walked` changes between iterations.
+  const ctx: ClosureExpansionContext = {
+    cachedCatalog,
+    closureRel,
+    closureAbs,
+    cachedHashesByFile,
+    projectDirAbs: discovery.projectDirAbs,
+  };
 
   let walked: WalkOutput | null = null;
   // Iterate to fixpoint. On a typical 1-file change, this loop runs
@@ -67,14 +76,7 @@ export function expandClosureToFixpoint(input: ClosureInput): ClosureOutput {
       files: discovery.files.filter((p) => closureAbs.has(p)),
       projectDirAbs: discovery.projectDirAbs,
     });
-    const grew = expandClosureOnce(
-      walked,
-      cachedCatalog,
-      closureRel,
-      closureAbs,
-      cachedHashesByFile,
-      discovery.projectDirAbs,
-    );
+    const grew = expandClosureOnce(walked, ctx);
     if (!grew) break;
   }
   /* v8 ignore next 3 */
@@ -84,14 +86,17 @@ export function expandClosureToFixpoint(input: ClosureInput): ClosureOutput {
   return { walked, closureRel };
 }
 
-function expandClosureOnce(
-  walked: WalkOutput,
-  cachedCatalog: Catalog,
-  closureRel: Set<string>,
-  closureAbs: Set<string>,
-  cachedHashesByFile: ReadonlyMap<string, ReadonlySet<string>>,
-  projectDirAbs: string,
-): boolean {
+/** Loop-invariant context for {@link expandClosureOnce}. */
+interface ClosureExpansionContext {
+  readonly cachedCatalog: Catalog;
+  readonly closureRel: Set<string>;
+  readonly closureAbs: Set<string>;
+  readonly cachedHashesByFile: ReadonlyMap<string, ReadonlySet<string>>;
+  readonly projectDirAbs: string;
+}
+
+function expandClosureOnce(walked: WalkOutput, ctx: ClosureExpansionContext): boolean {
+  const { cachedCatalog, closureRel, closureAbs, cachedHashesByFile, projectDirAbs } = ctx;
   const newHashes = collectHashesFromOccurrences(walked.occurrences);
   const staleHashes = collectStaleHashes(closureRel, cachedHashesByFile, newHashes);
   // @fitness-ignore-next-line silent-early-returns -- `expandClosureOnce` returns boolean as its documented "did the closure grow this iteration?" contract; `false` is the fixed-point signal driving the outer expansion loop, not a hidden failure.

@@ -81,15 +81,13 @@ function buildShard(spec: ShardWorkerSpec): ShardBuildResult {
   // parent build's sharded span via the TRACEPARENT the runner propagates into
   // this worker's env (extracted at the CLI boundary by initTelemetry). No live
   // view here — the worker is headless — so no progress/monitor plumbing.
-  const built = buildAndResolveCatalog(
-    spanRunStage({ 'opensip_tools.graph.shard_id': shard.id }),
+  const built = buildAndResolveCatalog({
+    runStage: spanRunStage({ 'opensip_tools.graph.shard_id': shard.id }),
     adapter,
     discovery,
     resolutionMode,
-    undefined,
-    undefined,
-    /* emitBoundaryCalls */ true,
-  );
+    emitBoundaryCalls: true,
+  });
 
   return {
     shardId: shard.id,

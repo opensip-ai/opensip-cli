@@ -29,7 +29,7 @@ import type { RunStage } from '../catalog-builder.js';
 
 // A pass-through runStage: just invoke the work fn. The orchestrator's
 // real one adds progress/pressure plumbing we don't need here.
-const runStage: RunStage = (_stage, _onProgress, _monitor, fn) => fn();
+const runStage: RunStage = ({ fn }) => fn();
 
 function occ(
   simpleName: string,

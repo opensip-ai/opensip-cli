@@ -15,7 +15,7 @@ import { spanRunStage } from '../graph-tracer.js';
 describe('spanRunStage (sharded-worker stage spans)', () => {
   it('runs fn and returns its value with no SDK registered (no-op span)', () => {
     const run = spanRunStage({ 'opensip_tools.graph.shard_id': 's1' });
-    const result = run('parse', undefined, undefined, () => 'OUT');
+    const result = run({ stage: 'parse', onProgress: undefined, monitor: undefined, fn: () => 'OUT' });
     expect(result).toBe('OUT');
   });
 
@@ -23,12 +23,14 @@ describe('spanRunStage (sharded-worker stage spans)', () => {
     const run = spanRunStage();
     const attrsFn = vi.fn(() => ({ 'opensip_tools.graph.file_count': 3 }));
     const out = { files: [1, 2, 3] };
-    run('discover', undefined, undefined, () => out, undefined, attrsFn);
+    run({ stage: 'discover', onProgress: undefined, monitor: undefined, fn: () => out, attrsFn });
     expect(attrsFn).toHaveBeenCalledWith(out);
   });
 
   it('tolerates base attrs + a no-op span without throwing', () => {
     const run = spanRunStage({ 'opensip_tools.graph.shard_id': 's2' });
-    expect(() => run('resolve', undefined, undefined, () => undefined)).not.toThrow();
+    expect(() =>
+      run({ stage: 'resolve', onProgress: undefined, monitor: undefined, fn: () => undefined }),
+    ).not.toThrow();
   });
 });

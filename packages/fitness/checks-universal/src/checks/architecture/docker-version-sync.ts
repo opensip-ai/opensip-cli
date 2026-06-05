@@ -90,13 +90,24 @@ function extractMajor(version: string): number {
 // LINE-LEVEL ANALYSIS HELPERS
 // =============================================================================
 
+/**
+ * Per-Dockerfile analysis context: the file's path (absolute + repo-relative
+ * for messages) and the shared violation sink. Threaded so the line-level
+ * helpers stay under the wide-function parameter budget.
+ */
+interface DockerfileVersionContext {
+  filePath: string
+  relPath: string
+  violations: CheckViolation[]
+}
+
 function checkNodeVersion(
   line: string,
   lineNum: number,
-  filePath: string,
   expectedNodeMajor: number,
-  violations: CheckViolation[],
+  ctx: DockerfileVersionContext,
 ): void {
+  const { filePath, violations } = ctx
   const nodeMatch = FROM_NODE_PATTERN.exec(line)
   const nodeVersion = nodeMatch?.[1]
   if (!nodeVersion) return
@@ -118,11 +129,10 @@ function checkNodeVersion(
 function checkPnpmVersion(
   line: string,
   lineNum: number,
-  filePath: string,
-  relPath: string,
   expectedPnpmVersion: string,
-  violations: CheckViolation[],
+  ctx: DockerfileVersionContext,
 ): boolean {
+  const { filePath, relPath, violations } = ctx
   const hardcodedMatch = PNPM_HARDCODED_PATTERN.exec(line)
   const hardcodedVersion = hardcodedMatch?.[1]
   if (!hardcodedVersion) return false
@@ -162,11 +172,9 @@ function checkPnpmVersion(
 
 function analyzeDockerfileLines(
   lines: string[],
-  filePath: string,
-  relPath: string,
   expectedNodeMajor: number | null,
   expectedPnpmVersion: string | null,
-  violations: CheckViolation[],
+  ctx: DockerfileVersionContext,
 ): void {
   for (const [i, rawLine] of lines.entries()) {
     if (!rawLine) continue
@@ -174,18 +182,11 @@ function analyzeDockerfileLines(
     const lineNum = i + 1
 
     if (expectedNodeMajor !== null) {
-      checkNodeVersion(line, lineNum, filePath, expectedNodeMajor, violations)
+      checkNodeVersion(line, lineNum, expectedNodeMajor, ctx)
     }
 
     if (expectedPnpmVersion !== null) {
-      const shouldSkipLine = checkPnpmVersion(
-        line,
-        lineNum,
-        filePath,
-        relPath,
-        expectedPnpmVersion,
-        violations,
-      )
+      const shouldSkipLine = checkPnpmVersion(line, lineNum, expectedPnpmVersion, ctx)
       if (shouldSkipLine) continue
     }
   }
@@ -243,14 +244,11 @@ export const dockerVersionSync = defineCheck({
       const hasNodeFrom = lines.some((line) => FROM_NODE_PATTERN.test(line.trim()))
       if (!hasNodeFrom) continue
 
-      void analyzeDockerfileLines(
-        lines,
+      void analyzeDockerfileLines(lines, expectedNodeMajor, expectedPnpmVersion, {
         filePath,
         relPath,
-        expectedNodeMajor,
-        expectedPnpmVersion,
         violations,
-      )
+      })
     }
 
     return violations

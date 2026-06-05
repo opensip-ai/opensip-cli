@@ -128,13 +128,10 @@ describe('pushCreationEdge', () => {
     const map = new Map<string, CallEdge[]>();
     const stats = createMutableStats();
     pushCreationEdge(
-      { dummy: true },
-      { dummy: true },
+      { line: 10, column: 4, text: '() => {}' },
       'owner-1',
       'child-1',
-      map,
-      stats,
-      () => ({ line: 10, column: 4, text: '() => {}' }),
+      { edgesByOwner: map, stats },
     );
     const edges = map.get('owner-1');
     expect(edges).toBeDefined();
@@ -154,13 +151,10 @@ describe('pushCreationEdge', () => {
     const stats = createMutableStats();
     const inner = 'x'.repeat(CREATION_EDGE_TEXT_MAX + 50);
     pushCreationEdge(
-      { dummy: true },
-      { dummy: true },
+      { line: 1, column: 0, text: inner },
       'owner-1',
       'child-1',
-      map,
-      stats,
-      () => ({ line: 1, column: 0, text: inner }),
+      { edgesByOwner: map, stats },
     );
     const edge = map.get('owner-1')?.[0];
     expect(edge).toBeDefined();
@@ -174,13 +168,10 @@ describe('pushCreationEdge', () => {
     const map = new Map<string, CallEdge[]>();
     const stats = createMutableStats();
     pushCreationEdge(
-      { dummy: true },
-      { dummy: true },
+      { line: 42, column: 7, text: '() => null' },
       'owner-1',
       'child-1',
-      map,
-      stats,
-      () => ({ line: 42, column: 7, text: '() => null' }),
+      { edgesByOwner: map, stats },
     );
     const edge = map.get('owner-1')?.[0];
     expect(edge?.line).toBe(42);

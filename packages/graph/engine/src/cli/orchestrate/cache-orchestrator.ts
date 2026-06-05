@@ -94,14 +94,14 @@ export function obtainCatalog(input: ObtainCatalogInput): ObtainCatalogOutput {
         onProgress: input.onProgress,
         monitor: input.monitor,
       })
-    : buildAndResolveCatalog(
-        input.runStage,
-        input.adapter,
-        input.discovery,
-        input.resolutionMode,
-        input.onProgress,
-        input.monitor,
-      );
+    : buildAndResolveCatalog({
+        runStage: input.runStage,
+        adapter: input.adapter,
+        discovery: input.discovery,
+        resolutionMode: input.resolutionMode,
+        onProgress: input.onProgress,
+        monitor: input.monitor,
+      });
 
   // Stamp packages (nearest package.json), then drop name-guessed edges that
   // contradict the import graph. Order matters: the constraint reads the

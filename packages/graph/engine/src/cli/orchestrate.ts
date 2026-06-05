@@ -23,7 +23,7 @@
  * public type surface.
  */
 
-import { withSpan, type Attributes, type Signal } from '@opensip-tools/core';
+import { withSpan, type Signal } from '@opensip-tools/core';
 
 import { currentAdapterRegistry, pickAdapter } from '../lang-adapter/registry.js';
 import { CatalogRepo } from '../persistence/catalog-repo.js';
@@ -38,7 +38,7 @@ import { currentRules } from '../rules/registry.js';
 
 import { GRAPH_TRACER } from './graph-tracer.js';
 import { obtainCatalog } from './orchestrate/cache-orchestrator.js';
-import { createPressureMonitor, type PressureMonitor } from './pressure-monitor.js';
+import { createPressureMonitor } from './pressure-monitor.js';
 
 import type {
   Catalog,
@@ -50,10 +50,8 @@ import type {
   ResolutionStats,
   Rule,
 } from '../types.js';
-import type {
-  GraphProgressCallback,
-  GraphStage,
-} from './orchestrate/types.js';
+import type { RunStageArgs } from './orchestrate/catalog-builder.js';
+import type { GraphProgressCallback } from './orchestrate/types.js';
 import type { DataStore } from '@opensip-tools/datastore';
 
 // Re-export the orchestration types so existing callers (the engine's
@@ -140,14 +138,8 @@ export interface RunGraphResult {
   readonly features: FeatureTable | null;
 }
 
-function runStage<T>(
-  stage: GraphStage,
-  onProgress: GraphProgressCallback | undefined,
-  monitor: PressureMonitor | undefined,
-  fn: () => T,
-  detailFn?: (result: T) => string | undefined,
-  attrsFn?: (result: T) => Attributes,
-): T {
+function runStage<T>(args: RunStageArgs<T>): T {
+  const { stage, onProgress, monitor, fn, detailFn, attrsFn } = args;
   monitor?.setStage(stage);
   // Sample BEFORE the stage starts. The previous stage may have left
   // the heap near the threshold; bail out before doing more work that
@@ -192,17 +184,17 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
   const monitor = createPressureMonitor();
   try {
     const adapter = pickAdapterFor(input);
-    const discovery = runStage(
-      'discover',
-      input.onProgress,
+    const discovery = runStage({
+      stage: 'discover',
+      onProgress: input.onProgress,
       monitor,
-      () => adapter.discoverFiles({
+      fn: () => adapter.discoverFiles({
         cwd: input.cwd,
         configPathOverride: input.tsConfigPath,
       }),
-      (d) => `${String(d.files.length)} files`,
-      (d) => ({ 'opensip_tools.graph.file_count': d.files.length }),
-    );
+      detailFn: (d) => `${String(d.files.length)} files`,
+      attrsFn: (d) => ({ 'opensip_tools.graph.file_count': d.files.length }),
+    });
 
     const { catalog, cacheHit, resolutionStats } = obtainCatalog({
       runStage,
@@ -216,38 +208,36 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
       monitor,
     });
 
-    const indexes: Indexes = runStage(
-      'index',
-      input.onProgress,
+    const indexes: Indexes = runStage({
+      stage: 'index',
+      onProgress: input.onProgress,
       monitor,
-      () => buildIndexes(catalog),
-      undefined,
+      fn: () => buildIndexes(catalog),
       // cacheHit is resolved by obtainCatalog (parse/walk/resolve) above, so it
       // is known by the time the index stage runs. Surfacing it here gives the
       // consumer a low-cardinality flag for "was this an incremental/cached run."
-      () => ({ 'opensip_tools.graph.cache_hit': cacheHit }),
-    );
+      attrsFn: () => ({ 'opensip_tools.graph.cache_hit': cacheHit }),
+    });
 
     // Stage 3.5 — feature derivation. Runs after index / before rules so rules
     // consume the columns as a plain view (ADR-0006). Computes only the union
     // of the rule set's featureDeps + the caller's emitFeatures.
-    const features: FeatureTable = runStage(
-      'features',
-      input.onProgress,
+    const features: FeatureTable = runStage({
+      stage: 'features',
+      onProgress: input.onProgress,
       monitor,
-      () => buildFeatures(catalog, indexes, config, requestedColumns),
-      undefined,
-      (f) => ({
+      fn: () => buildFeatures(catalog, indexes, config, requestedColumns),
+      attrsFn: (f) => ({
         'opensip_tools.graph.feature_columns': requestedColumns.length,
         'opensip_tools.graph.scc_count': f.scc.length,
       }),
-    );
+    });
 
-    const signals: Signal[] = runStage(
-      'rules',
-      input.onProgress,
+    const signals: Signal[] = runStage({
+      stage: 'rules',
+      onProgress: input.onProgress,
       monitor,
-      () => {
+      fn: () => {
         const collected: Signal[] = [];
         for (const rule of ruleSet) {
           // Thread the active adapter's RuleHints so non-TypeScript
@@ -261,12 +251,12 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
         }
         return collected;
       },
-      (sigs) => `${String(ruleSet.length)} rule(s), ${String(sigs.length)} signal(s)`,
-      (sigs) => ({
+      detailFn: (sigs) => `${String(ruleSet.length)} rule(s), ${String(sigs.length)} signal(s)`,
+      attrsFn: (sigs) => ({
         'opensip_tools.graph.rule_count': ruleSet.length,
         'opensip_tools.graph.signal_count': sigs.length,
       }),
-    );
+    });
 
     // Materialize the requested dashboard columns into the persisted catalog
     // (ADR-0006). obtainCatalog already wrote the feature-LESS catalog; a
