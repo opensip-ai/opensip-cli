@@ -46,7 +46,7 @@ import type {
   ResolveInput,
   ResolveOutput,
 } from '@opensip-tools/graph';
-import type { Node } from 'web-tree-sitter';
+import type { Node } from '@opensip-tools/tree-sitter';
 
 function javaPosition(node: Node, file: JavaParsedFile): {
   readonly line: number;

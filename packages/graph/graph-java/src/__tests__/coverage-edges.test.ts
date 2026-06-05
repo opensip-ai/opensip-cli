@@ -16,10 +16,9 @@
  *     non-module-init occurrence early-return, and the falsy occs guard.
  */
 
-import { fileURLToPath } from 'node:url';
-
+import { parseJava } from '@opensip-tools/lang-java';
 import { describe, expect, it } from 'vitest';
-import { Parser, Language, type Node } from 'web-tree-sitter';
+
 
 import { digestJavaBody } from '../body-digest.js';
 import { resolveDependencies } from '../resolve-dependencies.js';
@@ -35,20 +34,14 @@ import type {
   FunctionOccurrence,
   ResolveInput,
 } from '@opensip-tools/graph';
+import type { Node } from '@opensip-tools/tree-sitter';
 
-// web-tree-sitter needs a one-time async init + grammar load. Top-level
-// await runs once before any test body (vitest evaluates the module first).
-await Parser.init();
-const Java = await Language.load(
-  fileURLToPath(new URL('../../wasm/tree-sitter-java.wasm', import.meta.url)),
-);
-
+// ADR-0010: parse via the canonical lang-java substrate (which owns the
+// grammar) rather than constructing a web-tree-sitter parser here.
 function parseRoot(src: string): Node {
-  const parser = new Parser();
-  parser.setLanguage(Java);
-  const tree = parser.parse(src);
-  if (tree === null) throw new Error('parse returned no tree');
-  return tree.rootNode;
+  const parsed = parseJava(src, 'fixture.java');
+  if (parsed === null) throw new Error('parse returned no tree');
+  return parsed.tree.rootNode;
 }
 
 function findNode(node: Node, type: string): Node | null {

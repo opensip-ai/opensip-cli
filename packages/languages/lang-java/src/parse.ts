@@ -1,25 +1,29 @@
 /**
- * @fileoverview Lightweight Java "parse" — returns content metadata.
+ * @fileoverview Java parse — web-tree-sitter + vendored tree-sitter-java.wasm.
  *
- * The MVP Java adapter does not ship a full AST parser. Tree-sitter
- * integration is deferred. `parse()` returns a minimal tree object
- * that exposes the source text and line offsets, enough for
- * text-pattern checks. Delegates to core's shared
- * `buildMinimalTextTree` factory; the `JavaTree` alias keeps the
- * adapter generic-parameter name distinct so future per-language
- * tree-sitter trees can grow independently.
- *
- * Future: replace with web-tree-sitter + tree-sitter-java to produce a
- * real AST. The adapter contract is unchanged — only the JavaTree
- * shape grows.
+ * ADR-0010: `lang-java` is the canonical Java parse substrate — fitness checks
+ * parse via the adapter (`getSharedTree`) and the graph Java adapter consumes
+ * this too. The grammar loads once at module top level (the WASM runtime is
+ * initialized by `@opensip-tools/tree-sitter`'s top-level `Parser.init()`); a
+ * single reused parser keeps `parse()` synchronous. Tree-sitter recovers from
+ * syntax errors with MISSING nodes, so a malformed file yields a partial tree
+ * (non-null) rather than throwing.
  */
 
-import { buildMinimalTextTree, type MinimalTextTree } from '@opensip-tools/core'
+import { fileURLToPath } from 'node:url'
 
-/** Parse-tree alias for Java (currently a minimal text tree; will become a real AST). */
-export type JavaTree = MinimalTextTree
+import { loadGrammar, createParser, parseToTree, type ParsedFile } from '@opensip-tools/tree-sitter'
 
-/** Parses Java source into a {@link JavaTree} for check consumption. */
-export function parseJava(content: string, filePath: string): JavaTree {
-  return buildMinimalTextTree(content, filePath)
+const grammar = await loadGrammar(
+  fileURLToPath(new URL('../wasm/tree-sitter-java.wasm', import.meta.url)),
+)
+const parser = createParser(grammar)
+
+/** Parsed Java source: tree-sitter parse tree plus the original source text. */
+export type JavaTree = ParsedFile
+
+/** Parses Java source into a {@link JavaTree}, or null when no tree is produced. */
+export function parseJava(content: string, _filePath: string): JavaTree | null {
+  const tree = parseToTree(parser, content)
+  return tree ? { tree, source: content } : null
 }

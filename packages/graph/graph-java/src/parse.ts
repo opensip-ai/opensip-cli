@@ -1,35 +1,19 @@
 /**
- * Java parseProject — web-tree-sitter + vendored tree-sitter-java.wasm.
+ * Java parseProject — consumes `@opensip-tools/lang-java` (ADR-0010).
  *
- * The parse driver (read → parse → ParseError on failure, total over
- * `input.files` per invariant I-7) lives in
- * `@opensip-tools/graph-adapter-common`; this module loads the vendored
- * Java grammar WASM and binds the driver to it, then re-exports the
- * nominal Java parsed-project types consumed by the resolver and tests.
- *
- * The grammar is loaded via a module top-level `await Language.load(...)`.
- * `graph-adapter-common`'s parse module (statically imported above) runs
- * `await Parser.init()` first, so the WASM runtime is ready before this
- * load. Adapter discovery `import()`s this package, so both awaits settle
- * before the engine calls `parseProject` — keeping `parseProject`
- * synchronous (see graph-adapter-common/parse.ts). The `.wasm` is vendored
- * under `../wasm/` and shipped in the package `files`.
- *
- * Parsed-project shape: `Map<absoluteFilePath, { tree, source }>`.
+ * `lang-java` is the canonical Java parse substrate: it owns the vendored
+ * tree-sitter-java grammar and produces the `{ tree, source }` parsed-file
+ * shape. The graph adapter no longer loads a grammar of its own; it binds the
+ * shared `createParseProjectFromAdapter` driver to `javaAdapter`. The
+ * parsed-project shape and the downstream walk/resolve are unchanged.
  */
 
-import { fileURLToPath } from 'node:url';
-
 import {
-  createTreeSitterParseProject,
+  createParseProjectFromAdapter,
   type TreeSitterParsedFile,
   type TreeSitterParsedProject,
 } from '@opensip-tools/graph-adapter-common';
-import { Language } from 'web-tree-sitter';
-
-const Java = await Language.load(
-  fileURLToPath(new URL('../wasm/tree-sitter-java.wasm', import.meta.url)),
-);
+import { javaAdapter } from '@opensip-tools/lang-java';
 
 /** Parsed Java source file: tree-sitter parse tree plus original source text. */
 export type JavaParsedFile = TreeSitterParsedFile;
@@ -38,7 +22,4 @@ export type JavaParsedFile = TreeSitterParsedFile;
 export type JavaParsedProject = TreeSitterParsedProject<JavaParsedFile>;
 
 /** Parses every Java source file in the input set into a {@link JavaParsedProject}. */
-export const parseProject = createTreeSitterParseProject<JavaParsedFile>({
-  grammar: Java,
-  languageId: 'java',
-});
+export const parseProject = createParseProjectFromAdapter(javaAdapter);

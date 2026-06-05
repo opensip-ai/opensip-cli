@@ -273,27 +273,20 @@ export default tseslint.config(
   // lang-*".
   // ---------------------------------------------------------------------------
   {
-    files: [
-      'packages/graph/graph-python/src/**/*.ts',
-      'packages/graph/graph-rust/src/**/*.ts',
-      'packages/graph/graph-go/src/**/*.ts',
-    ],
+    files: ['packages/graph/graph-{python,rust,go,java}/src/**/*.ts'],
     ignores: [
-      'packages/graph/graph-python/src/**/__tests__/**',
-      'packages/graph/graph-python/src/**/*.test.ts',
-      'packages/graph/graph-rust/src/**/__tests__/**',
-      'packages/graph/graph-rust/src/**/*.test.ts',
-      'packages/graph/graph-go/src/**/__tests__/**',
-      'packages/graph/graph-go/src/**/*.test.ts',
+      'packages/graph/graph-{python,rust,go,java}/src/**/__tests__/**',
+      'packages/graph/graph-{python,rust,go,java}/src/**/*.test.ts',
     ],
     rules: {
       'no-restricted-imports': ['error', {
         paths: [{
           name: 'web-tree-sitter',
           message:
-            'ADR-0010: a migrated graph adapter (python, rust, go) parses via its ' +
-            '@opensip-tools/lang-* package and consumes the tree-sitter substrate ' +
-            'from @opensip-tools/tree-sitter. It must not import web-tree-sitter directly.',
+            'ADR-0010: every tree-sitter graph adapter (python, rust, go, java) now ' +
+            'parses via its @opensip-tools/lang-* package and consumes the tree-sitter ' +
+            'substrate from @opensip-tools/tree-sitter. Production code must not import ' +
+            'web-tree-sitter directly (test fixtures that build trees are exempt).',
         }],
       }],
     },

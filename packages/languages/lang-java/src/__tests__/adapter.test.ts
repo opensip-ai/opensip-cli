@@ -9,14 +9,12 @@ describe('javaAdapter', () => {
     expect(javaAdapter.fileExtensions).toContain('.java')
   })
 
-  it('parse() returns a tree with line starts', () => {
-    const tree = javaAdapter.parse(
-      'class A {\n  void m() {}\n}',
-      'A.java',
-    )
+  it('parse() returns a real tree-sitter tree + source', () => {
+    const src = 'class A {\n  void m() {}\n}'
+    const tree = javaAdapter.parse(src, 'A.java')
     expect(tree).not.toBeNull()
-    expect(tree?.filePath).toBe('A.java')
-    expect(tree?.lineStarts.length).toBe(3)
+    expect(tree?.source).toBe(src)
+    expect(tree?.tree.rootNode.type).toBe('program')
   })
 })
 
