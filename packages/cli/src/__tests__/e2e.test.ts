@@ -232,14 +232,15 @@ describe('CLI e2e', () => {
   });
 
   describe('sim', () => {
-    it('runs the built-in default recipe with no scenarios registered', () => {
+    it('fails closed with exit 2 when no scenarios are registered (audit P1c)', () => {
       // No user-authored scenarios in the e2e env, so the default recipe
-      // matches zero scenarios and exits cleanly. Since Phase 4 (ADR-0011)
-      // the sim view is the shared envelope-derived table; with zero units
-      // it renders the shared run-summary line ("0 Passed, 0 Failed ...").
-      const { stdout, exitCode } = run('sim');
-      expect(exitCode).toBe(0);
-      expect(stdout).toContain('0 Passed, 0 Failed');
+      // matches zero scenarios. "Empty work is not success": a run that
+      // simulated nothing must NOT report as a pass (exit 0) — that would
+      // mask a misconfig/missing-dep as a green CI run. It is a
+      // configuration/unavailable condition (exit 2), distinct from an
+      // actual scenario failure (exit 1).
+      const { exitCode } = run('sim');
+      expect(exitCode).toBe(2);
     });
 
     it('exits 2 when given an unknown recipe name', () => {

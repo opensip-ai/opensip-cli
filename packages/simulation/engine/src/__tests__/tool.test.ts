@@ -16,7 +16,10 @@ import { enterScope, RunScope } from '@opensip-tools/core';
 import { Command } from 'commander';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { clearScenarioRegistry } from '../framework/registry.js';
+import { ASSERTIONS } from '../framework/assertions.js';
+import { persona } from '../framework/personas.js';
+import { clearScenarioRegistry, currentScenarioRegistry } from '../framework/registry.js';
+import { defineLoadScenario } from '../kinds/load/define.js';
 import { simulationTool } from '../tool.js';
 
 import type { ToolCliContext } from '@opensip-tools/core';
@@ -93,6 +96,24 @@ function makeFakeContext(program: Command): {
   return { ctx, rendered, exitCodes, emitted };
 }
 
+/**
+ * Register one trivial load scenario into the current scope's registry so a
+ * `sim` run has work to do. Since the zero-scenario fail-closed guard (audit
+ * P1c), a run with an empty registry returns an ErrorResult (exit 2) rather
+ * than a sim-done pass — happy-path tests must supply at least one scenario.
+ */
+function registerProbeScenario(): void {
+  currentScenarioRegistry().register(defineLoadScenario({
+    id: 'probe',
+    name: 'probe',
+    description: 'probe',
+    tags: [],
+    personas: [persona('user', 1)],
+    duration: 1,
+    assertions: [ASSERTIONS.lowErrorRate(1)],
+  }));
+}
+
 describe('simulationTool metadata', () => {
   it('exposes id, version, description', () => {
     expect(simulationTool.metadata.id).toBe('simulation');
@@ -140,6 +161,7 @@ describe('simulationTool.register', () => {
     const program = new Command();
     program.exitOverride();
     const { ctx, rendered } = makeFakeContext(program);
+    registerProbeScenario();
 
     simulationTool.register(ctx);
 
@@ -155,6 +177,7 @@ describe('simulationTool.register', () => {
     const program = new Command();
     program.exitOverride();
     const { ctx, emitted } = makeFakeContext(program);
+    registerProbeScenario();
 
     simulationTool.register(ctx);
 

@@ -15,9 +15,11 @@
  *   2. .mjs plugin discovery via `loadAllSimPlugins(projectDir)`.
  *   3. npm package discovery: `@opensip-tools/scenarios-*` packages
  *      (or anything under `plugins.scenarioPackages` / customer scopes).
- *   4. No-scenarios guard: warn loudly if zero scenarios registered,
- *      because a silent green run scanning nothing is the failure mode
- *      the CLI exists to prevent.
+ *   4. No-scenarios guard: `executeSim` fails the run closed with a
+ *      CONFIGURATION_ERROR (exit 2) when zero scenarios would run,
+ *      because a silent green run simulating nothing is the failure mode
+ *      the CLI exists to prevent. (The loader only structured-logs the
+ *      empty registry; the fatal decision is the command's.)
  */
 
 import { pathToFileURL } from 'node:url';
@@ -113,11 +115,11 @@ export async function ensureScenariosLoaded(projectDir?: string): Promise<void> 
   //    the same failure mode fitness's no-checks guard exists to
   //    prevent.
   if (currentScenarioRegistry().size === 0) {
-    const msg =
-      'opensip-tools: no scenarios were loaded. ' +
-      'Install at least one @opensip-tools/scenarios-* package, ' +
-      'or declare plugins.scenarioPackages in opensip-tools.config.yml.\n';
-    process.stderr.write(msg);
+    // Structured-log only. The user-facing decision — fail the run closed
+    // with a CONFIGURATION_ERROR exit so a misconfig/missing-dep can't
+    // produce a green run that simulated nothing — is owned by executeSim's
+    // zero-scenarios guard (single responsibility: the loader loads, the
+    // command decides whether an empty result is fatal).
     logger.warn({
       evt: 'cli.scenario_packages.empty',
       module: 'cli:sim',
@@ -356,6 +358,37 @@ export async function executeSim(
   const recipeResult = await service.runRecipe(recipe, { kindFilter });
 
   const scenarios = recipeResult.scenarios;
+
+  // Fail closed on an empty run. Zero executed scenarios — whether because
+  // no scenario packages were loaded at all, or because the recipe/`--kind`
+  // selector matched none of the registered scenarios — must NOT report as a
+  // pass (exit 0). A green run that simulated nothing is the exact failure
+  // mode that masks a misconfig or missing dependency in CI. It is a
+  // configuration/unavailable condition (exit 2), distinct from an actual
+  // scenario failure (exit 1). Tailor the guidance to the cause.
+  if (scenarios.length === 0) {
+    const registryEmpty = currentScenarioRegistry().size === 0;
+    logger.warn({
+      evt: 'cli.sim.empty_run',
+      module: 'cli:sim',
+      recipeName,
+      registryEmpty,
+      kindFilter,
+    });
+    return {
+      result: {
+        type: 'error',
+        message: registryEmpty
+          ? 'No scenarios were loaded — nothing to simulate.'
+          : `Recipe '${recipeName}' selected zero scenarios — nothing to simulate.`,
+        suggestion: registryEmpty
+          ? 'Install at least one @opensip-tools/scenarios-* package, declare plugins.scenarioPackages in opensip-tools.config.yml, or run `opensip-tools init` to scaffold example scenarios.'
+          : 'Check the recipe selector and any --kind filter — at least one registered scenario must match.',
+        exitCode: EXIT_CODES.CONFIGURATION_ERROR,
+      },
+    };
+  }
+
   const passed = scenarios.filter((s) => s.passed).length;
   const failed = scenarios.length - passed;
 

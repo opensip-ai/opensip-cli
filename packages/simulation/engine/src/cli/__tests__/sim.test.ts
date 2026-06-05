@@ -37,6 +37,18 @@ describe('executeSim', () => {
   });
 
   it('runs the built-in default recipe when no --recipe is passed', async () => {
+    // Register a scenario so the default recipe has something to run — an
+    // empty selection now fails closed (see the zero-scenario guard tests
+    // below), so this test must supply work to exercise the happy path.
+    currentScenarioRegistry().register(defineLoadScenario({
+      id: 'default-probe',
+      name: 'default-probe',
+      description: 'default-probe',
+      tags: [],
+      personas: [persona('user', 1)],
+      duration: 1,
+      assertions: [ASSERTIONS.lowErrorRate(1)],
+    }));
     const { result } = await executeSim(args());
     expect(result.type).toBe('sim-done');
     if (result.type === 'sim-done') {
@@ -81,7 +93,7 @@ describe('executeSim', () => {
     }
   });
 
-  it('--kind filter eliminates scenarios of other kinds', async () => {
+  it('--kind filter eliminates scenarios of other kinds (fails closed when none remain)', async () => {
     currentScenarioRegistry().register(defineLoadScenario({
       id: 'load-x',
       name: 'load-x',
@@ -91,11 +103,15 @@ describe('executeSim', () => {
       duration: 1,
       assertions: [ASSERTIONS.lowErrorRate(1)],
     }));
+    // The chaos filter removes the only (load) scenario → zero selected.
+    // "Empty work is not success": this is now a fail-closed config error
+    // (exit 2), not a sim-done with zero units reported as a pass. The
+    // registry is non-empty, so the message points at the selector.
     const { result } = await executeSim(args({ kind: 'chaos' }));
-    expect(result.type).toBe('sim-done');
-    if (result.type === 'sim-done') {
-      expect(result.envelope.units).toHaveLength(0);
-      expect(result.shouldFail).toBe(false);
+    expect(result.type).toBe('error');
+    if (result.type === 'error') {
+      expect(result.exitCode).toBe(2);
+      expect(result.message).toContain('zero scenarios');
     }
   });
 
@@ -140,12 +156,15 @@ describe('executeSim', () => {
       },
     });
     // The default recipe selects all registered scenarios; --kind invariant
-    // narrows the 'load' tripwire out before execution.
+    // narrows the 'load' tripwire out before execution. The load-bearing
+    // assertion is that the filtered-out scenario never runs; the empty
+    // selection now also fails closed (exit 2), but the no-side-effects
+    // guarantee is what this test protects.
     const { result } = await executeSim(args({ kind: 'invariant' }));
-    expect(result.type).toBe('sim-done');
     expect(executed).toBe(false);
-    if (result.type === 'sim-done') {
-      expect(result.envelope.units).toHaveLength(0);
+    expect(result.type).toBe('error');
+    if (result.type === 'error') {
+      expect(result.exitCode).toBe(2);
     }
   });
 
@@ -167,12 +186,17 @@ describe('executeSim', () => {
     }
   });
 
-  it('returns shouldFail=false for an empty scenario set', async () => {
+  it('fails closed (exit 2) when the scenario registry is empty (audit P1c)', async () => {
+    // "Empty work is not success": with no scenarios registered at all, a run
+    // simulated nothing. That must be a configuration/unavailable error (exit
+    // 2), never a green sim-done pass that masks a misconfig/missing-dep.
     const { result } = await executeSim(args());
-    expect(result.type).toBe('sim-done');
-    if (result.type === 'sim-done') {
-      expect(result.envelope.units).toHaveLength(0);
-      expect(result.shouldFail).toBe(false);
+    expect(result.type).toBe('error');
+    if (result.type === 'error') {
+      expect(result.exitCode).toBe(2);
+      // Registry-empty cause → install/scaffold guidance.
+      expect(result.message).toContain('No scenarios were loaded');
+      expect(result.suggestion).toContain('init');
     }
   });
 

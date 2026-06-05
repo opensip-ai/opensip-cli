@@ -214,7 +214,7 @@ The default recipe ([`packages/simulation/engine/src/recipes/built-in-recipes.ts
 
 Same three sources as checks:
 
-1. **Built-in.** Currently empty — the engine ships kind support but no built-in scenarios. (Compare to `fit`, where `@opensip-tools/checks-universal` ships universal checks.)
+1. **Built-in.** Currently empty — the engine ships kind support but no built-in scenarios. (Compare to `fit`, where `@opensip-tools/checks-universal` ships universal checks.) Because of this, running `sim` in a project with no project-local or npm-package scenarios fails closed with exit 2 (an empty run is not a pass — see the exit-code contract in the [CLI reference](/docs/opensip-tools/70-reference/01-cli-commands/#sim--run-simulation-scenarios)). Run `opensip-tools init` to scaffold example scenarios first.
 2. **Project-local.** `<project>/opensip-tools/sim/scenarios/*.mjs`. Loaded by the plugin discoverer at startup.
 3. **npm-package.** Any package listed in `plugins.sim:` in the project config. The package's main entry exports `scenarios: RunnableScenario[]` and optionally `recipes: SimulationRecipe[]`. Sim packs use explicit pinning only — there is no `@opensip-tools/sim-*` name-prefix auto-discovery today.
 

@@ -156,7 +156,7 @@ opensip-tools sim --kind <kind>
 | `--open` | bool | `false` | Launch dashboard after run. |
 | `--debug` | bool | `false` | Enable debug-level logging. |
 
-**Exit codes:** 0 (all scenarios passed), 1 (any scenario failed), 2 (config/runtime error).
+**Exit codes:** 0 (all scenarios passed), 1 (any scenario failed), 2 (config/runtime error, **including a run that selected zero scenarios** — an empty run fails closed rather than reporting a false pass: no scenario packages installed, or the recipe/`--kind` selector matched none). Exit 0 therefore always means at least one scenario ran and passed.
 
 **See also:** [`30-sim/`](/docs/opensip-tools/30-sim/).
 
