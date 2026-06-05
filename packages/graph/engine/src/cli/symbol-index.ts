@@ -1,3 +1,4 @@
+// @fitness-ignore-file no-direct-stdout-in-tool-engine -- auxiliary subcommand status line: `graph symbol-index` writes its artifact to a file and prints a one-line "wrote N symbols to <path>" confirmation. This is not the signal-envelope run output (ADR-0011), which routes through the composition root.
 /**
  * `opensip-tools graph symbol-index --out <path>` — emit a symbol-index
  * JSON artifact suitable for agent consumption (e.g., feeding into a

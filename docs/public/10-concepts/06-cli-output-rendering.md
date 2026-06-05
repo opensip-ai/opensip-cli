@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-03
+last_verified: 2026-06-04
 release: v2.6.x
 title: "CLI output rendering"
 audience: [contributors]
@@ -82,9 +82,10 @@ presentation primitives.
 
 ## What is not in scope
 
-- **`--json`** is a separate machine contract (`CliOutput` v1.0) with its
-  own `emitJson` seam; it does not go through the view-model. See
-  [Contract surfaces](./04-contract-surfaces.md).
+- **`--json`** is a separate machine contract (the `SignalEnvelope`,
+  `schemaVersion: 2`) with its own `emitEnvelope` seam (the shared
+  `formatSignalJson` formatter at the composition root, ADR-0011); it does
+  not go through the view-model. See [Contract surfaces](./04-contract-surfaces.md).
 - **Live progress views** (the animated `fit`/`graph` runners) are
   inherently TTY-only and render directly with cli-ui primitives. A non-TTY
   run falls back to the static, dual-rendered result. Expressing a live

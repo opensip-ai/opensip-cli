@@ -50,7 +50,7 @@ import { buildUnifiedReportLines, countFiles, resolutionBannerText } from './gra
 import { loadGraphConfig, runGraph, runShardedGraph } from './orchestrate.js';
 import { positionalPathLabel, resolvePositionalPaths } from './positional-paths.js';
 import { MemoryPressureError } from './pressure-monitor.js';
-import { renderWorkspaceJson, writeWorkspaceReport } from './workspace-report.js';
+import { buildWorkspaceJsonDocument, writeWorkspaceReport } from './workspace-report.js';
 import { discoverPolyglotUnits, runWorkspaceUnitsInParallel } from './workspace-runner.js';
 
 import type { GraphCommandOptions } from './graph-options.js';
@@ -485,7 +485,9 @@ async function executeWorkspaceGraph(
   for (const r of result.perUnit) allSignals.push(...r.signals);
 
   if (opts.json === true) {
-    process.stdout.write(`${renderWorkspaceJson(result.perUnit, durationMs)}\n`);
+    // ADR-0011: emit through the CLI seam, not process.stdout directly.
+    // cli.emitJson applies the same JSON.stringify(_, null, 2) + '\n'.
+    cli.emitJson(buildWorkspaceJsonDocument(result.perUnit, durationMs));
   } else {
     await writeWorkspaceReport(result.perUnit, durationMs, cli);
     // Persist exactly one aggregate session for the whole --workspace

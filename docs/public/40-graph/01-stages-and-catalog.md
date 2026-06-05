@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-03
+last_verified: 2026-06-04
 release: v2.6.0
 title: "Stages and catalog (graph)"
 audience: [contributors, plugin-authors, ci-integrators]
@@ -95,9 +95,9 @@ The `graph` command is the static call-graph tool. Where `fit` answers "is the c
 └──────────────────────────────┬───────────────────────────────────────┘
                                ▼
 ┌──────────────────────────────────────────────────────────────────────┐
-│  Stage 6  —  RENDER                                                  │
-│  Signal[] → terminal report | JSON | SARIF | dashboard               │
-│  Output: stdout, files, exit code                                    │
+│  Stage 6  —  ENVELOPE + RENDER (composition root)                   │
+│  Signal[] → SignalEnvelope (build-envelope.ts); the root formats it  │
+│  → terminal | JSON | SARIF | dashboard. Output: stdout, files, exit  │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -200,13 +200,13 @@ Two corrections keep the coupling grid honest — every off-diagonal edge follow
 
 ### Stage 5 — Render
 
-[`render/`](../../../packages/graph/engine/src/render/) — one file per output mode:
+Per [ADR-0011](../../decisions/ADR-0011-signal-output-currency-formatter-sink.md), graph (like every tool) **no longer renders its own machine output**. Stage 5 ends by collapsing the run's `Signal[]` into one `SignalEnvelope` in [`cli/build-envelope.ts`](../../../packages/graph/engine/src/cli/build-envelope.ts) (the same `SignalEnvelope` `fit` and `sim` emit). The graph engine returns that envelope via `CommandResult`; the **CLI composition root** maps flags to a (formatter × sink) pair:
 
-- `table.ts` — terminal report (default): four sections — catalog summary, findings grouped by rule (top 10 per rule with overflow indicator), top 10 entry points, one-line summary.
-- `json.ts` — `CliOutput` shape from `@opensip-tools/contracts`; same envelope `fit` uses.
-- `sarif.ts` — SARIF 2.1.0 for `--gate-save` / `--gate-compare` / `--report-to`.
+- **Terminal report (default)** — the human/table formatter, derived from `envelope.units` + `envelope.signals`.
+- **`--json`** — the shared `formatSignalJson` formatter (the envelope *is* the JSON).
+- **SARIF** (`--gate-save` / `--gate-compare` / `--report-to`) — the shared `formatSignalSarif` formatter.
 
-The CLI handler [`cli/graph.ts`](../../../packages/graph/engine/src/cli/graph.ts) picks the renderer based on flags and writes its output.
+The old per-tool `render/json.ts` (which built the retired `CliOutput`) was **deleted**; graph keeps only graph-specific render helpers (e.g. `render/table.ts`, the OpenSIP rule-id mapping) under [`render/`](../../../packages/graph/engine/src/render/). The CLI handler [`cli/graph.ts`](../../../packages/graph/engine/src/cli/graph.ts) returns the envelope; the root renders/delivers it.
 
 ---
 

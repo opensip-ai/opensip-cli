@@ -26,10 +26,87 @@
 // docs/plans/ready/depcruise-gate-activation/phase-7-verification.md.
 //
 import { execFileSync } from 'node:child_process';
+import { writeFileSync, rmSync } from 'node:fs';
 
 // Well below the ~390 cross-package edges observed; guards against a
 // partial break where only a few stragglers resolve.
 const MIN_CROSS_PACKAGE_EDGES = 50;
+
+// ADR-0011 tool-output gate liveness. Edge-resolution (above) proves the
+// resolver works; it does NOT prove a specific rule still FIRES. The three
+// rules added in Phase 8 (tool-engines-no-output-{formatters,sinks,barrel})
+// guard "tools emit, never render/deliver". A gate that cannot fail is not a
+// gate — so we inject a temporary forbidden import into a tool engine, run
+// depcruise scoped to JUST that probe file, and assert the expected rule
+// reports it. Every probe is removed in a finally, so the working tree is
+// never left dirty even if depcruise throws (it's CI-safe + local-safe).
+const PROBE_DIR = 'packages/graph/engine/src';
+const TOOL_OUTPUT_PROBES = [
+  {
+    // Deep subpath import → resolves straight into output/src/format/.
+    file: `${PROBE_DIR}/__gate_probe_formatter__.ts`,
+    source:
+      "import { formatSignalSarif } from '../../../output/src/format/signal-sarif.js';\n" +
+      'export const _gateProbe = formatSignalSarif;\n',
+    rule: 'tool-engines-no-output-formatters',
+  },
+  {
+    // Deep subpath import → resolves straight into output/src/sink/.
+    file: `${PROBE_DIR}/__gate_probe_sink__.ts`,
+    source:
+      "import { createCloudSignalSink } from '../../../output/src/sink/cloud-signal-sink.js';\n" +
+      'export const _gateProbe = createCloudSignalSink;\n',
+    rule: 'tool-engines-no-output-sinks',
+  },
+  {
+    // Barrel import → resolves to output/src/index.ts (the realistic
+    // regression vector the granular rules can't see).
+    file: `${PROBE_DIR}/__gate_probe_barrel__.ts`,
+    source:
+      "import { formatSignalSarif } from '@opensip-tools/output';\n" +
+      'export const _gateProbe = formatSignalSarif;\n',
+    rule: 'tool-engines-no-output-barrel',
+  },
+];
+
+function depcruiseReport(target) {
+  // err-long emits the rule name + offending edge; non-zero exit on
+  // violations is expected and not an error for the probe.
+  try {
+    return execFileSync(
+      'npx',
+      ['depcruise', '--config', '.dependency-cruiser.cjs', '--no-progress', '--output-type', 'err', target],
+      { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },
+    );
+  } catch (error) {
+    // depcruise exits non-zero when it finds violations; the report we want
+    // is on stdout, which execFileSync attaches to the thrown error.
+    return (error.stdout || '') + (error.stderr || '');
+  }
+}
+
+function verifyToolOutputGatesFire() {
+  for (const probe of TOOL_OUTPUT_PROBES) {
+    try {
+      writeFileSync(probe.file, probe.source, 'utf8');
+      const report = depcruiseReport(probe.file);
+      if (!report.includes(probe.rule)) {
+        console.error(
+          `verify-gate-live: FAIL — probe import in ${probe.file} did NOT trip ` +
+            `'${probe.rule}'. The ADR-0011 tool-output gate is INERT.\n` +
+            `depcruise report:\n${report}`,
+        );
+        process.exit(1);
+      }
+    } finally {
+      rmSync(probe.file, { force: true });
+    }
+  }
+  console.log(
+    `verify-gate-live: OK — all ${TOOL_OUTPUT_PROBES.length} tool-output gates ` +
+      'fired on a probe (tools-emit-never-render is live).',
+  );
+}
 
 // Top-level package dir of a packages/... path. Two-segment packages
 // (graph/engine, fitness/checks-x, languages/lang-x) key on three path
@@ -92,6 +169,9 @@ function main() {
   }
 
   console.log('verify-gate-live: OK — ' + crossPackageEdges + ' cross-package edges resolved into package src trees; the architecture gate is live.');
+
+  // Beyond edge-resolution: prove the ADR-0011 tool-output rules still fire.
+  verifyToolOutputGatesFire();
 }
 
 main();

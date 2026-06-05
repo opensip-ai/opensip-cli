@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-03
+last_verified: 2026-06-04
 release: v2.6.x
 title: "Layered package graph"
 audience: [contributors]
@@ -66,12 +66,12 @@ This document is the conceptual map. For the lookup-shaped catalog of every pack
 
 **Layer 1 — `@opensip-tools/core`.** The kernel. Ships types, errors, IDs, the logger, the path resolver, the language-adapter contract, the plugin discovery mechanics (including the generic marker-discovery walker), and the Tool registry. No knowledge of fitness, simulation, or any other tool. No dependency on Commander, Ink, or any UI library.
 
-**Layer 2 — `@opensip-tools/datastore`, `@opensip-tools/contracts`, `@opensip-tools/session-store`, and `@opensip-tools/reporting`.** Four packages above the kernel, each depending only on `core` and (where noted) on lower siblings within this layer — never on a tool.
+**Layer 2 — `@opensip-tools/datastore`, `@opensip-tools/contracts`, `@opensip-tools/session-store`, and `@opensip-tools/output`.** Four packages above the kernel, each depending only on `core` and (where noted) on lower siblings within this layer — never on a tool.
 
 - **`@opensip-tools/datastore`** is the persistence kernel — the `DataStore` interface, the SQLite + Drizzle implementation, the in-memory backend for tests, the workspace migration store under `migrations/`. Paradigm-agnostic infrastructure: tools and session-store own their domain schemas (sessions in session-store; baseline/catalog in graph; baseline in fitness) and register them with the datastore at open time. Depends on `core` only.
-- **`@opensip-tools/contracts`** is the shared contract layer between Tools and the runner: the `CliOutput`/`CheckOutput`/`FindingOutput` shape every tool produces, the `CommandResult` discriminated union the renderer dispatches on, the exit-code constants, the cross-tool `StoredSession` type, and the `GraphCatalog` type surface that the graph tool produces and the dashboard consumes. A types-and-constants surface — the `SessionRepo` runtime and sessions schema live in `session-store`, not here. Imports `core` and `datastore`. Does not import any tool.
+- **`@opensip-tools/contracts`** is the shared contract layer between Tools and the runner: the `SignalEnvelope` shape every tool returns (with its `verdict`/`units[]`/`signals[]`), the `CommandResult` discriminated union the renderer dispatches on, the exit-code constants, the cross-tool `StoredSession` type, and the `GraphCatalog` type surface that the graph tool produces and the dashboard consumes. A types-and-constants surface — the `SessionRepo` runtime and sessions schema live in `session-store`, not here. Imports `core` and `datastore`. Does not import any tool.
 - **`@opensip-tools/session-store`** owns session persistence: the `SessionRepo` runtime, the `sessions`/`session_checks`/`session_findings` schema, and the `generateSessionId`/`sanitizeForFilename` helpers. Depends on `core`, `datastore`, and `contracts` (for the `StoredSession` shape it round-trips).
-- **`@opensip-tools/reporting`** builds SARIF and reports findings to the cloud (`reportToCloud`). Consumed by the fitness and graph baseline-export paths. Depends on `core` and `contracts` only.
+- **`@opensip-tools/output`** (renamed from `@opensip-tools/reporting`, ADR-0011) owns all machine output: pure `(envelope) => string` formatters under `format/` (json, sarif, table) and effectful `sink/` delivery (cloud egress, entitlement). The CLI composition root composes a formatter with a sink per the run's flags; tool engines no longer import it. Depends on `core` and `contracts` only.
 
 **Layer 3 — Tools, shared libraries, and language adapters.** Peer packages, all depending on `contracts`, `datastore`, and `core`. Three groups at this layer:
 
@@ -124,7 +124,7 @@ The build runs `pnpm depcruise` as part of the standard `pnpm lint` flow. A forb
 Real codebases have edge cases. Two earlier cross-layer exceptions once lived in [`.dependency-cruiser.cjs`](../../../.dependency-cruiser.cjs); both have since been **paid down** and deleted:
 
 - **`lang-typescript` → `fitness`** (the `filterContent` back-edge): `filterContent` / `clearFilterCache` / `FilteredContent` now live in `@opensip-tools/lang-typescript` itself, so no lang pack reaches up into a tool. The `lang-no-fitness-except-typescript` rule is gone.
-- **`graph` → `fitness`** (SARIF reuse): SARIF building and cloud reporting moved to `@opensip-tools/contracts` / `@opensip-tools/reporting`, so `graph` reports without a `graph → fitness` edge. The `graph-may-import-fitness-sarif` info-exception is gone.
+- **`graph` → `fitness`** (SARIF reuse): SARIF is now the single shared `formatSignalSarif` formatter in `@opensip-tools/output`, applied at the composition root (ADR-0011) — `graph` returns a `SignalEnvelope` and imports neither fitness nor `@opensip-tools/output`. The `graph-may-import-fitness-sarif` info-exception is gone.
 
 What remains is not an exception but a *second lens*. The layer ruleset runs twice, and both passes gate `pnpm lint`.
 

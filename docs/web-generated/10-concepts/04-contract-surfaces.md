@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-03
+last_verified: 2026-06-04
 release: v2.6.x
 title: "Contract surfaces"
 audience: [contributors, plugin-authors, ci-integrators]
@@ -35,8 +35,8 @@ A contract is a promise to a consumer outside your control. Break it, and the co
 |---|---|---|---|---|
 | 1 | CLI argv (commands and flags) | humans, CI, shells | **stable** (semver-major) | `packages/*/src/*tool.ts` |
 | 2 | Exit codes | CI, scripts | **stable** (semver-major) | `packages/contracts/src/exit-codes.ts` |
-| 3 | JSON output (`CliOutput`) | CI, dashboards, the gate, OpenSIP Cloud | **stable** (semver-major) | `packages/contracts/src/types.ts` |
-| 4 | SARIF output | GitHub Code Scanning, IDEs | **stable** (versioned by SARIF spec) | `packages/reporting/src/sarif.ts` |
+| 3 | JSON output (`SignalEnvelope`) | CI, dashboards, the gate, OpenSIP Cloud | **stable** (semver-major) | `packages/contracts/src/signal-envelope.ts` |
+| 4 | SARIF output | GitHub Code Scanning, IDEs | **stable** (versioned by SARIF spec) | `packages/output/src/format/signal-sarif.ts` |
 | 5 | Tool plugin contract (`Tool`) | third-party tools | **stable** (semver-major) | `packages/core/src/tools/types.ts` |
 | 6 | Plugin discovery (`opensipTools.kind` markers; check-pack name prefix is a deprecated fallback) | third-party tools, check packs | **stable** (semver-major) | `packages/core/src/plugins/tool-package-discovery.ts`, `packages/fitness/engine/src/plugins/check-package-discovery.ts` |
 
@@ -109,45 +109,31 @@ CI integrations are the primary consumer. `opensip-tools fit && deploy` is an id
 
 ---
 
-## 3. JSON output (`CliOutput`)
+## 3. JSON output (`SignalEnvelope`)
 
-The structured stdout when `--json` is set. Shape lives at [`packages/contracts/src/types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/packages/contracts/src/types.ts):
+The structured stdout when `--json` is set — the **same envelope for every tool** (`fit`, `sim`, `graph`), per [ADR-0011](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/docs/decisions/ADR-0011-signal-output-currency-formatter-sink.md). Shape lives at [`packages/contracts/src/signal-envelope.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/packages/contracts/src/signal-envelope.ts):
 
 ```ts
-interface CliOutput {
-  readonly version: '1.0';
+interface SignalEnvelope {
+  readonly schemaVersion: 2;
   readonly tool: 'fit' | 'sim' | 'graph';
-  readonly timestamp: string;            // ISO 8601
   readonly recipe?: string;
-  readonly score: number;
-  readonly passed: boolean;
-  readonly summary: { total: number; passed: number; failed: number; errors: number; warnings: number };
-  readonly checks: readonly CheckOutput[];
-  readonly durationMs: number;
-}
-
-interface CheckOutput {
-  readonly checkSlug: string;
-  readonly passed: boolean;
-  readonly violationCount?: number;
-  readonly findings: readonly FindingOutput[];
-  readonly durationMs: number;
-}
-
-interface FindingOutput {
-  readonly ruleId: string;
-  readonly message: string;
-  readonly severity: 'error' | 'warning';
-  readonly filePath?: string;
-  readonly line?: number;
-  readonly column?: number;
-  readonly suggestion?: string;
+  readonly runId: string;
+  readonly createdAt: string;            // ISO 8601
+  readonly verdict: {
+    readonly score: number;
+    readonly passed: boolean;            // no critical/high signals
+    readonly summary: { total: number; passed: number; failed: number; errors: number; warnings: number };
+  };
+  readonly units: readonly UnitResult[]; // per-unit ran/errored/timing facts
+  readonly signals: readonly Signal[];   // the flat findings list (4-level severity)
+  readonly resolutionMode?: 'exact' | 'fast'; // graph-only
 }
 ```
 
-The `version: '1.0'` discriminator is part of the contract. A future minor can add fields; a major can change `version` to `'2.0'` and break old consumers.
+`Signal` is the single output currency (`packages/core/src/types/signal.ts`): 4-level severity (`critical|high|medium|low`), `category`, `provider`, `fingerprint`, fix hint. The `schemaVersion: 2` discriminator is part of the contract; it replaces the retired v1 `CliOutput` (`version: '1.0'`). A future minor can add fields; a major can change `schemaVersion` and break old consumers.
 
-The full per-field reference (when each field is present, what each value can be) is in [`70-reference/04-json-output-schema.md`](/docs/opensip-tools/70-reference/04-json-output-schema/).
+The full per-field reference (when each field is present, what each value can be) **and the v1 `CliOutput` → v2 `SignalEnvelope` mapping** are in [`70-reference/04-json-output-schema.md`](/docs/opensip-tools/70-reference/04-json-output-schema/).
 
 **Stability rule.** Adding optional fields is a minor change. Adding required fields, removing fields, or changing types is a major change. Reordering keys within objects is *not* part of the contract — consumers must parse, not pattern-match — but in practice the renderer emits keys in declared order.
 
@@ -155,9 +141,9 @@ The full per-field reference (when each field is present, what each value can be
 
 ## 4. SARIF output
 
-When `--gate-save` runs, the baseline is a SARIF 2.1.0 document built by [`packages/reporting/src/sarif.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/packages/reporting/src/sarif.ts). The shape is the SARIF spec's, not ours — opensip-tools commits to producing valid SARIF 2.1.0, not to a custom shape. Consumers (GitHub Code Scanning, VS Code SARIF Viewer, custom CI tooling) can read these files with any SARIF parser.
+SARIF 2.1.0 is produced by the single shared `formatSignalSarif` formatter ([`packages/output/src/format/signal-sarif.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/packages/output/src/format/signal-sarif.ts)) — used by `--report-to` and by `fit-baseline-export` / `graph-baseline-export` (the gate baselines themselves are stored as signals in SQLite, not SARIF; see surface 3 and the gate doc). The shape is the SARIF spec's, not ours — opensip-tools commits to producing valid SARIF 2.1.0, not to a custom shape. Consumers (GitHub Code Scanning, VS Code SARIF Viewer, custom CI tooling) can read these files with any SARIF parser.
 
-**Stability rule.** The fields opensip-tools fills in are: `runs[].tool.driver.name = 'opensip-tools'`, `runs[].results[]` carrying `ruleId`, `message.text`, `level`, and `locations[].physicalLocation.{artifactLocation, region}`. Future versions may fill in more SARIF fields; we won't stop filling in those.
+**Stability rule.** The fields opensip-tools fills in are: `runs[0].tool.driver.name = 'opensip-tools-<tool>'`, `runs[0].results[]` carrying `ruleId`, `message.text`, `level` (`critical`/`high` → `error`; `medium` → `warning`; `low` → `note`), and `locations[].physicalLocation.{artifactLocation, region}`. Future versions may fill in more SARIF fields; we won't stop filling in those.
 
 The gate's identity hash for diff matching is **not** SARIF-spec — it's an opensip-tools internal: `sha256(filePath + '\n' + ruleId + '\n' + message)`, deliberately excluding line numbers so unrelated line shifts don't register as added/resolved. See [`packages/fitness/engine/src/gate.ts:243`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/packages/fitness/engine/src/gate.ts) and [`10-concepts/05-architecture-gate.md`](/docs/opensip-tools/10-concepts/05-architecture-gate/).
 
@@ -244,7 +230,7 @@ It's worth being explicit about what isn't promised:
 - **Logger output format.** Logs are JSON Lines, but the field set is internal. Don't grep production logs for specific keys; treat them as opaque.
 - **Cache file format.** The AST cache, the glob cache, the prewarm cache — all rebuildable. They have on-disk shapes, but those shapes change without notice. Wiping `<project>/opensip-tools/.runtime/cache/` is always safe.
 - **Session record format.** Sessions are written to `<project>/opensip-tools/.runtime/sessions/{timestamp}-{tool}-{recipe?}.json`, but the shape is internal. The `sessions list` command is the supported reader.
-- **OpenSIP Cloud API.** The cloud is a separate product. Its API is its own contract, not opensip-tools'. The CLI POSTs `CliOutput` (which *is* stable), and the cloud is responsible for ingesting it.
+- **OpenSIP Cloud API.** The cloud is a separate product. Its API is its own contract, not opensip-tools'. The CLI POSTs signals (the `SignalBatch` wire shape derived from the envelope; SARIF on the `--report-to` path), and the cloud is responsible for ingesting it.
 
 ---
 

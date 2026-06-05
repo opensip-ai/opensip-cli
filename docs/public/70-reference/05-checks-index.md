@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-04
+last_verified: 2026-06-05
 release: v2.6.x
 title: "Checks reference"
 audience: [getting-started, ci-integrators, plugin-authors]
@@ -20,17 +20,17 @@ related-docs:
 ---
 # Checks reference
 
-opensip-tools ships **145+ built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
+opensip-tools ships **146+ built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
 
 > This page is **auto-generated** from the source by [`scripts/build-checks-index.mjs`](https://github.com/opensip-ai/opensip-tools/blob/main/scripts/build-checks-index.mjs). Do not edit it by hand — edit the check's source file (the link in each row), then re-run the generator.
 
 ---
 
-## Universal  *(90 checks)*
+## Universal  *(91 checks)*
 
 Language-agnostic; runs against every project.
 
-### Architecture  *(12)*
+### Architecture  *(13)*
 
 | Slug | Description |
 |---|---|
@@ -41,6 +41,7 @@ Language-agnostic; runs against every project.
 | [`heavy-import-detection`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/heavy-import-detection.ts) | Detects heavy/deprecated library imports and excessive named imports that bloat bundle size |
 | [`interface-implementation-consistency`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/modules/interface-implementation-consistency.ts) | Verifies interfaces match their implementations |
 | [`no-custom-event-emitter`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/no-custom-event-emitter.ts) | Detects direct EventEmitter usage that should use infrastructure/events |
+| [`no-direct-stdout-in-tool-engine`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/no-direct-stdout-in-tool-engine.ts) | Tool engines must emit a SignalEnvelope, not write run output to stdout (ADR-0011) |
 | [`no-duplicate-packages`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/dependencies/no-duplicate-packages.ts) | Detects packages that serve the same purpose |
 | [`node-version-consistency`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/node-version-consistency.ts) | Validate Node.js version consistency across configs |
 | [`phantom-dependency-detection`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/dependencies/phantom-dependency-detection.ts) | Detect phantom dependencies (used but not declared in package.json) |

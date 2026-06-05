@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-03
+last_verified: 2026-06-04
 release: v2.6.0
 title: "Rules and gating (graph)"
 audience: [contributors, plugin-authors, ci-integrators]
@@ -262,15 +262,15 @@ This intentionally **allows fingerprint removal**. Cleaning up findings doesn't 
 
 ### How this differs from `fit`'s gate
 
-`fit`'s gate (see [`20-fit/04-output-gate-sarif.md`](/docs/opensip-tools/20-fit/04-output-gate-sarif/)) is fundamentally the same shape — save fingerprints, compare later, fail on new — but it uses a SARIF baseline and hashes findings on `(filePath, ruleId, message)` (no line number). Graph's gate uses a fingerprint-set baseline that includes line numbers. v2: both baselines live in the project's SQLite store (`fit_baseline` row and `graph_baseline_signals` rows respectively), atomic via SQLite transactions. They're independent — running one doesn't affect the other.
+`fit`'s gate (see [`20-fit/04-output-gate-sarif.md`](/docs/opensip-tools/20-fit/04-output-gate-sarif/)) is fundamentally the same shape — save signals, compare later, fail on new — but it hashes findings on `(filePath, ruleId, message)` (no line number). Graph's gate uses a fingerprint-set baseline that includes line numbers. Per [ADR-0011](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/docs/decisions/ADR-0011-signal-output-currency-formatter-sink.md), **both gates store signals, not SARIF**: fit's baseline is the stored `SignalEnvelope`; graph's is a signal-fingerprint set. Both live in the project's SQLite store (`fit_baseline` row and `graph_baseline_signals` rows respectively), atomic via SQLite transactions. They're independent — running one doesn't affect the other.
 
 ---
 
 ## SARIF and `--report-to`
 
-`graph --json` produces the same `CliOutput` envelope `fit` does, so any consumer of the JSON contract works unchanged. For external integration, `--report-to <url>` posts SARIF 2.1.0 to a configured endpoint (OpenSIP Cloud or any SARIF-compatible receiver).
+`graph --json` produces the same `SignalEnvelope` `fit` and `sim` do, so any consumer of the JSON contract works unchanged (see [`70-reference/04-json-output-schema.md`](/docs/opensip-tools/70-reference/04-json-output-schema/)). For external integration, `--report-to <url>` posts SARIF 2.1.0 to a configured endpoint (OpenSIP Cloud or any SARIF-compatible receiver).
 
-The SARIF mapping is a graph-native emitter, [`renderSarifOpenSip` in `render/sarif-opensip.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/packages/graph/engine/src/render/sarif-opensip.ts) (re-exported as `renderSarif` from [`render/sarif.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/packages/graph/engine/src/render/sarif.ts); since DEC-498 it no longer wraps fitness's `buildSarifLog`):
+Per [ADR-0011](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/docs/decisions/ADR-0011-signal-output-currency-formatter-sink.md), graph no longer owns a SARIF emitter: it returns its `SignalEnvelope` and the composition root formats it via the **single shared** `formatSignalSarif` formatter ([`packages/output/src/format/signal-sarif.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/packages/output/src/format/signal-sarif.ts)). Graph's only SARIF-specific responsibility is mapping each engine rule slug to its OpenSIP-convention rule id (`graph.<rule-family>.<rule-id>`) at envelope assembly ([`cli/build-envelope.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/packages/graph/engine/src/cli/build-envelope.ts)) — tool vocabulary stays graph-owned. The shared formatter's mapping:
 
 | Graph concept | SARIF field |
 |---|---|
@@ -278,9 +278,9 @@ The SARIF mapping is a graph-native emitter, [`renderSarifOpenSip` in `render/sa
 | Rule | `runs[0].tool.driver.rules[].id` — the distinct OpenSIP-convention rule ids (`graph.<rule-family>.<rule-id>`), sorted |
 | Signal | `runs[0].results[]`, each with `ruleId` set to its mapped OpenSIP rule id |
 | Function occurrence | `result.locations[0].physicalLocation.{artifactLocation,region}` |
-| Severity | `result.level` (`error` \| `warning`) |
+| Severity | `result.level` (`critical`/`high` → `error`; `medium` → `warning`; `low` → `note`) |
 
-The graph SARIF is a graph-native emitter (it no longer wraps fitness's `buildSarifLog`, per DEC-498) and emits the standard SARIF 2.1.0 fields. Today the SARIF carries `ruleId` + location only; fingerprinting remains part of the graph gate's SQLite baseline.
+Today the SARIF carries `ruleId` + location only; fingerprinting remains part of the graph gate's SQLite baseline.
 
 Exit code 4 is reserved for `--report-to` upload failure (network error or non-2xx response). This separates "the gate said no" (exit 1) from "we couldn't tell the gate anything" (exit 4) — both fail the build but mean different things.
 

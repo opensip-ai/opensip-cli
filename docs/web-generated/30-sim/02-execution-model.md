@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-03
+last_verified: 2026-06-04
 release: v2.6.x
 title: "Sim execution model"
 audience: [contributors]
@@ -143,32 +143,22 @@ The `--kind` CLI filter (`opensip-tools sim --kind invariant`) narrows the recip
 
 ## The aggregated result
 
-After every scenario runs, the recipe service produces a `SimDoneResult` ([`packages/contracts/src/command-results.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/packages/contracts/src/command-results.ts)):
+After every scenario runs, the recipe service builds the run's **`SignalEnvelope`** (each scenario is a *unit* that produces signals, ADR-0011) and returns it inside a `SimDoneResult` ([`packages/contracts/src/command-results.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/packages/contracts/src/command-results.ts)):
 
 ```ts
 interface SimDoneResult {
   type: 'sim-done';
   recipeName: string;
   cwd: string;
-  totalScenarios: number;
-  passedScenarios: number;
-  failedScenarios: number;
-  scenarios: {
-    scenarioId: string;
-    scenarioName: string;
-    kind: 'load' | 'chaos' | 'invariant' | 'fix-evaluation';
-    passed: boolean;
-    durationMs: number;
-    error?: string;
-  }[];
   durationMs: number;
   shouldFail?: boolean;        // any scenario failed
+  envelope: SignalEnvelope;    // the run's signals + verdict + per-scenario units
 }
 ```
 
-This is the union member that the renderer consumes (the `App.tsx` dispatcher in [`packages/cli/src/ui/`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/packages/cli/src/ui/) switches on `result.type`). It's also the shape `--json` serializes.
+`SimDoneResult` is the internal `CommandResult` union member the renderer consumes (the `App.tsx` dispatcher in [`packages/cli/src/ui/`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/packages/cli/src/ui/) switches on `result.type`); it derives the per-scenario table from `envelope.units` (one unit per scenario — `slug` = scenario id, `passed`, `durationMs`, `error?`). The **`--json` output is the `envelope` itself** (the same `SignalEnvelope` `fit` and `graph` emit, via the shared `formatSignalJson` formatter) — the old bespoke `sim-done` JSON shape is retired. See [`70-reference/04-json-output-schema.md`](/docs/opensip-tools/70-reference/04-json-output-schema/).
 
-Per-kind details (the load p99, the invariant counterexample, the chaos recovery time) are *not* in `SimDoneResult.scenarios[]`. They're in the executor result, which lives in the run's session record on disk under `<project>/opensip-tools/.runtime/sessions/{timestamp}-sim-{recipe?}.json`. The dashboard reads the session record to show full per-kind detail; the CLI summary stays compact.
+Per-kind details (the load p99, the invariant counterexample, the chaos recovery time) are *not* in the envelope. They're in the executor result, which lives in the run's session record on disk under `<project>/opensip-tools/.runtime/sessions/{timestamp}-sim-{recipe?}.json`. The dashboard reads the session record to show full per-kind detail; the CLI summary stays compact.
 
 ---
 

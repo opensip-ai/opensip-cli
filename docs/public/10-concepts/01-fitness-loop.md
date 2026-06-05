@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-03
+last_verified: 2026-06-04
 release: v2.6.x
 title: "The fitness loop"
 audience: [contributors, plugin-authors, ci-integrators]
@@ -215,15 +215,15 @@ A timeout per check kicks in if `execution.timeout` is set. A timed-out check re
 
 ## Stage 7 — Signal aggregation
 
-Source: [`packages/core/src/types/signal.ts`](../../../packages/core/src/types/signal.ts), [`packages/contracts/src/types.ts`](../../../packages/contracts/src/types.ts), [`packages/fitness/engine/src/framework/result-builder.ts`](../../../packages/fitness/engine/src/framework/result-builder.ts).
+Source: [`packages/core/src/types/signal.ts`](../../../packages/core/src/types/signal.ts), [`packages/contracts/src/signal-envelope.ts`](../../../packages/contracts/src/signal-envelope.ts), [`packages/fitness/engine/src/framework/result-builder.ts`](../../../packages/fitness/engine/src/framework/result-builder.ts).
 
-Every check returns a `CheckResult` carrying `Signal[]`. The recipe service aggregates results into the run-level `RecipeRunSummary` (totals, pass/fail counts, ignored counts), then hands the whole shape to the rendering layer.
+Every check returns a `CheckResult` carrying `Signal[]`. The recipe service aggregates results into the run-level summary (totals, pass/fail counts, ignored counts), then assembles the `SignalEnvelope`.
 
-The `CliOutput` type ([`packages/contracts/src/types.ts`](../../../packages/contracts/src/types.ts)) is the canonical envelope: version, tool, timestamp, score, passed flag, summary, durationMs, and a `checks[]` array each with its own findings. Anything that consumes the JSON output (CI, dashboard, the gate) reads `CliOutput`.
+The `SignalEnvelope` ([`packages/contracts/src/signal-envelope.ts`](../../../packages/contracts/src/signal-envelope.ts)) is the canonical artifact: `schemaVersion`, `tool`, `recipe?`, `runId`, `createdAt`, a `verdict` (score, passed, summary), a `units[]` sidecar (per-check ran/errored/timing facts), and the flat `signals[]` list. Anything that consumes the JSON output (CI, dashboard, the gate) reads the envelope (ADR-0011).
 
 The aggregation pass is also where the score is computed — currently `Math.round((passedChecks / totalChecks) * 100)` (a simple pass-rate percent). The score is informational; the exit code is the gate.
 
-> **Where the example lands:** the run produces a `CliOutput` carrying ~80 checks and ~30 findings, two of which are our `no-console-log` violations.
+> **Where the example lands:** the run produces a `SignalEnvelope` carrying ~80 units and ~30 signals, two of which are our `no-console-log` violations.
 
 ---
 
@@ -231,10 +231,10 @@ The aggregation pass is also where the score is computed — currently `Math.rou
 
 Source: [`packages/cli/src/ui/`](../../../packages/cli/src/ui/), [`packages/fitness/engine/src/cli/fit.ts`](../../../packages/fitness/engine/src/cli/fit.ts), [`packages/cli/src/open-dashboard.ts`](../../../packages/cli/src/open-dashboard.ts).
 
-The render layer is dispatched by output mode:
+The fitness Tool **returns its `SignalEnvelope`** via `CommandResult`; the CLI composition root dispatches by output mode (ADR-0011 — tools no longer render their own output):
 
-- **`--json`** — `process.stdout.write(JSON.stringify(output) + '\n')`. No tables, no colors, no spinner. Pure data.
-- **`--sarif`** (or `--gate-save`/`--gate-compare`) — `buildSarifLog(output)`, then JSON-serialize.
+- **`--json`** — the shared `formatSignalJson` formatter (the envelope *is* the JSON), via `cli.emitEnvelope`. No tables, no colors, no spinner. Pure data.
+- **SARIF** (via `--gate-save`/`--gate-compare`/`--report-to`/`fit-baseline-export`) — the shared `formatSignalSarif` formatter, owned by the root (`cli.writeSarif` / `cli.deliverSignals`).
 - **default (Ink)** — `cli.renderLive('fit', args)` mounts a live Ink view that transitions from spinner → results table → summary footer. The fitness Tool doesn't depend on Ink directly; it calls back through `ToolCliContext.renderLive`, which the CLI implements.
 
 After rendering, the dashboard auto-open runs if conditions allow: `--open` was passed (or the user opted into auto-open in their config), output isn't `--json`, and stdout is a TTY. The HTML report at `<project>/opensip-tools/.runtime/reports/latest.html` opens in the user's default browser (a single rolling file overwritten on each generation, not a per-run archive).
@@ -270,6 +270,6 @@ The fitness loop is the spine. The next three docs in this section sharpen it:
 
 - **[`02-tool-plugin-model.md`](./02-tool-plugin-model.md)** — how the CLI doesn't know what `fit` does. Stage 1 in depth.
 - **[`03-modular-monolith.md`](./03-modular-monolith.md)** — the 29-package layer cake that makes Stages 1, 3, and 6 isolatable.
-- **[`04-contract-surfaces.md`](./04-contract-surfaces.md)** — the public edges: argv, Tool interface, plugin manifest, CliOutput.
+- **[`04-contract-surfaces.md`](./04-contract-surfaces.md)** — the public edges: argv, Tool interface, plugin manifest, the `SignalEnvelope`.
 
 When you want stage-by-stage detail, jump to [`../20-fit/`](../20-fit/) — each doc there expands one of these stages with full code paths.

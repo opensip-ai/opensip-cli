@@ -45,32 +45,43 @@ export async function writeWorkspaceReport(
 }
 
 /**
- * Render the JSON document for `graph --workspace --json`.
+ * Build the JSON document object for `graph --workspace --json`. Returns the
+ * plain object so the dispatcher can route it through the CLI's `emitJson`
+ * seam (ADR-0011: tools emit, the composition root owns the stdout IO),
+ * instead of writing to `process.stdout` directly.
+ */
+export function buildWorkspaceJsonDocument(
+  perUnit: readonly WorkspaceUnitRunResult[],
+  durationMs: number,
+): Record<string, unknown> {
+  return {
+    version: '1.0',
+    tool: 'graph',
+    command: 'graph',
+    mode: 'workspace',
+    timestamp: new Date().toISOString(),
+    durationMs,
+    units: perUnit.map((r) => ({
+      unitId: r.unitId,
+      rootDir: r.rootDir,
+      displayPath: r.displayPath,
+      exitCode: r.exitCode,
+      signals: r.signals,
+    })),
+    totalFindings: perUnit.reduce((n, r) => n + r.signals.length, 0),
+  }
+}
+
+/**
+ * Render the JSON document for `graph --workspace --json` as a string.
+ * Retained for unit-test ergonomics; the dispatcher emits the object via
+ * `cli.emitJson` (which applies the same `JSON.stringify(_, null, 2)`).
  */
 export function renderWorkspaceJson(
   perUnit: readonly WorkspaceUnitRunResult[],
   durationMs: number,
 ): string {
-  return JSON.stringify(
-    {
-      version: '1.0',
-      tool: 'graph',
-      command: 'graph',
-      mode: 'workspace',
-      timestamp: new Date().toISOString(),
-      durationMs,
-      units: perUnit.map((r) => ({
-        unitId: r.unitId,
-        rootDir: r.rootDir,
-        displayPath: r.displayPath,
-        exitCode: r.exitCode,
-        signals: r.signals,
-      })),
-      totalFindings: perUnit.reduce((n, r) => n + r.signals.length, 0),
-    },
-    null,
-    2,
-  )
+  return JSON.stringify(buildWorkspaceJsonDocument(perUnit, durationMs), null, 2)
 }
 
 function renderWorkspaceStatusLines(

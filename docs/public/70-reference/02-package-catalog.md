@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-03
+last_verified: 2026-06-04
 release: v2.6.0
 title: "Package catalog"
 audience: [contributors, plugin-authors]
@@ -33,16 +33,16 @@ Pure types, registries, errors, IDs, logger, paths. No tool-specific knowledge.
 
 `@opensip-tools/datastore` is the SQLite + Drizzle persistence kernel; it sits between `core` and the rest of this layer and depends only on `core`. Tools and `session-store` own their domain schemas (sessions in session-store; baseline/catalog in graph; baseline in fitness). Adding a new tool means adding a new schema module — datastore is paradigm-agnostic infrastructure.
 
-`@opensip-tools/contracts` defines the contract layer between Tools and the runner — output shapes, exit codes, the cross-tool `StoredSession` type, and the `GraphCatalog` surface. A types-and-constants package (no runtime persistence or rendering). Imports `core` and `datastore` only.
+`@opensip-tools/contracts` defines the contract layer between Tools and the runner — the `SignalEnvelope` output shape every tool returns, exit codes, the cross-tool `StoredSession` type, and the `GraphCatalog` surface. A types-and-constants package (no runtime persistence or rendering). Imports `core` and `datastore` only.
 
-`@opensip-tools/session-store` owns session persistence (the `SessionRepo` runtime and the sessions schema). `@opensip-tools/reporting` builds SARIF and reports findings to the cloud. Both are Layer 2 siblings consumed by the tools above.
+`@opensip-tools/session-store` owns session persistence (the `SessionRepo` runtime and the sessions schema). `@opensip-tools/output` (renamed from `@opensip-tools/reporting`, ADR-0011) owns all machine output: pure `(envelope) => string` formatters under `format/` (json, sarif, table) and effectful delivery `sink/`s (cloud egress, entitlement). Both are Layer 2 siblings consumed by the tools above — though tools no longer import the formatters/sinks directly (the composition root does; see the dep-cruiser rules in [`80-implementation/05-layer-policy.md`](../80-implementation/05-layer-policy.md)).
 
 | Package | Path | Role | Key exports |
 |---|---|---|---|
 | `@opensip-tools/datastore` | `packages/datastore/` | SQLite + Drizzle persistence kernel — `DataStore` interface, factory, in-memory + on-disk backends, workspace migration store under `migrations/` | `DataStore`, `DataStoreFactory`, `DataStoreOpenOptions`, `DataStoreMigrationError` |
-| `@opensip-tools/contracts` | `packages/contracts/` | Shared contract types — `CliOutput`/`CommandResult` shapes, exit codes, the cross-tool `StoredSession` type, `GraphCatalog` surface | `CliOutput`, `CheckOutput`, `FindingOutput`, `CommandResult`, `EXIT_CODES`, `getErrorSuggestion`, `StoredSession`, `GraphCatalog` |
+| `@opensip-tools/contracts` | `packages/contracts/` | Shared contract types — the `SignalEnvelope`/`CommandResult` shapes, exit codes, the cross-tool `StoredSession` type, `GraphCatalog` surface | `SignalEnvelope`, `RunVerdict`, `UnitResult`, `buildSignalEnvelope`, `CommandResult`, `EXIT_CODES`, `getErrorSuggestion`, `StoredSession`, `GraphCatalog` |
 | `@opensip-tools/session-store` | `packages/session-store/` | Session persistence — `SessionRepo` runtime, `sessions`/`session_checks`/`session_findings` schema, session-id helpers. Depends on `core`, `datastore`, `contracts` | `SessionRepo`, `SessionListOptions`, `sessions`, `generateSessionId`, `sanitizeForFilename` |
-| `@opensip-tools/reporting` | `packages/reporting/` | SARIF construction + cloud reporting. Depends on `core`, `contracts` | `buildSarifLog`, `chunkSarifRuns`, `reportToCloud`, `ReportResult`, `SarifResult`, `SarifLocation` |
+| `@opensip-tools/output` | `packages/output/` | Machine output layer (renamed from `@opensip-tools/reporting`, ADR-0011): pure `format/` formatters + effectful `sink/` delivery. Depends on `core`, `contracts` | `formatSignalJson`, `formatSignalSarif`, `buildOpenSipSarif`, `formatSignalTableRows`, `formatSignalTableSummary`, `Formatter`, `postChunked`, `createCloudSignalSink`, `resolveSignalSink`, `resolveRepoIdentity`, `checkEntitlement` |
 
 ## Layer 3 — tools, shared libraries, and language adapters
 
@@ -52,9 +52,9 @@ Peer packages at the same layer. Tools implement the `Tool` contract; shared lib
 
 | Package | Path | Role | Key exports |
 |---|---|---|---|
-| `@opensip-tools/fitness` | `packages/fitness/engine/` | Fitness check engine, `defineCheck`, `defineRecipe`, gate, SARIF builder | `defineCheck`, `defineRecipe`, `FitnessRecipeService`, `defaultRecipeRegistry`, `getCheckConfig`, `executeFit`, `loadSignalersConfig`, `fitnessTool`, `saveBaseline`, `compareToBaseline`, `buildSarifLog`, `reportToCloud`, `openDashboard` |
+| `@opensip-tools/fitness` | `packages/fitness/engine/` | Fitness check engine, `defineCheck`, `defineRecipe`, gate. Returns a `SignalEnvelope`; SARIF/cloud egress is owned by the composition root (ADR-0011) | `defineCheck`, `defineRecipe`, `FitnessRecipeService`, `defaultRecipeRegistry`, `getCheckConfig`, `executeFit`, `loadSignalersConfig`, `fitnessTool`, `saveBaseline`, `compareToBaseline`, `openDashboard` |
 | `@opensip-tools/simulation` | `packages/simulation/engine/` | Simulation engine, four scenario kinds | `defineLoadScenario`, `defineChaosScenario`, `defineInvariantScenario`, `defineFixEvaluationScenario`, `defineSimulationRecipe`, `simulationTool`, `currentSimulationRecipeRegistry`, `SCENARIO_KINDS` |
-| `@opensip-tools/graph` | `packages/graph/engine/` | Static call-graph + dead-end analysis kernel. Seven-stage staged pipeline (discover → inventory → edges → indexes → features → rules → render). Language-agnostic — adapters live in their own publishable packages (see "Graph language adapters" below) and register through `registerAdapter`. Owns its own SARIF emitter (`render/sarif-opensip.ts`, DEC-498 — no longer the fitness shim); depends on `@opensip-tools/contracts` + `@opensip-tools/reporting`, not fitness | `graphTool`, `Catalog`, `FunctionOccurrence`, `CallEdge`, `Indexes`, `Rule`, `Renderer`, `GraphLanguageAdapter`, `registerAdapter`, `pickAdapter` |
+| `@opensip-tools/graph` | `packages/graph/engine/` | Static call-graph + dead-end analysis kernel. Seven-stage staged pipeline (discover → inventory → edges → indexes → features → rules → render). Language-agnostic — adapters live in their own publishable packages (see "Graph language adapters" below) and register through `registerAdapter`. Returns a `SignalEnvelope` (assembled in `cli/build-envelope.ts`); the shared `formatSignalSarif` formatter and all egress are owned by the composition root (ADR-0011). Depends on `@opensip-tools/contracts`, not fitness or `@opensip-tools/output` | `graphTool`, `Catalog`, `FunctionOccurrence`, `CallEdge`, `Indexes`, `Rule`, `Renderer`, `GraphLanguageAdapter`, `registerAdapter`, `pickAdapter` |
 
 ### Shared libraries
 

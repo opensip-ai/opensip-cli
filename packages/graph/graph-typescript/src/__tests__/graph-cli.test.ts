@@ -94,7 +94,12 @@ function makeCli(): CapturedCli {
       debug: vi.fn(),
     },
     setExitCode: (c: number) => { exitCodes.push(c); },
-    emitJson: vi.fn(),
+    // Mirror the composition root's `emitJson` seam (cli-context.ts):
+    // JSON.stringify(_, null, 2) + '\n' to stdout, so the `--workspace --json`
+    // integration test can parse the emitted document (ADR-0011).
+    emitJson: vi.fn((value: unknown) => {
+      process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
+    }),
     // Mirror the composition root's `emitEnvelope` seam: write the envelope as
     // JSON to stdout so the `--json` integration test can parse it.
     emitEnvelope: vi.fn((envelope: unknown) => {
