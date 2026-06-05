@@ -41,7 +41,6 @@ export type {
   Indexes,
   Rule,
   RuleHints,
-  GraphConfig,
   ResolutionStats,
   ResolverVerdict,
   ParseError,

@@ -14,6 +14,11 @@
 // index builder; nothing in production consumes the engine's.
 export { buildIndexes } from './pipeline/indexes.js';
 
+// `GraphConfig` — the engine's tuning/config data type. No external consumer
+// imports it from the public barrel; rule unit tests that construct a config to
+// drive `.evaluate(...)` import it from here instead (ADR-0009 surface policy).
+export type { GraphConfig } from './types.js';
+
 export { alwaysThrowsBranchRule } from './rules/always-throws-branch.js';
 export { noSideEffectPathRule } from './rules/no-side-effect-path.js';
 export { duplicatedFunctionBodyRule } from './rules/duplicated-function-body.js';
