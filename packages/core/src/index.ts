@@ -8,13 +8,14 @@ export { buildSignalBatch, MAX_SIGNALS_PER_BATCH } from './types/signal-batch.js
 export type { SignalSink, EmitResult } from './signals/signal-sink.js';
 export { noopSignalSink } from './signals/signal-sink.js';
 // Inline suppression primitive (ADR-0014) — shared `@x-ignore-*` machinery
-export { filterSignalsBySuppressions } from './signals/suppress.js';
+export { filterSignalsBySuppressions, scanSuppressionDirectives } from './signals/suppress.js';
 export type {
   SuppressionKeywords,
   SuppressionLocation,
   SuppressionRequest,
   SuppressionMatch,
   SuppressionResult,
+  SuppressionScan,
 } from './signals/suppress.js';
 export { COMMENT_OPENERS, stripCommentOpener } from './signals/comment-openers.js';
 

@@ -175,8 +175,12 @@ function isKnownDirectiveLine(line: string): boolean {
   });
 }
 
-/** Per-file scan result. */
-interface ScannedDirectives {
+/**
+ * Per-file scan result. Exposed so lower-level callers (e.g. fitness's
+ * `parseFileIgnoreDirective` / `parseIgnoreDirectives` wrappers) can build on
+ * the same single scan implementation instead of re-deriving it.
+ */
+export interface SuppressionScan {
   /** Ids named by a file-level directive. */
   readonly fileIgnoredIds: ReadonlySet<string>;
   /** Target 1-based line → ids named by a next-line directive. */
@@ -186,7 +190,10 @@ interface ScannedDirectives {
 }
 
 /** Scan a file's content once, extracting every directive for `keywords`. */
-function scanDirectives(content: string, keywords: SuppressionKeywords): ScannedDirectives {
+export function scanSuppressionDirectives(
+  content: string,
+  keywords: SuppressionKeywords,
+): SuppressionScan {
   const lines = content.split('\n');
   const fileIgnoredIds = new Set<string>();
   const lineIgnoredIds = new Map<number, Set<string>>();
@@ -270,12 +277,12 @@ export async function filterSignalsBySuppressions(
   }
 
   // Scan each unique file once, in parallel.
-  const scanByFile = new Map<string, ScannedDirectives>();
+  const scanByFile = new Map<string, SuppressionScan>();
   await Promise.all(
     [...uniqueFiles].map(async (filePath) => {
       try {
         const content = await readFile(filePath);
-        scanByFile.set(filePath, scanDirectives(content, keywords));
+        scanByFile.set(filePath, scanSuppressionDirectives(content, keywords));
       } catch {
         // Unreadable file → no directives. Graceful-degrade, never throw.
       }
@@ -302,7 +309,7 @@ export async function filterSignalsBySuppressions(
 function matchSuppression(
   locations: readonly SuppressionLocation[],
   id: string,
-  scanByFile: ReadonlyMap<string, ScannedDirectives>,
+  scanByFile: ReadonlyMap<string, SuppressionScan>,
 ): { file: string; line: number | 'file' } | null {
   for (const loc of locations) {
     const scan = scanByFile.get(loc.file);
