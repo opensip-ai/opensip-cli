@@ -11,11 +11,12 @@ describe('pythonAdapter', () => {
     expect(pythonAdapter.aliases).toContain('py')
   })
 
-  it('parse() returns a tree with line starts', () => {
-    const tree = pythonAdapter.parse('def main():\n    print("hi")\n', 'foo.py')
+  it('parse() returns a real tree-sitter tree + source', () => {
+    const src = 'def main():\n    print("hi")\n'
+    const tree = pythonAdapter.parse(src, 'foo.py')
     expect(tree).not.toBeNull()
-    expect(tree?.filePath).toBe('foo.py')
-    expect(tree?.lineStarts.length).toBe(3)
+    expect(tree?.source).toBe(src)
+    expect(tree?.tree.rootNode.type).toBe('module')
   })
 })
 

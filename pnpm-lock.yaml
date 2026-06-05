@@ -745,6 +745,9 @@ importers:
       '@opensip-tools/core':
         specifier: workspace:*
         version: link:../../core
+      '@opensip-tools/tree-sitter':
+        specifier: workspace:*
+        version: link:../../tree-sitter
     devDependencies:
       '@types/node':
         specifier: ^22.19.19

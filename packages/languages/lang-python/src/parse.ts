@@ -1,25 +1,30 @@
 /**
- * @fileoverview Lightweight Python "parse" — returns content metadata.
+ * @fileoverview Python parse — web-tree-sitter + vendored tree-sitter-python.wasm.
  *
- * The MVP Python adapter does not ship a full AST parser. Tree-sitter
- * integration is deferred. `parse()` returns a minimal tree object
- * that exposes the source text and line offsets, enough for
- * text-pattern checks. Delegates to core's shared
- * `buildMinimalTextTree` factory; the `PythonTree` alias keeps the
- * adapter generic-parameter name distinct so future per-language
- * tree-sitter trees can grow independently.
- *
- * Future: replace with web-tree-sitter + tree-sitter-python to produce
- * a real AST. The adapter contract is unchanged — only the PythonTree
- * shape grows.
+ * ADR-0010: `lang-python` is the canonical Python parse substrate for the whole
+ * platform — fitness checks parse via the adapter (`getSharedTree`) and the
+ * graph Python adapter consumes this too. The grammar is loaded once at module
+ * top level (the WASM runtime is initialized by `@opensip-tools/tree-sitter`'s
+ * own top-level `Parser.init()`, statically imported here); a single reused
+ * parser keeps `parse()` synchronous and allocation-free. Tree-sitter recovers
+ * from syntax errors with MISSING nodes, so a malformed file yields a partial
+ * tree (non-null) rather than throwing — callers can inspect `rootNode.hasError`.
  */
 
-import { buildMinimalTextTree, type MinimalTextTree } from '@opensip-tools/core'
+import { fileURLToPath } from 'node:url'
 
-/** Parse-tree alias for Python (currently a minimal text tree; will become a real AST). */
-export type PythonTree = MinimalTextTree
+import { loadGrammar, createParser, parseToTree, type ParsedFile } from '@opensip-tools/tree-sitter'
 
-/** Parses Python source into a {@link PythonTree}, or null on unparseable input. */
-export function parsePython(content: string, filePath: string): PythonTree | null {
-  return buildMinimalTextTree(content, filePath)
+const grammar = await loadGrammar(
+  fileURLToPath(new URL('../wasm/tree-sitter-python.wasm', import.meta.url)),
+)
+const parser = createParser(grammar)
+
+/** Parsed Python source: tree-sitter parse tree plus the original source text. */
+export type PythonTree = ParsedFile
+
+/** Parses Python source into a {@link PythonTree}, or null when no tree is produced. */
+export function parsePython(content: string, _filePath: string): PythonTree | null {
+  const tree = parseToTree(parser, content)
+  return tree ? { tree, source: content } : null
 }
