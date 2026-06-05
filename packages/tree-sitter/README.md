@@ -2,9 +2,9 @@
      Change the package's "description" (or the generator template) and run
      `pnpm docs:readmes`. CI enforces sync via `pnpm docs:readmes:check`. -->
 
-# @opensip-tools/session-store
+# @opensip-tools/tree-sitter
 
-> Session persistence for OpenSIP Tools — the session SQLite schema and SessionRepo, extracted from contracts
+> Grammar-agnostic tree-sitter substrate (parser lifecycle + node accessors) shared by lang-* and the graph adapters
 
 This is an **internal library** of the opensip-tools toolkit. It is published so the CLI and tools can depend on it; most users will not install it directly.
 
@@ -13,7 +13,7 @@ Part of [**opensip-tools**](https://github.com/opensip-ai/opensip-tools) — an 
 ## Install
 
 ```bash
-npm install @opensip-tools/session-store
+npm install @opensip-tools/tree-sitter
 ```
 
 Most users just install the CLI, which bundles the first-party tools:
@@ -26,7 +26,7 @@ npm install -g opensip-tools
 
 - 📚 Project docs: https://opensip.ai/docs/opensip-tools/
 - 🧭 Package catalog (what every package does): https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/docs/public/70-reference/02-package-catalog.md
-- 📦 Source: https://github.com/opensip-ai/opensip-tools/tree/v3.0.0/packages/session-store
+- 📦 Source: https://github.com/opensip-ai/opensip-tools/tree/v3.0.0/packages/tree-sitter
 
 ## License
 
