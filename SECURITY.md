@@ -28,16 +28,26 @@ If you discover a security vulnerability in opensip-tools, please report it resp
 
 ### Scope
 
-This policy covers all 17 first-party `@opensip-tools/*` packages:
+This policy covers all 31 first-party packages (the unscoped
+`opensip-tools` CLI plus 30 `@opensip-tools/*` packages):
 
 - `opensip-tools` — the CLI binary
-- `@opensip-tools/contracts` — shared CLI infrastructure
 - `@opensip-tools/core` — kernel (errors, logger, language adapters,
   plugin loader, Tool contract)
+- `@opensip-tools/contracts` — Tool↔runner contract types (types-only)
+- `@opensip-tools/datastore` — SQLite + Drizzle persistence layer
+- `@opensip-tools/session-store` — SessionRepo runtime + sessions schema
+- `@opensip-tools/output` — machine-output formatters + delivery sinks
+- `@opensip-tools/dashboard` — self-contained HTML report generator
+- `@opensip-tools/cli-ui` — shared Ink/React CLI primitives
+- `@opensip-tools/tree-sitter` — grammar-agnostic web-tree-sitter substrate
 - `@opensip-tools/fitness` — fitness engine
-- `@opensip-tools/simulation` — simulation engine
-- `@opensip-tools/checks-{typescript,universal,python,go,java,cpp}` —
+- `@opensip-tools/checks-{typescript,universal,python,go,java,cpp,rust}` —
   fitness check packs
+- `@opensip-tools/simulation` — simulation engine
+- `@opensip-tools/graph` — static call-graph engine
+- `@opensip-tools/graph-adapter-common` — shared tree-sitter adapter scaffolding
+- `@opensip-tools/graph-{typescript,python,rust,go,java}` — graph language adapters
 - `@opensip-tools/lang-{typescript,rust,python,go,java,cpp}` —
   language adapters
 

@@ -23,9 +23,10 @@ opensip-tools/
 │   │                            #   IDs, language adapters, plugin loader,
 │   │                            #   Tool contract
 │   ├── contracts/               # @opensip-tools/contracts — contract types
-│   │                            #   between Tools and the runner: CliOutput,
-│   │                            #   CommandResult, exit codes, session
-│   │                            #   persistence, GraphCatalog type surface
+│   │                            #   between Tools and the runner: SignalEnvelope
+│   │                            #   (ADR-0011; replaced CliOutput), CommandResult,
+│   │                            #   exit codes, the StoredSession type (runtime in
+│   │                            #   session-store), GraphCatalog type surface
 │   ├── datastore/               # @opensip-tools/datastore — SQLite + Drizzle
 │   │                            #   persistence layer: DataStore interface,
 │   │                            #   sqlite/memory backends, factory, schema
@@ -41,6 +42,17 @@ opensip-tools/
 │   │                            #   theme). Extracted from cli/ so tools that
 │   │                            #   ship a live view depend on the UI kit
 │   │                            #   without pulling in the dispatcher.
+│   ├── output/                  # @opensip-tools/output — machine output layer
+│   │                            #   (ADR-0011): pure format/ formatters (json,
+│   │                            #   sarif, table) + effectful sink/ delivery
+│   │                            #   (cloud egress, entitlement). Tools never
+│   │                            #   import it; the composition root does.
+│   ├── session-store/           # @opensip-tools/session-store — SessionRepo
+│   │                            #   runtime + sessions schema (the StoredSession
+│   │                            #   type itself lives in contracts)
+│   ├── tree-sitter/             # @opensip-tools/tree-sitter — grammar-agnostic
+│   │                            #   web-tree-sitter substrate shared by lang-*
+│   │                            #   and the graph tree-sitter adapters
 │   │
 │   ├── fitness/                 # fitness namespace
 │   │   ├── engine/              # @opensip-tools/fitness — fitness engine,
@@ -67,7 +79,9 @@ opensip-tools/
 │   │   │                        #   upstream of go/java/python/rust
 │   │   ├── graph-typescript/    # @opensip-tools/graph-typescript — TS adapter
 │   │   ├── graph-python/        # @opensip-tools/graph-python — Python adapter
-│   │   └── graph-rust/          # @opensip-tools/graph-rust — Rust adapter
+│   │   ├── graph-rust/          # @opensip-tools/graph-rust — Rust adapter
+│   │   ├── graph-go/            # @opensip-tools/graph-go — Go adapter
+│   │   └── graph-java/          # @opensip-tools/graph-java — Java adapter
 │   │
 │   └── languages/               # language adapters
 │       ├── lang-typescript/
@@ -453,7 +467,7 @@ npm's self-replacement and pnpm's lack of OIDC support.
 
 ## Project Status
 
-**v2.0.0** — opensip-tools is a tool-plugin platform: `core` is a
+**v3.0.0** — opensip-tools is a tool-plugin platform: `core` is a
 strict kernel, and `fitness`, `graph`, and `simulation` are peer
 tools implementing a shared Tool contract, with `cli` as a generic
 dispatcher. Adding a new tool requires zero CLI changes.
