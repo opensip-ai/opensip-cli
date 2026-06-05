@@ -96,6 +96,12 @@ distinct from:
   surface + `fitnessTool`; drop engine internals (registries, recipe service,
   gate primitives, `FitBaselineRepo`, CLI handlers). Locked by a runtime
   export-surface test; applies ADR-0009 concretely to fitness
+- [ADR-0014](./ADR-0014-shared-inline-signal-suppression.md) — Inline,
+  per-occurrence, reason-carrying finding suppression is a shared
+  `@opensip-tools/core` primitive over the `Signal` stream; fitness migrates its
+  accidental-home implementation onto it and graph adopts it (3.0 GA
+  prerequisite). Whole-rule disable + the baseline ratchet stay per-tool.
+  Extends ADR-0005's hoist-shared-substrate-to-core symmetry to suppression
 
 ### Superseded
 
