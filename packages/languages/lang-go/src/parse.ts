@@ -1,25 +1,29 @@
 /**
- * @fileoverview Lightweight Go "parse" — returns content metadata.
+ * @fileoverview Go parse — web-tree-sitter + vendored tree-sitter-go.wasm.
  *
- * The MVP Go adapter does not ship a full AST parser. Tree-sitter
- * integration is deferred. `parse()` returns a minimal tree object
- * that exposes the source text and line offsets, enough for
- * text-pattern checks. Delegates to core's shared
- * `buildMinimalTextTree` factory; the `GoTree` alias keeps the
- * adapter generic-parameter name distinct so future per-language
- * tree-sitter trees can grow independently.
- *
- * Future: replace with web-tree-sitter + tree-sitter-go to produce a
- * real AST. The adapter contract is unchanged — only the GoTree shape
- * grows.
+ * ADR-0010: `lang-go` is the canonical Go parse substrate — fitness checks
+ * parse via the adapter (`getSharedTree`) and the graph Go adapter consumes
+ * this too. The grammar loads once at module top level (the WASM runtime is
+ * initialized by `@opensip-tools/tree-sitter`'s top-level `Parser.init()`); a
+ * single reused parser keeps `parse()` synchronous. Tree-sitter recovers from
+ * syntax errors with MISSING nodes, so a malformed file yields a partial tree
+ * (non-null) rather than throwing.
  */
 
-import { buildMinimalTextTree, type MinimalTextTree } from '@opensip-tools/core'
+import { fileURLToPath } from 'node:url'
 
-/** Parse-tree alias for Go (currently a minimal text tree; will become a real AST). */
-export type GoTree = MinimalTextTree
+import { loadGrammar, createParser, parseToTree, type ParsedFile } from '@opensip-tools/tree-sitter'
 
-/** Parses Go source into a {@link GoTree} for check consumption. */
-export function parseGo(content: string, filePath: string): GoTree {
-  return buildMinimalTextTree(content, filePath)
+const grammar = await loadGrammar(
+  fileURLToPath(new URL('../wasm/tree-sitter-go.wasm', import.meta.url)),
+)
+const parser = createParser(grammar)
+
+/** Parsed Go source: tree-sitter parse tree plus the original source text. */
+export type GoTree = ParsedFile
+
+/** Parses Go source into a {@link GoTree}, or null when no tree is produced. */
+export function parseGo(content: string, _filePath: string): GoTree | null {
+  const tree = parseToTree(parser, content)
+  return tree ? { tree, source: content } : null
 }

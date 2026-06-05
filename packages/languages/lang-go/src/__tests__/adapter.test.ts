@@ -9,11 +9,12 @@ describe('goAdapter', () => {
     expect(goAdapter.fileExtensions).toContain('.go')
   })
 
-  it('parse() returns a tree with line starts', () => {
-    const tree = goAdapter.parse('package main\n\nfunc main() {}\n', 'foo.go')
+  it('parse() returns a real tree-sitter tree + source', () => {
+    const src = 'package main\n\nfunc main() {}\n'
+    const tree = goAdapter.parse(src, 'foo.go')
     expect(tree).not.toBeNull()
-    expect(tree?.filePath).toBe('foo.go')
-    expect(tree?.lineStarts.length).toBe(4)
+    expect(tree?.source).toBe(src)
+    expect(tree?.tree.rootNode.type).toBe('source_file')
   })
 })
 

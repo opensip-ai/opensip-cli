@@ -276,19 +276,22 @@ export default tseslint.config(
     files: [
       'packages/graph/graph-python/src/**/*.ts',
       'packages/graph/graph-rust/src/**/*.ts',
+      'packages/graph/graph-go/src/**/*.ts',
     ],
     ignores: [
       'packages/graph/graph-python/src/**/__tests__/**',
       'packages/graph/graph-python/src/**/*.test.ts',
       'packages/graph/graph-rust/src/**/__tests__/**',
       'packages/graph/graph-rust/src/**/*.test.ts',
+      'packages/graph/graph-go/src/**/__tests__/**',
+      'packages/graph/graph-go/src/**/*.test.ts',
     ],
     rules: {
       'no-restricted-imports': ['error', {
         paths: [{
           name: 'web-tree-sitter',
           message:
-            'ADR-0010: a migrated graph adapter (python, rust) parses via its ' +
+            'ADR-0010: a migrated graph adapter (python, rust, go) parses via its ' +
             '@opensip-tools/lang-* package and consumes the tree-sitter substrate ' +
             'from @opensip-tools/tree-sitter. It must not import web-tree-sitter directly.',
         }],

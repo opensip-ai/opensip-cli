@@ -51,7 +51,7 @@ import type {
   ResolveInput,
   ResolveOutput,
 } from '@opensip-tools/graph';
-import type { Node } from 'web-tree-sitter';
+import type { Node } from '@opensip-tools/tree-sitter';
 
 function goPosition(node: Node, file: GoParsedFile): {
   readonly line: number;

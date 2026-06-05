@@ -13,7 +13,7 @@ import { childrenOf, namedChildrenOf } from '@opensip-tools/graph-adapter-common
 
 import type { GoParsedFile } from './parse.js';
 import type { FunctionOccurrence } from '@opensip-tools/graph';
-import type { Node } from 'web-tree-sitter';
+import type { Node } from '@opensip-tools/tree-sitter';
 
 export function extractPackageName(file: GoParsedFile): string {
   for (const child of childrenOf(file.tree.rootNode)) {

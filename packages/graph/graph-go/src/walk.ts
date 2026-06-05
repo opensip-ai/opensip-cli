@@ -70,7 +70,7 @@ import type {
   WalkInput,
   WalkOutput,
 } from '@opensip-tools/graph';
-import type { Node } from 'web-tree-sitter';
+import type { Node } from '@opensip-tools/tree-sitter';
 
 const TEST_FILE_NAME_RE = /(?:^|\/)[^/]+_test\.go$/;
 const GENERATED_PATH_RE = /\bvendor\/|\.pb\.go$|_generated\.go$|\.gen\.go$|zz_generated_/;

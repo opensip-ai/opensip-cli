@@ -596,9 +596,12 @@ importers:
       '@opensip-tools/graph-adapter-common':
         specifier: workspace:*
         version: link:../graph-adapter-common
-      web-tree-sitter:
-        specifier: 0.25.10
-        version: 0.25.10
+      '@opensip-tools/lang-go':
+        specifier: workspace:*
+        version: link:../../languages/lang-go
+      '@opensip-tools/tree-sitter':
+        specifier: workspace:*
+        version: link:../../tree-sitter
     devDependencies:
       '@types/node':
         specifier: ^22.19.19
@@ -731,6 +734,9 @@ importers:
       '@opensip-tools/core':
         specifier: workspace:*
         version: link:../../core
+      '@opensip-tools/tree-sitter':
+        specifier: workspace:*
+        version: link:../../tree-sitter
     devDependencies:
       '@types/node':
         specifier: ^22.19.19
