@@ -21,7 +21,7 @@ describe('@opensip-tools/lang-rust barrel', () => {
   it('re-exports parseRust', () => {
     expect(typeof pkg.parseRust).toBe('function')
     const tree = pkg.parseRust('fn main() {}', 'main.rs')
-    expect(tree?.filePath).toBe('main.rs')
+    expect(tree?.tree.rootNode.type).toBe('source_file')
   })
 
   it('re-exports stripStrings and stripComments', () => {

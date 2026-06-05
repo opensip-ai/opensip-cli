@@ -10,11 +10,12 @@ describe('rustAdapter', () => {
     expect(rustAdapter.aliases).toContain('rs')
   })
 
-  it('parse() returns a tree with line starts', () => {
-    const tree = rustAdapter.parse('fn main() {\n  println!("hi");\n}', 'foo.rs')
+  it('parse() returns a real tree-sitter tree + source', () => {
+    const src = 'fn main() {\n  println!("hi");\n}'
+    const tree = rustAdapter.parse(src, 'foo.rs')
     expect(tree).not.toBeNull()
-    expect(tree?.filePath).toBe('foo.rs')
-    expect(tree?.lineStarts.length).toBe(3)
+    expect(tree?.source).toBe(src)
+    expect(tree?.tree.rootNode.type).toBe('source_file')
   })
 })
 

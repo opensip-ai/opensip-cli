@@ -264,27 +264,33 @@ export default tseslint.config(
   // ---------------------------------------------------------------------------
   // ADR-0010 ratchet — a migrated graph adapter must not import web-tree-sitter.
   //
-  // graph-python now parses via @opensip-tools/lang-python and sources all
-  // tree-sitter surface (incl. the Node type) from @opensip-tools/tree-sitter.
-  // It must not reach back to web-tree-sitter directly. As each remaining
-  // language (go/java/rust) migrates to lang-*, add its graph-* glob here; once
-  // all four are migrated, graph-adapter-common/parse.ts goes away and this can
-  // generalize to "web-tree-sitter only in tree-sitter + lang-*".
+  // A migrated graph adapter parses via its @opensip-tools/lang-* package and
+  // sources all tree-sitter surface (incl. the Node type) from
+  // @opensip-tools/tree-sitter. It must not reach back to web-tree-sitter
+  // directly. As each remaining language migrates to lang-*, add its graph-*
+  // glob here; once all four are migrated, graph-adapter-common/parse.ts goes
+  // away and this can generalize to "web-tree-sitter only in tree-sitter +
+  // lang-*".
   // ---------------------------------------------------------------------------
   {
-    files: ['packages/graph/graph-python/src/**/*.ts'],
+    files: [
+      'packages/graph/graph-python/src/**/*.ts',
+      'packages/graph/graph-rust/src/**/*.ts',
+    ],
     ignores: [
       'packages/graph/graph-python/src/**/__tests__/**',
       'packages/graph/graph-python/src/**/*.test.ts',
+      'packages/graph/graph-rust/src/**/__tests__/**',
+      'packages/graph/graph-rust/src/**/*.test.ts',
     ],
     rules: {
       'no-restricted-imports': ['error', {
         paths: [{
           name: 'web-tree-sitter',
           message:
-            'ADR-0010: graph-python parses via @opensip-tools/lang-python and ' +
-            'consumes the tree-sitter substrate from @opensip-tools/tree-sitter. ' +
-            'It must not import web-tree-sitter directly.',
+            'ADR-0010: a migrated graph adapter (python, rust) parses via its ' +
+            '@opensip-tools/lang-* package and consumes the tree-sitter substrate ' +
+            'from @opensip-tools/tree-sitter. It must not import web-tree-sitter directly.',
         }],
       }],
     },

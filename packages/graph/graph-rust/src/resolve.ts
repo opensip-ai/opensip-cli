@@ -60,7 +60,7 @@ import type {
   ResolveInput,
   ResolveOutput,
 } from '@opensip-tools/graph';
-import type { Node } from 'web-tree-sitter';
+import type { Node } from '@opensip-tools/tree-sitter';
 
 interface NameIndex {
   /** All occurrences keyed by simple name (excludes module-init / arrow synthetics). */

@@ -1,34 +1,29 @@
 /**
- * @fileoverview Lightweight Rust "parse" — returns content metadata.
+ * @fileoverview Rust parse — web-tree-sitter + vendored tree-sitter-rust.wasm.
  *
- * The MVP Rust adapter does not ship a full AST parser. Tree-sitter
- * integration is deferred. `parse()` returns a minimal tree object
- * that exposes the source text and line offsets, enough for
- * text-pattern checks. Delegates to core's shared
- * `buildMinimalTextTree` factory; the `RustTree` alias keeps the
- * adapter generic-parameter name distinct so future per-language
- * tree-sitter trees can grow independently.
- *
- * Future: replace with web-tree-sitter + tree-sitter-rust to produce a
- * real AST. The adapter contract is unchanged — only the RustTree
- * shape grows.
+ * ADR-0010: `lang-rust` is the canonical Rust parse substrate — fitness checks
+ * parse via the adapter (`getSharedTree`) and the graph Rust adapter consumes
+ * this too. The grammar loads once at module top level (the WASM runtime is
+ * initialized by `@opensip-tools/tree-sitter`'s top-level `Parser.init()`); a
+ * single reused parser keeps `parse()` synchronous. Tree-sitter recovers from
+ * syntax errors with MISSING nodes, so a malformed file yields a partial tree
+ * (non-null) rather than throwing.
  */
 
-import { buildMinimalTextTree, type MinimalTextTree } from '@opensip-tools/core'
+import { fileURLToPath } from 'node:url'
 
-/** Parse-tree alias for Rust (currently a minimal text tree; will become a real AST). */
-export type RustTree = MinimalTextTree
+import { loadGrammar, createParser, parseToTree, type ParsedFile } from '@opensip-tools/tree-sitter'
 
-/**
- * Build the Rust adapter's text-tree shim. The current MVP body
- * delegates to `buildMinimalTextTree`, which never returns `null`; the
- * empty-`filePath` case is accepted as a pass-through (the tree still
- * carries `filePath: ''` for diagnostics; callers that want to reject
- * empty paths should validate upstream). When tree-sitter integration
- * lands, the return type will widen to `RustTree | null` and parse
- * failures will become reachable; downstream consumers should then
- * gate on the result.
- */
-export function parseRust(content: string, filePath: string): RustTree {
-  return buildMinimalTextTree(content, filePath)
+const grammar = await loadGrammar(
+  fileURLToPath(new URL('../wasm/tree-sitter-rust.wasm', import.meta.url)),
+)
+const parser = createParser(grammar)
+
+/** Parsed Rust source: tree-sitter parse tree plus the original source text. */
+export type RustTree = ParsedFile
+
+/** Parses Rust source into a {@link RustTree}, or null when no tree is produced. */
+export function parseRust(content: string, _filePath: string): RustTree | null {
+  const tree = parseToTree(parser, content)
+  return tree ? { tree, source: content } : null
 }
