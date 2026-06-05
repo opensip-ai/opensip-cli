@@ -226,7 +226,7 @@ opensip-tools graph --workspace
 # → one session in the dashboard combining TS package results + Cargo member results
 ```
 
-**Session contract.** A single CLI invocation produces a single dashboard session, regardless of how many positional paths or workspace units the run analyzed. Modes that produce machine-readable artifacts instead of dashboard sessions (`--json`, `--gate-save`, `--gate-compare`, `--report-to`, `--catalog-output`) opt out.
+**Session contract.** A single CLI invocation produces a single dashboard session, regardless of how many positional paths or workspace units the run analyzed. Modes that produce machine-readable artifacts instead of dashboard sessions (`--json`, `--gate-save`, `--gate-compare`, `--report-to`) opt out. (Machine-artifact catalog/SARIF exports live on the dedicated `catalog-export` / `sarif-export` subcommands — the v1 `graph --catalog-output` flag was retired by the graph-adapter split.)
 
 **Adapter selection.** v2.0.0 ships first-party graph adapters for TypeScript, Python, Rust, Go, and Java — each is its own publishable npm package under the `@opensip-tools/graph-*` namespace. Discovery is by name pattern: `node_modules` is walked for any package whose name matches `@opensip-tools/graph-*`, or you can pin an explicit list under `plugins.graphAdapters:` in `opensip-tools.config.yml`. Marker-file detection (`tsconfig.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `pom.xml`/`build.gradle*`) then chooses which discovered adapter(s) apply to the run; positional paths inherit that decision unless `--language` overrides it.
 
