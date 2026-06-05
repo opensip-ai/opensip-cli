@@ -176,17 +176,32 @@ export interface ToolCliContext {
    * `process.stdout.write(JSON.stringify(value, null, 2) + '\n')` call
    * that every tool's `--json` mode would otherwise duplicate. The CLI
    * owns the IO seam; tools call `emitJson` and the CLI decides how the
-   * value reaches the terminal (today: pretty-printed JSON to stdout;
-   * future: optional `--out <file>`, envelope wrappers, etc.).
+   * value reaches the terminal.
+   *
+   * This is the **general-purpose JSON seam**, distinct from `emitEnvelope`
+   * (below). Use it for `--json` output that is NOT a run-signal envelope:
+   * auxiliary/list subcommands (`fit-list`, `fit-recipes`, `graph-lookup`,
+   * `graph-symbol-index`), the `graph --workspace --json` report document,
+   * and bare error objects (`{ error }`). The main analyze commands' run
+   * output goes through `emitEnvelope` instead. Both are current, sanctioned
+   * stdout seams — see the `no-direct-stdout-in-tool-engine` check, which
+   * permits exactly `render` / `emitJson` / `emitEnvelope` / `deliverSignals`
+   * / `writeSarif`.
    */
   readonly emitJson: (value: unknown) => void;
   /**
-   * Emit a tool-run **signal envelope** as machine-output (ADR-0011). The
+   * Emit a tool **run-signal envelope** as machine-output (ADR-0011). The
    * CLI composition root formats the envelope through the single shared
    * `formatSignalJson` formatter and writes it to stdout — so the `--json`
-   * wire contract lives in `@opensip-tools/output`, not re-stringified per
-   * tool. Tools switch from `emitJson(toolShapedOutput)` to
-   * `emitEnvelope(envelope)` as they migrate (Phases 4–6, ADR-0011).
+   * wire contract for a run lives in `@opensip-tools/output`, not
+   * re-stringified per tool.
+   *
+   * This is the specialised seam for the **main analyze commands' run output**
+   * (`fit`, `graph`, `sim`): they build a `SignalEnvelope` and call
+   * `emitEnvelope`, where the older bespoke-JSON path used `emitJson(result)`
+   * (the ADR-0011 Phase 4–6 migration, now complete). `emitJson` remains for
+   * everything that is not a run envelope (see above) — the two seams are
+   * complementary, not transitional.
    *
    * The value is the `SignalEnvelope` from `@opensip-tools/contracts`; it is
    * typed `unknown` here for the same reason `render`/`emitJson` are — the

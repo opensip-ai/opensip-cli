@@ -28,12 +28,15 @@
  *     layer-inversion blind spot (e.g. a type-only `fitness -> graph`
  *     import). Verified 0 violations (786 modules / 1847 deps).
  *
- * Caveat for future maintainers: the hygiene rules inherited from base
- * (notably `not-to-dev-dep`) now also see type-only edges. A legitimate
- * type-only import of a devDependency's types from production source
- * would surface here even though it's runtime-safe. None exist today; if
- * one is ever intentional, exclude that specific rule by name from the
- * spread below rather than relaxing the whole gate.
+ * Note for future maintainers: this config inherits `...base.options`, which
+ * includes `includeOnly: '^packages/'`. That drops every node_modules edge
+ * before rules run, so npm-targeting hygiene rules cannot fire here either —
+ * turning on `tsPreCompilationDeps` makes type-only *package-layer* edges
+ * visible, but not edges into node_modules. Dev-dependency hygiene is therefore
+ * NOT a depcruise concern in either config; it lives in ESLint
+ * `import-x/no-extraneous-dependencies` (which sees node_modules). If you add a
+ * new base rule that should be scoped out of the type-inclusive run, exclude it
+ * by name from the spread below rather than relaxing the whole gate.
  */
 
 const base = require('./dependency-cruiser.cjs');

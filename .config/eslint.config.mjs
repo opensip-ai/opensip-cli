@@ -182,6 +182,29 @@ export default tseslint.config(
       // package mains before they're built. Type checker catches missing
       // imports for type-checked code anyway.
       'import-x/no-unresolved': 'off',
+      // Dev-dependency hygiene — production source must import only declared
+      // `dependencies`/`peerDependencies`, never `devDependencies`. This is the
+      // AUTHORITATIVE gate for that invariant: dependency-cruiser cannot enforce
+      // it because its `includeOnly: '^packages/'` drops every node_modules edge
+      // before rules run, so a `to: { dependencyTypes: ['npm-dev'] }` rule there
+      // is structurally inert (verified empirically; the old depcruise
+      // `not-to-dev-dep` rule was removed for that reason — ADR-0009 lineage).
+      // ESLint resolves node_modules natively, so it can. `includeTypes: true`
+      // also forbids `import type` of a devDep from production code; the
+      // test/script/config globs below are where devDeps (vitest, etc.) are
+      // legitimately allowed.
+      'import-x/no-extraneous-dependencies': ['error', {
+        devDependencies: [
+          '**/*.test.{ts,tsx}',
+          '**/__tests__/**',
+          '**/*.config.{ts,mts,cts}',
+          'scripts/**',
+          '.config/**',
+        ],
+        optionalDependencies: false,
+        peerDependencies: true,
+        includeTypes: true,
+      }],
     },
   },
 

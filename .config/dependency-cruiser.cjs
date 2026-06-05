@@ -75,18 +75,14 @@ module.exports = {
       from: { pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`] },
       to: { path: String.raw`/src/internal\.ts$` },
     },
-    {
-      name: 'not-to-dev-dep',
-      severity: 'error',
-      comment:
-        "Source code must not import devDependencies. Move the package to " +
-        "dependencies or refactor the import out of source.",
-      from: {
-        path: '^packages/',
-        pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`],
-      },
-      to: { dependencyTypes: ['npm-dev'] },
-    },
+    // Dev-dependency hygiene ("production source must not import a
+    // devDependency") is NOT a depcruise rule. `options.includeOnly: '^packages/'`
+    // drops every node_modules edge before rules run, so a `to: { dependencyTypes:
+    // ['npm-dev'] }` rule is structurally inert here (verified empirically with a
+    // probe import of an external devDep). The former `not-to-dev-dep` rule was
+    // removed for that reason. The invariant is enforced by ESLint
+    // `import-x/no-extraneous-dependencies` (.config/eslint.config.mjs), which
+    // resolves node_modules natively — that is the authoritative gate for it.
 
     // -------------------------------------------------------------------
     // Persistence ownership — keep the repository boundary a real seam, not
@@ -102,8 +98,9 @@ module.exports = {
     // (`sql`/`eq`/…) was considered but is unenforceable under this config —
     // `options.includeOnly: '^packages/'` drops every node_modules edge before
     // rules run, so any `to:` targeting an npm package is inert (verified: a
-    // probe import of `drizzle-orm` from a non-persistence file is NOT flagged,
-    // the same reason `not-to-dev-dep` cannot fire here). The residual it would
+    // probe import of `drizzle-orm` from a non-persistence file is NOT flagged —
+    // the same structural reason dev-dep hygiene cannot live here and is enforced
+    // in ESLint instead; see the note above). The residual it would
     // have covered — `db.run(sql`raw SQL`)` with no table import — does not
     // reach a table *symbol*, so it falls outside the boundary this seam
     // protects. (Audit finding-3.)
