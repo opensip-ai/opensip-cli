@@ -284,6 +284,17 @@
       "purpose": "Step-by-step guide for writing a new GraphLanguageAdapter — C/C++, or anything else — without touching the engine."
     },
     {
+      "file": "docs/web-generated/40-graph/04-suppressing-findings.md",
+      "path": "/docs/opensip-tools/40-graph/04-suppressing-findings/",
+      "section": "40-graph",
+      "title": "Suppressing findings (graph)",
+      "audience": [
+        "contributors",
+        "ci-integrators"
+      ],
+      "purpose": "Inline source-level waivers — how `@graph-ignore-next-line` and `@graph-ignore-file` work, the any-member rule for cycles, and how a waiver relates to the gate baseline."
+    },
+    {
       "file": "docs/web-generated/50-extend/01-plugin-authoring.md",
       "path": "/docs/opensip-tools/50-extend/01-plugin-authoring/",
       "section": "50-extend",
@@ -605,7 +616,8 @@
       "pages": [
         "/docs/opensip-tools/40-graph/01-stages-and-catalog/",
         "/docs/opensip-tools/40-graph/02-rules-and-gating/",
-        "/docs/opensip-tools/40-graph/03-adding-a-language/"
+        "/docs/opensip-tools/40-graph/03-adding-a-language/",
+        "/docs/opensip-tools/40-graph/04-suppressing-findings/"
       ]
     },
     {
@@ -731,6 +743,7 @@
         "/docs/opensip-tools/20-fit/04-output-gate-sarif/",
         "/docs/opensip-tools/40-graph/01-stages-and-catalog/",
         "/docs/opensip-tools/40-graph/02-rules-and-gating/",
+        "/docs/opensip-tools/40-graph/04-suppressing-findings/",
         "/docs/opensip-tools/60-guides/03-wire-into-ci/",
         "/docs/opensip-tools/60-guides/04-adopt-in-a-monorepo/",
         "/docs/opensip-tools/60-guides/05-migrate-from-eslint/",
@@ -767,6 +780,7 @@
         "/docs/opensip-tools/40-graph/01-stages-and-catalog/",
         "/docs/opensip-tools/40-graph/02-rules-and-gating/",
         "/docs/opensip-tools/40-graph/03-adding-a-language/",
+        "/docs/opensip-tools/40-graph/04-suppressing-findings/",
         "/docs/opensip-tools/50-extend/04-check-pack-architecture/",
         "/docs/opensip-tools/50-extend/05-language-adapters/",
         "/docs/opensip-tools/70-reference/01-cli-commands/",
