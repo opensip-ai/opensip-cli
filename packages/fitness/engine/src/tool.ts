@@ -282,8 +282,3 @@ export const fitnessTool: Tool = {
     // catalog warming, etc.) without requiring a contract change.
   },
 };
-
-// Pre-load hook setter — used by the CLI to wire project-plugin
-// auto-sync into ensureChecksLoaded's startup path. Re-exported here
-// so the CLI's bootstrap doesn't need to deep-import.
-export { setPreLoadHook } from './cli/fit.js';

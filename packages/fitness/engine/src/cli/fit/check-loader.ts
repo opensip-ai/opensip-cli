@@ -3,10 +3,9 @@
  * Plugin/check discovery + registration for the `fit` command.
  *
  * Owns ALL fit-lifecycle singletons (`checksLoadedFor`,
- * `pluginLoadErrors`, `loadWarnings`, `preLoadHook`) — they are a
+ * `pluginLoadErrors`, `loadWarnings`) — they are a
  * single unit of state, written exactly once per process by
- * `ensureChecksLoaded()` (or by the CLI bootstrap, in `preLoadHook`'s
- * case) and read by the phase helpers downstream (`buildFitEnvelope`,
+ * `ensureChecksLoaded()` and read by the phase helpers downstream (`buildFitEnvelope`,
  * `buildFitDoneResult`) plus the public `getPluginLoadErrors()` /
  * `getDisplayName()` / `getIcon()` accessors that `FitView` and
  * `dashboard.ts` consume.
@@ -76,18 +75,6 @@ let pluginLoadErrors: readonly string[] = [];
  */
 let loadWarnings: string[] = [];
 
-/**
- * Pre-load hook the CLI registers via setPreLoadHook(). Lets the CLI
- * inject CLI-only behavior (e.g. project-plugin auto-sync) without
- * fitness needing to import CLI internals. Called once before the
- * first ensureChecksLoaded() in this process.
- */
-export type PreLoadHook = (projectDir: string) => Promise<void>;
-
-/** Lifecycle singleton, set by `setPreLoadHook` (called from the CLI
- * bootstrap); read by `ensureChecksLoaded` once per process. */
-let preLoadHook: PreLoadHook | undefined;
-
 // ---------------------------------------------------------------------------
 // Public accessors
 // ---------------------------------------------------------------------------
@@ -109,11 +96,6 @@ export function getPluginLoadErrors(): readonly string[] {
   return pluginLoadErrors;
 }
 
-/** Register a hook the CLI runs before fitness loads checks. */
-export function setPreLoadHook(hook: PreLoadHook | undefined): void {
-  preLoadHook = hook;
-}
-
 /** Get the number of enabled checks (available after ensureChecksLoaded). */
 export function getEnabledCheckCount(): number {
   return defaultRegistry.listEnabled().length;
@@ -131,13 +113,6 @@ export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
   // Reset per-run warning buffer. Singleton lifetime mirrors checksLoadedFor —
   // a fresh load (new projectDir or first call) starts with no warnings.
   loadWarnings = [];
-
-  // 0. CLI-injected pre-load hook (auto-sync project plugins, etc).
-  //    Skipped when no hook is registered (e.g. running fitness via the
-  //    Tool API outside the CLI).
-  if (projectDir && preLoadHook) {
-    await preLoadHook(projectDir);
-  }
 
   // 1. Load fit plugins — discovers .mjs files in
   //    <projectDir>/opensip-tools/fit/{checks,recipes}/ and any

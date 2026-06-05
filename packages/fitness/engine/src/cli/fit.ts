@@ -17,7 +17,7 @@
  *   - `fit/result-builders.ts`  — SignalEnvelope / FitDoneResult / session persist
  *
  * This file re-exports the public surface (`executeFit`,
- * `ensureChecksLoaded`, the display accessors, `setPreLoadHook`, the
+ * `ensureChecksLoaded`, the display accessors, the
  * formatting helpers) so existing consumers (`opensip-tools`,
  * `dashboard.ts`, the fitness `index.ts` barrel) keep resolving the
  * same names.
@@ -55,9 +55,8 @@ export {
   getLoadWarnings,
   getPluginLoadErrors,
   loadDiscoveredCheckPackages,
-  setPreLoadHook,
 } from './fit/check-loader.js';
-export type { LoadDiscoveredResult, PreLoadHook } from './fit/check-loader.js';
+export type { LoadDiscoveredResult } from './fit/check-loader.js';
 export { getDisplayName, getIcon } from './fit/display-registry.js';
 // `formatValidatedColumn` moved to `@opensip-tools/cli-ui` (shared by the
 // fit static + live table views) in ADR-0011 Phase 6; re-export it here so

@@ -75,23 +75,6 @@ export function getPluginLoadErrors(): readonly string[] {
 }
 
 /**
- * Pre-load hook the CLI registers via setPreLoadHook(). Lets the CLI
- * inject CLI-only behavior (e.g. project-plugin auto-sync) without
- * simulation needing to import CLI internals. Called once before the
- * first ensureScenariosLoaded() in this process.
- */
-export type PreLoadHook = (projectDir: string) => Promise<void>;
-
-/** Lifecycle singleton, set by `setPreLoadHook` (called from the CLI
- * bootstrap); read by `ensureScenariosLoaded` once per process. */
-let preLoadHook: PreLoadHook | undefined;
-
-/** Register a hook the CLI runs before simulation loads scenarios. */
-export function setPreLoadHook(hook: PreLoadHook | undefined): void {
-  preLoadHook = hook;
-}
-
-/**
  * Discover and load every sim plugin and scenario package for the
  * project. Idempotent per-projectDir; calling twice with the same
  * directory is a no-op after the first.
@@ -99,13 +82,6 @@ export function setPreLoadHook(hook: PreLoadHook | undefined): void {
 export async function ensureScenariosLoaded(projectDir?: string): Promise<void> {
   const key = projectDir ?? '';
   if (scenariosLoadedFor === key) return;
-
-  // 0. CLI-injected pre-load hook (auto-sync project plugins, etc).
-  //    Skipped when no hook is registered (e.g. running sim via the
-  //    Tool API outside the CLI).
-  if (projectDir && preLoadHook) {
-    await preLoadHook(projectDir);
-  }
 
   // 1. Load sim plugins — discovers .mjs files in
   //    <projectDir>/opensip-tools/sim/{scenarios,recipes}/ and any

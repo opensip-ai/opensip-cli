@@ -143,8 +143,7 @@ export { simulationTool, simulationTool as tool } from './tool.js'
 // `cli/sim.js` path. `getPluginLoadErrors` is an internal render/accessor helper
 // with no external consumer, so it is exported only from its own module for
 // the simulation CLI's relative imports — not re-exported here.
-export { ensureScenariosLoaded, setPreLoadHook } from './cli/sim.js'
-export type { PreLoadHook } from './cli/sim.js'
+export { ensureScenariosLoaded } from './cli/sim.js'
 
 // =============================================================================
 // PLUGIN DISCOVERY — sim plugin contract + @opensip-tools/scenarios-*

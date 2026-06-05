@@ -115,8 +115,3 @@ export const simulationTool: Tool = {
   register,
   contributeScope,
 };
-
-// Pre-load hook re-export — mirrors fitness's tool surface so a future
-// CLI bootstrap that injects project-plugin auto-sync can do it
-// symmetrically for both tools.
-export { setPreLoadHook } from './cli/sim.js';
