@@ -63,8 +63,9 @@ PACKAGES=(
   datastore
   contracts
   session-store
-  reporting
+  output
   cli-ui
+  tree-sitter
   lang-typescript lang-rust lang-python lang-go lang-java lang-cpp
   dashboard
   fitness simulation graph
