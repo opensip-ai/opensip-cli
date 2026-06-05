@@ -4,6 +4,78 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.0.0] — 2026-06-04
+
+**First GA / stable release.** opensip-tools graduates to a stable, semver-governed
+1.x-style contract (declared `3.0.0` per
+[ADR-0012](docs/decisions/ADR-0012-versioning-and-release-policy.md)). The v2.x line
+stabilized the signal-output model behind the scenes; 3.0 makes it the public
+contract.
+
+> ### ⚠️ BREAKING CHANGES
+>
+> 3.0 carries breaking changes to the machine-readable `--json` shape, the
+> published package set, and the programmatic (importable) API surface. **If you
+> only run the CLI and read its terminal output, nothing changes — upgrade and
+> carry on.** Everyone else: read the
+> **[v2 → v3 migration guide](docs/public/70-reference/07-migrating-v2-to-v3.md)**.
+
+> **Heads-up for plugin authors / `--json` consumers:** the `--json` payload, the
+> `@opensip-tools/contracts` type surface, the `@opensip-tools/reporting` package
+> name, the `RunScope` recipe-config slot, and the `./internal` subpath exports
+> all changed. The
+> [migration guide](docs/public/70-reference/07-migrating-v2-to-v3.md) is the
+> step-by-step checklist.
+
+### Added
+
+- **Signals are the universal output currency (ADR-0011).** `--json` now emits a
+  `SignalEnvelope` (`schemaVersion: 2`): `signals[]` + `verdict { score, passed,
+  summary }` + `units[]`, identical across `fit` / `sim` / `graph`. A `fit`
+  check, a `graph` rule, and a `sim` scenario are all **units** that *produce
+  signals*. See the
+  [JSON output schema](docs/public/70-reference/04-json-output-schema.md).
+- **`@opensip-tools/tree-sitter` package (ADR-0010).** The new canonical
+  tree-sitter parse substrate: wraps `web-tree-sitter` and hosts the relocated
+  graph node accessors. The `lang-*` packages are now the canonical parse
+  substrate; Python / Rust / Go / Java parse through `lang-*` → tree-sitter.
+- **New fitness checks** `no-direct-stdout-in-tool-engine` and
+  `restrict-raw-db-access`, plus new dependency-cruiser tool-output gates — they
+  enforce that tools emit signals (not stdout) and never touch the raw DB
+  directly (ADR-0009 / ADR-0011).
+- **[v2 → v3 migration guide](docs/public/70-reference/07-migrating-v2-to-v3.md)**
+  under `70-reference/`.
+
+### Changed
+
+- **`--json` shape: `CliOutput` → `SignalEnvelope`.** The old fitness-shaped
+  `CliOutput` (`version: "1.0"`, `checks[]`, `findings[]`) is replaced by the
+  signal-native envelope. Severity is now the four-rung scale
+  `critical | high | medium | low`, replacing `error | warning`. Full field
+  mapping: [v1 → v2 mapping table](docs/public/70-reference/04-json-output-schema.md#v1--v2-mapping).
+- **Tools no longer render.** Egress moved to the CLI composition root, which
+  routes formatter × sink (`json` / `sarif` / `table` × file / cloud). A new
+  `cli.writeSarif` file seam carries SARIF output through the root (ADR-0011).
+- **Renamed package: `@opensip-tools/reporting` → `@opensip-tools/output`.** Split
+  into a pure `format/` half (signal → string formatters) and an effectful
+  `sink/` half (file, cloud).
+- **Kernel: `recipeCheckConfig` / `RecipeCheckConfigSlot` → `recipeUnitConfig` /
+  `RecipeUnitConfigSlot`** on `RunScope` — the slot serves every tool's units,
+  not just fitness checks.
+- **Public surface curated (ADR-0009, audit Findings 2–4).** The `./internal`
+  subpath exports are no longer published, so external consumers can no longer
+  import them. Graph's public barrel was curated: orchestration / CLI helpers
+  moved behind `./internal`.
+
+### Removed
+
+- **Removed from `@opensip-tools/contracts`:** `CliOutput`, `CheckOutput`,
+  `FindingOutput`, `TableRow`, `SummaryOptions` — the types that backed the old
+  `CliOutput` rendering model.
+- **`./internal` subpaths are no longer in the published `exports` map** of any
+  package (e.g. `@opensip-tools/fitness/internal`,
+  `@opensip-tools/graph/internal`). They were never a supported surface.
+
 ## [2.6.2] — 2026-06-03
 
 OpenSIP Cloud signal sync, a two-audit remediation pass, and packaging polish.

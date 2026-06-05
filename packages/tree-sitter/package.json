@@ -1,9 +1,9 @@
 {
   "name": "@opensip-tools/tree-sitter",
-  "version": "2.6.2",
+  "version": "3.0.0",
   "license": "MIT",
   "description": "Grammar-agnostic tree-sitter substrate (parser lifecycle + node accessors) shared by lang-* and the graph adapters",
-  "keywords": ["opensip-tools", "tree-sitter", "ast", "parser", "static-analysis"],
+  "keywords": ["opensip-tools", "static-analysis", "code-quality", "tree-sitter", "ast", "parser"],
   "repository": {
     "type": "git",
     "url": "https://github.com/opensip-ai/opensip-tools.git",

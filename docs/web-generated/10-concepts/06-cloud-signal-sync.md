@@ -59,11 +59,11 @@ If you don't have a key, none of this runs — no network, no check, no cost. Th
                  OpenSIP Cloud (https://opensip.ai/api)
 ```
 
-Per [ADR-0011](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/docs/decisions/ADR-0011-signal-output-currency-formatter-sink.md), a tool **returns its `SignalEnvelope` and never emits**: the composition root ([`deliver-envelope.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/packages/cli/src/bootstrap/deliver-envelope.ts)) maps the envelope to the cloud `SignalBatch` wire shape (`buildSignalBatch` — adding repo identity, preserving `runId`/`createdAt`, dropping `verdict`/`units`) and emits it through the run's `signalSink`. The per-tool `emitRunSignals` driver was retired.
+Per [ADR-0011](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/docs/decisions/ADR-0011-signal-output-currency-formatter-sink.md), a tool **returns its `SignalEnvelope` and never emits**: the composition root ([`deliver-envelope.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/cli/src/bootstrap/deliver-envelope.ts)) maps the envelope to the cloud `SignalBatch` wire shape (`buildSignalBatch` — adding repo identity, preserving `runId`/`createdAt`, dropping `verdict`/`units`) and emits it through the run's `signalSink`. The per-tool `emitRunSignals` driver was retired.
 
-**The sink is chosen once, at startup.** The CLI's pre-action hook calls [`resolveSignalSink`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/packages/output/src/sink/resolve-signal-sink.ts), which returns the **no-op sink** unless *all* of these hold: an API key is present, `cloud.sync` is not `false`, `--no-cloud` was not passed, and the endpoint is HTTPS. So for a keyless run the sink is a no-op with zero IO — the cost only exists when you've opted in.
+**The sink is chosen once, at startup.** The CLI's pre-action hook calls [`resolveSignalSink`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/output/src/sink/resolve-signal-sink.ts), which returns the **no-op sink** unless *all* of these hold: an API key is present, `cloud.sync` is not `false`, `--no-cloud` was not passed, and the endpoint is HTTPS. So for a keyless run the sink is a no-op with zero IO — the cost only exists when you've opted in.
 
-**The entitlement check is deferred to the first emit, and cached.** [`checkEntitlement`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/packages/output/src/sink/entitlement.ts) answers "is this key entitled to store signals?" It is **fail-closed**: on *any* ambiguity — no key, an unreachable endpoint, a non-2xx response, a malformed body — the answer is `entitled: false` and nothing is sent. A positive result is cached (~6h) so it isn't a network round-trip every run; a `401`/`403` at emit time busts the cache, so a revoked plan stops within one run rather than waiting out the TTL.
+**The entitlement check is deferred to the first emit, and cached.** [`checkEntitlement`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/output/src/sink/entitlement.ts) answers "is this key entitled to store signals?" It is **fail-closed**: on *any* ambiguity — no key, an unreachable endpoint, a non-2xx response, a malformed body — the answer is `entitled: false` and nothing is sent. A positive result is cached (~6h) so it isn't a network round-trip every run; a `401`/`403` at emit time busts the cache, so a revoked plan stops within one run rather than waiting out the TTL.
 
 On a successful sync you'll see one line on stderr: `✓ Sent N signals to OpenSIP Cloud`.
 
@@ -71,7 +71,7 @@ On a successful sync you'll see one line on stderr: `✓ Sent N signals to OpenS
 
 ## Exactly what is sent
 
-The unit of egress is a **`SignalBatch`** ([`packages/core/src/types/signal-batch.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/packages/core/src/types/signal-batch.ts)):
+The unit of egress is a **`SignalBatch`** ([`packages/core/src/types/signal-batch.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/core/src/types/signal-batch.ts)):
 
 ```ts
 interface SignalBatch {
@@ -87,7 +87,7 @@ interface SignalBatch {
 }
 ```
 
-Each `Signal` is a finding the tool **already produced locally** — its file path, message, suggestion, code-location hints, and rule metadata ([`packages/core/src/types/signal.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/packages/core/src/types/signal.ts)). The batch adds run context: the tool, recipe, a **repo identity** (your git commit SHA and origin remote URL), a run id, a timestamp, and severity counts. Large batches are capped, with a `truncated` count recording how many were dropped.
+Each `Signal` is a finding the tool **already produced locally** — its file path, message, suggestion, code-location hints, and rule metadata ([`packages/core/src/types/signal.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/core/src/types/signal.ts)). The batch adds run context: the tool, recipe, a **repo identity** (your git commit SHA and origin remote URL), a run id, a timestamp, and severity counts. Large batches are capped, with a `truncated` count recording how many were dropped.
 
 Nothing else leaves your machine — no source file contents beyond the path/line/hint already in a finding, no environment, no credentials. The local SQLite store is unaffected and remains the source of truth.
 

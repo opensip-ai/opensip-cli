@@ -1,9 +1,15 @@
 {
   "name": "@opensip-tools/session-store",
-  "version": "2.6.2",
+  "version": "3.0.0",
   "license": "MIT",
   "description": "Session persistence for OpenSIP Tools — the session SQLite schema and SessionRepo, extracted from contracts",
-  "keywords": ["opensip-tools", "static-analysis", "code-quality", "sqlite", "persistence"],
+  "keywords": [
+    "opensip-tools",
+    "static-analysis",
+    "code-quality",
+    "sqlite",
+    "persistence"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/opensip-ai/opensip-tools.git",

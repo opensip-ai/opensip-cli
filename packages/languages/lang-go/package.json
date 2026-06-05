@@ -1,9 +1,18 @@
 {
   "name": "@opensip-tools/lang-go",
-  "version": "2.6.2",
+  "version": "3.0.0",
   "license": "MIT",
   "description": "Go language adapter for opensip-tools",
-  "keywords": ["opensip-tools", "static-analysis", "code-quality", "parser", "ast", "tree-sitter", "go", "golang"],
+  "keywords": [
+    "opensip-tools",
+    "static-analysis",
+    "code-quality",
+    "parser",
+    "ast",
+    "tree-sitter",
+    "go",
+    "golang"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/opensip-ai/opensip-tools.git",

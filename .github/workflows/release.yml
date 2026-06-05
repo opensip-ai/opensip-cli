@@ -121,6 +121,9 @@ jobs:
           pnpm --filter @opensip-tools/output          pack --pack-destination /tmp/tarballs
           # Layer 3 — shared Ink/React UI primitives (used by every tool live view + the CLI)
           pnpm --filter @opensip-tools/cli-ui          pack --pack-destination /tmp/tarballs
+          # Layer 3 — tree-sitter parse substrate (ADR-0010; consumed by the
+          # non-TS language adapters + tree-sitter graph adapters + checks-python)
+          pnpm --filter @opensip-tools/tree-sitter     pack --pack-destination /tmp/tarballs
           # Layer 3 — language adapters
           pnpm --filter @opensip-tools/lang-typescript  pack --pack-destination /tmp/tarballs
           pnpm --filter @opensip-tools/lang-rust        pack --pack-destination /tmp/tarballs
@@ -226,6 +229,9 @@ jobs:
           publish_if_new output
           # Layer 3 — shared Ink/React UI primitives
           publish_if_new cli-ui
+          # Layer 3 — tree-sitter parse substrate (before the non-TS language
+          # adapters + tree-sitter graph adapters + checks-python that depend on it)
+          publish_if_new tree-sitter
           # Layer 3 — language adapters (lang-typescript first; downstream check packs depend on it)
           publish_if_new lang-typescript
           publish_if_new lang-rust

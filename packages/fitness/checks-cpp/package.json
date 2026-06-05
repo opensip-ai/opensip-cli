@@ -1,9 +1,17 @@
 {
   "name": "@opensip-tools/checks-cpp",
-  "version": "2.6.2",
+  "version": "3.0.0",
   "license": "MIT",
   "description": "C/C++ fitness checks (clang-tidy backed)",
-  "keywords": ["opensip-tools", "static-analysis", "code-quality", "fitness-checks", "linting", "cpp", "c++"],
+  "keywords": [
+    "opensip-tools",
+    "static-analysis",
+    "code-quality",
+    "fitness-checks",
+    "linting",
+    "cpp",
+    "c++"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/opensip-ai/opensip-tools.git",
@@ -14,7 +22,9 @@
     "url": "https://github.com/opensip-ai/opensip-tools/issues"
   },
   "type": "module",
-  "opensipTools": { "kind": "fit-pack" },
+  "opensipTools": {
+    "kind": "fit-pack"
+  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {

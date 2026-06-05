@@ -1,9 +1,15 @@
 {
   "name": "@opensip-tools/simulation",
-  "version": "2.6.2",
+  "version": "3.0.0",
   "license": "MIT",
   "description": "Simulation scenarios for OpenSIP Tools",
-  "keywords": ["opensip-tools", "static-analysis", "code-quality", "simulation", "testing"],
+  "keywords": [
+    "opensip-tools",
+    "static-analysis",
+    "code-quality",
+    "simulation",
+    "testing"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/opensip-ai/opensip-tools.git",

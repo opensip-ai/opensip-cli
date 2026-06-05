@@ -1,9 +1,15 @@
 {
   "name": "@opensip-tools/output",
-  "version": "2.6.2",
+  "version": "3.0.0",
   "license": "MIT",
   "description": "Output layer for OpenSIP Tools — pure signal-envelope formatters (json/sarif/table) and effectful sinks (file/cloud)",
-  "keywords": ["opensip-tools", "static-analysis", "code-quality", "sarif", "output"],
+  "keywords": [
+    "opensip-tools",
+    "static-analysis",
+    "code-quality",
+    "sarif",
+    "output"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/opensip-ai/opensip-tools.git",

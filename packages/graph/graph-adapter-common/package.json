@@ -1,9 +1,15 @@
 {
   "name": "@opensip-tools/graph-adapter-common",
-  "version": "2.6.2",
+  "version": "3.0.0",
   "license": "MIT",
   "description": "Shared scaffolding for the tree-sitter graph language adapters (go, java, python, rust)",
-  "keywords": ["opensip-tools", "static-analysis", "code-quality", "call-graph", "tree-sitter"],
+  "keywords": [
+    "opensip-tools",
+    "static-analysis",
+    "code-quality",
+    "call-graph",
+    "tree-sitter"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/opensip-ai/opensip-tools.git",

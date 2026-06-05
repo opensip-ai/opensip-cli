@@ -25,7 +25,7 @@ opensip-tools reads two config files:
 | `<project>/opensip-tools.config.yml` | Project (committed) | Targets, plugins, fitness config, CLI defaults |
 | `~/.opensip-tools/config.yml` | User (gitignored, cross-project) | OpenSIP Cloud API key |
 
-The Zod schema lives at [`packages/fitness/engine/src/signalers/schema.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/packages/fitness/engine/src/signalers/schema.ts).
+The Zod schema lives at [`packages/fitness/engine/src/signalers/schema.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/fitness/engine/src/signalers/schema.ts).
 
 ## Top-level shape
 
@@ -43,7 +43,7 @@ graph: {}                 # graph rule knobs (read out-of-band — see below)
 
 Every section is optional; a missing section becomes `{}`.
 
-The validated schema (`SignalersConfigSchema`) covers `globalExcludes`, `targets`, `checkOverrides`, `fitness`, `simulation`, and `cli`. **`plugins:`, `dashboard:`, and `graph:` are read out-of-band** by separate parsers ([`readProjectPluginsList`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/packages/core/src/plugins/discover.ts), `extractDashboardEditor` in [`dashboard.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/packages/fitness/engine/src/cli/dashboard.ts), and `loadGraphConfig` in [`graph-config.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/packages/graph/engine/src/cli/graph-config.ts)) so each can evolve independently of the fitness schema. The `graph:` loader is deliberately permissive — a missing config, malformed YAML, or absent `graph:` key all collapse to `{}`, and every rule then falls back to its in-rule default.
+The validated schema (`SignalersConfigSchema`) covers `globalExcludes`, `targets`, `checkOverrides`, `fitness`, `simulation`, and `cli`. **`plugins:`, `dashboard:`, and `graph:` are read out-of-band** by separate parsers ([`readProjectPluginsList`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/core/src/plugins/discover.ts), `extractDashboardEditor` in [`dashboard.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/fitness/engine/src/cli/dashboard.ts), and `loadGraphConfig` in [`graph-config.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/graph/engine/src/cli/graph-config.ts)) so each can evolve independently of the fitness schema. The `graph:` loader is deliberately permissive — a missing config, malformed YAML, or absent `graph:` key all collapse to `{}`, and every rule then falls back to its in-rule default.
 
 ---
 
@@ -183,7 +183,7 @@ Read out-of-band like `plugins:`.
 
 ## `graph`
 
-Per-rule knobs for the `graph` tool. Read out-of-band by `loadGraphConfig` ([`graph-config.ts`](https://github.com/opensip-ai/opensip-tools/blob/v2.6.2/packages/graph/engine/src/cli/graph-config.ts)), not by the fitness Zod schema. Every field is optional; an omitted field uses the rule's in-rule default. The loader projects only the field types — it does not strictly validate, so a malformed value is dropped (the rule then uses its default).
+Per-rule knobs for the `graph` tool. Read out-of-band by `loadGraphConfig` ([`graph-config.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/graph/engine/src/cli/graph-config.ts)), not by the fitness Zod schema. Every field is optional; an omitted field uses the rule's in-rule default. The loader projects only the field types — it does not strictly validate, so a malformed value is dropped (the rule then uses its default).
 
 ### Duplicated-function-body (`graph:duplicated-function-body`)
 

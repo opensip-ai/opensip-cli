@@ -76,6 +76,7 @@ const OVERRIDES = {
   '@opensip-tools/datastore': ['sqlite', 'drizzle', 'persistence'],
   '@opensip-tools/session-store': ['sqlite', 'persistence'],
   '@opensip-tools/output': ['sarif', 'output'],
+  '@opensip-tools/tree-sitter': ['tree-sitter', 'ast', 'parser'],
   '@opensip-tools/dashboard': ['html-report', 'visualization', 'reporting'],
   '@opensip-tools/cli-ui': ['cli', 'terminal', 'ink', 'react'],
   '@opensip-tools/graph-adapter-common': ['call-graph', 'tree-sitter'],
