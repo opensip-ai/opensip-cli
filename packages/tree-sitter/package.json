@@ -1,13 +1,13 @@
 {
-  "name": "@opensip-tools/graph-adapter-common",
+  "name": "@opensip-tools/tree-sitter",
   "version": "2.6.2",
   "license": "MIT",
-  "description": "Shared scaffolding for the tree-sitter graph language adapters (go, java, python, rust)",
-  "keywords": ["opensip-tools", "static-analysis", "code-quality", "call-graph", "tree-sitter"],
+  "description": "Grammar-agnostic tree-sitter substrate (parser lifecycle + node accessors) shared by lang-* and the graph adapters",
+  "keywords": ["opensip-tools", "tree-sitter", "ast", "parser", "static-analysis"],
   "repository": {
     "type": "git",
     "url": "https://github.com/opensip-ai/opensip-tools.git",
-    "directory": "packages/graph/graph-adapter-common"
+    "directory": "packages/tree-sitter"
   },
   "homepage": "https://github.com/opensip-ai/opensip-tools",
   "bugs": {
@@ -26,10 +26,6 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@opensip-tools/core": "workspace:*",
-    "@opensip-tools/graph": "workspace:*",
-    "@opensip-tools/tree-sitter": "workspace:*",
-    "glob": "^13.0.0",
     "web-tree-sitter": "0.25.10"
   },
   "devDependencies": {

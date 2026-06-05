@@ -156,6 +156,36 @@ module.exports = {
     },
 
     // -------------------------------------------------------------------
+    // Layer enforcement — tree-sitter is the grammar-agnostic substrate
+    // (ADR-0010), between core and the lang-*/graph adapters.
+    // -------------------------------------------------------------------
+    {
+      name: 'tree-sitter-imports-core-only',
+      severity: 'error',
+      comment:
+        '@opensip-tools/tree-sitter is the grammar-agnostic tree-sitter substrate ' +
+        '(ADR-0010): web-tree-sitter lifecycle + node accessors. It depends on ' +
+        'web-tree-sitter (and optionally core) only, and must NOT import from ' +
+        'datastore, contracts, cli, any tool, lang-*, checks-*, output, or the ' +
+        'graph packages — those sit at or above it in the layer order. Keeping it ' +
+        'graph-free is the whole point of the package (lang-* could not otherwise ' +
+        'reach the parser without an illegal lang→graph edge).',
+      from: { path: '^packages/tree-sitter/src/' },
+      to: {
+        path: [
+          '^packages/datastore/',
+          '^packages/contracts/',
+          '^packages/cli/',
+          '^packages/fitness/',
+          '^packages/simulation/',
+          '^packages/graph/',
+          '^packages/languages/lang-',
+          '^packages/output/',
+        ],
+      },
+    },
+
+    // -------------------------------------------------------------------
     // Layer enforcement — datastore depends only on core
     // -------------------------------------------------------------------
     {

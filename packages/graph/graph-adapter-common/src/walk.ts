@@ -21,6 +21,8 @@
 
 import { relative } from 'node:path';
 
+import { nameOf, childrenOf, namedChildrenOf } from '@opensip-tools/tree-sitter';
+
 import type { TreeSitterParsedFile, TreeSitterParsedProject } from './parse.js';
 import type {
   BodyDigest,
@@ -198,39 +200,14 @@ export function synthesizeModuleInit<F extends TreeSitterParsedFile>(
 
 // ── node helpers ──────────────────────────────────────────────────
 
-/**
- * Read the text of a node's `name` field, or `null` when absent.
- *
- * Byte-identical across the tree-sitter adapters (go/java/python/rust):
- * every grammar exposes the declared name via a `name` field on
- * function / method / class / impl nodes. Hoisted here so the four
- * adapters share one definition.
- */
-export function nameOf(node: Node): string | null {
-  const name = node.childForFieldName('name');
-  return name ? name.text : null;
-}
-
-/**
- * `node.children` with the nulls removed.
- *
- * web-tree-sitter types `.children` / `.namedChildren` as `(Node | null)[]`
- * (a null slot is theoretically possible mid-iteration during an
- * incremental re-parse). For our one-shot `parser.parse(src)` over a
- * complete buffer the slots are always populated, but rather than scatter
- * a defensive `if (child)` guard across every adapter's traversal loops we
- * filter once here and hand back a clean `Node[]`. Keeping this in one
- * place also means the (unreachable-for-us) null branch is covered by this
- * package's tests instead of denting every adapter's branch coverage.
- */
-export function childrenOf(node: Node): Node[] {
-  return node.children.filter((c): c is Node => c !== null);
-}
-
-/** `node.namedChildren` with the nulls removed. See {@link childrenOf}. */
-export function namedChildrenOf(node: Node): Node[] {
-  return node.namedChildren.filter((c): c is Node => c !== null);
-}
+// `nameOf` / `childrenOf` / `namedChildrenOf` now live in the canonical
+// grammar-agnostic substrate `@opensip-tools/tree-sitter` (ADR-0010). They
+// are re-exported here so the graph adapters' existing imports from
+// `@opensip-tools/graph-adapter-common` are unchanged. (Imported, not just
+// re-exported, because `synthesizeModuleInit` above uses `childrenOf`
+// internally — a plain `export…from` would not bind it in scope.)
+// eslint-disable-next-line unicorn/prefer-export-from -- childrenOf is also used internally; the import binding is required
+export { nameOf, childrenOf, namedChildrenOf };
 
 // ── resolver helper ───────────────────────────────────────────────
 

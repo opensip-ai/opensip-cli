@@ -5,6 +5,7 @@
     "baseUrl": ".",
     "paths": {
       "@opensip-tools/core": ["packages/core/src/index.ts"],
+      "@opensip-tools/tree-sitter": ["packages/tree-sitter/src/index.ts"],
       "@opensip-tools/datastore": ["packages/datastore/src/index.ts"],
       "@opensip-tools/contracts": ["packages/contracts/src/index.ts"],
       "@opensip-tools/session-store": ["packages/session-store/src/index.ts"],
