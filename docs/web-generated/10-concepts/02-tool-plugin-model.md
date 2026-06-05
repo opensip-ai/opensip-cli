@@ -52,7 +52,7 @@ The contract has been deliberately kept narrow. Each field exists for a specific
 - **`metadata.id`** is the registry key. `ToolRegistry.register(t)` writes `tools[t.metadata.id] = t` (last-writer-wins via `Map#set`) — see [`packages/core/src/tools/registry.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/core/src/tools/registry.ts). This is how a third-party Tool can override a first-party one (though [`packages/cli/src/bootstrap/register-tools.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/cli/src/bootstrap/register-tools.ts)'s discovery loop deliberately skips packages whose `metadata.id` matches a bundled tool, so a non-customized third-party install can't accidentally clobber `fit`/`sim`/`graph`).
 - **`commands[]`** carries metadata only — no handlers. The CLI uses this list for `--help` listings and conflict detection (two tools can't both claim the `fit` subcommand). Keeping the list metadata-only means `--help` is cheap: the CLI doesn't have to invoke each tool's `register()` to enumerate available commands.
 - **`register(cli)`** does the actual Commander wiring. It receives a `ToolCliContext` (the program object, the render function, the dashboard launcher, the logger, the exit-code setter) and uses it to mount its commands. Tools never import the CLI package directly — they call back into shared infrastructure through this context object.
-- **`initialize()`** is optional async setup, called once before any command runs. Most tools don't need it (`fit` doesn't — its setup is lazy inside command handlers). It's there for tools that need eager work: warming a cache, loading a marketplace catalog, validating a license.
+- **`initialize()`** is optional async setup, called once per process — lazily, by the CLI's preAction hook, when a subcommand owned by this tool is about to run (not eagerly for every tool at startup, so an uninvoked tool and the `--help`/welcome paths pay nothing). Most tools don't need it (`fit` doesn't — its setup is lazy inside command handlers). It's there for tools that need eager work: warming a cache, loading a marketplace catalog, validating a license. A throwing `initialize()` is fatal — the command does not run.
 
 ### The `ToolCliContext` shape
 
@@ -98,16 +98,20 @@ The flow lives in [`packages/cli/src/index.ts`](https://github.com/opensip-ai/op
    and calls toolRegistry.register(pkg.tool). Bundled-tool ids are
    skipped so third-party installs can't accidentally clobber them.
 
-4. Optional initialize:
-   for each tool in toolRegistry.list():
-     await tool.initialize?.();
-
-5. Build Commander tree:
+4. Build Commander tree:
    const ctx = buildToolCliContext({ program, ... });
    mountAllToolCommands(toolRegistry, ctx);
 
-6. Parse argv:
+5. Parse argv:
    program.parseAsync(process.argv);
+
+6. Optional initialize (lazy, per-tool, in the preAction hook):
+   When a subcommand is about to run, the CLI resolves the tool that
+   owns it and calls that tool's initialize() exactly once per process,
+   after the run scope is entered and just before the action body. Tools
+   not invoked this run pay nothing; `--help` and the welcome screen run
+   no initialize(). A throwing initialize() is fatal (the command does
+   not run). See packages/cli/src/bootstrap/pre-action-hook.ts.
 ```
 
 First-party tools (`fit`, `sim`, `graph`) are imported statically. They're a direct dep of `opensip-tools` and ship in the same npm install. Third-party tools are discovered by walking `node_modules` for any package whose `package.json` declares the `opensipTools` metadata block — see [`packages/core/src/plugins/tool-package-discovery.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/core/src/plugins/tool-package-discovery.ts).

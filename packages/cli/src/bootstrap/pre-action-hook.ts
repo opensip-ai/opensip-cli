@@ -17,6 +17,10 @@
  *      gated on project.scope === 'project' && existsSync(projectRoot)
  *   6. Project: header (Phase 2.2)
  *   7. cli.start log line
+ *   8. lazy Tool.initialize() — run the owning tool's optional one-time
+ *      init exactly once per process, after the scope is entered and just
+ *      before the action body (P1a). CLI-only commands have no owner and
+ *      skip it; a failing init is fatal.
  *
  * Strict --config: when `--config <path>` doesn't resolve, the
  * underlying ValidationError surfaces with exit 2 — no silent walk-up.
@@ -38,6 +42,8 @@ import {
   resolveProjectPaths,
   resolveUserPaths,
   type ProjectContext,
+  type Tool,
+  type ToolRegistry,
 } from '@opensip-tools/core';
 import { resolveSignalSink } from '@opensip-tools/output';
 
@@ -121,6 +127,65 @@ function formatNoProjectFoundMessage(cwd: string, jsonOutput: boolean): string {
 
 
 const MODULE_TAG = 'cli:bootstrap';
+
+/**
+ * Tool ids whose `initialize()` has already run in this process. The Tool
+ * contract guarantees `initialize()` is called "at most once per process";
+ * this set enforces that across multiple preAction firings (long-lived
+ * hosts, tests). Process-scoped on purpose — a fresh CLI process starts
+ * empty.
+ */
+const initializedToolIds = new Set<string>();
+
+/**
+ * Find the registered tool that owns the invoked subcommand, matching the
+ * descriptor's canonical name or any alias. Returns undefined for
+ * CLI-only commands (init/sessions/configure/plugin/...) — they belong to
+ * no tool, so no `initialize()` runs for them.
+ */
+export function resolveOwningTool(tools: ToolRegistry, cmdName: string): Tool | undefined {
+  return tools
+    .list()
+    .find((tool) =>
+      tool.commands.some((c) => c.name === cmdName || (c.aliases?.includes(cmdName) ?? false)),
+    );
+}
+
+/**
+ * Lazy, memoized Tool.initialize() (P1a). Resolve the tool owning the
+ * invoked subcommand and run its initialize() exactly once per process,
+ * after the scope is entered and immediately before the action body. Tools
+ * not invoked this run pay nothing; `--help`/welcome run no initialize().
+ *
+ * Fail-fast: a throwing initialize() exits non-zero rather than letting a
+ * half-initialised tool run its command and silently appear to work. The
+ * id is recorded only on success, so a transient failure can retry in a
+ * long-lived host. Extracted from the hook body to keep its complexity
+ * within budget.
+ */
+async function maybeInitializeOwningTool(
+  tools: ToolRegistry,
+  cmdName: string,
+  runId: string,
+): Promise<void> {
+  const owningTool = resolveOwningTool(tools, cmdName);
+  if (!owningTool?.initialize || initializedToolIds.has(owningTool.metadata.id)) return;
+  try {
+    await owningTool.initialize();
+    initializedToolIds.add(owningTool.metadata.id);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`✗ Tool '${owningTool.metadata.id}' failed to initialize: ${msg}\n`);
+    logger.error({
+      evt: 'cli.tool.initialize_failed',
+      module: MODULE_TAG,
+      runId,
+      toolId: owningTool.metadata.id,
+      error: msg,
+    });
+    process.exit(1);
+  }
+}
 
 /**
  * Schema-version bailout. Exits 2 with the "upgrade your CLI" message
@@ -218,7 +283,7 @@ function warnAboutPhantomRuntimes(project: ProjectContext, jsonOutput: boolean):
  *   doesn't resolve cli-ui's or its own package version by mistake.
  */
 export function installPreActionHook(program: Command, version: string): void {
-  program.hook('preAction', (_thisCommand, actionCommand) => {
+  program.hook('preAction', async (_thisCommand, actionCommand) => {
     const runId = generatePrefixedId('run');
 
     const opts = actionCommand.opts();
@@ -381,5 +446,12 @@ export function installPreActionHook(program: Command, version: string): void {
         walkedUp: project.walkedUp,
       });
     }
+
+    // 8. Lazy, memoized Tool.initialize() — runs the owning tool's
+    //    optional one-time init here, AFTER enterScope (so eager setup that
+    //    registers packs / reads currentScope() sees the bound scope) and
+    //    immediately before Commander invokes the action body. See the
+    //    helper for the once-per-process + fail-fast semantics.
+    await maybeInitializeOwningTool(tools, actionCommand.name(), runId);
   });
 }
