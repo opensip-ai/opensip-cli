@@ -2,7 +2,7 @@
  * @fileoverview Core finding and result types for fitness checks
  *
  * CheckResult carries Signal[]. Factory functions
- * (createResultWithSignals, createErrorResult, createPassingResult) provide
+ * (createResultWithSignals, createErrorResult) provide
  * the standard way to construct check results.
  */
 
@@ -222,18 +222,4 @@ export function createErrorResult(
       extra: error ? { originalError: error.message, ...(error.stack ? { stack: error.stack } : {}) } : undefined,
     },
   }
-}
-
-/**
- * Create a passing result with no signals.
- */
-export function createPassingResult(
-  totalItems: number,
-  unit: string,
-): CheckResult {
-  return createResultWithSignals(
-    CheckInfoFactory.compliance(totalItems, totalItems, unit),
-    [],
-    totalItems,
-  )
 }
