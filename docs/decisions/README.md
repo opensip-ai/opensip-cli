@@ -91,6 +91,11 @@ distinct from:
   not a fast-climbing integer); **3.0.0 is the first GA/stable release** on the
   existing names (same-name 1.0 reset is impossible — 1.0.0 is burned on npm;
   rename rejected); old versions retired via `npm deprecate`, never `unpublish`
+- [ADR-0013](./ADR-0013-fitness-curated-export-surface.md) — Curate the
+  `@opensip-tools/fitness` public barrel to the check/recipe/plugin authoring
+  surface + `fitnessTool`; drop engine internals (registries, recipe service,
+  gate primitives, `FitBaselineRepo`, CLI handlers). Locked by a runtime
+  export-surface test; applies ADR-0009 concretely to fitness
 
 ### Superseded
 
