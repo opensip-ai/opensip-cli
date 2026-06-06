@@ -19,7 +19,7 @@
  * the single `graph` invocation.
  */
 
-import { type CliProgram } from '@opensip-tools/contracts';
+import { applyCommonFlags, type CliProgram } from '@opensip-tools/contracts';
 import { ConfigurationError, logger, readPackageVersion, ValidationError } from '@opensip-tools/core';
 
 // PR 3 of plan 2026-05-23-plan-graph-adapter-package-split.md: the
@@ -153,6 +153,7 @@ function register(cli: ToolCliContext): void {
         noCache?: boolean;
         resolution?: ResolutionMode;
         verbose?: boolean;
+        quiet?: boolean;
         config?: GraphConfig;
         rules?: readonly Rule[];
       },
@@ -178,12 +179,10 @@ function register(cli: ToolCliContext): void {
 
 /** Mount the unified `graph` subcommand (rules, entry points, catalog summary). */
 function registerGraphCommand(program: CliProgram, cli: ToolCliContext): void {
-  program
+  const graphCmd = program
     .command(GRAPH.name)
     .description(GRAPH.description)
     .argument('[paths...]', 'Subtrees to analyze (default: whole project)')
-    .option(OPT_CWD, OPT_DESC_CWD, process.cwd())
-    .option('--json', 'Output structured JSON', false)
     .option('--no-cache', 'Skip catalog cache (force full rebuild)')
     .option(
       '--resolution <mode>',
@@ -193,8 +192,6 @@ function registerGraphCommand(program: CliProgram, cli: ToolCliContext): void {
     .option('--recipe <name>', 'Run a named recipe (a subset of graph rules). Default: all rules')
     .option('--gate-save', 'Save current Signal set as the gate baseline', false)
     .option('--gate-compare', 'Compare current Signals to the gate baseline', false)
-    .option('--report-to <url>', 'POST findings to OpenSIP Cloud or compatible')
-    .option('--api-key <key>', 'API key for --report-to authentication')
     .option('--profile <path>', 'Write graph performance profile JSON to path')
     .option(
       '--workspace',
@@ -211,16 +208,19 @@ function registerGraphCommand(program: CliProgram, cli: ToolCliContext): void {
       'Force a specific language adapter (suppresses auto-detection)',
     )
     .option(
-      '-v, --verbose',
-      'Show detailed catalog, findings-by-rule, and entry-point sections in the done view (default: summary only)',
-      false,
-    )
-    .option(
       '--list-files',
       'List the source files graph would discover for this scope and exit (no build; honors [paths...], --workspace, --language, --json)',
       false,
-    )
-    .option('--debug', 'Enable debug mode for structured log output', false)
+    );
+  // Common cross-tool flags from the single registry (ADR-0021): --cwd, --json,
+  // --quiet, --verbose, --debug, --report-to, --api-key. graph-specific flags
+  // stay declared above.
+  applyCommonFlags(
+    graphCmd,
+    ['cwd', 'json', 'quiet', 'verbose', 'debug', 'reportTo', 'apiKey'],
+    { cwd: process.cwd() },
+  );
+  graphCmd
     .action(async (paths: readonly string[], opts: {
       cwd: string;
       json?: boolean;
@@ -235,6 +235,7 @@ function registerGraphCommand(program: CliProgram, cli: ToolCliContext): void {
       concurrency?: number;
       language?: string;
       verbose?: boolean;
+      quiet?: boolean;
       resolution?: string;
       listFiles?: boolean;
     }) => {
@@ -303,6 +304,7 @@ function registerGraphCommand(program: CliProgram, cli: ToolCliContext): void {
           cwd: opts.cwd,
           noCache: opts.cache === false,
           verbose: opts.verbose === true,
+          quiet: opts.quiet === true,
           resolution,
           // Resolve `--recipe` here (the action runs inside the entered
           // RunScope via the pre-action hook) and pass the rule subset into
