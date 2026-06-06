@@ -56,7 +56,44 @@ jobs:
       - run: pnpm -r run clean
       - run: pnpm build
       - run: pnpm typecheck
-      - run: pnpm test
+
+      # ADR-0017 — the release gate must be at least as strict as the PR gate.
+      # npm versions are immutable; the release lane is the last gate before an
+      # unrecoverable artifact, so it re-runs the same correctness gates PR CI
+      # (.github/workflows/ci.yml) runs, BEFORE pack/publish. Without these, a
+      # tag could publish after a path that failed PR CI (lint regression,
+      # coverage drift, or a net-new dogfood finding) and reach npm.
+      #
+      # These four steps mirror ci.yml exactly (same commands — do not invent a
+      # stricter or looser variant):
+      #   - `pnpm lint`          — ESLint + both dependency-cruiser passes + gate:verify
+      #   - `pnpm test:coverage` — full suite WITH per-package coverage thresholds
+      #     (replaces the former plain `pnpm test`, which skipped thresholds)
+      #   - `pnpm fit:ci`        — dogfood: fails on any error-level fit finding
+      #     (failOnErrors: 1 in opensip-tools.config.yml)
+      #   - `pnpm graph:ci`      — dogfood: fails on any net-new graph finding
+      #
+      # The dogfood gates run the COMPILED engine from dist
+      # (node packages/cli/dist/index.js …), so they must run AFTER `pnpm -r run
+      # clean` + `pnpm build` above — the same ordering ci.yml's "Clean dist"
+      # step documents.
+      #
+      # The SARIF export/upload steps from ci.yml are intentionally NOT mirrored
+      # here: Code Scanning is a PR-DIFF ratchet; the release gate needs only the
+      # pass/fail exit. Do not "complete the symmetry" by adding SARIF uploads.
+      #
+      # The generated-artifact sync (docs/web-generated, per-package READMEs,
+      # keywords, checks-index) that ci.yml runs as separate steps is ALREADY
+      # enforced above by the first `verify-release.mjs` step (checks 4/7/8/9),
+      # so no extra sync steps are needed here.
+      - name: Lint (mirror ci.yml — ADR-0017)
+        run: pnpm lint
+      - name: Test with coverage thresholds (mirror ci.yml — ADR-0017)
+        run: pnpm test:coverage
+      - name: Fit (dogfood — mirror ci.yml; ADR-0017)
+        run: pnpm fit:ci
+      - name: Graph (dogfood — mirror ci.yml; ADR-0017)
+        run: pnpm graph:ci
 
       # Probe the registry for every package we are about to publish. A
       # package whose name is not yet on npm needs trusted publishing
@@ -66,38 +103,32 @@ jobs:
       # is the authoritative gate. The warning gives a named, predictable
       # failure point so a later 404 from `npm publish` is easy to map
       # back to "trusted publisher missing" rather than "registry flake".
+      #
+      # The package list is DERIVED from scripts/release-package-order.mjs
+      # (the single source of truth — ADR-0017). Do NOT hand-list packages
+      # here; edit that script and every release surface follows. This is the
+      # fix for the historical drift where `tree-sitter` was packed + published
+      # but missing from this preflight loop — `--print names` cannot omit it.
       - name: Preflight — detect packages not yet on npm
         run: |
           set -u
           new_count=0
-          for pkg in \
-            core \
-            datastore \
-            contracts \
-            session-store \
-            output \
-            cli-ui \
-            lang-typescript lang-rust lang-python lang-go lang-java lang-cpp \
-            dashboard \
-            fitness simulation graph \
-            graph-adapter-common \
-            graph-typescript graph-python graph-rust graph-go graph-java \
-            checks-universal checks-typescript checks-python checks-go checks-java checks-cpp checks-rust ; do
-            name="@opensip-tools/$pkg"
+          while IFS= read -r pkg ; do
+            # The CLI publishes under the UNSCOPED name `opensip-tools`; every
+            # other entry is `@opensip-tools/<pkg>`. The source-of-truth lists
+            # the CLI as the bare `opensip-tools` token.
+            if [ "$pkg" = "opensip-tools" ] ; then
+              name="opensip-tools"
+            else
+              name="@opensip-tools/$pkg"
+            fi
             if npm view "$name" version >/dev/null 2>&1 ; then
               echo "  ok  $name"
             else
               echo "::warning title=New package detected::$name is not yet on npm. Publish will fail unless trusted publisher is registered on npmjs.com (org opensip-ai → package settings → Publishing access)."
               new_count=$((new_count + 1))
             fi
-          done
-          # The CLI publishes under the unscoped name `opensip-tools`.
-          if npm view "opensip-tools" version >/dev/null 2>&1 ; then
-            echo "  ok  opensip-tools"
-          else
-            echo "::warning title=New package detected::opensip-tools is not yet on npm. Publish will fail unless trusted publisher is registered on npmjs.com (org opensip-ai → package settings → Publishing access)."
-            new_count=$((new_count + 1))
-          fi
+          done < <(node scripts/release-package-order.mjs --print names)
           if [ "$new_count" -gt 0 ] ; then
             echo "::notice::$new_count new package(s) detected. Continuing — publish step will fail loudly for any unregistered trusted publisher."
           fi
@@ -106,55 +137,17 @@ jobs:
       # workspace:* deps into concrete versions, which `npm publish` then
       # uploads. We pack all 31 up front so the publish step can run
       # against a known-good set of tarballs in dependency order.
+      #
+      # The pack list + ORDER is DERIVED from scripts/release-package-order.mjs
+      # (the single source of truth — ADR-0017): `--print pack` emits the
+      # `pnpm --filter` selectors in dependency order. Do NOT re-hand-list the
+      # packages here; edit that script and every release surface follows.
       - name: Pack all workspace packages (resolves workspace:*)
         run: |
           mkdir -p /tmp/tarballs
-          # Layer 1 — kernel
-          pnpm --filter @opensip-tools/core             pack --pack-destination /tmp/tarballs
-          # Layer 2 — datastore (SQLite + Drizzle persistence)
-          pnpm --filter @opensip-tools/datastore        pack --pack-destination /tmp/tarballs
-          # Layer 2 — shared CLI infra
-          pnpm --filter @opensip-tools/contracts       pack --pack-destination /tmp/tarballs
-          # Layer 2 — session-store (session schema + SessionRepo) + output
-          # (signal-envelope formatters + sinks); both extracted from contracts in the 2.1.0 split
-          pnpm --filter @opensip-tools/session-store   pack --pack-destination /tmp/tarballs
-          pnpm --filter @opensip-tools/output          pack --pack-destination /tmp/tarballs
-          # Layer 3 — shared Ink/React UI primitives (used by every tool live view + the CLI)
-          pnpm --filter @opensip-tools/cli-ui          pack --pack-destination /tmp/tarballs
-          # Layer 3 — tree-sitter parse substrate (ADR-0010; consumed by the
-          # non-TS language adapters + tree-sitter graph adapters + checks-python)
-          pnpm --filter @opensip-tools/tree-sitter     pack --pack-destination /tmp/tarballs
-          # Layer 3 — language adapters
-          pnpm --filter @opensip-tools/lang-typescript  pack --pack-destination /tmp/tarballs
-          pnpm --filter @opensip-tools/lang-rust        pack --pack-destination /tmp/tarballs
-          pnpm --filter @opensip-tools/lang-python      pack --pack-destination /tmp/tarballs
-          pnpm --filter @opensip-tools/lang-go          pack --pack-destination /tmp/tarballs
-          pnpm --filter @opensip-tools/lang-java        pack --pack-destination /tmp/tarballs
-          pnpm --filter @opensip-tools/lang-cpp         pack --pack-destination /tmp/tarballs
-          # Layer 3 — dashboard (depends on core + contracts only; consumed by fitness)
-          pnpm --filter @opensip-tools/dashboard        pack --pack-destination /tmp/tarballs
-          # Layer 3 — tools
-          pnpm --filter @opensip-tools/fitness          pack --pack-destination /tmp/tarballs
-          pnpm --filter @opensip-tools/simulation       pack --pack-destination /tmp/tarballs
-          pnpm --filter @opensip-tools/graph            pack --pack-destination /tmp/tarballs
-          # Layer 3.5 — shared tree-sitter adapter scaffolding (depends on graph engine; consumed by the 4 tree-sitter packs)
-          pnpm --filter @opensip-tools/graph-adapter-common pack --pack-destination /tmp/tarballs
-          # Layer 3.6 — graph adapter packs (depend on graph engine; tree-sitter packs also depend on graph-adapter-common)
-          pnpm --filter @opensip-tools/graph-typescript pack --pack-destination /tmp/tarballs
-          pnpm --filter @opensip-tools/graph-python    pack --pack-destination /tmp/tarballs
-          pnpm --filter @opensip-tools/graph-rust      pack --pack-destination /tmp/tarballs
-          pnpm --filter @opensip-tools/graph-go        pack --pack-destination /tmp/tarballs
-          pnpm --filter @opensip-tools/graph-java      pack --pack-destination /tmp/tarballs
-          # Layer 4 — check packs
-          pnpm --filter @opensip-tools/checks-universal  pack --pack-destination /tmp/tarballs
-          pnpm --filter @opensip-tools/checks-typescript pack --pack-destination /tmp/tarballs
-          pnpm --filter @opensip-tools/checks-python     pack --pack-destination /tmp/tarballs
-          pnpm --filter @opensip-tools/checks-go         pack --pack-destination /tmp/tarballs
-          pnpm --filter @opensip-tools/checks-java       pack --pack-destination /tmp/tarballs
-          pnpm --filter @opensip-tools/checks-cpp        pack --pack-destination /tmp/tarballs
-          pnpm --filter @opensip-tools/checks-rust       pack --pack-destination /tmp/tarballs
-          # Layer 5 — composition root (unscoped name → opensip-tools-<ver>.tgz)
-          pnpm --filter opensip-tools                   pack --pack-destination /tmp/tarballs
+          while IFS= read -r filter ; do
+            pnpm --filter "$filter" pack --pack-destination /tmp/tarballs
+          done < <(node scripts/release-package-order.mjs --print pack)
           ls -la /tmp/tarballs
 
       # Post-pack / pre-publish smoke test. Installs the freshly-packed
@@ -168,6 +161,14 @@ jobs:
       # the packed bytes together catches an inter-package export/ABI
       # mismatch. Runs BEFORE publish, so a bad set never reaches npm
       # (where version immutability makes it unrecoverable).
+      #
+      # This packed smoke is intentionally SHALLOW: smoke-pack.mjs runs
+      # `--version` + `--help`, which exercise the full import graph (the ABI
+      # surface) without needing a project fixture. Command-level depth
+      # (init/fit/graph/sessions/dashboard against the installed binary) is owned
+      # by the separately-scoped CLI-acceptance harness; the hardened release
+      # gate will simply call a deeper smoke-pack.mjs once that lands. Do NOT add
+      # the deeper commands here — keep the two efforts thin at this seam.
       - name: Smoke-test packed tarballs (load CLI before publishing)
         env:
           RELEASE_TAG: ${{ github.ref_name }}
@@ -218,51 +219,20 @@ jobs:
             npm publish /tmp/tarballs/${name}-${VERSION}.tgz --access public --provenance
           }
 
-          # Layer 1 — kernel
-          publish_if_new core
-          # Layer 2 — datastore (SQLite + Drizzle persistence)
-          publish_if_new datastore
-          # Layer 2 — shared CLI infra
-          publish_if_new contracts
-          # Layer 2 — session-store + output (extracted from contracts in 2.1.0)
-          publish_if_new session-store
-          publish_if_new output
-          # Layer 3 — shared Ink/React UI primitives
-          publish_if_new cli-ui
-          # Layer 3 — tree-sitter parse substrate (before the non-TS language
-          # adapters + tree-sitter graph adapters + checks-python that depend on it)
-          publish_if_new tree-sitter
-          # Layer 3 — language adapters (lang-typescript first; downstream check packs depend on it)
-          publish_if_new lang-typescript
-          publish_if_new lang-rust
-          publish_if_new lang-python
-          publish_if_new lang-go
-          publish_if_new lang-java
-          publish_if_new lang-cpp
-          # Layer 3 — dashboard (depends on core + contracts only; published before fitness)
-          publish_if_new dashboard
-          # Layer 3 — tools (depend on core, contracts, lang-typescript, dashboard)
-          publish_if_new fitness
-          publish_if_new simulation
-          publish_if_new graph
-          # Layer 3.5 — shared tree-sitter adapter scaffolding (before the 4 tree-sitter packs that depend on it)
-          publish_if_new graph-adapter-common
-          # Layer 3.6 — graph adapter packs (depend on graph engine)
-          publish_if_new graph-typescript
-          publish_if_new graph-python
-          publish_if_new graph-rust
-          publish_if_new graph-go
-          publish_if_new graph-java
-          # Layer 4 — check packs (depend on fitness)
-          publish_if_new checks-universal
-          publish_if_new checks-typescript
-          publish_if_new checks-python
-          publish_if_new checks-go
-          publish_if_new checks-java
-          publish_if_new checks-cpp
-          publish_if_new checks-rust
-          # Layer 5 — CLI (unscoped `opensip-tools`; depends on every tool, every check pack, every adapter)
-          publish_unscoped opensip-tools
+          # The publish ORDER is DERIVED from scripts/release-package-order.mjs
+          # (the single source of truth — ADR-0017): `--print names` emits the
+          # unscoped tarball-segment tokens in strict dependency order, CLI
+          # last. The bare `opensip-tools` token routes to publish_unscoped
+          # (unscoped tarball name); every other token to publish_if_new
+          # (scoped `@opensip-tools/<pkg>`). Do NOT re-hand-list the packages
+          # here; edit that script and every release surface follows.
+          while IFS= read -r pkg ; do
+            if [ "$pkg" = "opensip-tools" ] ; then
+              publish_unscoped opensip-tools
+            else
+              publish_if_new "$pkg"
+            fi
+          done < <(node scripts/release-package-order.mjs --print names)
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3

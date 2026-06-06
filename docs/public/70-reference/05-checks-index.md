@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-05
+last_verified: 2026-06-06
 release: v3.0.x
 title: "Checks reference"
 audience: [getting-started, ci-integrators, plugin-authors]
@@ -20,13 +20,13 @@ related-docs:
 ---
 # Checks reference
 
-opensip-tools ships **148+ built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
+opensip-tools ships **149+ built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
 
 > This page is **auto-generated** from the source by [`scripts/build-checks-index.mjs`](https://github.com/opensip-ai/opensip-tools/blob/main/scripts/build-checks-index.mjs). Do not edit it by hand — edit the check's source file (the link in each row), then re-run the generator.
 
 ---
 
-## Universal  *(92 checks)*
+## Universal  *(93 checks)*
 
 Language-agnostic; runs against every project.
 
@@ -72,7 +72,7 @@ Language-agnostic; runs against every project.
 | [`use-centralized-crypto`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/security/use-centralized-crypto.ts) | Enforce use of centralized crypto module instead of direct crypto operations |
 | [`webhook-signature-verification`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/security/webhook-signature-verification.ts) | Detect webhook endpoints without signature verification |
 
-### Quality  *(24)*
+### Quality  *(25)*
 
 | Slug | Description |
 |---|---|
@@ -82,6 +82,7 @@ Language-agnostic; runs against every project.
 | [`expo-vector-icons`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/quality/frontend/expo-vector-icons.ts) | Ensure consistent icon library usage with @expo/vector-icons |
 | [`file-length-limit`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/file-length-limit.ts) | *(no description; see source)* |
 | [`fitness-ignore-hygiene`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/quality/fitness-ignore-hygiene.ts) | Validates that @fitness-ignore directives have valid check slugs and reason comments |
+| [`graph-ignore-hygiene`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/quality/graph-ignore-hygiene.ts) | Validates that @graph-ignore directives have valid graph rule ids and reason comments |
 | [`graphql-offset-pagination`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/quality/api/graphql-offset-pagination.ts) | Detect $offset variables in GraphQL queries that indicate offset-based pagination |
 | [`image-optimization`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/quality/frontend/image-optimization.ts) | Detect unoptimized image usage and recommend best practices |
 | [`navigation-typing`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/quality/frontend/navigation-typing.ts) | Verify navigation params are properly typed for type-safe routing |

@@ -9,6 +9,16 @@ end-users install directly, via `npm i -g opensip-tools`.)
 
 ## The 31 packages
 
+> **Single source of truth.** This table, the publish order below, the
+> npm-verify loop in step 6, the loops in `.github/workflows/release.yml`
+> (preflight/pack/publish), and `scripts/bootstrap-publish.sh` are all
+> derived from — or verified against — `scripts/release-package-order.mjs`
+> (ADR-0017). The PR-time contract test
+> `packages/cli/src/__tests__/release-package-order-contract.test.ts`
+> fails CI if any of these surfaces drifts from that source, so adding,
+> removing, or renaming a publishable package forces every surface to be
+> updated together. Do not hand-edit the package list in one place only.
+
 | Layer | Package | Path |
 |-------|---------|------|
 | Kernel | `@opensip-tools/core` | `packages/core` |
@@ -67,17 +77,25 @@ their `dependencies`.
    top. The release-consistency gate (step 3) refuses to publish without
    one.
 
-3. Sanity-check locally:
+3. Sanity-check locally. The release workflow re-runs the **full PR gate**
+   before it packs/publishes (ADR-0017 — the release gate must be at least
+   as strict as the PR gate, because npm versions are immutable), so the
+   local preflight must mirror it for a green local run to predict CI:
    ```bash
-   pnpm install && pnpm typecheck && pnpm test && pnpm lint
+   pnpm install && pnpm -r run clean && pnpm build && pnpm typecheck && pnpm lint
+   pnpm test:coverage             # per-package coverage thresholds (matches release CI)
+   pnpm fit:ci && pnpm graph:ci   # dogfood gates now block release too (ADR-0017)
    pnpm docs:build                                # regenerate docs/web-generated/ at the new version pin
-   pnpm verify-release --expected-version vX.Y.Z  # version + CHANGELOG + docs + cross-pkg deps
+   pnpm verify-release --expected-version vX.Y.Z  # version + CHANGELOG + docs + cross-pkg deps + package-set (check #10)
    ```
 
    `pnpm lint` runs both ESLint and dependency-cruiser. Both must be
-   zero-error. `pnpm verify-release` runs the same gate CI uses (see
-   `scripts/verify-release.mjs`); a green local run guarantees CI's
-   pre-publish step will also be green.
+   zero-error. `pnpm test:coverage` enforces the per-package coverage
+   thresholds (plain `pnpm test` skips them). `pnpm fit:ci` /
+   `pnpm graph:ci` are the dogfood gates — after ADR-0017 they block the
+   release, not just PR merge. `pnpm verify-release` runs the same gate CI
+   uses (see `scripts/verify-release.mjs`); a green run of this complete
+   set guarantees CI's pre-publish steps will also be green.
 
 4. Commit, tag, push:
    ```bash

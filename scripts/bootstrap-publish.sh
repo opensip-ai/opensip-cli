@@ -55,25 +55,17 @@ NPMRC=$(mktemp)
 trap 'rm -rf "$TARBALL_DIR" "$NPMRC"' EXIT
 echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > "$NPMRC"
 
-# Mirror the publish order from .github/workflows/release.yml.
-# Sequential by design — downstream packages reference upstream
-# versions resolved by pnpm pack at pack time.
-PACKAGES=(
-  core
-  datastore
-  contracts
-  session-store
-  output
-  cli-ui
-  tree-sitter
-  lang-typescript lang-rust lang-python lang-go lang-java lang-cpp
-  dashboard
-  fitness simulation graph
-  graph-adapter-common
-  graph-typescript graph-python graph-rust graph-go graph-java
-  checks-universal checks-typescript checks-python checks-go checks-java checks-cpp checks-rust
-  opensip-tools
-)
+# The package list + ORDER is DERIVED from scripts/release-package-order.mjs
+# (the single source of truth — ADR-0017), the same source the release
+# workflow's pack/preflight/publish loops read. Sequential by design —
+# downstream packages reference upstream versions resolved by pnpm pack at
+# pack time. Do NOT re-hand-list packages here; edit that script and every
+# release surface follows. (`--print names` emits the unscoped tarball-segment
+# tokens in dependency order, CLI last.)
+PACKAGES=()
+while IFS= read -r pkg; do
+  PACKAGES+=("$pkg")
+done < <(node "$REPO_ROOT/scripts/release-package-order.mjs" --print names)
 
 published=0
 skipped=0

@@ -107,6 +107,12 @@ distinct from:
   engine-side cacheKey site, so a tool upgrade invalidates the catalog +
   per-shard fragment caches for every language. One stamp, both caches, no
   datastore migration; safe over-invalidation (one cold rebuild per upgrade)
+- [ADR-0016](./ADR-0016-universal-progress-currency.md) — Universal progress
+  currency + one live-progress renderer
+- [ADR-0017](./ADR-0017-release-gate-policy.md) — Release gate must be at least
+  as strict as the PR gate: `release.yml` re-runs `lint`/`test:coverage`/`fit:ci`/
+  `graph:ci` before pack (option A, not verify-tagged-SHA); plus a single source
+  of truth for the publishable package set verified by a PR-time contract test
 
 ### Superseded
 

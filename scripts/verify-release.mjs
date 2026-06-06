@@ -7,7 +7,7 @@
 // disagree with package.json, missing CHANGELOG entries, stale
 // generated docs, cross-package deps pointing at the wrong version.
 //
-// Nine checks (all run; any failure exits 1):
+// Ten checks (all run; any failure exits 1):
 //
 //   1. All @opensip-tools/* packages share the same `version`.
 //   2. Tag matches the package version (CI: --expected-version $TAG).
@@ -21,6 +21,12 @@
 //      staled these and 4 did not cover them). build-package-readmes --check.
 //   8. Package keywords are in sync. build-package-keywords --check.
 //   9. The checks index is in sync. extract-checks-metadata | build-checks-index --check.
+//  10. The publishable workspace set equals scripts/release-package-order.mjs
+//      (the single source of truth — ADR-0017). Catches a package that exists in
+//      the workspace but is missing from / stale in the release order BEFORE any
+//      pack/publish. Set comparison only; the ORDER + the workflow/bootstrap/docs
+//      surfaces are the PR-time contract test's job
+//      (packages/cli/src/__tests__/release-package-order-contract.test.ts).
 //
 // Usage:
 //   node scripts/verify-release.mjs                     # local pre-flight
@@ -34,6 +40,8 @@ import { execFileSync } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { RELEASE_PACKAGE_ORDER, discoverPublishablePackages } from './release-package-order.mjs';
 
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const SCOPE = '@opensip-tools/';
@@ -66,48 +74,26 @@ const skip = (id, msg) => skips.push({ id, msg });
 // Package discovery
 // ---------------------------------------------------------------------
 
-async function pathExists(p) {
-  try { await fs.access(p); return true; } catch { return false; }
-}
-
+// Discovery is single-sourced: discoverPublishablePackages() (from
+// release-package-order.mjs) is the ONE walk over packages/** that applies the
+// publishable rule (name is `opensip-tools` or `@opensip-tools/*`, AND not
+// `private: true`). We enrich each discovered `{ name, dir }` with the
+// version/deps this script's checks need, rather than duplicating the walk.
 async function findScopedPackages() {
+  const discovered = await discoverPublishablePackages(REPO_ROOT);
   const found = [];
-  const baseDir = join(REPO_ROOT, 'packages');
-  const topEntries = await fs.readdir(baseDir, { withFileTypes: true });
-
-  for (const top of topEntries) {
-    if (!top.isDirectory()) continue;
-    const topPath = join(baseDir, top.name);
-
-    // Direct child: packages/<name>/package.json
-    await maybeAdd(found, join(topPath, 'package.json'));
-
-    // One level deeper: packages/<group>/<name>/package.json
-    const subEntries = await fs.readdir(topPath, { withFileTypes: true });
-    for (const sub of subEntries) {
-      if (!sub.isDirectory()) continue;
-      await maybeAdd(found, join(topPath, sub.name, 'package.json'));
-    }
-  }
-
-  return found;
-}
-
-async function maybeAdd(list, pkgPath) {
-  if (!(await pathExists(pkgPath))) return;
-  const pkg = JSON.parse(await fs.readFile(pkgPath, 'utf8'));
-  // The CLI publishes under the unscoped name `opensip-tools` (the one package
-  // end-users install directly); everything else is `@opensip-tools/*`. Both
-  // must share the consensus version, so include the unscoped name here.
-  if (typeof pkg.name === 'string' && (pkg.name === 'opensip-tools' || pkg.name.startsWith(SCOPE))) {
-    list.push({
+  for (const { name, dir } of discovered) {
+    const pkgPath = join(REPO_ROOT, dir, 'package.json');
+    const pkg = JSON.parse(await fs.readFile(pkgPath, 'utf8'));
+    found.push({
       path: pkgPath,
-      name: pkg.name,
+      name,
       version: pkg.version,
       dependencies: pkg.dependencies ?? {},
       devDependencies: pkg.devDependencies ?? {},
     });
   }
+  return found;
 }
 
 // ---------------------------------------------------------------------
@@ -243,6 +229,28 @@ try {
   );
 } catch (error) {
   fail(9, `could not run the checks-index check: ${error.message}`);
+}
+
+// 10 — Publishable workspace set == release-package-order.mjs set.
+// `pkgs` is already the discovered publishable set (via discoverPublishablePackages,
+// the single discovery walk). Compare its names to RELEASE_PACKAGE_ORDER's names.
+{
+  const discoveredNames = new Set(pkgs.map((p) => p.name));
+  const orderNames = new Set(RELEASE_PACKAGE_ORDER.map((p) => p.name));
+  const inWorkspaceNotOrder = [...discoveredNames].filter((n) => !orderNames.has(n)).sort();
+  const inOrderNotWorkspace = [...orderNames].filter((n) => !discoveredNames.has(n)).sort();
+  if (inWorkspaceNotOrder.length === 0 && inOrderNotWorkspace.length === 0) {
+    pass(10, `publishable workspace set (${discoveredNames.size}) matches release-package-order.mjs.`);
+  } else {
+    const lines = [];
+    if (inWorkspaceNotOrder.length > 0) {
+      lines.push(`    in workspace but NOT in release order (add to scripts/release-package-order.mjs): ${inWorkspaceNotOrder.join(', ')}`);
+    }
+    if (inOrderNotWorkspace.length > 0) {
+      lines.push(`    in release order but NOT in workspace (remove/rename in scripts/release-package-order.mjs): ${inOrderNotWorkspace.join(', ')}`);
+    }
+    fail(10, `publishable set disagrees with release-package-order.mjs:\n${lines.join('\n')}`);
+  }
 }
 
 // ---------------------------------------------------------------------
