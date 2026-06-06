@@ -22,6 +22,21 @@ importers:
       '@eslint/js':
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.4.0(jiti@2.7.0))
+      '@opensip-tools/checks-cpp':
+        specifier: workspace:*
+        version: link:packages/fitness/checks-cpp
+      '@opensip-tools/checks-go':
+        specifier: workspace:*
+        version: link:packages/fitness/checks-go
+      '@opensip-tools/checks-java':
+        specifier: workspace:*
+        version: link:packages/fitness/checks-java
+      '@opensip-tools/checks-python':
+        specifier: workspace:*
+        version: link:packages/fitness/checks-python
+      '@opensip-tools/checks-rust':
+        specifier: workspace:*
+        version: link:packages/fitness/checks-rust
       '@opensip-tools/checks-typescript':
         specifier: workspace:*
         version: link:packages/fitness/checks-typescript
