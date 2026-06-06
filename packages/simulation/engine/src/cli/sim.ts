@@ -23,7 +23,7 @@
 
 import { pathToFileURL } from 'node:url';
 
-import { buildSignalEnvelope, EXIT_CODES } from '@opensip-tools/contracts';
+import { buildFindingGroups, buildSignalEnvelope, EXIT_CODES } from '@opensip-tools/contracts';
 import { currentScope, discoverPackagesByMarker, logger, registerRecipesFromMod } from '@opensip-tools/core';
 
 import { currentScenarioRegistry } from '../framework/registry.js';
@@ -39,7 +39,7 @@ import { SimulationRecipeService } from '../recipes/service.js';
 import type { RunnableScenario } from '../framework/runnable-scenario.js';
 import type { SimPluginExports } from '../plugins/types.js';
 import type { SimulationScenarioResult } from '../recipes/service.js';
-import type { ErrorResult, SimDoneResult, ToolOptions, UnitResult } from '@opensip-tools/contracts';
+import type { ErrorResult, SimDoneResult, ToolOptions, UnitResult, VerboseDetail } from '@opensip-tools/contracts';
 import type { Signal } from '@opensip-tools/core';
 
 // ---------------------------------------------------------------------------
@@ -315,7 +315,7 @@ export interface ExecuteSimOptions {
  * recipe is missing). The caller decides what to print or render.
  */
 export async function executeSim(
-  args: ToolOptions,
+  args: ToolOptions & { readonly verbose?: boolean },
   opts: ExecuteSimOptions = {},
 ): Promise<{ result: SimDoneResult | ErrorResult }> {
   // Lifecycle: load .mjs plugins + scenario packages before the recipe
@@ -395,6 +395,15 @@ export async function executeSim(
     signals,
   });
 
+  // ADR-0021: on --verbose, carry the per-scenario detail body so the shared
+  // resultToView seam renders it identically in a TTY and a pipe. Reuses the
+  // shared contracts mapping (sim scenario ids are the unit slugs; identity
+  // display name).
+  const verboseDetail: VerboseDetail | undefined =
+    args.verbose === true
+      ? { kind: 'findings', groups: buildFindingGroups(units, signals) }
+      : undefined;
+
   return {
     result: {
       type: 'sim-done',
@@ -403,6 +412,7 @@ export async function executeSim(
       durationMs: recipeResult.durationMs,
       shouldFail: failed > 0,
       envelope,
+      ...(verboseDetail === undefined ? {} : { verboseDetail }),
     },
   };
 }

@@ -249,8 +249,12 @@ export function resultToView(result: CommandResult): ViewNode {
     case 'sim-done': {
       // sim is migrated (Phase 4): the result always carries an envelope and
       // the per-scenario table is derived from it (one unit row per scenario).
-      // ADR-0021: the optional verbose per-scenario body renders above it.
-      return envelopeToTableView(result.envelope, result.verboseDetail);
+      // ADR-0021: the optional verbose per-scenario body renders above it, and a
+      // non-verbose run shows the shared "Use --verbose…" hint.
+      return withVerboseHint(
+        envelopeToTableView(result.envelope, result.verboseDetail),
+        result.verboseDetail === undefined,
+      );
     }
     case 'graph-done': {
       // graph keeps its own rich report view (it delivers signals via an

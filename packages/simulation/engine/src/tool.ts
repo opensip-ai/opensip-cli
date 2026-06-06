@@ -6,7 +6,7 @@
  * surface, JSON/Ink dispatch, and dashboard auto-open hook.
  */
 
-import { EXIT_CODES, type CliProgram, type ToolOptions } from '@opensip-tools/contracts';
+import { applyCommonFlags, EXIT_CODES, type CliProgram, type ToolOptions } from '@opensip-tools/contracts';
 import { readPackageVersion } from '@opensip-tools/core';
 
 import { renderSimLive } from './cli/sim-runner.js';
@@ -55,20 +55,22 @@ function register(cli: ToolCliContext): void {
     }
   });
 
-  program
+  const simCmd = program
     .command(SIM.name)
     .description(SIM.description)
-    .option('--recipe <name>', 'Run a named sim recipe (default: built-in `default`)')
-    .option('--cwd <path>', 'Target directory', process.cwd())
-    .option('--json', 'Output structured JSON', false)
-    .option('-q, --quiet', 'Suppress banner / boxes; print only the pass-fail summary', false)
-    .option('--open', 'Launch the HTML dashboard in your browser after the run completes', false)
-    .option('--report-to <url>', 'POST signals to OpenSIP Cloud or compatible')
-    .option('--api-key <key>', 'API key for --report-to authentication')
-    .option('--debug', 'Enable debug mode for structured log output', false)
+    .option('--recipe <name>', 'Run a named sim recipe (default: built-in `default`)');
+  // Common cross-tool flags from the single registry (ADR-0021): --cwd, --json,
+  // --quiet, --verbose, --debug, --report-to, --api-key, --open. sim gained
+  // -v/--verbose here (per-scenario detail).
+  applyCommonFlags(
+    simCmd,
+    ['cwd', 'json', 'quiet', 'verbose', 'debug', 'reportTo', 'apiKey', 'open'],
+    { cwd: process.cwd() },
+  );
+  simCmd
     .action(
       async (
-        opts: ToolOptions & { recipe?: string; quiet?: boolean; open?: boolean },
+        opts: ToolOptions & { recipe?: string; quiet?: boolean; open?: boolean; verbose?: boolean },
       ) => {
         // Interactive TTY (non-json): the animated live view. Egress + exit code
         // are handled inside the registerLiveView callback / renderSimLive after

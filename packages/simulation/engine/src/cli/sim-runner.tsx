@@ -22,11 +22,14 @@ import {
   LiveProgress,
   normalizeBannerSize,
   ProjectHeader,
+  renderToInk,
   RunFooterHints,
   RunHeader,
   RunSummary,
   ThemeProvider,
   UpdateHint,
+  VERBOSE_DETAIL_HINT,
+  viewFindingsGroups,
   type ProgressEvent,
   type ProgressSurface,
 } from '@opensip-tools/cli-ui';
@@ -35,6 +38,7 @@ import {
   type ErrorResult,
   type SignalEnvelope,
   type ToolOptions,
+  type VerboseDetail,
 } from '@opensip-tools/contracts';
 import { createInProcessTransport, currentScope } from '@opensip-tools/core';
 import { Box, Static, useApp, render } from 'ink';
@@ -49,11 +53,12 @@ const SIM_RUNNING_SURFACE: ProgressSurface = { shape: 'pool', label: 'Running sc
 /** The sim subcommand's parsed options. `quiet`/`open` are not on the base
  *  ToolOptions (they're added by the command's `.option(...)` flags), so the
  *  live view widens the type to read `quiet`. */
-type SimLiveArgs = ToolOptions & { readonly quiet?: boolean };
+type SimLiveArgs = ToolOptions & { readonly quiet?: boolean; readonly verbose?: boolean };
 
 interface SimDoneShape {
   readonly envelope: SignalEnvelope;
   readonly durationMs: number;
+  readonly verboseDetail?: VerboseDetail;
 }
 
 type SimState =
@@ -118,7 +123,10 @@ export function SimRunner({ args, setExitCode, onEnvelope }: SimRunnerProps): Re
       } else {
         if (result.shouldFail === true) setExitCode?.(EXIT_CODES.RUNTIME_ERROR);
         onEnvelope?.(result.envelope);
-        setState({ phase: 'done', result: { envelope: result.envelope, durationMs: result.durationMs } });
+        setState({
+          phase: 'done',
+          result: { envelope: result.envelope, durationMs: result.durationMs, verboseDetail: result.verboseDetail },
+        });
       }
       setTimeout(() => exit(), 100);
     })();
@@ -174,10 +182,16 @@ export function SimRunner({ args, setExitCode, onEnvelope }: SimRunnerProps): Re
   }
 
   const { summary } = state.result.envelope.verdict;
+  const { verboseDetail } = state.result;
+  const findingsDetail =
+    verboseDetail?.kind === 'findings' && verboseDetail.groups.length > 0 ? verboseDetail : undefined;
   return (
     <>
       {header}
       <Box flexDirection="column">
+        {args.quiet !== true && findingsDetail !== undefined && (
+          <Box>{renderToInk(viewFindingsGroups(findingsDetail.groups))}</Box>
+        )}
         <RunSummary
           passed={summary.passed}
           failed={summary.failed}
@@ -187,9 +201,14 @@ export function SimRunner({ args, setExitCode, onEnvelope }: SimRunnerProps): Re
         />
         {args.quiet !== true && (
           <RunFooterHints
-            hints={[
-              { text: 'opensip-tools dashboard for HTML report', bold: ['opensip-tools dashboard'] },
-            ]}
+            hints={
+              args.verbose === true
+                ? [{ text: 'opensip-tools dashboard for HTML report', bold: ['opensip-tools dashboard'] }]
+                : [
+                    VERBOSE_DETAIL_HINT,
+                    { text: 'opensip-tools dashboard for HTML report', bold: ['opensip-tools dashboard'] },
+                  ]
+            }
           />
         )}
       </Box>
