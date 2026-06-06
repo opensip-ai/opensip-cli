@@ -14,6 +14,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { defineCheck } from '../../framework/define-check.js';
+import { CheckAbortedError } from '../../framework/execution-context.js';
 import { runOneCheck } from '../run-one-check.js';
 
 import type { ProcessorContext } from '../check-result-processor.js';
@@ -97,6 +98,83 @@ describe('runOneCheck — timeout-detection invariant (audit F7)', () => {
     );
 
     expect(outcome.processOutput?.checkResult.timedOut).toBe(true);
+  });
+
+  it('reports a CheckAbortedError (retryResult.result === undefined, not a timeout) as a non-timeout error', async () => {
+    // defineCheck re-throws CheckAbortedError; executeWithRetry surfaces it as
+    // `{ result: undefined, lastError }` WITHOUT aborting runOneCheck's own
+    // controller. So runOneCheck takes the undefined-result error branch with
+    // `signal.aborted === false` → timedOut must be false (the timeout never
+    // fired). This is the branch that distinguishes "errored" from "timed out".
+    const aborting = vi.fn(() => {
+      throw new CheckAbortedError('aborted-check');
+    });
+    const check = defineCheck({
+      id: uid(),
+      slug: 'aborted-check',
+      description: 'throws CheckAbortedError',
+      tags: ['quality'],
+      analyzeAll: aborting,
+    });
+
+    const outcome = await runOneCheck(
+      check,
+      {
+        cwd: process.cwd(),
+        checkIndex: 1,
+        totalChecks: 1,
+        recipeTimeoutMs: 5000,
+        retryEnabled: false,
+        maxRetries: 0,
+      },
+      makeProcessorContext(),
+    );
+
+    const cr = outcome.processOutput?.checkResult;
+    expect(cr).toBeDefined();
+    expect(cr?.passed).toBe(false);
+    expect(cr?.timedOut).toBe(false);
+    expect(cr?.error).toBeDefined();
+  });
+
+  it('catches a throw raised while processing a successful result (catch path)', async () => {
+    // The success path calls processSuccessResult, which invokes
+    // onCheckComplete. We make that callback throw ONLY on the success
+    // summary (passed === true); the throw escapes the try block and is
+    // handled by runOneCheck's catch, which re-dispatches to
+    // processErrorResult. Since the controller never aborted, the recovered
+    // result is reported as a non-timeout error.
+    const passing = vi.fn(() => Promise.resolve([]));
+    const check = defineCheck({
+      id: uid(),
+      slug: 'ok-but-callback-throws',
+      description: 'passes',
+      tags: ['quality'],
+      analyzeAll: passing,
+    });
+
+    const outcome = await runOneCheck(
+      check,
+      {
+        cwd: process.cwd(),
+        checkIndex: 1,
+        totalChecks: 1,
+        recipeTimeoutMs: 5000,
+        retryEnabled: false,
+        maxRetries: 0,
+      },
+      makeProcessorContext({
+        onCheckComplete: (_slug, summary) => {
+          if (summary.passed) throw new Error('callback exploded');
+        },
+      }),
+    );
+
+    const cr = outcome.processOutput?.checkResult;
+    expect(cr).toBeDefined();
+    expect(cr?.timedOut).toBe(false);
+    expect(cr?.passed).toBe(false);
+    expect(cr?.error).toContain('callback exploded');
   });
 
   it('does NOT flag timedOut=true when the check completes well within the timeout', async () => {

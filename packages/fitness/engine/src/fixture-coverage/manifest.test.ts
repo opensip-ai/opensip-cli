@@ -145,4 +145,61 @@ describe('validateBookkeeping', () => {
     expect(validateBookkeeping(coverageConfig({ checks, allowlist: ['a'], allowNonEmptyAllowlist: false }))).not.toEqual([])
     expect(validateBookkeeping(coverageConfig({ checks, allowlist: ['a'], allowNonEmptyAllowlist: true }))).toEqual([])
   })
+
+  it('flags a commandExemptions entry that no longer ships', () => {
+    const problems = validateBookkeeping(
+      coverageConfig({ checks: [check({ slug: 'a' })], commandExemptions: { gone: 'why' } }),
+    )
+    expect(problems.some((p) => p.includes("commandExemptions names 'gone'") && p.includes('no longer ships'))).toBe(true)
+  })
+
+  it('healthy config with a valid knownUnfixturable entry → no problems', () => {
+    const problems = validateBookkeeping(
+      coverageConfig({ checks: [check({ slug: 'a' })], knownUnfixturable: { a: 'absolute repo paths' } }),
+    )
+    expect(problems).toEqual([])
+  })
+
+  it('flags a knownUnfixturable entry that no longer ships', () => {
+    const problems = validateBookkeeping(
+      coverageConfig({ checks: [check({ slug: 'a' })], knownUnfixturable: { gone: 'why' } }),
+    )
+    expect(problems.some((p) => p.includes("knownUnfixturable names 'gone'"))).toBe(true)
+  })
+
+  it('flags a knownUnfixturable entry that is actually a command check', () => {
+    const problems = validateBookkeeping(
+      coverageConfig({
+        checks: [check({ slug: 'cmd', analysisMode: 'command' })],
+        commandExemptions: { cmd: 'shells out' },
+        knownUnfixturable: { cmd: 'should be commandExemptions' },
+      }),
+    )
+    expect(problems.some((p) => p.includes('put it in commandExemptions'))).toBe(true)
+  })
+
+  it('flags a knownUnfixturable entry with an empty reason', () => {
+    const problems = validateBookkeeping(
+      coverageConfig({ checks: [check({ slug: 'a' })], knownUnfixturable: { a: '' } }),
+    )
+    expect(problems.some((p) => p.includes('needs a non-empty reason'))).toBe(true)
+  })
+
+  it('flags a slug listed in BOTH allowlist and knownUnfixturable', () => {
+    const problems = validateBookkeeping(
+      coverageConfig({ checks: [check({ slug: 'a' })], allowlist: ['a'], knownUnfixturable: { a: 'reason' } }),
+    )
+    expect(problems.some((p) => p.includes('BOTH allowlist and knownUnfixturable'))).toBe(true)
+  })
+
+  it('flags a slug listed in BOTH knownUnfixturable and commandExemptions', () => {
+    const problems = validateBookkeeping(
+      coverageConfig({
+        checks: [check({ slug: 'a' })],
+        commandExemptions: { a: 'cmd reason' },
+        knownUnfixturable: { a: 'unfix reason' },
+      }),
+    )
+    expect(problems.some((p) => p.includes('BOTH knownUnfixturable and commandExemptions'))).toBe(true)
+  })
 })

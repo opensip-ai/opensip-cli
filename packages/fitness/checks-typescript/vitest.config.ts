@@ -7,7 +7,15 @@ export default defineConfig({
     include: ['src/**/*.test.ts'],
     coverage: {
       include: ['src/**'],
-      exclude: ['src/**/*.test.ts', 'src/**/__tests__/**', 'src/index.ts'],
+      // `__fixtures__/**` holds sample source files the checks analyze as
+      // text — they are test data, never executed, so they must not count
+      // toward code coverage (they only drag the denominator to 0%).
+      exclude: [
+        'src/**/*.test.ts',
+        'src/**/__tests__/**',
+        'src/**/__fixtures__/**',
+        'src/index.ts',
+      ],
       thresholds: {
         statements: 90,
         branches: 85,
