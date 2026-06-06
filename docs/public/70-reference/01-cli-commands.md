@@ -194,6 +194,11 @@ opensip-tools graph --report-to <url>
 
 # Scope to a named recipe (a subset of graph rules; default = all rules)
 opensip-tools graph --recipe <name>
+
+# List the source files graph would discover for this scope — no build
+opensip-tools graph --list-files
+opensip-tools graph --list-files --json       # machine-readable: { count, files }
+opensip-tools graph --list-files --workspace  # the per-unit fan-out set
 ```
 
 `graph` is the single entry point for static call-graph analysis. The default (non-JSON) output is a one-line summary; pass `-v`/`--verbose` to expand the structured terminal report into its detailed sections: catalog summary, findings grouped by rule (top 10 per rule, with overflow indicator), and top 10 inferred entry points. The full data is always available via `--json`.
@@ -214,7 +219,17 @@ opensip-tools graph --recipe <name>
 | `--gate-compare` | bool | `false` | Compare current Signals to the saved baseline; exit non-zero on regression. |
 | `--report-to <url>` | string | — | POST findings to OpenSIP Cloud or a compatible SARIF endpoint. |
 | `-v, --verbose` | bool | `false` | Expand the done view to show the detailed catalog, findings-by-rule, and entry-point sections (default: one-line summary only). |
+| `--list-files` | bool | `false` | Discovery-only: resolve and print the source-file set this scope would analyze (whole project, positional subtrees, or `--workspace` fan-out) and exit — no catalog build. Reuses the adapter's stage-0 discovery, so the list is faithful to a real run (`.d.ts` excluded, TypeScript extension-priority collisions collapsed, per-tsconfig `include`/`exclude` honored). Composes with `[paths...]`, `--workspace`, and `--language`; `--json` emits `{ count, files }`. |
 | `--debug` | bool | `false` | Enable debug-mode structured log output. |
+
+**Inspecting discovery (`--list-files`).** `graph` does not enumerate files the way a filesystem walk would — it asks the language adapter, which for TypeScript means the set the `tsconfig` resolves (so `.d.ts` is excluded, an extension-priority collision like a `foo.tsx` shadowed by a sibling `foo.ts` is collapsed to the `.ts`, and each package's `include`/`exclude` is honored). `--list-files` prints exactly that set for the chosen scope and exits before any catalog build, which makes it the cheap, authoritative answer to "what does graph actually see?" The whole-project list and the `--workspace` list can legitimately differ — the latter is the union of per-package `tsconfig`s, which may exclude paths (e.g. `__fixtures__`, root scripts, out-of-`src` files) the root tree includes. To diff graph's view against the VCS:
+
+```
+opensip-tools graph --list-files --json | jq -r '.files[]' | sort > /tmp/graph.txt
+git ls-files '*.ts' '*.tsx' | sort > /tmp/git.txt
+comm -23 /tmp/git.txt /tmp/graph.txt   # tracked but NOT discovered
+comm -13 /tmp/git.txt /tmp/graph.txt   # discovered but NOT tracked
+```
 
 **Polyglot example.** In a repo with both a TypeScript pnpm workspace and a Cargo workspace, the polyglot detection applies both adapters in a single run:
 

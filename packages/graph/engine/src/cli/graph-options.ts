@@ -111,4 +111,16 @@ export interface GraphCommandOptions {
   readonly gitSha?: string;
   /** Optional UUID for the catalog-output run. Auto-generated if absent. */
   readonly runId?: string;
+  /**
+   * `--list-files`: discovery-only mode. Resolve and print the source-file
+   * set the run would analyze for the given scope (whole project, positional
+   * subtrees, or `--workspace` fan-out) WITHOUT building the catalog, then
+   * exit. The list is faithful to a real run — it reuses the adapter's
+   * stage-0 `discoverFiles` (so `.d.ts` is excluded, TypeScript
+   * extension-priority collisions are collapsed, and per-tsconfig
+   * include/exclude is honored) — which makes it the canonical way to diff
+   * graph's view of a repo against e.g. `git ls-files`. Composes with
+   * `--json` for machine-readable output.
+   */
+  readonly listFiles?: boolean;
 }

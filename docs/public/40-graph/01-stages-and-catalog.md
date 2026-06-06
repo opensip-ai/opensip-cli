@@ -114,6 +114,8 @@ The stage boundaries are deliberately narrow: each stage communicates through ty
 
 Output: `{ projectDirAbs, files, configPathAbs?, compilerOptions? }`. The optional `configPathAbs` and `compilerOptions` are adapter-private and thread through to `parseProject` / `cacheKey` unchanged.
 
+You can run this stage in isolation — `graph --list-files` resolves and prints exactly this `files` set (relative to the project root) for the chosen scope and exits before stage 1, no catalog build. It honors `[paths...]`, `--workspace`, `--language`, and `--json`. Because it reuses `discoverFiles` verbatim, the printed set reflects the adapter's real view (for TypeScript: `.d.ts` excluded, extension-priority collisions collapsed, per-`tsconfig` `include`/`exclude` honored) — which makes it the authoritative way to confirm a repo's file set is being discovered as expected, or to diff that set against `git ls-files`. See [`70-reference/01-cli-commands.md`](../70-reference/01-cli-commands.md#graph--static-call-graph--dead-end-analysis).
+
 ### Stage 1+2 — Parse, walk, resolve
 
 `adapter.parseProject` builds adapter-internal parse state (TypeScript: a `ts.Program`; the checker is constructed lazily during exact edge resolution; Python, Rust, Go, Java: a `Map<filePath, tree-sitter Tree>` produced by a vendored `web-tree-sitter` WASM grammar — no native build at install). `adapter.walkProject` then walks every file from stage 0 exactly once and emits both:

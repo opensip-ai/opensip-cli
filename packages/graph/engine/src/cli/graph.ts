@@ -45,7 +45,6 @@ import { mapOpenSipRuleIdToEngineSlug } from '../render/rule-id-mapping.js';
 
 import { applyGraphSuppressions } from './apply-suppressions.js';
 import { buildGraphEnvelope } from './build-envelope.js';
-import { detectLanguages } from './detect.js';
 import { runCatalogJsonMode, runGateMode } from './graph-modes.js';
 import { buildUnifiedReportLines, countFiles, resolutionBannerText } from './graph-report.js';
 import {
@@ -57,6 +56,7 @@ import { loadGraphConfig, runGraph, runShardedGraph } from './orchestrate.js';
 import { positionalPathLabel, resolvePositionalPaths } from './positional-paths.js';
 import { MemoryPressureError } from './pressure-monitor.js';
 import { GraphProfileBuilder, writeGraphProfile } from './profile.js';
+import { resolveAdaptersForRun } from './resolve-adapters.js';
 import { buildWorkspaceJsonDocument, writeWorkspaceReport } from './workspace-report.js';
 import { discoverPolyglotUnits, runWorkspaceUnitsInParallel } from './workspace-runner.js';
 
@@ -66,7 +66,7 @@ import type { RunGraphResult } from './orchestrate.js';
 import type { GraphProfileRunRecorder } from './profile.js';
 import type { Catalog, FeatureColumn, GraphConfig, Rule } from '../types.js';
 import type { GraphDoneResult, SignalEnvelope } from '@opensip-tools/contracts';
-import type { LanguageAdapter, Signal, ToolCliContext } from '@opensip-tools/core';
+import type { Signal, ToolCliContext } from '@opensip-tools/core';
 import type { DataStore } from '@opensip-tools/datastore';
 
 // Re-exports kept so the package barrel + cli/graph-runner.tsx + tests
@@ -679,38 +679,6 @@ async function executeWorkspaceGraph(
     durationMs,
   });
 }
-
-/**
- * Resolve which language adapters apply to this run. With `--language`
- * set, returns exactly that adapter (errors if unregistered). Without
- * it, runs marker-based detection and returns every adapter the repo
- * exposes a marker for (polyglot per spec D6).
- */
-function resolveAdaptersForRun(
-  opts: GraphCommandOptions,
-  cli: ToolCliContext,
-): readonly LanguageAdapter[] {
-  const registry = cli.scope.languages;
-  if (typeof opts.language === 'string' && opts.language.length > 0) {
-    const canonical = registry.canonicalize(opts.language) ?? opts.language;
-    const adapter = registry.get(canonical);
-    if (!adapter) {
-      throw new ConfigurationError(
-        `--language '${opts.language}' is not a registered adapter.`,
-      );
-    }
-    return [adapter];
-  }
-  const detection = detectLanguages(opts.cwd, registry);
-  const adapters: LanguageAdapter[] = [];
-  for (const id of detection.adapterIds) {
-    const adapter = registry.get(id);
-    /* v8 ignore next */
-    if (adapter) adapters.push(adapter);
-  }
-  return adapters;
-}
-
 
 /**
  * Persist one graph session after a non-opt-out run. Exported so the

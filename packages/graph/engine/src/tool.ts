@@ -34,6 +34,7 @@ import { runCatalogJsonMode } from './cli/graph-modes.js';
 import { renderGraphLive } from './cli/graph-runner.js';
 import { executeGraph, handleGraphError } from './cli/graph.js';
 import { runHeapPreflight } from './cli/heap-preflight.js';
+import { executeListFiles } from './cli/list-files.js';
 import { listGraphRecipes } from './cli/list-graph-recipes.js';
 import { executeLookup } from './cli/lookup.js';
 import { loadGraphConfig, runGraph } from './cli/orchestrate.js';
@@ -215,6 +216,11 @@ function registerGraphCommand(program: CliProgram, cli: ToolCliContext): void {
       'Show detailed catalog, findings-by-rule, and entry-point sections in the done view (default: summary only)',
       false,
     )
+    .option(
+      '--list-files',
+      'List the source files graph would discover for this scope and exit (no build; honors [paths...], --workspace, --language, --json)',
+      false,
+    )
     .option('--debug', 'Enable debug mode for structured log output', false)
     .action(async (paths: readonly string[], opts: {
       cwd: string;
@@ -231,12 +237,31 @@ function registerGraphCommand(program: CliProgram, cli: ToolCliContext): void {
       language?: string;
       verbose?: boolean;
       resolution?: string;
+      listFiles?: boolean;
     }) => {
       // Validate --resolution at the boundary so a typo fails loudly
       // rather than silently falling back to exact. Covers every
       // downstream path (interactive live view, executeGraph, workspace
       // fan-out) since they all branch off this single action.
       const resolution = parseResolutionMode(opts.resolution);
+
+      // --list-files short-circuits to discovery-only: print the resolved
+      // source-file set for this scope and exit, BEFORE heap preflight or any
+      // catalog build. Reuses the same scoping flags (paths / --workspace /
+      // --language) and honors --json.
+      if (opts.listFiles === true) {
+        await executeListFiles(
+          {
+            cwd: opts.cwd,
+            json: opts.json,
+            paths,
+            workspace: opts.workspace,
+            language: opts.language,
+          },
+          cli,
+        );
+        return;
+      }
       // Preflight runs BEFORE any heavy work. If the repo's file count
       // exceeds a threshold AND the current heap cap is too low, this
       // re-execs the process with elevated `--max-old-space-size`. The

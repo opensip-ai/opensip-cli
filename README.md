@@ -193,6 +193,7 @@ opensip-tools graph --gate-compare  # compare against baseline; exit 1 on new si
 opensip-tools graph --report-to <url>  # POST SARIF 2.1.0 to an endpoint
 opensip-tools graph packages/core      # scope to one or more subtrees (faster)
 opensip-tools graph --workspace        # fan across every detected workspace unit in parallel
+opensip-tools graph --list-files       # print the files graph would discover (no build); add --json for { count, files }
 ```
 
 Positional `[paths...]` scope the run to one or more existing directories (absolute or relative to `--cwd`); the shell handles any globs (`graph 'packages/*/src'`). Useful on monorepos where a global run is slow: a scoped run typically completes in seconds and fits easily in the default Node heap. The trade-off is fidelity — call sites that cross the in-scope boundary become unresolved, so the orphan-subtree and other reachability rules report against the in-scope subtree(s) only. Positional paths are mutually exclusive with `--workspace`.
