@@ -7,27 +7,25 @@
  *   `define.ts` → `executor.ts` (uses `createChaosScenarioRunner`)
  *   `executor.ts` → `define.ts`  (uses `ChaosScenarioConfig`)
  *
- * The split inverts the dependency. Both files now import the config
- * shape from here, and nothing in this file imports back. `define.ts`
- * re-exports `ChaosScenarioConfig` so existing callers (the engine's
- * public barrel, downstream tools) see no API change.
+ * The split inverts the dependency. Both files import the config shape from
+ * here, and nothing in this file imports back. `define.ts` re-exports
+ * `ChaosScenarioConfig` so callers keep one import path.
  */
 
-import type { ChaosConfig } from '../../types/base-types.js';
-import type {
-  PersonaConfig,
-  ScenarioAssertion,
-} from '../../types/framework-types.js';
+import type { FaultSpec } from '../../framework/execution/fault-spec.js';
+import type { Target } from '../../framework/execution/target.js';
+import type { ScenarioAssertion } from '../../types/framework-types.js';
+import type { Workload } from '../../types/workload.js';
 
 /**
  * Author-facing configuration for a chaos scenario.
  *
  * The `kind` discriminator is set by the entry point.
  *
- * Chaos is a framework-driven kind — the runner always uses the shared
- * `runLoadWindow` driver with explicit injection plus a recovery window.
- * A custom-`execute` escape hatch would undermine the injection model and
- * is intentionally omitted here.
+ * Chaos drives a real BYO `target` under client-side fault injection: a
+ * steady-state window with the fault model active, then a recovery window with
+ * faults lifted. There is intentionally no custom-`execute` escape hatch — the
+ * `target` IS the BYO seam.
  */
 export interface ChaosScenarioConfig {
   // Required metadata
@@ -36,16 +34,21 @@ export interface ChaosScenarioConfig {
   readonly description: string;
   readonly tags: readonly string[];
 
-  // Base load configuration
-  readonly personas: readonly PersonaConfig[];
+  // What to drive, and how hard
+  /** The BYO target driven once per request (throws on failure). */
+  readonly target: Target;
+  /** Arrival-rate workload (rps + optional concurrency/ramp). */
+  readonly workload: Workload;
+  /** Steady-state (fault-active) window duration, in seconds. */
   readonly duration: number;
-  readonly rampUp?: number;
-  readonly targetRps?: number;
 
-  // Chaos contract
-  readonly chaos: ChaosConfig;
+  // Fault contract
+  /** Client-side faults injected during the steady-state window. */
+  readonly fault: FaultSpec;
+  /** Assertions evaluated on the steady-state (fault-active) metrics. */
   readonly steadyStateAssertions: readonly ScenarioAssertion[];
+  /** Assertions evaluated on the recovery (faults-lifted) metrics. */
   readonly recoveryAssertions: readonly ScenarioAssertion[];
-  /** Recovery window in milliseconds after chaos lifts. */
+  /** Recovery window in milliseconds after faults lift. */
   readonly recoveryWindow: number;
 }

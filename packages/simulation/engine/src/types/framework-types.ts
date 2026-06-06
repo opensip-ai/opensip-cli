@@ -8,9 +8,8 @@
  *
  * The exports below are the small set of cross-kind shapes that each kind's
  * `define`/`executor`/`result` modules consume — execution context + logger,
- * persona config, assertion + failed-assertion shapes, the load result
- * payload (produced by `ScenarioResultBuilder`), and the optional
- * custom-`execute` hook.
+ * assertion + failed-assertion shapes, and the load result payload (produced by
+ * `ScenarioResultBuilder`).
  */
 
 import type {
@@ -34,20 +33,6 @@ export type ScenarioAssertion = Readonly<MutableScenarioAssertion>
  */
 export interface FailedAssertion extends ScenarioAssertion {
   readonly actual: number
-}
-
-// =============================================================================
-// PERSONA TYPES
-// =============================================================================
-
-/**
- * Configuration for a persona in a scenario (readonly variant for framework use).
- */
-export interface PersonaConfig {
-  readonly personaId: string
-  readonly count: number
-  readonly spawnRate: number
-  readonly actions: readonly string[]
 }
 
 // =============================================================================
@@ -80,9 +65,7 @@ export interface ScenarioLogger {
  * This is the builder's output shape: the load and chaos executors build a
  * payload of this shape and wrap it into their kind-specific
  * `ScenarioExecutorResult` envelope (the discriminated union over kinds in
- * `framework/scenario-executor-result.ts`). It is also the return type of the
- * optional custom-`execute` hook (`CustomExecuteFn`), so scenario authors who
- * supply their own load driver return this shape.
+ * `framework/scenario-executor-result.ts`).
  */
 export interface LoadResultPayload {
   readonly passed: boolean
@@ -94,18 +77,8 @@ export interface LoadResultPayload {
   readonly signals: readonly Signal[]
 }
 
-/**
- * Custom execute function signature for load scenarios.
- *
- * The documented extension point for plugging a real load driver into a load
- * scenario (in place of the built-in mock loop). Custom execute functions
- * return a `LoadResultPayload`; the load runner wraps it into a
- * `LoadScenarioExecutorResult`.
- */
-export type CustomExecuteFn = (context: ScenarioExecutionContext) => Promise<LoadResultPayload>
-
 // =============================================================================
 // RE-EXPORTS
 // =============================================================================
 
-export { type AssertionOperator, type PersonaType, type ChaosConfig, type SimulationMetrics } from './base-types.js'
+export { type AssertionOperator, type SimulationMetrics } from './base-types.js'

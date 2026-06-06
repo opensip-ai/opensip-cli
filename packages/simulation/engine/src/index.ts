@@ -5,8 +5,8 @@
  * The package exposes two kind-specific scenario authoring entry points
  * sharing one runtime contract:
  *
- *   - `defineLoadScenario`           ← personas + ramp + sustain + assert SLO
- *   - `defineChaosScenario`          ← base load + failure injection + recovery
+ *   - `defineLoadScenario`           ← BYO target + workload + assert SLO
+ *   - `defineChaosScenario`          ← BYO target + client-side faults + recovery
  */
 
 // =============================================================================
@@ -110,8 +110,9 @@ export { loadAllSimPlugins } from './plugins/loader.js'
 // =============================================================================
 // SHARED INFRASTRUCTURE
 // =============================================================================
-// Authoring helpers (assertions, personas) and runtime utilities
-// (result builder, metric resolver, abort/sleep helpers) shared by every kind.
+// Authoring helpers (assertions, BYO target + fault builders) and runtime
+// utilities (result builder, metric resolver, abort/sleep helpers) shared by
+// every kind.
 
 export {
   ASSERTIONS,
@@ -121,15 +122,13 @@ export {
   getOperatorDescription,
 } from './framework/assertions.js'
 
-export {
-  persona,
-  type PersonaOptions,
-  PERSONAS,
-  type PersonaPresets,
-  getTotalPersonaCount,
-  getEstimatedRps,
-  getPersonaTypes,
-} from './framework/personas.js'
+// BYO-target authoring surface: the `Target` seam, the neutral workload, and
+// the client-side fault vocabulary + ergonomic builders.
+export { httpTarget, type HttpTargetOptions } from './framework/execution/http-target.js'
+export { fault } from './framework/execution/fault-builders.js'
+export type { Target, TargetContext } from './framework/execution/target.js'
+export type { Workload } from './types/workload.js'
+export type { Fault, FaultKind, FaultSpec } from './framework/execution/fault-spec.js'
 
 export {
   ScenarioResultBuilder,
@@ -193,12 +192,8 @@ export type {
   AssertionOperator,
   ScenarioAssertion,
   FailedAssertion,
-  PersonaConfig,
   ScenarioExecutionContext,
   ScenarioLogger,
-  CustomExecuteFn,
-  PersonaType,
-  ChaosConfig,
   SimulationMetrics,
   LoadResultPayload,
 } from './types/framework-types.js'

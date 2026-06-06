@@ -11,12 +11,14 @@ import { enterScope } from '@opensip-tools/core';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { ASSERTIONS } from '../framework/assertions.js';
+import { fault } from '../framework/execution/fault-builders.js';
 import { ScenarioAbortedError } from '../framework/execution/scenario-aborted-error.js';
-import { persona } from '../framework/personas.js';
 import { defineChaosScenario } from '../kinds/chaos/define.js';
 import { defineLoadScenario } from '../kinds/load/define.js';
 
 import { makeSimTestScope } from './test-utils/with-sim-scope.js';
+
+const noopTarget = async (): Promise<void> => {};
 
 beforeEach(() => {
   // Item 1: scenarioRegistry is per-RunScope. Enter a fresh scope.
@@ -30,7 +32,8 @@ describe('Load scenario execution', () => {
       name: 'load-exec-1',
       description: 'tiny load run',
       tags: [],
-      personas: [persona('user', 1, { spawnRate: 1 })],
+      target: noopTarget,
+      workload: { rps: 1 },
       duration: 1,
       assertions: [ASSERTIONS.lowErrorRate(1)],
     });
@@ -48,7 +51,8 @@ describe('Load scenario execution', () => {
       name: 'load-exec-aborted',
       description: 'aborted',
       tags: [],
-      personas: [persona('user', 1, { spawnRate: 1 })],
+      target: noopTarget,
+      workload: { rps: 1 },
       duration: 5,
       assertions: [ASSERTIONS.lowErrorRate(1)],
     });
@@ -58,15 +62,15 @@ describe('Load scenario execution', () => {
     await expect(scenario.run(ac.signal)).rejects.toThrow(ScenarioAbortedError);
   });
 
-  it('honors a target RPS when set', async () => {
+  it('honors an explicit workload rps + concurrency', async () => {
     const scenario = defineLoadScenario({
       id: 'load-targetrps',
       name: 'load-targetrps',
       description: 'load with explicit RPS',
       tags: [],
-      personas: [persona('user', 2, { spawnRate: 1 })],
+      target: noopTarget,
+      workload: { rps: 10, concurrency: 4 },
       duration: 1,
-      targetRps: 10,
       assertions: [ASSERTIONS.lowErrorRate(1)],
     });
 
@@ -83,20 +87,10 @@ describe('Chaos scenario execution', () => {
       name: 'chaos-exec-1',
       description: 'tiny chaos run',
       tags: [],
-      personas: [persona('user', 1, { spawnRate: 1 })],
+      target: noopTarget,
+      workload: { rps: 1 },
       duration: 1,
-      chaos: {
-        enabled: true,
-        probability: 0.1,
-        types: [
-          {
-            type: 'error',
-            target: '*',
-            probability: 0.5,
-            config: { type: 'error', statusCode: 500, message: 'injected' },
-          },
-        ],
-      },
+      fault: fault.of([fault.drop()], { probability: 0.1 }),
       steadyStateAssertions: [ASSERTIONS.lowErrorRate(1)],
       recoveryAssertions: [ASSERTIONS.lowErrorRate(1)],
       recoveryWindow: 100,

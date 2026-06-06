@@ -215,23 +215,35 @@ export const recipes = [{
 }
 
 export function exampleScenarioSource(): string {
-  return `// Example simulation scenario — completes immediately.
+  return `// Example simulation scenario — a real load window against an in-process target.
+//
+// 'sim' is a standalone driver: you bring the target. This demo drives a
+// trivial in-process target so it runs out-of-box and shows the harness
+// mechanics (a real request loop, measured latency, asserted SLOs). To test
+// YOUR service, replace 'target' with httpTarget({ url: process.env.TARGET_URL })
+// — and point it only at a target you own. For fault injection, see the chaos
+// docs (defineChaosScenario + fault.*).
 //
 // Edit this file or add new .mjs files to opensip-tools/sim/scenarios/.
 // Files in this directory are auto-loaded on the next \`opensip-tools sim\` run.
 //
 // Docs: https://github.com/opensip-ai/opensip-tools#simulation
-import { defineLoadScenario } from '@opensip-tools/simulation';
+import { defineLoadScenario, ASSERTIONS /*, httpTarget */ } from '@opensip-tools/simulation';
 
 export const scenarios = [
   defineLoadScenario({
     id: 'example-scenario',
     name: 'example-scenario',
-    description: 'Demo scenario — completes immediately with no work',
+    description: 'Demo load scenario — drives a trivial in-process target',
     tags: ['example'],
-    personas: [],
-    duration: 0,
-    assertions: [],
+    // BYO target: any async function that resolves on success / throws on failure.
+    // Swap for your service:  target: httpTarget({ url: process.env.TARGET_URL }),
+    target: async () => {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    },
+    workload: { rps: 20, rampUp: 1 },
+    duration: 3,
+    assertions: [ASSERTIONS.lowErrorRate(), ASSERTIONS.lowLatency('p95', 500)],
   }),
 ];
 `;

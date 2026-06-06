@@ -17,7 +17,7 @@ import { Command } from 'commander';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ASSERTIONS } from '../framework/assertions.js';
-import { persona } from '../framework/personas.js';
+import { noopTarget } from './test-utils/targets.js';
 import { clearScenarioRegistry, currentScenarioRegistry } from '../framework/registry.js';
 import { defineLoadScenario } from '../kinds/load/define.js';
 import { simulationTool } from '../tool.js';
@@ -108,7 +108,8 @@ function registerProbeScenario(): void {
     name: 'probe',
     description: 'probe',
     tags: [],
-    personas: [persona('user', 1)],
+    target: noopTarget,
+    workload: { rps: 1 },
     duration: 1,
     assertions: [ASSERTIONS.lowErrorRate(1)],
   }));

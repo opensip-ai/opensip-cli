@@ -7,7 +7,7 @@ import { enterScope } from '@opensip-tools/core'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { ASSERTIONS } from '../framework/assertions.js'
-import { persona } from '../framework/personas.js'
+import { fault } from '../framework/execution/fault-builders.js'
 import {
   clearScenarioRegistry,
   currentScenarioRegistry,
@@ -32,6 +32,8 @@ afterEach(() => {
   clearScenarioRegistry()
 })
 
+const noopTarget = async (): Promise<void> => {}
+
 function defineOneOfEachKind(): void {
   currentScenarioRegistry().register(
     defineLoadScenario({
@@ -39,7 +41,8 @@ function defineOneOfEachKind(): void {
       name: 'cross load',
       description: 'load',
       tags: ['shared-tag', 'load-only'],
-      personas: [persona('buyer', 1)],
+      target: noopTarget,
+      workload: { rps: 1 },
       duration: 1,
       assertions: [ASSERTIONS.lowErrorRate(1)],
     }),
@@ -51,20 +54,10 @@ function defineOneOfEachKind(): void {
       name: 'cross chaos',
       description: 'chaos',
       tags: ['shared-tag', 'chaos-only'],
-      personas: [persona('buyer', 1)],
+      target: noopTarget,
+      workload: { rps: 1 },
       duration: 1,
-      chaos: {
-        enabled: true,
-        probability: 0.1,
-        types: [
-          {
-            type: 'error',
-            target: '*',
-            probability: 0.5,
-            config: { type: 'error', statusCode: 500, message: 'x' },
-          },
-        ],
-      },
+      fault: fault.of([fault.drop()], { probability: 0.1 }),
       steadyStateAssertions: [ASSERTIONS.lowErrorRate(1)],
       recoveryAssertions: [ASSERTIONS.lowErrorRate(1)],
       recoveryWindow: 100,

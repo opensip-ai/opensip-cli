@@ -1,13 +1,13 @@
 /**
  * @fileoverview `defineChaosScenario` — chaos-kind entry point.
  *
- * The chaos kind composes a load-style base run with explicit failure injection
- * and a recovery-window assertion contract. Authors supply:
- *   - load-side fields (personas, duration, ramp-up, target RPS)
- *   - a `chaos` injection config (already typed by `ChaosConfig` in base-types)
- *   - `steadyStateAssertions` evaluated while chaos is active
- *   - `recoveryAssertions` evaluated during the post-chaos recovery window
- *   - `recoveryWindow` (ms) — how long after chaos lifts to evaluate recovery
+ * The chaos kind drives a real BYO `target` under client-side fault injection
+ * with a recovery-window assertion contract. Authors supply:
+ *   - a `target` (the BYO seam) + a `workload` (rps/concurrency/ramp) + `duration`
+ *   - a `fault` spec (client-side faults + probability)
+ *   - `steadyStateAssertions` evaluated while faults are active
+ *   - `recoveryAssertions` evaluated during the post-fault recovery window
+ *   - `recoveryWindow` (ms) — how long after faults lift to evaluate recovery
  */
 
 import {
@@ -27,38 +27,62 @@ import type { RunnableScenario } from '../../framework/runnable-scenario.js'
 // the config shape from `'./define.js'` without churn.
 export type { ChaosScenarioConfig } from './config.js'
 
-function validatePersonasAndDuration(
+const VALID_FAULT_KINDS = new Set(['latency', 'abort', 'drop'])
+
+function validateTargetAndWorkload(
   config: ChaosScenarioConfig,
   errors: ScenarioValidationError[],
 ): void {
-  if (config.personas.length === 0) {
-    errors.push({ field: 'personas', message: 'at least one persona is required' })
+  if (typeof config.target !== 'function') {
+    errors.push({ field: 'target', message: 'target must be a function (the BYO seam)' })
+  }
+  if (typeof config.workload?.rps !== 'number' || config.workload.rps <= 0) {
+    errors.push({ field: 'workload.rps', message: 'workload.rps must be a positive number' })
+  }
+  if (config.workload?.concurrency !== undefined && config.workload.concurrency < 1) {
+    errors.push({ field: 'workload.concurrency', message: 'workload.concurrency must be >= 1' })
+  }
+  if (config.workload?.rampUp !== undefined && config.workload.rampUp < 0) {
+    errors.push({ field: 'workload.rampUp', message: 'workload.rampUp must be non-negative' })
   }
   if (typeof config.duration !== 'number' || config.duration <= 0) {
     errors.push({ field: 'duration', message: 'duration must be a positive number' })
   }
 }
 
-function validateChaos(config: ChaosScenarioConfig, errors: ScenarioValidationError[]): void {
-  if (!config.chaos) {
-    errors.push({ field: 'chaos', message: 'chaos config is required for chaos scenarios' })
+function validateFault(config: ChaosScenarioConfig, errors: ScenarioValidationError[]): void {
+  if (!config.fault) {
+    errors.push({ field: 'fault', message: 'fault spec is required for chaos scenarios' })
     return
   }
-  if (typeof config.chaos.enabled !== 'boolean') {
-    errors.push({ field: 'chaos.enabled', message: 'chaos.enabled must be boolean' })
-  }
   if (
-    typeof config.chaos.probability !== 'number' ||
-    config.chaos.probability < 0 ||
-    config.chaos.probability > 1
+    typeof config.fault.probability !== 'number' ||
+    config.fault.probability < 0 ||
+    config.fault.probability > 1
   ) {
     errors.push({
-      field: 'chaos.probability',
-      message: 'chaos.probability must be in [0, 1]',
+      field: 'fault.probability',
+      message: 'fault.probability must be in [0, 1]',
     })
   }
-  if (!Array.isArray(config.chaos.types)) {
-    errors.push({ field: 'chaos.types', message: 'chaos.types must be an array' })
+  if (!Array.isArray(config.fault.faults) || config.fault.faults.length === 0) {
+    errors.push({ field: 'fault.faults', message: 'fault.faults must be a non-empty array' })
+    return
+  }
+  for (let i = 0; i < config.fault.faults.length; i++) {
+    const f = config.fault.faults[i]
+    if (!f || !VALID_FAULT_KINDS.has(f.kind)) {
+      errors.push({
+        field: `fault.faults[${i}].kind`,
+        message: "fault kind must be one of 'latency' | 'abort' | 'drop'",
+      })
+    }
+    if (f?.kind === 'latency' && (typeof f.ms !== 'number' || f.ms < 0)) {
+      errors.push({
+        field: `fault.faults[${i}].ms`,
+        message: 'latency fault requires a non-negative ms',
+      })
+    }
   }
 }
 
@@ -97,8 +121,8 @@ function validateAssertions(
 export function validateChaosScenarioConfig(config: ChaosScenarioConfig): void {
   const errors: ScenarioValidationError[] = []
   validateScenarioMetadata(config, errors)
-  validatePersonasAndDuration(config, errors)
-  validateChaos(config, errors)
+  validateTargetAndWorkload(config, errors)
+  validateFault(config, errors)
   validateAssertions(config, errors)
 
   throwValidationErrors(errors, 'chaos')

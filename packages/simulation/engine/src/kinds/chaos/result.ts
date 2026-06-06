@@ -9,16 +9,20 @@
  *   - the chaos events that fired during the run
  */
 
-import type { ChaosType, SimulationMetrics } from '../../types/base-types.js'
+import type { FaultKind } from '../../framework/execution/fault-spec.js'
+import type { SimulationMetrics } from '../../types/base-types.js'
 import type {
   ScenarioAssertion,
   FailedAssertion,
 } from '../../types/framework-types.js'
 
-/** A single chaos event recorded during the run, for diagnostics. */
+/** A single fault occurrence recorded during the run, for diagnostics. */
 export interface ChaosEvent {
-  readonly type: ChaosType
+  /** Which client-side fault fired. */
+  readonly type: FaultKind
+  /** Milliseconds into the steady-state window when it fired. */
   readonly atMs: number
+  /** Where the perturbation was applied (the client request site). */
   readonly target: string
 }
 

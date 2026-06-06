@@ -1,11 +1,11 @@
 /**
  * @fileoverview `defineLoadScenario` — load-kind entry point.
  *
- * The load kind preserves the existing personas + ramp + sustain + assert
- * shape that the framework already supported. The author-facing config
- * interface is `LoadScenarioConfig` (no `kind` field — the entry point sets
- * it). Validation runs at definition time; registration is the caller's
- * responsibility (the simulation plugin loader walks `module.scenarios`
+ * The load kind drives a BYO `target` at a `workload` (rps + optional
+ * concurrency/ramp) over `duration` seconds and asserts measured SLOs. The
+ * author-facing config interface is `LoadScenarioConfig` (no `kind` field — the
+ * entry point sets it). Validation runs at definition time; registration is the
+ * caller's responsibility (the simulation plugin loader walks `module.scenarios`
  * and registers them into `scope.registries.scenarios`).
  */
 
@@ -19,62 +19,37 @@ import { createLoadScenarioRunner } from './executor.js'
 
 import type { LoadScenarioConfig } from './config.js'
 import type { RunnableScenario } from '../../framework/runnable-scenario.js'
-import type {
-  PersonaConfig,
-} from '../../types/framework-types.js'
 
 // `LoadScenarioConfig` moved to `./config.ts` to break the
 // `define.ts ↔ executor.ts` file-level cycle. Re-exported here so
 // existing callers keep their import paths.
 export type { LoadScenarioConfig } from './config.js'
 
-function validatePersona(
-  persona: PersonaConfig | undefined,
-  index: number,
-  errors: ScenarioValidationError[],
-): void {
-  if (!persona) return
-
-  if (!persona.personaId) {
-    errors.push({
-      field: `personas[${index}].personaId`,
-      message: 'personaId is required',
-    })
-  }
-  if (typeof persona.count !== 'number' || persona.count <= 0) {
-    errors.push({
-      field: `personas[${index}].count`,
-      message: 'count must be a positive number',
-    })
-  }
-}
-
-function collectPersonaValidationErrors(
+function validateTargetAndWorkload(
   config: LoadScenarioConfig,
   errors: ScenarioValidationError[],
 ): void {
-  if (config.personas.length === 0) {
-    errors.push({ field: 'personas', message: 'at least one persona is required' })
-    return
+  if (typeof config.target !== 'function') {
+    errors.push({ field: 'target', message: 'target must be a function (the BYO seam)' })
   }
-
-  for (let i = 0; i < config.personas.length; i++) {
-    validatePersona(config.personas[i], i, errors)
+  if (typeof config.workload?.rps !== 'number' || config.workload.rps <= 0) {
+    errors.push({ field: 'workload.rps', message: 'workload.rps must be a positive number' })
+  }
+  if (config.workload?.concurrency !== undefined && config.workload.concurrency < 1) {
+    errors.push({ field: 'workload.concurrency', message: 'workload.concurrency must be >= 1' })
   }
 }
 
 function validateRampUp(config: LoadScenarioConfig, errors: ScenarioValidationError[]): void {
-  if (config.rampUp === undefined) return
+  const { rampUp } = config.workload ?? {}
+  if (rampUp === undefined) return
 
-  if (typeof config.rampUp !== 'number' || config.rampUp < 0) {
-    errors.push({ field: 'rampUp', message: 'rampUp must be a non-negative number' })
+  if (typeof rampUp !== 'number' || rampUp < 0) {
+    errors.push({ field: 'workload.rampUp', message: 'workload.rampUp must be a non-negative number' })
     return
   }
-  if (config.rampUp > config.duration) {
-    errors.push({
-      field: 'rampUp',
-      message: 'rampUp cannot exceed duration',
-    })
+  if (rampUp > config.duration) {
+    errors.push({ field: 'workload.rampUp', message: 'workload.rampUp cannot exceed duration' })
   }
 }
 
@@ -92,7 +67,7 @@ export function validateLoadScenarioConfig(config: LoadScenarioConfig): void {
   const errors: ScenarioValidationError[] = []
 
   validateScenarioMetadata(config, errors)
-  collectPersonaValidationErrors(config, errors)
+  validateTargetAndWorkload(config, errors)
 
   if (typeof config.duration !== 'number' || config.duration <= 0) {
     errors.push({ field: 'duration', message: 'duration must be a positive number' })
@@ -108,16 +83,17 @@ export function validateLoadScenarioConfig(config: LoadScenarioConfig): void {
 }
 
 /**
- * Define a load-kind simulation scenario with automatic registration.
+ * Define a load-kind simulation scenario.
  *
  * @example
  * ```typescript
  * export const myScenario = defineLoadScenario({
  *   id: 'my-scenario',
  *   name: 'My Scenario',
- *   description: 'Tests typical user flows',
+ *   description: 'Drives the checkout endpoint',
  *   tags: ['smoke'],
- *   personas: [persona('buyer', 10), persona('seller', 5)],
+ *   target: httpTarget({ url: process.env.TARGET_URL! }),
+ *   workload: { rps: 50, rampUp: 5 },
  *   duration: 300,
  *   assertions: [
  *     ASSERTIONS.lowErrorRate(),

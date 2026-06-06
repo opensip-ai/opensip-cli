@@ -13,7 +13,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { makeSimTestScope } from '../../__tests__/test-utils/with-sim-scope.js';
 import { ASSERTIONS } from '../../framework/assertions.js';
-import { persona } from '../../framework/personas.js';
+import { noopTarget } from '../../__tests__/test-utils/targets.js';
+import { fault } from '../../framework/execution/fault-builders.js';
 import { clearScenarioRegistry, currentScenarioRegistry } from '../../framework/registry.js';
 import { defineChaosScenario } from '../../kinds/chaos/define.js';
 import { defineLoadScenario } from '../../kinds/load/define.js';
@@ -307,7 +308,8 @@ function defineThreeScenarios(): void {
     name: 'load-a',
     description: 'load',
     tags: ['fast', 'demo'],
-    personas: [persona('user', 1)],
+    target: noopTarget,
+    workload: { rps: 1 },
     duration: 1,
     assertions: [ASSERTIONS.lowErrorRate(1)],
   }));
@@ -316,7 +318,8 @@ function defineThreeScenarios(): void {
     name: 'load-b',
     description: 'load',
     tags: ['slow'],
-    personas: [persona('user', 1)],
+    target: noopTarget,
+    workload: { rps: 1 },
     duration: 1,
     assertions: [ASSERTIONS.lowErrorRate(1)],
   }));
@@ -325,20 +328,10 @@ function defineThreeScenarios(): void {
     name: 'chaos-a',
     description: 'chaos',
     tags: ['demo'],
-    personas: [persona('user', 1)],
+    target: noopTarget,
+    workload: { rps: 1 },
     duration: 1,
-    chaos: {
-      enabled: true,
-      probability: 0.1,
-      types: [
-        {
-          type: 'error',
-          target: '*',
-          probability: 0.5,
-          config: { type: 'error', statusCode: 500, message: 'injected' },
-        },
-      ],
-    },
+    fault: fault.of([fault.drop()], { probability: 0.1 }),
     steadyStateAssertions: [ASSERTIONS.lowErrorRate(1)],
     recoveryAssertions: [ASSERTIONS.lowErrorRate(0.5)],
     recoveryWindow: 100,

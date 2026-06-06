@@ -1,35 +1,28 @@
-// @fitness-ignore-file detached-promises -- load-window driver calls synchronous emit/append helpers inside the async tick loop
+// @fitness-ignore-file detached-promises -- the driver intentionally dispatches in-flight requests and tracks them in a Set, draining via Promise.allSettled
 /**
  * @fileoverview Shared load-window driver used by the load and chaos kinds.
  *
- * Both kinds run a tick-driven RPS loop with ramp-up, latency tracking, and
- * a 95% baseline success rate. The chaos kind additionally interposes a
- * per-tick `injectChaos` callback that can override the request outcome
- * (e.g. force-fail) and emit a `LoadWindowEvent`. Centralising the loop here is
- * the Template Method shape called for in Layer 3 Phase E2 — kind executors
- * supply the failure-injection variation point, the framework owns the
- * loop lifecycle.
+ * Both kinds run a tick-driven RPS loop with ramp-up and latency tracking that
+ * issues **real requests** against a user-supplied {@link Target}: each request
+ * is awaited, timed, and classified from resolve (success) / throw (failure).
+ * Requests are dispatched concurrently up to the workload's in-flight cap so
+ * real latency overlaps instead of serializing.
+ *
+ * The driver is fault-agnostic. The chaos kind injects faults by wrapping its
+ * `Target` with the fault model (`fault-model.ts`) before handing it here — the
+ * driver just drives whatever `Target` it is given. Centralising the loop here
+ * keeps both kinds on one real driver (the Template Method shape: kinds supply
+ * the `Target`, the framework owns the loop lifecycle).
  */
 
-import { getEstimatedRps } from '../personas.js'
+import { resolveConcurrency } from '../../types/workload.js'
 
 import { LatencyTracker } from './latency-tracker.js'
 
+import type { Target } from './target.js'
 import type { SimulationMetrics } from '../../types/base-types.js'
-import type { PersonaConfig, ScenarioExecutionContext } from '../../types/framework-types.js'
-
-/**
- * Diagnostic event the chaos kind emits when `injectChaos` returns a
- * `chaos-event` outcome. The `type` discriminator is left generic over a
- * caller-supplied string-literal union — chaos parameterises this with its
- * own `ChaosType` so the boundary is type-safe and no runtime cast is
- * required when the framework hands events back to the kind.
- */
-interface LoadWindowEvent<T extends string = string> {
-  readonly type: T
-  readonly atMs: number
-  readonly target: string
-}
+import type { ScenarioExecutionContext } from '../../types/framework-types.js'
+import type { Workload } from '../../types/workload.js'
 
 // =============================================================================
 // PUBLIC TYPES
@@ -37,53 +30,20 @@ interface LoadWindowEvent<T extends string = string> {
 
 /** Subset of a kind config the load-window driver actually consumes. */
 export interface LoadWindowConfig {
-  readonly duration: number
-  readonly rampUp?: number
-  readonly targetRps?: number
-  readonly personas: readonly PersonaConfig[]
+  readonly workload: Workload
 }
 
-/**
- * Outcome of a single tick request, returned by the optional `injectChaos`
- * callback. Encodes how the loop should account for the request:
- *
- *   - `'success'`     — counted as a successful request.
- *   - `'failure'`     — counted as a failed request (no chaos event).
- *   - `'chaos-event'` — counted as a failed request **and** emits a
- *                       `LoadWindowEvent` carrying the supplied diagnostic
- *                       payload.
- *   - `null`          — defer to the default 95%-success roll.
- */
-export type TickOutcome<T extends string = string> =
-  | { readonly kind: 'success' }
-  | { readonly kind: 'failure' }
-  | { readonly kind: 'chaos-event'; readonly event: LoadWindowEvent<T> }
-  | null
-
-/**
- * Per-tick injection hook. Called once per request the loop attempts to
- * issue. Receiving `tickStartMs` gives implementations a relative timestamp
- * for `LoadWindowEvent.atMs`.
- */
-type InjectChaos<T extends string = string> = (args: {
-  readonly tickStartMs: number
-}) => TickOutcome<T>
-
 /** Options passed to `runLoadWindow`. */
-export interface RunLoadWindowOptions<T extends string = string> {
+export interface RunLoadWindowOptions {
   /** Duration the window runs for, in milliseconds. */
   readonly windowMs: number
-  /**
-   * Optional per-request hook letting a kind override the default
-   * 95%-success roll (chaos uses this to inject failures).
-   */
-  readonly injectChaos?: InjectChaos<T>
+  /** The (possibly fault-decorated) target driven once per request. */
+  readonly target: Target
 }
 
 /** Aggregated outcome of a single load window. */
-export interface LoadWindowResult<T extends string = string> {
+export interface LoadWindowResult {
   readonly metrics: SimulationMetrics
-  readonly events: readonly LoadWindowEvent<T>[]
 }
 
 // =============================================================================
@@ -102,41 +62,6 @@ function createMetrics(): SimulationMetrics {
     p95LatencyMs: 0,
     p99LatencyMs: 0,
     errorsGenerated: 0,
-  }
-}
-
-function applyOutcome<T extends string>(
-  metrics: SimulationMetrics,
-  events: LoadWindowEvent<T>[],
-  outcome: TickOutcome<T>,
-): void {
-  if (outcome === null) {
-    // Default 95% success rate.
-    if (Math.random() < 0.95) {
-      metrics.successfulRequests++
-    } else {
-      metrics.failedRequests++
-      metrics.errorsGenerated++
-    }
-    return
-  }
-
-  switch (outcome.kind) {
-    case 'success': {
-      metrics.successfulRequests++
-      return
-    }
-    case 'failure': {
-      metrics.failedRequests++
-      metrics.errorsGenerated++
-      return
-    }
-    case 'chaos-event': {
-      metrics.failedRequests++
-      metrics.errorsGenerated++
-      events.push(outcome.event)
-      return
-    }
   }
 }
 
@@ -159,27 +84,48 @@ function sleepTick(intervalMs: number, signal: AbortSignal): Promise<void> {
 }
 
 /**
- * Run a single load-style window. Returns the aggregated metrics + any
- * chaos events collected during the run.
+ * Run a single load-style window against a real `Target`.
  *
- * The default request outcome is the load kind's 95% success roll. A chaos
- * kind passes `injectChaos` to override per-tick outcomes and emit
- * `LoadWindowEvent`s. The driver does not produce signals today —
- * kind executors assemble their own signal lists in their result wrappers,
- * so a `signals` slot here would always be empty (and previously caused
- * `findingsGenerated` to silently always be 0).
+ * Per request: time the awaited `target` call, count success on resolve and
+ * failure on throw (including aborts), and record the measured latency. The
+ * driver paces toward `workload.rps` with optional ramp-up and never exceeds
+ * `resolveConcurrency(workload)` in-flight requests. In-flight requests are
+ * drained before the latency snapshot is taken so it reflects the full window.
  */
-export async function runLoadWindow<T extends string = string>(
+export async function runLoadWindow(
   config: LoadWindowConfig,
   context: ScenarioExecutionContext,
-  options: RunLoadWindowOptions<T>,
-): Promise<LoadWindowResult<T>> {
-  const targetRps = config.targetRps ?? getEstimatedRps(config.personas)
+  options: RunLoadWindowOptions,
+): Promise<LoadWindowResult> {
+  const { workload } = config
+  const targetRps = workload.rps
+  const maxInFlight = resolveConcurrency(workload)
   const metrics = createMetrics()
   const latencyTracker = new LatencyTracker()
-  const events: LoadWindowEvent<T>[] = []
   const start = Date.now()
-  const rampUpMs = (config.rampUp ?? 0) * 1000
+  const rampUpMs = (workload.rampUp ?? 0) * 1000
+  const inFlight = new Set<Promise<void>>()
+
+  const dispatchOne = (): void => {
+    const t0 = Date.now()
+    metrics.totalRequests++
+    const run = (async (): Promise<void> => {
+      try {
+        await options.target({
+          signal: context.abortSignal,
+          correlationId: context.correlationId,
+        })
+        metrics.successfulRequests++
+      } catch {
+        metrics.failedRequests++
+        metrics.errorsGenerated++
+      } finally {
+        latencyTracker.record(Date.now() - t0)
+      }
+    })()
+    inFlight.add(run)
+    void run.finally(() => inFlight.delete(run))
+  }
 
   while (Date.now() - start < options.windowMs) {
     if (context.abortSignal.aborted) break
@@ -191,18 +137,21 @@ export async function runLoadWindow<T extends string = string>(
 
     for (let i = 0; i < requestsThisTick; i++) {
       if (context.abortSignal.aborted) break
-      const latency = Math.random() * 50 + 1
-      metrics.totalRequests++
-      latencyTracker.record(latency)
-
-      const outcome = options.injectChaos
-        ? options.injectChaos({ tickStartMs: elapsed })
-        : null
-      applyOutcome(metrics, events, outcome)
+      // Backpressure: never exceed the in-flight concurrency cap. Awaiting a
+      // settling request naturally paces RPS toward what latency + concurrency
+      // allow.
+      while (inFlight.size >= maxInFlight && !context.abortSignal.aborted) {
+        await Promise.race([...inFlight])
+      }
+      if (context.abortSignal.aborted) break
+      dispatchOne()
     }
 
     await sleepTick(TICK_INTERVAL_MS, context.abortSignal)
   }
+
+  // Drain any still-in-flight requests so the latency snapshot covers them.
+  await Promise.allSettled([...inFlight])
 
   const snapshot = latencyTracker.getLatencySnapshot()
   metrics.avgLatencyMs = snapshot.avgLatencyMs
@@ -210,5 +159,5 @@ export async function runLoadWindow<T extends string = string>(
   metrics.p95LatencyMs = snapshot.p95LatencyMs
   metrics.p99LatencyMs = snapshot.p99LatencyMs
 
-  return { metrics, events }
+  return { metrics }
 }

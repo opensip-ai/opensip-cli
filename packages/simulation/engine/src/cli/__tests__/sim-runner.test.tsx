@@ -26,7 +26,7 @@ import React from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { ASSERTIONS } from '../../framework/assertions.js';
-import { persona } from '../../framework/personas.js';
+import { noopTarget } from '../../__tests__/test-utils/targets.js';
 import { clearScenarioRegistry, currentScenarioRegistry } from '../../framework/registry.js';
 import { defineLoadScenario } from '../../kinds/load/define.js';
 import { simulationTool } from '../../tool.js';
@@ -58,7 +58,8 @@ function registerProbe(id = 'probe'): void {
     name: id,
     description: id,
     tags: [],
-    personas: [persona('user', 1)],
+    target: noopTarget,
+    workload: { rps: 1 },
     duration: 1,
     assertions: [ASSERTIONS.lowErrorRate(1)],
   }));

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { makeSimTestScope } from '../../__tests__/test-utils/with-sim-scope.js';
 import { ASSERTIONS } from '../../framework/assertions.js';
-import { persona } from '../../framework/personas.js';
+import { noopTarget } from '../../__tests__/test-utils/targets.js';
 import { clearScenarioRegistry, currentScenarioRegistry } from '../../framework/registry.js';
 import { defineLoadScenario } from '../../kinds/load/define.js';
 import { executeSim } from '../sim.js';
@@ -76,7 +76,8 @@ describe('executeSim', () => {
       name: 'default-probe',
       description: 'default-probe',
       tags: [],
-      personas: [persona('user', 1)],
+      target: noopTarget,
+      workload: { rps: 1 },
       duration: 1,
       assertions: [ASSERTIONS.lowErrorRate(1)],
     }));
@@ -93,7 +94,8 @@ describe('executeSim', () => {
       name: 'load-a',
       description: 'load a',
       tags: ['demo'],
-      personas: [persona('user', 1)],
+      target: noopTarget,
+      workload: { rps: 1 },
       duration: 1,
       assertions: [ASSERTIONS.lowErrorRate(1)],
     }));

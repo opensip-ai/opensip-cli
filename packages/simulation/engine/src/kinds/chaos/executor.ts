@@ -1,58 +1,27 @@
 /**
  * @fileoverview Chaos-kind executor.
  *
- * Composes the shared `runLoadWindow` driver with explicit failure injection
- * and a recovery window. The current implementation runs the loop for the
- * configured duration with chaos active (`injectChaos` returns failures /
- * `chaos-event` outcomes per the configured probability), then continues
- * for `recoveryWindow` ms with chaos disabled to evaluate recovery
- * assertions.
- *
- * This is the v1 shape — when Plan 01 Phase 9 (chaos scenarios) authors real
- * scenarios, the executor may grow phase-aware metric snapshots and event
- * recording. The result type already accommodates that growth.
+ * Composes the real `runLoadWindow` driver with the client-side fault model:
+ * a steady-state window drives the BYO `target` wrapped by the fault model
+ * (latency/abort/drop injected at the configured probability), then a recovery
+ * window drives the bare target with faults lifted. Each window's measured
+ * metrics are scored against its assertion set; the scenario passes iff both
+ * windows hold.
  */
 
 import { ScenarioAbortedError } from '../../framework/execution/execution-engine.js'
+import { createFaultModel } from '../../framework/execution/fault-model.js'
 import { runLoadWindow } from '../../framework/execution/run-load-window.js'
 import { ScenarioResultBuilder } from '../../framework/result-builder.js'
 import { createScenarioLogger } from '../../framework/scenario-logger.js'
 
 import type { ChaosScenarioConfig } from './config.js'
 import type { ChaosAssertionVerdict, ChaosEvent } from './result.js'
-import type { TickOutcome } from '../../framework/execution/run-load-window.js'
+import type { FaultModelDeps } from '../../framework/execution/fault-model.js'
 import type { RunnableScenario } from '../../framework/runnable-scenario.js'
 import type { ChaosScenarioExecutorResult } from '../../framework/scenario-executor-result.js'
-import type { ChaosType, SimulationMetrics } from '../../types/base-types.js'
-import type {
-  ScenarioExecutionContext,
-} from '../../types/framework-types.js'
-
-/**
- * Per-tick injection callback for the chaos kind. Returns a `chaos-event`
- * outcome at the configured probability (with the first injection's `type`
- * + `target`); otherwise defers to the default 95% success roll.
- */
-function buildInjectChaos(
-  config: ChaosScenarioConfig,
-): () => TickOutcome<ChaosType> {
-  return () => {
-    if (!config.chaos.enabled || Math.random() >= config.chaos.probability) {
-      return null
-    }
-    const injection = config.chaos.types[0]
-    if (!injection) {
-      // chaos active but no injection definitions — count as a generic failure.
-      return { kind: 'failure' }
-    }
-    const event: ChaosEvent = {
-      type: injection.type,
-      atMs: 0, // overwritten below by the loop's timing
-      target: injection.target,
-    }
-    return { kind: 'chaos-event', event }
-  }
-}
+import type { SimulationMetrics } from '../../types/base-types.js'
+import type { ScenarioExecutionContext } from '../../types/framework-types.js'
 
 function evaluateAssertionsForWindow(
   scenarioId: string,
@@ -71,8 +40,16 @@ function evaluateAssertionsForWindow(
   }
 }
 
-/** Build a `RunnableScenario` for a chaos-kind config. */
-export function createChaosScenarioRunner(config: ChaosScenarioConfig): RunnableScenario {
+/**
+ * Build a `RunnableScenario` for a chaos-kind config.
+ *
+ * `deps.rng` is forwarded to the fault model so tests can drive the
+ * probability gate deterministically; production defaults to `Math.random`.
+ */
+export function createChaosScenarioRunner(
+  config: ChaosScenarioConfig,
+  deps: FaultModelDeps = {},
+): RunnableScenario {
   return Object.freeze({
     kind: 'chaos' as const,
     id: config.id,
@@ -96,31 +73,19 @@ export function createChaosScenarioRunner(config: ChaosScenarioConfig): Runnable
 
         const startTime = Date.now()
         try {
-          const steadyDurationMs = config.duration * 1000
-          const recoveryDurationMs = config.recoveryWindow
+          const faultModel = createFaultModel(config.fault, deps)
 
-          // Steady-state window: chaos is active. Parameterise on `ChaosType`
-          // so the events flowing back through the framework are typed as
-          // `LoadWindowEvent<ChaosType>` (structurally identical to
-          // `ChaosEvent`) — no runtime cast required.
-          const injectChaos = buildInjectChaos(config)
-          const steady = await runLoadWindow<ChaosType>(config, context, {
-            windowMs: steadyDurationMs,
-            injectChaos: ({ tickStartMs }) => {
-              const outcome = injectChaos()
-              if (outcome?.kind === 'chaos-event') {
-                // Stamp the relative timestamp the framework supplies.
-                return {
-                  kind: 'chaos-event',
-                  event: { ...outcome.event, atMs: tickStartMs },
-                }
-              }
-              return outcome
-            },
+          // Steady-state window: drive the fault-decorated target.
+          const steadyStart = Date.now()
+          const steady = await runLoadWindow({ workload: config.workload }, context, {
+            windowMs: config.duration * 1000,
+            target: faultModel.wrap(config.target),
           })
-          // Recovery window: no injectChaos hook — defaults to 95% success.
-          const recovery = await runLoadWindow<ChaosType>(config, context, {
-            windowMs: recoveryDurationMs,
+
+          // Recovery window: faults lifted — drive the bare target.
+          const recovery = await runLoadWindow({ workload: config.workload }, context, {
+            windowMs: config.recoveryWindow,
+            target: config.target,
           })
 
           const steadyVerdict = evaluateAssertionsForWindow(
@@ -132,17 +97,22 @@ export function createChaosScenarioRunner(config: ChaosScenarioConfig): Runnable
           const recoveryVerdict = evaluateAssertionsForWindow(
             config.id,
             recovery.metrics,
-            recoveryDurationMs / 1000,
+            config.recoveryWindow / 1000,
             config.recoveryAssertions,
           )
 
           const passed =
             steadyVerdict.failed.length === 0 && recoveryVerdict.failed.length === 0
 
-          const chaosEvents: readonly ChaosEvent[] = Object.freeze([
-            ...steady.events,
-            ...recovery.events,
-          ])
+          const chaosEvents: readonly ChaosEvent[] = Object.freeze(
+            faultModel.drained().map((f) =>
+              Object.freeze({
+                type: f.kind,
+                atMs: Math.max(0, f.at - steadyStart),
+                target: 'client',
+              }),
+            ),
+          )
 
           return Object.freeze({
             kind: 'chaos' as const,
@@ -156,7 +126,7 @@ export function createChaosScenarioRunner(config: ChaosScenarioConfig): Runnable
               steadyStateAssertions: steadyVerdict,
               recoveryAssertions: recoveryVerdict,
               chaosEvents,
-              recoveryWindowMs: recoveryDurationMs,
+              recoveryWindowMs: config.recoveryWindow,
             }),
           })
         } catch (error) {
