@@ -60,7 +60,8 @@ describe('sim tool — flag-surface contract', () => {
     expect(recordRegisteredFlags()).toEqual(
       // ADR-0011 (Phase 4): sim gained cloud egress (--report-to / --api-key)
       // when it began emitting the signal envelope.
-      ['--cwd', '--debug', '--json', '--open', '--quiet', '--recipe', '--report-to', '--api-key'].sort(),
+      // ADR-0021: sim gained -v/--verbose (cross-tool flag parity).
+      ['--cwd', '--debug', '--json', '--open', '--quiet', '--verbose', '--recipe', '--report-to', '--api-key'].sort(),
     );
   });
 });

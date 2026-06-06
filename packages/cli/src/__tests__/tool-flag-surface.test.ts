@@ -66,7 +66,8 @@ const EXPECTED: Record<string, string[]> = {
     '--resolution', '--run-id', '--verbose', '--workspace',
   ],
   // ADR-0011 (Phase 4): sim gained --report-to / --api-key cloud egress.
-  simulation: ['--api-key', '--cwd', '--debug', '--json', '--open', '--quiet', '--recipe', '--report-to'],
+  // ADR-0021: sim gained -v/--verbose (cross-tool flag parity).
+  simulation: ['--api-key', '--cwd', '--debug', '--json', '--open', '--quiet', '--recipe', '--report-to', '--verbose'],
 };
 
 describe('first-party tool flag-surface contract', () => {
