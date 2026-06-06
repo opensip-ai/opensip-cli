@@ -27,6 +27,10 @@ coverage/
 # Turbo
 .turbo/
 
+# In-repo git worktrees (parallel sessions). Tracked via .git/worktrees;
+# ignoring the checkout dir prevents accidental `git add` of a worktree.
+.worktrees/
+
 # Logs
 *.log
 

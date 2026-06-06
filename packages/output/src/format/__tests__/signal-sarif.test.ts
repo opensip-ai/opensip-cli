@@ -4,6 +4,8 @@ import { buildOpenSipSarif, formatSignalSarif } from '../signal-sarif.js';
 
 import { EMPTY_ENVELOPE, FIXTURE_ENVELOPE } from './envelope.fixtures.js';
 
+import type { SignalEnvelope } from '@opensip-tools/contracts';
+
 describe('formatSignalSarif', () => {
   it('renders the envelope as SARIF v2.1.0 (snapshot)', () => {
     expect(formatSignalSarif(FIXTURE_ENVELOPE)).toMatchSnapshot();
@@ -31,6 +33,61 @@ describe('formatSignalSarif', () => {
       runs: { results: { level: string }[] }[];
     };
     expect(parsed.runs[0].results.map((r) => r.level)).toEqual(['error', 'warning']);
+  });
+
+  it('maps critical → error and low → note (exhaustive severity mapping)', () => {
+    const env: SignalEnvelope = {
+      ...FIXTURE_ENVELOPE,
+      signals: [
+        { ...FIXTURE_ENVELOPE.signals[0], severity: 'critical' },
+        { ...FIXTURE_ENVELOPE.signals[1], severity: 'low' },
+      ],
+    };
+    const parsed = JSON.parse(formatSignalSarif(env)) as {
+      runs: { results: { level: string }[] }[];
+    };
+    expect(parsed.runs[0].results.map((r) => r.level)).toEqual(['error', 'note']);
+  });
+
+  it('emits a location with only a uri (no region) when the signal has no line/column', () => {
+    const env: SignalEnvelope = {
+      ...FIXTURE_ENVELOPE,
+      signals: [
+        {
+          ...FIXTURE_ENVELOPE.signals[0],
+          line: undefined,
+          column: undefined,
+          code: { file: 'src/whole.ts' },
+        },
+      ],
+    };
+    const parsed = JSON.parse(formatSignalSarif(env)) as {
+      runs: { results: { locations: { physicalLocation: { artifactLocation: { uri: string }; region?: unknown } }[] }[] }[];
+    };
+    const loc = parsed.runs[0].results[0].locations[0].physicalLocation;
+    expect(loc.artifactLocation.uri).toBe('src/whole.ts');
+    expect(loc.region).toBeUndefined();
+  });
+
+  it('falls back to filePath/line/column when the signal carries no code hint', () => {
+    const env: SignalEnvelope = {
+      ...FIXTURE_ENVELOPE,
+      signals: [
+        {
+          ...FIXTURE_ENVELOPE.signals[0],
+          code: undefined,
+          filePath: 'src/legacy.ts',
+          line: 5,
+          column: undefined,
+        },
+      ],
+    };
+    const parsed = JSON.parse(formatSignalSarif(env)) as {
+      runs: { results: { locations: { physicalLocation: { artifactLocation: { uri: string }; region?: { startLine?: number; startColumn?: number } } }[] }[] }[];
+    };
+    const loc = parsed.runs[0].results[0].locations[0].physicalLocation;
+    expect(loc.artifactLocation.uri).toBe('src/legacy.ts');
+    expect(loc.region).toEqual({ startLine: 5 });
   });
 
   it('produces a single run with no results for an empty envelope', () => {

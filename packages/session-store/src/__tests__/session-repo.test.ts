@@ -1,4 +1,5 @@
 import { DataStoreFactory, type DataStore } from '@opensip-tools/datastore';
+import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { sessions } from '../schema/sessions.js';
@@ -169,6 +170,76 @@ describe('SessionRepo — error paths', () => {
   it('purge() rethrows after closing datastore', () => {
     datastore.close();
     expect(() => repo.purge(new Date())).toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Non-Error throwables. Closing the datastore throws a real `Error`, which
+// only exercises the `error instanceof Error` true-branch of the catch-block
+// log coercion. A backend that throws a bare value (string/object) drives the
+// `: String(error)` false-branch — proving the repo coerces any throwable and
+// still rethrows the original value verbatim.
+// ---------------------------------------------------------------------------
+
+/**
+ * Minimal DataStore stub whose db / transaction surface throws a non-Error
+ * value. Only the members SessionRepo touches in save/list/purge are present;
+ * the rest are stubbed to satisfy the interface.
+ */
+function throwingDataStore(thrown: unknown): DataStore {
+  const explode = (): never => {
+    throw thrown;
+  };
+  return {
+    db: {
+      select: explode,
+      delete: explode,
+    },
+    transaction: explode,
+    close: explode,
+  } as unknown as DataStore;
+}
+
+describe('SessionRepo — non-Error throwables in catch blocks', () => {
+  it('save() rethrows a non-Error value verbatim', () => {
+    const repoT = new SessionRepo(throwingDataStore('boom-string'));
+    expect(() => repoT.save(makeSession())).toThrow('boom-string');
+  });
+
+  it('list() rethrows a non-Error value verbatim', () => {
+    const thrown = { code: 'WEIRD' };
+    const repoT = new SessionRepo(throwingDataStore(thrown));
+    expect(() => repoT.list()).toThrow(); // throws the bare object
+    try {
+      repoT.list();
+    } catch (error) {
+      expect(error).toBe(thrown);
+    }
+  });
+
+  it('purge() rethrows a non-Error value verbatim', () => {
+    const repoT = new SessionRepo(throwingDataStore('purge-boom'));
+    expect(() => repoT.purge(new Date())).toThrow('purge-boom');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Optional recipe column. `recipe` is nullable; save() coalesces an absent
+// recipe to SQL NULL, and hydrateSession() coalesces a NULL column back to
+// `undefined`. Both prior tests always set recipe, so the null/undefined
+// sides of those two coalesces went uncovered.
+// ---------------------------------------------------------------------------
+
+describe('SessionRepo — optional recipe', () => {
+  it('round-trips a session with no recipe (stored NULL, hydrated undefined)', () => {
+    const session = makeSession({ id: 'no-recipe', recipe: undefined });
+    repo.save(session);
+    const fetched = repo.get('no-recipe');
+    expect(fetched).not.toBeNull();
+    expect(fetched?.recipe).toBeUndefined();
+    // The persisted column must be SQL NULL, not the string "undefined".
+    const row = datastore.db.select().from(sessions).where(eq(sessions.id, 'no-recipe')).get();
+    expect(row?.recipe).toBeNull();
   });
 });
 

@@ -22,6 +22,7 @@ export const ARCHITECTURE_DISPLAY = Object.freeze<Record<string, CheckDisplayEnt
   'release-gate-parity': ['🚦', 'Release Gate Parity'],
   'restrict-raw-db-access': ['🗄️', 'Restrict Raw DB Access'],
   'stale-build-artifacts': ['🏚️', 'Stale Build Artifacts'],
+  'vitest-config-required-with-tests': ['🧪', 'Vitest Config Required With Tests'],
 })
 
 /** Documentation check display entries (UNIVERSAL only) */

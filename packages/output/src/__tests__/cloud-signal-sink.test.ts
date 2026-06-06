@@ -27,6 +27,17 @@ describe('createCloudSignalSink', () => {
     expect(seen[0].key).toBe(`${b.runId}:0`);
   });
 
+  it('does not double-append /signals when the endpoint already ends in it', async () => {
+    const urls: string[] = [];
+    const fetchImpl = vi.fn((url: unknown) => {
+      urls.push(String(url));
+      return Promise.resolve(new Response(null, { status: 200 }));
+    }) as unknown as typeof fetch;
+    const sink = createCloudSignalSink({ endpoint: 'https://x.test/api/signals', apiKey: 'k', fetchImpl });
+    await sink.emit(batch(1));
+    expect(urls[0]).toBe('https://x.test/api/signals');
+  });
+
   it('chunks a large batch into multiple POSTs', async () => {
     const fetchImpl = vi.fn(() => Promise.resolve(new Response(null, { status: 200 }))) as unknown as typeof fetch;
     const sink = createCloudSignalSink({ endpoint: 'https://x.test/api', apiKey: 'k', fetchImpl });
@@ -53,6 +64,18 @@ describe('createCloudSignalSink', () => {
     const fetchImpl = vi.fn() as unknown as typeof fetch;
     const sink = createCloudSignalSink({ endpoint: 'https://x.test/api', apiKey: 'k', fetchImpl });
     const r = await sink.emit(batch(0));
+    expect(r).toEqual({ accepted: 0, authRejected: false });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('returns accepted:0 (never throws) if an unexpected error escapes the transport', async () => {
+    // Defense in depth: postChunked never throws, but emit must swallow any
+    // unexpected error too. A non-string endpoint makes the internal
+    // `.endsWith` URL-normalization throw synchronously inside emit's try.
+    const badEndpoint = { endsWith: undefined } as unknown as string;
+    const fetchImpl = vi.fn(() => Promise.resolve(new Response(null, { status: 200 }))) as unknown as typeof fetch;
+    const sink = createCloudSignalSink({ endpoint: badEndpoint, apiKey: 'k', fetchImpl });
+    const r = await sink.emit(batch(2));
     expect(r).toEqual({ accepted: 0, authRejected: false });
     expect(fetchImpl).not.toHaveBeenCalled();
   });

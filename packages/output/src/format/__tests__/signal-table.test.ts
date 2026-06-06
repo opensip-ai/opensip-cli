@@ -41,6 +41,21 @@ describe('formatSignalTableRows', () => {
     expect(formatSignalTableRows(EMPTY_ENVELOPE)).toEqual([]);
   });
 
+  it('groups multiple signals that share a source onto one row', () => {
+    // Two signals with the SAME source must accumulate into the unit's row
+    // (exercises the existing-bucket append path of groupSignalsBySource).
+    const env: SignalEnvelope = {
+      ...EMPTY_ENVELOPE,
+      units: [{ slug: 'graph:cycle', passed: false, durationMs: 4 }],
+      signals: [
+        { ...FIXTURE_ENVELOPE.signals[0], source: 'graph:cycle', severity: 'high' },
+        { ...FIXTURE_ENVELOPE.signals[0], id: 'sig_two', source: 'graph:cycle', severity: 'low' },
+      ],
+    };
+    const [row] = formatSignalTableRows(env);
+    expect(row).toMatchObject({ unit: 'graph:cycle', errors: 1, warnings: 1 });
+  });
+
   it('surfaces fitness validated/itemType/ignored columns when present on the unit', () => {
     // Fitness carries per-unit `filesValidated`/`itemType`/`ignoredCount` —
     // facts a flat signal list cannot express. The shared table formatter
