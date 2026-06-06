@@ -88,6 +88,11 @@ export type { CliDefaults } from './cli-config.js';
 export { commonFlags, applyCommonFlags, MANDATORY_COMMON_FLAGS } from './cli-flags.js';
 export type { CommonFlagKey, CommonFlagSpec } from './cli-flags.js';
 
+// Verbose-detail builder (ADR-0021) — shared Signal[] → FindingGroup[] mapping
+// for the tools' `verboseDetail` carrier (fit + sim; one source, not per-tool).
+export { buildFindingGroups } from './verbose-detail.js';
+export type { FindingGroupUnit } from './verbose-detail.js';
+
 // Session persistence type. The cross-tool StoredSession shape stays here
 // as the contract surface; SessionRepo + the sessions schema +
 // generateSessionId/sanitizeForFilename moved to @opensip-tools/session-store

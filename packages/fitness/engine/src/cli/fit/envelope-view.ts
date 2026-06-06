@@ -18,11 +18,12 @@
  */
 
 import { formatValidatedColumn } from '@opensip-tools/cli-ui';
+import { buildFindingGroups } from '@opensip-tools/contracts';
 import { formatDuration, isErrorSignal } from '@opensip-tools/core';
 
 import { getDisplayName } from './display-registry.js';
 
-import type { FindingGroup, FindingLine, SignalEnvelope, UnitResult, VerboseDetail } from '@opensip-tools/contracts';
+import type { SignalEnvelope, UnitResult, VerboseDetail } from '@opensip-tools/contracts';
 import type { Signal } from '@opensip-tools/core';
 
 /** A live-view results-table row — one per check unit, with fitness columns. */
@@ -39,15 +40,6 @@ export interface FitTableRow {
   readonly ignored: number;
   readonly duration: string;
   readonly durationMs: number;
-}
-
-/** A findings-block group — one per check that emitted ≥1 signal (or errored). */
-export interface FitFindingsGroup {
-  readonly checkSlug: string;
-  readonly error?: string;
-  readonly findings: readonly Signal[];
-  readonly errorCount: number;
-  readonly warningCount: number;
 }
 
 /** Group a run's signals by `signal.source` (the emitting check's slug). */
@@ -97,61 +89,16 @@ export function fitValidatedCell(row: FitTableRow): string {
 }
 
 /**
- * Build the findings-block groups from the envelope — one per check that
- * emitted ≥1 signal OR errored. Findings are the raw 4-level signals (the
- * block colours error vs. warn from severity).
- */
-export function envelopeToFindingsGroups(envelope: SignalEnvelope): FitFindingsGroup[] {
-  const bySource = groupBySource(envelope.signals);
-  const groups: FitFindingsGroup[] = [];
-  for (const unit of envelope.units) {
-    const findings = bySource.get(unit.slug) ?? [];
-    if (findings.length === 0 && unit.error === undefined) continue;
-    let errorCount = 0;
-    let warningCount = 0;
-    for (const s of findings) {
-      if (isErrorSignal(s)) errorCount += 1;
-      else warningCount += 1;
-    }
-    groups.push({ checkSlug: unit.slug, error: unit.error, findings, errorCount, warningCount });
-  }
-  return groups;
-}
-
-/** Map one `Signal` to the renderer-agnostic `FindingLine` (display fields only,
- *  4-level severity collapsed to the 2-level error/warning rung). */
-function toFindingLine(signal: Signal): FindingLine {
-  let location: string | undefined;
-  if (signal.filePath !== '') {
-    location = signal.line === undefined ? signal.filePath : `${signal.filePath}:${String(signal.line)}`;
-  }
-  return {
-    severity: isErrorSignal(signal) ? 'error' : 'warning',
-    message: signal.message,
-    ...(location === undefined ? {} : { location }),
-    ...(signal.suggestion === undefined ? {} : { suggestion: signal.suggestion }),
-  };
-}
-
-/**
  * Build the run's verbose detail body (ADR-0021) — `undefined` unless the run
- * asked for it (`--verbose` or the deprecated `--findings`). Maps the
- * envelope's findings groups to the contracts `VerboseDetail{kind:'findings'}`
- * carrier (display fields only — no `Signal`/core types cross into the result)
- * so the cli `resultToView` seam renders fit's detail identically in a TTY and a
- * pipe.
+ * asked for it (`--verbose` or the deprecated `--findings`). Delegates the
+ * Signal[] → `FindingGroup[]` mapping to the shared contracts
+ * `buildFindingGroups` (one source for fit + sim), passing fit's display
+ * registry so each block is titled with the check's pretty name.
  */
 export function buildFitVerboseDetail(
   envelope: SignalEnvelope,
   opts: { readonly verbose?: boolean; readonly findings?: boolean },
 ): VerboseDetail | undefined {
   if (opts.verbose !== true && opts.findings !== true) return undefined;
-  const groups: FindingGroup[] = envelopeToFindingsGroups(envelope).map((g) => ({
-    title: getDisplayName(g.checkSlug),
-    ...(g.error === undefined ? {} : { error: g.error }),
-    errorCount: g.errorCount,
-    warningCount: g.warningCount,
-    findings: g.findings.map(toFindingLine),
-  }));
-  return { kind: 'findings', groups };
+  return { kind: 'findings', groups: buildFindingGroups(envelope.units, envelope.signals, getDisplayName) };
 }
