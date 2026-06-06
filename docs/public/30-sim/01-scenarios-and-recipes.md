@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-03
+last_verified: 2026-06-05
 release: v3.0.0
 title: "Scenarios and recipes (sim)"
 audience: [contributors, plugin-authors]
@@ -8,6 +8,9 @@ purpose: "What a sim scenario is, the two kinds, and how recipes compose them. T
 source-files:
   - packages/simulation/engine/src/index.ts
   - packages/simulation/engine/src/types/kind-types.ts
+  - packages/simulation/engine/src/framework/execution/target.ts
+  - packages/simulation/engine/src/framework/execution/fault-spec.ts
+  - packages/simulation/engine/src/types/workload.ts
   - packages/simulation/engine/src/kinds/load/define.ts
   - packages/simulation/engine/src/kinds/chaos/define.ts
   - packages/simulation/engine/src/recipes/types.ts
@@ -23,6 +26,13 @@ The `sim` command is the simulation tool. Where `fit` answers "is the codebase c
 
 > ⚠️ `sim` is **experimental**. The author-facing API (the `define*Scenario` entry points) shifts more aggressively than `fit`'s. Pin to a major version in your check pack; expect occasional breaking changes in minors.
 
+> **`sim` is a standalone driver — you bring the target.** Every scenario
+> supplies a `target`: an async function the harness calls once per request
+> (it resolves on success, throws on failure). Point it **only at a service you
+> own or control** — never at a third party. Driving load or faults at someone
+> else's endpoint is abuse. Use `httpTarget({ url })` for HTTP, or any async
+> function for gRPC / in-process / shell-out targets.
+
 > **What you'll understand after this:**
 > - The two scenario kinds and what each models.
 > - The shared runtime contract that lets one engine run both.
@@ -37,8 +47,8 @@ opensip-tools sim recognizes two kinds, each with its own author-facing entry po
 
 | Kind | Entry point | Models |
 |---|---|---|
-| **load** | `defineLoadScenario` | Personas + ramp + sustain phase. Asserts SLOs (latency, throughput, error rate). |
-| **chaos** | `defineChaosScenario` | Base load + injected failures (kill, latency, partition). Asserts recovery. |
+| **load** | `defineLoadScenario` | A BYO `target` driven at a `workload` (rps + optional ramp + concurrency). Asserts SLOs (latency percentiles, error rate, throughput). |
+| **chaos** | `defineChaosScenario` | A BYO `target` under **client-side** fault injection (latency / abort / drop) at a probability, then a recovery window. Asserts steady-state + recovery SLOs. |
 
 Each kind has its own `define.ts`, `executor.ts`, and `result.ts` under [`packages/simulation/engine/src/kinds/<kind>/`](../../../packages/simulation/engine/src/kinds/). They share a common runtime contract (`RunnableScenario`, `ScenarioExecutorResult`) so the engine can execute any kind through the same dispatcher.
 
@@ -47,66 +57,75 @@ The old generic `defineScenario` alias has been removed. New code uses the kind-
 ### `defineLoadScenario`
 
 ```ts
-import { defineLoadScenario } from '@opensip-tools/simulation';
+import { defineLoadScenario, httpTarget, ASSERTIONS } from '@opensip-tools/simulation';
 
 export default defineLoadScenario({
   id: '...',                            // UUID
   name: 'api-checkout-burst',
   description: 'Sustain 200 RPS checkout traffic for 30s',
   tags: ['load', 'checkout'],
-  personas: [{ name: 'shopper', weight: 1.0, action: async () => { /* ... */ } }],
-  duration: { value: 30, unit: 'seconds' },
-  rampUp: { value: 5, unit: 'seconds' },
-  targetRps: 200,
+  // The BYO seam: point only at a service you own.
+  target: httpTarget({ url: process.env.TARGET_URL }),
+  workload: { rps: 200, rampUp: 5 },    // rps + optional concurrency/rampUp (seconds)
+  duration: 30,                          // seconds
   assertions: [
-    { name: 'p99-under-200ms', assert: (r) => r.p99LatencyMs < 200 },
-    { name: 'error-rate-under-1pct', assert: (r) => r.errorRate < 0.01 },
+    ASSERTIONS.lowLatency('p99', 200),   // p99 latency < 200ms
+    ASSERTIONS.lowErrorRate(0.01),       // error rate < 1%
   ],
 });
 ```
 
-The framework runs the personas at the configured RPS for the duration, collects latency and error stats, then evaluates each assertion against the result. Pass/fail is the AND of all assertions.
+The driver issues real requests to the `target` at `workload.rps` (bounded by
+`workload.concurrency`, ramping over `workload.rampUp`) for `duration` seconds,
+measures real latency and success/failure per request, then evaluates each
+assertion against the measured metrics. Pass/fail is the AND of all assertions.
+Assertions are built with the `ASSERTIONS` factories over a fixed set of metric
+keys (`p50/p95/p99_latency`, `error_rate`, `success_rate`, `requests_per_second`, …).
 
 ### `defineChaosScenario`
 
 ```ts
-import { defineChaosScenario, ASSERTIONS, persona } from '@opensip-tools/simulation';
+import { defineChaosScenario, httpTarget, fault, ASSERTIONS } from '@opensip-tools/simulation';
 
 export default defineChaosScenario({
-  id: 'kill-database-recovers-in-10s',
-  name: 'kill-database-recovers-in-10s',
-  description: 'After killing the database, the API recovers within 10s',
-  tags: ['chaos', 'database'],
+  id: 'checkout-resilient-under-fault',
+  name: 'checkout-resilient-under-fault',
+  description: 'Checkout stays within SLO under client-side faults, recovers after',
+  tags: ['chaos', 'checkout'],
 
-  // Base-load configuration is flattened onto the chaos config — same
-  // fields the load kind takes (personas, duration, rampUp, targetRps).
-  personas: [persona('buyer', 5)],
-  duration: 30,
-  rampUp: 5,
-  targetRps: 50,
+  // Same BYO target + workload the load kind takes.
+  target: httpTarget({ url: process.env.TARGET_URL }),
+  workload: { rps: 50, rampUp: 5 },
+  duration: 30,                       // steady-state (fault-active) window, seconds
 
-  // Failure injection contract.
-  chaos: {
-    enabled: true,
-    probability: 0.1,
-    types: [
-      {
-        type: 'error',
-        target: 'database',
-        probability: 0.5,
-        config: { type: 'error', statusCode: 500, message: 'db unavailable' },
-      },
-    ],
-  },
+  // Client-side fault contract: at probability 0.1, perturb a request with
+  // either +800ms latency or a dropped request.
+  fault: fault.of(
+    [fault.latency({ ms: 800 }), fault.drop()],
+    { probability: 0.1 },
+  ),
 
-  // Two assertion sets — one for each phase the executor runs.
-  steadyStateAssertions: [ASSERTIONS.lowErrorRate(0.5)],
-  recoveryAssertions:    [ASSERTIONS.lowErrorRate(0.05)],
-  recoveryWindow: 10_000, // ms after chaos lifts
+  // Two assertion sets — one per phase the executor runs.
+  steadyStateAssertions: [ASSERTIONS.lowErrorRate(0.05), ASSERTIONS.lowLatency('p95', 1500)],
+  recoveryAssertions:    [ASSERTIONS.lowErrorRate(0.01), ASSERTIONS.lowLatency('p95', 500)],
+  recoveryWindow: 10_000,             // ms after faults lift
 });
 ```
 
-The chaos kind composes a base load with explicit failure injection and a recovery contract. The executor runs the load window with chaos active, then runs a recovery window with chaos off. Steady-state assertions evaluate against the chaos-active window; recovery assertions evaluate against the post-chaos window. Pass/fail is the AND of both verdicts.
+The chaos kind drives the same real load window with the fault model active,
+then runs a recovery window with faults lifted. Steady-state assertions evaluate
+against the fault-active window; recovery assertions against the recovery window.
+Pass/fail is the AND of both verdicts.
+
+**Client-side vs server-side faults (the honesty boundary).** The shipped faults
+(`latency`, `abort`, `drop`) perturb the harness's *own* interaction with the
+target — they are real, but client-side. The harness **cannot** kill your pod or
+sever your database from the outside. To exercise **server-side** faults (inject
+500s, drop a dependency, add network latency), point the `target` at a
+**fault-injectable endpoint you control** — e.g. a [Toxiproxy](https://github.com/Shopify/toxiproxy)
+proxy in front of your service, a chaos-mesh'd staging environment, or a
+test-flagged endpoint — and let the harness drive and measure around it. The
+harness ships no fault injector and no demo server.
 
 ---
 
