@@ -16,7 +16,7 @@
  * only forbids the reverse — cli-ui must never import contracts.
  */
 
-import { line, group, viewRunSummary, viewFooterHints, formatValidatedColumn, parseValidatedCount, sortFitRowPriority, type Span, type Tone, type ViewNode } from '@opensip-tools/cli-ui';
+import { line, group, viewRunSummary, viewFooterHints, viewVerboseLines, viewFindingsGroups, formatValidatedColumn, parseValidatedCount, sortFitRowPriority, type Span, type Tone, type ViewNode } from '@opensip-tools/cli-ui';
 import { formatSignalTableRows, formatSignalTableSummary, type SignalTableRow } from '@opensip-tools/output';
 
 import { viewInit } from './views/init-view.js';
@@ -33,7 +33,7 @@ import {
 } from './views/misc-views.js';
 import { viewPlugin } from './views/plugin-view.js';
 
-import type { CommandResult, ErrorResult, GraphDoneResult, SignalEnvelope } from '@opensip-tools/contracts';
+import type { CommandResult, ErrorResult, GraphDoneResult, SignalEnvelope, VerboseDetail } from '@opensip-tools/contracts';
 
 const SPACER: ViewNode = { kind: 'spacer' };
 
@@ -165,15 +165,32 @@ function envelopeTableNode(rows: readonly SignalTableRow[]): ViewNode | null {
 }
 
 /**
+ * Render a tool's verbose detail body (ADR-0021) as a `ViewNode`, switching on
+ * the union `kind`. `lines` → verbatim text (graph's catalog/findings dump);
+ * `findings` → the shared coloured findings blocks (fit/sim). Rendered through
+ * the same seam as everything else, so a tool's `--verbose` output is identical
+ * in a TTY and a pipe.
+ */
+export function renderVerboseDetail(detail: VerboseDetail): ViewNode {
+  return detail.kind === 'lines' ? viewVerboseLines(detail.lines) : viewFindingsGroups(detail.groups);
+}
+
+/**
  * The shared envelope → terminal-table view. Used by every migrated tool's
  * result (fit/sim always; graph when it carries an envelope). The per-tool
  * `rows`/`reportLines` legacy derivations it once fell back to were retired in
  * Phase 7 (ADR-0011).
+ *
+ * When `verboseDetail` is present (a `--verbose` run), its rendered body is
+ * prepended above the per-unit table (ADR-0021).
  */
-export function envelopeToTableView(envelope: SignalEnvelope): ViewNode {
+export function envelopeToTableView(envelope: SignalEnvelope, verboseDetail?: VerboseDetail): ViewNode {
   const rows = formatSignalTableRows(envelope);
   const summary = formatSignalTableSummary(envelope);
   const children: ViewNode[] = [];
+  if (verboseDetail !== undefined) {
+    children.push(renderVerboseDetail(verboseDetail), SPACER);
+  }
   const table = envelopeTableNode(rows);
   if (table !== null) children.push(table);
   children.push(
@@ -194,8 +211,9 @@ export function resultToView(result: CommandResult): ViewNode {
     case 'fit-done': {
       // ADR-0011 (fitness migrated, Phase 6): the result always carries an
       // envelope; the terminal table is derived from it (one row per check
-      // unit, with the fitness-only Validated/Ignores columns).
-      return envelopeToTableView(result.envelope);
+      // unit, with the fitness-only Validated/Ignores columns). ADR-0021: the
+      // optional verbose findings body renders above the table in both media.
+      return envelopeToTableView(result.envelope, result.verboseDetail);
     }
     case 'error': {
       return errorView(result);
@@ -203,7 +221,8 @@ export function resultToView(result: CommandResult): ViewNode {
     case 'sim-done': {
       // sim is migrated (Phase 4): the result always carries an envelope and
       // the per-scenario table is derived from it (one unit row per scenario).
-      return envelopeToTableView(result.envelope);
+      // ADR-0021: the optional verbose per-scenario body renders above it.
+      return envelopeToTableView(result.envelope, result.verboseDetail);
     }
     case 'graph-done': {
       // graph keeps its own rich report view (it delivers signals via an
