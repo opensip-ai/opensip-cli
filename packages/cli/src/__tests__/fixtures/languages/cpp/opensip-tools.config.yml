@@ -1,0 +1,16 @@
+globalExcludes:
+  - "node_modules/**"
+
+targets:
+  cpp-source:
+    description: "C++ acceptance source"
+    languages: [cpp]
+    concerns: [backend]
+    include:
+      - "src/**/*.cpp"
+      - "src/**/*.hpp"
+
+fitness:
+  failOnErrors: 0
+  failOnWarnings: 0
+  disabledChecks: []

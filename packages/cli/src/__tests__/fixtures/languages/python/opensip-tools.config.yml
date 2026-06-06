@@ -1,0 +1,15 @@
+globalExcludes:
+  - "node_modules/**"
+
+targets:
+  py-source:
+    description: "Python acceptance source"
+    languages: [python]
+    concerns: [backend]
+    include:
+      - "src/**/*.py"
+
+fitness:
+  failOnErrors: 0
+  failOnWarnings: 0
+  disabledChecks: []
