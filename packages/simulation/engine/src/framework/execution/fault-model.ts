@@ -61,18 +61,6 @@ function delay(ms: number, signal: AbortSignal): Promise<void> {
   })
 }
 
-function rejectOnAbort(signal: AbortSignal): Promise<never> {
-  return new Promise<never>((_resolve, reject) => {
-    if (signal.aborted) {
-      reject(new Error('fault:abort'))
-      return
-    }
-    signal.addEventListener('abort', () => reject(new Error('fault:abort')), {
-      once: true,
-    })
-  })
-}
-
 /**
  * Build a fault model for a `FaultSpec`.
  *
@@ -98,16 +86,21 @@ export function createFaultModel(spec: FaultSpec, deps: FaultModelDeps = {}): Fa
         return
       }
       case 'abort': {
-        // Abort up front, then race the call against an abort rejection so the
-        // request fails even if the target ignores the signal.
+        // Abort the request: hand a well-behaved target an already-aborted
+        // signal so it cancels, but guarantee the request fails regardless of
+        // whether the target honours the signal (we throw deterministically).
         const controller = new AbortController()
         controller.abort()
-        const signal = AbortSignal.any([ctx.signal, controller.signal])
-        await Promise.race([
-          target({ signal, correlationId: ctx.correlationId }),
-          rejectOnAbort(signal),
-        ])
-        return
+        const signal =
+          typeof AbortSignal.any === 'function'
+            ? AbortSignal.any([ctx.signal, controller.signal])
+            : controller.signal
+        // Fire the call so a signal-aware target observes the abort; ignore how
+        // it settles — this request is counted as a failure either way.
+        void Promise.resolve(target({ signal, correlationId: ctx.correlationId })).catch(
+          () => undefined,
+        )
+        throw new Error('fault:abort')
       }
       case 'drop': {
         // Never reach the target; the driver counts a client-observed failure.
