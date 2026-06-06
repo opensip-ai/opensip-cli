@@ -113,6 +113,23 @@ distinct from:
   as strict as the PR gate: `release.yml` re-runs `lint`/`test:coverage`/`fit:ci`/
   `graph:ci` before pack (option A, not verify-tagged-SHA); plus a single source
   of truth for the publishable package set verified by a PR-time contract test
+- [ADR-0018](./ADR-0018-chaos-resilience-harness.md) — `sim` is a real BYO-target
+  resilience/load harness: `load`/`chaos` drive a user-supplied `Target` and
+  measure real outcomes, `chaos` injects client-side faults
+  (`latency`/`abort`/`drop`) over a steady-state then a recovery window; the
+  harness ships no runtime, demo server, or third-party target
+- [ADR-0019](./ADR-0019-external-tool-adapter-checks.md) — External quality tools
+  (eslint, dependency-cruiser, …) run as first-party `command:` fit checks so
+  `fit` is the single quality entry point — wrap, don't reimplement; the published
+  check packs ship no opinionated wrappers, the pattern is taught in
+  `docs/public/50-extend` and this public repo is the living dogfooded example
+  (dependency-cruiser keeps a standalone bootstrap carve-out)
+- [ADR-0020](./ADR-0020-dogfood-gate-hard-fail.md) — The dogfood gate hard-fails
+  the CI step on error-level findings: `fit --gate-save` now returns the
+  `failOnErrors`/`failOnWarnings` exit code (mirroring live/JSON mode) instead of
+  exiting 0 and trusting only the external Code Scanning net-new ratchet + branch
+  protection (the weakness ADR-0017 rejected). The ratchet is retained for PR
+  annotations and backlog adopters; graph's gate is the tracked follow-up
 
 ### Superseded
 

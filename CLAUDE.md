@@ -348,15 +348,19 @@ pnpm typecheck && pnpm test && pnpm lint
 ## Dogfood Gate
 
 CI runs `pnpm fit:ci` on every PR — opensip-tools analyzes itself.
-The step writes findings into the (CI-ephemeral) datastore via
-`fit --gate-save` (exit 0 regardless of findings) so the SARIF export
-step always has something to write. A separate workflow step exports
-to SARIF (`fit-baseline-export --out fit.sarif`) and uploads to
-GitHub Code Scanning. GH compares against the latest main-branch
-SARIF and surfaces **new** alerts inline on PR diffs and under
-Security → Code scanning alerts. That is the ratchet: existing
-violations are recorded in the baseline; only net-new violations
-surface as new alerts on contributor PRs.
+`fit --gate-save` writes findings into the (CI-ephemeral) datastore
+AND hard-fails the step on any error-level finding — it returns the
+`failOnErrors`/`failOnWarnings` exit code (ADR-0020), so the CI step
+itself is the gate, not just the downstream ratchet. A separate
+workflow step then exports to SARIF (`fit-baseline-export --out
+fit.sarif`) under `if: always()` — so the baseline + annotations
+export even when the gate fails — and uploads to GitHub Code Scanning.
+GH compares against the latest main-branch SARIF and surfaces **new**
+alerts inline on PR diffs and under Security → Code scanning alerts.
+That net-new ratchet is the complementary annotation layer (and the
+model for adopters with a backlog: `failOnErrors: 0` = ratchet-only):
+existing violations are recorded in the baseline; only net-new
+violations surface as new alerts on contributor PRs.
 
 A hard PR gate that fails on any net-new alert is configured via
 GitHub branch protection (Settings → Branches → main → "Require
