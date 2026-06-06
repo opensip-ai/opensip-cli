@@ -65,6 +65,15 @@ describe('getErrorSuggestion', () => {
       expect: { exitCode: EXIT_CODES.CONFIGURATION_ERROR, messageContains: 'my-recipe' },
     },
     {
+      // The `Recipe not found:` substring with no extractable slug — the
+      // /Recipe not found: (.+)/ regex fails (nothing after the colon) but the
+      // substring fallback still classifies it as a recipe error and the
+      // suggest builder substitutes "unknown".
+      name: 'recipe-not-found rule falls back to "unknown" when slug missing',
+      input: 'Recipe not found:',
+      expect: { exitCode: EXIT_CODES.CONFIGURATION_ERROR, messageContains: 'unknown' },
+    },
+    {
       name: 'check-not-found rule fires for bare "not found: <slug>"',
       input: 'not found: foo-check',
       expect: { exitCode: EXIT_CODES.CHECK_NOT_FOUND, messageContains: 'foo-check' },

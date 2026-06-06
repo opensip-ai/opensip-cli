@@ -1,0 +1,149 @@
+import { createSignal, type Signal, type SignalSeverity } from '@opensip-tools/core';
+import { describe, expect, it } from 'vitest';
+
+import { buildSignalEnvelope, type UnitResult } from './signal-envelope.js';
+
+function signal(severity: SignalSeverity): Signal {
+  return createSignal({
+    source: 'test',
+    severity,
+    ruleId: `rule-${severity}`,
+    message: `a ${severity} finding`,
+  });
+}
+
+function unit(slug: string, passed: boolean): UnitResult {
+  return { slug, passed, durationMs: 1 };
+}
+
+const BASE = {
+  tool: 'fit' as const,
+  runId: 'run-1',
+  createdAt: '2026-01-01T00:00:00.000Z',
+};
+
+describe('buildSignalEnvelope', () => {
+  it('stamps the schema version, identity, and passes signals/units through verbatim', () => {
+    const units = [unit('a', true), unit('b', true)];
+    const signals = [signal('low')];
+    const env = buildSignalEnvelope({
+      ...BASE,
+      recipe: 'example',
+      units,
+      signals,
+      resolutionMode: 'fast',
+    });
+
+    expect(env.schemaVersion).toBe(2);
+    expect(env.tool).toBe('fit');
+    expect(env.recipe).toBe('example');
+    expect(env.runId).toBe('run-1');
+    expect(env.createdAt).toBe('2026-01-01T00:00:00.000Z');
+    expect(env.resolutionMode).toBe('fast');
+    // pass-through, not copies
+    expect(env.units).toBe(units);
+    expect(env.signals).toBe(signals);
+  });
+
+  it('derives summary.total/passed/failed from the units (units are what "ran")', () => {
+    const env = buildSignalEnvelope({
+      ...BASE,
+      units: [unit('a', true), unit('b', false), unit('c', true), unit('d', false)],
+      signals: [],
+    });
+
+    expect(env.verdict.summary.total).toBe(4);
+    expect(env.verdict.summary.passed).toBe(2);
+    expect(env.verdict.summary.failed).toBe(2);
+  });
+
+  it('counts critical and high signals as errors; medium and low as warnings', () => {
+    const env = buildSignalEnvelope({
+      ...BASE,
+      units: [unit('a', false)],
+      signals: [signal('critical'), signal('high'), signal('medium'), signal('low')],
+    });
+
+    expect(env.verdict.summary.errors).toBe(2);
+    expect(env.verdict.summary.warnings).toBe(2);
+  });
+
+  it('passed ⇔ zero error-rung signals: a warnings-only run still passes', () => {
+    const env = buildSignalEnvelope({
+      ...BASE,
+      units: [unit('a', true)],
+      signals: [signal('medium'), signal('low')],
+    });
+
+    expect(env.verdict.summary.errors).toBe(0);
+    expect(env.verdict.passed).toBe(true);
+  });
+
+  it('passed is false as soon as a single error-rung signal is present', () => {
+    const env = buildSignalEnvelope({
+      ...BASE,
+      // every unit reported passed, but an error-rung signal still fails the run
+      units: [unit('a', true)],
+      signals: [signal('high')],
+    });
+
+    expect(env.verdict.summary.errors).toBe(1);
+    expect(env.verdict.passed).toBe(false);
+  });
+
+  it('score is passRate over the unit summary (rounded passed/total percentage)', () => {
+    const env = buildSignalEnvelope({
+      ...BASE,
+      units: [unit('a', true), unit('b', true), unit('c', false)],
+      signals: [],
+    });
+
+    // 2 of 3 passed → round(66.67) === 67
+    expect(env.verdict.score).toBe(67);
+  });
+
+  it('scores 100 for an empty run (no units) and reports it as passed', () => {
+    const env = buildSignalEnvelope({
+      ...BASE,
+      units: [],
+      signals: [],
+    });
+
+    expect(env.verdict.summary.total).toBe(0);
+    expect(env.verdict.summary.passed).toBe(0);
+    expect(env.verdict.summary.failed).toBe(0);
+    expect(env.verdict.score).toBe(100);
+    expect(env.verdict.passed).toBe(true);
+  });
+
+  it('expresses "ran, errored, 0 signals": a unit can carry an error with no signals', () => {
+    const errored: UnitResult = {
+      slug: 'boom',
+      passed: false,
+      durationMs: 5,
+      error: 'adapter exploded',
+    };
+    const env = buildSignalEnvelope({
+      ...BASE,
+      units: [errored],
+      signals: [],
+    });
+
+    expect(env.units[0]?.error).toBe('adapter exploded');
+    expect(env.verdict.summary.failed).toBe(1);
+    // no signals → no errors counted, but the failed unit drags the score down
+    expect(env.verdict.summary.errors).toBe(0);
+    expect(env.verdict.score).toBe(0);
+  });
+
+  it('omits optional recipe and resolutionMode when not supplied', () => {
+    const env = buildSignalEnvelope({
+      ...BASE,
+      units: [unit('a', true)],
+      signals: [],
+    });
+
+    expect(env.recipe).toBeUndefined();
+    expect(env.resolutionMode).toBeUndefined();
+  });
+});
