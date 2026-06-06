@@ -24,6 +24,7 @@ import { buildFitnessSessionPayload } from '../../persistence/session-payload.js
 import { violationToSignal } from '../../signalers/violation-to-signal.js';
 
 import { getPluginLoadErrors } from './check-loader.js';
+import { buildFitVerboseDetail } from './envelope-view.js';
 
 import type { FitnessRecipeServiceCallbacks, CheckSummary } from '../../recipes/service-types.js';
 import type { FitnessRecipeResult, RecipeCheckResult } from '../../recipes/types.js';
@@ -133,6 +134,12 @@ export function buildFitDoneResult({ args, fitnessResult, envelope, signalersCon
 
   const label = args.tags ? `tags: ${args.tags}` : `recipe ${recipeName ?? 'default'}`;
 
+  // ADR-0021: carry the verbose findings body on the result so the shared
+  // resultToView seam renders it identically in a TTY and a pipe (the old
+  // TTY-only path left `fit --verbose | cat` empty). `--findings` is the
+  // deprecated alias of `--verbose`.
+  const verboseDetail = buildFitVerboseDetail(envelope, args);
+
   return {
     type: 'fit-done',
     label,
@@ -141,6 +148,7 @@ export function buildFitDoneResult({ args, fitnessResult, envelope, signalersCon
     shouldFail,
     configFound: true,
     warnings: warnings && warnings.length > 0 ? warnings : undefined,
+    ...(verboseDetail === undefined ? {} : { verboseDetail }),
   };
 }
 

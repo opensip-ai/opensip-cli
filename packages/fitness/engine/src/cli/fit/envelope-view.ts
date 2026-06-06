@@ -22,7 +22,7 @@ import { formatDuration, isErrorSignal } from '@opensip-tools/core';
 
 import { getDisplayName } from './display-registry.js';
 
-import type { SignalEnvelope, UnitResult } from '@opensip-tools/contracts';
+import type { FindingGroup, FindingLine, SignalEnvelope, UnitResult, VerboseDetail } from '@opensip-tools/contracts';
 import type { Signal } from '@opensip-tools/core';
 
 /** A live-view results-table row — one per check unit, with fitness columns. */
@@ -116,4 +116,40 @@ export function envelopeToFindingsGroups(envelope: SignalEnvelope): FitFindingsG
     groups.push({ checkSlug: unit.slug, error: unit.error, findings, errorCount, warningCount });
   }
   return groups;
+}
+
+/** Map one `Signal` to the renderer-agnostic `FindingLine` (display fields only,
+ *  4-level severity collapsed to the 2-level error/warning rung). */
+function toFindingLine(signal: Signal): FindingLine {
+  const location =
+    signal.filePath === '' ? undefined : signal.line ? `${signal.filePath}:${String(signal.line)}` : signal.filePath;
+  return {
+    severity: isErrorSignal(signal) ? 'error' : 'warning',
+    message: signal.message,
+    ...(location === undefined ? {} : { location }),
+    ...(signal.suggestion === undefined ? {} : { suggestion: signal.suggestion }),
+  };
+}
+
+/**
+ * Build the run's verbose detail body (ADR-0021) — `undefined` unless the run
+ * asked for it (`--verbose` or the deprecated `--findings`). Maps the
+ * envelope's findings groups to the contracts `VerboseDetail{kind:'findings'}`
+ * carrier (display fields only — no `Signal`/core types cross into the result)
+ * so the cli `resultToView` seam renders fit's detail identically in a TTY and a
+ * pipe.
+ */
+export function buildFitVerboseDetail(
+  envelope: SignalEnvelope,
+  opts: { readonly verbose?: boolean; readonly findings?: boolean },
+): VerboseDetail | undefined {
+  if (opts.verbose !== true && opts.findings !== true) return undefined;
+  const groups: FindingGroup[] = envelopeToFindingsGroups(envelope).map((g) => ({
+    title: getDisplayName(g.checkSlug),
+    ...(g.error === undefined ? {} : { error: g.error }),
+    errorCount: g.errorCount,
+    warningCount: g.warningCount,
+    findings: g.findings.map(toFindingLine),
+  }));
+  return { kind: 'findings', groups };
 }
