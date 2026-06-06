@@ -74,7 +74,7 @@ Language-agnostic; runs against every project.
 | [`use-centralized-crypto`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/security/use-centralized-crypto.ts) | Enforce use of centralized crypto module instead of direct crypto operations |
 | [`webhook-signature-verification`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/security/webhook-signature-verification.ts) | Detect webhook endpoints without signature verification |
 
-### Quality  *(25)*
+### Quality  *(27)*
 
 | Slug | Description |
 |---|---|
@@ -95,8 +95,10 @@ Language-agnostic; runs against every project.
 | [`no-non-null-assertions`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/quality/patterns/no-non-null-assertions.ts) | Detects TypeScript non-null assertion operator (!) usage in production code — prefer proper null handling |
 | [`no-process-artifacts`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/quality/code-structure/no-process-artifacts.ts) | Detects process/planning artifacts (Phase X, Sprint X, version stamps) in comments |
 | [`no-raw-regex-on-code`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/quality/no-raw-regex-on-code.ts) | Detect regex checks that should use contentFilter: strip-strings |
+| [`no-skipped-tests`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/testing/no-skipped-tests.ts) | Tests must never ship skipped, focused (.only), or placeholder |
 | [`no-temporary-workarounds`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/quality/no-temporary-workarounds.ts) | Detects HACK/FIXME comments that describe themselves as temporary |
 | [`no-todo-comments`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/no-todo-comments.ts) | TODO/FIXME/XXX/OPTIMIZE markers should not ship to production |
+| [`no-unimplemented-markers`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/no-unimplemented-markers.ts) | *(no description; see source)* |
 | [`no-window-alert`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/quality/no-window-alert.ts) | Disallows window.alert(), window.confirm(), and window.prompt() — use proper UI components |
 | [`performance-anti-patterns`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/quality/patterns/performance-anti-patterns.ts) | Detects common performance anti-patterns (sequential await, spread in loops) |
 | [`pino-serializer-coverage`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/quality/observability/pino-serializer-coverage.ts) | Validates that complex objects logged have proper Pino serializers |
@@ -144,12 +146,10 @@ Language-agnostic; runs against every project.
 | [`no-markdown-references`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/quality/no-markdown-references.ts) | Detect markdown file references in code comments that may become stale |
 | [`public-api-jsdoc`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/documentation/public-api-jsdoc.ts) | Requires JSDoc documentation on all public API exports in shared packages |
 
-### Testing  *(6)*
+### Testing  *(4)*
 
 | Slug | Description |
 |---|---|
-| [`no-focused-tests`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/testing/no-focused-tests.ts) | Detects .only in test files that would skip other tests |
-| [`no-skipped-tests`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/testing/no-skipped-tests.ts) | Detects .skip in test files that prevent tests from running |
 | [`no-stub-tests`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/testing/no-stub-tests.ts) | Detects stub tests with empty bodies, TODO-only bodies, or trivial always-passing assertions |
 | [`test-convention-consistency`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/testing/test-convention-consistency.ts) | Detects mixed .test and .spec naming conventions across the codebase |
 | [`test-file-naming`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/testing/test-file-naming.ts) | Validates test file naming conventions follow *.test.ts or *.spec.ts patterns |

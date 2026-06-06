@@ -1,4 +1,3 @@
-export * from './no-focused-tests.js'
 export * from './no-skipped-tests.js'
 export * from './no-stub-tests.js'
 export * from './test-convention-consistency.js'

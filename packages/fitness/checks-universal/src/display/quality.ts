@@ -26,6 +26,7 @@ export const QUALITY_DISPLAY = Object.freeze<Record<string, CheckDisplayEntry>>(
   'no-raw-regex-on-code': ['🔍', 'No Raw Regex On Code'],
   'no-temporary-workarounds': ['🧹', 'No Temporary Workarounds'],
   'no-todo-comments': ['📝', 'No TODO Comments'],
+  'no-unimplemented-markers': ['🚧', 'No Unimplemented Markers'],
   'no-window-alert': ['🚫', 'No Window Alert'],
   'performance-anti-patterns': ['⚡', 'Performance Anti-Patterns'],
   'pino-serializer-coverage': ['📊', 'Pino Serializer Coverage'],

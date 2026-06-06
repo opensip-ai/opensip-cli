@@ -131,6 +131,10 @@ checkOverrides:
   no-eval: [backend, cli]
   semgrep-justifications: [backend, cli]
   no-todo-comments: [backend, cli]
+  # Same rationale as no-todo-comments: the "not implemented" throw/macro
+  # idioms appear by design in this check's own fixtures and in markdown/docs;
+  # pin to production source so the gate fires only on real shipped code.
+  no-unimplemented-markers: [backend, cli]
   # file-length is a *source-shape* norm: it should measure production
   # TypeScript, not test files (legitimately long: many cases) nor vendored
   # third-party assets (e.g. the committed Cytoscape UMD bundle, a `.js`
@@ -176,7 +180,11 @@ graph:
 
 fitness:
   failOnErrors: 1
-  failOnWarnings: 0
+  # Zero-warnings gate: `fit` fails locally on ANY warning, not just net-new in
+  # CI. This makes warning-severity incomplete-work signals (e.g. no-todo-comments
+  # TODO/FIXME/XXX markers) a hard local failure — we do not ship deferred work.
+  # The repo is at 0 warnings; this keeps it there.
+  failOnWarnings: 1
   disabledChecks:
     # Testing — architectural mismatch with this repo's testing approach
     # (integration tests over 1:1 file pairing). See Phase 0 audit findings

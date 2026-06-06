@@ -27,7 +27,6 @@ export const SECURITY_DISPLAY = Object.freeze<Record<string, CheckDisplayEntry>>
 
 /** Testing check display entries (UNIVERSAL only) */
 export const TESTING_DISPLAY = Object.freeze<Record<string, CheckDisplayEntry>>({
-  'no-focused-tests': ['🧪', 'No Focused Tests'],
   'no-skipped-tests': ['🧪', 'No Skipped Tests'],
   'no-stub-tests': ['🧪', 'No Stub Tests'],
   'test-convention-consistency': ['🧪', 'Test Convention Consistency'],
