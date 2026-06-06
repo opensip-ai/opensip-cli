@@ -21,18 +21,6 @@ import { currentScenarioRegistry } from '../framework/registry.js';
 import type { SimulationRecipe, ScenarioSelector } from './types.js';
 import type { RunnableScenario } from '../framework/runnable-scenario.js';
 import type { ScenarioExecutorResult } from '../framework/scenario-executor-result.js';
-import type { ScenarioKind } from '../types/kind-types.js';
-
-/** Optional narrowing applied to the recipe-selected scenarios before they run. */
-export interface RunRecipeOptions {
-  /**
-   * Restrict execution to a single scenario kind (the `--kind` CLI flag).
-   * Applied to the recipe-selected set BEFORE execution, so scenarios of
-   * other kinds — which may have real side effects (load, chaos) — are never
-   * run, only to be hidden from the output afterward.
-   */
-  readonly kindFilter?: ScenarioKind;
-}
 
 /** Per-scenario outcome inside a recipe run. */
 export interface SimulationScenarioResult {
@@ -63,7 +51,7 @@ export interface SimulationRecipeServiceConfig {
    * Optional live-progress callback (ADR-0016). Fired once with `(0, total)`
    * before execution and then with a monotonic `(completed, total)` after each
    * scenario finishes — across BOTH sequential and parallel modes. `total` is
-   * the post-kind-filter selected-set size. Count-shaped (not a renderer event)
+   * the recipe-selected set size. Count-shaped (not a renderer event)
    * so the engine stays UI-agnostic; the sim runner maps it to ProgressEvents.
    */
   readonly onProgress?: (completed: number, total: number) => void;
@@ -82,17 +70,9 @@ export class SimulationRecipeService {
    */
   async runRecipe(
     recipe: SimulationRecipe,
-    options: RunRecipeOptions = {},
   ): Promise<SimulationRecipeResult> {
     const startedAt = Date.now();
-    const matched = resolveSelector(recipe.scenarios);
-    // `--kind` narrows the recipe-selected set BEFORE execution. Previously the
-    // CLI ran every recipe-selected scenario and post-filtered the results,
-    // which meant a `--kind invariant` run still executed load/chaos scenarios
-    // (with their side effects) and merely hid them. Filter first, run second.
-    const selected = options.kindFilter
-      ? matched.filter((s) => s.kind === options.kindFilter)
-      : matched;
+    const selected = resolveSelector(recipe.scenarios);
 
     logger.info({
       evt: 'simulation.recipe.start',

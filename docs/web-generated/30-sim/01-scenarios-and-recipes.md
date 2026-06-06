@@ -4,14 +4,12 @@ last_verified: 2026-06-03
 release: v3.0.0
 title: "Scenarios and recipes (sim)"
 audience: [contributors, plugin-authors]
-purpose: "What a sim scenario is, the four kinds, and how recipes compose them. The author-facing primitives in the simulation tool."
+purpose: "What a sim scenario is, the two kinds, and how recipes compose them. The author-facing primitives in the simulation tool."
 source-files:
   - packages/simulation/engine/src/index.ts
   - packages/simulation/engine/src/types/kind-types.ts
   - packages/simulation/engine/src/kinds/load/define.ts
   - packages/simulation/engine/src/kinds/chaos/define.ts
-  - packages/simulation/engine/src/kinds/invariant/define.ts
-  - packages/simulation/engine/src/kinds/fix-evaluation/define.ts
   - packages/simulation/engine/src/recipes/types.ts
   - packages/simulation/engine/src/recipes/define-recipe.ts
 related-docs:
@@ -23,26 +21,24 @@ related-docs:
 
 The `sim` command is the simulation tool. Where `fit` answers "is the codebase clean?", `sim` answers "does it behave correctly under stress?" Same architecture (Tool, Recipe, Engine, Renderer), different primitives.
 
-> ⚠️ `sim` is **experimental**. The author-facing API (the four `define*Scenario` entry points) shifts more aggressively than `fit`'s. Pin to a major version in your check pack; expect occasional breaking changes in minors.
+> ⚠️ `sim` is **experimental**. The author-facing API (the `define*Scenario` entry points) shifts more aggressively than `fit`'s. Pin to a major version in your check pack; expect occasional breaking changes in minors.
 
 > **What you'll understand after this:**
-> - The four scenario kinds and what each models.
-> - The shared runtime contract that lets one engine run all four.
+> - The two scenario kinds and what each models.
+> - The shared runtime contract that lets one engine run both.
 > - How sim recipes compose scenarios.
 > - When to reach for sim vs. fit.
 
 ---
 
-## The four scenario kinds
+## The scenario kinds
 
-opensip-tools sim recognizes four kinds today, each with its own author-facing entry point in [`packages/simulation/engine/src/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/simulation/engine/src/index.ts):
+opensip-tools sim recognizes two kinds, each with its own author-facing entry point in [`packages/simulation/engine/src/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/simulation/engine/src/index.ts):
 
 | Kind | Entry point | Models |
 |---|---|---|
 | **load** | `defineLoadScenario` | Personas + ramp + sustain phase. Asserts SLOs (latency, throughput, error rate). |
 | **chaos** | `defineChaosScenario` | Base load + injected failures (kill, latency, partition). Asserts recovery. |
-| **invariant** | `defineInvariantScenario` | Seed state → act → assert a property holds. Property-based testing shape. |
-| **fix-evaluation** _(deferred — not yet available)_ | `defineFixEvaluationScenario` | Replay a corpus of signals against a fix-generating agent → score with predicates. |
 
 Each kind has its own `define.ts`, `executor.ts`, and `result.ts` under [`packages/simulation/engine/src/kinds/<kind>/`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/simulation/engine/src/kinds/). They share a common runtime contract (`RunnableScenario`, `ScenarioExecutorResult`) so the engine can execute any kind through the same dispatcher.
 
@@ -112,73 +108,18 @@ export default defineChaosScenario({
 
 The chaos kind composes a base load with explicit failure injection and a recovery contract. The executor runs the load window with chaos active, then runs a recovery window with chaos off. Steady-state assertions evaluate against the chaos-active window; recovery assertions evaluate against the post-chaos window. Pass/fail is the AND of both verdicts.
 
-### `defineInvariantScenario`
-
-```ts
-import { defineInvariantScenario } from '@opensip-tools/simulation';
-
-export default defineInvariantScenario({
-  id: '...',
-  name: 'signal-reaches-fixed-stage',
-  description: 'Emitting a recipe-matched signal advances the workflow to FIXED',
-  tags: ['invariant', 'workflow'],
-  relatesToInvariant: 'docs/invariants.md#signal-reaches-fixed',
-  setup: async (ctx) => {
-    const tenant = await ctx.seedTenant({ /* fakes wired by deps */ });
-    ctx.scratch.tenant = tenant;
-  },
-  act: async (ctx) => {
-    await ctx.emitSignal({ tenant: ctx.scratch.tenant, ruleId: 'fit:no-console-log', /* ... */ });
-    await ctx.runReconcilerTick(ctx.scratch.tenant);
-  },
-  assert: async (ctx) => {
-    await ctx.expectStage({ tenant: ctx.scratch.tenant, stage: 'FIXED' });
-    await ctx.expectAuditEntry({ tenant: ctx.scratch.tenant, kind: 'fix-applied' });
-  },
-});
-```
-
-The invariant kind drives a workflow-integration lifecycle. `setup`, `act`, and `assert` all receive an `InvariantContext`; none takes or returns state. Setup seeds tenants and wires drivers, act emits signals and advances the workflow, and assert records expectations through helpers like `ctx.expectStage`, `ctx.expectOutcome`, and `assertEquals`. Pass/fail is the AND of every recorded assertion holding and every phase finishing in `pass`. Default drivers throw `NOT_IMPLEMENTED`; tests pass fakes via `deps`.
-
-### `defineFixEvaluationScenario`
-
-```ts
-import { defineFixEvaluationScenario } from '@opensip-tools/simulation';
-
-export default defineFixEvaluationScenario({
-  id: '...',
-  name: 'corpus-eval-no-console-log',
-  description: 'Agent fixes 95% of no-console-log violations from the corpus',
-  tags: ['fix-eval', 'no-console-log'],
-  corpus: { signalRuleId: 'fit:no-console-log', sampleSize: 100 },
-  agent: { /* agent provider config */ },
-  predicates: [
-    { name: 'fix-applies-cleanly', predicate: /* ... */ },
-    { name: 'tests-still-pass', predicate: /* ... */ },
-    { name: 'lint-still-clean', predicate: /* ... */ },
-  ],
-  scoreThreshold: 0.95,
-});
-```
-
-The fix-evaluation kind replays a corpus of past signals against a fix-generating agent and scores the agent's output with predicates. This is the shape that integrates with OpenSIP's autoresearch / continuous-learning loop.
-
-> **Deferred — not yet available.** The type surface, `defineFixEvaluationScenario`, and the predicate model ship so the shape is stable for the future harness, but the evaluation harness itself (corpus replay, agent invocation, predicate scoring) is **not wired**. Defining and running a fix-evaluation scenario today produces an explicit *"unavailable — fix-evaluation harness deferred"* result — a placeholder, never a real verdict (`outcome.harnessAvailable: false`). Don't rely on it for real fix scoring yet.
-
 ---
 
 ## The shared runtime contract
 
-Despite four entry points, every scenario produces a `RunnableScenario` ([`packages/simulation/engine/src/framework/runnable-scenario.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/simulation/engine/src/framework/runnable-scenario.ts)) — a struct carrying the scenario's id, name, description, kind, tags, and a `run(abortSignal)` method that returns `Promise<ScenarioExecutorResult>`. The engine's dispatcher reads the kind discriminator and hands the scenario to the appropriate executor:
+Both entry points produce a `RunnableScenario` ([`packages/simulation/engine/src/framework/runnable-scenario.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/simulation/engine/src/framework/runnable-scenario.ts)) — a struct carrying the scenario's id, name, description, kind, tags, and a `run(abortSignal)` method that returns `Promise<ScenarioExecutorResult>`. The engine's dispatcher reads the kind discriminator and hands the scenario to the appropriate executor:
 
 ```
-RunnableScenario { kind: 'load', run(signal)           } ─► loadExecutor      ─► LoadScenarioExecutorResult
-RunnableScenario { kind: 'chaos', run(signal)          } ─► chaosExecutor     ─► ChaosScenarioExecutorResult
-RunnableScenario { kind: 'invariant', run(signal)      } ─► invariantExecutor ─► InvariantScenarioExecutorResult
-RunnableScenario { kind: 'fix-evaluation', run(signal) } ─► fixEvalExecutor   ─► FixEvaluationScenarioExecutorResult
+RunnableScenario { kind: 'load', run(signal)  } ─► loadExecutor  ─► LoadScenarioExecutorResult
+RunnableScenario { kind: 'chaos', run(signal) } ─► chaosExecutor ─► ChaosScenarioExecutorResult
 ```
 
-The result types are kind-specific (a load result has `p99LatencyMs` and percentiles; an invariant result has per-phase status logs and the assertion records the assert phase produced). The recipe layer projects each kind's result into a common `ScenarioResult` shape so the renderer doesn't need to know the kind.
+The result types are kind-specific (a load result has `p99LatencyMs` and percentiles; a chaos result has steady-state + recovery metrics and per-phase chaos events). The recipe layer projects each kind's result into a common `ScenarioResult` shape so the renderer doesn't need to know the kind.
 
 Kind-specific authoring plus a shared runtime contract keeps the engine extensible: adding a scenario kind means adding a directory under `kinds/`, exporting a new entry point from `index.ts`, and updating the dispatcher.
 
@@ -202,9 +143,9 @@ export default defineSimulationRecipe({
 
 (The fitness-side helper is named `defineRecipe`. Sim's helper is namespaced as `defineSimulationRecipe` so a project that imports both into one module doesn't have to alias.)
 
-Selectors are similar to fit's but with a slightly different set: `all`, `tags`, `kind`, `explicit` ([`packages/simulation/engine/src/recipes/types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/simulation/engine/src/recipes/types.ts)). Sim swaps fit's `pattern` selector for a `kind` selector that filters by scenario kind (`load` / `chaos` / `invariant` / `fix-evaluation`). The `--kind` CLI flag layers a post-selector intersection on top — you can run a recipe and further narrow it to one kind.
+Selectors are similar to fit's but with a slightly different set: `all`, `tags`, `kind`, `explicit` ([`packages/simulation/engine/src/recipes/types.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/simulation/engine/src/recipes/types.ts)). Sim swaps fit's `pattern` selector for a `kind` selector that filters by scenario kind (`load` / `chaos`).
 
-`sequential` mode is the typical shape for sim recipes — load scenarios contend for resources, so running them in parallel is rarely correct. `parallel` is available for invariant scenarios (which are usually pure) or fix-evaluation scenarios that fan out across independent inputs.
+`sequential` mode is the typical shape for sim recipes — load scenarios contend for resources, so running them in parallel is rarely correct. `parallel` is available for scenarios that fan out across independent inputs.
 
 The default recipe ([`packages/simulation/engine/src/recipes/built-in-recipes.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/simulation/engine/src/recipes/built-in-recipes.ts)) selects every registered scenario in sequential order. Project-local recipes live under `<project>/opensip-tools/sim/recipes/*.mjs`.
 
@@ -230,8 +171,6 @@ The registry ([`packages/simulation/engine/src/framework/registry.ts`](https://g
 | "Does this commit introduce a new violation?" | **fit** with `--gate-compare` |
 | "Does this service handle 200 RPS without 5xx?" | **sim** (load) |
 | "Does the system recover from a 5-second DB outage?" | **sim** (chaos) |
-| "Does the order book never go negative under any sequence of operations?" | **sim** (invariant) |
-| "Does my fix-generating agent solve 95% of the corpus?" | **sim** (fix-evaluation) |
 
 `fit` is fast and deterministic — no I/O beyond reading source files, scales to thousands of files in seconds. `sim` is slow and (intentionally) non-deterministic in the load and chaos kinds — it runs real workloads and measures wall-clock outcomes. They complement each other: `fit` runs on every PR, `sim` runs on a slower cadence (nightly, pre-deploy, weekly).
 

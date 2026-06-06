@@ -50,10 +50,10 @@ describe('discoverScenarioPackages — auto-discovery (default)', () => {
 
   it('returns every @opensip-tools/scenarios-* package without privileging any one', () => {
     makeNodeModulesPackage(testDir, '@opensip-tools/scenarios-load-default')
-    makeNodeModulesPackage(testDir, '@opensip-tools/scenarios-invariant-default')
+    makeNodeModulesPackage(testDir, '@opensip-tools/scenarios-extra-default')
     const result = discoverScenarioPackages({ projectDir: testDir })
     expect(result.map((p) => p.name).sort()).toEqual([
-      '@opensip-tools/scenarios-invariant-default',
+      '@opensip-tools/scenarios-extra-default',
       '@opensip-tools/scenarios-load-default',
     ])
   })
@@ -158,7 +158,7 @@ describe('discoverScenarioPackages — explicit packages', () => {
   it('loads only the configured list', () => {
     makeNodeModulesPackage(testDir, '@opensip-tools/scenarios-load-default')
     makeNodeModulesPackage(testDir, '@opensip-tools/scenarios-chaos-default')
-    makeNodeModulesPackage(testDir, '@opensip-tools/scenarios-invariant-default')
+    makeNodeModulesPackage(testDir, '@opensip-tools/scenarios-extra-default')
     const result = discoverScenarioPackages({
       projectDir: testDir,
       explicitPackages: ['@opensip-tools/scenarios-load-default'],

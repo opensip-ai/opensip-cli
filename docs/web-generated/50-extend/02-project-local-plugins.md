@@ -131,7 +131,7 @@ export const scenarios = [defineLoadScenario({
 })];
 ```
 
-Same shape for `defineChaosScenario`, `defineInvariantScenario`, `defineFixEvaluationScenario` — each pinned to its own kind. See [scenarios and recipes](/docs/opensip-tools/30-sim/01-scenarios-and-recipes/).
+Same shape for `defineChaosScenario` — each pinned to its own kind. See [scenarios and recipes](/docs/opensip-tools/30-sim/01-scenarios-and-recipes/).
 
 ## When to graduate
 

@@ -3,9 +3,8 @@
  *
  * A Tier-2 guardrail (audit "Done Definition"): lock the promised surface so a
  * flag can't be added/removed without an explicit contract update, and prove
- * the scheduler applies CLI filters + recipe selectors BEFORE invoking any
- * scenario runner (the class of bug behind P0-1, where `--kind` filtered after
- * execution). Scoped to the non-cloud sim domain.
+ * the scheduler applies recipe selectors BEFORE invoking any scenario runner
+ * (so a narrowed-out scenario never runs). Scoped to the non-cloud sim domain.
  */
 
 import { enterScope } from '@opensip-tools/core';
@@ -61,7 +60,7 @@ describe('sim tool — flag-surface contract', () => {
     expect(recordRegisteredFlags()).toEqual(
       // ADR-0011 (Phase 4): sim gained cloud egress (--report-to / --api-key)
       // when it began emitting the signal envelope.
-      ['--cwd', '--debug', '--json', '--kind', '--open', '--quiet', '--recipe', '--report-to', '--api-key'].sort(),
+      ['--cwd', '--debug', '--json', '--open', '--quiet', '--recipe', '--report-to', '--api-key'].sort(),
     );
   });
 });
@@ -111,7 +110,7 @@ describe('sim scheduler — narrowing precedes execution', () => {
     expect(result.totalScenarios).toBe(0);
   });
 
-  it('the --kind filter excludes other-kind scenarios before they run', async () => {
+  it('a kind recipe selector excludes other-kind scenarios before they run', async () => {
     const fired = { ran: false };
     currentScenarioRegistry().register(tripwire('excluded-by-kind', 'load', fired));
     const recipe = defineSimulationRecipe({
@@ -119,12 +118,13 @@ describe('sim scheduler — narrowing precedes execution', () => {
       name: 'kind-exclude',
       displayName: 'Kind exclude',
       description: 'x',
-      scenarios: { type: 'all' },
+      // The recipe selects only chaos scenarios; the 'load' tripwire is dropped
+      // before execution.
+      scenarios: { type: 'kind', kinds: ['chaos'] },
       execution: { mode: 'sequential' },
     });
 
-    // kindFilter narrows to 'invariant'; the 'load' tripwire is dropped.
-    const result = await new SimulationRecipeService().runRecipe(recipe, { kindFilter: 'invariant' });
+    const result = await new SimulationRecipeService().runRecipe(recipe);
 
     expect(fired.ran).toBe(false);
     expect(result.totalScenarios).toBe(0);

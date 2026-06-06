@@ -236,7 +236,7 @@
         "contributors",
         "plugin-authors"
       ],
-      "purpose": "What a sim scenario is, the four kinds, and how recipes compose them. The author-facing primitives in the simulation tool."
+      "purpose": "What a sim scenario is, the two kinds, and how recipes compose them. The author-facing primitives in the simulation tool."
     },
     {
       "file": "docs/web-generated/30-sim/02-execution-model.md",

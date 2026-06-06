@@ -94,7 +94,7 @@ The runtime cost scales with `checks × matched-files`, not with project size. A
 
 - **Check** — a single `fit` rule. One file, one `defineCheck()` call. Runs once per matched file.
 - **Recipe** — a named lineup of checks (or scenarios) plus execution options. Used for "what should we run in this CI step?"
-- **Scenario** — a single `sim` workload (load, chaos, invariant, fix-evaluation).
+- **Scenario** — a single `sim` workload (load, chaos).
 - **Rule** — what `graph` calls its analyses (orphan-subtree, duplicated-function-body, large-function, etc.). As of v2.6.0 a rule is authored with `defineRule`, the call-graph parallel to `defineCheck`; ten ship in the box. The difference from a check is the input: a rule queries the engine **dataset** (call graph + derived feature columns), not a single file's `(content, filePath)`.
 
 See [vocabulary](./05-vocabulary.md) for the full glossary.

@@ -36,20 +36,12 @@ import {
 } from '../plugins/scenario-package-discovery.js';
 import { currentSimulationRecipeRegistry } from '../recipes/registry.js';
 import { SimulationRecipeService } from '../recipes/service.js';
-import { SCENARIO_KINDS } from '../types/kind-types.js';
 
 import type { RunnableScenario } from '../framework/runnable-scenario.js';
 import type { SimPluginExports } from '../plugins/types.js';
 import type { SimulationScenarioResult } from '../recipes/service.js';
-import type { ScenarioKind } from '../types/kind-types.js';
 import type { ErrorResult, SimDoneResult, ToolOptions, UnitResult } from '@opensip-tools/contracts';
 import type { Signal } from '@opensip-tools/core';
-
-const VALID_KINDS = new Set<ScenarioKind>(SCENARIO_KINDS);
-
-function isValidKind(value: string): value is ScenarioKind {
-  return (VALID_KINDS as Set<string>).has(value);
-}
 
 // ---------------------------------------------------------------------------
 // Lazy-load simulation scenarios
@@ -344,37 +336,16 @@ export async function executeSim(
     };
   }
 
-  // `--kind`, when present, narrows the recipe-selected scenarios in addition
-  // to the recipe's own selector. It must be a known kind — fail fast on a
-  // typo BEFORE anything runs, rather than (as before) silently ignoring an
-  // invalid value and executing every scenario the recipe selected.
-  let kindFilter: ScenarioKind | undefined;
-  if (args.kind !== undefined) {
-    if (!isValidKind(args.kind)) {
-      return {
-        result: {
-          type: 'error',
-          message: `Unknown scenario kind '${args.kind}'.`,
-          suggestion: `Valid kinds: ${[...VALID_KINDS].join(', ')}.`,
-          exitCode: EXIT_CODES.CONFIGURATION_ERROR,
-        },
-      };
-    }
-    kindFilter = args.kind;
-  }
-
-  // The kind filter is applied inside runRecipe, BEFORE execution, so
-  // filtered-out scenarios (with their side effects) never run.
   const service = new SimulationRecipeService({ cwd: args.cwd, onProgress: opts.onProgress });
-  const recipeResult = await service.runRecipe(recipe, { kindFilter });
+  const recipeResult = await service.runRecipe(recipe);
 
   const scenarios = recipeResult.scenarios;
 
   // Fail closed on an empty run. Zero executed scenarios — whether because
-  // no scenario packages were loaded at all, or because the recipe/`--kind`
-  // selector matched none of the registered scenarios — must NOT report as a
-  // pass (exit 0). A green run that simulated nothing is the exact failure
-  // mode that masks a misconfig or missing dependency in CI. It is a
+  // no scenario packages were loaded at all, or because the recipe selector
+  // matched none of the registered scenarios — must NOT report as a pass
+  // (exit 0). A green run that simulated nothing is the exact failure mode
+  // that masks a misconfig or missing dependency in CI. It is a
   // configuration/unavailable condition (exit 2), distinct from an actual
   // scenario failure (exit 1). Tailor the guidance to the cause.
   if (scenarios.length === 0) {
@@ -384,7 +355,6 @@ export async function executeSim(
       module: 'cli:sim',
       recipeName,
       registryEmpty,
-      kindFilter,
     });
     return {
       result: {
@@ -394,7 +364,7 @@ export async function executeSim(
           : `Recipe '${recipeName}' selected zero scenarios — nothing to simulate.`,
         suggestion: registryEmpty
           ? 'Install at least one @opensip-tools/scenarios-* package, declare plugins.scenarioPackages in opensip-tools.config.yml, or run `opensip-tools init` to scaffold example scenarios.'
-          : 'Check the recipe selector and any --kind filter — at least one registered scenario must match.',
+          : 'Check the recipe selector — at least one registered scenario must match.',
         exitCode: EXIT_CODES.CONFIGURATION_ERROR,
       },
     };

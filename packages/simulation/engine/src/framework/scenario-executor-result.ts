@@ -7,16 +7,11 @@
  *
  * Persistence + dashboard code dispatch on `result.kind` to per-kind
  * renderers. Adding a new kind is a compile-time exhaustiveness break in
- * every dispatch site — that's the architectural ceiling DEC-338 enforces.
- *
- * This commit lands the load variant; subsequent commits extend the union
- * with chaos, invariant, and fix-evaluation variants.
+ * every dispatch site.
  */
 
 
 import type { ChaosOutcome } from '../kinds/chaos/result.js'
-import type { FixEvaluationOutcome } from '../kinds/fix-evaluation/result.js'
-import type { InvariantOutcome } from '../kinds/invariant/result.js'
 import type { LoadOutcome } from '../kinds/load/result.js'
 import type { Signal } from '@opensip-tools/core'
 
@@ -44,18 +39,6 @@ export interface ChaosScenarioExecutorResult extends BaseScenarioExecutorResult 
   readonly outcome: ChaosOutcome
 }
 
-/** Invariant-kind result envelope. */
-export interface InvariantScenarioExecutorResult extends BaseScenarioExecutorResult {
-  readonly kind: 'invariant'
-  readonly outcome: InvariantOutcome
-}
-
-/** Fix-evaluation-kind result envelope. */
-export interface FixEvaluationScenarioExecutorResult extends BaseScenarioExecutorResult {
-  readonly kind: 'fix-evaluation'
-  readonly outcome: FixEvaluationOutcome
-}
-
 /**
  * Discriminated union over scenario executor results.
  *
@@ -65,5 +48,3 @@ export interface FixEvaluationScenarioExecutorResult extends BaseScenarioExecuto
 export type ScenarioExecutorResult =
   | LoadScenarioExecutorResult
   | ChaosScenarioExecutorResult
-  | InvariantScenarioExecutorResult
-  | FixEvaluationScenarioExecutorResult

@@ -3,11 +3,8 @@
  * execution-engine + per-kind executor paths are exercised. Each
  * scenario uses a tiny duration so the test runs quickly.
  *
- * Invariant and fix-evaluation kinds have stricter validation
- * requirements (relatesToInvariant doc anchor + signal payload + async
- * setup) that are tested in their dedicated define-*.test.ts files;
- * this file focuses on actually running the executor for the simpler
- * load and chaos kinds.
+ * This file focuses on actually running the executor for the load and
+ * chaos kinds.
  */
 
 import { enterScope } from '@opensip-tools/core';

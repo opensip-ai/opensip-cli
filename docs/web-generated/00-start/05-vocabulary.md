@@ -62,12 +62,10 @@ As of v2.6.0 the generic recipe substrate — the named selection of units (by i
 
 ## Scenario
 
-A **scenario** is the sim-side equivalent of a check — a single, named, deterministic simulation. The four kinds today are:
+A **scenario** is the sim-side equivalent of a check — a single, named, deterministic simulation. The two kinds today are:
 
 - **`load`** — exercise the system at a workload level and measure throughput/latency.
 - **`chaos`** — inject failures and assert recovery.
-- **`invariant`** — assert a property holds across many random inputs.
-- **`fix-evaluation`** — replay a corpus of fixes and score them.
 
 Scenarios are defined by tool packs analogous to check packs ([`packages/simulation/engine/src/kinds/`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/simulation/engine/src/kinds/)). The shape is younger and less stable than checks — expect minor-version churn.
 

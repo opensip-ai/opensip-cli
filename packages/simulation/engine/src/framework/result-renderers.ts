@@ -14,8 +14,6 @@
  */
 
 
-import { createEmptyMetrics } from './result-builder.js'
-
 import type { ScenarioExecutorResult } from './scenario-executor-result.js'
 import type { SimulationMetrics } from '../types/base-types.js'
 
@@ -72,51 +70,6 @@ export function renderScenarioResultView(
         assertionsPassed: passedCount,
         assertionsFailed: failedCount,
         outcomeLabel: `${result.outcome.chaosEvents.length} chaos events, ${failedCount} failed`,
-      }
-    }
-
-    case 'invariant': {
-      const heldCount = result.outcome.assertions.filter((a) => a.held).length
-      const failedCount = result.outcome.assertions.length - heldCount
-      return {
-        kind: 'invariant',
-        scenarioId: result.scenarioId,
-        passed: result.passed,
-        durationMs: result.durationMs,
-        metrics: createEmptyMetrics(),
-        assertionsPassed: heldCount,
-        assertionsFailed: failedCount,
-        outcomeLabel: `${result.outcome.assertions.length} invariants checked, ${failedCount} failed`,
-      }
-    }
-
-    case 'fix-evaluation': {
-      // Deferred feature: when the harness isn't wired, label the run as
-      // explicitly unavailable rather than as a failed evaluation, so it reads
-      // honestly instead of looking like a real (negative) verdict.
-      if (!result.outcome.harnessAvailable) {
-        return {
-          kind: 'fix-evaluation',
-          scenarioId: result.scenarioId,
-          passed: result.passed,
-          durationMs: result.durationMs,
-          metrics: createEmptyMetrics(),
-          assertionsPassed: 0,
-          assertionsFailed: 0,
-          outcomeLabel: 'unavailable — fix-evaluation harness deferred',
-        }
-      }
-      return {
-        kind: 'fix-evaluation',
-        scenarioId: result.scenarioId,
-        passed: result.passed,
-        durationMs: result.durationMs,
-        metrics: createEmptyMetrics(),
-        assertionsPassed: result.outcome.predicateMatched ? 1 : 0,
-        assertionsFailed: result.outcome.predicateMatched ? 0 : 1,
-        outcomeLabel: result.outcome.predicateMatched
-          ? 'predicate matched'
-          : `predicate did not match (matchedExpectedOutcome=${result.outcome.matchedExpectedOutcome})`,
       }
     }
 

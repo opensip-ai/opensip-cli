@@ -1,6 +1,6 @@
 // @fitness-ignore-file file-length-limit -- aggregate coverage-driven test fixture; splitting destroys the contract
 /**
- * @fileoverview Edge-case tests for the four `defineXxxScenario` validators.
+ * @fileoverview Edge-case tests for the `defineXxxScenario` validators.
  *
  * The "happy path" tests for each kind live in their dedicated test file.
  * This file fills coverage gaps:
@@ -24,16 +24,6 @@ import {
   validateChaosScenarioConfig,
 } from '../kinds/chaos/define.js';
 import {
-  defineFixEvaluationScenario,
-  validateFixEvaluationScenarioConfig,
-  type FixEvaluationScenarioConfig,
-} from '../kinds/fix-evaluation/define.js';
-import { resetPredicateRegistryToBaseline } from '../kinds/fix-evaluation/predicates/index.js';
-import {
-  defineInvariantScenario,
-  validateInvariantScenarioConfig,
-} from '../kinds/invariant/define.js';
-import {
   defineLoadScenario,
   validateLoadScenarioConfig,
 } from '../kinds/load/define.js';
@@ -41,11 +31,6 @@ import {
 import { makeSimTestScope } from './test-utils/with-sim-scope.js';
 
 import type { ChaosConfig } from '../types/base-types.js';
-
-// Async no-op stubs reused across the invariant scenario tests below.
-// Inlining them avoids @typescript-eslint/require-await on each call site.
-// eslint-disable-next-line @typescript-eslint/require-await -- intentional async no-op stub for scenario phase hooks
-const noopAsync = async (): Promise<void> => undefined;
 
 const baseChaos: ChaosConfig = {
   enabled: true,
@@ -60,28 +45,6 @@ const baseChaos: ChaosConfig = {
   ],
 };
 
-const baseFixEvalConfig: Omit<FixEvaluationScenarioConfig, 'id' | 'name' | 'predicate'> = {
-  description: 'desc',
-  tags: ['security'],
-  category: 'security',
-  score: 5,
-  criteriaMet: [],
-  source: 'simulation',
-  severity: 'high',
-  expectedDifficulty: 'trivial',
-  signalIntent: 'actionable',
-  judgmentMode: 'predicate-match',
-  provenance: 'real-world-inspired',
-  expectedOutcome: 'success',
-  signal: {
-    source: 'simulation',
-    severity: 'high',
-    category: 'security',
-    ruleId: 'corpus:test',
-    message: 'test',
-  },
-};
-
 beforeEach(() => {
   // Item 1: scenarioRegistry is per-RunScope. Each test gets a fresh
   // scope with an empty scenario registry; enterScope (enterWith)
@@ -91,7 +54,6 @@ beforeEach(() => {
 
 afterEach(() => {
   clearScenarioRegistry();
-  resetPredicateRegistryToBaseline();
 });
 
 // =============================================================================
@@ -441,299 +403,5 @@ describe('chaos kind — validation edges', () => {
         recoveryWindow: 100,
       }),
     ).toThrow(/name is required/);
-  });
-});
-
-// =============================================================================
-// INVARIANT KIND
-// =============================================================================
-
-describe('invariant kind — validation edges', () => {
-  it('registry rejects a name-collision for invariant scenarios', () => {
-    const first = defineInvariantScenario({
-      id: 'inv-n-1',
-      name: 'Shared Inv Name',
-      description: 'd',
-      tags: [],
-      relatesToInvariant: 'doc.md#a',
-      setup: noopAsync,
-      act: noopAsync,
-      assert: noopAsync,
-    });
-    currentScenarioRegistry().register(first);
-
-    const second = defineInvariantScenario({
-      id: 'inv-n-2',
-      name: 'Shared Inv Name',
-      description: 'd',
-      tags: [],
-      relatesToInvariant: 'doc.md#a',
-      setup: noopAsync,
-      act: noopAsync,
-      assert: noopAsync,
-    });
-    expect(() => currentScenarioRegistry().register(second)).toThrow(/name collision/);
-  });
-
-  it('defineInvariantScenario does not auto-register (Phase 6 contract)', () => {
-    const scenario = defineInvariantScenario({
-      id: 'inv-noreg',
-      name: 'Inv No Reg',
-      description: 'd',
-      tags: [],
-      relatesToInvariant: 'doc.md#a',
-      setup: noopAsync,
-      act: noopAsync,
-      assert: noopAsync,
-    });
-    expect(scenario.kind).toBe('invariant');
-    expect(currentScenarioRegistry().get('inv-noreg')).toBeUndefined();
-  });
-
-  it('defineInvariantScenario still requires id', () => {
-    expect(() =>
-      defineInvariantScenario({
-        id: '',
-        name: 'x',
-        description: 'd',
-        tags: [],
-        relatesToInvariant: 'doc.md#a',
-        setup: noopAsync,
-        act: noopAsync,
-        assert: noopAsync,
-      }),
-    ).toThrow(/id is required/);
-  });
-
-  it('rejects setup that is not a function', () => {
-    expect(() =>
-      validateInvariantScenarioConfig({
-        id: 'inv-no-setup',
-        name: 'No Setup',
-        description: 'd',
-        tags: [],
-        relatesToInvariant: 'doc.md#a',
-        // @ts-expect-error -- intentional invalid
-        setup: 'not-a-function',
-        act: noopAsync,
-        assert: noopAsync,
-      }),
-    ).toThrow(/setup must be an async function/);
-  });
-
-  it('rejects when name is empty', () => {
-    expect(() =>
-      validateInvariantScenarioConfig({
-        id: 'inv-noname',
-        name: '',
-        description: 'd',
-        tags: [],
-        relatesToInvariant: 'doc.md#a',
-        setup: noopAsync,
-        act: noopAsync,
-        assert: noopAsync,
-      }),
-    ).toThrow(/name is required/);
-  });
-
-  it('rejects when description is whitespace-only', () => {
-    expect(() =>
-      validateInvariantScenarioConfig({
-        id: 'inv-nodesc',
-        name: 'name',
-        description: '   ',
-        tags: [],
-        relatesToInvariant: 'doc.md#a',
-        setup: noopAsync,
-        act: noopAsync,
-        assert: noopAsync,
-      }),
-    ).toThrow(/description is required/);
-  });
-
-  it('rejects act that is not a function', () => {
-    expect(() =>
-      validateInvariantScenarioConfig({
-        id: 'inv-no-act',
-        name: 'No Act',
-        description: 'd',
-        tags: [],
-        relatesToInvariant: 'doc.md#a',
-        setup: noopAsync,
-        // @ts-expect-error -- intentional invalid
-        act: null,
-        assert: noopAsync,
-      }),
-    ).toThrow(/act must be an async function/);
-  });
-
-  it('rejects assert that is not a function', () => {
-    expect(() =>
-      validateInvariantScenarioConfig({
-        id: 'inv-no-assert',
-        name: 'No Assert',
-        description: 'd',
-        tags: [],
-        relatesToInvariant: 'doc.md#a',
-        setup: noopAsync,
-        act: noopAsync,
-        // @ts-expect-error -- intentional invalid
-        assert: 42,
-      }),
-    ).toThrow(/assert must be an async function/);
-  });
-});
-
-// =============================================================================
-// FIX-EVALUATION KIND
-// =============================================================================
-
-describe('fix-evaluation kind — validation edges', () => {
-  it('registry rejects a name-collision for fix-evaluation scenarios', () => {
-    const first = defineFixEvaluationScenario({
-      ...baseFixEvalConfig,
-      id: 'fe-n-1',
-      name: 'Shared FE Name',
-      predicate: { all_of: [{ id: 'tests-pass' }, { id: 'no-tests-modified' }] },
-    });
-    currentScenarioRegistry().register(first);
-
-    const second = defineFixEvaluationScenario({
-      ...baseFixEvalConfig,
-      id: 'fe-n-2',
-      name: 'Shared FE Name',
-      predicate: { all_of: [{ id: 'tests-pass' }, { id: 'no-tests-modified' }] },
-    });
-    expect(() => currentScenarioRegistry().register(second)).toThrow(/name collision/);
-  });
-
-  it('defineFixEvaluationScenario does not auto-register (Phase 6 contract)', () => {
-    const scenario = defineFixEvaluationScenario({
-      ...baseFixEvalConfig,
-      id: 'fe-noreg',
-      name: 'FE No Reg',
-      predicate: { all_of: [{ id: 'tests-pass' }, { id: 'no-tests-modified' }] },
-    });
-    expect(scenario.kind).toBe('fix-evaluation');
-    expect(currentScenarioRegistry().get('fe-noreg')).toBeUndefined();
-  });
-
-  it('defineFixEvaluationScenario still requires id', () => {
-    expect(() =>
-      defineFixEvaluationScenario({
-        ...baseFixEvalConfig,
-        id: '',
-        name: 'x',
-        predicate: { all_of: [{ id: 'tests-pass' }, { id: 'no-tests-modified' }] },
-      }),
-    ).toThrow(/id is required/);
-  });
-
-  it('rejects predicate-match without a predicate', () => {
-    expect(() =>
-      validateFixEvaluationScenarioConfig({
-        ...baseFixEvalConfig,
-        id: 'fe-no-pred',
-        name: 'No Pred',
-        // predicate intentionally omitted
-      }),
-    ).toThrow(/predicate is required when judgmentMode/);
-  });
-
-  it('rejects predicate node that declares both all_of and any_of', () => {
-    expect(() =>
-      validateFixEvaluationScenarioConfig({
-        ...baseFixEvalConfig,
-        id: 'fe-both',
-        name: 'Both',
-        predicate: {
-          all_of: [{ id: 'tests-pass' }],
-          any_of: [{ id: 'no-tests-modified' }],
-        },
-      }),
-    ).toThrow(/either all_of or any_of, not both/);
-  });
-
-  it('rejects a leaf with a non-string id', () => {
-    expect(() =>
-      validateFixEvaluationScenarioConfig({
-        ...baseFixEvalConfig,
-        id: 'fe-bad-leaf',
-        name: 'Bad Leaf',
-        predicate: {
-          // @ts-expect-error -- intentional invalid leaf
-          all_of: [{ id: 42 }, { id: 'no-tests-modified' }],
-        },
-      }),
-    ).toThrow(/predicate leaf must have a string id/);
-  });
-
-  it('rejects when name is empty', () => {
-    expect(() =>
-      validateFixEvaluationScenarioConfig({
-        ...baseFixEvalConfig,
-        id: 'fe-noname',
-        name: '',
-        predicate: { all_of: [{ id: 'tests-pass' }, { id: 'no-tests-modified' }] },
-      }),
-    ).toThrow(/name is required/);
-  });
-
-  it('rejects when description is whitespace-only', () => {
-    expect(() =>
-      validateFixEvaluationScenarioConfig({
-        ...baseFixEvalConfig,
-        description: '   ',
-        id: 'fe-nodesc',
-        name: 'name',
-        predicate: { all_of: [{ id: 'tests-pass' }, { id: 'no-tests-modified' }] },
-      }),
-    ).toThrow(/description is required/);
-  });
-
-  it('walks any_of branches', () => {
-    expect(() =>
-      validateFixEvaluationScenarioConfig({
-        ...baseFixEvalConfig,
-        id: 'fe-anyof',
-        name: 'AnyOf',
-        predicate: {
-          any_of: [
-            { id: 'tests-pass' },
-            { id: 'no-tests-modified' }, // gaming-defense leaf
-          ],
-        },
-      }),
-    ).not.toThrow();
-  });
-
-  it('walks deep nested predicate trees', () => {
-    expect(() =>
-      validateFixEvaluationScenarioConfig({
-        ...baseFixEvalConfig,
-        id: 'fe-deep',
-        name: 'Deep',
-        predicate: {
-          all_of: [
-            {
-              any_of: [{ id: 'tests-pass' }, { id: 'no-tests-modified' }],
-            },
-          ],
-        },
-      }),
-    ).not.toThrow();
-  });
-
-  it('rejects when signal payload is missing', () => {
-    expect(() =>
-      validateFixEvaluationScenarioConfig({
-        ...baseFixEvalConfig,
-        id: 'fe-no-sig',
-        name: 'No Sig',
-        // @ts-expect-error -- intentional missing
-        signal: undefined,
-        predicate: { all_of: [{ id: 'tests-pass' }, { id: 'no-tests-modified' }] },
-      }),
-    ).toThrow(/signal payload is required/);
   });
 });

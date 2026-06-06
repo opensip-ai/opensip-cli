@@ -63,13 +63,12 @@ function register(cli: ToolCliContext): void {
     .option('--json', 'Output structured JSON', false)
     .option('-q, --quiet', 'Suppress banner / boxes; print only the pass-fail summary', false)
     .option('--open', 'Launch the HTML dashboard in your browser after the run completes', false)
-    .option('--kind <kind>', 'Filter scenarios by kind (load | chaos | invariant | fix-evaluation)')
     .option('--report-to <url>', 'POST signals to OpenSIP Cloud or compatible')
     .option('--api-key <key>', 'API key for --report-to authentication')
     .option('--debug', 'Enable debug mode for structured log output', false)
     .action(
       async (
-        opts: ToolOptions & { recipe?: string; quiet?: boolean; open?: boolean; kind?: string },
+        opts: ToolOptions & { recipe?: string; quiet?: boolean; open?: boolean },
       ) => {
         // Interactive TTY (non-json): the animated live view. Egress + exit code
         // are handled inside the registerLiveView callback / renderSimLive after

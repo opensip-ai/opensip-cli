@@ -150,7 +150,7 @@ describe('simulationTool.register', () => {
     expect(sim).toBeDefined();
     const optionNames = (sim?.options ?? []).map((o) => o.long ?? o.short);
     expect(optionNames).toEqual(
-      expect.arrayContaining(['--recipe', '--cwd', '--json', '--kind', '--debug', '--open']),
+      expect.arrayContaining(['--recipe', '--cwd', '--json', '--debug', '--open']),
     );
     expect(optionNames).toEqual(expect.arrayContaining(['--quiet']));
     // ADR-0011 (Phase 4): sim gains cloud egress via the root's deliverSignals.

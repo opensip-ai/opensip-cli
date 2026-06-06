@@ -60,8 +60,6 @@ export interface ToolOptions {
   debug: boolean;
   /** Recipe name to run. Defaults to the built-in `default` if omitted. */
   recipe?: string;
-  /** Filter by scenario kind (load / chaos / invariant / fix-evaluation). */
-  kind?: string;
   /**
    * `--report-to <url>` — POST the run's signals to OpenSIP Cloud or a
    * compatible receiver. sim gained cloud egress when it began emitting the

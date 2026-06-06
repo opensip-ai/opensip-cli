@@ -2,13 +2,11 @@
 /**
  * @opensip-tools/simulation — Simulation scenarios for codebase analysis.
  *
- * Per Plan 01 Phase 0b.5 / DEC-338, the package exposes four kind-specific
- * scenario authoring entry points sharing one runtime contract:
+ * The package exposes two kind-specific scenario authoring entry points
+ * sharing one runtime contract:
  *
  *   - `defineLoadScenario`           ← personas + ramp + sustain + assert SLO
  *   - `defineChaosScenario`          ← base load + failure injection + recovery
- *   - `defineInvariantScenario`      ← seed → act → assert state
- *   - `defineFixEvaluationScenario`  ← run agent against signal → score predicate
  */
 
 // =============================================================================
@@ -36,8 +34,6 @@ export type {
   ScenarioExecutorResult,
   LoadScenarioExecutorResult,
   ChaosScenarioExecutorResult,
-  InvariantScenarioExecutorResult,
-  FixEvaluationScenarioExecutorResult,
 } from './framework/scenario-executor-result.js'
 
 // =============================================================================
@@ -75,57 +71,6 @@ export {
   type ChaosScenarioConfig,
 } from './kinds/chaos/define.js'
 export type { ChaosOutcome, ChaosEvent, ChaosAssertionVerdict } from './kinds/chaos/result.js'
-
-// =============================================================================
-// INVARIANT KIND
-// =============================================================================
-
-export {
-  defineInvariantScenario,
-  validateInvariantScenarioConfig,
-  type InvariantScenarioConfig,
-} from './kinds/invariant/define.js'
-export type {
-  InvariantContext,
-  InvariantContextDeps,
-} from './kinds/invariant/context.js'
-export type {
-  InvariantOutcome,
-  InvariantPhaseResult,
-  InvariantPhaseStatus,
-  InvariantAssertion,
-} from './kinds/invariant/result.js'
-
-// =============================================================================
-// FIX-EVALUATION KIND
-// =============================================================================
-
-export {
-  defineFixEvaluationScenario,
-  validateFixEvaluationScenarioConfig,
-  type FixEvaluationScenarioConfig,
-  type PredicateComposition,
-  type PredicateLeaf,
-  type SignalPayload,
-} from './kinds/fix-evaluation/define.js'
-export type {
-  FixEvaluationOutcome,
-  PredicateLeafVerdict,
-  PredicateCompositeVerdict,
-  PredicateVerdict,
-  AgentRunSummary,
-} from './kinds/fix-evaluation/result.js'
-export {
-  predicateRegistry,
-  registerPredicate,
-  getPredicate,
-  listPredicateIds,
-  resetPredicateRegistryToBaseline,
-  type PredicateEvaluator,
-  type PredicateEvaluationContext,
-  type PredicateEvaluationResult,
-  type PredicateArgs,
-} from './kinds/fix-evaluation/predicates/index.js'
 
 // =============================================================================
 // TOOL PLUGIN — simulation as a Tool implementation

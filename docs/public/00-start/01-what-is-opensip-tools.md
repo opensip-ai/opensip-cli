@@ -81,7 +81,7 @@ The primary loop. *"Is the codebase clean?"* A check runs once per file and retu
 
 ### `sim` — simulation scenarios *(experimental)*
 
-The second loop, opt-in. *"Does it behave correctly under stress?"* A scenario simulates a workload — load, chaos, invariant, fix-evaluation — and asserts something about the system under test. Same Tool/Recipe/Engine/Renderer shape as `fit`; the API surface still moves between minor releases.
+The second loop, opt-in. *"Does it behave correctly under stress?"* A scenario simulates a workload — load, chaos — and asserts something about the system under test. Same Tool/Recipe/Engine/Renderer shape as `fit`; the API surface still moves between minor releases.
 
 ### `graph` — static call-graph analysis
 

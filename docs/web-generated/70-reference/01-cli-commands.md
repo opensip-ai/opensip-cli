@@ -143,20 +143,18 @@ Tool-owned: [`packages/simulation/engine/src/tool.ts`](https://github.com/opensi
 ```
 opensip-tools sim
 opensip-tools sim --recipe <name>
-opensip-tools sim --kind <kind>
 ```
 
 | Flag | Type | Default | Effect |
 |---|---|---|---|
 | `--recipe <name>` | string | built-in `default` | Run a named sim recipe. |
-| `--kind <kind>` | string | — | Filter scenarios by kind. One of `load`, `chaos`, `invariant`, `fix-evaluation`. |
 | `--cwd <path>` | path | `process.cwd()` | Target directory. |
 | `--json` | bool | `false` | Emit the `SignalEnvelope` JSON on stdout instead of the table renderer. |
 | `-q, --quiet` | bool | `false` | Suppress banner. |
 | `--open` | bool | `false` | Launch dashboard after run. |
 | `--debug` | bool | `false` | Enable debug-level logging. |
 
-**Exit codes:** 0 (all scenarios passed), 1 (any scenario failed), 2 (config/runtime error, **including a run that selected zero scenarios** — an empty run fails closed rather than reporting a false pass: no scenario packages installed, or the recipe/`--kind` selector matched none). Exit 0 therefore always means at least one scenario ran and passed.
+**Exit codes:** 0 (all scenarios passed), 1 (any scenario failed), 2 (config/runtime error, **including a run that selected zero scenarios** — an empty run fails closed rather than reporting a false pass: no scenario packages installed, or the recipe selector matched none). Exit 0 therefore always means at least one scenario ran and passed.
 
 **See also:** [`30-sim/`](/docs/opensip-tools/30-sim/).
 

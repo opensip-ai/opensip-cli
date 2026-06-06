@@ -8,9 +8,8 @@
  * uniform semantics (every kind enforces id/name shape the same way and
  * stamps the same `code: 'VALIDATION.SCENARIO.INVALID_CONFIG'`).
  *
- * Kind-specific checks (chaos's recovery window, fix-evaluation's
- * predicate tree, invariant's `relatesToInvariant` anchor) stay inline
- * in each define.ts.
+ * Kind-specific checks (e.g. chaos's recovery window) stay inline in
+ * each define.ts.
  */
 
 import { ValidationError as CoreValidationError } from '@opensip-tools/core'

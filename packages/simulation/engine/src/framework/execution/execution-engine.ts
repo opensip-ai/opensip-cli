@@ -3,10 +3,10 @@
  *
  * Historically this file housed the legacy `runSimulationLoop` /
  * `createScenario` / `createStandardExecutor` orchestration model. That
- * model was retired once all four kinds (load, chaos, invariant,
- * fix-evaluation) unified on the new `ScenarioExecutionContext` /
- * `runLoadWindow` model in Wave 4 of the Layer 3 remediation plan; the
- * legacy `defineScenario` alias was deleted in the same release.
+ * model was retired once both kinds (load, chaos) unified on the new
+ * `ScenarioExecutionContext` / `runLoadWindow` model in Wave 4 of the
+ * Layer 3 remediation plan; the legacy `defineScenario` alias was deleted
+ * in the same release.
  *
  * What remains here is a small set of stable helpers consumed across
  * the simulation runtime:

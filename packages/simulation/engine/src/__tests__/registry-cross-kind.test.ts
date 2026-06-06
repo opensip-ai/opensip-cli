@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-empty-function -- scenario phase hooks must match `() => Promise<void>` shape; cross-kind registry tests use no-op stubs */
 /**
  * @fileoverview Tests for cross-kind registry behavior — tag filtering,
  * kind filtering, and discriminated-union exhaustiveness.
@@ -18,9 +17,6 @@ import {
 } from '../framework/registry.js'
 import { renderScenarioResultView } from '../framework/result-renderers.js'
 import { defineChaosScenario } from '../kinds/chaos/define.js'
-import { defineFixEvaluationScenario } from '../kinds/fix-evaluation/define.js'
-import { resetPredicateRegistryToBaseline } from '../kinds/fix-evaluation/predicates/index.js'
-import { defineInvariantScenario } from '../kinds/invariant/define.js'
 import { defineLoadScenario } from '../kinds/load/define.js'
 import { SCENARIO_KINDS } from '../types/kind-types.js'
 
@@ -34,7 +30,6 @@ beforeEach(() => {
 
 afterEach(() => {
   clearScenarioRegistry()
-  resetPredicateRegistryToBaseline()
 })
 
 function defineOneOfEachKind(): void {
@@ -75,70 +70,28 @@ function defineOneOfEachKind(): void {
       recoveryWindow: 100,
     }),
   )
-
-  currentScenarioRegistry().register(
-    defineInvariantScenario({
-      id: 'cross-invariant',
-      name: 'cross invariant',
-      description: 'invariant',
-      tags: ['shared-tag', 'invariant-only'],
-      relatesToInvariant: 'doc.md#anchor',
-      setup: async () => {},
-      act: async () => {},
-      assert: async () => {},
-    }),
-  )
-
-  currentScenarioRegistry().register(
-    defineFixEvaluationScenario({
-      id: 'cross-fix-eval',
-      name: 'cross fix eval',
-      description: 'fix-evaluation',
-      tags: ['shared-tag', 'fix-eval-only'],
-      category: 'security',
-      score: 3,
-      criteriaMet: ['code-file'],
-      source: 'simulation',
-      severity: 'high',
-      expectedDifficulty: 'trivial',
-      signalIntent: 'actionable',
-      judgmentMode: 'predicate-match',
-      provenance: 'real-world-inspired',
-      expectedOutcome: 'success',
-      signal: {
-        source: 'simulation',
-        severity: 'high',
-        category: 'security',
-        ruleId: 'corpus:test',
-        message: 'test',
-      },
-      predicate: { all_of: [{ id: 'tests-pass' }, { id: 'no-tests-modified' }] },
-    }),
-  )
 }
 
 describe('cross-kind registry', () => {
-  it('registers all four kinds in the same registry', () => {
+  it('registers both kinds in the same registry', () => {
     defineOneOfEachKind()
-    expect(getRegisteredScenarios().size).toBe(4)
+    expect(getRegisteredScenarios().size).toBe(2)
   })
 
-  it('SCENARIO_KINDS enumerates exactly the four supported kinds', () => {
-    expect(SCENARIO_KINDS).toEqual(['load', 'chaos', 'invariant', 'fix-evaluation'])
+  it('SCENARIO_KINDS enumerates exactly the supported kinds', () => {
+    expect(SCENARIO_KINDS).toEqual(['load', 'chaos'])
   })
 
   it('getScenariosByKind filters by kind', () => {
     defineOneOfEachKind()
     expect(getScenariosByKind('load').map((s) => s.id)).toEqual(['cross-load'])
     expect(getScenariosByKind('chaos').map((s) => s.id)).toEqual(['cross-chaos'])
-    expect(getScenariosByKind('invariant').map((s) => s.id)).toEqual(['cross-invariant'])
-    expect(getScenariosByKind('fix-evaluation').map((s) => s.id)).toEqual(['cross-fix-eval'])
   })
 
   it('getScenariosByTag works across kinds', () => {
     defineOneOfEachKind()
     const all = getScenariosByTag('shared-tag').map((s) => s.id).sort()
-    expect(all).toEqual(['cross-chaos', 'cross-fix-eval', 'cross-invariant', 'cross-load'])
+    expect(all).toEqual(['cross-chaos', 'cross-load'])
   })
 })
 
@@ -151,14 +104,12 @@ describe('result discriminated union', () => {
       results.push(await s.run(new AbortController().signal))
     }
     const views = results.map(renderScenarioResultView)
-    expect(views).toHaveLength(4)
+    expect(views).toHaveLength(2)
     for (const v of views) {
       expect(typeof v.outcomeLabel).toBe('string')
       expect(typeof v.assertionsPassed).toBe('number')
       expect(typeof v.assertionsFailed).toBe('number')
     }
-    expect(views.map((v) => v.kind).sort()).toEqual(
-      ['chaos', 'fix-evaluation', 'invariant', 'load'].sort(),
-    )
+    expect(views.map((v) => v.kind).sort()).toEqual(['chaos', 'load'].sort())
   })
 })

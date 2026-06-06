@@ -1,9 +1,8 @@
 /**
  * @fileoverview Cross-kind type definitions for the Simulation Framework.
  *
- * Per Plan 01 Phase 0b.5, the framework now exposes four kind-specific entry
- * points (`defineLoadScenario`, `defineChaosScenario`, `defineInvariantScenario`,
- * `defineFixEvaluationScenario`). The discriminated union over kinds lives in
+ * The framework exposes two kind-specific entry points (`defineLoadScenario`,
+ * `defineChaosScenario`). The discriminated union over kinds lives in
  * `framework/scenario-executor-result.ts`; the cross-kind `RunnableScenario`
  * lives in `framework/runnable-scenario.ts`.
  *

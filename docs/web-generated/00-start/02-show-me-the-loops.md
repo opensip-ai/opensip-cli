@@ -79,7 +79,7 @@ Exit code drives CI. That's the whole contract.
 
 ## `sim` — a scenario
 
-A scenario describes a load (or chaos, invariant, or fix-evaluation) workload and the assertions that should hold against the result. Drop it under `opensip-tools/sim/scenarios/`.
+A scenario describes a load (or chaos) workload and the assertions that should hold against the result. Drop it under `opensip-tools/sim/scenarios/`.
 
 ```js
 // opensip-tools/sim/scenarios/checkout-burst.mjs
@@ -109,7 +109,7 @@ export default defineLoadScenario({
 });
 ```
 
-The four scenario kinds — `defineLoadScenario`, `defineChaosScenario`, `defineInvariantScenario`, `defineFixEvaluationScenario` — each emit the same `RunnableScenario` shape with a different `kind:` discriminator. Recipes compose scenarios the same way fit recipes compose checks. Deeper detail: [scenarios and recipes](/docs/opensip-tools/30-sim/01-scenarios-and-recipes/).
+The two scenario kinds — `defineLoadScenario`, `defineChaosScenario` — each emit the same `RunnableScenario` shape with a different `kind:` discriminator. Recipes compose scenarios the same way fit recipes compose checks. Deeper detail: [scenarios and recipes](/docs/opensip-tools/30-sim/01-scenarios-and-recipes/).
 
 > Simulation is opt-in and experimental. The shapes are stable; the runtime mechanics are still being hardened.
 

@@ -13,14 +13,11 @@
  *   - renderScenarioResultView's exhaustiveness branch fires when an
  *     unknown `kind` reaches the renderer; tests force this with a
  *     hand-rolled cast to verify the runtime guard, not just the types.
- *   - The fix-evaluation predicate registry rejects empty ids at registration
- *     time so that misconfigured corpora fail fast.
  */
 
 import { Registry, type Registerable, ValidationError } from '@opensip-tools/core';
 import { describe, expect, it } from 'vitest';
 
-import { registerPredicate } from '../../kinds/fix-evaluation/predicates/index.js';
 import { LatencyTracker } from '../execution/latency-tracker.js';
 import { renderScenarioResultView } from '../result-renderers.js';
 
@@ -173,68 +170,5 @@ describe('renderScenarioResultView — exhaustiveness guard', () => {
     } as unknown as ScenarioExecutorResult;
 
     expect(() => renderScenarioResultView(future)).toThrow(/exhaustiveness/);
-  });
-
-  it('renders the "predicate matched" branch for a fix-evaluation result', () => {
-    const result: ScenarioExecutorResult = {
-      kind: 'fix-evaluation',
-      scenarioId: 'fe-1',
-      passed: true,
-      durationMs: 12,
-      signals: [],
-      outcome: {
-        // The real-harness path: a genuine matched verdict (harness available).
-        harnessAvailable: true,
-        predicateMatched: true,
-        verdict: undefined,
-        agentRun: { filesModified: [], testsModified: [], agentReportedSuccess: true },
-        matchedExpectedOutcome: true,
-      },
-    };
-    const view = renderScenarioResultView(result);
-    expect(view.outcomeLabel).toBe('predicate matched');
-    expect(view.assertionsPassed).toBe(1);
-    expect(view.assertionsFailed).toBe(0);
-  });
-
-  it('renders the "predicate did not match" branch for an available fix-evaluation result', () => {
-    const result: ScenarioExecutorResult = {
-      kind: 'fix-evaluation',
-      scenarioId: 'fe-2',
-      passed: false,
-      durationMs: 9,
-      signals: [],
-      outcome: {
-        // Real-harness path with a non-matching verdict (harness available).
-        harnessAvailable: true,
-        predicateMatched: false,
-        verdict: undefined,
-        agentRun: { filesModified: [], testsModified: [], agentReportedSuccess: false },
-        matchedExpectedOutcome: false,
-      },
-    };
-    const view = renderScenarioResultView(result);
-    expect(view.outcomeLabel).toContain('predicate did not match');
-    expect(view.assertionsFailed).toBe(1);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// registerPredicate — empty-id guard
-// ---------------------------------------------------------------------------
-
-describe('registerPredicate — empty id rejection', () => {
-  it('throws when id is an empty string', () => {
-    // eslint-disable-next-line @typescript-eslint/require-await -- predicate signature
-    expect(() => registerPredicate('', async () => ({ passed: true }))).toThrow(
-      /non-empty id/,
-    );
-  });
-
-  it('throws when id is whitespace-only', () => {
-    // eslint-disable-next-line @typescript-eslint/require-await -- predicate signature
-    expect(() => registerPredicate('   ', async () => ({ passed: true }))).toThrow(
-      /non-empty id/,
-    );
   });
 });

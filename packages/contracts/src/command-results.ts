@@ -242,8 +242,6 @@ export interface ExperimentalResult {
   type: 'experimental';
   tool: 'sim';
   cwd: string;
-  /** Optional `--kind` filter (load / chaos / invariant / fix-evaluation). */
-  kind?: string;
 }
 
 /** Outcome of a `sim --recipe <name>` run. */

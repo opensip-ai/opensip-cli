@@ -32,7 +32,7 @@ export interface TagsScenarioSelector {
   readonly exclude?: readonly string[];
 }
 
-/** Selector that filters by scenario kind (load / chaos / invariant / fix-evaluation). */
+/** Selector that filters by scenario kind (load / chaos). */
 export interface KindScenarioSelector {
   readonly type: 'kind';
   readonly kinds: readonly ScenarioKind[];
