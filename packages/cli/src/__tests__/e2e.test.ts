@@ -6,7 +6,6 @@
  * these tests (pnpm --filter=opensip-tools build).
  */
 
-import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -14,51 +13,13 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, it, expect, afterEach, beforeEach } from 'vitest';
 
+import { distRunner, CLI_PKG_VERSION } from './harness/cli-acceptance.js';
+
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 // __dirname = packages/cli/src/__tests__/ → CLI binary is at packages/cli/dist/index.js
-const CLI = join(__dirname, '../../dist/index.js');
 const FIXTURE = join(__dirname, 'fixtures/sample-project');
 
-// Read version from the CLI package's package.json so this test doesn't
-// drift when the version bumps. Source + test now read from the same
-// place — fixes the assertion-vs-source drift that shipped 0.2.0 with
-// the --version test still pinned to '0.1.0'.
-const CLI_PKG_VERSION: string = (() => {
-  const pkg = JSON.parse(readFileSync(join(__dirname, '../../package.json'), 'utf8')) as { version: string };
-  return pkg.version;
-})();
-
-/** Run the CLI binary with the given arguments and return stdout + exitCode. */
-function run(...args: string[]): { stdout: string; exitCode: number } {
-  try {
-    const stdout = execFileSync('node', [CLI, ...args], {
-      cwd: FIXTURE,
-      encoding: 'utf8',
-      timeout: 60_000,
-      env: { ...process.env, NO_COLOR: '1' },
-    });
-    return { stdout, exitCode: 0 };
-  } catch (error: unknown) {
-    const err = error as { stdout?: string; status?: number };
-    return { stdout: err.stdout ?? '', exitCode: err.status ?? 1 };
-  }
-}
-
-/** Run the CLI in a specific working directory. */
-function runIn(cwd: string, ...args: string[]): { stdout: string; exitCode: number } {
-  try {
-    const stdout = execFileSync('node', [CLI, ...args], {
-      cwd,
-      encoding: 'utf8',
-      timeout: 60_000,
-      env: { ...process.env, NO_COLOR: '1' },
-    });
-    return { stdout, exitCode: 0 };
-  } catch (error: unknown) {
-    const err = error as { stdout?: string; status?: number };
-    return { stdout: err.stdout ?? '', exitCode: err.status ?? 1 };
-  }
-}
+const cli = distRunner();
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -75,21 +36,21 @@ describe('CLI e2e', () => {
   });
 
   it('--help shows usage information', () => {
-    const { stdout, exitCode } = run('--help');
+    const { stdout, exitCode } = cli.run(['--help'], { cwd: FIXTURE });
     expect(exitCode).toBe(0);
     expect(stdout).toContain('Commands:');
     expect(stdout).toContain('fit');
   });
 
   it('--version shows the version string', () => {
-    const { stdout, exitCode } = run('--version');
+    const { stdout, exitCode } = cli.run(['--version'], { cwd: FIXTURE });
     expect(exitCode).toBe(0);
     expect(stdout.trim()).toBe(CLI_PKG_VERSION);
   });
 
   describe('fit', () => {
     it('runs successfully with --json', () => {
-      const { stdout, exitCode } = run('fit', '--json');
+      const { stdout, exitCode } = cli.run(['fit', '--json'], { cwd: FIXTURE });
       // Parse as JSON — should not throw. ADR-0011: --json is the signal envelope.
       const output = JSON.parse(stdout);
       expect(output.schemaVersion).toBe(2);
@@ -104,19 +65,19 @@ describe('CLI e2e', () => {
     });
 
     it('--list shows available checks', () => {
-      const { stdout, exitCode } = run('fit', '--list');
+      const { stdout, exitCode } = cli.run(['fit', '--list'], { cwd: FIXTURE });
       expect(exitCode).toBe(0);
       expect(stdout).toContain('Available Fitness Checks');
     });
 
     it('--recipes shows available recipes', () => {
-      const { stdout, exitCode } = run('fit', '--recipes');
+      const { stdout, exitCode } = cli.run(['fit', '--recipes'], { cwd: FIXTURE });
       expect(exitCode).toBe(0);
       expect(stdout).toContain('Available Recipes');
     });
 
     it('--list --json outputs valid JSON', () => {
-      const { stdout, exitCode } = run('fit', '--list', '--json');
+      const { stdout, exitCode } = cli.run(['fit', '--list', '--json'], { cwd: FIXTURE });
       expect(exitCode).toBe(0);
       const output = JSON.parse(stdout);
       expect(output.type).toBe('list-checks');
@@ -125,7 +86,7 @@ describe('CLI e2e', () => {
     });
 
     it('--recipes --json outputs valid JSON', () => {
-      const { stdout, exitCode } = run('fit', '--recipes', '--json');
+      const { stdout, exitCode } = cli.run(['fit', '--recipes', '--json'], { cwd: FIXTURE });
       expect(exitCode).toBe(0);
       const output = JSON.parse(stdout);
       expect(output.type).toBe('list-recipes');
@@ -133,7 +94,7 @@ describe('CLI e2e', () => {
     });
 
     it('--check runs a single check', () => {
-      const { stdout } = run('fit', '--json', '--check', 'no-console-log');
+      const { stdout } = cli.run(['fit', '--json', '--check', 'no-console-log'], { cwd: FIXTURE });
       const output = JSON.parse(stdout);
       expect(output.tool).toBe('fit');
       expect(output.verdict).toBeDefined();
@@ -144,7 +105,7 @@ describe('CLI e2e', () => {
     });
 
     it('--recipe quick-smoke runs without error', () => {
-      const { stdout } = run('fit', '--json', '--recipe', 'quick-smoke');
+      const { stdout } = cli.run(['fit', '--json', '--recipe', 'quick-smoke'], { cwd: FIXTURE });
       const output = JSON.parse(stdout);
       expect(output.tool).toBe('fit');
       expect(output.verdict).toBeDefined();
@@ -152,7 +113,7 @@ describe('CLI e2e', () => {
     });
 
     it('--json summary fields have expected types', () => {
-      const { stdout } = run('fit', '--json', '--recipe', 'quick-smoke');
+      const { stdout } = cli.run(['fit', '--json', '--recipe', 'quick-smoke'], { cwd: FIXTURE });
       const output = JSON.parse(stdout);
       expect(typeof output.createdAt).toBe('string');
       expect(typeof output.verdict.score).toBe('number');
@@ -165,7 +126,7 @@ describe('CLI e2e', () => {
       // Regression for 2026-05-25 audit: recipe-not-found must route to
       // CONFIGURATION_ERROR (2), not CHECK_NOT_FOUND (3). Asserting `=== 2`
       // (vs. `not.toBe(0)`) closes the loop on that fix end-to-end.
-      const { stdout, exitCode } = run('fit', '--json', '--recipe', 'nonexistent-recipe');
+      const { stdout, exitCode } = cli.run(['fit', '--json', '--recipe', 'nonexistent-recipe'], { cwd: FIXTURE });
       expect(exitCode).toBe(2);
       const output = JSON.parse(stdout);
       expect(output.error).toBeDefined();
@@ -176,7 +137,7 @@ describe('CLI e2e', () => {
       const tempDir = join(tmpdir(), `opensip-e2e-noconfig-${Date.now()}-${Math.random().toString(36).slice(2)}`);
       mkdirSync(tempDir, { recursive: true });
       try {
-        const { stdout, exitCode } = runIn(tempDir, 'fit', '--json');
+        const { stdout, exitCode } = cli.run(['fit', '--json'], { cwd: tempDir });
         expect(exitCode).toBe(2);
         const output = JSON.parse(stdout);
         expect(output.error).toContain('No opensip-tools.config.yml found');
@@ -196,7 +157,7 @@ describe('CLI e2e', () => {
         mkdirSync(join(tempDir, 'src'), { recursive: true });
         writeFileSync(join(tempDir, 'src', 'a.ts'), 'export const x = 1\n');
 
-        const { stdout, exitCode } = runIn(tempDir, 'fit', '--json', '--check', 'no-console-log', '--config', 'nested/custom.yml');
+        const { stdout, exitCode } = cli.run(['fit', '--json', '--check', 'no-console-log', '--config', 'nested/custom.yml'], { cwd: tempDir });
         expect(exitCode).toBe(0);
         const output = JSON.parse(stdout);
         expect(output.tool).toBe('fit');
@@ -221,7 +182,7 @@ describe('CLI e2e', () => {
         mkdirSync(join(tempDir, 'src'), { recursive: true });
         writeFileSync(join(tempDir, 'src', 'a.ts'), 'export const x = 1\n');
 
-        const { stdout, exitCode } = runIn(tempDir, 'fit', '--json', '--check', 'no-console-log');
+        const { stdout, exitCode } = cli.run(['fit', '--json', '--check', 'no-console-log'], { cwd: tempDir });
         expect(exitCode).toBe(0);
         const output = JSON.parse(stdout);
         expect(output.tool).toBe('fit');
@@ -239,26 +200,26 @@ describe('CLI e2e', () => {
       // mask a misconfig/missing-dep as a green CI run. It is a
       // configuration/unavailable condition (exit 2), distinct from an
       // actual scenario failure (exit 1).
-      const { exitCode } = run('sim');
+      const { exitCode } = cli.run(['sim'], { cwd: FIXTURE });
       expect(exitCode).toBe(2);
     });
 
     it('exits 2 when given an unknown recipe name', () => {
-      const { exitCode } = run('sim', '--recipe', 'nonexistent');
+      const { exitCode } = cli.run(['sim', '--recipe', 'nonexistent'], { cwd: FIXTURE });
       expect(exitCode).toBe(2);
     });
   });
 
   describe('sessions list', () => {
     it('runs without crashing', () => {
-      const { exitCode } = run('sessions', 'list');
+      const { exitCode } = cli.run(['sessions', 'list'], { cwd: FIXTURE });
       expect(exitCode).toBe(0);
     });
   });
 
   describe('plugin list', () => {
     it('shows plugin information', () => {
-      const { stdout, exitCode } = run('plugin', 'list');
+      const { stdout, exitCode } = cli.run(['plugin', 'list'], { cwd: FIXTURE });
       expect(exitCode).toBe(0);
       expect(stdout).toContain('Installed Plugins');
     });
@@ -277,7 +238,7 @@ describe('CLI e2e', () => {
       tempDir = join(tmpdir(), `opensip-e2e-init-${Date.now()}-${Math.random().toString(36).slice(2)}`);
       mkdirSync(tempDir, { recursive: true });
 
-      const { exitCode } = runIn(tempDir, 'init', '--language', 'typescript');
+      const { exitCode } = cli.run(['init', '--language', 'typescript'], { cwd: tempDir });
       expect(exitCode).toBe(0);
 
       expect(existsSync(join(tempDir, 'opensip-tools.config.yml'))).toBe(true);
@@ -292,10 +253,10 @@ describe('CLI e2e', () => {
       mkdirSync(tempDir, { recursive: true });
 
       // First run creates the layout.
-      runIn(tempDir, 'init', '--language', 'typescript');
+      cli.run(['init', '--language', 'typescript'], { cwd: tempDir });
       // Second run refuses with exit 2 and surfaces a partialStateError
       // pointing at --keep / --remove.
-      const { stdout, exitCode } = runIn(tempDir, 'init', '--language', 'typescript', '--json');
+      const { stdout, exitCode } = cli.run(['init', '--language', 'typescript', '--json'], { cwd: tempDir });
       expect(exitCode).toBe(2);
       const output = JSON.parse(stdout);
       expect(output.created).toBe(false);
@@ -307,7 +268,7 @@ describe('CLI e2e', () => {
       tempDir = join(tmpdir(), `opensip-e2e-init3-${Date.now()}-${Math.random().toString(36).slice(2)}`);
       mkdirSync(tempDir, { recursive: true });
 
-      const { exitCode } = runIn(tempDir, 'init', '--json');
+      const { exitCode } = cli.run(['init', '--json'], { cwd: tempDir });
       expect(exitCode).toBe(2);
       // Nothing should have been written.
       expect(existsSync(join(tempDir, 'opensip-tools.config.yml'))).toBe(false);
@@ -316,7 +277,7 @@ describe('CLI e2e', () => {
 
   describe('output cleanliness', () => {
     it('NO_COLOR=1 disables ANSI escape sequences', () => {
-      const { stdout } = run('--help');
+      const { stdout } = cli.run(['--help'], { cwd: FIXTURE });
       // ANSI escape sequences start with ESC (0x1b)
        
       const hasAnsi = stdout.includes('[');
@@ -324,7 +285,7 @@ describe('CLI e2e', () => {
     });
 
     it('--list output has no ANSI escape sequences', () => {
-      const { stdout } = run('fit', '--list');
+      const { stdout } = cli.run(['fit', '--list'], { cwd: FIXTURE });
        
       const hasAnsi = stdout.includes('[');
       expect(hasAnsi).toBe(false);

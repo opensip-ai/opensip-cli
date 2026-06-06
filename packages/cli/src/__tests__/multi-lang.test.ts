@@ -7,35 +7,19 @@
  * fixtures/multi-lang sample tree as input.
  */
 
-import { spawnSync } from 'node:child_process'
 import { readFileSync, readdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { beforeEach, describe, expect, it } from 'vitest'
 
+import { distRunner } from './harness/cli-acceptance.js'
+
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
-const CLI = join(__dirname, '../../dist/index.js')
 const FIXTURE = join(__dirname, 'fixtures/multi-lang')
 const UNKNOWN_FIXTURE = join(__dirname, 'fixtures/unknown-language')
 
-function runIn(cwd: string, ...args: string[]): { stdout: string; stderr: string; exitCode: number } {
-  const result = spawnSync('node', [CLI, ...args], {
-    cwd,
-    encoding: 'utf8',
-    timeout: 60_000,
-    env: { ...process.env, NO_COLOR: '1' },
-  })
-  return {
-    stdout: result.stdout ?? '',
-    stderr: result.stderr ?? '',
-    exitCode: result.status ?? 1,
-  }
-}
-
-function run(...args: string[]): { stdout: string; stderr: string; exitCode: number } {
-  return runIn(FIXTURE, ...args)
-}
+const cli = distRunner()
 
 describe('CLI multi-language', () => {
   beforeEach(() => {
@@ -46,7 +30,7 @@ describe('CLI multi-language', () => {
   it('lists language adapters for all six bundled languages', () => {
     // The CLI doesn't expose adapters via --list yet; verify by running
     // fit and checking it doesn't throw on any of the language targets.
-    const result = run('fit', '--json')
+    const result = cli.run(['fit', '--json'], { cwd: FIXTURE })
     expect([0, 1]).toContain(result.exitCode) // 0 if all pass, 1 if some fail (acceptable in fixture)
     const output: unknown = JSON.parse(result.stdout)
     expect(typeof output).toBe('object')
@@ -54,7 +38,7 @@ describe('CLI multi-language', () => {
   })
 
   it('produces no plugin-load errors for the fixture', () => {
-    const result = run('fit', '--json')
+    const result = cli.run(['fit', '--json'], { cwd: FIXTURE })
     // stderr may have warnings about unrelated things, but no
     // "lang plugin failed to load" or "plugin failed to load"
     expect(result.stderr).not.toContain('lang plugin failed to load')
@@ -83,7 +67,7 @@ describe('CLI multi-language', () => {
   })
 
   it('warns loudly when a target declares an unrecognized language tag', () => {
-    const result = runIn(UNKNOWN_FIXTURE, 'fit', '--json')
+    const result = cli.run(['fit', '--json'], { cwd: UNKNOWN_FIXTURE })
     // Phase 9 contract: an unrecognized language tag (here `klingon` —
     // no content-filter adapter and not a recognized non-code format)
     // produces a stderr warning and continues running. The fit command

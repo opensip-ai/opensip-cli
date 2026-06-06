@@ -15,7 +15,6 @@
  * the build must be done first (pnpm --filter=opensip-tools build).
  */
 
-import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -23,26 +22,14 @@ import { fileURLToPath } from 'node:url';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { distRunner } from './harness/cli-acceptance.js';
+
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
-const CLI = join(__dirname, '../../dist/index.js');
+
+const cli = distRunner();
 
 function runCli(args: string[], cwd: string, env: Record<string, string> = {}): { stdout: string; stderr: string; exitCode: number } {
-  try {
-    const stdout = execFileSync('node', [CLI, ...args], {
-      cwd,
-      encoding: 'utf8',
-      timeout: 60_000,
-      env: { ...process.env, NO_COLOR: '1', ...env },
-    });
-    return { stdout, stderr: '', exitCode: 0 };
-  } catch (error) {
-    const e = error as { stdout?: string | Buffer; stderr?: string | Buffer; status?: number };
-    return {
-      stdout: typeof e.stdout === 'string' ? e.stdout : e.stdout?.toString() ?? '',
-      stderr: typeof e.stderr === 'string' ? e.stderr : e.stderr?.toString() ?? '',
-      exitCode: e.status ?? 1,
-    };
-  }
+  return cli.run(args, { cwd, env });
 }
 
 let testDir: string;
