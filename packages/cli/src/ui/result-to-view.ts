@@ -231,13 +231,12 @@ export function envelopeToTableView(envelope: SignalEnvelope, verboseDetail?: Ve
 /** Map any CommandResult to its view-model node (total — every variant covered). */
 export function resultToView(result: CommandResult): ViewNode {
   switch (result.type) {
-    case 'fit-done': {
-      // ADR-0011 (fitness migrated, Phase 6): the result always carries an
-      // envelope; the terminal table is derived from it (one row per check
-      // unit, with the fitness-only Validated/Ignores columns). ADR-0021: the
-      // optional verbose findings body renders above the table in both media,
-      // and a non-verbose run shows the shared "Use --verbose…" hint (matching
-      // graph and the TTY live view).
+    // fit (Phase 6) and sim (Phase 4) are both envelope-backed: the terminal
+    // table is derived from the envelope (one row per check/scenario unit) and
+    // the optional verbose body + non-verbose "Use --verbose…" hint render
+    // through the one shared seam (ADR-0011/ADR-0021), identically in TTY/pipe.
+    case 'fit-done':
+    case 'sim-done': {
       return withVerboseHint(
         envelopeToTableView(result.envelope, result.verboseDetail),
         result.verboseDetail === undefined,
@@ -245,16 +244,6 @@ export function resultToView(result: CommandResult): ViewNode {
     }
     case 'error': {
       return errorView(result);
-    }
-    case 'sim-done': {
-      // sim is migrated (Phase 4): the result always carries an envelope and
-      // the per-scenario table is derived from it (one unit row per scenario).
-      // ADR-0021: the optional verbose per-scenario body renders above it, and a
-      // non-verbose run shows the shared "Use --verbose…" hint.
-      return withVerboseHint(
-        envelopeToTableView(result.envelope, result.verboseDetail),
-        result.verboseDetail === undefined,
-      );
     }
     case 'graph-done': {
       // graph keeps its own rich report view (it delivers signals via an

@@ -35,6 +35,34 @@ export interface FindingGroupUnit {
   readonly error?: string;
 }
 
+/** Group a run's signals by `signal.source` (the emitting unit's slug). */
+function indexBySource(signals: readonly Signal[]): Map<string, Signal[]> {
+  const bySource = new Map<string, Signal[]>();
+  for (const signal of signals) {
+    const bucket = bySource.get(signal.source);
+    if (bucket) bucket.push(signal);
+    else bySource.set(signal.source, [signal]);
+  }
+  return bySource;
+}
+
+/** Build one finding group for a unit + its findings (counts the rungs). */
+function groupForUnit(unit: FindingGroupUnit, findings: readonly Signal[], title: string): FindingGroup {
+  let errorCount = 0;
+  let warningCount = 0;
+  for (const s of findings) {
+    if (isErrorSignal(s)) errorCount += 1;
+    else warningCount += 1;
+  }
+  return {
+    title,
+    ...(unit.error === undefined ? {} : { error: unit.error }),
+    errorCount,
+    warningCount,
+    findings: findings.map(toFindingLine),
+  };
+}
+
 /**
  * Group a run's signals by `signal.source` (the emitting unit's slug) into the
  * verbose `FindingGroup[]` — one block per unit that emitted ≥1 finding or that
@@ -46,30 +74,12 @@ export function buildFindingGroups(
   signals: readonly Signal[],
   displayName: (slug: string) => string = (slug) => slug,
 ): FindingGroup[] {
-  const bySource = new Map<string, Signal[]>();
-  for (const signal of signals) {
-    const bucket = bySource.get(signal.source);
-    if (bucket) bucket.push(signal);
-    else bySource.set(signal.source, [signal]);
-  }
-
+  const bySource = indexBySource(signals);
   const groups: FindingGroup[] = [];
   for (const unit of units) {
     const findings = bySource.get(unit.slug) ?? [];
     if (findings.length === 0 && unit.error === undefined) continue;
-    let errorCount = 0;
-    let warningCount = 0;
-    for (const s of findings) {
-      if (isErrorSignal(s)) errorCount += 1;
-      else warningCount += 1;
-    }
-    groups.push({
-      title: displayName(unit.slug),
-      ...(unit.error === undefined ? {} : { error: unit.error }),
-      errorCount,
-      warningCount,
-      findings: findings.map(toFindingLine),
-    });
+    groups.push(groupForUnit(unit, findings, displayName(unit.slug)));
   }
   return groups;
 }
