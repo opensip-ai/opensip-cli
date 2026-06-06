@@ -34,7 +34,7 @@ export interface GraphRecipeCatalogEntry {
 }
 
 /**
- * Build the rule catalog from the scope's rule registry. All five built-in
+ * Build the rule catalog from the scope's rule registry. Built-in graph
  * rules are first-party, so `source` is hardcoded `'built-in'` for now —
  * graph has no community-rule namespace registry yet (documented; a richer
  * display can land with Plan D rules). Returns `[]` when the graph subscope

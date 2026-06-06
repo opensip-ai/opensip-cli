@@ -1,10 +1,9 @@
 /**
  * Per-check fixture-coverage allowlist for checks-cpp (testing gap P0).
  *
- * `ALLOWLIST` names shipped checks that do NOT yet have clean+violation
- * fixtures in a co-located `__fixtures__/<slug>/` directory. It MUST shrink to `[]`
- * — each entry is a check whose pass/fail coverage is still owed. Once empty,
- * Phase 5 drops `allowNonEmptyAllowlist` so a new uncovered check fails CI.
+ * `ALLOWLIST` is currently empty: there are no shipped, fixture-exercisable
+ * checks missing clean+violation fixtures. A future entry would mean a check
+ * whose pass/fail fixture coverage is still owed.
  *
  * `COMMAND_EXEMPTIONS` are `analysisMode:'command'` checks that shell out to
  * external tools and cannot be exercised by writing a fixture file; they are

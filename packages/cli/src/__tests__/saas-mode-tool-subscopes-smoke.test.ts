@@ -167,7 +167,7 @@ describe('SaaS-mode tool-subscope isolation', () => {
     const scopeB = makeScopeWithBothTools();
 
     expect(scopeA.graph!.rules).not.toBe(scopeB.graph!.rules);
-    // Both are seeded with the same six built-in rules at construction.
+    // Both are seeded with the same built-in rules at construction.
     expect(scopeA.graph!.rules.getAll().length).toBeGreaterThan(0);
     expect(scopeA.graph!.rules.getAll().length).toBe(scopeB.graph!.rules.getAll().length);
 

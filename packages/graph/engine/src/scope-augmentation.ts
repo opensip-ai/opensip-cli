@@ -12,7 +12,7 @@
  *
  *   - lang-adapter `registry` — per-process language adapter registry.
  *   - rules `registry`        — per-process rule registry (seeded with
- *                              the six built-in rules at construction).
+ *                              the built-in rules at construction).
  *
  * Both are now per-RunScope. The graph tool's `contributeScope` hook (in
  * `tool.ts`) instantiates fresh registries and attaches them to
@@ -39,7 +39,7 @@ export interface GraphSubscope {
    *  adapter packages (graph-typescript, graph-python, graph-rust)
    *  register via the CLI's discovery walker. */
   readonly adapters: GraphAdapterRegistry;
-  /** Rule registry — pre-seeded with the six built-in rules. */
+  /** Rule registry — pre-seeded with the built-in rules. */
   readonly rules: GraphRulesRegistry;
   /** Recipe registry — pre-seeded with the built-in graph recipes. */
   readonly recipes: GraphRecipeRegistry;

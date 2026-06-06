@@ -2,21 +2,27 @@
 /**
  * dependency-cruiser config — enforces the layered architecture.
  *
- * Layer order (lower depends on higher only):
+ * Layer order (lower numbers are more foundational; higher layers may depend
+ * on lower layers, but lower layers must not import upward):
  *
  *   1. @opensip-tools/core           — kernel
  *   2. @opensip-tools/datastore      — SQLite + Drizzle persistence layer
- *   3. @opensip-tools/contracts      — shared contract types (SignalEnvelope, CommandResult, exit codes)
- *   4. @opensip-tools/lang-*         — language adapters (depend on core)
+ *   2. @opensip-tools/contracts      — shared contract types (SignalEnvelope, CommandResult, exit codes)
+ *   2. @opensip-tools/tree-sitter    — grammar-agnostic parser substrate
+ *   2. @opensip-tools/cli-ui         — shared Ink/React presentational primitives
+ *   3. @opensip-tools/session-store  — session persistence over datastore/contracts
+ *   3. @opensip-tools/output         — signal-envelope formatters + sinks
+ *   3. @opensip-tools/lang-*         — language adapters
+ *   3. @opensip-tools/dashboard      — HTML report generator (core + contracts)
  *   4. @opensip-tools/fitness        — fitness engine + cli/* commands
  *   4. @opensip-tools/simulation     — simulation engine + cli/* commands
- *   4. @opensip-tools/dashboard      — HTML report generator (depends on core + contracts)
- *   4. @opensip-tools/cli-ui         — shared Ink/React presentational primitives (banner, spinner, header, theme)
+ *   4. @opensip-tools/graph          — graph engine + cli/* commands
  *   5. @opensip-tools/checks-*       — fitness check packs (depend on fitness)
- *   6. opensip-tools            — entry point (depends on every tool)
+ *   5. @opensip-tools/graph-*        — graph adapter packs (depend on graph)
+ *   6. opensip-tools                 — CLI composition root (depends on tools)
  *
- * Forbidden edges enforce that dependencies flow from lower-numbered layers
- * upward only — a higher layer must never reach DOWN into a lower layer.
+ * Forbidden edges pin these import boundaries package by package; adjacent
+ * packages at the same displayed layer can still have stricter allowlists.
  *
  * The previous lang-typescript → fitness back-edge for filterContent was
  * paid down (Wave 3 Chain E / Phase D3): filterContent / clearFilterCache /
@@ -645,8 +651,8 @@ module.exports = {
     },
     // PR 3 of plan 2026-05-23-plan-graph-adapter-package-split.md
     // deleted graph-pipeline-no-lang-import and
-    // graph-orchestrate-no-direct-lang-import. With all three first-
-    // party adapter subtrees relocated into their own packages, the
+    // graph-orchestrate-no-direct-lang-import. With first-party adapter
+    // subtrees relocated into their own packages, the
     // engine has no `engine/src/lang-*` directory to police; the
     // package-edge rule graph-engine-no-adapter-packs (below) takes
     // over and is strictly stronger because pnpm + the lockfile
@@ -763,8 +769,8 @@ module.exports = {
     // deleted graph-no-tree-sitter-import-outside-lang-packs. The
     // engine no longer declares tree-sitter as a runtime dependency,
     // so there is nothing for any engine/src/* file to import.
-    // tree-sitter ships only as a dep of the @opensip-tools/graph-
-    // (python|rust) adapter packs, where it belongs.
+    // tree-sitter ships only through adapter/substrate packages, where it
+    // belongs.
     //
     // ADR-0010 restored: that deletion removed the ENGINE-scoped guard, but the
     // ADR's enforcement-reason requires the broader invariant — construction of

@@ -17,9 +17,9 @@
  *   cacheKey         → ./cache-key.ts
  *   ruleHints        → ./rule-hints.ts
  *
- * Files outside this subtree are forbidden from importing tree-sitter
- * directly; the dep-cruiser rule
- * `graph-no-tree-sitter-import-outside-lang-packs` enforces it.
+ * Production graph adapters are forbidden from importing `web-tree-sitter`
+ * directly; the ADR-0010 restricted-import rule in the shared ESLint config
+ * enforces it.
  */
 
 import { cacheKey as pythonCacheKey } from './cache-key.js';

@@ -2,8 +2,8 @@
  * @fileoverview Shared rule-trigger fixture for the golden-fingerprint and
  * signal-output snapshot tests.
  *
- * Builds one `Catalog` whose occurrences collectively trigger all five
- * built-in rules:
+ * Builds one `Catalog` whose occurrences collectively trigger the original
+ * five-rule golden set:
  *   - `graph:orphan-subtree`         — `orphanFn` (unreachable, no callers)
  *   - `graph:test-only-reachable`    — `testHelperFn` (reached only from a test file)
  *   - `graph:no-side-effect-path`    — `pureFn` (pure, ≥2 calls, span ≥10, discarded caller)

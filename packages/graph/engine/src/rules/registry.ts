@@ -5,13 +5,13 @@
  * Each `RunScope` owns its own rule registry (Item 1 / D7). The graph
  * tool's `contributeScope` hook constructs a fresh registry per CLI
  * invocation and attaches it to `scope.graph.rules`. The registry is
- * seeded with the five built-in rules at construction.
+ * seeded with the built-in rules at construction.
  *
  * Built on the kernel's unified `Registry<T>` with
  * `duplicatePolicy: 'warn-first-wins'` — re-registering the same rule
  * slug keeps the incumbent and emits a structured warning.
  *
- * v0.2 shipped with five built-in rules; runtime rule loading is
+ * v0.2 shipped with the first built-in rules; runtime rule loading is
  * deferred to v0.3 per DEC-6. The legacy `rules` array export was a
  * process-level snapshot read by `orchestrate`/`graph` CLI commands;
  * it's gone. Callers now use the `currentRules()` helper.

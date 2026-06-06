@@ -1,11 +1,9 @@
 /**
  * Unit tests for the language-adapter registry.
  *
- * The registry is a process-global Map<string, GraphLanguageAdapter>.
- * Every test starts by clearing it so registration state is
- * deterministic, and restores any previous adapters afterwards (today
- * tests don't run alongside a bootstrap-time registration, but the
- * registry is global so we still need to clean up).
+ * The registry is resolved from the current RunScope. Every test enters a
+ * fresh graph scope and clears that scope-bound registry after the case, so
+ * registration state stays deterministic.
  */
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';

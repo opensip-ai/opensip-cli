@@ -4,9 +4,9 @@
  *
  * Promoted (moved, not copied) from graph's `renderSarifOpenSip`
  * (`graph/engine/src/render/sarif-opensip.ts`), which already walked
- * `Signal[]` directly — the better SARIF builder. The `CliOutput`-based
- * `buildSarifLog` (`../sarif.ts`) is retired once fitness/graph stop using it
- * (Phase 7). This is the ONE sarif formatter post-migration.
+ * `Signal[]` directly — the better SARIF builder. The older `CliOutput`-
+ * based SARIF path is retired; this is the one SARIF formatter
+ * post-migration.
  *
  * Two surfaces:
  *
@@ -14,7 +14,7 @@
  *   identity → SARIF string. It emits each signal's `ruleId` **as-is**; the
  *   graph-specific `engine-slug → OpenSIP-rule-ID` mapping stays in graph
  *   (tool vocabulary does not belong in this tool-agnostic layer) and is
- *   applied by graph's temporary re-export before calling in.
+ *   applied while graph builds its {@link SignalEnvelope}.
  * - {@link formatSignalSarif} — the canonical {@link Formatter}: reads
  *   `signals`/`tool` off the envelope and derives the driver name
  *   (`opensip-tools-<tool>`). Pure: no IO, no clock, no id generation.

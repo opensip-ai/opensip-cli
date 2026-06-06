@@ -150,12 +150,11 @@ export type {
   GraphAdapterPackageMetadata,
 } from './plugins/graph-adapter-discovery.js';
 
-// PR 3 of plan 2026-05-23-plan-graph-adapter-package-split.md: with
-// all three first-party adapters relocated into their own packages
-// (graph-typescript, graph-python, graph-rust), the engine no longer
-// re-exports any adapter, parsed-project type, or rule-hints
-// constant. Cross-package tests import directly from each adapter
-// pack.
+// PR 3 of plan 2026-05-23-plan-graph-adapter-package-split.md:
+// first-party adapters live in their own graph-* packages, so the
+// engine no longer re-exports any adapter, parsed-project type, or
+// rule-hints constant. Cross-package tests import directly from each
+// adapter pack.
 
 // `ownerEdgeKey` is public API: the tree-sitter adapter packs consume it to
 // emit owner edges consistently with the engine (part of the adapter contract).

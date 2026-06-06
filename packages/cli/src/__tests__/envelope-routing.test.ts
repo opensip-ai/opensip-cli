@@ -4,8 +4,9 @@
  * (`emitEnvelope` → `formatSignalJson` → stdout), the terminal table
  * (`renderResult` → `envelopeToTableView`), cloud sync (`deliverEnvelope` →
  * `scope.signalSink`), and `--report-to` (envelope → SARIF → http, owning
- * exit 4) — driven by a hand-built envelope. Tools are NOT yet migrated, so
- * a result WITHOUT an envelope must still take the legacy render path.
+ * exit 4) — driven by a hand-built envelope. This pins the migrated root path:
+ * envelope-bearing tool results are rendered and delivered by the composition
+ * root instead of by tool-local formatters.
  */
 import { renderToText } from '@opensip-tools/cli-ui';
 import { EXIT_CODES, type FitDoneResult, type SignalEnvelope } from '@opensip-tools/contracts';

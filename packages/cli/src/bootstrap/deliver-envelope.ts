@@ -3,8 +3,8 @@
  * deliver-envelope — the composition root's signal-delivery step (ADR-0011,
  * Phase 3).
  *
- * After a migrated tool returns its {@link SignalEnvelope}, the root — not the
- * tool — delivers it to the effectful sinks:
+ * After a tool returns its {@link SignalEnvelope}, the root — not the tool —
+ * delivers it to the effectful sinks:
  *
  *   1. **Cloud sync (best-effort).** Map the envelope → `SignalBatch`
  *      (`@opensip-tools/core` `buildSignalBatch`, adding repo identity and
@@ -21,10 +21,9 @@
  *      otherwise passed; a real check/gate failure (`runFailed`) dominates and
  *      is never masked by a reporting failure (ADR-0008).
  *
- * This is the seam that lets the tool engines drop their `@opensip-tools/output`
- * dependency (they stop calling `emitRunSignals` / `reportToCloud` themselves).
- * It is wired into the tools' result handoff as they migrate (Phases 4–6); in
- * Phase 3 it is additive and dormant for un-migrated tools.
+ * This is the seam that keeps tool engines free of `@opensip-tools/output`:
+ * engines return envelopes, and the composition root owns formatting,
+ * delivery, and report-upload exit-code policy.
  */
 
 import { mkdir, writeFile } from 'node:fs/promises';

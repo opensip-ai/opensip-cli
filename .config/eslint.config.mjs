@@ -290,10 +290,9 @@ export default tseslint.config(
   // A migrated graph adapter parses via its @opensip-tools/lang-* package and
   // sources all tree-sitter surface (incl. the Node type) from
   // @opensip-tools/tree-sitter. It must not reach back to web-tree-sitter
-  // directly. As each remaining language migrates to lang-*, add its graph-*
-  // glob here; once all four are migrated, graph-adapter-common/parse.ts goes
-  // away and this can generalize to "web-tree-sitter only in tree-sitter +
-  // lang-*".
+  // directly. The four tree-sitter graph adapters are now covered here; the
+  // remaining graph-adapter-common parse surface is shared type/driver code,
+  // not a place that constructs parsers.
   // ---------------------------------------------------------------------------
   {
     files: ['packages/graph/graph-{python,rust,go,java}/src/**/*.ts'],

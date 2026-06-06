@@ -1,11 +1,12 @@
-// @fitness-ignore-file file-length-limit -- Contract test suite covering the 9 behavioral invariants (I-1..I-9) for all three GraphLanguageAdapter implementations (TS/Python/Rust); splitting per-language fragments the single-source contract document those tests verify.
+// @fitness-ignore-file file-length-limit -- Contract test suite covering the 9 behavioral invariants (I-1..I-9) for the TS/Python/Rust GraphLanguageAdapter cohort exercised here; splitting per-language fragments the single-source contract document those tests verify.
 /**
  * GraphLanguageAdapter contract test suite.
  *
  * Validates each of the 9 behavioral invariants (I-1 through I-9)
  * defined in docs/plans/11-graph-language-adapter-contract.md §3
- * against `typescriptGraphAdapter`. Future adapter PRs add `describe`
- * blocks against their own fixtures referencing the same invariants.
+ * against the TS/Python/Rust adapters covered in this suite. Additional
+ * adapter cohorts can add `describe` blocks against their own fixtures while
+ * referencing the same invariants.
  *
  * Each test names the invariant it covers in the title so reviewers
  * can map a failure straight to the contract clause.

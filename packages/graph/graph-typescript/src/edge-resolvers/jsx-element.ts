@@ -6,8 +6,8 @@
  * via the type checker. Lower-cased intrinsic elements (`<div />`)
  * are ignored — they have no catalog entry.
  *
- * Stage 2 entry point. P2 ships a stub returning UNRESOLVED;
- * full implementation lands in P3.
+ * Returns `UNRESOLVED` only when the JSX tag is intrinsic or the type checker
+ * cannot connect the component tag back to a cataloged declaration.
  */
 
 import ts from 'typescript';

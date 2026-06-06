@@ -2,11 +2,11 @@
  * @fileoverview Per-unit recipe configuration accessors — the generic
  * half of the recipe substrate's config-override surface.
  *
- * A recipe can carry a `config` map keyed by unit slug (checks today,
- * rules in a later phase). The recipe service projects this map into the
- * current `RunScope`'s `recipeUnitConfig` slot before any unit runs and
- * clears it once the run completes. Each unit reads its slice via
- * `getUnitConfig<T>(slug)` and merges it with its built-in defaults.
+ * A recipe can carry a `config` map keyed by unit slug. Tool-specific recipe
+ * services project this map into the current `RunScope`'s `recipeUnitConfig`
+ * slot before any unit runs and clear it once the run completes. Each unit
+ * reads its slice via `getUnitConfig<T>(slug)` and merges it with its built-in
+ * defaults.
  *
  * Scope-bound (not module-bound) lookup is load-bearing — the runtime
  * frequently has TWO copies of a tool package loaded:

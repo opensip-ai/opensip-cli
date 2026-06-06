@@ -23,8 +23,7 @@ interface LifecycleType {
 }
 
 /**
- * Phase 1: Hardcoded registry of known types with lifecycle methods.
- * Avoids the complexity of dynamic type scanning.
+ * Hardcoded registry of known types with lifecycle methods.
  * Extend this list as new lifecycle types are identified.
  */
 const KNOWN_LIFECYCLE_TYPES: readonly LifecycleType[] = [
@@ -254,7 +253,7 @@ function analyzeCleanupCoverage(absolutePath: string, content: string): CheckVio
  * Check: quality/lifecycle-cleanup-enforcement
  *
  * Detects resources with lifecycle methods (destroy, close, shutdown, stop, disconnect)
- * created without cleanup. Uses a hardcoded registry of known types for Phase 1.
+ * created without cleanup. Uses a hardcoded registry of known lifecycle types.
  */
 export const lifecycleCleanupEnforcement = defineCheck({
   id: '6350ce24-8ccc-4607-a962-8b067633547c',

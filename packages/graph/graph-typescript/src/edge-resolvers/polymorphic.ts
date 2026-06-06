@@ -2,9 +2,6 @@
 /**
  * Resolve method calls on interfaces / abstract classes to all
  * implementations.
- *
- * P2 ships a stub returning UNRESOLVED; P3 enriches via type-checker
- * inspection of the receiver's declared type.
  */
 
 import ts from 'typescript';

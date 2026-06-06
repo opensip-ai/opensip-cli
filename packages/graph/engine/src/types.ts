@@ -4,8 +4,8 @@ import type { Signal } from '@opensip-tools/core';
  * `RuleHints` — adapter-supplied per-language rule input. Historically
  * declared in `lang-adapter/types.ts` and re-exported here so rule
  * modules under `rules/` could consult hints without importing from
- * `lang-adapter/` (the dep-cruiser rule `graph-pipeline-no-lang-import`
- * bans `rules/` from reaching into any `lang-*` directory).
+ * `lang-adapter/`. Keeping the type in the engine's shared type layer preserves
+ * that direction after the old in-package `lang-*` directory rules were retired.
  *
  * The original re-export created a `types.ts ↔ lang-adapter/types.ts`
  * file-level cycle reported by `circular-import-detection`. The fix is

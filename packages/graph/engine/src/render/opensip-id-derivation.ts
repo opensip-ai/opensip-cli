@@ -13,12 +13,12 @@
  * when the file is renamed or lines shift.
  *
  * Cross-repo source-of-truth risk: if opensip's algorithm changes,
- * this mirror desynchronizes silently. Mitigation: Phase 13 ships a
- * cross-repo golden test that imports `computeSymbolId` from opensip
- * and `deriveOpenSipSymbolId` from engine and asserts identical output
- * on a shared fixture set. The engine-package version (carried in
- * `CatalogExportProvenance.engineVersion`) documents the cutover
- * boundary if the algorithm ever evolves.
+ * this mirror desynchronizes silently. The local golden tests pin this
+ * package's implementation; a cross-repo parity test should compare it
+ * against opensip's `computeSymbolId` / `computeEdgeId` whenever that
+ * source is available. The engine-package version (carried in
+ * `CatalogExportProvenance.engineVersion`) documents the cutover boundary
+ * if the algorithm ever evolves.
  *
  * Phase 3 Task 3.2 per DEC-498.
  */

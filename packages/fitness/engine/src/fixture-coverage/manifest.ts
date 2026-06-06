@@ -57,7 +57,7 @@ export interface CheckFixtureRequirement {
   readonly fixtureBasenames: readonly string[]
 }
 
-/** Per-pack list of slugs not yet covered; must shrink to []. */
+/** Per-pack temporary coverage gaps. Non-empty lists fail unless explicitly waived. */
 export type CoverageAllowlist = readonly string[]
 /** Per-pack command-mode exemptions: slug → justification. */
 export type CommandExemptions = Readonly<Record<string, string>>

@@ -31,9 +31,8 @@ function hintsToText(items: readonly HintItem[]): string {
 
 /**
  * Minimal table rendering: a header row then cell rows, cells joined by
- * two spaces. Column-width alignment is intentionally deferred to a later
- * phase (see the dual-renderer plan, Phase 5); this keeps the `table`
- * node total without over-building before there is a consumer.
+ * two spaces. Column-width alignment is intentionally not attempted here; the
+ * plain-text path only promises stable, ANSI-free content.
  */
 function tableToText(columns: readonly string[], rows: readonly (readonly Span[])[]): string {
   const header = columns.join('  ');

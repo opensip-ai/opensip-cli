@@ -4,9 +4,9 @@
 /**
  * graphTool — graph as a Tool plugin.
  *
- * Owns the Commander wiring for the single `graph` subcommand. The CLI
- * calls register() once at startup; this file owns the option-parsing
- * surface and dispatches to cli/graph.ts.
+ * Owns the Commander wiring for the graph command surface. The CLI calls
+ * register() once at startup; this file owns the option-parsing surface and
+ * dispatches to the graph CLI helpers.
  *
  * Per spec §10A AC-2 / AC-1: this module does NOT import from
  * opensip-tools. It receives the ToolCliContext interface from
@@ -23,11 +23,10 @@ import { type CliProgram } from '@opensip-tools/contracts';
 import { ConfigurationError, logger, readPackageVersion, ValidationError } from '@opensip-tools/core';
 
 // PR 3 of plan 2026-05-23-plan-graph-adapter-package-split.md: the
-// engine no longer hosts any adapter source. All three first-party
-// adapters (typescript, python, rust) live in their own packages and
-// register themselves via the CLI's discovery walker
-// (register-graph-adapters.ts). The historical engine-side bootstrap
-// is gone.
+// engine no longer hosts adapter source. First-party adapters live in
+// their own packages and register via the CLI's discovery walker
+// (register-graph-adapters.ts). The historical engine-side bootstrap is
+// gone.
 import { exportGraphBaseline } from './cli/baseline-export.js';
 import { buildGraphRecipeCatalog, buildGraphRuleCatalog } from './cli/dashboard-data.js';
 import { runCatalogJsonMode } from './cli/graph-modes.js';

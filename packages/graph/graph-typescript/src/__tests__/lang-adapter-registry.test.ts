@@ -67,7 +67,8 @@ describe('pickAdapter — registry-size shortcuts', () => {
 });
 
 /**
- * Register all three first-party adapters into the CURRENT scope.
+ * Register the three adapters covered by this dominance test into the CURRENT
+ * scope.
  * Lives at module scope (rather than inside a describe block) for
  * eslint's consistent-function-scoping rule. Called from each test
  * body in the dominance-heuristic block: vitest's hook → test

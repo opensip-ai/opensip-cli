@@ -7,9 +7,9 @@
  * `.function-card-overlay` element to <body>. Re-opening swaps the
  * content of the same overlay (singleton invariant — §10.2).
  *
- * Closes on Escape key (panel orchestrator), close-button click, and
- * click on the overlay backdrop. The "open in editor" and "trace from
- * entry" buttons are wired in P9.
+ * Closes on Escape key (panel orchestrator), close-button click, and click on
+ * the overlay backdrop. "Trace from entry" renders the shortest indexed path
+ * from an inferred entry point when one exists.
  */
 
 export function dashboardFunctionCardJs(): string {
@@ -140,8 +140,7 @@ function openFunctionCard(bodyHash) {
 }
 
 function renderTraceInCard(card, path) {
-  // Replace the body of the card with the rendered trace path. Phase P9
-  // produces a real path; before then this shows a "not yet wired" hint.
+  // Replace the body of the card with the rendered trace path.
   const old = card.querySelector('.fc-trace-result');
   if (old) old.parentNode.removeChild(old);
   const section = el('div', { class: 'fc-section fc-trace-result' });

@@ -9,13 +9,13 @@
  * packageCoupling) are materialized into the catalog JSON only when the
  * producing run requests them.
  *
- * Algorithms here are verbatim ports of analyses that previously lived only
- * as client-side JavaScript inside the dashboard (`code-paths/indexes.ts`
- * blast, `code-paths/scc.ts` Tarjan, `code-paths/view-coupling.ts` coupling)
- * or inline inside individual rules (the `endLine − line + 1` span,
- * `orphan-subtree`'s reachability BFS, `test-only-reachable`'s prod BFS). The
- * engine is now the single canonical home; Phase 5 deletes the rule-local
- * copies and Phase 6 deletes the client-JS copies.
+ * Algorithms here are ports of analyses that first lived in dashboard-side
+ * JavaScript (`code-paths/indexes.ts` blast, `code-paths/scc.ts` Tarjan,
+ * `code-paths/view-coupling.ts` coupling) or inline inside individual rules
+ * (the `endLine − line + 1` span, `orphan-subtree`'s reachability BFS,
+ * `test-only-reachable`'s prod BFS). The engine is now the canonical home for
+ * computed feature columns; dashboard helpers still assemble view-local
+ * indexes and drilldowns from the catalog plus the precomputed features.
  */
 
 import { logger } from '@opensip-tools/core';

@@ -11,10 +11,9 @@
  *      arity-null vs arity-0 distinction, unresolved-edge differentiation.
  *
  * Cross-repo validation (engine ↔ opensip symbol-id.ts byte-equivalence)
- * lands in Phase 13's golden test, which imports both implementations
- * and asserts identical output on a shared fixture set. The golden
- * values here are pre-computed against opensip's algorithm; Phase 13
- * verifies the relationship empirically.
+ * belongs in a parity test that can import both implementations. The golden
+ * values here are pre-computed against opensip's algorithm and pin the local
+ * mirror until such a cross-repo fixture is available.
  *
  * Phase 3 Task 3.2 per DEC-498.
  */

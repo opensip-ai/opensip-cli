@@ -4,10 +4,10 @@
  *
  * `fingerprintSignal(s)` = `ruleId|filePath|line|column` (fingerprint-signal.ts).
  * This is the baseline + Code-Scanning identity: renaming a slug or shifting a
- * finding's location invalidates every saved gate baseline. This test runs all
- * five `BUILT_IN_RULES` over a fixture that triggers each, fingerprints every
- * emitted Signal, sorts, and asserts the multiset equals the checked-in golden
- * `fingerprint-baseline.json`.
+ * finding's location invalidates every saved gate baseline. This test runs the
+ * original five-rule golden set over a fixture that triggers each,
+ * fingerprints every emitted Signal, sorts, and asserts the multiset equals
+ * the checked-in golden `fingerprint-baseline.json`.
  *
  * The golden baseline is byte-identical to the pre-refactor output: the port to
  * `defineRule` only wraps `evaluate` in a positional→object adapter, and the
@@ -41,7 +41,7 @@ const BASELINE_PATH = join(HERE, '__fixtures__', 'fingerprint-baseline.json');
 
 const EMPTY_CONFIG: GraphConfig = {};
 
-// The five built-in rules in registration order (mirrors registry.ts).
+// Original five-rule golden set, in its historical registration order.
 const RULES: readonly Rule[] = [
   orphanSubtreeRule,
   duplicatedFunctionBodyRule,

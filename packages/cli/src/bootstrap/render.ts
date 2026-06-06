@@ -6,10 +6,8 @@
  * TTY the result renders through Ink (themed; colorless under NO_COLOR via
  * the ThemeProvider); when stdout is piped/redirected/CI it renders as
  * plain text with no banner. Tools never make this choice — they return a
- * `CommandResult` and this seam picks Ink vs. text. (Migration is phased:
- * `resultToView` returns null for result types not yet expressed as a
- * view-model, and those still render through the legacy Ink App — TTY
- * only — until Phase 5 finishes the migration.)
+ * `CommandResult` and this seam picks Ink vs. text. `resultToView` is total
+ * over the `CommandResult` union, so both media consume the same view-model.
  *
  * Every Ink/cli-ui import here is dynamic so this module loads no
  * React/Ink at startup — the hot `opensip-tools fit --json` path (which

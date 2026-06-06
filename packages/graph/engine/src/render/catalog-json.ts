@@ -15,8 +15,8 @@
  * `computeSymbolId` / `computeEdgeId` so `INSERT ... ON CONFLICT DO
  * UPDATE` collides correctly on existing substrate rows.
  *
- * Edge taxonomy at v1: `calls` only. `depends_on` (module-import
- * edges) lands in Phase 4. `creation` may be added later.
+ * Edge taxonomy at v1: `calls` plus `depends_on` module-import edges.
+ * `creation` may be added later.
  */
 
 import { resolveCallee } from '../resolve-callee.js';

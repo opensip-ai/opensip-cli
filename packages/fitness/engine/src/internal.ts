@@ -12,8 +12,8 @@
 export { executeFit } from './cli/fit.js';
 
 // Per-check fixture-coverage test infrastructure (testing gap P0). Pure,
-// vitest-free helpers consumed by each check pack's fixture-coverage.test.ts;
-// the harness that exercises a fixture lands in Phase 1.
+// vitest-free manifest helpers and fixture runners consumed by each check
+// pack's fixture-coverage.test.ts.
 export {
   buildFixtureManifest,
   validateBookkeeping,

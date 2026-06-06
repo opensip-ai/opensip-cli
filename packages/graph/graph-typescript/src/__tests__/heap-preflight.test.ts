@@ -86,8 +86,8 @@ describe('runHeapPreflight', () => {
     writeFileSync(join(dir, 'index.ts'), 'export const x = 1;\n', 'utf8');
     originalSentinel = process.env.OPENSIP_HEAP_ELEVATED;
     // Item 1: adapter registry is per-RunScope. Construct a fresh
-    // scope, attach graph subscope, and register the three first-party
-    // adapters so runHeapPreflight()'s pickAdapter() resolves them.
+    // scope, attach graph subscope, and register the adapters this test imports
+    // so runHeapPreflight()'s pickAdapter() resolves them.
     const scope = new RunScope();
     Object.assign(scope, graphTool.contributeScope?.() ?? {});
     enterScope(scope);

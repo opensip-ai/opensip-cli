@@ -2,8 +2,8 @@
 /**
  * Resolve `obj.method()` / `Pkg.fn()` calls.
  *
- * P2 ships a basic identifier-symbol-based resolution; P3 enriches
- * with polymorphic dispatch on interface / abstract method calls.
+ * Direct symbol resolution handles concrete declarations; the polymorphic
+ * resolver handles interface / abstract method dispatch.
  */
 
 import ts from 'typescript';
