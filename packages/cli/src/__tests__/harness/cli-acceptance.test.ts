@@ -7,18 +7,33 @@
  * harness — the migrated e2e suites no longer carry their own spawn helpers.
  */
 
+import { fileURLToPath } from 'node:url';
+
 import { describe, it, expect } from 'vitest';
+
+import { runScenarios as coreRunScenarios } from '../../../../../scripts/lib/cli-acceptance-core.mjs';
 
 import {
   checkScenario,
   distRunner,
   expectEnvelope,
+  expectGraphCatalogNonEmpty,
   CLI_PKG_VERSION,
+  type Scenario,
   type SpawnResult,
 } from './cli-acceptance.js';
 
 function spawnResult(over: Partial<SpawnResult> = {}): SpawnResult {
   return { stdout: '', stderr: '', exitCode: 0, ...over };
+}
+
+/** Project a scenario result to the fields that must match across both lanes. */
+function projectResult(r: { name: string; ok: boolean; failures: string[] }): {
+  name: string;
+  ok: boolean;
+  failures: string[];
+} {
+  return { name: r.name, ok: r.ok, failures: r.failures };
 }
 
 describe('checkScenario', () => {
@@ -90,10 +105,49 @@ describe('expectEnvelope', () => {
   });
 });
 
+describe('expectGraphCatalogNonEmpty', () => {
+  const predicate = expectGraphCatalogNonEmpty();
+
+  it('accepts a graph envelope with at least one unit', () => {
+    expect(predicate({ schemaVersion: 2, tool: 'graph', signals: [], units: [{ slug: 'x' }] })).toEqual([]);
+  });
+
+  it('rejects an empty graph catalog (no signals, no units)', () => {
+    const failures = predicate({ schemaVersion: 2, tool: 'graph', signals: [], units: [] });
+    expect(failures.some((f) => f.includes('empty catalog'))).toBe(true);
+  });
+
+  it('rejects a non-graph tool', () => {
+    const failures = predicate({ schemaVersion: 2, tool: 'fit', signals: [{}], units: [] });
+    expect(failures.some((f) => f.includes('tool'))).toBe(true);
+  });
+});
+
 describe('distRunner (real CLI)', () => {
   it('reports the package version for --version', () => {
     const { stdout, exitCode } = distRunner().run(['--version']);
     expect(exitCode).toBe(0);
     expect(stdout.trim()).toBe(CLI_PKG_VERSION);
+  });
+});
+
+describe('.mjs core / TS wrapper parity', () => {
+  // The release script (smoke-pack.mjs) runs scenarios via the raw .mjs core;
+  // the PR lane runs them via the TS wrapper. Both must produce identical
+  // pass/fail + failure messages so assertion semantics cannot silently diverge.
+  it('produces identical results via the wrapper and the raw core', () => {
+    const scenarios: Scenario[] = [
+      { name: 'version passes', args: ['--version'], expect: { exitCode: 0, stdoutIncludes: CLI_PKG_VERSION } },
+      { name: 'version fails (deliberate)', args: ['--version'], expect: { exitCode: 1 } },
+    ];
+    const descriptor = {
+      kind: 'node-script' as const,
+      script: fileURLToPath(new URL('../../../dist/index.js', import.meta.url)),
+    };
+    const viaWrapper = distRunner().runScenarios(scenarios).map(projectResult);
+    const viaCore = coreRunScenarios(descriptor, scenarios).results.map(projectResult);
+    expect(viaWrapper).toEqual(viaCore);
+    // sanity: the deliberate-fail scenario actually failed in both lanes
+    expect(viaWrapper[1]?.ok).toBe(false);
   });
 });

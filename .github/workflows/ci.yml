@@ -57,6 +57,11 @@ jobs:
       # (each pack's src/__tests__/fixture-coverage.test.ts) — they are ordinary
       # vitest files, so a shipped check with no clean/violation fixture fails CI
       # here with no separate step. See docs/public/50-extend/04-check-pack-architecture.md.
+      #
+      # It also runs the per-language CLI acceptance matrix
+      # (packages/cli/src/__tests__/language-acceptance.test.ts) and the e2e
+      # suites, which spawn the built CLI via the shared acceptance harness —
+      # hence the `pnpm build` step above is a prerequisite. (Register PR lane.)
       - name: Test (with coverage thresholds)
         run: pnpm test:coverage
 

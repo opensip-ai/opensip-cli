@@ -162,13 +162,14 @@ jobs:
       # mismatch. Runs BEFORE publish, so a bad set never reaches npm
       # (where version immutability makes it unrecoverable).
       #
-      # This packed smoke is intentionally SHALLOW: smoke-pack.mjs runs
-      # `--version` + `--help`, which exercise the full import graph (the ABI
-      # surface) without needing a project fixture. Command-level depth
-      # (init/fit/graph/sessions/dashboard against the installed binary) is owned
-      # by the separately-scoped CLI-acceptance harness; the hardened release
-      # gate will simply call a deeper smoke-pack.mjs once that lands. Do NOT add
-      # the deeper commands here — keep the two efforts thin at this seam.
+      # smoke-pack.mjs now runs a COMMAND-LEVEL scenario set (init/fit/graph/
+      # sessions/dashboard + `plugin add` for a tool and a fit-pack plugin)
+      # against the INSTALLED tarball bin via the shared CLI-acceptance harness
+      # core (scripts/lib/cli-acceptance-core.mjs) — the same core the PR-lane
+      # Vitest suites use, so scenario semantics can't diverge (parity test in
+      # packages/cli/src/__tests__/harness/). See the register's "Release Lane".
+      # No flag change here: the script packs its own fixture plugins into the
+      # work dir; this step just hands it the workspace tarballs.
       - name: Smoke-test packed tarballs (load CLI before publishing)
         env:
           RELEASE_TAG: ${{ github.ref_name }}

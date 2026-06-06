@@ -1,3 +1,4 @@
+// @fitness-ignore-file test-file-naming -- this is a shared test HELPER (the typed acceptance-harness wrapper imported by the e2e + language-acceptance suites), not a test file; it deliberately is not named *.test.ts.
 /**
  * @fileoverview Typed Vitest wrapper over the CLI acceptance harness core.
  *
@@ -66,11 +67,6 @@ export class CliRunner {
 /** Runner against the source-tree build (`packages/cli/dist/index.js`). */
 export function distRunner(): CliRunner {
   return new CliRunner({ kind: 'node-script', script: DIST_CLI })
-}
-
-/** Runner against an installed tarball bin (release lane). */
-export function installedBinRunner(bin: string): CliRunner {
-  return new CliRunner({ kind: 'installed-bin', bin })
 }
 
 /**
