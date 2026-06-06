@@ -90,9 +90,14 @@ jobs:
           category: opensip-tools-fit
 
       # Dogfood the graph tool the same way as fit: --gate-save records the
-      # current Signals into the (CI-ephemeral) datastore, then the SARIF export
-      # is uploaded to Code Scanning. GH compares against the latest main-branch
-      # graph SARIF and surfaces only NET-NEW graph findings on PR diffs.
+      # current Signals into the (CI-ephemeral) datastore AND hard-fails the CI
+      # step on any error-level graph finding (core's isErrorSignal rung —
+      # `critical`/`high`; ADR-0020), mirroring fit:ci. The findings reaching the
+      # gate are already `@graph-ignore`-suppression-filtered (ADR-0014), so only
+      # UNSUPPRESSED error-level findings trip it. The SARIF export then runs below
+      # under `if: always()` (surviving a failed gate); GH compares against the
+      # latest main-branch graph SARIF and surfaces NET-NEW graph findings on PR
+      # diffs as the complementary annotation layer.
       - name: Graph (dogfood)
         id: graph
         run: pnpm graph:ci

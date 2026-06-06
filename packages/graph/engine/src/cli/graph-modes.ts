@@ -22,6 +22,7 @@ import { dirname } from 'node:path';
 import { EXIT_CODES } from '@opensip-tools/contracts';
 import {
   ConfigurationError,
+  isErrorSignal,
   logger,
   ToolError,
 } from '@opensip-tools/core';
@@ -61,11 +62,32 @@ export async function runGateMode(
   }
   const repo = new GraphBaselineRepo(datastore);
   if (opts.gateSave === true) {
+    // ADR-0020: gate-save records the baseline AND hard-fails the step when the
+    // current (already suppression-filtered, ADR-0014) signal set contains any
+    // error-rung finding. `signals` reaching this mode is the post-`@graph-ignore`
+    // `kept` set (see `cli/graph.ts:484`), so this counts UNSUPPRESSED findings
+    // only. The error rung is core's canonical `isErrorSignal` (`critical`/`high`)
+    // — the same predicate fit's `shouldFail`/`failOnErrors` threshold and graph's
+    // own envelope verdict (`build-envelope.ts`) use, so all consumers agree on
+    // what "error" means. The CI step (`pnpm graph:ci`) is therefore the honest
+    // pass/fail signal — it no longer exits 0 while error-level graph findings
+    // exist, so enforcement does not rely solely on the downstream Code Scanning
+    // net-new ratchet + branch protection (the external config ADR-0017 declined
+    // to trust). The SARIF export runs in a separate `if: always()` CI step, so
+    // the baseline + net-new PR annotations survive a failed gate. Mirror of
+    // `fit-modes.ts`'s gate-save branch.
     saveBaseline(signals, repo);
-    cli.setExitCode(EXIT_CODES.SUCCESS);
+    const errorCount = signals.filter(isErrorSignal).length;
+    const runFailed = errorCount > 0;
+    cli.setExitCode(runFailed ? EXIT_CODES.RUNTIME_ERROR : EXIT_CODES.SUCCESS);
     await cli.render({
       type: 'gate-done',
-      lines: [`Graph baseline saved (${String(signals.length)} signals)`],
+      lines: runFailed
+        ? [
+            `Graph baseline saved (${String(signals.length)} signals)`,
+            `Graph gate FAILED: ${String(errorCount)} error-level finding(s) present.`,
+          ]
+        : [`Graph baseline saved (${String(signals.length)} signals)`],
     });
     return;
   }

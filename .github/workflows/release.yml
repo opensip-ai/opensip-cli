@@ -73,8 +73,11 @@ jobs:
       #   - `pnpm test:coverage` — full suite WITH per-package coverage thresholds
       #     (replaces the former plain `pnpm test`, which skipped thresholds)
       #   - `pnpm fit:ci`        — dogfood: fails on any error-level fit finding
-      #     (failOnErrors: 1 in opensip-tools.config.yml)
-      #   - `pnpm graph:ci`      — dogfood: fails on any net-new graph finding
+      #     (failOnErrors: 1 in opensip-tools.config.yml; ADR-0020)
+      #   - `pnpm graph:ci`      — dogfood: fails on any error-level graph finding
+      #     (the `critical`/`high` rung, core's isErrorSignal), mirroring fit:ci
+      #     (ADR-0020). Net-new (ratchet) detection is the complementary Code
+      #     Scanning annotation layer in ci.yml, not what gates the release here.
       #
       # The dogfood gates run the COMPILED engine from dist
       # (node packages/cli/dist/index.js …), so they must run AFTER `pnpm -r run
@@ -83,7 +86,10 @@ jobs:
       #
       # The SARIF export/upload steps from ci.yml are intentionally NOT mirrored
       # here: Code Scanning is a PR-DIFF ratchet; the release gate needs only the
-      # pass/fail exit. Do not "complete the symmetry" by adding SARIF uploads.
+      # pass/fail exit, which both fit:ci and graph:ci now provide directly —
+      # `--gate-save` returns the error-level exit code (ADR-0020), so the gate
+      # enforces itself without depending on the external Code Scanning ratchet.
+      # Do not "complete the symmetry" by adding SARIF uploads.
       #
       # The generated-artifact sync (docs/web-generated, per-package READMEs,
       # keywords, checks-index) that ci.yml runs as separate steps is ALREADY

@@ -2,6 +2,7 @@
 status: active
 last_verified: 2026-06-06
 owner: opensip-tools
+follow-up-status: graph half implemented 2026-06-06 (graph-modes.ts gate-save branch + graph-gate-mode.test.ts)
 ---
 
 # ADR-0020: The dogfood gate hard-fails the CI step on error-level findings (ratchet retained for annotations)
@@ -22,7 +23,10 @@ enforcement-reason: >
   RUNTIME_ERROR, so the `pnpm fit:ci` CI step itself fails — mirroring live /
   JSON mode. Regression-pinned by
   `packages/fitness/engine/src/cli/__tests__/fit-gate-mode.test.ts`. The graph
-  half (`graph:ci`) is the tracked follow-up (see Consequences).
+  half (`graph:ci`) is now implemented identically in `runGateMode`'s gate-save
+  branch (`graph/engine/src/cli/graph-modes.ts`): on any error-rung signal
+  (core's `isErrorSignal`, `critical`/`high`) in the post-`@graph-ignore` set it
+  sets exit RUNTIME_ERROR. Pinned by `graph/engine/src/cli/__tests__/graph-gate-mode.test.ts`.
 ```
 
 **Decision:** The dogfood gate (`pnpm fit:ci` = `fit --gate-save`, and by policy
@@ -92,6 +96,19 @@ lose the baseline or the inline PR annotations.
   signals on `main` first — flipping it blind could redden `graph:ci` given the
   outstanding wide-function/cycle findings. Scoped as a separate change so this
   one stays safe and focused; the policy in this ADR covers both gates.
+  - **STATUS (2026-06-06): implemented.** `runGateMode`'s gate-save branch in
+    `packages/graph/engine/src/cli/graph-modes.ts` now saves the baseline AND
+    sets exit `RUNTIME_ERROR` when the post-`@graph-ignore` signal set
+    (`cli/graph.ts` applies suppressions before the gate, so the count is of
+    *unsuppressed* findings) contains any `isErrorSignal` (`critical`/`high`).
+    The stated prerequisite held empirically: `graph --gate-save` on `main`
+    saves 0 signals and the default render reports 0 Errors / 0 Warnings, i.e.
+    every finding (including the error-rung wide-function / cycle-crossing-package
+    / large-function instances those rules can emit) is already
+    `@graph-ignore`-waived (26 directives), so the post-suppression error count is
+    0 and `pnpm graph:ci` stays green. Pinned by
+    `packages/graph/engine/src/cli/__tests__/graph-gate-mode.test.ts`. The
+    `release.yml` and `ci.yml` graph comments are corrected to match.
 - **The net-new ratchet + branch protection remain** for rich PR-diff annotations
   and as the documented model for consumers adopting a backlog (`failOnErrors: 0`
   = ratchet-only).
