@@ -1,11 +1,13 @@
 /**
  * Per-check pass/fail fixture coverage for checks-go (testing gap P0).
  *
- * Every shipped, non-command check must have a clean fixture (0 findings) and a
- * violation fixture (>=1) under a co-located `__fixtures__/<slug>/` directory
- * next to the check's source. Slugs on ALLOWLIST are exempt until their
- * fixtures land (the list must reach []). The harness runs each check
- * in-process via the engine's internal coverage helpers.
+ * Every shipped, non-command, fixture-exercisable check must have a clean
+ * fixture (0 findings) and a violation fixture (>=1) under a co-located
+ * `__fixtures__/<slug>/` directory next to the check's source. The ALLOWLIST is
+ * empty, so the ratchet is live: a new uncovered check fails this test. Command
+ * checks live in COMMAND_EXEMPTIONS; structurally un-exercisable checks live in
+ * KNOWN_UNFIXTURABLE. The harness runs each check in-process via the engine's
+ * internal coverage helpers.
  */
 
 import { dirname, join } from 'node:path'
@@ -21,7 +23,12 @@ import { describe, expect, it } from 'vitest'
 
 import { checks } from '../index.js'
 
-import { ALLOWLIST, COMMAND_EXEMPTIONS, FILENAME_OVERRIDES } from './fixture-coverage.allowlist.js'
+import {
+  ALLOWLIST,
+  COMMAND_EXEMPTIONS,
+  FILENAME_OVERRIDES,
+  KNOWN_UNFIXTURABLE,
+} from './fixture-coverage.allowlist.js'
 
 const PACK_SRC = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -30,25 +37,28 @@ const config: CoverageConfig = {
   checks,
   allowlist: ALLOWLIST,
   commandExemptions: COMMAND_EXEMPTIONS,
+  knownUnfixturable: KNOWN_UNFIXTURABLE,
   filenameOverrides: FILENAME_OVERRIDES,
-  // Phase 5 removes this once ALLOWLIST is [] (turns the ratchet fully live).
-  allowNonEmptyAllowlist: true,
 }
 
 const cases = await planCoverageCases(config, PACK_SRC)
 
 describe('checks-go · fixture-coverage bookkeeping', () => {
-  it('config is self-consistent (allowlist + command exemptions valid)', () => {
+  it('config is self-consistent (allowlist empty, exemptions valid)', () => {
     expect(validateBookkeeping(config)).toEqual([])
   })
 })
 
 describe('checks-go · fixture-coverage', () => {
   if (cases.length === 0) {
-    // Every shipped check is still allowlisted — nothing to assert yet, but the
-    // wiring must be meaningful (this fails if the allowlist is wrongly empty).
-    it('every shipped check is allowlisted', () => {
-      expect(ALLOWLIST.length).toBeGreaterThan(0)
+    // No fixturable checks (e.g. an all-command pack): assert every shipped
+    // check is accounted for by an exemption rather than silently uncovered.
+    it('every shipped check is exempted or allowlisted', () => {
+      const accounted =
+        ALLOWLIST.length +
+        Object.keys(COMMAND_EXEMPTIONS).length +
+        Object.keys(KNOWN_UNFIXTURABLE).length
+      expect(accounted).toBeGreaterThan(0)
     })
     return
   }

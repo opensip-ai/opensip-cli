@@ -1,16 +1,13 @@
 /**
  * Per-check pass/fail fixture coverage for checks-cpp (testing gap P0).
  *
- * Every shipped, non-command check must have a clean fixture (0 findings) and a
- * violation fixture (>=1) under a co-located `__fixtures__/<slug>/` directory
- * next to the check's source. Slugs on ALLOWLIST are exempt until their
- * fixtures land (the list must reach []). The harness runs each check
- * in-process via the engine's internal coverage helpers.
- *
- * checks-cpp ships a single command-mode check (`cpp-clang-tidy`), so the case
- * list is legitimately empty: there is nothing fixture-exercisable here. The
- * empty-case guard below accepts that as long as the wiring stays meaningful —
- * i.e. the gap is owed via the allowlist OR closed via a command exemption.
+ * Every shipped, non-command, fixture-exercisable check must have a clean
+ * fixture (0 findings) and a violation fixture (>=1) under a co-located
+ * `__fixtures__/<slug>/` directory next to the check's source. The ALLOWLIST is
+ * empty, so the ratchet is live: a new uncovered check fails this test. Command
+ * checks live in COMMAND_EXEMPTIONS; structurally un-exercisable checks live in
+ * KNOWN_UNFIXTURABLE. The harness runs each check in-process via the engine's
+ * internal coverage helpers.
  */
 
 import { dirname, join } from 'node:path'
@@ -26,7 +23,12 @@ import { describe, expect, it } from 'vitest'
 
 import { checks } from '../index.js'
 
-import { ALLOWLIST, COMMAND_EXEMPTIONS, FILENAME_OVERRIDES } from './fixture-coverage.allowlist.js'
+import {
+  ALLOWLIST,
+  COMMAND_EXEMPTIONS,
+  FILENAME_OVERRIDES,
+  KNOWN_UNFIXTURABLE,
+} from './fixture-coverage.allowlist.js'
 
 const PACK_SRC = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -35,26 +37,28 @@ const config: CoverageConfig = {
   checks,
   allowlist: ALLOWLIST,
   commandExemptions: COMMAND_EXEMPTIONS,
+  knownUnfixturable: KNOWN_UNFIXTURABLE,
   filenameOverrides: FILENAME_OVERRIDES,
-  // Phase 5 removes this once ALLOWLIST is [] (turns the ratchet fully live).
-  allowNonEmptyAllowlist: true,
 }
 
 const cases = await planCoverageCases(config, PACK_SRC)
 
 describe('checks-cpp · fixture-coverage bookkeeping', () => {
-  it('config is self-consistent (allowlist + command exemptions valid)', () => {
+  it('config is self-consistent (allowlist empty, exemptions valid)', () => {
     expect(validateBookkeeping(config)).toEqual([])
   })
 })
 
 describe('checks-cpp · fixture-coverage', () => {
   if (cases.length === 0) {
-    // No fixture-exercisable cases. The wiring must still be meaningful: either
-    // a check is owed coverage (allowlist) or every shipped check is closed via
-    // a command exemption. This fails only if the pack is silently mis-wired.
-    it('every shipped check is allowlisted or command-exempt', () => {
-      expect(ALLOWLIST.length + Object.keys(COMMAND_EXEMPTIONS).length).toBeGreaterThan(0)
+    // No fixturable checks (e.g. an all-command pack): assert every shipped
+    // check is accounted for by an exemption rather than silently uncovered.
+    it('every shipped check is exempted or allowlisted', () => {
+      const accounted =
+        ALLOWLIST.length +
+        Object.keys(COMMAND_EXEMPTIONS).length +
+        Object.keys(KNOWN_UNFIXTURABLE).length
+      expect(accounted).toBeGreaterThan(0)
     })
     return
   }

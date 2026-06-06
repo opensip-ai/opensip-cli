@@ -1,18 +1,14 @@
 /**
  * Per-check fixture-coverage allowlist for checks-universal (testing gap P0).
  *
- * `ALLOWLIST` names shipped checks that do NOT have clean+violation fixtures in
- * a co-located `__fixtures__/<slug>/` directory. The goal is `[]`; the four
- * residual entries are checks that are STRUCTURALLY NOT fixture-exercisable —
- * each one's own analyze logic (self-defeating contentFilter, or scanning
- * `process.cwd()` instead of the supplied files) makes it impossible to drive a
- * deterministic finding from an on-disk fixture. Each carries an inline reason.
- * These are pre-existing check bugs, not missing coverage; closing them is a
- * fix to the check, after which the slug graduates off this list.
+ * `ALLOWLIST` (migration-only) is `[]` — every shipped, fixture-exercisable
+ * check has clean+violation fixtures, so the ratchet is fully live.
  *
  * `COMMAND_EXEMPTIONS` are `analysisMode:'command'` checks that shell out to
- * external tools and cannot be exercised by writing a fixture file; they are
- * covered by the failure-mode / packed-smoke lanes instead (gap register).
+ * external tools and cannot be exercised by writing a fixture file (covered by
+ * the failure-mode / packed-smoke lanes). `KNOWN_UNFIXTURABLE` are non-command
+ * checks that fixture-coverage surfaced as structurally un-exercisable
+ * pre-existing defects — documented, permanent until the check is fixed.
  */
 
 import type {
@@ -21,29 +17,28 @@ import type {
   FilenameOverrides,
 } from '@opensip-tools/fitness/internal'
 
-export const ALLOWLIST: CoverageAllowlist = [
-  // auth-middleware-coverage: self-defeating under its own contentFilter — analyze()
-  // strips string literals, then its route regex requires a non-empty quoted path,
-  // so the path is blanked before the matcher runs. Cannot be exercised on disk.
-  'auth-middleware-coverage',
-  // dependency-version-consistency: ignores the FileAccessor and scans process.cwd()
-  // directly, so an on-disk fixture cannot drive its input.
-  'dependency-version-consistency',
-  // env-var-validation: every `process.env.X` match contains the substring `env.X`,
-  // which matches its own ENV_ACCESS "safe" pattern — so all accesses are treated
-  // as safe and nothing can ever be flagged.
-  'env-var-validation',
-  // phantom-dependency-detection: extractImports() strips string literals (quotes
-  // included) before matching the quoted import specifier `['"]([^'"]+)['"]`, so no
-  // import is ever extracted and no phantom dependency can be detected.
-  'phantom-dependency-detection',
-]
+export const ALLOWLIST: CoverageAllowlist = []
 
 export const COMMAND_EXEMPTIONS: CommandExemptions = {
   'dead-code': "analysisMode:'command' — runs knip; covered by failure-mode + packed-smoke lanes",
   'dependency-vulnerability-audit':
     "analysisMode:'command' — runs the package-manager audit; covered by packed-smoke",
   'semgrep-scan': "analysisMode:'command' — shells to semgrep; covered by packed-smoke",
+}
+
+// Non-command checks that fixture-coverage SURFACED as structurally
+// un-exercisable — each is a pre-existing check defect (the check can never
+// produce a deterministic finding from an on-disk fixture). Documented here as
+// permanent exemptions; fixing the check graduates the slug off this list.
+export const KNOWN_UNFIXTURABLE: CommandExemptions = {
+  'auth-middleware-coverage':
+    'self-defeating: analyze() strips string literals, but its route regex needs a non-empty quoted path',
+  'dependency-version-consistency':
+    'ignores the FileAccessor and scans process.cwd() directly — an on-disk fixture cannot drive it',
+  'env-var-validation':
+    'every `process.env.X` contains `env.X`, which matches its own "safe" ENV_ACCESS pattern — never flags',
+  'phantom-dependency-detection':
+    'extractImports() strips string-literal quotes before matching the quoted specifier — no import is ever extracted',
 }
 
 export const FILENAME_OVERRIDES: FilenameOverrides = {

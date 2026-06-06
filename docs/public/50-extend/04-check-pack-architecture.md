@@ -262,6 +262,50 @@ For the full walkthrough — boilerplate, testing, publishing — see [`50-exten
 
 ---
 
+## Required: pass/fail fixtures
+
+Every shipped check must prove **both directions** — that it fires on bad code
+*and* stays silent on clean code — or CI fails. Each first-party check pack runs
+a `fixture-coverage.test.ts` meta-test (built on
+`@opensip-tools/fitness/internal`) that, for every shipped check, loads a clean
+and a violation fixture and asserts the clean one produces **0** findings for
+that check and the violation one produces **≥1**.
+
+Add fixtures co-located with the check, in a `__fixtures__/<slug>/` directory:
+
+```
+src/checks/<category>/
+  my-check.ts
+  my-check.test.ts
+  __fixtures__/my-check/
+    clean.ts        # 0 findings for my-check
+    violation.ts    # >=1 finding for my-check
+```
+
+- **Per claimed language.** A check scoped to multiple `languages` needs one
+  pair per language (`clean.ts`+`violation.ts`, `clean.py`+`violation.py`, …).
+  A multi-extension *file-typed* check needs only one representative pair.
+- **Config/docs/metadata checks** use the matching domain — a `package.json`
+  check gets `clean.package.json`/`violation.package.json` (set a
+  `FILENAME_OVERRIDES` entry), and a check needing sibling files or repo context
+  uses `clean/` and `violation/` **directories** holding the minimal project.
+- **Command-mode checks** (`analysisMode: 'command'`, e.g. clang-tidy/semgrep
+  passthroughs) can't be exercised by a file — list them in
+  `COMMAND_EXEMPTIONS` with a reason; they're covered by the packed-smoke lane.
+- The `ALLOWLIST` is empty and ratcheted: a new check with no fixtures fails CI.
+  A check that genuinely can't be fixture-driven goes in `KNOWN_UNFIXTURABLE`
+  with a justification (and ideally a follow-up to fix it).
+
+> **Harness note.** The coverage harness runs each check in-process under a
+> minimal scope with no language adapter registered, so the adapter's
+> `contentFilter` (string/comment stripping) is a no-op — write the trigger as
+> real code and keep the clean fixture free of the trigger token entirely (even
+> in comments/strings). The check's own `*.test.ts` covers content-filter
+> behavior. First-party authors can call `runCheckOnFixture` from
+> `@opensip-tools/fitness/internal` for a one-line per-check assertion.
+
+---
+
 ## Where the example lands
 
 `acme-api`'s loaded check inventory:

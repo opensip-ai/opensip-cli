@@ -1,14 +1,13 @@
 /**
  * Per-check fixture-coverage allowlist for checks-typescript (testing gap P0).
  *
- * `ALLOWLIST` names shipped checks that do NOT yet have clean+violation
- * fixtures in a co-located `__fixtures__/<slug>/` directory. It MUST shrink to `[]`
- * — each entry is a check whose pass/fail coverage is still owed. Once empty,
- * Phase 5 drops `allowNonEmptyAllowlist` so a new uncovered check fails CI.
+ * `ALLOWLIST` (migration-only) is `[]` — every shipped, fixture-exercisable
+ * check has clean+violation fixtures, so the ratchet is fully live: a new check
+ * with no fixtures fails CI.
  *
- * `COMMAND_EXEMPTIONS` are `analysisMode:'command'` checks that shell out to
- * external tools and cannot be exercised by writing a fixture file; this pack
- * ships none.
+ * `COMMAND_EXEMPTIONS` are `analysisMode:'command'` checks (none in this pack).
+ * `KNOWN_UNFIXTURABLE` are non-command checks that still cannot be exercised by
+ * an on-disk fixture (documented, permanent — fix the check to graduate it off).
  */
 
 import type {
@@ -17,21 +16,19 @@ import type {
   FilenameOverrides,
 } from '@opensip-tools/fitness/internal'
 
-export const ALLOWLIST: CoverageAllowlist = [
-  // package-json-exports-field: analyzeAll filters files.paths with
-  // `p.startsWith('packages/')`, but the coverage harness supplies ABSOLUTE
-  // temp-dir paths (targetFiles = join(root, p)), so the filter matches zero
-  // package.json files and the check can never fire on a fixture. Not
-  // fixture-exercisable without repo-relative paths; covered by the live
-  // dogfood run instead.
-  'package-json-exports-field',
-  // typescript-frontend: analyzeAll shells out to `npx tsc --noEmit` in each
-  // discovered apps/* dir (subprocess + network/toolchain dependent, like a
-  // command-mode check). Not fixture-exercisable; covered by the live run.
-  'typescript-frontend',
-]
+export const ALLOWLIST: CoverageAllowlist = []
 
 export const COMMAND_EXEMPTIONS: CommandExemptions = {}
+
+export const KNOWN_UNFIXTURABLE: CommandExemptions = {
+  // analyzeAll filters files.paths with `p.startsWith('packages/')`, but the
+  // harness supplies ABSOLUTE temp-dir paths, so the filter matches zero files
+  // and the check can never fire on a fixture. Covered by the live dogfood run.
+  'package-json-exports-field': 'analyzeAll assumes repo-relative paths; harness uses absolute temp paths',
+  // analyzeAll shells out to `npx tsc --noEmit` per apps/* dir (subprocess +
+  // toolchain dependent, effectively command-mode). Covered by the live run.
+  'typescript-frontend': 'shells out to `npx tsc --noEmit` — effectively command-mode',
+}
 
 export const FILENAME_OVERRIDES: FilenameOverrides = {
   // Universal-domain checks (no checkScope.languages / fileTypes) default to a

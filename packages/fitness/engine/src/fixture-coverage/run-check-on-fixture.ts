@@ -201,12 +201,13 @@ export async function planCoverageCases(
     filenameOverrides: config.filenameOverrides,
   })
   const allow = new Set(config.allowlist)
+  const unfixturable = new Set(Object.keys(config.knownUnfixturable ?? {}))
   const checkBySlug = new Map(config.checks.map((c) => [c.config.slug, c]))
   const dirs = await indexFixtureDirs(fixturesRoot)
 
   const cases: CoverageCase[] = []
   for (const req of requirements) {
-    if (req.domain.kind === 'command-exempt' || allow.has(req.slug)) continue
+    if (req.domain.kind === 'command-exempt' || allow.has(req.slug) || unfixturable.has(req.slug)) continue
     const check = checkBySlug.get(req.slug)
     if (!check) continue // unreachable: manifest came from these checks
     cases.push(...(await casesForRequirement(req, check, dirs.get(req.slug) ?? null)))

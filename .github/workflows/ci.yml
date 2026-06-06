@@ -52,6 +52,11 @@ jobs:
       # in each vitest.config.ts are enforced on every PR. Coverage had
       # silently drifted below threshold in 13 packages because the gate only
       # ran `pnpm test` (no `--coverage`); test:coverage closes that hole.
+      #
+      # This step also runs the per-check pass/fail fixture-coverage meta-tests
+      # (each pack's src/__tests__/fixture-coverage.test.ts) — they are ordinary
+      # vitest files, so a shipped check with no clean/violation fixture fails CI
+      # here with no separate step. See docs/public/50-extend/04-check-pack-architecture.md.
       - name: Test (with coverage thresholds)
         run: pnpm test:coverage
 

@@ -157,6 +157,15 @@ export interface CoverageConfig {
    * check with PR-description justification (mirrors `disabledChecks` policy).
    */
   readonly allowNonEmptyAllowlist?: boolean
+  /**
+   * Non-command checks that cannot be exercised by an on-disk fixture and are
+   * NOT migration debt: slug → reason. Distinct from `allowlist` (temporary,
+   * must reach []) — these are permanent, documented exemptions (e.g. a check
+   * that shells out to a toolchain, assumes absolute repo paths, or has a
+   * self-defeating matcher). Skipped by the planner and validated like command
+   * exemptions, so the allowlist ratchet stays fully live alongside them.
+   */
+  readonly knownUnfixturable?: CommandExemptions
 }
 
 function allowlistProblems(config: CoverageConfig, shipped: ReadonlyMap<string, CheckConfig>): string[] {
@@ -199,6 +208,28 @@ function exemptionProblems(config: CoverageConfig, shipped: ReadonlyMap<string, 
   return problems
 }
 
+function unfixturableProblems(config: CoverageConfig, shipped: ReadonlyMap<string, CheckConfig>): string[] {
+  const problems: string[] = []
+  for (const [slug, reason] of Object.entries(config.knownUnfixturable ?? {})) {
+    const cfg = shipped.get(slug)
+    if (!cfg) {
+      problems.push(`knownUnfixturable names '${slug}', which no longer ships — remove it`)
+    } else if (cfg.analysisMode === 'command') {
+      problems.push(`'${slug}' is analysisMode:'command' — put it in commandExemptions, not knownUnfixturable`)
+    }
+    if (reason.length === 0) {
+      problems.push(`knownUnfixturable['${slug}'] needs a non-empty reason`)
+    }
+    if (config.allowlist.includes(slug)) {
+      problems.push(`'${slug}' is in BOTH allowlist and knownUnfixturable — pick one`)
+    }
+    if (slug in config.commandExemptions) {
+      problems.push(`'${slug}' is in BOTH knownUnfixturable and commandExemptions — pick one`)
+    }
+  }
+  return problems
+}
+
 function manifestProblems(config: CoverageConfig): string[] {
   try {
     buildFixtureManifest(config.checks, {
@@ -224,6 +255,7 @@ export function validateBookkeeping(config: CoverageConfig): string[] {
   return [
     ...allowlistProblems(config, shipped),
     ...exemptionProblems(config, shipped),
+    ...unfixturableProblems(config, shipped),
     ...manifestProblems(config),
   ]
 }

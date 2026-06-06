@@ -30,3 +30,5 @@ export const COMMAND_EXEMPTIONS: CommandExemptions = {
 }
 
 export const FILENAME_OVERRIDES: FilenameOverrides = {}
+
+export const KNOWN_UNFIXTURABLE: CommandExemptions = {}
