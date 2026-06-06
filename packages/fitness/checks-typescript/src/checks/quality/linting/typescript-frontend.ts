@@ -1,88 +1,57 @@
 /**
  * @fileoverview TypeScript Frontend Compiler Check
  *
- * Validates TypeScript compilation for frontend apps (apps/*).
+ * Validates TypeScript compilation for frontend apps (apps/*). Runs
+ * `tsc --noEmit` in each discovered `apps/<name>/` that has a `tsconfig.json`,
+ * and reports the parsed compiler errors. Because it shells out to an external
+ * toolchain (one invocation per app, in that app's own directory so its
+ * `tsconfig.json` resolves correctly), it is modelled as `analysisMode:'command'`
+ * using the same `sh -c` orchestration idiom as `dependency-vulnerability-audit`.
  */
-// @fitness-ignore-file fitness-check-standards -- Uses fs for directory listing/stat operations, not file content reading
 
-import { existsSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { defineCheck, execAbortable, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
+import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
 
 /**
- * TypeScript error line pattern.
- * The pattern is safe from ReDoS because:
- * - ([^(]+) uses negated character class with fixed delimiter (opening paren)
- * - (\d+) and (\d+) only match digits with fixed delimiters
- * - (error|warning) is a fixed alternation
- * - (TS\d+) has fixed prefix and only matches digits
- * - (.+) matches to end of line (anchored by $)
+ * Shell program run from the project root (the command's cwd). For each
+ * `apps/<name>/` containing a `tsconfig.json` it emits an `::app::` marker, runs
+ * `tsc --noEmit` in that directory (merging stderr), then an `::exit::` marker
+ * carrying the per-app exit code. We always `exit 0` so the framework treats the
+ * run as successful and defers entirely to `parseOutput` (mirrors
+ * `dependency-vulnerability-audit`).
+ */
+const TSC_PER_APP_PROGRAM = `
+for d in apps/*/; do
+  [ -f "\${d}tsconfig.json" ] || continue
+  echo "::app::\${d}"
+  (cd "$d" && npx tsc --noEmit 2>&1)
+  echo "::exit::$?"
+done
+exit 0
+`
+
+// Markers emitted by the shell program.
+const APP_MARKER_PATTERN = /^::app::(.+)$/
+const EXIT_MARKER_PATTERN = /^::exit::(\d+)$/
+/**
+ * A single tsc diagnostic line: `file(line,col): error TSxxxx: message`.
+ * ReDoS-safe: `[^(]+` is bounded by the `(` delimiter, the numeric groups match
+ * digits only, and each group has a distinct fixed delimiter.
  */
 // eslint-disable-next-line sonarjs/slow-regex -- [^(]+ bounded by '(' delimiter; each group has distinct delimiters
-const TS_ERROR_PATTERN = /^([^(]+)\((\d+),(\d+)\):\s*(error|warning)\s+(TS\d+):\s*(.+)$/gm
+const TS_ERROR_LINE_PATTERN = /^([^(]+)\((\d+),(\d+)\):\s*(error|warning)\s+(TS\d+):\s*(.+)$/
 
-/**
- * Parse TypeScript error output
- */
-function parseErrors(output: string): {
+interface ParsedError {
   file: string
   line: number
   code: string
   message: string
-}[] {
-  const errors: {
-    file: string
-    line: number
-    code: string
-    message: string
-  }[] = []
-
-  TS_ERROR_PATTERN.lastIndex = 0
-  let match
-
-  while ((match = TS_ERROR_PATTERN.exec(output)) !== null) {
-    errors.push({
-      /* v8 ignore next -- defensive nullish fallback */
-      file: match[1] ?? '',
-      // @fitness-ignore-next-line numeric-validation -- regex (\d+) guarantees digits only; parseInt always returns a valid integer
-      line: Number.parseInt(match[2] ?? '0', 10),
-      /* v8 ignore next -- defensive nullish fallback */
-      code: match[5] ?? '',
-      /* v8 ignore next -- defensive nullish fallback */
-      message: match[6] ?? '',
-    })
-  }
-
-  return errors
 }
 
 /**
- * Find apps with tsconfig.json in the apps directory
- */
-function findAppsWithTsconfig(appsDir: string): string[] {
-  if (!existsSync(appsDir)) {
-    return []
-  }
-  return readdirSync(appsDir).filter((entry) => {
-    const entryPath = join(appsDir, entry)
-    return statSync(entryPath).isDirectory() && existsSync(join(entryPath, 'tsconfig.json'))
-  })
-}
-
-/**
- * Find repo root by walking up from the given path.
- */
-function findRepoRoot(startPath: string): string {
-  let cwd = startPath
-  while (cwd !== '/' && !existsSync(join(cwd, 'apps'))) {
-    cwd = join(cwd, '..')
-  }
-  return cwd
-}
-
-/**
- * Create a generic compilation failure violation.
+ * Create a generic compilation failure violation (app failed to compile but no
+ * structured tsc diagnostics were parsed — e.g. a config error or crash).
  */
 function createGenericFailure(appPath: string, app: string): CheckViolation {
   return {
@@ -96,12 +65,10 @@ function createGenericFailure(appPath: string, app: string): CheckViolation {
 }
 
 /**
- * Convert parsed TypeScript errors to violations.
+ * Convert parsed TypeScript errors to violations (capped at 10 per app to avoid
+ * overwhelming output).
  */
-function errorsToViolations(
-  appPath: string,
-  errors: { file: string; line: number; code: string; message: string }[],
-): CheckViolation[] {
+function errorsToViolations(appPath: string, errors: readonly ParsedError[]): CheckViolation[] {
   return errors.slice(0, 10).map((err) => ({
     filePath: join(appPath, err.file),
     line: err.line,
@@ -114,38 +81,76 @@ function errorsToViolations(
 }
 
 /**
- * Process a single app's TypeScript compilation result.
+ * Strip the `apps/` prefix and trailing slash to get the bare app name. The
+ * shell glob (`apps/<name>/`) yields exactly one trailing slash.
  */
-function processAppResult(
-  appPath: string,
-  app: string,
-  exitCode: number | null,
-  stdout: string,
-): CheckViolation[] {
-  if (exitCode === 0 || exitCode === null) {
-    return []
+function appNameFromDir(appDir: string): string {
+  return appDir.replace(/^apps\//, '').replace(/\/$/, '')
+}
+
+/**
+ * Parse the combined per-app tsc output into violations. Tracks the current app
+ * via `::app::` markers and finalizes it on the matching `::exit::` marker: a
+ * non-zero exit with parsed diagnostics yields those; a non-zero exit with no
+ * parseable diagnostics yields a single generic failure; a zero exit yields none.
+ */
+export function parseTscOutput(stdout: string, cwd: string): CheckViolation[] {
+  const violations: CheckViolation[] = []
+  let currentApp: string | null = null
+  let buffer: ParsedError[] = []
+
+  const finalize = (appDir: string, exitCode: number): void => {
+    if (exitCode !== 0) {
+      const appPath = join(cwd, appDir)
+      if (buffer.length > 0) {
+        violations.push(...errorsToViolations(appPath, buffer))
+      } else {
+        violations.push(createGenericFailure(appPath, appNameFromDir(appDir)))
+      }
+    }
+    buffer = []
   }
 
-  const errors = parseErrors(stdout || '')
-  if (errors.length === 0) {
-    return [createGenericFailure(appPath, app)]
+  for (const line of stdout.split('\n')) {
+    const appMatch = APP_MARKER_PATTERN.exec(line)
+    if (appMatch?.[1]) {
+      currentApp = appMatch[1]
+      buffer = []
+      continue
+    }
+
+    const exitMatch = EXIT_MARKER_PATTERN.exec(line)
+    if (exitMatch?.[1] && currentApp) {
+      finalize(currentApp, Number.parseInt(exitMatch[1], 10))
+      currentApp = null
+      continue
+    }
+
+    if (!currentApp) continue
+    const errMatch = TS_ERROR_LINE_PATTERN.exec(line)
+    if (errMatch) {
+      buffer.push({
+        file: errMatch[1] ?? '',
+        // @fitness-ignore-next-line numeric-validation -- regex (\d+) guarantees digits only
+        line: Number.parseInt(errMatch[2] ?? '0', 10),
+        code: errMatch[5] ?? '',
+        message: errMatch[6] ?? '',
+      })
+    }
   }
 
-  return errorsToViolations(appPath, errors)
+  return violations
 }
 
 /**
  * Check: quality/typescript-frontend
  *
- * Runs TypeScript compiler for frontend apps.
- *
- * Uses analyzeAll mode because we need to run tsc in multiple app directories.
+ * Runs the TypeScript compiler for each frontend app under `apps/*`.
  */
 export const typescriptFrontend = defineCheck({
   id: 'a32ab706-f817-404c-835f-da79f64505c7',
   slug: 'typescript-frontend',
   scope: { languages: ['typescript', 'tsx'], concerns: ['frontend', 'ui'] },
-  contentFilter: 'strip-strings',
 
   confidence: 'medium',
   description: 'Validates TypeScript compilation for frontend apps',
@@ -158,43 +163,17 @@ export const typescriptFrontend = defineCheck({
 
 **Why it matters:** Frontend apps have their own \`tsconfig.json\` settings and dependencies. Compiling each app independently catches type errors specific to that app's configuration and imported modules.
 
-**Scope:** Cross-file analysis (\`analyzeAll\`) running \`npx tsc --noEmit\` in each discovered app directory. General best practice.`,
+**Scope:** External toolchain check (\`analysisMode:'command'\`). Runs \`tsc --noEmit\` in each discovered \`apps/*\` directory from the project root. General best practice.`,
   tags: ['quality', 'type-safety', 'code-quality'],
   fileTypes: ['ts', 'tsx'],
 
-  analyzeAll: async (files: FileAccessor): Promise<CheckViolation[]> => {
-    const firstPath = files.paths[0]
-    if (!firstPath) {
-      return []
-    }
-
-    const cwd = findRepoRoot(firstPath)
-    const appsDir = join(cwd, 'apps')
-    const apps = findAppsWithTsconfig(appsDir)
-
-    if (apps.length === 0) {
-      return []
-    }
-
-    const violations: CheckViolation[] = []
-
-    for (const app of apps) {
-      const appPath = join(appsDir, app)
-
-      const result = await execAbortable('npx tsc --noEmit 2>&1', {
-        cwd: appPath,
-        // @fitness-ignore-next-line no-hardcoded-timeouts -- framework default for tsc subprocess execution
-        timeout: 60_000,
-        maxBuffer: 10 * 1024 * 1024,
-      })
-
-      if (result.aborted) {
-        continue
-      }
-
-      violations.push(...processAppResult(appPath, app, result.exitCode, result.stdout))
-    }
-
-    return violations
+  command: {
+    bin: 'sh',
+    args: ['-c', TSC_PER_APP_PROGRAM],
+    // The shell program always exits 0; per-app status is carried inline.
+    expectedExitCodes: [0],
+    parseOutput(stdout, _stderr, _exitCode, _files, cwd): CheckViolation[] {
+      return parseTscOutput(stdout, cwd)
+    },
   },
 })
