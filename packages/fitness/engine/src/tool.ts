@@ -45,6 +45,7 @@
 
 
 import {
+  applyCommonFlags,
   type CliProgram,
   type FitOptions,
   type ToolOptions,
@@ -80,10 +81,6 @@ const FIT_LIVE_VIEW_KEY = 'fit';
 // Shared option flags + descriptions reused across every fitness
 // subcommand. Constants exist to satisfy sonarjs/no-duplicate-string
 // and to keep the Commander wiring consistent if the wording changes.
-const JSON_FLAG = '--json';
-const JSON_DESC = 'Output structured JSON';
-const CWD_FLAG = '--cwd <path>';
-const CWD_DESC = 'Target directory';
 
 // =============================================================================
 // COMMAND DESCRIPTORS — used by --help listings and conflict detection.
@@ -161,7 +158,7 @@ function register(cli: ToolCliContext): void {
 // =============================================================================
 
 function registerFitCommand(program: CliProgram, cli: ToolCliContext): void {
-  program
+  const fitCmd = program
     .command(FIT.name)
     .description(FIT.description)
     .option('--recipe <name>', 'Use a named recipe (default, quick-smoke, backend, etc.)')
@@ -169,20 +166,26 @@ function registerFitCommand(program: CliProgram, cli: ToolCliContext): void {
     .option('--tags <tags>', 'Filter checks by tags (comma-separated)')
     .option('--list', 'List available checks', false)
     .option('--recipes', 'List available recipes', false)
-    .option(JSON_FLAG, JSON_DESC, false)
-    .option('-v, --verbose', 'Show finding details inline + findings summary', false)
-    .option('--findings', 'Show all findings grouped by check after the run', false)
-    .option('--report-to <url>', 'POST findings to a URL (OpenSIP Cloud or compatible)')
-    .option('--api-key <key>', 'API key for --report-to authentication')
+    .option('--findings', '(deprecated: use --verbose) Show all findings grouped by check after the run', false)
     .option('--exclude <slug>', 'Exclude check (repeatable)', (val: string, prev: string[]) => [...prev, val], [] as string[])
-    .option(CWD_FLAG, CWD_DESC, process.cwd())
     .option('--config <path>', 'Path to opensip-tools.config.yml (overrides package.json pointer and default)')
-    .option('-q, --quiet', 'Suppress banner / boxes; print only the pass-fail summary', false)
-    .option('--open', 'Launch the HTML dashboard in your browser after the run completes', false)
-    .option('--debug', 'Enable debug mode for structured log output', false)
     .option('--gate-save', 'Architecture-gate: save current findings as baseline in the project SQLite store (mutually exclusive with --gate-compare)', false)
-    .option('--gate-compare', 'Architecture-gate: compare current findings against the saved baseline; exit 1 on regression', false)
+    .option('--gate-compare', 'Architecture-gate: compare current findings against the saved baseline; exit 1 on regression', false);
+  // Common cross-tool flags from the single registry (ADR-0021): --cwd, --json,
+  // --quiet, --verbose, --debug, --report-to, --api-key, --open. fit-specific
+  // flags stay declared above.
+  applyCommonFlags(
+    fitCmd,
+    ['cwd', 'json', 'quiet', 'verbose', 'debug', 'reportTo', 'apiKey', 'open'],
+    { cwd: process.cwd() },
+  );
+  fitCmd
     .action(async (opts: FitOptions) => {
+      // --findings is the deprecated alias of --verbose (ADR-0021, ADR-0012
+      // one-release window): fold it into verbose so the single verbose path
+      // drives the detail body. The deprecation note surfaces through the
+      // run's warnings channel (not a raw stderr write — ADR-0011).
+      if (opts.findings === true) opts.verbose = true;
       if (opts.gateSave === true || opts.gateCompare === true) {
         await runGateMode(opts, cli);
         return;
@@ -208,9 +211,8 @@ function registerListCommand(program: CliProgram, cli: ToolCliContext): void {
     .command(FIT_LIST.name)
     .description(FIT_LIST.description);
   for (const alias of FIT_LIST.aliases ?? []) fitListCmd.alias(alias);
+  applyCommonFlags(fitListCmd, ['cwd', 'json'], { cwd: process.cwd() });
   fitListCmd
-    .option(CWD_FLAG, CWD_DESC, process.cwd())
-    .option(JSON_FLAG, JSON_DESC, false)
     .action(async (opts: ToolOptions) => {
       const result = await listChecks(opts.cwd);
       if (opts.json) { cli.emitJson(result); return; }
@@ -223,9 +225,8 @@ function registerRecipesCommand(program: CliProgram, cli: ToolCliContext): void 
     .command(FIT_RECIPES.name)
     .description(FIT_RECIPES.description);
   for (const alias of FIT_RECIPES.aliases ?? []) fitRecipesCmd.alias(alias);
+  applyCommonFlags(fitRecipesCmd, ['cwd', 'json'], { cwd: process.cwd() });
   fitRecipesCmd
-    .option(CWD_FLAG, CWD_DESC, process.cwd())
-    .option(JSON_FLAG, JSON_DESC, false)
     .action(async (opts: ToolOptions) => {
       const result = await listRecipes(opts.cwd);
       if (opts.json) { cli.emitJson(result); return; }
@@ -234,12 +235,12 @@ function registerRecipesCommand(program: CliProgram, cli: ToolCliContext): void 
 }
 
 function registerBaselineExportCommand(program: CliProgram, cli: ToolCliContext): void {
-  program
+  const fitBaselineCmd = program
     .command(FIT_BASELINE_EXPORT.name)
     .description(FIT_BASELINE_EXPORT.description)
-    .requiredOption('--out <path>', 'Output file path for the SARIF baseline')
-    .option(CWD_FLAG, CWD_DESC, process.cwd())
-    .option(JSON_FLAG, JSON_DESC, false)
+    .requiredOption('--out <path>', 'Output file path for the SARIF baseline');
+  applyCommonFlags(fitBaselineCmd, ['cwd', 'json'], { cwd: process.cwd() });
+  fitBaselineCmd
     .action(async (opts: ToolOptions & { out: string }) => {
       const datastore = cli.scope.datastore() as DataStore;
       const result = await exportFitBaseline(datastore, opts.out, cli);
