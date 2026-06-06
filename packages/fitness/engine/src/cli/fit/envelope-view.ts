@@ -121,8 +121,10 @@ export function envelopeToFindingsGroups(envelope: SignalEnvelope): FitFindingsG
 /** Map one `Signal` to the renderer-agnostic `FindingLine` (display fields only,
  *  4-level severity collapsed to the 2-level error/warning rung). */
 function toFindingLine(signal: Signal): FindingLine {
-  const location =
-    signal.filePath === '' ? undefined : signal.line ? `${signal.filePath}:${String(signal.line)}` : signal.filePath;
+  let location: string | undefined;
+  if (signal.filePath !== '') {
+    location = signal.line === undefined ? signal.filePath : `${signal.filePath}:${String(signal.line)}`;
+  }
   return {
     severity: isErrorSignal(signal) ? 'error' : 'warning',
     message: signal.message,
