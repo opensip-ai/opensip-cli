@@ -45,6 +45,9 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
         run: node scripts/verify-release.mjs --expected-version "$RELEASE_TAG"
 
+      - name: Verify package supply-chain policy
+        run: pnpm supply-chain:verify
+
       # Clean every package's dist/ before build. tsc never deletes orphan
       # output files when their source is moved or removed, and `files:
       # ["dist"]` in package.json blindly globs the whole tree — so a

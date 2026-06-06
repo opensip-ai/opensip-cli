@@ -1,0 +1,627 @@
+// @fitness-ignore-file unbounded-memory -- reads small repository config files (package.json, lockfiles, workflows); bounded by standard project metadata size
+/**
+ * @fileoverview Package supply-chain policy check
+ *
+ * Validates consumer-side package-manager guardrails for npm, pnpm, and Bun:
+ * pinned package manager, committed lockfile, frozen CI installs, install
+ * script policy, dependency maturity gates, lockfile integrity coverage,
+ * exotic dependency review, and trusted publishing posture.
+ */
+
+import * as fs from 'node:fs'
+import * as path from 'node:path'
+
+import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
+
+interface PackageJson {
+  name?: string
+  private?: boolean
+  packageManager?: string
+  scripts?: Record<string, string>
+  dependencies?: Record<string, string>
+  devDependencies?: Record<string, string>
+  optionalDependencies?: Record<string, string>
+  peerDependencies?: Record<string, string>
+  trustedDependencies?: string[]
+}
+
+interface PackageJsonFile {
+  filePath: string
+  relPath: string
+  packageDir: string
+  json: PackageJson
+}
+
+interface WorkflowFile {
+  filePath: string
+  relPath: string
+  content: string
+}
+
+interface ProjectSnapshot {
+  rootDir: string
+  rootPackagePath: string
+  rootPackage: PackageJson
+  packages: PackageJsonFile[]
+  lockfiles: Set<string>
+  pnpmWorkspace: string | null
+  npmrc: string | null
+  bunfig: string | null
+  workflows: WorkflowFile[]
+}
+
+const SUPPORTED_LOCKFILES = [
+  'pnpm-lock.yaml',
+  'package-lock.json',
+  'npm-shrinkwrap.json',
+  'bun.lock',
+  'bun.lockb',
+] as const
+
+const INSTALL_LIFECYCLE_SCRIPTS = new Set(['preinstall', 'install', 'postinstall'])
+const DEPENDENCY_FIELDS = [
+  'dependencies',
+  'devDependencies',
+  'optionalDependencies',
+  'peerDependencies',
+] as const
+
+function readIfExists(filePath: string): string | null {
+  try {
+    if (!fs.existsSync(filePath)) return null
+    return fs.readFileSync(filePath, 'utf8')
+  } catch {
+    return null
+  }
+}
+
+function parseJson<T>(content: string): T | null {
+  try {
+    return JSON.parse(content) as T
+  } catch {
+    return null
+  }
+}
+
+function lineOf(content: string, needle: string | RegExp): number {
+  const lines = content.split('\n')
+  for (const [i, line] of lines.entries()) {
+    if (typeof needle === 'string' ? line.includes(needle) : needle.test(line)) {
+      return i + 1
+    }
+  }
+  return 1
+}
+
+function normalizeRel(filePath: string, rootDir: string): string {
+  return path.relative(rootDir, filePath).split(path.sep).join('/')
+}
+
+function getConfigValue(content: string | null, key: string): string | null {
+  if (!content) return null
+  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const match = new RegExp(`^\\s*${escaped}\\s*[:=]\\s*([^#\\n]+)`, 'm').exec(content)
+  return match?.[1]?.trim().replace(/^['"]|['"]$/g, '') ?? null
+}
+
+function getNpmrcBoolean(content: string | null, key: string): boolean {
+  return getConfigValue(content, key)?.toLowerCase() === 'true'
+}
+
+function getPositiveNumber(content: string | null, key: string): number | null {
+  const value = getConfigValue(content, key)
+  if (!value) return null
+  const parsed = Number.parseInt(value, 10)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
+}
+
+function hasTopLevelKey(content: string | null, key: string): boolean {
+  if (!content) return false
+  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return new RegExp(`^${escaped}:`, 'm').test(content)
+}
+
+function hasScalarValue(content: string | null, key: string, expected: string): boolean {
+  return getConfigValue(content, key)?.toLowerCase() === expected.toLowerCase()
+}
+
+async function readPackageJsons(files: FileAccessor, rootDir: string): Promise<PackageJsonFile[]> {
+  const packagePaths = files.paths
+    .filter((filePath) => path.basename(filePath) === 'package.json')
+    .sort((a, b) => a.length - b.length)
+
+  const packages: PackageJsonFile[] = []
+  for (const filePath of packagePaths) {
+    const content = await files.read(filePath)
+    const json = parseJson<PackageJson>(content)
+    if (!json) continue
+    packages.push({
+      filePath,
+      relPath: normalizeRel(filePath, rootDir),
+      packageDir: path.dirname(filePath),
+      json,
+    })
+  }
+  return packages
+}
+
+function findRootPackagePath(paths: readonly string[]): string | null {
+  const candidates = paths
+    .filter((filePath) => path.basename(filePath) === 'package.json')
+    .sort((a, b) => a.split(path.sep).length - b.split(path.sep).length)
+  return candidates[0] ?? null
+}
+
+function readWorkflows(rootDir: string): WorkflowFile[] {
+  const workflowsDir = path.join(rootDir, '.github', 'workflows')
+  if (!fs.existsSync(workflowsDir)) return []
+  const workflows: WorkflowFile[] = []
+  for (const entry of fs.readdirSync(workflowsDir, { withFileTypes: true })) {
+    if (!entry.isFile() || !/\.(ya?ml)$/i.test(entry.name)) continue
+    const filePath = path.join(workflowsDir, entry.name)
+    const content = readIfExists(filePath)
+    if (content === null) continue
+    workflows.push({ filePath, relPath: normalizeRel(filePath, rootDir), content })
+  }
+  return workflows
+}
+
+async function buildSnapshot(files: FileAccessor): Promise<ProjectSnapshot | null> {
+  const rootPackagePath = findRootPackagePath(files.paths)
+  if (!rootPackagePath) return null
+  const rootDir = path.dirname(rootPackagePath)
+  const rootContent = await files.read(rootPackagePath)
+  const rootPackage = parseJson<PackageJson>(rootContent)
+  if (!rootPackage) return null
+
+  return {
+    rootDir,
+    rootPackagePath,
+    rootPackage,
+    packages: await readPackageJsons(files, rootDir),
+    lockfiles: new Set(SUPPORTED_LOCKFILES.filter((name) => fs.existsSync(path.join(rootDir, name)))),
+    pnpmWorkspace: readIfExists(path.join(rootDir, 'pnpm-workspace.yaml')),
+    npmrc: readIfExists(path.join(rootDir, '.npmrc')),
+    bunfig: readIfExists(path.join(rootDir, 'bunfig.toml')),
+    workflows: readWorkflows(rootDir),
+  }
+}
+
+function pushViolation(
+  violations: CheckViolation[],
+  filePath: string,
+  type: string,
+  message: string,
+  suggestion: string,
+  severity: 'error' | 'warning' = 'warning',
+  line = 1,
+): void {
+  violations.push({ filePath, line, severity, type, message, suggestion })
+}
+
+function checkPackageManagerPin(snapshot: ProjectSnapshot, violations: CheckViolation[]): void {
+  const value = snapshot.rootPackage.packageManager
+  if (!value) {
+    pushViolation(
+      violations,
+      snapshot.rootPackagePath,
+      'package-manager-missing',
+      'Root package.json does not declare a packageManager pin',
+      'Add an exact packageManager value such as "pnpm@11.5.1+sha512.<hash>" so Corepack installs the expected package manager.',
+      'error',
+    )
+    return
+  }
+
+  if (!/^(npm|pnpm|bun)@\d+\.\d+\.\d+(?:[-+][A-Za-z0-9._~+-]+)?$/.test(value)) {
+    pushViolation(
+      violations,
+      snapshot.rootPackagePath,
+      'package-manager-not-exact',
+      `packageManager "${value}" is not an exact package-manager version`,
+      'Pin packageManager to an exact version; do not use ranges, tags, or unversioned package-manager names.',
+      'error',
+      lineOf(readIfExists(snapshot.rootPackagePath) ?? '', 'packageManager'),
+    )
+  }
+
+  if (value.startsWith('pnpm@') && !value.includes('+sha512.')) {
+    pushViolation(
+      violations,
+      snapshot.rootPackagePath,
+      'package-manager-missing-integrity',
+      'pnpm packageManager pin is missing a Corepack sha512 integrity suffix',
+      'Use `corepack use pnpm@<version>` with a modern Corepack so package.json records the sha512-qualified pnpm pin.',
+      'warning',
+      lineOf(readIfExists(snapshot.rootPackagePath) ?? '', 'packageManager'),
+    )
+  }
+}
+
+function checkLockfilePosture(snapshot: ProjectSnapshot, violations: CheckViolation[]): void {
+  if (snapshot.lockfiles.size === 0) {
+    pushViolation(
+      violations,
+      snapshot.rootPackagePath,
+      'lockfile-missing',
+      'No supported package-manager lockfile found at the project root',
+      'Commit one root lockfile: pnpm-lock.yaml, package-lock.json, npm-shrinkwrap.json, or bun.lock.',
+      'error',
+    )
+    return
+  }
+
+  if (snapshot.lockfiles.size > 1) {
+    pushViolation(
+      violations,
+      snapshot.rootPackagePath,
+      'multiple-lockfiles',
+      `Multiple package-manager lockfiles found: ${[...snapshot.lockfiles].join(', ')}`,
+      'Keep one authoritative lockfile for the package manager used by package.json#packageManager.',
+      'warning',
+    )
+  }
+}
+
+function checkPackageLockIntegrity(snapshot: ProjectSnapshot, violations: CheckViolation[]): void {
+  const lockPath = path.join(snapshot.rootDir, 'package-lock.json')
+  const content = readIfExists(lockPath)
+  if (!content) return
+  const lock = parseJson<{
+    packages?: Record<string, { resolved?: string; integrity?: string }>
+    dependencies?: Record<string, { resolved?: string; integrity?: string }>
+  }>(content)
+  if (!lock) return
+
+  const entries = [
+    ...Object.entries(lock.packages ?? {}),
+    ...Object.entries(lock.dependencies ?? {}),
+  ]
+  for (const [name, entry] of entries) {
+    if (!entry.resolved?.startsWith('http')) continue
+    if (entry.integrity) continue
+    pushViolation(
+      violations,
+      lockPath,
+      'lockfile-entry-missing-integrity',
+      `Remote package-lock entry "${name || '<root>'}" has a resolved URL but no integrity hash`,
+      'Regenerate the lockfile with a modern npm CLI and review any direct URL dependencies.',
+      'error',
+      lineOf(content, entry.resolved),
+    )
+  }
+}
+
+function checkPnpmLockIntegrity(snapshot: ProjectSnapshot, violations: CheckViolation[]): void {
+  const lockPath = path.join(snapshot.rootDir, 'pnpm-lock.yaml')
+  const content = readIfExists(lockPath)
+  if (!content) return
+  const lines = content.split('\n')
+  for (const [index, rawLine] of lines.entries()) {
+    const line = rawLine.trim()
+    if (!line.includes('http') || !/(tarball|resolution):/.test(line)) continue
+    const lookahead = lines.slice(index, index + 8).join('\n')
+    if (/integrity:\s*sha\d+-/i.test(lookahead) || /integrity:\s*['"]?sha\d+-/i.test(line)) continue
+    pushViolation(
+      violations,
+      lockPath,
+      'lockfile-entry-missing-integrity',
+      'pnpm lockfile contains a remote tarball resolution without a nearby integrity hash',
+      'Upgrade pnpm and regenerate the lockfile; modern pnpm rejects mutable remote tarball entries without integrity.',
+      'error',
+      index + 1,
+    )
+  }
+}
+
+function checkLockfileIntegrity(snapshot: ProjectSnapshot, violations: CheckViolation[]): void {
+  checkPackageLockIntegrity(snapshot, violations)
+  checkPnpmLockIntegrity(snapshot, violations)
+}
+
+function dependencyEntries(pkg: PackageJson): [string, string][] {
+  const entries: [string, string][] = []
+  for (const field of DEPENDENCY_FIELDS) {
+    for (const [name, spec] of Object.entries(pkg[field] ?? {})) {
+      entries.push([name, spec])
+    }
+  }
+  return entries
+}
+
+function hasCommitPin(spec: string): boolean {
+  return /#[a-f0-9]{40}(?:$|[^\da-f])/i.test(spec)
+}
+
+function isExoticSpec(spec: string): boolean {
+  return /^(git\+|git:\/\/|github:|gitlab:|bitbucket:|https?:\/\/|ssh:\/\/|git@|file:)/.test(spec)
+}
+
+function checkExoticDependencies(snapshot: ProjectSnapshot, violations: CheckViolation[]): void {
+  for (const pkg of snapshot.packages) {
+    const content = readIfExists(pkg.filePath) ?? ''
+    for (const [name, spec] of dependencyEntries(pkg.json)) {
+      if (!isExoticSpec(spec)) continue
+      const isGit = /^(git\+|git:\/\/|github:|gitlab:|bitbucket:|ssh:\/\/|git@)/.test(spec)
+      if (isGit && hasCommitPin(spec)) continue
+      const kind = spec.startsWith('file:') ? 'local path dependency' : 'mutable non-registry dependency'
+      pushViolation(
+        violations,
+        pkg.filePath,
+        'exotic-dependency-source',
+        `${pkg.relPath} declares ${kind} ${name}@${spec}`,
+        'Prefer registry/workspace dependencies. If a git dependency is unavoidable, pin it to a full 40-character commit SHA and review it explicitly.',
+        'warning',
+        lineOf(content, `"${name}"`),
+      )
+    }
+  }
+}
+
+function checkInstallLifecycleScripts(snapshot: ProjectSnapshot, violations: CheckViolation[]): void {
+  for (const pkg of snapshot.packages) {
+    for (const scriptName of Object.keys(pkg.json.scripts ?? {})) {
+      if (!INSTALL_LIFECYCLE_SCRIPTS.has(scriptName)) continue
+      pushViolation(
+        violations,
+        pkg.filePath,
+        'install-lifecycle-script',
+        `${pkg.relPath} declares an install-time lifecycle script "${scriptName}"`,
+        'Avoid install-time lifecycle scripts in publishable packages. If this is an app-only script, document why it is safe and keep dependency install scripts disabled or allowlisted.',
+        pkg.json.private === true ? 'warning' : 'error',
+        lineOf(readIfExists(pkg.filePath) ?? '', `"${scriptName}"`),
+      )
+    }
+  }
+}
+
+function checkInstallScriptPolicy(snapshot: ProjectSnapshot, violations: CheckViolation[]): void {
+  if (snapshot.lockfiles.has('pnpm-lock.yaml')) {
+    if (!hasTopLevelKey(snapshot.pnpmWorkspace, 'allowBuilds')) {
+      pushViolation(
+        violations,
+        path.join(snapshot.rootDir, 'pnpm-workspace.yaml'),
+        'install-script-policy-missing',
+        'pnpm project does not declare an allowBuilds install-script policy',
+        'Add an explicit allowBuilds map to pnpm-workspace.yaml and approve only dependencies that truly need install/build scripts.',
+        'error',
+      )
+    }
+    if (hasScalarValue(snapshot.pnpmWorkspace, 'dangerouslyAllowAllBuilds', 'true')) {
+      pushViolation(
+        violations,
+        path.join(snapshot.rootDir, 'pnpm-workspace.yaml'),
+        'install-script-policy-allows-all',
+        'pnpm dangerouslyAllowAllBuilds is enabled',
+        'Remove dangerouslyAllowAllBuilds and use a narrow allowBuilds map instead.',
+        'error',
+        lineOf(snapshot.pnpmWorkspace ?? '', 'dangerouslyAllowAllBuilds'),
+      )
+    }
+  }
+
+  if (snapshot.lockfiles.has('package-lock.json') || snapshot.lockfiles.has('npm-shrinkwrap.json')) {
+    const npmHasPolicy =
+      getNpmrcBoolean(snapshot.npmrc, 'ignore-scripts') ||
+      (getNpmrcBoolean(snapshot.npmrc, 'strict-allow-scripts') && snapshot.npmrc?.includes('allow-scripts'))
+    if (!npmHasPolicy) {
+      pushViolation(
+        violations,
+        path.join(snapshot.rootDir, '.npmrc'),
+        'install-script-policy-missing',
+        'npm project does not disable or strictly allowlist dependency install scripts',
+        'Set ignore-scripts=true, or use strict-allow-scripts=true with a narrow allow-scripts policy for dependencies that genuinely need lifecycle hooks.',
+        'warning',
+      )
+    }
+  }
+
+  if (snapshot.lockfiles.has('bun.lock') || snapshot.lockfiles.has('bun.lockb')) {
+    const trusted = snapshot.rootPackage.trustedDependencies
+    if (!Array.isArray(trusted)) {
+      pushViolation(
+        violations,
+        snapshot.rootPackagePath,
+        'install-script-policy-missing',
+        'Bun project does not declare trustedDependencies',
+        'Add trustedDependencies to package.json. Use [] to disable all dependency lifecycle scripts, or list only reviewed packages.',
+        'warning',
+      )
+    }
+  }
+}
+
+function checkMinimumReleaseAge(snapshot: ProjectSnapshot, violations: CheckViolation[]): void {
+  if (snapshot.lockfiles.has('pnpm-lock.yaml')) {
+    if ((getPositiveNumber(snapshot.pnpmWorkspace, 'minimumReleaseAge') ?? 0) <= 0) {
+      pushViolation(
+        violations,
+        path.join(snapshot.rootDir, 'pnpm-workspace.yaml'),
+        'minimum-release-age-missing',
+        'pnpm minimumReleaseAge is not explicitly enabled',
+        'Set minimumReleaseAge: 1440 or higher in pnpm-workspace.yaml, and pair it with minimumReleaseAgeStrict: true.',
+        'error',
+      )
+    }
+    if (!hasScalarValue(snapshot.pnpmWorkspace, 'minimumReleaseAgeStrict', 'true')) {
+      pushViolation(
+        violations,
+        path.join(snapshot.rootDir, 'pnpm-workspace.yaml'),
+        'minimum-release-age-not-strict',
+        'pnpm minimumReleaseAgeStrict is not enabled',
+        'Set minimumReleaseAgeStrict: true so newly published versions fail closed instead of being silently exempted.',
+        'warning',
+      )
+    }
+  }
+
+  if (
+    (snapshot.lockfiles.has('package-lock.json') || snapshot.lockfiles.has('npm-shrinkwrap.json')) &&
+    (getPositiveNumber(snapshot.npmrc, 'min-release-age') ?? 0) <= 0
+  ) {
+    pushViolation(
+      violations,
+      path.join(snapshot.rootDir, '.npmrc'),
+      'minimum-release-age-missing',
+      'npm min-release-age is not enabled',
+      'Set min-release-age to a positive number of days in project .npmrc.',
+      'warning',
+    )
+  }
+
+  if (
+    (snapshot.lockfiles.has('bun.lock') || snapshot.lockfiles.has('bun.lockb')) &&
+    (getPositiveNumber(snapshot.bunfig, 'minimumReleaseAge') ?? 0) <= 0
+  ) {
+    pushViolation(
+      violations,
+      path.join(snapshot.rootDir, 'bunfig.toml'),
+      'minimum-release-age-missing',
+      'Bun minimumReleaseAge is not enabled',
+      'Set [install].minimumReleaseAge to a positive number of seconds in bunfig.toml.',
+      'warning',
+    )
+  }
+}
+
+function workflowLines(workflow: WorkflowFile): string[] {
+  return workflow.content.split('\n')
+}
+
+function isFrozenInstallLine(line: string): boolean {
+  return /\bnpm\s+ci\b/.test(line) ||
+    /\bpnpm\s+(?:install|i)\b.*--frozen-lockfile/.test(line) ||
+    /\bpnpm\s+ci\b/.test(line) ||
+    /\bbun\s+install\b.*--frozen-lockfile/.test(line) ||
+    /\bbun\s+ci\b/.test(line)
+}
+
+function isPackageManagerBootstrapLine(line: string): boolean {
+  return /\bnpm\s+install\b.*\s--prefix\b.*\bnpm@\d+/.test(line) ||
+    /\bnpm\s+install\s+--prefix\b.*\bnpm@\d+/.test(line)
+}
+
+function isMutableInstallLine(line: string): boolean {
+  if (isPackageManagerBootstrapLine(line)) return false
+  return /\bnpm\s+install\b/.test(line) ||
+    (/\bpnpm\s+(?:install|i)\b/.test(line) && !line.includes('--frozen-lockfile')) ||
+    (/\bbun\s+install\b/.test(line) && !line.includes('--frozen-lockfile'))
+}
+
+function checkFrozenCiInstalls(snapshot: ProjectSnapshot, violations: CheckViolation[]): void {
+  if (snapshot.workflows.length === 0) return
+  let hasFrozenInstall = false
+  for (const workflow of snapshot.workflows) {
+    for (const [index, rawLine] of workflowLines(workflow).entries()) {
+      const line = rawLine.trim()
+      if (line.startsWith('#')) continue
+      if (isFrozenInstallLine(line)) hasFrozenInstall = true
+      if (!isMutableInstallLine(line)) continue
+      pushViolation(
+        violations,
+        workflow.filePath,
+        'ci-install-not-frozen',
+        `${workflow.relPath} uses a mutable package install command: ${line}`,
+        'Use npm ci, pnpm install --frozen-lockfile, pnpm ci, bun install --frozen-lockfile, or bun ci in CI.',
+        'error',
+        index + 1,
+      )
+    }
+  }
+
+  if (!hasFrozenInstall) {
+    pushViolation(
+      violations,
+      snapshot.workflows[0]?.filePath ?? snapshot.rootPackagePath,
+      'ci-frozen-install-missing',
+      'No frozen package install command was found in GitHub workflows',
+      'Use npm ci, pnpm install --frozen-lockfile, pnpm ci, bun install --frozen-lockfile, or bun ci in every CI install lane.',
+      'warning',
+    )
+  }
+}
+
+function checkTrustedPublishing(snapshot: ProjectSnapshot, violations: CheckViolation[]): void {
+  for (const workflow of snapshot.workflows) {
+    if (!/\bnpm\s+publish\b/.test(workflow.content)) continue
+    if (!/id-token:\s*write/.test(workflow.content)) {
+      pushViolation(
+        violations,
+        workflow.filePath,
+        'trusted-publishing-missing-oidc',
+        `${workflow.relPath} publishes to npm without id-token: write permission`,
+        'Use npm trusted publishing/OIDC and add permissions.id-token: write to the publish job.',
+        'error',
+        lineOf(workflow.content, 'npm publish'),
+      )
+    }
+    if (!/(--provenance|NPM_CONFIG_PROVENANCE\s*[:=]\s*true|provenance:\s*true)/.test(workflow.content)) {
+      pushViolation(
+        violations,
+        workflow.filePath,
+        'publish-provenance-missing',
+        `${workflow.relPath} publishes to npm without explicit provenance`,
+        'Publish with npm trusted publishing and --provenance so consumers can verify build provenance.',
+        'warning',
+        lineOf(workflow.content, 'npm publish'),
+      )
+    }
+    if (/(NPM_TOKEN|NODE_AUTH_TOKEN)/.test(workflow.content)) {
+      pushViolation(
+        violations,
+        workflow.filePath,
+        'publish-token-exposure',
+        `${workflow.relPath} references a long-lived npm publish token`,
+        'Prefer npm trusted publishing/OIDC. Remove NPM_TOKEN/NODE_AUTH_TOKEN from publish jobs after migration.',
+        'warning',
+        lineOf(workflow.content, /NPM_TOKEN|NODE_AUTH_TOKEN/),
+      )
+    }
+  }
+}
+
+export async function analyzePackageSupplyChainPolicy(files: FileAccessor): Promise<CheckViolation[]> {
+  const snapshot = await buildSnapshot(files)
+  if (!snapshot) return []
+
+  const violations: CheckViolation[] = []
+  checkPackageManagerPin(snapshot, violations)
+  checkLockfilePosture(snapshot, violations)
+  checkLockfileIntegrity(snapshot, violations)
+  checkExoticDependencies(snapshot, violations)
+  checkInstallLifecycleScripts(snapshot, violations)
+  checkInstallScriptPolicy(snapshot, violations)
+  checkMinimumReleaseAge(snapshot, violations)
+  checkFrozenCiInstalls(snapshot, violations)
+  checkTrustedPublishing(snapshot, violations)
+  return violations
+}
+
+export const packageSupplyChainPolicy = defineCheck({
+  id: 'ea3ec1d6-16ab-43c4-9875-50d3fd9f564c',
+  slug: 'package-supply-chain-policy',
+  scope: { languages: ['typescript'], concerns: ['config'] },
+  contentFilter: 'raw',
+  fileTypes: ['json'],
+
+  confidence: 'medium',
+  description: 'Validate npm/pnpm/Bun supply-chain guardrails',
+  longDescription: `**Purpose:** Validates package-manager supply-chain guardrails for npm, pnpm, and Bun projects.
+
+**Detects:**
+- Missing or non-exact \`packageManager\` pins
+- Missing or conflicting lockfiles
+- Remote lockfile entries without integrity hashes
+- Mutable git, URL, tarball, or local path dependencies
+- Install-time lifecycle scripts and missing install-script allowlists
+- Missing dependency release-age gates
+- CI install commands that can rewrite lockfiles
+- npm publish workflows that lack OIDC/provenance or still use long-lived tokens
+
+**Why it matters:** Modern npm-family attacks often execute during installation, exploit fresh compromised versions before takedown, or bypass weakened lockfile/install-script policy. These checks keep the project in a fail-closed posture before dependency code runs in CI or developer machines.
+
+**Scope:** General best practice. Cross-file analysis over package metadata, root lockfiles, package-manager config files, and GitHub workflow files.`,
+  tags: ['security', 'dependencies', 'supply-chain'],
+
+  analyzeAll: analyzePackageSupplyChainPolicy,
+})

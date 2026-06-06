@@ -493,6 +493,19 @@
       "purpose": "Everything a --json consumer or plugin author must change to move from opensip-tools v2.x to v3.0."
     },
     {
+      "file": "docs/web-generated/70-reference/08-supply-chain-security.md",
+      "path": "/docs/opensip-tools/70-reference/08-supply-chain-security/",
+      "section": "70-reference",
+      "title": "Supply-chain security",
+      "audience": [
+        "getting-started",
+        "ci-integrators",
+        "plugin-authors",
+        "contributors"
+      ],
+      "purpose": "How opensip-tools reduces npm-family install risk for customers and how teams can use the package-supply-chain-policy check."
+    },
+    {
       "file": "docs/web-generated/80-implementation/01-cli-dispatch.md",
       "path": "/docs/opensip-tools/80-implementation/01-cli-dispatch/",
       "section": "80-implementation",
@@ -653,7 +666,8 @@
         "/docs/opensip-tools/70-reference/04-json-output-schema/",
         "/docs/opensip-tools/70-reference/05-checks-index/",
         "/docs/opensip-tools/70-reference/06-dashboard/",
-        "/docs/opensip-tools/70-reference/07-migrating-v2-to-v3/"
+        "/docs/opensip-tools/70-reference/07-migrating-v2-to-v3/",
+        "/docs/opensip-tools/70-reference/08-supply-chain-security/"
       ]
     },
     {
@@ -687,7 +701,8 @@
         "/docs/opensip-tools/60-guides/03-wire-into-ci/",
         "/docs/opensip-tools/60-guides/05-migrate-from-eslint/",
         "/docs/opensip-tools/70-reference/03-configuration/",
-        "/docs/opensip-tools/70-reference/05-checks-index/"
+        "/docs/opensip-tools/70-reference/05-checks-index/",
+        "/docs/opensip-tools/70-reference/08-supply-chain-security/"
       ]
     },
     {
@@ -723,6 +738,7 @@
         "/docs/opensip-tools/70-reference/04-json-output-schema/",
         "/docs/opensip-tools/70-reference/05-checks-index/",
         "/docs/opensip-tools/70-reference/07-migrating-v2-to-v3/",
+        "/docs/opensip-tools/70-reference/08-supply-chain-security/",
         "/docs/opensip-tools/80-implementation/02-plugin-loader/"
       ]
     },
@@ -751,7 +767,8 @@
         "/docs/opensip-tools/70-reference/03-configuration/",
         "/docs/opensip-tools/70-reference/04-json-output-schema/",
         "/docs/opensip-tools/70-reference/05-checks-index/",
-        "/docs/opensip-tools/70-reference/07-migrating-v2-to-v3/"
+        "/docs/opensip-tools/70-reference/07-migrating-v2-to-v3/",
+        "/docs/opensip-tools/70-reference/08-supply-chain-security/"
       ]
     },
     {
@@ -786,6 +803,7 @@
         "/docs/opensip-tools/70-reference/01-cli-commands/",
         "/docs/opensip-tools/70-reference/02-package-catalog/",
         "/docs/opensip-tools/70-reference/06-dashboard/",
+        "/docs/opensip-tools/70-reference/08-supply-chain-security/",
         "/docs/opensip-tools/80-implementation/01-cli-dispatch/",
         "/docs/opensip-tools/80-implementation/02-plugin-loader/",
         "/docs/opensip-tools/80-implementation/03-session-and-persistence/",

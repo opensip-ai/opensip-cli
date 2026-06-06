@@ -13,6 +13,7 @@ related-docs:
   - ./01-what-is-opensip-tools.md
   - ./05-vocabulary.md
   - ../70-reference/01-cli-commands.md
+  - ../70-reference/08-supply-chain-security.md
 ---
 # Quick start
 
@@ -73,6 +74,8 @@ opensip-tools sim --recipe example
 ```
 
 If `fit --recipe example` exits 0, the platform is wired correctly end-to-end: language detection picked the right adapter, the plugin loader found the example check, the recipe service matched it, the engine executed it, and the renderer drew the result. Every later doc is depth on one of those steps.
+
+opensip-tools publishes through npm trusted publishing/provenance and rejects OpenSIP package-level install hooks before release. For the remaining npm-install risk model, see [supply-chain security](../70-reference/08-supply-chain-security.md).
 
 > **Upgrading from `@opensip-tools/cli`?**
 > The CLI was renamed to the unscoped **`opensip-tools`** in v2.4.0 — one command

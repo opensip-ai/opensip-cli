@@ -48,6 +48,9 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      - name: Verify package supply-chain policy
+        run: pnpm supply-chain:verify
+
       # Runs the full test suite WITH coverage so the per-package thresholds
       # in each vitest.config.ts are enforced on every PR. Coverage had
       # silently drifted below threshold in 13 packages because the gate only

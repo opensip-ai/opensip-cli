@@ -25,6 +25,15 @@ allowBuilds:
   esbuild: false
   unrs-resolver: false
 
+# Supply-chain guard: delay fresh npm publishes long enough for ecosystem
+# takedowns/advisories to land, and keep lockfile verification active in CI.
+minimumReleaseAge: 1440
+minimumReleaseAgeStrict: true
+minimumReleaseAgeIgnoreMissingTime: false
+trustPolicy: no-downgrade
+trustLockfile: false
+blockExoticSubdeps: true
+
 # Security pins — transitive-dependency version floors.
 overrides:
   "postcss@<8.5.10": ">=8.5.10"

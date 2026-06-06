@@ -41,6 +41,7 @@
     "docs:keywords": "node scripts/build-package-keywords.mjs",
     "docs:keywords:check": "node scripts/build-package-keywords.mjs --check",
     "verify-release": "node scripts/verify-release.mjs",
+    "supply-chain:verify": "node scripts/verify-supply-chain.mjs",
     "smoke-pack": "node scripts/smoke-pack.mjs",
     "prepare": "git config core.hooksPath .githooks 2>/dev/null || true"
   },

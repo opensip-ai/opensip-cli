@@ -20,7 +20,7 @@ related-docs:
 ---
 # Checks reference
 
-opensip-tools ships **149+ built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
+opensip-tools ships **150+ built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
 
 > This page is **auto-generated** from the source by [`scripts/build-checks-index.mjs`](https://github.com/opensip-ai/opensip-tools/blob/main/scripts/build-checks-index.mjs). Do not edit it by hand — edit the check's source file (the link in each row), then re-run the generator.
 
@@ -30,7 +30,7 @@ opensip-tools ships **149+ built-in checks** across seven packs. Each check is a
 
 Language-agnostic; runs against every project.
 
-### Architecture  *(14)*
+### Architecture  *(13)*
 
 | Slug | Description |
 |---|---|
@@ -44,12 +44,11 @@ Language-agnostic; runs against every project.
 | [`no-direct-stdout-in-tool-engine`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/no-direct-stdout-in-tool-engine.ts) | Tool engines must emit a SignalEnvelope, not write run output to stdout (ADR-0011) |
 | [`no-duplicate-packages`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/dependencies/no-duplicate-packages.ts) | Detects packages that serve the same purpose |
 | [`node-version-consistency`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/node-version-consistency.ts) | Validate Node.js version consistency across configs |
-| [`phantom-dependency-detection`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/dependencies/phantom-dependency-detection.ts) | Detect phantom dependencies (used but not declared in package.json) |
 | [`project-readme-existence`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/project-readme-existence.ts) | Ensures every package has a README.md file |
 | [`restrict-raw-db-access`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/restrict-raw-db-access.ts) | Confine the raw Drizzle handle (DataStore.db) to the persistence ownership boundary (ADR-0009) |
 | [`stale-build-artifacts`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/architecture/stale-build-artifacts.ts) | Detects compiled .js/.d.ts/.js.map files in source directories that should only exist in dist/ |
 
-### Security  *(18)*
+### Security  *(19)*
 
 | Slug | Description |
 |---|---|
@@ -65,6 +64,7 @@ Language-agnostic; runs against every project.
 | [`jwt-validation`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/security/jwt-validation.ts) | Validate JWT handling follows security best practices |
 | [`no-eval`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/security/no-eval.ts) | Detect dangerous eval and dynamic code execution |
 | [`no-hardcoded-secrets`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/security/no-hardcoded-secrets.ts) | Detect hardcoded secrets, API keys, and credentials in source code |
+| [`package-supply-chain-policy`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/security/package-supply-chain-policy.ts) | Validate npm/pnpm/Bun supply-chain guardrails |
 | [`pii-logging`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/security/pii-logging.ts) | Detect PII fields in log statements |
 | [`rate-limit-coverage`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/security/rate-limit-coverage.ts) | Validate routes have rate limiting configured |
 | [`semgrep-scan`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-universal/src/checks/security/semgrep-scan.ts) | Run Semgrep static analysis to detect security vulnerabilities |
@@ -155,11 +155,11 @@ Language-agnostic; runs against every project.
 
 ---
 
-## TypeScript  *(50 checks)*
+## TypeScript  *(51 checks)*
 
 TypeScript/JavaScript projects; uses TS-AST analysis.
 
-### Architecture  *(8)*
+### Architecture  *(9)*
 
 | Slug | Description |
 |---|---|
@@ -170,6 +170,7 @@ TypeScript/JavaScript projects; uses TS-AST analysis.
 | [`missing-type-exports`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-typescript/src/checks/architecture/missing-type-exports.ts) | Detects types imported via deep internal paths not declared in the package exports map or barrel |
 | [`module-coupling-fan-out`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-typescript/src/checks/architecture/module-coupling-fan-out.ts) | Flags files with high outbound import fan-out (god-files) |
 | [`package-json-exports-field`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-typescript/src/checks/architecture/package-json-exports-field.ts) | *(no description; see source)* |
+| [`phantom-dependency-detection`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-typescript/src/checks/architecture/phantom-dependency-detection.ts) | Detect phantom dependencies (used but not declared in package.json) |
 | [`tsconfig-extends-validation`](https://github.com/opensip-ai/opensip-tools/blob/main/packages/fitness/checks-typescript/src/checks/architecture/tsconfig-extends-validation.ts) | Ensures all tsconfig.json files extend a shared base and the base file exists |
 
 ### Security  *(5)*

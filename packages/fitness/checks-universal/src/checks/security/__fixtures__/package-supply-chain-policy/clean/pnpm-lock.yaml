@@ -1,0 +1,15 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+
+importers:
+  .:
+    dependencies:
+      yaml:
+        specifier: ^2.9.0
+        version: 2.9.0
+
+packages:
+  yaml@2.9.0:
+    resolution: {integrity: sha512-clean}

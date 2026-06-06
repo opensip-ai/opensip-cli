@@ -41,6 +41,9 @@ async function walkDir(dir) {
   for (const e of entries) {
     const p = `${dir}/${e.name}`;
     if (e.isDirectory()) {
+      if (e.name === '__fixtures__' || e.name === 'fixtures' || e.name === '__tests__') {
+        continue;
+      }
       out.push(...(await walkDir(p)));
     } else if (e.isFile() && (e.name.endsWith('.ts') || e.name.endsWith('.tsx'))) {
       out.push(p);

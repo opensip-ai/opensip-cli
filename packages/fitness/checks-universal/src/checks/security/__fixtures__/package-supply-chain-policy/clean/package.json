@@ -1,0 +1,9 @@
+{
+  "name": "clean-supply-chain-app",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "pnpm@11.5.1+sha512.abc123",
+  "dependencies": {
+    "yaml": "^2.9.0"
+  }
+}
