@@ -88,6 +88,21 @@ importers:
 
   packages/cli:
     dependencies:
+      '@opensip-tools/checks-cpp':
+        specifier: workspace:*
+        version: link:../fitness/checks-cpp
+      '@opensip-tools/checks-go':
+        specifier: workspace:*
+        version: link:../fitness/checks-go
+      '@opensip-tools/checks-java':
+        specifier: workspace:*
+        version: link:../fitness/checks-java
+      '@opensip-tools/checks-python':
+        specifier: workspace:*
+        version: link:../fitness/checks-python
+      '@opensip-tools/checks-rust':
+        specifier: workspace:*
+        version: link:../fitness/checks-rust
       '@opensip-tools/checks-typescript':
         specifier: workspace:*
         version: link:../fitness/checks-typescript

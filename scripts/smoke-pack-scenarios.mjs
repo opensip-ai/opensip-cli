@@ -140,6 +140,30 @@ export function buildPackedSmokeScenarios({ expectedVersion, consumerCwd, toolPl
           if (typeof parsed?.totalCount !== 'number' || parsed.totalCount <= 0) {
             failures.push(`list-checks.totalCount: expected > 0, got ${JSON.stringify(parsed?.totalCount)}`)
           }
+          // Guardrail (P1-1): a packed `opensip-tools` install must bundle every
+          // language check pack it advertises (README/FAQ/CLAUDE/checks-index all
+          // claim TS, Python, Go, Java, C/C++, Rust). The monorepo masks gaps
+          // because all packs are root devDeps; only this packed-consumer lane
+          // resolves the CLI's *declared* deps alone. Assert one stable slug per
+          // pack so a pack dropped from cli/package.json fails the release gate
+          // instead of silently shipping a TS-only CLI.
+          const slugs = new Set(
+            Array.isArray(parsed?.checks) ? parsed.checks.map((c) => c?.slug) : [],
+          )
+          const requiredByPack = {
+            'checks-python': 'python-no-bare-except',
+            'checks-go': 'go-no-fmt-print',
+            'checks-java': 'java-no-print-stack-trace',
+            'checks-cpp': 'cpp-clang-tidy',
+            'checks-rust': 'rust-no-dbg-macro',
+          }
+          for (const [pack, slug] of Object.entries(requiredByPack)) {
+            if (!slugs.has(slug)) {
+              failures.push(
+                `list-checks: expected a "${slug}" check from ${pack} — the packed CLI does not bundle that language pack`,
+              )
+            }
+          }
           return failures
         },
       },

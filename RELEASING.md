@@ -197,8 +197,12 @@ Order:
 14. **Check packs** (any order within this group):
     `checks-typescript`, `checks-universal`, `checks-python`,
     `checks-go`, `checks-java`, `checks-cpp`, `checks-rust` — all
-    peer-depend on fitness. `checks-rust` is opt-in (not a CLI
-    dependency); install explicitly.
+    peer-depend on fitness and are first-party CLI dependencies; the CLI
+    bundles every check pack it loads by default (see step 15), so
+    installing `opensip-tools` pulls them all in. The packed-install
+    smoke test (`scripts/smoke-pack-scenarios.mjs`) asserts one slug per
+    language pack, so a pack dropped from `packages/cli/package.json`
+    fails the release gate rather than silently shipping a TS-only CLI.
 15. **`opensip-tools`** (unscoped — the user-facing CLI) — depends on
     every tool, every check pack and every graph adapter pack the CLI
     loads by default, every language adapter, contracts, datastore,
