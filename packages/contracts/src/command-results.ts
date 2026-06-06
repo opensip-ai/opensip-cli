@@ -13,6 +13,45 @@
 import type { StoredSession } from './session-types.js';
 import type { SignalEnvelope } from './signal-envelope.js';
 
+// --- Verbose detail currency (ADR-0021) -------------------------------------
+//
+// `--verbose` is an output-currency concern, not a per-tool live-runner concern.
+// A tool's verbose "detail body" is carried as renderer-agnostic data on its
+// *DoneResult and rendered ONCE by the cli `resultToView` seam, so it is
+// identical in a TTY and a pipe. The body is a typed union so tools that have
+// line-oriented detail (graph's catalog/findings/entry-point dump) and tools
+// with per-finding detail (fit/sim, coloured by severity) share one carrier
+// without flattening one into the other.
+
+/** One displayed finding inside a verbose findings group. Display fields only —
+ *  no core `Signal` type leaks into contracts. */
+export interface FindingLine {
+  readonly severity: 'error' | 'warning';
+  readonly message: string;
+  /** Source location for display, e.g. `"path/to/file.ts:42"`. */
+  readonly location?: string;
+  readonly suggestion?: string;
+}
+
+/** A verbose findings block — one per unit (check / scenario) that emitted ≥1
+ *  finding, or that errored. */
+export interface FindingGroup {
+  /** Display name (pretty), falling back to the unit slug. */
+  readonly title: string;
+  /** Set when the unit itself errored (vs. emitted findings). */
+  readonly error?: string;
+  readonly errorCount: number;
+  readonly warningCount: number;
+  readonly findings: readonly FindingLine[];
+}
+
+/** Renderer-agnostic verbose detail body carried on a migrated `*DoneResult`.
+ *  `resultToView` switches on `kind`: `lines` → verbatim text; `findings` → the
+ *  coloured findings block (rendered identically in Ink and plain text). */
+export type VerboseDetail =
+  | { readonly kind: 'lines'; readonly lines: readonly string[] }
+  | { readonly kind: 'findings'; readonly groups: readonly FindingGroup[] };
+
 /** Union type for all command results — App.tsx dispatches on result.type */
 export type CommandResult =
   | FitDoneResult
@@ -93,6 +132,12 @@ export interface FitDoneResult {
   /** Whether an opensip-tools.config.yml was found in the target directory */
   configFound?: boolean;
   /**
+   * Verbose detail body (ADR-0021), present only on `--verbose`/`--findings`
+   * runs. Rendered by the shared `resultToView` seam so the detail is identical
+   * in a TTY and a pipe. Fit populates the `findings` kind.
+   */
+  readonly verboseDetail?: VerboseDetail;
+  /**
    * User-facing non-fatal warnings collected during the run (plugin load
    * failures, unknown languages in config, missing check packages, etc.).
    *
@@ -121,6 +166,13 @@ export interface GraphDoneResult {
   readonly durationMs: number;
   /** Next-step hint strip (hints may bold substrings); empty to suppress (verbose mode). */
   readonly footerHints: readonly { readonly text: string; readonly bold?: readonly string[] }[];
+  /**
+   * Verbose detail body (ADR-0021). Graph populates the `lines` kind. Carried
+   * here so graph's verbose body renders through the same shared seam as the
+   * other tools; `reportLines`/`footerHints` above are retired in Phase 2 once
+   * the seam consumes this field.
+   */
+  readonly verboseDetail?: VerboseDetail;
 }
 
 /**
@@ -261,6 +313,12 @@ export interface SimDoneResult {
    * summary fields are duplicated on the result.
    */
   envelope: SignalEnvelope;
+  /**
+   * Verbose detail body (ADR-0021), present only on `--verbose` runs. Rendered
+   * by the shared `resultToView` seam. Sim populates the `findings` kind
+   * (per-scenario detail).
+   */
+  readonly verboseDetail?: VerboseDetail;
 }
 
 /**

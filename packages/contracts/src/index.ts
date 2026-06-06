@@ -62,6 +62,9 @@ export type {
   SyncEntry,
   HelpResult,
   ErrorResult,
+  VerboseDetail,
+  FindingGroup,
+  FindingLine,
 } from './command-results.js';
 
 // Canonical pass-rate (`score`) computation — shared by every tool that
