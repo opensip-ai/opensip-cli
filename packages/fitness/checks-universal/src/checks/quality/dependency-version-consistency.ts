@@ -43,11 +43,6 @@ const TRACKED_DEPENDENCIES = [
  */
 const WORKSPACE_PREFIXES: string[] = []
 
-/**
- * Directories to exclude from package discovery
- */
-const TRAVERSAL_SKIP_DIRS = new Set(['node_modules', 'dist', '.turbo', '.git'])
-
 interface PackageJson {
   name?: string | undefined
   dependencies?: Record<string, string> | undefined
@@ -68,41 +63,7 @@ interface VersionAnalysis {
   hasInconsistency: boolean
 }
 
-/* v8 ignore start -- filesystem traversal helpers; depth/error/file-size branches covered by integration */
-/**
- * Find all package.json files in the workspace
- */
-function findPackageJsonFiles(projectRoot: string): string[] {
-  const files: string[] = []
-
-  function searchDir(dir: string, depth = 0): void {
-    if (depth > 5) return
-
-    try {
-      const entries = fs.readdirSync(dir, { withFileTypes: true })
-      for (const entry of entries) {
-        if (TRAVERSAL_SKIP_DIRS.has(entry.name)) continue
-
-        const fullPath = path.join(dir, entry.name)
-        if (entry.isDirectory()) {
-          searchDir(fullPath, depth + 1)
-        } else if (
-          entry.name === 'package.json' &&
-          fullPath !== path.join(projectRoot, 'package.json')
-        ) {
-          // Skip root package.json - it defines the canonical versions
-          files.push(fullPath)
-        }
-      }
-    } catch {
-      // @swallow-ok Skip unreadable directories
-    }
-  }
-
-  searchDir(projectRoot)
-  return files
-}
-
+/* v8 ignore start -- filesystem read helpers; error/file-size branches covered by integration */
 /**
  * Parse a package.json file safely
  */
@@ -293,12 +254,22 @@ export const dependencyVersionConsistency = defineCheck({
 
   // @fitness-ignore-next-line concurrency-safety -- async keyword required by analyzeAll interface contract; synchronous analysis implementation
   // eslint-disable-next-line @typescript-eslint/require-await -- AnalyzeAllCheckConfig requires Promise<CheckViolation[]>; this implementation is synchronous
-  async analyzeAll(_files: FileAccessor): Promise<CheckViolation[]> {
+  async analyzeAll(files: FileAccessor): Promise<CheckViolation[]> {
     const violations: CheckViolation[] = []
 
-    // Use process.cwd() since we're doing file system operations directly
-    const projectRoot = process.cwd()
-    const packageJsonFiles = findPackageJsonFiles(projectRoot)
+    // Discover package.json files from the supplied set (NOT process.cwd()), so
+    // the check analyzes exactly the files in scope — identical behavior under
+    // `fit` (root + every package's package.json are in scope) and under tests.
+    // The shortest path is the topmost (root) package.json — the canonical
+    // version source; the rest are the workspace packages compared against it.
+    const pkgJsonPaths = files.paths
+      .filter((p) => path.basename(p) === 'package.json')
+      .sort((a, b) => a.length - b.length)
+    if (pkgJsonPaths.length === 0) {
+      return violations
+    }
+    const projectRoot = path.dirname(pkgJsonPaths[0] ?? '')
+    const packageJsonFiles = pkgJsonPaths.slice(1)
 
     // Analyze version consistency
     const analysis = analyzeDependencyVersions(packageJsonFiles, projectRoot)

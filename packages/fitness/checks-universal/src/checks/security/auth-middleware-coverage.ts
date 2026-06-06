@@ -5,7 +5,7 @@
 
 import { logger } from '@opensip-tools/core'
 import { defineCheck, type CheckViolation } from '@opensip-tools/fitness'
-import { stripStringLiterals, stripStringsAndComments } from '@opensip-tools/fitness'
+import { stripStringsAndComments } from '@opensip-tools/fitness'
 
 /**
  * Match Fastify route definitions
@@ -170,7 +170,10 @@ export const authMiddlewareCoverage = defineCheck({
   id: 'eb8b97f1-3125-4391-be4d-020c74413817',
   slug: 'auth-middleware-coverage',
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'strip-strings',
+  // 'raw', not 'strip-strings': the route matcher needs the quoted route PATH
+  // (`fastify.get('/users', …)`), which string-stripping would blank — making
+  // the `[^'"\`]+` path group unmatchable and the check inert.
+  contentFilter: 'raw',
 
   confidence: 'medium',
   description: 'Validate routes have authentication middleware',
@@ -210,12 +213,9 @@ export const authMiddlewareCoverage = defineCheck({
         continue
       }
 
-      const strippedLine = stripStringLiterals(line)
-      const strippedContext = stripStringLiterals(context)
-
       for (const pattern of ROUTE_PATTERNS) {
-        const match = pattern.match(strippedLine)
-        if (match && pattern.check(strippedContext)) {
+        const match = pattern.match(line)
+        if (match && pattern.check(context)) {
           violations.push({
             line: lineNum + 1,
             column: match.index,

@@ -26,19 +26,18 @@ export const COMMAND_EXEMPTIONS: CommandExemptions = {
   'semgrep-scan': "analysisMode:'command' — shells to semgrep; covered by packed-smoke",
 }
 
-// Non-command checks that fixture-coverage SURFACED as structurally
-// un-exercisable — each is a pre-existing check defect (the check can never
-// produce a deterministic finding from an on-disk fixture). Documented here as
-// permanent exemptions; fixing the check graduates the slug off this list.
+// Non-command checks that cannot be exercised by an on-disk fixture. The other
+// three defects fixture-coverage surfaced here (auth-middleware-coverage,
+// dependency-version-consistency, env-var-validation) plus this entry's sibling
+// have been FIXED and now carry real clean+violation fixtures.
 export const KNOWN_UNFIXTURABLE: CommandExemptions = {
-  'auth-middleware-coverage':
-    'self-defeating: analyze() strips string literals, but its route regex needs a non-empty quoted path',
-  'dependency-version-consistency':
-    'ignores the FileAccessor and scans process.cwd() directly — an on-disk fixture cannot drive it',
-  'env-var-validation':
-    'every `process.env.X` contains `env.X`, which matches its own "safe" ENV_ACCESS pattern — never flags',
+  // The string-stripping bug (specifier blanked before extraction) was real, but
+  // fixing it revealed a deeper flaw: the detection logic floods with false
+  // positives on a pnpm monorepo (1439 "phantom" errors on this repo — it
+  // doesn't account for workspace hoisting / root-declared deps / resolution).
+  // Left dormant pending a proper workspace-aware rewrite, not a quick fix.
   'phantom-dependency-detection':
-    'extractImports() strips string-literal quotes before matching the quoted specifier — no import is ever extracted',
+    'detection logic false-positive-floods on pnpm monorepos (1439 on self); needs a workspace-aware rewrite, not just the string-stripping fix',
 }
 
 export const FILENAME_OVERRIDES: FilenameOverrides = {

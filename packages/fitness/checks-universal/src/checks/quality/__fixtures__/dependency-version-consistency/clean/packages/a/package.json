@@ -1,0 +1,4 @@
+{
+  "name": "pkg-a",
+  "devDependencies": { "typescript": "5.7.0" }
+}

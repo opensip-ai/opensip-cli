@@ -44,7 +44,12 @@ const LOGICAL_OR_PATTERN = /process\.env\.\w+\s*\|\|/
 const NON_NULL_ASSERTION_PATTERN = /process\.env\.\w+\s*!\s*[,;)]/
 const GET_ENV_PATTERN = /getEnv\s*\(/
 const CONFIG_ACCESS_PATTERN = /config\.\w+/
-const ENV_ACCESS_PATTERN = /env\.\w+/
+// A validated env-object access (e.g. `env.PORT` from a typed config) is safe —
+// but NOT `process.env.X`, whose own text contains the substring `env.X`. The
+// negative lookbehind stops this pattern from matching the access it's meant to
+// flag (which otherwise made every process.env access "safe" — the check never
+// fired).
+const ENV_ACCESS_PATTERN = /(?<!process\.)\benv\.\w+/
 const REQUIRE_ENV_PATTERN = /requireEnv\s*\(/
 const OPTIONAL_ENV_PATTERN = /optionalEnv\s*\(/
 

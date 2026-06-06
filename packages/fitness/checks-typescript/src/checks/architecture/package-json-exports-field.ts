@@ -10,6 +10,11 @@
 
 import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-tools/fitness'
 
+// Match a `packages/` or `services/` workspace segment whether the path is
+// repo-relative (`packages/a/package.json`) or absolute (`/abs/packages/a/…`).
+const WORKSPACE_SEGMENT = /(?:^|\/)(?:packages|services)\//
+const PACKAGES_SEGMENT = /(?:^|\/)packages\//
+
 export const packageJsonExportsField = defineCheck({
   id: 'e1f2a3b4-c5d6-7e8f-9a0b-1c2d3e4f5a6b',
   slug: 'package-json-exports-field',
@@ -23,8 +28,7 @@ export const packageJsonExportsField = defineCheck({
     const packageJsonPaths = files.paths.filter(p =>
       p.endsWith('package.json') &&
       !p.includes('node_modules') &&
-      p !== 'package.json' && // skip root
-      (p.startsWith('packages/') || p.startsWith('services/')),
+      WORKSPACE_SEGMENT.test(p), // only workspace packages/services (excludes the root)
     )
 
     for (const filePath of packageJsonPaths) {
@@ -41,7 +45,7 @@ export const packageJsonExportsField = defineCheck({
       }
 
       // Skip private packages that aren't consumed by others
-      if (parsed.private === true && !filePath.startsWith('packages/')) continue
+      if (parsed.private === true && !PACKAGES_SEGMENT.test(filePath)) continue
 
       if (!parsed.exports) {
         const name = (parsed.name as string) ?? filePath

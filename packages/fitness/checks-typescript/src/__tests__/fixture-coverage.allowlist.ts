@@ -21,12 +21,11 @@ export const ALLOWLIST: CoverageAllowlist = []
 export const COMMAND_EXEMPTIONS: CommandExemptions = {}
 
 export const KNOWN_UNFIXTURABLE: CommandExemptions = {
-  // analyzeAll filters files.paths with `p.startsWith('packages/')`, but the
-  // harness supplies ABSOLUTE temp-dir paths, so the filter matches zero files
-  // and the check can never fire on a fixture. Covered by the live dogfood run.
-  'package-json-exports-field': 'analyzeAll assumes repo-relative paths; harness uses absolute temp paths',
-  // analyzeAll shells out to `npx tsc --noEmit` per apps/* dir (subprocess +
-  // toolchain dependent, effectively command-mode). Covered by the live run.
+  // analyzeAll shells out to `npx tsc --noEmit` per discovered apps/* dir — a
+  // subprocess + toolchain-dependent check, effectively command-mode; not
+  // exercisable by a static fixture. Covered by the live dogfood run.
+  // (package-json-exports-field was FIXED — its path filter now accepts absolute
+  // paths — and now carries a real fixture, so it's no longer listed here.)
   'typescript-frontend': 'shells out to `npx tsc --noEmit` — effectively command-mode',
 }
 
