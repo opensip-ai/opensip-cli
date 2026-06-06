@@ -379,7 +379,6 @@ const transformDoc = (source, srcRel, releaseRef) => {
   let text = source;
   text = applyWebMarkers(text);
   text = rewriteLinks(text, srcRel, releaseRef);
-  text = warnIfMermaid(text, srcRel);
   return text;
 };
 
@@ -480,19 +479,6 @@ const rewriteToGithubUrl = (resolvedFromRepoRoot, anchor, releaseRef) =>
   );
 
 const joinAnchor = (path, anchor) => (anchor ? `${path}${anchor}` : path);
-
-const warnIfMermaid = (text, srcRel) => {
-  // SVG pre-rendering for mermaid blocks is not yet wired. When the
-  // first mermaid block is added, integrate @mermaid-js/mermaid-cli
-  // here: convert each fenced ```mermaid block to an SVG written to
-  // docs/web-generated/diagrams/<hash>.svg and replace the block with an <img>.
-  if (/```mermaid/.test(text)) {
-    err(
-      `warn: ${srcRel} contains a mermaid block — SVG pre-rendering not yet wired; leaving block as-is. See scripts/build-web-docs.mjs:warnIfMermaid().`
-    );
-  }
-  return text;
-};
 
 const log = (msg) => console.error(`[build-web-docs] ${msg}`);
 const err = (msg) => console.error(`[build-web-docs] ${msg}`);
