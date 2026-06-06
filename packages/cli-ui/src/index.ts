@@ -40,6 +40,13 @@ export {
   line,
   group,
 } from './view-model.js';
+export {
+  viewVerboseLines,
+  viewFindingsGroups,
+  viewVerboseHint,
+  type FindingLineView,
+  type FindingGroupView,
+} from './verbose-detail.js';
 export { renderToText } from './render-to-text.js';
 export { renderToInk } from './render-to-ink.js';
 export {
