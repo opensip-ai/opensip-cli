@@ -14,7 +14,7 @@
       ]
     },
     "packages/cli": {
-      "entry": ["src/__tests__/fixtures/**/*.ts"],
+      "entry": ["src/__tests__/fixtures/**/*.{ts,js}"],
       "ignoreDependencies": [
         "@opensip-tools/checks-typescript",
         "@opensip-tools/checks-universal",
