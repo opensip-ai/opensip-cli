@@ -59,9 +59,10 @@ const EXPECTED: Record<string, string[]> = {
   ],
   graph: [
     // ADR-0011 (Phase 5): graph gained --api-key for --report-to cloud egress.
+    // ADR-0021: graph gained -q/--quiet for cross-tool flag parity.
     '--api-key', '--changed-file', '--concurrency', '--cwd', '--debug',
     '--gate-compare', '--gate-save', '--json', '--language', '--list-files',
-    '--mode', '--no-cache', '--out', '--profile', '--recipe', '--report-to',
+    '--mode', '--no-cache', '--out', '--profile', '--quiet', '--recipe', '--report-to',
     '--resolution', '--run-id', '--verbose', '--workspace',
   ],
   // ADR-0011 (Phase 4): sim gained --report-to / --api-key cloud egress.

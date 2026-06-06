@@ -163,15 +163,16 @@ describe('resultToView', () => {
   });
 
   it('renders graph-done summary + footer via the shared producers (no banner text)', () => {
+    // Non-verbose: no verboseDetail; the seam emits the shared "Use --verbose…"
+    // hint + graph's dashboard hint (ADR-0021).
     const out = textOf({
       type: 'graph-done',
-      reportLines: [],
       summary: { passed: 3, failed: 0, errors: 0, warnings: 0 },
       durationMs: 1200,
-      footerHints: [{ text: 'Use --verbose for detailed results', bold: ['--verbose'] }],
     });
     expect(out).toContain('3 Passed, 0 Failed (0 Errors, 0 Warnings) | Duration 1.2s');
     expect(out).toContain('  Use --verbose for detailed results');
+    expect(out).toContain('opensip-tools dashboard for HTML report');
   });
 
   it('renders gate-done lines verbatim', () => {
@@ -183,17 +184,19 @@ describe('resultToView', () => {
   });
 
   it('renders the graph-done verbose body and fast-tier caveat', () => {
+    // Verbose: the body rides on verboseDetail{kind:'lines'} (ADR-0021); the
+    // seam renders it and suppresses the footer hints.
     const out = textOf({
       type: 'graph-done',
-      reportLines: ['== Catalog ==', '5 functions across 2 files (cacheHit=false)'],
+      verboseDetail: { kind: 'lines', lines: ['== Catalog ==', '5 functions across 2 files (cacheHit=false)'] },
       resolutionBanner: 'Resolution: fast (syntactic) — edges are approximate.',
       summary: { passed: 1, failed: 1, errors: 0, warnings: 0 },
       durationMs: 50,
-      footerHints: [],
     });
     expect(out).toContain('== Catalog ==');
     expect(out).toContain('5 functions across 2 files');
     expect(out).toContain('Resolution: fast (syntactic)');
     expect(out).toContain('1 Passed, 1 Failed');
+    expect(out).not.toContain('Use --verbose for detailed results');
   });
 });

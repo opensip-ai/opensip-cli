@@ -24,9 +24,8 @@ import type { ToolCliContext } from '@opensip-tools/core';
 /** Minimal structural view of GraphDoneResult — avoids a contracts dep in this adapter test. */
 interface GraphDoneLike {
   readonly type: string;
-  readonly reportLines: readonly string[];
+  readonly verboseDetail?: { readonly kind: 'lines'; readonly lines: readonly string[] } | { readonly kind: 'findings'; readonly groups: readonly unknown[] };
   readonly summary: { readonly passed: number };
-  readonly footerHints: readonly { readonly text: string }[];
 }
 
 const FIXTURE_TSCONFIG = JSON.stringify({
@@ -169,8 +168,9 @@ describe('executeGraph', () => {
     const done = render.mock.calls[0]?.[0] as GraphDoneLike;
     expect(done.type).toBe('graph-done');
     expect(typeof done.summary.passed).toBe('number');
-    expect(done.footerHints.some((h) => h.text.includes('Use --verbose for detailed results'))).toBe(true);
-    expect(done.reportLines).toEqual([]);
+    // Non-verbose: no verbose body; the "Use --verbose…" footer is emitted by
+    // the shared resultToView seam (ADR-0021), not carried on the result.
+    expect(done.verboseDetail).toBeUndefined();
     expect(exitCodes).toContain(0);
   });
 
@@ -182,13 +182,12 @@ describe('executeGraph', () => {
     await executeGraph({ cwd: dir, verbose: true }, cli);
     const done = render.mock.calls[0]?.[0] as GraphDoneLike;
     expect(done.type).toBe('graph-done');
-    const body = done.reportLines.join('\n');
+    const body = done.verboseDetail?.kind === 'lines' ? done.verboseDetail.lines.join('\n') : '';
     expect(body).toContain('== Catalog ==');
     expect(body).toContain('== Findings');
     expect(body).toContain('== Entry points');
     // The trailing "== Summary ==" block is suppressed (includeSummary: false).
     expect(body).not.toContain('== Summary ==');
-    expect(done.footerHints).toEqual([]);
     expect(exitCodes).toContain(0);
   });
 
