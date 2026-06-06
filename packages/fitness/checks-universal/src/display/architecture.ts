@@ -18,7 +18,6 @@ export const ARCHITECTURE_DISPLAY = Object.freeze<Record<string, CheckDisplayEnt
   'no-direct-stdout-in-tool-engine': ['📤', 'No Direct Stdout In Tool Engine'],
   'no-duplicate-packages': ['📦', 'No Duplicate Packages'],
   'node-version-consistency': ['📦', 'Node Version Consistency'],
-  'phantom-dependency-detection': ['📦', 'Phantom Dependency Detection'],
   'project-readme-existence': ['📝', 'Project README Existence'],
   'restrict-raw-db-access': ['🗄️', 'Restrict Raw DB Access'],
   'stale-build-artifacts': ['🏚️', 'Stale Build Artifacts'],

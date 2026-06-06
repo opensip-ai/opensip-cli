@@ -683,43 +683,6 @@ describe('heavy-import-detection', () => {
 })
 
 // =============================================================================
-// phantom-dependency-detection
-// =============================================================================
-
-describe('phantom-dependency-detection', () => {
-  let cwd: string
-
-  beforeAll(() => {
-    cwd = makeFixtureDir('phantom')
-    writeFixture(cwd, 'package.json', JSON.stringify({
-      name: 'demo',
-      dependencies: { lodash: '^4.0.0' },
-    }, null, 2))
-    writeFixture(cwd, 'src/uses-lodash.ts', [
-      'import _ from "lodash";',
-      'export const x = _.pick({ a: 1 }, ["a"]);',
-    ].join('\n'))
-    writeFixture(cwd, 'src/uses-undeclared.ts', [
-      'import { v4 } from "uuid";',
-      'export const id = v4();',
-    ].join('\n'))
-  })
-
-  afterAll(() => rmSync(cwd, { recursive: true, force: true }))
-
-  it('runs without throwing', async () => {
-    const result = await findCheck('phantom-dependency-detection').run(cwd, {
-      targetFiles: [
-        join(cwd, 'package.json'),
-        join(cwd, 'src/uses-lodash.ts'),
-        join(cwd, 'src/uses-undeclared.ts'),
-      ],
-    })
-    expect(result).toBeDefined()
-  })
-})
-
-// =============================================================================
 // project-readme-existence
 // =============================================================================
 

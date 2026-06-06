@@ -26,19 +26,15 @@ export const COMMAND_EXEMPTIONS: CommandExemptions = {
   'semgrep-scan': "analysisMode:'command' — shells to semgrep; covered by packed-smoke",
 }
 
-// Non-command checks that cannot be exercised by an on-disk fixture. The other
-// three defects fixture-coverage surfaced here (auth-middleware-coverage,
-// dependency-version-consistency, env-var-validation) plus this entry's sibling
-// have been FIXED and now carry real clean+violation fixtures.
-export const KNOWN_UNFIXTURABLE: CommandExemptions = {
-  // The string-stripping bug (specifier blanked before extraction) was real, but
-  // fixing it revealed a deeper flaw: the detection logic floods with false
-  // positives on a pnpm monorepo (1439 "phantom" errors on this repo — it
-  // doesn't account for workspace hoisting / root-declared deps / resolution).
-  // Left dormant pending a proper workspace-aware rewrite, not a quick fix.
-  'phantom-dependency-detection':
-    'detection logic false-positive-floods on pnpm monorepos (1439 on self); needs a workspace-aware rewrite, not just the string-stripping fix',
-}
+// Non-command checks that cannot be exercised by an on-disk fixture. Empty:
+// every defect fixture-coverage surfaced in this pack (auth-middleware-coverage,
+// dependency-version-consistency, env-var-validation) has been FIXED and now
+// carries real clean+violation fixtures. phantom-dependency-detection — whose
+// regex/text extractor could not distinguish a real import from import-like text
+// inside a string literal — was moved to checks-typescript and rewritten on the
+// TypeScript AST (a string literal is never an ImportDeclaration), where it is
+// fully fixtured.
+export const KNOWN_UNFIXTURABLE: CommandExemptions = {}
 
 export const FILENAME_OVERRIDES: FilenameOverrides = {
   // env-secret-exposure declares languages [json, typescript, yaml] but fileTypes

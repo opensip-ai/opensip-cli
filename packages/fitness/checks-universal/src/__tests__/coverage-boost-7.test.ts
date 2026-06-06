@@ -604,59 +604,6 @@ describe('eslint-justifications branches', () => {
 })
 
 // =============================================================================
-// phantom-dependency-detection: branches
-// =============================================================================
-
-describe('phantom-dependency-detection', () => {
-  let cwd: string
-
-  beforeAll(() => {
-    cwd = makeFixtureDir('phantom')
-    // package with dependency on lodash
-    writeFixture(cwd, 'package.json', JSON.stringify({
-      name: 'root',
-      dependencies: { lodash: '^4.0.0' },
-    }, null, 2))
-    // file imports phantom dep (express not in package.json)
-    writeFixture(cwd, 'src/server.ts', [
-      'import express from "express";',
-      'import _ from "lodash";', // declared
-      'export const app = express();',
-    ].join('\n'))
-    // file imports node:* — built-in, ignored
-    writeFixture(cwd, 'src/util.ts', [
-      'import * as fs from "node:fs";',
-      'export function read(p: string) { return fs.readFileSync(p); }',
-    ].join('\n'))
-    // file imports relative — ignored
-    writeFixture(cwd, 'src/relative.ts', [
-      'import { x } from "./other";',
-      'export const y = x;',
-    ].join('\n'))
-  })
-
-  afterAll(() => rmSync(cwd, { recursive: true, force: true }))
-
-  it('flags phantom dependencies', async () => {
-    const origCwd = process.cwd()
-    process.chdir(cwd)
-    try {
-      const result = await findCheck('phantom-dependency-detection').run(cwd, {
-        targetFiles: [
-          join(cwd, 'package.json'),
-          join(cwd, 'src/server.ts'),
-          join(cwd, 'src/util.ts'),
-          join(cwd, 'src/relative.ts'),
-        ],
-      })
-      expect(result).toBeDefined()
-    } finally {
-      process.chdir(origCwd)
-    }
-  })
-})
-
-// =============================================================================
 // empty-package-detection: branches
 // =============================================================================
 
