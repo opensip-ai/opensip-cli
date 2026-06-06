@@ -195,77 +195,73 @@ async function buildSnapshot(files: FileAccessor): Promise<ProjectSnapshot | nul
 
 function pushViolation(
   violations: CheckViolation[],
-  filePath: string,
-  type: string,
-  message: string,
-  suggestion: string,
-  severity: 'error' | 'warning' = 'warning',
-  line = 1,
+  violation: Omit<CheckViolation, 'severity' | 'line'> & {
+    severity?: CheckViolation['severity']
+    line?: number
+  },
 ): void {
-  violations.push({ filePath, line, severity, type, message, suggestion })
+  violations.push({ severity: 'warning', line: 1, ...violation })
 }
 
 function checkPackageManagerPin(snapshot: ProjectSnapshot, violations: CheckViolation[]): void {
   const value = snapshot.rootPackage.packageManager
   if (!value) {
-    pushViolation(
-      violations,
-      snapshot.rootPackagePath,
-      'package-manager-missing',
-      'Root package.json does not declare a packageManager pin',
-      'Add an exact packageManager value such as "pnpm@11.5.1+sha512.<hash>" so Corepack installs the expected package manager.',
-      'error',
-    )
+    pushViolation(violations, {
+      filePath: snapshot.rootPackagePath,
+      type: 'package-manager-missing',
+      message: 'Root package.json does not declare a packageManager pin',
+      suggestion:
+        'Add an exact packageManager value such as "pnpm@11.5.1+sha512.<hash>" so Corepack installs the expected package manager.',
+      severity: 'error',
+    })
     return
   }
 
   if (!/^(npm|pnpm|bun)@\d+\.\d+\.\d+(?:[-+][A-Za-z0-9._~+-]+)?$/.test(value)) {
-    pushViolation(
-      violations,
-      snapshot.rootPackagePath,
-      'package-manager-not-exact',
-      `packageManager "${value}" is not an exact package-manager version`,
-      'Pin packageManager to an exact version; do not use ranges, tags, or unversioned package-manager names.',
-      'error',
-      lineOf(readIfExists(snapshot.rootPackagePath) ?? '', 'packageManager'),
-    )
+    pushViolation(violations, {
+      filePath: snapshot.rootPackagePath,
+      type: 'package-manager-not-exact',
+      message: `packageManager "${value}" is not an exact package-manager version`,
+      suggestion:
+        'Pin packageManager to an exact version; do not use ranges, tags, or unversioned package-manager names.',
+      severity: 'error',
+      line: lineOf(readIfExists(snapshot.rootPackagePath) ?? '', 'packageManager'),
+    })
   }
 
   if (value.startsWith('pnpm@') && !value.includes('+sha512.')) {
-    pushViolation(
-      violations,
-      snapshot.rootPackagePath,
-      'package-manager-missing-integrity',
-      'pnpm packageManager pin is missing a Corepack sha512 integrity suffix',
-      'Use `corepack use pnpm@<version>` with a modern Corepack so package.json records the sha512-qualified pnpm pin.',
-      'warning',
-      lineOf(readIfExists(snapshot.rootPackagePath) ?? '', 'packageManager'),
-    )
+    pushViolation(violations, {
+      filePath: snapshot.rootPackagePath,
+      type: 'package-manager-missing-integrity',
+      message: 'pnpm packageManager pin is missing a Corepack sha512 integrity suffix',
+      suggestion:
+        'Use `corepack use pnpm@<version>` with a modern Corepack so package.json records the sha512-qualified pnpm pin.',
+      line: lineOf(readIfExists(snapshot.rootPackagePath) ?? '', 'packageManager'),
+    })
   }
 }
 
 function checkLockfilePosture(snapshot: ProjectSnapshot, violations: CheckViolation[]): void {
   if (snapshot.lockfiles.size === 0) {
-    pushViolation(
-      violations,
-      snapshot.rootPackagePath,
-      'lockfile-missing',
-      'No supported package-manager lockfile found at the project root',
-      'Commit one root lockfile: pnpm-lock.yaml, package-lock.json, npm-shrinkwrap.json, or bun.lock.',
-      'error',
-    )
+    pushViolation(violations, {
+      filePath: snapshot.rootPackagePath,
+      type: 'lockfile-missing',
+      message: 'No supported package-manager lockfile found at the project root',
+      suggestion:
+        'Commit one root lockfile: pnpm-lock.yaml, package-lock.json, npm-shrinkwrap.json, or bun.lock.',
+      severity: 'error',
+    })
     return
   }
 
   if (snapshot.lockfiles.size > 1) {
-    pushViolation(
-      violations,
-      snapshot.rootPackagePath,
-      'multiple-lockfiles',
-      `Multiple package-manager lockfiles found: ${[...snapshot.lockfiles].join(', ')}`,
-      'Keep one authoritative lockfile for the package manager used by package.json#packageManager.',
-      'warning',
-    )
+    pushViolation(violations, {
+      filePath: snapshot.rootPackagePath,
+      type: 'multiple-lockfiles',
+      message: `Multiple package-manager lockfiles found: ${[...snapshot.lockfiles].join(', ')}`,
+      suggestion:
+        'Keep one authoritative lockfile for the package manager used by package.json#packageManager.',
+    })
   }
 }
 
@@ -286,15 +282,14 @@ function checkPackageLockIntegrity(snapshot: ProjectSnapshot, violations: CheckV
   for (const [name, entry] of entries) {
     if (!entry.resolved?.startsWith('http')) continue
     if (entry.integrity) continue
-    pushViolation(
-      violations,
-      lockPath,
-      'lockfile-entry-missing-integrity',
-      `Remote package-lock entry "${name || '<root>'}" has a resolved URL but no integrity hash`,
-      'Regenerate the lockfile with a modern npm CLI and review any direct URL dependencies.',
-      'error',
-      lineOf(content, entry.resolved),
-    )
+    pushViolation(violations, {
+      filePath: lockPath,
+      type: 'lockfile-entry-missing-integrity',
+      message: `Remote package-lock entry "${name || '<root>'}" has a resolved URL but no integrity hash`,
+      suggestion: 'Regenerate the lockfile with a modern npm CLI and review any direct URL dependencies.',
+      severity: 'error',
+      line: lineOf(content, entry.resolved),
+    })
   }
 }
 
@@ -308,15 +303,15 @@ function checkPnpmLockIntegrity(snapshot: ProjectSnapshot, violations: CheckViol
     if (!line.includes('http') || !/(tarball|resolution):/.test(line)) continue
     const lookahead = lines.slice(index, index + 8).join('\n')
     if (/integrity:\s*sha\d+-/i.test(lookahead) || /integrity:\s*['"]?sha\d+-/i.test(line)) continue
-    pushViolation(
-      violations,
-      lockPath,
-      'lockfile-entry-missing-integrity',
-      'pnpm lockfile contains a remote tarball resolution without a nearby integrity hash',
-      'Upgrade pnpm and regenerate the lockfile; modern pnpm rejects mutable remote tarball entries without integrity.',
-      'error',
-      index + 1,
-    )
+    pushViolation(violations, {
+      filePath: lockPath,
+      type: 'lockfile-entry-missing-integrity',
+      message: 'pnpm lockfile contains a remote tarball resolution without a nearby integrity hash',
+      suggestion:
+        'Upgrade pnpm and regenerate the lockfile; modern pnpm rejects mutable remote tarball entries without integrity.',
+      severity: 'error',
+      line: index + 1,
+    })
   }
 }
 
@@ -351,15 +346,14 @@ function checkExoticDependencies(snapshot: ProjectSnapshot, violations: CheckVio
       const isGit = /^(git\+|git:\/\/|github:|gitlab:|bitbucket:|ssh:\/\/|git@)/.test(spec)
       if (isGit && hasCommitPin(spec)) continue
       const kind = spec.startsWith('file:') ? 'local path dependency' : 'mutable non-registry dependency'
-      pushViolation(
-        violations,
-        pkg.filePath,
-        'exotic-dependency-source',
-        `${pkg.relPath} declares ${kind} ${name}@${spec}`,
-        'Prefer registry/workspace dependencies. If a git dependency is unavoidable, pin it to a full 40-character commit SHA and review it explicitly.',
-        'warning',
-        lineOf(content, `"${name}"`),
-      )
+      pushViolation(violations, {
+        filePath: pkg.filePath,
+        type: 'exotic-dependency-source',
+        message: `${pkg.relPath} declares ${kind} ${name}@${spec}`,
+        suggestion:
+          'Prefer registry/workspace dependencies. If a git dependency is unavoidable, pin it to a full 40-character commit SHA and review it explicitly.',
+        line: lineOf(content, `"${name}"`),
+      })
     }
   }
 }
@@ -368,15 +362,15 @@ function checkInstallLifecycleScripts(snapshot: ProjectSnapshot, violations: Che
   for (const pkg of snapshot.packages) {
     for (const scriptName of Object.keys(pkg.json.scripts ?? {})) {
       if (!INSTALL_LIFECYCLE_SCRIPTS.has(scriptName)) continue
-      pushViolation(
-        violations,
-        pkg.filePath,
-        'install-lifecycle-script',
-        `${pkg.relPath} declares an install-time lifecycle script "${scriptName}"`,
-        'Avoid install-time lifecycle scripts in publishable packages. If this is an app-only script, document why it is safe and keep dependency install scripts disabled or allowlisted.',
-        pkg.json.private === true ? 'warning' : 'error',
-        lineOf(readIfExists(pkg.filePath) ?? '', `"${scriptName}"`),
-      )
+      pushViolation(violations, {
+        filePath: pkg.filePath,
+        type: 'install-lifecycle-script',
+        message: `${pkg.relPath} declares an install-time lifecycle script "${scriptName}"`,
+        suggestion:
+          'Avoid install-time lifecycle scripts in publishable packages. If this is an app-only script, document why it is safe and keep dependency install scripts disabled or allowlisted.',
+        severity: pkg.json.private === true ? 'warning' : 'error',
+        line: lineOf(readIfExists(pkg.filePath) ?? '', `"${scriptName}"`),
+      })
     }
   }
 }
@@ -384,25 +378,24 @@ function checkInstallLifecycleScripts(snapshot: ProjectSnapshot, violations: Che
 function checkInstallScriptPolicy(snapshot: ProjectSnapshot, violations: CheckViolation[]): void {
   if (snapshot.lockfiles.has('pnpm-lock.yaml')) {
     if (!hasTopLevelKey(snapshot.pnpmWorkspace, 'allowBuilds')) {
-      pushViolation(
-        violations,
-        path.join(snapshot.rootDir, PNPM_WORKSPACE_FILE),
-        'install-script-policy-missing',
-        'pnpm project does not declare an allowBuilds install-script policy',
-        'Add an explicit allowBuilds map to pnpm-workspace.yaml and approve only dependencies that truly need install/build scripts.',
-        'error',
-      )
+      pushViolation(violations, {
+        filePath: path.join(snapshot.rootDir, PNPM_WORKSPACE_FILE),
+        type: 'install-script-policy-missing',
+        message: 'pnpm project does not declare an allowBuilds install-script policy',
+        suggestion:
+          'Add an explicit allowBuilds map to pnpm-workspace.yaml and approve only dependencies that truly need install/build scripts.',
+        severity: 'error',
+      })
     }
     if (hasScalarValue(snapshot.pnpmWorkspace, 'dangerouslyAllowAllBuilds', 'true')) {
-      pushViolation(
-        violations,
-        path.join(snapshot.rootDir, PNPM_WORKSPACE_FILE),
-        'install-script-policy-allows-all',
-        'pnpm dangerouslyAllowAllBuilds is enabled',
-        'Remove dangerouslyAllowAllBuilds and use a narrow allowBuilds map instead.',
-        'error',
-        lineOf(snapshot.pnpmWorkspace ?? '', 'dangerouslyAllowAllBuilds'),
-      )
+      pushViolation(violations, {
+        filePath: path.join(snapshot.rootDir, PNPM_WORKSPACE_FILE),
+        type: 'install-script-policy-allows-all',
+        message: 'pnpm dangerouslyAllowAllBuilds is enabled',
+        suggestion: 'Remove dangerouslyAllowAllBuilds and use a narrow allowBuilds map instead.',
+        severity: 'error',
+        line: lineOf(snapshot.pnpmWorkspace ?? '', 'dangerouslyAllowAllBuilds'),
+      })
     }
   }
 
@@ -411,28 +404,26 @@ function checkInstallScriptPolicy(snapshot: ProjectSnapshot, violations: CheckVi
       getNpmrcBoolean(snapshot.npmrc, 'ignore-scripts') ||
       (getNpmrcBoolean(snapshot.npmrc, 'strict-allow-scripts') && snapshot.npmrc?.includes('allow-scripts'))
     if (!npmHasPolicy) {
-      pushViolation(
-        violations,
-        path.join(snapshot.rootDir, '.npmrc'),
-        'install-script-policy-missing',
-        'npm project does not disable or strictly allowlist dependency install scripts',
-        'Set ignore-scripts=true, or use strict-allow-scripts=true with a narrow allow-scripts policy for dependencies that genuinely need lifecycle hooks.',
-        'warning',
-      )
+      pushViolation(violations, {
+        filePath: path.join(snapshot.rootDir, '.npmrc'),
+        type: 'install-script-policy-missing',
+        message: 'npm project does not disable or strictly allowlist dependency install scripts',
+        suggestion:
+          'Set ignore-scripts=true, or use strict-allow-scripts=true with a narrow allow-scripts policy for dependencies that genuinely need lifecycle hooks.',
+      })
     }
   }
 
   if (snapshot.lockfiles.has('bun.lock') || snapshot.lockfiles.has('bun.lockb')) {
     const trusted = snapshot.rootPackage.trustedDependencies
     if (!Array.isArray(trusted)) {
-      pushViolation(
-        violations,
-        snapshot.rootPackagePath,
-        'install-script-policy-missing',
-        'Bun project does not declare trustedDependencies',
-        'Add trustedDependencies to package.json. Use [] to disable all dependency lifecycle scripts, or list only reviewed packages.',
-        'warning',
-      )
+      pushViolation(violations, {
+        filePath: snapshot.rootPackagePath,
+        type: 'install-script-policy-missing',
+        message: 'Bun project does not declare trustedDependencies',
+        suggestion:
+          'Add trustedDependencies to package.json. Use [] to disable all dependency lifecycle scripts, or list only reviewed packages.',
+      })
     }
   }
 }
@@ -440,24 +431,23 @@ function checkInstallScriptPolicy(snapshot: ProjectSnapshot, violations: CheckVi
 function checkMinimumReleaseAge(snapshot: ProjectSnapshot, violations: CheckViolation[]): void {
   if (snapshot.lockfiles.has('pnpm-lock.yaml')) {
     if ((getPositiveNumber(snapshot.pnpmWorkspace, 'minimumReleaseAge') ?? 0) <= 0) {
-      pushViolation(
-        violations,
-        path.join(snapshot.rootDir, PNPM_WORKSPACE_FILE),
-        'minimum-release-age-missing',
-        'pnpm minimumReleaseAge is not explicitly enabled',
-        'Set minimumReleaseAge: 1440 or higher in pnpm-workspace.yaml, and pair it with minimumReleaseAgeStrict: true.',
-        'error',
-      )
+      pushViolation(violations, {
+        filePath: path.join(snapshot.rootDir, PNPM_WORKSPACE_FILE),
+        type: 'minimum-release-age-missing',
+        message: 'pnpm minimumReleaseAge is not explicitly enabled',
+        suggestion:
+          'Set minimumReleaseAge: 1440 or higher in pnpm-workspace.yaml, and pair it with minimumReleaseAgeStrict: true.',
+        severity: 'error',
+      })
     }
     if (!hasScalarValue(snapshot.pnpmWorkspace, 'minimumReleaseAgeStrict', 'true')) {
-      pushViolation(
-        violations,
-        path.join(snapshot.rootDir, PNPM_WORKSPACE_FILE),
-        'minimum-release-age-not-strict',
-        'pnpm minimumReleaseAgeStrict is not enabled',
-        'Set minimumReleaseAgeStrict: true so newly published versions fail closed instead of being silently exempted.',
-        'warning',
-      )
+      pushViolation(violations, {
+        filePath: path.join(snapshot.rootDir, PNPM_WORKSPACE_FILE),
+        type: 'minimum-release-age-not-strict',
+        message: 'pnpm minimumReleaseAgeStrict is not enabled',
+        suggestion:
+          'Set minimumReleaseAgeStrict: true so newly published versions fail closed instead of being silently exempted.',
+      })
     }
   }
 
@@ -465,28 +455,24 @@ function checkMinimumReleaseAge(snapshot: ProjectSnapshot, violations: CheckViol
     (snapshot.lockfiles.has('package-lock.json') || snapshot.lockfiles.has('npm-shrinkwrap.json')) &&
     (getPositiveNumber(snapshot.npmrc, 'min-release-age') ?? 0) <= 0
   ) {
-    pushViolation(
-      violations,
-      path.join(snapshot.rootDir, '.npmrc'),
-      'minimum-release-age-missing',
-      'npm min-release-age is not enabled',
-      'Set min-release-age to a positive number of days in project .npmrc.',
-      'warning',
-    )
+    pushViolation(violations, {
+      filePath: path.join(snapshot.rootDir, '.npmrc'),
+      type: 'minimum-release-age-missing',
+      message: 'npm min-release-age is not enabled',
+      suggestion: 'Set min-release-age to a positive number of days in project .npmrc.',
+    })
   }
 
   if (
     (snapshot.lockfiles.has('bun.lock') || snapshot.lockfiles.has('bun.lockb')) &&
     (getPositiveNumber(snapshot.bunfig, 'minimumReleaseAge') ?? 0) <= 0
   ) {
-    pushViolation(
-      violations,
-      path.join(snapshot.rootDir, 'bunfig.toml'),
-      'minimum-release-age-missing',
-      'Bun minimumReleaseAge is not enabled',
-      'Set [install].minimumReleaseAge to a positive number of seconds in bunfig.toml.',
-      'warning',
-    )
+    pushViolation(violations, {
+      filePath: path.join(snapshot.rootDir, 'bunfig.toml'),
+      type: 'minimum-release-age-missing',
+      message: 'Bun minimumReleaseAge is not enabled',
+      suggestion: 'Set [install].minimumReleaseAge to a positive number of seconds in bunfig.toml.',
+    })
   }
 }
 
@@ -523,27 +509,26 @@ function checkFrozenCiInstalls(snapshot: ProjectSnapshot, violations: CheckViola
       if (line.startsWith('#')) continue
       if (isFrozenInstallLine(line)) hasFrozenInstall = true
       if (!isMutableInstallLine(line)) continue
-      pushViolation(
-        violations,
-        workflow.filePath,
-        'ci-install-not-frozen',
-        `${workflow.relPath} uses a mutable package install command: ${line}`,
-        'Use npm ci, pnpm install --frozen-lockfile, pnpm ci, bun install --frozen-lockfile, or bun ci in CI.',
-        'error',
-        index + 1,
-      )
+      pushViolation(violations, {
+        filePath: workflow.filePath,
+        type: 'ci-install-not-frozen',
+        message: `${workflow.relPath} uses a mutable package install command: ${line}`,
+        suggestion:
+          'Use npm ci, pnpm install --frozen-lockfile, pnpm ci, bun install --frozen-lockfile, or bun ci in CI.',
+        severity: 'error',
+        line: index + 1,
+      })
     }
   }
 
   if (!hasFrozenInstall) {
-    pushViolation(
-      violations,
-      snapshot.workflows[0]?.filePath ?? snapshot.rootPackagePath,
-      'ci-frozen-install-missing',
-      'No frozen package install command was found in GitHub workflows',
-      'Use npm ci, pnpm install --frozen-lockfile, pnpm ci, bun install --frozen-lockfile, or bun ci in every CI install lane.',
-      'warning',
-    )
+    pushViolation(violations, {
+      filePath: snapshot.workflows[0]?.filePath ?? snapshot.rootPackagePath,
+      type: 'ci-frozen-install-missing',
+      message: 'No frozen package install command was found in GitHub workflows',
+      suggestion:
+        'Use npm ci, pnpm install --frozen-lockfile, pnpm ci, bun install --frozen-lockfile, or bun ci in every CI install lane.',
+    })
   }
 }
 
@@ -551,37 +536,34 @@ function checkTrustedPublishing(snapshot: ProjectSnapshot, violations: CheckViol
   for (const workflow of snapshot.workflows) {
     if (!/\bnpm\s+publish\b/.test(workflow.content)) continue
     if (!/id-token:\s*write/.test(workflow.content)) {
-      pushViolation(
-        violations,
-        workflow.filePath,
-        'trusted-publishing-missing-oidc',
-        `${workflow.relPath} publishes to npm without id-token: write permission`,
-        'Use npm trusted publishing/OIDC and add permissions.id-token: write to the publish job.',
-        'error',
-        lineOf(workflow.content, 'npm publish'),
-      )
+      pushViolation(violations, {
+        filePath: workflow.filePath,
+        type: 'trusted-publishing-missing-oidc',
+        message: `${workflow.relPath} publishes to npm without id-token: write permission`,
+        suggestion: 'Use npm trusted publishing/OIDC and add permissions.id-token: write to the publish job.',
+        severity: 'error',
+        line: lineOf(workflow.content, 'npm publish'),
+      })
     }
     if (!/(--provenance|NPM_CONFIG_PROVENANCE\s*[:=]\s*true|provenance:\s*true)/.test(workflow.content)) {
-      pushViolation(
-        violations,
-        workflow.filePath,
-        'publish-provenance-missing',
-        `${workflow.relPath} publishes to npm without explicit provenance`,
-        'Publish with npm trusted publishing and --provenance so consumers can verify build provenance.',
-        'warning',
-        lineOf(workflow.content, 'npm publish'),
-      )
+      pushViolation(violations, {
+        filePath: workflow.filePath,
+        type: 'publish-provenance-missing',
+        message: `${workflow.relPath} publishes to npm without explicit provenance`,
+        suggestion:
+          'Publish with npm trusted publishing and --provenance so consumers can verify build provenance.',
+        line: lineOf(workflow.content, 'npm publish'),
+      })
     }
     if (/(NPM_TOKEN|NODE_AUTH_TOKEN)/.test(workflow.content)) {
-      pushViolation(
-        violations,
-        workflow.filePath,
-        'publish-token-exposure',
-        `${workflow.relPath} references a long-lived npm publish token`,
-        'Prefer npm trusted publishing/OIDC. Remove NPM_TOKEN/NODE_AUTH_TOKEN from publish jobs after migration.',
-        'warning',
-        lineOf(workflow.content, /NPM_TOKEN|NODE_AUTH_TOKEN/),
-      )
+      pushViolation(violations, {
+        filePath: workflow.filePath,
+        type: 'publish-token-exposure',
+        message: `${workflow.relPath} references a long-lived npm publish token`,
+        suggestion:
+          'Prefer npm trusted publishing/OIDC. Remove NPM_TOKEN/NODE_AUTH_TOKEN from publish jobs after migration.',
+        line: lineOf(workflow.content, /NPM_TOKEN|NODE_AUTH_TOKEN/),
+      })
     }
   }
 }
