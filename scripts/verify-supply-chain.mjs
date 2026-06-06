@@ -33,9 +33,9 @@ function readText(relPath) {
 }
 
 function getConfigValue(content, key) {
-  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const match = new RegExp(`^\\s*${escaped}\\s*[:=]\\s*([^#\\n]+)`, 'm').exec(content);
-  return match?.[1]?.trim().replace(/^['"]|['"]$/g, '') ?? null;
+  const escaped = key.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+  const match = new RegExp(String.raw`^\s*${escaped}\s*[:=]\s*([^#\n]+)`, 'm').exec(content);
+  return match?.[1]?.trim().replaceAll(/^['"]|['"]$/g, '') ?? null;
 }
 
 function hasScalarValue(content, key, expected) {

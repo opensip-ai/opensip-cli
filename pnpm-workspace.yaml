@@ -34,6 +34,23 @@ trustPolicy: no-downgrade
 trustLockfile: false
 blockExoticSubdeps: true
 
+# Reviewed trust-policy exemptions. `trustPolicy: no-downgrade` rejects a
+# version when an earlier-published version of the same package carried
+# stronger publish-date trust evidence (npm provenance/attestation) than the
+# locked version — pnpm flags it as a possible takeover. The entries below are
+# stable transitive/direct deps the graph legitimately pins at versions that
+# predate (or lack) that attestation; each has been reviewed as known-good.
+# Pinned to EXACT versions on purpose: a future bump drops the exemption and
+# re-triggers the check, so the review is revisited rather than silently
+# inherited. Revisit when these publish a provenance-attested release we can
+# move to.
+trustPolicyExclude:
+  - "ast-v8-to-istanbul@1.0.2"  # vitest coverage transitive (via @vitest/coverage-v8)
+  - "dependency-cruiser@17.4.2" # direct devDep; latest release, no provenance attestation
+  - "semver@6.3.1"              # legacy v6 line pinned by older transitive tooling
+  - "tinyexec@1.2.2"            # transitive (tinyglobby / tooling)
+  - "undici-types@6.21.0"       # pinned by @types/node
+
 # Security pins — transitive-dependency version floors.
 overrides:
   "postcss@<8.5.10": ">=8.5.10"

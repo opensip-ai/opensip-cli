@@ -99,9 +99,9 @@ function normalizeRel(filePath: string, rootDir: string): string {
 
 function getConfigValue(content: string | null, key: string): string | null {
   if (!content) return null
-  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const match = new RegExp(`^\\s*${escaped}\\s*[:=]\\s*([^#\\n]+)`, 'm').exec(content)
-  return match?.[1]?.trim().replace(/^['"]|['"]$/g, '') ?? null
+  const escaped = key.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)
+  const match = new RegExp(String.raw`^\s*${escaped}\s*[:=]\s*([^#\n]+)`, 'm').exec(content)
+  return match?.[1]?.trim().replaceAll(/^['"]|['"]$/g, '') ?? null
 }
 
 function getNpmrcBoolean(content: string | null, key: string): boolean {
@@ -117,7 +117,7 @@ function getPositiveNumber(content: string | null, key: string): number | null {
 
 function hasTopLevelKey(content: string | null, key: string): boolean {
   if (!content) return false
-  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const escaped = key.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)
   return new RegExp(`^${escaped}:`, 'm').test(content)
 }
 
