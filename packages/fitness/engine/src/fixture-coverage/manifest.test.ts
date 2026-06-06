@@ -69,13 +69,14 @@ describe('buildFixtureManifest', () => {
     expect(req.fixtureBasenames).toEqual(['txt'])
   })
 
-  it('fileTypes-only check → file-typed domain', () => {
+  it('fileTypes-only check → file-typed domain with ONE representative basename', () => {
     const [req] = buildFixtureManifest(
       [check({ slug: 'f', fileTypes: ['md', '.yml'] })],
       noExemptions,
     )
     expect(req.domain).toEqual({ kind: 'file-typed', fileTypes: ['md', '.yml'] })
-    expect(req.fixtureBasenames).toEqual(['md', 'yml']) // leading dot stripped
+    // A multi-extension check needs only one representative pair (first type).
+    expect(req.fixtureBasenames).toEqual(['md'])
   })
 
   it('filenameOverrides wins over the derived basename', () => {

@@ -86,7 +86,12 @@ function basenamesFor(
       return [...new Set(domain.languages.map(extForLanguage))]
     }
     case 'file-typed': {
-      return [...new Set(domain.fileTypes.map(stripLeadingDot))]
+      // One representative fixture proves pass/fail. `fileTypes` is a
+      // file-matching list (e.g. a text check spanning 15 extensions), NOT a
+      // polyglot claim — that is `checkScope.languages` (the `language`
+      // domain, which keeps one fixture per claimed language). Authors needing
+      // a specific extension/filename set a `filenameOverrides` entry.
+      return [stripLeadingDot(domain.fileTypes[0] ?? 'txt')]
     }
     case 'universal': {
       return ['txt']

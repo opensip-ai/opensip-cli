@@ -27,3 +27,12 @@ export {
   type BuildManifestOptions,
   type CoverageConfig,
 } from './fixture-coverage/manifest.js';
+export {
+  runCheckOnFixture,
+  planCoverageCases,
+  type FixtureFile,
+  type FixtureCase,
+  type FixtureRun,
+  type FixtureVariant,
+  type CoverageCase,
+} from './fixture-coverage/run-check-on-fixture.js';
