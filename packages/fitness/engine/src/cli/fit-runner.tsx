@@ -29,11 +29,14 @@ import {
   LiveProgress,
   normalizeBannerSize,
   ProjectHeader,
+  renderToInk,
   RunFooterHints,
   RunHeader,
   RunSummary,
   ThemeProvider,
   UpdateHint,
+  VERBOSE_DETAIL_HINT,
+  viewFindingsGroups,
   type ProgressCallback,
   type ProgressEvent,
   type ProgressSurface,
@@ -49,9 +52,8 @@ import { createInProcessTransport, currentScope } from '@opensip-tools/core';
 import { Box, Static, Text, useApp, render } from 'ink';
 import React, { useEffect, useState } from 'react';
 
-import { envelopeToFindingsGroups, envelopeToFitRows } from './fit/envelope-view.js';
+import { envelopeToFitRows } from './fit/envelope-view.js';
 import {
-  FindingsBlock,
   ResultsTable,
   WarningsBlock,
 } from './fit-runner-views.js';
@@ -248,17 +250,20 @@ function FitRunner({ args, datastore, setExitCode, onEnvelope }: FitRunnerProps)
     }
 
     case 'done': {
-      const { envelope } = state.result;
+      const { envelope, verboseDetail } = state.result;
       const { summary } = envelope.verdict;
       const durationMs = envelope.units.reduce((total, u) => total + u.durationMs, 0);
-      const showFindings =
-        (args.verbose === true || args.findings === true) &&
-        summary.errors + summary.warnings > 0;
+      // ADR-0021: --findings is folded into --verbose at the action seam, so the
+      // verbose surface is driven by args.verbose alone. The detail body renders
+      // through the shared viewFindingsGroups producer (same path as the static
+      // `fit --verbose | cat` render), not the retired local FindingsBlock.
+      const findingsDetail =
+        verboseDetail?.kind === 'findings' && verboseDetail.groups.length > 0 ? verboseDetail : undefined;
       return (
         <>
           {staticHeader}
           <Box flexDirection="column">
-          {!args.quiet && (args.verbose === true || args.findings === true) && (
+          {!args.quiet && args.verbose === true && (
             <Box paddingTop={1} flexDirection="column">
               <ResultsTable rows={envelopeToFitRows(envelope)} />
             </Box>
@@ -273,13 +278,13 @@ function FitRunner({ args, datastore, setExitCode, onEnvelope }: FitRunnerProps)
           {!args.quiet && state.result.warnings && state.result.warnings.length > 0 && (
             <WarningsBlock warnings={state.result.warnings} />
           )}
-          {!args.quiet && showFindings && (
-            <FindingsBlock groups={envelopeToFindingsGroups(envelope)} />
+          {!args.quiet && findingsDetail !== undefined && (
+            <Box>{renderToInk(viewFindingsGroups(findingsDetail.groups))}</Box>
           )}
-          {!args.quiet && args.verbose !== true && args.findings !== true && (
+          {!args.quiet && args.verbose !== true && (
             <RunFooterHints
               hints={[
-                { text: 'Use --verbose for detailed results', bold: ['--verbose'] },
+                VERBOSE_DETAIL_HINT,
                 { text: 'opensip-tools dashboard for HTML report', bold: ['opensip-tools dashboard'] },
               ]}
             />

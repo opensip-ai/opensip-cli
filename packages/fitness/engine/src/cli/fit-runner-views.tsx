@@ -17,11 +17,7 @@ import { useTheme, sortFitRowPriority, parseValidatedCount } from '@opensip-tool
 import { Box, Text } from 'ink';
 import React from 'react';
 
-import { fitValidatedCell, type FitTableRow, type FitFindingsGroup } from './fit/envelope-view.js';
-
-import type { Signal } from '@opensip-tools/core';
-
-const DEFAULT_VIOLATIONS_PER_CHECK = 25;
+import { fitValidatedCell, type FitTableRow } from './fit/envelope-view.js';
 
 function statusColor(theme: ReturnType<typeof useTheme>, status: FitTableRow['status']): string {
   if (status === 'FAIL') return theme.statusFail;
@@ -124,87 +120,7 @@ export function WarningsBlock({ warnings }: { readonly warnings: readonly string
   );
 }
 
-/** A single finding's location string (`file:line`), or '' when no location. */
-function locationOf(signal: Signal): string {
-  if (!signal.filePath) return '';
-  return signal.line ? `${signal.filePath}:${signal.line}` : signal.filePath;
-}
-
-export function FindingsBlock({ groups }: { readonly groups: readonly FitFindingsGroup[] }): React.ReactElement {
-  const theme = useTheme();
-  const total = groups.reduce(
-    (sum, g) => sum + g.errorCount + g.warningCount + (g.error ? 1 : 0),
-    0,
-  );
-
-  const anyTruncated = groups.some(
-    (g) => g.findings.length > DEFAULT_VIOLATIONS_PER_CHECK,
-  );
-
-  return (
-    <Box flexDirection="column" paddingLeft={2}>
-      <Text>
-        <Text bold>Findings</Text>
-        {' '}
-        <Text dimColor>({total})</Text>
-        :
-      </Text>
-      <Text> </Text>
-      {groups.map((group) => {
-        const count = group.errorCount + group.warningCount + (group.error ? 1 : 0);
-        const visible = group.findings.slice(0, DEFAULT_VIOLATIONS_PER_CHECK);
-        const hidden = Math.max(0, group.findings.length - visible.length);
-        return (
-          <Box key={group.checkSlug} flexDirection="column" marginLeft={2}>
-            <Text>
-              <Text color={theme.brand}>{group.checkSlug}</Text>
-              {' '}
-              <Text dimColor>({count})</Text>
-            </Text>
-            {group.error && (
-              <Text>
-                {'      '}
-                <Text color={theme.error}>error</Text>
-                {'  '}
-                {group.error}
-              </Text>
-            )}
-            {visible.map((v, i) => {
-              const loc = locationOf(v);
-              const isError = v.severity === 'critical' || v.severity === 'high';
-              return (
-                <Box key={i} flexDirection="column">
-                  <Text>
-                    {'      '}
-                    <Text color={isError ? theme.error : theme.warning}>
-                      {isError ? 'error' : 'warn'}
-                    </Text>
-                    {'  '}
-                    {v.message}
-                    {loc ? ' ' : ''}
-                    {loc && <Text dimColor>{loc}</Text>}
-                  </Text>
-                  {v.suggestion && (
-                    <Text dimColor>{'            '}{v.suggestion}</Text>
-                  )}
-                </Box>
-              );
-            })}
-            {hidden > 0 && (
-              <Text dimColor>{'      '}… {hidden} more hidden (use <Text bold>--json</Text> or <Text bold>opensip-tools dashboard</Text> for all)</Text>
-            )}
-            <Text> </Text>
-          </Box>
-        );
-      })}
-      {anyTruncated && (
-        <Text dimColor>
-          {'  '}
-          Showing first {DEFAULT_VIOLATIONS_PER_CHECK} violations per check. For the full set, run with
-          {' '}<Text bold>--json</Text>{' '}or open
-          {' '}<Text bold>opensip-tools dashboard</Text>.
-        </Text>
-      )}
-    </Box>
-  );
-}
+// The former `FindingsBlock` Ink component (and its `locationOf` helper) was
+// retired by ADR-0021: the verbose findings body is now rendered by the shared
+// `viewFindingsGroups` producer (`@opensip-tools/cli-ui`), driven by the
+// result's `verboseDetail`, so the TTY and piped paths render one source.

@@ -182,6 +182,23 @@ export function renderVerboseDetail(detail: VerboseDetail): ViewNode {
 }
 
 /**
+ * Append the shared non-verbose footer (the "Use --verbose…" hint + the
+ * dashboard hint) to a view when `show` is true (ADR-0021). Used by the
+ * envelope-backed tools (fit/sim) so a non-verbose run nudges toward the detail
+ * body and the HTML report — parity with graph's footer.
+ */
+function withVerboseHint(node: ViewNode, show: boolean): ViewNode {
+  if (!show) return node;
+  return group([
+    node,
+    viewFooterHints([
+      VERBOSE_DETAIL_HINT,
+      { text: 'opensip-tools dashboard for HTML report', bold: ['opensip-tools dashboard'] },
+    ]),
+  ]);
+}
+
+/**
  * The shared envelope → terminal-table view. Used by every migrated tool's
  * result (fit/sim always; graph when it carries an envelope). The per-tool
  * `rows`/`reportLines` legacy derivations it once fell back to were retired in
@@ -218,8 +235,13 @@ export function resultToView(result: CommandResult): ViewNode {
       // ADR-0011 (fitness migrated, Phase 6): the result always carries an
       // envelope; the terminal table is derived from it (one row per check
       // unit, with the fitness-only Validated/Ignores columns). ADR-0021: the
-      // optional verbose findings body renders above the table in both media.
-      return envelopeToTableView(result.envelope, result.verboseDetail);
+      // optional verbose findings body renders above the table in both media,
+      // and a non-verbose run shows the shared "Use --verbose…" hint (matching
+      // graph and the TTY live view).
+      return withVerboseHint(
+        envelopeToTableView(result.envelope, result.verboseDetail),
+        result.verboseDetail === undefined,
+      );
     }
     case 'error': {
       return errorView(result);
