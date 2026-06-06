@@ -12,6 +12,7 @@
 import {
   throwValidationErrors,
   validateScenarioMetadata,
+  validateTargetAndWorkload,
   type ScenarioValidationError,
 } from '../../framework/validation.js'
 
@@ -24,21 +25,6 @@ import type { RunnableScenario } from '../../framework/runnable-scenario.js'
 // `define.ts ↔ executor.ts` file-level cycle. Re-exported here so
 // existing callers keep their import paths.
 export type { LoadScenarioConfig } from './config.js'
-
-function validateTargetAndWorkload(
-  config: LoadScenarioConfig,
-  errors: ScenarioValidationError[],
-): void {
-  if (typeof config.target !== 'function') {
-    errors.push({ field: 'target', message: 'target must be a function (the BYO seam)' })
-  }
-  if (typeof config.workload?.rps !== 'number' || config.workload.rps <= 0) {
-    errors.push({ field: 'workload.rps', message: 'workload.rps must be a positive number' })
-  }
-  if (config.workload?.concurrency !== undefined && config.workload.concurrency < 1) {
-    errors.push({ field: 'workload.concurrency', message: 'workload.concurrency must be >= 1' })
-  }
-}
 
 function validateRampUp(config: LoadScenarioConfig, errors: ScenarioValidationError[]): void {
   const { rampUp } = config.workload ?? {}

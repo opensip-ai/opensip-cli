@@ -125,6 +125,7 @@ export async function resolveEdgesFromRecords(
     const ownerKey = ownerEdgeKey(r.ownerHash, relative(input.projectDirAbs, r.sourceFile.fileName));
     if (r.kind === 'creation') {
       if (r.childHash === undefined) continue;
+      // @fitness-ignore-next-line detached-promises -- pushCallEdge/pushSharedCreationEdge return void (synchronous edge-sink writes), not promises
       pushSharedCreationEdge(tsPosition(r.node, r.sourceFile), ownerKey, r.childHash, sink);
       continue;
     }
@@ -137,6 +138,7 @@ export async function resolveEdgesFromRecords(
     };
     const verdict = computeVerdict(r.node, ctx);
     if (verdict === null) continue;
+    // @fitness-ignore-next-line detached-promises -- pushCallEdge/pushSharedCreationEdge return void (synchronous edge-sink writes), not promises
     pushCallEdge(r.node, r.sourceFile, verdict, ownerKey, sink);
   }
 
@@ -188,12 +190,14 @@ export async function resolveEdgesSyntactic(
   let processed = 0;
   for (const r of input.callSites) {
     // Cooperative yield — see resolveEdgesFromRecords (ADR-0016).
+    // @fitness-ignore-next-line performance-anti-patterns -- cooperative yield (ADR-0016) runs once per N call-sites so the live view stays responsive; intentionally serial, not parallelizable
     if (processed > 0 && processed % YIELD_EVERY_CALL_SITES === 0) await yieldToEventLoop();
     processed += 1;
     // Per-owner-occurrence bucket key (see resolveEdgesFromRecords).
     const ownerKey = ownerEdgeKey(r.ownerHash, relative(input.projectDirAbs, r.sourceFile.fileName));
     if (r.kind === 'creation') {
       if (r.childHash === undefined) continue;
+      // @fitness-ignore-next-line detached-promises -- pushCallEdge/pushSharedCreationEdge return void (synchronous edge-sink writes), not promises
       pushSharedCreationEdge(tsPosition(r.node, r.sourceFile), ownerKey, r.childHash, sink);
       continue;
     }
@@ -211,6 +215,7 @@ export async function resolveEdgesSyntactic(
       importIndex,
     });
     if (verdict === null) continue;
+    // @fitness-ignore-next-line detached-promises -- pushCallEdge/pushSharedCreationEdge return void (synchronous edge-sink writes), not promises
     pushCallEdge(r.node, r.sourceFile, verdict, ownerKey, sink);
   }
 

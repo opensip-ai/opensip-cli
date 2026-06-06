@@ -73,11 +73,15 @@ export function createFaultModel(spec: FaultSpec, deps: FaultModelDeps = {}): Fa
   const fired: FiredFault[] = []
   let perturbCount = 0
 
-  const applyFault = async (
+  /**
+   * Apply a single fault to a target invocation.
+   * @throws {Error} `fault:abort` when the abort fault fires, or `fault:drop` when the drop fault fires.
+   */
+  async function applyFault(
     fault: Fault,
     target: Target,
     ctx: TargetContext,
-  ): Promise<void> => {
+  ): Promise<void> {
     fired.push({ kind: fault.kind, at: Date.now() })
     switch (fault.kind) {
       case 'latency': {
@@ -90,6 +94,7 @@ export function createFaultModel(spec: FaultSpec, deps: FaultModelDeps = {}): Fa
         // signal so it cancels, but guarantee the request fails regardless of
         // whether the target honours the signal (we throw deterministically).
         const controller = new AbortController()
+        // @fitness-ignore-next-line detached-promises -- AbortController.abort() is a synchronous void call, not a promise
         controller.abort()
         const signal =
           typeof AbortSignal.any === 'function'
@@ -100,7 +105,7 @@ export function createFaultModel(spec: FaultSpec, deps: FaultModelDeps = {}): Fa
         try {
           await target({ signal, correlationId: ctx.correlationId })
         } catch {
-          // target observed the abort (or otherwise failed) — the request fails.
+          // @swallow-ok target observed the abort (or otherwise failed); we throw fault:abort below regardless.
         }
         throw new Error('fault:abort')
       }

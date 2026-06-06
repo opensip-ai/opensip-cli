@@ -14,7 +14,7 @@
  */
 
 import { existsSync, statSync } from 'node:fs'
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, relative } from 'node:path'
 
@@ -54,13 +54,16 @@ export interface FixtureRun {
 export async function runCheckOnFixture(check: Check, fixture: FixtureCase): Promise<FixtureRun> {
   const root = await mkdtemp(join(tmpdir(), 'fixcov-'))
   try {
-    const written: string[] = []
-    for (const file of fixture.files) {
-      const abs = join(root, file.path)
-      await mkdir(dirname(abs), { recursive: true })
-      await writeFile(abs, file.content, 'utf8')
-      written.push(abs)
-    }
+    const written = await Promise.all(
+      fixture.files.map(async (file) => {
+        const abs = join(root, file.path)
+        // mkdir({ recursive: true }) is safe to run concurrently for overlapping
+        // parent dirs, so each independent file write can proceed in parallel.
+        await mkdir(dirname(abs), { recursive: true })
+        await writeFile(abs, file.content, 'utf8')
+        return abs
+      }),
+    )
     const targetFiles = fixture.targetPaths
       ? fixture.targetPaths.map((p) => join(root, p))
       : written
@@ -101,17 +104,33 @@ function writeAsFilename(basename: string): string {
   return basename.includes('.') ? basename : `fixture.${basename}`
 }
 
+/**
+ * Defensive ceiling on a single fixture file. Fixtures are repo-controlled and
+ * tiny; a file over this is almost certainly a mistake (stray binary, generated
+ * blob) rather than a real test case, so we fail loudly instead of slurping it.
+ */
+const MAX_FIXTURE_BYTES = 1024 * 1024
+
 async function readDirFixture(dir: string): Promise<FixtureCase> {
-  const files: FixtureFile[] = []
-  const walk = async (d: string): Promise<void> => {
-    for (const entry of await readdir(d, { withFileTypes: true })) {
-      const abs = join(d, entry.name)
-      if (entry.isDirectory()) await walk(abs)
-      else files.push({ path: relative(dir, abs), content: await readFile(abs, 'utf8') })
-    }
+  const walk = async (d: string): Promise<FixtureFile[]> => {
+    const entries = await readdir(d, { withFileTypes: true })
+    // @fitness-ignore-next-line no-unbounded-concurrency -- bounded by the repo-controlled fixture tree (a handful of small files per check), not external load
+    const nested = await Promise.all(
+      entries.map(async (entry): Promise<FixtureFile[]> => {
+        const abs = join(d, entry.name)
+        if (entry.isDirectory()) return walk(abs)
+        const { size } = await stat(abs)
+        if (size > MAX_FIXTURE_BYTES) {
+          throw new Error(
+            `fixture file ${relative(dir, abs)} is ${String(size)} bytes (> ${String(MAX_FIXTURE_BYTES)}); fixtures must be small`,
+          )
+        }
+        return [{ path: relative(dir, abs), content: await readFile(abs, 'utf8') }]
+      }),
+    )
+    return nested.flat()
   }
-  await walk(dir)
-  return { files }
+  return { files: await walk(dir) }
 }
 
 /** One walk of `root`, indexing every `__fixtures__/<slug>` directory by slug. */

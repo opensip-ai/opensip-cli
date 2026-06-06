@@ -119,6 +119,7 @@ async function awaitBelowCap(
   signal: AbortSignal,
 ): Promise<void> {
   while (inFlight.size >= cap && !signal.aborted) {
+    // @fitness-ignore-next-line performance-anti-patterns -- back-pressure gate: blocks until the fastest in-flight request settles to free a concurrency slot; parallelizing defeats the cap
     await Promise.race(inFlight)
   }
 }

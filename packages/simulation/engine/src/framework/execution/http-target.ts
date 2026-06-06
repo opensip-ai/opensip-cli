@@ -13,7 +13,7 @@
  * around it.
  */
 
-import type { Target } from './target.js'
+import type { Target, TargetContext } from './target.js'
 
 /** Options for {@link httpTarget}. */
 export interface HttpTargetOptions {
@@ -37,7 +37,9 @@ const defaultOk = (status: number): boolean => status >= 200 && status < 300
 /** Build an HTTP {@link Target} from a URL + method/headers/body. */
 export function httpTarget(opts: HttpTargetOptions): Target {
   const isOk = opts.okStatus ?? defaultOk
-  return async (ctx): Promise<void> => {
+  /** @throws {Error} When the response status is not OK (per `isOk`). */
+  async function request(ctx: TargetContext): Promise<void> {
+    // @fitness-ignore-next-line no-raw-fetch -- BYO HTTP target for the chaos/load harness; raw fetch is the measured surface, abort handled via ctx.signal
     const res = await fetch(opts.url, {
       method: opts.method ?? 'GET',
       headers: opts.headers,
@@ -48,10 +50,11 @@ export function httpTarget(opts: HttpTargetOptions): Target {
     try {
       await res.arrayBuffer()
     } catch {
-      // body already consumed or the request was aborted — nothing to drain.
+      // @swallow-ok best-effort body drain; already-consumed or aborted bodies are fine to ignore.
     }
     if (!isOk(res.status)) {
       throw new Error(`httpTarget: ${opts.url} returned ${res.status}`)
     }
   }
+  return request
 }

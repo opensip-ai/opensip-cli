@@ -39,6 +39,7 @@ const IGNORED_PATTERNS = [
   /[-_]helpers?\.[jt]sx?$/, // Helper files
   /\.test\.helpers?\.[jt]sx?$/, // Test-only helper files (e.g. service.test.helpers.ts)
   /[-_.]fixtures?\.[jt]sx?$/, // Fixture files (foo-fixtures.ts, catalog.fixture.ts, …)
+  /[-_.]allowlist\.[jt]sx?$/, // Allowlist data modules (test config/data, not test cases)
   /[-_]utils?\.[jt]sx?$/, // Utility files
   /^services\.[jt]sx?$/, // Service mocks
   /^index\.[jt]sx?$/, // Index files (re-exports)

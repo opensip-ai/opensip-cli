@@ -108,6 +108,9 @@ function basenamesFor(
  * Disabled checks are skipped (they don't ship). Command-mode checks become
  * `command-exempt` and MUST carry a reason in `commandExemptions` — a missing
  * reason throws, so a new command check can't silently escape coverage.
+ *
+ * @throws {Error} when a command-mode check has no (or an empty) exemption
+ *   reason in `opts.commandExemptions`.
  */
 export function buildFixtureManifest(
   checks: readonly Check[],

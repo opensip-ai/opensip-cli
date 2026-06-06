@@ -12,6 +12,12 @@
 
 import type { ProgressJob, ProgressRun, ProgressTransport } from './progress-transport.js';
 
+/**
+ * Create an in-process {@link ProgressTransport} that runs each job eagerly in
+ * the current process and fans its events out to a single subscriber. Events
+ * emitted before the first `onProgress` listener attaches are buffered and
+ * flushed in order on subscription, so no early event is dropped.
+ */
 export function createInProcessTransport(): ProgressTransport {
   return {
     run<TEvent, TResult>(job: ProgressJob<TEvent, TResult>): ProgressRun<TEvent, TResult> {

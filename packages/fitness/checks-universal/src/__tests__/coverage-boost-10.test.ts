@@ -54,6 +54,11 @@ describe('test-file-naming directory walk', () => {
     writeFixture(cwd, 'packages/a/__tests__/unit/thing.test.ts', [
       'import { it } from "vitest"; it("x", () => undefined)',
     ].join('\n'))
+    // An allowlist data module under __tests__ -> IGNORED_PATTERNS branch
+    // (test config/data imported by a real *.test.ts; not a test case itself).
+    writeFixture(cwd, 'packages/a/__tests__/foo.allowlist.ts', [
+      'export const ALLOWLIST = []',
+    ].join('\n'))
     // A build-artifact dir under __tests__ -> SKIP_DIRECTORIES branch.
     writeFixture(cwd, 'packages/a/__tests__/dist/bundle.js', 'module.exports = {}')
     // A hidden directory at scan level -> startsWith('.') skip branch.
@@ -68,14 +73,16 @@ describe('test-file-naming directory walk', () => {
         join(cwd, 'packages/a/__tests__/widget-checks.tsx'),
         join(cwd, 'packages/a/__tests__/types.d.ts'),
         join(cwd, 'packages/a/__tests__/unit/thing.test.ts'),
+        join(cwd, 'packages/a/__tests__/foo.allowlist.ts'),
       ],
     })
     const matches = result.signals.map((s) => s.metadata.match)
-    // The misnamed .tsx file is flagged; the valid nested test and the
-    // .d.ts declaration file are not.
+    // The misnamed .tsx file is flagged; the valid nested test, the
+    // .d.ts declaration file, and the .allowlist.ts data module are not.
     expect(matches).toContain('widget-checks.tsx')
     expect(matches).not.toContain('thing.test.ts')
     expect(matches).not.toContain('types.d.ts')
+    expect(matches).not.toContain('foo.allowlist.ts')
   })
 })
 

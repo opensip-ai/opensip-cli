@@ -13,6 +13,7 @@
 import {
   throwValidationErrors,
   validateScenarioMetadata,
+  validateTargetAndWorkload,
   type ScenarioValidationError,
 } from '../../framework/validation.js'
 
@@ -29,19 +30,18 @@ export type { ChaosScenarioConfig } from './config.js'
 
 const VALID_FAULT_KINDS = new Set(['latency', 'abort', 'drop'])
 
-function validateTargetAndWorkload(
+/**
+ * Chaos-specific workload-timing checks: `rampUp` must be non-negative and
+ * `duration` must be positive. The common `target`/`workload.rps`/
+ * `workload.concurrency` checks live in the shared
+ * `validateTargetAndWorkload`; these stay inline because chaos uses a
+ * different `rampUp` message ("must be non-negative") than load and does not
+ * cross-check `rampUp` against `duration`.
+ */
+function validateChaosWorkloadTiming(
   config: ChaosScenarioConfig,
   errors: ScenarioValidationError[],
 ): void {
-  if (typeof config.target !== 'function') {
-    errors.push({ field: 'target', message: 'target must be a function (the BYO seam)' })
-  }
-  if (typeof config.workload?.rps !== 'number' || config.workload.rps <= 0) {
-    errors.push({ field: 'workload.rps', message: 'workload.rps must be a positive number' })
-  }
-  if (config.workload?.concurrency !== undefined && config.workload.concurrency < 1) {
-    errors.push({ field: 'workload.concurrency', message: 'workload.concurrency must be >= 1' })
-  }
   if (config.workload?.rampUp !== undefined && config.workload.rampUp < 0) {
     errors.push({ field: 'workload.rampUp', message: 'workload.rampUp must be non-negative' })
   }
@@ -121,6 +121,7 @@ export function validateChaosScenarioConfig(config: ChaosScenarioConfig): void {
   const errors: ScenarioValidationError[] = []
   validateScenarioMetadata(config, errors)
   validateTargetAndWorkload(config, errors)
+  validateChaosWorkloadTiming(config, errors)
   validateFault(config, errors)
   validateAssertions(config, errors)
 

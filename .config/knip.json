@@ -9,6 +9,11 @@
       "ignoreDependencies": [
         "@opensip-tools/checks-typescript",
         "@opensip-tools/checks-universal",
+        "@opensip-tools/checks-cpp",
+        "@opensip-tools/checks-go",
+        "@opensip-tools/checks-java",
+        "@opensip-tools/checks-python",
+        "@opensip-tools/checks-rust",
         "@opensip-tools/fitness",
         "vite"
       ]

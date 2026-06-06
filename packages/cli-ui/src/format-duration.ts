@@ -8,6 +8,7 @@
  * as e.g. "33.6s"; this intentionally does not roll over to minutes (the simple
  * seconds form is fine for the live view's stage timings).
  */
+// @fitness-ignore-file duplicate-utility-functions -- intentional: cli-ui is deliberately ink/react-only (see docstring above) and must not depend on @opensip-tools/core, so this 3-line formatter is duplicated by design rather than shared across the layer boundary.
 export function formatDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`;
   return `${(ms / 1000).toFixed(1)}s`;

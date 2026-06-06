@@ -15,6 +15,8 @@
 import { ValidationError as CoreValidationError } from '@opensip-tools/core'
 
 import type { ScenarioKind } from '../types/kind-types.js'
+import type { Target } from './execution/target.js'
+import type { Workload } from '../types/workload.js'
 
 // =============================================================================
 // PUBLIC TYPES
@@ -35,6 +37,17 @@ export interface ScenarioMetadataInput {
   readonly id?: string
   readonly name?: string
   readonly description?: string
+}
+
+/**
+ * The common `target` + `workload` subset every driven scenario kind
+ * shares (load, chaos). Both `LoadScenarioConfig` and `ChaosScenarioConfig`
+ * are assignable to this — the shared validator operates on this shape so
+ * each kind can pass its concrete config in.
+ */
+export interface TargetWorkloadInput {
+  readonly target: Target
+  readonly workload: Workload
 }
 
 /** Options for shared metadata validation. */
@@ -89,6 +102,37 @@ export function validateScenarioMetadata(
   // description
   if (requireDescription && (!config.description || config.description.trim() === '')) {
     errors.push({ field: 'description', message: 'description is required' })
+  }
+}
+
+// =============================================================================
+// TARGET + WORKLOAD VALIDATION
+// =============================================================================
+
+/**
+ * Validate the shared `target` + `workload` block common to every driven
+ * scenario kind (load, chaos):
+ *   - `target` must be a function (the BYO seam),
+ *   - `workload.rps` must be a positive number,
+ *   - `workload.concurrency`, when defined, must be >= 1.
+ *
+ * Mutates `errors` in place — no return value, matching the helper-collector
+ * style of `validateScenarioMetadata`. Kind-specific workload checks
+ * (e.g. load's `rampUp` vs `duration`, chaos's inline `rampUp`/`duration`)
+ * stay inline in each define.ts.
+ */
+export function validateTargetAndWorkload(
+  config: TargetWorkloadInput,
+  errors: ScenarioValidationError[],
+): void {
+  if (typeof config.target !== 'function') {
+    errors.push({ field: 'target', message: 'target must be a function (the BYO seam)' })
+  }
+  if (typeof config.workload?.rps !== 'number' || config.workload.rps <= 0) {
+    errors.push({ field: 'workload.rps', message: 'workload.rps must be a positive number' })
+  }
+  if (config.workload?.concurrency !== undefined && config.workload.concurrency < 1) {
+    errors.push({ field: 'workload.concurrency', message: 'workload.concurrency must be >= 1' })
   }
 }
 
