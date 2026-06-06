@@ -1,6 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
-import { analyzeFunctionTooLong } from '../checks/function-too-long.js'
+import { LanguageRegistry, RunScope, runWithScope } from '@opensip-tools/core'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+
+import { analyzeFunctionTooLong, pythonFunctionTooLong } from '../checks/function-too-long.js'
 
 /** A `def` whose body is `bodyLines` assignment statements. */
 function pyFunction(name: string, bodyLines: number): string {
@@ -31,5 +36,50 @@ describe('python-function-too-long', () => {
   it('returns [] on malformed input without throwing', () => {
     expect(() => analyzeFunctionTooLong('def (:\n', 'bad.py')).not.toThrow()
     expect(analyzeFunctionTooLong('def (:\n', 'bad.py')).toEqual([])
+  })
+})
+
+// Exercises the `analyze` closure declared inside `defineCheck({...})` end-to-end
+// (the pure analyzer above is called directly and never goes through `.run()`).
+// Mirrors run.test.ts: an empty scope drives applyContentFilter's no-adapter path.
+describe('pythonFunctionTooLong.run() execution coverage', () => {
+  const emptyScope = new RunScope({ languages: new LanguageRegistry() })
+  let cwd: string
+  let longTarget: string
+  let shortTarget: string
+
+  beforeAll(() => {
+    cwd = mkdtempSync(join(tmpdir(), 'opensip-checks-python-ftl-cov-'))
+    const longBody = Array.from({ length: 60 }, (_, i) => `    y${i} = ${i}`).join('\n')
+    longTarget = join(cwd, 'long.py')
+    writeFileSync(longTarget, `def oversized():\n${longBody}\n`)
+    shortTarget = join(cwd, 'short.py')
+    writeFileSync(shortTarget, 'def tidy():\n    return 1\n')
+  })
+
+  afterAll(() => {
+    rmSync(cwd, { recursive: true, force: true })
+  })
+
+  it('emits a signal for an over-budget function via .run()', async () => {
+    const result = await runWithScope(emptyScope, () =>
+      pythonFunctionTooLong.run(cwd, { targetFiles: [longTarget] }),
+    )
+    expect(Array.isArray(result.signals)).toBe(true)
+    expect(result.signals.length).toBeGreaterThanOrEqual(1)
+    expect(result.signals.some((s) => JSON.stringify(s).includes('oversized'))).toBe(true)
+  })
+
+  it('emits no signal for a function under the budget via .run()', async () => {
+    const result = await runWithScope(emptyScope, () =>
+      pythonFunctionTooLong.run(cwd, { targetFiles: [shortTarget] }),
+    )
+    expect(result.signals).toHaveLength(0)
+  })
+
+  it('exposes a stable check config (slug/analysisMode/tags)', () => {
+    expect(pythonFunctionTooLong.config.slug).toBe('python-function-too-long')
+    expect(pythonFunctionTooLong.config.analysisMode).toBe('analyze')
+    expect(pythonFunctionTooLong.config.tags).toContain('python')
   })
 })

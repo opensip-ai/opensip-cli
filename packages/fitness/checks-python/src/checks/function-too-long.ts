@@ -22,13 +22,22 @@ const MAX_FUNCTION_LINES = 50
 export function analyzeFunctionTooLong(content: string, filePath: string): CheckViolation[] {
   const violations: CheckViolation[] = []
   const parsed = getSharedTree(filePath, content)
+  // Defensive: tree-sitter recovers from any string into a (partial) tree, so
+  // getSharedTree never returns null here — unreachable from a string input.
+  /* v8 ignore start */
   if (!parsed) return violations
+  /* v8 ignore stop */
 
   walkNodes(parsed.tree.rootNode, (node) => {
     if (!isFunction(node)) return
     const span = node.endPosition.row - node.startPosition.row + 1
     if (span <= MAX_FUNCTION_LINES) return
+    // Defensive: a Python `function_definition` node always carries a `name`
+    // field (without it tree-sitter does not classify the node as a function),
+    // so the `?? '<anonymous>'` fallback arm is unreachable in practice.
+    /* v8 ignore start */
     const name = nameOf(node) ?? '<anonymous>'
+    /* v8 ignore stop */
     violations.push({
       message: `Function \`${name}\` is ${span} lines long (max ${MAX_FUNCTION_LINES}).`,
       severity: 'warning',
