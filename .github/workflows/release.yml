@@ -168,7 +168,7 @@ jobs:
       # smoke-pack.mjs now runs a COMMAND-LEVEL scenario set (init/fit/graph/
       # sessions/dashboard + `plugin add` for a tool and a fit-pack plugin)
       # against the INSTALLED tarball bin via the shared CLI-acceptance harness
-      # core (scripts/lib/cli-acceptance-core.mjs) — the same core the PR-lane
+      # core (scripts/cli-acceptance-core.mjs) — the same core the PR-lane
       # Vitest suites use, so scenario semantics can't diverge (parity test in
       # packages/cli/src/__tests__/harness/). See the register's "Release Lane".
       # No flag change here: the script packs its own fixture plugins into the

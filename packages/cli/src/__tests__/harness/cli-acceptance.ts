@@ -3,7 +3,7 @@
  * @fileoverview Typed Vitest wrapper over the CLI acceptance harness core.
  *
  * The spawn/assert logic lives in the dependency-free
- * `scripts/lib/cli-acceptance-core.mjs` so the release script
+ * `scripts/cli-acceptance-core.mjs` so the release script
  * (`scripts/smoke-pack.mjs`) and these Vitest suites share identical scenario
  * semantics. This wrapper adds a `CliRunner` bound to a binary descriptor and
  * ergonomic constructors; the e2e suites and the per-language acceptance suite
@@ -22,11 +22,11 @@ import {
   type ScenarioResult,
   type SpawnOptions,
   type SpawnResult,
-} from '../../../../../scripts/lib/cli-acceptance-core.mjs'
+} from '../../../../../scripts/cli-acceptance-core.mjs'
 
 // Re-export the core surfaces consumers need directly from the core module
 // (export…from, per unicorn/prefer-export-from).
-export { checkScenario, expectEnvelope } from '../../../../../scripts/lib/cli-acceptance-core.mjs'
+export { checkScenario, expectEnvelope } from '../../../../../scripts/cli-acceptance-core.mjs'
 export type {
   BinaryDescriptor,
   Scenario,
@@ -34,7 +34,7 @@ export type {
   ScenarioResult,
   SpawnOptions,
   SpawnResult,
-} from '../../../../../scripts/lib/cli-acceptance-core.mjs'
+} from '../../../../../scripts/cli-acceptance-core.mjs'
 
 /** Absolute path to the built CLI entry (this file is at src/__tests__/harness/). */
 const DIST_CLI = fileURLToPath(new URL('../../../dist/index.js', import.meta.url))

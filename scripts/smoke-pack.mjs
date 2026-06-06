@@ -26,7 +26,7 @@
 //
 // What runs after install: a command-level scenario set
 // (`smoke-pack-scenarios.mjs`) driven through the shared, dependency-free
-// CLI acceptance core (`lib/cli-acceptance-core.mjs`) against the installed
+// CLI acceptance core (`cli-acceptance-core.mjs`) against the installed
 // bin — the same core the in-repo Vitest harness uses, so scenario semantics
 // are identical in both lanes. `--version` alone already walks the whole
 // import graph (tool registration runs at CLI startup, before argument
@@ -46,7 +46,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { runScenarios } from './lib/cli-acceptance-core.mjs';
+import { runScenarios } from './cli-acceptance-core.mjs';
 import { buildPackedSmokeScenarios } from './smoke-pack-scenarios.mjs';
 
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));

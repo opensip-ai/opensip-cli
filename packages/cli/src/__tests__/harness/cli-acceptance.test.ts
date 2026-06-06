@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, it, expect } from 'vitest';
 
-import { runScenarios as coreRunScenarios } from '../../../../../scripts/lib/cli-acceptance-core.mjs';
+import { runScenarios as coreRunScenarios } from '../../../../../scripts/cli-acceptance-core.mjs';
 
 import {
   checkScenario,

@@ -10,6 +10,11 @@
  * release script (scripts/smoke-pack.mjs) both import this core, so scenario
  * semantics are provably identical in both lanes. Dependency-free (only
  * node:child_process) so the release script can import it with no build step.
+ *
+ * Types live in the sibling `cli-acceptance-core.d.mts` — the single source of
+ * type truth for this module (the repo has `allowJs` off, so TS consumers read
+ * the declaration, not JSDoc). Keep this file's comments to prose/rationale;
+ * encode types in the `.d.mts`, not in duplicate `@param`/`@returns` tags here.
  */
 
 import { spawnSync } from 'node:child_process'
@@ -22,11 +27,6 @@ import { spawnSync } from 'node:child_process'
  * of exit code: a process that warns on stderr but exits 0 (e.g. an
  * unrecognized-language-tag warning) still surfaces its stderr. `execFileSync`
  * only returns stdout on the success path and would silently drop that stderr.
- *
- * @param {{kind:'node-script',script:string}|{kind:'installed-bin',bin:string}} descriptor
- * @param {readonly string[]} args
- * @param {{cwd?:string, env?:Record<string,string>, timeout?:number}} [opts]
- * @returns {{stdout:string, stderr:string, exitCode:number}}
  */
 export function spawnCli(descriptor, args, opts = {}) {
   const file = descriptor.kind === 'node-script' ? 'node' : descriptor.bin
@@ -46,8 +46,8 @@ export function spawnCli(descriptor, args, opts = {}) {
 }
 
 /**
- * Assert a single result against a scenario's `expect` block.
- * @returns {string[]} failure messages (empty = pass)
+ * Assert a single result against a scenario's `expect` block. Returns the list
+ * of failure messages — an empty array means the scenario passed.
  */
 export function checkScenario(result, expect = {}) {
   const failures = []
@@ -81,9 +81,8 @@ export function checkScenario(result, expect = {}) {
 }
 
 /**
- * Shape-assert an opensip-tools `--json` Signal envelope.
- * @param {{tool?:string}} [opts]
- * @returns {(parsed:any) => string[]}
+ * Shape-assert an opensip-tools `--json` Signal envelope. Returns a predicate
+ * over the parsed stdout suitable for a scenario's `expect.json`.
  */
 export function expectEnvelope(opts = {}) {
   return (parsed) => {
@@ -105,10 +104,9 @@ export function expectEnvelope(opts = {}) {
 }
 
 /**
- * Run a scenario list against one binary descriptor.
- * @param {{kind:'node-script',script:string}|{kind:'installed-bin',bin:string}} descriptor
- * @param {readonly any[]} scenarios
- * @returns {{passed:number, failed:number, results:{name:string, ok:boolean, failures:string[], result:any}[]}}
+ * Run a scenario list against one binary descriptor, in order. Each scenario's
+ * optional `setup` hook runs before its spawn; a throwing hook fails just that
+ * scenario. Returns pass/fail counts plus the per-scenario results.
  */
 export function runScenarios(descriptor, scenarios) {
   const results = []

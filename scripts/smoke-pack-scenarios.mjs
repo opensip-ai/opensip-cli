@@ -4,7 +4,7 @@
  * `scripts/smoke-pack.mjs` installs the freshly-packed tarballs into a throwaway
  * consumer project and then drives the installed bin through these scenarios via
  * the shared, dependency-free CLI acceptance core
- * (`scripts/lib/cli-acceptance-core.mjs`). The scenarios are data — the core is
+ * (`scripts/cli-acceptance-core.mjs`). The scenarios are data — the core is
  * the only thing that spawns and asserts — so the release lane exercises exactly
  * the same scenario semantics as the in-repo Vitest harness.
  *
@@ -31,7 +31,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { expectEnvelope } from './lib/cli-acceptance-core.mjs'
+import { expectEnvelope } from './cli-acceptance-core.mjs'
 
 /**
  * Build the ordered packed-smoke scenario list.
@@ -41,10 +41,10 @@ import { expectEnvelope } from './lib/cli-acceptance-core.mjs'
  * @param {string} opts.consumerCwd       the throwaway consumer project dir (already has the CLI installed)
  * @param {string} opts.toolPluginTarball absolute path to the packed `kind:"tool"` fixture tarball
  * @param {string} opts.fitPackTarball    absolute path to the packed `kind:"fit-pack"` fixture tarball
- * @returns {import('./lib/cli-acceptance-core.mjs').Scenario[]}
+ * @returns {import('./cli-acceptance-core.mjs').Scenario[]}
  */
 export function buildPackedSmokeScenarios({ expectedVersion, consumerCwd, toolPluginTarball, fitPackTarball }) {
-  /** @type {import('./lib/cli-acceptance-core.mjs').Scenario[]} */
+  /** @type {import('./cli-acceptance-core.mjs').Scenario[]} */
   const scenarios = [
     {
       name: '--version reports the consensus release version',

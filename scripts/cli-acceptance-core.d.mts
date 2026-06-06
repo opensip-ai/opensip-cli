@@ -1,7 +1,9 @@
 /**
  * Type declarations for the dependency-free CLI acceptance harness core.
- * The runtime lives in `cli-acceptance-core.mjs`; this file gives the TS Vitest
- * wrapper (and any TS consumer) real types over it.
+ * The runtime lives in `cli-acceptance-core.mjs`; this file is the SINGLE
+ * source of type truth for the module — the repo has `allowJs` off, so TS
+ * consumers (the Vitest wrapper et al.) resolve types from this declaration,
+ * not from JSDoc in the `.mjs`. Keep types here, prose there.
  */
 
 export type BinaryDescriptor =
