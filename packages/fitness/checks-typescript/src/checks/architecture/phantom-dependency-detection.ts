@@ -266,15 +266,22 @@ function getCachedPackageJson(
   return pkgJson
 }
 
+/**
+ * Per-file dependency context: everything `violationForImport` needs that is
+ * constant across the imports of a single source file. Computed once in
+ * `collectFileViolations` and threaded as one value (only `imp` varies per call).
+ */
+interface FileDepContext {
+  pkgJson: PackageJson
+  allDeps: Record<string, string>
+  allowDevDeps: boolean
+  filePath: string
+  pkgJsonPath: string
+}
+
 /** Build the violation for a single import, or null when it's fine. */
-function violationForImport(
-  imp: ExtractedImport,
-  pkgJson: PackageJson,
-  allDeps: Record<string, string>,
-  allowDevDeps: boolean,
-  filePath: string,
-  pkgJsonPath: string,
-): CheckViolation | null {
+function violationForImport(imp: ExtractedImport, ctx: FileDepContext): CheckViolation | null {
+  const { pkgJson, allDeps, allowDevDeps, filePath, pkgJsonPath } = ctx
   const packageName = extractPackageName(imp.specifier)
   if (!packageName) return null
 
@@ -326,9 +333,10 @@ function collectFileViolations(
   }
   const allowDevDeps = allowsDevDependencies(filePath)
 
+  const ctx: FileDepContext = { pkgJson, allDeps, allowDevDeps, filePath, pkgJsonPath }
   const out: CheckViolation[] = []
   for (const imp of imports) {
-    const violation = violationForImport(imp, pkgJson, allDeps, allowDevDeps, filePath, pkgJsonPath)
+    const violation = violationForImport(imp, ctx)
     if (violation) out.push(violation)
   }
   return out
