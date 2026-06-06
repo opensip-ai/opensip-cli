@@ -130,6 +130,14 @@ distinct from:
   exiting 0 and trusting only the external Code Scanning net-new ratchet + branch
   protection (the weakness ADR-0017 rejected). The ratchet is retained for PR
   annotations and backlog adopters; graph's gate is the tracked follow-up
+- [ADR-0021](./ADR-0021-cross-tool-cli-flag-currency.md) — One source of truth
+  for cross-tool CLI flags: common flags (`--json`/`--cwd`/`--quiet`/`--verbose`/
+  `--debug`/`--report-to`/…) are declared once in `contracts` and applied via
+  `applyCommonFlags`; `--verbose` becomes an ADR-0011 output-currency concern
+  rendered once through the shared `resultToView` seam (TTY == pipe), not in each
+  tool's Ink runner; `sim` gains `--verbose`, `graph` gains `--quiet`; a
+  `cross-tool-flag-parity` fitness check enforces the mandatory set + canonical
+  descriptions
 
 ### Superseded
 
