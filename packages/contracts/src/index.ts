@@ -79,6 +79,12 @@ export type { ErrorSuggestion } from './exit-codes.js';
 export { loadCliDefaults } from './cli-config.js';
 export type { CliDefaults } from './cli-config.js';
 
+// Cross-tool common-flag registry (ADR-0021). One source of truth for the flags
+// every tool's run command shares; tools apply them via applyCommonFlags rather
+// than re-declaring `--json`/`--cwd`/`--report-to`/… per tool.
+export { commonFlags, applyCommonFlags, MANDATORY_COMMON_FLAGS } from './cli-flags.js';
+export type { CommonFlagKey, CommonFlagSpec } from './cli-flags.js';
+
 // Session persistence type. The cross-tool StoredSession shape stays here
 // as the contract surface; SessionRepo + the sessions schema +
 // generateSessionId/sanitizeForFilename moved to @opensip-tools/session-store
