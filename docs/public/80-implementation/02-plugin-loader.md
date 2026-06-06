@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-05-26
+last_verified: 2026-06-05
 release: v3.0.0
 title: "Plugin loader"
 audience: [contributors, plugin-authors]
@@ -42,6 +42,43 @@ opensip-tools loads four kinds of plugins. Each has its own discovery shape, but
 | **Language adapters** | Direct CLI imports (no discovery walk) | At CLI bootstrap, before any Tool's `register()` runs |
 
 Different kinds, different lifetimes. Tools are global to the binary — once registered, they're available regardless of cwd. Check packs and scenario packs are project-scoped — they load when the relevant Tool actually runs. Language adapters are bundled — they're a CLI dep, not a discoverable plugin, because the framework can't usefully run without them.
+
+```mermaid
+flowchart TB
+  Startup["CLI startup"]
+  FitRun["fit invocation"]
+  SimRun["sim invocation"]
+  GraphStartup["graph adapter bootstrap"]
+
+  Tools["Tool packages<br/>opensipTools.kind = tool<br/>node_modules walk"]
+  Languages["Bundled language adapters<br/>direct imports"]
+  GraphAdapters["Graph adapters<br/>explicit config or<br/>@opensip-tools/graph-* + marker"]
+
+  FitLocal["Project-local fit files<br/>opensip-tools/fit/checks<br/>opensip-tools/fit/recipes"]
+  FitPinned["Project-pinned fit packages<br/>.runtime/plugins/fit + plugins.fit"]
+  FitMarker["Fit-pack marker scan<br/>opensipTools.kind = fit-pack"]
+  FitExact["Exact check package pins<br/>plugins.checkPackages"]
+
+  SimLocal["Project-local sim files<br/>opensip-tools/sim/scenarios<br/>opensip-tools/sim/recipes"]
+  SimMarker["Sim-pack marker scan<br/>opensipTools.kind = sim-pack"]
+  SimScope["Scoped scenario packages<br/>configured scope / scenarios-*"]
+  SimPinned["Project-pinned sim packages<br/>.runtime/plugins/sim + plugins.sim"]
+
+  Startup --> Tools
+  Startup --> Languages
+  Startup --> GraphStartup
+  GraphStartup --> GraphAdapters
+
+  FitRun --> FitLocal
+  FitRun --> FitPinned
+  FitRun --> FitMarker
+  FitRun --> FitExact
+
+  SimRun --> SimLocal
+  SimRun --> SimMarker
+  SimRun --> SimScope
+  SimRun --> SimPinned
+```
 
 ---
 

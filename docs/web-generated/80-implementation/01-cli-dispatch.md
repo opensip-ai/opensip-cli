@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-03
+last_verified: 2026-06-05
 release: v3.0.0
 title: "CLI dispatch"
 audience: [contributors]
@@ -63,6 +63,35 @@ related-docs:
      each command's options and raises the log level for that run. A
      runId is generated and the day-level log file
      (logs/<YYYY-MM-DD>.jsonl) is opened lazily on first write.
+```
+
+The same startup path as a sequence:
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant User as User / CI
+  participant CLI as packages/cli main()
+  participant Core as core registries
+  participant Bootstrap as bootstrapCli()
+  participant Tools as ToolRegistry
+  participant Commander as Commander
+  participant Tool as selected Tool
+  participant Output as render / output / persistence
+
+  User->>CLI: opensip-tools command
+  CLI->>Core: create LanguageRegistry + ToolRegistry
+  CLI->>Bootstrap: register adapters, tools, discovered tools
+  Bootstrap->>Core: LanguageRegistry.register(...)
+  Bootstrap->>Tools: ToolRegistry.register(...)
+  CLI->>Tools: mountAllToolCommands(ctx)
+  Tools->>Commander: tool.register(ctx)
+  CLI->>Commander: register CLI-owned commands
+  Commander->>CLI: preAction()
+  CLI->>Core: enter RunScope and open DataStore lazily
+  Commander->>Tool: action(opts)
+  Tool-->>CLI: CommandResult / SignalEnvelope
+  CLI->>Output: render, deliver, persist, set exit code
 ```
 
 The whole thing fits in [`packages/cli/src/index.ts`](https://github.com/opensip-ai/opensip-tools/blob/v3.0.0/packages/cli/src/index.ts) at ~530 lines. Every step is direct — no plugin lifecycle hooks, no startup phases, no DI container. Just static imports and explicit registration calls.

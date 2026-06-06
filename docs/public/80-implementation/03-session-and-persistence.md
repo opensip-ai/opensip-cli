@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-03
+last_verified: 2026-06-05
 release: v3.0.0
 title: "Session and persistence"
 audience: [contributors]
@@ -72,6 +72,33 @@ Schemas are owned by the package that produces the data — datastore is paradig
 | `@opensip-tools/fitness` | `src/persistence/schema.ts` | `fit_baseline` |
 
 `__drizzle_migrations` is a fourth, internal table — Drizzle uses it to record which migrations have been applied.
+
+```mermaid
+flowchart TB
+  CLI["CLI preAction hook<br/>opens one DataStore"]
+  Store["datastore.sqlite<br/>SQLite + Drizzle"]
+  Migrations["__drizzle_migrations"]
+  Sessions["sessions<br/>session_tool_payload"]
+  Fit["fit_baseline"]
+  Graph["graph_catalog<br/>graph_baseline_*<br/>graph_shard_fragment"]
+
+  Logger["core logger"]
+  Logs["logs/YYYY-MM-DD.jsonl"]
+  Dashboard["dashboard compose"]
+  Report["reports/latest.html"]
+  Plugins["plugin command"]
+  PluginDirs["plugins/fit + plugins/sim<br/>node_modules hosts"]
+
+  CLI --> Store
+  Store --> Migrations
+  Store --> Sessions
+  Store --> Fit
+  Store --> Graph
+
+  Logger --> Logs
+  Dashboard --> Report
+  Plugins --> PluginDirs
+```
 
 SQLite + Drizzle were chosen because the runtime store is local, project-scoped, transactional, and small enough to rebuild if a user needs to delete it. A remote database, JSON-as-backend, or a broader persistence abstraction would add operational weight without improving the CLI's local-first behavior.
 

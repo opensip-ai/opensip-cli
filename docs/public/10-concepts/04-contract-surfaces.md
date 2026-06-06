@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-04
+last_verified: 2026-06-05
 release: v3.0.0
 title: "Contract surfaces"
 audience: [contributors, plugin-authors, ci-integrators]
@@ -112,6 +112,35 @@ CI integrations are the primary consumer. `opensip-tools fit && deploy` is an id
 ## 3. JSON output (`SignalEnvelope`)
 
 The structured stdout when `--json` is set — the **same envelope for every tool** (`fit`, `sim`, `graph`), per [ADR-0011](../../decisions/ADR-0011-signal-output-currency-formatter-sink.md). Shape lives at [`packages/contracts/src/signal-envelope.ts`](../../../packages/contracts/src/signal-envelope.ts):
+
+```mermaid
+flowchart LR
+  Fit["fit signals"]
+  Graph["graph signals"]
+  Sim["sim signals"]
+  Envelope["SignalEnvelope<br/>@opensip-tools/contracts"]
+  Root["CLI composition root"]
+  Json["JSON stdout"]
+  Sarif["SARIF formatter"]
+  Table["human table / Ink"]
+  Session["SessionRepo<br/>run history"]
+  Gate["fit / graph gate"]
+  Cloud["optional cloud sink"]
+  Dashboard["dashboard data"]
+
+  Fit --> Envelope
+  Graph --> Envelope
+  Sim --> Envelope
+  Envelope --> Root
+  Root --> Json
+  Root --> Sarif
+  Root --> Table
+  Root --> Session
+  Root --> Gate
+  Root -.-> Cloud
+  Session --> Dashboard
+  Graph --> Dashboard
+```
 
 ```ts
 interface SignalEnvelope {

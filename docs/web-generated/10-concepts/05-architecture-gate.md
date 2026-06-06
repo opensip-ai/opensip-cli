@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-04
+last_verified: 2026-06-05
 release: v3.0.0
 title: "Architecture gate"
 audience: [contributors, ci-integrators]
@@ -64,6 +64,39 @@ Unchanged (29):
 Exit code 1 if `degraded` (any added findings); 0 otherwise. CI gates on the exit code; humans read the diff.
 
 The flags are mutually exclusive — passing both raises a configuration error.
+
+```mermaid
+flowchart TB
+  Run["executeFit(args)<br/>standard fit run"]
+  Envelope["SignalEnvelope"]
+  Mode{"Gate mode"}
+  Save["--gate-save"]
+  Compare["--gate-compare"]
+  Store["fit_baseline row<br/>datastore.sqlite"]
+  Current["hash current signals<br/>filePath + ruleId + message"]
+  Baseline["hash baseline signals<br/>filePath + ruleId + message"]
+  Diff["diff hash sets"]
+  Added{"any added<br/>signals?"}
+  Pass["exit 0"]
+  Fail["exit 1"]
+  Missing["missing / invalid baseline<br/>exit 2"]
+
+  Run --> Envelope
+  Envelope --> Mode
+  Mode --> Save
+  Save --> Store
+  Save --> Pass
+  Mode --> Compare
+  Compare --> Store
+  Store --> Baseline
+  Store -.->|missing| Missing
+  Compare --> Current
+  Baseline --> Diff
+  Current --> Diff
+  Diff --> Added
+  Added -- yes --> Fail
+  Added -- no --> Pass
+```
 
 ---
 
