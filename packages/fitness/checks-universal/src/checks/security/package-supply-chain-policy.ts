@@ -71,6 +71,7 @@ function readIfExists(filePath: string): string | null {
     if (!fs.existsSync(filePath)) return null
     return fs.readFileSync(filePath, 'utf8')
   } catch {
+    // @swallow-ok unreadable file (permission/IO) -> treat as absent
     return null
   }
 }
@@ -79,6 +80,7 @@ function parseJson<T>(content: string): T | null {
   try {
     return JSON.parse(content) as T
   } catch {
+    // @swallow-ok malformed JSON -> treat as unparseable
     return null
   }
 }
