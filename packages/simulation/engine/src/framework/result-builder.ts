@@ -187,7 +187,6 @@ export function createEmptyMetrics(): SimulationMetrics {
     p95LatencyMs: 0,
     p99LatencyMs: 0,
     errorsGenerated: 0,
-    findingsGenerated: 0,
   }
 }
 
@@ -227,6 +226,5 @@ export function mergeMetrics(metricsList: readonly SimulationMetrics[]): Simulat
     p95LatencyMs: p95,
     p99LatencyMs: p99,
     errorsGenerated: metricsList.reduce((sum, m) => sum + m.errorsGenerated, 0),
-    findingsGenerated: metricsList.reduce((sum, m) => sum + m.findingsGenerated, 0),
   }
 }

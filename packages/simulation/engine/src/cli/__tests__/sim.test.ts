@@ -42,7 +42,6 @@ const loadResultWithSignal = (
       p95LatencyMs: 0,
       p99LatencyMs: 0,
       errorsGenerated: 0,
-      findingsGenerated: 0,
     },
     assertions: { passed: [], failed: [] },
   },

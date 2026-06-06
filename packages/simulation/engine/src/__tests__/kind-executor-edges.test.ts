@@ -72,7 +72,6 @@ describe('load executor — custom execute branch', () => {
             p95LatencyMs: 1,
             p99LatencyMs: 1,
             errorsGenerated: 0,
-            findingsGenerated: 0,
           },
           assertions: { passed: [], failed: [] },
           signals: [],

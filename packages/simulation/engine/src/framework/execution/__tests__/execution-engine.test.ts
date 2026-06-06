@@ -80,7 +80,6 @@ describe('resolveMetric (via validateAssertions)', () => {
     ['avg_latency_ms', baseMetrics({ avgLatencyMs: 60 }), 60],
     ['total_requests', baseMetrics({ totalRequests: 5 }), 5],
     ['failed_requests', baseMetrics({ failedRequests: 3 }), 3],
-    ['findings_generated', baseMetrics({ findingsGenerated: 2 }), 2],
   ] as const)('resolveMetric(%s)', (metric, metrics, expected) => {
     expect(resolveMetric(metric, metrics)).toBeCloseTo(expected);
   });

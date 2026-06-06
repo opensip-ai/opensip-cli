@@ -266,7 +266,6 @@ describe('createLoadScenarioRunner — custom execute path', () => {
       p95LatencyMs: 9,
       p99LatencyMs: 10,
       errorsGenerated: 0,
-      findingsGenerated: 0,
     };
     const runner = createLoadScenarioRunner(
       loadConfig({
@@ -329,7 +328,6 @@ describe('resolveMetric — latency key aliases', () => {
     p95LatencyMs: 70,
     p99LatencyMs: 120,
     errorsGenerated: 10,
-    findingsGenerated: 2,
   };
 
   it.each<[ScenarioMetricKey, number]>([

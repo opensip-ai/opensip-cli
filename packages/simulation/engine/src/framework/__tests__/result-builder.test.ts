@@ -16,7 +16,6 @@ const baseMetrics = (overrides: Partial<SimulationMetrics> = {}): SimulationMetr
   p95LatencyMs: 80,
   p99LatencyMs: 120,
   errorsGenerated: 0,
-  findingsGenerated: 0,
   ...overrides,
 });
 

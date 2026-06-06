@@ -28,7 +28,6 @@ const baseMetrics = (overrides: Partial<SimulationMetrics> = {}): SimulationMetr
   p95LatencyMs: 70,
   p99LatencyMs: 100,
   errorsGenerated: 5,
-  findingsGenerated: 0,
   ...overrides,
 });
 
@@ -104,7 +103,6 @@ describe('resolveMetric symmetry', () => {
     ['avg_latency_ms', { avgLatencyMs: 45 }, 45],
     ['total_requests', { totalRequests: 7 }, 7],
     ['failed_requests', { failedRequests: 4 }, 4],
-    ['findings_generated', { findingsGenerated: 3 }, 3],
   ])('%s resolves to %d via both paths', (metric, overrides, expected) => {
     const m = baseMetrics(overrides);
     expect(actualFromValidateAssertions(m, metric)).toBeCloseTo(expected);
@@ -131,13 +129,11 @@ describe('resolveMetric symmetry', () => {
       successfulRequests: 95,
       failedRequests: 5,
       errorsGenerated: 7,
-      findingsGenerated: 3,
       totalRequests: 100,
     });
     expect(resolveMetric('successful_requests', m)).toBe(95);
     expect(resolveMetric('failed_requests', m)).toBe(5);
     expect(resolveMetric('errors_generated', m)).toBe(7);
-    expect(resolveMetric('findings_generated', m)).toBe(3);
     expect(resolveMetric('total_requests', m)).toBe(100);
   });
 

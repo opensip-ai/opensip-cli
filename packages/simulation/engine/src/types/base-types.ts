@@ -128,6 +128,5 @@ export interface SimulationMetrics {
   p95LatencyMs: number
   p99LatencyMs: number
   errorsGenerated: number
-  findingsGenerated: number
 }
 

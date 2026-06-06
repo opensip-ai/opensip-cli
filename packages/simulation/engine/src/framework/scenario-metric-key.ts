@@ -41,7 +41,6 @@ export type ScenarioMetricKey =
   | 'successful_requests'
   | 'failed_requests'
   | 'errors_generated'
-  | 'findings_generated'
   // Reserved (returns 0 until an executor populates the underlying field)
   | 'max_latency_ms'
   | 'memory_mb'

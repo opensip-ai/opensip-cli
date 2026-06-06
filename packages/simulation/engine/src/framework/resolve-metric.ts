@@ -32,7 +32,6 @@
  *   - `successful_requests`                     → `successfulRequests`
  *   - `failed_requests`                         → `failedRequests`
  *   - `errors_generated`                        → `errorsGenerated`
- *   - `findings_generated`                      → `findingsGenerated`
  *
  * Reserved keys (recognised at type-level, not yet populated by any executor;
  * resolver returns `0`):
@@ -140,9 +139,6 @@ export function resolveMetric(
     }
     case 'errors_generated': {
       return metrics.errorsGenerated
-    }
-    case 'findings_generated': {
-      return metrics.findingsGenerated
     }
     case 'max_latency_ms':
     case 'memory_mb':
