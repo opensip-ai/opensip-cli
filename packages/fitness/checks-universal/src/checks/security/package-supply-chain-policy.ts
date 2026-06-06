@@ -58,6 +58,8 @@ const SUPPORTED_LOCKFILES = [
   'bun.lockb',
 ] as const
 
+const PNPM_WORKSPACE_FILE = 'pnpm-workspace.yaml'
+
 const INSTALL_LIFECYCLE_SCRIPTS = new Set(['preinstall', 'install', 'postinstall'])
 const DEPENDENCY_FIELDS = [
   'dependencies',
@@ -132,10 +134,12 @@ async function readPackageJsons(files: FileAccessor, rootDir: string): Promise<P
     .filter((filePath) => path.basename(filePath) === 'package.json')
     .sort((a, b) => a.length - b.length)
 
+  // Read all package.json files in parallel, then assemble in path order.
+  const contents = await Promise.all(packagePaths.map((filePath) => files.read(filePath)))
+
   const packages: PackageJsonFile[] = []
-  for (const filePath of packagePaths) {
-    const content = await files.read(filePath)
-    const json = parseJson<PackageJson>(content)
+  for (const [i, filePath] of packagePaths.entries()) {
+    const json = parseJson<PackageJson>(contents[i])
     if (!json) continue
     packages.push({
       filePath,
@@ -182,7 +186,7 @@ async function buildSnapshot(files: FileAccessor): Promise<ProjectSnapshot | nul
     rootPackage,
     packages: await readPackageJsons(files, rootDir),
     lockfiles: new Set(SUPPORTED_LOCKFILES.filter((name) => fs.existsSync(path.join(rootDir, name)))),
-    pnpmWorkspace: readIfExists(path.join(rootDir, 'pnpm-workspace.yaml')),
+    pnpmWorkspace: readIfExists(path.join(rootDir, PNPM_WORKSPACE_FILE)),
     npmrc: readIfExists(path.join(rootDir, '.npmrc')),
     bunfig: readIfExists(path.join(rootDir, 'bunfig.toml')),
     workflows: readWorkflows(rootDir),
@@ -382,7 +386,7 @@ function checkInstallScriptPolicy(snapshot: ProjectSnapshot, violations: CheckVi
     if (!hasTopLevelKey(snapshot.pnpmWorkspace, 'allowBuilds')) {
       pushViolation(
         violations,
-        path.join(snapshot.rootDir, 'pnpm-workspace.yaml'),
+        path.join(snapshot.rootDir, PNPM_WORKSPACE_FILE),
         'install-script-policy-missing',
         'pnpm project does not declare an allowBuilds install-script policy',
         'Add an explicit allowBuilds map to pnpm-workspace.yaml and approve only dependencies that truly need install/build scripts.',
@@ -392,7 +396,7 @@ function checkInstallScriptPolicy(snapshot: ProjectSnapshot, violations: CheckVi
     if (hasScalarValue(snapshot.pnpmWorkspace, 'dangerouslyAllowAllBuilds', 'true')) {
       pushViolation(
         violations,
-        path.join(snapshot.rootDir, 'pnpm-workspace.yaml'),
+        path.join(snapshot.rootDir, PNPM_WORKSPACE_FILE),
         'install-script-policy-allows-all',
         'pnpm dangerouslyAllowAllBuilds is enabled',
         'Remove dangerouslyAllowAllBuilds and use a narrow allowBuilds map instead.',
@@ -438,7 +442,7 @@ function checkMinimumReleaseAge(snapshot: ProjectSnapshot, violations: CheckViol
     if ((getPositiveNumber(snapshot.pnpmWorkspace, 'minimumReleaseAge') ?? 0) <= 0) {
       pushViolation(
         violations,
-        path.join(snapshot.rootDir, 'pnpm-workspace.yaml'),
+        path.join(snapshot.rootDir, PNPM_WORKSPACE_FILE),
         'minimum-release-age-missing',
         'pnpm minimumReleaseAge is not explicitly enabled',
         'Set minimumReleaseAge: 1440 or higher in pnpm-workspace.yaml, and pair it with minimumReleaseAgeStrict: true.',
@@ -448,7 +452,7 @@ function checkMinimumReleaseAge(snapshot: ProjectSnapshot, violations: CheckViol
     if (!hasScalarValue(snapshot.pnpmWorkspace, 'minimumReleaseAgeStrict', 'true')) {
       pushViolation(
         violations,
-        path.join(snapshot.rootDir, 'pnpm-workspace.yaml'),
+        path.join(snapshot.rootDir, PNPM_WORKSPACE_FILE),
         'minimum-release-age-not-strict',
         'pnpm minimumReleaseAgeStrict is not enabled',
         'Set minimumReleaseAgeStrict: true so newly published versions fail closed instead of being silently exempted.',
@@ -587,15 +591,21 @@ export async function analyzePackageSupplyChainPolicy(files: FileAccessor): Prom
   if (!snapshot) return []
 
   const violations: CheckViolation[] = []
-  checkPackageManagerPin(snapshot, violations)
-  checkLockfilePosture(snapshot, violations)
-  checkLockfileIntegrity(snapshot, violations)
-  checkExoticDependencies(snapshot, violations)
-  checkInstallLifecycleScripts(snapshot, violations)
-  checkInstallScriptPolicy(snapshot, violations)
-  checkMinimumReleaseAge(snapshot, violations)
-  checkFrozenCiInstalls(snapshot, violations)
-  checkTrustedPublishing(snapshot, violations)
+  const subChecks = [
+    checkPackageManagerPin,
+    checkLockfilePosture,
+    checkLockfileIntegrity,
+    checkExoticDependencies,
+    checkInstallLifecycleScripts,
+    checkInstallScriptPolicy,
+    checkMinimumReleaseAge,
+    checkFrozenCiInstalls,
+    checkTrustedPublishing,
+  ]
+  for (const runCheck of subChecks) {
+    // @fitness-ignore-next-line detached-promises -- sub-checks are synchronous (each returns void, mutating `violations`), not promises
+    runCheck(snapshot, violations)
+  }
   return violations
 }
 
