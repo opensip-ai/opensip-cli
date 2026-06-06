@@ -135,7 +135,9 @@ export function analyzeSkippedTests(content: string, filePath: string): CheckVio
           message: idiom.focused
             ? `Focused test detected (${idiom.label}) — it disables every other test in the file`
             : `Skipped/placeholder test detected (${idiom.label})`,
-          severity: 'error',
+          // Soft shipped default; repos wanting a hard gate set `failOnWarnings`
+          // (this repo does — see opensip-tools.config.yml).
+          severity: 'warning',
           line: i + 1,
           suggestion: idiom.focused ? FOCUSED_SUGGESTION : SUGGESTION,
         })

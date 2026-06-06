@@ -24,7 +24,7 @@ describe('analyzeSkippedTests (pure detector)', () => {
   it('flags .skip in a JS/TS test', () => {
     const v = analyzeSkippedTests("it.skip('x', () => {})", 'a.test.ts')
     expect(v.length).toBe(1)
-    expect(v[0]?.severity).toBe('error')
+    expect(v[0]?.severity).toBe('warning')
     expect(v[0]?.message).toContain('.skip')
   })
 

@@ -9,7 +9,7 @@ describe('analyzeUnimplementedMarkers', () => {
       const v = analyzeUnimplementedMarkers(`throw new Error('not implemented')`, 'a.ts')
       expect(v).toHaveLength(1)
       expect(v[0]?.line).toBe(1)
-      expect(v[0]?.severity).toBe('error')
+      expect(v[0]?.severity).toBe('warning')
     })
 
     it('flags "unimplemented" phrasing too', () => {

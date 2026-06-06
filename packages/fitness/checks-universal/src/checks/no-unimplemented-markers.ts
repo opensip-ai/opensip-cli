@@ -145,7 +145,9 @@ export function analyzeUnimplementedMarkers(content: string, filePath: string): 
       if (test(line)) {
         violations.push({
           message: `Unimplemented-work marker found (\`${marker}\` idiom): code announces it is not implemented`,
-          severity: 'error',
+          // Soft shipped default; repos wanting a hard gate set `failOnWarnings`
+          // (this repo does — see opensip-tools.config.yml).
+          severity: 'warning',
           line: i + 1,
           suggestion:
             'Implement before shipping, or track the work in an issue and remove the placeholder',
