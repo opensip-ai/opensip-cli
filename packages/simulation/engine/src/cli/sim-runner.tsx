@@ -83,13 +83,18 @@ function executeSimWithProgress(
   });
 }
 
-interface SimRunnerProps {
+/** Props for {@link SimRunner}. Exported so the live-view state machine can be
+ *  driven directly under ink-testing-library without spinning up the full
+ *  `render()` host (which needs a TTY stdout). */
+export interface SimRunnerProps {
   readonly args: SimLiveArgs;
   readonly setExitCode?: (code: number) => void;
   readonly onEnvelope?: (envelope: SignalEnvelope) => void;
 }
 
-function SimRunner({ args, setExitCode, onEnvelope }: SimRunnerProps): React.ReactElement {
+/** The sim live-view component (loading → running → done/error). Exported for
+ *  testing; production renders it through {@link renderSimLive}. */
+export function SimRunner({ args, setExitCode, onEnvelope }: SimRunnerProps): React.ReactElement {
   const { exit } = useApp();
   const [state, setState] = useState<SimState>({ phase: 'loading' });
 

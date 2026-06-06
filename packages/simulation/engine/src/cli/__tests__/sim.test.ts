@@ -1,4 +1,4 @@
-import { enterScope } from '@opensip-tools/core';
+import { createSignal, enterScope } from '@opensip-tools/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { makeSimTestScope } from '../../__tests__/test-utils/with-sim-scope.js';
@@ -8,13 +8,45 @@ import { clearScenarioRegistry, currentScenarioRegistry } from '../../framework/
 import { defineLoadScenario } from '../../kinds/load/define.js';
 import { executeSim } from '../sim.js';
 
+import type { ScenarioExecutorResult } from '../../framework/scenario-executor-result.js';
 import type { ToolOptions } from '@opensip-tools/contracts';
+import type { SignalSeverity } from '@opensip-tools/core';
 
 const args = (overrides: Partial<ToolOptions> = {}): ToolOptions => ({
   json: false,
   cwd: process.cwd(),
   debug: false,
   ...overrides,
+});
+
+/** A passing load-kind executor result carrying one signal — lets a test
+ *  exercise the envelope assembler's source-remap + critical-signal verdict
+ *  folding without running the real load loop. */
+const loadResultWithSignal = (
+  scenarioId: string,
+  source: string,
+  severity: SignalSeverity,
+  message: string,
+): ScenarioExecutorResult => ({
+  kind: 'load',
+  scenarioId,
+  passed: true,
+  durationMs: 0,
+  outcome: {
+    metrics: {
+      totalRequests: 0,
+      successfulRequests: 0,
+      failedRequests: 0,
+      avgLatencyMs: 0,
+      p50LatencyMs: 0,
+      p95LatencyMs: 0,
+      p99LatencyMs: 0,
+      errorsGenerated: 0,
+      findingsGenerated: 0,
+    },
+    assertions: { passed: [], failed: [] },
+  },
+  signals: [createSignal({ source, severity, ruleId: 'sim.test', message })],
 });
 
 beforeEach(() => {
@@ -121,6 +153,53 @@ describe('executeSim', () => {
     if (result.type === 'sim-done') {
       // The scenario's thrown error is carried on its unit (slug === scenarioId).
       expect(result.envelope.units[0]?.error).toContain('a-specific-message');
+    }
+  });
+
+  it('remaps each scenario signal to source = scenarioId in the run envelope', async () => {
+    // A scenario whose result emits a signal with a DIVERGENT `source`; the
+    // envelope assembler must re-attribute it to the scenarioId so the shared
+    // grouped table credits the right unit row (ADR-0011).
+    currentScenarioRegistry().register({
+      id: 'sig-scenario',
+      name: 'sig-scenario',
+      description: 'emits a signal',
+      kind: 'load',
+      tags: [],
+      run: () => Promise.resolve(
+        loadResultWithSignal('sig-scenario', 'some-other-source', 'low', 'fyi'),
+      ),
+    });
+
+    const { result } = await executeSim(args());
+    expect(result.type).toBe('sim-done');
+    if (result.type === 'sim-done') {
+      const sig = result.envelope.signals.find((s) => s.message === 'fyi');
+      expect(sig?.source).toBe('sig-scenario');
+    }
+  });
+
+  it('fails the unit verdict when a scenario emits a critical signal even though it passed', async () => {
+    // scenarioPassed folds the no-critical/high rule into the unit verdict: a
+    // scenario can report passed:true yet still fail because it surfaced a
+    // critical signal.
+    currentScenarioRegistry().register({
+      id: 'crit-scenario',
+      name: 'crit-scenario',
+      description: 'passes but emits a critical signal',
+      kind: 'load',
+      tags: [],
+      run: () => Promise.resolve(
+        loadResultWithSignal('crit-scenario', 'crit-scenario', 'critical', 'meltdown'),
+      ),
+    });
+
+    const { result } = await executeSim(args());
+    expect(result.type).toBe('sim-done');
+    if (result.type === 'sim-done') {
+      const unit = result.envelope.units.find((u) => u.slug === 'crit-scenario');
+      // passed:true from the executor, but the critical signal flips the unit.
+      expect(unit?.passed).toBe(false);
     }
   });
 });
