@@ -30,11 +30,14 @@ import {
   LiveProgress,
   normalizeBannerSize,
   ProjectHeader,
+  renderToInk,
   RunFooterHints,
   RunHeader,
   RunSummary,
   ThemeProvider,
   UpdateHint,
+  VERBOSE_DETAIL_HINT,
+  viewVerboseLines,
   type ProgressCallback,
   type ProgressEvent,
   type ProgressSurface,
@@ -125,6 +128,10 @@ interface GraphRunnerArgs {
    * summary line + footer hint only, matching fit's default surface.
    */
   readonly verbose?: boolean;
+  /** `--quiet`: suppress the banner / project header / run header chrome, leaving
+   *  only the live progress, summary, and (when not verbose) footer hints —
+   *  parity with fit/sim. */
+  readonly quiet?: boolean;
   /**
    * The project's `graph:` config block (rule knobs like
    * `minCrossPackageDuplicatePackages`, `minDuplicateBodyLines`,
@@ -238,7 +245,8 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
   const ui = scope?.ui;
   const walkedUp = scope?.projectContext?.walkedUp;
   const bannerSize = normalizeBannerSize(ui?.bannerSize);
-  const header = (
+  // --quiet suppresses the banner/header chrome (parity with fit/sim).
+  const header = args.quiet === true ? null : (
     <>
       <Banner size={bannerSize} version={ui?.version} projectPath={args.cwd} walkedUp={walkedUp} update={ui?.update} />
       {bannerSize === 'mini' && ui?.update !== undefined && <UpdateHint />}
@@ -278,9 +286,7 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
         <>
           {args.verbose === true && (
             <Box flexDirection="column" paddingTop={1}>
-              {state.reportLines.map((line, i) => (
-                <Text key={i}>{line}</Text>
-              ))}
+              {renderToInk(viewVerboseLines(state.reportLines))}
             </Box>
           )}
           <RunSummary
@@ -293,7 +299,7 @@ function GraphRunner({ args, datastore, setExitCode }: GraphRunnerProps): React.
           {args.verbose !== true && (
             <RunFooterHints
               hints={[
-                { text: 'Use --verbose for detailed results', bold: ['--verbose'] },
+                VERBOSE_DETAIL_HINT,
                 { text: 'opensip-tools dashboard for HTML report', bold: ['opensip-tools dashboard'] },
               ]}
             />
