@@ -16,7 +16,7 @@
  */
 
 import { viewFooterHints } from './run-footer-hints.js';
-import { group, line, type Span, type ViewNode } from './view-model.js';
+import { group, line, type HintItem, type Span, type ViewNode } from './view-model.js';
 
 /** Per-check cap on rendered findings — mirrors the prior FindingsBlock limit. */
 const DEFAULT_VIOLATIONS_PER_GROUP = 25;
@@ -38,9 +38,17 @@ export interface FindingGroupView {
   readonly findings: readonly FindingLineView[];
 }
 
+/** The single canonical "Use --verbose…" hint item. Tools that compose their
+ *  own footer (e.g. graph, which also shows a dashboard hint) reuse THIS item so
+ *  the string is never re-typed. */
+export const VERBOSE_DETAIL_HINT: HintItem = {
+  text: 'Use --verbose for detailed results',
+  bold: ['--verbose'],
+};
+
 /** The canonical next-step hint shown when a run was NOT verbose. */
 export function viewVerboseHint(): ViewNode {
-  return viewFooterHints([{ text: 'Use --verbose for detailed results', bold: ['--verbose'] }]);
+  return viewFooterHints([VERBOSE_DETAIL_HINT]);
 }
 
 /** Render a line-oriented verbose body verbatim (graph's catalog/findings dump). */

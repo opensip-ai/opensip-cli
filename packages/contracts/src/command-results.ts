@@ -157,20 +157,16 @@ export interface FitDoneResult {
  */
 export interface GraphDoneResult {
   type: 'graph-done';
-  /** Verbose body (catalog/findings/entry-points), one line per string; empty unless `--verbose`. */
-  readonly reportLines: readonly string[];
   /** Fast-tier approximation caveat, or `undefined` for an exact catalog. */
   readonly resolutionBanner?: string;
   /** Counts for the shared one-line PASS/FAIL summary. */
   readonly summary: { readonly passed: number; readonly failed: number; readonly errors: number; readonly warnings: number };
   readonly durationMs: number;
-  /** Next-step hint strip (hints may bold substrings); empty to suppress (verbose mode). */
-  readonly footerHints: readonly { readonly text: string; readonly bold?: readonly string[] }[];
   /**
-   * Verbose detail body (ADR-0021). Graph populates the `lines` kind. Carried
-   * here so graph's verbose body renders through the same shared seam as the
-   * other tools; `reportLines`/`footerHints` above are retired in Phase 2 once
-   * the seam consumes this field.
+   * Verbose detail body (ADR-0021). Graph populates the `lines` kind (its
+   * catalog / findings-by-rule / entry-point dump). Rendered by the shared
+   * `resultToView` seam; the non-verbose footer hints are emitted by the seam
+   * too (the old per-result `reportLines`/`footerHints` were retired here).
    */
   readonly verboseDetail?: VerboseDetail;
 }

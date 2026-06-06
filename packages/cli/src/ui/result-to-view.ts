@@ -16,7 +16,7 @@
  * only forbids the reverse — cli-ui must never import contracts.
  */
 
-import { line, group, viewRunSummary, viewFooterHints, viewVerboseLines, viewFindingsGroups, formatValidatedColumn, parseValidatedCount, sortFitRowPriority, type Span, type Tone, type ViewNode } from '@opensip-tools/cli-ui';
+import { line, group, viewRunSummary, viewFooterHints, viewVerboseLines, viewFindingsGroups, VERBOSE_DETAIL_HINT, formatValidatedColumn, parseValidatedCount, sortFitRowPriority, type Span, type Tone, type ViewNode } from '@opensip-tools/cli-ui';
 import { formatSignalTableRows, formatSignalTableSummary, type SignalTableRow } from '@opensip-tools/output';
 
 import { viewInit } from './views/init-view.js';
@@ -57,16 +57,22 @@ function errorView(result: ErrorResult): ViewNode {
  */
 function graphDoneView(result: GraphDoneResult): ViewNode {
   const children: ViewNode[] = [];
-  if (result.reportLines.length > 0) {
-    for (const l of result.reportLines) children.push(line([{ text: l }]));
-    children.push(SPACER);
+  if (result.verboseDetail !== undefined) {
+    children.push(renderVerboseDetail(result.verboseDetail), SPACER);
   }
   if (result.resolutionBanner !== undefined) {
     children.push(line([{ text: result.resolutionBanner, tone: 'muted' }]));
   }
   children.push(viewRunSummary({ ...result.summary, durationMs: result.durationMs }));
-  if (result.footerHints.length > 0) {
-    children.push(viewFooterHints(result.footerHints));
+  // Non-verbose run: show the shared "Use --verbose…" hint plus graph's
+  // dashboard hint (ADR-0021 — one source for the verbose-hint string).
+  if (result.verboseDetail === undefined) {
+    children.push(
+      viewFooterHints([
+        VERBOSE_DETAIL_HINT,
+        { text: 'opensip-tools dashboard for HTML report', bold: ['opensip-tools dashboard'] },
+      ]),
+    );
   }
   return group(children);
 }

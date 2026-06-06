@@ -44,6 +44,7 @@ export {
   viewVerboseLines,
   viewFindingsGroups,
   viewVerboseHint,
+  VERBOSE_DETAIL_HINT,
   type FindingLineView,
   type FindingGroupView,
 } from './verbose-detail.js';

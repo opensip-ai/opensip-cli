@@ -179,14 +179,15 @@ describe('executeGraph — render dispatch', () => {
       expect(setExitCode).toHaveBeenCalledWith(0);
       const done = render.mock.calls[0]?.[0] as GraphDoneResult;
       expect(done.type).toBe('graph-done');
-      expect(done.reportLines.join('\n')).toContain('== Catalog ==');
+      const body = done.verboseDetail?.kind === 'lines' ? done.verboseDetail.lines.join('\n') : '';
+      expect(body).toContain('== Catalog ==');
       expect(typeof done.summary.passed).toBe('number');
     } finally {
       datastore.close();
     }
   });
 
-  it('produces a default (non-verbose) graph-done result with footer hints and no body', async () => {
+  it('produces a default (non-verbose) graph-done result with no verbose body', async () => {
     currentAdapterRegistry().register(populatedAdapter());
     const datastore = DataStoreFactory.open({ backend: 'memory' });
     try {
@@ -195,8 +196,9 @@ describe('executeGraph — render dispatch', () => {
       expect(setExitCode).toHaveBeenCalledWith(0);
       const done = render.mock.calls[0]?.[0] as GraphDoneResult;
       expect(done.type).toBe('graph-done');
-      expect(done.footerHints.some((h) => h.text.includes('Use --verbose for detailed results'))).toBe(true);
-      expect(done.reportLines).toEqual([]);
+      // The "Use --verbose…" footer is now emitted by the shared resultToView
+      // seam (ADR-0021), not carried on the result.
+      expect(done.verboseDetail).toBeUndefined();
     } finally {
       datastore.close();
     }

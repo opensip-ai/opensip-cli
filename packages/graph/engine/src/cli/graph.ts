@@ -65,7 +65,7 @@ import type { Shard } from './orchestrate/shard-model.js';
 import type { RunGraphResult } from './orchestrate.js';
 import type { GraphProfileRunRecorder } from './profile.js';
 import type { Catalog, FeatureColumn, GraphConfig, Rule } from '../types.js';
-import type { GraphDoneResult, SignalEnvelope } from '@opensip-tools/contracts';
+import type { GraphDoneResult, SignalEnvelope, VerboseDetail } from '@opensip-tools/contracts';
 import type { Signal, ToolCliContext } from '@opensip-tools/core';
 import type { DataStore } from '@opensip-tools/datastore';
 
@@ -520,17 +520,6 @@ export async function dispatchGraphResult(
 }
 
 /**
- * Next-step hint strip for the default (non-verbose) graph report. Kept
- * identical to the Ink live view's `RunFooterHints` (graph-runner.tsx) so
- * the report reads the same whether it came from the live view or this
- * non-interactive path.
- */
-const GRAPH_FOOTER_HINTS: readonly { readonly text: string; readonly bold?: readonly string[] }[] = [
-  { text: 'Use --verbose for detailed results', bold: ['--verbose'] },
-  { text: 'opensip-tools dashboard for HTML report', bold: ['opensip-tools dashboard'] },
-];
-
-/**
  * Render the run and return its {@link SignalEnvelope} (ADR-0011).
  *
  * `--json` emits the envelope through the shared `formatSignalJson`
@@ -560,22 +549,29 @@ async function renderGraphResult(
   }
   logger.info({ evt: 'graph.render.table.start', module: MODULE_GRAPH_RENDER });
   const verbose = opts.verbose === true;
-  const reportLines = verbose
-    ? buildUnifiedReportLines(
-        {
-          catalog: result.catalog,
-          indexes: result.indexes,
-          signals: result.signals,
-          cacheHit: result.cacheHit,
-        },
-        { includeSummary: false },
-      )
-    : [];
+  // ADR-0021: graph's verbose body is carried as VerboseDetail{kind:'lines'} and
+  // rendered through the shared resultToView seam — the same path the live runner
+  // uses — instead of a graph-only `reportLines`/`footerHints` shape. The
+  // non-verbose footer hints are emitted by the seam (`graphDoneView`).
+  const verboseDetail: VerboseDetail | undefined = verbose
+    ? {
+        kind: 'lines',
+        lines: buildUnifiedReportLines(
+          {
+            catalog: result.catalog,
+            indexes: result.indexes,
+            signals: result.signals,
+            cacheHit: result.cacheHit,
+          },
+          { includeSummary: false },
+        ),
+      }
+    : undefined;
   const resolutionBanner = resolutionBannerText(result.catalog?.resolutionMode);
   const { summary } = envelope.verdict;
   const done: GraphDoneResult = {
     type: 'graph-done',
-    reportLines,
+    ...(verboseDetail === undefined ? {} : { verboseDetail }),
     ...(resolutionBanner === undefined ? {} : { resolutionBanner }),
     summary: {
       passed: summary.passed,
@@ -584,7 +580,6 @@ async function renderGraphResult(
       warnings: summary.warnings,
     },
     durationMs,
-    footerHints: verbose ? [] : GRAPH_FOOTER_HINTS,
   };
   await cli.render(done);
   logger.info({ evt: 'graph.render.table.complete', module: MODULE_GRAPH_RENDER });

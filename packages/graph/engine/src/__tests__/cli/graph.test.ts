@@ -238,7 +238,7 @@ describe('executeGraph — human / JSON modes', () => {
     datastore.close();
   });
 
-  it('produces a graph-done result with summary + footer hint on the default (non-verbose) path', async () => {
+  it('produces a graph-done result with summary and no verbose body on the default (non-verbose) path', async () => {
     const { cli, setExitCode, render } = mockCli(datastore);
     await executeGraph({ cwd: projectDir, noCache: true }, cli);
     expect(setExitCode).toHaveBeenCalledWith(0);
@@ -247,27 +247,27 @@ describe('executeGraph — human / JSON modes', () => {
     // covered there. Here we assert the result graph produced.
     const done = render.mock.calls[0]?.[0] as GraphDoneResult;
     expect(done.type).toBe('graph-done');
-    // Default surface: summary counts + footer hint, no verbose body.
+    // Default surface: summary counts, no verbose body. The "Use --verbose…"
+    // footer hint is now emitted by the shared resultToView seam (ADR-0021),
+    // not carried on the result — asserted in the cli result-to-view tests.
     expect(typeof done.summary.passed).toBe('number');
     expect(typeof done.durationMs).toBe('number');
-    expect(done.footerHints.some((h) => h.text.includes('Use --verbose for detailed results'))).toBe(true);
-    expect(done.reportLines).toEqual([]);
+    expect(done.verboseDetail).toBeUndefined();
   });
 
-  it('produces a verbose graph-done result with the report body and no footer hints', async () => {
+  it('produces a verbose graph-done result carrying the report body as VerboseDetail', async () => {
     const { cli, setExitCode, render } = mockCli(datastore);
     await executeGraph({ cwd: projectDir, noCache: true, verbose: true }, cli);
     expect(setExitCode).toHaveBeenCalledWith(0);
     const done = render.mock.calls[0]?.[0] as GraphDoneResult;
     expect(done.type).toBe('graph-done');
-    const body = done.reportLines.join('\n');
+    expect(done.verboseDetail?.kind).toBe('lines');
+    const body = done.verboseDetail?.kind === 'lines' ? done.verboseDetail.lines.join('\n') : '';
     expect(body).toContain('== Catalog ==');
     expect(body).toContain('== Findings');
     // The trailing "== Summary ==" block is suppressed (includeSummary:
     // false) — the shared summary line is rendered from done.summary.
     expect(body).not.toContain('== Summary ==');
-    // Footer hints suppressed in verbose mode, mirroring fit.
-    expect(done.footerHints).toEqual([]);
   });
 
   it('emits the signal envelope when --json is set', async () => {
